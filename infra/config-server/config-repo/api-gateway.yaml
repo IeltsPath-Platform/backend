@@ -1,0 +1,43 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: false
+              lower-case-service-id: true
+          routes:
+            - id: user-service
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/auth/**,/api/users/**
+
+app:
+  auth:
+    external-jwt-issuer: ${EXTERNAL_JWT_ISSUER:urn:code-base:auth}
+    external-jwt-secret: ${EXTERNAL_JWT_SECRET}
+    internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
+    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
+    internal-token-max-age-seconds: ${INTERNAL_TOKEN_MAX_AGE_SECONDS:60}
+    internal-jwt-paths:
+      - /api/users
+      - /auth/me
+    frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
+
+gateway:
+  security:
+    public-endpoints:
+      - /auth/login
+      - /auth/refresh
+      - /auth/logout
+      - /api/users/register
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,refresh

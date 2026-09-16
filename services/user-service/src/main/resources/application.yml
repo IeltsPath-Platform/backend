@@ -1,0 +1,8 @@
+server:
+  port: ${SERVER_PORT:8085}
+
+spring:
+  application:
+    name: user-service
+  config:
+    import: optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}

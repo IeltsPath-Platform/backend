@@ -1,0 +1,4 @@
+# Keep Graphify's local runtime and generated artifacts out of the source graph.
+.graphify-tools/
+graphify-out/
+*.md
