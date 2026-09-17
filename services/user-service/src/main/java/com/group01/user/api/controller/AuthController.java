@@ -1,5 +1,6 @@
 package com.group01.user.api.controller;
 
+import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import com.group01.user.api.dto.request.LoginRequest;
 import com.group01.user.api.dto.request.LogoutRequest;
 import com.group01.user.api.dto.request.RefreshRequest;
@@ -14,8 +15,6 @@ import com.group01.user.application.usecase.RefreshTokenUseCase;
 import com.group01.user.domain.aggregate.User;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/auth")
@@ -33,6 +31,7 @@ public class AuthController {
     private final RefreshTokenUseCase refreshTokenUseCase;
     private final LogoutUseCase logoutUseCase;
     private final GetUserByIdUseCase getUserByIdUseCase;
+    private final CurrentUserProvider currentUserProvider;
 
     @PostMapping("/login")
     public AuthTokenResponse login(@Valid @RequestBody LoginRequest request) {
@@ -51,9 +50,8 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public CurrentUserResponse me(@AuthenticationPrincipal Jwt jwt) {
-        UUID userId = UUID.fromString(jwt.getSubject());
-        User user = getUserByIdUseCase.execute(userId);
+    public CurrentUserResponse me() {
+        User user = getUserByIdUseCase.execute(currentUserProvider.requireUserId());
         return new CurrentUserResponse(
                 user.getId().toString(),
                 user.getId(),

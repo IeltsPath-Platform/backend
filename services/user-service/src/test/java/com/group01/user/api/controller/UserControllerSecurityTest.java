@@ -13,16 +13,15 @@ import com.group01.user.application.usecase.GetMyProfileUseCase;
 import com.group01.user.application.usecase.GetUserByIdUseCase;
 import com.group01.user.application.usecase.RegisterUseCase;
 import com.group01.user.application.usecase.UpdateUserUseCase;
-import com.group01.user.config.SecurityConfig;
+import com.group01.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.group01.user.domain.aggregate.User;
 import com.group01.user.domain.vo.Email;
 import com.group01.user.domain.vo.UserStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -41,14 +40,18 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
-@Import(SecurityConfig.class)
+@ImportAutoConfiguration(CommonSecurityAutoConfiguration.class)
 @TestPropertySource(properties = {
         "app.auth.external-jwt-issuer=urn:code-base:auth",
         "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
+        "app.security.public-endpoints[0].method=POST",
+        "app.security.public-endpoints[0].patterns[0]=/api/users/register",
         "spring.cloud.config.enabled=false"
 })
 class UserControllerSecurityTest {
@@ -111,6 +114,20 @@ class UserControllerSecurityTest {
     }
 
     @Test
+    void getMeUsesCurrentUserFromInternalToken() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(getMyProfileUseCase.execute(userId)).thenReturn(user(userId));
+
+        mockMvc.perform(get("/api/users/me")
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + signedToken(INTERNAL_SECRET, userId,
+                                        INTERNAL_ISSUER, List.of("LEARNER"))))
+                .andExpect(status().isOk());
+
+        verify(getMyProfileUseCase).execute(userId);
+    }
+
+    @Test
     void internalTokenWithWrongIssuerIsRejected() throws Exception {
         UUID subject = UUID.randomUUID();
 
@@ -139,16 +156,51 @@ class UserControllerSecurityTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void internalTokenWithNonUuidSubjectIsRejected() throws Exception {
+        mockMvc.perform(get("/api/users")
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + signedToken(INTERNAL_SECRET, "not-a-uuid",
+                                        INTERNAL_ISSUER, List.of("ADMIN"))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void internalTokenWithUnsupportedRoleIsRejected() throws Exception {
+        mockMvc.perform(get("/api/users")
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + signedToken(INTERNAL_SECRET, UUID.randomUUID().toString(),
+                                        INTERNAL_ISSUER, List.of("SUPER_ADMIN"))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void configuredPublicRegisterEndpointDoesNotRequireBearerToken() throws Exception {
+        mockMvc.perform(post("/api/users/register")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
     private String signedToken(
             String secret,
             UUID subject,
             String issuer,
             List<String> roles
     ) {
+        return signedToken(secret, subject.toString(), issuer, roles);
+    }
+
+    private String signedToken(
+            String secret,
+            String subject,
+            String issuer,
+            List<String> roles
+    ) {
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuer)
-                .subject(subject.toString())
+                .subject(subject)
                 .expiresAt(now.plusSeconds(300))
                 .claim("roles", roles)
                 .build();

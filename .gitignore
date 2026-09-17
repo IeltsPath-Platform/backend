@@ -51,4 +51,9 @@ payload.json
 .graphify-tools/
 graphify-out/
 .claude/
+claude/
 .plan/
+.plans/
+.agents/
+agents/
+plans/

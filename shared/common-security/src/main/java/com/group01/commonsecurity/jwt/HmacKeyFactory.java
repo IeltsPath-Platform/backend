@@ -1,16 +1,16 @@
-package com.group01.user.config;
+package com.group01.commonsecurity.jwt;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Base64;
 
-final class HmacKeyFactory {
+public final class HmacKeyFactory {
     private static final int MIN_SECRET_BYTES = 32;
 
     private HmacKeyFactory() {
     }
 
-    static SecretKey secretKey(String value, String property) {
+    public static SecretKey secretKey(String value, String property) {
         byte[] key = decode(value, property);
         if (key.length < MIN_SECRET_BYTES) {
             throw new IllegalArgumentException(property + " must be at least 32 bytes for HS256");

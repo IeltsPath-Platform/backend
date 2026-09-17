@@ -9,16 +9,12 @@ import org.springframework.validation.annotation.Validated;
 public record AuthTokenProperties(
         @NotBlank String externalJwtIssuer,
         @NotBlank String externalJwtSecret,
-        @NotBlank String internalJwtIssuer,
-        @NotBlank String internalJwtSecret,
         long accessTokenMaxAgeSeconds,
         long refreshTokenMaxAgeSeconds
 ) {
     public AuthTokenProperties {
         requireConfigured(externalJwtIssuer, "app.auth.external-jwt-issuer");
         requireConfigured(externalJwtSecret, "app.auth.external-jwt-secret");
-        requireConfigured(internalJwtIssuer, "app.auth.internal-jwt-issuer");
-        requireConfigured(internalJwtSecret, "app.auth.internal-jwt-secret");
         if (accessTokenMaxAgeSeconds <= 0) {
             accessTokenMaxAgeSeconds = 3600;
         }

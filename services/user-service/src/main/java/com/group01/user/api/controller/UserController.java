@@ -1,5 +1,6 @@
 package com.group01.user.api.controller;
 
+import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import com.group01.user.api.dto.request.AssignRoleRequest;
 import com.group01.user.api.dto.request.ChangeUserStatusRequest;
 import com.group01.user.api.dto.request.CreateUserRequest;
@@ -27,8 +28,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -57,6 +56,7 @@ public class UserController {
     private final AssignRoleUseCase assignRoleUseCase;
     private final ChangeUserStatusUseCase changeUserStatusUseCase;
     private final DeleteUserUseCase deleteUserUseCase;
+    private final CurrentUserProvider currentUserProvider;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
@@ -90,8 +90,8 @@ public class UserController {
     }
 
     @GetMapping("/me")
-    public UserResponse getMe(@AuthenticationPrincipal Jwt jwt) {
-        return toResponse(getMyProfileUseCase.execute(UUID.fromString(jwt.getSubject())));
+    public UserResponse getMe() {
+        return toResponse(getMyProfileUseCase.execute(currentUserProvider.requireUserId()));
     }
 
     @GetMapping
@@ -102,10 +102,9 @@ public class UserController {
 
     @PutMapping("/me")
     public UserResponse updateMe(
-            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody UpdateUserRequest request
     ) {
-        UUID userId = UUID.fromString(jwt.getSubject());
+        UUID userId = currentUserProvider.requireUserId();
         return toResponse(updateUserUseCase.execute(new UpdateUserCommand(
                 userId,
                 request.fullName(),

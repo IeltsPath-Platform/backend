@@ -19,13 +19,14 @@ Thư mục `services/` chứa các microservice xử lý nghiệp vụ của h�
 Ví dụ lấy user hiện tại trong controller:
 
 ```java
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
+import com.group01.commonsecurity.currentuser.CurrentUserProvider;
+
+private final CurrentUserProvider currentUserProvider;
 
 @GetMapping("/me")
-public UserResponse me(@AuthenticationPrincipal Jwt jwt) {
-    UUID userId = UUID.fromString(jwt.getSubject());
-    // roles nằm trong claim "roles" và đã được SecurityConfig validate.
+public UserResponse me() {
+    UUID userId = currentUserProvider.requireUserId();
+    // roles nằm trong claim "roles" và đã được common-security validate.
 }
 ```
 
@@ -60,10 +61,24 @@ Khi thêm service mới trong `services/`, nên làm các bước tối thiểu 
 1. Tạo thư mục mới, ví dụ `services/appointment-service`.
 2. Khai báo module mới trong root `pom.xml`.
 3. Thêm Eureka Client để service đăng ký lên Eureka.
-4. Nếu có protected API, thêm Spring Security OAuth2 Resource Server để verify internal JWT.
+4. Nếu có protected API, thêm dependency `common-security`; module này auto-config Spring Security OAuth2 Resource Server để verify internal JWT.
 5. Thêm file cấu hình tương ứng trong `infra/config-server/config-repo`.
 6. Thêm route mới ở `infra/config-server/config-repo/api-gateway.yaml`.
 7. Viết `README.md` riêng cho service đó.
+
+Service có endpoint public thì khai báo qua config, không copy `SecurityConfig`:
+
+```yaml
+app:
+  security:
+    public-endpoints:
+      - method: POST
+        patterns:
+          - /api/example/register
+```
+
+Service cần lấy user hiện tại thì inject `CurrentUserProvider` từ `common-security`
+và gọi `requireUserId()` hoặc `requireCurrentUser()`.
 
 ## Chạy local
 

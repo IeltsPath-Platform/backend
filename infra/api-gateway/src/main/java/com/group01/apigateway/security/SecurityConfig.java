@@ -3,6 +3,9 @@ package com.group01.apigateway.security;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.group01.apigateway.error.GatewayErrorResponse;
+import com.group01.commonsecurity.jwt.InternalJwtAuthorities;
+import com.group01.commonsecurity.jwt.InternalJwtClaims;
+import com.group01.commonsecurity.role.CanonicalRoles;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.OctetSequenceKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -19,7 +22,6 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
@@ -42,15 +44,12 @@ import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
 @Configuration
 @EnableConfigurationProperties({PublicEndpointProperties.class, AuthProperties.class})
 public class SecurityConfig {
-
-    private static final Set<String> CANONICAL_ROLES = Set.of("ADMIN", "LEARNER");
 
     private static final List<HttpMethod> CORS_METHODS = List.of(
             HttpMethod.GET,
@@ -166,19 +165,15 @@ public class SecurityConfig {
     }
 
     private Collection<GrantedAuthority> extractAuthorities(Jwt jwt) {
-        // Spring Security can prefix ROLE_ de dung voi hasRole/role-based access.
-        return claimRoles(jwt).stream()
-                .map(role -> "ROLE_" + role)
-                .map(SimpleGrantedAuthority::new)
-                .map(GrantedAuthority.class::cast)
-                .toList();
+        // Delegate sang InternalJwtAuthorities trong common-security.
+        return InternalJwtAuthorities.extractAuthorities(jwt);
     }
 
     private OAuth2TokenValidator<Jwt> canonicalRolesValidator() {
-        // Tu choi token khong co role hoac role khong nam trong danh sach hop le.
+        // Tu choi token khong co role hoac role khong nam trong CanonicalRoles.ALL.
         return jwt -> {
-            Set<String> roles = claimRoles(jwt);
-            return !roles.isEmpty() && CANONICAL_ROLES.containsAll(roles)
+            Set<String> roles = InternalJwtAuthorities.claimRoles(jwt);
+            return !roles.isEmpty() && CanonicalRoles.ALL.containsAll(roles)
                     ? OAuth2TokenValidatorResult.success()
                     : OAuth2TokenValidatorResult.failure(new OAuth2Error(
                     "invalid_token", "The token contains an unsupported role", null));
@@ -201,24 +196,6 @@ public class SecurityConfig {
                         "invalid_token", "The subject must be a UUID", null));
             }
         };
-    }
-
-    private Set<String> claimRoles(Jwt jwt) {
-        // Lay roles tu claim "roles"; chap nhan ca array va string don.
-        Set<String> roles = new LinkedHashSet<>();
-        addRoles(roles, jwt.getClaim("roles"));
-        return roles;
-    }
-
-    private void addRoles(Set<String> roles, Object value) {
-        // Normalize roles ve String de validator va converter xu ly chung mot cach.
-        if (value instanceof List<?> list) {
-            list.stream().map(String::valueOf).forEach(roles::add);
-            return;
-        }
-        if (value instanceof String role && !role.isBlank()) {
-            roles.add(role);
-        }
     }
 
     private Mono<Void> writeError(

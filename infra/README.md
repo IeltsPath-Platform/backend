@@ -54,7 +54,7 @@ EXTERNAL_JWT_SECRET
 GATEWAY_INTERNAL_JWT_SECRET
 ```
 
-Hai secret này là base64 của tối thiểu 32 bytes random. `EXTERNAL_JWT_SECRET` dùng cho token phát cho client; `GATEWAY_INTERNAL_JWT_SECRET` dùng cho token nội bộ giữa gateway và downstream service.
+Hai secret này là base64 của tối thiểu 32 bytes random. `EXTERNAL_JWT_SECRET` dùng cho token phát cho client; `GATEWAY_INTERNAL_JWT_SECRET` dùng cho token nội bộ giữa gateway và downstream service. Downstream service dùng `common-security` để verify internal JWT này, không copy/paste `SecurityConfig` riêng.
 
 ## Chạy local
 
