@@ -6,17 +6,3 @@ spring:
     name: eureka-server
   config:
     import: optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}
-
-eureka:
-  client:
-    register-with-eureka: false
-    fetch-registry: false
-
-  instance:
-    hostname: localhost
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info

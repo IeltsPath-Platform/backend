@@ -111,24 +111,126 @@ Dịch vụ **API Gateway** (`infra/api-gateway`) được xây dựng 100% dự
 - **Maven**: Version 3.9+.
 - **Docker & Docker Desktop**: Để chạy ứng dụng hạ tầng và Cơ sở dữ liệu.
 
-### 2. Biên Dịch Dự Án (Build Codebase)
+### 2. Cài Graphify Cho Người Lần Đầu
+Graphify giúp tạo knowledge graph từ source code để đọc kiến trúc, quan hệ file,
+class, dependency và luồng gọi nhanh hơn. Package trên PyPI tên là `graphifyy`
+nhưng command sau khi cài là `graphify`.
+
+Kiểm tra máy đã có `uv` chưa:
+
+```powershell
+uv --version
+```
+
+Nếu chưa có `uv`, cài bằng PowerShell:
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Sau khi cài, đóng terminal rồi mở lại. Nếu command vẫn chưa nhận, chạy:
+
+```powershell
+uv tool update-shell
+```
+
+Cài Graphify bằng `uv`:
+
+```powershell
+uv tool install graphifyy
+graphify --version
+```
+
+Đăng ký Graphify skill cho project hiện tại:
+
+```powershell
+graphify install --project
+```
+
+Tạo graph cho repo:
+
+```powershell
+graphify .
+```
+
+Kết quả sẽ nằm trong `graphify-out/`, gồm graph JSON, báo cáo và trang HTML
+tương tác. Repo đã có `.graphifyignore` để bỏ qua artifact Graphify và markdown
+khi build graph.
+
+### 3. Biên Dịch Dự Án (Build Codebase)
 Mở terminal tại thư mục gốc của dự án và chạy:
 ```bash
 mvn clean compile -DskipTests
 ```
 *(Nếu hiển thị `BUILD SUCCESS` là toàn bộ cấu trúc dự án và các module con đã hợp lệ).*
 
-### 3. Khởi Chạy Hạ Tầng Với Docker
-Chạy lệnh sau để khởi tạo Database PostgreSQL và các service hạ tầng:
-```bash
-docker-compose up -d
+### 4. Khởi Chạy Hạ Tầng Với Docker
+Trước khi chạy, đảm bảo Docker Desktop đang bật và file `.env` ở root có đủ
+các biến bắt buộc:
+
+```env
+POSTGRES_PASSWORD=123456
+EXTERNAL_JWT_SECRET=<base64-32-bytes>
+GATEWAY_INTERNAL_JWT_SECRET=<base64-32-bytes>
 ```
 
-Trạng thái các Port hạ tầng sau khi chạy:
+Tạo nhanh HMAC secret bằng PowerShell nếu cần:
+
+```powershell
+$bytes = New-Object byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+[Convert]::ToBase64String($bytes)
+```
+
+Build và chạy toàn bộ hệ thống:
+
+```bash
+docker compose up -d --build
+```
+
+Docker Compose builds regular Spring Boot services with `Dockerfile.spring-service`
+and passes each Maven module path through `MODULE_PATH`. `config-server` keeps a
+dedicated Dockerfile because it packages `config-repo` into the image.
+
+Kiểm tra trạng thái container:
+
+```bash
+docker compose ps
+```
+
+Xem log khi cần debug:
+
+```bash
+docker compose logs -f config-server
+docker compose logs -f eureka-server
+docker compose logs -f api-gateway
+docker compose logs -f user-service
+```
+
+Các URL/port sau khi chạy:
+
 - **API Gateway**: `http://localhost:8080`
 - **Eureka Server Dashboard**: `http://localhost:8761`
 - **Config Server**: `http://localhost:8888`
-- **PostgreSQL Database**: `localhost:5432` (User: `postgres`, Password: `postgres_password`, DB: `app_db`)
+- **User PostgreSQL Database**: `localhost:5432` (User: `postgres`, Password: lấy từ `POSTGRES_PASSWORD`, DB: `user_db`)
+
+Dừng container nhưng giữ dữ liệu database:
+
+```bash
+docker compose down
+```
+
+Dừng và xóa cả volume database local:
+
+```bash
+docker compose down -v
+```
+
+Khi sửa `Dockerfile`, `docker-compose.yml`, hoặc `config-repo`, chạy lại:
+
+```bash
+docker compose up -d --build --force-recreate
+```
 
 Docker Compose yêu cầu hai HMAC secret riêng qua environment:
 
@@ -138,7 +240,7 @@ Docker Compose yêu cầu hai HMAC secret riêng qua environment:
 Secret phải là base64 của tối thiểu 32 bytes random. Không dùng lại một
 `JWT_SECRET` chung cho cả external và internal token, và không commit secret vào Git.
 
-### 4. User Service: vai trò và cơ sở dữ liệu
+### 5. User Service: vai trò và cơ sở dữ liệu
 
 `user-service` hiện chỉ hỗ trợ hai vai trò: `LEARNER` và `ADMIN`. Đăng ký công khai tại `/api/users/register` luôn tạo người dùng với vai trò `LEARNER`; các vai trò khác bị từ chối. Gateway và user service chỉ chấp nhận JWT có các vai trò chuẩn hóa này.
 
@@ -203,11 +305,6 @@ server:
 spring:
   application:
     name: order-service # Tên service đăng ký với Gateway & Eureka
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
 
 app:
   auth:

@@ -72,6 +72,10 @@ Hoặc chạy toàn bộ bằng Docker Compose từ thư mục gốc:
 docker compose up -d
 ```
 
+Compose uses the root `Dockerfile.spring-service` for regular Spring Boot
+services. `config-server` keeps its own Dockerfile because it includes
+`config-repo`.
+
 ## Tài liệu chi tiết
 
 - [API Gateway](api-gateway/README.md)

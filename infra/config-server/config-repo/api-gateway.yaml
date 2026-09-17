@@ -6,22 +6,54 @@ spring:
     gateway:
       server:
         webflux:
-          discovery:
-            locator:
-              enabled: false
-              lower-case-service-id: true
           routes:
             - id: user-service
+              # Đích mà Gateway sẽ forward request tới.
+              #
+              # "lb://" = Load Balancer.
+              # Gateway KHÔNG gọi một host/port cố định như:
+              # http://localhost:8081
+              #
+              # Thay vào đó Gateway sẽ tìm service có tên USER-SERVICE
+              # thông qua Service Discovery, ví dụ Eureka.
+              #
+              # Nếu Eureka đang có:
+              #
+              # USER-SERVICE
+              # ├── 10.0.0.11:8081
+              # ├── 10.0.0.12:8081
+              # └── 10.0.0.13:8081
+              #
+              # thì Spring Cloud LoadBalancer sẽ chọn một instance phù hợp
+              # rồi Gateway forward request tới instance đó.
+              #
+              # USER-SERVICE phải khớp với service id mà user-service
+              # đăng ký lên Eureka, thường đến từ:
+              #
+              # spring:
+              #   application:
+              #     name: user-service
+              #
+              # Eureka thường hiển thị service id ở dạng USER-SERVICE.
               uri: lb://USER-SERVICE
+
               predicates:
+                # Chỉ những request có path match một trong các pattern này
+                # mới sử dụng route "user-service".
+                #
+                # Ví dụ:
+                # POST /auth/login
+                # GET  /api/users/me
+                #
+                # đều sẽ được route tới USER-SERVICE.
                 - Path=/auth/**,/api/users/**
 
 app:
   auth:
     external-jwt-issuer: ${EXTERNAL_JWT_ISSUER:urn:code-base:auth}
-    external-jwt-secret: ${EXTERNAL_JWT_SECRET}
+    external-jwt-secret: ${EXTERNAL_JWT_SECRET:FaU24nQz6jxA6m3ihV49zlGXoncSfkNMgYpgC7XPKXc=}
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
-    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
+    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}
     internal-token-max-age-seconds: ${INTERNAL_TOKEN_MAX_AGE_SECONDS:60}
     internal-jwt-paths:
       - /api/users

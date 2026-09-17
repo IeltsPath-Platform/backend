@@ -1,15 +1,28 @@
 server:
+  # Port chạy Eureka Server.
+  # Ưu tiên biến môi trường SERVER_PORT.
+  # Nếu không có thì mặc định là 8761.
   port: ${SERVER_PORT:8761}
 
 eureka:
   client:
+    # Không đăng ký chính Eureka Server vào registry của nó.
     register-with-eureka: false
+
+    # Không fetch registry từ Eureka Server khác.
     fetch-registry: false
+
   server:
+    # Tắt self-preservation để local/dev dễ thấy instance chết bị loại nhanh.
+    # Production thường nên cân nhắc bật lại.
     enable-self-preservation: false
 
 management:
   endpoints:
     web:
       exposure:
+        # Các Actuator endpoint được phép truy cập qua HTTP.
+        # health  : trạng thái service.
+        # info    : thông tin application.
+        # refresh : refresh config runtime nếu dùng Spring Cloud Config.
         include: health,info,refresh

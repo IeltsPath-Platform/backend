@@ -1,0 +1,26 @@
+FROM maven:3.9-eclipse-temurin-21 AS builder
+ARG MODULE_PATH
+WORKDIR /app
+
+COPY . .
+
+RUN set -eux; \
+    test -n "${MODULE_PATH}"; \
+    for attempt in 1 2 3 4 5; do \
+      mvn -B -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.pool=false dependency:go-offline -pl "${MODULE_PATH}" -am && break; \
+      find /root/.m2/repository -name "*.lastUpdated" -delete || true; \
+      rm -rf /root/.m2/repository/com/github/luben/zstd-jni; \
+      if [ "${attempt}" -eq 5 ]; then exit 1; fi; \
+      sleep $((attempt * 5)); \
+    done
+
+RUN set -eux; \
+    mvn -B clean package -pl "${MODULE_PATH}" -am -DskipTests; \
+    cp "${MODULE_PATH}"/target/*.jar /tmp/app.jar
+
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+COPY --from=builder /tmp/app.jar ./app.jar
+
+ENTRYPOINT ["java", "-jar", "app.jar"]

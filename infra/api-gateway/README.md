@@ -108,4 +108,5 @@ java -jar target/api-gateway-1.0-SNAPSHOT.jar
 
 ## 🐳 Docker (Tùy chọn)
 
-Nếu dự án có cung cấp `Dockerfile`, bạn có thể đóng gói ứng dụng này bằng Docker để chạy chung mạng (network) với các service khác. Hãy đảm bảo container của Gateway có thể kết nối được tới mạng của Config Server và Eureka Server.
+API Gateway được build qua `Dockerfile.spring-service` từ `docker-compose.yml`
+với `MODULE_PATH=infra/api-gateway`.

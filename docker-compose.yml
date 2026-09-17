@@ -6,17 +6,17 @@ networks:
 # VOLUMES
 # ==========================================
 volumes:
-  app-db-data:
+  user-db-data:
 
 services:
   # ==========================================
   # 1. BASE DATABASE
   # ==========================================
-  app-db:
+  user-db:
     image: postgres:15-alpine
-    container_name: app-db
+    container_name: user-db
     environment:
-      POSTGRES_DB: app_db
+      POSTGRES_DB: user_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}"
     ports:
@@ -24,9 +24,9 @@ services:
     networks:
       - codebase-network
     volumes:
-      - app-db-data:/var/lib/postgresql/data
+      - user-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d app_db"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d user_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -56,7 +56,9 @@ services:
   eureka-server:
     build:
       context: .
-      dockerfile: infra/eureka-server/Dockerfile
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: infra/eureka-server
     container_name: eureka-server
     ports:
       - "8761:8761"
@@ -78,7 +80,9 @@ services:
   api-gateway:
     build:
       context: .
-      dockerfile: infra/api-gateway/Dockerfile
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: infra/api-gateway
     container_name: api-gateway
     ports:
       - "8080:8080"
@@ -100,13 +104,15 @@ services:
   user-service:
     build:
       context: .
-      dockerfile: services/user-service/Dockerfile
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: services/user-service
     container_name: user-service
     environment:
       - SERVER_PORT=8085
       - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
       - EUREKA_URL=http://eureka-server:8761/eureka/
-      - USER_DB_URL=jdbc:postgresql://app-db:5432/app_db
+      - USER_DB_URL=jdbc:postgresql://user-db:5432/user_db
       - USER_DB_USERNAME=postgres
       - USER_DB_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       - EXTERNAL_JWT_ISSUER=${EXTERNAL_JWT_ISSUER:-urn:code-base:auth}
@@ -116,7 +122,7 @@ services:
     networks:
       - codebase-network
     depends_on:
-      app-db:
+      user-db:
         condition: service_healthy
       config-server:
         condition: service_healthy

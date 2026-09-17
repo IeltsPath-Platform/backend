@@ -5,6 +5,7 @@ COPY pom.xml ./
 COPY infra/api-gateway/pom.xml infra/api-gateway/
 COPY infra/config-server/pom.xml infra/config-server/
 COPY infra/eureka-server/pom.xml infra/eureka-server/
+COPY services/user-service/pom.xml services/user-service/
 COPY shared/common-security/pom.xml shared/common-security/
 
 RUN set -eux; \

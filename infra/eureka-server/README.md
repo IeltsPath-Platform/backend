@@ -29,12 +29,8 @@ Config Server: http://localhost:8888
 
 Ở môi trường local, Eureka thường chạy standalone:
 
-```yaml
-eureka:
-  client:
-    register-with-eureka: false
-    fetch-registry: false
-```
+Cấu hình Eureka server nằm trong `infra/config-server/config-repo/eureka-server.yaml`
+để tránh lặp với `src/main/resources/application.yaml`.
 
 ## Chạy local
 
