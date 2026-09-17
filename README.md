@@ -169,7 +169,7 @@ Trước khi chạy, đảm bảo Docker Desktop đang bật và file `.env` ở
 các biến bắt buộc:
 
 ```env
-POSTGRES_PASSWORD=123456
+POSTGRES_PASSWORD=<set-a-local-password>
 EXTERNAL_JWT_SECRET=<base64-32-bytes>
 GATEWAY_INTERNAL_JWT_SECRET=<base64-32-bytes>
 ```
@@ -254,6 +254,48 @@ Khi thành viên trong nhóm cần phát triển một dịch vụ nghiệp vụ
 
 ### Bước 1: Tạo thư mục cho service mới
 Tạo thư mục mới trong `services/` (ví dụ: `services/order-service`).
+
+### Kiến trúc bắt buộc cho business service mới
+
+Mỗi service mới là một bounded context, có domain model và database riêng. Dùng
+hướng phụ thuộc `api -> application -> domain`; `infrastructure` chỉ triển khai
+chi tiết kỹ thuật cho các contract phía trong.
+
+```text
+src/main/java/com/group01/<service>
+|
+|-- domain
+|   |-- aggregate
+|   |-- entity
+|   |-- vo
+|   |-- event
+|   |-- exception
+|   `-- repository
+|
+|-- application
+|   |-- command
+|   |-- query
+|   |-- result
+|   |-- usecase
+|   |-- port
+|   `-- exception
+|
+|-- api
+|   |-- controller
+|   `-- dto
+|
+`-- infrastructure
+    |-- persistence
+    |-- client
+    |-- messaging
+    |-- scheduler
+    `-- config
+```
+
+- Controller chỉ map HTTP với use case; business rule và state transition nằm trong domain.
+- Tách domain aggregate khỏi JPA entity; repository interface ở layer trong, adapter/JPA ở infrastructure.
+- Gọi service ngoài, broker hoặc storage qua `application/port` và infrastructure adapter; không để HTTP/SDK DTO đi vào domain.
+- Không tạo package rỗng, không bắt buộc CQRS/domain event. Chỉ thêm khi domain/use case thực sự cần.
 
 ### Bước 2: Khai báo Module trong Root `pom.xml`
 Thêm module mới vào danh sách `<modules>` trong root [pom.xml](file:///c:/Users/Admin/OneDrive/Desktop/microservice-code-base/pom.xml):
