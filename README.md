@@ -1,6 +1,6 @@
-# 🚀 `code-base` — Microservices Starter Baseline Template
+# 🚀 IELTSPath
 
-Bộ khung (boilerplate / starter template) chuẩn hóa kiến trúc **Microservices** xây dựng trên hệ sinh thái **Java 21** và **Spring Cloud**. Khung dự án đã được tích hợp sẵn hệ thống hạ tầng lõi (Gateway, Service Discovery, Config Server) cùng module Bảo mật (Security) dùng chung, giúp team phát triển nhanh chóng khởi tạo và mở rộng các dịch vụ nghiệp vụ mới.
+IELTSPath là backend microservices xây dựng trên hệ sinh thái **Java 21** và **Spring Cloud**. Dự án tích hợp hạ tầng lõi gồm Gateway, Service Discovery, Config Server và module bảo mật dùng chung.
 
 ---
 
@@ -27,15 +27,14 @@ Bộ khung (boilerplate / starter template) chuẩn hóa kiến trúc **Microser
 Dự án được thiết kế theo mô hình **Maven Multi-module**:
 
 ```text
-code-base/
+IELTSPath/
 ├── infra/                      # Chứa các dịch vụ hạ tầng Spring Cloud
 │   ├── api-gateway/            # [Port 8080] API Gateway (WebFlux Reactive Netty), kiểm tra JWT & định tuyến
 │   ├── config-server/          # [Port 8888] Centralized Config Server
 │   └── eureka-server/          # [Port 8761] Eureka Service Discovery Registry Server
 ├── shared/                     # Chứa các module dùng chung giữa các microservices
 │   └── common-security/        # CanonicalRoles, InternalJwtClaims, InternalJwtAuthorities, InternalJwtValidators
-├── services/                   # Thư mục dành riêng để chứa các microservices nghiệp vụ mới
-│   └── user-service/           # [artifactId: user-service] Quản lý user, đăng nhập, phát hành JWT
+├── services/                   # Chứa các microservice nghiệp vụ
 ├── docker-compose.yml          # File Docker Compose khởi chạy hạ tầng (Postgres, Infrastructure)
 ├── pom.xml                     # Root POM quản lý phiên bản và danh sách module
 └── README.md                   # Tài liệu hướng dẫn dự án
@@ -54,7 +53,7 @@ sequenceDiagram
     participant Gateway as API Gateway (8080)
     participant Eureka as Eureka Server (8761)
     participant Service as Business Microservice
-    participant Auth as Auth/User Service
+    participant Auth as Authentication Service
 
     Client->>Gateway: Gửi HTTP Request + Authorization Header (Bearer JWT)
     Gateway->>Gateway: Verify external JWT (issuer/subject/role)
@@ -67,32 +66,13 @@ sequenceDiagram
     Service-->>Client: Trả về kết quả HTTP Response
 ```
 
-### 2. Cơ Chế Bảo Mật: Gateway-signed Internal JWT
+### 2. Cơ Chế Bảo Mật
 
-Hệ thống truyền identity bằng JWT đã verify, không dùng raw identity header. Trust boundary hiện tại:
-
-- **External access token** do auth/user-service phát hành cho client, tối giản còn
-  `iss=urn:code-base:auth`, `sub=<user-id>`, `exp`, `roles`.
-- **API Gateway** verify external token bằng `EXTERNAL_JWT_SECRET`, sau đó ký
-  **internal JWT** rất ngắn hạn cho downstream bằng secret nội bộ riêng.
-- **Downstream service** dùng `common-security`; service tự verify chữ ký gateway,
-  `iss=urn:code-base:api-gateway`, `sub=<user-id>`, `exp`, `roles`.
-- Gateway thay `Authorization` từ client bằng `Authorization: Bearer <internal-jwt>` trước khi forward.
-- Role hợp lệ hiện chỉ gồm `ADMIN` và `LEARNER` — định nghĩa tập trung tại `CanonicalRoles.ALL` trong `common-security`.
-
-Downstream lấy identity từ JWT đã verify:
-
-```java
-import com.group01.commonsecurity.currentuser.CurrentUserProvider;
-
-private final CurrentUserProvider currentUserProvider;
-
-@GetMapping("/me")
-public UserResponse me() {
-    UUID userId = currentUserProvider.requireUserId();
-    // roles claim đã được common-security validate và convert thành ROLE_*
-}
-```
+Client xác thực bằng access token. API Gateway kiểm tra token này trước khi định tuyến,
+sau đó thay nó bằng một internal JWT ngắn hạn để gửi đến service đích. Các downstream
+service xác thực internal JWT bằng `common-security` và chỉ dùng identity đã được xác
+thực; không tin cậy các header danh tính do client tự gửi. Secret cho external và
+internal token được tách riêng, còn role được quản lý tập trung.
 
 ### 3. Kiến Trúc Reactive (Reactive Programming Model) Tại API Gateway
 
@@ -174,37 +154,10 @@ EXTERNAL_JWT_SECRET=<base64-32-bytes>
 GATEWAY_INTERNAL_JWT_SECRET=<base64-32-bytes>
 ```
 
-Tạo nhanh HMAC secret bằng PowerShell nếu cần:
-
-```powershell
-$bytes = New-Object byte[] 32
-[Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-[Convert]::ToBase64String($bytes)
-```
-
 Build và chạy toàn bộ hệ thống:
 
 ```bash
 docker compose up -d --build
-```
-
-Docker Compose builds regular Spring Boot services with `Dockerfile.spring-service`
-and passes each Maven module path through `MODULE_PATH`. `config-server` keeps a
-dedicated Dockerfile because it packages `config-repo` into the image.
-
-Kiểm tra trạng thái container:
-
-```bash
-docker compose ps
-```
-
-Xem log khi cần debug:
-
-```bash
-docker compose logs -f config-server
-docker compose logs -f eureka-server
-docker compose logs -f api-gateway
-docker compose logs -f user-service
 ```
 
 Các URL/port sau khi chạy:
@@ -212,231 +165,15 @@ Các URL/port sau khi chạy:
 - **API Gateway**: `http://localhost:8080`
 - **Eureka Server Dashboard**: `http://localhost:8761`
 - **Config Server**: `http://localhost:8888`
-- **User PostgreSQL Database**: `localhost:5432` (User: `postgres`, Password: lấy từ `POSTGRES_PASSWORD`, DB: `user_db`)
+- **PostgreSQL Database**: `localhost:5432`
 
-Dừng container nhưng giữ dữ liệu database:
+### 5. Quản Lý Schema Bằng Flyway
 
-```bash
-docker compose down
-```
+Với service sử dụng Flyway, migration tự chạy khi service khởi động. Khi thay đổi schema:
 
-Dừng và xóa cả volume database local:
-
-```bash
-docker compose down -v
-```
-
-Khi sửa `Dockerfile`, `docker-compose.yml`, hoặc `config-repo`, chạy lại:
-
-```bash
-docker compose up -d --build --force-recreate
-```
-
-Docker Compose yêu cầu hai HMAC secret riêng qua environment:
-
-- `EXTERNAL_JWT_SECRET`: user-service ký external access token, gateway verify.
-- `GATEWAY_INTERNAL_JWT_SECRET`: gateway ký internal JWT, user-service verify.
-
-Secret phải là base64 của tối thiểu 32 bytes random. Không dùng lại một
-`JWT_SECRET` chung cho cả external và internal token, và không commit secret vào Git.
-
-### 5. User Service: vai trò và cơ sở dữ liệu
-
-`user-service` hiện chỉ hỗ trợ hai vai trò: `LEARNER` và `ADMIN`. Đăng ký công khai tại `/api/users/register` luôn tạo người dùng với vai trò `LEARNER`; các vai trò khác bị từ chối. Gateway và user service chỉ chấp nhận JWT có các vai trò chuẩn hóa này.
-
-Schema user service được khởi tạo hoàn toàn từ migration `V1__create_user_tables.sql`, bao gồm bảng `users`, `roles`, `user_roles` và `refresh_tokens`. Đây là baseline cho database mới; database đã chạy các migration user-service cũ phải được tạo lại trước khi khởi động service.
-
----
-
-## ➕ Hướng Dẫn Thêm Microservice Nghiệp Vụ Mới (Add New Microservice)
-
-Khi thành viên trong nhóm cần phát triển một dịch vụ nghiệp vụ mới (ví dụ: `product-service`, `order-service`), hãy thực hiện các bước sau:
-
-### Bước 1: Tạo thư mục cho service mới
-Tạo thư mục mới trong `services/` (ví dụ: `services/order-service`).
-
-### Kiến trúc bắt buộc cho business service mới
-
-Mỗi service mới là một bounded context, có domain model và database riêng. Dùng
-hướng phụ thuộc `api -> application -> domain`; `infrastructure` chỉ triển khai
-chi tiết kỹ thuật cho các contract phía trong.
-
-```text
-src/main/java/com/group01/<service>
-|
-|-- domain
-|   |-- aggregate
-|   |-- entity
-|   |-- vo
-|   |-- event
-|   |-- exception
-|   `-- repository
-|
-|-- application
-|   |-- command
-|   |-- query
-|   |-- result
-|   |-- usecase
-|   |-- port
-|   `-- exception
-|
-|-- api
-|   |-- controller
-|   `-- dto
-|
-`-- infrastructure
-    |-- persistence
-    |-- client
-    |-- messaging
-    |-- scheduler
-    `-- config
-```
-
-- Controller chỉ map HTTP với use case; business rule và state transition nằm trong domain.
-- Tách domain aggregate khỏi JPA entity; repository interface ở layer trong, adapter/JPA ở infrastructure.
-- Gọi service ngoài, broker hoặc storage qua `application/port` và infrastructure adapter; không để HTTP/SDK DTO đi vào domain.
-- Không tạo package rỗng, không bắt buộc CQRS/domain event. Chỉ thêm khi domain/use case thực sự cần.
-
-### Bước 2: Khai báo Module trong Root `pom.xml`
-Thêm module mới vào danh sách `<modules>` trong root [pom.xml](file:///c:/Users/Admin/OneDrive/Desktop/microservice-code-base/pom.xml):
-```xml
-<modules>
-    <module>shared/common-security</module>
-    <module>infra/api-gateway</module>
-    <module>infra/config-server</module>
-    <module>infra/eureka-server</module>
-    <module>services/user-service</module>
-    <module>services/order-service</module> <!-- Thêm service mới tại đây -->
-</modules>
-```
-
-### Bước 3: Đặt cấu hình `pom.xml` cho Service mới
-File `pom.xml` của service mới phải có parent trỏ về `code-base`, nhúng Eureka
-Client và `common-security` nếu service có protected API.
-Không dùng raw identity header làm identity; service phải verify internal JWT do gateway ký.
-```xml
-<parent>
-    <groupId>com.group01</groupId>
-    <artifactId>code-base</artifactId>
-    <version>1.0-SNAPSHOT</version>
-    <relativePath>../../pom.xml</relativePath>
-</parent>
-
-<artifactId>order-service</artifactId>
-
-<dependencies>
-    <!-- Shared downstream internal JWT verifier -->
-    <dependency>
-        <groupId>com.group01</groupId>
-        <artifactId>common-security</artifactId>
-        <version>${project.version}</version>
-    </dependency>
-    <!-- Nhúng Eureka Client để tự động đăng ký với Eureka -->
-    <dependency>
-        <groupId>org.springframework.cloud</groupId>
-        <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
-    </dependency>
-</dependencies>
-```
-
-### Bước 4: Cấu hình `application.yml` cho Service mới
-```yaml
-server:
-  port: 8081 # Chọn port phù hợp
-
-spring:
-  application:
-    name: order-service # Tên service đăng ký với Gateway & Eureka
-
-app:
-  auth:
-    internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
-    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
-  security:
-    public-endpoints: [] # Add public endpoints here when needed.
-```
-
-### Bước 5: Kích hoạt Service
-Thêm annotation `@EnableDiscoveryClient` tại class main của Spring Boot application:
-```java
-@SpringBootApplication
-@EnableDiscoveryClient
-public class OrderServiceApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(OrderServiceApplication.class, args);
-    }
-}
-```
-#### Cách dùng migration SQL trong dự án
-
-Dự án đang dùng `Flyway` để quản lý schema database. File migration nằm trong:
-
-```text
-services/user-service/src/main/resources/db/migration/
-```
-
-Mỗi file theo quy ước tên:
-
-```text
-V1__create_user_tables.sql
-V2__add_user_indexes.sql
-V3__update_refresh_token_table.sql
-```
-
-- `V` + số phiên bản + `__` + mô tả ngắn
-- Flyway sẽ thực thi theo thứ tự phiên bản tăng dần
-- Nếu một migration đã chạy rồi, nó sẽ không chạy lại nữa
-
-Ví dụ migration hiện có:
-
-```sql
--- services/user-service/src/main/resources/db/migration/V1__create_user_tables.sql
-CREATE TABLE users (...);
-CREATE TABLE roles (...);
-CREATE TABLE user_roles (...);
-CREATE TABLE refresh_tokens (...);
-```
-
-Khi ứng dụng khởi động, config trong `infra/config-server/config-repo/user-service.yaml` đã bật:
-
-```yaml
-spring:
-  flyway:
-    enabled: true
-```
-
-Nên khi chạy:
-
-```bash
-docker compose up -d --build
-```
-
-hoặc khởi động `user-service` bằng Spring Boot, Flyway sẽ tự động chạy migration tương ứng trước khi ứng dụng bắt đầu nhận request.
-
-Nếu cần chạy migration thủ công trên database local, dùng lệnh sau:
-
-```bash
-mvn -pl services/user-service flyway:migrate \
-  -Dflyway.url=jdbc:postgresql://localhost:5432/user_db \
-  -Dflyway.user=postgres \
-  -Dflyway.password=123456
-```
-
-Nếu cần reset database để test từ đầu, có thể xóa schema cũ rồi chạy lại migration:
-
-```bash
-psql -h localhost -U postgres -d user_db -c "DROP SCHEMA public CASCADE;"
-psql -h localhost -U postgres -d user_db -c "CREATE SCHEMA public;"
-```
-
-Sau đó khởi động lại service hoặc chạy lại `flyway:migrate` để schema được tạo lại từ đầu.
-
-Lưu ý quan trọng:
-- Không sửa migration cũ đã apply trên môi trường thật, vì Flyway giữ lịch sử phiên bản
-- Nếu cần thay đổi schema, hãy tạo file migration mới thay vì chỉnh file cũ
-- Với môi trường phát triển, có thể xóa database local và chạy lại migration để khởi tạo cấu trúc mới
-
----
+1. Thêm file SQL vào `services/<service-name>/src/main/resources/db/migration/`.
+2. Đặt tên theo mẫu `V<version>__<short_description>.sql`: version tăng dần, mô tả viết thường và dùng dấu gạch dưới; ví dụ `V1__create_initial_schema.sql`.
+3. Không sửa migration đã được áp dụng; tạo migration mới với version tiếp theo cho mọi thay đổi schema.
 
 ## 🌿 Quy Chuẩn Đặt Tên Nhánh (Branch Naming Convention)
 
@@ -468,69 +205,3 @@ Lưu ý quan trọng:
 <type>/<module>-<short-description>
 <type>/<issue-id>-<short-description>
 ```
-
-Ví dụ:
-
-```text
-feature/user-service-login
-feature/api-gateway-jwt-validation
-fix/user-service-refresh-token-bug
-hotfix/PROJ-89-user-login-production
-refactor/common-security-role-parser
-chore/update-docker-compose
-docs/graphify-usage-guide
-test/user-service-auth-controller
-perf/user-service-query-optimization
-release/v1.2.0
-```
-
-### 4. Nếu có ticket/issue
-
-Nên thêm ID vào để dễ trace:
-
-```text
-feature/PROJ-42-user-login
-fix/PROJ-89-gateway-jwt-error
-```
-
-### 5. Ví dụ đặt tên phù hợp cho team microservices
-
-```text
-feature/api-gateway-route-protection
-feature/user-service-register-flow
-fix/user-service-role-assignment
-refactor/config-server-shared-properties
-chore/docker-compose-postgres-setup
-```
-
-### 6. Gợi ý workflow với Git
-
-- `main` — nhánh production
-- `develop` — nhánh tích hợp
-- Tạo nhánh mới từ `develop`
-- Khi hoàn thành, mở Pull Request về `develop` hoặc `main` tùy case
-
-### 7. Dấu hiệu tên nhánh tốt
-
-Tên nhánh nên trả lời được 3 câu:
-
-- Mục tiêu của nhánh là gì?
-- Module nào liên quan?
-- Sửa/đổi cái gì?
-
-Ví dụ tên nhánh tốt:
-
-```text
-feature/user-service-register-api
-fix/eureka-service-discovery-timeout
-refactor/api-gateway-security-filter
-```
-
----
-
----
-
-## 🤝 Quy Tắc Đóng Góp & Phát Triển (Contribution Guidelines)
-1. **Coding Style**: Tuân thủ chuẩn Spring Boot best practices. Sử dụng Lombok để giảm boiler-plate code.
-2. **Security**: Downstream không được tin raw identity header; mọi protected API phải verify internal JWT do gateway ký.
-3. **Commit Message**: Đặt tên commit rõ ràng theo định dạng `feat:`, `fix:`, `refactor:`, `docs:`.

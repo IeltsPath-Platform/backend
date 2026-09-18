@@ -2,11 +2,11 @@
 
 - Phiên bản: 1.3
 - Cập nhật lần cuối: 2026-09-18
-- Dự án: `code-base` (`com.group01:code-base:1.0-SNAPSHOT`)
+- Dự án: `IELTSPath` (Maven coordinates hiện tại: `com.group01:code-base:1.0-SNAPSHOT`)
 
 ## 1. Tổng quan dự án
 
-`code-base` là một bộ khung khởi đầu backend theo kiến trúc microservices. Dự án cung cấp hạ tầng Spring Cloud, cơ chế bảo mật JWT dùng chung cho các downstream service và một bounded context nghiệp vụ đã được triển khai: quản lý danh tính người dùng và quyền truy cập.
+`IELTSPath` là backend theo kiến trúc microservices. Dự án cung cấp hạ tầng Spring Cloud, cơ chế bảo mật JWT dùng chung cho các downstream service và một bounded context nghiệp vụ đã được triển khai: quản lý danh tính người dùng và quyền truy cập.
 
 Repository này không phải là đặc tả sản phẩm hoàn chỉnh; không được suy diễn thêm các khả năng nghiệp vụ ngoài các module được liệt kê bên dưới.
 

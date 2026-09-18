@@ -2,11 +2,11 @@
 
 - Phiên bản: 1.0
 - Cập nhật lần cuối: 2026-09-18
-- Dự án: `code-base` (`com.group01:code-base:1.0-SNAPSHOT`)
+- Dự án: `IELTSPath` (Maven coordinates hiện tại: `com.group01:code-base:1.0-SNAPSHOT`)
 
 ## 1. TL;DR - Đọc trước trong 60 giây
 
-`code-base` là starter backend Java 21/Spring Cloud cho microservices. Hiện chỉ
+`IELTSPath` là backend Java 21/Spring Cloud theo kiến trúc microservices. Hiện chỉ
 có một bounded context nghiệp vụ đã triển khai: User. Hạ tầng gồm Config Server,
 Eureka và API Gateway; PostgreSQL `user_db` thuộc riêng `user-service`.
 
