@@ -27,7 +27,7 @@ class RegisterUseCaseTest {
     private CreateUserUseCase createUserUseCase;
 
     @Test
-    void publicRegistrationCreatesLearnerUser() {
+    void publicRegistrationCreatesCustomerUser() {
         User user = user();
         when(createUserUseCase.execute(any(CreateUserCommand.class))).thenReturn(user);
         RegisterUseCase useCase = new RegisterUseCase(createUserUseCase);
@@ -43,7 +43,7 @@ class RegisterUseCaseTest {
         ArgumentCaptor<CreateUserCommand> createCaptor = ArgumentCaptor.forClass(CreateUserCommand.class);
         verify(createUserUseCase).execute(createCaptor.capture());
 
-        assertThat(createCaptor.getValue().roles()).containsExactly("LEARNER");
+        assertThat(createCaptor.getValue().roles()).containsExactly("CUSTOMER");
         assertThat(result.getStatus()).isEqualTo(UserStatus.ACTIVE);
     }
 
@@ -59,7 +59,7 @@ class RegisterUseCaseTest {
                         "ADMIN"
                 )))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Public registration only supports the LEARNER role");
+                .hasMessage("Public registration only supports the CUSTOMER role");
 
         verifyNoInteractions(createUserUseCase);
     }

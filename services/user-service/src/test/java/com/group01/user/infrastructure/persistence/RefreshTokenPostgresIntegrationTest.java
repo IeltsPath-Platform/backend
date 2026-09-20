@@ -86,15 +86,22 @@ class RefreshTokenPostgresIntegrationTest {
 
     private void insertUser(UUID userId) throws Exception {
         try (Connection connection = POSTGRES.createConnection("");
-             PreparedStatement statement = connection.prepareStatement("""
-                     insert into users (id, email, full_name, password_hash, status)
-                     values (?, ?, ?, ?, 'ACTIVE')
+             PreparedStatement userStmt = connection.prepareStatement("""
+                     insert into users (id, email, password_hash, status)
+                     values (?, ?, ?, 'ACTIVE')
+                     """);
+             PreparedStatement profileStmt = connection.prepareStatement("""
+                     insert into user_profiles (user_id, full_name)
+                     values (?, ?)
                      """)) {
-            statement.setObject(1, userId);
-            statement.setString(2, userId + "@example.com");
-            statement.setString(3, "Integration User");
-            statement.setString(4, "hash");
-            statement.executeUpdate();
+            userStmt.setObject(1, userId);
+            userStmt.setString(2, userId + "@example.com");
+            userStmt.setString(3, "hash");
+            userStmt.executeUpdate();
+
+            profileStmt.setObject(1, userId);
+            profileStmt.setString(2, "Integration User");
+            profileStmt.executeUpdate();
         }
     }
 

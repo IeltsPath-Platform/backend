@@ -28,7 +28,7 @@ External JWT có payload tối giản:
   "iss": "urn:code-base:auth",
   "sub": "user-id",
   "exp": 1760003600,
-  "roles": ["LEARNER"]
+  "roles": ["CUSTOMER"]
 }
 ```
 
@@ -54,11 +54,14 @@ UUID userId = UUID.fromString(jwt.getSubject());
 ## Role hiện tại
 
 ```text
-LEARNER
+CUSTOMER
+CONTENT_AUTHOR
+EXAMINER
+SALES_STAFF
 ADMIN
 ```
 
-Registration public mặc định tạo user với role `LEARNER`. Các API quản trị yêu cầu `ADMIN`.
+Registration public mặc định tạo user với role `CUSTOMER`. Các API quản trị yêu cầu `ADMIN`.
 
 ## Các package chính
 

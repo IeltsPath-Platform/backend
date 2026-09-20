@@ -44,7 +44,7 @@ class InternalJwtServiceTest {
                 .issuer("urn:code-base:auth")
                 .expiresAt(Instant.now().plusSeconds(300))
                 .subject(subject.toString())
-                .claim("roles", List.of("LEARNER", "UNSUPPORTED"))
+                .claim("roles", List.of("CUSTOMER", "UNSUPPORTED"))
                 .build();
 
         String token = service.createToken(externalToken);
@@ -56,7 +56,7 @@ class InternalJwtServiceTest {
 
         assertThat(decoded.getClaimAsString("iss")).isEqualTo("urn:code-base:api-gateway");
         assertThat(decoded.getSubject()).isEqualTo(subject.toString());
-        assertThat(decoded.getClaimAsStringList("roles")).containsExactly("LEARNER");
+        assertThat(decoded.getClaimAsStringList("roles")).containsExactly("CUSTOMER");
         assertThat(decoded.hasClaim("aud")).isFalse();
         assertThat(decoded.getClaimAsString("type")).isNull();
         assertThat(decoded.getClaimAsString("email")).isNull();

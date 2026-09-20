@@ -29,19 +29,19 @@ class CreateUserUseCaseTest {
     private RoleRepository roleRepository;
 
     @Test
-    void createsLocalUserWithDefaultLearnerRole() {
+    void createsLocalUserWithDefaultCustomerRole() {
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         CreateUserUseCase useCase = new CreateUserUseCase(userRepository, roleRepository, passwordEncoder);
-        Role learner = Role.builder().id(UUID.randomUUID()).name(RoleName.LEARNER).description("Learner user").build();
+        Role customer = Role.builder().id(UUID.randomUUID()).name(RoleName.CUSTOMER).description("Customer user").build();
         when(userRepository.existsByEmail("john@example.com")).thenReturn(false);
-        when(roleRepository.findByNames(Set.of("LEARNER"))).thenReturn(List.of(learner));
+        when(roleRepository.findByNames(Set.of("CUSTOMER"))).thenReturn(List.of(customer));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         User created = useCase.execute(new CreateUserCommand("John@Example.com", "secret123", "John Doe", "0123456789", null));
 
         assertThat(created.getEmail().value()).isEqualTo("john@example.com");
         assertThat(passwordEncoder.matches("secret123", created.getPasswordHash())).isTrue();
-        assertThat(created.getRoles()).extracting(role -> role.getName().name()).containsExactly("LEARNER");
+        assertThat(created.getRoles()).extracting(role -> role.getName().name()).containsExactly("CUSTOMER");
         assertThat(created.getStatus().name()).isEqualTo("ACTIVE");
     }
 }

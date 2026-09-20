@@ -18,10 +18,10 @@ public class RegisterUseCase {
     @Transactional
     public User execute(RegisterCommand command) {
         String requestedRole = command.role() == null || command.role().isBlank()
-                ? RoleName.LEARNER.name()
+                ? RoleName.CUSTOMER.name()
                 : command.role();
-        if (!RoleName.LEARNER.name().equals(requestedRole)) {
-            throw new IllegalArgumentException("Public registration only supports the LEARNER role");
+        if (!RoleName.CUSTOMER.name().equals(requestedRole)) {
+            throw new IllegalArgumentException("Public registration only supports the CUSTOMER role");
         }
 
         return createUserUseCase.execute(new CreateUserCommand(
@@ -29,7 +29,7 @@ public class RegisterUseCase {
                 command.password(),
                 command.fullName(),
                 command.phoneNumber(),
-                Set.of(RoleName.LEARNER.name())
+                Set.of(RoleName.CUSTOMER.name())
         ));
     }
 }

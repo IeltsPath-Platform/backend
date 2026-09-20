@@ -92,7 +92,7 @@ class UserControllerSecurityTest {
         UUID ownerId = UUID.randomUUID();
         UUID foreignId = UUID.randomUUID();
         when(getUserByIdUseCase.execute(ownerId)).thenReturn(user(ownerId));
-        String token = signedToken(INTERNAL_SECRET, ownerId, INTERNAL_ISSUER, List.of("LEARNER"));
+        String token = signedToken(INTERNAL_SECRET, ownerId, INTERNAL_ISSUER, List.of("CUSTOMER"));
 
         mockMvc.perform(get("/api/users/{id}", ownerId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
@@ -121,7 +121,7 @@ class UserControllerSecurityTest {
         mockMvc.perform(get("/api/users/me")
                         .header(HttpHeaders.AUTHORIZATION,
                                 "Bearer " + signedToken(INTERNAL_SECRET, userId,
-                                        INTERNAL_ISSUER, List.of("LEARNER"))))
+                                        INTERNAL_ISSUER, List.of("CUSTOMER"))))
                 .andExpect(status().isOk());
 
         verify(getMyProfileUseCase).execute(userId);

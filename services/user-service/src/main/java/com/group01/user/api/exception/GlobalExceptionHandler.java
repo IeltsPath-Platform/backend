@@ -2,7 +2,11 @@ package com.group01.user.api.exception;
 
 import com.group01.user.domain.exception.AuthenticationFailedException;
 import com.group01.user.domain.exception.EmailAlreadyExistsException;
+import com.group01.user.domain.exception.InvalidActionTokenException;
 import com.group01.user.domain.exception.InvalidUserStatusException;
+import com.group01.user.domain.exception.LearnerProfileNotFoundException;
+import com.group01.user.domain.exception.LearningGoalNotFoundException;
+import com.group01.user.domain.exception.OAuthIdentityNotFoundException;
 import com.group01.user.domain.exception.PhoneAlreadyExistsException;
 import com.group01.user.domain.exception.RoleNotFoundException;
 import com.group01.user.domain.exception.UserNotFoundException;
@@ -29,7 +33,12 @@ public class GlobalExceptionHandler {
                 request.getRequestURI(), exception.getMessage());
     }
 
-    @ExceptionHandler(UserNotFoundException.class)
+    @ExceptionHandler({
+            UserNotFoundException.class,
+            LearnerProfileNotFoundException.class,
+            LearningGoalNotFoundException.class,
+            OAuthIdentityNotFoundException.class
+    })
     ResponseEntity<ErrorResponse> handleNotFound(RuntimeException exception, HttpServletRequest request) {
         return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, null);
     }
@@ -49,7 +58,13 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.FORBIDDEN, "Forbidden", request, null);
     }
 
-    @ExceptionHandler({RoleNotFoundException.class, InvalidUserStatusException.class, IllegalArgumentException.class})
+    @ExceptionHandler({
+            RoleNotFoundException.class,
+            InvalidUserStatusException.class,
+            InvalidActionTokenException.class,
+            IllegalArgumentException.class,
+            IllegalStateException.class
+    })
     ResponseEntity<ErrorResponse> handleBadRequest(RuntimeException exception, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request, null);
     }

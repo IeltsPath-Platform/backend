@@ -121,21 +121,60 @@ uv tool install graphifyy
 graphify --version
 ```
 
-Đăng ký Graphify skill cho project hiện tại:
+Đăng ký Graphify skill cho Codex trong project hiện tại (tuỳ chọn):
 
 ```powershell
-graphify install --project
+graphify install --platform codex
 ```
 
-Tạo graph cho repo:
+Tạo knowledge graph từ source code. Chế độ `--code-only` không cần API key hoặc LLM:
 
 ```powershell
-graphify .
+graphify extract . --code-only
 ```
 
-Kết quả sẽ nằm trong `graphify-out/`, gồm graph JSON, báo cáo và trang HTML
-tương tác. Repo đã có `.graphifyignore` để bỏ qua artifact Graphify và markdown
-khi build graph.
+Tạo trang đồ thị tương tác từ graph đã sinh:
+
+```powershell
+graphify export html --graph .\graphify-out\graph.json
+```
+
+Cập nhật đồ thị sau khi code thay đổi (Incremental Update):
+
+Sau khi thêm mới hoặc sửa đổi code, chạy lệnh cập nhật gia tăng để cập nhật graph nhanh chóng mà không cần extract lại toàn bộ từ đầu:
+
+```powershell
+graphify update .
+```
+
+Nếu vừa refactor lớn hoặc xóa nhiều file, dùng cờ `--force`:
+
+```powershell
+graphify update . --force
+```
+
+Sau khi update, chạy lại lệnh xuất HTML để đồng bộ giao diện hiển thị:
+
+```powershell
+graphify export html --graph .\graphify-out\graph.json
+```
+
+Truy vấn và phân tích quan hệ codebase qua CLI:
+
+```powershell
+graphify query "<câu hỏi về codebase>"
+graphify explain "<khái niệm hoặc symbol>"
+graphify path "<symbol A>" "<symbol B>"
+graphify affected "<symbol thay đổi>"
+```
+
+Kết quả nằm trong `graphify-out/`:
+
+- `graph.json`: knowledge graph dùng với các lệnh như `graphify query`, `graphify path` và `graphify explain`.
+- `graph.html`: trang đồ thị tương tác, có thể mở trực tiếp bằng trình duyệt.
+- `cache/`: cache nội bộ; `cache/stat-index.json` không phải graph hoàn chỉnh.
+
+Nếu đã cấu hình API key/backend LLM, có thể bỏ `--code-only` để Graphify bổ sung các quan hệ semantic. Repo đã có `.graphifyignore` để bỏ qua artifact Graphify và markdown khi build graph.
 
 ### 3. Biên Dịch Dự Án (Build Codebase)
 Mở terminal tại thư mục gốc của dự án và chạy:

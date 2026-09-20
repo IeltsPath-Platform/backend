@@ -56,7 +56,7 @@ public class CreateUserUseCase {
 
     private Set<Role> resolveRoles(Set<String> requestedRoles) {
         Set<String> roleNames = requestedRoles == null || requestedRoles.isEmpty()
-                ? Set.of(RoleName.LEARNER.name())
+                ? Set.of(RoleName.CUSTOMER.name())
                 : requestedRoles.stream().map(role -> RoleName.from(role).name()).collect(Collectors.toSet());
         Set<Role> roles = new HashSet<>(roleRepository.findByNames(roleNames));
         if (roles.size() != roleNames.size()) {

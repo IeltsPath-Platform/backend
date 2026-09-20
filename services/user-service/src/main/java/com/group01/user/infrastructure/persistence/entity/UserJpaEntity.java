@@ -74,8 +74,12 @@ public class UserJpaEntity {
         if (id == null) {
             id = UUID.randomUUID();
         }
-        createdAt = now;
-        updatedAt = now;
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
     }
 
     @PreUpdate

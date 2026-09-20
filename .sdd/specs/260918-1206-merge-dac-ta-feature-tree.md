@@ -254,7 +254,7 @@ Dữ liệu đề do thầy cung cấp. **Web người học = chính. Mobile = 
 | **Phạm vi** | MVP |
 | **Nguồn** | Đ§3.2 |
 
-### 4.3 · AI sinh bài luyện theo điểm yếu — Làm mới
+### 4.3 · AI goi y bài luyện theo điểm yếu — Làm mới
 
 | | |
 | -- | -- |
@@ -315,7 +315,7 @@ Data thầy cấp; không lấy nguồn ngoài trái phép.
 | **Phạm vi** | MVP |
 | **Nguồn** | Đ§4.3 |
 
-### 5.4 · Trợ lý RAG hỏi đáp — Làm mới
+### 5.4 · Trợ lý RAG hỏi đáp — Làm mới(xem lai du time kh)
 
 | | |
 | -- | -- |
@@ -367,7 +367,7 @@ Mobile chính trải nghiệm; Admin kiểm duyệt; Web hỗ trợ/hạn chế.
 | **Phạm vi** | MVP |
 | **Nguồn** | Đ§5.3 · T§5 gamification |
 
-### 6.5 · Gia sư & lớp học — Đã có — cần mở rộng
+### 6.5 · Gia sư  & lớp học — Đã có — cần mở rộng(bo)
 
 | | |
 | -- | -- |

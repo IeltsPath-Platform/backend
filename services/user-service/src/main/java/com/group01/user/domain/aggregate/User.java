@@ -57,6 +57,14 @@ public class User {
         touch();
     }
 
+    public void changePassword(String newPasswordHash) {
+        if (newPasswordHash == null || newPasswordHash.isBlank()) {
+            throw new IllegalArgumentException("Mật khẩu băm không được để trống");
+        }
+        this.passwordHash = newPasswordHash;
+        touch();
+    }
+
     public Set<Role> getRoles() {
         return Collections.unmodifiableSet(new HashSet<>(roles));
     }

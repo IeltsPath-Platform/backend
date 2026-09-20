@@ -133,7 +133,7 @@ Code hiện tại không sử dụng domain event, factory, CQRS query object ho
 - `api-gateway` xác thực external JWT, route thông qua Eureka, thay thế authorization value đầu vào cho các downstream path đã cấu hình và ký một internal HMAC JWT có thời gian sống ngắn.
 - Các downstream service dạng servlet sử dụng `CommonSecurityAutoConfiguration` của `common-security` để xác thực internal token và tạo Spring authorities. Auto-configuration này được thiết kế riêng cho servlet.
 - Gateway sử dụng WebFlux và có `SecurityWebFilterChain` riêng; không được áp dụng servlet auto-configuration cho Gateway.
-- Việc xác thực internal token yêu cầu issuer đúng theo cấu hình, subject là UUID, có expiry và role thuộc `CanonicalRoles.ALL` (`ADMIN`, `LEARNER`). Token claim và role constant phải được quản lý tập trung trong `common-security`.
+- Việc xác thực internal token yêu cầu issuer đúng theo cấu hình, subject là UUID, có expiry và role thuộc `CanonicalRoles.ALL` (`ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF`). Token claim và role constant phải được quản lý tập trung trong `common-security`.
 - External signing secret và internal signing secret phải tách biệt. Cấu hình sử dụng `EXTERNAL_JWT_SECRET` và `GATEWAY_INTERNAL_JWT_SECRET`; HMAC secret phải được encode bằng Base64 và có độ dài tối thiểu 32 byte. Không bao giờ sao chép giá trị thực của chúng vào code, tài liệu, test, log hoặc commit.
 
 ### 3.5 Ranh giới Microservice
