@@ -14,7 +14,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 
 @Configuration
-@EnableConfigurationProperties(AuthTokenProperties.class)
+@EnableConfigurationProperties({AuthTokenProperties.class, AuthCookieProperties.class})
 public class AuthTokenConfig {
     @Bean
     PasswordEncoder passwordEncoder() {

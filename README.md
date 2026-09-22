@@ -6,19 +6,19 @@ IELTSPath là backend microservices xây dựng trên hệ sinh thái **Java 21*
 
 ## 🛠️ Công Nghệ Sử Dụng (Tech Stack)
 
-| Thành phần | Công nghệ / Thư viện | Phiên bản | Chức năng chính |
-| :--- | :--- | :--- | :--- |
-| **Language** | Java | **OpenJDK 21** | Ngôn ngữ lập trình cốt lõi |
-| **Framework** | Spring Boot | **3.5.14** | Framework ứng dụng nền tảng |
-| **Cloud Ecosystem** | Spring Cloud | **2025.0.0** | Hệ sinh thái dịch vụ đám mây |
-| **API Gateway** | Spring Cloud Gateway (WebFlux Reactive) | 2025.0.0 | Quản lý định tuyến API, xác thực & phân quyền tập trung dựa trên kiến trúc Phản ứng (Reactive, Non-blocking Netty Engine) |
-| **Service Discovery** | Spring Cloud Netflix Eureka | 2025.0.0 | Đăng ký và phát hiện dịch vụ tự động |
-| **Config Management**| Spring Cloud Config Server | 2025.0.0 | Quản lý cấu hình tập trung cho toàn bộ microservices |
-| **Security & Auth** | Spring Security & OAuth2 (Reactive) | 3.5.14 | Xử lý token JWT và Context người dùng bất đồng bộ |
-| **Shared Common** | Custom `common-security` | 1.0-SNAPSHOT | Module dùng chung: `CanonicalRoles`, `InternalJwtClaims`, `InternalJwtAuthorities`, `InternalJwtValidators` |
-| **Database** | PostgreSQL | 15-alpine | Hệ quản trị cơ sở dữ liệu quan hệ |
-| **Containerization** | Docker & Docker Compose | Latest | Đóng gói và chạy môi trường hạ tầng nhanh chóng |
-| **Build Tool** | Maven (Multi-module) | 3.9+ | Quản lý dependencies và đóng gói dự án |
+| Thành phần                | Công nghệ / Thư viện                | Phiên bản          | Chức năng chính                                                                                                                        |
+| :-------------------------- | :-------------------------------------- | :------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Language**          | Java                                    | **OpenJDK 21** | Ngôn ngữ lập trình cốt lõi                                                                                                          |
+| **Framework**         | Spring Boot                             | **3.5.14**     | Framework ứng dụng nền tảng                                                                                                           |
+| **Cloud Ecosystem**   | Spring Cloud                            | **2025.0.0**   | Hệ sinh thái dịch vụ đám mây                                                                                                       |
+| **API Gateway**       | Spring Cloud Gateway (WebFlux Reactive) | 2025.0.0             | Quản lý định tuyến API, xác thực & phân quyền tập trung dựa trên kiến trúc Phản ứng (Reactive, Non-blocking Netty Engine) |
+| **Service Discovery** | Spring Cloud Netflix Eureka             | 2025.0.0             | Đăng ký và phát hiện dịch vụ tự động                                                                                           |
+| **Config Management** | Spring Cloud Config Server              | 2025.0.0             | Quản lý cấu hình tập trung cho toàn bộ microservices                                                                               |
+| **Security & Auth**   | Spring Security & OAuth2 (Reactive)     | 3.5.14               | Xử lý token JWT và Context người dùng bất đồng bộ                                                                               |
+| **Shared Common**     | Custom`common-security`               | 1.0-SNAPSHOT         | Module dùng chung:`CanonicalRoles`, `InternalJwtClaims`, `InternalJwtAuthorities`, `InternalJwtValidators`                       |
+| **Database**          | PostgreSQL                              | 15-alpine            | Hệ quản trị cơ sở dữ liệu quan hệ                                                                                                 |
+| **Containerization**  | Docker & Docker Compose                 | Latest               | Đóng gói và chạy môi trường hạ tầng nhanh chóng                                                                                |
+| **Build Tool**        | Maven (Multi-module)                    | 3.9+                 | Quản lý dependencies và đóng gói dự án                                                                                            |
 
 ---
 
@@ -77,6 +77,7 @@ internal token được tách riêng, còn role được quản lý tập trung.
 ### 3. Kiến Trúc Reactive (Reactive Programming Model) Tại API Gateway
 
 Dịch vụ **API Gateway** (`infra/api-gateway`) được xây dựng 100% dựa trên mô hình **Lập trình Phản ứng (Reactive Programming)**:
+
 - **Framework**: Sử dụng `spring-cloud-starter-gateway-server-webflux` chạy trên engine non-blocking **Netty** giúp xử lý hàng nghìn kết nối đồng thời với lượng tài nguyên CPU/RAM tối thiểu.
 - **Reactive Security**: Phân quyền & giải mã Token JWT bất đồng bộ thông qua `ServerHttpSecurity`, `SecurityWebFilterChain` và `NimbusReactiveJwtDecoder`.
 - **Reactive Filters**: Tất cả bộ lọc (`CorrelationIdFilter`, `LoggingFilter`) đều thực thi non-blocking thông qua `Mono<Void>` và `ServerWebExchange`.
@@ -87,11 +88,13 @@ Dịch vụ **API Gateway** (`infra/api-gateway`) được xây dựng 100% dự
 ## 🚀 Hướng Dẫn Chạy Dự Án Cho Lập Trình Viên (Getting Started)
 
 ### 1. Yêu Cầu Môi Trường (Prerequisites)
+
 - **Java Development Kit (JDK)**: Version 21.
 - **Maven**: Version 3.9+.
 - **Docker & Docker Desktop**: Để chạy ứng dụng hạ tầng và Cơ sở dữ liệu.
 
 ### 2. Cài Graphify Cho Người Lần Đầu
+
 Graphify giúp tạo knowledge graph từ source code để đọc kiến trúc, quan hệ file,
 class, dependency và luồng gọi nhanh hơn. Package trên PyPI tên là `graphifyy`
 nhưng command sau khi cài là `graphify`.
@@ -177,13 +180,17 @@ Kết quả nằm trong `graphify-out/`:
 Nếu đã cấu hình API key/backend LLM, có thể bỏ `--code-only` để Graphify bổ sung các quan hệ semantic. Repo đã có `.graphifyignore` để bỏ qua artifact Graphify và markdown khi build graph.
 
 ### 3. Biên Dịch Dự Án (Build Codebase)
+
 Mở terminal tại thư mục gốc của dự án và chạy:
+
 ```bash
 mvn clean compile -DskipTests
 ```
+
 *(Nếu hiển thị `BUILD SUCCESS` là toàn bộ cấu trúc dự án và các module con đã hợp lệ).*
 
 ### 4. Khởi Chạy Hạ Tầng Với Docker
+
 Trước khi chạy, đảm bảo Docker Desktop đang bật và file `.env` ở root có đủ
 các biến bắt buộc:
 

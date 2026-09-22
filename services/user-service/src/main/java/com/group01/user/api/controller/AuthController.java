@@ -18,9 +18,12 @@ import com.group01.user.application.usecase.LoginUseCase;
 import com.group01.user.application.usecase.LogoutUseCase;
 import com.group01.user.application.usecase.RefreshTokenUseCase;
 import com.group01.user.application.usecase.ResetPasswordUseCase;
+import com.group01.user.api.cookie.AuthCookieService;
 import com.group01.user.domain.aggregate.User;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -40,6 +43,7 @@ public class AuthController {
     private final ResetPasswordUseCase resetPasswordUseCase;
     private final GetUserByIdUseCase getUserByIdUseCase;
     private final CurrentUserProvider currentUserProvider;
+    private final AuthCookieService authCookieService;
 
     @PostMapping("/forgot-password")
     public MessageResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
@@ -54,18 +58,49 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public AuthTokenResponse login(@Valid @RequestBody LoginRequest request) {
-        return tokenResponse(loginUseCase.execute(request.usernameOrEmail(), request.password()), "Login successful");
+    public AuthTokenResponse login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+        AuthTokenResult tokens = loginUseCase.execute(request.usernameOrEmail(), request.password());
+        authCookieService.addAuthCookies(
+                response,
+                tokens.accessToken(),
+                tokens.refreshToken(),
+                tokens.accessTokenExpiresInSeconds(),
+                tokens.refreshTokenExpiresInSeconds()
+        );
+        return tokenResponse(tokens, "Login successful");
     }
 
     @PostMapping("/refresh")
-    public AuthTokenResponse refresh(@RequestBody(required = false) RefreshRequest request) {
-        return tokenResponse(refreshTokenUseCase.execute(request == null ? null : request.refreshToken()), "Token refreshed");
+    public AuthTokenResponse refresh(
+            @CookieValue(name = "${app.auth.cookie.refresh-token-name:refresh_token}", required = false) String cookieRefreshToken,
+            @RequestBody(required = false) RefreshRequest request,
+            HttpServletResponse response
+    ) {
+        String token = (cookieRefreshToken != null && !cookieRefreshToken.isBlank())
+                ? cookieRefreshToken
+                : (request == null ? null : request.refreshToken());
+        AuthTokenResult tokens = refreshTokenUseCase.execute(token);
+        authCookieService.addAuthCookies(
+                response,
+                tokens.accessToken(),
+                tokens.refreshToken(),
+                tokens.accessTokenExpiresInSeconds(),
+                tokens.refreshTokenExpiresInSeconds()
+        );
+        return tokenResponse(tokens, "Token refreshed");
     }
 
     @PostMapping("/logout")
-    public MessageResponse logout(@RequestBody(required = false) LogoutRequest request) {
-        logoutUseCase.execute(request == null ? null : request.refreshToken());
+    public MessageResponse logout(
+            @CookieValue(name = "${app.auth.cookie.refresh-token-name:refresh_token}", required = false) String cookieRefreshToken,
+            @RequestBody(required = false) LogoutRequest request,
+            HttpServletResponse response
+    ) {
+        String token = (cookieRefreshToken != null && !cookieRefreshToken.isBlank())
+                ? cookieRefreshToken
+                : (request == null ? null : request.refreshToken());
+        logoutUseCase.execute(token);
+        authCookieService.clearCookies(response);
         return new MessageResponse("Logout successful");
     }
 

@@ -12,6 +12,7 @@ import com.group01.user.application.usecase.LogoutUseCase;
 import com.group01.user.application.usecase.RefreshTokenUseCase;
 import com.group01.user.application.usecase.ResetPasswordUseCase;
 import com.group01.user.application.usecase.RevokeUserActionTokensUseCase;
+import com.group01.user.api.cookie.AuthCookieService;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.OctetSequenceKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -75,6 +76,7 @@ class ActionTokenSecurityTest {
     @MockBean private ForgotPasswordUseCase forgotPasswordUseCase;
     @MockBean private ResetPasswordUseCase resetPasswordUseCase;
     @MockBean private GetUserByIdUseCase getUserByIdUseCase;
+    @MockBean private AuthCookieService authCookieService;
 
     @MockBean private GetActionTokensByUserIdUseCase getActionTokensByUserIdUseCase;
     @MockBean private RevokeUserActionTokensUseCase revokeUserActionTokensUseCase;
