@@ -47,6 +47,38 @@ spring:
                 #
                 # đều sẽ được route tới USER-SERVICE.
                 - Path=/auth/**,/api/users/**
+            - id: access-service
+              uri: lb://ACCESS-SERVICE
+              predicates:
+                - Path=/api/access/**
+            - id: content-service
+              uri: lb://CONTENT-SERVICE
+              predicates:
+                - Path=/api/content/**
+            - id: assessment-service
+              uri: lb://ASSESSMENT-SERVICE
+              predicates:
+                - Path=/api/assessments/**
+            - id: learning-support-service
+              uri: lb://LEARNING-SUPPORT-SERVICE
+              predicates:
+                - Path=/api/learning-support/**
+            - id: game-service
+              uri: lb://GAME-SERVICE
+              predicates:
+                - Path=/api/games/**
+            - id: notification-service
+              uri: lb://NOTIFICATION-SERVICE
+              predicates:
+                - Path=/api/notifications/**
+            - id: community-service
+              uri: lb://COMMUNITY-SERVICE
+              predicates:
+                - Path=/api/community/**
+            - id: ai-learning-service
+              uri: ${AI_LEARNING_SERVICE_URI:http://localhost:8000}
+              predicates:
+                - Path=/api/ai-learning/**
 
 app:
   auth:
@@ -58,6 +90,14 @@ app:
     internal-jwt-paths:
       - /api/users
       - /auth/me
+      - /api/access
+      - /api/content
+      - /api/assessments
+      - /api/learning-support
+      - /api/games
+      - /api/notifications
+      - /api/community
+      - /api/ai-learning
     frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
 
 gateway:

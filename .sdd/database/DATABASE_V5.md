@@ -21,7 +21,7 @@ external_baseline: HKUDS/DeepTutor v1.6.9
 | **V2** | Review business MVP: Activation Key + Point + Premium; AI grading dùng point; Human Grading dùng Premium quota; ADP cũ dùng DeepTutor-driven mastery; hoàn thiện vocabulary và role nghiệp vụ. |
 | **V3** | Tách `game-service`/`game_db`; thêm realtime multiplayer; Personal Library gộp vào `learning-service`. |
 | **V4** | Thêm Video Learning qua YouTube URL/Video ID; baseline **87 bảng nghiệp vụ + 9 outbox = 96 bảng vật lý**. |
-| **V5** | **Bỏ Adaptive Engine cũ và `ai-assistant-service`**. Learning chuyển sang DeepTutor core. Xóa 6 bảng adaptive cũ + `topic_gate_attempts` + `mistake_notebook_entries` + 2 bảng AI Chat; thêm persistence cho DeepTutor Mastery Path, interaction/evidence/event, tutor session/message/turn runtime và Question Notebook practice. Adaptive core được tách thành `ai-learning-service`/`ai_learning_db`; activity/streak/video progress/note/flashcard chuyển sang `learning-support-service`/`learning_support_db`. Còn **91 bảng nghiệp vụ + 9 outbox = 100 bảng vật lý**. |
+| **V5** | **Bỏ Adaptive Engine cũ và `ai-assistant-service`**. Learning chuyển sang DeepTutor core. Xóa 6 bảng adaptive cũ + `topic_gate_attempts` + `mistake_notebook_entries` + 2 bảng AI Chat; thêm persistence cho DeepTutor Mastery Path, interaction/evidence/event, tutor session/message/turn runtime và Question Notebook practice. Adaptive core được tách thành `ai-learning-service`/`ai_learning_db`; activity/streak/video progress/note/flashcard chuyển sang `learning-support-service`/`learning_support_db`. Content MVP bỏ adaptive topic graph/gate, bỏ vocab↔KP mapping, nhúng question options vào version, gộp asset links và defer package↔vocabulary mapping. Còn **85 bảng nghiệp vụ + 9 outbox = 94 bảng vật lý**. |
 
 ---
 
@@ -51,7 +51,7 @@ Tài liệu này là baseline database cho kiến trúc IELTSPath V2, trong đó
 | :--- | ---: |
 | Identity | 8 |
 | Plans / Activation Key / Point | 8 |
-| Content | 22 |
+| Content | **16** |
 | Assessment | 10 |
 | AI Learning / DeepTutor Core | **13** |
 | Learning Support | **8** |
@@ -60,9 +60,9 @@ Tài liệu này là baseline database cho kiến trúc IELTSPath V2, trong đó
 | Community | 3 |
 | Quiz / Leaderboard | 4 |
 | Grading core | 3 |
-| **Tổng nghiệp vụ** | **91** |
+| **Tổng nghiệp vụ** | **85** |
 | Transactional Outbox | **9 bảng vật lý** |
-| **Tổng baseline** | **100 bảng** |
+| **Tổng baseline** | **94 bảng** |
 
 ## 1.2 Các bảng V4 bị xóa
 
@@ -466,7 +466,7 @@ Khi activate key `PREMIUM`, `access-service` ghi activation và publish event. `
 
 ## 4.1 `topics`
 
-Lưu cây chủ đề học tập. Bảng tạo cấu trúc cây topic chung của curriculum, dùng làm khung điều hướng và mở khóa lộ trình.
+Lưu taxonomy chủ đề chuẩn của IELTSPath để phân loại content. `topics` chỉ mô tả nội dung/curriculum; nó **không** biểu diễn prerequisite, trạng thái unlock hay adaptive progression. `parent_topic_id` nếu dùng chỉ phục vụ phân cấp hiển thị/phân loại.
 
 Thuộc tính chính:
 
@@ -484,7 +484,7 @@ Thuộc tính chính:
 
 ## 4.2 `knowledge_points`
 
-Đơn vị kiến thức mà hệ thống theo dõi learner mạnh/yếu và dùng cho DeepTutor Mastery Path. Knowledge point là đơn vị kiến thức nhỏ mà hệ thống thực sự theo dõi mastery và dùng để cá nhân hóa bài luyện.
+Định nghĩa canonical knowledge point trong curriculum. `content-service` chỉ sở hữu định nghĩa và metadata của KP; `ai-learning-service` map các KP này sang DeepTutor `KnowledgePoint` để theo dõi mastery và quyết định adaptive learning.
 
 Thuộc tính chính:
 
@@ -494,13 +494,14 @@ Thuộc tính chính:
 | `topic_id` | uuid | FK → `topics` | Định danh topic liên quan. |
 | `code` | — | — | Mã nghiệp vụ ổn định. |
 | `name` | — | — | Tên hiển thị. |
-| `kind` | — | — | Thuộc tính nghiệp vụ của bảng. |
+| `learning_type` | varchar(20) | CHECK | DeepTutor `KnowledgeType`: `MEMORY`, `CONCEPT`, `PROCEDURE`, `DESIGN`. Đây là type dùng cho mastery/policy trong `ai-learning-service`. |
 | `skill?` | — | — | Thuộc tính nghiệp vụ của bảng. |
 | `description` | — | — | Mô tả chi tiết. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
 | `created_at` | — | — | Thời điểm tạo bản ghi. |
 | `updated_at` | — | — | Thời điểm cập nhật gần nhất. |
 
+`learning_type` phải map 1:1 sang DeepTutor `KnowledgeType`. Các category nghiệp vụ như Grammar/Vocabulary/Strategy (nếu bổ sung sau) chỉ là metadata phân loại content, không thay thế `learning_type`.
 
 ## 4.3 `vocabulary_items`
 
@@ -545,23 +546,11 @@ Thuộc tính chính:
 
 Ví dụ từ `record` có thể có một sense `NOUN` với nghĩa "bản ghi" và một sense `VERB` với nghĩa "ghi lại"; mỗi sense có ví dụ riêng.
 
-## 4.5 `vocabulary_knowledge_points`
-
-Gắn vocabulary sense với knowledge point để dùng cho cây tri thức, mastery, adaptive learning và sinh bài. Bảng nối vocab sense với knowledge point để kết quả học vocab có thể quay lại mastery/adaptive learning.
-
-Thuộc tính chính:
-
-| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
-| :--- | :--- | :--- | :--- |
-| `vocabulary_sense_id` | uuid | FK → `vocabulary_senses` | Nghĩa/loại từ được gắn. |
-| `knowledge_point_id` | uuid | FK → `knowledge_points` | Knowledge point liên quan. |
-| `weight` | numeric? | — | Mức độ liên quan nếu cần. |
-| `PK(vocabulary_sense_id, knowledge_point_id)` | — | PK | Một liên kết chỉ tồn tại một lần. |
 # 5. Content — Đề, bài học và câu hỏi
 
 ## 5.1 `content_packages`
 
-Đại diện cho một bộ nội dung hoàn chỉnh như mock test, placement test, practice set, quiz, game set hoặc lesson. Package có thể là nội dung miễn phí hoặc Premium. Đây là đơn vị nội dung cấp cao như mock test, placement test, practice set, quiz hoặc lesson.
+Đại diện cho một bộ nội dung hoàn chỉnh như mock test, placement test, practice set, quiz, game set hoặc lesson. Content không sở hữu khái niệm plan `FREE/PREMIUM`; nếu package cần entitlement thì chỉ khai báo `required_feature_key`, còn quyết định user có quyền truy cập thuộc `access-service`.
 
 Thuộc tính chính:
 
@@ -571,7 +560,7 @@ Thuộc tính chính:
 | `code` | — | — | Mã nghiệp vụ ổn định. |
 | `title` | — | — | Tiêu đề. |
 | `package_type` | — | — | Loại package. |
-| `access_level` | — | — | `FREE`, `PREMIUM`. Dùng để gate quyền truy cập cả package. |
+| `required_feature_key?` | varchar(100) | Logical ref ↗ `Access.plan_features.feature_key` | Feature cần có để truy cập package; `NULL` nếu không có feature gate riêng. Không FK xuyên service. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
 | `current_published_version_id?` | — | — | Phiên bản đang publish. |
 | `created_at` | — | — | Thời điểm tạo bản ghi. |
@@ -589,12 +578,13 @@ Thuộc tính chính:
 | `package_id` | uuid | FK → `content_packages` | Định danh content package liên quan. |
 | `version_number` | — | — | Số thứ tự/phiên bản. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
-| `rules` | jsonb | — | Cấu hình/rule dạng JSON. |
+| `rules` | jsonb | — | Chỉ chứa delivery/assessment configuration như shuffle, navigation mode, timer/section behavior. Không chứa mastery threshold, topic unlock, prerequisite, adaptive progression, review schedule hoặc `next_objective` rule. |
 | `schema_version` | integer | — | Phiên bản schema của payload. |
 | `published_at?` | — | — | Thời điểm publish nếu đã publish. |
 | `published_by?` | uuid | Logical ref ↗ `Identity.users` | Tham chiếu tới đối tượng liên quan. |
 | `UQ(package_id, version_number)` | — | `UQ(package_id, version_number)` | Ràng buộc duy nhất cho tổ hợp cột. |
 
+Invariant: `rules` không phải adaptive policy store. Mọi mastery gate, prerequisite học tập, retention/review scheduling và quyết định `next_objective()` thuộc `ai-learning-service` / DeepTutor.
 
 ## 5.3 `content_sections`
 
@@ -616,7 +606,7 @@ Thuộc tính chính:
 
 ## 5.4 `questions`
 
-ID ổn định của một câu hỏi qua nhiều lần chỉnh sửa. `access_level` cho phép question bank chứa câu riêng cho Premium. Đây là identity ổn định của câu hỏi qua nhiều lần chỉnh sửa; nội dung thật nằm trong `question_versions`.
+ID ổn định của một câu hỏi qua nhiều lần chỉnh sửa; nội dung thật nằm trong `question_versions`. Nếu cần gate một question khi tái sử dụng độc lập, Content chỉ khai báo `required_feature_key`; entitlement do `access-service` quyết định.
 
 Thuộc tính chính:
 
@@ -625,13 +615,13 @@ Thuộc tính chính:
 | `id` | uuid | PK | Định danh duy nhất của bản ghi. |
 | `question_type` | — | — | Loại câu hỏi. |
 | `skill?` | — | — | Kỹ năng liên quan. |
-| `access_level` | — | — | `FREE`, `PREMIUM`. |
+| `required_feature_key?` | varchar(100) | Logical ref ↗ `Access.plan_features.feature_key` | Feature cần có để truy cập question khi áp dụng; `NULL` nếu không có gate riêng. Không FK xuyên service. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
 | `current_published_version_id?` | — | — | Phiên bản đang publish. |
 | `created_at` | — | — | Thời điểm tạo bản ghi. |
 | `updated_at` | — | — | Thời điểm cập nhật gần nhất. |
 
-Rule publish: package `FREE` không được chứa question `PREMIUM`. Package `PREMIUM` có thể chứa cả question `FREE` và `PREMIUM`.
+Content không tự suy luận hierarchy entitlement giữa package và question. Khi resource có `required_feature_key`, quyền truy cập được kiểm tra qua `access-service`; Content chỉ giữ requirement key.
 
 ## 5.5 `question_versions`
 
@@ -644,8 +634,9 @@ Thuộc tính chính:
 | `id` | uuid | PK | Định danh duy nhất của bản ghi. |
 | `question_id` | uuid | FK → `questions` | Định danh câu hỏi liên quan. |
 | `version_number` | — | — | Số thứ tự/phiên bản. |
-| `stem` | — | — | Thuộc tính nghiệp vụ của bảng. |
-| `answer_spec` | jsonb | — | Tham chiếu tới đối tượng liên quan. |
+| `stem` | — | — | Nội dung câu hỏi/prompt của version. |
+| `options?` | jsonb | — | Danh sách lựa chọn/phần tử ghép của các question type cần option; thuộc immutable question version, không tách bảng riêng. |
+| `answer_spec` | jsonb | — | Đáp án chuẩn/rule chấm của question version. |
 | `schema_version` | integer | — | Phiên bản schema của payload. |
 | `explanation` | — | — | Thuộc tính nghiệp vụ của bảng. |
 | `difficulty?` | — | — | Thuộc tính nghiệp vụ của bảng. |
@@ -653,25 +644,7 @@ Thuộc tính chính:
 | `UQ(question_id, version_number)` | — | `UQ(question_id, version_number)` | Ràng buộc duy nhất cho tổ hợp cột. |
 
 
-## 5.6 `question_options`
-
-Lưu lựa chọn hoặc phần tử ghép của câu hỏi. Nó lưu options hoặc phần tử ghép của các question type cần danh sách lựa chọn có thứ tự.
-
-Thuộc tính chính:
-
-| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
-| :--- | :--- | :--- | :--- |
-| `id` | uuid | PK | Định danh duy nhất của bản ghi. |
-| `question_version_id` | uuid | FK → `question_versions` | Định danh phiên bản câu hỏi liên quan. |
-| `option_key` | — | — | Thuộc tính nghiệp vụ của bảng. |
-| `content` | — | — | Nội dung dữ liệu. |
-| `sort_order` | — | — | Thứ tự hiển thị/xử lý. |
-| `UQ(question_version_id, option_key)` | — | `UQ(question_version_id, option_key)` | Ràng buộc duy nhất cho tổ hợp cột. |
-
-
-Không lưu thêm `is_correct` nếu `answer_spec` là nguồn đáp án chính.
-
-## 5.7 `section_questions`
+## 5.6 `section_questions`
 
 Gắn một question version vào vị trí cụ thể trong section. Bảng nối quyết định câu hỏi/version nào xuất hiện ở vị trí nào trong một section cụ thể.
 
@@ -687,7 +660,7 @@ Thuộc tính chính:
 | `UQ(section_id, sort_order)` | — | `UQ(section_id, sort_order)` | Ràng buộc duy nhất cho tổ hợp cột. |
 
 
-## 5.8 `question_knowledge_points`
+## 5.7 `question_knowledge_points`
 
 Gắn câu hỏi với knowledge point mà nó kiểm tra. Mapping này cho biết một câu hỏi đang đánh giá knowledge point nào và trọng số đóng góp của từng point.
 
@@ -701,7 +674,7 @@ Thuộc tính chính:
 | `PK(question_version_id, knowledge_point_id)` | — | `PK(question_version_id, knowledge_point_id)` | Khóa chính tổng hợp. |
 
 
-## 5.9 `content_assets`
+## 5.8 `content_assets`
 
 Lưu passage text hoặc metadata của audio/hình ảnh/media. Bảng quản lý passage, audio, image và media metadata dùng chung cho content mà không cần lưu binary trực tiếp trong PostgreSQL.
 
@@ -721,93 +694,37 @@ Thuộc tính chính:
 
 File binary không nhất thiết lưu trực tiếp trong DB.
 
-## 5.10 `section_assets`
 
-Gắn asset dùng chung cho section. Bảng nối asset với section khi passage/audio được dùng chung cho nhiều câu trong cùng phần.
+## 5.9 `content_asset_links`
 
-Thuộc tính chính:
-
-| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
-| :--- | :--- | :--- | :--- |
-| `section_id` | uuid | FK → `content_sections` | Định danh section liên quan. |
-| `asset_id` | uuid | FK → `content_assets` | Định danh đối tượng `asset` liên quan. |
-| `sort_order` | — | — | Thứ tự hiển thị/xử lý. |
-| `PK(section_id, asset_id)` | — | `PK(section_id, asset_id)` | Khóa chính tổng hợp. |
-
-
-## 5.11 `question_assets`
-
-Gắn asset riêng vào question version. Bảng nối asset riêng với một question version khi media chỉ thuộc câu hỏi cụ thể.
+Gắn `content_assets` vào **section** hoặc **question version**. Một bảng link chung thay cho hai bảng `section_assets` và `question_assets`, vì cả hai đều biểu diễn cùng một quan hệ: asset được dùng bởi một content owner cụ thể.
 
 Thuộc tính chính:
 
 | Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
 | :--- | :--- | :--- | :--- |
-| `question_version_id` | uuid | FK → `question_versions` | Định danh phiên bản câu hỏi liên quan. |
-| `asset_id` | uuid | FK → `content_assets` | Định danh đối tượng `asset` liên quan. |
-| `sort_order` | — | — | Thứ tự hiển thị/xử lý. |
-| `PK(question_version_id, asset_id)` | — | `PK(question_version_id, asset_id)` | Khóa chính tổng hợp. |
+| `id` | uuid | PK | Định danh link. |
+| `asset_id` | uuid | FK → `content_assets` | Asset được sử dụng. |
+| `section_id?` | uuid | FK → `content_sections` | Có giá trị khi asset thuộc một section. |
+| `question_version_id?` | uuid | FK → `question_versions` | Có giá trị khi asset thuộc một question version. |
+| `sort_order` | integer | DEFAULT 0 | Thứ tự hiển thị/xử lý asset trong owner. |
+| `created_at` | timestamptz | — | Thời điểm tạo mapping. |
 
-
-## 5.12 `topic_prerequisites`
-
-Xác định topic nào phải hoàn thành trước khi mở topic khác. Bảng mô tả quan hệ phụ thuộc giữa các topic để Learning biết topic nào chưa được phép mở.
-
-Thuộc tính chính:
-
-| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
-| :--- | :--- | :--- | :--- |
-| `topic_id` | uuid | FK → `topics` | Định danh topic liên quan. |
-| `required_topic_id` | uuid | FK → `topics` | Định danh đối tượng `required_topic` liên quan. |
-| `PK(topic_id, required_topic_id)` | — | `PK(topic_id, required_topic_id)` | Khóa chính tổng hợp. |
-
-
-## 5.13 `topic_gate_rules`
-
-Xác định bài kiểm tra dùng để vượt một topic. MVP chốt gate theo **assessment** với ngưỡng **`minimum_score = 70%`**.
-
-`topic_prerequisites` trả lời *topic nào phải học trước topic nào*; `topic_gate_rules` trả lời *learner phải đạt điều kiện nào để topic được xem là hoàn thành và mở topic tiếp theo*. Gate rule quy định bài kiểm tra nào và ngưỡng điểm nào cần đạt để learner hoàn thành/mở khóa topic.
-
-Thuộc tính chính:
-
-| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
-| :--- | :--- | :--- | :--- |
-| `id` | uuid | PK | Định danh gate rule. |
-| `topic_id` | uuid | FK → `topics` | Topic được kiểm tra. |
-| `package_version_id` | uuid | FK → `content_package_versions` | Bài assessment dùng làm gate. |
-| `minimum_score` | numeric(5,2) | DEFAULT `70.00` | Điểm phần trăm tối thiểu để pass. MVP dùng 70%. |
-| `status` | — | — | `ACTIVE`, `INACTIVE`. |
-| `created_at` | timestamptz | — | Thời điểm tạo. |
-| `updated_at` | timestamptz | — | Thời điểm cập nhật gần nhất. |
-
-Luồng MVP:
+Constraint bắt buộc:
 
 ```text
-Topic
-  ↓
-Gate Test
-  ↓
-score >= 70%
-  ├── YES → PASS → gửi formal result/evidence về DeepTutor → DeepTutor policy quyết định advance
-  └── NO  → FAIL → DeepTutor remediation → learner có thể làm lại formal gate
+exactly one of:
+- section_id
+- question_version_id
 ```
 
-## 5.14 `package_lexical_entries`
+Không cho phép cả hai cùng `NULL` hoặc cùng có giá trị. Có unique constraint/index riêng cho `(section_id, asset_id)` và `(question_version_id, asset_id)` khi cột owner tương ứng không `NULL`.
 
-Gắn một phiên bản package/bài học với vocabulary sense mà package sử dụng hoặc muốn learner học. Vì một từ có thể có nhiều nghĩa, liên kết đi tới `vocabulary_senses` thay vì chỉ tới lemma chung. Mapping này giúp biết package đang chứa/nhắm tới vocab sense nào, phục vụ pre-learning vocab, flashcard và phân tích nội dung.
+`topic_prerequisites` và `topic_gate_rules` **không còn trong V5**. IELTSPath không duy trì một topic-unlock engine song song; thứ tự objective, mastery gate, review và `next_objective()` thuộc DeepTutor trong `ai-learning-service`.
 
-Thuộc tính chính:
+`package_lexical_entries` cũng chưa đưa vào MVP. Nếu sau này có feature "Vocabulary in this lesson" hoặc pre-learn vocabulary theo package, mapping package ↔ vocabulary sense sẽ được bổ sung khi business flow đó được chốt.
 
-| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
-| :--- | :--- | :--- | :--- |
-| `package_version_id` | uuid | FK → `content_package_versions` | Phiên bản package liên quan. |
-| `vocabulary_sense_id` | uuid | FK → `vocabulary_senses` | Nghĩa/loại từ được dùng trong package. |
-| `sort_order?` | integer | — | Thứ tự hiển thị nếu UI có danh sách vocabulary của bài. |
-| `PK(package_version_id, vocabulary_sense_id)` | — | PK | Không gắn trùng cùng một sense vào cùng một package version. |
-
-Bảng này hỗ trợ các feature như "từ vựng trong bài", pre-learn vocabulary, tạo flashcard từ bài và liên kết content với cây tri thức.
-
-## 5.15 `learning_videos`
+## 5.10 `learning_videos`
 
 Lưu metadata của video học tập được IELTSPath chọn từ YouTube. Hệ thống **không lưu file video**, không transcode và không stream video; YouTube chịu trách nhiệm phát video. IELTSPath chỉ lưu tham chiếu YouTube và metadata phục vụ học tập.
 
@@ -824,7 +741,7 @@ Thuộc tính chính:
 | `duration_seconds?` | integer | CHECK >= 0 | Thời lượng video nếu đã biết. |
 | `topic_id?` | uuid | FK → `topics` | Topic chính liên quan tới video nếu cần phân loại/recommend. |
 | `level?` | varchar(20) | — | Mức độ nội dung, ví dụ `A2`, `B1`, `B2`, `C1`. |
-| `access_level` | varchar(20) | — | Quyền truy cập, ví dụ `FREE`, `PREMIUM`. |
+| `required_feature_key?` | varchar(100) | Logical ref ↗ `Access.plan_features.feature_key` | Feature cần có để truy cập video; `NULL` nếu không có gate riêng. Không FK xuyên service. |
 | `status` | varchar(30) | — | Trạng thái như `DRAFT`, `PUBLISHED`, `ARCHIVED`. |
 | `created_by` | uuid | Logical ref ↗ `Identity.users` | CONTENT_AUTHOR/ADMIN tạo record video. |
 | `created_at` | timestamptz | — | Thời điểm tạo. |
@@ -838,12 +755,12 @@ youtube_video_id = "abc123"
 title = "How Climate Change Affects Cities"
 topic = Environment
 level = B2
-access_level = PREMIUM
+required_feature_key = VIDEO_LEARNING_PREMIUM
 ```
 
 Frontend dùng `youtube_video_id` với YouTube IFrame Player API để play, pause, seek và đọc `currentTime`.
 
-## 5.16 `video_segments`
+## 5.11 `video_segments`
 
 Chia một YouTube video thành các đoạn transcript/subtitle có mốc thời gian. Đây là bảng nền cho subtitle đồng bộ, replay/loop segment, Dictation, Shadowing và lưu câu/đoạn để học lại.
 
@@ -871,7 +788,7 @@ Climate change is affecting cities around the world.
 
 Frontend đọc `currentTime` từ YouTube, tìm segment có `start_ms <= currentTime < end_ms` rồi highlight subtitle tương ứng.
 
-## 5.17 `video_segment_lexical_entries`
+## 5.12 `video_segment_lexical_entries`
 
 Gắn các **từ hoặc cụm từ đáng học** xuất hiện trong một video segment với kho vocabulary của IELTSPath. Không lưu mọi token trong subtitle thành row; chỉ lưu lexical entry mà UI cần cho tương tác học từ/cụm từ.
 
@@ -903,7 +820,7 @@ Khi learner click lexical entry, frontend có thể mở `vocabulary_sense` tư�
 
 ### Video comprehension trong V4
 
-V4 **không có bảng `video_questions`**. Baseline hiện tại chỉ chốt Watch/Subtitle, interactive vocabulary, saved segment, Dictation và Shadowing. Nếu sau này bổ sung comprehension question, hệ thống sẽ ưu tiên tái sử dụng `questions`, `question_versions`, `question_options` hiện có và chỉ thiết kế mapping video ↔ question khi business flow được chốt.
+V4 **không có bảng `video_questions`**. Baseline hiện tại chỉ chốt Watch/Subtitle, interactive vocabulary, saved segment, Dictation và Shadowing. Nếu sau này bổ sung comprehension question, hệ thống sẽ ưu tiên tái sử dụng `questions` và `question_versions` (options nằm trong `question_versions.options`) rồi chỉ thiết kế mapping video ↔ question khi business flow được chốt.
 
 ---
 # 6. Assessment — Làm bài, nộp bài và kết quả
@@ -2476,9 +2393,9 @@ Không có `ai_assistant_db`.
 # 17. Baseline cuối
 
 ```text
-Business tables: 91
+Business tables: 85
 Outbox tables:    9
-Physical total: 100
+Physical total: 94
 ```
 
 Quan trọng hơn số lượng bảng là boundary:

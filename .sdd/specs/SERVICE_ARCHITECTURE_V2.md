@@ -192,6 +192,25 @@ YouTube learning metadata / segment
 
 `content-service` là canonical source of truth cho nội dung học và nội dung assessment được publish.
 
+Boundary hiện tại:
+
+```text
+topics / knowledge_points
+= curriculum taxonomy + canonical KP metadata
+
+knowledge_points.learning_type
+= MEMORY | CONCEPT | PROCEDURE | DESIGN
+= map 1:1 sang DeepTutor KnowledgeType
+
+required_feature_key
+= requirement key tham chiếu logic tới access-service
+= content-service không hard-code FREE/PREMIUM entitlement
+
+content_package_versions.rules
+= delivery / assessment configuration only
+= không chứa mastery, unlock, prerequisite hay adaptive policy
+```
+
 ## 6.2 Database
 
 ```text
@@ -205,22 +224,16 @@ topics
 knowledge_points
 vocabulary_items
 vocabulary_senses
-vocabulary_knowledge_points
 
 content_packages
 content_package_versions
 content_sections
 questions
 question_versions
-question_options
 section_questions
 question_knowledge_points
 content_assets
-section_assets
-question_assets
-topic_prerequisites
-topic_gate_rules
-package_lexical_entries
+content_asset_links
 learning_videos
 video_segments
 video_segment_lexical_entries
