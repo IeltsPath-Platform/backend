@@ -6,4 +6,3 @@ spring:
     name: community-service
   config:
     import: optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}
-
