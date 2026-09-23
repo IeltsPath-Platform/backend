@@ -1,0 +1,3 @@
+package com.group01.assessment.api.dto.response;
+import com.group01.assessment.application.result.AssessmentAttemptResult; import com.group01.assessment.domain.vo.*; import java.time.Instant; import java.util.UUID;
+public record AssessmentAttemptResponse(UUID id,UUID userId,UUID packageVersionId,AttemptType attemptType,AttemptMode mode,AttemptChannel channel,AttemptStatus status,Instant startedAt,Instant submittedAt,Instant expiresAt,long rowVersion,Instant createdAt,Instant updatedAt){ public static AssessmentAttemptResponse from(AssessmentAttemptResult r){return new AssessmentAttemptResponse(r.id(),r.userId(),r.packageVersionId(),r.attemptType(),r.mode(),r.channel(),r.status(),r.startedAt(),r.submittedAt(),r.expiresAt(),r.rowVersion(),r.createdAt(),r.updatedAt());}}

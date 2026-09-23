@@ -9,7 +9,7 @@ Last updated: 2026-09-18
 Tài liệu này mô tả topology, communication pattern, data ownership và architectural boundary đang tồn tại của hệ thống. Nó phải tuân [Constitution](constitution.md) và tham chiếu [Security Specification](security.md) cho security policy chi tiết.
 
 Đây không phải API/schema/class documentation. Feature và module spec phải dùng tài liệu này để đặt thay đổi vào đúng bounded context và dependency boundary.
-
+[graphify-out](../../graphify-out)
 ## 2. KIẾN TRÚC TỔNG QUAN
 
 `code-base` là Maven multi-module backend theo architectural direction DDD, Clean Architecture và Microservices. Hiện có một business bounded context cùng ba infrastructure service, một shared library và một database do business service sở hữu.
