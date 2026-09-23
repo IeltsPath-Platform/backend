@@ -7,6 +7,7 @@ networks:
 # ==========================================
 volumes:
   user-db-data:
+  learning-support-db-data:
 
 services:
   # ==========================================
@@ -27,6 +28,25 @@ services:
       - user-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d user_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  learning-support-db:
+    image: postgres:15-alpine
+    container_name: learning-support-db
+    environment:
+      POSTGRES_DB: learning_support_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}"
+    ports:
+      - "127.0.0.1:5433:5432"
+    networks:
+      - codebase-network
+    volumes:
+      - learning-support-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d learning_support_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -130,6 +150,38 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8085/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  learning-support-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: services/learning-support-service
+    container_name: learning-support-service
+    environment:
+      - SERVER_PORT=8086
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - LEARNING_SUPPORT_DB_URL=jdbc:postgresql://learning-support-db:5432/learning_support_db
+      - LEARNING_SUPPORT_DB_USERNAME=postgres
+      - LEARNING_SUPPORT_DB_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      - INTERNAL_JWT_ISSUER=${INTERNAL_JWT_ISSUER:-urn:code-base:api-gateway}
+      - GATEWAY_INTERNAL_JWT_SECRET=${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}
+    networks:
+      - codebase-network
+    depends_on:
+      learning-support-db:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/actuator/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 6

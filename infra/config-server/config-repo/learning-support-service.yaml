@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: ${LEARNING_SUPPORT_DB_URL:jdbc:postgresql://localhost:5432/learning_support_db}
+    url: ${LEARNING_SUPPORT_DB_URL:jdbc:postgresql://localhost:5433/learning_support_db}
     username: ${LEARNING_SUPPORT_DB_USERNAME:postgres}
-    password: ${LEARNING_SUPPORT_DB_PASSWORD:123456}
+    password: ${LEARNING_SUPPORT_DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate

@@ -16,9 +16,10 @@ Repository này không phải là đặc tả sản phẩm hoàn chỉnh; không
 | `infra/eureka-server` | Service Registry dùng cho Service Discovery. |
 | `infra/api-gateway` | Điểm vào WebFlux, xác thực JWT bên ngoài, routing và phát hành JWT nội bộ có thời gian sống ngắn. |
 | `services/user-service` | Quản lý người dùng, vai trò, đăng nhập, phát hành access token, vòng đời refresh token và quản trị người dùng. |
+| `services/learning-support-service` | Learner-owned utility state: activity, streak, video progress, saved segment, note, flashcard. Không phải mastery authority. |
 | `shared/common-security` | Auto-configuration bảo mật servlet dùng chung cho downstream service, xác thực JWT nội bộ, định nghĩa role chuẩn và truy cập thông tin người dùng hiện tại. Đây là thư viện dùng chung, không phải một service có thể deploy độc lập. |
 
-Hiện tại chỉ `user-service` sở hữu database. PostgreSQL database/schema của service này được đặt tên là `user_db` trong Docker Compose và chứa người dùng, vai trò, quan hệ user-role và refresh token đã được hash.
+`user-service` sở hữu `user_db`. `learning-support-service` sở hữu `learning_support_db`. Hai database tách trong Docker Compose.
 
 ## 2. Tech Stack - Bắt buộc tuân thủ
 
@@ -147,9 +148,9 @@ Code hiện tại không sử dụng domain event, factory, CQRS query object ho
 ### 3.6 Configuration và Runtime
 
 - Bootstrap setting nằm trong `src/main/resources/application.yml` hoặc `src/main/resources/application.yaml` của từng module.
-- Shared runtime setting và service-specific runtime setting nằm trong `infra/config-server/config-repo/{application,api-gateway,eureka-server,user-service}.yaml`. Tránh lặp lại global Eureka Client setting trong các file cấu hình riêng của từng service.
+- Shared runtime setting và service-specific runtime setting nằm trong `infra/config-server/config-repo/{application,api-gateway,eureka-server,user-service,learning-support-service}.yaml`. Tránh lặp lại global Eureka Client setting trong các file cấu hình riêng của từng service.
 - Thứ tự khởi động là Config Server, Eureka Server, Gateway, sau đó đến các business service.
-- Docker Compose khởi động `user-db` cùng toàn bộ infrastructure service và `user-service`.
+- Docker Compose khởi động `user-db`, `learning-support-db`, infrastructure, `user-service` và `learning-support-service`.
 - `Dockerfile.spring-service` build các Maven module thông thường được chọn bằng `MODULE_PATH`; Config Server có Dockerfile riêng vì cần đóng gói thêm `config-repo`.
 
 ### 3.7 Hiệu năng Persistence, N+1 và độ phức tạp
