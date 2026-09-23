@@ -14,7 +14,6 @@ import com.group01.user.application.usecase.GetLearningGoalsByUserIdUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,6 +30,7 @@ import java.util.UUID;
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class LearningGoalController {
+
     private final GetActiveLearningGoalUseCase getActiveLearningGoalUseCase;
     private final GetLearningGoalsByUserIdUseCase getLearningGoalsByUserIdUseCase;
     private final CreateLearningGoalUseCase createLearningGoalUseCase;
@@ -72,28 +72,6 @@ public class LearningGoalController {
         return toResponse(changeLearningGoalStatusUseCase.execute(new ChangeLearningGoalStatusCommand(
                 goalId,
                 userId,
-                request.status()
-        )));
-    }
-
-    @GetMapping("/{id}/learning-goals")
-    @PreAuthorize("hasRole('ADMIN') or #p0.toString() == authentication.name")
-    public List<LearningGoalResponse> getLearningGoalsByUserId(@PathVariable("id") UUID id) {
-        return getLearningGoalsByUserIdUseCase.execute(id).stream()
-                .map(this::toResponse)
-                .toList();
-    }
-
-    @PutMapping("/{id}/learning-goals/{goalId}/status")
-    @PreAuthorize("hasRole('ADMIN')")
-    public LearningGoalResponse updateGoalStatusByAdmin(
-            @PathVariable("id") UUID id,
-            @PathVariable("goalId") UUID goalId,
-            @Valid @RequestBody ChangeLearningGoalStatusRequest request
-    ) {
-        return toResponse(changeLearningGoalStatusUseCase.execute(new ChangeLearningGoalStatusCommand(
-                goalId,
-                null,
                 request.status()
         )));
     }

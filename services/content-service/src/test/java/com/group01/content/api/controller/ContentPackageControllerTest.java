@@ -1,41 +1,43 @@
 package com.group01.content.api.controller;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import com.group01.content.api.dto.request.CreateContentPackageRequest;
 import com.group01.content.api.dto.request.PublishPackageRequest;
 import com.group01.content.api.exception.GlobalExceptionHandler;
 import com.group01.content.application.command.CreateContentPackageCommand;
 import com.group01.content.application.command.PublishContentPackageCommand;
-import com.group01.content.application.result.ContentPackageDetailResult;
 import com.group01.content.application.result.ContentPackageResult;
-import com.group01.content.application.usecase.*;
+import com.group01.content.application.usecase.AddContentSectionUseCase;
+import com.group01.content.application.usecase.AddPackageVersionUseCase;
+import com.group01.content.application.usecase.CreateContentPackageUseCase;
+import com.group01.content.application.usecase.GetContentPackageDetailUseCase;
+import com.group01.content.application.usecase.ListContentPackagesUseCase;
+import com.group01.content.application.usecase.PublishContentPackageUseCase;
 import com.group01.content.domain.exception.ContentPackageNotFoundException;
 import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.PublicationStatus;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
 class ContentPackageControllerTest {
@@ -57,15 +59,6 @@ class ContentPackageControllerTest {
 
     @Mock
     private PublishContentPackageUseCase publishContentPackageUseCase;
-
-    @Mock
-    private ArchiveContentPackageUseCase archiveContentPackageUseCase;
-
-    @Mock
-    private UnpublishContentPackageUseCase unpublishContentPackageUseCase;
-
-    @Mock
-    private CurrentUserProvider currentUserProvider;
 
     @InjectMocks
     private ContentPackageController contentPackageController;
@@ -89,7 +82,7 @@ class ContentPackageControllerTest {
                 PublicationStatus.PUBLISHED, UUID.randomUUID(), Instant.now(), Instant.now()
         );
 
-        when(listContentPackagesUseCase.execute(null, PublicationStatus.PUBLISHED)).thenReturn(List.of(result));
+        when(listContentPackagesUseCase.execute(null, null)).thenReturn(List.of(result));
 
         mockMvc.perform(get("/api/content/packages"))
                 .andExpect(status().isOk())
@@ -125,8 +118,8 @@ class ContentPackageControllerTest {
         when(createContentPackageUseCase.execute(any(CreateContentPackageCommand.class))).thenReturn(result);
 
         mockMvc.perform(post("/api/content/packages")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(jsonPath("$.code").value("PKG_02"));
@@ -146,40 +139,10 @@ class ContentPackageControllerTest {
         when(publishContentPackageUseCase.execute(any(PublishContentPackageCommand.class))).thenReturn(result);
 
         mockMvc.perform(post("/api/content/packages/" + packageId + "/publish")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PUBLISHED"))
                 .andExpect(jsonPath("$.currentPublishedVersionId").value(versionId.toString()));
-    }
-
-    @Test
-    @DisplayName("POST /api/content/packages/{id}/archive should archive package")
-    void shouldArchivePackage() throws Exception {
-        UUID packageId = UUID.randomUUID();
-        ContentPackageResult result = new ContentPackageResult(
-                packageId, "PKG_01", "IELTS Cam 18", PackageType.MOCK_TEST, AccessLevel.FREE,
-                PublicationStatus.ARCHIVED, null, Instant.now(), Instant.now()
-        );
-        when(archiveContentPackageUseCase.execute(packageId)).thenReturn(result);
-
-        mockMvc.perform(post("/api/content/packages/" + packageId + "/archive"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("ARCHIVED"));
-    }
-
-    @Test
-    @DisplayName("POST /api/content/packages/{id}/unpublish should unpublish package")
-    void shouldUnpublishPackage() throws Exception {
-        UUID packageId = UUID.randomUUID();
-        ContentPackageResult result = new ContentPackageResult(
-                packageId, "PKG_01", "IELTS Cam 18", PackageType.MOCK_TEST, AccessLevel.FREE,
-                PublicationStatus.DRAFT, null, Instant.now(), Instant.now()
-        );
-        when(unpublishContentPackageUseCase.execute(packageId)).thenReturn(result);
-
-        mockMvc.perform(post("/api/content/packages/" + packageId + "/unpublish"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("DRAFT"));
     }
 }

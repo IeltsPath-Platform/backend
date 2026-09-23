@@ -1,11 +1,5 @@
 package com.group01.content.domain.aggregate;
 
-import com.group01.content.domain.entity.QuestionVersion;
-import com.group01.content.domain.vo.AccessLevel;
-import com.group01.content.domain.vo.PublicationStatus;
-import com.group01.content.domain.vo.QuestionType;
-import com.group01.content.domain.vo.Skill;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,7 +7,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.group01.content.domain.entity.QuestionVersion;
+import com.group01.content.domain.vo.AccessLevel;
+import com.group01.content.domain.vo.PublicationStatus;
+import com.group01.content.domain.vo.QuestionType;
+import com.group01.content.domain.vo.Skill;
+
 public class Question {
+
     private final UUID id;
     private QuestionType questionType;
     private Skill skill;
@@ -25,8 +26,8 @@ public class Question {
     private final List<QuestionVersion> versions;
 
     public Question(UUID id, QuestionType questionType, Skill skill, AccessLevel accessLevel,
-                    PublicationStatus status, UUID currentPublishedVersionId,
-                    Instant createdAt, Instant updatedAt, List<QuestionVersion> versions) {
+            PublicationStatus status, UUID currentPublishedVersionId,
+            Instant createdAt, Instant updatedAt, List<QuestionVersion> versions) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.questionType = Objects.requireNonNull(questionType, "questionType must not be null");
         this.skill = skill;
@@ -60,13 +61,44 @@ public class Question {
         this.updatedAt = Instant.now();
     }
 
-    public UUID getId() { return id; }
-    public QuestionType getQuestionType() { return questionType; }
-    public Skill getSkill() { return skill; }
-    public AccessLevel getAccessLevel() { return accessLevel; }
-    public PublicationStatus getStatus() { return status; }
-    public UUID getCurrentPublishedVersionId() { return currentPublishedVersionId; }
-    public Instant getCreatedAt() { return createdAt; }
-    public Instant getUpdatedAt() { return updatedAt; }
-    public List<QuestionVersion> getVersions() { return Collections.unmodifiableList(versions); }
+    public void archive() {
+        this.status = PublicationStatus.ARCHIVED;
+        this.updatedAt = Instant.now();
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public QuestionType getQuestionType() {
+        return questionType;
+    }
+
+    public Skill getSkill() {
+        return skill;
+    }
+
+    public AccessLevel getAccessLevel() {
+        return accessLevel;
+    }
+
+    public PublicationStatus getStatus() {
+        return status;
+    }
+
+    public UUID getCurrentPublishedVersionId() {
+        return currentPublishedVersionId;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public List<QuestionVersion> getVersions() {
+        return Collections.unmodifiableList(versions);
+    }
 }

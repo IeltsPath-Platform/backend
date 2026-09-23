@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -49,21 +50,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(LearningGoalController.class)
 @ImportAutoConfiguration(CommonSecurityAutoConfiguration.class)
 @TestPropertySource(properties = {
-        "app.auth.external-jwt-issuer=urn:code-base:auth",
-        "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
-        "spring.cloud.config.enabled=false"
+    "app.auth.external-jwt-issuer=urn:code-base:auth",
+    "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
+    "spring.cloud.config.enabled=false"
 })
 class LearningGoalSecurityTest {
+
     private static final String INTERNAL_SECRET = "ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4NzY1NDMyMTA=";
     private static final String INTERNAL_ISSUER = "urn:code-base:api-gateway";
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean private GetActiveLearningGoalUseCase getActiveLearningGoalUseCase;
-    @MockBean private GetLearningGoalsByUserIdUseCase getLearningGoalsByUserIdUseCase;
-    @MockBean private CreateLearningGoalUseCase createLearningGoalUseCase;
-    @MockBean private ChangeLearningGoalStatusUseCase changeLearningGoalStatusUseCase;
+    @MockBean
+    private GetActiveLearningGoalUseCase getActiveLearningGoalUseCase;
+    @MockBean
+    private GetLearningGoalsByUserIdUseCase getLearningGoalsByUserIdUseCase;
+    @MockBean
+    private CreateLearningGoalUseCase createLearningGoalUseCase;
+    @MockBean
+    private ChangeLearningGoalStatusUseCase changeLearningGoalStatusUseCase;
 
     @DynamicPropertySource
     static void hmacProperties(DynamicPropertyRegistry registry) {
@@ -84,9 +90,26 @@ class LearningGoalSecurityTest {
         String token = signedToken(INTERNAL_SECRET, userId, INTERNAL_ISSUER, List.of("CUSTOMER"));
 
         mockMvc.perform(get("/api/users/me/learning-goals/active")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.targetBand").value(7.5));
+
+        verify(getActiveLearningGoalUseCase).execute(userId);
+    }
+
+    @Test
+    void learnerCanGetOwnLearningGoals() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(getLearningGoalsByUserIdUseCase.execute(userId)).thenReturn(List.of(goalResult(userId, BigDecimal.valueOf(7.0))));
+
+        String token = signedToken(INTERNAL_SECRET, userId, INTERNAL_ISSUER, List.of("CUSTOMER"));
+
+        mockMvc.perform(get("/api/users/me/learning-goals")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].targetBand").value(7.0));
+
+        verify(getLearningGoalsByUserIdUseCase).execute(userId);
     }
 
     @Test
@@ -106,57 +129,23 @@ class LearningGoalSecurityTest {
                 """;
 
         mockMvc.perform(post("/api/users/me/learning-goals")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.targetBand").value(8.0));
+
+        verify(createLearningGoalUseCase).execute(any(CreateLearningGoalCommand.class));
     }
 
     @Test
-    void ownerCanGetLearningGoalsById() throws Exception {
-        UUID ownerId = UUID.randomUUID();
-        when(getLearningGoalsByUserIdUseCase.execute(ownerId)).thenReturn(List.of(goalResult(ownerId, BigDecimal.valueOf(7.0))));
-
-        String token = signedToken(INTERNAL_SECRET, ownerId, INTERNAL_ISSUER, List.of("CUSTOMER"));
-
-        mockMvc.perform(get("/api/users/{id}/learning-goals", ownerId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void otherLearnerCannotGetLearningGoalsById() throws Exception {
-        UUID ownerId = UUID.randomUUID();
-        UUID otherId = UUID.randomUUID();
-
-        String token = signedToken(INTERNAL_SECRET, otherId, INTERNAL_ISSUER, List.of("CUSTOMER"));
-
-        mockMvc.perform(get("/api/users/{id}/learning-goals", ownerId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void adminCanGetLearningGoalsById() throws Exception {
-        UUID userId = UUID.randomUUID();
-        when(getLearningGoalsByUserIdUseCase.execute(userId)).thenReturn(List.of());
-
-        String adminToken = signedToken(INTERNAL_SECRET, UUID.randomUUID(), INTERNAL_ISSUER, List.of("ADMIN"));
-
-        mockMvc.perform(get("/api/users/{id}/learning-goals", userId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void adminCanUpdateGoalStatusById() throws Exception {
+    void learnerCanUpdateOwnGoalStatus() throws Exception {
         UUID userId = UUID.randomUUID();
         UUID goalId = UUID.randomUUID();
         when(changeLearningGoalStatusUseCase.execute(any(ChangeLearningGoalStatusCommand.class)))
                 .thenReturn(goalResult(userId, BigDecimal.valueOf(7.0)));
 
-        String adminToken = signedToken(INTERNAL_SECRET, UUID.randomUUID(), INTERNAL_ISSUER, List.of("ADMIN"));
+        String token = signedToken(INTERNAL_SECRET, userId, INTERNAL_ISSUER, List.of("CUSTOMER"));
 
         String body = """
                 {
@@ -164,30 +153,13 @@ class LearningGoalSecurityTest {
                 }
                 """;
 
-        mockMvc.perform(put("/api/users/{id}/learning-goals/{goalId}/status", userId, goalId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+        mockMvc.perform(put("/api/users/me/learning-goals/{goalId}/status", goalId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
                 .andExpect(status().isOk());
-    }
 
-    @Test
-    void learnerCannotUpdateGoalStatusById() throws Exception {
-        UUID userId = UUID.randomUUID();
-        UUID goalId = UUID.randomUUID();
-        String learnerToken = signedToken(INTERNAL_SECRET, userId, INTERNAL_ISSUER, List.of("CUSTOMER"));
-
-        String body = """
-                {
-                    "status": "ACHIEVED"
-                }
-                """;
-
-        mockMvc.perform(put("/api/users/{id}/learning-goals/{goalId}/status", userId, goalId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + learnerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isForbidden());
+        verify(changeLearningGoalStatusUseCase).execute(any(ChangeLearningGoalStatusCommand.class));
     }
 
     private LearningGoalResult goalResult(UUID userId, BigDecimal targetBand) {
@@ -225,4 +197,3 @@ class LearningGoalSecurityTest {
                 new ImmutableJWKSet<SecurityContext>(new JWKSet(key)));
     }
 }
-

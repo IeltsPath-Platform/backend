@@ -3,7 +3,6 @@ package com.group01.user.api.controller;
 import com.group01.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.group01.user.application.command.UpdateLearnerProfileCommand;
 import com.group01.user.application.result.LearnerProfileResult;
-import com.group01.user.application.usecase.DeleteLearnerProfileUseCase;
 import com.group01.user.application.usecase.GetLearnerProfileUseCase;
 import com.group01.user.application.usecase.UpdateLearnerProfileUseCase;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -38,7 +37,6 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -47,20 +45,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(LearnerProfileController.class)
 @ImportAutoConfiguration(CommonSecurityAutoConfiguration.class)
 @TestPropertySource(properties = {
-        "app.auth.external-jwt-issuer=urn:code-base:auth",
-        "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
-        "spring.cloud.config.enabled=false"
+    "app.auth.external-jwt-issuer=urn:code-base:auth",
+    "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
+    "spring.cloud.config.enabled=false"
 })
 class LearnerProfileSecurityTest {
+
     private static final String INTERNAL_SECRET = "ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4NzY1NDMyMTA=";
     private static final String INTERNAL_ISSUER = "urn:code-base:api-gateway";
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean private GetLearnerProfileUseCase getLearnerProfileUseCase;
-    @MockBean private UpdateLearnerProfileUseCase updateLearnerProfileUseCase;
-    @MockBean private DeleteLearnerProfileUseCase deleteLearnerProfileUseCase;
+    @MockBean
+    private GetLearnerProfileUseCase getLearnerProfileUseCase;
+    @MockBean
+    private UpdateLearnerProfileUseCase updateLearnerProfileUseCase;
 
     @DynamicPropertySource
     static void hmacProperties(DynamicPropertyRegistry registry) {
@@ -81,7 +81,7 @@ class LearnerProfileSecurityTest {
         String token = signedToken(INTERNAL_SECRET, userId, INTERNAL_ISSUER, List.of("CUSTOMER"));
 
         mockMvc.perform(get("/api/users/me/profile")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.displayName").value("John Doe"));
 
@@ -107,111 +107,13 @@ class LearnerProfileSecurityTest {
                 """;
 
         mockMvc.perform(put("/api/users/me/profile")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.displayName").value("New Name"));
-    }
 
-    @Test
-    void ownerCanGetProfileById() throws Exception {
-        UUID ownerId = UUID.randomUUID();
-        when(getLearnerProfileUseCase.execute(ownerId)).thenReturn(profileResult(ownerId, "Owner"));
-
-        String token = signedToken(INTERNAL_SECRET, ownerId, INTERNAL_ISSUER, List.of("CUSTOMER"));
-
-        mockMvc.perform(get("/api/users/{id}/profile", ownerId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void otherLearnerCannotGetProfileById() throws Exception {
-        UUID ownerId = UUID.randomUUID();
-        UUID otherId = UUID.randomUUID();
-
-        String token = signedToken(INTERNAL_SECRET, otherId, INTERNAL_ISSUER, List.of("CUSTOMER"));
-
-        mockMvc.perform(get("/api/users/{id}/profile", ownerId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void adminCanGetAnyProfileById() throws Exception {
-        UUID userId = UUID.randomUUID();
-        when(getLearnerProfileUseCase.execute(userId)).thenReturn(profileResult(userId, "Learner"));
-
-        String adminToken = signedToken(INTERNAL_SECRET, UUID.randomUUID(), INTERNAL_ISSUER, List.of("ADMIN"));
-
-        mockMvc.perform(get("/api/users/{id}/profile", userId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void adminCanUpdateProfileById() throws Exception {
-        UUID userId = UUID.randomUUID();
-        when(updateLearnerProfileUseCase.execute(any(UpdateLearnerProfileCommand.class)))
-                .thenReturn(profileResult(userId, "Admin Updated"));
-
-        String adminToken = signedToken(INTERNAL_SECRET, UUID.randomUUID(), INTERNAL_ISSUER, List.of("ADMIN"));
-
-        String body = """
-                {
-                    "displayName": "Admin Updated",
-                    "visibility": "PUBLIC"
-                }
-                """;
-
-        mockMvc.perform(put("/api/users/{id}/profile", userId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void learnerCannotUpdateProfileById() throws Exception {
-        UUID userId = UUID.randomUUID();
-        String learnerToken = signedToken(INTERNAL_SECRET, userId, INTERNAL_ISSUER, List.of("CUSTOMER"));
-
-        String body = """
-                {
-                    "displayName": "Attempt",
-                    "visibility": "PUBLIC"
-                }
-                """;
-
-        mockMvc.perform(put("/api/users/{id}/profile", userId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + learnerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void adminCanDeleteProfileById() throws Exception {
-        UUID userId = UUID.randomUUID();
-        String adminToken = signedToken(INTERNAL_SECRET, UUID.randomUUID(), INTERNAL_ISSUER, List.of("ADMIN"));
-
-        mockMvc.perform(delete("/api/users/{id}/profile", userId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Xóa hồ sơ học tập thành công"));
-
-        verify(deleteLearnerProfileUseCase).execute(userId);
-    }
-
-    @Test
-    void learnerCannotDeleteProfileById() throws Exception {
-        UUID userId = UUID.randomUUID();
-        String learnerToken = signedToken(INTERNAL_SECRET, userId, INTERNAL_ISSUER, List.of("CUSTOMER"));
-
-        mockMvc.perform(delete("/api/users/{id}/profile", userId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + learnerToken))
-                .andExpect(status().isForbidden());
+        verify(updateLearnerProfileUseCase).execute(any(UpdateLearnerProfileCommand.class));
     }
 
     private LearnerProfileResult profileResult(UUID userId, String displayName) {
@@ -248,4 +150,3 @@ class LearnerProfileSecurityTest {
                 new ImmutableJWKSet<SecurityContext>(new JWKSet(key)));
     }
 }
-

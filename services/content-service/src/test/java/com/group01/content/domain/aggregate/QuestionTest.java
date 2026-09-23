@@ -1,5 +1,11 @@
 package com.group01.content.domain.aggregate;
 
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
 import com.group01.content.domain.entity.QuestionVersion;
 import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
@@ -7,12 +13,6 @@ import com.group01.content.domain.vo.QuestionDifficulty;
 import com.group01.content.domain.vo.QuestionOptionPayload;
 import com.group01.content.domain.vo.QuestionType;
 import com.group01.content.domain.vo.Skill;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class QuestionTest {
 
@@ -47,5 +47,14 @@ class QuestionTest {
         assertThat(question.getStatus()).isEqualTo(PublicationStatus.PUBLISHED);
         assertThat(question.getCurrentPublishedVersionId()).isEqualTo(v1.getId());
     }
-}
 
+    @Test
+    @DisplayName("Should archive question")
+    void shouldArchiveQuestion() {
+        Question question = Question.create(QuestionType.MULTIPLE_CHOICE, Skill.READING, AccessLevel.FREE);
+        question.archive();
+
+        assertThat(question.getStatus()).isEqualTo(PublicationStatus.ARCHIVED);
+        assertThat(question.getUpdatedAt()).isNotNull();
+    }
+}

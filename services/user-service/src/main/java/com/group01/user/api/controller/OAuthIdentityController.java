@@ -7,7 +7,6 @@ import com.group01.user.application.result.OAuthIdentityResult;
 import com.group01.user.application.usecase.GetOAuthIdentitiesUseCase;
 import com.group01.user.application.usecase.UnlinkOAuthIdentityUseCase;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +20,7 @@ import java.util.UUID;
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class OAuthIdentityController {
+
     private final GetOAuthIdentitiesUseCase getOAuthIdentitiesUseCase;
     private final UnlinkOAuthIdentityUseCase unlinkOAuthIdentityUseCase;
     private final CurrentUserProvider currentUserProvider;
@@ -40,24 +40,6 @@ public class OAuthIdentityController {
         return new MessageResponse("Hủy liên kết tài khoản OAuth thành công");
     }
 
-    @GetMapping("/{id}/oauth")
-    @PreAuthorize("hasRole('ADMIN')")
-    public List<OAuthIdentityResponse> getOAuthIdentitiesByUserId(@PathVariable("id") UUID id) {
-        return getOAuthIdentitiesUseCase.execute(id).stream()
-                .map(this::toResponse)
-                .toList();
-    }
-
-    @DeleteMapping("/{id}/oauth/{provider}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public MessageResponse unlinkOAuthIdentityByAdmin(
-            @PathVariable("id") UUID id,
-            @PathVariable("provider") String provider
-    ) {
-        unlinkOAuthIdentityUseCase.execute(id, provider);
-        return new MessageResponse("Hủy liên kết tài khoản OAuth của người dùng thành công");
-    }
-
     private OAuthIdentityResponse toResponse(OAuthIdentityResult result) {
         return new OAuthIdentityResponse(
                 result.id(),
@@ -69,4 +51,3 @@ public class OAuthIdentityController {
         );
     }
 }
-
