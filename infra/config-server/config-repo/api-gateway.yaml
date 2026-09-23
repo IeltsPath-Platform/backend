@@ -36,7 +36,6 @@ spring:
               #
               # Eureka thường hiển thị service id ở dạng USER-SERVICE.
               uri: lb://USER-SERVICE
-
               predicates:
                 # Chỉ những request có path match một trong các pattern này
                 # mới sử dụng route "user-service".
@@ -47,22 +46,68 @@ spring:
                 #
                 # đều sẽ được route tới USER-SERVICE.
                 - Path=/auth/**,/api/users/**
+
+            - id: access-service
+              uri: lb://ACCESS-SERVICE
+              predicates:
+                - Path=/api/access/**
+
+            - id: content-service
+              uri: lb://CONTENT-SERVICE
+              predicates:
+                - Path=/api/content/**
+
+            - id: assessment-service
+              uri: lb://ASSESSMENT-SERVICE
+              predicates:
+                - Path=/api/assessments/**
+
+            - id: learning-support-service
+              uri: lb://LEARNING-SUPPORT-SERVICE
+              predicates:
+                - Path=/api/learning-support/**
+
+            - id: game-service
+              uri: lb://GAME-SERVICE
+              predicates:
+                - Path=/api/games/**
+
+            - id: notification-service
+              uri: lb://NOTIFICATION-SERVICE
+              predicates:
+                - Path=/api/notifications/**
+
             - id: community-service
               uri: lb://COMMUNITY-SERVICE
               predicates:
                 - Path=/api/community/**
 
+            - id: ai-learning-service
+              uri: ${AI_LEARNING_SERVICE_URI:http://localhost:8000}
+              predicates:
+                - Path=/api/ai-learning/**
+
 app:
   auth:
     external-jwt-issuer: ${EXTERNAL_JWT_ISSUER:urn:code-base:auth}
     external-jwt-secret: ${EXTERNAL_JWT_SECRET:FaU24nQz6jxA6m3ihV49zlGXoncSfkNMgYpgC7XPKXc=}
+
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
     internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}
     internal-token-max-age-seconds: ${INTERNAL_TOKEN_MAX_AGE_SECONDS:60}
+
     internal-jwt-paths:
       - /api/users
       - /auth/me
+      - /api/access
+      - /api/content
+      - /api/assessments
+      - /api/learning-support
+      - /api/games
+      - /api/notifications
       - /api/community
+      - /api/ai-learning
+
     frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
 
 gateway:

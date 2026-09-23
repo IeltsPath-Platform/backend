@@ -3,18 +3,13 @@ package com.group01.user.api.controller;
 import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import com.group01.user.api.dto.request.UpdateLearnerProfileRequest;
 import com.group01.user.api.dto.response.LearnerProfileResponse;
-import com.group01.user.api.dto.response.MessageResponse;
 import com.group01.user.application.command.UpdateLearnerProfileCommand;
 import com.group01.user.application.result.LearnerProfileResult;
-import com.group01.user.application.usecase.DeleteLearnerProfileUseCase;
 import com.group01.user.application.usecase.GetLearnerProfileUseCase;
 import com.group01.user.application.usecase.UpdateLearnerProfileUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,9 +21,9 @@ import java.util.UUID;
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class LearnerProfileController {
+
     private final GetLearnerProfileUseCase getLearnerProfileUseCase;
     private final UpdateLearnerProfileUseCase updateLearnerProfileUseCase;
-    private final DeleteLearnerProfileUseCase deleteLearnerProfileUseCase;
     private final CurrentUserProvider currentUserProvider;
 
     @GetMapping("/me/profile")
@@ -49,36 +44,6 @@ public class LearnerProfileController {
                 request.timezone(),
                 request.visibility()
         )));
-    }
-
-    @GetMapping("/{id}/profile")
-    @PreAuthorize("hasRole('ADMIN') or #p0.toString() == authentication.name")
-    public LearnerProfileResponse getProfileById(@PathVariable("id") UUID id) {
-        return toResponse(getLearnerProfileUseCase.execute(id));
-    }
-
-    @PutMapping("/{id}/profile")
-    @PreAuthorize("hasRole('ADMIN')")
-    public LearnerProfileResponse updateProfileById(
-            @PathVariable("id") UUID id,
-            @Valid @RequestBody UpdateLearnerProfileRequest request
-    ) {
-        return toResponse(updateLearnerProfileUseCase.execute(new UpdateLearnerProfileCommand(
-                id,
-                request.displayName(),
-                request.avatarReference(),
-                request.bio(),
-                request.selfReportedBand(),
-                request.timezone(),
-                request.visibility()
-        )));
-    }
-
-    @DeleteMapping("/{id}/profile")
-    @PreAuthorize("hasRole('ADMIN')")
-    public MessageResponse deleteProfileById(@PathVariable("id") UUID id) {
-        deleteLearnerProfileUseCase.execute(id);
-        return new MessageResponse("Xóa hồ sơ học tập thành công");
     }
 
     private LearnerProfileResponse toResponse(LearnerProfileResult result) {

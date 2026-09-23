@@ -41,19 +41,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(OAuthIdentityController.class)
 @ImportAutoConfiguration(CommonSecurityAutoConfiguration.class)
 @TestPropertySource(properties = {
-        "app.auth.external-jwt-issuer=urn:code-base:auth",
-        "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
-        "spring.cloud.config.enabled=false"
+    "app.auth.external-jwt-issuer=urn:code-base:auth",
+    "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
+    "spring.cloud.config.enabled=false"
 })
 class OAuthIdentitySecurityTest {
+
     private static final String INTERNAL_SECRET = "ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4NzY1NDMyMTA=";
     private static final String INTERNAL_ISSUER = "urn:code-base:api-gateway";
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean private GetOAuthIdentitiesUseCase getOAuthIdentitiesUseCase;
-    @MockBean private UnlinkOAuthIdentityUseCase unlinkOAuthIdentityUseCase;
+    @MockBean
+    private GetOAuthIdentitiesUseCase getOAuthIdentitiesUseCase;
+    @MockBean
+    private UnlinkOAuthIdentityUseCase unlinkOAuthIdentityUseCase;
 
     @DynamicPropertySource
     static void hmacProperties(DynamicPropertyRegistry registry) {
@@ -76,7 +79,7 @@ class OAuthIdentitySecurityTest {
         String token = signedToken(INTERNAL_SECRET, userId, INTERNAL_ISSUER, List.of("CUSTOMER"));
 
         mockMvc.perform(get("/api/users/me/oauth")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].provider").value("GOOGLE"));
 
@@ -89,56 +92,11 @@ class OAuthIdentitySecurityTest {
         String token = signedToken(INTERNAL_SECRET, userId, INTERNAL_ISSUER, List.of("CUSTOMER"));
 
         mockMvc.perform(delete("/api/users/me/oauth/{provider}", "GOOGLE")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Hủy liên kết tài khoản OAuth thành công"));
 
         verify(unlinkOAuthIdentityUseCase).execute(userId, "GOOGLE");
-    }
-
-    @Test
-    void adminCanGetOAuthIdentitiesById() throws Exception {
-        UUID userId = UUID.randomUUID();
-        String adminToken = signedToken(INTERNAL_SECRET, UUID.randomUUID(), INTERNAL_ISSUER, List.of("ADMIN"));
-
-        mockMvc.perform(get("/api/users/{id}/oauth", userId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
-                .andExpect(status().isOk());
-
-        verify(getOAuthIdentitiesUseCase).execute(userId);
-    }
-
-    @Test
-    void learnerCannotGetOAuthIdentitiesById() throws Exception {
-        UUID userId = UUID.randomUUID();
-        String learnerToken = signedToken(INTERNAL_SECRET, userId, INTERNAL_ISSUER, List.of("CUSTOMER"));
-
-        mockMvc.perform(get("/api/users/{id}/oauth", userId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + learnerToken))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void adminCanUnlinkOAuthIdentityById() throws Exception {
-        UUID userId = UUID.randomUUID();
-        String adminToken = signedToken(INTERNAL_SECRET, UUID.randomUUID(), INTERNAL_ISSUER, List.of("ADMIN"));
-
-        mockMvc.perform(delete("/api/users/{id}/oauth/{provider}", userId, "GOOGLE")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Hủy liên kết tài khoản OAuth của người dùng thành công"));
-
-        verify(unlinkOAuthIdentityUseCase).execute(userId, "GOOGLE");
-    }
-
-    @Test
-    void learnerCannotUnlinkOAuthIdentityById() throws Exception {
-        UUID userId = UUID.randomUUID();
-        String learnerToken = signedToken(INTERNAL_SECRET, userId, INTERNAL_ISSUER, List.of("CUSTOMER"));
-
-        mockMvc.perform(delete("/api/users/{id}/oauth/{provider}", userId, "GOOGLE")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + learnerToken))
-                .andExpect(status().isForbidden());
     }
 
     private String signedToken(String secret, UUID subject, String issuer, List<String> roles) {
@@ -161,4 +119,3 @@ class OAuthIdentitySecurityTest {
                 new ImmutableJWKSet<SecurityContext>(new JWKSet(key)));
     }
 }
-
