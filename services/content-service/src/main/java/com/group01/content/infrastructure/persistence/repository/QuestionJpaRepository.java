@@ -18,6 +18,9 @@ public interface QuestionJpaRepository extends JpaRepository<QuestionJpaEntity, 
     Optional<QuestionJpaEntity> findById(UUID id);
 
     @EntityGraph(attributePaths = {"versions"})
+    List<QuestionJpaEntity> findAllByIdIn(List<UUID> ids);
+
+    @EntityGraph(attributePaths = {"versions"})
     List<QuestionJpaEntity> findBySkill(Skill skill);
 }
 

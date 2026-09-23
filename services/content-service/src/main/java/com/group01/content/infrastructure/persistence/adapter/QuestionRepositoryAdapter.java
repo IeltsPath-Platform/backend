@@ -36,6 +36,11 @@ public class QuestionRepositoryAdapter implements QuestionRepository {
     }
 
     @Override
+    public List<Question> findByIds(List<UUID> ids) {
+        return questionJpaRepository.findAllByIdIn(ids).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public List<Question> findBySkill(Skill skill) {
         return questionJpaRepository.findBySkill(skill).stream().map(mapper::toDomain).toList();
     }

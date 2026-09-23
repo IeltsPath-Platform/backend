@@ -72,6 +72,11 @@ spring:
               predicates:
                 - Path=/api/games/**
 
+            - id: game-service-websocket
+              uri: lb:ws://GAME-SERVICE
+              predicates:
+                - Path=/ws/games/**
+
             - id: notification-service
               uri: lb://NOTIFICATION-SERVICE
               predicates:
@@ -119,6 +124,7 @@ gateway:
       - /auth/forgot-password
       - /auth/reset-password
       - /api/users/register
+      - /ws/games/**
 
 management:
   endpoints:

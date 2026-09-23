@@ -1,3 +1,4 @@
+services:
   learning-support-db:
     image: postgres:15-alpine
     container_name: learning-support-db
@@ -35,3 +36,54 @@
       interval: 5s
       timeout: 5s
       retries: 5
+
+  game-db:
+    image: postgres:15-alpine
+    container_name: game-db
+    environment:
+      POSTGRES_DB: game_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${GAME_DB_PASSWORD:?Set GAME_DB_PASSWORD}"
+    ports:
+      - "127.0.0.1:5435:5432"
+    networks:
+      - codebase-network
+    volumes:
+      - game-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d game_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  game-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: services/game-service
+    container_name: game-service
+    environment:
+      SERVER_PORT: 8087
+      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+      GAME_DB_URL: jdbc:postgresql://game-db:5432/game_db
+      GAME_DB_USERNAME: postgres
+      GAME_DB_PASSWORD: "${GAME_DB_PASSWORD:?Set GAME_DB_PASSWORD}"
+      GATEWAY_INTERNAL_JWT_SECRET: "${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}"
+      CONTENT_SERVICE_URL: ${CONTENT_SERVICE_URL:-http://content-service:8082}
+    ports:
+      - "127.0.0.1:8087:8087"
+    networks:
+      - codebase-network
+    depends_on:
+      game-db:
+        condition: service_healthy
+
+networks:
+  codebase-network:
+    driver: bridge
+
+volumes:
+  learning-support-db-data:
+  community-db-data:
+  game-db-data:

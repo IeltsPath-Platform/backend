@@ -22,6 +22,9 @@ public interface VocabularyItemJpaRepository extends JpaRepository<VocabularyIte
     Optional<VocabularyItemJpaEntity> findById(UUID id);
 
     @EntityGraph(attributePaths = {"senses"})
+    List<VocabularyItemJpaEntity> findAllByIdIn(List<UUID> ids);
+
+    @EntityGraph(attributePaths = {"senses"})
     @Query("SELECT v FROM VocabularyItemJpaEntity v WHERE LOWER(v.lemma) LIKE LOWER(CONCAT('%', :query, '%')) ORDER BY v.lemma ASC")
     List<VocabularyItemJpaEntity> searchByLemma(@Param("query") String query);
 

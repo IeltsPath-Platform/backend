@@ -10,6 +10,7 @@ import java.util.UUID;
 public interface QuestionRepository {
     Question save(Question question);
     Optional<Question> findById(UUID id);
+    List<Question> findByIds(List<UUID> ids);
     List<Question> findBySkill(Skill skill);
     List<Question> findAll();
 }
