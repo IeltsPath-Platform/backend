@@ -73,7 +73,7 @@ ai_assistant_db
 | :--- | :--- | :--- | ---: | :--- |
 | `user-service` | Java + Spring Boot | `user_db` | 8 | Identity, role, profile, learning goal |
 | `access-service` | Java + Spring Boot | `access_db` | 8 | Plan, subscription, Premium, activation key, point |
-| `content-service` | Java + Spring Boot | `content_db` | 22 | Curriculum, knowledge point, question bank, vocabulary, video metadata |
+| `content-service` | Java + Spring Boot | `content_db` | 16 | Curriculum, knowledge point, question bank, vocabulary, video metadata |
 | `assessment-service` | Java + Spring Boot | `assessment_db` | 13 | Formal assessment, result, error analysis, Writing/Speaking grading |
 | `ai-learning-service` | Python + FastAPI + DeepTutor | `ai_learning_db` | 13 | DeepTutor adaptive learning, mastery, tutor runtime, question-level review |
 | `learning-support-service` | Java + Spring Boot | `learning_support_db` | 8 | Learning activity, streak, video progress, note, flashcard |
@@ -84,9 +84,9 @@ ai_assistant_db
 Tổng:
 
 ```text
-91 business tables
+85 business tables
 + 9 outbox_events
-= 100 physical tables
+= 94 physical tables
 ```
 
 Mỗi database có một `outbox_events` riêng.
@@ -180,8 +180,6 @@ Các service khác chỉ giữ logical reference đến subscription/ledger khi 
 IELTS curriculum
 Topic
 Knowledge Point
-Prerequisite
-Topic gate rule
 Vocabulary
 Content package / version
 Question Bank
@@ -792,9 +790,9 @@ ai_assistant_db
 ```text
 Business services:     9
 Business databases:   9
-Business tables:      91
+Business tables:      85
 Outbox tables:         9
-Physical tables:     100
+Physical tables:      94
 ```
 
 Source of truth theo domain:

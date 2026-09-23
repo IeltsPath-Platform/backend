@@ -6,4 +6,32 @@ spring:
     name: game-service
   config:
     import: optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}
+  datasource:
+    url: ${GAME_DB_URL:jdbc:postgresql://localhost:5435/game_db}
+    username: ${GAME_DB_USERNAME:postgres}
+    password: ${GAME_DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+app:
+  auth:
+    internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
+    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
+  security:
+    public-endpoints:
+      - method: GET
+        patterns:
+          - /actuator/health
+          - /actuator/info
+          - /ws/games
+
+game:
+  content:
+    base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
+  websocket:
+    allowed-origins: ${GAME_WEBSOCKET_ALLOWED_ORIGINS:http://localhost:5173}
 

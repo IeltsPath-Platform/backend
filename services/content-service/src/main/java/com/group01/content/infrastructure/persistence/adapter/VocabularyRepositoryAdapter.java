@@ -35,6 +35,11 @@ public class VocabularyRepositoryAdapter implements VocabularyRepository {
     }
 
     @Override
+    public List<VocabularyItem> findByIds(List<UUID> ids) {
+        return vocabularyItemJpaRepository.findAllByIdIn(ids).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public Optional<VocabularyItem> findByNormalizedLemma(String normalizedLemma) {
         return vocabularyItemJpaRepository.findByNormalizedLemma(normalizedLemma).map(mapper::toDomain);
     }
