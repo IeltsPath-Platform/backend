@@ -1,37 +1,3 @@
-networks:
-  codebase-network:
-    driver: bridge
-
-# ==========================================
-# VOLUMES
-# ==========================================
-volumes:
-  user-db-data:
-  learning-support-db-data:
-
-services:
-  # ==========================================
-  # 1. BASE DATABASE
-  # ==========================================
-  user-db:
-    image: postgres:15-alpine
-    container_name: user-db
-    environment:
-      POSTGRES_DB: user_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}"
-    ports:
-      - "5432:5432"
-    networks:
-      - codebase-network
-    volumes:
-      - user-db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d user_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   learning-support-db:
     image: postgres:15-alpine
     container_name: learning-support-db
@@ -51,138 +17,21 @@ services:
       timeout: 5s
       retries: 5
 
-  # ==========================================
-  # 2. SPRING CLOUD INFRASTRUCTURE
-  # ==========================================
-  config-server:
-    build:
-      context: .
-      dockerfile: infra/config-server/Dockerfile
-    container_name: config-server
-    ports:
-      - "8888:8888"
+  community-db:
+    image: postgres:15-alpine
+    container_name: community-db
     environment:
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-native}
-      - CONFIG_NATIVE_REPO_URI=file:/app/config-repo
+      POSTGRES_DB: community_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}"
+    ports:
+      - "127.0.0.1:5434:5432"
     networks:
       - codebase-network
+    volumes:
+      - community-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8888/actuator/health || exit 1"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres -d community_db"]
+      interval: 5s
       timeout: 5s
       retries: 5
-      start_period: 20s
-
-  eureka-server:
-    build:
-      context: .
-      dockerfile: Dockerfile.spring-service
-      args:
-        MODULE_PATH: infra/eureka-server
-    container_name: eureka-server
-    ports:
-      - "8761:8761"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
-    networks:
-      - codebase-network
-    depends_on:
-      config-server:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8761/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-
-  api-gateway:
-    build:
-      context: .
-      dockerfile: Dockerfile.spring-service
-      args:
-        MODULE_PATH: infra/api-gateway
-    container_name: api-gateway
-    ports:
-      - "8080:8080"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
-      - EUREKA_URL=http://eureka-server:8761/eureka/
-      - EXTERNAL_JWT_ISSUER=${EXTERNAL_JWT_ISSUER:-urn:code-base:auth}
-      - EXTERNAL_JWT_SECRET=${EXTERNAL_JWT_SECRET:?Set EXTERNAL_JWT_SECRET}
-      - INTERNAL_JWT_ISSUER=${INTERNAL_JWT_ISSUER:-urn:code-base:api-gateway}
-      - GATEWAY_INTERNAL_JWT_SECRET=${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}
-      - INTERNAL_TOKEN_MAX_AGE_SECONDS=${INTERNAL_TOKEN_MAX_AGE_SECONDS:-60}
-    networks:
-      - codebase-network
-    depends_on:
-      eureka-server:
-        condition: service_healthy
-
-  user-service:
-    build:
-      context: .
-      dockerfile: Dockerfile.spring-service
-      args:
-        MODULE_PATH: services/user-service
-    container_name: user-service
-    environment:
-      - SERVER_PORT=8085
-      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
-      - EUREKA_URL=http://eureka-server:8761/eureka/
-      - USER_DB_URL=jdbc:postgresql://user-db:5432/user_db
-      - USER_DB_USERNAME=postgres
-      - USER_DB_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-      - EXTERNAL_JWT_ISSUER=${EXTERNAL_JWT_ISSUER:-urn:code-base:auth}
-      - EXTERNAL_JWT_SECRET=${EXTERNAL_JWT_SECRET:?Set EXTERNAL_JWT_SECRET}
-      - INTERNAL_JWT_ISSUER=${INTERNAL_JWT_ISSUER:-urn:code-base:api-gateway}
-      - GATEWAY_INTERNAL_JWT_SECRET=${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}
-    networks:
-      - codebase-network
-    depends_on:
-      user-db:
-        condition: service_healthy
-      config-server:
-        condition: service_healthy
-      eureka-server:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8085/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
-      start_period: 30s
-
-  learning-support-service:
-    build:
-      context: .
-      dockerfile: Dockerfile.spring-service
-      args:
-        MODULE_PATH: services/learning-support-service
-    container_name: learning-support-service
-    environment:
-      - SERVER_PORT=8086
-      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
-      - EUREKA_URL=http://eureka-server:8761/eureka/
-      - LEARNING_SUPPORT_DB_URL=jdbc:postgresql://learning-support-db:5432/learning_support_db
-      - LEARNING_SUPPORT_DB_USERNAME=postgres
-      - LEARNING_SUPPORT_DB_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-      - INTERNAL_JWT_ISSUER=${INTERNAL_JWT_ISSUER:-urn:code-base:api-gateway}
-      - GATEWAY_INTERNAL_JWT_SECRET=${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}
-    networks:
-      - codebase-network
-    depends_on:
-      learning-support-db:
-        condition: service_healthy
-      config-server:
-        condition: service_healthy
-      eureka-server:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
-      start_period: 30s
