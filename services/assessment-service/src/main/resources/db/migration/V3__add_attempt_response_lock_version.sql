@@ -1,0 +1,1 @@
+ALTER TABLE attempt_responses ADD COLUMN IF NOT EXISTS lock_version BIGINT NOT NULL DEFAULT 0;

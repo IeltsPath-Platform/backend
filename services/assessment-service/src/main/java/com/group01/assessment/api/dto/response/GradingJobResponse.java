@@ -1,0 +1,3 @@
+package com.group01.assessment.api.dto.response;
+import com.group01.assessment.application.result.GradingJobResult; import com.group01.assessment.domain.vo.*; import java.time.Instant; import java.util.UUID;
+public record GradingJobResponse(UUID id,UUID submissionId,UUID userId,Skill skill,GradingMode gradingMode,GradingJobStatus status,Integer pointCostSnapshot,String idempotencyKey,Instant createdAt,Instant completedAt){public static GradingJobResponse from(GradingJobResult r){return new GradingJobResponse(r.id(),r.submissionId(),r.userId(),r.skill(),r.gradingMode(),r.status(),r.pointCostSnapshot(),r.idempotencyKey(),r.createdAt(),r.completedAt());}}

@@ -1,0 +1,2 @@
+package com.group01.assessment.infrastructure.persistence.repository; import com.group01.assessment.infrastructure.persistence.entity.ItemResultJpaEntity; import org.springframework.data.jpa.repository.JpaRepository; import org.springframework.stereotype.Repository; import java.util.*;
+@Repository public interface ItemResultJpaRepository extends JpaRepository<ItemResultJpaEntity,UUID>{List<ItemResultJpaEntity> findByResultId(UUID resultId);}
