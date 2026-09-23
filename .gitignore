@@ -46,6 +46,7 @@ payload.json
 
 .env
 .codex-tmp/
+.m2-test-repository/
 
 # Local code graph runtime/artifacts
 .graphify-tools/
