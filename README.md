@@ -35,6 +35,7 @@ IELTSPath/
 ├── shared/                     # Chứa các module dùng chung giữa các microservices
 │   └── common-security/        # CanonicalRoles, InternalJwtClaims, InternalJwtAuthorities, InternalJwtValidators
 ├── services/                   # Chứa các microservice nghiệp vụ
+├── services/community-service  # Bài viết, bình luận, reaction và moderation
 ├── docker-compose.yml          # File Docker Compose khởi chạy hạ tầng (Postgres, Infrastructure)
 ├── pom.xml                     # Root POM quản lý phiên bản và danh sách module
 └── README.md                   # Tài liệu hướng dẫn dự án
@@ -204,7 +205,9 @@ Các URL/port sau khi chạy:
 - **API Gateway**: `http://localhost:8080`
 - **Eureka Server Dashboard**: `http://localhost:8761`
 - **Config Server**: `http://localhost:8888`
-- **PostgreSQL Database**: `localhost:5432`
+- **User PostgreSQL Database**: `localhost:5432`
+- **Community PostgreSQL Database**: `localhost:5433`
+- **Community API (qua Gateway)**: `http://localhost:8080/api/community/**`
 
 ### 5. Quản Lý Schema Bằng Flyway
 

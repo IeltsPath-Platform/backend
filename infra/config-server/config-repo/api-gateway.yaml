@@ -47,6 +47,10 @@ spring:
                 #
                 # đều sẽ được route tới USER-SERVICE.
                 - Path=/auth/**,/api/users/**
+            - id: community-service
+              uri: lb://COMMUNITY-SERVICE
+              predicates:
+                - Path=/api/community/**
 
 app:
   auth:
@@ -58,6 +62,7 @@ app:
     internal-jwt-paths:
       - /api/users
       - /auth/me
+      - /api/community
     frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
 
 gateway:

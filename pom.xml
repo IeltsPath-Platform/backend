@@ -24,6 +24,7 @@
         <module>infra/config-server</module>
         <module>infra/eureka-server</module>
         <module>services/user-service</module>
+        <module>services/community-service</module>
     </modules>
 
     <dependencyManagement>
