@@ -1,6 +1,6 @@
 package com.group01.content.api.dto.request;
 
-import com.group01.content.domain.vo.AccessLevel;
+import com.group01.content.api.dto.AccessLevel;
 import com.group01.content.domain.vo.VideoLevel;
 import jakarta.validation.constraints.NotBlank;
 
@@ -23,4 +23,3 @@ public record CreateLearningVideoRequest(
         VideoLevel level,
         AccessLevel accessLevel
 ) {}
-

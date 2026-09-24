@@ -17,7 +17,7 @@ public class GetGameSessionUseCase {
     @Transactional(readOnly = true)
     public GameSessionResult execute(UUID sessionId, UUID userId) {
         return sessionRepository.findOwned(sessionId, userId)
-                .map(session -> GameSessionResult.from(session, false))
+                .map(GameSessionResult::from)
                 .orElseThrow(() -> new GameSessionNotFoundException(sessionId));
     }
 }

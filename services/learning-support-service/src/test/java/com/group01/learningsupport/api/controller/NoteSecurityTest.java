@@ -1,11 +1,8 @@
 package com.group01.learningsupport.api.controller;
 
 import com.group01.commonsecurity.config.CommonSecurityAutoConfiguration;
-import com.group01.learningsupport.application.usecase.CreateNoteUseCase;
-import com.group01.learningsupport.application.usecase.DeleteNoteUseCase;
-import com.group01.learningsupport.application.usecase.GetNoteUseCase;
-import com.group01.learningsupport.application.usecase.ListNotesUseCase;
-import com.group01.learningsupport.application.usecase.UpdateNoteUseCase;
+import com.group01.learningsupport.application.result.NoteResult;
+import com.group01.learningsupport.application.usecase.*;
 import com.group01.learningsupport.domain.aggregate.Note;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.OctetSequenceKey;
@@ -19,11 +16,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.JwsHeader;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.jwt.*;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -38,6 +31,7 @@ import java.util.UUID;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(NoteController.class)
@@ -82,13 +76,17 @@ class NoteSecurityTest {
     @Test
     void tokenSubjectIsPassedToCreateNote() throws Exception {
         UUID userId = UUID.randomUUID();
-        when(createNoteUseCase.execute(userId, "Note", "Body")).thenReturn(Note.create(userId, "Note", "Body"));
+        when(createNoteUseCase.execute(userId, "Note", "Body"))
+                .thenReturn(NoteResult.from(Note.create(userId, "Note", "Body")));
 
         mockMvc.perform(post("/api/learning-support/notes")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedToken(userId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"Note\",\"body\":\"Body\"}"))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
+                .andExpect(jsonPath("$.title").value("Note"))
+                .andExpect(jsonPath("$.body").value("Body"));
 
         verify(createNoteUseCase).execute(userId, "Note", "Body");
     }

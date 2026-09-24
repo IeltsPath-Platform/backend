@@ -27,7 +27,7 @@ public class CreateContentPackageUseCase {
                 command.code(),
                 command.title(),
                 command.packageType(),
-                command.accessLevel()
+                command.requiredFeatureKey()
         );
 
         ContentPackage saved = contentPackageRepository.save(pkg);
@@ -36,7 +36,7 @@ public class CreateContentPackageUseCase {
                 saved.getCode(),
                 saved.getTitle(),
                 saved.getPackageType(),
-                saved.getAccessLevel(),
+                saved.getRequiredFeatureKey(),
                 saved.getStatus(),
                 saved.getCurrentPublishedVersionId(),
                 saved.getCreatedAt(),
@@ -44,4 +44,3 @@ public class CreateContentPackageUseCase {
         );
     }
 }
-

@@ -1,7 +1,6 @@
 package com.group01.learningsupport.application.usecase;
 
 import com.group01.learningsupport.application.command.UpsertStreakCommand;
-import com.group01.learningsupport.domain.aggregate.Streak;
 import com.group01.learningsupport.domain.repository.LearningActivityRepository;
 import com.group01.learningsupport.domain.repository.StreakRepository;
 import org.junit.jupiter.api.Test;
@@ -11,10 +10,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class UpsertStreakUseCaseTest {
     private final StreakRepository streakRepository = mock(StreakRepository.class);
@@ -26,10 +22,10 @@ class UpsertStreakUseCaseTest {
         UUID userId = UUID.randomUUID();
         when(streakRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Streak saved = useCase.execute(new UpsertStreakCommand(userId, 3, 5, LocalDate.parse("2026-09-22"), "Asia/Ho_Chi_Minh"));
+        var saved = useCase.execute(new UpsertStreakCommand(userId, 3, 5, LocalDate.parse("2026-09-22"), "Asia/Ho_Chi_Minh"));
 
-        assertEquals(3, saved.getCurrentDays());
-        assertEquals(5, saved.getLongestDays());
+        assertEquals(3, saved.currentDays());
+        assertEquals(5, saved.longestDays());
         verify(streakRepository).save(any());
         verifyNoInteractions(activityRepository);
     }

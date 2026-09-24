@@ -15,6 +15,19 @@ Community Service owns posts, threaded comments, reactions, moderation, and the 
 
 Authenticated users create content and may edit or soft-delete only their own active content. `ADMIN` may hide or restore non-deleted content.
 
+## Internal architecture
+
+- `api`: HTTP controllers, request/response DTOs, validation, and mapping between authenticated identity and application
+  input.
+- `application`: one use case per post, comment, moderation, reaction, or listing operation; commands, queries, and
+  result records.
+- `domain`: post/comment aggregates, value objects, domain exceptions, and repository contracts.
+- `infrastructure`: JPA entities and repositories, persistence mappers, and adapters that implement domain repository
+  contracts.
+
+Controllers do not return domain aggregates. Application inputs receive the verified user ID and admin capability from
+the API boundary; they do not read security context or raw identity headers themselves.
+
 ## Endpoints
 
 | Method | Path | Purpose |

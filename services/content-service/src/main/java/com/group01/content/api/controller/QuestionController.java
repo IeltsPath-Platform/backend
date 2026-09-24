@@ -1,18 +1,6 @@
 package com.group01.content.api.controller;
 
-import java.util.List;
-import java.util.UUID;
-
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
-
+import com.group01.content.api.AccessLevelCompatibility;
 import com.group01.content.api.dto.request.AddQuestionVersionRequest;
 import com.group01.content.api.dto.request.CreateQuestionRequest;
 import com.group01.content.api.dto.response.QuestionDetailResponse;
@@ -21,15 +9,15 @@ import com.group01.content.application.command.AddQuestionVersionCommand;
 import com.group01.content.application.command.CreateQuestionCommand;
 import com.group01.content.application.result.QuestionDetailResult;
 import com.group01.content.application.result.QuestionResult;
-import com.group01.content.application.usecase.AddQuestionVersionUseCase;
-import com.group01.content.application.usecase.ArchiveQuestionUseCase;
-import com.group01.content.application.usecase.CreateQuestionUseCase;
-import com.group01.content.application.usecase.GetQuestionDetailUseCase;
-import com.group01.content.application.usecase.ListQuestionsUseCase;
+import com.group01.content.application.usecase.*;
 import com.group01.content.domain.vo.Skill;
-
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping({"/api/content/questions", "/api/content/admin/questions"})
@@ -63,7 +51,7 @@ public class QuestionController {
         QuestionResult result = createQuestionUseCase.execute(new CreateQuestionCommand(
                 request.questionType(),
                 request.skill(),
-                request.accessLevel()
+                AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT")
         ));
         return QuestionResponse.from(result);
     }
@@ -82,7 +70,10 @@ public class QuestionController {
                 request.answerSpecJson(),
                 request.explanation(),
                 request.difficulty(),
-                request.knowledgePoints()
+                request.knowledgePoints() == null ? null : request.knowledgePoints().stream()
+                        .map(kp -> new AddQuestionVersionCommand.KnowledgePointInput(
+                                kp.questionVersionId(), kp.knowledgePointId(), kp.weight()))
+                        .toList()
         ));
         return QuestionResponse.from(result);
     }

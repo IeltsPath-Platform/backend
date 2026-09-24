@@ -1,6 +1,9 @@
 package com.group01.assessment.infrastructure.persistence.entity;
 
-import com.group01.assessment.domain.vo.*;
+import com.group01.assessment.domain.vo.AttemptChannel;
+import com.group01.assessment.domain.vo.AttemptMode;
+import com.group01.assessment.domain.vo.AttemptStatus;
+import com.group01.assessment.domain.vo.AttemptType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,7 +30,7 @@ public class AssessmentAttemptJpaEntity {
     private AttemptChannel channel;
     @Enumerated(EnumType.STRING) @Column(nullable = false)
     private AttemptStatus status;
-    @Column(name = "started_at", nullable = false)
+    @Column(name = "started_at")
     private Instant startedAt;
     private Instant submittedAt;
     private Instant expiresAt;

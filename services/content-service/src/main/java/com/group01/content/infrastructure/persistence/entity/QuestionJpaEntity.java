@@ -1,6 +1,5 @@
 package com.group01.content.infrastructure.persistence.entity;
 
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.domain.vo.QuestionType;
 import com.group01.content.domain.vo.Skill;
@@ -35,9 +34,8 @@ public class QuestionJpaEntity {
     @Column(name = "skill", length = 50)
     private Skill skill;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "access_level", nullable = false, length = 50)
-    private AccessLevel accessLevel;
+    @Column(name = "required_feature_key", length = 100)
+    private String requiredFeatureKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
@@ -59,4 +57,3 @@ public class QuestionJpaEntity {
     @Builder.Default
     private List<QuestionVersionJpaEntity> versions = new ArrayList<>();
 }
-

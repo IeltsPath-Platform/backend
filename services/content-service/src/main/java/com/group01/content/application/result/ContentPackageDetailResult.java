@@ -1,6 +1,5 @@
 package com.group01.content.application.result;
 
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.PublicationStatus;
 
@@ -13,7 +12,7 @@ public record ContentPackageDetailResult(
         String code,
         String title,
         PackageType packageType,
-        AccessLevel accessLevel,
+        String requiredFeatureKey,
         PublicationStatus status,
         UUID currentPublishedVersionId,
         int versionNumber,
@@ -24,4 +23,3 @@ public record ContentPackageDetailResult(
         Instant updatedAt,
         List<ContentSectionResult> sections
 ) {}
-

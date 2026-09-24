@@ -3,7 +3,6 @@ package com.group01.content.application.usecase;
 import com.group01.content.application.result.LearningVideoResult;
 import com.group01.content.domain.aggregate.LearningVideo;
 import com.group01.content.domain.repository.LearningVideoRepository;
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,8 +19,8 @@ public class ListLearningVideosUseCase {
         this.learningVideoRepository = learningVideoRepository;
     }
 
-    public List<LearningVideoResult> execute(AccessLevel accessLevel, PublicationStatus status) {
-        List<LearningVideo> videos = learningVideoRepository.findAll(accessLevel, status);
+    public List<LearningVideoResult> execute(Boolean featureRequired, PublicationStatus status) {
+        List<LearningVideo> videos = learningVideoRepository.findAll(featureRequired, status);
         return videos.stream()
                 .map(v -> new LearningVideoResult(
                         v.getId(),
@@ -33,7 +32,7 @@ public class ListLearningVideosUseCase {
                         v.getDurationSeconds(),
                         v.getTopicId(),
                         v.getLevel(),
-                        v.getAccessLevel(),
+                        v.getRequiredFeatureKey(),
                         v.getStatus(),
                         v.getCreatedBy(),
                         v.getCreatedAt(),
@@ -42,4 +41,3 @@ public class ListLearningVideosUseCase {
                 .toList();
     }
 }
-

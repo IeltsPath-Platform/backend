@@ -1,6 +1,5 @@
 package com.group01.content.application.command;
 
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.VideoLevel;
 
 import java.util.UUID;
@@ -14,7 +13,6 @@ public record CreateLearningVideoCommand(
         Integer durationSeconds,
         UUID topicId,
         VideoLevel level,
-        AccessLevel accessLevel,
+        String requiredFeatureKey,
         UUID createdBy
 ) {}
-

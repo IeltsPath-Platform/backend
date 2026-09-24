@@ -8,4 +8,6 @@ import java.util.UUID;
 public interface AssessmentResultRepository {
     AssessmentResult save(AssessmentResult result);
     Optional<AssessmentResult> findLatestByAttemptId(UUID attemptId);
+
+    Optional<AssessmentResult> findLatestForUpdateByAttemptId(UUID attemptId);
 }

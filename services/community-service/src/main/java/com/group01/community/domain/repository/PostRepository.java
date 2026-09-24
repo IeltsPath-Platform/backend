@@ -1,6 +1,7 @@
 package com.group01.community.domain.repository;
 
 import com.group01.community.domain.aggregate.Post;
+import com.group01.community.domain.vo.CommunityPage;
 import com.group01.community.domain.vo.ContentStatus;
 
 import java.util.Optional;
@@ -11,5 +12,5 @@ public interface PostRepository {
 
     Optional<Post> findById(UUID id);
 
-    PageResult<Post> findByStatus(ContentStatus status, PageQuery query);
+    CommunityPage<Post> findByStatus(ContentStatus status, int page, int size);
 }

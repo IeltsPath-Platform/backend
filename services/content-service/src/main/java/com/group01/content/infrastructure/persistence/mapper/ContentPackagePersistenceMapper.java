@@ -29,7 +29,7 @@ public class ContentPackagePersistenceMapper {
                 entity.getCode(),
                 entity.getTitle(),
                 entity.getPackageType(),
-                entity.getAccessLevel(),
+                entity.getRequiredFeatureKey(),
                 entity.getStatus(),
                 entity.getCurrentPublishedVersionId(),
                 entity.getCreatedAt(),
@@ -51,7 +51,7 @@ public class ContentPackagePersistenceMapper {
                 .code(domain.getCode())
                 .title(domain.getTitle())
                 .packageType(domain.getPackageType())
-                .accessLevel(domain.getAccessLevel())
+                .requiredFeatureKey(domain.getRequiredFeatureKey())
                 .status(domain.getStatus())
                 .currentPublishedVersionId(domain.getCurrentPublishedVersionId())
                 .createdAt(domain.getCreatedAt())
@@ -174,4 +174,3 @@ public class ContentPackagePersistenceMapper {
                 .build();
     }
 }
-

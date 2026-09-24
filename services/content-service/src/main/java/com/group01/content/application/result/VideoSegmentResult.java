@@ -1,6 +1,5 @@
 package com.group01.content.application.result;
 
-import com.group01.content.domain.entity.VideoSegmentLexicalEntry;
 
 import java.time.Instant;
 import java.util.List;
@@ -16,6 +15,5 @@ public record VideoSegmentResult(
         String translationVi,
         Instant createdAt,
         Instant updatedAt,
-        List<VideoSegmentLexicalEntry> lexicalEntries
+        List<VideoSegmentLexicalEntryResult> lexicalEntries
 ) {}
-

@@ -32,7 +32,7 @@ public class LearningVideoPersistenceMapper {
                 entity.getDurationSeconds(),
                 entity.getTopicId(),
                 entity.getLevel(),
-                entity.getAccessLevel(),
+                entity.getRequiredFeatureKey(),
                 entity.getStatus(),
                 entity.getCreatedBy(),
                 entity.getCreatedAt(),
@@ -59,7 +59,7 @@ public class LearningVideoPersistenceMapper {
                 .durationSeconds(domain.getDurationSeconds())
                 .topicId(domain.getTopicId())
                 .level(domain.getLevel())
-                .accessLevel(domain.getAccessLevel())
+                .requiredFeatureKey(domain.getRequiredFeatureKey())
                 .status(domain.getStatus())
                 .createdBy(domain.getCreatedBy())
                 .createdAt(domain.getCreatedAt())

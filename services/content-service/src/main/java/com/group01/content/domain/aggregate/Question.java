@@ -1,37 +1,32 @@
 package com.group01.content.domain.aggregate;
 
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
-
 import com.group01.content.domain.entity.QuestionVersion;
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.domain.vo.QuestionType;
 import com.group01.content.domain.vo.Skill;
+
+import java.time.Instant;
+import java.util.*;
 
 public class Question {
 
     private final UUID id;
     private QuestionType questionType;
     private Skill skill;
-    private AccessLevel accessLevel;
+    private String requiredFeatureKey;
     private PublicationStatus status;
     private UUID currentPublishedVersionId;
     private final Instant createdAt;
     private Instant updatedAt;
     private final List<QuestionVersion> versions;
 
-    public Question(UUID id, QuestionType questionType, Skill skill, AccessLevel accessLevel,
+    public Question(UUID id, QuestionType questionType, Skill skill, String requiredFeatureKey,
             PublicationStatus status, UUID currentPublishedVersionId,
             Instant createdAt, Instant updatedAt, List<QuestionVersion> versions) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.questionType = Objects.requireNonNull(questionType, "questionType must not be null");
         this.skill = skill;
-        this.accessLevel = accessLevel != null ? accessLevel : AccessLevel.FREE;
+        this.requiredFeatureKey = requiredFeatureKey;
         this.status = status != null ? status : PublicationStatus.DRAFT;
         this.currentPublishedVersionId = currentPublishedVersionId;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
@@ -39,9 +34,9 @@ public class Question {
         this.versions = versions != null ? new ArrayList<>(versions) : new ArrayList<>();
     }
 
-    public static Question create(QuestionType questionType, Skill skill, AccessLevel accessLevel) {
+    public static Question create(QuestionType questionType, Skill skill, String requiredFeatureKey) {
         Instant now = Instant.now();
-        return new Question(UUID.randomUUID(), questionType, skill, accessLevel,
+        return new Question(UUID.randomUUID(), questionType, skill, requiredFeatureKey,
                 PublicationStatus.DRAFT, null, now, now, new ArrayList<>());
     }
 
@@ -78,8 +73,8 @@ public class Question {
         return skill;
     }
 
-    public AccessLevel getAccessLevel() {
-        return accessLevel;
+    public String getRequiredFeatureKey() {
+        return requiredFeatureKey;
     }
 
     public PublicationStatus getStatus() {

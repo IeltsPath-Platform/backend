@@ -86,7 +86,7 @@ public class GetContentPackageDetailUseCase {
                 pkg.getCode(),
                 pkg.getTitle(),
                 pkg.getPackageType(),
-                pkg.getAccessLevel(),
+                pkg.getRequiredFeatureKey(),
                 pkg.getStatus(),
                 pkg.getCurrentPublishedVersionId(),
                 versionNumber,
@@ -99,4 +99,3 @@ public class GetContentPackageDetailUseCase {
         );
     }
 }
-

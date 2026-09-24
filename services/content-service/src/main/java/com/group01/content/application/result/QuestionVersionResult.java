@@ -1,6 +1,5 @@
 package com.group01.content.application.result;
 
-import com.group01.content.domain.entity.QuestionKnowledgePoint;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.domain.vo.QuestionDifficulty;
 import com.group01.content.domain.vo.QuestionOptionPayload;
@@ -21,6 +20,5 @@ public record QuestionVersionResult(
         PublicationStatus status,
         Instant createdAt,
         Instant updatedAt,
-        List<QuestionKnowledgePoint> knowledgePoints
+        List<QuestionKnowledgePointResult> knowledgePoints
 ) {}
-

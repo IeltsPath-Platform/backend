@@ -1,6 +1,7 @@
 package com.group01.learningsupport.application.usecase;
 
 import com.group01.learningsupport.application.command.CreateLearningActivityCommand;
+import com.group01.learningsupport.application.result.LearningActivityResult;
 import com.group01.learningsupport.domain.aggregate.LearningActivity;
 import com.group01.learningsupport.domain.repository.LearningActivityRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,14 +14,14 @@ public class CreateLearningActivityUseCase {
     private final LearningActivityRepository repository;
 
     @Transactional
-    public LearningActivity execute(CreateLearningActivityCommand command) {
-        return repository.save(LearningActivity.create(
+    public LearningActivityResult execute(CreateLearningActivityCommand command) {
+        return LearningActivityResult.from(repository.save(LearningActivity.create(
                 command.userId(),
                 command.activityType(),
                 command.sourceType(),
                 command.sourceId(),
                 command.occurredAt(),
                 command.durationSeconds()
-        ));
+        )));
     }
 }

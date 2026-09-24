@@ -35,7 +35,7 @@ public class PublishLearningVideoUseCase {
                 saved.getDurationSeconds(),
                 saved.getTopicId(),
                 saved.getLevel(),
-                saved.getAccessLevel(),
+                saved.getRequiredFeatureKey(),
                 saved.getStatus(),
                 saved.getCreatedBy(),
                 saved.getCreatedAt(),
@@ -43,4 +43,3 @@ public class PublishLearningVideoUseCase {
         );
     }
 }
-

@@ -67,4 +67,7 @@ mvn -pl services/assessment-service -am test
 mvn -pl services/assessment-service -am compile -DskipTests
 ```
 
-The module currently includes application/domain tests and an application-context test. PostgreSQL migration verification requires a PostgreSQL runtime or Testcontainers support when those tests are added.
+The module includes application/domain tests, an application-context test, and a Testcontainers PostgreSQL schema test.
+The schema test applies Flyway, validates JPA mappings with Hibernate, and checks assessment result and video-practice
+persistence against the V5 schema; it is skipped when Docker is unavailable. Creating video practice requires `videoId`,
+`segmentId`, `practiceType`, and `referenceTextSnapshot` so the attempt retains its segment and transcript snapshot.

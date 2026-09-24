@@ -3,11 +3,7 @@ package com.group01.game.infrastructure.websocket;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.group01.game.application.result.GameMatchResult;
-import com.group01.game.application.usecase.ChangeGameRoomMembershipUseCase;
-import com.group01.game.application.usecase.GetGameMatchStateUseCase;
-import com.group01.game.application.usecase.GetGameRoomUseCase;
-import com.group01.game.application.usecase.StartGameMatchUseCase;
-import com.group01.game.application.usecase.SubmitGameAnswerUseCase;
+import com.group01.game.application.usecase.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -68,7 +64,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             String type = envelope.path("type").asText("");
             switch (type) {
                 case "PING" -> send(session, Map.of("type", "PONG"));
-                case "ROOM_STATE" -> send(session, Map.of("type", "ROOM_STATE", "room", getRoom.byId(roomId, userId)));
+                case "ROOM_STATE" -> send(session, RoomStateMessage.of("ROOM_STATE", getRoom.byId(roomId, userId)));
                 case "RECONNECT" -> reconnect(session, userId, requiredUuid(envelope, "matchId"));
                 case "READY" -> {
                     membership.ready(roomId, userId, envelope.path("ready").asBoolean(false));
@@ -104,7 +100,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void reconnect(WebSocketSession session, UUID userId, UUID matchId) throws IOException {
-        send(session, Map.of("type", "MATCH_STATE", "match", getMatch.execute(matchId, userId)));
+        send(session, MatchStateMessage.of("MATCH_STATE", getMatch.execute(matchId, userId)));
     }
 
     private void submitMatchAnswer(JsonNode envelope, UUID roomId, UUID userId) throws IOException {
@@ -124,7 +120,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         @SuppressWarnings("unchecked")
         Map<String, Object> payload = objectMapper.convertValue(answerNode, Map.class);
         var result = submitAnswer.execute(ownState.sessionId(), userId, sequence, payload, duration);
-        broadcast(ownState.roomId(), Map.of("type", "ANSWER_ACCEPTED", "userId", userId.toString(), "answer", result));
+        broadcast(ownState.roomId(), AnswerAcceptedMessage.of(userId.toString(), result));
         if ("COMPLETED".equals(result.sessionStatus())) {
             broadcastPersonalizedMatchState(ownState.roomId(), matchId, "MATCH_STATE");
         }
@@ -136,7 +132,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             if (!member.isOpen()) continue;
             UUID userId = attribute(member, USER_ID_ATTRIBUTE);
             try {
-                send(member, Map.of("type", type, "match", getMatch.execute(matchId, userId)));
+                send(member, MatchStateMessage.of(type, getMatch.execute(matchId, userId)));
             } catch (RuntimeException ignored) {
                 // A connected room member who is not a match player must not receive match data.
             }
@@ -145,7 +141,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private void broadcastRoomState(UUID roomId, UUID userId) throws IOException {
         var room = getRoom.byId(roomId, userId);
-        broadcast(roomId, Map.of("type", "ROOM_STATE", "room", room));
+        broadcast(roomId, RoomStateMessage.of("ROOM_STATE", room));
     }
 
     private void broadcast(UUID roomId, Object value) throws IOException {

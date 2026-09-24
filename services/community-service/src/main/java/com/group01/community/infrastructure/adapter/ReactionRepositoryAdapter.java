@@ -2,7 +2,8 @@ package com.group01.community.infrastructure.adapter;
 
 import com.group01.community.domain.repository.ReactionRepository;
 import com.group01.community.domain.vo.ReactionType;
-import com.group01.community.infrastructure.persistence.*;
+import com.group01.community.infrastructure.persistence.entity.PostReactionId;
+import com.group01.community.infrastructure.persistence.repository.PostReactionJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 

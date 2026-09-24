@@ -1,5 +1,7 @@
 package com.group01.content.api.controller;
 
+import com.group01.content.api.AccessLevelCompatibility;
+import com.group01.content.api.dto.AccessLevel;
 import com.group01.content.api.dto.request.AddContentSectionRequest;
 import com.group01.content.api.dto.request.AddPackageVersionRequest;
 import com.group01.content.api.dto.request.CreateContentPackageRequest;
@@ -15,7 +17,6 @@ import com.group01.content.application.result.ContentPackageDetailResult;
 import com.group01.content.application.result.ContentPackageResult;
 import com.group01.content.application.result.ContentSectionResult;
 import com.group01.content.application.usecase.*;
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +43,9 @@ public class ContentPackageController {
             @RequestParam(value = "accessLevel", required = false) AccessLevel accessLevel,
             @RequestParam(value = "status", required = false) PublicationStatus status
     ) {
-        return listContentPackagesUseCase.execute(accessLevel, status).stream()
+        return listContentPackagesUseCase.execute(
+                        AccessLevelCompatibility.toFeatureRequiredFilter(accessLevel), status
+                ).stream()
                 .map(ContentPackageResponse::from)
                 .toList();
     }
@@ -60,7 +63,7 @@ public class ContentPackageController {
                 request.code(),
                 request.title(),
                 request.packageType(),
-                request.accessLevel()
+                AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT")
         ));
         return ContentPackageResponse.from(result);
     }

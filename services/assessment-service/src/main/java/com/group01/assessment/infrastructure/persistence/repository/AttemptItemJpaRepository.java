@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -16,4 +17,7 @@ public interface AttemptItemJpaRepository extends JpaRepository<AttemptItemJpaEn
     Optional<AttemptItemJpaEntity> findByIdAndAttemptId(@Param("itemId") UUID itemId, @Param("attemptId") UUID attemptId);
     @Query("select i from AttemptItemJpaEntity i join AttemptSectionJpaEntity s on s.id = i.attemptSectionId where s.attemptId = :attemptId order by s.sortOrder, i.sortOrder")
     List<AttemptItemJpaEntity> findByAttemptId(@Param("attemptId") UUID attemptId);
+
+    @Query("select i.id from AttemptItemJpaEntity i join AttemptSectionJpaEntity s on s.id = i.attemptSectionId where s.attemptId = :attemptId and i.id in :itemIds")
+    Set<UUID> findExistingIdsByAttemptId(@Param("itemIds") Set<UUID> itemIds, @Param("attemptId") UUID attemptId);
 }

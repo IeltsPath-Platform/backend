@@ -2,6 +2,7 @@ package com.group01.learningsupport.api.controller;
 
 import com.group01.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.group01.learningsupport.application.command.CreateLearningActivityCommand;
+import com.group01.learningsupport.application.result.LearningActivityResult;
 import com.group01.learningsupport.application.usecase.CreateLearningActivityUseCase;
 import com.group01.learningsupport.application.usecase.DeleteLearningActivityUseCase;
 import com.group01.learningsupport.application.usecase.ListLearningActivitiesUseCase;
@@ -19,11 +20,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.JwsHeader;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.jwt.*;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -41,6 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(LearningActivityController.class)
@@ -79,7 +77,8 @@ class LearningActivitySecurityTest {
     @Test
     void tokenSubjectIsPassedToCreateActivity() throws Exception {
         UUID userId = UUID.randomUUID();
-        when(createLearningActivityUseCase.execute(any())).thenReturn(activity(userId));
+        when(createLearningActivityUseCase.execute(any()))
+                .thenReturn(LearningActivityResult.from(activity(userId)));
 
         mockMvc.perform(post("/api/learning-support/activities")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedToken(userId))
@@ -93,7 +92,10 @@ class LearningActivitySecurityTest {
                                   "durationSeconds": 12
                                 }
                                 """))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
+                .andExpect(jsonPath("$.activityType").value("WATCH"))
+                .andExpect(jsonPath("$.durationSeconds").value(12));
 
         ArgumentCaptor<CreateLearningActivityCommand> captor = ArgumentCaptor.forClass(CreateLearningActivityCommand.class);
         verify(createLearningActivityUseCase).execute(captor.capture());

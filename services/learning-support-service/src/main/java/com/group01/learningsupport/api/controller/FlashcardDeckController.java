@@ -4,32 +4,16 @@ import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import com.group01.learningsupport.api.dto.request.AddDeckItemRequest;
 import com.group01.learningsupport.api.dto.request.CreateDeckRequest;
 import com.group01.learningsupport.api.dto.request.UpdateDeckRequest;
+import com.group01.learningsupport.api.dto.response.DeckItemResponse;
+import com.group01.learningsupport.api.dto.response.FlashcardDeckResponse;
+import com.group01.learningsupport.api.dto.response.PageResponse;
 import com.group01.learningsupport.application.query.PageQuery;
-import com.group01.learningsupport.application.result.PageResult;
-import com.group01.learningsupport.application.usecase.AddFlashcardToDeckUseCase;
-import com.group01.learningsupport.application.usecase.CreateFlashcardDeckUseCase;
-import com.group01.learningsupport.application.usecase.DeleteFlashcardDeckUseCase;
-import com.group01.learningsupport.application.usecase.GetFlashcardDeckUseCase;
-import com.group01.learningsupport.application.usecase.ListDeckItemsUseCase;
-import com.group01.learningsupport.application.usecase.ListFlashcardDecksUseCase;
-import com.group01.learningsupport.application.usecase.RemoveFlashcardFromDeckUseCase;
-import com.group01.learningsupport.application.usecase.UpdateFlashcardDeckUseCase;
-import com.group01.learningsupport.domain.aggregate.DeckItem;
-import com.group01.learningsupport.domain.aggregate.FlashcardDeck;
+import com.group01.learningsupport.application.usecase.*;
 import com.group01.learningsupport.domain.vo.LibraryStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
@@ -49,29 +33,34 @@ public class FlashcardDeckController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public FlashcardDeck create(@Valid @RequestBody CreateDeckRequest request) {
-        return createFlashcardDeckUseCase.execute(currentUserProvider.requireUserId(), request.name(), request.description());
+    public FlashcardDeckResponse create(@Valid @RequestBody CreateDeckRequest request) {
+        return FlashcardDeckResponse.from(createFlashcardDeckUseCase.execute(
+                currentUserProvider.requireUserId(), request.name(), request.description()
+        ));
     }
 
     @GetMapping
-    public PageResult<FlashcardDeck> list(
+    public PageResponse<FlashcardDeckResponse> list(
             @RequestParam(defaultValue = "ACTIVE") LibraryStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return listFlashcardDecksUseCase.execute(currentUserProvider.requireUserId(), status, new PageQuery(page, size));
+        return PageResponse.from(
+                listFlashcardDecksUseCase.execute(currentUserProvider.requireUserId(), status, new PageQuery(page, size)),
+                FlashcardDeckResponse::from
+        );
     }
 
     @GetMapping("/{id}")
-    public FlashcardDeck get(@PathVariable UUID id) {
-        return getFlashcardDeckUseCase.execute(currentUserProvider.requireUserId(), id);
+    public FlashcardDeckResponse get(@PathVariable UUID id) {
+        return FlashcardDeckResponse.from(getFlashcardDeckUseCase.execute(currentUserProvider.requireUserId(), id));
     }
 
     @PutMapping("/{id}")
-    public FlashcardDeck update(@PathVariable UUID id, @Valid @RequestBody UpdateDeckRequest request) {
-        return updateFlashcardDeckUseCase.execute(
+    public FlashcardDeckResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateDeckRequest request) {
+        return FlashcardDeckResponse.from(updateFlashcardDeckUseCase.execute(
                 currentUserProvider.requireUserId(), id, request.name(), request.description(), request.status()
-        );
+        ));
     }
 
     @DeleteMapping("/{id}")
@@ -89,12 +78,15 @@ public class FlashcardDeckController {
     }
 
     @GetMapping("/{deckId}/items")
-    public PageResult<DeckItem> listItems(
+    public PageResponse<DeckItemResponse> listItems(
             @PathVariable UUID deckId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return listDeckItemsUseCase.execute(currentUserProvider.requireUserId(), deckId, new PageQuery(page, size));
+        return PageResponse.from(
+                listDeckItemsUseCase.execute(currentUserProvider.requireUserId(), deckId, new PageQuery(page, size)),
+                DeckItemResponse::from
+        );
     }
 
     @DeleteMapping("/{deckId}/items/{flashcardId}")

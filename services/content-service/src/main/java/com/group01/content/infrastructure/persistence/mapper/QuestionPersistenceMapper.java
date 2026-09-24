@@ -36,7 +36,7 @@ public class QuestionPersistenceMapper {
                 entity.getId(),
                 entity.getQuestionType(),
                 entity.getSkill(),
-                entity.getAccessLevel(),
+                entity.getRequiredFeatureKey(),
                 entity.getStatus(),
                 entity.getCurrentPublishedVersionId(),
                 entity.getCreatedAt(),
@@ -57,7 +57,7 @@ public class QuestionPersistenceMapper {
                 .id(domain.getId())
                 .questionType(domain.getQuestionType())
                 .skill(domain.getSkill())
-                .accessLevel(domain.getAccessLevel())
+                .requiredFeatureKey(domain.getRequiredFeatureKey())
                 .status(domain.getStatus())
                 .currentPublishedVersionId(domain.getCurrentPublishedVersionId())
                 .createdAt(domain.getCreatedAt())
@@ -131,4 +131,3 @@ public class QuestionPersistenceMapper {
                 .build();
     }
 }
-

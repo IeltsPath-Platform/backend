@@ -12,11 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class StartGameSessionUseCase {
@@ -70,7 +66,7 @@ public class StartGameSessionUseCase {
         outboxWriter.append("GameSession", saved.id().toString(), "GameSessionStarted",
                 Map.of("sessionId", saved.id().toString(), "userId", saved.userId().toString(),
                         "learningDomain", saved.learningDomain(), "gameType", saved.gameType()));
-        return GameSessionResult.from(saved, false);
+        return GameSessionResult.from(saved);
     }
 
 }
