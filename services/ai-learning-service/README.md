@@ -36,19 +36,41 @@ runtime. The service configuration uses `AI_LEARNING_INTERNAL_JWT_SECRET`,
 and decode to at least 32 bytes. Supply secret values through runtime
 configuration; do not put them in this file or the image.
 
-The PostgreSQL constraint for goal-bound mastery paths is defined in
-`migrations/V1__one_mastery_path_per_learning_goal.sql`. Apply it after the V5
-`mastery_paths` table exists. The script stops if the database already contains
-more than one path for a non-null `(user_id, learning_goal_id)` pair; reconcile
-those rows before retrying. `AI_LEARNING_TEST_DATABASE_URL` enables the
-concurrent-insert integration test in `tests/test_mastery_path_goal_uniqueness.py`.
+## Database migrations
+
+`ai_learning_db` is migrated by Flyway from `migrations/`, in numeric version order:
+
+| Version | File | Creates |
+| --- | --- | --- |
+| `0.1` | `V0_1__create_v5_mastery_tables.sql` | V5 `mastery_paths`, `mastery_interactions`, `mastery_events` |
+| `1` | `V1__one_mastery_path_per_learning_goal.sql` | One path per `(user_id, learning_goal_id)` |
+| `2` | `V2__formal_assessment_evidence.sql` | Evidence projection and the result-version ledger |
+
+`V1` stops if the database already contains more than one path for a non-null
+`(user_id, learning_goal_id)` pair; reconcile those rows before retrying.
+
+`mastery_interactions.status` accepts the lowercase values DeepTutor writes
+(`registered`, `awaiting_input`, `answered`, `graded`, `abandoned`), not the uppercase
+names in `DATABASE_V5.md`. `interaction_id` is a UUID as in V5; Phase 1 never inserts
+interactions, so DeepTutor's question-id format is checked when Tutor Chat is built.
+
+A database where `V1` and `V2` were applied by hand has no Flyway history table, so
+`flyway migrate` reports a non-empty schema. Baseline it once at the last applied
+version, then migrate normally:
+
+```powershell
+flyway -baselineOnMigrate=true -baselineVersion=2 migrate
+```
+
+The PostgreSQL tests build each schema by running this same migration chain
+(`tests/postgres_schema_support.py`); there is no hand-written DDL in the tests.
+`AI_LEARNING_TEST_DATABASE_URL` points them at a disposable database.
 
 The service uses DeepTutor's synchronous `LearningStore` interface. Its
 PostgreSQL adapter locks one aggregate row with `SELECT ... FOR UPDATE`; nested
 DeepTutor transactions for bootstrap join one PostgreSQL transaction so path
 ownership, initial state, curriculum, revision, and events commit together.
-Apply the V5 mastery schema and the uniqueness migration before enabling the
-path endpoints.
+Run the Flyway migrations before enabling the path endpoints.
 The active-goal and curriculum contracts also depend on User Service
 `V4__enforce_one_active_learning_goal_per_user.sql` and Content Service
 `V3__add_knowledge_point_learning_type.sql` being applied to their own databases.

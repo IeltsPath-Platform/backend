@@ -1,50 +1,34 @@
-"""Disposable PostgreSQL schema with the DATABASE_V5 AI Learning tables plus this service's migrations.
+"""Disposable PostgreSQL schema built only from this service's ``migrations/V*.sql``.
 
-The base V5 tables are not created by a migration in this repository, so tests
-create them here in an isolated schema and then apply ``migrations/V*.sql``.
+Tests apply the same migration chain Flyway runs, in the same version order, so
+the schema under test cannot drift from the deployed one.
 """
 
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
+from typing import Iterable
 from urllib.parse import quote
 from uuid import uuid4
 
-BASE_V5_TABLES = """
-CREATE TABLE mastery_paths (
-    path_id UUID PRIMARY KEY,
-    user_id UUID NOT NULL,
-    learning_goal_id UUID,
-    state_json JSONB NOT NULL,
-    revision BIGINT NOT NULL,
-    owner_session_id UUID,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
-);
-CREATE TABLE mastery_interactions (
-    interaction_id UUID PRIMARY KEY,
-    path_id UUID NOT NULL REFERENCES mastery_paths(path_id) ON DELETE CASCADE,
-    status VARCHAR(30) NOT NULL,
-    question_json JSONB NOT NULL,
-    session_id UUID,
-    turn_id UUID,
-    user_answer TEXT NOT NULL DEFAULT '',
-    result_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
-);
-CREATE TABLE mastery_events (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    path_id UUID NOT NULL REFERENCES mastery_paths(path_id) ON DELETE CASCADE,
-    revision BIGINT NOT NULL,
-    event_type VARCHAR(100) NOT NULL,
-    payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-    session_id UUID,
-    turn_id UUID,
-    created_at TIMESTAMPTZ NOT NULL
-);
-"""
+MIGRATIONS_DIR = Path(__file__).parents[1] / "migrations"
+
+_VERSIONED = re.compile(r"^V(\d+(?:_\d+)*)__")
+
+
+def migration_version(path: Path) -> str:
+    """Flyway version of a ``V<version>__<name>.sql`` file, with ``_`` read as ``.``."""
+    match = _VERSIONED.match(path.name)
+    if match is None:
+        raise ValueError(f"Not a versioned migration: {path.name}")
+    return match.group(1).replace("_", ".")
+
+
+def ordered_migrations(paths: Iterable[Path]) -> list[Path]:
+    """Order migrations the way Flyway does: by numeric version parts, never by file name."""
+    return sorted(paths, key=lambda path: tuple(int(part) for part in migration_version(path).split(".")))
 
 
 class PostgresSchema:
@@ -65,8 +49,7 @@ class PostgresSchema:
             with connection.cursor() as cursor:
                 cursor.execute(f'CREATE SCHEMA "{self.name}"')
                 cursor.execute(f'SET search_path TO "{self.name}"')
-                cursor.execute(BASE_V5_TABLES)
-                for migration in sorted((Path(__file__).parents[1] / "migrations").glob("V*.sql")):
+                for migration in ordered_migrations(MIGRATIONS_DIR.glob("V*.sql")):
                     cursor.execute(migration.read_text(encoding="utf-8"))
         finally:
             connection.close()
@@ -77,6 +60,15 @@ class PostgresSchema:
         try:
             with connection.cursor() as cursor:
                 cursor.execute(f'DROP SCHEMA IF EXISTS "{self.name}" CASCADE')
+        finally:
+            connection.close()
+
+    def execute(self, sql: str, params: tuple = ()) -> None:
+        connection = self._psycopg2.connect(self.url)
+        try:
+            with connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(sql, params)
         finally:
             connection.close()
 
