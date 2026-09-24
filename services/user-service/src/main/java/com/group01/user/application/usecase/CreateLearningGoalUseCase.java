@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -37,8 +36,9 @@ public class CreateLearningGoalUseCase {
                         learningGoalRepository.save(existingActiveGoal);
                     });
 
+            // No id: the JPA entity generates it. A preassigned id makes Spring Data merge an entity
+            // that does not exist yet, which Hibernate rejects as a stale update.
             LearningGoal newGoal = LearningGoal.builder()
-                    .id(UUID.randomUUID())
                     .userId(command.userId())
                     .targetBand(command.targetBand())
                     .examDate(command.examDate())
