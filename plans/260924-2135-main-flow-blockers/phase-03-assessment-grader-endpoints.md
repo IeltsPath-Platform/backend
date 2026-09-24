@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Assessment grader endpoints"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 effort: "~4.5h"

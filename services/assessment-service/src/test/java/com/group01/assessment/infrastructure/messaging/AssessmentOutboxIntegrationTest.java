@@ -1,10 +1,17 @@
 package com.group01.assessment.infrastructure.messaging;
 
 import com.group01.assessment.application.command.FinalizeAssessmentResultCommand;
+import com.group01.assessment.application.command.ItemResultInput;
+import com.group01.assessment.application.command.KnowledgeJudgmentInput;
+import com.group01.assessment.application.command.SaveGradingDetailsCommand;
+import com.group01.assessment.application.result.AssessmentResultResult;
+import com.group01.assessment.application.usecase.CreateAssessmentResultUseCase;
 import com.group01.assessment.application.usecase.FinalizeAssessmentResultUseCase;
+import com.group01.assessment.application.usecase.SaveAssessmentResultDetailsUseCase;
+import com.group01.assessment.domain.exception.InvalidAssessmentStateException;
+import com.group01.assessment.domain.vo.QualitativeJudgment;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.AmqpAdmin;
-import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.Queue;
@@ -27,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -64,6 +72,8 @@ class AssessmentOutboxIntegrationTest {
     }
 
     @Autowired FinalizeAssessmentResultUseCase finalizeResult;
+    @Autowired CreateAssessmentResultUseCase createResult;
+    @Autowired SaveAssessmentResultDetailsUseCase saveDetails;
     @Autowired OutboxRelay relay;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactionManager;
@@ -97,45 +107,116 @@ class AssessmentOutboxIntegrationTest {
 
     @Test
     void relayPublishesOnlyCommittedOutboxRows() throws Exception {
-        String queue = "test.assessment-completed." + UUID.randomUUID();
-        amqpAdmin.declareQueue(new Queue(queue, false, false, true));
-        Binding binding = BindingBuilder.bind(new Queue(queue)).to(assessmentEventsExchange).with("assessment.completed.v2");
-        amqpAdmin.declareBinding(binding);
+        String queue = declareTestQueue();
         UUID eventId = UUID.randomUUID();
+        try {
+            try (Connection uncommitted = DriverManager.getConnection(
+                    POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
+                uncommitted.setAutoCommit(false);
+                try (PreparedStatement insert = uncommitted.prepareStatement("""
+                        INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, payload)
+                        VALUES (?, 'AssessmentResult', ?, 'AssessmentCompleted.v2', '{"event_id":"test"}'::jsonb)
+                        """)) {
+                    insert.setObject(1, eventId);
+                    insert.setString(2, UUID.randomUUID().toString());
+                    insert.executeUpdate();
+                }
 
-        try (Connection uncommitted = DriverManager.getConnection(
-                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
-            uncommitted.setAutoCommit(false);
-            try (PreparedStatement insert = uncommitted.prepareStatement("""
-                    INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, payload)
-                    VALUES (?, 'AssessmentResult', ?, 'AssessmentCompleted.v2', '{"event_id":"test"}'::jsonb)
-                    """)) {
-                insert.setObject(1, eventId);
-                insert.setString(2, UUID.randomUUID().toString());
-                insert.executeUpdate();
+                relay.publishPendingBatch();
+                assertNull(rabbitTemplate.receive(queue, 500), "an uncommitted outbox row must not be published");
+
+                uncommitted.commit();
             }
 
             relay.publishPendingBatch();
-            assertNull(rabbitTemplate.receive(queue, 500), "an uncommitted outbox row must not be published");
-
-            uncommitted.commit();
+            Message message = rabbitTemplate.receive(queue, 5000);
+            assertNotNull(message);
+            assertEquals(eventId.toString(), message.getMessageProperties().getMessageId());
+            assertEquals("AssessmentCompleted.v2", message.getMessageProperties().getType());
+            assertTrue(new String(message.getBody(), StandardCharsets.UTF_8).contains("event_id"));
+            assertNotNull(jdbc.queryForObject("SELECT published_at FROM outbox_events WHERE id = ?",
+                    java.sql.Timestamp.class, eventId));
+        } finally {
+            amqpAdmin.deleteQueue(queue);
         }
-
-        relay.publishPendingBatch();
-        Message message = rabbitTemplate.receive(queue, 5000);
-        assertNotNull(message);
-        assertEquals(eventId.toString(), message.getMessageProperties().getMessageId());
-        assertEquals("AssessmentCompleted.v2", message.getMessageProperties().getType());
-        assertTrue(new String(message.getBody(), StandardCharsets.UTF_8).contains("event_id"));
-        assertNotNull(jdbc.queryForObject("SELECT published_at FROM outbox_events WHERE id = ?",
-                java.sql.Timestamp.class, eventId));
     }
 
-    private UUID seedGradedDraftResult() {
+    @Test
+    void graderLifecycleFinalizesWithTheGradersBandAndPublishesOneEvent() {
+        String queue = declareTestQueue();
+        try {
+            UUID knowledgePointId = UUID.randomUUID();
+            SubmittedAttempt attempt = seedSubmittedAttempt(knowledgePointId);
+            // The learner opened the version with a self-declared band; the grader's band must replace it.
+            UUID resultId = jdbc.queryForObject("SELECT gen_random_uuid()", UUID.class);
+            jdbc.update("""
+                    INSERT INTO assessment_results (id, attempt_id, result_version, status, overall_band)
+                    VALUES (?, ?, 1, 'DRAFT', 9.0)
+                    """, resultId, attempt.attemptId());
+            assertThrows(InvalidAssessmentStateException.class,
+                    () -> createResult.executeForGrader(attempt.attemptId(), null),
+                    "the learner's draft is still being graded");
+
+            saveDetails.executeForGrader(new SaveGradingDetailsCommand(resultId, 6.5, null,
+                    List.of(new ItemResultInput(attempt.itemId(), 1.0, 1.0, true, null, "{}")), null,
+                    List.of(new KnowledgeJudgmentInput(attempt.itemId(), knowledgePointId, QualitativeJudgment.PASS))));
+            AssessmentResultResult completed = finalizeResult.execute(new FinalizeAssessmentResultCommand(resultId));
+            finalizeResult.execute(new FinalizeAssessmentResultCommand(resultId));
+
+            assertEquals("COMPLETED", completed.status());
+            assertEquals(6.5, completed.overallBand());
+            assertEquals(1, outboxRows(resultId));
+
+            relay.publishPendingBatch();
+            List<String> published = eventsFor(queue, resultId);
+            assertEquals(1, published.size(), "a repeated finalize must not emit a second event");
+            assertTrue(published.get(0).contains("\"PASS\""));
+
+            // A regrade opens version 2 and announces it on its own.
+            AssessmentResultResult regrade = createResult.executeForGrader(attempt.attemptId(), null);
+            assertEquals(2, regrade.resultVersion());
+            saveDetails.executeForGrader(new SaveGradingDetailsCommand(regrade.id(), 5.0, null,
+                    List.of(new ItemResultInput(attempt.itemId(), 0.0, 1.0, false, null, "{}")), null, null));
+            finalizeResult.execute(new FinalizeAssessmentResultCommand(regrade.id()));
+            relay.publishPendingBatch();
+            assertEquals(1, eventsFor(queue, regrade.id()).size());
+        } finally {
+            amqpAdmin.deleteQueue(queue);
+        }
+    }
+
+    /** Bodies on the queue that announce {@code resultId}; other tests' outbox rows are published by the same relay. */
+    private List<String> eventsFor(String queue, UUID resultId) {
+        List<String> bodies = new java.util.ArrayList<>();
+        Message message;
+        while ((message = rabbitTemplate.receive(queue, 1000)) != null) {
+            String body = new String(message.getBody(), StandardCharsets.UTF_8);
+            if (body.contains(resultId.toString())) {
+                bodies.add(body);
+            }
+        }
+        return bodies;
+    }
+
+    /**
+     * Not auto-delete: RabbitMQ drops an auto-delete queue as soon as its last consumer cancels, and every
+     * {@code receive(queue, timeout)} consumes and cancels, so a second receive would hit a deleted queue.
+     */
+    private String declareTestQueue() {
+        String queue = "test.assessment-completed." + UUID.randomUUID();
+        amqpAdmin.declareQueue(new Queue(queue, false, false, false));
+        amqpAdmin.declareBinding(BindingBuilder.bind(new Queue(queue)).to(assessmentEventsExchange)
+                .with("assessment.completed.v2"));
+        return queue;
+    }
+
+    private record SubmittedAttempt(UUID attemptId, UUID itemId) {
+    }
+
+    private SubmittedAttempt seedSubmittedAttempt(UUID knowledgePointId) {
         UUID attemptId = UUID.randomUUID();
         UUID sectionId = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
-        UUID resultId = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO assessment_attempts (id, user_id, package_version_id, attempt_type, mode, channel, status,
                                                  started_at, submitted_at, learning_goal_id)
@@ -152,14 +233,20 @@ class AssessmentOutboxIntegrationTest {
         jdbc.update("""
                 INSERT INTO attempt_item_knowledge_points (attempt_item_id, knowledge_point_id, weight)
                 VALUES (?, ?, 1.00)
-                """, itemId, UUID.randomUUID());
+                """, itemId, knowledgePointId);
+        return new SubmittedAttempt(attemptId, itemId);
+    }
+
+    private UUID seedGradedDraftResult() {
+        SubmittedAttempt attempt = seedSubmittedAttempt(UUID.randomUUID());
+        UUID resultId = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO assessment_results (id, attempt_id, result_version, status) VALUES (?, ?, 1, 'DRAFT')
-                """, resultId, attemptId);
+                """, resultId, attempt.attemptId());
         jdbc.update("""
                 INSERT INTO item_results (id, result_id, attempt_item_id, score, max_score, is_correct, feedback_snapshot)
                 VALUES (?, ?, ?, 1.00, 1.00, TRUE, '{}'::jsonb)
-                """, UUID.randomUUID(), resultId, itemId);
+                """, UUID.randomUUID(), resultId, attempt.itemId());
         return resultId;
     }
 

@@ -49,7 +49,7 @@ Ngoài phạm vi:
 |-------|------|--------|
 | 1 | [AI Learning baseline schema and Flyway](./phase-01-ai-learning-baseline-schema-and-flyway.md) | Completed |
 | 2 | [Pending formal result inbox](./phase-02-pending-formal-result-inbox.md) | Completed |
-| 3 | [Assessment grader endpoints](./phase-03-assessment-grader-endpoints.md) | Pending |
+| 3 | [Assessment grader endpoints](./phase-03-assessment-grader-endpoints.md) | Completed |
 | 4 | [Minimal compose and end-to-end verification](./phase-04-minimal-compose-and-end-to-end-verification.md) | Pending |
 
 ## Dependencies

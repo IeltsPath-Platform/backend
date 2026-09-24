@@ -3,6 +3,7 @@ package com.group01.assessment.application.usecase;
 import com.group01.assessment.application.command.CreateAssessmentResultCommand;
 import com.group01.assessment.domain.aggregate.AssessmentAttempt;
 import com.group01.assessment.domain.entity.AssessmentResult;
+import com.group01.assessment.domain.exception.AssessmentNotFoundException;
 import com.group01.assessment.domain.exception.InvalidAssessmentStateException;
 import com.group01.assessment.domain.repository.AssessmentAttemptRepository;
 import com.group01.assessment.domain.repository.AssessmentResultRepository;
@@ -65,6 +66,65 @@ class CreateAssessmentResultUseCaseTest {
         assertThrows(InvalidAssessmentStateException.class, () -> new CreateAssessmentResultUseCase(attempts, results)
                 .execute(new CreateAssessmentResultCommand(userId, attemptId, 6.5)));
         verify(results, never()).save(any());
+    }
+
+    @Test
+    void learnerCannotOpenAResultForAnotherLearnersAttempt() {
+        when(attempts.findByIdAndUserId(attemptId, userId)).thenReturn(Optional.empty());
+
+        assertThrows(AssessmentNotFoundException.class, () -> new CreateAssessmentResultUseCase(attempts, results)
+                .execute(new CreateAssessmentResultCommand(userId, attemptId, 6.0)));
+        verify(results, never()).save(any());
+    }
+
+    @Test
+    void graderOpensTheNextVersionWithoutALearner() {
+        stubAttemptById(AttemptStatus.SUBMITTED);
+        when(results.findLatestByAttemptId(attemptId)).thenReturn(Optional.of(
+                new AssessmentResult(UUID.randomUUID(), attemptId, 1, AssessmentResult.COMPLETED, 6.0, Instant.now())));
+        when(results.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = new CreateAssessmentResultUseCase(attempts, results).executeForGrader(attemptId, 7.0);
+
+        assertEquals(2, result.resultVersion());
+        assertEquals(AssessmentResult.DRAFT, result.status());
+        assertEquals(7.0, result.overallBand());
+        verify(attempts, never()).findByIdAndUserId(any(), any());
+    }
+
+    @Test
+    void graderCannotOpenAVersionWhileTheLatestIsStillBeingGraded() {
+        stubAttemptById(AttemptStatus.SUBMITTED);
+        when(results.findLatestByAttemptId(attemptId)).thenReturn(Optional.of(
+                new AssessmentResult(UUID.randomUUID(), attemptId, 1, AssessmentResult.DRAFT, 9.0, null)));
+
+        assertThrows(InvalidAssessmentStateException.class,
+                () -> new CreateAssessmentResultUseCase(attempts, results).executeForGrader(attemptId, null));
+        verify(results, never()).save(any());
+    }
+
+    @Test
+    void graderCannotOpenAResultForAnUnsubmittedAttempt() {
+        stubAttemptById(AttemptStatus.IN_PROGRESS);
+
+        assertThrows(InvalidAssessmentStateException.class,
+                () -> new CreateAssessmentResultUseCase(attempts, results).executeForGrader(attemptId, null));
+        verify(results, never()).save(any());
+    }
+
+    @Test
+    void graderOpeningAnUnknownAttemptIsNotFound() {
+        when(attempts.findById(attemptId)).thenReturn(Optional.empty());
+
+        assertThrows(AssessmentNotFoundException.class,
+                () -> new CreateAssessmentResultUseCase(attempts, results).executeForGrader(attemptId, null));
+    }
+
+    private void stubAttemptById(AttemptStatus status) {
+        Instant now = Instant.now();
+        when(attempts.findById(attemptId)).thenReturn(Optional.of(new AssessmentAttempt(attemptId,
+                userId, UUID.randomUUID(), AttemptType.QUIZ, AttemptMode.STANDARD, AttemptChannel.WEB,
+                status, now, now, null, 1, now, now, UUID.randomUUID())));
     }
 
     private void stubSubmittedAttempt() {

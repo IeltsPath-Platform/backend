@@ -1,8 +1,12 @@
 package com.group01.assessment.application.usecase;
 
 import com.group01.assessment.application.command.ErrorAnalysisInput;
+import com.group01.assessment.application.command.ItemResultInput;
 import com.group01.assessment.application.command.KnowledgeJudgmentInput;
 import com.group01.assessment.application.command.SaveAssessmentResultDetailsCommand;
+import com.group01.assessment.application.command.SaveGradingDetailsCommand;
+import com.group01.assessment.application.command.SkillScoreInput;
+import com.group01.assessment.domain.entity.AssessmentResult;
 import com.group01.assessment.domain.entity.ErrorAnalysisItem;
 import com.group01.assessment.domain.entity.ItemResult;
 import com.group01.assessment.domain.entity.ItemResultKnowledgeJudgment;
@@ -47,20 +51,50 @@ public class SaveAssessmentResultDetailsUseCase {
         this.judgments = judgments;
     }
 
+    /** Learner entry: the latest version of the caller's own attempt. The result's band is not changed. */
     @Transactional
     public void execute(SaveAssessmentResultDetailsCommand command) {
         var attempt = attempts.findByIdAndUserId(command.attemptId(), command.userId())
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
         var result = results.findLatestForUpdateByAttemptId(attempt.getId())
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
+        requireGradable(result);
+        saveDetails(attempt.getId(), result, command.skillScores(), command.itemResults(), command.errors(),
+                command.knowledgeJudgments());
+    }
+
+    /**
+     * Grader entry (EXAMINER/ADMIN, enforced by the controller): any learner's result, which must be the latest
+     * version and still being graded. The grader's band always replaces the version's band, even when null, so a
+     * finalized result never carries a band the learner declared when opening it.
+     */
+    @Transactional
+    public void executeForGrader(SaveGradingDetailsCommand command) {
+        var result = results.findForUpdateById(command.resultId())
+                .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
+        requireGradable(result);
+        var latest = results.findLatestByAttemptId(result.attemptId()).orElse(result);
+        if (latest.resultVersion() != result.resultVersion()) {
+            throw new InvalidAssessmentStateException("Only the latest result version can be graded");
+        }
+        saveDetails(result.attemptId(), result, command.skillScores(), command.itemResults(), command.errors(),
+                command.knowledgeJudgments());
+        results.save(result.withGradedBand(command.overallBand()));
+    }
+
+    private static void requireGradable(AssessmentResult result) {
         if (!result.isGradable()) {
             throw new InvalidAssessmentStateException(
                     "A finalized result cannot be changed; create a new result version to regrade");
         }
+    }
 
-        if (command.skillScores() != null && !command.skillScores().isEmpty()) {
+    private void saveDetails(UUID attemptId, AssessmentResult result, List<SkillScoreInput> skillScores,
+                             List<ItemResultInput> itemResults, List<ErrorAnalysisInput> errorInputs,
+                             List<KnowledgeJudgmentInput> knowledgeJudgments) {
+        if (skillScores != null && !skillScores.isEmpty()) {
             Set<Skill> submittedSkills = new HashSet<>();
-            for (var score : command.skillScores()) {
+            for (var score : skillScores) {
                 if (!submittedSkills.add(score.skill())) {
                     throw new InvalidAssessmentStateException("Only one score per skill is allowed");
                 }
@@ -68,7 +102,7 @@ public class SaveAssessmentResultDetailsUseCase {
 
             Map<Skill, SkillScore> existingBySkill = skills.findByResultId(result.id()).stream()
                     .collect(Collectors.toMap(SkillScore::skill, Function.identity()));
-            skills.saveAll(command.skillScores().stream()
+            skills.saveAll(skillScores.stream()
                     .map(score -> {
                         SkillScore existing = existingBySkill.get(score.skill());
                         return new SkillScore(existing == null ? UUID.randomUUID() : existing.id(), result.id(),
@@ -78,8 +112,8 @@ public class SaveAssessmentResultDetailsUseCase {
                     .toList());
         }
 
-        if (command.itemResults() != null && !command.itemResults().isEmpty()) {
-            List<UUID> submittedAttemptItemIds = command.itemResults().stream()
+        if (itemResults != null && !itemResults.isEmpty()) {
+            List<UUID> submittedAttemptItemIds = itemResults.stream()
                     .map(item -> item.attemptItemId())
                     .toList();
             Set<UUID> uniqueAttemptItemIds = new HashSet<>(submittedAttemptItemIds);
@@ -89,13 +123,13 @@ public class SaveAssessmentResultDetailsUseCase {
             }
 
             Set<UUID> existingAttemptItemIds = attemptItems.findExistingIdsByAttemptId(
-                    uniqueAttemptItemIds, attempt.getId());
+                    uniqueAttemptItemIds, attemptId);
             if (!existingAttemptItemIds.containsAll(uniqueAttemptItemIds)) {
                 throw new InvalidAssessmentStateException(
                         "Item results must reference items from this assessment attempt");
             }
 
-            for (var item : command.itemResults()) {
+            for (var item : itemResults) {
                 if (item.maxScore() != null && (item.maxScore() <= 0
                         || (item.score() != null && item.score() > item.maxScore()))) {
                     throw new InvalidAssessmentStateException(
@@ -105,7 +139,7 @@ public class SaveAssessmentResultDetailsUseCase {
 
             Map<UUID, ItemResult> existingByAttemptItem = items.findByResultId(result.id()).stream()
                     .collect(Collectors.toMap(ItemResult::attemptItemId, Function.identity()));
-            List<ItemResult> itemResults = command.itemResults().stream()
+            List<ItemResult> graded = itemResults.stream()
                     .map(item -> {
                         ItemResult existing = existingByAttemptItem.get(item.attemptItemId());
                         return new ItemResult(existing == null ? UUID.randomUUID() : existing.id(), result.id(),
@@ -113,12 +147,12 @@ public class SaveAssessmentResultDetailsUseCase {
                                 item.durationMilliseconds(), item.feedbackSnapshot());
                     })
                     .toList();
-            items.saveAll(itemResults);
+            items.saveAll(graded);
         }
 
-        if (command.errors() != null && !command.errors().isEmpty()) {
+        if (errorInputs != null && !errorInputs.isEmpty()) {
             Set<UUID> submittedErrorIds = new HashSet<>();
-            for (ErrorAnalysisInput error : command.errors()) {
+            for (ErrorAnalysisInput error : errorInputs) {
                 if (error.id() == null || !submittedErrorIds.add(error.id())) {
                     throw new InvalidAssessmentStateException("Error analysis IDs must be present and unique");
                 }
@@ -129,7 +163,7 @@ public class SaveAssessmentResultDetailsUseCase {
             Set<UUID> validResultItemIds = itemResultByAttemptItemId.values().stream()
                     .map(ItemResult::id)
                     .collect(Collectors.toSet());
-            boolean referencesMissingItemResult = command.errors().stream()
+            boolean referencesMissingItemResult = errorInputs.stream()
                     .anyMatch(error -> !itemResultByAttemptItemId.containsKey(error.attemptItemId()));
             if (referencesMissingItemResult) {
                 throw new InvalidAssessmentStateException(
@@ -144,15 +178,15 @@ public class SaveAssessmentResultDetailsUseCase {
                         "Error analysis ID already belongs to another assessment result");
             }
 
-            errors.saveAll(command.errors().stream()
+            errors.saveAll(errorInputs.stream()
                     .map(error -> new ErrorAnalysisItem(error.id(),
                             itemResultByAttemptItemId.get(error.attemptItemId()).id(),
                             error.knowledgePointId(), error.errorType(), error.explanation()))
                     .toList());
         }
 
-        if (command.knowledgeJudgments() != null && !command.knowledgeJudgments().isEmpty()) {
-            saveKnowledgeJudgments(result.id(), command.knowledgeJudgments());
+        if (knowledgeJudgments != null && !knowledgeJudgments.isEmpty()) {
+            saveKnowledgeJudgments(result.id(), knowledgeJudgments);
         }
     }
 

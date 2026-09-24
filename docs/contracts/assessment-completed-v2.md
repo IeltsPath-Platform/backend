@@ -10,11 +10,12 @@ next objective).
 The event is emitted when a result version is finalized:
 
 ```text
-POST /api/assessments/attempts                capture active learning goal + Content KP snapshot
-... grading saves item results, max scores, judgments (result stays DRAFT)
-FinalizeAssessmentResultUseCase               DRAFT/PROCESSING -> COMPLETED
-                                              + outbox_events row, same DB transaction
-OutboxRelay                                   committed row -> RabbitMQ (publisher confirm + mandatory routing)
+POST /api/assessments/attempts                                  capture active learning goal + Content KP snapshot
+POST /api/assessments/grading/attempts/{attemptId}/results      EXAMINER/ADMIN opens a DRAFT version
+PUT  /api/assessments/grading/results/{resultId}/details        item results, max scores, judgments, band (still DRAFT)
+POST /api/assessments/grading/results/{resultId}/finalize       FinalizeAssessmentResultUseCase: DRAFT/PROCESSING -> COMPLETED
+                                                                + outbox_events row, same DB transaction
+OutboxRelay                                                     committed row -> RabbitMQ (publisher confirm + mandatory routing)
 ```
 
 - A result is never announced partially graded. Finalization requires every attempt

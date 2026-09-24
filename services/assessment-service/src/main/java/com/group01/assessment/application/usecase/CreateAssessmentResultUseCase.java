@@ -2,6 +2,7 @@ package com.group01.assessment.application.usecase;
 
 import com.group01.assessment.application.command.CreateAssessmentResultCommand;
 import com.group01.assessment.application.result.AssessmentResultResult;
+import com.group01.assessment.domain.aggregate.AssessmentAttempt;
 import com.group01.assessment.domain.entity.AssessmentResult;
 import com.group01.assessment.domain.exception.*;
 import com.group01.assessment.domain.repository.*;
@@ -18,14 +19,24 @@ import java.util.UUID;
 public class CreateAssessmentResultUseCase {
     private final AssessmentAttemptRepository attempts; private final AssessmentResultRepository results;
     public CreateAssessmentResultUseCase(AssessmentAttemptRepository attempts, AssessmentResultRepository results){this.attempts=attempts;this.results=results;}
+    /** Learner entry: the attempt must belong to the caller. */
     @Transactional
     public AssessmentResultResult execute(CreateAssessmentResultCommand c){
         var attempt=attempts.findByIdAndUserId(c.attemptId(),c.userId()).orElseThrow(()->new AssessmentNotFoundException("Assessment attempt not found"));
+        return openNextVersion(attempt,c.overallBand());
+    }
+    /** Grader entry (EXAMINER/ADMIN, enforced by the controller): any learner's attempt. */
+    @Transactional
+    public AssessmentResultResult executeForGrader(UUID attemptId, Double overallBand){
+        var attempt=attempts.findById(attemptId).orElseThrow(()->new AssessmentNotFoundException("Assessment attempt not found"));
+        return openNextVersion(attempt,overallBand);
+    }
+    private AssessmentResultResult openNextVersion(AssessmentAttempt attempt, Double overallBand){
         if(attempt.getStatus()!=AttemptStatus.SUBMITTED) throw new InvalidAssessmentStateException("Only submitted attempts can have a result");
-        var latest=results.findLatestByAttemptId(c.attemptId());
+        var latest=results.findLatestByAttemptId(attempt.getId());
         if(latest.isPresent()&&latest.get().isGradable()) throw new InvalidAssessmentStateException("The latest result version is still being graded");
         int version=latest.map(r->r.resultVersion()+1).orElse(1);
-        var saved=results.save(new AssessmentResult(UUID.randomUUID(),c.attemptId(),version,AssessmentResult.DRAFT,c.overallBand(),null));
+        var saved=results.save(new AssessmentResult(UUID.randomUUID(),attempt.getId(),version,AssessmentResult.DRAFT,overallBand,null));
         return new AssessmentResultResult(saved.id(),saved.attemptId(),saved.resultVersion(),saved.status(),saved.overallBand(),saved.completedAt());
     }
 }

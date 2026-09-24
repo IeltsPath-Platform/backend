@@ -24,6 +24,14 @@ public record AssessmentResult(UUID id, UUID attemptId, int resultVersion, Strin
         return DRAFT.equals(status) || PROCESSING.equals(status);
     }
 
+    /** The band a grader decided for this version; replaces any band set when the version was opened. */
+    public AssessmentResult withGradedBand(Double band) {
+        if (!isGradable()) {
+            throw new InvalidAssessmentStateException("Only a draft or processing result can be graded");
+        }
+        return new AssessmentResult(id, attemptId, resultVersion, status, band, completedAt);
+    }
+
     public AssessmentResult complete(Instant at) {
         if (!isGradable()) {
             throw new InvalidAssessmentStateException("Only a draft or processing result can be finalized");
