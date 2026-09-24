@@ -1,36 +1,43 @@
 package com.group01.game.application.usecase;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.group01.game.application.port.OutboxWriter;
+import com.group01.game.application.port.GameAnswerEvaluator;
 import com.group01.game.application.port.GameMatchEventWriter;
+import com.group01.game.application.port.OutboxWriter;
 import com.group01.game.application.result.GameAnswerResult;
 import com.group01.game.domain.aggregate.GameAnswer;
+import com.group01.game.domain.aggregate.GameMatchPlayer;
 import com.group01.game.domain.aggregate.GameSession;
+import com.group01.game.domain.aggregate.GameSessionStatus;
+import com.group01.game.domain.exception.GameMatchNotFoundException;
 import com.group01.game.domain.exception.GameSessionNotFoundException;
+import com.group01.game.domain.repository.GameMatchPlayerRepository;
+import com.group01.game.domain.repository.GameMatchRepository;
 import com.group01.game.domain.repository.GameSessionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class SubmitGameAnswerUseCase {
     private final GameSessionRepository sessionRepository;
-    private final ObjectMapper objectMapper;
+    private final GameAnswerEvaluator answerEvaluator;
     private final OutboxWriter outboxWriter;
     private final GameMatchEventWriter matchEventWriter;
+    private final GameMatchRepository matchRepository;
+    private final GameMatchPlayerRepository matchPlayerRepository;
 
-    public SubmitGameAnswerUseCase(GameSessionRepository sessionRepository, ObjectMapper objectMapper,
-                                   OutboxWriter outboxWriter, GameMatchEventWriter matchEventWriter) {
+    public SubmitGameAnswerUseCase(GameSessionRepository sessionRepository, GameAnswerEvaluator answerEvaluator,
+                                   OutboxWriter outboxWriter, GameMatchEventWriter matchEventWriter,
+                                   GameMatchRepository matchRepository,
+                                   GameMatchPlayerRepository matchPlayerRepository) {
         this.sessionRepository = sessionRepository;
-        this.objectMapper = objectMapper;
+        this.answerEvaluator = answerEvaluator;
         this.outboxWriter = outboxWriter;
         this.matchEventWriter = matchEventWriter;
+        this.matchRepository = matchRepository;
+        this.matchPlayerRepository = matchPlayerRepository;
     }
 
     @Transactional
@@ -53,14 +60,14 @@ public class SubmitGameAnswerUseCase {
         if (durationMilliseconds < 0) throw new IllegalArgumentException("durationMilliseconds must not be negative");
         Object rawItems = session.sourceSnapshot().get("items");
         Map<String, Object> item = (Map<String, Object>) ((List<?>) rawItems).get(itemSequence - 1);
-        boolean correct = isCorrect(item.get("answerSpecJson"), responsePayload.get("answer"));
+        boolean correct = answerEvaluator.isCorrect(item.get("answerSpecJson"), responsePayload.get("answer"));
         session.recordAnswer(correct, Instant.now());
         GameAnswer answer = new GameAnswer(UUID.randomUUID(), sessionId, itemSequence,
                 asUuid(item.get("vocabularySenseId")), asUuid(item.get("questionVersionId")),
                 item, responsePayload, correct, durationMilliseconds);
         sessionRepository.saveAnswer(answer);
         GameSession saved = sessionRepository.save(session);
-        boolean matchCompleted = session.matchPlayerId() != null && matchEventWriter.recordAnswer(answer, saved);
+        boolean matchCompleted = session.matchPlayerId() != null && updateMatchAfterAnswer(answer, saved);
         outboxWriter.append("GameSession", sessionId.toString(), "GameAnswerSubmitted",
                 Map.of("sessionId", sessionId.toString(), "itemSequence", itemSequence,
                         "isCorrect", correct, "score", saved.score()));
@@ -71,31 +78,40 @@ public class SubmitGameAnswerUseCase {
         return new GameAnswerResult(answer.id(), itemSequence, correct, saved.score(), saved.status().name(), false);
     }
 
-    private boolean isCorrect(Object answerSpecValue, Object submittedValue) {
-        if (submittedValue == null || answerSpecValue == null) return false;
-        try {
-            JsonNode expected = objectMapper.readTree(answerSpecValue.toString());
-            JsonNode actual = objectMapper.valueToTree(submittedValue);
-            if (expected.isObject()) {
-                for (String key : List.of("answer", "correctAnswer", "correctOptionId", "optionId", "expected")) {
-                    if (expected.has(key)) return matches(expected.get(key), actual);
-                }
-            }
-            if (expected.isArray()) {
-                for (JsonNode candidate : expected) if (matches(candidate, actual)) return true;
-                return false;
-            }
-            return matches(expected, actual);
-        } catch (Exception exception) {
-            throw new IllegalStateException("Stored game answer key is invalid", exception);
+    private boolean updateMatchAfterAnswer(GameAnswer answer, GameSession session) {
+        UUID matchPlayerId = session.matchPlayerId();
+        GameMatchPlayer initialPlayer = matchPlayerRepository.findById(matchPlayerId)
+                .orElseThrow(() -> new GameMatchNotFoundException(matchPlayerId));
+        var match = matchRepository.findForUpdate(initialPlayer.matchId())
+                .orElseThrow(() -> new GameMatchNotFoundException(initialPlayer.matchId()));
+        if (match.status() != com.group01.game.domain.aggregate.GameMatch.Status.IN_PROGRESS) {
+            throw new IllegalStateException("Match is no longer in progress");
         }
-    }
 
-    private boolean matches(JsonNode expected, JsonNode actual) {
-        if (expected.isTextual() && actual.isTextual()) {
-            return expected.asText().trim().equalsIgnoreCase(actual.asText().trim());
-        }
-        return expected.equals(actual);
+        Instant now = Instant.now();
+        GameMatchPlayer player = matchPlayerRepository.findById(matchPlayerId)
+                .orElseThrow(() -> new GameMatchNotFoundException(matchPlayerId));
+        matchPlayerRepository.save(player.withProgress(
+                session.score(), session.status() == GameSessionStatus.COMPLETED, now));
+        matchEventWriter.recordAnswer(match.id(), player.id(), answer, session, now);
+
+        List<GameMatchPlayer> players = matchPlayerRepository.findByMatchId(match.id());
+        boolean completed = !players.isEmpty()
+                && players.stream().allMatch(p -> p.status() == GameMatchPlayer.Status.FINISHED);
+        if (!completed) return false;
+
+        List<GameMatchPlayer> sortedPlayers = players.stream()
+                .sorted(Comparator.comparingInt(GameMatchPlayer::score).reversed()
+                        .thenComparingLong(GameMatchPlayer::durationMilliseconds)
+                        .thenComparing(p -> p.userId().toString()))
+                .toList();
+        List<GameMatchPlayer> rankedPlayers = java.util.stream.IntStream.range(0, sortedPlayers.size())
+                .mapToObj(index -> sortedPlayers.get(index).withRank(index + 1))
+                .toList();
+        matchPlayerRepository.saveAll(rankedPlayers);
+        match.complete(now);
+        matchRepository.save(match);
+        return true;
     }
 
     private UUID asUuid(Object value) { return value == null ? null : UUID.fromString(value.toString()); }

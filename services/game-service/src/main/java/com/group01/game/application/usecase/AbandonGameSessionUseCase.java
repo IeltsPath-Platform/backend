@@ -1,7 +1,7 @@
 package com.group01.game.application.usecase;
 
-import com.group01.game.application.result.GameSessionResult;
 import com.group01.game.application.port.OutboxWriter;
+import com.group01.game.application.result.GameSessionResult;
 import com.group01.game.domain.exception.GameSessionNotFoundException;
 import com.group01.game.domain.repository.GameSessionRepository;
 import org.springframework.stereotype.Service;
@@ -28,6 +28,6 @@ public class AbandonGameSessionUseCase {
         var saved = sessionRepository.save(session);
         outboxWriter.append("GameSession", sessionId.toString(), "GameSessionAbandoned",
                 java.util.Map.of("sessionId", sessionId.toString(), "userId", userId.toString()));
-        return GameSessionResult.from(saved, false);
+        return GameSessionResult.from(saved);
     }
 }

@@ -8,11 +8,7 @@ import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/assessments/video-practice")
@@ -25,11 +21,10 @@ public class VideoPracticeController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public VideoPracticeAttemptResponse create(
-            @Valid @RequestBody CreateVideoPracticeAttemptRequest request
-    ) {
+            @Valid @RequestBody CreateVideoPracticeAttemptRequest request) {
         var result = submitVideoPracticeUseCase.execute(new CreateVideoPracticeAttemptCommand(
-                currentUser.requireUserId(), request.videoId(), request.practiceType()
-        ));
+                currentUser.requireUserId(), request.videoId(), request.segmentId(),
+                request.practiceType(), request.referenceTextSnapshot()));
         return VideoPracticeAttemptResponse.from(result);
     }
 }

@@ -1,29 +1,28 @@
 package com.group01.content.application.usecase;
 
+import com.group01.content.application.result.QuestionResult;
+import com.group01.content.domain.aggregate.Question;
+import com.group01.content.domain.exception.QuestionNotFoundException;
+import com.group01.content.domain.repository.QuestionRepository;
+import com.group01.content.domain.vo.PublicationStatus;
+import com.group01.content.domain.vo.QuestionType;
+import com.group01.content.domain.vo.Skill;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import com.group01.content.application.result.QuestionResult;
-import com.group01.content.domain.aggregate.Question;
-import com.group01.content.domain.exception.QuestionNotFoundException;
-import com.group01.content.domain.repository.QuestionRepository;
-import com.group01.content.domain.vo.AccessLevel;
-import com.group01.content.domain.vo.PublicationStatus;
-import com.group01.content.domain.vo.QuestionType;
-import com.group01.content.domain.vo.Skill;
 
 @ExtendWith(MockitoExtension.class)
 class ArchiveQuestionUseCaseTest {
@@ -39,7 +38,7 @@ class ArchiveQuestionUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        question = Question.create(QuestionType.MULTIPLE_CHOICE, Skill.READING, AccessLevel.FREE);
+        question = Question.create(QuestionType.MULTIPLE_CHOICE, Skill.READING, null);
         questionId = question.getId();
     }
 

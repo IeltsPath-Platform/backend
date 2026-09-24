@@ -46,7 +46,7 @@ public class PublishContentPackageUseCase {
                 saved.getCode(),
                 saved.getTitle(),
                 saved.getPackageType(),
-                saved.getAccessLevel(),
+                saved.getRequiredFeatureKey(),
                 saved.getStatus(),
                 saved.getCurrentPublishedVersionId(),
                 saved.getCreatedAt(),
@@ -54,4 +54,3 @@ public class PublishContentPackageUseCase {
         );
     }
 }
-

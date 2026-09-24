@@ -32,7 +32,7 @@ public class CreateLearningVideoUseCase {
                 command.durationSeconds(),
                 command.topicId(),
                 command.level(),
-                command.accessLevel(),
+                command.requiredFeatureKey(),
                 command.createdBy()
         );
 
@@ -47,7 +47,7 @@ public class CreateLearningVideoUseCase {
                 saved.getDurationSeconds(),
                 saved.getTopicId(),
                 saved.getLevel(),
-                saved.getAccessLevel(),
+                saved.getRequiredFeatureKey(),
                 saved.getStatus(),
                 saved.getCreatedBy(),
                 saved.getCreatedAt(),
@@ -55,4 +55,3 @@ public class CreateLearningVideoUseCase {
         );
     }
 }
-

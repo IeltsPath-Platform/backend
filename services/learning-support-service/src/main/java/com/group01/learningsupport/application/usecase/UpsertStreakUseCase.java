@@ -1,6 +1,7 @@
 package com.group01.learningsupport.application.usecase;
 
 import com.group01.learningsupport.application.command.UpsertStreakCommand;
+import com.group01.learningsupport.application.result.StreakResult;
 import com.group01.learningsupport.domain.aggregate.Streak;
 import com.group01.learningsupport.domain.repository.StreakRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,13 +14,13 @@ public class UpsertStreakUseCase {
     private final StreakRepository streakRepository;
 
     @Transactional
-    public Streak execute(UpsertStreakCommand command) {
-        return streakRepository.save(Streak.of(
+    public StreakResult execute(UpsertStreakCommand command) {
+        return StreakResult.from(streakRepository.save(Streak.of(
                 command.userId(),
                 command.currentDays(),
                 command.longestDays(),
                 command.lastQualifiedDate(),
                 command.timezone()
-        ));
+        )));
     }
 }

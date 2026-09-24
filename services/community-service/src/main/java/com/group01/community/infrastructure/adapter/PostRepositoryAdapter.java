@@ -2,15 +2,12 @@ package com.group01.community.infrastructure.adapter;
 
 import com.group01.community.domain.aggregate.Post;
 import com.group01.community.domain.repository.PostRepository;
-import com.group01.community.domain.repository.PageQuery;
-import com.group01.community.domain.repository.PageResult;
+import com.group01.community.domain.vo.CommunityPage;
 import com.group01.community.domain.vo.ContentStatus;
-import com.group01.community.infrastructure.persistence.PostJpaEntity;
-import com.group01.community.infrastructure.persistence.PostJpaRepository;
+import com.group01.community.infrastructure.persistence.mapper.PostPersistenceMapper;
+import com.group01.community.infrastructure.persistence.repository.PostJpaRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
@@ -21,40 +18,22 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PostRepositoryAdapter implements PostRepository {
     private final PostJpaRepository repository;
+    private final PostPersistenceMapper mapper;
 
-    public Post save(Post p) {
-        return toDomain(repository.save(toEntity(p)));
+    @Override
+    public Post save(Post post) {
+        return mapper.toDomain(repository.save(mapper.toEntity(post)));
     }
 
+    @Override
     public Optional<Post> findById(UUID id) {
-        return repository.findById(id).map(this::toDomain);
+        return repository.findById(id).map(mapper::toDomain);
     }
 
-    public PageResult<Post> findByStatus(ContentStatus status, PageQuery query) {
-        Page<Post> p = repository.findByStatus(status, pageable(query)).map(this::toDomain);
-        return new PageResult<>(p.getContent(), p.getNumber(), p.getSize(), p.getTotalElements(), p.getTotalPages());
-    }
-
-    private Pageable pageable(PageQuery q) {
-        Sort.Direction d = q.descending() ? Sort.Direction.DESC : Sort.Direction.ASC;
-        return PageRequest.of(q.page(), q.size(), Sort.by(d, q.sortProperty()).and(Sort.by(d, "id")));
-    }
-
-    private PostJpaEntity toEntity(Post p) {
-        PostJpaEntity e = new PostJpaEntity();
-        e.id = p.getId();
-        e.authorId = p.getAuthorId();
-        e.category = p.getCategory();
-        e.title = p.getTitle();
-        e.body = p.getBody();
-        e.status = p.getStatus();
-        e.createdAt = p.getCreatedAt();
-        e.updatedAt = p.getUpdatedAt();
-        e.version = p.getVersion();
-        return e;
-    }
-
-    private Post toDomain(PostJpaEntity e) {
-        return new Post(e.id, e.authorId, e.category, e.title, e.body, e.status, e.createdAt, e.updatedAt, e.version);
+    @Override
+    public CommunityPage<Post> findByStatus(ContentStatus status, int page, int size) {
+        var sort = Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"));
+        var result = repository.findByStatus(status, PageRequest.of(page, size, sort));
+        return new CommunityPage<>(result.getContent().stream().map(mapper::toDomain).toList(), result.getTotalElements());
     }
 }

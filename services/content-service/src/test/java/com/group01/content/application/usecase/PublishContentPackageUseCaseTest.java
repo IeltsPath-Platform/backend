@@ -7,7 +7,6 @@ import com.group01.content.domain.entity.ContentPackageVersion;
 import com.group01.content.domain.exception.ContentPackageNotFoundException;
 import com.group01.content.domain.exception.InvalidContentStateException;
 import com.group01.content.domain.repository.ContentPackageRepository;
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.PublicationStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +45,7 @@ class PublishContentPackageUseCaseTest {
     void setUp() {
         packageId = UUID.randomUUID();
         userId = UUID.randomUUID();
-        contentPackage = ContentPackage.create("PKG_01", "Mock Test", PackageType.MOCK_TEST, AccessLevel.FREE);
+        contentPackage = ContentPackage.create("PKG_01", "Mock Test", PackageType.MOCK_TEST, null);
         version = ContentPackageVersion.create(contentPackage.getId(), 1, "{}");
         versionId = version.getId();
         contentPackage.addVersion(version);
@@ -90,4 +89,3 @@ class PublishContentPackageUseCaseTest {
                 .isInstanceOf(InvalidContentStateException.class);
     }
 }
-

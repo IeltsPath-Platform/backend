@@ -1,6 +1,7 @@
 package com.group01.learningsupport.application.usecase;
 
 import com.group01.learningsupport.application.command.UpsertVideoProgressCommand;
+import com.group01.learningsupport.application.result.VideoLearningProgressResult;
 import com.group01.learningsupport.domain.aggregate.VideoLearningProgress;
 import com.group01.learningsupport.domain.repository.VideoLearningProgressRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +14,8 @@ public class UpsertVideoProgressUseCase {
     private final VideoLearningProgressRepository repository;
 
     @Transactional
-    public VideoLearningProgress execute(UpsertVideoProgressCommand command) {
-        return repository.findByUserIdAndVideoId(command.userId(), command.videoId())
+    public VideoLearningProgressResult execute(UpsertVideoProgressCommand command) {
+        VideoLearningProgress progress = repository.findByUserIdAndVideoId(command.userId(), command.videoId())
                 .map(existing -> {
                     existing.replace(
                             command.lastPositionMs(),
@@ -38,5 +39,6 @@ public class UpsertVideoProgressUseCase {
                         command.lastWatchedAt(),
                         command.completedAt()
                 )));
+        return VideoLearningProgressResult.from(progress);
     }
 }

@@ -1,16 +1,11 @@
 package com.group01.content.domain.aggregate;
 
 import com.group01.content.domain.entity.VideoSegment;
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.domain.vo.VideoLevel;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 public class LearningVideo {
     private final UUID id;
@@ -22,7 +17,7 @@ public class LearningVideo {
     private Integer durationSeconds;
     private UUID topicId;
     private VideoLevel level;
-    private AccessLevel accessLevel;
+    private String requiredFeatureKey;
     private PublicationStatus status;
     private UUID createdBy;
     private final Instant createdAt;
@@ -31,7 +26,7 @@ public class LearningVideo {
 
     public LearningVideo(UUID id, String youtubeVideoId, String youtubeUrl, String title,
                          String description, String thumbnailUrl, Integer durationSeconds,
-                         UUID topicId, VideoLevel level, AccessLevel accessLevel,
+                         UUID topicId, VideoLevel level, String requiredFeatureKey,
                          PublicationStatus status, UUID createdBy,
                          Instant createdAt, Instant updatedAt, List<VideoSegment> segments) {
         this.id = Objects.requireNonNull(id, "id must not be null");
@@ -43,7 +38,7 @@ public class LearningVideo {
         this.durationSeconds = durationSeconds;
         this.topicId = topicId;
         this.level = level;
-        this.accessLevel = accessLevel != null ? accessLevel : AccessLevel.FREE;
+        this.requiredFeatureKey = requiredFeatureKey;
         this.status = status != null ? status : PublicationStatus.DRAFT;
         this.createdBy = createdBy;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
@@ -53,10 +48,10 @@ public class LearningVideo {
 
     public static LearningVideo create(String youtubeVideoId, String youtubeUrl, String title,
                                        String description, String thumbnailUrl, Integer durationSeconds,
-                                       UUID topicId, VideoLevel level, AccessLevel accessLevel, UUID createdBy) {
+                                       UUID topicId, VideoLevel level, String requiredFeatureKey, UUID createdBy) {
         Instant now = Instant.now();
         return new LearningVideo(UUID.randomUUID(), youtubeVideoId, youtubeUrl, title, description,
-                thumbnailUrl, durationSeconds, topicId, level, accessLevel,
+                thumbnailUrl, durationSeconds, topicId, level, requiredFeatureKey,
                 PublicationStatus.DRAFT, createdBy, now, now, new ArrayList<>());
     }
 
@@ -79,11 +74,13 @@ public class LearningVideo {
     public Integer getDurationSeconds() { return durationSeconds; }
     public UUID getTopicId() { return topicId; }
     public VideoLevel getLevel() { return level; }
-    public AccessLevel getAccessLevel() { return accessLevel; }
+
+    public String getRequiredFeatureKey() {
+        return requiredFeatureKey;
+    }
     public PublicationStatus getStatus() { return status; }
     public UUID getCreatedBy() { return createdBy; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public List<VideoSegment> getSegments() { return Collections.unmodifiableList(segments); }
 }
-

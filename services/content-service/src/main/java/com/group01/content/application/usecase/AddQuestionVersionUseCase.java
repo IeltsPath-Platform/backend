@@ -3,6 +3,7 @@ package com.group01.content.application.usecase;
 import com.group01.content.application.command.AddQuestionVersionCommand;
 import com.group01.content.application.result.QuestionResult;
 import com.group01.content.domain.aggregate.Question;
+import com.group01.content.domain.entity.QuestionKnowledgePoint;
 import com.group01.content.domain.entity.QuestionVersion;
 import com.group01.content.domain.exception.QuestionNotFoundException;
 import com.group01.content.domain.repository.QuestionRepository;
@@ -34,8 +35,12 @@ public class AddQuestionVersionUseCase {
         );
 
         if (command.knowledgePoints() != null) {
-            for (var kp : command.knowledgePoints()) {
-                version.addKnowledgePoint(kp);
+            for (var knowledgePoint : command.knowledgePoints()) {
+                version.addKnowledgePoint(new QuestionKnowledgePoint(
+                        knowledgePoint.questionVersionId(),
+                        knowledgePoint.knowledgePointId(),
+                        knowledgePoint.weight()
+                ));
             }
         }
 
@@ -46,7 +51,7 @@ public class AddQuestionVersionUseCase {
                 saved.getId(),
                 saved.getQuestionType(),
                 saved.getSkill(),
-                saved.getAccessLevel(),
+                saved.getRequiredFeatureKey(),
                 saved.getStatus(),
                 saved.getCurrentPublishedVersionId(),
                 saved.getCreatedAt(),
@@ -54,4 +59,3 @@ public class AddQuestionVersionUseCase {
         );
     }
 }
-

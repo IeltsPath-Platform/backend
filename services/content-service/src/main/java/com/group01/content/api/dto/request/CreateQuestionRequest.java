@@ -1,6 +1,6 @@
 package com.group01.content.api.dto.request;
 
-import com.group01.content.domain.vo.AccessLevel;
+import com.group01.content.api.dto.AccessLevel;
 import com.group01.content.domain.vo.QuestionType;
 import com.group01.content.domain.vo.Skill;
 import jakarta.validation.constraints.NotNull;
@@ -12,4 +12,3 @@ public record CreateQuestionRequest(
         Skill skill,
         AccessLevel accessLevel
 ) {}
-

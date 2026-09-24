@@ -38,7 +38,10 @@ public class GetQuestionDetailUseCase {
                         v.getStatus(),
                         v.getCreatedAt(),
                         v.getUpdatedAt(),
-                        v.getKnowledgePoints()
+                        v.getKnowledgePoints().stream()
+                                .map(kp -> new QuestionKnowledgePointResult(
+                                        kp.getQuestionVersionId(), kp.getKnowledgePointId(), kp.getWeight()))
+                                .toList()
                 ))
                 .toList();
 
@@ -46,7 +49,7 @@ public class GetQuestionDetailUseCase {
                 question.getId(),
                 question.getQuestionType(),
                 question.getSkill(),
-                question.getAccessLevel(),
+                question.getRequiredFeatureKey(),
                 question.getStatus(),
                 question.getCurrentPublishedVersionId(),
                 question.getCreatedAt(),
@@ -55,4 +58,3 @@ public class GetQuestionDetailUseCase {
         );
     }
 }
-

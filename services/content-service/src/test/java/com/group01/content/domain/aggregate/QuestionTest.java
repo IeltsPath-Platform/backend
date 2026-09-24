@@ -1,25 +1,20 @@
 package com.group01.content.domain.aggregate;
 
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import com.group01.content.domain.entity.QuestionVersion;
+import com.group01.content.domain.vo.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.group01.content.domain.entity.QuestionVersion;
-import com.group01.content.domain.vo.AccessLevel;
-import com.group01.content.domain.vo.PublicationStatus;
-import com.group01.content.domain.vo.QuestionDifficulty;
-import com.group01.content.domain.vo.QuestionOptionPayload;
-import com.group01.content.domain.vo.QuestionType;
-import com.group01.content.domain.vo.Skill;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class QuestionTest {
 
     @Test
     @DisplayName("Should create question and add version with options")
     void shouldCreateQuestionAndAddVersion() {
-        Question question = Question.create(QuestionType.MULTIPLE_CHOICE, Skill.READING, AccessLevel.FREE);
+        Question question = Question.create(QuestionType.MULTIPLE_CHOICE, Skill.READING, null);
 
         assertThat(question.getId()).isNotNull();
         assertThat(question.getStatus()).isEqualTo(PublicationStatus.DRAFT);
@@ -51,7 +46,7 @@ class QuestionTest {
     @Test
     @DisplayName("Should archive question")
     void shouldArchiveQuestion() {
-        Question question = Question.create(QuestionType.MULTIPLE_CHOICE, Skill.READING, AccessLevel.FREE);
+        Question question = Question.create(QuestionType.MULTIPLE_CHOICE, Skill.READING, null);
         question.archive();
 
         assertThat(question.getStatus()).isEqualTo(PublicationStatus.ARCHIVED);

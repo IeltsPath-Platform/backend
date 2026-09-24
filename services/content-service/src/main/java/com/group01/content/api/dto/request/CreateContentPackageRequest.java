@@ -1,6 +1,6 @@
 package com.group01.content.api.dto.request;
 
-import com.group01.content.domain.vo.AccessLevel;
+import com.group01.content.api.dto.AccessLevel;
 import com.group01.content.domain.vo.PackageType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -20,4 +20,3 @@ public record CreateContentPackageRequest(
 
         AccessLevel accessLevel
 ) {}
-

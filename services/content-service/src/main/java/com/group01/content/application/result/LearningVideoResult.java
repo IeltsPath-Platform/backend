@@ -1,6 +1,5 @@
 package com.group01.content.application.result;
 
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.domain.vo.VideoLevel;
 
@@ -17,10 +16,9 @@ public record LearningVideoResult(
         Integer durationSeconds,
         UUID topicId,
         VideoLevel level,
-        AccessLevel accessLevel,
+        String requiredFeatureKey,
         PublicationStatus status,
         UUID createdBy,
         Instant createdAt,
         Instant updatedAt
 ) {}
-

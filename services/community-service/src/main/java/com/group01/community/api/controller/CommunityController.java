@@ -1,10 +1,22 @@
 package com.group01.community.api.controller;
 
-import com.group01.community.api.dto.CommunityDtos.*;
-import com.group01.community.application.CommunityService;
-import com.group01.community.domain.aggregate.*;
-import com.group01.community.domain.repository.PageResult;
-import com.group01.community.domain.vo.*;
+import com.group01.commonsecurity.currentuser.CurrentUserProvider;
+import com.group01.commonsecurity.role.CanonicalRoles;
+import com.group01.community.api.dto.request.CommentRequest;
+import com.group01.community.api.dto.request.ModerationRequest;
+import com.group01.community.api.dto.request.PostRequest;
+import com.group01.community.api.dto.request.UpdateCommentRequest;
+import com.group01.community.api.dto.response.CommentResponse;
+import com.group01.community.api.dto.response.PageResponse;
+import com.group01.community.api.dto.response.PostResponse;
+import com.group01.community.application.CommunityActor;
+import com.group01.community.application.command.*;
+import com.group01.community.application.query.PageQuery;
+import com.group01.community.application.result.CommentResult;
+import com.group01.community.application.result.PageResult;
+import com.group01.community.application.result.PostResult;
+import com.group01.community.application.usecase.*;
+import com.group01.community.domain.vo.ReactionType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -16,12 +28,28 @@ import java.util.UUID;
 @RequestMapping("/api/community")
 @RequiredArgsConstructor
 public class CommunityController {
-    private final CommunityService service;
+    private final CurrentUserProvider currentUserProvider;
+    private final CreatePostUseCase createPostUseCase;
+    private final GetPostUseCase getPostUseCase;
+    private final ListPostsUseCase listPostsUseCase;
+    private final EditPostUseCase editPostUseCase;
+    private final DeletePostUseCase deletePostUseCase;
+    private final ModeratePostUseCase moderatePostUseCase;
+    private final CreateCommentUseCase createCommentUseCase;
+    private final ListCommentsUseCase listCommentsUseCase;
+    private final EditCommentUseCase editCommentUseCase;
+    private final DeleteCommentUseCase deleteCommentUseCase;
+    private final ModerateCommentUseCase moderateCommentUseCase;
+    private final AddReactionUseCase addReactionUseCase;
+    private final RemoveReactionUseCase removeReactionUseCase;
 
     @PostMapping("/posts")
     @ResponseStatus(HttpStatus.CREATED)
-    public PostResponse create(@Valid @RequestBody PostRequest r) {
-        return post(service.createPost(r.category(), r.title(), r.body()));
+    public PostResponse create(@Valid @RequestBody PostRequest request) {
+        PostResult result = createPostUseCase.execute(actor(), new CreatePostCommand(
+                request.category(), request.title(), request.body()
+        ));
+        return PostResponse.from(result);
     }
 
     @GetMapping("/posts")
@@ -29,46 +57,48 @@ public class CommunityController {
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "20") int size
     ) {
-        PageResult<Post> result = service.listPosts(page, size);
-        var ids = result.content().stream().map(Post::getId).collect(java.util.stream.Collectors.toSet());
-        var counts = service.reactionCounts(ids);
+        PageResult<PostResult> result = listPostsUseCase.execute(new PageQuery(page, size));
         return new PageResponse<>(
-                result.content().stream()
-                        .map(p -> post(p, counts.getOrDefault(p.getId(), java.util.Map.of())))
-                        .toList(),
-                page,
-                size,
-                result.totalElements(),
-                result.totalPages(),
+                result.content().stream().map(PostResponse::from).toList(),
+                result.page(), result.size(), result.totalElements(), result.totalPages(),
                 "createdAt,desc;id,desc"
         );
     }
 
     @GetMapping("/posts/{id}")
     public PostResponse get(@PathVariable("id") UUID id) {
-        return post(service.getPost(id));
+        return PostResponse.from(getPostUseCase.execute(id, actor()));
     }
 
     @PutMapping("/posts/{id}")
-    public PostResponse edit(@PathVariable("id") UUID id, @Valid @RequestBody PostRequest r) {
-        return post(service.editPost(id, r.category(), r.title(), r.body()));
+    public PostResponse edit(@PathVariable("id") UUID id, @Valid @RequestBody PostRequest request) {
+        PostResult result = editPostUseCase.execute(actor(), new EditPostCommand(
+                id, request.category(), request.title(), request.body()
+        ));
+        return PostResponse.from(result);
     }
 
     @DeleteMapping("/posts/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable("id") UUID id) {
-        service.deletePost(id);
+        deletePostUseCase.execute(actor(), new DeletePostCommand(id));
     }
 
     @PutMapping("/posts/{id}/status")
-    public PostResponse moderate(@PathVariable("id") UUID id, @Valid @RequestBody ModerationRequest r) {
-        return post(service.moderatePost(id, r.status()));
+    public PostResponse moderate(@PathVariable("id") UUID id, @Valid @RequestBody ModerationRequest request) {
+        return PostResponse.from(moderatePostUseCase.execute(actor(), new ModeratePostCommand(id, request.status())));
     }
 
     @PostMapping("/posts/{postId}/comments")
     @ResponseStatus(HttpStatus.CREATED)
-    public CommentResponse comment(@PathVariable("postId") UUID postId, @Valid @RequestBody CommentRequest r) {
-        return comment(service.createComment(postId, r.parentCommentId(), r.body()));
+    public CommentResponse comment(
+            @PathVariable("postId") UUID postId,
+            @Valid @RequestBody CommentRequest request
+    ) {
+        CommentResult result = createCommentUseCase.execute(actor(), new CreateCommentCommand(
+                postId, request.parentCommentId(), request.body()
+        ));
+        return CommentResponse.from(result);
     }
 
     @GetMapping("/posts/{postId}/comments")
@@ -77,73 +107,52 @@ public class CommunityController {
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "20") int size
     ) {
-        PageResult<Comment> result = service.listComments(postId, page, size);
+        PageResult<CommentResult> result = listCommentsUseCase.execute(actor(), postId, new PageQuery(page, size));
         return new PageResponse<>(
-                result.content().stream().map(this::comment).toList(),
-                page,
-                size,
-                result.totalElements(),
-                result.totalPages(),
+                result.content().stream().map(CommentResponse::from).toList(),
+                result.page(), result.size(), result.totalElements(), result.totalPages(),
                 "createdAt,asc;id,asc"
         );
     }
 
     @PutMapping("/comments/{id}")
-    public CommentResponse editComment(@PathVariable("id") UUID id, @Valid @RequestBody UpdateCommentRequest r) {
-        return comment(service.editComment(id, r.body()));
+    public CommentResponse editComment(
+            @PathVariable("id") UUID id,
+            @Valid @RequestBody UpdateCommentRequest request
+    ) {
+        return CommentResponse.from(editCommentUseCase.execute(actor(), new EditCommentCommand(id, request.body())));
     }
 
     @DeleteMapping("/comments/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteComment(@PathVariable("id") UUID id) {
-        service.deleteComment(id);
+        deleteCommentUseCase.execute(actor(), new DeleteCommentCommand(id));
     }
 
     @PutMapping("/comments/{id}/status")
-    public CommentResponse moderateComment(@PathVariable("id") UUID id, @Valid @RequestBody ModerationRequest r) {
-        return comment(service.moderateComment(id, r.status()));
+    public CommentResponse moderateComment(
+            @PathVariable("id") UUID id,
+            @Valid @RequestBody ModerationRequest request
+    ) {
+        return CommentResponse.from(moderateCommentUseCase.execute(
+                actor(), new ModerateCommentCommand(id, request.status())
+        ));
     }
 
     @PutMapping("/posts/{postId}/reactions/{type}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void react(@PathVariable("postId") UUID postId, @PathVariable("type") ReactionType type) {
-        service.addReaction(postId, type);
+        addReactionUseCase.execute(actor(), new AddReactionCommand(postId, type));
     }
 
     @DeleteMapping("/posts/{postId}/reactions/{type}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unreact(@PathVariable("postId") UUID postId, @PathVariable("type") ReactionType type) {
-        service.removeReaction(postId, type);
+        removeReactionUseCase.execute(actor(), new RemoveReactionCommand(postId, type));
     }
 
-    private PostResponse post(Post p) {
-        return post(p, service.reactionCounts(p.getId()));
-    }
-
-    private PostResponse post(Post p, java.util.Map<ReactionType, Long> counts) {
-        return new PostResponse(
-                p.getId(),
-                p.getAuthorId(),
-                p.getCategory(),
-                p.getTitle(),
-                p.getBody(),
-                p.getStatus(),
-                counts,
-                p.getCreatedAt(),
-                p.getUpdatedAt()
-        );
-    }
-
-    private CommentResponse comment(Comment c) {
-        return new CommentResponse(
-                c.getId(),
-                c.getPostId(),
-                c.getAuthorId(),
-                c.getParentCommentId(),
-                c.getBody(),
-                c.getStatus(),
-                c.getCreatedAt(),
-                c.getUpdatedAt()
-        );
+    private CommunityActor actor() {
+        var user = currentUserProvider.requireCurrentUser();
+        return new CommunityActor(user.id(), user.hasRole(CanonicalRoles.ADMIN));
     }
 }

@@ -1,6 +1,5 @@
 package com.group01.content.infrastructure.persistence.repository;
 
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.infrastructure.persistence.entity.ContentPackageJpaEntity;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -23,10 +22,12 @@ public interface ContentPackageJpaRepository extends JpaRepository<ContentPackag
     @EntityGraph(attributePaths = {"versions"})
     Optional<ContentPackageJpaEntity> findById(UUID id);
 
-    @Query("SELECT p FROM ContentPackageJpaEntity p WHERE (:accessLevel IS NULL OR p.accessLevel = :accessLevel) AND (:status IS NULL OR p.status = :status) ORDER BY p.createdAt DESC")
-    List<ContentPackageJpaEntity> findAllFiltered(@Param("accessLevel") AccessLevel accessLevel,
+    @EntityGraph(attributePaths = {"versions"})
+    Optional<ContentPackageJpaEntity> findDistinctByVersions_Id(UUID versionId);
+
+    @Query("SELECT p FROM ContentPackageJpaEntity p WHERE (:featureRequired IS NULL OR (:featureRequired = true AND p.requiredFeatureKey IS NOT NULL) OR (:featureRequired = false AND p.requiredFeatureKey IS NULL)) AND (:status IS NULL OR p.status = :status) ORDER BY p.createdAt DESC")
+    List<ContentPackageJpaEntity> findAllFiltered(@Param("featureRequired") Boolean featureRequired,
                                                   @Param("status") PublicationStatus status);
 
     boolean existsByCode(String code);
 }
-

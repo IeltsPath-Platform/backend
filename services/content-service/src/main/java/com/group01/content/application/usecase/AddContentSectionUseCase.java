@@ -2,8 +2,6 @@ package com.group01.content.application.usecase;
 
 import com.group01.content.application.command.AddContentSectionCommand;
 import com.group01.content.application.result.ContentSectionResult;
-import com.group01.content.domain.aggregate.ContentPackage;
-import com.group01.content.domain.entity.ContentPackageVersion;
 import com.group01.content.domain.entity.ContentSection;
 import com.group01.content.domain.exception.ContentPackageNotFoundException;
 import com.group01.content.domain.repository.ContentPackageRepository;
@@ -23,25 +21,14 @@ public class AddContentSectionUseCase {
     }
 
     public ContentSectionResult execute(AddContentSectionCommand command) {
-        // Find package owning this version
-        List<ContentPackage> packages = contentPackageRepository.findAll(null, null);
-        ContentPackage targetPkg = null;
-        ContentPackageVersion targetVersion = null;
-
-        for (ContentPackage p : packages) {
-            for (ContentPackageVersion v : p.getVersions()) {
-                if (v.getId().equals(command.packageVersionId())) {
-                    targetPkg = p;
-                    targetVersion = v;
-                    break;
-                }
-            }
-            if (targetVersion != null) break;
-        }
-
-        if (targetVersion == null) {
-            throw new ContentPackageNotFoundException("Package version not found: " + command.packageVersionId());
-        }
+        var targetPackage = contentPackageRepository.findByVersionId(command.packageVersionId())
+                .orElseThrow(() -> new ContentPackageNotFoundException(
+                        "Package version not found: " + command.packageVersionId()));
+        var targetVersion = targetPackage.getVersions().stream()
+                .filter(version -> version.getId().equals(command.packageVersionId()))
+                .findFirst()
+                .orElseThrow(() -> new ContentPackageNotFoundException(
+                        "Package version not found: " + command.packageVersionId()));
 
         ContentSection section = ContentSection.create(
                 command.packageVersionId(),
@@ -53,7 +40,7 @@ public class AddContentSectionUseCase {
         );
 
         targetVersion.addSection(section);
-        contentPackageRepository.save(targetPkg);
+        contentPackageRepository.save(targetPackage);
 
         return new ContentSectionResult(
                 section.getId(),
@@ -69,4 +56,3 @@ public class AddContentSectionUseCase {
         );
     }
 }
-

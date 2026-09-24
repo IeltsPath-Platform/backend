@@ -1,43 +1,38 @@
 package com.group01.content.api.controller;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import static org.mockito.ArgumentMatchers.any;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import static org.mockito.Mockito.when;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.group01.content.api.dto.AccessLevel;
 import com.group01.content.api.dto.request.CreateContentPackageRequest;
 import com.group01.content.api.dto.request.PublishPackageRequest;
 import com.group01.content.api.exception.GlobalExceptionHandler;
 import com.group01.content.application.command.CreateContentPackageCommand;
 import com.group01.content.application.command.PublishContentPackageCommand;
 import com.group01.content.application.result.ContentPackageResult;
-import com.group01.content.application.usecase.AddContentSectionUseCase;
-import com.group01.content.application.usecase.AddPackageVersionUseCase;
-import com.group01.content.application.usecase.CreateContentPackageUseCase;
-import com.group01.content.application.usecase.GetContentPackageDetailUseCase;
-import com.group01.content.application.usecase.ListContentPackagesUseCase;
-import com.group01.content.application.usecase.PublishContentPackageUseCase;
+import com.group01.content.application.usecase.*;
 import com.group01.content.domain.exception.ContentPackageNotFoundException;
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.PublicationStatus;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
 class ContentPackageControllerTest {
@@ -78,7 +73,7 @@ class ContentPackageControllerTest {
     void shouldReturnPackages() throws Exception {
         UUID id = UUID.randomUUID();
         ContentPackageResult result = new ContentPackageResult(
-                id, "PKG_01", "IELTS Cam 18", PackageType.MOCK_TEST, AccessLevel.FREE,
+                id, "PKG_01", "IELTS Cam 18", PackageType.MOCK_TEST, null,
                 PublicationStatus.PUBLISHED, UUID.randomUUID(), Instant.now(), Instant.now()
         );
 
@@ -111,7 +106,7 @@ class ContentPackageControllerTest {
                 "PKG_02", "IELTS Listening Test", PackageType.PRACTICE_SET, AccessLevel.FREE
         );
         ContentPackageResult result = new ContentPackageResult(
-                id, "PKG_02", "IELTS Listening Test", PackageType.PRACTICE_SET, AccessLevel.FREE,
+                id, "PKG_02", "IELTS Listening Test", PackageType.PRACTICE_SET, null,
                 PublicationStatus.DRAFT, null, Instant.now(), Instant.now()
         );
 
@@ -133,7 +128,7 @@ class ContentPackageControllerTest {
         PublishPackageRequest request = new PublishPackageRequest(versionId);
 
         ContentPackageResult result = new ContentPackageResult(
-                packageId, "PKG_01", "IELTS Cam 18", PackageType.MOCK_TEST, AccessLevel.FREE,
+                packageId, "PKG_01", "IELTS Cam 18", PackageType.MOCK_TEST, null,
                 PublicationStatus.PUBLISHED, versionId, Instant.now(), Instant.now()
         );
         when(publishContentPackageUseCase.execute(any(PublishContentPackageCommand.class))).thenReturn(result);

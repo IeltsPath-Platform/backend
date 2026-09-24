@@ -2,7 +2,6 @@ package com.group01.content.infrastructure.persistence.adapter;
 
 import com.group01.content.domain.aggregate.ContentPackage;
 import com.group01.content.domain.repository.ContentPackageRepository;
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.infrastructure.persistence.mapper.ContentPackagePersistenceMapper;
 import com.group01.content.infrastructure.persistence.repository.ContentPackageJpaRepository;
@@ -37,13 +36,18 @@ public class ContentPackageRepositoryAdapter implements ContentPackageRepository
     }
 
     @Override
+    public Optional<ContentPackage> findByVersionId(UUID versionId) {
+        return contentPackageJpaRepository.findDistinctByVersions_Id(versionId).map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<ContentPackage> findByCode(String code) {
         return contentPackageJpaRepository.findByCode(code).map(mapper::toDomain);
     }
 
     @Override
-    public List<ContentPackage> findAll(AccessLevel accessLevel, PublicationStatus status) {
-        return contentPackageJpaRepository.findAllFiltered(accessLevel, status).stream()
+    public List<ContentPackage> findAll(Boolean featureRequired, PublicationStatus status) {
+        return contentPackageJpaRepository.findAllFiltered(featureRequired, status).stream()
                 .map(mapper::toDomain).toList();
     }
 
@@ -52,4 +56,3 @@ public class ContentPackageRepositoryAdapter implements ContentPackageRepository
         return contentPackageJpaRepository.existsByCode(code);
     }
 }
-

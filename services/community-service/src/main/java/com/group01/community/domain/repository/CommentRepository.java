@@ -1,6 +1,7 @@
 package com.group01.community.domain.repository;
 
 import com.group01.community.domain.aggregate.Comment;
+import com.group01.community.domain.vo.CommunityPage;
 import com.group01.community.domain.vo.ContentStatus;
 
 import java.util.Optional;
@@ -13,5 +14,5 @@ public interface CommentRepository {
 
     Optional<Comment> findByIdForUpdate(UUID id);
 
-    PageResult<Comment> findByPostIdAndStatus(UUID postId, ContentStatus status, PageQuery query);
+    CommunityPage<Comment> findByPostIdAndStatus(UUID postId, ContentStatus status, int page, int size);
 }

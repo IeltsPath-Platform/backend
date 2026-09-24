@@ -1,7 +1,6 @@
 package com.group01.learningsupport.application.usecase;
 
 import com.group01.learningsupport.application.command.CreateLearningActivityCommand;
-import com.group01.learningsupport.domain.aggregate.LearningActivity;
 import com.group01.learningsupport.domain.exception.ResourceNotFoundException;
 import com.group01.learningsupport.domain.repository.LearningActivityRepository;
 import org.junit.jupiter.api.Test;
@@ -13,10 +12,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class CreateLearningActivityUseCaseTest {
     private final LearningActivityRepository repository = mock(LearningActivityRepository.class);
@@ -26,7 +22,7 @@ class CreateLearningActivityUseCaseTest {
     void createLeavesVerifiedAtEmpty() {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        LearningActivity saved = useCase.execute(new CreateLearningActivityCommand(
+        var saved = useCase.execute(new CreateLearningActivityCommand(
                 UUID.randomUUID(),
                 "WATCH",
                 "VIDEO",
@@ -35,7 +31,7 @@ class CreateLearningActivityUseCaseTest {
                 30
         ));
 
-        assertNull(saved.getVerifiedAt());
+        assertNull(saved.verifiedAt());
     }
 }
 

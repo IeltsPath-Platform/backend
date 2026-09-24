@@ -1,14 +1,13 @@
 package com.group01.content.application.usecase;
 
-import java.util.UUID;
-
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.group01.content.application.result.QuestionResult;
 import com.group01.content.domain.aggregate.Question;
 import com.group01.content.domain.exception.QuestionNotFoundException;
 import com.group01.content.domain.repository.QuestionRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -31,7 +30,7 @@ public class ArchiveQuestionUseCase {
                 saved.getId(),
                 saved.getQuestionType(),
                 saved.getSkill(),
-                saved.getAccessLevel(),
+                saved.getRequiredFeatureKey(),
                 saved.getStatus(),
                 saved.getCurrentPublishedVersionId(),
                 saved.getCreatedAt(),

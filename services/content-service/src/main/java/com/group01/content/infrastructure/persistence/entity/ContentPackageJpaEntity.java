@@ -1,6 +1,5 @@
 package com.group01.content.infrastructure.persistence.entity;
 
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.PublicationStatus;
 import jakarta.persistence.*;
@@ -36,9 +35,8 @@ public class ContentPackageJpaEntity {
     @Column(name = "package_type", nullable = false, length = 50)
     private PackageType packageType;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "access_level", nullable = false, length = 50)
-    private AccessLevel accessLevel;
+    @Column(name = "required_feature_key", length = 100)
+    private String requiredFeatureKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
@@ -60,4 +58,3 @@ public class ContentPackageJpaEntity {
     @Builder.Default
     private List<ContentPackageVersionJpaEntity> versions = new ArrayList<>();
 }
-

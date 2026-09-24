@@ -1,5 +1,7 @@
 package com.group01.content.api.controller;
 
+import com.group01.content.api.AccessLevelCompatibility;
+import com.group01.content.api.dto.AccessLevel;
 import com.group01.content.api.dto.request.AddSegmentLexicalEntryRequest;
 import com.group01.content.api.dto.request.AddVideoSegmentRequest;
 import com.group01.content.api.dto.request.CreateLearningVideoRequest;
@@ -14,7 +16,6 @@ import com.group01.content.application.result.LearningVideoResult;
 import com.group01.content.application.result.VideoDetailResult;
 import com.group01.content.application.result.VideoSegmentResult;
 import com.group01.content.application.usecase.*;
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +42,9 @@ public class LearningVideoController {
             @RequestParam(value = "accessLevel", required = false) AccessLevel accessLevel,
             @RequestParam(value = "status", required = false) PublicationStatus status
     ) {
-        return listLearningVideosUseCase.execute(accessLevel, status).stream()
+        return listLearningVideosUseCase.execute(
+                        AccessLevelCompatibility.toFeatureRequiredFilter(accessLevel), status
+                ).stream()
                 .map(LearningVideoResponse::from)
                 .toList();
     }
@@ -64,7 +67,7 @@ public class LearningVideoController {
                 request.durationSeconds(),
                 request.topicId(),
                 request.level(),
-                request.accessLevel(),
+                AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "VIDEO_LEARNING_PREMIUM"),
                 null
         ));
         return LearningVideoResponse.from(result);

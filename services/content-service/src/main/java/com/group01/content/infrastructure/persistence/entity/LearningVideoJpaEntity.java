@@ -1,6 +1,5 @@
 package com.group01.content.infrastructure.persistence.entity;
 
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.domain.vo.VideoLevel;
 import jakarta.persistence.*;
@@ -51,9 +50,8 @@ public class LearningVideoJpaEntity {
     @Column(name = "level", length = 20)
     private VideoLevel level;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "access_level", nullable = false, length = 20)
-    private AccessLevel accessLevel;
+    @Column(name = "required_feature_key", length = 100)
+    private String requiredFeatureKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
@@ -75,4 +73,3 @@ public class LearningVideoJpaEntity {
     @Builder.Default
     private List<VideoSegmentJpaEntity> segments = new ArrayList<>();
 }
-

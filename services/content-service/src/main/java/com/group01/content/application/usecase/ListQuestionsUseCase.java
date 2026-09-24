@@ -32,7 +32,7 @@ public class ListQuestionsUseCase {
                         q.getId(),
                         q.getQuestionType(),
                         q.getSkill(),
-                        q.getAccessLevel(),
+                        q.getRequiredFeatureKey(),
                         q.getStatus(),
                         q.getCurrentPublishedVersionId(),
                         q.getCreatedAt(),
@@ -41,4 +41,3 @@ public class ListQuestionsUseCase {
                 .toList();
     }
 }
-

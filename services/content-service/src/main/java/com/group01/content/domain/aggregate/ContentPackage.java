@@ -1,23 +1,18 @@
 package com.group01.content.domain.aggregate;
 
 import com.group01.content.domain.entity.ContentPackageVersion;
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.PublicationStatus;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 public class ContentPackage {
     private final UUID id;
     private String code;
     private String title;
     private PackageType packageType;
-    private AccessLevel accessLevel;
+    private String requiredFeatureKey;
     private PublicationStatus status;
     private UUID currentPublishedVersionId;
     private final Instant createdAt;
@@ -25,14 +20,14 @@ public class ContentPackage {
     private final List<ContentPackageVersion> versions;
 
     public ContentPackage(UUID id, String code, String title, PackageType packageType,
-                          AccessLevel accessLevel, PublicationStatus status,
+                          String requiredFeatureKey, PublicationStatus status,
                           UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
                           List<ContentPackageVersion> versions) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.code = Objects.requireNonNull(code, "code must not be null");
         this.title = Objects.requireNonNull(title, "title must not be null");
         this.packageType = Objects.requireNonNull(packageType, "packageType must not be null");
-        this.accessLevel = accessLevel != null ? accessLevel : AccessLevel.FREE;
+        this.requiredFeatureKey = requiredFeatureKey;
         this.status = status != null ? status : PublicationStatus.DRAFT;
         this.currentPublishedVersionId = currentPublishedVersionId;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
@@ -40,9 +35,9 @@ public class ContentPackage {
         this.versions = versions != null ? new ArrayList<>(versions) : new ArrayList<>();
     }
 
-    public static ContentPackage create(String code, String title, PackageType packageType, AccessLevel accessLevel) {
+    public static ContentPackage create(String code, String title, PackageType packageType, String requiredFeatureKey) {
         Instant now = Instant.now();
-        return new ContentPackage(UUID.randomUUID(), code, title, packageType, accessLevel,
+        return new ContentPackage(UUID.randomUUID(), code, title, packageType, requiredFeatureKey,
                 PublicationStatus.DRAFT, null, now, now, new ArrayList<>());
     }
 
@@ -66,7 +61,10 @@ public class ContentPackage {
     public String getCode() { return code; }
     public String getTitle() { return title; }
     public PackageType getPackageType() { return packageType; }
-    public AccessLevel getAccessLevel() { return accessLevel; }
+
+    public String getRequiredFeatureKey() {
+        return requiredFeatureKey;
+    }
     public PublicationStatus getStatus() { return status; }
     public UUID getCurrentPublishedVersionId() { return currentPublishedVersionId; }
     public Instant getCreatedAt() { return createdAt; }

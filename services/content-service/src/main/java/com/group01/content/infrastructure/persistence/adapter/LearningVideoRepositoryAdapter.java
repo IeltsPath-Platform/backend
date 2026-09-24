@@ -2,7 +2,6 @@ package com.group01.content.infrastructure.persistence.adapter;
 
 import com.group01.content.domain.aggregate.LearningVideo;
 import com.group01.content.domain.repository.LearningVideoRepository;
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.infrastructure.persistence.mapper.LearningVideoPersistenceMapper;
 import com.group01.content.infrastructure.persistence.repository.LearningVideoJpaRepository;
@@ -37,13 +36,18 @@ public class LearningVideoRepositoryAdapter implements LearningVideoRepository {
     }
 
     @Override
+    public Optional<LearningVideo> findBySegmentId(UUID segmentId) {
+        return learningVideoJpaRepository.findDistinctBySegments_Id(segmentId).map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<LearningVideo> findByYoutubeVideoId(String youtubeVideoId) {
         return learningVideoJpaRepository.findByYoutubeVideoId(youtubeVideoId).map(mapper::toDomain);
     }
 
     @Override
-    public List<LearningVideo> findAll(AccessLevel accessLevel, PublicationStatus status) {
-        return learningVideoJpaRepository.findAllFiltered(accessLevel, status).stream()
+    public List<LearningVideo> findAll(Boolean featureRequired, PublicationStatus status) {
+        return learningVideoJpaRepository.findAllFiltered(featureRequired, status).stream()
                 .map(mapper::toDomain).toList();
     }
 
@@ -52,4 +56,3 @@ public class LearningVideoRepositoryAdapter implements LearningVideoRepository {
         return learningVideoJpaRepository.existsByYoutubeVideoId(youtubeVideoId);
     }
 }
-

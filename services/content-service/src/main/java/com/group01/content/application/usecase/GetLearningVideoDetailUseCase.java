@@ -36,7 +36,18 @@ public class GetLearningVideoDetailUseCase {
                         s.getTranslationVi(),
                         s.getCreatedAt(),
                         s.getUpdatedAt(),
-                        s.getLexicalEntries()
+                        s.getLexicalEntries().stream()
+                                .map(entry -> new VideoSegmentLexicalEntryResult(
+                                        entry.getId(),
+                                        entry.getSegmentId(),
+                                        entry.getVocabularySenseId(),
+                                        entry.getSurfaceText(),
+                                        entry.getStartChar(),
+                                        entry.getEndChar(),
+                                        entry.getSortOrder(),
+                                        entry.getCreatedAt()
+                                ))
+                                .toList()
                 ))
                 .toList();
 
@@ -50,7 +61,7 @@ public class GetLearningVideoDetailUseCase {
                 video.getDurationSeconds(),
                 video.getTopicId(),
                 video.getLevel(),
-                video.getAccessLevel(),
+                video.getRequiredFeatureKey(),
                 video.getStatus(),
                 video.getCreatedBy(),
                 video.getCreatedAt(),
@@ -59,4 +70,3 @@ public class GetLearningVideoDetailUseCase {
         );
     }
 }
-

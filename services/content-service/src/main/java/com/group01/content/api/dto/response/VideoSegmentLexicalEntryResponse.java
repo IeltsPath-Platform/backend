@@ -1,6 +1,6 @@
 package com.group01.content.api.dto.response;
 
-import com.group01.content.domain.entity.VideoSegmentLexicalEntry;
+import com.group01.content.application.result.VideoSegmentLexicalEntryResult;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -15,17 +15,16 @@ public record VideoSegmentLexicalEntryResponse(
         int sortOrder,
         Instant createdAt
 ) {
-    public static VideoSegmentLexicalEntryResponse from(VideoSegmentLexicalEntry entity) {
+    public static VideoSegmentLexicalEntryResponse from(VideoSegmentLexicalEntryResult result) {
         return new VideoSegmentLexicalEntryResponse(
-                entity.getId(),
-                entity.getSegmentId(),
-                entity.getVocabularySenseId(),
-                entity.getSurfaceText(),
-                entity.getStartChar(),
-                entity.getEndChar(),
-                entity.getSortOrder(),
-                entity.getCreatedAt()
+                result.id(),
+                result.segmentId(),
+                result.vocabularySenseId(),
+                result.surfaceText(),
+                result.startChar(),
+                result.endChar(),
+                result.sortOrder(),
+                result.createdAt()
         );
     }
 }
-

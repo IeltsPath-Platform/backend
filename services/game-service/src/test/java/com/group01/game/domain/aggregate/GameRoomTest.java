@@ -17,7 +17,7 @@ class GameRoomTest {
         GameRoom room = new GameRoom(UUID.randomUUID(), "ABCD", host, 2, Instant.EPOCH);
         room.join(guest, Instant.EPOCH);
         assertThrows(InvalidGameRoomStateException.class, () -> room.join(UUID.randomUUID(), Instant.EPOCH));
-        assertThrows(InvalidGameRoomStateException.class, () -> room.startMatch(host));
+        assertThrows(InvalidGameRoomStateException.class, () -> room.startMatch(host, Instant.EPOCH));
         room.setReady(host, true, Instant.EPOCH.plusSeconds(1));
         room.setReady(guest, true, Instant.EPOCH.plusSeconds(1));
         room.startMatch(host, Instant.EPOCH.plusSeconds(1));

@@ -1,7 +1,8 @@
 package com.group01.content.api.dto.response;
 
+import com.group01.content.api.AccessLevelCompatibility;
+import com.group01.content.api.dto.AccessLevel;
 import com.group01.content.application.result.QuestionDetailResult;
-import com.group01.content.domain.vo.AccessLevel;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.domain.vo.QuestionType;
 import com.group01.content.domain.vo.Skill;
@@ -29,7 +30,7 @@ public record QuestionDetailResponse(
                 result.id(),
                 result.questionType(),
                 result.skill(),
-                result.accessLevel(),
+                AccessLevelCompatibility.toAccessLevel(result.requiredFeatureKey()),
                 result.status(),
                 result.currentPublishedVersionId(),
                 result.createdAt(),
@@ -38,4 +39,3 @@ public record QuestionDetailResponse(
         );
     }
 }
-

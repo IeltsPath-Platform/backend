@@ -1,18 +1,8 @@
 package com.group01.learningsupport.application.usecase;
 
 import com.group01.learningsupport.application.ApplicationSupport;
-import com.group01.learningsupport.application.query.PageQuery;
-import com.group01.learningsupport.application.result.PageResult;
-import com.group01.learningsupport.domain.aggregate.Flashcard;
-import com.group01.learningsupport.domain.aggregate.FlashcardDeck;
-import com.group01.learningsupport.domain.aggregate.Note;
-import com.group01.learningsupport.domain.exception.ResourceNotFoundException;
-import com.group01.learningsupport.domain.repository.FlashcardDeckItemRepository;
-import com.group01.learningsupport.domain.repository.FlashcardDeckRepository;
+import com.group01.learningsupport.application.result.FlashcardResult;
 import com.group01.learningsupport.domain.repository.FlashcardRepository;
-import com.group01.learningsupport.domain.repository.NoteRepository;
-import com.group01.learningsupport.domain.vo.FlashcardSourceType;
-import com.group01.learningsupport.domain.vo.LibraryStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +15,7 @@ public class GetFlashcardUseCase {
     private final FlashcardRepository repository;
 
     @Transactional(readOnly = true)
-    public Flashcard execute(UUID userId, UUID flashcardId) {
-        return ApplicationSupport.required(repository.findByIdAndUserId(flashcardId, userId));
+    public FlashcardResult execute(UUID userId, UUID flashcardId) {
+        return FlashcardResult.from(ApplicationSupport.required(repository.findByIdAndUserId(flashcardId, userId)));
     }
 }

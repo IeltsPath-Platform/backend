@@ -1,45 +1,37 @@
 package com.group01.content.api.controller;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import static org.mockito.ArgumentMatchers.any;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import static org.mockito.Mockito.when;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.group01.content.api.dto.AccessLevel;
 import com.group01.content.api.dto.request.CreateQuestionRequest;
 import com.group01.content.api.exception.GlobalExceptionHandler;
 import com.group01.content.application.command.CreateQuestionCommand;
 import com.group01.content.application.result.QuestionDetailResult;
 import com.group01.content.application.result.QuestionResult;
 import com.group01.content.application.result.QuestionVersionResult;
-import com.group01.content.application.usecase.AddQuestionVersionUseCase;
-import com.group01.content.application.usecase.ArchiveQuestionUseCase;
-import com.group01.content.application.usecase.CreateQuestionUseCase;
-import com.group01.content.application.usecase.GetQuestionDetailUseCase;
-import com.group01.content.application.usecase.ListQuestionsUseCase;
+import com.group01.content.application.usecase.*;
 import com.group01.content.domain.exception.QuestionNotFoundException;
-import com.group01.content.domain.vo.AccessLevel;
-import com.group01.content.domain.vo.PublicationStatus;
-import com.group01.content.domain.vo.QuestionDifficulty;
-import com.group01.content.domain.vo.QuestionOptionPayload;
-import com.group01.content.domain.vo.QuestionType;
-import com.group01.content.domain.vo.Skill;
+import com.group01.content.domain.vo.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
 class QuestionControllerTest {
@@ -77,7 +69,7 @@ class QuestionControllerTest {
     void shouldReturnQuestions() throws Exception {
         UUID q1 = UUID.randomUUID();
         QuestionResult qResult = new QuestionResult(
-                q1, QuestionType.MULTIPLE_CHOICE, Skill.READING, AccessLevel.FREE,
+                q1, QuestionType.MULTIPLE_CHOICE, Skill.READING, null,
                 PublicationStatus.PUBLISHED, UUID.randomUUID(), Instant.now(), Instant.now()
         );
 
@@ -107,7 +99,7 @@ class QuestionControllerTest {
         );
 
         QuestionDetailResult detailResult = new QuestionDetailResult(
-                questionId, QuestionType.MULTIPLE_CHOICE, Skill.READING, AccessLevel.FREE,
+                questionId, QuestionType.MULTIPLE_CHOICE, Skill.READING, null,
                 PublicationStatus.PUBLISHED, versionId, Instant.now(), Instant.now(),
                 List.of(versionResult)
         );
@@ -142,7 +134,7 @@ class QuestionControllerTest {
                 QuestionType.MULTIPLE_CHOICE, Skill.LISTENING, AccessLevel.FREE
         );
         QuestionResult result = new QuestionResult(
-                questionId, QuestionType.MULTIPLE_CHOICE, Skill.LISTENING, AccessLevel.FREE,
+                questionId, QuestionType.MULTIPLE_CHOICE, Skill.LISTENING, null,
                 PublicationStatus.DRAFT, null, Instant.now(), Instant.now()
         );
 
@@ -161,7 +153,7 @@ class QuestionControllerTest {
     void shouldArchiveQuestion() throws Exception {
         UUID questionId = UUID.randomUUID();
         QuestionResult result = new QuestionResult(
-                questionId, QuestionType.MULTIPLE_CHOICE, Skill.LISTENING, AccessLevel.FREE,
+                questionId, QuestionType.MULTIPLE_CHOICE, Skill.LISTENING, null,
                 PublicationStatus.ARCHIVED, null, Instant.now(), Instant.now()
         );
 
