@@ -9,6 +9,31 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    # An outbox row is marked published only after a positive confirm for a routed message.
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+
+assessment:
+  user:
+    base-url: ${USER_SERVICE_URL:http://localhost:8085}
+  content:
+    base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
+  messaging:
+    exchange: ${ASSESSMENT_EVENTS_EXCHANGE:assessment.events}
+  outbox:
+    relay:
+      enabled: ${ASSESSMENT_OUTBOX_RELAY_ENABLED:true}
+      poll-interval: PT2S
+      batch-size: 50
+      max-attempts: 20
+      confirm-timeout: PT5S
 
 app:
   auth:

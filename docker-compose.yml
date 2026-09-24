@@ -56,6 +56,27 @@ services:
       timeout: 5s
       retries: 5
 
+  # Integration event broker. Assessment publishes AssessmentCompleted.v2 to the "assessment.events" topic
+  # exchange; AI Learning declares and consumes its own durable queue, retry queue and DLQ.
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}"
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    networks:
+      - codebase-network
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
   game-service:
     build:
       context: .
@@ -87,3 +108,4 @@ volumes:
   learning-support-db-data:
   community-db-data:
   game-db-data:
+  rabbitmq-data:

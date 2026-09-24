@@ -24,6 +24,8 @@ public class ItemResultJpaEntity {
     private UUID attemptItemId;
     @Column(name = "score", nullable = false, precision = 8, scale = 2)
     private BigDecimal score;
+    @Column(name = "max_score", precision = 8, scale = 2)
+    private BigDecimal maxScore;
     @Column(name = "is_correct")
     private Boolean correct;
     @Column(name = "duration_milliseconds")

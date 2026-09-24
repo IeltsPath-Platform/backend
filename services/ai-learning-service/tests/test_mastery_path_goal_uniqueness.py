@@ -78,7 +78,7 @@ class MasteryPathGoalUniquenessTest(unittest.TestCase):
                     start.wait(timeout=10)
                     cursor.execute(
                         "INSERT INTO mastery_paths (path_id, user_id, learning_goal_id) VALUES (%s, %s, %s)",
-                        (uuid4(), user_id, goal_id),
+                        (str(uuid4()), str(user_id), str(goal_id)),
                     )
                 connection.commit()
                 outcome = "inserted"
@@ -105,7 +105,7 @@ class MasteryPathGoalUniquenessTest(unittest.TestCase):
                 cursor.execute(f'SET search_path TO "{self.schema}"')
                 cursor.execute(
                     "SELECT COUNT(*) FROM mastery_paths WHERE user_id = %s AND learning_goal_id = %s",
-                    (user_id, goal_id),
+                    (str(user_id), str(goal_id)),
                 )
                 self.assertEqual(cursor.fetchone()[0], 1)
         finally:

@@ -12,7 +12,16 @@ The service currently supports:
 - creating learner submissions and local grading job state;
 - creating video practice attempts.
 
-The service does not call Content, Access, User, AI, or human grading services. IDs such as package, question, video, and knowledge point references are stored as local logical references. Point debit, entitlement checks, provider execution, event publishing, and broker integration remain follow-up work.
+When an attempt starts, the service captures two things by forwarding the caller's gateway JWT:
+
+- the learner's active learning goal, from User Service `GET /api/users/me/learning-goals/active`;
+- the question to knowledge-point mapping, from Content Service `POST /internal/assessment-content/knowledge-point-mappings`.
+
+Both are stored with the attempt (`assessment_attempts.learning_goal_id`, `attempt_item_knowledge_points`) and are never re-resolved later.
+
+A created result is a DRAFT. Grading saves item results, including `max_score` and optional per-knowledge-point `PASS`/`FAIL`/`NOT_ASSESSED` judgments. `FinalizeAssessmentResultUseCase` then moves the result to COMPLETED and writes `AssessmentCompleted.v2` to `outbox_events` in the same transaction. `OutboxRelay` publishes committed rows to the RabbitMQ exchange `assessment.events` with routing key `assessment.completed.v2`, using publisher confirms. See `docs/contracts/assessment-completed-v2.md`.
+
+IDs such as package, question and video references stay local logical references. Point debit, entitlement checks, provider execution, and an HTTP surface for graders to save details and finalize are still follow-up work.
 
 ## HTTP API
 
@@ -44,6 +53,9 @@ The service owns the `assessment_db` PostgreSQL database. Flyway migrations are 
 - `ASSESSMENT_DB_PASSWORD`
 - `GATEWAY_INTERNAL_JWT_SECRET`
 - `INTERNAL_JWT_ISSUER`
+- `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`
+- `USER_SERVICE_URL`, `CONTENT_SERVICE_URL`
+- `ASSESSMENT_OUTBOX_RELAY_ENABLED` (default `true`)
 
 The service imports configuration from Config Server and registers with Eureka using the shared project runtime configuration. Do not put credentials or JWT secret values in source or documentation.
 
@@ -56,7 +68,7 @@ api -> application -> domain
 infrastructure -> domain
 ```
 
-Controllers map validated HTTP requests to application commands. Use cases coordinate domain objects and repository contracts. JPA entities, Spring Data repositories, mappers, and adapters stay in infrastructure. No cross-service client, message publisher, or provider adapter is part of the current module.
+Controllers map validated HTTP requests to application commands. Use cases coordinate domain objects, repository contracts, and the `application/port` interfaces for User and Content lookups. JPA entities, Spring Data repositories, mappers, adapters, the HTTP clients (`infrastructure/client`), and the outbox relay (`infrastructure/messaging`) stay in infrastructure.
 
 ## Verification
 

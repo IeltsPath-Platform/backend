@@ -1,6 +1,7 @@
 package com.group01.content.application.usecase;
 
 import com.group01.content.application.result.QuestionDetailResult;
+import com.group01.content.application.result.QuestionKnowledgePointResult;
 import com.group01.content.application.result.QuestionVersionResult;
 import com.group01.content.domain.aggregate.Question;
 import com.group01.content.domain.exception.QuestionNotFoundException;

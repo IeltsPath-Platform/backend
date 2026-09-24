@@ -51,3 +51,36 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+class ConsumerSettings(BaseSettings):
+    """Settings for the AssessmentCompleted.v2 consumer process."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="AI_LEARNING_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    database_url: SecretStr
+    amqp_url: SecretStr
+    assessment_exchange: str = "assessment.events"
+    # Transient failures wait this long in the retry queue before redelivery.
+    retry_delay_ms: int = 30_000
+    # After this many failed deliveries the message is parked in the dead-letter queue.
+    max_delivery_attempts: int = 5
+
+    @field_validator("assessment_exchange")
+    @classmethod
+    def reject_blank_exchange(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Configuration value must not be blank")
+        return value
+
+    @field_validator("retry_delay_ms", "max_delivery_attempts")
+    @classmethod
+    def require_positive(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("Configuration value must be positive")
+        return value

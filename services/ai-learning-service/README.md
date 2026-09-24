@@ -13,9 +13,11 @@ Service chuyên trách **Adaptive Learning và DeepTutor AI Tutor Core** cho n�
 - Learner adaptive state persisted in PostgreSQL `mastery_paths.state_json`.
 - Safe progress, status, and path-map reads derived through DeepTutor v1.6.9 policy.
 - Internal JWT authentication using only the validated Authorization bearer token.
+- Formal Assessment feedback: an `AssessmentCompleted.v2` RabbitMQ consumer applies
+  finalized, pre-graded results through DeepTutor (see
+  `docs/contracts/assessment-completed-v2.md`).
 
-Tutor sessions, formal assessment ingestion, RabbitMQ consumers, question-level
-review APIs, and mistake practice are outside this phase.
+Tutor sessions, question-level review APIs, and mistake practice are outside this phase.
 
 ## Build the service image
 
@@ -49,7 +51,7 @@ Apply the V5 mastery schema and the uniqueness migration before enabling the
 path endpoints.
 The active-goal and curriculum contracts also depend on User Service
 `V4__enforce_one_active_learning_goal_per_user.sql` and Content Service
-`V2__add_knowledge_point_learning_type.sql` being applied to their own databases.
+`V3__add_knowledge_point_learning_type.sql` being applied to their own databases.
 
 Curriculum topics follow Content Service's sibling `sortOrder` in tree preorder.
 Knowledge Points are ordered by `createdAt` ascending, with UUID as a stable
@@ -62,4 +64,53 @@ The public Phase 1 routes are:
 - `GET /api/ai-learning/progress`
 - `GET /api/ai-learning/status`
 - `GET /api/ai-learning/paths/{pathId}/map`
+
+## Formal assessment consumer
+
+Run the consumer as a separate process from the same image:
+
+```powershell
+python -m app.messaging.assessment_consumer
+```
+
+It needs `AI_LEARNING_DATABASE_URL` and `AI_LEARNING_AMQP_URL`. Optional settings are
+`AI_LEARNING_ASSESSMENT_EXCHANGE` (default `assessment.events`),
+`AI_LEARNING_RETRY_DELAY_MS` and `AI_LEARNING_MAX_DELIVERY_ATTEMPTS`. It declares its
+own queue, retry queue and dead-letter queue.
+
+Apply `migrations/V2__formal_assessment_evidence.sql` after V1. It adds:
+
+- the `mastery_learning_evidence` projection;
+- the `UNIQUE (path_id, source, source_reference_id)` evidence identity;
+- the `formal_assessment_result_versions` ledger.
+
+Every aggregate commit rebuilds the projection from `state_json` in the same
+transaction.
+
+DeepTutor v1.6.9 has no entry point for already-graded results.
+`app/learning/external_assessment.py` subclasses `LearningService` and replays the
+post-grade steps of `_apply_grade`, calling DeepTutor's own methods for every
+adaptive computation:
+
+- `record_quiz_attempt`
+- `_record_quiz_evidence`
+- `calculate_mastery` and `update_mastery`
+- `SpacedRepetitionScheduler`
+- `record_qualitative_in_memory`
+- `scheduler.replay` for regrades
+
+The consumer never creates a learning path, because creating one needs the
+learner's curriculum token. An event for a goal that has no path yet is retried,
+then parked in the dead-letter queue.
+
+Tests run from this directory with the pinned submodule on the import path:
+
+```powershell
+$env:PYTHONPATH = "../../third_party/deeptutor;."
+python -m pytest tests
+```
+
+`AI_LEARNING_TEST_DATABASE_URL` enables the PostgreSQL integration and end-to-end
+tests, which each run in their own throwaway schema. `AI_LEARNING_TEST_AMQP_URL`
+enables the RabbitMQ tests.
 

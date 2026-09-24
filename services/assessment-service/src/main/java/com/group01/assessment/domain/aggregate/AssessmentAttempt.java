@@ -20,11 +20,22 @@ public final class AssessmentAttempt {
     private long rowVersion;
     private final Instant createdAt;
     private Instant updatedAt;
+    // The learner's active goal when the attempt started. Null means the learner had no active goal,
+    // in which case the finalized result is not attributed to any adaptive learning path.
+    private final UUID learningGoalId;
 
     public AssessmentAttempt(UUID id, UUID userId, UUID packageVersionId, AttemptType attemptType,
                              AttemptMode mode, AttemptChannel channel, AttemptStatus status,
                              Instant startedAt, Instant submittedAt, Instant expiresAt,
                              long rowVersion, Instant createdAt, Instant updatedAt) {
+        this(id, userId, packageVersionId, attemptType, mode, channel, status, startedAt, submittedAt, expiresAt,
+                rowVersion, createdAt, updatedAt, null);
+    }
+
+    public AssessmentAttempt(UUID id, UUID userId, UUID packageVersionId, AttemptType attemptType,
+                             AttemptMode mode, AttemptChannel channel, AttemptStatus status,
+                             Instant startedAt, Instant submittedAt, Instant expiresAt,
+                             long rowVersion, Instant createdAt, Instant updatedAt, UUID learningGoalId) {
         this.id = id;
         this.userId = userId;
         this.packageVersionId = packageVersionId;
@@ -38,13 +49,20 @@ public final class AssessmentAttempt {
         this.rowVersion = rowVersion;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.learningGoalId = learningGoalId;
     }
 
     public static AssessmentAttempt start(UUID userId, UUID packageVersionId, AttemptType type,
                                           AttemptMode mode, AttemptChannel channel, Instant expiresAt) {
+        return start(userId, packageVersionId, type, mode, channel, expiresAt, null);
+    }
+
+    public static AssessmentAttempt start(UUID userId, UUID packageVersionId, AttemptType type,
+                                          AttemptMode mode, AttemptChannel channel, Instant expiresAt,
+                                          UUID learningGoalId) {
         Instant now = Instant.now();
         return new AssessmentAttempt(UUID.randomUUID(), userId, packageVersionId, type, mode, channel,
-                AttemptStatus.IN_PROGRESS, now, null, expiresAt, 0, now, now);
+                AttemptStatus.IN_PROGRESS, now, null, expiresAt, 0, now, now, learningGoalId);
     }
 
     public void submit(Instant now) {
@@ -84,4 +102,5 @@ public final class AssessmentAttempt {
     public long getRowVersion() { return rowVersion; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public UUID getLearningGoalId() { return learningGoalId; }
 }

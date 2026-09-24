@@ -40,4 +40,6 @@ public class AssessmentAttemptJpaEntity {
     private Instant createdAt;
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+    @Column(name = "learning_goal_id")
+    private UUID learningGoalId;
 }

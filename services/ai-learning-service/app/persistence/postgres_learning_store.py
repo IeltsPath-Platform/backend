@@ -20,6 +20,15 @@ from deeptutor.learning.storage import (
     LearningTransaction,
 )
 
+from app.learning.formal_provenance import formal_source_reference
+
+
+def _uuid_or_none(value: str) -> str | None:
+    try:
+        return str(UUID(str(value))) if value else None
+    except ValueError:
+        return None
+
 
 class _Cursor:
     def __init__(self, cursor: Any) -> None:
@@ -198,6 +207,7 @@ class PostgresLearningStore:
                         cursor.execute("SELECT revision FROM mastery_paths WHERE path_id = %s", (path_id,))
                         current = cursor.fetchone()
                         raise LearningConflictError(path_id, tx.base_revision, int(current[0]) if current else 0)
+                    self._sync_evidence_projection(cursor, path_id, tx.progress)
                     for event_type, event_payload, session_id, turn_id in tx.events:
                         cursor.execute(
                             """INSERT INTO mastery_events
@@ -213,6 +223,91 @@ class PostgresLearningStore:
             if token is not None:
                 self._active.reset(token)
             connection.close()
+
+    @staticmethod
+    def _sync_evidence_projection(cursor: Any, path_id: str, progress: LearningProgress) -> None:
+        """Mirror aggregate evidence into ``mastery_learning_evidence`` inside the commit.
+
+        Same contract as DeepTutor's SQLite store: the projection is rebuilt from
+        the aggregate in the write transaction, so it can never commit ahead of or
+        disagree with ``state_json``. Formal evidence exposes its deterministic
+        ``source_reference_id``; the unique index on
+        ``(path_id, source, source_reference_id)`` rejects a duplicated outcome.
+        """
+        cursor.execute("DELETE FROM mastery_learning_evidence WHERE path_id = %s", (path_id,))
+        for ordinal, evidence in enumerate(progress.learning_evidence):
+            reference = formal_source_reference(evidence)
+            cursor.execute(
+                """INSERT INTO mastery_learning_evidence
+                   (path_id, ordinal, knowledge_point_id, occurred_at, source, source_reference_id,
+                    assessment_type, result, quality, hints_used, attempt_count, confidence,
+                    response_time_seconds, session_id, turn_id, evidence_json)
+                   VALUES (%s, %s, %s, to_timestamp(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)""",
+                (
+                    path_id,
+                    ordinal,
+                    str(UUID(evidence.knowledge_point_id)),
+                    evidence.timestamp,
+                    evidence.source,
+                    reference,
+                    evidence.assessment_type,
+                    evidence.result,
+                    evidence.quality,
+                    evidence.hints_used,
+                    evidence.attempt_count,
+                    evidence.confidence,
+                    evidence.response_time,
+                    # Formal evidence carries provenance in these fields, not tutor ids.
+                    None if reference else _uuid_or_none(evidence.session_id),
+                    None if reference else _uuid_or_none(evidence.turn_id),
+                    json.dumps(evidence.model_dump(mode="json"), ensure_ascii=False),
+                ),
+            )
+
+    def _active_connection(self, path_id: str) -> Any:
+        active = self._active.get()
+        if active is None or active[0] != self._validate_id(path_id):
+            raise LearningStoreError("Formal result versions must be read and written inside the path transaction")
+        return active[1]
+
+    def applied_result_version(self, path_id: str, attempt_id: str) -> int | None:
+        """Latest result version already applied for an attempt, read under the path lock."""
+        with self._active_connection(path_id).cursor() as cursor:
+            cursor.execute(
+                "SELECT result_version FROM formal_assessment_result_versions "
+                "WHERE path_id = %s AND attempt_id = %s",
+                (self._validate_id(path_id), str(attempt_id)),
+            )
+            row = cursor.fetchone()
+            return int(row[0]) if row else None
+
+    def record_applied_result(
+        self,
+        path_id: str,
+        *,
+        attempt_id: str,
+        result_id: str,
+        result_version: int,
+        event_id: str,
+    ) -> None:
+        """Advance the applied version; the SQL predicate refuses any non-increasing version."""
+        with self._active_connection(path_id).cursor() as cursor:
+            cursor.execute(
+                """INSERT INTO formal_assessment_result_versions
+                   (path_id, attempt_id, result_id, result_version, event_id, applied_at)
+                   VALUES (%s, %s, %s, %s, %s, now())
+                   ON CONFLICT (path_id, attempt_id) DO UPDATE SET
+                       result_id = EXCLUDED.result_id,
+                       result_version = EXCLUDED.result_version,
+                       event_id = EXCLUDED.event_id,
+                       applied_at = EXCLUDED.applied_at
+                   WHERE formal_assessment_result_versions.result_version < EXCLUDED.result_version""",
+                (self._validate_id(path_id), str(attempt_id), str(result_id), int(result_version), str(event_id)),
+            )
+            if cursor.rowcount != 1:
+                raise LearningStoreError(
+                    f"Result version {result_version} for attempt {attempt_id} is not newer than the applied version"
+                )
 
     def mutate(self, book_id: str, mutation: Any, *, create: bool = False) -> tuple[LearningProgress, Any]:
         with self.transaction(book_id, create=create) as tx:

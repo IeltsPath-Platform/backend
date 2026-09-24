@@ -23,13 +23,19 @@ class PathNotFound(Exception):
     """The path does not exist or is not owned by the caller."""
 
 
+class PathNotBootstrapped(Exception):
+    """No path exists for the goal yet and no curriculum was supplied to create one."""
+
+
 class PathService:
     def __init__(
         self,
         store: PostgresLearningStore,
-        user_client: UserServiceClient,
-        content_client: ContentServiceClient,
+        user_client: UserServiceClient | None = None,
+        content_client: ContentServiceClient | None = None,
     ) -> None:
+        # The Assessment consumer only uses ensure_path on existing paths, so it
+        # builds this service without the learner-facing HTTP clients.
         self._store = store
         self._learning = LearningService(store)
         self._users = user_client
@@ -60,31 +66,46 @@ class PathService:
         if goal["userId"] != str(user_id):
             raise ValueError("Active goal owner does not match authenticated learner")
         goal_id = goal["id"]
-        existing_path_id = await run_in_threadpool(self._store.find_path, user_id, goal_id)
-        if existing_path_id:
-            progress = await run_in_threadpool(self._store.get_owned_progress, existing_path_id, user_id)
-            if progress is None:
-                raise PathNotFound
-            return existing_path_id, progress
-
+        try:
+            return await run_in_threadpool(self.ensure_path, user_id, goal_id)
+        except PathNotBootstrapped:
+            pass
         topics, content_points = await self._content.get_curriculum(bearer_token)
         modules = CurriculumAdapter.to_modules(topics, content_points)
+        return await run_in_threadpool(self.ensure_path, user_id, goal_id, modules)
+
+    def ensure_path(
+        self, user_id: UUID | str, learning_goal_id: UUID | str, modules: list[Any] | None = None
+    ) -> tuple[str, Any]:
+        """Return the single path of ``(user_id, learning_goal_id)``, creating it at most once.
+
+        Shared by the learner API and the Assessment consumer. Creation needs the
+        canonical curriculum; without ``modules`` a missing path raises
+        ``PathNotBootstrapped`` instead of inventing an empty path.
+        """
+        existing_path_id = self._store.find_path(user_id, learning_goal_id)
+        if existing_path_id:
+            return existing_path_id, self._owned(existing_path_id, user_id)
+        if modules is None:
+            raise PathNotBootstrapped
         path_id = str(uuid4())
         try:
-            progress = await run_in_threadpool(self._create_path, path_id, user_id, goal_id, modules)
-            return path_id, progress
+            return path_id, self._create_path(path_id, user_id, str(learning_goal_id), modules)
         except UniqueViolation as exc:
-            # Two requests can pass the preflight lookup together. The partial
-            # unique index chooses the winner; the loser returns that same path.
+            # Two callers can pass the lookup together. The partial unique index
+            # chooses the winner; the loser returns that same path.
             if exc.diag.constraint_name != "uq_mastery_paths_user_learning_goal":
                 raise
-            winner_path_id = await run_in_threadpool(self._store.find_path, user_id, goal_id)
+            winner_path_id = self._store.find_path(user_id, learning_goal_id)
             if winner_path_id is None:
                 raise
-            winner = await run_in_threadpool(self._store.get_owned_progress, winner_path_id, user_id)
-            if winner is None:
-                raise PathNotFound
-            return winner_path_id, winner
+            return winner_path_id, self._owned(winner_path_id, user_id)
+
+    def _owned(self, path_id: str, user_id: UUID | str) -> Any:
+        progress = self._store.get_owned_progress(path_id, user_id)
+        if progress is None:
+            raise PathNotFound
+        return progress
 
     def _create_path(self, path_id: str, user_id: UUID, goal_id: str, modules: list[Any]) -> Any:
         with self._store.transaction(

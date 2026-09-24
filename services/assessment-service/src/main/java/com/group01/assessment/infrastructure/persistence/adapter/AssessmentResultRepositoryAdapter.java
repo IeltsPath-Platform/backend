@@ -15,4 +15,8 @@ import java.util.Optional; import java.util.UUID;
     public Optional<AssessmentResult> findLatestForUpdateByAttemptId(UUID id) {
         return repository.findForUpdateByAttemptId(id, PageRequest.of(0, 1)).stream().findFirst().map(mapper::toDomain);
     }
+
+    public Optional<AssessmentResult> findForUpdateById(UUID id) {
+        return repository.findForUpdateById(id).map(mapper::toDomain);
+    }
 }

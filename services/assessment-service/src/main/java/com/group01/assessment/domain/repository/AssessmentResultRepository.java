@@ -10,4 +10,6 @@ public interface AssessmentResultRepository {
     Optional<AssessmentResult> findLatestByAttemptId(UUID attemptId);
 
     Optional<AssessmentResult> findLatestForUpdateByAttemptId(UUID attemptId);
+
+    Optional<AssessmentResult> findForUpdateById(UUID resultId);
 }

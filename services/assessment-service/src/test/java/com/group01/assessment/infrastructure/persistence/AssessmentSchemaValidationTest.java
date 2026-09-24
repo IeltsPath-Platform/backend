@@ -4,6 +4,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -30,10 +31,16 @@ class AssessmentSchemaValidationTest {
         LocalContainerEntityManagerFactoryBean entityManagerFactory = new LocalContainerEntityManagerFactoryBean();
         entityManagerFactory.setDataSource(new DriverManagerDataSource(
                 postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword()));
+        entityManagerFactory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
         entityManagerFactory.setPackagesToScan("com.group01.assessment.infrastructure.persistence.entity");
+        // Same naming strategies Spring Boot applies at runtime, so validation sees the real column names.
         entityManagerFactory.setJpaPropertyMap(Map.of(
                 "hibernate.hbm2ddl.auto", "validate",
-                "hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect"));
+                "hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect",
+                "hibernate.physical_naming_strategy",
+                "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy",
+                "hibernate.implicit_naming_strategy",
+                "org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy"));
         entityManagerFactory.afterPropertiesSet();
 
         try {
