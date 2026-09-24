@@ -1,7 +1,7 @@
 ---
 title: "Gỡ blocker luồng chính Assessment → DeepTutor (không LLM)"
 description: "Gỡ các blocker để luồng Assessment finalize → RabbitMQ → DeepTutor → /status chạy thật: baseline schema ai_learning_db + Flyway, hộp chờ khi chưa có path, endpoint grader, compose tối thiểu và kiểm chứng E2E."
-status: pending
+status: completed
 priority: P1
 branch: "main"
 tags: [feature, backend, database, api, auth, infra]
@@ -50,7 +50,7 @@ Ngoài phạm vi:
 | 1 | [AI Learning baseline schema and Flyway](./phase-01-ai-learning-baseline-schema-and-flyway.md) | Completed |
 | 2 | [Pending formal result inbox](./phase-02-pending-formal-result-inbox.md) | Completed |
 | 3 | [Assessment grader endpoints](./phase-03-assessment-grader-endpoints.md) | Completed |
-| 4 | [Minimal compose and end-to-end verification](./phase-04-minimal-compose-and-end-to-end-verification.md) | Pending |
+| 4 | [Minimal compose and end-to-end verification](./phase-04-minimal-compose-and-end-to-end-verification.md) | Completed |
 
 ## Dependencies
 

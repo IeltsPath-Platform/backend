@@ -88,6 +88,29 @@ The public Phase 1 routes are:
 - `GET /api/ai-learning/status`
 - `GET /api/ai-learning/paths/{pathId}/map`
 
+## Run with Docker Compose
+
+From the repository root, with the variables listed in the root README in `.env`:
+
+```bash
+docker compose up -d --build rabbitmq ai-learning-db ai-learning-migrate ai-learning-api ai-learning-consumer
+```
+
+| Service | What it does | Environment it receives |
+| --- | --- | --- |
+| `ai-learning-db` | PostgreSQL `ai_learning_db` on `127.0.0.1:5436` | `AI_LEARNING_DB_PASSWORD` |
+| `ai-learning-migrate` | `flyway migrate` once over `migrations/`, then exits 0 | JDBC URL, `postgres`, `AI_LEARNING_DB_PASSWORD` |
+| `ai-learning-api` | `uvicorn main:app` on `127.0.0.1:8000`, starts after the migration | `AI_LEARNING_INTERNAL_JWT_SECRET` (from `GATEWAY_INTERNAL_JWT_SECRET`), `AI_LEARNING_DATABASE_URL`, `AI_LEARNING_USER_SERVICE_BASE_URL`, `AI_LEARNING_CONTENT_SERVICE_BASE_URL` |
+| `ai-learning-consumer` | `python -m app.messaging.assessment_consumer`, restarted if it exits | `AI_LEARNING_DATABASE_URL`, `AI_LEARNING_AMQP_URL` only (no JWT secret) |
+
+The API forwards the learner's internal JWT straight to User (`8085`) and Content (`8082`),
+not through the Gateway, so both base URLs default to `http://host.docker.internal:<port>`.
+Both containers use one image; the build installs DeepTutor with its full dependency stack
+(about 1.6 GB), although the main flow imports no LLM module.
+
+Check the migration with `docker compose run --rm ai-learning-migrate info`; running
+`migrate` again reports that the schema is up to date.
+
 ## Formal assessment consumer
 
 Run the consumer as a separate process from the same image:
