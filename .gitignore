@@ -53,8 +53,6 @@ payload.json
 graphify-out/
 .claude/
 claude/
-.plan/
-.plans/
 .agents/
 agents/
-plans/
+
