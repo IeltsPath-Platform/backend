@@ -6,6 +6,7 @@ import com.group01.user.domain.exception.InvalidActionTokenException;
 import com.group01.user.domain.exception.InvalidUserStatusException;
 import com.group01.user.domain.exception.LearnerProfileNotFoundException;
 import com.group01.user.domain.exception.LearningGoalNotFoundException;
+import com.group01.user.domain.exception.LearningGoalConflictException;
 import com.group01.user.domain.exception.OAuthIdentityNotFoundException;
 import com.group01.user.domain.exception.PhoneAlreadyExistsException;
 import com.group01.user.domain.exception.RoleNotFoundException;
@@ -43,7 +44,7 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, null);
     }
 
-    @ExceptionHandler({EmailAlreadyExistsException.class, PhoneAlreadyExistsException.class})
+    @ExceptionHandler({EmailAlreadyExistsException.class, PhoneAlreadyExistsException.class, LearningGoalConflictException.class})
     ResponseEntity<ErrorResponse> handleConflict(RuntimeException exception, HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, exception.getMessage(), request, null);
     }

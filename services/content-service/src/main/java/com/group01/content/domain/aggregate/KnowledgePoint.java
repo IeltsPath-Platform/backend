@@ -2,6 +2,7 @@ package com.group01.content.domain.aggregate;
 
 import com.group01.content.domain.vo.ContentStatus;
 import com.group01.content.domain.vo.KnowledgePointKind;
+import com.group01.content.domain.vo.LearningType;
 import com.group01.content.domain.vo.Skill;
 
 import java.time.Instant;
@@ -14,6 +15,7 @@ public class KnowledgePoint {
     private String code;
     private String name;
     private KnowledgePointKind kind;
+    private LearningType learningType;
     private Skill skill;
     private String description;
     private ContentStatus status;
@@ -21,6 +23,7 @@ public class KnowledgePoint {
     private Instant updatedAt;
 
     public KnowledgePoint(UUID id, UUID topicId, String code, String name, KnowledgePointKind kind,
+                          LearningType learningType,
                           Skill skill, String description, ContentStatus status,
                           Instant createdAt, Instant updatedAt) {
         this.id = Objects.requireNonNull(id, "id must not be null");
@@ -28,28 +31,37 @@ public class KnowledgePoint {
         this.code = Objects.requireNonNull(code, "code must not be null");
         this.name = Objects.requireNonNull(name, "name must not be null");
         this.kind = Objects.requireNonNull(kind, "kind must not be null");
+        this.learningType = learningType;
         this.skill = skill;
         this.description = description;
         this.status = status != null ? status : ContentStatus.ACTIVE;
+        if (this.status == ContentStatus.ACTIVE && this.learningType == null) {
+            throw new IllegalArgumentException("learningType is required for an active knowledge point");
+        }
         this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.updatedAt = updatedAt != null ? updatedAt : this.createdAt;
     }
 
     public static KnowledgePoint create(UUID topicId, String code, String name,
-                                        KnowledgePointKind kind, Skill skill, String description) {
+                                        KnowledgePointKind kind, LearningType learningType,
+                                        Skill skill, String description) {
         Instant now = Instant.now();
-        return new KnowledgePoint(UUID.randomUUID(), topicId, code, name, kind, skill, description,
+        return new KnowledgePoint(UUID.randomUUID(), topicId, code, name, kind, learningType, skill, description,
                 ContentStatus.ACTIVE, now, now);
     }
 
-    public void update(String name, KnowledgePointKind kind, Skill skill, String description, ContentStatus status) {
+    public void update(String name, KnowledgePointKind kind, LearningType learningType,
+                       Skill skill, String description, ContentStatus status) {
         this.name = Objects.requireNonNull(name, "name must not be null");
         this.kind = Objects.requireNonNull(kind, "kind must not be null");
+        ContentStatus updatedStatus = status != null ? status : this.status;
+        if (updatedStatus == ContentStatus.ACTIVE && learningType == null) {
+            throw new IllegalArgumentException("learningType is required for an active knowledge point");
+        }
+        this.learningType = learningType;
         this.skill = skill;
         this.description = description;
-        if (status != null) {
-            this.status = status;
-        }
+        this.status = updatedStatus;
         this.updatedAt = Instant.now();
     }
 
@@ -58,6 +70,7 @@ public class KnowledgePoint {
     public String getCode() { return code; }
     public String getName() { return name; }
     public KnowledgePointKind getKind() { return kind; }
+    public LearningType getLearningType() { return learningType; }
     public Skill getSkill() { return skill; }
     public String getDescription() { return description; }
     public ContentStatus getStatus() { return status; }

@@ -15,6 +15,7 @@ public class KnowledgePointPersistenceMapper {
                 entity.getCode(),
                 entity.getName(),
                 entity.getKind(),
+                entity.getLearningType(),
                 entity.getSkill(),
                 entity.getDescription(),
                 entity.getStatus(),
@@ -31,6 +32,7 @@ public class KnowledgePointPersistenceMapper {
                 .code(domain.getCode())
                 .name(domain.getName())
                 .kind(domain.getKind())
+                .learningType(domain.getLearningType())
                 .skill(domain.getSkill())
                 .description(domain.getDescription())
                 .status(domain.getStatus())

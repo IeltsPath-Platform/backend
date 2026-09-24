@@ -1,6 +1,7 @@
 package com.group01.content.api.dto.request;
 
 import com.group01.content.domain.vo.KnowledgePointKind;
+import com.group01.content.domain.vo.LearningType;
 import com.group01.content.domain.vo.Skill;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -22,6 +23,9 @@ public record CreateKnowledgePointRequest(
 
         @NotNull(message = "kind is required")
         KnowledgePointKind kind,
+
+        @NotNull(message = "learningType is required")
+        LearningType learningType,
 
         Skill skill,
         String description

@@ -1,6 +1,6 @@
 # 🚀 IELTSPath
 
-IELTSPath là backend microservices xây dựng trên hệ sinh thái **Java 21** và **Spring Cloud**. Dự án tích hợp hạ tầng lõi gồm Gateway, Service Discovery, Config Server và module bảo mật dùng chung.
+IELTSPath là backend microservices gồm các dịch vụ **Java 21 / Spring Cloud** và dịch vụ **Python / FastAPI**. Hệ thống tích hợp Gateway, Service Discovery, Config Server và module bảo mật dùng chung.
 
 ---
 
@@ -8,23 +8,24 @@ IELTSPath là backend microservices xây dựng trên hệ sinh thái **Java 21*
 
 | Thành phần                | Công nghệ / Thư viện                | Phiên bản          | Chức năng chính                                                                                                                        |
 | :-------------------------- | :-------------------------------------- | :------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
-| **Language**          | Java                                    | **OpenJDK 21** | Ngôn ngữ lập trình cốt lõi                                                                                                          |
+| **Language**          | Java, Python                            | **OpenJDK 21, Python 3.11+** | Ngôn ngữ triển khai các microservice                                                                                              |
 | **Framework**         | Spring Boot                             | **3.5.14**     | Framework ứng dụng nền tảng                                                                                                           |
 | **Cloud Ecosystem**   | Spring Cloud                            | **2025.0.0**   | Hệ sinh thái dịch vụ đám mây                                                                                                       |
 | **API Gateway**       | Spring Cloud Gateway (WebFlux Reactive) | 2025.0.0             | Quản lý định tuyến API, xác thực & phân quyền tập trung dựa trên kiến trúc Phản ứng (Reactive, Non-blocking Netty Engine) |
+| **AI Learning API**  | FastAPI, DeepTutor                      | Python 3.11+         | Adaptive Learning và DeepTutor Mastery Path                              |
 | **Service Discovery** | Spring Cloud Netflix Eureka             | 2025.0.0             | Đăng ký và phát hiện dịch vụ tự động                                                                                           |
 | **Config Management** | Spring Cloud Config Server              | 2025.0.0             | Quản lý cấu hình tập trung cho toàn bộ microservices                                                                               |
 | **Security & Auth**   | Spring Security & OAuth2 (Reactive)     | 3.5.14               | Xử lý token JWT và Context người dùng bất đồng bộ                                                                               |
 | **Shared Common**     | Custom`common-security`               | 1.0-SNAPSHOT         | Module dùng chung:`CanonicalRoles`, `InternalJwtClaims`, `InternalJwtAuthorities`, `InternalJwtValidators`                       |
 | **Database**          | PostgreSQL                              | 15-alpine            | Hệ quản trị cơ sở dữ liệu quan hệ                                                                                                 |
 | **Containerization**  | Docker & Docker Compose                 | Latest               | Đóng gói và chạy môi trường hạ tầng nhanh chóng                                                                                |
-| **Build Tool**        | Maven (Multi-module)                    | 3.9+                 | Quản lý dependencies và đóng gói dự án                                                                                            |
+| **Build Tool**        | Maven, pip                               | Maven 3.9+, pip       | Maven cho Java services; pip requirements và Dockerfile riêng cho AI Learning                                                   |
 
 ---
 
 ## 📁 Cấu Trúc Dự Án (Project Architecture)
 
-Dự án được thiết kế theo mô hình **Maven Multi-module**:
+Dịch vụ Java dùng **Maven Multi-module**; `ai-learning-service` là Python/FastAPI service riêng.
 
 ```text
 IELTSPath/
@@ -35,6 +36,9 @@ IELTSPath/
 ├── shared/                     # Chứa các module dùng chung giữa các microservices
 │   └── common-security/        # CanonicalRoles, InternalJwtClaims, InternalJwtAuthorities, InternalJwtValidators
 ├── services/                   # Chứa các microservice nghiệp vụ
+│   ├── ai-learning-service/    # [Port 8000] FastAPI + DeepTutor, build bằng Dockerfile riêng
+│   ├── user-service/           # User identity, roles, auth và learning goals
+│   └── learning-support-service/ # Learner-owned utility state
 ├── services/community-service  # Bài viết, bình luận, reaction và moderation
 ├── docker-compose.yml          # File Docker Compose khởi chạy hạ tầng (Postgres, Infrastructure)
 ├── pom.xml                     # Root POM quản lý phiên bản và danh sách module
@@ -91,6 +95,7 @@ Dịch vụ **API Gateway** (`infra/api-gateway`) được xây dựng 100% dự
 ### 1. Yêu Cầu Môi Trường (Prerequisites)
 
 - **Java Development Kit (JDK)**: Version 21.
+- **Python**: Version 3.11+ để chạy hoặc build `ai-learning-service`.
 - **Maven**: Version 3.9+.
 - **Docker & Docker Desktop**: Để chạy ứng dụng hạ tầng và Cơ sở dữ liệu.
 

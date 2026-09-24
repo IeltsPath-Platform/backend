@@ -1,7 +1,7 @@
 ---
 type: implementation-plan
 version: phase1
-status: ready-for-contract-finalization
+status: in-progress
 service: ai-learning-service
 scope: DeepTutor v1.6.9 integration baseline
 external_baseline: HKUDS/DeepTutor v1.6.9
@@ -12,6 +12,8 @@ external_baseline: HKUDS/DeepTutor v1.6.9
 ## 1. Goal and invariants
 
 Implement the existing Python/FastAPI ai-learning-service scaffold as the IELTSPath integration boundary around DeepTutor v1.6.9. The service adapts platform data, calls DeepTutor, persists its aggregate state, verifies platform identity, exposes learner APIs, and consumes formal assessment events.
+
+**Execution scope update (2026-09-24):** The currently authorized implementation slice is Stage A: synchronous PostgreSQL mastery-path storage, JWT identity, User/Content Service clients, curriculum bootstrap, and the four learner path/progress/status/map APIs. Formal assessment ingestion and RabbitMQ are explicitly deferred from this execution slice. Keep the broader contracts below as follow-up design context; do not claim the whole Phase 1 definition of done until those later flows are implemented and verified.
 
 **DeepTutor is the sole adaptive learning engine.** IELTSPath must not add another mastery algorithm, adaptive policy, review scheduler, learning planner, weakness engine, or next-action engine. Platform code may validate and transform inputs, invoke DeepTutor operations, persist results, and map safe response DTOs.
 
@@ -34,7 +36,7 @@ Inspected before preparing this plan:
 - DeepTutor deeptutor/learning/{service,storage,models,mastery,policy,scheduler}.py, deeptutor/services/session/sqlite_store.py, deeptutor/services/practice/storage.py, and the submodule pyproject.toml.
 - Existing Gateway token issuer and common security validation code; existing Assessment Service result entities and tracked event references.
 
-The repo has an existing services/ai-learning-service/{main.py,README.md,requirements.txt} scaffold, but no implemented service architecture, assessment event schema, or broker configuration. SERVICE_ARCHITECTURE_V2.md references AssessmentCompleted.v2; it does not define the payload. DATABASE_V5.md is the authoritative PostgreSQL table and column inventory. Do not copy table DDL into this plan.
+The repo now has a Stage A implementation in services/ai-learning-service/{main.py,app,tests}: JWT-protected learner APIs, User/Content Service clients, canonical curriculum mapping, and a synchronous PostgreSQL LearningStore adapter. Formal assessment event schema and broker configuration remain unimplemented. SERVICE_ARCHITECTURE_V2.md references AssessmentCompleted.v2; it does not define the payload. DATABASE_V5.md is the authoritative PostgreSQL table and column inventory. Do not copy table DDL into this plan.
 
 ### DeepTutor v1.6.9 facts that constrain implementation
 
@@ -181,13 +183,13 @@ Do not describe PostgreSQL FOR UPDATE as a literal replacement for SQLite BEGIN 
 ### 5.4 Path bootstrap and curriculum mapping
 
 1. Derive user_id exclusively from validated internal JWT sub.
-2. Fetch the caller's active learning goal from User Service and the required published curriculum/KPs from Content Service. Exact HTTP route/DTO shapes are TO VERIFY against those services before implementation. Exactly one active goal is a USER CONTRACT REQUIRED; if there is no active goal, return a domain error and never invent a default goal.
+2. Fetch the caller's active learning goal from User Service at `GET /api/users/me/learning-goals/active` and the curriculum from Content Service at `GET /api/content/topics` plus `GET /api/content/knowledge-points`. These routes and response DTOs were verified against the current controllers. User Service enforces one active goal per learner; if there is no active goal, return a domain error and never invent a default goal.
 3. If either required service is unavailable, fail bootstrap with a retryable dependency error. Do not create an empty or goal-less path. Optional enrichment, if any is later added, must be identified separately.
 4. Validate all curriculum KPs before mutation. learning_type is required metadata. Explicit mapping is MEMORY → KnowledgeType.MEMORY, CONCEPT → KnowledgeType.CONCEPT, PROCEDURE → KnowledgeType.PROCEDURE, DESIGN → KnowledgeType.DESIGN. Missing or invalid values are a curriculum contract violation: reject the bootstrap, record a safe diagnostic, and do not fall back to another type.
-5. Use str(content knowledge_points.id) for DeepTutor KnowledgePoint.id. Preserve module/topic identity and order as source data allows. KP.code is display/business-readable metadata, not aggregate identity. The same canonical Content UUID must match AssessmentCompleted mappings.
+5. Use str(content knowledge_points.id) for DeepTutor KnowledgePoint.id. Preserve module/topic identity and order as source data allows. Content Service defines topic sibling order through sortOrder and returns Knowledge Points with createdAt but no learning sortOrder; Stage A orders KPs by createdAt ascending with UUID as a deterministic tie-breaker. This is an accepted baseline ordering, not an editorial learning-sequence contract. KP.code is display/business-readable metadata, not aggregate identity. The same canonical Content UUID must match AssessmentCompleted mappings.
 6. Route both `POST /api/ai-learning/paths` and the Assessment consumer through one application operation: `ensurePath(userId, learningGoalId)`. It looks up `(user_id, learning_goal_id)`, returns the existing path, or creates exactly one path and persists ownership in the same transaction. Do not duplicate path-creation logic across API and consumer.
 7. Make concurrent ensure calls safe with a database uniqueness constraint and conflict recovery: after a uniqueness race, reload and return the winning path. An application SELECT-before-INSERT alone is insufficient. See Required Follow-up Changes.
-8. Call DeepTutor `LearningService.get_or_create(path_id)` and `replace_modules_for_path(..., append=False, ...)`; do not construct `LearningProgress` manually. The smallest ownership-aware extension at the DeepTutor service/store boundary remains an implementation detail to verify.
+8. Call DeepTutor `LearningService.get_or_create(path_id)` and `replace_modules_for_path(..., append=False, ...)`; do not construct `LearningProgress` manually. The PostgreSQL adapter opens the ownership-aware transaction and joins these unchanged DeepTutor operations.
 
 **Acceptance:** one `(user_id, learning_goal_id)` identifies one path; API and event bootstrap converge on that same path under concurrency. Invalid curriculum and dependency failures leave no partial path. `/progress` and `/status` use only the active goal's path; no active goal returns a domain error.
 
@@ -339,7 +341,7 @@ Return the safe result of DeepTutor policy.next_objective() for the active goal'
 
 Return a response DTO mapped from DeepTutor map summary and module/KP information. Resolve the path only where mastery_paths.user_id equals the authenticated UUID.
 
-Final rule: one active learning goal drives one active mastery path. Historical/inactive goals do not drive default `/progress` or `/status`; these endpoints never choose a random path. User Service must define/enforce exactly one active goal (**USER CONTRACT REQUIRED**). With no active goal, return a domain error and never create a fake/default goal. Historical path selection is future scope.
+Final rule: one active learning goal drives one active mastery path. Historical/inactive goals do not drive default `/progress` or `/status`; these endpoints never choose a random path. User Service enforces exactly one active goal. With no active goal, return a domain error and never create a fake/default goal. Historical path selection is future scope.
 
 Do not expose raw LearningProgress, RepetitionState, pending expected answers, internal mastery_events, or private reasoning.
 
@@ -404,9 +406,9 @@ Tests must verify the behavior below using the pinned v1.6.9 functions and Postg
 
 services/ai-learning-service/
 - app/api/ — FastAPI routes and response DTO mapping
-- app/application/ — path bootstrap and formal assessment orchestration
-- app/integrations/ — User/Content clients and contracted event consumer
-- app/adapters/ — curriculum and formal evidence transformations
+- app/application/ — path bootstrap and safe read orchestration
+- app/clients/ — User/Content Service clients; no event consumer in Stage A
+- app/adapters/ — canonical curriculum transformation
 - app/persistence/ — synchronous PostgreSQL LearningStore
 - app/security/ — internal JWT verification
 - tests/
@@ -418,13 +420,13 @@ Do not create application modules solely to wrap DeepTutor mastery, policy, or s
 
 ## 13. Delivery risks and unresolved decisions
 
-- **DeepTutor external-result API:** v1.6.9 has no public external pre-graded full-pipeline method. The minimal fork extension signature and replay implementation must be approved before formal mutation.
-- **Path ownership during creation:** `get_or_create(book_id)` has no owner/goal parameters. `ensurePath` must preserve DeepTutor's service boundary while persisting owner and goal atomically; exact extension point remains TO VERIFY.
+- **DeepTutor external-result API:** v1.6.9 has no public external pre-graded full-pipeline method. This remains deferred until formal mutation work is authorized; the minimal fork extension signature and replay implementation must be reviewed first.
+- **Path ownership during creation:** Stage A resolves this by opening the PostgreSQL transaction with owner/goal metadata, then joining DeepTutor's unchanged synchronous `get_or_create()` and `replace_modules_for_path()` transactions. No DeepTutor source change is needed for path bootstrap.
 - **Assessment event contract:** `AssessmentCompleted.v2` schema, producer, result-version lifecycle and mapping snapshot must be accepted before consumer implementation (NEW CONTRACT REQUIRED). RabbitMQ transport is decided; names/config remain TO DEFINE.
-- **Database constraints:** `mastery_paths` has no unique `(user_id, learning_goal_id)` constraint, and `mastery_learning_evidence` documents a non-unique source index. Both constraints must be approved/designed before concurrent path creation or formal consumer implementation.
-- **Active-goal contract:** User Service must expose/enforce exactly one active goal per learner (USER CONTRACT REQUIRED); no active goal means a domain error.
-- **Service HTTP contracts:** verify actual User/Content client routes, DTOs, service authentication, and retryable error mapping before implementing either client.
-- **Blocking database calls:** use the synchronous adapter and FastAPI threadpool boundary; capacity tuning is deployment work, not a reason to change DeepTutor to async.
+- **Database constraints:** The goal-bound path partial unique index is defined in the AI Learning service migration and is required before deployment. Evidence-source uniqueness remains future work for formal assessment ingestion.
+- **Active-goal contract:** Stage A uses User Service `GET /api/users/me/learning-goals/active`; no active goal maps to a domain error. User Service now enforces one active goal per learner.
+- **Service HTTP contracts:** Stage A User/Content routes and DTOs were verified against their controllers and response records; runtime dependency failures return retryable 502/503 responses.
+- **Blocking database calls:** synchronous persistence runs through FastAPI's threadpool boundary. Capacity tuning remains deployment work, not a reason to change DeepTutor to async.
 - **Database migration execution:** DATABASE_V5 is a design source, not an implemented Python migration. Select a reproducible schema rollout process before deployment (TO VERIFY); do not duplicate or silently diverge from DATABASE_V5.
 
 ## 14. Architecture / Schema Contradictions
@@ -452,9 +454,9 @@ DATABASE_V5 is authoritative and remains unchanged in this task. The required fo
 ## 16. TO VERIFY / NEW CONTRACT REQUIRED
 
 - **NEW CONTRACT REQUIRED:** accepted `AssessmentCompleted.v2` schema: finalized status, monotonic `result_version`, item outcomes, explicit qualitative judgment when applicable, and Question→KP mapping+weight snapshot.
-- **USER CONTRACT REQUIRED:** User Service route/DTO for active goal and invariant of exactly one active goal; no active goal is an error case.
-- **TO VERIFY:** exact User Service and Content Service routes/DTOs; internal HTTP service authentication.
-- **TO VERIFY:** DeepTutor `record_external_assessment(...)` signature and ownership-aware path-creation seam; exact regrade replay implementation. Core behavior is fixed: superseded result versions must not double-count.
+- **VERIFIED FOR STAGE A:** User active-goal and Content curriculum routes/DTOs; the exactly-one-active-goal invariant; bearer forwarding; ownership-aware PostgreSQL transaction around DeepTutor path creation.
+- **TO VERIFY BEFORE DEPLOYMENT:** runtime provisioning of the internal signing secret and database credentials; exact readiness/routing registration for the Python service.
+- **TO VERIFY BEFORE FORMAL MUTATION:** DeepTutor `record_external_assessment(...)` signature and exact regrade replay implementation. Core behavior is fixed: superseded result versions must not double-count.
 - **TO DEFINE:** RabbitMQ exchange/routing names, retry count/timeout and DLQ bindings, Python client library if no repo convention exists, and deployment configuration. RabbitMQ itself is final, not an open choice.
 - **TO VERIFY:** schema migration tooling/rollout for the Python service and the approved design/application of both required unique constraints.
 - Whether future PracticeStore or SessionStore operations are necessary for an explicitly accepted Phase 1 use case.

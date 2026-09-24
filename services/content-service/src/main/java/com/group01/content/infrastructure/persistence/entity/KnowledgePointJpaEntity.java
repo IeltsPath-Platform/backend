@@ -2,6 +2,7 @@ package com.group01.content.infrastructure.persistence.entity;
 
 import com.group01.content.domain.vo.ContentStatus;
 import com.group01.content.domain.vo.KnowledgePointKind;
+import com.group01.content.domain.vo.LearningType;
 import com.group01.content.domain.vo.Skill;
 import jakarta.persistence.*;
 import lombok.*;
@@ -36,6 +37,10 @@ public class KnowledgePointJpaEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "kind", nullable = false, length = 50)
     private KnowledgePointKind kind;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "learning_type", length = 20)
+    private LearningType learningType;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "skill", length = 50)
