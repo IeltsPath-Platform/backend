@@ -166,5 +166,114 @@ class FormalAssessmentPostgresTest(unittest.TestCase):
         self.assertEqual(self.reload().version, revision)
 
 
+class _CurriculumClient:
+    """Content Service stub returning the flattened topic/KP shape ``ContentServiceClient`` produces."""
+
+    async def get_curriculum(self, _bearer_token):
+        modules = curriculum()
+        topics = [{"id": module.id, "name": module.name, "sortOrder": module.order, "status": "ACTIVE"}
+                  for module in modules]
+        points = [
+            {"id": kp.id, "topicId": module.id, "name": kp.name, "learningType": kp.type.value.upper(),
+             "status": "ACTIVE", "createdAt": f"2026-09-24T10:00:0{index}Z"}
+            for module in modules
+            for index, kp in enumerate(module.knowledge_points)
+        ]
+        return topics, points
+
+
+class PendingFormalResultPostgresTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.schema = PostgresSchema(database_url_or_skip(cls))
+        cls.schema.create()
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "schema"):
+            cls.schema.drop()
+
+    def setUp(self):
+        self.store = PostgresLearningStore(self.schema.url)
+        self.paths = PathService(self.store)
+        self.ingestion = FormalAssessmentIngestionService(self.store, self.paths)
+
+    def command(self, user_id, goal_id):
+        return FormalEvidenceAdapter.to_command(event(
+            user_id=user_id, goal_id=goal_id, attempt_id=str(uuid4()),
+            items=[item([mapping(VOCABULARY_KP)], is_correct=True)]))
+
+    def pending_rows(self, user_id):
+        return self.schema.query(
+            "SELECT count(*) FROM pending_formal_assessment_results WHERE user_id = %s", (user_id,))[0][0]
+
+    def test_parking_and_path_creation_racing_apply_the_result_exactly_once(self):
+        for _ in range(10):
+            user_id, goal_id = str(uuid4()), str(uuid4())
+            command = self.command(user_id, goal_id)
+            start = threading.Barrier(2)
+            errors = []
+
+            def park():
+                try:
+                    start.wait(timeout=10)
+                    store = PostgresLearningStore(self.schema.url)
+                    FormalAssessmentIngestionService(store, PathService(store)).ingest(command)
+                except Exception as exc:  # noqa: BLE001 - surfaced by the assertion below
+                    errors.append(exc)
+
+            def create():
+                try:
+                    start.wait(timeout=10)
+                    PathService(PostgresLearningStore(self.schema.url)).ensure_path(user_id, goal_id, curriculum())
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(exc)
+
+            workers = [threading.Thread(target=park), threading.Thread(target=create)]
+            for worker in workers:
+                worker.start()
+            for worker in workers:
+                worker.join(timeout=30)
+
+            self.assertEqual(errors, [])
+            path_id = self.store.find_path(user_id, goal_id)
+            progress = self.store.get_owned_progress(path_id, user_id)
+            self.assertEqual(len(progress.quiz_attempts), 1)
+            self.assertEqual(self.pending_rows(user_id), 0)
+            ledger = self.schema.query(
+                "SELECT count(*) FROM formal_assessment_result_versions WHERE path_id = %s", (path_id,))
+            self.assertEqual(ledger[0][0], 1)
+
+    def test_first_status_call_creates_the_path_with_the_pending_result_applied(self):
+        user_id, goal_id = str(uuid4()), str(uuid4())
+        consumer = AssessmentCompletedConsumer(self.ingestion, AssessmentCompletedTopology(), max_delivery_attempts=3)
+        channel = _AckingChannel()
+        for delivery_tag in range(1, 7):
+            consumer.on_message(channel, SimpleNamespace(delivery_tag=delivery_tag),
+                                SimpleNamespace(message_id=str(uuid4()), headers={}, content_type="application/json",
+                                                type="AssessmentCompleted.v2"),
+                                json.dumps(event(user_id=user_id, goal_id=goal_id, attempt_id=str(uuid4()),
+                                                 items=[item([mapping(VOCABULARY_KP)], is_correct=True)])).encode())
+        self.assertEqual(channel.acks, [1, 2, 3, 4, 5, 6])
+        self.assertEqual(self.pending_rows(user_id), 6)
+        self.assertIsNone(self.store.find_path(user_id, goal_id))
+
+        api_paths = PathService(
+            self.store,
+            _ActiveGoalClient({"id": goal_id, "userId": user_id, "status": "ACTIVE"}),
+            _CurriculumClient(),
+        )
+        path_id, status = asyncio.run(api_paths.active_status(user_id, "internal-token"))
+
+        self.assertEqual(status["revision"], 1)
+        self.assertEqual(status["knowledgePointId"], GRAMMAR_KP)
+        self.assertEqual(self.pending_rows(user_id), 0)
+        reloaded = PostgresLearningStore(self.schema.url).get_owned_progress(path_id, user_id)
+        self.assertEqual(next_objective(reloaded).knowledge_point_id, GRAMMAR_KP)
+        ledger = self.schema.query(
+            "SELECT count(*) FROM formal_assessment_result_versions WHERE path_id = %s", (path_id,))
+        self.assertEqual(ledger[0][0], 6)
+
+
 if __name__ == "__main__":
     unittest.main()

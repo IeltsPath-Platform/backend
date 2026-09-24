@@ -10,6 +10,7 @@ from deeptutor.learning.policy import map_summary, next_objective
 from deeptutor.learning.service import LearningService
 
 from app.adapters.curriculum_adapter import CurriculumAdapter
+from app.application.formal_result_applier import FormalResultApplier
 from app.clients.content_service import ContentServiceClient
 from app.clients.user_service import UserServiceClient
 from app.persistence.postgres_learning_store import PostgresLearningStore
@@ -33,6 +34,7 @@ class PathService:
         store: PostgresLearningStore,
         user_client: UserServiceClient | None = None,
         content_client: ContentServiceClient | None = None,
+        applier: FormalResultApplier | None = None,
     ) -> None:
         # The Assessment consumer only uses ensure_path on existing paths, so it
         # builds this service without the learner-facing HTTP clients.
@@ -40,6 +42,8 @@ class PathService:
         self._learning = LearningService(store)
         self._users = user_client
         self._content = content_client
+        # Every path creation drains the parked results of its goal.
+        self._applier = applier or FormalResultApplier(store)
 
     async def _active_goal(self, bearer_token: str) -> dict[str, Any]:
         try:
@@ -113,9 +117,12 @@ class PathService:
             create=True,
             user_id=user_id,
             learning_goal_id=goal_id,
-        ):
+        ) as tx:
             self._learning.get_or_create(path_id)
-            return self._learning.replace_modules_for_path(path_id, modules, append=False)
+            self._learning.replace_modules_for_path(path_id, modules, append=False)
+            # Joins this transaction: path, curriculum and parked results commit as one revision.
+            self._applier.apply_pending(path_id, str(user_id), goal_id)
+            return tx.progress
 
     async def active_progress(self, user_id: UUID, bearer_token: str) -> tuple[str, dict[str, Any]]:
         path_id, progress = await self.ensure_active_path(user_id, bearer_token)

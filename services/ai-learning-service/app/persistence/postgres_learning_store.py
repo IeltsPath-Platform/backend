@@ -159,6 +159,9 @@ class PostgresLearningStore:
         token = None
         try:
             with connection.cursor(cursor_factory=RealDictCursor) as cursor:
+                if create and user_id is not None and learning_goal_id:
+                    # Serializes path creation with park_formal_result for the same goal.
+                    self._lock_goal(cursor, user_id, learning_goal_id)
                 cursor.execute(
                     "SELECT path_id, state_json, revision FROM mastery_paths "
                     "WHERE path_id = %s FOR UPDATE",
@@ -267,7 +270,7 @@ class PostgresLearningStore:
     def _active_connection(self, path_id: str) -> Any:
         active = self._active.get()
         if active is None or active[0] != self._validate_id(path_id):
-            raise LearningStoreError("Formal result versions must be read and written inside the path transaction")
+            raise LearningStoreError("Formal results must be read and written inside the path transaction")
         return active[1]
 
     def applied_result_version(self, path_id: str, attempt_id: str) -> int | None:
@@ -308,6 +311,70 @@ class PostgresLearningStore:
                 raise LearningStoreError(
                     f"Result version {result_version} for attempt {attempt_id} is not newer than the applied version"
                 )
+
+    @staticmethod
+    def _lock_goal(cursor: Any, user_id: UUID | str, learning_goal_id: UUID | str) -> None:
+        """Transaction-scoped advisory lock on ``(user_id, learning_goal_id)``."""
+        cursor.execute(
+            "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+            (f"{UUID(str(user_id))}:{UUID(str(learning_goal_id))}",),
+        )
+
+    def park_formal_result(self, command: Any) -> bool:
+        """Park a result whose goal has no path yet; ``False`` if the path exists after all.
+
+        Runs in its own transaction under the same advisory lock as path creation,
+        so a result is either parked before the path commits (and that creation
+        applies it) or finds the committed path here. A redelivered event keeps one row.
+        """
+        if command.raw_event is None:
+            raise ValueError("Only an event received from the broker can be parked")
+        with closing(psycopg2.connect(self._database_url)) as connection:
+            with connection:
+                with connection.cursor() as cursor:
+                    self._lock_goal(cursor, command.user_id, command.learning_goal_id)
+                    cursor.execute(
+                        "SELECT 1 FROM mastery_paths WHERE user_id = %s AND learning_goal_id = %s",
+                        (str(command.user_id), str(command.learning_goal_id)),
+                    )
+                    if cursor.fetchone() is not None:
+                        return False
+                    cursor.execute(
+                        """INSERT INTO pending_formal_assessment_results
+                           (event_id, user_id, learning_goal_id, attempt_id, result_version, payload)
+                           VALUES (%s, %s, %s, %s, %s, %s::jsonb)
+                           ON CONFLICT (event_id) DO NOTHING""",
+                        (
+                            str(command.event_id),
+                            str(command.user_id),
+                            str(command.learning_goal_id),
+                            str(command.attempt_id),
+                            int(command.result_version),
+                            json.dumps(command.raw_event, ensure_ascii=False),
+                        ),
+                    )
+                    return True
+
+    def pending_formal_results(
+        self, path_id: str, user_id: UUID | str, learning_goal_id: UUID | str
+    ) -> list[tuple[str, Any]]:
+        """Parked ``(event_id, payload)`` rows of the goal, locked inside the path transaction."""
+        with self._active_connection(path_id).cursor() as cursor:
+            cursor.execute(
+                """SELECT event_id::text, payload FROM pending_formal_assessment_results
+                   WHERE user_id = %s AND learning_goal_id = %s
+                   ORDER BY attempt_id, result_version
+                   FOR UPDATE""",
+                (str(user_id), str(learning_goal_id)),
+            )
+            return [(row[0], row[1]) for row in cursor.fetchall()]
+
+    def delete_pending_formal_results(self, path_id: str, event_ids: list[str]) -> None:
+        with self._active_connection(path_id).cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM pending_formal_assessment_results WHERE event_id = ANY(%s::uuid[])",
+                (list(event_ids),),
+            )
 
     def mutate(self, book_id: str, mutation: Any, *, create: bool = False) -> tuple[LearningProgress, Any]:
         with self.transaction(book_id, create=create) as tx:

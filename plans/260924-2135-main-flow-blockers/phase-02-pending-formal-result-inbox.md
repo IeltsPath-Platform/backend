@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Pending formal result inbox"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 effort: "~5h"

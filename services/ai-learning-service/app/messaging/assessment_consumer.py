@@ -69,11 +69,17 @@ class AssessmentCompletedConsumer:
                 channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
             return
 
-        logger.info(
-            "AssessmentCompleted.v2 %s %s on path %s (version %s, %s evidence)",
-            command.event_id, outcome.status, outcome.path_id, outcome.result_version,
-            len(outcome.recorded_evidence),
-        )
+        if outcome.status == "pending":
+            logger.info(
+                "AssessmentCompleted.v2 %s pending until the path of goal %s exists (version %s)",
+                command.event_id, command.learning_goal_id, outcome.result_version,
+            )
+        else:
+            logger.info(
+                "AssessmentCompleted.v2 %s %s on path %s (version %s, %s evidence)",
+                command.event_id, outcome.status, outcome.path_id, outcome.result_version,
+                len(outcome.recorded_evidence),
+            )
         channel.basic_ack(delivery_tag=method.delivery_tag)
 
     def _previous_failures(self, properties: Any) -> int:

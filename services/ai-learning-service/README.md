@@ -45,6 +45,7 @@ configuration; do not put them in this file or the image.
 | `0.1` | `V0_1__create_v5_mastery_tables.sql` | V5 `mastery_paths`, `mastery_interactions`, `mastery_events` |
 | `1` | `V1__one_mastery_path_per_learning_goal.sql` | One path per `(user_id, learning_goal_id)` |
 | `2` | `V2__formal_assessment_evidence.sql` | Evidence projection and the result-version ledger |
+| `3` | `V3__pending_formal_assessment_results.sql` | Results parked until the goal's path exists |
 
 `V1` stops if the database already contains more than one path for a non-null
 `(user_id, learning_goal_id)` pair; reconcile those rows before retrying.
@@ -99,6 +100,12 @@ It needs `AI_LEARNING_DATABASE_URL` and `AI_LEARNING_AMQP_URL`. Optional setting
 `AI_LEARNING_ASSESSMENT_EXCHANGE` (default `assessment.events`),
 `AI_LEARNING_RETRY_DELAY_MS` and `AI_LEARNING_MAX_DELIVERY_ATTEMPTS`. It declares its
 own queue, retry queue and dead-letter queue.
+
+A result whose goal has no path yet is parked in `pending_formal_assessment_results`
+and ACKed (log outcome `pending`), not retried. The first `POST /paths`, `GET /progress`
+or `GET /status` for that goal creates the path and applies the parked results in the
+same transaction. Parked rows are kept until then; nothing expires them yet, so a goal
+that is never opened keeps its rows. See `docs/contracts/assessment-completed-v2.md`.
 
 Apply `migrations/V2__formal_assessment_evidence.sql` after V1. It adds:
 

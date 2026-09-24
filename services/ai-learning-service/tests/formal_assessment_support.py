@@ -9,6 +9,7 @@ database. The PostgreSQL behaviour itself is covered by the *_postgres tests.
 from __future__ import annotations
 
 from contextlib import contextmanager
+import json
 import sqlite3
 import threading
 from uuid import UUID, uuid4
@@ -80,6 +81,8 @@ class InMemoryLearningStore:
     def __init__(self) -> None:
         self.paths: dict[str, dict] = {}
         self.result_versions: dict[tuple[str, str], int] = {}
+        # Parked results by event_id: {user_id, learning_goal_id, attempt_id, result_version, payload}.
+        self.pending: dict[str, dict] = {}
         self.committed_events: list[tuple[str, int, str, dict]] = []
         self.commits = 0
         self._lock = threading.RLock()
@@ -118,9 +121,12 @@ class InMemoryLearningStore:
                 owner = {"user_id": row["user_id"], "learning_goal_id": row["learning_goal_id"]}
             tx = LearningTransaction(self._interactions, progress, created=created)
             pending_versions: dict[tuple[str, str], int] = {}
-            self._local.active = (path_id, tx, pending_versions)
+            consumed_pending: set[str] = set()
+            self._local.active = (path_id, tx, pending_versions, consumed_pending)
             try:
                 yield tx
+                for event_id in consumed_pending:
+                    self.pending.pop(event_id, None)
                 if tx.changed:
                     revision = tx.base_revision + 1
                     tx.progress.version = revision
@@ -156,11 +162,38 @@ class InMemoryLearningStore:
         progress.version = row["revision"]
         return progress
 
-    def _pending(self, path_id):
+    def _active(self, path_id):
         active = getattr(self._local, "active", None)
         if active is None or active[0] != str(UUID(str(path_id))):
-            raise LearningStoreError("Formal result versions must be read and written inside the path transaction")
-        return active[2]
+            raise LearningStoreError("Formal results must be read and written inside the path transaction")
+        return active
+
+    def _pending(self, path_id):
+        return self._active(path_id)[2]
+
+    def park_formal_result(self, command):
+        # The store lock stands in for the PostgreSQL (user, goal) advisory lock.
+        with self._lock:
+            if self.find_path(command.user_id, command.learning_goal_id) is not None:
+                return False
+            self.pending.setdefault(str(command.event_id), {
+                "user_id": str(command.user_id),
+                "learning_goal_id": str(command.learning_goal_id),
+                "attempt_id": str(command.attempt_id),
+                "result_version": command.result_version,
+                "payload": json.loads(json.dumps(command.raw_event)),
+            })
+            return True
+
+    def pending_formal_results(self, path_id, user_id, learning_goal_id):
+        self._active(path_id)
+        rows = [(event_id, row) for event_id, row in self.pending.items()
+                if row["user_id"] == str(user_id) and row["learning_goal_id"] == str(learning_goal_id)]
+        rows.sort(key=lambda entry: (entry[1]["attempt_id"], entry[1]["result_version"]))
+        return [(event_id, row["payload"]) for event_id, row in rows]
+
+    def delete_pending_formal_results(self, path_id, event_ids):
+        self._active(path_id)[3].update(event_ids)
 
     def applied_result_version(self, path_id, attempt_id):
         key = (str(path_id), str(attempt_id))
