@@ -249,6 +249,16 @@ Thuộc tính chính:
 | `updated_at` | — | — | Thời điểm cập nhật gần nhất. |
 
 
+Ràng buộc active goal:
+
+```sql
+CREATE UNIQUE INDEX uq_learning_goals_one_active_per_user
+    ON learning_goals (user_id)
+    WHERE status = 'ACTIVE';
+```
+
+Mỗi learner có tối đa một goal `ACTIVE`. Khi tạo hoặc kích hoạt goal mới, User Service pause goal active hiện tại trong cùng transaction; unique index xử lý các request cạnh tranh.
+
 ---
 # 3. Gói, quyền sử dụng, Activation Key và Point
 
@@ -502,6 +512,8 @@ Thuộc tính chính:
 | `updated_at` | — | — | Thời điểm cập nhật gần nhất. |
 
 `learning_type` phải map 1:1 sang DeepTutor `KnowledgeType`. Các category nghiệp vụ như Grammar/Vocabulary/Strategy (nếu bổ sung sau) chỉ là metadata phân loại content, không thay thế `learning_type`.
+
+`learning_type` là `MEMORY | CONCEPT | PROCEDURE | DESIGN`, ánh xạ 1:1 sang DeepTutor `KnowledgeType`; không suy ra từ `kind`. Trạng thái `ACTIVE` yêu cầu `learning_type IS NOT NULL`. Migration V2 chuyển các Knowledge Point active chưa được phân loại sang `INACTIVE`, giữ nguyên dữ liệu và chờ content editor phân loại trước khi publish lại.
 
 ## 4.3 `vocabulary_items`
 
@@ -1137,7 +1149,10 @@ Index đề xuất:
 ```text
 (user_id, updated_at DESC)
 (learning_goal_id)
+UNIQUE (user_id, learning_goal_id) WHERE learning_goal_id IS NOT NULL
 ```
+
+Partial unique index trên bảo đảm mỗi learning goal có tối đa một mastery path thuộc learner đó. Các path không gắn goal (`learning_goal_id IS NULL`) vẫn có thể tồn tại nhiều bản ghi cho cùng user.
 
 Không tạo các cột `WEAK / LEARNING / MASTERED` riêng. Display status được derive bằng DeepTutor policy từ aggregate.
 

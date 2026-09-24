@@ -39,6 +39,7 @@ public class KnowledgePointController {
                 request.code(),
                 request.name(),
                 request.kind(),
+                request.learningType(),
                 request.skill(),
                 request.description()
         ));

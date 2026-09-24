@@ -34,6 +34,7 @@ public class GetKnowledgePointsUseCase {
                         kp.getCode(),
                         kp.getName(),
                         kp.getKind(),
+                        kp.getLearningType(),
                         kp.getSkill(),
                         kp.getDescription(),
                         kp.getStatus(),

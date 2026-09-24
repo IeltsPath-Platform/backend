@@ -3,6 +3,7 @@ package com.group01.content.api.dto.response;
 import com.group01.content.application.result.KnowledgePointResult;
 import com.group01.content.domain.vo.ContentStatus;
 import com.group01.content.domain.vo.KnowledgePointKind;
+import com.group01.content.domain.vo.LearningType;
 import com.group01.content.domain.vo.Skill;
 
 import java.time.Instant;
@@ -14,6 +15,7 @@ public record KnowledgePointResponse(
         String code,
         String name,
         KnowledgePointKind kind,
+        LearningType learningType,
         Skill skill,
         String description,
         ContentStatus status,
@@ -27,6 +29,7 @@ public record KnowledgePointResponse(
                 result.code(),
                 result.name(),
                 result.kind(),
+                result.learningType(),
                 result.skill(),
                 result.description(),
                 result.status(),

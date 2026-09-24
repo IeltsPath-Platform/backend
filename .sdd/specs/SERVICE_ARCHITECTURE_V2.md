@@ -109,6 +109,8 @@ Account recovery / verification token
 
 `user-service` là source of truth cho thông tin định danh người dùng và mục tiêu học dài hạn.
 
+Mỗi learner có tối đa một learning goal ở trạng thái `ACTIVE` (partial unique index trên `learning_goals(user_id)`); tạo hoặc kích hoạt goal mới sẽ pause goal active hiện tại trong cùng transaction. Active-goal endpoint chỉ trả goal duy nhất; nếu dữ liệu vi phạm invariant, service fail closed thay vì chọn một goal tùy ý.
+
 ## 4.2 Database
 
 ```text
@@ -199,6 +201,7 @@ topics / knowledge_points
 knowledge_points.learning_type
 = MEMORY | CONCEPT | PROCEDURE | DESIGN
 = map 1:1 sang DeepTutor KnowledgeType
+ACTIVE Knowledge Point bắt buộc có learning_type; `kind` là phân loại content riêng
 
 required_feature_key
 = requirement key tham chiếu logic tới access-service

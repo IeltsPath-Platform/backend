@@ -35,6 +35,7 @@ public class CreateKnowledgePointUseCase {
                 command.code(),
                 command.name(),
                 command.kind(),
+                command.learningType(),
                 command.skill(),
                 command.description()
         );
@@ -46,6 +47,7 @@ public class CreateKnowledgePointUseCase {
                 saved.getCode(),
                 saved.getName(),
                 saved.getKind(),
+                saved.getLearningType(),
                 saved.getSkill(),
                 saved.getDescription(),
                 saved.getStatus(),

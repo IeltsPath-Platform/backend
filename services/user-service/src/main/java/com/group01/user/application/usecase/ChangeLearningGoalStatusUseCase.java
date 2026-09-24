@@ -4,12 +4,14 @@ import com.group01.user.application.command.ChangeLearningGoalStatusCommand;
 import com.group01.user.application.result.LearningGoalResult;
 import com.group01.user.domain.aggregate.LearningGoal;
 import com.group01.user.domain.exception.LearningGoalNotFoundException;
+import com.group01.user.domain.exception.LearningGoalConflictException;
 import com.group01.user.domain.repository.LearningGoalRepository;
 import com.group01.user.domain.vo.GoalStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @Service
 @RequiredArgsConstructor
@@ -36,24 +38,27 @@ public class ChangeLearningGoalStatusUseCase {
             throw new IllegalArgumentException("Trạng thái không hợp lệ: " + command.status());
         }
 
-        switch (targetStatus) {
-            case ACHIEVED -> goal.complete();
-            case ABANDONED -> goal.abandon();
-            case PAUSED -> goal.pause();
-            case ACTIVE -> {
-                // Nếu muốn kích hoạt lại mục tiêu này, tạm dừng mục tiêu đang active khác (nếu có)
-                learningGoalRepository.findActiveByUserId(goal.getUserId())
-                        .filter(other -> !other.getId().equals(goal.getId()))
-                        .ifPresent(other -> {
-                            other.pause();
-                            learningGoalRepository.save(other);
-                        });
-                goal.resume();
+        try {
+            switch (targetStatus) {
+                case ACHIEVED -> goal.complete();
+                case ABANDONED -> goal.abandon();
+                case PAUSED -> goal.pause();
+                case ACTIVE -> {
+                    learningGoalRepository.findActiveByUserId(goal.getUserId())
+                            .filter(other -> !other.getId().equals(goal.getId()))
+                            .ifPresent(other -> {
+                                other.pause();
+                                learningGoalRepository.save(other);
+                            });
+                    goal.resume();
+                }
             }
-        }
 
-        LearningGoal saved = learningGoalRepository.save(goal);
-        return toResult(saved);
+            LearningGoal saved = learningGoalRepository.save(goal);
+            return toResult(saved);
+        } catch (DataIntegrityViolationException exception) {
+            throw new LearningGoalConflictException("An active learning goal already exists for this user");
+        }
     }
 
     private LearningGoalResult toResult(LearningGoal goal) {
