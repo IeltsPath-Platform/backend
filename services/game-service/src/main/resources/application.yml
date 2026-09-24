@@ -5,7 +5,10 @@ spring:
   application:
     name: game-service
   config:
-    import: optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}
+    import:
+      - optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}
+      - optional:file:./.env[.properties]
+      - optional:file:../../.env[.properties]
   datasource:
     url: ${GAME_DB_URL:jdbc:postgresql://localhost:5435/game_db}
     username: ${GAME_DB_USERNAME:postgres}

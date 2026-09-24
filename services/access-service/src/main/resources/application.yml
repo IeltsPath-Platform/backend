@@ -5,5 +5,7 @@ spring:
   application:
     name: access-service
   config:
-    import: optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}
-
+    import:
+      - optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}
+      - optional:file:./.env[.properties]
+      - optional:file:../../.env[.properties]

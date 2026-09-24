@@ -56,6 +56,8 @@ GATEWAY_INTERNAL_JWT_SECRET
 
 Hai secret này là base64 của tối thiểu 32 bytes random. `EXTERNAL_JWT_SECRET` dùng cho token phát cho client; `GATEWAY_INTERNAL_JWT_SECRET` dùng cho token nội bộ giữa gateway và downstream service. Downstream service dùng `common-security` để verify internal JWT này, không copy/paste `SecurityConfig` riêng.
 
+Khi chạy Spring service từ IntelliJ hoặc Maven, mỗi module nạp `.env` ở thư mục gốc repository làm property source sau Config Server. Cấu hình hỗ trợ working directory là thư mục gốc hoặc thư mục module. Vì vậy Gateway, User Service và mọi downstream service dùng cùng một `GATEWAY_INTERNAL_JWT_SECRET`; không nhập secret riêng vào từng Run Configuration. Docker Compose cũng nội suy từ `.env` gốc.
+
 ## Chạy local
 
 Chạy từng module từ thư mục gốc:
