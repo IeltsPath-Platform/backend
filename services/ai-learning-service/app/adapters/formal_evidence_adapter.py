@@ -6,7 +6,7 @@ schedules reviews, picks objectives or applies thresholds.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -56,6 +56,8 @@ class FormalAssessmentCommand:
     assessment_type: str
     completed_at: datetime
     items: tuple[ItemObservation, ...]
+    # The validated event as received, kept so a parked result can be re-read later.
+    raw_event: dict[str, Any] | None = field(default=None, compare=False, repr=False)
 
     def provenance(self, item: ItemObservation) -> str:
         return FormalProvenance(
@@ -107,6 +109,7 @@ class FormalEvidenceAdapter:
             assessment_type=_text(data, "assessment_type"),
             completed_at=_timestamp(data, "completed_at"),
             items=tuple(items),
+            raw_event=envelope,
         )
 
 

@@ -229,6 +229,52 @@ Với service sử dụng Flyway, migration tự chạy khi service khởi độ
 2. Đặt tên theo mẫu `V<version>__<short_description>.sql`: version tăng dần, mô tả viết thường và dùng dấu gạch dưới; ví dụ `V1__create_initial_schema.sql`.
 3. Không sửa migration đã được áp dụng; tạo migration mới với version tiếp theo cho mọi thay đổi schema.
 
+### 6. Chạy Luồng Chính Local (Assessment → AI Learning)
+
+Luồng: learner làm bài → grader finalize → outbox → RabbitMQ → consumer → DeepTutor → `GET /api/ai-learning/status`.
+Phần AI Learning chạy bằng compose; các service Java chạy trên host (IDE hoặc `java -jar`).
+
+**Biến môi trường** (đặt trong `.env` ở root, file này đã được gitignore; không commit giá trị):
+
+| Biến | Dùng cho |
+| --- | --- |
+| `POSTGRES_PASSWORD`, `GAME_DB_PASSWORD` | Compose nội suy toàn bộ file, nên phải có dù không chạy các DB đó |
+| `AI_LEARNING_DB_PASSWORD` | `ai-learning-db`, Flyway migrate, API và consumer |
+| `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | Broker trong compose. Assessment trên host phải dùng đúng cặp này (mặc định `guest` sẽ fail) |
+| `GATEWAY_INTERNAL_JWT_SECRET` | Gateway và AI Learning API phải dùng cùng giá trị, lệch sẽ trả 401 |
+| `EXTERNAL_JWT_SECRET` | User Service ký token, Gateway xác thực |
+
+Nếu mật khẩu có ký tự đặc biệt, hãy percent-encode hoặc chọn giá trị an toàn cho URL, vì nó nằm trong URL DB/AMQP.
+
+**Thứ tự khởi động:**
+
+1. PostgreSQL local (`localhost:5432`) có sẵn `user_db`, `content_db`, `assessment_db`. Flyway của từng service tự áp khi khởi động.
+2. AI Learning và RabbitMQ:
+   ```bash
+   docker compose up -d --build rabbitmq ai-learning-db ai-learning-migrate ai-learning-api ai-learning-consumer
+   ```
+   `ai-learning-migrate` chạy Flyway một lần (`0.1 → 1 → 2 → 3`) rồi thoát với exit 0; API (`127.0.0.1:8000`) và consumer chờ bước này xong.
+   Consumer tự khai báo queue chính, retry, DLQ và binding `assessment.completed.v2`.
+3. Service Java trên host, với cùng biến môi trường ở trên: config-server → eureka → api-gateway → user → content → assessment.
+
+Container AI Learning gọi User (`8085`) và Content (`8082`) trên host qua `host.docker.internal`, và chuyển tiếp thẳng internal JWT của learner. Trên Windows, firewall có thể chặn đường này: cho Java đi qua firewall (mạng private), hoặc chạy API bằng `uvicorn` trên host.
+
+**Tài khoản có quyền (chỉ dev, chỉ trên DB local):**
+
+1. Đăng ký tài khoản qua `POST /api/users/register`. Mọi tài khoản mới đều nhận role `CUSTOMER`.
+2. Hệ thống không seed ADMIN. Gán ADMIN cho tài khoản đầu tiên bằng SQL trên `user_db` local:
+   ```sql
+   INSERT INTO user_roles (user_id, role_id)
+   SELECT u.id, r.id FROM users u JOIN roles r ON r.name = 'ADMIN'
+   WHERE u.email = '<email của admin>'
+   ON CONFLICT DO NOTHING;
+   ```
+   > ⚠️ Không bao giờ chạy lệnh này trên database dùng chung hoặc production.
+3. Admin đăng nhập lại (`POST /auth/login`) để token mang role mới, rồi cấp role khác (ví dụ `EXAMINER`) qua `PUT /api/users/{id}/roles`. Người được cấp cũng phải đăng nhập lại.
+
+Grader (`EXAMINER`/`ADMIN`) chấm qua `/api/assessments/grading/**`, xem `services/assessment-service/README.md`.
+Bằng chứng E2E của lần kiểm chứng gần nhất nằm trong `plans/260924-2135-main-flow-blockers/reports/`.
+
 ## 🌿 Quy Chuẩn Đặt Tên Nhánh (Branch Naming Convention)
 
 Để team làm việc thống nhất và dễ review code, nên đặt tên nhánh theo quy tắc sau:

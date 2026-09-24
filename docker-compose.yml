@@ -77,6 +77,85 @@ services:
       timeout: 5s
       retries: 6
 
+  # AI Learning (DeepTutor): its own database, migrated once by Flyway, then the API and the
+  # AssessmentCompleted.v2 consumer from the same image. The Java services run on the host (IDE).
+  ai-learning-db:
+    image: postgres:15-alpine
+    container_name: ai-learning-db
+    environment:
+      POSTGRES_DB: ai_learning_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${AI_LEARNING_DB_PASSWORD:?Set AI_LEARNING_DB_PASSWORD}"
+    ports:
+      - "127.0.0.1:5436:5432"
+    networks:
+      - codebase-network
+    volumes:
+      - ai-learning-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_learning_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ai-learning-migrate:
+    # Same Flyway major as the Java services (Spring Boot 3.5 BOM).
+    image: flyway/flyway:11-alpine
+    container_name: ai-learning-migrate
+    command: migrate
+    environment:
+      FLYWAY_URL: jdbc:postgresql://ai-learning-db:5432/ai_learning_db
+      FLYWAY_USER: postgres
+      FLYWAY_PASSWORD: "${AI_LEARNING_DB_PASSWORD:?Set AI_LEARNING_DB_PASSWORD}"
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
+    volumes:
+      - ./services/ai-learning-service/migrations:/flyway/sql:ro
+    networks:
+      - codebase-network
+    depends_on:
+      ai-learning-db:
+        condition: service_healthy
+
+  ai-learning-api:
+    build: &ai-learning-build
+      context: .
+      dockerfile: services/ai-learning-service/Dockerfile
+    container_name: ai-learning-api
+    environment:
+      # Must equal the Gateway's value: the API validates the Gateway-signed internal JWT.
+      AI_LEARNING_INTERNAL_JWT_SECRET: "${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}"
+      AI_LEARNING_DATABASE_URL: "postgresql://postgres:${AI_LEARNING_DB_PASSWORD:?Set AI_LEARNING_DB_PASSWORD}@ai-learning-db:5432/ai_learning_db"
+      # The learner's internal JWT is forwarded straight to User and Content on the host, not through the Gateway.
+      AI_LEARNING_USER_SERVICE_BASE_URL: ${AI_LEARNING_USER_SERVICE_BASE_URL:-http://host.docker.internal:8085}
+      AI_LEARNING_CONTENT_SERVICE_BASE_URL: ${AI_LEARNING_CONTENT_SERVICE_BASE_URL:-http://host.docker.internal:8082}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks:
+      - codebase-network
+    depends_on:
+      ai-learning-migrate:
+        condition: service_completed_successfully
+
+  ai-learning-consumer:
+    build: *ai-learning-build
+    container_name: ai-learning-consumer
+    command: ["python", "-m", "app.messaging.assessment_consumer"]
+    # Database and broker only: the consumer never needs the JWT secret.
+    environment:
+      AI_LEARNING_DATABASE_URL: "postgresql://postgres:${AI_LEARNING_DB_PASSWORD:?Set AI_LEARNING_DB_PASSWORD}@ai-learning-db:5432/ai_learning_db"
+      AI_LEARNING_AMQP_URL: "amqp://${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME}:${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}@rabbitmq:5672/%2F"
+    networks:
+      - codebase-network
+    # The pika process exits when it loses the broker for good; compose brings it back.
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      ai-learning-migrate:
+        condition: service_completed_successfully
+
   game-service:
     build:
       context: .
@@ -109,3 +188,4 @@ volumes:
   community-db-data:
   game-db-data:
   rabbitmq-data:
+  ai-learning-db-data:

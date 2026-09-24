@@ -36,8 +36,10 @@ public class AddQuestionVersionUseCase {
 
         if (command.knowledgePoints() != null) {
             for (var knowledgePoint : command.knowledgePoints()) {
+                // The version id is generated above, so a mapping always belongs to this version;
+                // a client-supplied questionVersionId is ignored.
                 version.addKnowledgePoint(new QuestionKnowledgePoint(
-                        knowledgePoint.questionVersionId(),
+                        version.getId(),
                         knowledgePoint.knowledgePointId(),
                         knowledgePoint.weight()
                 ));

@@ -3,65 +3,29 @@
 Set AI_LEARNING_TEST_DATABASE_URL to a disposable PostgreSQL database to run it.
 """
 
-import os
 import threading
 import unittest
-from pathlib import Path
 from uuid import uuid4
+
+from tests.postgres_schema_support import PostgresSchema, database_url_or_skip
 
 
 class MasteryPathGoalUniquenessTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        database_url = os.environ.get("AI_LEARNING_TEST_DATABASE_URL")
-        if not database_url:
-            raise unittest.SkipTest("AI_LEARNING_TEST_DATABASE_URL is not configured")
-        try:
-            import psycopg2
-        except ImportError as exc:
-            raise unittest.SkipTest("psycopg2 is not installed") from exc
+        database_url = database_url_or_skip(cls)
+        import psycopg2
 
         cls.psycopg2 = psycopg2
         cls.database_url = database_url
-        cls.schema = f"ai_learning_path_constraint_{uuid4().hex}"
-
-        connection = psycopg2.connect(database_url)
-        connection.autocommit = True
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(f'CREATE SCHEMA "{cls.schema}"')
-                cursor.execute(f'SET search_path TO "{cls.schema}"')
-                cursor.execute(
-                    """
-                    CREATE TABLE mastery_paths (
-                        path_id UUID PRIMARY KEY,
-                        user_id UUID NOT NULL,
-                        learning_goal_id UUID,
-                        state_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-                        revision BIGINT NOT NULL DEFAULT 0
-                    )
-                    """
-                )
-                migration = (
-                    Path(__file__).parents[1]
-                    / "migrations"
-                    / "V1__one_mastery_path_per_learning_goal.sql"
-                ).read_text(encoding="utf-8")
-                cursor.execute(migration)
-        finally:
-            connection.close()
+        cls.postgres_schema = PostgresSchema(database_url)
+        cls.postgres_schema.create()
+        cls.schema = cls.postgres_schema.name
 
     @classmethod
     def tearDownClass(cls):
-        if not hasattr(cls, "schema"):
-            return
-        connection = cls.psycopg2.connect(cls.database_url)
-        connection.autocommit = True
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(f'DROP SCHEMA IF EXISTS "{cls.schema}" CASCADE')
-        finally:
-            connection.close()
+        if hasattr(cls, "postgres_schema"):
+            cls.postgres_schema.drop()
 
     def test_concurrent_goal_bound_inserts_allow_only_one_winner(self):
         user_id = uuid4()
@@ -77,7 +41,9 @@ class MasteryPathGoalUniquenessTest(unittest.TestCase):
                     cursor.execute(f'SET search_path TO "{self.schema}"')
                     start.wait(timeout=10)
                     cursor.execute(
-                        "INSERT INTO mastery_paths (path_id, user_id, learning_goal_id) VALUES (%s, %s, %s)",
+                        """INSERT INTO mastery_paths
+                           (path_id, user_id, learning_goal_id, state_json, revision, created_at, updated_at)
+                           VALUES (%s, %s, %s, '{}'::jsonb, 0, now(), now())""",
                         (str(uuid4()), str(user_id), str(goal_id)),
                     )
                 connection.commit()

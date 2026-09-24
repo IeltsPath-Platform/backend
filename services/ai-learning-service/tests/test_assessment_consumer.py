@@ -71,6 +71,19 @@ class AssessmentCompletedConsumerTest(unittest.TestCase):
         self.assertEqual(channel.acks, [1])
         self.assertEqual(self.attempts(), 1)
 
+    def test_result_for_a_goal_without_a_path_is_parked_and_acknowledged(self):
+        channel = FakeChannel()
+        body = json.dumps(event(user_id=self.user_id, goal_id=str(uuid4()), attempt_id=str(uuid4()),
+                                items=[item([mapping(VOCABULARY_KP)], is_correct=True)])).encode()
+
+        with self.assertLogs("app.messaging.assessment_consumer", level="INFO") as logs:
+            self.consumer.on_message(channel, SimpleNamespace(delivery_tag=6), properties(), body)
+
+        self.assertEqual(channel.acks, [6])
+        self.assertEqual((channel.nacks, channel.published), ([], []))
+        self.assertEqual(len(self.store.pending), 1)
+        self.assertIn("pending", "\n".join(logs.output))
+
     def test_database_failure_is_not_acknowledged_and_goes_to_the_retry_queue(self):
         consumer = AssessmentCompletedConsumer(FailingIngestion(), self.topology, max_delivery_attempts=3)
         channel = FakeChannel()

@@ -36,19 +36,42 @@ runtime. The service configuration uses `AI_LEARNING_INTERNAL_JWT_SECRET`,
 and decode to at least 32 bytes. Supply secret values through runtime
 configuration; do not put them in this file or the image.
 
-The PostgreSQL constraint for goal-bound mastery paths is defined in
-`migrations/V1__one_mastery_path_per_learning_goal.sql`. Apply it after the V5
-`mastery_paths` table exists. The script stops if the database already contains
-more than one path for a non-null `(user_id, learning_goal_id)` pair; reconcile
-those rows before retrying. `AI_LEARNING_TEST_DATABASE_URL` enables the
-concurrent-insert integration test in `tests/test_mastery_path_goal_uniqueness.py`.
+## Database migrations
+
+`ai_learning_db` is migrated by Flyway from `migrations/`, in numeric version order:
+
+| Version | File | Creates |
+| --- | --- | --- |
+| `0.1` | `V0_1__create_v5_mastery_tables.sql` | V5 `mastery_paths`, `mastery_interactions`, `mastery_events` |
+| `1` | `V1__one_mastery_path_per_learning_goal.sql` | One path per `(user_id, learning_goal_id)` |
+| `2` | `V2__formal_assessment_evidence.sql` | Evidence projection and the result-version ledger |
+| `3` | `V3__pending_formal_assessment_results.sql` | Results parked until the goal's path exists |
+
+`V1` stops if the database already contains more than one path for a non-null
+`(user_id, learning_goal_id)` pair; reconcile those rows before retrying.
+
+`mastery_interactions.status` accepts the lowercase values DeepTutor writes
+(`registered`, `awaiting_input`, `answered`, `graded`, `abandoned`), not the uppercase
+names in `DATABASE_V5.md`. `interaction_id` is a UUID as in V5; Phase 1 never inserts
+interactions, so DeepTutor's question-id format is checked when Tutor Chat is built.
+
+A database where `V1` and `V2` were applied by hand has no Flyway history table, so
+`flyway migrate` reports a non-empty schema. Baseline it once at the last applied
+version, then migrate normally:
+
+```powershell
+flyway -baselineOnMigrate=true -baselineVersion=2 migrate
+```
+
+The PostgreSQL tests build each schema by running this same migration chain
+(`tests/postgres_schema_support.py`); there is no hand-written DDL in the tests.
+`AI_LEARNING_TEST_DATABASE_URL` points them at a disposable database.
 
 The service uses DeepTutor's synchronous `LearningStore` interface. Its
 PostgreSQL adapter locks one aggregate row with `SELECT ... FOR UPDATE`; nested
 DeepTutor transactions for bootstrap join one PostgreSQL transaction so path
 ownership, initial state, curriculum, revision, and events commit together.
-Apply the V5 mastery schema and the uniqueness migration before enabling the
-path endpoints.
+Run the Flyway migrations before enabling the path endpoints.
 The active-goal and curriculum contracts also depend on User Service
 `V4__enforce_one_active_learning_goal_per_user.sql` and Content Service
 `V3__add_knowledge_point_learning_type.sql` being applied to their own databases.
@@ -65,6 +88,29 @@ The public Phase 1 routes are:
 - `GET /api/ai-learning/status`
 - `GET /api/ai-learning/paths/{pathId}/map`
 
+## Run with Docker Compose
+
+From the repository root, with the variables listed in the root README in `.env`:
+
+```bash
+docker compose up -d --build rabbitmq ai-learning-db ai-learning-migrate ai-learning-api ai-learning-consumer
+```
+
+| Service | What it does | Environment it receives |
+| --- | --- | --- |
+| `ai-learning-db` | PostgreSQL `ai_learning_db` on `127.0.0.1:5436` | `AI_LEARNING_DB_PASSWORD` |
+| `ai-learning-migrate` | `flyway migrate` once over `migrations/`, then exits 0 | JDBC URL, `postgres`, `AI_LEARNING_DB_PASSWORD` |
+| `ai-learning-api` | `uvicorn main:app` on `127.0.0.1:8000`, starts after the migration | `AI_LEARNING_INTERNAL_JWT_SECRET` (from `GATEWAY_INTERNAL_JWT_SECRET`), `AI_LEARNING_DATABASE_URL`, `AI_LEARNING_USER_SERVICE_BASE_URL`, `AI_LEARNING_CONTENT_SERVICE_BASE_URL` |
+| `ai-learning-consumer` | `python -m app.messaging.assessment_consumer`, restarted if it exits | `AI_LEARNING_DATABASE_URL`, `AI_LEARNING_AMQP_URL` only (no JWT secret) |
+
+The API forwards the learner's internal JWT straight to User (`8085`) and Content (`8082`),
+not through the Gateway, so both base URLs default to `http://host.docker.internal:<port>`.
+Both containers use one image; the build installs DeepTutor with its full dependency stack
+(about 1.6 GB), although the main flow imports no LLM module.
+
+Check the migration with `docker compose run --rm ai-learning-migrate info`; running
+`migrate` again reports that the schema is up to date.
+
 ## Formal assessment consumer
 
 Run the consumer as a separate process from the same image:
@@ -77,6 +123,12 @@ It needs `AI_LEARNING_DATABASE_URL` and `AI_LEARNING_AMQP_URL`. Optional setting
 `AI_LEARNING_ASSESSMENT_EXCHANGE` (default `assessment.events`),
 `AI_LEARNING_RETRY_DELAY_MS` and `AI_LEARNING_MAX_DELIVERY_ATTEMPTS`. It declares its
 own queue, retry queue and dead-letter queue.
+
+A result whose goal has no path yet is parked in `pending_formal_assessment_results`
+and ACKed (log outcome `pending`), not retried. The first `POST /paths`, `GET /progress`
+or `GET /status` for that goal creates the path and applies the parked results in the
+same transaction. Parked rows are kept until then; nothing expires them yet, so a goal
+that is never opened keeps its rows. See `docs/contracts/assessment-completed-v2.md`.
 
 Apply `migrations/V2__formal_assessment_evidence.sql` after V1. It adds:
 

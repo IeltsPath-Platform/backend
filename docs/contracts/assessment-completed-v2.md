@@ -10,11 +10,12 @@ next objective).
 The event is emitted when a result version is finalized:
 
 ```text
-POST /api/assessments/attempts                capture active learning goal + Content KP snapshot
-... grading saves item results, max scores, judgments (result stays DRAFT)
-FinalizeAssessmentResultUseCase               DRAFT/PROCESSING -> COMPLETED
-                                              + outbox_events row, same DB transaction
-OutboxRelay                                   committed row -> RabbitMQ (publisher confirm + mandatory routing)
+POST /api/assessments/attempts                                  capture active learning goal + Content KP snapshot
+POST /api/assessments/grading/attempts/{attemptId}/results      EXAMINER/ADMIN opens a DRAFT version
+PUT  /api/assessments/grading/results/{resultId}/details        item results, max scores, judgments, band (still DRAFT)
+POST /api/assessments/grading/results/{resultId}/finalize       FinalizeAssessmentResultUseCase: DRAFT/PROCESSING -> COMPLETED
+                                                                + outbox_events row, same DB transaction
+OutboxRelay                                                     committed row -> RabbitMQ (publisher confirm + mandatory routing)
 ```
 
 - A result is never announced partially graded. Finalization requires every attempt
@@ -84,6 +85,9 @@ The event carries no correct answers, expected answers or examiner reasoning.
 Consumer delivery rules:
 
 - ACK only after the path's PostgreSQL transaction commits.
+- No path yet for `(user_id, learning_goal_id)`: the event is parked in
+  `pending_formal_assessment_results` (keyed by `event_id`, so a redelivery keeps one
+  row) and ACKed. It is not retried and never reaches the DLQ. See below.
 - Transient failure: NACK without requeue, so the message waits in the retry queue.
 - After `AI_LEARNING_MAX_DELIVERY_ATTEMPTS` failures (default 5), or on any contract
   violation, the message is published to the DLQ with an `x-ai-learning-failure`
@@ -105,3 +109,25 @@ Consumer delivery rules:
     `calculate_mastery` and `scheduler.replay`, then the new version is applied.
 - `UNIQUE (path_id, source, source_reference_id)` on `mastery_learning_evidence` is the
   database backstop against a duplicated outcome.
+
+## Results that arrive before the learning path
+
+The consumer cannot create a path: that needs the learner's token to read the
+curriculum. A result for a goal whose path does not exist yet is therefore parked,
+and the learner's first path request (`POST /paths`, `GET /progress` or `GET /status`)
+applies it.
+
+- Parking and path creation both take `pg_advisory_xact_lock` on
+  `hashtextextended('{user_id}:{learning_goal_id}', 0)`. Either the row is parked before
+  the path commits, and creation applies it, or parking sees the committed path and
+  applies the result normally.
+- The transaction that creates the path applies every parked result of that
+  `(user_id, learning_goal_id)` in `(attempt_id, result_version)` order through the same
+  pipeline and ledger as a live event, deletes them, and commits path, curriculum and
+  results as one revision. Only the latest version of an attempt remains in effect.
+- Parked results of another goal are never applied to the path.
+- A parked payload that no longer parses stays parked, is logged, and does not block
+  the path. Rows are kept until the path is created; there is no expiry yet.
+- If applying a parked result fails, the whole path creation rolls back (no partial
+  state) and the request fails, with 503 when the database is unavailable; the next
+  request retries it.

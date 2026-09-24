@@ -7,7 +7,8 @@ from deeptutor.learning.policy import next_objective
 
 from app.adapters.formal_evidence_adapter import FormalEvidenceAdapter
 from app.application.formal_assessment_ingestion import FormalAssessmentIngestionService
-from app.application.path_service import PathNotBootstrapped, PathService
+from app.application.formal_result_applier import FormalResultApplier
+from app.application.path_service import PathService
 
 from tests.formal_assessment_support import (
     COHERENCE_KP,
@@ -141,11 +142,14 @@ class FormalAssessmentIngestionTest(unittest.TestCase):
         self.assertEqual(len(outcome.recorded_evidence), 1)
 
     def test_event_for_a_goal_without_a_path_is_not_applied_to_another_path(self):
+        """Was ``PathNotBootstrapped``; a result for a goal without a path is now parked as pending."""
         payload = event(user_id=self.user_id, goal_id=str(uuid4()), attempt_id=str(uuid4()),
                         items=[item([mapping(VOCABULARY_KP)], is_correct=True)])
 
-        with self.assertRaises(PathNotBootstrapped):
-            self.ingest(payload)
+        outcome = self.ingest(payload)
+
+        self.assertEqual(outcome.status, "pending")
+        self.assertIsNone(outcome.path_id)
         self.assertEqual(self.vocabulary_attempts(), [])
 
     def test_next_objective_changes_only_as_deeptutor_policy_decides(self):
@@ -161,6 +165,111 @@ class FormalAssessmentIngestionTest(unittest.TestCase):
             self.ingest(self.result([item([mapping(VOCABULARY_KP)], is_correct=True)], version=1))
         after_many = next_objective(self.store.load(self.path_id))
         self.assertEqual(after_many.knowledge_point_id, GRAMMAR_KP)
+
+
+class PendingFormalResultTest(unittest.TestCase):
+    """A finalized result for a goal whose path does not exist yet waits in the inbox."""
+
+    def setUp(self):
+        self.store = InMemoryLearningStore()
+        self.paths = PathService(self.store)
+        self.ingestion = FormalAssessmentIngestionService(self.store, self.paths)
+        self.user_id, self.goal_id, self.attempt_id = str(uuid4()), str(uuid4()), str(uuid4())
+
+    def ingest(self, payload):
+        return self.ingestion.ingest(FormalEvidenceAdapter.to_command(payload))
+
+    def result(self, items, *, version=1, goal_id=None, attempt_id=None):
+        return event(user_id=self.user_id, goal_id=goal_id or self.goal_id, attempt_id=attempt_id or self.attempt_id,
+                     items=items, result_version=version)
+
+    def create_path(self, goal_id=None):
+        path_id, progress = self.paths.ensure_path(self.user_id, goal_id or self.goal_id, curriculum())
+        return path_id, progress
+
+    def test_result_before_the_path_exists_is_parked_without_creating_a_path(self):
+        outcome = self.ingest(self.result([item([mapping(VOCABULARY_KP)], is_correct=True)]))
+
+        self.assertEqual(outcome.status, "pending")
+        self.assertEqual(len(self.store.pending), 1)
+        self.assertEqual(self.store.paths, {})
+
+    def test_redelivery_while_pending_keeps_one_row(self):
+        payload = self.result([item([mapping(VOCABULARY_KP)], is_correct=True)])
+
+        self.assertEqual(self.ingest(payload).status, "pending")
+        self.assertEqual(self.ingest(payload).status, "pending")
+
+        self.assertEqual(len(self.store.pending), 1)
+
+    def test_creating_the_path_applies_pending_results_in_the_same_revision(self):
+        self.ingest(self.result([item([mapping(VOCABULARY_KP)], is_correct=True)]))
+        commits_before = self.store.commits
+
+        path_id, progress = self.create_path()
+
+        self.assertEqual(self.store.commits, commits_before + 1)
+        self.assertEqual(progress.version, 1)
+        self.assertEqual([a.is_correct for a in progress.quiz_attempts], [True])
+        self.assertEqual(self.store.load(path_id).version, 1)
+        self.assertEqual(self.store.pending, {})
+
+    def test_redelivery_after_the_pending_result_was_applied_is_a_duplicate(self):
+        payload = self.result([item([mapping(VOCABULARY_KP)], is_correct=True)])
+        self.ingest(payload)
+        path_id, _ = self.create_path()
+
+        outcome = self.ingest(payload)
+
+        self.assertEqual(outcome.status, "duplicate")
+        self.assertEqual(len(self.store.load(path_id).quiz_attempts), 1)
+
+    def test_only_the_latest_pending_version_of_an_attempt_takes_effect(self):
+        # Delivered out of order: the regrade arrives before the version it replaces.
+        self.ingest(self.result([item([mapping(VOCABULARY_KP)], is_correct=True)], version=2))
+        self.ingest(self.result([item([mapping(VOCABULARY_KP)], is_correct=False)], version=1))
+
+        path_id, progress = self.create_path()
+
+        self.assertEqual([a.is_correct for a in progress.quiz_attempts], [True])
+        self.assertEqual(progress.mastery_levels[VOCABULARY_KP], compute_mastery([True]))
+        self.assertEqual(self.store.pending, {})
+
+    def test_pending_results_of_another_goal_are_not_applied(self):
+        other_goal = str(uuid4())
+        self.ingest(self.result([item([mapping(VOCABULARY_KP)], is_correct=True)], goal_id=other_goal))
+
+        _, progress = self.create_path()
+
+        self.assertEqual(progress.quiz_attempts, [])
+        self.assertEqual(len(self.store.pending), 1)
+
+    def test_unreadable_pending_payload_stays_parked_and_does_not_block_the_path(self):
+        self.ingest(self.result([item([mapping(VOCABULARY_KP)], is_correct=True)]))
+        broken_event_id = str(uuid4())
+        self.store.pending[broken_event_id] = {
+            "user_id": self.user_id, "learning_goal_id": self.goal_id, "attempt_id": str(uuid4()),
+            "result_version": 1, "payload": {"event_type": "AssessmentCompleted.v1"},
+        }
+
+        with self.assertLogs("app.application.formal_result_applier", level="WARNING") as logs:
+            _, progress = self.create_path()
+
+        self.assertEqual(len(progress.quiz_attempts), 1)
+        self.assertEqual(list(self.store.pending), [broken_event_id])
+        self.assertIn(broken_event_id, "\n".join(logs.output))
+
+    def test_failure_while_applying_pending_results_creates_no_path(self):
+        self.ingest(self.result([item([mapping(VOCABULARY_KP)], is_correct=True)]))
+        applier = FormalResultApplier(self.store)
+        paths = PathService(self.store, applier=applier)
+        applier.apply_to_path = lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("ledger down"))
+
+        with self.assertRaises(RuntimeError):
+            paths.ensure_path(self.user_id, self.goal_id, curriculum())
+
+        self.assertEqual(self.store.paths, {})
+        self.assertEqual(len(self.store.pending), 1)
 
 
 if __name__ == "__main__":

@@ -8,9 +8,13 @@ import json
 import os
 import time
 import unittest
+from unittest import mock
 from uuid import uuid4
 
+from psycopg2 import OperationalError
+
 from app.application.formal_assessment_ingestion import FormalAssessmentIngestionService
+from app.application.formal_result_applier import FormalResultApplier
 from app.application.path_service import PathService
 from app.messaging.assessment_consumer import FAILURE_HEADER, AssessmentCompletedConsumer
 from app.messaging.topology import AssessmentCompletedTopology
@@ -109,23 +113,36 @@ class AssessmentRabbitMqTest(unittest.TestCase):
         self.channel.basic_ack(dead_method.delivery_tag)
         self.assertIn("contract", dead_properties.headers[FAILURE_HEADER])
 
-    def test_transient_failure_is_redelivered_through_the_retry_queue(self):
-        payload = event(user_id=self.user_id, goal_id=str(uuid4()), attempt_id=str(uuid4()),
-                        items=[item([mapping(VOCABULARY_KP)], is_correct=True)])
-        # No path exists for this goal: a retryable condition.
-        self.publish(json.dumps(payload).encode())
+    def test_result_before_the_path_exists_is_parked_not_retried(self):
+        self.publish(json.dumps(event(user_id=self.user_id, goal_id=str(uuid4()), attempt_id=str(uuid4()),
+                                      items=[item([mapping(VOCABULARY_KP)], is_correct=True)])).encode())
 
         method, properties, body = self.consume_one(self.topology.queue)
         self.consumer.on_message(self.channel, method, properties, body)
 
-        redelivered_method, redelivered_properties, redelivered_body = self.consume_one(self.topology.queue)
-        deaths = redelivered_properties.headers["x-death"]
-        self.assertTrue(any(d["queue"] == self.topology.queue and d["reason"] == "rejected" for d in deaths))
-        # Second failure exhausts max_delivery_attempts=2 and parks the message.
-        self.consumer.on_message(self.channel, redelivered_method, redelivered_properties, redelivered_body)
+        self.assertEqual(self.schema.query("SELECT count(*) FROM pending_formal_assessment_results")[0][0], 1)
+        time.sleep(self.topology.retry_delay_ms / 1000 * 2)
+        for queue in (self.topology.queue, self.topology.retry_queue, self.topology.dead_letter_queue):
+            self.assertEqual(self.channel.queue_declare(queue=queue, passive=True).method.message_count, 0, queue)
+
+    def test_transient_failure_is_redelivered_through_the_retry_queue(self):
+        """Used "no path yet" as the transient failure; that is now parked, so the database fails instead."""
+        payload = event(user_id=self.user_id, goal_id=self.goal_id, attempt_id=str(uuid4()),
+                        items=[item([mapping(VOCABULARY_KP)], is_correct=True)])
+        self.publish(json.dumps(payload).encode())
+
+        with mock.patch.object(FormalResultApplier, "apply_to_path",
+                               side_effect=OperationalError("database unavailable")):
+            method, properties, body = self.consume_one(self.topology.queue)
+            self.consumer.on_message(self.channel, method, properties, body)
+
+            redelivered_method, redelivered_properties, redelivered_body = self.consume_one(self.topology.queue)
+            deaths = redelivered_properties.headers["x-death"]
+            self.assertTrue(any(d["queue"] == self.topology.queue and d["reason"] == "rejected" for d in deaths))
+            # Second failure exhausts max_delivery_attempts=2 and parks the message.
+            self.consumer.on_message(self.channel, redelivered_method, redelivered_properties, redelivered_body)
         dead_method, _, _ = self.consume_one(self.topology.dead_letter_queue)
         self.channel.basic_ack(dead_method.delivery_tag)
-
 
 if __name__ == "__main__":
     unittest.main()

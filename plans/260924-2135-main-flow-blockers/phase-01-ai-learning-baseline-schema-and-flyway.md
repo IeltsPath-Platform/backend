@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "AI Learning baseline schema and Flyway"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 effort: "~2h"
