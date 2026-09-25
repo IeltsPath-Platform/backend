@@ -86,6 +86,16 @@ scope is recorded as a `path.scope_applied` event. Scoping decides what the path
 is still decided only by DeepTutor's `next_objective()`. An existing path is returned as is, without reading
 Content again.
 
+A finalized `PLACEMENT` result tests out the points the learner already masters, in the same transaction as its
+evidence: points whose effective `bandMax` is not above the placement's `overall_band`, and points every placement
+item answered correctly (or judged PASS). Test-out is a DeepTutor learner mastery override, so `next_objective()`
+skips the point; the placement evidence is still recorded and no mastery score, gate, policy or scheduler changes.
+The pinned DeepTutor submodule is the unmodified upstream release, so provenance is kept in the override note
+(`placement:{attemptId}:v{version}`) and `/progress` and `/map` report `masterySource: "placement"` for it
+(`system` = cleared by evidence, `learner` = the learner's own claim). A regraded placement replaces that attempt's
+test-out; a learner's own override is never replaced or cleared. Tested-out points have no repetition state, so
+they are not scheduled for review.
+
 Curriculum topics follow Content Service's sibling `sortOrder` in tree preorder.
 Knowledge Points are ordered by `createdAt` ascending, with UUID as a stable
 tie-breaker; Content Service does not currently expose an editorial learning

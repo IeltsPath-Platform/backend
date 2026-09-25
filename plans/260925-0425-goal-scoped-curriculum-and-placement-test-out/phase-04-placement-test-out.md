@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Placement test-out"
-status: pending
+status: completed
 priority: P1
 dependencies: [1, 2, 3]
 effort: "~5h"
@@ -25,7 +25,12 @@ chúng (D3, D5). Test-out dùng cơ chế override sẵn có của DeepTutor, n�
 
 ## Requirements
 - Functional:
-  - **Mở rộng tối thiểu DeepTutor** (submodule của nhóm; plan Phase 1 cho phép "minimal extension"):
+  - *(Đổi khi cook: submodule trỏ thẳng vào upstream `HKUDS/DeepTutor`, nhóm không có fork, nên commit trong
+    submodule không push được và sẽ làm hỏng clone của mọi người. Vì vậy **không sửa DeepTutor**: provenance nằm
+    trong `note` của override (`placement:{attempt_id}:v{result_version}`), và
+    `app/learning/placement_test_out.py` trả `masterySource = "placement"` cho các override đó. Kết quả D5 giữ
+    nguyên. Phương án gốc bên dưới giữ lại để tham khảo nếu nhóm tạo fork.)*
+  - ~~Mở rộng tối thiểu DeepTutor~~ (phương án gốc, không làm):
     - `LearnerMasteryOverride.source: str = "learner"`.
     - `mastery_source()` trả `override.source` thay vì hằng `"learner"`.
     - `set_learner_mastery_override(..., source="learner")` nhận thêm tham số.

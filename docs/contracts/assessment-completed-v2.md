@@ -111,6 +111,19 @@ Consumer delivery rules:
 - `UNIQUE (path_id, source, source_reference_id)` on `mastery_learning_evidence` is the
   database backstop against a duplicated outcome.
 
+## Placement test-out
+
+For `assessment_type = PLACEMENT`, AI Learning also tests out knowledge points, after recording the evidence and in
+the same transaction:
+
+- every point of the path whose effective band (snapshot taken from Content when the path was built) has an upper
+  end not above `overall_band`;
+- every point that at least one item of this placement maps to, with no item answered wrong or judged `FAIL`.
+
+A tested-out point is a DeepTutor learner mastery override noted `placement:{attempt_id}:v{result_version}`. A higher
+result version of the same attempt replaces the earlier test-out. Points already mastered by evidence, and points
+with a learner's own override, are left as they are. Other assessment types never test out.
+
 ## Results that arrive before the learning path
 
 The consumer cannot create a path: that needs the learner's token to read the

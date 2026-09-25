@@ -13,6 +13,7 @@ from app.adapters.curriculum_adapter import CurriculumAdapter
 from app.adapters.curriculum_scope import CurriculumScope, KnowledgePointBand, target_band_of
 from app.application.formal_result_applier import FormalResultApplier
 from app.clients.content_service import ContentServiceClient
+from app.learning.placement_test_out import with_placement_provenance
 from app.clients.user_service import UserServiceClient
 from app.persistence.postgres_learning_store import PostgresLearningStore
 
@@ -158,7 +159,7 @@ class PathService:
 
     async def active_progress(self, user_id: UUID, bearer_token: str) -> tuple[str, dict[str, Any]]:
         path_id, progress = await self.ensure_active_path(user_id, bearer_token)
-        summary = map_summary(progress)
+        summary = with_placement_provenance(map_summary(progress), progress)
         return path_id, {
             "pathId": path_id,
             "revision": progress.version,
@@ -191,5 +192,5 @@ class PathService:
         return {
             "pathId": str(path_id),
             "revision": progress.version,
-            "map": map_summary(progress),
+            "map": with_placement_provenance(map_summary(progress), progress),
         }

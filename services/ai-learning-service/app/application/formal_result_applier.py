@@ -16,6 +16,7 @@ from deeptutor.learning.scheduler import SpacedRepetitionScheduler
 
 from app.adapters.formal_evidence_adapter import FormalAssessmentCommand, FormalEvidenceAdapter
 from app.learning.external_assessment import ExternalAssessmentLearningService
+from app.learning.placement_test_out import PLACEMENT, PlacementTestOut
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class FormalResultApplier:
         self._store = store
         self._learning = learning or ExternalAssessmentLearningService(store)
         self._scheduler = scheduler or SpacedRepetitionScheduler()
+        self._placement = PlacementTestOut(self._learning)
 
     def apply_pending(self, path_id: str, user_id: str, learning_goal_id: str) -> list[IngestionOutcome]:
         """Apply the parked results of ``(user_id, learning_goal_id)`` inside the open path transaction.
@@ -88,6 +90,9 @@ class FormalResultApplier:
                     tx.progress, attempt_id=command.attempt_id, scheduler=self._scheduler
                 )
             recorded, unknown = self._apply(tx, command)
+            if command.assessment_type == PLACEMENT:
+                # After the evidence: a point the evidence already masters needs no test-out.
+                self._placement.apply(tx, path_id, command, self._store.knowledge_point_bands(path_id))
             self._store.record_applied_result(
                 path_id,
                 attempt_id=command.attempt_id,
