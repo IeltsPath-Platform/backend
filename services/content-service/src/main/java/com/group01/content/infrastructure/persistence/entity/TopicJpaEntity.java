@@ -6,6 +6,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -37,6 +38,12 @@ public class TopicJpaEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     private ContentStatus status;
+
+    @Column(name = "band_min", precision = 2, scale = 1)
+    private BigDecimal bandMin;
+
+    @Column(name = "band_max", precision = 2, scale = 1)
+    private BigDecimal bandMax;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

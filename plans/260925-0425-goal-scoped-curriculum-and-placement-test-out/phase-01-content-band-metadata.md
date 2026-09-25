@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Content band metadata"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 effort: "~3h"
@@ -26,8 +26,9 @@ thừa: KP không ghi đè thì dùng band của topic. API trả sẵn band hi�
     - `topics.band_min`, `topics.band_max`, `knowledge_points.band_min`, `knowledge_points.band_max`.
     - Kiểu `NUMERIC(2,1)`, nullable.
     - CHECK: giá trị nằm trong 0.0–9.0, bội số của 0.5, và `band_min ≤ band_max` khi cả hai có mặt.
-  - Band hiệu lực của KP: mỗi đầu `min`/`max` lấy giá trị của KP nếu có, ngược lại lấy của topic.
-    Topic con **không** kế thừa band của topic cha (giữ đơn giản; ghi rõ trong README).
+  - Band hiệu lực của KP: KP có khoảng riêng (ít nhất một đầu khác null) thì dùng **trọn** khoảng đó, ngược lại
+    dùng khoảng của topic. *(Đổi khi cook: kế thừa từng đầu độc lập có thể ghép ra khoảng ngược, ví dụ KP
+    `min=8.0` dưới topic `max=7.0`.)* Topic con **không** kế thừa band của topic cha (ghi rõ trong README).
   - `CreateTopicRequest`, `UpdateTopicRequest` và `CreateKnowledgePointRequest` nhận `bandMin`/`bandMax`
     tùy chọn, validate cùng quy tắc với CHECK.
   - `TopicTreeResponse` trả `bandMin`, `bandMax`. `KnowledgePointResponse` trả `bandMin`, `bandMax` (giá trị
@@ -51,7 +52,7 @@ thừa: KP không ghi đè thì dùng band của topic. API trả sẵn band hi�
 ### Tests Before
 1. Chạy gate Content, ghi mốc (hiện 38 test).
 2. Viết test **fail trước**:
-   - `BandRangeTest`: nhận 4.0–6.5; từ chối 9.5, 4.3 và min > max; kế thừa từng đầu độc lập.
+   - `BandRangeTest`: nhận 4.0–6.5; từ chối 9.5, 4.3 và min > max; KP có khoảng riêng thay trọn khoảng của topic.
    - Migration test (Testcontainers): Flyway đến V5, CHECK từ chối `band_min = 7.0, band_max = 5.0`; dữ liệu
      V4 vẫn hợp lệ với band NULL.
    - `GetKnowledgePointsUseCase`: KP không ghi đè thì `effective*` bằng band topic; KP ghi đè một đầu thì chỉ

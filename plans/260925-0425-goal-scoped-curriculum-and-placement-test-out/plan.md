@@ -42,7 +42,7 @@ engine duy nhất, không có planner thứ hai"):
 
 | # | Câu hỏi | Mặc định đề xuất | Lý do |
 | --- | --- | --- | --- |
-| D1 | Band gắn ở đâu? | `band_min`/`band_max` trên **topic**. KP có thể ghi đè; KP không ghi đè thì kế thừa topic. Content trả sẵn band hiệu lực của KP. | Topic = module của DeepTutor, lọc theo module rất tự nhiên. KP ghi đè cho trường hợp đặc biệt. Luật kế thừa chỉ có ở Content. |
+| D1 | Band gắn ở đâu? | `band_min`/`band_max` trên **topic**. KP có thể ghi đè trọn khoảng; KP không ghi đè thì kế thừa topic. Content trả sẵn band hiệu lực của KP. | Topic = module của DeepTutor, lọc theo module rất tự nhiên. KP ghi đè cho trường hợp đặc biệt. Luật kế thừa chỉ có ở Content. |
 | D2 | Lọc phạm vi theo gì? | Chỉ theo `targetBand`: KP vào path khi `effectiveBandMin ≤ targetBand` hoặc không có band. **Chưa** lọc theo skill. | Goal chưa có trường skill trọng tâm; thêm skill cần sửa User Service và UI. |
 | D3 | Test-out từ placement dựa vào gì? | Chỉ bài `PLACEMENT`. (a) KP có `effectiveBandMax ≤ overallBand` của placement được test-out. (b) KP có mọi item placement map tới đều đúng (hoặc judgment PASS) được test-out. | (a) cho learner giỏi bỏ qua nhanh nguyên cụm dễ; (b) dùng bằng chứng từng KP. Cả hai không làm giả evidence. |
 | D4 | Đổi goal thì sao? | Không mang mastery sang. Goal mới có path mới; placement làm dưới goal mới sẽ test-out lại. | Tránh bài toán hợp nhất state giữa hai path; làm sau nếu cần. |
@@ -61,7 +61,7 @@ Ngoài phạm vi:
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Content band metadata](./phase-01-content-band-metadata.md) | Pending |
+| 1 | [Content band metadata](./phase-01-content-band-metadata.md) | Completed |
 | 2 | [Goal-scoped curriculum](./phase-02-goal-scoped-curriculum.md) | Pending |
 | 3 | [Placement band in AssessmentCompleted.v2](./phase-03-placement-band-in-event.md) | Pending |
 | 4 | [Placement test-out](./phase-04-placement-test-out.md) | Pending |
