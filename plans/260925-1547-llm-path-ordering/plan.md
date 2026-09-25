@@ -1,6 +1,6 @@
 ---
 title: "Sắp xếp lộ trình bằng LLM (Gemini) trong phạm vi KP của Content"
-description: "Khi tạo path, AI Learning gọi Gemini một lần để sắp thứ tự module và KP theo goal và kết quả placement. LLM chỉ sắp xếp, không thêm, bỏ hay chuyển KP. Kết quả được kiểm tra rồi mới ghi vào DeepTutor. Engine học của DeepTutor giữ nguyên."
+description: "Khi tạo path, AI Learning gọi Gemini một lần, qua đúng lớp LLM của DeepTutor, để sắp thứ tự module và KP theo goal và kết quả placement. LLM chỉ sắp xếp, không thêm, bỏ hay chuyển KP. Kết quả được kiểm tra rồi mới ghi vào DeepTutor. Engine học của DeepTutor giữ nguyên."
 status: pending
 priority: P1
 branch: "feat/ai-learning-service"
@@ -26,6 +26,13 @@ Vì vậy plan này dùng **cách A: chạy ngầm một lần**. Khi tạo path
 trên, và Gemini trả về **thứ tự** module và KP. Không cần session, WebSocket hay hội thoại. Chế độ hội thoại (cách
 B) để lại cho Tutor runtime sau này.
 
+Gemini được dùng **đúng như DeepTutor đang dùng LLM** (pha 1):
+- cấu hình là một profile `gemini` trong model catalog của DeepTutor (`data/user/settings/model_catalog.json`);
+- lời gọi đi qua `deeptutor.services.llm.complete()`, theo mẫu lời gọi một lần của `mastery_hints.py`;
+- JSON được đọc bằng `json_with_reasoning_retry` của DeepTutor.
+
+Không có client riêng, thư viện mới hay biến môi trường cho key.
+
 Bất biến giữ nguyên từ spec V2 và các plan trước:
 - DeepTutor vẫn là engine adaptive duy nhất: `compute_mastery`, cổng mastery, scheduler và `next_objective()` không đổi.
 - KP trong path luôn là KP của Content, giữ nguyên id. Kết quả thi từ Assessment vẫn map được vào path.
@@ -36,7 +43,7 @@ Bất biến giữ nguyên từ spec V2 và các plan trước:
 | # | Quyết định |
 | --- | --- |
 | L1 | Cách A: gọi LLM một lần khi tạo path, không hội thoại. |
-| L2 | Nhà cung cấp: **Gemini**, key qua biến môi trường. |
+| L2 | Nhà cung cấp: **Gemini**. Cấu hình và gọi qua đúng lớp LLM của DeepTutor: profile `binding: gemini` trong model catalog của DeepTutor, lời gọi `deeptutor.services.llm.complete()`. Key chỉ nằm trong file catalog (bị git-ignore), không qua biến môi trường, như DeepTutor. Không viết client riêng. |
 | L3 | LLM **chỉ sắp xếp lại thứ tự**, không được bỏ bớt hay thêm KP. Thêm ràng buộc: KP không được chuyển sang module khác, vì topic của Content là nhóm cố định. LLM sắp thứ tự module, và thứ tự KP bên trong từng module. |
 | L4 | Xử lý khi LLM lỗi: chiến lược đầy đủ để **làm sau** (xem "Làm sau"). MVP chỉ có hành vi mặc định an toàn: giữ thứ tự của Content như hiện nay, ghi log và event, không chặn việc tạo path. |
 | L5 | Học viên làm bài sau đó vẫn cập nhật path như cũ: evidence, mastery, test-out và lịch ôn. Thứ tự do LLM sắp là cố định; chỉ trạng thái học thay đổi. |
@@ -45,7 +52,7 @@ Bất biến giữ nguyên từ spec V2 và các plan trước:
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Gemini client and configuration](./phase-01-gemini-client.md) | Pending |
+| 1 | [Gemini through DeepTutor's LLM layer](./phase-01-gemini-via-deeptutor-llm.md) | Pending |
 | 2 | [Ordering request and validation](./phase-02-ordering-request-and-validation.md) | Pending |
 | 3 | [Order the path at creation](./phase-03-order-at-path-creation.md) | Pending |
 | 4 | [Compose, docs and E2E](./phase-04-compose-docs-e2e.md) | Pending |
@@ -56,19 +63,29 @@ Bất biến giữ nguyên từ spec V2 và các plan trước:
   bảng band theo path, và `overall_band` trong event.
 - Pha 2 cần pha 1; pha 3 cần pha 1 và 2; pha 4 cần tất cả.
 - Gate chung sau mỗi pha: suite Python của AI Learning (PostgreSQL + RabbitMQ), `compileall`, `git diff --check`,
-  `graphify update .`. **Không có test nào gọi Gemini thật:** mọi test dùng transport giả của `httpx`.
+  `graphify update .`.
+- **Không có test nào gọi Gemini thật.**
+  - Test unit thay hàm gọi LLM bằng hàm giả, như test của DeepTutor.
+  - Test tích hợp đi qua lớp LLM thật của DeepTutor, tới một server giả kiểu OpenAI, với catalog tạm.
+- Môi trường test cần dependency của DeepTutor, cài như image (`pip install ./third_party/deeptutor`).
+- Không sửa submodule DeepTutor.
 
 ## Làm sau (ngoài phạm vi, ghi lại theo L4)
 
-1. **Chiến lược khi LLM lỗi:** retry có backoff, giới hạn thời gian chờ tổng, circuit breaker khi Gemini lỗi
-   liên tục, sắp xếp lại bất đồng bộ (tạo path theo thứ tự Content trước, rồi sắp lại khi LLM trả lời), cảnh báo
-   khi tỉ lệ lỗi cao.
+1. **Chiến lược khi LLM lỗi:**
+   - Retry có backoff: `complete()` của DeepTutor đã có sẵn (`max_retries`, backoff lũy thừa). MVP đặt
+     `max_retries=0`, giống `mastery_hints.py`. Khi làm, bật retry của DeepTutor thay vì viết cơ chế mới.
+   - Giới hạn thời gian chờ tổng.
+   - Circuit breaker khi Gemini lỗi liên tục.
+   - Sắp xếp lại bất đồng bộ: tạo path theo thứ tự Content trước, rồi sắp lại khi LLM trả lời.
+   - Cảnh báo khi tỉ lệ lỗi cao.
 2. **Sắp xếp lại khi placement tới sau khi path đã được tạo.** Hiện chỉ sắp một lần lúc tạo path. Nếu lúc đó chưa
    có placement, thứ tự chỉ dựa trên goal.
 3. **Sắp xếp lại khi làm mới path (`POST /paths`).** KP mới vẫn được thêm vào cuối module theo thứ tự của Content.
 4. **Chế độ hội thoại (cách B):** học viên chỉnh lộ trình qua chat với tutor. Việc này cần Tutor runtime (session,
    turn, WebSocket).
-5. **Giới hạn chi phí và quota** Gemini theo học viên hoặc theo ngày; đo token.
+5. **Giới hạn chi phí và quota** Gemini theo học viên hoặc theo ngày. DeepTutor đã ghi token vào
+   `data/user/usage.sqlite3`; phần còn thiếu là đặt giới hạn.
 6. Cho LLM bỏ bớt KP: cần quyết định sư phạm mới, hiện không cho phép theo L3.
 
 ## Rủi ro chung
@@ -79,3 +96,6 @@ Bất biến giữ nguyên từ spec V2 và các plan trước:
 - **Chi phí:** mỗi path một lời gọi. Số path tỉ lệ với số goal nên chi phí có giới hạn.
 - **Dữ liệu gửi ra ngoài:** chỉ gửi band, số phút mỗi ngày, số ngày tới kỳ thi, tên và loại KP, đúng/sai từng KP
   trong placement. **Không** gửi email, tên, user id hay bất kỳ token nào.
+- **Key nằm trên đĩa**, trong file catalog của DeepTutor. File bị git-ignore, DeepTutor ghi với quyền `0600`, và chỉ
+  container API gắn thư mục này. Khi import, lớp LLM của DeepTutor đặt `OPENAI_API_KEY` trong process API. Đây là
+  hành vi của DeepTutor; consumer không import lớp này.
