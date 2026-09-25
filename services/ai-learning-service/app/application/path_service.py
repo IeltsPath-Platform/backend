@@ -10,6 +10,7 @@ from deeptutor.learning.policy import map_summary, next_objective
 from deeptutor.learning.service import LearningService
 
 from app.adapters.curriculum_adapter import CurriculumAdapter
+from app.adapters.curriculum_scope import CurriculumScope, KnowledgePointBand, target_band_of
 from app.application.formal_result_applier import FormalResultApplier
 from app.clients.content_service import ContentServiceClient
 from app.clients.user_service import UserServiceClient
@@ -74,12 +75,27 @@ class PathService:
             return await run_in_threadpool(self.ensure_path, user_id, goal_id)
         except PathNotBootstrapped:
             pass
+        target_band = target_band_of(goal)
         topics, content_points = await self._content.get_curriculum(bearer_token)
-        modules = CurriculumAdapter.to_modules(topics, content_points)
-        return await run_in_threadpool(self.ensure_path, user_id, goal_id, modules)
+        scoped = CurriculumScope.select(topics, content_points, target_band)
+        modules = CurriculumAdapter.to_modules(scoped.topics, scoped.knowledge_points)
+        scope = {
+            "target_band": str(target_band),
+            "included": len(scoped.knowledge_points),
+            "excluded": scoped.excluded_count,
+        }
+        return await run_in_threadpool(
+            lambda: self.ensure_path(user_id, goal_id, modules, bands=scoped.bands, scope=scope)
+        )
 
     def ensure_path(
-        self, user_id: UUID | str, learning_goal_id: UUID | str, modules: list[Any] | None = None
+        self,
+        user_id: UUID | str,
+        learning_goal_id: UUID | str,
+        modules: list[Any] | None = None,
+        *,
+        bands: dict[str, KnowledgePointBand] | None = None,
+        scope: dict[str, Any] | None = None,
     ) -> tuple[str, Any]:
         """Return the single path of ``(user_id, learning_goal_id)``, creating it at most once.
 
@@ -94,7 +110,9 @@ class PathService:
             raise PathNotBootstrapped
         path_id = str(uuid4())
         try:
-            return path_id, self._create_path(path_id, user_id, str(learning_goal_id), modules)
+            return path_id, self._create_path(
+                path_id, user_id, str(learning_goal_id), modules, bands=bands, scope=scope
+            )
         except UniqueViolation as exc:
             # Two callers can pass the lookup together. The partial unique index
             # chooses the winner; the loser returns that same path.
@@ -111,7 +129,16 @@ class PathService:
             raise PathNotFound
         return progress
 
-    def _create_path(self, path_id: str, user_id: UUID, goal_id: str, modules: list[Any]) -> Any:
+    def _create_path(
+        self,
+        path_id: str,
+        user_id: UUID,
+        goal_id: str,
+        modules: list[Any],
+        *,
+        bands: dict[str, KnowledgePointBand] | None = None,
+        scope: dict[str, Any] | None = None,
+    ) -> Any:
         with self._store.transaction(
             path_id,
             create=True,
@@ -120,6 +147,11 @@ class PathService:
         ) as tx:
             self._learning.get_or_create(path_id)
             self._learning.replace_modules_for_path(path_id, modules, append=False)
+            if bands is not None:
+                # Before parked results: placement test-out reads these bands.
+                self._store.replace_knowledge_point_bands(path_id, bands)
+            if scope is not None:
+                tx.emit("path.scope_applied", scope)
             # Joins this transaction: path, curriculum and parked results commit as one revision.
             self._applier.apply_pending(path_id, str(user_id), goal_id)
             return tx.progress

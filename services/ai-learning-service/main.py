@@ -8,6 +8,7 @@ from psycopg2 import OperationalError
 from uuid import UUID
 
 from app.adapters.curriculum_adapter import CurriculumContractError
+from app.adapters.curriculum_scope import NoCurriculumInScope
 from app.application.path_service import ActiveGoalRequired, PathNotFound, PathService
 from app.api.dto.responses import (
     LearningPathMapResponse,
@@ -41,6 +42,14 @@ async def active_goal_required_handler(_request, _exc):
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
         content={"detail": "An active learning goal is required"},
+    )
+
+
+@app.exception_handler(NoCurriculumInScope)
+async def no_curriculum_in_scope_handler(_request, _exc):
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={"detail": "No learning content matches the goal's target band"},
     )
 
 

@@ -7,7 +7,7 @@ from contextvars import ContextVar
 import json
 import time
 from datetime import datetime, timezone
-from typing import Any, Iterator
+from typing import Any, Iterator, Mapping
 from uuid import UUID
 
 import psycopg2
@@ -375,6 +375,31 @@ class PostgresLearningStore:
                 "DELETE FROM pending_formal_assessment_results WHERE event_id = ANY(%s::uuid[])",
                 (list(event_ids),),
             )
+
+    def replace_knowledge_point_bands(self, path_id: str, bands: Mapping[str, Any]) -> None:
+        """Replace the path's band snapshot inside the open path transaction."""
+        path_id = self._validate_id(path_id)
+        with self._active_connection(path_id).cursor() as cursor:
+            cursor.execute("DELETE FROM mastery_path_knowledge_point_bands WHERE path_id = %s", (path_id,))
+            for knowledge_point_id, band in bands.items():
+                cursor.execute(
+                    """INSERT INTO mastery_path_knowledge_point_bands
+                       (path_id, knowledge_point_id, band_min, band_max) VALUES (%s, %s, %s, %s)""",
+                    (path_id, str(UUID(str(knowledge_point_id))), band.min, band.max),
+                )
+
+    def knowledge_point_bands(self, path_id: str) -> dict[str, Any]:
+        """The path's band snapshot, read inside the open path transaction."""
+        from app.adapters.curriculum_scope import KnowledgePointBand
+
+        path_id = self._validate_id(path_id)
+        with self._active_connection(path_id).cursor() as cursor:
+            cursor.execute(
+                "SELECT knowledge_point_id::text, band_min, band_max FROM mastery_path_knowledge_point_bands "
+                "WHERE path_id = %s",
+                (path_id,),
+            )
+            return {row[0]: KnowledgePointBand(row[1], row[2]) for row in cursor.fetchall()}
 
     def mutate(self, book_id: str, mutation: Any, *, create: bool = False) -> tuple[LearningProgress, Any]:
         with self.transaction(book_id, create=create) as tx:

@@ -83,6 +83,8 @@ class InMemoryLearningStore:
         self.result_versions: dict[tuple[str, str], int] = {}
         # Parked results by event_id: {user_id, learning_goal_id, attempt_id, result_version, payload}.
         self.pending: dict[str, dict] = {}
+        # Band snapshot per path: {path_id: {knowledge_point_id: KnowledgePointBand}}.
+        self.bands: dict[str, dict] = {}
         self.committed_events: list[tuple[str, int, str, dict]] = []
         self.commits = 0
         self._lock = threading.RLock()
@@ -122,11 +124,14 @@ class InMemoryLearningStore:
             tx = LearningTransaction(self._interactions, progress, created=created)
             pending_versions: dict[tuple[str, str], int] = {}
             consumed_pending: set[str] = set()
-            self._local.active = (path_id, tx, pending_versions, consumed_pending)
+            staged_bands: dict = {}
+            self._local.active = (path_id, tx, pending_versions, consumed_pending, staged_bands)
             try:
                 yield tx
                 for event_id in consumed_pending:
                     self.pending.pop(event_id, None)
+                if "bands" in staged_bands:
+                    self.bands[path_id] = staged_bands["bands"]
                 if tx.changed:
                     revision = tx.base_revision + 1
                     tx.progress.version = revision
@@ -191,6 +196,13 @@ class InMemoryLearningStore:
                 if row["user_id"] == str(user_id) and row["learning_goal_id"] == str(learning_goal_id)]
         rows.sort(key=lambda entry: (entry[1]["attempt_id"], entry[1]["result_version"]))
         return [(event_id, row["payload"]) for event_id, row in rows]
+
+    def replace_knowledge_point_bands(self, path_id, bands):
+        self._active(path_id)[4]["bands"] = dict(bands)
+
+    def knowledge_point_bands(self, path_id):
+        staged = self._active(path_id)[4]
+        return dict(staged["bands"]) if "bands" in staged else dict(self.bands.get(str(path_id), {}))
 
     def delete_pending_formal_results(self, path_id, event_ids):
         self._active(path_id)[3].update(event_ids)

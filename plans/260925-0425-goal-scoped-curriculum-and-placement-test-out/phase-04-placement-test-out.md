@@ -40,9 +40,7 @@ chúng (D3, D5). Test-out dùng cơ chế override sẵn có của DeepTutor, n�
   - Không bao giờ ghi đè override `source == "learner"`.
   - KP đã `system` mastered thì không cần override (bỏ qua).
   - API: `masterySource` trong `/progress` và `/map` có thêm giá trị `"placement"`.
-  - Band của KP phải có trong path: lưu `effectiveBandMax` của KP ở pha 2, trong `KnowledgePoint.metadata`
-    nếu model của DeepTutor có chỗ; nếu không thì trong một map band riêng, tính lại khi tạo path. Chốt lúc cook
-    sau khi đọc `models.py`.
+  - Band của KP đọc từ `mastery_path_knowledge_point_bands` (pha 2 ghi), trong cùng transaction.
 - Non-functional:
   - Toàn bộ logic chọn KP test-out là một hàm thuần trong IELTSPath
     (`PlacementTestOut.select(progress, command) -> set[kp_id]`). Nó chỉ đọc band và kết quả chấm; không tính

@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Goal-scoped curriculum"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 effort: "~3h"
@@ -27,6 +27,9 @@ dung ở adapter, trước khi dữ liệu vào DeepTutor. Không có quyết đ
   - `targetBand` thiếu hoặc sai kiểu trong response của User → lỗi contract (502), không âm thầm lấy cả curriculum.
   - Sau khi lọc mà không còn KP nào: trả **409** với thông báo "Không có nội dung phù hợp với band mục tiêu".
     Đây không phải lỗi của Content, nên không trả 502.
+  - Lưu band hiệu lực của mọi KP trong path vào bảng `mastery_path_knowledge_point_bands` (migration V4), trong
+    cùng transaction tạo path và trước khi áp kết quả trong hộp chờ. *(Chốt khi cook, chuyển từ pha 4:
+    `KnowledgePoint` của DeepTutor không có trường metadata, và consumer không có token để gọi Content.)*
   - Ghi phạm vi đã dùng vào `mastery_events` (`path.scope_applied`, gồm `targetBand` và số KP giữ/bỏ) để truy vết.
 - Non-functional:
   - Luật phạm vi là một hàm thuần, test được độc lập (`CurriculumScope.select(topics, points, target_band)`).

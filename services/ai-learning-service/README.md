@@ -46,6 +46,7 @@ configuration; do not put them in this file or the image.
 | `1` | `V1__one_mastery_path_per_learning_goal.sql` | One path per `(user_id, learning_goal_id)` |
 | `2` | `V2__formal_assessment_evidence.sql` | Evidence projection and the result-version ledger |
 | `3` | `V3__pending_formal_assessment_results.sql` | Results parked until the goal's path exists |
+| `4` | `V4__mastery_path_knowledge_point_bands.sql` | Band snapshot of each knowledge point in a path |
 
 `V1` stops if the database already contains more than one path for a non-null
 `(user_id, learning_goal_id)` pair; reconcile those rows before retrying.
@@ -75,6 +76,15 @@ Run the Flyway migrations before enabling the path endpoints.
 The active-goal and curriculum contracts also depend on User Service
 `V4__enforce_one_active_learning_goal_per_user.sql` and Content Service
 `V3__add_knowledge_point_learning_type.sql` being applied to their own databases.
+
+A new path contains only the knowledge points in scope for the active goal's `targetBand`: a point is kept when
+its effective `bandMin` from Content Service is empty or not above the target band. There is no upper bound; easier
+points stay in the path and placement test-out skips them. A topic whose points were all left out is dropped, and
+if nothing is left the path API returns 409. The effective band of every kept point is stored with the path
+(`mastery_path_knowledge_point_bands`) in the creating transaction, before parked results are applied. The applied
+scope is recorded as a `path.scope_applied` event. Scoping decides what the path contains; which point to learn next
+is still decided only by DeepTutor's `next_objective()`. An existing path is returned as is, without reading
+Content again.
 
 Curriculum topics follow Content Service's sibling `sortOrder` in tree preorder.
 Knowledge Points are ordered by `createdAt` ascending, with UUID as a stable
