@@ -1,4 +1,5 @@
 import unittest
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from deeptutor.learning.models import ErrorType
@@ -36,6 +37,21 @@ class FormalEvidenceAdapterContractTest(unittest.TestCase):
             source_reference_id(data["result_id"], 1, data["item_results"][0]["item_result_id"], VOCABULARY_KP),
         )
         self.assertIs(command.items[0].is_correct, True)
+
+    def test_overall_band_is_read_when_present(self):
+        self.assertEqual(FormalEvidenceAdapter.to_command(valid_event(overall_band=6.5)).overall_band, Decimal("6.5"))
+        self.assertIsNone(FormalEvidenceAdapter.to_command(valid_event(overall_band=None)).overall_band)
+
+    def test_events_without_overall_band_are_still_valid(self):
+        payload = valid_event()
+        payload["data"].pop("overall_band", None)
+
+        self.assertIsNone(FormalEvidenceAdapter.to_command(payload).overall_band)
+
+    def test_invalid_overall_band_is_rejected(self):
+        for bad in ("abc", 9.5, 4.3, True):
+            with self.subTest(bad=bad), self.assertRaises(ContractError):
+                FormalEvidenceAdapter.to_command(valid_event(overall_band=bad))
 
     def test_missing_learning_goal_is_rejected_instead_of_using_the_current_goal(self):
         payload = valid_event()

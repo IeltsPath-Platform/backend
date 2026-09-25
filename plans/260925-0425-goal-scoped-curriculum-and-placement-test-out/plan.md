@@ -63,7 +63,7 @@ Ngoài phạm vi:
 |-------|------|--------|
 | 1 | [Content band metadata](./phase-01-content-band-metadata.md) | Completed |
 | 2 | [Goal-scoped curriculum](./phase-02-goal-scoped-curriculum.md) | Completed |
-| 3 | [Placement band in AssessmentCompleted.v2](./phase-03-placement-band-in-event.md) | Pending |
+| 3 | [Placement band in AssessmentCompleted.v2](./phase-03-placement-band-in-event.md) | Completed |
 | 4 | [Placement test-out](./phase-04-placement-test-out.md) | Pending |
 | 5 | [Path refresh and E2E verification](./phase-05-path-refresh-and-e2e.md) | Pending |
 

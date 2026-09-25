@@ -62,7 +62,8 @@ public class AssessmentCompletedEventFactory {
         return new AssessmentCompletedV2(eventId, AssessmentCompletedV2.EVENT_TYPE, occurredAt,
                 AssessmentCompletedV2.SOURCE, new AssessmentCompletedV2.Data(attempt.getUserId(),
                 attempt.getLearningGoalId(), attempt.getId(), result.id(), result.resultVersion(),
-                attempt.getAttemptType().name(), result.status(), result.completedAt(), List.copyOf(eventItems)));
+                attempt.getAttemptType().name(), result.status(), result.completedAt(), decimal(result.overallBand()),
+                List.copyOf(eventItems)));
     }
 
     public String toJson(AssessmentCompletedV2 event) {

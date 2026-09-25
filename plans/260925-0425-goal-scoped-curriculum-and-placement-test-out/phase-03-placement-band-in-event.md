@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Placement band in AssessmentCompleted.v2"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 effort: "~2h"

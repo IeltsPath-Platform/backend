@@ -49,6 +49,7 @@ OutboxRelay                                                     committed row ->
 | `assessment_type` | string | `PLACEMENT`, `OFFICIAL_PRACTICE`, `MOCK`, `TOPIC_GATE`, `QUIZ` |
 | `status` | string | Always `COMPLETED`. |
 | `completed_at` | ISO-8601 instant | |
+| `overall_band` | number or null | The grader's band for this version (0.0–9.0, half-band steps); `null` when none was recorded. **Optional and additive:** events published before it existed have no such key, and consumers read a missing key as `null`. AI Learning uses it only for `PLACEMENT` test-out. |
 | `item_results[]` | array | One entry per attempt item. |
 
 Each `item_results[]` entry:

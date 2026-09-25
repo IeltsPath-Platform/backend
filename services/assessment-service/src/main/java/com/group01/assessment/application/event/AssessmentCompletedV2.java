@@ -1,5 +1,6 @@
 package com.group01.assessment.application.event;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
@@ -17,9 +18,12 @@ public record AssessmentCompletedV2(UUID eventId, String eventType, Instant occu
     public static final String EVENT_TYPE = "AssessmentCompleted.v2";
     public static final String SOURCE = "assessment-service";
 
+    /** {@code overallBand} is the grader's band for this version, or null when none was recorded. */
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Data(UUID userId, UUID learningGoalId, UUID attemptId, UUID resultId, int resultVersion,
-                       String assessmentType, String status, Instant completedAt, List<ItemResult> itemResults) {}
+                       String assessmentType, String status, Instant completedAt, BigDecimal overallBand,
+                       List<ItemResult> itemResults) {}
 
     /** {@code isCorrect} is null when the item was not graded as right/wrong (for example an essay). */
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
