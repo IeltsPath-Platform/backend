@@ -12,7 +12,7 @@ effort: "~4h"
 ## Overview
 Dựng dữ liệu gửi cho Gemini (bối cảnh học viên và kho KP), và kiểm tra chặt đề xuất trả về. Đề xuất chỉ được
 chấp nhận khi đúng là một **hoán vị**: cùng tập module, cùng tập KP trong mỗi module, không thêm, không bỏ, không
-chuyển KP sang module khác (L3). Phần này là hàm thuần, không đụng DB hay DeepTutor.
+chuyển KP sang module khác (L3). Phần này là hàm thuần, không đụng DB và không gọi LLM. Lời gọi LLM nằm ở pha 1.
 
 ## Context
 - Kho KP: `modules` do `CurriculumAdapter` dựng từ curriculum đã lọc band (`CurriculumScope`, plan `260925-0425`).
@@ -26,11 +26,18 @@ chuyển KP sang module khác (L3). Phần này là hàm thuần, không đụng
     - `target_band`, `days_until_exam` (hoặc null), `minutes_per_day`;
     - `placement_band` (hoặc null);
     - `placement_results`: danh sách `{knowledge_point_id, correct: bool | null}`.
-  - `OrderingRequest.build(context, modules, bands)` → `(system_prompt, user_payload, response_schema)`:
-    - Payload liệt kê module và KP bằng id, tên, `learningType`, band. KP được đánh số theo module.
-    - Prompt yêu cầu: chỉ sắp thứ tự module và thứ tự KP trong mỗi module; dùng đúng các id đã cho; ưu tiên phần
-      yếu theo placement, phần nền tảng trước phần phụ thuộc, và phù hợp thời gian còn lại tới kỳ thi.
-    - Schema: `{"modules": [{"id": str, "knowledge_point_ids": [str]}], "rationale": str}`.
+  - `OrderingRequest.build(context, modules, bands)` → `(system_prompt, user_payload)`, là hai tham số
+    `system_prompt` và `prompt` của `complete()` (pha 1):
+    - `user_payload` là chuỗi JSON liệt kê module và KP bằng id, tên, `learningType`, band. KP được đánh số theo
+      module.
+    - Prompt yêu cầu:
+      - chỉ sắp thứ tự module, và thứ tự KP trong mỗi module;
+      - dùng đúng các id đã cho;
+      - ưu tiên phần yếu theo placement, đặt phần nền tảng trước phần phụ thuộc, và phù hợp thời gian còn lại tới
+        kỳ thi.
+    - Dạng JSON trả về được mô tả ngay trong system prompt:
+      `{"modules": [{"id": str, "knowledge_point_ids": [str]}], "rationale": str}`. DeepTutor chỉ gửi
+      `response_format: {"type": "json_object"}`, không gửi schema riêng.
   - `OrderingValidator.apply(modules, proposal) -> list[LearningModule]`:
     - Chấp nhận khi: tập module id trùng khớp; mỗi module có đúng tập KP của nó; không trùng lặp; không id lạ.
     - Trả về bản sao của `modules` đã sắp lại. Tên, loại và `module_id` của KP lấy từ Content, không lấy từ LLM.
@@ -40,7 +47,8 @@ chuyển KP sang module khác (L3). Phần này là hàm thuần, không đụng
   - `rationale` của LLM chỉ để log và event, tối đa 500 ký tự, không hiện cho học viên.
 - Non-functional:
   - Không gửi email, tên, user id hay token. Có test khóa điều này.
-  - Payload có giới hạn kích thước: nếu kho KP quá lớn (chốt ngưỡng khi cook), bỏ qua LLM và dùng thứ tự Content.
+  - Payload có giới hạn kích thước: nếu kho KP quá lớn (chốt ngưỡng khi cook), bỏ qua LLM và dùng thứ tự Content,
+    lý do `payload_too_large`.
 
 ## Related Code Files
 - Create: `services/ai-learning-service/app/learning/path_ordering.py`
