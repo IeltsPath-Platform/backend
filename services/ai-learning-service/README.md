@@ -46,6 +46,7 @@ configuration; do not put them in this file or the image.
 | `1` | `V1__one_mastery_path_per_learning_goal.sql` | One path per `(user_id, learning_goal_id)` |
 | `2` | `V2__formal_assessment_evidence.sql` | Evidence projection and the result-version ledger |
 | `3` | `V3__pending_formal_assessment_results.sql` | Results parked until the goal's path exists |
+| `4` | `V4__mastery_path_knowledge_point_bands.sql` | Band snapshot of each knowledge point in a path |
 
 `V1` stops if the database already contains more than one path for a non-null
 `(user_id, learning_goal_id)` pair; reconcile those rows before retrying.
@@ -76,10 +77,37 @@ The active-goal and curriculum contracts also depend on User Service
 `V4__enforce_one_active_learning_goal_per_user.sql` and Content Service
 `V3__add_knowledge_point_learning_type.sql` being applied to their own databases.
 
+A new path contains only the knowledge points in scope for the active goal's `targetBand`: a point is kept when
+its effective `bandMin` from Content Service is empty or not above the target band. There is no upper bound; easier
+points stay in the path and placement test-out skips them. A topic whose points were all left out is dropped, and
+if nothing is left the path API returns 409. The effective band of every kept point is stored with the path
+(`mastery_path_knowledge_point_bands`) in the creating transaction, before parked results are applied. The applied
+scope is recorded as a `path.scope_applied` event. Scoping decides what the path contains; which point to learn next
+is still decided only by DeepTutor's `next_objective()`. An existing path is returned as is, without reading
+Content again.
+
+A finalized `PLACEMENT` result tests out the points the learner already masters, in the same transaction as its
+evidence: points whose effective `bandMax` is not above the placement's `overall_band`, and points every placement
+item answered correctly (or judged PASS). Test-out is a DeepTutor learner mastery override, so `next_objective()`
+skips the point; the placement evidence is still recorded and no mastery score, gate, policy or scheduler changes.
+The pinned DeepTutor submodule is the unmodified upstream release, so provenance is kept in the override note
+(`placement:{attemptId}:v{version}`) and `/progress` and `/map` report `masterySource: "placement"` for it
+(`system` = cleared by evidence, `learner` = the learner's own claim). A regraded placement replaces that attempt's
+test-out; a learner's own override is never replaced or cleared. Tested-out points have no repetition state, so
+they are not scheduled for review.
+
 Curriculum topics follow Content Service's sibling `sortOrder` in tree preorder.
 Knowledge Points are ordered by `createdAt` ascending, with UUID as a stable
 tie-breaker; Content Service does not currently expose an editorial learning
 order for Knowledge Points.
+
+`POST /api/ai-learning/paths` also refreshes an existing path from Content: new points in scope are added, names and
+order follow Content, and the response's `addedKnowledgePointCount` counts the points added by the call (all of them
+when the path is created). A refresh only adds, because DeepTutor's `replace_modules` deletes the state of any point
+missing from the new module set. A point that left the curriculum (inactive, deleted, or now above the target band)
+stays in the path with its history and is retired with a `retired:content` override, so `next_objective()` skips it
+and `masterySource` reports `retired`; it is restored if it comes back in scope. DeepTutor's summary counts a retired
+point as cleared. An unchanged curriculum commits nothing. The GET routes never read Content for an existing path.
 
 The public Phase 1 routes are:
 

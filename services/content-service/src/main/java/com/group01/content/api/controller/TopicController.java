@@ -1,5 +1,6 @@
 package com.group01.content.api.controller;
 
+import com.group01.content.domain.vo.BandRange;
 import com.group01.content.api.dto.request.CreateTopicRequest;
 import com.group01.content.api.dto.request.UpdateTopicRequest;
 import com.group01.content.api.dto.response.TopicResponse;
@@ -51,7 +52,8 @@ public class TopicController {
                 request.parentTopicId(),
                 request.code(),
                 request.name(),
-                request.sortOrder()
+                request.sortOrder(),
+                BandRange.of(request.bandMin(), request.bandMax())
         ));
         return TopicResponse.from(result);
     }
@@ -67,7 +69,8 @@ public class TopicController {
                 request.parentTopicId(),
                 request.name(),
                 request.sortOrder(),
-                request.status()
+                request.status(),
+                BandRange.of(request.bandMin(), request.bandMax())
         ));
         return TopicResponse.from(result);
     }

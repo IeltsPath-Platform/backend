@@ -27,7 +27,8 @@ public class UpdateTopicUseCase {
                     .orElseThrow(() -> new TopicNotFoundException(command.parentTopicId()));
         }
 
-        topic.update(command.parentTopicId(), command.name(), command.sortOrder(), command.status());
+        topic.update(command.parentTopicId(), command.name(), command.sortOrder(), command.status(),
+                command.band());
         Topic saved = topicRepository.save(topic);
 
         return new TopicResult(
@@ -38,7 +39,8 @@ public class UpdateTopicUseCase {
                 saved.getSortOrder(),
                 saved.getStatus(),
                 saved.getCreatedAt(),
-                saved.getUpdatedAt()
+                saved.getUpdatedAt(),
+                saved.getBand()
         );
     }
 }

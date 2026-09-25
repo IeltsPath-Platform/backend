@@ -488,8 +488,12 @@ Thuộc tính chính:
 | `name` | — | — | Tên hiển thị. |
 | `sort_order` | — | — | Thứ tự hiển thị/xử lý. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
+| `band_min?` | numeric(2,1) | CHECK 0.0–9.0, bội số 0.5, `≤ band_max` | Band IELTS thấp nhất mà topic hướng tới. NULL = không giới hạn dưới. |
+| `band_max?` | numeric(2,1) | CHECK 0.0–9.0, bội số 0.5 | Band IELTS cao nhất mà topic hướng tới. NULL = không giới hạn trên. |
 | `created_at` | — | — | Thời điểm tạo bản ghi. |
 | `updated_at` | — | — | Thời điểm cập nhật gần nhất. |
+
+Khoảng band là metadata nội dung, không phải trạng thái học. `ai-learning-service` dùng nó để chọn phạm vi path theo band mục tiêu của goal, và để test-out từ placement. Cả hai đầu NULL nghĩa là "mọi band".
 
 
 ## 4.2 `knowledge_points`
@@ -508,8 +512,12 @@ Thuộc tính chính:
 | `skill?` | — | — | Thuộc tính nghiệp vụ của bảng. |
 | `description` | — | — | Mô tả chi tiết. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
+| `band_min?` | numeric(2,1) | CHECK như `topics` | Khoảng band riêng của KP (xem dưới). |
+| `band_max?` | numeric(2,1) | CHECK như `topics` | Khoảng band riêng của KP (xem dưới). |
 | `created_at` | — | — | Thời điểm tạo bản ghi. |
 | `updated_at` | — | — | Thời điểm cập nhật gần nhất. |
+
+Band hiệu lực của KP: nếu KP có khoảng band riêng (ít nhất một đầu khác NULL) thì dùng **trọn** khoảng đó, ngược lại dùng khoảng của topic. Không ghép một đầu của KP với đầu kia của topic, để không bao giờ ra khoảng ngược (`min > max`). Topic con không kế thừa band của topic cha. API trả cả khoảng riêng (`bandMin`/`bandMax`) và khoảng hiệu lực (`effectiveBandMin`/`effectiveBandMax`).
 
 `learning_type` phải map 1:1 sang DeepTutor `KnowledgeType`. Các category nghiệp vụ như Grammar/Vocabulary/Strategy (nếu bổ sung sau) chỉ là metadata phân loại content, không thay thế `learning_type`.
 

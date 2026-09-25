@@ -1,5 +1,6 @@
 package com.group01.content.domain.aggregate;
 
+import com.group01.content.domain.vo.BandRange;
 import com.group01.content.domain.vo.ContentStatus;
 import com.group01.content.domain.vo.KnowledgePointKind;
 import com.group01.content.domain.vo.LearningType;
@@ -19,12 +20,14 @@ public class KnowledgePoint {
     private Skill skill;
     private String description;
     private ContentStatus status;
+    // Own range only; an unbounded range means the topic's range applies.
+    private final BandRange band;
     private final Instant createdAt;
     private Instant updatedAt;
 
     public KnowledgePoint(UUID id, UUID topicId, String code, String name, KnowledgePointKind kind,
                           LearningType learningType,
-                          Skill skill, String description, ContentStatus status,
+                          Skill skill, String description, ContentStatus status, BandRange band,
                           Instant createdAt, Instant updatedAt) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.topicId = Objects.requireNonNull(topicId, "topicId must not be null");
@@ -38,6 +41,7 @@ public class KnowledgePoint {
         if (this.status == ContentStatus.ACTIVE && this.learningType == null) {
             throw new IllegalArgumentException("learningType is required for an active knowledge point");
         }
+        this.band = band != null ? band : BandRange.UNBOUNDED;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.updatedAt = updatedAt != null ? updatedAt : this.createdAt;
     }
@@ -45,9 +49,15 @@ public class KnowledgePoint {
     public static KnowledgePoint create(UUID topicId, String code, String name,
                                         KnowledgePointKind kind, LearningType learningType,
                                         Skill skill, String description) {
+        return create(topicId, code, name, kind, learningType, skill, description, BandRange.UNBOUNDED);
+    }
+
+    public static KnowledgePoint create(UUID topicId, String code, String name,
+                                        KnowledgePointKind kind, LearningType learningType,
+                                        Skill skill, String description, BandRange band) {
         Instant now = Instant.now();
         return new KnowledgePoint(UUID.randomUUID(), topicId, code, name, kind, learningType, skill, description,
-                ContentStatus.ACTIVE, now, now);
+                ContentStatus.ACTIVE, band, now, now);
     }
 
     public void update(String name, KnowledgePointKind kind, LearningType learningType,
@@ -74,6 +84,7 @@ public class KnowledgePoint {
     public Skill getSkill() { return skill; }
     public String getDescription() { return description; }
     public ContentStatus getStatus() { return status; }
+    public BandRange getBand() { return band; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

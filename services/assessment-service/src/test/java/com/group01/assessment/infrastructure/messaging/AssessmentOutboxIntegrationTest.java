@@ -10,6 +10,7 @@ import com.group01.assessment.application.usecase.FinalizeAssessmentResultUseCas
 import com.group01.assessment.application.usecase.SaveAssessmentResultDetailsUseCase;
 import com.group01.assessment.domain.exception.InvalidAssessmentStateException;
 import com.group01.assessment.domain.vo.QualitativeJudgment;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.core.BindingBuilder;
@@ -142,7 +143,7 @@ class AssessmentOutboxIntegrationTest {
     }
 
     @Test
-    void graderLifecycleFinalizesWithTheGradersBandAndPublishesOneEvent() {
+    void graderLifecycleFinalizesWithTheGradersBandAndPublishesOneEvent() throws Exception {
         String queue = declareTestQueue();
         try {
             UUID knowledgePointId = UUID.randomUUID();
@@ -171,6 +172,8 @@ class AssessmentOutboxIntegrationTest {
             List<String> published = eventsFor(queue, resultId);
             assertEquals(1, published.size(), "a repeated finalize must not emit a second event");
             assertTrue(published.get(0).contains("\"PASS\""));
+            assertEquals(6.5, new ObjectMapper().readTree(published.get(0)).at("/data/overall_band").asDouble(),
+                    "the event carries the grader's band");
 
             // A regrade opens version 2 and announces it on its own.
             AssessmentResultResult regrade = createResult.executeForGrader(attempt.attemptId(), null);

@@ -32,7 +32,8 @@ public class CreateTopicUseCase {
                 command.parentTopicId(),
                 command.code(),
                 command.name(),
-                command.sortOrder()
+                command.sortOrder(),
+                command.band()
         );
 
         Topic saved = topicRepository.save(topic);
@@ -44,7 +45,8 @@ public class CreateTopicUseCase {
                 saved.getSortOrder(),
                 saved.getStatus(),
                 saved.getCreatedAt(),
-                saved.getUpdatedAt()
+                saved.getUpdatedAt(),
+                saved.getBand()
         );
     }
 }

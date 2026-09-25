@@ -70,7 +70,8 @@ class FormalAssessmentPostgresTest(unittest.TestCase):
         return PostgresLearningStore(self.schema.url).get_owned_progress(self.path_id, self.user_id)
 
     def test_assessment_result_changes_status_through_real_deeptutor_after_postgres_reload(self):
-        status_client = _ActiveGoalClient({"id": self.goal_id, "userId": self.user_id, "status": "ACTIVE"})
+        status_client = _ActiveGoalClient({"id": self.goal_id, "userId": self.user_id, "status": "ACTIVE",
+                                           "targetBand": 9.0})
         api_paths = PathService(self.store, status_client, content_client=None)
         before = asyncio.run(api_paths.active_status(self.user_id, "internal-token"))[1]
         self.assertEqual((before["action"], before["knowledgePointId"]), ("probe", VOCABULARY_KP))
@@ -260,7 +261,7 @@ class PendingFormalResultPostgresTest(unittest.TestCase):
 
         api_paths = PathService(
             self.store,
-            _ActiveGoalClient({"id": goal_id, "userId": user_id, "status": "ACTIVE"}),
+            _ActiveGoalClient({"id": goal_id, "userId": user_id, "status": "ACTIVE", "targetBand": 9.0}),
             _CurriculumClient(),
         )
         path_id, status = asyncio.run(api_paths.active_status(user_id, "internal-token"))

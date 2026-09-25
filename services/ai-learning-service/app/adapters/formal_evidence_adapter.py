@@ -14,6 +14,7 @@ from uuid import UUID
 
 from deeptutor.learning.models import ErrorType
 
+from app.adapters.curriculum_scope import parse_band
 from app.learning.formal_provenance import FormalProvenance, source_reference_id
 
 EVENT_TYPE = "AssessmentCompleted.v2"
@@ -56,6 +57,8 @@ class FormalAssessmentCommand:
     assessment_type: str
     completed_at: datetime
     items: tuple[ItemObservation, ...]
+    # The grader's band for this result version; None when absent or not recorded.
+    overall_band: Decimal | None = None
     # The validated event as received, kept so a parked result can be re-read later.
     raw_event: dict[str, Any] | None = field(default=None, compare=False, repr=False)
 
@@ -109,6 +112,7 @@ class FormalEvidenceAdapter:
             assessment_type=_text(data, "assessment_type"),
             completed_at=_timestamp(data, "completed_at"),
             items=tuple(items),
+            overall_band=_band(data, "overall_band"),
             raw_event=envelope,
         )
 
@@ -171,6 +175,14 @@ def _error_type(value: Any) -> ErrorType | None:
         return ErrorType(value.strip().lower())
     except ValueError:
         return None
+
+
+def _band(container: dict[str, Any], key: str) -> Decimal | None:
+    # Optional and additive in v2: events published before it existed have no such key.
+    try:
+        return parse_band(container.get(key), key)
+    except ValueError as exc:
+        raise ContractError(str(exc)) from exc
 
 
 def _object(value: Any, name: str) -> dict[str, Any]:

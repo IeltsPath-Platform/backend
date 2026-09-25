@@ -86,6 +86,7 @@ class FinalizeAssessmentResultUseCaseTest {
         assertEquals(1, data.get("result_version").asInt());
         assertEquals("MOCK", data.get("assessment_type").asText());
         assertEquals("COMPLETED", data.get("status").asText());
+        assertEquals(6.5, data.get("overall_band").asDouble());
         JsonNode item = data.get("item_results").get(0);
         assertEquals(itemResultId.toString(), item.get("item_result_id").asText());
         assertEquals(questionVersionId.toString(), item.get("question_version_id").asText());
@@ -99,6 +100,25 @@ class FinalizeAssessmentResultUseCaseTest {
         assertTrue(mappings.get(0).get("qualitative_judgment").isNull());
         assertEquals("PASS", mappings.get(1).get("qualitative_judgment").asText());
         assertFalse(json.toString().contains("correct_answer"));
+    }
+
+    @Test
+    void resultWithoutABandAnnouncesAnExplicitNullBand() throws Exception {
+        AssessmentResult unbanded = new AssessmentResult(resultId, attemptId, 1, AssessmentResult.DRAFT, null, null);
+        stubGradedAttempt(goalId);
+        when(results.findForUpdateById(resultId)).thenReturn(Optional.of(unbanded));
+        when(results.findLatestByAttemptId(attemptId)).thenReturn(Optional.of(unbanded));
+        when(knowledgeSnapshot.findByAttemptItemIds(List.of(itemId))).thenReturn(List.of());
+        when(judgments.findByItemResultIds(List.of(itemResultId))).thenReturn(List.of());
+        when(errors.findByResultId(resultId)).thenReturn(List.of());
+
+        useCase().execute(new FinalizeAssessmentResultCommand(resultId));
+
+        ArgumentCaptor<OutboxEvent> event = ArgumentCaptor.forClass(OutboxEvent.class);
+        verify(outbox).save(event.capture());
+        JsonNode data = objectMapper.readTree(event.getValue().payload()).get("data");
+        assertTrue(data.has("overall_band"));
+        assertTrue(data.get("overall_band").isNull());
     }
 
     @Test
