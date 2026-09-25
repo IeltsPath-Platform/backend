@@ -102,12 +102,13 @@ async def ensure_learning_path(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     service: PathService = Depends(get_path_service),
 ):
-    path_id, progress = await service.ensure_active_path(user.user_id, credentials.credentials)
+    path_id, progress, added = await service.refresh_active_path(user.user_id, credentials.credentials)
     return {
         "pathId": path_id,
         "revision": progress.version,
         "moduleCount": len(progress.modules),
         "knowledgePointCount": sum(len(module.knowledge_points) for module in progress.modules),
+        "addedKnowledgePointCount": added,
     }
 
 

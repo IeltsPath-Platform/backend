@@ -15,6 +15,8 @@ class PathCreatedResponse(ApiResponse):
     revision: int
     module_count: int = Field(alias="moduleCount")
     knowledge_point_count: int = Field(alias="knowledgePointCount")
+    # Knowledge points this call put into the path: all of them on creation, the new ones on a refresh.
+    added_knowledge_point_count: int = Field(alias="addedKnowledgePointCount")
 
 
 class MasteryCounts(ApiResponse):

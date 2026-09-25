@@ -8,8 +8,7 @@ evidence and never changes mastery scores, gates, policy or the scheduler.
 
 DeepTutor's override has no provenance field and the pinned submodule is the
 unmodified upstream release, so provenance lives in the override note:
-``placement:{attempt_id}:v{result_version}``. ``mastery_source`` reports such
-an override as ``placement`` instead of ``learner``.
+``placement:{attempt_id}:v{result_version}`` (see ``override_provenance``).
 
 A point is tested out by a ``PLACEMENT`` result when either
 (a) its effective band has an upper end not above the placement's
@@ -22,40 +21,22 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from deeptutor.learning.policy import find_knowledge_point, is_assessed_mastered, mastery_source as deeptutor_source
+from deeptutor.learning.policy import find_knowledge_point, is_assessed_mastered
 
 from app.adapters.curriculum_scope import KnowledgePointBand
 from app.adapters.formal_evidence_adapter import FormalAssessmentCommand
+from app.learning.override_provenance import (  # noqa: F401 - re-exported for callers of this module
+    PLACEMENT_NOTE_PREFIX,
+    mastery_source,
+    with_placement_provenance,
+)
 
 PLACEMENT = "PLACEMENT"
-NOTE_PREFIX = "placement:"
-PLACEMENT_SOURCE = "placement"
+NOTE_PREFIX = PLACEMENT_NOTE_PREFIX
 
 
 def placement_note(attempt_id: str, result_version: int) -> str:
     return f"{NOTE_PREFIX}{attempt_id}:v{result_version}"
-
-
-def is_placement_override(override: Any) -> bool:
-    return str(getattr(override, "note", "")).startswith(NOTE_PREFIX)
-
-
-def mastery_source(progress: Any, kp: Any) -> str:
-    """DeepTutor's ``system``/``learner`` provenance, with placement overrides reported as ``placement``."""
-    source = deeptutor_source(progress, kp)
-    if source == "learner" and is_placement_override(progress.learner_mastery_overrides.get(kp.id)):
-        return PLACEMENT_SOURCE
-    return source
-
-
-def with_placement_provenance(summary: dict[str, Any], progress: Any) -> dict[str, Any]:
-    """Relabel ``map_summary`` entries whose override came from a placement."""
-    for module in summary.get("modules", []):
-        for entry in module.get("knowledge_points", []):
-            override = progress.learner_mastery_overrides.get(entry["id"])
-            if entry.get("mastery_source") == "learner" and is_placement_override(override):
-                entry["mastery_source"] = PLACEMENT_SOURCE
-    return summary
 
 
 class PlacementTestOut:

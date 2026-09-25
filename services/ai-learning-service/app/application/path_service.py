@@ -10,10 +10,11 @@ from deeptutor.learning.policy import map_summary, next_objective
 from deeptutor.learning.service import LearningService
 
 from app.adapters.curriculum_adapter import CurriculumAdapter
-from app.adapters.curriculum_scope import CurriculumScope, KnowledgePointBand, target_band_of
+from app.adapters.curriculum_scope import CurriculumScope, KnowledgePointBand, ScopedCurriculum, target_band_of
 from app.application.formal_result_applier import FormalResultApplier
 from app.clients.content_service import ContentServiceClient
-from app.learning.placement_test_out import with_placement_provenance
+from app.application.curriculum_refresh import merge_curriculum, same_structure
+from app.learning.override_provenance import RETIRED_NOTE, is_retired_override, with_placement_provenance
 from app.clients.user_service import UserServiceClient
 from app.persistence.postgres_learning_store import PostgresLearningStore
 
@@ -68,26 +69,60 @@ class PathService:
         return goal
 
     async def ensure_active_path(self, user_id: UUID, bearer_token: str) -> tuple[str, Any]:
+        """The active goal's path; Content is read only when the path must be created."""
+        goal = await self._owned_active_goal(user_id, bearer_token)
+        try:
+            return await run_in_threadpool(self.ensure_path, user_id, goal["id"])
+        except PathNotBootstrapped:
+            pass
+        path_id, progress, _added = await self._create_from_content(user_id, goal, bearer_token)
+        return path_id, progress
+
+    async def refresh_active_path(self, user_id: UUID, bearer_token: str) -> tuple[str, Any, int]:
+        """Create the active goal's path, or bring an existing one up to date with Content.
+
+        Returns ``(path_id, progress, added)`` where ``added`` counts the knowledge
+        points this call put into the path. A refresh only adds (see
+        ``curriculum_refresh``); an unchanged curriculum commits nothing.
+        """
+        goal = await self._owned_active_goal(user_id, bearer_token)
+        try:
+            path_id, _ = await run_in_threadpool(self.ensure_path, user_id, goal["id"])
+        except PathNotBootstrapped:
+            return await self._create_from_content(user_id, goal, bearer_token)
+        modules, scoped, target_band = await self._scoped_curriculum(goal, bearer_token)
+        added = await run_in_threadpool(self._refresh_path, path_id, modules, scoped.bands, target_band)
+        progress = await run_in_threadpool(self._owned, path_id, user_id)
+        return path_id, progress, added
+
+    async def _owned_active_goal(self, user_id: UUID, bearer_token: str) -> dict[str, Any]:
         goal = await self._active_goal(bearer_token)
         if goal["userId"] != str(user_id):
             raise ValueError("Active goal owner does not match authenticated learner")
-        goal_id = goal["id"]
-        try:
-            return await run_in_threadpool(self.ensure_path, user_id, goal_id)
-        except PathNotBootstrapped:
-            pass
+        return goal
+
+    async def _scoped_curriculum(
+        self, goal: dict[str, Any], bearer_token: str
+    ) -> tuple[list[Any], ScopedCurriculum, Any]:
         target_band = target_band_of(goal)
         topics, content_points = await self._content.get_curriculum(bearer_token)
         scoped = CurriculumScope.select(topics, content_points, target_band)
         modules = CurriculumAdapter.to_modules(scoped.topics, scoped.knowledge_points)
+        return modules, scoped, target_band
+
+    async def _create_from_content(
+        self, user_id: UUID, goal: dict[str, Any], bearer_token: str
+    ) -> tuple[str, Any, int]:
+        modules, scoped, target_band = await self._scoped_curriculum(goal, bearer_token)
         scope = {
             "target_band": str(target_band),
             "included": len(scoped.knowledge_points),
             "excluded": scoped.excluded_count,
         }
-        return await run_in_threadpool(
-            lambda: self.ensure_path(user_id, goal_id, modules, bands=scoped.bands, scope=scope)
+        path_id, progress = await run_in_threadpool(
+            lambda: self.ensure_path(user_id, goal["id"], modules, bands=scoped.bands, scope=scope)
         )
+        return path_id, progress, sum(len(module.knowledge_points) for module in modules)
 
     def ensure_path(
         self,
@@ -123,6 +158,37 @@ class PathService:
             if winner_path_id is None:
                 raise
             return winner_path_id, self._owned(winner_path_id, user_id)
+
+    def _refresh_path(
+        self, path_id: str, modules: list[Any], bands: dict[str, KnowledgePointBand], target_band: Any
+    ) -> int:
+        """Merge the fresh curriculum into the path under its row lock; commit only a real change."""
+        with self._store.transaction(path_id) as tx:
+            merge = merge_curriculum(tx.progress.modules, modules)
+            overrides = tx.progress.learner_mastery_overrides
+            current_bands = self._store.knowledge_point_bands(path_id)
+            # Missing points keep the band they had, so placement test-out still sees it.
+            merged_bands = {kp_id: band for kp_id, band in current_bands.items() if kp_id in merge.missing}
+            merged_bands.update(bands)
+            to_retire = [kp_id for kp_id in merge.missing if kp_id not in overrides]
+            to_restore = [kp_id for kp_id, override in overrides.items()
+                          if is_retired_override(override) and kp_id not in merge.missing]
+            if (same_structure(tx.progress.modules, merge.modules) and merged_bands == current_bands
+                    and not to_retire and not to_restore):
+                return 0
+            self._learning.replace_modules_for_path(path_id, merge.modules, append=False)
+            self._store.replace_knowledge_point_bands(path_id, merged_bands)
+            for kp_id in to_retire:
+                self._learning.set_learner_mastery_override(path_id, kp_id, mastered=True, note=RETIRED_NOTE)
+            for kp_id in to_restore:
+                self._learning.set_learner_mastery_override(path_id, kp_id, mastered=False)
+            tx.emit("path.scope_refreshed", {
+                "target_band": str(target_band),
+                "added": merge.added,
+                "retired": to_retire,
+                "restored": to_restore,
+            })
+            return len(merge.added)
 
     def _owned(self, path_id: str, user_id: UUID | str) -> Any:
         progress = self._store.get_owned_progress(path_id, user_id)

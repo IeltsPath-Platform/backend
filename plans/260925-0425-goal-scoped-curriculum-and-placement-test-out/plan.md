@@ -1,7 +1,7 @@
 ---
 title: "Path cá nhân hóa theo goal và test-out từ placement"
 description: "Content gắn band cho topic/KP; AI Learning chỉ đưa vào path các KP trong phạm vi band mục tiêu của goal; kết quả placement đánh dấu test-out qua override của DeepTutor; POST /paths làm mới phạm vi. Không thêm planner thứ hai."
-status: pending
+status: completed
 priority: P1
 branch: "feat/ai-learning-service"
 tags: [feature, backend, database, api, adaptive-learning]
@@ -65,7 +65,7 @@ Ngoài phạm vi:
 | 2 | [Goal-scoped curriculum](./phase-02-goal-scoped-curriculum.md) | Completed |
 | 3 | [Placement band in AssessmentCompleted.v2](./phase-03-placement-band-in-event.md) | Completed |
 | 4 | [Placement test-out](./phase-04-placement-test-out.md) | Completed |
-| 5 | [Path refresh and E2E verification](./phase-05-path-refresh-and-e2e.md) | Pending |
+| 5 | [Path refresh and E2E verification](./phase-05-path-refresh-and-e2e.md) | Completed |
 
 ## Dependencies
 

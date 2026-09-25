@@ -101,6 +101,14 @@ Knowledge Points are ordered by `createdAt` ascending, with UUID as a stable
 tie-breaker; Content Service does not currently expose an editorial learning
 order for Knowledge Points.
 
+`POST /api/ai-learning/paths` also refreshes an existing path from Content: new points in scope are added, names and
+order follow Content, and the response's `addedKnowledgePointCount` counts the points added by the call (all of them
+when the path is created). A refresh only adds, because DeepTutor's `replace_modules` deletes the state of any point
+missing from the new module set. A point that left the curriculum (inactive, deleted, or now above the target band)
+stays in the path with its history and is retired with a `retired:content` override, so `next_objective()` skips it
+and `masterySource` reports `retired`; it is restored if it comes back in scope. DeepTutor's summary counts a retired
+point as cleared. An unchanged curriculum commits nothing. The GET routes never read Content for an existing path.
+
 The public Phase 1 routes are:
 
 - `POST /api/ai-learning/paths`

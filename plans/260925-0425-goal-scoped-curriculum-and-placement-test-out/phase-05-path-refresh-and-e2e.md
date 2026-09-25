@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Path refresh and E2E verification"
-status: pending
+status: completed
 priority: P1
 dependencies: [1, 2, 3, 4]
 effort: "~4h"
@@ -28,8 +28,9 @@ vào, thứ tự được cập nhật. Sau đó chạy E2E thật qua Gateway v
     - Có thay đổi: một revision, event `path.scope_refreshed` gồm số KP thêm.
   - GET (`/progress`, `/status`, `/map`) không đổi hành vi: không gọi Content với path đã có.
   - KP INACTIVE bên Content vẫn còn trong path nhưng bị đánh dấu để `next_objective()` bỏ qua. **TO VERIFY lúc
-    cook:** DeepTutor có cơ chế ẩn KP nào không. Nếu không có, dùng override `source="retired"` qua cùng mở rộng
-    ở pha 4, và ghi rõ quyết định.
+    cook:** DeepTutor có cơ chế ẩn KP nào không. *(Kết quả: không có. Dùng override với note `retired:content`,
+    `masterySource = "retired"`, và tự gỡ khi KP quay lại phạm vi. Đánh đổi: phần `counts` của DeepTutor tính KP
+    retired là đã qua.)*
 - Non-functional:
   - Làm mới chạy dưới row lock của path (transaction hiện có), an toàn khi chạy song song với consumer.
 
