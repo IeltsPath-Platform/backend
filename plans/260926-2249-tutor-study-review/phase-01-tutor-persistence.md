@@ -1,13 +1,13 @@
 ---
-phase: 4
+phase: 1
 title: "Lưu trữ tutor: session, message, turn"
-status: pending
+status: complete
 priority: P1
-dependencies: [3]
+dependencies: []
 effort: "~1.5d"
 ---
 
-# Phase 4: Lưu trữ tutor
+# Phase 1: Lưu trữ tutor
 
 ## Overview
 Bảng và store PostgreSQL cho buổi học của tutor. Thiết kế **gọn hơn** V5 §7.7–7.9, vì V5 sao chép runtime nhiều worker
@@ -43,7 +43,7 @@ Tutor tự viết chạy một instance, mỗi turn là một request HTTP, nên
   - `finish_turn(turn_id, status, failure_code='')`.
   - `add_message(user_id, session_id, turn_id, role, content, metadata)`, `recent_messages(user_id, session_id, limit)`.
   - `recover_interrupted_turns()`: chuyển mọi turn `running` sang `failed`, `failure_code='interrupted'`. Gọi khi API khởi
-    động (pha 6), vì một instance duy nhất nên turn `running` lúc khởi động chắc chắn đã chết.
+    động (pha 3), vì một instance duy nhất nên turn `running` lúc khởi động chắc chắn đã chết.
 - Không log nội dung message.
 
 ## Implementation Steps
@@ -60,4 +60,4 @@ Tutor tự viết chạy một instance, mỗi turn là một request HTTP, nên
 7. Gate đầy đủ.
 
 ## Success Criteria
-- [ ] Ba bảng có ràng buộc đúng; store kiểm chủ sở hữu ở mọi method; một turn chạy mỗi session.
+- [x] Ba bảng có ràng buộc đúng; store kiểm chủ sở hữu ở mọi method; một turn chạy mỗi session.

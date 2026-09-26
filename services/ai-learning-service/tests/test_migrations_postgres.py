@@ -109,6 +109,26 @@ class MigrationsPostgresTest(unittest.TestCase):
         with self.assertRaises(psycopg2.errors.UniqueViolation):
             self._insert_interaction(path_id, "answered")
 
+    def test_tutor_tables_allow_one_running_turn_per_session(self):
+        import psycopg2
+
+        self.assertTrue({"sessions", "turns", "messages"} <= self._tables())
+        path_id = self._insert_path()
+        session_id = str(uuid4())
+        self.schema.execute(
+            """INSERT INTO sessions (id, user_id, path_id, created_at, updated_at)
+               VALUES (%s, %s, %s, now(), now())""",
+            (session_id, str(uuid4()), path_id),
+        )
+        insert_turn = "INSERT INTO turns (id, session_id, status, created_at) VALUES (%s, %s, %s, now())"
+        self.schema.execute(insert_turn, (str(uuid4()), session_id, "completed"))
+        self.schema.execute(insert_turn, (str(uuid4()), session_id, "running"))
+
+        with self.assertRaises(psycopg2.errors.UniqueViolation):
+            self.schema.execute(insert_turn, (str(uuid4()), session_id, "running"))
+        with self.assertRaises(psycopg2.errors.CheckViolation):
+            self.schema.execute(insert_turn, (str(uuid4()), session_id, "queued"))
+
     def test_path_revision_cannot_be_negative(self):
         import psycopg2
 
