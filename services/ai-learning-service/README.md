@@ -206,11 +206,33 @@ model available to the team, keep `binding: "gemini"`, and leave `base_url` empt
 for DeepTutor's default Gemini endpoint. Keep `extra_headers` empty for this setup.
 The model in the example file is a starting value, not a requirement.
 
+The example sets `"reasoning_effort": "low"` on the model. Without it, DeepTutor
+v1.6.9 sends `minimal` to every `gemini-3*` model, and `gemini-3.8-flash` answers
+`400 Thinking level MINIMAL is not supported`. Keep the field unless the chosen
+model accepts `minimal`. Google also rejects `gemini-2.5-flash` for new API keys
+with a 404.
+
 DeepTutor caches configuration for the process lifetime. After any catalog change:
 
 ```powershell
 docker compose restart ai-learning-api
-docker compose exec ai-learning-api deeptutor config show
+docker compose exec -u appuser ai-learning-api deeptutor config show
+```
+
+Always run DeepTutor commands in the container as `appuser` (`-u appuser`). A plain
+`docker compose exec` runs as root. DeepTutor rewrites the catalog as a root-owned
+`0600` file, which the API process (uid 10001) cannot read. The API then treats the
+catalog as empty, overwrites it with an empty catalog, and reports
+`llm_not_configured`: the key and model are lost from the file. Root also leaves
+other files behind, such as `user/logs/deeptutor.jsonl`, and after that even
+`-u appuser` commands fail with `PermissionError`. To recover:
+
+```powershell
+docker compose stop ai-learning-api
+Remove-Item -Recurse -Force services/ai-learning-service/deeptutor-data
+# create the catalog again as above, fill in the key and model, then:
+docker compose up -d ai-learning-api
+docker compose exec -u appuser ai-learning-api deeptutor config show
 ```
 
 Check `llm.provider` is `gemini`, `llm.model` matches the chosen model, and
