@@ -67,8 +67,24 @@ Bất biến giữ nguyên từ spec V2 và các plan trước:
 - **Không có test nào gọi Gemini thật.**
   - Test unit thay hàm gọi LLM bằng hàm giả, như test của DeepTutor.
   - Test tích hợp đi qua lớp LLM thật của DeepTutor, tới một server giả kiểu OpenAI, với catalog tạm.
-- Môi trường test cần dependency của DeepTutor, cài như image (`pip install ./third_party/deeptutor`).
+- Môi trường test cần thêm 4 gói mà lớp LLM của DeepTutor dùng, qua `requirements-test.txt` (pha 1).
 - Không sửa submodule DeepTutor.
+
+## Quy tắc cho người implement
+
+1. **Không sửa gì trong `third_party/deeptutor`.** Đây là submodule upstream, không có fork để push. Cần hành vi
+   khác thì làm ở AI Learning.
+2. **Mọi lời gọi LLM đi qua `deeptutor.services.llm.complete()`**, gom trong `app/learning/deeptutor_llm.py`. Không
+   viết client HTTP cho Gemini, không dùng SDK Google, không thêm thư viện runtime.
+3. **Không có biến môi trường cho key, model hay endpoint.** Cấu hình chỉ nằm trong catalog của DeepTutor.
+4. **Không ghi đè engine của DeepTutor.** Thứ tự đi vào path bằng `replace_modules_for_path` như hôm nay; profile
+   đi vào bằng `record_learner_profile`; event bằng `tx.emit`.
+5. **LLM không bao giờ làm hỏng việc tạo path.** Mọi lỗi quy về thứ tự Content kèm `reason`.
+6. **Không lộ dữ liệu:** không log key, payload hay prompt đầy đủ; không gửi email, tên, user id, goal id.
+7. Làm theo thứ tự pha. Mỗi pha: test fail trước, rồi code, rồi gate. Mỗi pha một commit. Trước khi commit, không để
+   lại `__pycache__`, `data/` hay `usage.sqlite3` trong repo (chạy test với `PYTHONDONTWRITEBYTECODE=1`).
+8. Mỗi pha có bảng "Đọc trước khi code": đọc các file đó trước, nhất là phần của DeepTutor.
+9. Gặp điều plan không nói rõ, hoặc thấy plan sai so với code: dừng lại và hỏi, không tự đoán.
 
 ## Làm sau (ngoài phạm vi, ghi lại theo L4)
 
