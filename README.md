@@ -281,6 +281,18 @@ Thư mục `third_party/deeptutor` chỉ là bản clone DeepTutor để **đọ
 mastery của AI Learning (`services/ai-learning-service/app/mastery`) được port từ đó;
 service không import, không build và không test dựa vào thư mục này.
 
+**Kiểm chứng tutor study/review qua Gateway:** khởi động các Java service theo thứ tự ở trên, rồi chạy
+`ai-learning-db`, `ai-learning-migrate`, `ai-learning-api`, `ai-learning-consumer` và `llm-stub` trong Compose.
+Đặt `LLM_STUB_MODE=script`, `AI_LEARNING_LLM_BASE_URL=http://llm-stub:8090/v1beta/openai/`,
+`AI_LEARNING_LLM_MODEL=stub-model`, `AI_LEARNING_LLM_API_KEY=stub-only` và
+`AI_LEARNING_LLM_TIMEOUT_SECONDS=45` trong môi trường của lệnh Compose. Sau đó, từ
+`services/ai-learning-service`, chạy `python tests/e2e/tutor_e2e.py` với
+`TUTOR_E2E_USER_A_EMAIL/PASSWORD` và `TUTOR_E2E_USER_B_EMAIL/PASSWORD` của hai tài khoản test có goal active.
+Có thể dùng `--register-disposable` để script tự tạo hai tài khoản test và goal local; bản ghi của chúng vẫn ở
+`user_db` sau khi chạy. Script kiểm HTTP + SSE, keep-alive qua Gateway, cách ly session, formal result qua RabbitMQ,
+mastery và file write trong container. Xem [Tutor study/review](services/ai-learning-service/README.md#tutor-studyreview)
+và [SSE contract](docs/contracts/tutor-sse-v1.md).
+
 **Chạy test Python AI Learning:**
 
 Từ thư mục gốc, dùng virtual environment Python của dự án:

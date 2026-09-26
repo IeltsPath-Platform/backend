@@ -1080,13 +1080,14 @@ pronunciationScore = 82
 `result_payload` cho phép giữ response chi tiết của pronunciation provider trong MVP mà chưa phải tách nhiều bảng rubric/word score.
 ---
 
-# 7. AI Learning — DeepTutor Core & Tutor Runtime
+# 7. AI Learning — Ported Mastery Core & Tutor Runtime
 
-Phần này là **persistence adapter cho DeepTutor**, không phải một Adaptive Engine do IELTSPath tự thiết kế. Source behavior nằm ở DeepTutor `LearningProgress`, `mastery.py`, `policy.py`, `scheduler.py`, `service.py` và session runtime.
+Mastery engine trong `ai-learning-service/app/mastery` port behavior từ DeepTutor; tutor study/review trong
+`app/tutor` do IELTSPath tự triển khai. Service không phụ thuộc DeepTutor ở runtime.
 
 Baseline upstream: **HKUDS/DeepTutor v1.6.9**.
 
-DeepTutor upstream lưu Mastery Path trong workspace-scoped SQLite với một aggregate `state_json`, revision compare-and-swap, interaction lifecycle, event log và evidence projection. V5 port các semantics đó sang PostgreSQL để phù hợp microservice/multi-user của IELTSPath.
+DeepTutor upstream lưu Mastery Path trong workspace-scoped SQLite với một aggregate `state_json`, revision compare-and-swap, interaction lifecycle, event log và evidence projection. Migration hiện có của AI Learning port phần mastery sang PostgreSQL. `V5__tutor_sessions.sql` triển khai `sessions`, `messages`, `turns` gọn cho HTTP + SSE, một API instance. Các mục 7.2, 7.6, 7.10–7.13 mô tả thiết kế dự kiến, **chưa có bảng tương ứng trong migration hiện tại**.
 
 ## 7.0 Quy tắc ownership và mapping
 
@@ -1167,6 +1168,8 @@ Không tạo các cột `WEAK / LEARNING / MASTERED` riêng. Display status đư
 ---
 
 ## 7.2 `mastery_path_sessions`
+
+**Chưa triển khai.** Tutor hiện gắn trực tiếp `sessions.path_id` với `mastery_paths`.
 
 Liên kết conversation/tutor session với Mastery Path. Semantics giữ từ upstream: một session chỉ thuộc tối đa một path tại một thời điểm.
 
@@ -1269,6 +1272,8 @@ Index:
 
 ## 7.6 `mastery_path_leases`
 
+**Chưa triển khai.** Tutor hiện dùng PostgreSQL row lock và revision của path cho mỗi mutation.
+
 Giữ invariant “một mutating turn được quyền sửa path tại một thời điểm”, tương đương upstream `MasteryPathLease`.
 
 | Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
@@ -1284,16 +1289,14 @@ Lease được release khi turn kết thúc/cancel/recovery. Nếu implementatio
 
 ## 7.7 `sessions`
 
-Shared Tutor/Chat session runtime theo semantics DeepTutor session store. Đây thay `ai_conversations` cũ và đồng thời là learning-session conversation state.
+Session study/review của tutor tự viết. Mỗi session gắn một path do server chọn và một learner sở hữu.
 
 | Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
 | :--- | :--- | :--- | :--- |
 | `id` | uuid | PK | Session ID. |
 | `user_id` | uuid | Logical ref ↗ `Identity.users` | Owner; extension cần cho centralized multi-user PostgreSQL. |
-| `title` | varchar(200) | DEFAULT `New conversation` | Tên session. |
-| `compressed_summary` | text | DEFAULT '' | Summary lịch sử dài để context compression. |
-| `summary_up_to_message_id?` | bigint | Logical ref → `messages.id` | Message boundary đã được summary. |
-| `preferences_json` | jsonb | DEFAULT `{}` | Session/surface preferences. |
+| `path_id` | uuid | NOT NULL, FK → `mastery_paths(path_id)` ON DELETE CASCADE | Active path khi tạo session; thuộc cùng `user_id`. |
+| `title` | varchar(200) | NOT NULL, DEFAULT `New session` | Tên session. |
 | `created_at` | timestamptz | NOT NULL | Thời điểm tạo. |
 | `updated_at` | timestamptz | NOT NULL | Lần hoạt động gần nhất. |
 | `archived_at?` | timestamptz | — | Archive/soft-hide khi cần. |
@@ -1301,70 +1304,59 @@ Shared Tutor/Chat session runtime theo semantics DeepTutor session store. Đây 
 Index:
 
 ```text
-(user_id, updated_at DESC)
+(user_id, updated_at DESC) WHERE archived_at IS NULL
 ```
 
 ---
 
 ## 7.8 `messages`
 
-Persist message history của Tutor Agent/session. DeepTutor hỗ trợ message branching bằng `parent_message_id`; V5 giữ behavior này.
+Persist message history của tutor. Tool call/result không lưu thành message; câu hỏi và kết quả chấm nằm ở `mastery_interactions`.
 
 | Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
 | :--- | :--- | :--- | :--- |
-| `id` | bigint | PK identity | Message ID. |
-| `session_id` | uuid | FK → `sessions` | Session chứa message. |
-| `role` | varchar(30) | NOT NULL | `user`, `assistant`, `system/tool` theo runtime contract. |
-| `content` | text | DEFAULT '' | Nội dung hiển thị/lưu. |
-| `capability` | varchar(100) | DEFAULT '' | Capability xử lý message. |
-| `events_json` | jsonb | DEFAULT `[]` | Render/runtime events gắn vào message. |
-| `attachments_json` | jsonb | DEFAULT `[]` | Metadata attachment nếu surface hỗ trợ. |
-| `metadata_json` | jsonb | DEFAULT `{}` | Metadata mở rộng. |
-| `parent_message_id?` | bigint | FK self → `messages` | Parent trên active conversation branch. |
+| `id` | bigint | PK, GENERATED ALWAYS AS IDENTITY | Message ID. |
+| `session_id` | uuid | NOT NULL, FK → `sessions(id)` ON DELETE CASCADE | Session chứa message. |
+| `turn_id?` | uuid | FK → `turns(id)` ON DELETE SET NULL | Turn tạo message. |
+| `role` | varchar(20) | NOT NULL, CHECK `user` hoặc `assistant` | Người viết message. |
+| `content` | text | NOT NULL | Nội dung hiển thị/lưu. |
+| `metadata_json` | jsonb | NOT NULL, DEFAULT `{}` | `question_id` trên assistant message đặt câu hỏi. |
 | `created_at` | timestamptz | NOT NULL | Thời điểm tạo. |
 
 Index:
 
 ```text
-(session_id, created_at, id)
-(session_id, parent_message_id)
+(session_id, id)
 ```
 
 ---
 
 ## 7.9 `turns`
 
-Durable runtime state cho mỗi agent turn. Dùng cho concurrency, resume/recovery và WebSocket rehydration.
+Durable state cho mỗi HTTP + SSE turn. API chỉ chạy một instance; lúc khởi động, turn còn `running` được chuyển sang `failed/interrupted`.
 
 | Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
 | :--- | :--- | :--- | :--- |
 | `id` | uuid | PK | Turn ID. |
-| `session_id` | uuid | FK → `sessions` | Session chứa turn. |
-| `capability` | varchar(100) | DEFAULT '' | Ví dụ mastery/tutor capability. |
-| `status` | varchar(30) | NOT NULL | `QUEUED`, `RUNNING`, `WAITING_INPUT`, `COMPLETED`, `FAILED`, `CANCELLED`. |
-| `error` | text | DEFAULT '' | Error text an toàn cho runtime/debug. |
-| `owner_id` | varchar(255) | DEFAULT '' | Worker owner. |
-| `fencing_token` | bigint | DEFAULT 0 | Ngăn stale worker commit. |
-| `state_version` | bigint | DEFAULT 1 | Runtime state version. |
+| `session_id` | uuid | NOT NULL, FK → `sessions(id)` ON DELETE CASCADE | Session chứa turn. |
+| `status` | varchar(20) | NOT NULL, CHECK `running`, `completed`, `failed` | Trạng thái turn. |
 | `failure_code` | varchar(100) | DEFAULT '' | Machine-readable failure code. |
-| `retryable` | boolean | DEFAULT false | Turn có thể retry hay không. |
-| `assistant_message_id?` | bigint | FK → `messages` | Final assistant message nếu đã materialize. |
 | `created_at` | timestamptz | NOT NULL | Thời điểm tạo. |
-| `updated_at` | timestamptz | NOT NULL | Lần cập nhật gần nhất. |
 | `finished_at?` | timestamptz | — | Thời điểm terminal. |
 
 Index:
 
 ```text
-(session_id, updated_at DESC)
-(session_id, status, updated_at DESC)
+UNIQUE (session_id) WHERE status = 'running'
 ```
 
-Nên có partial unique constraint bảo đảm một session không có hai active turns cạnh tranh nếu runtime contract yêu cầu.
+Partial unique index bảo đảm mỗi session chỉ có một turn đang chạy. Mastery mutation khóa hàng `mastery_paths` theo từng giao dịch ngắn.
 
 ---
 
 ## 7.10 `turn_events`
+
+**Chưa triển khai.** SSE phát trực tiếp trong turn; lịch sử message và interaction được lưu riêng.
 
 Append-only ordered event stream của một agent turn, dùng để stream/replay UI và khôi phục trace sau refresh.
 
@@ -1386,6 +1378,8 @@ Append-only ordered event stream của một agent turn, dùng để stream/repl
 
 
 ## 7.11 `notebook_entries`
+
+**Chưa triển khai.** Question notebook thuộc pha follow-up, không phải study/review baseline.
 
 Durable Question Notebook của DeepTutor. Bảng này lưu **câu hỏi mà learner đã thực sự làm** sau khi interaction/assessment được grade. Nó khác `mastery_interactions`: `mastery_interactions` quản lý lifecycle câu hỏi đang chờ trả lời, còn `notebook_entries` là history/search/review source sau khi câu hỏi đã được materialize.
 
@@ -1440,6 +1434,8 @@ Không dùng `notebook_entries` làm mastery authority. Mastery vẫn được m
 
 ## 7.12 `practice_review_state`
 
+**Chưa triển khai.** Chỉ thêm khi triển khai question practice/review.
+
 Current review state cho **một question notebook entry cụ thể**. Đây là question-level spaced practice của DeepTutor, khác với KP-level `repetition_states/review_queue` nằm trong `LearningProgress`.
 
 ```text
@@ -1476,6 +1472,8 @@ Bảng này không thay thế DeepTutor Mastery scheduler. Hai scheduler phục 
 ---
 
 ## 7.13 `practice_review_events`
+
+**Chưa triển khai.** Chỉ thêm khi triển khai question practice/review.
 
 Append-only/idempotent history của từng lần learner review một `notebook_entries` item. `practice_review_state` là current state; bảng này giải thích state đã thay đổi qua những lần review nào.
 
@@ -1558,19 +1556,19 @@ Cấm consumer update `mastery_paths.state_json` bằng ad-hoc SQL.
 
 ## 7.16 Transaction boundary
 
-Một mutating tutor turn cần commit atomically các dữ liệu liên quan khi phù hợp:
+Tutor study/review hiện dùng một giao dịch PostgreSQL ngắn cho mỗi mutation trên path; giao dịch này khóa hàng
+`mastery_paths` và commit `state_json`, revision, interaction, event và evidence cùng nhau. `turns` và `messages`
+được ghi bằng giao dịch riêng; failure sẽ đóng turn bằng `failure_code`, và startup recovery xử lý turn bị ngắt.
+Các bảng dự kiến sau chưa nằm trong transaction boundary hiện tại:
 
 ```text
-mastery_paths revision/state_json
-mastery_interactions
-mastery_events
-mastery_learning_evidence projection
-notebook_entries / practice review state-events khi turn tạo hoặc review question
-turn status/events
+turn_events
+notebook_entries / practice review state-events
+mastery_path_leases
 ai_learning_db.outbox_events
 ```
 
-Implementation có thể chia transaction theo runtime architecture, nhưng phải giữ idempotency và không để trạng thái mastery commit trong khi durable interaction/evidence bị mất.
+Không được tách interaction/evidence ra khỏi giao dịch mastery của tool; nếu cần atomicity của toàn turn, phải thiết kế thêm trước khi mở rộng runtime nhiều instance.
 
 ---
 

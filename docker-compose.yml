@@ -121,6 +121,7 @@ services:
       context: .
       dockerfile: services/ai-learning-service/Dockerfile
     container_name: ai-learning-api
+    restart: unless-stopped
     environment:
       # Must equal the Gateway's value: the API validates the Gateway-signed internal JWT.
       AI_LEARNING_INTERNAL_JWT_SECRET: "${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}"
@@ -169,9 +170,11 @@ services:
     command: ["python", "/stub/llm_stub.py"]
     environment:
       LLM_STUB_MODE: ${LLM_STUB_MODE:-reverse}
+      LLM_STUB_SCRIPT: ${LLM_STUB_SCRIPT:-/stub/tutor-stub-script.json}
       PYTHONDONTWRITEBYTECODE: "1"
     volumes:
       - ./services/ai-learning-service/tests/e2e/llm_stub.py:/stub/llm_stub.py:ro
+      - ./services/ai-learning-service/tests/e2e/tutor-stub-script.json:/stub/tutor-stub-script.json:ro
     networks:
       - codebase-network
 

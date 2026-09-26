@@ -17,7 +17,59 @@ Service chuyên trách **Adaptive Learning** cho nền tảng IELTSPath.
   finalized, pre-graded results through the mastery engine (see
   `docs/contracts/assessment-completed-v2.md`).
 
-Tutor sessions, question-level review APIs, and mistake practice are outside this phase.
+Tutor study/review sessions are now available through the endpoints below. Question notebook and mistake practice
+remain separate follow-up work.
+
+## Tutor study/review
+
+The tutor uses the learner's server-selected active path and `next_objective()`; requests never contain a path id.
+Gateway validates the external JWT and forwards an internal JWT, as it does for the other AI Learning endpoints.
+All routes below begin with `/api/ai-learning/tutor`:
+
+| Method | Route | Result |
+| --- | --- | --- |
+| `POST` | `/sessions` | Create a session on the active path (`{"title":"..."}` is optional); 409 without an active goal. |
+| `GET` | `/sessions?limit=50` | Newest unarchived sessions; `limit` is 1–100. |
+| `GET` | `/sessions/{sessionId}` | Latest 200 messages and this session's open question; 404 for another learner's session. |
+| `DELETE` | `/sessions/{sessionId}` | Archive the session; 204. |
+| `POST` | `/sessions/{sessionId}/turns` | Exactly one `message` (up to 4,000 characters) or `answer` (`questionId`, `text` up to 2,000); returns SSE. |
+
+A turn emits `turn.started`, optional `assistant.message` and `tool.called`, then `question` or `grading`, and
+`turn.completed` or `turn.failed`. The correct answer stays server-side until grading; SSE never includes an
+`expectedAnswer` field. See [the SSE contract](../../docs/contracts/tutor-sse-v1.md) for payloads and errors.
+
+Use `fetch` because browser `EventSource` cannot send the bearer `Authorization` header for this POST endpoint:
+
+```js
+const response = await fetch(`/api/ai-learning/tutor/sessions/${sessionId}/turns`, {
+  method: "POST",
+  headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+  body: JSON.stringify({ message: "Teach me this objective" }),
+});
+if (!response.ok) throw new Error(`Tutor request failed: ${response.status}`);
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let buffer = "";
+while (true) {
+  const { value, done } = await reader.read();
+  if (done) break;
+  buffer += decoder.decode(value, { stream: true });
+  let boundary;
+  while ((boundary = buffer.indexOf("\n\n")) >= 0) {
+    const block = buffer.slice(0, boundary);
+    buffer = buffer.slice(boundary + 2);
+    if (!block.startsWith(":")) handleTutorEvent(block);
+  }
+}
+```
+
+Set `AI_LEARNING_LLM_API_KEY` and the other `AI_LEARNING_LLM_*` settings described below to use a real provider.
+Without a key, a turn emits `turn.failed` with `llm_not_configured`. The model receives the study/review system
+prompt, current objective and progress, an open question for this session, the latest 20 session messages, the
+learner profile if present, and tool results. A submitted answer reaches the model; after grading, its tool result
+may also include the correct answer so the model can explain it. The prompt does not add the learner's name, email,
+user id, or bearer token. The API runs one instance: on restart it marks interrupted turns failed, and each session
+allows one running turn. If a client disconnects, the server finishes that turn; reload its result from `GET /sessions/{id}`.
 
 ## Mastery engine
 
@@ -61,6 +113,7 @@ runtime configuration; do not put them in this file or the image.
 | `2` | `V2__formal_assessment_evidence.sql` | Evidence projection and the result-version ledger |
 | `3` | `V3__pending_formal_assessment_results.sql` | Results parked until the goal's path exists |
 | `4` | `V4__mastery_path_knowledge_point_bands.sql` | Band snapshot of each knowledge point in a path |
+| `5` | `V5__tutor_sessions.sql` | Tutor sessions, turns, and learner/assistant messages |
 
 `V1` stops if the database already contains more than one path for a non-null
 `(user_id, learning_goal_id)` pair; reconcile those rows before retrying.
@@ -379,4 +432,3 @@ to Gemini.
 `AI_LEARNING_TEST_DATABASE_URL` enables the PostgreSQL integration and end-to-end
 tests, which each run in their own throwaway schema. `AI_LEARNING_TEST_AMQP_URL`
 enables the RabbitMQ tests.
-
