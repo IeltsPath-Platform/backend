@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Ordering request and validation"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 effort: "~4h"

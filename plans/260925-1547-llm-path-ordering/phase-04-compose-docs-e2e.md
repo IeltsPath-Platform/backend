@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Compose, docs and E2E"
-status: pending
+status: completed
 priority: P1
 dependencies: [1, 2, 3]
 effort: "~4h"

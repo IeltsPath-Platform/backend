@@ -1,7 +1,7 @@
 ---
 title: "Sắp xếp lộ trình bằng LLM (Gemini) trong phạm vi KP của Content"
 description: "Khi tạo path, AI Learning gọi Gemini một lần, qua đúng lớp LLM của DeepTutor, để sắp thứ tự module và KP theo goal và kết quả placement. LLM chỉ sắp xếp, không thêm, bỏ hay chuyển KP. Kết quả được kiểm tra rồi mới ghi vào DeepTutor. Engine học của DeepTutor giữ nguyên."
-status: in-progress
+status: completed
 priority: P1
 branch: "feat/ai-learning-service"
 tags: [feature, backend, ai, llm, adaptive-learning]
@@ -52,10 +52,10 @@ Bất biến giữ nguyên từ spec V2 và các plan trước:
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Gemini through DeepTutor's LLM layer](./phase-01-gemini-via-deeptutor-llm.md) | In progress |
-| 2 | [Ordering request and validation](./phase-02-ordering-request-and-validation.md) | Pending |
-| 3 | [Order the path at creation](./phase-03-order-at-path-creation.md) | Pending |
-| 4 | [Compose, docs and E2E](./phase-04-compose-docs-e2e.md) | Pending |
+| 1 | [Gemini through DeepTutor's LLM layer](./phase-01-gemini-via-deeptutor-llm.md) | Completed |
+| 2 | [Ordering request and validation](./phase-02-ordering-request-and-validation.md) | Completed |
+| 3 | [Order the path at creation](./phase-03-order-at-path-creation.md) | Completed |
+| 4 | [Compose, docs and E2E](./phase-04-compose-docs-e2e.md) | Completed |
 
 ## Dependencies
 

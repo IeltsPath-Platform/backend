@@ -46,9 +46,23 @@ from evidence that its cases were actually executed.
 
 ## Validation and next steps
 
-Documentation was prepared while implementation was in progress. Test, Docker,
-Gateway E2E, and review results are pending evidence from the implementation
-controller; no passing gate is claimed here. Update this section and synchronize
-all plan phases after those results are available. Verification reports belong in
-`plans/260925-1547-llm-path-ordering/reports/` and must omit credentials, tokens, full
-prompts, and full payloads.
+Verified on 2026-09-26 against `13dcdd8` plus `d5d3837`. The second commit keeps `*.sh` files LF, so the container
+entrypoint survives a Windows checkout with `core.autocrlf`.
+
+- Python suite with PostgreSQL and RabbitMQ: 179 passed, 0 skipped.
+- Java suite (`mvn test`): 317 tests, 0 failures, 0 skipped.
+- Gateway E2E with the OpenAI-compatible stub: all five cases passed.
+  - `reverse`: `source=llm`.
+  - `unknown_kp`: `invalid_ordering`.
+  - `slow`: `llm_timeout`, after 20 s.
+  - `error`: `llm_error`.
+  - No catalog: `llm_not_configured`.
+- Placement parked before the path still tested out. A later result updated mastery without changing the order.
+  A refresh appended the new point without calling the LLM again.
+- The container runs API and consumer as uid 10001 and writes the root-owned bind mount.
+  `deeptutor config show` masks the key.
+
+Evidence: `plans/260925-1547-llm-path-ordering/reports/e2e-verification-260926-llm-path-ordering-report.md`.
+
+Next: the team runs the real-key check from the AI Learning README. The follow-ups listed in the plan are still
+open.

@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Order the path at creation"
-status: pending
+status: completed
 priority: P1
 dependencies: [1, 2]
 effort: "~4h"
