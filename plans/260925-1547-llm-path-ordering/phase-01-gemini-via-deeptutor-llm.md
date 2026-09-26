@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Gemini through DeepTutor's LLM layer"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 effort: "~3h"
