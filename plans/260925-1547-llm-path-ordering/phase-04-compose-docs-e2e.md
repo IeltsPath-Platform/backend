@@ -14,76 +14,90 @@ effort: "~4h"
 liệu, rồi kiểm chứng E2E qua Gateway với một server giả kiểu OpenAI, để không phụ thuộc key thật. Key thật do nhóm
 tự chạy thử trên máy.
 
+## Đọc trước khi code
+| File | Để làm gì |
+| --- | --- |
+| `docker-compose.yml` (`ai-learning-api`, `ai-learning-consumer`) | Hai service dùng chung một image (`&ai-learning-build`); consumer đổi `command`. |
+| `services/ai-learning-service/Dockerfile` | Đang chạy bằng `USER appuser` (uid 10001), `WORKDIR /app`. |
+| `third_party/deeptutor/docker-compose.ghcr.yml` | DeepTutor gắn `./data:/app/data`, cấu hình provider trong catalog. |
+| `third_party/deeptutor/Dockerfile` (entrypoint, đoạn `chown -R deeptutor:deeptutor /app/data`) | Cách DeepTutor làm thư mục data ghi được. |
+| `third_party/deeptutor/deeptutor_cli/config_cmd.py` (`config show`) | Lệnh kiểm tra cấu hình LLM, che key. |
+
 ## Context
-- Compose của DeepTutor gắn `./data:/app/data`. Cấu hình provider nằm trong `data/user/settings/model_catalog.json`.
-- Entrypoint image DeepTutor `chown` `/app/data` cho user không đặc quyền, vì DeepTutor ghi vào đó: catalog đã chuẩn
-  hóa, `system.json`, `usage.sqlite3`. Image AI Learning đang chạy bằng `appuser` (uid 10001).
-- DeepTutor gọi Gemini qua endpoint tương thích OpenAI. Vì vậy server giả cho E2E là server kiểu OpenAI
-  (`/chat/completions`), không phải `generateContent`.
-- CLI `deeptutor` được cài cùng package. Lệnh `deeptutor config show` in provider, model và endpoint, và che key.
+- DeepTutor ghi vào `data/user/` khi dùng lớp LLM: catalog đã chuẩn hóa, `settings/system.json`, `usage.sqlite3`.
+  Thư mục gắn từ host phải ghi được bởi user trong container.
+- Nhóm chạy trên Windows (README dùng PowerShell) với Docker Desktop: thư mục gắn từ host ghi được với mọi uid.
+  Trên Linux thì cần `chown` như entrypoint của DeepTutor.
+- `ai-learning-api` và `ai-learning-consumer` dùng chung image. Entrypoint mới phải chạy đúng cả `CMD` mặc định
+  (uvicorn) lẫn `command` của consumer.
+- DeepTutor gọi Gemini qua endpoint tương thích OpenAI, nên server giả là server kiểu OpenAI
+  (`POST .../chat/completions`), không phải `generateContent`.
 
 ## Requirements
 - Functional:
-  - Compose, service `ai-learning-api`:
-    - `DEEPTUTOR_HOME: /app`;
-    - volume `./services/ai-learning-service/deeptutor-data:/app/data`, giống `./data:/app/data` của DeepTutor.
-    - Chưa có catalog thì DeepTutor tự tạo catalog rỗng. Lời gọi trả `llm_not_configured` và path theo thứ tự
-      Content, nên compose vẫn chạy khi chưa có key.
-  - Dockerfile AI Learning: thư mục `/app/data` phải ghi được bởi user trong container. Làm như entrypoint của
-    DeepTutor: `chown` `/app/data`, rồi chạy uvicorn bằng `appuser` (hạ quyền bằng `setpriv`). Kiểm chứng rằng sau
-    khi container chạy, máy host vẫn sửa được file catalog.
-  - `ai-learning-consumer` **không** gắn thư mục này và không có `DEEPTUTOR_HOME`.
-  - Server giả `llm-stub` trong compose, chỉ bật khi dùng profile `llm-stub`:
-    - Server kiểu OpenAI. Nó đọc payload, rồi đảo ngược thứ tự module và KP.
-    - Có chế độ trả KP lạ, chế độ chậm hơn timeout, và chế độ trả 500.
-    - Catalog dùng cho E2E có profile `gemini` với `base_url` trỏ tới server giả.
+  - Dockerfile:
+    - `ENV DEEPTUTOR_HOME=/app`; tạo sẵn `/app/data` thuộc `appuser`.
+    - Thêm `services/ai-learning-service/docker-entrypoint.sh`, chạy bằng root:
+      `chown -R appuser:appuser /app/data 2>/dev/null || true`, rồi
+      `exec setpriv --reuid=appuser --regid=appuser --init-groups "$@"`. Bỏ `USER appuser`, thêm
+      `ENTRYPOINT ["/app/docker-entrypoint.sh"]`, giữ `CMD` uvicorn. Kiểm tra `setpriv` có trong `python:3.11-slim`;
+      nếu không có thì cài `util-linux` hoặc dùng `gosu`.
+    - Kiểm chứng: process uvicorn và consumer đều chạy bằng uid 10001 (`docker compose exec ... id`).
+  - Compose:
+    - `ai-learning-api` thêm volume `./services/ai-learning-service/deeptutor-data:/app/data`, giống `./data:/app/data`
+      của DeepTutor. Không thêm biến môi trường nào cho key hay model.
+    - Chưa có catalog: DeepTutor tự tạo catalog rỗng, lời gọi trả `llm_not_configured`, path theo thứ tự Content.
+      Compose vẫn chạy khi chưa có key.
+    - `ai-learning-consumer` **không** gắn thư mục này.
+    - Service `llm-stub`, chỉ bật khi dùng `--profile llm-stub`:
+      - image `python:3.11-slim`, chạy `services/ai-learning-service/tests/e2e/llm_stub.py` (gắn bằng volume),
+        cổng nội bộ 8090, trong `codebase-network`;
+      - server kiểu OpenAI: đọc payload trong message `user`, trả `{"modules": [...], "rationale": "..."}`;
+      - chế độ qua biến `LLM_STUB_MODE`: `reverse` (đảo thứ tự module và KP, mặc định), `unknown_kp` (thêm một KP
+        lạ), `slow` (ngủ 30 giây, lâu hơn timeout 20 giây), `error` (trả 500).
+    - Commit catalog cho E2E: `services/ai-learning-service/tests/e2e/model_catalog.stub.json`, profile `gemini`, key
+      giả `stub-key`, `base_url: http://llm-stub:8090/v1beta/openai/`.
   - README AI Learning, mục "LLM path ordering":
-    - Dữ liệu nào được gửi và không được gửi.
-    - Key nằm ở đâu:
-      - file catalog trong thư mục bị git-ignore;
-      - DeepTutor ghi file với quyền `0600`.
-    - Cách cấu hình:
-      1. Chép `model_catalog.example.json` vào `deeptutor-data/user/settings/model_catalog.json`.
-      2. Điền key và model Gemini.
-      3. Khởi động lại container API, vì DeepTutor cache cấu hình.
-      4. Kiểm tra bằng `deeptutor config show`.
-    - Hành vi khi lỗi: bảng các `reason` và thứ tự Content.
-    - Cách tắt: bỏ profile LLM khỏi catalog, hoặc không gắn catalog.
-    - Sổ token của DeepTutor nằm ở `deeptutor-data/user/usage.sqlite3`.
-  - README root:
-    - Ghi đường dẫn catalog và bước cấu hình Gemini (không ghi key).
-    - Không thêm biến môi trường nào cho key.
-    - Nêu rõ môi trường test Python cần dependency của DeepTutor.
-  - Postman:
-    - Thêm kiểm tra thứ tự module trả về khi có server giả.
-    - Thêm một kịch bản catalog chưa cấu hình LLM.
+    - Dữ liệu nào được gửi và không được gửi (theo pha 2).
+    - Key nằm ở đâu: `deeptutor-data/user/settings/model_catalog.json`, bị git-ignore; DeepTutor ghi với quyền `0600`.
+    - Cách cấu hình (PowerShell):
+      1. Tạo `deeptutor-data/user/settings/`, chép `model_catalog.example.json` vào đó với tên `model_catalog.json`.
+      2. Điền key và model Gemini, để `base_url` trống.
+      3. `docker compose restart ai-learning-api` (DeepTutor cache cấu hình).
+      4. `docker compose exec ai-learning-api deeptutor config show` → provider `gemini`, key hiện `***`.
+    - Hành vi khi lỗi: bảng các `reason` (pha 1 và 3) và thứ tự Content.
+    - Cách tắt: xóa profile trong service `llm` của catalog, hoặc xóa file catalog, rồi restart.
+    - Sổ token của DeepTutor: `deeptutor-data/user/usage.sqlite3`.
+  - README root: mục chạy local ghi bước cấu hình Gemini (đường dẫn catalog, không ghi key) và `requirements-test.txt`.
 - Non-functional:
   - Không commit key hay file catalog thật. Report không chứa key hay nội dung prompt đầy đủ.
 
 ## Implementation Steps
-1. Chạy E2E qua Gateway, 2 learner, catalog trỏ tới `llm-stub`:
-   - Learner có placement:
-     - thứ tự path khác thứ tự Content, đúng theo server giả;
-     - test-out vẫn đúng;
-     - `/status` theo thứ tự mới.
-   - Server giả trả KP lạ → path theo thứ tự Content; event có `source=content`, lý do `invalid_ordering`.
-   - Server giả chậm hơn timeout → path vẫn được tạo, theo thứ tự Content, lý do `llm_timeout`.
-   - Catalog rỗng → path theo thứ tự Content, lý do `llm_not_configured`.
+1. Chạy E2E qua Gateway, 2 learner, `--profile llm-stub`, chép `model_catalog.stub.json` vào `deeptutor-data`:
+   - `reverse`, learner có placement:
+     - thứ tự module trong `/map` ngược với thứ tự Content; `/status` theo thứ tự mới;
+     - test-out vẫn đúng; event `path.ordered` có `source=llm`.
+   - `unknown_kp` → path theo thứ tự Content; event `source=content`, reason `invalid_ordering`,
+     detail `unknown_knowledge_point`.
+   - `slow` → path vẫn được tạo sau khoảng 20 giây, thứ tự Content, reason `llm_timeout`.
+   - `error` → thứ tự Content, reason `llm_error`.
+   - Xóa catalog, restart → thứ tự Content, reason `llm_not_configured`.
+   - Mỗi kịch bản dùng một learner/goal mới, vì LLM chỉ được gọi khi tạo path.
 2. Chạy lại toàn bộ gate Java và Python: 0 fail, 0 skip.
-3. Ghi report vào `reports/`.
-4. Viết hướng dẫn để nhóm chạy thử với key Gemini thật:
-   - Điền catalog, để `base_url` trống.
-   - Khởi động lại API, rồi chạy `deeptutor config show`.
-   - Tạo path, rồi xem event `path.ordered` có `source=llm`.
+3. Ghi report vào `plans/260925-1547-llm-path-ordering/reports/`, không có key, token hay nội dung prompt đầy đủ.
+4. Viết hướng dẫn để nhóm chạy thử với key Gemini thật (trong README): điền catalog, restart, `deeptutor config show`,
+   tạo path, xem event `path.ordered` có `source=llm`.
 
 ## Success Criteria
 - [ ] Compose chạy được cả khi có và khi không có catalog.
-- [ ] Container API ghi được `/app/data`; máy host vẫn sửa được catalog.
-- [ ] E2E với server giả đạt 4 kịch bản trên.
+- [ ] Container API ghi được `/app/data`; API và consumer chạy bằng `appuser`.
+- [ ] E2E với server giả đạt 5 kịch bản trên.
 - [ ] Tài liệu ghi rõ dữ liệu gửi ra ngoài, key nằm ở đâu, và cách tắt tính năng.
 
 ## Risk Assessment
-- **Quyền ghi thư mục gắn từ host khác nhau giữa Linux và Docker Desktop:** kiểm chứng trên Linux trong E2E, và ghi
-  cách xử lý vào README.
-- **Catalog của DeepTutor sau này dùng chung cho Tutor:** đúng chủ đích, vì Tutor runtime cũng đọc catalog này. Muốn
-  tắt riêng việc sắp xếp thì cần một cờ mới. Chưa làm.
+- **Quyền ghi thư mục gắn từ host khác nhau giữa Linux và Docker Desktop:** entrypoint `chown` như DeepTutor; kiểm
+  chứng trên Linux trong E2E.
+- **`deeptutor config show` cần thêm cấu hình khác của DeepTutor và báo lỗi:** nếu vậy, README dùng event
+  `path.ordered` để kiểm tra thay cho lệnh này.
+- **Catalog của DeepTutor sau này dùng chung cho Tutor:** đúng chủ đích. Muốn tắt riêng việc sắp xếp thì cần một cờ
+  mới; chưa làm.
