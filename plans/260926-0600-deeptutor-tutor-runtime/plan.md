@@ -1,7 +1,8 @@
 ---
 title: "Tích hợp Tutor runtime của DeepTutor vào AI Learning"
 description: "Chạy nguyên Tutor của DeepTutor (mastery loop study/review/outline, sinh câu hỏi, sổ câu hỏi, reading, memory, notebook) bên trong ai-learning-service. Lưu trữ đổi sang PostgreSQL qua adapter; học viên kết nối bằng WebSocket qua Gateway; ghi chú đi vào notes của learning-support-service. Không RAG, không sửa submodule."
-status: pending
+status: superseded
+supersededBy: "260926-2152-own-mastery-engine-and-tutor"
 priority: P1
 branch: "feat/ai-learning-service"
 tags: [feature, backend, ai, deeptutor, tutor, websocket]
@@ -13,6 +14,8 @@ source: conversation
 ---
 
 # Tích hợp Tutor runtime của DeepTutor vào AI Learning
+
+> **Superseded (2026-09-26).** Không làm theo plan này. Yêu cầu mới: service không import và không phụ thuộc DeepTutor lúc chạy. Xem [260926-2152-own-mastery-engine-and-tutor](../260926-2152-own-mastery-engine-and-tutor/plan.md).
 
 ## Overview
 
