@@ -64,7 +64,9 @@ tự chạy thử trên máy.
       1. Tạo `deeptutor-data/user/settings/`, chép `model_catalog.example.json` vào đó với tên `model_catalog.json`.
       2. Điền key và model Gemini, để `base_url` trống.
       3. `docker compose restart ai-learning-api` (DeepTutor cache cấu hình).
-      4. `docker compose exec ai-learning-api deeptutor config show` → provider `gemini`, key hiện `***`.
+      4. `docker compose exec -u appuser ai-learning-api deeptutor config show` → provider `gemini`, key hiện `***`.
+         Phải có `-u appuser`: chạy bằng root làm DeepTutor ghi catalog thành file của root, API không đọc được
+         và ghi đè bằng catalog rỗng (phát hiện khi nhóm chạy thử key thật, 2026-09-26).
     - Hành vi khi lỗi: bảng các `reason` (pha 1 và 3) và thứ tự Content.
     - Cách tắt: xóa profile trong service `llm` của catalog, hoặc xóa file catalog, rồi restart.
     - Sổ token của DeepTutor: `deeptutor-data/user/usage.sqlite3`.

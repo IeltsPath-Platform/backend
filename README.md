@@ -270,8 +270,14 @@ trống, rồi chạy:
 
 ```powershell
 docker compose restart ai-learning-api
-docker compose exec ai-learning-api deeptutor config show
+docker compose exec -u appuser ai-learning-api deeptutor config show
 ```
+
+Luôn chạy lệnh DeepTutor trong container bằng `-u appuser`. `docker compose exec`
+mặc định chạy bằng root. Khi đó DeepTutor ghi lại catalog thành file của root với quyền
+`0600`, API (uid 10001) không đọc được, nên coi catalog là rỗng và ghi đè nó: key và
+model mất khỏi file, path báo `llm_not_configured`. Nếu đã lỡ chạy bằng root, xóa
+catalog, tạo lại, rồi restart `ai-learning-api`.
 
 Kiểm tra `llm.provider` là `gemini`, model đúng cấu hình và `llm.api_key` hiển thị
 `***`. Không cấu hình hoặc LLM lỗi thì vẫn tạo path theo thứ tự Content. Thứ tự đã

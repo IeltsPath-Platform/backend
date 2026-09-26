@@ -80,4 +80,9 @@ Log API có đúng một dòng `warning` cho mỗi lần LLM không dùng đư�
   (run `b22a04b4`) pass cả 5 kịch bản.
 - **Điều Gateway nên biết (có từ trước, ngoài phạm vi plan):** sau khi restart một service phía sau, request đầu
   tiên qua Gateway có thể nhận 500 một lần.
+- **Lỗi phát hiện sau report này (2026-09-26):** `docker compose exec` mặc định chạy bằng root. Nếu
+  `deeptutor config show` chạy bằng root **trước** lần đầu API đọc catalog, DeepTutor ghi lại catalog thành file
+  của root (`0600`). API (uid 10001) không đọc được, coi catalog là rỗng và ghi đè nó; path nhận
+  `llm_not_configured`. Đã tái hiện ngoài container. Trong E2E ở trên, lệnh này chạy sau các kịch bản nên không
+  lộ ra. README giờ dùng `docker compose exec -u appuser`.
 - **Chưa kiểm chứng:** gọi Gemini thật. Nhóm tự làm theo mục "LLM path ordering" trong README AI Learning.

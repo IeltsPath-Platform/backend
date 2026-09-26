@@ -210,8 +210,16 @@ DeepTutor caches configuration for the process lifetime. After any catalog chang
 
 ```powershell
 docker compose restart ai-learning-api
-docker compose exec ai-learning-api deeptutor config show
+docker compose exec -u appuser ai-learning-api deeptutor config show
 ```
+
+Always run DeepTutor commands in the container as `appuser` (`-u appuser`). A plain
+`docker compose exec` runs as root. DeepTutor rewrites the catalog as a root-owned
+`0600` file, which the API process (uid 10001) cannot read. The API then treats the
+catalog as empty, overwrites it with an empty catalog, and reports
+`llm_not_configured`: the key and model are lost from the file. If that happened,
+delete the catalog and create it again as described above. Then restart
+`ai-learning-api`: the entrypoint gives `/app/data` back to `appuser` on start.
 
 Check `llm.provider` is `gemini`, `llm.model` matches the chosen model, and
 `llm.api_key` is `***`. Use only those fields when recording configuration evidence;
