@@ -121,6 +121,8 @@ services:
       context: .
       dockerfile: services/ai-learning-service/Dockerfile
     container_name: ai-learning-api
+    volumes:
+      - ./services/ai-learning-service/deeptutor-data:/app/data
     environment:
       # Must equal the Gateway's value: the API validates the Gateway-signed internal JWT.
       AI_LEARNING_INTERNAL_JWT_SECRET: "${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}"
@@ -155,6 +157,18 @@ services:
         condition: service_healthy
       ai-learning-migrate:
         condition: service_completed_successfully
+
+  llm-stub:
+    profiles: ["llm-stub"]
+    image: python:3.11-slim
+    command: ["python", "/stub/llm_stub.py"]
+    environment:
+      LLM_STUB_MODE: ${LLM_STUB_MODE:-reverse}
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - ./services/ai-learning-service/tests/e2e/llm_stub.py:/stub/llm_stub.py:ro
+    networks:
+      - codebase-network
 
   game-service:
     build:

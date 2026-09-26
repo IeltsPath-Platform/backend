@@ -12,6 +12,7 @@ from deeptutor.learning.service import LearningService
 from app.adapters.curriculum_adapter import CurriculumAdapter
 from app.adapters.curriculum_scope import CurriculumScope, KnowledgePointBand, ScopedCurriculum, target_band_of
 from app.application.formal_result_applier import FormalResultApplier
+from app.application.path_orderer import OrderingOutcome, PathOrderer
 from app.clients.content_service import ContentServiceClient
 from app.application.curriculum_refresh import merge_curriculum, same_structure
 from app.learning.override_provenance import RETIRED_NOTE, is_retired_override, with_placement_provenance
@@ -38,6 +39,7 @@ class PathService:
         user_client: UserServiceClient | None = None,
         content_client: ContentServiceClient | None = None,
         applier: FormalResultApplier | None = None,
+        orderer: PathOrderer | None = None,
     ) -> None:
         # The Assessment consumer only uses ensure_path on existing paths, so it
         # builds this service without the learner-facing HTTP clients.
@@ -47,6 +49,7 @@ class PathService:
         self._content = content_client
         # Every path creation drains the parked results of its goal.
         self._applier = applier or FormalResultApplier(store)
+        self._orderer = orderer
 
     async def _active_goal(self, bearer_token: str) -> dict[str, Any]:
         try:
@@ -114,13 +117,18 @@ class PathService:
         self, user_id: UUID, goal: dict[str, Any], bearer_token: str
     ) -> tuple[str, Any, int]:
         modules, scoped, target_band = await self._scoped_curriculum(goal, bearer_token)
+        ordering = None
+        if self._orderer is not None:
+            ordering = await self._orderer.order(user_id, goal, modules, scoped)
+            modules = ordering.modules
         scope = {
             "target_band": str(target_band),
             "included": len(scoped.knowledge_points),
             "excluded": scoped.excluded_count,
         }
         path_id, progress = await run_in_threadpool(
-            lambda: self.ensure_path(user_id, goal["id"], modules, bands=scoped.bands, scope=scope)
+            lambda: self.ensure_path(user_id, goal["id"], modules, bands=scoped.bands, scope=scope,
+                                     ordering=ordering)
         )
         return path_id, progress, sum(len(module.knowledge_points) for module in modules)
 
@@ -132,6 +140,7 @@ class PathService:
         *,
         bands: dict[str, KnowledgePointBand] | None = None,
         scope: dict[str, Any] | None = None,
+        ordering: OrderingOutcome | None = None,
     ) -> tuple[str, Any]:
         """Return the single path of ``(user_id, learning_goal_id)``, creating it at most once.
 
@@ -147,7 +156,7 @@ class PathService:
         path_id = str(uuid4())
         try:
             return path_id, self._create_path(
-                path_id, user_id, str(learning_goal_id), modules, bands=bands, scope=scope
+                path_id, user_id, str(learning_goal_id), modules, bands=bands, scope=scope, ordering=ordering
             )
         except UniqueViolation as exc:
             # Two callers can pass the lookup together. The partial unique index
@@ -205,6 +214,7 @@ class PathService:
         *,
         bands: dict[str, KnowledgePointBand] | None = None,
         scope: dict[str, Any] | None = None,
+        ordering: OrderingOutcome | None = None,
     ) -> Any:
         with self._store.transaction(
             path_id,
@@ -219,6 +229,15 @@ class PathService:
                 self._store.replace_knowledge_point_bands(path_id, bands)
             if scope is not None:
                 tx.emit("path.scope_applied", scope)
+            if ordering is not None:
+                tx.emit("path.ordered", {
+                    "source": ordering.source, "reason": ordering.reason, "detail": ordering.detail,
+                    "model": ordering.model, "rationale": ordering.rationale,
+                    "module_count": len(modules),
+                    "knowledge_point_count": sum(len(module.knowledge_points) for module in modules),
+                })
+                if ordering.learner_profile:
+                    self._learning.record_learner_profile(path_id, fields=ordering.learner_profile)
             # Joins this transaction: path, curriculum and parked results commit as one revision.
             self._applier.apply_pending(path_id, str(user_id), goal_id)
             return tx.progress

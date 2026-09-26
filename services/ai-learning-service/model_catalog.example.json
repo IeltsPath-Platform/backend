@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "services": {
+    "llm": {
+      "active_profile_id": "llm-profile-gemini",
+      "active_model_id": "llm-model-gemini",
+      "profiles": [
+        {
+          "id": "llm-profile-gemini",
+          "name": "Gemini",
+          "binding": "gemini",
+          "base_url": "",
+          "api_key": "REPLACE_WITH_GEMINI_API_KEY",
+          "api_version": "",
+          "extra_headers": {},
+          "models": [
+            {"id": "llm-model-gemini", "name": "Gemini Flash", "model": "gemini-2.5-flash"}
+          ]
+        }
+      ]
+    }
+  }
+}

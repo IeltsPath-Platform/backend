@@ -45,6 +45,7 @@ context
 payload.json
 
 .env
+services/ai-learning-service/deeptutor-data/
 .codex-tmp/
 .m2-test-repository/
 

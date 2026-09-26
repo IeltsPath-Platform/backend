@@ -1,7 +1,7 @@
 ---
 title: "Sắp xếp lộ trình bằng LLM (Gemini) trong phạm vi KP của Content"
 description: "Khi tạo path, AI Learning gọi Gemini một lần, qua đúng lớp LLM của DeepTutor, để sắp thứ tự module và KP theo goal và kết quả placement. LLM chỉ sắp xếp, không thêm, bỏ hay chuyển KP. Kết quả được kiểm tra rồi mới ghi vào DeepTutor. Engine học của DeepTutor giữ nguyên."
-status: pending
+status: in-progress
 priority: P1
 branch: "feat/ai-learning-service"
 tags: [feature, backend, ai, llm, adaptive-learning]
@@ -52,12 +52,16 @@ Bất biến giữ nguyên từ spec V2 và các plan trước:
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Gemini through DeepTutor's LLM layer](./phase-01-gemini-via-deeptutor-llm.md) | Pending |
+| 1 | [Gemini through DeepTutor's LLM layer](./phase-01-gemini-via-deeptutor-llm.md) | In progress |
 | 2 | [Ordering request and validation](./phase-02-ordering-request-and-validation.md) | Pending |
 | 3 | [Order the path at creation](./phase-03-order-at-path-creation.md) | Pending |
 | 4 | [Compose, docs and E2E](./phase-04-compose-docs-e2e.md) | Pending |
 
 ## Dependencies
+
+Implementation clarification (2026-09-26): the user confirmed that refresh must preserve the existing
+module/KP order and append new points to their module. `curriculum_refresh.py` and its tests are therefore
+included in phase 3; refreshed Content metadata and retirement/restoration still apply.
 
 - Cần plan `260925-0425-goal-scoped-curriculum-and-placement-test-out` (PR #10) đã merge: kho KP đã lọc theo band,
   bảng band theo path, và `overall_band` trong event.

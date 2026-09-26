@@ -2,10 +2,10 @@
 
 DeepTutor's ``replace_modules`` deletes the mastery, evidence, attempts and
 overrides of every knowledge point missing from the new module set. A refresh
-therefore only ever adds: every point already in the path is kept. Points of
-the fresh curriculum come first, in Content order; a kept point whose topic
-is still in the curriculum stays in that module after its fresh points, and a
-module that left the curriculum keeps its points at the end of the path.
+therefore only ever adds: every point already in the path is kept. Existing
+module and point order stays fixed; new points join the end of their module,
+and new modules join the end of the path. Content still owns names, types and
+topic membership, so a moved point joins the end of its new module.
 """
 
 from __future__ import annotations
@@ -36,24 +36,41 @@ def same_structure(left: list[Any], right: list[Any]) -> bool:
 
 
 def merge_curriculum(current: list[LearningModule], fresh: list[LearningModule]) -> CurriculumMerge:
-    fresh_ids = {kp.id for module in fresh for kp in module.knowledge_points}
+    fresh_points = {kp.id: (module.id, kp) for module in fresh for kp in module.knowledge_points}
+    fresh_modules = {module.id: module for module in fresh}
     current_ids = {kp.id for module in current for kp in module.knowledge_points}
-
-    merged = [module.model_copy(deep=True) for module in fresh]
-    by_id = {module.id: module for module in merged}
+    merged = []
+    by_id = {}
+    placed: set[str] = set()
     missing: list[str] = []
     for module in sorted(current, key=lambda m: m.order):
-        kept = [kp for kp in module.knowledge_points if kp.id not in fresh_ids]
-        if not kept:
-            continue
-        missing.extend(kp.id for kp in kept)
-        if module.id in by_id:
-            by_id[module.id].knowledge_points.extend(kp.model_copy(deep=True) for kp in kept)
-        else:
-            leftover = module.model_copy(deep=True)
-            leftover.knowledge_points = [kp.model_copy(deep=True) for kp in kept]
-            merged.append(leftover)
-            by_id[leftover.id] = leftover
+        copied = fresh_modules.get(module.id, module).model_copy(deep=True)
+        copied.knowledge_points = []
+        for point in module.knowledge_points:
+            latest = fresh_points.get(point.id)
+            if latest is None:
+                missing.append(point.id)
+                updated = point
+            elif latest[0] == module.id:
+                updated = latest[1]
+            else:
+                # Content moved this point; append it to its destination below.
+                continue
+            copied.knowledge_points.append(updated.model_copy(deep=True))
+            placed.add(point.id)
+        merged.append(copied)
+        by_id[copied.id] = copied
+    for module in fresh:
+        if module.id not in by_id:
+            copied = module.model_copy(deep=True)
+            copied.knowledge_points = []
+            merged.append(copied)
+            by_id[copied.id] = copied
+        destination = by_id[module.id]
+        for point in module.knowledge_points:
+            if point.id not in placed:
+                destination.knowledge_points.append(point.model_copy(deep=True))
+                placed.add(point.id)
     for order, module in enumerate(merged):
         module.order = order
         for kp in module.knowledge_points:

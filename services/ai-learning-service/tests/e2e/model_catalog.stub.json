@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "services": {
+    "llm": {
+      "active_profile_id": "llm-profile-gemini",
+      "active_model_id": "llm-model-gemini",
+      "profiles": [
+        {
+          "id": "llm-profile-gemini",
+          "name": "Local ordering stub",
+          "binding": "gemini",
+          "base_url": "http://llm-stub:8090/v1beta/openai/",
+          "api_key": "stub-key",
+          "api_version": "",
+          "extra_headers": {},
+          "models": [
+            {"id": "llm-model-gemini", "name": "Stub model", "model": "gemini-2.5-flash"}
+          ]
+        }
+      ]
+    }
+  }
+}

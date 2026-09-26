@@ -10,6 +10,8 @@ from uuid import UUID
 from app.adapters.curriculum_adapter import CurriculumContractError
 from app.adapters.curriculum_scope import NoCurriculumInScope
 from app.application.path_service import ActiveGoalRequired, PathNotFound, PathService
+from app.application.path_orderer import PathOrderer
+from app.learning.deeptutor_llm import DeepTutorOrderingLlm
 from app.api.dto.responses import (
     LearningPathMapResponse,
     LearningProgressResponse,
@@ -24,10 +26,12 @@ from app.security.internal_jwt import AuthenticatedUser, bearer_scheme, require_
 
 
 def get_path_service(settings: Settings = Depends(get_settings)) -> PathService:
+    store = PostgresLearningStore(settings.database_url.get_secret_value())
     return PathService(
-        PostgresLearningStore(settings.database_url.get_secret_value()),
+        store,
         UserServiceClient(settings.user_service_base_url),
         ContentServiceClient(settings.content_service_base_url),
+        orderer=PathOrderer(store, DeepTutorOrderingLlm()),
     )
 
 app = FastAPI(

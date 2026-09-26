@@ -355,6 +355,19 @@ class PostgresLearningStore:
                     )
                     return True
 
+    def pending_formal_payloads(self, user_id: UUID | str, goal_id: UUID | str) -> list[dict]:
+        """Read a goal's parked results without retaining a connection or locking its rows."""
+        with closing(psycopg2.connect(self._database_url)) as connection:
+            with connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """SELECT payload FROM pending_formal_assessment_results
+                           WHERE user_id = %s AND learning_goal_id = %s
+                           ORDER BY attempt_id, result_version""",
+                        (str(user_id), str(goal_id)),
+                    )
+                    return [row[0] for row in cursor.fetchall()]
+
     def pending_formal_results(
         self, path_id: str, user_id: UUID | str, learning_goal_id: UUID | str
     ) -> list[tuple[str, Any]]:

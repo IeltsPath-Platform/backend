@@ -129,16 +129,64 @@ class PathRefreshTest(unittest.TestCase):
         self.assertEqual(mastery_source(progress, self.kp(KP_1)), "")
         self.assertEqual(next_objective(progress).knowledge_point_id, KP_1)
 
-    def test_a_topic_that_left_keeps_its_points_at_the_end_of_the_path(self):
+    def test_a_topic_that_left_keeps_its_points_in_their_original_position(self):
         self.content.topics = [self.content.topics[1]]
         self.content.points = [self.content.points[1], EditableContent.point(KP_NEW, TOPIC_B)]
 
         _, progress, added = self.refresh()
 
         self.assertEqual(added, 1)
-        self.assertEqual([m.id for m in progress.modules], [TOPIC_B, TOPIC_A])
-        self.assertEqual(kp_ids(progress), [KP_2, KP_NEW, KP_1])
+        self.assertEqual([m.id for m in progress.modules], [TOPIC_A, TOPIC_B])
+        self.assertEqual(kp_ids(progress), [KP_1, KP_2, KP_NEW])
         self.assertEqual([m.order for m in progress.modules], [0, 1])
+
+    def test_content_reordering_does_not_change_the_existing_path_order(self):
+        self.content.topics.reverse()
+        revision = self.progress().version
+
+        _, progress, added = self.refresh()
+
+        self.assertEqual([module.id for module in progress.modules], [TOPIC_A, TOPIC_B])
+        self.assertEqual([module.order for module in progress.modules], [0, 1])
+        self.assertEqual(kp_ids(progress), [KP_1, KP_2])
+        self.assertEqual((added, progress.version), (0, revision))
+
+    def test_new_points_append_even_when_their_content_creation_date_sorts_first(self):
+        self.content.points[0]["createdAt"] = "2026-09-26"
+        new_point = EditableContent.point(KP_NEW, TOPIC_A)
+        new_point["createdAt"] = "2020-01-01"
+        self.content.points.insert(0, new_point)
+
+        _, progress, added = self.refresh()
+
+        self.assertEqual(added, 1)
+        self.assertEqual(kp_ids(progress), [KP_1, KP_NEW, KP_2])
+
+    def test_new_modules_append_even_when_content_puts_them_first(self):
+        new_topic = str(uuid4())
+        self.content.topics.insert(0, {"id": new_topic, "name": "New topic", "sortOrder": -1})
+        self.content.points.insert(0, EditableContent.point(KP_NEW, new_topic))
+
+        _, progress, added = self.refresh()
+
+        self.assertEqual(added, 1)
+        self.assertEqual([module.id for module in progress.modules], [TOPIC_A, TOPIC_B, new_topic])
+        self.assertEqual([module.order for module in progress.modules], [0, 1, 2])
+        self.assertEqual(kp_ids(progress), [KP_1, KP_2, KP_NEW])
+
+    def test_a_point_moved_by_content_appends_to_its_new_module_and_keeps_its_history(self):
+        self.record(KP_1)
+        mastery = self.progress().mastery_levels[KP_1]
+        self.content.points[0]["topicId"] = TOPIC_B
+
+        _, progress, added = self.refresh()
+
+        self.assertEqual(added, 0)
+        self.assertEqual([point.id for point in progress.modules[0].knowledge_points], [])
+        self.assertEqual([point.id for point in progress.modules[1].knowledge_points], [KP_2, KP_1])
+        self.assertEqual(progress.modules[1].knowledge_points[1].module_id, TOPIC_B)
+        self.assertEqual(progress.mastery_levels[KP_1], mastery)
+        self.assertEqual([attempt.knowledge_point_id for attempt in progress.quiz_attempts], [KP_1])
 
     def test_a_refresh_is_one_revision_with_a_scope_refreshed_event(self):
         revision = self.progress().version

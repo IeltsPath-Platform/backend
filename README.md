@@ -259,6 +259,44 @@ Nếu mật khẩu có ký tự đặc biệt, hãy percent-encode hoặc chọn
 
 Container AI Learning gọi User (`8085`) và Content (`8082`) trên host qua `host.docker.internal`, và chuyển tiếp thẳng internal JWT của learner. Trên Windows, firewall có thể chặn đường này: cho Java đi qua firewall (mạng private), hoặc chạy API bằng `uvicorn` trên host.
 
+**Sắp xếp path bằng Gemini (tùy chọn):**
+
+AI Learning gọi Gemini qua lớp LLM của DeepTutor khi tạo path cho goal mới. Cấu hình
+nằm ở `services/ai-learning-service/deeptutor-data/user/settings/model_catalog.json`,
+được git-ignore và chỉ gắn vào container API. Tạo file này từ
+`services/ai-learning-service/model_catalog.example.json` nếu chưa có catalog;
+không ghi đè catalog hiện có. Điền key/model trong file riêng này, giữ `base_url`
+trống, rồi chạy:
+
+```powershell
+docker compose restart ai-learning-api
+docker compose exec ai-learning-api deeptutor config show
+```
+
+Kiểm tra `llm.provider` là `gemini`, model đúng cấu hình và `llm.api_key` hiển thị
+`***`. Không cấu hình hoặc LLM lỗi thì vẫn tạo path theo thứ tự Content. Thứ tự đã
+lưu được giữ nguyên khi nhận kết quả thi hoặc refresh; KP mới được thêm cuối module.
+Xem [LLM path ordering](services/ai-learning-service/README.md#llm-path-ordering)
+để biết dữ liệu gửi ra ngoài, cách cấu hình không ghi đè file, tắt tính năng, bảng
+lý do fallback và năm kịch bản E2E bằng stub không cần key thật.
+
+**Chạy test Python AI Learning:**
+
+Từ thư mục gốc, dùng virtual environment Python của dự án:
+
+```powershell
+Set-Location services/ai-learning-service
+python -m pip install pytest -r requirements-test.txt
+$env:PYTHONPATH = "../../third_party/deeptutor;."
+$env:PYTHONDONTWRITEBYTECODE = "1"
+python -m pytest tests
+Set-Location ../..
+```
+
+Đặt `AI_LEARNING_TEST_DATABASE_URL` và `AI_LEARNING_TEST_AMQP_URL` tới PostgreSQL
+và RabbitMQ local dành cho test để chạy đủ integration suite; thiếu chúng thì các
+case tương ứng bị skip. Test LLM dùng catalog tạm và server giả, không gọi Gemini.
+
 **Tài khoản có quyền (chỉ dev, chỉ trên DB local):**
 
 1. Đăng ký tài khoản qua `POST /api/users/register`. Mọi tài khoản mới đều nhận role `CUSTOMER`.

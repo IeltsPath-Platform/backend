@@ -190,6 +190,13 @@ class InMemoryLearningStore:
             })
             return True
 
+    def pending_formal_payloads(self, user_id, goal_id):
+        with self._lock:
+            rows = [row for row in self.pending.values()
+                    if row["user_id"] == str(user_id) and row["learning_goal_id"] == str(goal_id)]
+            rows.sort(key=lambda row: (row["attempt_id"], row["result_version"]))
+            return [json.loads(json.dumps(row["payload"])) for row in rows]
+
     def pending_formal_results(self, path_id, user_id, learning_goal_id):
         self._active(path_id)
         rows = [(event_id, row) for event_id, row in self.pending.items()
