@@ -11,6 +11,8 @@ are not ported. No request or response text is ever logged.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+import json
 from typing import Any
 
 import httpx
@@ -90,19 +92,47 @@ class ChatCompletionsClient:
         max_tokens: int = 8192,
         reasoning_effort: str | None = None,
     ) -> str:
+        message = await self._post(
+            [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
+            response_format=response_format, temperature=temperature, max_tokens=max_tokens,
+            reasoning_effort=reasoning_effort,
+        )
+        return message.get("content") or ""
+
+    async def chat(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]] | None = None,
+        temperature: float = 0.3,
+        max_tokens: int = 4096,
+        reasoning_effort: str | None = None,
+    ) -> "ChatReply":
+        """One chat round with optional function tools; returns the text and any tool calls."""
+        message = await self._post(messages, tools=tools, temperature=temperature, max_tokens=max_tokens,
+                                   reasoning_effort=reasoning_effort)
+        calls = []
+        for raw in message.get("tool_calls") or []:
+            function = raw.get("function") or {}
+            try:
+                arguments = json.loads(function.get("arguments") or "{}")
+            except (TypeError, ValueError):
+                arguments = None
+            calls.append(ToolCall(str(raw.get("id") or ""), str(function.get("name") or ""),
+                                  arguments if isinstance(arguments, dict) else None, raw))
+        return ChatReply(message.get("content") or "", tuple(calls))
+
+    async def _post(self, messages: list[dict[str, Any]], *, tools: list[dict[str, Any]] | None = None,
+                    response_format: dict[str, Any] | None = None, temperature: float,
+                    max_tokens: int, reasoning_effort: str | None) -> dict[str, Any]:
         requested_effort = reasoning_effort or self._settings.reasoning_effort
-        body: dict[str, Any] = {
-            "model": self._settings.model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt},
-            ],
-            "max_tokens": max_tokens,
-        }
+        body: dict[str, Any] = {"model": self._settings.model, "messages": messages, "max_tokens": max_tokens}
         if supports_temperature(self._settings.model, requested_effort):
             body["temperature"] = temperature
         if response_format is not None:
             body["response_format"] = response_format
+        if tools:
+            body["tools"] = tools
         effort = resolve_reasoning_effort(self._settings.model, requested_effort)
         if effort is not None:
             body["reasoning_effort"] = effort
@@ -117,10 +147,32 @@ class ChatCompletionsClient:
         if response.status_code >= 400:
             raise LlmApiError(response.status_code)
         try:
-            content = response.json()["choices"][0]["message"].get("content")
+            message = response.json()["choices"][0]["message"]
         except (ValueError, KeyError, IndexError, TypeError, AttributeError):
             raise LlmApiError(response.status_code) from None
-        return content or ""
+        if not isinstance(message, dict):
+            raise LlmApiError(response.status_code)
+        return message
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    """A function call the model asked for. ``arguments`` is ``None`` when they were not a JSON object.
+
+    ``raw`` is the provider's own tool-call object; it is echoed back unchanged on the next round because some
+    providers attach fields (such as Gemini's thought signatures) that must round-trip.
+    """
+
+    id: str
+    name: str
+    arguments: dict[str, Any] | None
+    raw: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ChatReply:
+    content: str
+    tool_calls: tuple[ToolCall, ...] = ()
 
 
 def _usable(payload: Any, expected_key: str | None) -> bool:

@@ -1,20 +1,20 @@
 ---
-phase: 5
+phase: 2
 title: "Tutor engine study/review"
-status: pending
+status: complete
 priority: P1
-dependencies: [4]
+dependencies: [1]
 effort: "~3d"
 ---
 
-# Phase 5: Tutor engine study/review
+# Phase 2: Tutor engine study/review
 
 ## Overview
 Vòng lặp tool-calling tự viết, không phụ thuộc framework. Mỗi turn:
 1. Nạp session, path và mục tiêu hiện tại (`next_objective`).
 2. Gọi LLM với prompt study/review và 4 tool.
 3. Thực thi tool trên engine đã port.
-4. Phát sự kiện ra ngoài (pha 6 đổi sự kiện thành SSE).
+4. Phát sự kiện ra ngoài (pha 3 đổi sự kiện thành SSE).
 
 Hành vi dạy học chuyển thể từ mastery loop của DeepTutor.
 
@@ -30,8 +30,8 @@ Trong `third_party/deeptutor/deeptutor/`:
 - Test tham khảo: `learning/tests/test_guided_mastery_updates.py` (20), phần quiz/grade/assess của `test_mastery_tools.py` và `test_mastery_choices.py`.
 
 ## Requirements
-- **Port tiếp vào engine** (quy tắc port như pha 1–2):
-  - Nhóm interaction của `LearningTransaction` đã port ở pha 2 (`app/mastery/store.py`); chỉ thêm test nếu cần.
+- **Port tiếp vào engine** (quy tắc port như plan refactor [260926-2152](../260926-2152-remove-deeptutor-dependency/plan.md)):
+  - Nhóm interaction của `LearningTransaction` đã port trong plan refactor (`app/mastery/store.py`); chỉ thêm test nếu cần.
   - `app/mastery/service.py`: `register_question`, `record_question_answer`, `grade_interaction`, `record_qualitative_for_path` và helper.
   - Test chuyển thể tương ứng trong `tests/test_mastery_*.py`, dùng `tests/mastery_memory_store.py` khi cần store.
 - **Tool** (`app/tutor/tools.py`), schema JSON gửi cho LLM:
@@ -46,10 +46,10 @@ Trong `third_party/deeptutor/deeptutor/`:
   - Tham số sai (KP không thuộc path, sai loại, không có câu hỏi chờ) → trả **lỗi dạng text cho LLM**, không làm hỏng turn.
   - Evidence từ tutor dùng `source` mặc định của engine (`mastery_path`), phân biệt với evidence chính thức.
 - **Vòng lặp** (`app/tutor/engine.py`, `TutorEngine.run_turn(user_id, session_id, message | answer) -> AsyncIterator[TutorEvent]`):
-  1. `begin_turn` (pha 4); lưu message của học viên.
+  1. `begin_turn` (pha 1); lưu message của học viên.
   2. Nếu request có `answer {question_id, text}`: `record_question_answer` **trước** khi gọi LLM, như DeepTutor.
   3. Prompt: system prompt chuyển thể từ `mastery_loop.yaml`, chỉ phần study/review, tiếng Anh cho nội dung IELTS; context gồm kết quả `mastery_status` và 20 message gần nhất của session.
-  4. Lặp: gọi `ChatCompletionsClient` (pha 3) với 4 tool. Có tool call thì chạy tool, thêm kết quả, lặp tiếp. Dừng khi LLM trả text cuối, hoặc khi `mastery_quiz` thành công. Tối đa 6 vòng; quá → `failed/too_many_rounds`.
+  4. Lặp: gọi `ChatCompletionsClient` (`app/llm/client.py`) với 4 tool. Có tool call thì chạy tool, thêm kết quả, lặp tiếp. Dừng khi LLM trả text cuối, hoặc khi `mastery_quiz` thành công. Tối đa 6 vòng; quá → `failed/too_many_rounds`.
   5. Lưu message assistant (có `question_id` nếu vừa đặt câu hỏi); `finish_turn`.
   - Sự kiện: `turn.started`, `assistant.message` (text của từng vòng), `tool.called` (chỉ tên tool), `question`, `grading`, `turn.completed`, `turn.failed` (`failure_code`). Không sự kiện nào chứa `expected_answer`, prompt hay key.
   - Lỗi LLM hoặc lỗi bất ngờ → `turn.failed`; message học viên đã lưu vẫn còn; turn không kẹt ở `running`.
@@ -74,5 +74,5 @@ Trong `third_party/deeptutor/deeptutor/`:
 4. Gate đầy đủ.
 
 ## Success Criteria
-- [ ] Một chu kỳ quiz → answer → grade chạy hết trên PostgreSQL bằng engine port, không import DeepTutor.
-- [ ] Mastery do tutor cập nhật giống hệt cách engine cập nhật từ test chuyển thể.
+- [x] Một chu kỳ quiz → answer → grade chạy hết trên PostgreSQL bằng engine port, không import DeepTutor.
+- [x] Mastery do tutor cập nhật giống hệt cách engine cập nhật từ test chuyển thể.

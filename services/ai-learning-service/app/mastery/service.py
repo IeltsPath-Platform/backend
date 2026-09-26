@@ -1,5 +1,5 @@
 # Derived from DeepTutor v1.6.9 (Apache-2.0), deeptutor/learning/service.py @ da856ad.
-# Modified for IELTSPath: only the operations the service calls; the store is always injected
+# Modified for IELTSPath: only the operations the service and the tutor call; the store is always injected
 # (no default SQLite store).
 """Mastery path operations over an injected, transactional store."""
 
@@ -9,14 +9,19 @@ import time
 from typing import TYPE_CHECKING, Literal
 import uuid
 
+from app.mastery.grading import classify_error, grade_answer
 from app.mastery.mastery import compute_mastery
 from app.mastery.models import (
     ErrorRecord,
+    InteractionStatus,
     LearnerMasteryOverride,
     LearnerProfile,
     LearningEvidence,
     LearningModule,
     LearningProgress,
+    MasteryInteraction,
+    PendingOption,
+    PendingQuestion,
     QuizAttempt,
     RetryAttempt,
 )
@@ -45,6 +50,21 @@ _LEARNER_PROFILE_FIELDS: tuple[str, ...] = (
 
 class MasteryInteractionError(RuntimeError):
     """Base error for invalid durable question lifecycle transitions."""
+
+
+class NoPendingInteractionError(MasteryInteractionError):
+    """Raised when grading or resuming without an outstanding question."""
+
+
+class StaleInteractionError(MasteryInteractionError):
+    """Raised when a caller submits an answer for a superseded question."""
+
+    def __init__(self, submitted_id: str, current_id: str) -> None:
+        self.submitted_id = submitted_id
+        self.current_id = current_id
+        super().__init__(
+            f"Question {submitted_id!r} is no longer pending; answer {current_id!r} instead"
+        )
 
 
 class LearningService:
@@ -202,6 +222,512 @@ class LearningService:
         )
         progress.learning_evidence.append(evidence)
         return evidence
+
+    def _apply_grade(
+        self,
+        progress: LearningProgress,
+        *,
+        question_id: str,
+        knowledge_point_id: str,
+        module_id: str,
+        user_answer: str,
+        expected_answer: str,
+        question_type: str,
+        self_attribution: str = "",
+        scheduler: SpacedRepetitionScheduler | None = None,
+        session_id: str = "",
+        turn_id: str = "",
+    ) -> bool:
+        """Mutate one aggregate with a grade without performing I/O."""
+        is_correct = bool(expected_answer) and grade_answer(
+            user_answer, expected_answer, question_type
+        )
+        # Capture the active retry before recording this answer graduates it.
+        # Past retries on this or another question must not weaken later reviews.
+        retrying = any(
+            rec.question_id == question_id
+            and rec.knowledge_point_id == knowledge_point_id
+            and rec.status in ("active", "retrying")
+            for rec in progress.error_records
+        )
+        already_scheduled = knowledge_point_id in progress.repetition_states
+        self.record_quiz_attempt(
+            progress,
+            QuizAttempt(
+                question_id=question_id,
+                knowledge_point_id=knowledge_point_id,
+                module_id=module_id,
+                is_correct=is_correct,
+                user_answer=user_answer,
+                self_attribution=self_attribution,
+                error_type=None if is_correct else classify_error(user_answer),
+            ),
+        )
+        evidence = None
+        if knowledge_point_id:
+            evidence = self._record_quiz_evidence(
+                progress,
+                knowledge_point_id,
+                is_correct=is_correct,
+                retrying=retrying,
+                session_id=session_id,
+                turn_id=turn_id,
+                assessment_type="review" if already_scheduled else "quiz",
+            )
+            self.update_mastery(
+                progress, knowledge_point_id, self.calculate_mastery(progress, knowledge_point_id)
+            )
+            kp_type = progress.knowledge_types.get(knowledge_point_id)
+            if kp_type is not None and scheduler is not None:
+                state = progress.repetition_states.get(
+                    knowledge_point_id
+                ) or scheduler.get_initial_state(kp_type)
+                progress.repetition_states[knowledge_point_id] = state
+                scheduler.schedule_review(state, kp_type, evidence)
+                progress.review_queue = scheduler.build_review_queue(progress)
+        return is_correct
+
+    @staticmethod
+    def _interaction_from_legacy_pending(
+        progress: LearningProgress,
+        *,
+        session_id: str = "",
+        turn_id: str = "",
+    ) -> MasteryInteraction | None:
+        pending = progress.pending_question
+        if pending is None:
+            return None
+        return MasteryInteraction(
+            interaction_id=pending.question_id,
+            path_id=progress.book_id,
+            question=pending,
+            status=InteractionStatus.REGISTERED,
+            session_id=session_id,
+            turn_id=turn_id,
+        )
+
+    def register_question(
+        self,
+        book_id: str,
+        pending: PendingQuestion,
+        *,
+        session_id: str = "",
+        turn_id: str = "",
+        require_current_objective: bool = False,
+    ) -> tuple[LearningProgress, MasteryInteraction, bool]:
+        """Atomically register one outstanding question.
+
+        Retrying ``mastery_quiz`` while a question is active returns the
+        existing interaction instead of overwriting its expected answer.
+        """
+
+        def register(tx):
+            active = tx.active_interaction()
+            if active is None:
+                active = self._interaction_from_legacy_pending(
+                    tx.progress, session_id=session_id, turn_id=turn_id
+                )
+                if active is not None:
+                    persisted = tx.get_interaction(active.interaction_id)
+                    if persisted is not None and persisted.status in {
+                        InteractionStatus.GRADED,
+                        InteractionStatus.ABANDONED,
+                    }:
+                        # Repair a legacy aggregate whose compatibility field
+                        # survived after the durable interaction completed.
+                        tx.progress.pending_question = None
+                        tx.touch()
+                        active = None
+                    elif persisted is not None:
+                        active = persisted
+                    else:
+                        tx.put_interaction(active)
+            if active is not None:
+                return active, False
+
+            known_kp = next(
+                (
+                    kp
+                    for module in tx.progress.modules
+                    for kp in module.knowledge_points
+                    if kp.id == pending.knowledge_point_id
+                ),
+                None,
+            )
+            if known_kp is None:
+                raise MasteryInteractionError(
+                    f"Unknown objective {pending.knowledge_point_id!r}; refresh mastery_status"
+                )
+            if require_current_objective:
+                from app.mastery.policy import next_objective
+
+                if next_objective(tx.progress).knowledge_point_id != pending.knowledge_point_id:
+                    raise MasteryInteractionError("The requested knowledge point is not the current objective")
+
+            interaction = MasteryInteraction(
+                interaction_id=pending.question_id,
+                path_id=book_id,
+                question=pending,
+                status=InteractionStatus.REGISTERED,
+                session_id=session_id,
+                turn_id=turn_id,
+            )
+            tx.progress.pending_question = pending
+            tx.put_interaction(interaction)
+            from app.mastery.pending import public_pending_question
+
+            tx.emit(
+                "interaction.registered",
+                {
+                    "interaction_id": interaction.interaction_id,
+                    "knowledge_point_id": pending.knowledge_point_id,
+                    "question": public_pending_question(pending).to_dict(),
+                },
+                session_id=session_id,
+                turn_id=turn_id,
+            )
+            return interaction, True
+
+        progress, result = self._store.mutate(book_id, register)
+        interaction, created = result
+        return progress, interaction, created
+
+    def mark_question_awaiting(
+        self,
+        book_id: str,
+        *,
+        interaction_id: str = "",
+        session_id: str = "",
+        turn_id: str = "",
+    ) -> MasteryInteraction | None:
+        """Persist that an interaction card has been presented to the learner."""
+
+        def mark(tx):
+            interaction = (
+                tx.get_interaction(interaction_id) if interaction_id else tx.active_interaction()
+            )
+            if interaction is None:
+                active = tx.active_interaction()
+                if active is not None and interaction_id:
+                    raise StaleInteractionError(interaction_id, active.interaction_id)
+                interaction = self._interaction_from_legacy_pending(
+                    tx.progress, session_id=session_id, turn_id=turn_id
+                )
+                if interaction is None:
+                    return None
+                if interaction_id and interaction.interaction_id != interaction_id:
+                    raise StaleInteractionError(interaction_id, interaction.interaction_id)
+            if interaction.status == InteractionStatus.REGISTERED:
+                interaction.status = InteractionStatus.AWAITING_INPUT
+                interaction.session_id = session_id or interaction.session_id
+                interaction.turn_id = turn_id or interaction.turn_id
+                tx.put_interaction(interaction)
+                tx.emit(
+                    "interaction.awaiting_input",
+                    {"interaction_id": interaction.interaction_id},
+                    session_id=interaction.session_id,
+                    turn_id=interaction.turn_id,
+                )
+            return interaction
+
+        _, interaction = self._store.mutate(book_id, mark)
+        return interaction
+
+    def record_question_answer(
+        self,
+        book_id: str,
+        answer: str,
+        *,
+        interaction_id: str = "",
+        session_id: str = "",
+        turn_id: str = "",
+    ) -> MasteryInteraction | None:
+        """Durably record a reply before the LLM gets another reasoning round."""
+
+        def record(tx):
+            interaction = (
+                tx.get_interaction(interaction_id) if interaction_id else tx.active_interaction()
+            )
+            if interaction is None:
+                active = tx.active_interaction()
+                if active is not None and interaction_id:
+                    raise StaleInteractionError(interaction_id, active.interaction_id)
+                interaction = self._interaction_from_legacy_pending(
+                    tx.progress, session_id=session_id, turn_id=turn_id
+                )
+            if interaction is None:
+                return None
+            if interaction_id and interaction.interaction_id != interaction_id:
+                raise StaleInteractionError(interaction_id, interaction.interaction_id)
+            if session_id and interaction.session_id and interaction.session_id != session_id:
+                raise MasteryInteractionError("The question belongs to another session")
+            if interaction.status in {
+                InteractionStatus.REGISTERED,
+                InteractionStatus.AWAITING_INPUT,
+            }:
+                interaction.status = InteractionStatus.ANSWERED
+                interaction.user_answer = str(answer or "")
+                interaction.session_id = session_id or interaction.session_id
+                interaction.turn_id = turn_id or interaction.turn_id
+                tx.put_interaction(interaction)
+                tx.emit(
+                    "interaction.answered",
+                    {"interaction_id": interaction.interaction_id},
+                    session_id=interaction.session_id,
+                    turn_id=interaction.turn_id,
+                )
+            elif (
+                interaction.status == InteractionStatus.ANSWERED
+                and interaction.question.question_type == "choice"
+            ):
+                # Recover from a prior unreadable composer commit (#1004): allow
+                # a later readable pick to replace the stalled user_answer.
+                from app.mastery.pending import is_readable_choice_answer
+
+                stored = str(interaction.user_answer or "")
+                incoming = str(answer or "")
+                option_map = interaction.question.choice_map
+                if not is_readable_choice_answer(stored, option_map) and is_readable_choice_answer(
+                    incoming, option_map
+                ):
+                    interaction.user_answer = incoming
+                    interaction.session_id = session_id or interaction.session_id
+                    interaction.turn_id = turn_id or interaction.turn_id
+                    tx.put_interaction(interaction)
+                    tx.emit(
+                        "interaction.answered",
+                        {"interaction_id": interaction.interaction_id},
+                        session_id=interaction.session_id,
+                        turn_id=interaction.turn_id,
+                    )
+            return interaction
+
+        _, interaction = self._store.mutate(book_id, record)
+        return interaction
+
+    def grade_interaction(
+        self,
+        book_id: str,
+        *,
+        answer: str,
+        question_id: str = "",
+        answer_for_grading: str | None = None,
+        expected_answer: str | None = None,
+        resolved_choice_options: dict[str, str] | None = None,
+        scheduler: SpacedRepetitionScheduler | None = None,
+        session_id: str = "",
+        turn_id: str = "",
+        require_answered: bool = False,
+    ) -> tuple[LearningProgress, MasteryInteraction, bool]:
+        """Grade and resolve an interaction in one idempotent transaction.
+
+        Returns ``(progress, interaction, replayed)``.  A retry carrying the
+        same ``question_id`` returns the stored result and never appends a
+        second attempt.
+        """
+
+        def grade(tx):
+            interaction = tx.get_interaction(question_id) if question_id else None
+            if interaction is None and not question_id:
+                interaction = tx.active_interaction()
+            if interaction is None:
+                legacy = self._interaction_from_legacy_pending(
+                    tx.progress, session_id=session_id, turn_id=turn_id
+                )
+                if legacy is not None and (not question_id or legacy.interaction_id == question_id):
+                    interaction = legacy
+                    tx.put_interaction(interaction)
+            if interaction is None:
+                active = tx.active_interaction()
+                if active is not None and question_id:
+                    raise StaleInteractionError(question_id, active.interaction_id)
+                raise NoPendingInteractionError("No question is awaiting an answer")
+            if question_id and interaction.interaction_id != question_id:
+                raise StaleInteractionError(question_id, interaction.interaction_id)
+            if session_id and interaction.session_id and interaction.session_id != session_id:
+                raise MasteryInteractionError("The question belongs to another session")
+            if interaction.status == InteractionStatus.GRADED:
+                return interaction, True
+            if interaction.status == InteractionStatus.ABANDONED:
+                raise NoPendingInteractionError("The question was abandoned")
+            if require_answered and interaction.status != InteractionStatus.ANSWERED:
+                raise MasteryInteractionError("The learner has not answered this question")
+
+            pending = interaction.question
+            raw_answer = str(answer or "")
+            if interaction.status == InteractionStatus.ANSWERED:
+                stored = str(interaction.user_answer or "")
+                if pending.question_type == "choice":
+                    from app.mastery.pending import (
+                        has_option_bodies,
+                        is_readable_choice_answer,
+                        resolve_choice_submission,
+                    )
+
+                    option_map = pending.choice_map
+                    if is_readable_choice_answer(stored, option_map):
+                        raw_answer = stored
+                    elif is_readable_choice_answer(raw_answer, option_map):
+                        # Prior commit was unreadable clarifying text (#1004) —
+                        # accept the fresh readable answer and rewrite storage.
+                        interaction.user_answer = raw_answer
+                    else:
+                        raw_answer = stored
+                    if has_option_bodies(option_map):
+                        graded_answer = (
+                            resolve_choice_submission(raw_answer, option_map) or raw_answer
+                        )
+                    else:
+                        # Legacy questions may need option bodies recovered by
+                        # the trusted tool adapter from the original turn.
+                        graded_answer = (
+                            raw_answer if answer_for_grading is None else answer_for_grading
+                        )
+                else:
+                    raw_answer = stored
+                    graded_answer = raw_answer
+            else:
+                graded_answer = raw_answer if answer_for_grading is None else answer_for_grading
+            authoritative_answer = (
+                pending.expected_answer if expected_answer is None else expected_answer
+            )
+            if pending.question_type == "choice" and resolved_choice_options:
+                # Bodies recovered for a legacy question (see the tool
+                # adapter): store them in the structured form so nothing has
+                # to recover them again.
+                pending.options = [
+                    PendingOption(label=label, body=body)
+                    for label, body in resolved_choice_options.items()
+                ]
+                pending.expected_answer = authoritative_answer
+                interaction.question = pending
+            is_correct = self._apply_grade(
+                tx.progress,
+                question_id=pending.question_id,
+                knowledge_point_id=pending.knowledge_point_id,
+                module_id=pending.module_id,
+                user_answer=graded_answer,
+                expected_answer=authoritative_answer,
+                question_type=pending.question_type,
+                scheduler=scheduler,
+                session_id=session_id,
+                turn_id=turn_id,
+            )
+            if (
+                tx.progress.pending_question is not None
+                and tx.progress.pending_question.question_id == pending.question_id
+            ):
+                tx.progress.pending_question = None
+            interaction.status = InteractionStatus.GRADED
+            interaction.user_answer = raw_answer
+            interaction.session_id = session_id or interaction.session_id
+            interaction.turn_id = turn_id or interaction.turn_id
+            interaction.result = {
+                "is_correct": is_correct,
+                "knowledge_point_id": pending.knowledge_point_id,
+            }
+            tx.put_interaction(interaction)
+            tx.emit(
+                "attempt.recorded",
+                {
+                    "interaction_id": interaction.interaction_id,
+                    "knowledge_point_id": pending.knowledge_point_id,
+                    "is_correct": is_correct,
+                },
+                session_id=interaction.session_id,
+                turn_id=interaction.turn_id,
+            )
+            if tx.progress.learning_evidence:
+                latest = tx.progress.learning_evidence[-1]
+                if latest.knowledge_point_id == pending.knowledge_point_id:
+                    tx.emit(
+                        "evidence.recorded",
+                        {
+                            "knowledge_point_id": latest.knowledge_point_id,
+                            "assessment_type": latest.assessment_type,
+                            "result": latest.result,
+                            "quality": latest.quality,
+                        },
+                        session_id=interaction.session_id,
+                        turn_id=interaction.turn_id,
+                    )
+            tx.emit(
+                "interaction.graded",
+                dict(interaction.result),
+                session_id=interaction.session_id,
+                turn_id=interaction.turn_id,
+            )
+            return interaction, False
+
+        progress, result = self._store.mutate(book_id, grade)
+        interaction, replayed = result
+        return progress, interaction, replayed
+
+    def record_qualitative_for_path(
+        self,
+        book_id: str,
+        kp_id: str,
+        *,
+        passed: bool,
+        evidence: str = "",
+        scheduler: SpacedRepetitionScheduler | None = None,
+        session_id: str = "",
+        turn_id: str = "",
+        require_current_objective: bool = False,
+    ) -> LearningProgress:
+        def record(tx):
+            from app.mastery.policy import QUALITATIVE_TYPES, find_knowledge_point
+
+            kp, _, _ = find_knowledge_point(tx.progress, kp_id)
+            if kp is None:
+                raise MasteryInteractionError(
+                    f"Unknown objective {kp_id!r}; refresh mastery_status"
+                )
+            if kp.type not in QUALITATIVE_TYPES:
+                raise MasteryInteractionError(
+                    f"Objective {kp.name!r} must be graded with mastery_quiz + mastery_grade"
+                )
+            if require_current_objective:
+                from app.mastery.policy import next_objective
+
+                if next_objective(tx.progress).knowledge_point_id != kp_id:
+                    raise MasteryInteractionError("The requested knowledge point is not the current objective")
+            self.record_qualitative_in_memory(
+                tx.progress,
+                kp_id,
+                passed=passed,
+                evidence=evidence,
+                scheduler=scheduler,
+                session_id=session_id,
+                turn_id=turn_id,
+            )
+            tx.touch()
+            tx.emit(
+                "mastery.assessed",
+                {
+                    "knowledge_point_id": kp_id,
+                    "passed": bool(passed),
+                },
+                session_id=session_id,
+                turn_id=turn_id,
+            )
+            if tx.progress.learning_evidence:
+                latest = tx.progress.learning_evidence[-1]
+                if latest.knowledge_point_id == kp_id:
+                    tx.emit(
+                        "evidence.recorded",
+                        {
+                            "knowledge_point_id": latest.knowledge_point_id,
+                            "assessment_type": latest.assessment_type,
+                            "result": latest.result,
+                            "quality": latest.quality,
+                        },
+                        session_id=session_id,
+                        turn_id=turn_id,
+                    )
+
+        progress, _ = self._store.mutate(book_id, record)
+        return progress
 
     def replace_modules_for_path(
         self,
@@ -430,4 +956,4 @@ class LearningService:
         progress.updated_at = time.time()
 
 
-__all__ = ["LearningService", "MasteryInteractionError"]
+__all__ = ["LearningService", "MasteryInteractionError", "NoPendingInteractionError", "StaleInteractionError"]
