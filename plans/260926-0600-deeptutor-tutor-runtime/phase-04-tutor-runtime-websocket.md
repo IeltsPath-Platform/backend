@@ -28,16 +28,19 @@ Kèm một số REST tối thiểu để liệt kê và xem session.
 - Functional:
   - `app/deeptutor_runtime/container.py`: dựng container khi app khởi động (`lifespan`), gán vào
     `app.state.application_container`.
-    - **Bật:** `mastery`, `ask_questions` / `deep_question` (pha 8), `reading` (pha 11), memory tools (pha 9).
-    - **Tắt:** knowledge base / RAG (T4), web search, code execution, partners, subagent, math animator, research, các
-      tích hợp ngoài (Obsidian, MarginNote, IMA), sinh ảnh, sinh video.
+    - Loop capability giữ lại (B4): `mastery`, `ask_questions`, `immersive_reading`. Các capability khác trong
+      `BUILTIN_LOOP_CAPABILITY_SPECS` đều bị loại, kể cả `explore_context` (T4).
+    - Turn capability: chỉ những gì mastery, question và reading cần (pha 1 liệt kê). Không `deep_research`,
+      `deep_solve`, `math_animator`.
+    - Tool của chat: tắt web search, code execution, knowledge base, MCP. Kiểm tra settings `tools` của DeepTutor
+      (`deeptutor config show` đang in `"tools": []`) và test rằng không tool nào trong số này được đưa cho LLM.
     - Danh sách bật/tắt là **allowlist** trong code, có test.
   - Endpoint `GET /api/ai-learning/tutor/ws` (WebSocket):
-    1. Xác thực internal JWT trước khi `accept` (cách truyền token: pha 5). Không hợp lệ → đóng với mã 4401.
-    2. `set_current_user(CurrentUser(id=learner_id, is_admin=False, …))` cho cả kết nối.
-    3. Chuyển giao cho logic của `unified_websocket`. Nếu hàm này gọi `ws_require_auth` cứng, thì bọc để bỏ qua bước auth
-       của DeepTutor, hoặc cấu hình auth của DeepTutor sang chế độ nhận user đã đặt sẵn. Pha 1 đã chỉ ra cách nào không
-       cần sửa submodule.
+    - Endpoint gọi thẳng `deeptutor.api.routers.unified_ws.unified_websocket(ws)`. Xác thực nằm trong
+      `ws_require_auth` đã được thay (B3): đọc internal JWT từ header `Authorization` của handshake; không hợp lệ thì
+      đóng 4001 **trước** `accept`; hợp lệ thì cài `CurrentUser` role `user`.
+    - **Test bắt buộc:** trong turn, `get_current_user().is_admin` là `False`, và `id` là UUID của học viên. Không bao
+      giờ là `local-admin`.
   - REST (qua `api/routers/sessions.py` của DeepTutor nếu dùng được với adapter, hoặc bọc mỏng):
     - `GET /api/ai-learning/tutor/sessions`: session của học viên;
     - `GET /api/ai-learning/tutor/sessions/{id}`: message và turn;

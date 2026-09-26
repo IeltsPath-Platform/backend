@@ -26,6 +26,10 @@ một report go/no-go.
 | `multi_user/context.py`, `services/path_service.py` | Phạm vi theo người dùng |
 | `api/routers/unified_ws.py`, `api/contracts/turn_protocol.py` | Giao thức mà pha 4 sẽ dùng |
 
+## Điểm thay phải thử
+Dùng đúng bảng B1–B5 trong `plan.md`. Spike xác nhận hoặc bác bỏ từng dòng. Nếu một điểm không thay được, ghi lý do và
+cách khác trong report; không sửa submodule.
+
 ## Requirements
 - Functional:
   - Script hoặc test tích hợp `tests/spike/test_mastery_turn_on_postgres.py`:

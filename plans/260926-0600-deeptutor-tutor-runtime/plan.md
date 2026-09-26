@@ -54,7 +54,25 @@ Bất biến giữ nguyên từ spec V2 và các plan trước:
 - `unified_ws` nhận `ApplicationContainer` từ `ws.app.state.application_container`, nên app chủ (AI Learning) có thể tự dựng container.
 - Người dùng hiện tại nằm trong ContextVar `deeptutor.multi_user.context` (`set_current_user`). Mọi phạm vi theo người dùng của DeepTutor đọc từ đây.
 
-Cách T1: một module `app/deeptutor_runtime/bootstrap.py` chạy **trước khi** import bất kỳ capability nào. Nó gán lại `deeptutor.learning.storage.LearningStore`, các hàm lấy session store, `MemoryStore` và `NotebookManager` sang bản của AI Learning. Pha 1 xác định danh sách điểm thay chính xác. Có test khóa danh sách này để lần nâng DeepTutor sau báo ngay nếu thiếu điểm nào.
+Cách T1: một module `app/deeptutor_runtime/bootstrap.py` chạy **trước khi** import bất kỳ capability nào, và gán lại các
+điểm dưới đây sang bản của AI Learning. Có test khóa danh sách này, để lần nâng DeepTutor sau báo ngay nếu thiếu điểm nào.
+
+### Điểm thay đã kiểm chứng trên v1.6.9 (2026-09-26)
+
+| # | Điểm thay | Vì sao làm được | Ràng buộc |
+| --- | --- | --- | --- |
+| B1 | `deeptutor.learning.storage.LearningStore` → adapter pha 2 | `deeptutor/learning/__init__.py` chỉ import `models`. Có 4 module import `LearningStore` ở top-level (`learning/service.py`, `learning/navigation.py`, `api/routers/sessions.py`, `api/routers/mastery_path.py`); các module còn lại import trong hàm. | Bootstrap phải chạy **trước** mọi import `deeptutor.learning.service`: là dòng import đầu tiên của `main.py`, của `app/messaging/assessment_consumer.py` và của `tests/conftest.py`. AI Learning hiện import `deeptutor.learning.service` ở nhiều file. Adapter nhận tham số `root` như bản gốc, nhưng bỏ qua giá trị. |
+| B2 | `deeptutor.services.session.{get_session_store, get_sqlite_session_store, get_sqlite_session_store_for}` **và** `deeptutor.services.session.sqlite_store.get_sqlite_session_store` → adapter pha 3 | Package init chỉ import `protocol`, `sqlite_store` và `turn_runtime`. Có 6 module import ở top-level qua package (`app/container.py`, routers `sessions`, `practice`, `courses`, `dashboard`, `question_notebook`), khoảng 40 chỗ import trong hàm, và 3 chỗ lấy thẳng từ `sqlite_store`. | Thay ở **cả hai** module. `services/workspace/session_{transfer,move}.py` dùng class `SQLiteSessionStore` trực tiếp, nhưng không nằm trong luồng Tutor (không bật workspace transfer). |
+| B3 | `deeptutor.api.routers.auth.ws_require_auth` → bản IELTSPath | `unified_websocket` import hàm này **trong hàm**. | **Bắt buộc.** Khi auth của DeepTutor tắt (mặc định), bản gốc gán user là `local_admin_user()`, tức **học viên thành admin** và thấy dữ liệu của mọi người. Bản thay phải: xác thực internal JWT (header `Authorization` do Gateway gửi); tạo `CurrentUser(id=<learner uuid>, username=<learner uuid>, role="user", scope=scope_for_user(id, is_admin=False))`; gọi `set_current_user`; trả token để `unified_websocket` reset như bản gốc. Không hợp lệ → `ws.close(code=4001)` và trả `ws_auth_failed`. |
+| B4 | `deeptutor.capabilities.registry.BUILTIN_LOOP_CAPABILITY_SPECS` → chỉ `mastery`, `ask_questions`, `immersive_reading`; `discover_external_loop_capabilities` → `()` | `all_loop_capabilities()` đọc tuple này mỗi turn và tự đăng ký vào catalog. | Tắt: `solve`, `obsidian`, `marginnote4`, `subagent`, `ima`, `course_study`, `immersive_watching`, **`explore_context`** (đọc nguồn tài liệu đính kèm, T4), `setup`, `partner_authoring`, `partner_group`, `visualization_generation`. Turn capability (`chat`, `deep_question`…) có registry riêng (`runtime/registry/capability_registry.py`); pha 1 xác định cách lọc tương tự. |
+| B5 | `ApplicationContainer.build()` rồi gán vào `app.state.application_container` và `set_application_container(...)` | `unified_ws` ưu tiên `ws.app.state.application_container`. `set_capability_catalog` và `set_application_container` là hook có sẵn. | Coordination mặc định là `MemoryCoordinator` (trong process), không cần Redis. Chạy **một** instance API. |
+| B6 | `MemoryStore` / `get_memory_store` → adapter pha 9 | `services/memory/store.py` có `get_memory_store()`. | Pha 9 đo các kiểu import như B1 và B2. |
+| B7 | `NotebookManager` → adapter pha 10 | `services/notebook/service.py`. | Như trên. |
+
+Thư viện: trong venv sạch chỉ có `requirements-test.txt` hiện tại, import `deeptutor.app.container`, `api.routers.unified_ws`,
+các capability `mastery`, `reading` và `question`, cùng `services.memory`, `notebook`, `practice` đều **thành công**, không cần gói
+mới (kiểm chứng 2026-09-26). Khi chạy thật có thể cần thêm gói nạp lười; pha 1 ghi lại và thêm vào `requirements-test.txt`,
+kèm ràng buộc phiên bản lấy từ `third_party/deeptutor/pyproject.toml`.
 
 ## Phases
 
