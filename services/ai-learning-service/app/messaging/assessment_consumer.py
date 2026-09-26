@@ -1,4 +1,4 @@
-"""Consume AssessmentCompleted.v2 and apply it to DeepTutor learning paths.
+"""Consume AssessmentCompleted.v2 and apply it to mastery paths.
 
 Delivery contract:
 

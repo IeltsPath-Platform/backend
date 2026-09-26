@@ -12,7 +12,7 @@ IELTSPath là backend microservices gồm các dịch vụ **Java 21 / Spring Cl
 | **Framework**         | Spring Boot                             | **3.5.14**     | Framework ứng dụng nền tảng                                                                                                           |
 | **Cloud Ecosystem**   | Spring Cloud                            | **2025.0.0**   | Hệ sinh thái dịch vụ đám mây                                                                                                       |
 | **API Gateway**       | Spring Cloud Gateway (WebFlux Reactive) | 2025.0.0             | Quản lý định tuyến API, xác thực & phân quyền tập trung dựa trên kiến trúc Phản ứng (Reactive, Non-blocking Netty Engine) |
-| **AI Learning API**  | FastAPI, DeepTutor                      | Python 3.11+         | Adaptive Learning và DeepTutor Mastery Path                              |
+| **AI Learning API**  | FastAPI, mastery engine port từ DeepTutor | Python 3.11+         | Adaptive Learning và Mastery Path                                        |
 | **Service Discovery** | Spring Cloud Netflix Eureka             | 2025.0.0             | Đăng ký và phát hiện dịch vụ tự động                                                                                           |
 | **Config Management** | Spring Cloud Config Server              | 2025.0.0             | Quản lý cấu hình tập trung cho toàn bộ microservices                                                                               |
 | **Security & Auth**   | Spring Security & OAuth2 (Reactive)     | 3.5.14               | Xử lý token JWT và Context người dùng bất đồng bộ                                                                               |
@@ -36,7 +36,7 @@ IELTSPath/
 ├── shared/                     # Chứa các module dùng chung giữa các microservices
 │   └── common-security/        # CanonicalRoles, InternalJwtClaims, InternalJwtAuthorities, InternalJwtValidators
 ├── services/                   # Chứa các microservice nghiệp vụ
-│   ├── ai-learning-service/    # [Port 8000] FastAPI + DeepTutor, build bằng Dockerfile riêng
+│   ├── ai-learning-service/    # [Port 8000] FastAPI + mastery engine riêng, build bằng Dockerfile riêng
 │   ├── user-service/           # User identity, roles, auth và learning goals
 │   └── learning-support-service/ # Learner-owned utility state
 ├── services/community-service  # Bài viết, bình luận, reaction và moderation
@@ -231,7 +231,7 @@ Với service sử dụng Flyway, migration tự chạy khi service khởi độ
 
 ### 6. Chạy Luồng Chính Local (Assessment → AI Learning)
 
-Luồng: learner làm bài → grader finalize → outbox → RabbitMQ → consumer → DeepTutor → `GET /api/ai-learning/status`.
+Luồng: learner làm bài → grader finalize → outbox → RabbitMQ → consumer → mastery engine → `GET /api/ai-learning/status`.
 Phần AI Learning chạy bằng compose; các service Java chạy trên host (IDE hoặc `java -jar`).
 
 **Biến môi trường** (đặt trong `.env` ở root, file này đã được gitignore; không commit giá trị):
@@ -261,33 +261,25 @@ Container AI Learning gọi User (`8085`) và Content (`8082`) trên host qua `h
 
 **Sắp xếp path bằng Gemini (tùy chọn):**
 
-AI Learning gọi Gemini qua lớp LLM của DeepTutor khi tạo path cho goal mới. Cấu hình
-nằm ở `services/ai-learning-service/deeptutor-data/user/settings/model_catalog.json`,
-được git-ignore và chỉ gắn vào container API. Tạo file này từ
-`services/ai-learning-service/model_catalog.example.json` nếu chưa có catalog;
-không ghi đè catalog hiện có. Điền key/model trong file riêng này, giữ `base_url`
-trống, rồi chạy:
+AI Learning gọi Gemini qua API chuẩn OpenAI khi tạo path cho goal mới. Đặt key trong
+`.env` ở root (đã git-ignore), rồi tạo lại container API:
 
 ```powershell
-docker compose restart ai-learning-api
-docker compose exec -u appuser ai-learning-api deeptutor config show
+# trong .env: AI_LEARNING_LLM_API_KEY=<key của nhóm>
+docker compose up -d ai-learning-api
 ```
 
-Luôn chạy lệnh DeepTutor trong container bằng `-u appuser`. `docker compose exec`
-mặc định chạy bằng root. Khi đó DeepTutor ghi lại catalog thành file của root với quyền
-`0600`, API (uid 10001) không đọc được, nên coi catalog là rỗng và ghi đè nó: key và
-model mất khỏi file, path báo `llm_not_configured`. Root còn tạo các file khác, ví dụ
-log `user/logs/deeptutor.jsonl`, khiến cả lệnh `-u appuser` cũng báo `PermissionError`.
-Nếu đã lỡ chạy bằng root: dừng `ai-learning-api`, xóa cả thư mục
-`services/ai-learning-service/deeptutor-data`, tạo lại catalog, rồi
-`docker compose up -d ai-learning-api`.
+Model mặc định là `gemini-3.8-flash` với `AI_LEARNING_LLM_REASONING_EFFORT=low`; đổi bằng
+`AI_LEARNING_LLM_MODEL`, `AI_LEARNING_LLM_BASE_URL`, `AI_LEARNING_LLM_REASONING_EFFORT`.
+Không có key hoặc LLM lỗi thì vẫn tạo path theo thứ tự Content. Thứ tự đã lưu được giữ
+nguyên khi nhận kết quả thi hoặc refresh; KP mới được thêm cuối module. Xem
+[LLM path ordering](services/ai-learning-service/README.md#llm-path-ordering) để biết dữ
+liệu gửi ra ngoài, bảng biến cấu hình, bảng lý do fallback và năm kịch bản E2E bằng stub
+không cần key thật.
 
-Kiểm tra `llm.provider` là `gemini`, model đúng cấu hình và `llm.api_key` hiển thị
-`***`. Không cấu hình hoặc LLM lỗi thì vẫn tạo path theo thứ tự Content. Thứ tự đã
-lưu được giữ nguyên khi nhận kết quả thi hoặc refresh; KP mới được thêm cuối module.
-Xem [LLM path ordering](services/ai-learning-service/README.md#llm-path-ordering)
-để biết dữ liệu gửi ra ngoài, cách cấu hình không ghi đè file, tắt tính năng, bảng
-lý do fallback và năm kịch bản E2E bằng stub không cần key thật.
+Thư mục `third_party/deeptutor` chỉ là bản clone DeepTutor để **đọc tham khảo**. Engine
+mastery của AI Learning (`services/ai-learning-service/app/mastery`) được port từ đó;
+service không import, không build và không test dựa vào thư mục này.
 
 **Chạy test Python AI Learning:**
 
@@ -296,7 +288,6 @@ Từ thư mục gốc, dùng virtual environment Python của dự án:
 ```powershell
 Set-Location services/ai-learning-service
 python -m pip install pytest -r requirements-test.txt
-$env:PYTHONPATH = "../../third_party/deeptutor;."
 $env:PYTHONDONTWRITEBYTECODE = "1"
 python -m pytest tests
 Set-Location ../..
@@ -304,7 +295,7 @@ Set-Location ../..
 
 Đặt `AI_LEARNING_TEST_DATABASE_URL` và `AI_LEARNING_TEST_AMQP_URL` tới PostgreSQL
 và RabbitMQ local dành cho test để chạy đủ integration suite; thiếu chúng thì các
-case tương ứng bị skip. Test LLM dùng catalog tạm và server giả, không gọi Gemini.
+case tương ứng bị skip. Test LLM dùng biến `AI_LEARNING_LLM_*` tạm và server giả, không gọi Gemini.
 
 **Tài khoản có quyền (chỉ dev, chỉ trên DB local):**
 

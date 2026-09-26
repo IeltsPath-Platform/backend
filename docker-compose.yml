@@ -77,7 +77,7 @@ services:
       timeout: 5s
       retries: 6
 
-  # AI Learning (DeepTutor): its own database, migrated once by Flyway, then the API and the
+  # AI Learning: its own database, migrated once by Flyway, then the API and the
   # AssessmentCompleted.v2 consumer from the same image. The Java services run on the host (IDE).
   ai-learning-db:
     image: postgres:15-alpine
@@ -121,8 +121,6 @@ services:
       context: .
       dockerfile: services/ai-learning-service/Dockerfile
     container_name: ai-learning-api
-    volumes:
-      - ./services/ai-learning-service/deeptutor-data:/app/data
     environment:
       # Must equal the Gateway's value: the API validates the Gateway-signed internal JWT.
       AI_LEARNING_INTERNAL_JWT_SECRET: "${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}"
@@ -130,6 +128,13 @@ services:
       # The learner's internal JWT is forwarded straight to User and Content on the host, not through the Gateway.
       AI_LEARNING_USER_SERVICE_BASE_URL: ${AI_LEARNING_USER_SERVICE_BASE_URL:-http://host.docker.internal:8085}
       AI_LEARNING_CONTENT_SERVICE_BASE_URL: ${AI_LEARNING_CONTENT_SERVICE_BASE_URL:-http://host.docker.internal:8082}
+      # Path ordering LLM (OpenAI-compatible chat completions). Without a key the API keeps the
+      # deterministic Content order.
+      AI_LEARNING_LLM_BASE_URL: ${AI_LEARNING_LLM_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+      AI_LEARNING_LLM_MODEL: ${AI_LEARNING_LLM_MODEL:-gemini-3.8-flash}
+      AI_LEARNING_LLM_API_KEY: ${AI_LEARNING_LLM_API_KEY:-}
+      AI_LEARNING_LLM_REASONING_EFFORT: ${AI_LEARNING_LLM_REASONING_EFFORT:-low}
+      AI_LEARNING_LLM_TIMEOUT_SECONDS: ${AI_LEARNING_LLM_TIMEOUT_SECONDS:-20}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

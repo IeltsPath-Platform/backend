@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from unittest import mock
 from uuid import uuid4
 
-from deeptutor.learning.policy import next_objective
+from app.mastery.policy import next_objective
 
 from app.adapters.formal_evidence_adapter import FormalEvidenceAdapter
 from app.application.formal_assessment_ingestion import FormalAssessmentIngestionService

@@ -1,8 +1,7 @@
-"""Provenance of DeepTutor learner mastery overrides written by IELTSPath.
+"""Provenance of learner mastery overrides written by IELTSPath.
 
-DeepTutor v1.6.9 reports every override as ``learner`` and its override model
-has no provenance field; the pinned submodule is the unmodified upstream
-release. IELTSPath therefore marks its own overrides in the note and relabels
+The engine (as DeepTutor v1.6.9) reports every override as ``learner`` and its
+override model has no provenance field. IELTSPath therefore marks its own overrides in the note and relabels
 them in the learner-facing summary:
 
 * ``placement:{attempt_id}:v{result_version}``: tested out by a placement result;
@@ -15,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from deeptutor.learning.policy import mastery_source as deeptutor_source
+from app.mastery.policy import mastery_source as deeptutor_source
 
 PLACEMENT_NOTE_PREFIX = "placement:"
 RETIRED_NOTE = "retired:content"
@@ -43,7 +42,7 @@ def is_retired_override(override: Any) -> bool:
 
 
 def mastery_source(progress: Any, kp: Any) -> str:
-    """DeepTutor's ``system``/``learner`` provenance, with IELTSPath overrides relabelled."""
+    """The engine's ``system``/``learner`` provenance, with IELTSPath overrides relabelled."""
     source = deeptutor_source(progress, kp)
     if source == "learner":
         return override_source(progress.learner_mastery_overrides.get(kp.id))

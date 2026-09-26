@@ -1,5 +1,10 @@
-"""Keep DeepTutor's import-time files outside the checkout."""
+"""Suite-wide safety: no test may reach a real LLM provider.
 
-from tests.deeptutor_llm_support import isolate_deeptutor_home
+``LlmSettings`` also reads a local ``.env``; environment values take precedence, so blanking the
+model and key here leaves the LLM unconfigured unless a test points it at a local stub.
+"""
 
-isolate_deeptutor_home()
+import os
+
+os.environ["AI_LEARNING_LLM_MODEL"] = ""
+os.environ["AI_LEARNING_LLM_API_KEY"] = ""

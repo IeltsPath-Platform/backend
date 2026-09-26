@@ -1,4 +1,4 @@
-"""PostgreSQL implementation of the DeepTutor synchronous LearningStore contract."""
+"""PostgreSQL implementation of the mastery engine's synchronous LearningStore contract."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ from uuid import UUID
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-from deeptutor.learning.models import LearningProgress
-from deeptutor.learning.storage import (
+from app.mastery.models import LearningProgress
+from app.mastery.store import (
     LearningConflictError,
     LearningStoreError,
     LearningTransaction,
@@ -43,13 +43,13 @@ class _Cursor:
 
 
 class _Connection:
-    """Small DB-API compatibility layer for SQL used by DeepTutor transactions."""
+    """Small DB-API compatibility layer for the qmark SQL of ``LearningTransaction``."""
 
     def __init__(self, connection: Any) -> None:
         self._connection = connection
 
     def execute(self, sql: str, params: tuple[Any, ...] = ()) -> _Cursor:
-        # DeepTutor's transaction contract uses SQLite qmark parameters. PostgreSQL
+        # ``LearningTransaction`` (ported verbatim) uses qmark parameters. PostgreSQL
         # accepts the same SQL once those placeholders are translated.
         values = list(params)
         if "INSERT INTO mastery_interactions" in sql:
@@ -104,9 +104,9 @@ class _BufferedCursor(_Cursor):
 
 
 class PostgresLearningStore:
-    """Store DeepTutor aggregates in V5 ``mastery_paths`` rows.
+    """Store mastery aggregates in V5 ``mastery_paths`` rows.
 
-    The interface remains synchronous to match DeepTutor v1.6.9. Nested
+    The interface stays synchronous, as in DeepTutor v1.6.9 which the engine ports. Nested
     transactions for the same path join the outer unit of work, allowing path
     creation and curriculum replacement to commit as one aggregate revision.
     """
@@ -231,7 +231,7 @@ class PostgresLearningStore:
     def _sync_evidence_projection(cursor: Any, path_id: str, progress: LearningProgress) -> None:
         """Mirror aggregate evidence into ``mastery_learning_evidence`` inside the commit.
 
-        Same contract as DeepTutor's SQLite store: the projection is rebuilt from
+        Same contract as DeepTutor v1.6.9's SQLite store: the projection is rebuilt from
         the aggregate in the write transaction, so it can never commit ahead of or
         disagree with ``state_json``. Formal evidence exposes its deterministic
         ``source_reference_id``; the unique index on

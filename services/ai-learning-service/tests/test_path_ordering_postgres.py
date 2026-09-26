@@ -1,4 +1,4 @@
-"""Path ordering through real DeepTutor HTTP and disposable PostgreSQL schemas."""
+"""Path ordering through the real LLM client over HTTP and disposable PostgreSQL schemas."""
 
 import asyncio
 import json
@@ -12,9 +12,9 @@ from app.adapters.formal_evidence_adapter import FormalEvidenceAdapter
 from app.application.formal_assessment_ingestion import FormalAssessmentIngestionService
 from app.application.path_orderer import PathOrderer
 from app.application.path_service import PathService
-from app.learning.deeptutor_llm import DeepTutorOrderingLlm
+from app.learning.ordering_llm import OrderingLlm
 from app.persistence.postgres_learning_store import PostgresLearningStore
-from tests.deeptutor_llm_support import OpenAiStub, TEST_API_KEY, TEST_MODEL, isolated_llm_catalog
+from tests.llm_test_support import OpenAiStub, TEST_API_KEY, TEST_MODEL, isolated_llm_env
 from tests.formal_assessment_support import event, item, mapping
 from tests.postgres_schema_support import PostgresSchema, database_url_or_skip
 from tests.test_path_orderer import CONTENT_ORDER, LLM_ORDER, ContentClient, GoalClient, ordered_ids
@@ -35,7 +35,7 @@ class PathOrderingPostgresTest(unittest.TestCase):
     def service(self, learner_goal, llm=None):
         store = PostgresLearningStore(self.schema.url)
         return PathService(store, GoalClient(learner_goal), ContentClient(),
-                           orderer=PathOrderer(store, llm or DeepTutorOrderingLlm(), today=lambda: TODAY))
+                           orderer=PathOrderer(store, llm or OrderingLlm(), today=lambda: TODAY))
 
     def park(self, learner_goal, *, attempt_id=None, version=1):
         payload = event(user_id=learner_goal["userId"], goal_id=learner_goal["id"],
@@ -76,7 +76,7 @@ class PathOrderingPostgresTest(unittest.TestCase):
         with_placement, without_placement = goal(), goal()
         self.park(with_placement)
         path_ids = []
-        with OpenAiStub(content=json.dumps(valid_proposal())) as server, isolated_llm_catalog(server.base_url):
+        with OpenAiStub(content=json.dumps(valid_proposal())) as server, isolated_llm_env(server.base_url):
             for learner in (with_placement, without_placement):
                 path_id, _ = asyncio.run(self.service(learner).ensure_active_path(learner["userId"], "internal-token"))
                 path_ids.append(path_id)
@@ -123,7 +123,7 @@ class PathOrderingPostgresTest(unittest.TestCase):
             states_at_request.extend(connection.closed for connection in connections)
 
         with OpenAiStub(content=json.dumps(valid_proposal()), on_request=observe_request) as server:
-            with isolated_llm_catalog(server.base_url), patch("psycopg2.connect", side_effect=connect):
+            with isolated_llm_env(server.base_url), patch("psycopg2.connect", side_effect=connect):
                 path_id, _ = asyncio.run(self.service(learner).ensure_active_path(learner["userId"], "internal-token"))
         self.assertTrue(states_at_request)
         self.assertTrue(all(states_at_request), "A PostgreSQL connection remained open during LLM I/O")
@@ -135,7 +135,7 @@ class PathOrderingPostgresTest(unittest.TestCase):
         async def race():
             ready = asyncio.Event()
             arrivals = 0
-            delegate = DeepTutorOrderingLlm()
+            delegate = OrderingLlm()
 
             class SynchronizedLlm:
                 async def propose(self, system_prompt, payload):
@@ -150,7 +150,7 @@ class PathOrderingPostgresTest(unittest.TestCase):
             return await asyncio.gather(*(service.ensure_active_path(learner["userId"], "internal-token")
                                           for service in services))
 
-        with OpenAiStub(content=json.dumps(valid_proposal())) as server, isolated_llm_catalog(server.base_url):
+        with OpenAiStub(content=json.dumps(valid_proposal())) as server, isolated_llm_env(server.base_url):
             results = asyncio.run(race())
         self.assertEqual(results[0][0], results[1][0])
         self.assertEqual(len(server.requests), 2)
@@ -173,9 +173,9 @@ class PathOrderingPostgresTest(unittest.TestCase):
         for reason, server_kwargs, configured in cases:
             with self.subTest(reason=reason):
                 learner = goal()
-                with OpenAiStub(**server_kwargs) as server, isolated_llm_catalog(server.base_url, configured=configured):
+                with OpenAiStub(**server_kwargs) as server, isolated_llm_env(server.base_url, configured=configured):
                     timeout = 0.03 if reason == "llm_timeout" else 20.0
-                    service = self.service(learner, DeepTutorOrderingLlm(timeout_seconds=timeout))
+                    service = self.service(learner, OrderingLlm(timeout_seconds=timeout))
                     path_id, _ = asyncio.run(service.ensure_active_path(learner["userId"], "internal-token"))
                 progress = PostgresLearningStore(self.schema.url).get_owned_progress(path_id, learner["userId"])
                 self.assertEqual(ordered_ids(progress), CONTENT_ORDER)

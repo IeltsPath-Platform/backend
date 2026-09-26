@@ -1,4 +1,4 @@
-"""Route one finalized Assessment result version to the learner's DeepTutor path.
+"""Route one finalized Assessment result version to the learner's mastery path.
 
 The path of the result's goal either exists, and the result is applied to it, or
 does not exist yet, and the result is parked until the learner's first path
@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from deeptutor.learning.scheduler import SpacedRepetitionScheduler
+from app.mastery.scheduler import SpacedRepetitionScheduler
 
 from app.adapters.formal_evidence_adapter import FormalAssessmentCommand
 from app.application.formal_result_applier import FormalResultApplier, IngestionOutcome

@@ -7,8 +7,8 @@ import json
 import unittest
 from uuid import uuid4
 
-from deeptutor.learning.models import LearningProgress
-from deeptutor.learning.policy import next_objective
+from app.mastery.models import LearningProgress
+from app.mastery.policy import next_objective
 
 from app.adapters.curriculum_adapter import CurriculumAdapter
 from app.adapters.curriculum_scope import CurriculumScope

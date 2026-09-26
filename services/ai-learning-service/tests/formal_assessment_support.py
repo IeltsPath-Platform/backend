@@ -14,8 +14,8 @@ import sqlite3
 import threading
 from uuid import UUID, uuid4
 
-from deeptutor.learning.models import KnowledgePoint, KnowledgeType, LearningModule, LearningProgress
-from deeptutor.learning.storage import LearningStoreError, LearningTransaction
+from app.mastery.models import KnowledgePoint, KnowledgeType, LearningModule, LearningProgress
+from app.mastery.store import LearningStoreError, LearningTransaction
 
 MODULE_ID = "11111111-1111-4111-8111-111111111111"
 VOCABULARY_KP = "22222222-2222-4222-8222-222222222201"  # MEMORY

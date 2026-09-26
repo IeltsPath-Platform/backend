@@ -2,7 +2,7 @@
 
 import unittest
 
-from deeptutor.learning.models import KnowledgeType
+from app.mastery.models import KnowledgeType
 
 from app.adapters.curriculum_adapter import CurriculumAdapter, CurriculumContractError
 

@@ -1,67 +1,30 @@
-"""Isolated DeepTutor catalogs and a loopback OpenAI-compatible HTTP server."""
+"""Isolated LLM settings and a loopback OpenAI-compatible HTTP server for tests."""
 
 from __future__ import annotations
 
-import atexit
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
-from pathlib import Path
-import tempfile
 import threading
 import time
 from unittest.mock import patch
 
 TEST_API_KEY = "synthetic-loopback-provider-key"
 TEST_MODEL = "gemini-2.5-flash"
-_suite_home: tempfile.TemporaryDirectory | None = None
-
-
-def isolate_deeptutor_home() -> None:
-    """Run before test collection imports DeepTutor and creates runtime files."""
-    global _suite_home
-    if _suite_home is None:
-        _suite_home = tempfile.TemporaryDirectory(prefix="ieltspath-deeptutor-tests-")
-        os.environ["DEEPTUTOR_HOME"] = _suite_home.name
-        atexit.register(_suite_home.cleanup)
-
-
-def reset_deeptutor_caches() -> None:
-    from deeptutor.services.config.model_catalog import ModelCatalogService
-    from deeptutor.services.llm.config import clear_llm_config_cache
-    from deeptutor.services.path_service import PathService
-
-    clear_llm_config_cache()
-    ModelCatalogService._instances.clear()
-    PathService.reset_instance()
 
 
 @contextmanager
-def isolated_llm_catalog(base_url: str, *, configured: bool = True):
-    """Select Gemini using only a disposable catalog pointing to the stub."""
-    with tempfile.TemporaryDirectory(prefix="ieltspath-llm-catalog-") as home:
-        with patch.dict(os.environ, {"DEEPTUTOR_HOME": home}):
-            path = Path(home) / "data/user/settings/model_catalog.json"
-            path.parent.mkdir(parents=True)
-            service = {"active_profile_id": None, "active_model_id": None, "profiles": []}
-            if configured:
-                service = {
-                    "active_profile_id": "test-gemini-profile",
-                    "active_model_id": "test-gemini-model",
-                    "profiles": [{
-                        "id": "test-gemini-profile", "name": "Test Gemini", "binding": "gemini",
-                        "base_url": base_url, "api_key": TEST_API_KEY, "api_version": "",
-                        "extra_headers": {},
-                        "models": [{"id": "test-gemini-model", "name": "Test model", "model": TEST_MODEL}],
-                    }],
-                }
-            path.write_text(json.dumps({"version": 1, "services": {"llm": service}}), encoding="utf-8")
-            reset_deeptutor_caches()
-            try:
-                yield path
-            finally:
-                reset_deeptutor_caches()
+def isolated_llm_env(base_url: str, *, configured: bool = True):
+    """Point the LLM settings at a local stub; environment values override any ``.env`` file."""
+    values = {
+        "AI_LEARNING_LLM_BASE_URL": base_url,
+        "AI_LEARNING_LLM_MODEL": TEST_MODEL if configured else "",
+        "AI_LEARNING_LLM_API_KEY": TEST_API_KEY if configured else "",
+        "AI_LEARNING_LLM_REASONING_EFFORT": "",
+    }
+    with patch.dict(os.environ, values):
+        yield
 
 
 class OpenAiStub:

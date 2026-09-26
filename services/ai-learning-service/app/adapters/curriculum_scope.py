@@ -1,7 +1,7 @@
 """Choose which canonical knowledge points belong in a learner's path for a goal.
 
 This is content scoping, like choosing a syllabus: it decides what the path
-contains before DeepTutor sees it. It makes no adaptive decision; DeepTutor's
+contains before the mastery engine sees it. It makes no adaptive decision; the engine's
 policy alone decides what to learn next inside the scoped path.
 
 Rule: a knowledge point is in scope when its effective ``bandMin`` (from

@@ -1,24 +1,23 @@
-"""External (already graded) assessment evidence at the DeepTutor LearningService boundary.
+"""External (already graded) assessment evidence at the mastery engine's LearningService boundary.
 
-DeepTutor v1.6.9 grades every answer itself (``grade_and_record`` ->
-``_apply_grade`` -> ``grade_answer``); it has no entry point for an outcome that
-another authority already graded. This subclass adds that entry point and only
-sequences the pinned DeepTutor operations — attempt recording, error records,
-evidence quality, mastery scoring, spaced repetition, review queue and the
-qualitative gate all stay inside DeepTutor code. No threshold, formula or
+The engine (ported from DeepTutor v1.6.9) grades answers itself; it has no
+entry point for an outcome that another authority already graded. This subclass
+adds that entry point and only sequences the engine's operations — attempt
+recording, error records, evidence quality, mastery scoring, spaced repetition,
+review queue and the qualitative gate all stay inside ``app.mastery``. No threshold, formula or
 schedule is implemented here.
 """
 
 from __future__ import annotations
 
-from deeptutor.learning.models import (
+from app.mastery.models import (
     ErrorType,
     LearningEvidence,
     LearningProgress,
     QuizAttempt,
 )
-from deeptutor.learning.scheduler import SpacedRepetitionScheduler
-from deeptutor.learning.service import LearningService
+from app.mastery.scheduler import SpacedRepetitionScheduler
+from app.mastery.service import LearningService
 
 from app.learning.formal_provenance import (
     FORMAL_EVIDENCE_SOURCE,
@@ -40,7 +39,7 @@ class ExternalAssessmentLearningService(LearningService):
         source_reference_id: str,
         scheduler: SpacedRepetitionScheduler,
     ) -> LearningEvidence:
-        """Fold one pre-graded outcome through DeepTutor's post-grade pipeline.
+        """Fold one pre-graded outcome through the engine's post-grade pipeline.
 
         Same sequence as ``LearningService._apply_grade`` after its grading step:
         record attempt -> record evidence -> recompute mastery -> advance the
@@ -94,7 +93,7 @@ class ExternalAssessmentLearningService(LearningService):
         source_reference_id: str,
         scheduler: SpacedRepetitionScheduler,
     ) -> LearningEvidence:
-        """Record an explicit qualitative judgment through DeepTutor's qualitative gate."""
+        """Record an explicit qualitative judgment through the engine's qualitative gate."""
         self.record_qualitative_in_memory(
             progress,
             knowledge_point_id,
@@ -117,7 +116,7 @@ class ExternalAssessmentLearningService(LearningService):
         """Remove every formal outcome of an attempt so its newer result version replaces it.
 
         Returns the knowledge points whose derived state was rebuilt from the
-        evidence that remains. Rebuilding uses DeepTutor's own recomputation seams:
+        evidence that remains. Rebuilding uses the engine's own recomputation seams:
         ``calculate_mastery`` over the remaining attempts and ``scheduler.replay``
         over the remaining evidence.
         """

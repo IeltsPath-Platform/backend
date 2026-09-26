@@ -6,7 +6,7 @@ from decimal import Decimal
 import json
 from typing import Any
 
-from deeptutor.learning.models import LearningModule
+from app.mastery.models import LearningModule
 
 from app.adapters.curriculum_scope import ScopedCurriculum, target_band_of
 from app.adapters.formal_evidence_adapter import FormalAssessmentCommand

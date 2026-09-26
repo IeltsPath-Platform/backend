@@ -1,4 +1,4 @@
-"""Validate AssessmentCompleted.v2 and translate it into a DeepTutor-oriented command.
+"""Validate AssessmentCompleted.v2 and translate it into a mastery-engine command.
 
 The adapter only checks the contract and reshapes data. It never decides mastery,
 schedules reviews, picks objectives or applies thresholds.
@@ -12,7 +12,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from uuid import UUID
 
-from deeptutor.learning.models import ErrorType
+from app.mastery.models import ErrorType
 
 from app.adapters.curriculum_scope import parse_band
 from app.learning.formal_provenance import FormalProvenance, source_reference_id
@@ -167,7 +167,7 @@ def _item(raw: Any, result_id: str, result_version: int) -> ItemObservation:
 
 
 def _error_type(value: Any) -> ErrorType | None:
-    # Assessment's error analysis is free text. Only a value naming one of DeepTutor's
+    # Assessment's error analysis is free text. Only a value naming one of the engine's
     # error categories maps; anything else carries no error classification.
     if not isinstance(value, str) or not value.strip():
         return None

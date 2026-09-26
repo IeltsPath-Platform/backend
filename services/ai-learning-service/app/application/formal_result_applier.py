@@ -1,8 +1,8 @@
-"""Apply finalized Assessment result versions to an existing DeepTutor path.
+"""Apply finalized Assessment result versions to an existing mastery path.
 
-Orchestration only: version/idempotency decisions, dispatch to DeepTutor
+Orchestration only: version/idempotency decisions, dispatch to mastery engine
 operations and the transaction boundary. Every adaptive consequence is computed
-by DeepTutor through ``ExternalAssessmentLearningService``.
+by the engine through ``ExternalAssessmentLearningService``.
 """
 
 from __future__ import annotations
@@ -11,8 +11,8 @@ from dataclasses import dataclass, field
 import logging
 from typing import Any, Literal
 
-from deeptutor.learning.policy import QUALITATIVE_TYPES, find_knowledge_point
-from deeptutor.learning.scheduler import SpacedRepetitionScheduler
+from app.mastery.policy import QUALITATIVE_TYPES, find_knowledge_point
+from app.mastery.scheduler import SpacedRepetitionScheduler
 
 from app.adapters.formal_evidence_adapter import FormalAssessmentCommand, FormalEvidenceAdapter
 from app.learning.external_assessment import ExternalAssessmentLearningService
@@ -149,7 +149,7 @@ class FormalResultApplier:
                     )
                     tx.emit("mastery.assessed", {"knowledge_point_id": kp.id, "passed": passed})
                 elif item.is_correct is not None:
-                    # Quantitative gate for MEMORY/PROCEDURE; for CONCEPT/DESIGN DeepTutor
+                    # Quantitative gate for MEMORY/PROCEDURE; for CONCEPT/DESIGN the engine
                     # treats an attempt as supporting evidence that never moves the gate.
                     evidence = self._learning.record_external_quiz_outcome(
                         tx.progress,

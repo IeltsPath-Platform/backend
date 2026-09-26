@@ -6,15 +6,15 @@ from datetime import date, datetime, timezone
 import logging
 from typing import Any
 
-from deeptutor.learning.models import LearningModule
 from starlette.concurrency import run_in_threadpool
 
 from app.adapters.curriculum_scope import ScopedCurriculum
 from app.adapters.formal_evidence_adapter import FormalEvidenceAdapter
-from app.learning.deeptutor_llm import DeepTutorOrderingLlm
+from app.learning.ordering_llm import OrderingLlm
 from app.learning.path_ordering import (
     InvalidOrdering, LearnerContext, OrderingRequest, OrderingValidator, PayloadTooLarge,
 )
+from app.mastery.models import LearningModule
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ def _learner_profile(context: LearnerContext) -> dict[str, str]:
 
 
 class PathOrderer:
-    def __init__(self, store: Any, llm: DeepTutorOrderingLlm, *,
+    def __init__(self, store: Any, llm: OrderingLlm, *,
                  today: Callable[[], date] = _utc_today) -> None:
         self._store = store
         self._llm = llm

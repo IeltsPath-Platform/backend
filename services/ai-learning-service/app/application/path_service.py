@@ -1,4 +1,4 @@
-"""Goal-bound DeepTutor path bootstrap and safe read operations."""
+"""Goal-bound mastery path bootstrap and safe read operations."""
 
 from typing import Any
 from uuid import UUID, uuid4
@@ -6,8 +6,8 @@ from uuid import UUID, uuid4
 from psycopg2.errors import UniqueViolation
 from starlette.concurrency import run_in_threadpool
 
-from deeptutor.learning.policy import map_summary, next_objective
-from deeptutor.learning.service import LearningService
+from app.mastery.policy import map_summary, next_objective
+from app.mastery.service import LearningService
 
 from app.adapters.curriculum_adapter import CurriculumAdapter
 from app.adapters.curriculum_scope import CurriculumScope, KnowledgePointBand, ScopedCurriculum, target_band_of

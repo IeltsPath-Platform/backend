@@ -1,8 +1,7 @@
-"""Provenance of formal Assessment evidence inside the DeepTutor aggregate.
+"""Provenance of formal Assessment evidence inside the mastery aggregate.
 
-DeepTutor v1.6.9 models ignore unknown fields (``extra="ignore"``), so provenance
-cannot be added as new attributes without a fork. It is carried in fields the
-pinned models already persist:
+The engine's models keep DeepTutor v1.6.9's shape and ignore unknown fields
+(``extra="ignore"``), so provenance is carried in fields they already persist:
 
 * ``LearningEvidence.source``     -> ``FORMAL_EVIDENCE_SOURCE``
 * ``LearningEvidence.turn_id``    -> the deterministic ``source_reference_id``
@@ -18,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID, uuid5
 
-from deeptutor.learning.models import LearningEvidence
+from app.mastery.models import LearningEvidence
 
 FORMAL_EVIDENCE_SOURCE = "assessment_service"
 

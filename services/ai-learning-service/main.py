@@ -1,4 +1,4 @@
-"""IELTSPath Adaptive Learning and DeepTutor runtime API."""
+"""IELTSPath Adaptive Learning API."""
 
 import httpx
 from fastapi import Depends, FastAPI, status
@@ -11,7 +11,7 @@ from app.adapters.curriculum_adapter import CurriculumContractError
 from app.adapters.curriculum_scope import NoCurriculumInScope
 from app.application.path_service import ActiveGoalRequired, PathNotFound, PathService
 from app.application.path_orderer import PathOrderer
-from app.learning.deeptutor_llm import DeepTutorOrderingLlm
+from app.learning.ordering_llm import OrderingLlm
 from app.api.dto.responses import (
     LearningPathMapResponse,
     LearningProgressResponse,
@@ -31,12 +31,12 @@ def get_path_service(settings: Settings = Depends(get_settings)) -> PathService:
         store,
         UserServiceClient(settings.user_service_base_url),
         ContentServiceClient(settings.content_service_base_url),
-        orderer=PathOrderer(store, DeepTutorOrderingLlm()),
+        orderer=PathOrderer(store, OrderingLlm()),
     )
 
 app = FastAPI(
     title="IELTSPath AI Learning Service",
-    description="Adaptive Learning, DeepTutor Mastery Path, and Tutor Runtime",
+    description="Adaptive Learning and Mastery Path",
     version="1.0.0",
 )
 

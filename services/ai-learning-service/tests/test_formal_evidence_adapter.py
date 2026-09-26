@@ -2,7 +2,7 @@ import unittest
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from deeptutor.learning.models import ErrorType
+from app.mastery.models import ErrorType
 
 from app.adapters.formal_evidence_adapter import ContractError, FormalEvidenceAdapter
 from app.learning.formal_provenance import FORMAL_EVIDENCE_NAMESPACE, source_reference_id

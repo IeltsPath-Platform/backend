@@ -12,7 +12,7 @@ from app.adapters.formal_evidence_adapter import FormalEvidenceAdapter
 from app.application.formal_assessment_ingestion import FormalAssessmentIngestionService
 from app.application.path_orderer import PathOrderer
 from app.application.path_service import PathService
-from app.learning.deeptutor_llm import DeepTutorOrderingLlm, LlmProposal
+from app.learning.ordering_llm import LlmProposal, OrderingLlm
 from app.learning.path_ordering import PayloadTooLarge
 from tests.formal_assessment_support import InMemoryLearningStore, event, item, mapping
 from tests.test_path_ordering import (
@@ -340,11 +340,11 @@ class OrderedPathCreationTest(unittest.TestCase):
         self.assertIsNone(progress.learner_profile)
         self.assertEqual(self.ordering_events(path_id), [])
 
-    def test_path_creation_uses_the_real_deeptutor_llm_with_a_local_server(self):
-        from tests.deeptutor_llm_support import OpenAiStub, TEST_MODEL, isolated_llm_catalog
+    def test_path_creation_uses_the_real_llm_client_with_a_local_server(self):
+        from tests.llm_test_support import OpenAiStub, TEST_MODEL, isolated_llm_env
 
-        with OpenAiStub(content=json.dumps(valid_proposal())) as server, isolated_llm_catalog(server.base_url):
-            self.paths = self.service(DeepTutorOrderingLlm())
+        with OpenAiStub(content=json.dumps(valid_proposal())) as server, isolated_llm_env(server.base_url):
+            self.paths = self.service(OrderingLlm())
             path_id, progress = self.create()
 
         self.assertEqual(ordered_ids(progress), LLM_ORDER)

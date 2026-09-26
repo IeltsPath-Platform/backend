@@ -1,13 +1,13 @@
 """Placement test-out: skip the knowledge points a placement shows the learner already masters.
 
-A tested-out point is recorded as a DeepTutor learner mastery override, the
-mechanism DeepTutor already offers for "may advance past this point without
+A tested-out point is recorded as a learner mastery override, the
+mechanism the engine already offers for "may advance past this point without
 the gate". ``is_mastered`` honours it, so ``next_objective`` skips the point.
 The placement evidence itself is still recorded normally; test-out never fakes
 evidence and never changes mastery scores, gates, policy or the scheduler.
 
-DeepTutor's override has no provenance field and the pinned submodule is the
-unmodified upstream release, so provenance lives in the override note:
+The override model has no provenance field and keeps DeepTutor v1.6.9's shape so
+stored paths stay readable, so provenance lives in the override note:
 ``placement:{attempt_id}:v{result_version}`` (see ``override_provenance``).
 
 A point is tested out by a ``PLACEMENT`` result when either
@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from deeptutor.learning.policy import find_knowledge_point, is_assessed_mastered
+from app.mastery.policy import find_knowledge_point, is_assessed_mastered
 
 from app.adapters.curriculum_scope import KnowledgePointBand
 from app.adapters.formal_evidence_adapter import FormalAssessmentCommand
@@ -70,7 +70,7 @@ class PlacementTestOut:
         }
 
     def __init__(self, learning: Any) -> None:
-        # A DeepTutor LearningService: overrides are written through its own API.
+        # The engine's LearningService: overrides are written through its own API.
         self._learning = learning
 
     def apply(self, tx: Any, path_id: str, command: FormalAssessmentCommand,

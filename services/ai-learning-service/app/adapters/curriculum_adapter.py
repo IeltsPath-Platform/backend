@@ -1,9 +1,9 @@
-"""Map Content Service curriculum records into DeepTutor's pinned models."""
+"""Map Content Service curriculum records into the mastery engine's models."""
 
 from typing import Any
 from uuid import UUID
 
-from deeptutor.learning.models import KnowledgePoint, KnowledgeType, LearningModule
+from app.mastery.models import KnowledgePoint, KnowledgeType, LearningModule
 
 
 _KNOWLEDGE_TYPES = {

@@ -1,1 +1,1 @@
-"""Adapters translating canonical curriculum into DeepTutor models."""
+"""Adapters translating canonical curriculum into mastery engine models."""

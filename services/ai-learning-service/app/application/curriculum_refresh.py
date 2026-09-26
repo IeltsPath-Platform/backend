@@ -1,6 +1,6 @@
 """Merge a freshly scoped curriculum into an existing path without losing learner state.
 
-DeepTutor's ``replace_modules`` deletes the mastery, evidence, attempts and
+The engine's ``replace_modules`` deletes the mastery, evidence, attempts and
 overrides of every knowledge point missing from the new module set. A refresh
 therefore only ever adds: every point already in the path is kept. Existing
 module and point order stays fixed; new points join the end of their module,
@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from deeptutor.learning.models import LearningModule
+from app.mastery.models import LearningModule
 
 
 @dataclass(frozen=True)

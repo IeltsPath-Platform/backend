@@ -2,8 +2,8 @@ import threading
 import unittest
 from uuid import uuid4
 
-from deeptutor.learning.mastery import compute_mastery
-from deeptutor.learning.policy import next_objective
+from app.mastery.mastery import compute_mastery
+from app.mastery.policy import next_objective
 
 from app.adapters.formal_evidence_adapter import FormalEvidenceAdapter
 from app.application.formal_assessment_ingestion import FormalAssessmentIngestionService

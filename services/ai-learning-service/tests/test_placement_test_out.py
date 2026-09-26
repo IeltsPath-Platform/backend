@@ -8,15 +8,15 @@ import unittest
 from decimal import Decimal
 from uuid import uuid4
 
-from deeptutor.learning.models import LearnerMasteryOverride
-from deeptutor.learning.policy import next_objective
+from app.mastery.models import LearnerMasteryOverride
+from app.mastery.policy import next_objective
 
 from app.adapters.curriculum_scope import KnowledgePointBand
 from app.adapters.formal_evidence_adapter import FormalEvidenceAdapter
 from app.application.formal_assessment_ingestion import FormalAssessmentIngestionService
 from app.application.path_service import PathService
 from app.learning.placement_test_out import PlacementTestOut, with_placement_provenance
-from deeptutor.learning.policy import map_summary
+from app.mastery.policy import map_summary
 
 from tests.formal_assessment_support import (
     COHERENCE_KP,
