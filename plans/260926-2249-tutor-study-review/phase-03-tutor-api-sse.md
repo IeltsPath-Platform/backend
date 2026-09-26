@@ -1,13 +1,13 @@
 ---
-phase: 6
+phase: 3
 title: "API tutor HTTP + SSE"
-status: pending
+status: complete
 priority: P1
-dependencies: [5]
+dependencies: [2]
 effort: "~1.5d"
 ---
 
-# Phase 6: API tutor HTTP + SSE
+# Phase 3: API tutor HTTP + SSE
 
 ## Overview
 Mở tutor ra ngoài bằng REST, và một endpoint `POST` trả `text/event-stream` cho mỗi lượt học. Xác thực như mọi API khác
@@ -39,8 +39,8 @@ active của học viên, do server xác định.
   - Header `Cache-Control: no-cache`, `X-Accel-Buffering: no`.
 - **Client ngắt kết nối**: turn vẫn chạy tới cuối phía server để state nhất quán; client đọc lại kết quả bằng
   `GET /sessions/{id}`.
-- Khởi động API (`lifespan`): gọi `recover_interrupted_turns()` (pha 4). Consumer không gọi.
-- Hợp đồng sự kiện ghi ở `docs/contracts/tutor-sse-v1.md` (pha 7 hoàn thiện ví dụ).
+- Khởi động API (`lifespan`): gọi `recover_interrupted_turns()` (pha 1). Consumer không gọi.
+- Hợp đồng sự kiện ghi ở `docs/contracts/tutor-sse-v1.md` (pha 4 hoàn thiện ví dụ).
 - Gateway: route `ai-learning-service` (`Path=/api/ai-learning/**`) đã phủ. Không đổi cơ chế xác thực. Pha 7 kiểm SSE đi
   qua Gateway không bị gom buffer và không bị timeout giữa chừng.
 
@@ -59,5 +59,5 @@ active của học viên, do server xác định.
 8. Gate đầy đủ.
 
 ## Success Criteria
-- [ ] Học viên học một KP qua HTTP + SSE, chỉ với internal JWT như mọi API khác.
-- [ ] Không endpoint nào nhận path id từ client.
+- [x] Học viên học một KP qua HTTP + SSE, chỉ với internal JWT như mọi API khác.
+- [x] Không endpoint nào nhận path id từ client.

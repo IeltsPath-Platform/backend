@@ -1,5 +1,9 @@
 """IELTSPath Adaptive Learning API."""
 
+import asyncio
+from contextlib import asynccontextmanager
+import logging
+
 import httpx
 from fastapi import Depends, FastAPI, status
 from fastapi.responses import JSONResponse
@@ -9,36 +13,40 @@ from uuid import UUID
 
 from app.adapters.curriculum_adapter import CurriculumContractError
 from app.adapters.curriculum_scope import NoCurriculumInScope
+from app.api.dependencies import get_path_service
+from app.api.tutor import router as tutor_router
 from app.application.path_service import ActiveGoalRequired, PathNotFound, PathService
-from app.application.path_orderer import PathOrderer
-from app.learning.ordering_llm import OrderingLlm
 from app.api.dto.responses import (
     LearningPathMapResponse,
     LearningProgressResponse,
     LearningStatusResponse,
     PathCreatedResponse,
 )
-from app.clients.content_service import ContentServiceClient
-from app.clients.user_service import UserServiceClient
-from app.config import Settings, get_settings
-from app.persistence.postgres_learning_store import PostgresLearningStore
+from app.config import get_settings
 from app.security.internal_jwt import AuthenticatedUser, bearer_scheme, require_current_user
+from app.tutor.session_store import TutorSessionStore
+
+logger = logging.getLogger(__name__)
 
 
-def get_path_service(settings: Settings = Depends(get_settings)) -> PathService:
-    store = PostgresLearningStore(settings.database_url.get_secret_value())
-    return PathService(
-        store,
-        UserServiceClient(settings.user_service_base_url),
-        ContentServiceClient(settings.content_service_base_url),
-        orderer=PathOrderer(store, OrderingLlm()),
-    )
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # One API instance serves every tutor turn, so a turn still marked running at start-up died with the
+    # previous process; failing it frees its session. Do not serve turns until recovery succeeds.
+    store = TutorSessionStore(get_settings().database_url.get_secret_value())
+    recovered = await asyncio.to_thread(store.recover_interrupted_turns)
+    if recovered:
+        logger.warning("Failed %s tutor turns interrupted by the previous shutdown", recovered)
+    yield
+
 
 app = FastAPI(
     title="IELTSPath AI Learning Service",
-    description="Adaptive Learning and Mastery Path",
+    description="Adaptive Learning, Mastery Path, and study/review tutor",
     version="1.0.0",
+    lifespan=lifespan,
 )
+app.include_router(tutor_router)
 
 
 @app.exception_handler(ActiveGoalRequired)
@@ -148,4 +156,3 @@ async def get_path_map(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
