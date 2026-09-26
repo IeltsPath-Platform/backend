@@ -14,7 +14,7 @@
           "api_version": "",
           "extra_headers": {},
           "models": [
-            {"id": "llm-model-gemini", "name": "Gemini Flash", "model": "gemini-3.8-flash"}
+            {"id": "llm-model-gemini", "name": "Gemini Flash", "model": "gemini-3.8-flash", "reasoning_effort": "low"}
           ]
         }
       ]

@@ -206,6 +206,12 @@ model available to the team, keep `binding: "gemini"`, and leave `base_url` empt
 for DeepTutor's default Gemini endpoint. Keep `extra_headers` empty for this setup.
 The model in the example file is a starting value, not a requirement.
 
+The example sets `"reasoning_effort": "low"` on the model. Without it, DeepTutor
+v1.6.9 sends `minimal` to every `gemini-3*` model, and `gemini-3.8-flash` answers
+`400 Thinking level MINIMAL is not supported`. Keep the field unless the chosen
+model accepts `minimal`. Google also rejects `gemini-2.5-flash` for new API keys
+with a 404.
+
 DeepTutor caches configuration for the process lifetime. After any catalog change:
 
 ```powershell
