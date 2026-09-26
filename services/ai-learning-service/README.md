@@ -217,9 +217,17 @@ Always run DeepTutor commands in the container as `appuser` (`-u appuser`). A pl
 `docker compose exec` runs as root. DeepTutor rewrites the catalog as a root-owned
 `0600` file, which the API process (uid 10001) cannot read. The API then treats the
 catalog as empty, overwrites it with an empty catalog, and reports
-`llm_not_configured`: the key and model are lost from the file. If that happened,
-delete the catalog and create it again as described above. Then restart
-`ai-learning-api`: the entrypoint gives `/app/data` back to `appuser` on start.
+`llm_not_configured`: the key and model are lost from the file. Root also leaves
+other files behind, such as `user/logs/deeptutor.jsonl`, and after that even
+`-u appuser` commands fail with `PermissionError`. To recover:
+
+```powershell
+docker compose stop ai-learning-api
+Remove-Item -Recurse -Force services/ai-learning-service/deeptutor-data
+# create the catalog again as above, fill in the key and model, then:
+docker compose up -d ai-learning-api
+docker compose exec -u appuser ai-learning-api deeptutor config show
+```
 
 Check `llm.provider` is `gemini`, `llm.model` matches the chosen model, and
 `llm.api_key` is `***`. Use only those fields when recording configuration evidence;

@@ -276,8 +276,11 @@ docker compose exec -u appuser ai-learning-api deeptutor config show
 Luôn chạy lệnh DeepTutor trong container bằng `-u appuser`. `docker compose exec`
 mặc định chạy bằng root. Khi đó DeepTutor ghi lại catalog thành file của root với quyền
 `0600`, API (uid 10001) không đọc được, nên coi catalog là rỗng và ghi đè nó: key và
-model mất khỏi file, path báo `llm_not_configured`. Nếu đã lỡ chạy bằng root, xóa
-catalog, tạo lại, rồi restart `ai-learning-api`.
+model mất khỏi file, path báo `llm_not_configured`. Root còn tạo các file khác, ví dụ
+log `user/logs/deeptutor.jsonl`, khiến cả lệnh `-u appuser` cũng báo `PermissionError`.
+Nếu đã lỡ chạy bằng root: dừng `ai-learning-api`, xóa cả thư mục
+`services/ai-learning-service/deeptutor-data`, tạo lại catalog, rồi
+`docker compose up -d ai-learning-api`.
 
 Kiểm tra `llm.provider` là `gemini`, model đúng cấu hình và `llm.api_key` hiển thị
 `***`. Không cấu hình hoặc LLM lỗi thì vẫn tạo path theo thứ tự Content. Thứ tự đã
