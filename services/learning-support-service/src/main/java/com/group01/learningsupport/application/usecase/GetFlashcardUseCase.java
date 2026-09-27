@@ -16,6 +16,6 @@ public class GetFlashcardUseCase {
 
     @Transactional(readOnly = true)
     public FlashcardResult execute(UUID userId, UUID flashcardId) {
-        return FlashcardResult.from(ApplicationSupport.required(repository.findByIdAndUserId(flashcardId, userId)));
+        return FlashcardResult.from(ApplicationSupport.required(repository.findAvailableByIdAndUserId(flashcardId, userId)));
     }
 }

@@ -31,7 +31,7 @@ public class UpdateFlashcardUseCase {
             String back,
             LibraryStatus status
     ) {
-        Flashcard card = ApplicationSupport.required(repository.findByIdAndUserId(flashcardId, userId));
+        Flashcard card = ApplicationSupport.required(repository.findAvailableByIdAndUserId(flashcardId, userId));
         card.update(sourceType, vocabularySenseId, sourceReferenceId, highlightedText, front, back, status);
         if (status != LibraryStatus.ACTIVE) {
             items.deleteByFlashcardId(flashcardId);

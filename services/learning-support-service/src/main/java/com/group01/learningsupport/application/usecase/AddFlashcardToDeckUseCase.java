@@ -29,7 +29,7 @@ public class AddFlashcardToDeckUseCase {
     @Transactional
     public void execute(UUID userId, UUID deckId, UUID flashcardId, Integer sortOrder) {
         FlashcardDeck deck = ApplicationSupport.required(decks.findByIdAndUserId(deckId, userId));
-        Flashcard card = ApplicationSupport.required(cards.findByIdAndUserId(flashcardId, userId));
+        Flashcard card = ApplicationSupport.required(cards.findAvailableByIdAndUserId(flashcardId, userId));
         if (deck.getStatus() != LibraryStatus.ACTIVE || card.getStatus() != LibraryStatus.ACTIVE) {
             throw new ResourceNotFoundException();
         }

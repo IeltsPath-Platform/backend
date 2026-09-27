@@ -65,7 +65,7 @@ class LearningSupportSchemaTest {
                 "idx_notes_user_status_updated",
                 "idx_flashcard_decks_user_status_updated",
                 "uq_flashcard_decks_user_name_not_deleted",
-                "idx_flashcards_user_status_updated",
+                "idx_flashcards_user_status_updated_id",
                 "idx_flashcard_deck_items_deck_sort",
                 "idx_flashcard_deck_items_flashcard",
                 "idx_outbox_events_published_created"
@@ -101,6 +101,24 @@ class LearningSupportSchemaTest {
         insertDeck(userId, "Academic Vocabulary", "DELETED");
         insertDeck(userId, "Academic Vocabulary", "ACTIVE");
         assertThrows(SQLException.class, () -> insertDeck(userId, "Academic Vocabulary", "ACTIVE"));
+    }
+
+    @Test
+    void flashcardsHaveOptimisticLockVersion() throws Exception {
+        String sql = """
+                SELECT is_nullable, column_default
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'flashcards'
+                  AND column_name = 'version'
+                """;
+        try (Connection connection = connection();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet column = statement.executeQuery()) {
+            org.junit.jupiter.api.Assertions.assertTrue(column.next());
+            assertEquals("NO", column.getString("is_nullable"));
+            assertEquals("0", column.getString("column_default"));
+        }
     }
 
     private static void insertProgress(UUID userId, UUID videoId) throws SQLException {

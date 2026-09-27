@@ -27,16 +27,8 @@ public class DeleteFlashcardUseCase {
 
     @Transactional
     public void execute(UUID userId, UUID flashcardId) {
-        Flashcard card = ApplicationSupport.required(repository.findByIdAndUserId(flashcardId, userId));
-        card.update(
-                card.getSourceType(),
-                card.getVocabularySenseId(),
-                card.getSourceReferenceId(),
-                card.getHighlightedText(),
-                card.getFront(),
-                card.getBack(),
-                LibraryStatus.DELETED
-        );
+        Flashcard card = ApplicationSupport.required(repository.findAvailableByIdAndUserId(flashcardId, userId));
+        card.delete();
         repository.save(card);
         items.deleteByFlashcardId(flashcardId);
     }

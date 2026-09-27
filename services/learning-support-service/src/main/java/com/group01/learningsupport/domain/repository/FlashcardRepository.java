@@ -10,7 +10,7 @@ import java.util.UUID;
 public interface FlashcardRepository {
     Flashcard save(Flashcard flashcard);
 
-    Optional<Flashcard> findByIdAndUserId(UUID id, UUID userId);
+    Optional<Flashcard> findAvailableByIdAndUserId(UUID id, UUID userId);
 
     OwnedPage<Flashcard> findByUserIdAndStatus(UUID userId, LibraryStatus status, int page, int size);
 }

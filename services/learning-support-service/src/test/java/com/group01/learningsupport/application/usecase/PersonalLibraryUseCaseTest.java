@@ -49,7 +49,7 @@ class PersonalLibraryUseCaseTest {
         Flashcard card = Flashcard.create(userId, FlashcardSourceType.MANUAL, null, null, null, "front", "back");
         card.update(FlashcardSourceType.MANUAL, null, null, null, "front", "back", LibraryStatus.ARCHIVED);
         when(decks.findByIdAndUserId(deck.getId(), userId)).thenReturn(Optional.of(deck));
-        when(cards.findByIdAndUserId(card.getId(), userId)).thenReturn(Optional.of(card));
+        when(cards.findAvailableByIdAndUserId(card.getId(), userId)).thenReturn(Optional.of(card));
 
         assertThrows(ResourceNotFoundException.class, () -> useCase.execute(userId, deck.getId(), card.getId(), 1));
         verify(items, never()).add(any(), any(), any());
@@ -65,7 +65,7 @@ class PersonalLibraryUseCaseTest {
         UUID cardId = UUID.randomUUID();
         FlashcardDeck deck = FlashcardDeck.create(userId, "Deck", null);
         when(decks.findByIdAndUserId(deck.getId(), userId)).thenReturn(Optional.of(deck));
-        when(cards.findByIdAndUserId(cardId, userId)).thenReturn(Optional.empty());
+        when(cards.findAvailableByIdAndUserId(cardId, userId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> useCase.execute(userId, deck.getId(), cardId, null));
         verifyNoInteractions(items);
@@ -108,9 +108,71 @@ class PersonalLibraryUseCaseTest {
         FlashcardDeck deck = FlashcardDeck.create(userId, "Deck", null);
         Flashcard card = Flashcard.create(userId, FlashcardSourceType.MANUAL, null, null, null, "front", "back");
         when(decks.findByIdAndUserId(deck.getId(), userId)).thenReturn(Optional.of(deck));
-        when(cards.findByIdAndUserId(card.getId(), userId)).thenReturn(Optional.of(card));
+        when(cards.findAvailableByIdAndUserId(card.getId(), userId)).thenReturn(Optional.of(card));
         org.mockito.Mockito.doThrow(new ConflictException()).when(items).add(deck.getId(), card.getId(), 1);
 
         assertThrows(ConflictException.class, () -> useCase.execute(userId, deck.getId(), card.getId(), 1));
+    }
+
+    @Test
+    void highlightedFlashcardSupportsUserDefinedContentWithoutVocabularyLookup() {
+        UUID sourceId = UUID.randomUUID();
+
+        Flashcard card = Flashcard.create(
+                UUID.randomUUID(),
+                FlashcardSourceType.HIGHLIGHT,
+                null,
+                sourceId,
+                "in spite of",
+                "in spite of",
+                "mac du"
+        );
+
+        assertEquals(FlashcardSourceType.HIGHLIGHT, card.getSourceType());
+        assertEquals(sourceId, card.getSourceReferenceId());
+        assertEquals("in spite of", card.getHighlightedText());
+        assertEquals("mac du", card.getBack());
+    }
+
+    @Test
+    void updateCannotBeUsedAsDeleteOperation() {
+        Flashcard card = Flashcard.create(
+                UUID.randomUUID(), FlashcardSourceType.MANUAL, null, null, null, "front", "back"
+        );
+
+        assertThrows(InvalidDataException.class, () -> card.update(
+                FlashcardSourceType.MANUAL, null, null, null, "front", "back", LibraryStatus.DELETED
+        ));
+    }
+
+    @Test
+    void softDeleteHidesFlashcardAndRemovesDeckMemberships() {
+        FlashcardRepository cards = mock(FlashcardRepository.class);
+        FlashcardDeckItemRepository items = mock(FlashcardDeckItemRepository.class);
+        DeleteFlashcardUseCase useCase = new DeleteFlashcardUseCase(cards, items);
+        UUID userId = UUID.randomUUID();
+        Flashcard card = Flashcard.create(
+                userId, FlashcardSourceType.MANUAL, null, null, null, "front", "back"
+        );
+        when(cards.findAvailableByIdAndUserId(card.getId(), userId)).thenReturn(Optional.of(card));
+        when(cards.save(card)).thenReturn(card);
+
+        useCase.execute(userId, card.getId());
+
+        assertEquals(LibraryStatus.DELETED, card.getStatus());
+        verify(cards).save(card);
+        verify(items).deleteByFlashcardId(card.getId());
+    }
+
+    @Test
+    void deletedFlashcardsCannotBeListed() {
+        FlashcardRepository cards = mock(FlashcardRepository.class);
+        ListFlashcardsUseCase useCase = new ListFlashcardsUseCase(cards);
+
+        assertThrows(InvalidDataException.class, () -> useCase.execute(
+                UUID.randomUUID(), LibraryStatus.DELETED,
+                new com.group01.learningsupport.application.query.PageQuery(0, 20)
+        ));
+        verifyNoInteractions(cards);
     }
 }
