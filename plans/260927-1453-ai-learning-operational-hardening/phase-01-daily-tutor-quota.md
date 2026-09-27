@@ -169,9 +169,8 @@ xóa cache settings như `test_tutor_api_postgres.py`; mỗi test dùng học vi
 - Bổ sung từ mục Risk: khởi động gọi `DailyQuotaStore.check_ready()`; chỉ nhận tên IANA trong `pg_timezone_names`
   (từ chối `UTC+7` vì Postgres đọc ngược dấu) và kiểm bảng `llm_daily_usage` tồn tại.
 - Lỗi khi `consume` → đóng lượt `failed/internal_error` rồi trả lỗi, session không bị kẹt. Lượt bị từ chối có log `reason=quota`.
-- Review: `plans/reports/code-reviewer-260927-2117-daily-tutor-quota-review-report.md`; còn mở (Low, chưa làm):
-  `Retry-After` chưa nằm trong CORS exposed headers của Gateway (frontend dùng `resetsAt`); tóm tắt memory lỗi không
-  được hoàn; bảng `llm_daily_usage` chưa có retention.
+- Review: `plans/reports/code-reviewer-260927-2117-daily-tutor-quota-review-report.md`. Các việc còn mở (Low) được
+  ghi ở `plan.md`, mục "Làm sau", từ mục 4 đến 6.
 
 ## Risk Assessment
 - **Múi giờ sai tên** → Postgres báo lỗi ở lần gọi đầu. Giảm: test khởi động gọi `usage()` một lần; README ghi rõ tên IANA.

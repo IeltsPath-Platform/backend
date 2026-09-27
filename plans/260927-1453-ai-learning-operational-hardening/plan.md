@@ -56,6 +56,18 @@ Phase 2 phụ thuộc phase 1 (E2E kiểm cả endpoint `/tutor/usage`).
 2. Trừ AI Points qua access-service (`POST /api/access/points/debit`, `idempotencyKey` = turnId), khi có giá mỗi lượt.
 3. Nhắc lịch ôn qua notification-service; Immersive Watching cho Listening.
 
+Còn mở sau phase 1 (code review 2026-09-27, mức Low; chi tiết trong
+[report review](../reports/code-reviewer-260927-2117-daily-tutor-quota-review-report.md)):
+
+4. **Gateway CORS (tùy chọn, chỉ làm khi frontend cần)**: thêm `Retry-After` vào exposed headers
+   (`infra/api-gateway/.../security/SecurityConfig.java`) khi frontend thật sự cần đọc header của `429` (ví dụ thư viện
+   tự retry theo header). Hiện không cần: body `429` đã có `resetsAt`, và hết lượt trong ngày nên hiện thông báo thay vì retry.
+5. **Hoàn lần tóm tắt memory khi gọi model lỗi**: hiện một lần tóm tắt lỗi vẫn bị tính, nên khi nhà cung cấp sập, học
+   viên có thể mất hết 10 lần/ngày mà không có memory mới.
+6. **Dọn dữ liệu cũ**: `llm_daily_usage` chưa có retention (mỗi học viên thêm tối đa 2 dòng/ngày), và mỗi request bị
+   từ chối vì hết hạn mức vẫn tạo một dòng `turns` `failed/quota_exceeded`, nên client retry liên tục làm bảng tăng
+   không giới hạn. Cần job xóa định kỳ hoặc chặn retry sớm hơn.
+
 ## Validation Log
 
 ### Session 1 (2026-09-27)
