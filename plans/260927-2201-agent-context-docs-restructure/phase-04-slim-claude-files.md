@@ -1,10 +1,12 @@
 ---
 phase: 4
-title: "Slim CLAUDE files"
-status: pending
+title: Slim CLAUDE files
+status: in-progress
 priority: P1
-dependencies: [1, 3]
-effort: "~0.5d"
+dependencies:
+  - 1
+  - 3
+effort: ~0.5d
 ---
 
 # Phase 4: Slim CLAUDE files
