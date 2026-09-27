@@ -10,14 +10,24 @@ server-generated UUIDs. The active learning path is selected by the server.
 | `GET` | `/sessions?limit=50` | Limit 1–100 | `200` array of newest unarchived summaries |
 | `GET` | `/sessions/{sessionId}` | None | `200` summary plus latest 200 `messages` and `pendingQuestion` |
 | `DELETE` | `/sessions/{sessionId}` | None | `204` |
-| `POST` | `/sessions/{sessionId}/turns` | Exactly one of `message` or `answer` | `200 text/event-stream` |
+| `POST` | `/sessions/{sessionId}/turns` | Exactly one of `message` or `answer` | `200 text/event-stream`; `429` JSON when the daily turn limit is reached |
 | `GET` | `/memory` | None | `200` `{ "content": "...", "updatedAt": "..." }`; no stored memory returns empty content and `null` timestamp |
 | `DELETE` | `/memory` | None | `204`; clears the learner's memory and skips all messages that exist at deletion time |
+| `GET` | `/usage` | None | `200` `{ "timezone": "Asia/Ho_Chi_Minh", "resetsAt": "...", "tutorTurns": { "used": 3, "limit": 50 }, "memorySummaries": { "used": 0, "limit": 10 } }`; `limit` `0` means unlimited |
 
 `message` must be 1–4,000 characters. `answer` is `{ "questionId": "uuid", "text": "..." }` with 1–2,000
 characters. An invalid body returns JSON `422` before streaming. Missing or invalid authentication returns `401`;
 an unowned, missing, or archived session returns `404`; another running turn in that session returns `409`.
 Creating a session without an active learning goal also returns `409`.
+
+Each learner has a daily limit of tutor turns (default 50) and of memory summaries (default 10). The day ends at
+midnight in the service's configured time zone (default `Asia/Ho_Chi_Minh`). A turn over the limit returns `429`
+before any SSE and before the model is called:
+`{ "detail": "Daily tutor turn limit reached", "limit": 50, "resetsAt": "2026-09-27T17:00:00Z" }`, with a
+`Retry-After` header in seconds until `resetsAt`. Validation `422`, `404` and `409` do not count. A turn that ends in
+`turn.failed` with `llm_not_configured`, or with `llm_error` before any `tool.called` or `assistant.message` event, is not
+counted. Once the model has answered, the turn counts even if a later model call fails; other failures always count. A
+memory summary over its limit is skipped silently and retried on a later turn or day.
 
 Each SSE block has `event: <name>`, `data: <JSON object>` and a blank line. JSON keys are camelCase. While no event
 is ready, the service sends `: keep-alive` comments about every 15 seconds. Responses set `Cache-Control: no-cache`

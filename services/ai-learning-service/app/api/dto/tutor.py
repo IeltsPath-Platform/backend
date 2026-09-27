@@ -70,6 +70,24 @@ class LearnerMemoryResponse(ApiResponse):
     updated_at: datetime | None = Field(default=None, alias="updatedAt")
 
 
+class UsageCountResponse(ApiResponse):
+    used: int
+    limit: int  # 0 = unlimited
+
+
+class TutorUsageResponse(ApiResponse):
+    timezone: str
+    resets_at: datetime = Field(alias="resetsAt")
+    tutor_turns: UsageCountResponse = Field(alias="tutorTurns")
+    memory_summaries: UsageCountResponse = Field(alias="memorySummaries")
+
+
+class QuotaExceededResponse(ApiResponse):
+    detail: str
+    limit: int
+    resets_at: datetime = Field(alias="resetsAt")
+
+
 class TutorMessageResponse(ApiResponse):
     id: int
     role: str

@@ -35,6 +35,7 @@ All routes below begin with `/api/ai-learning/tutor`:
 | `POST` | `/sessions/{sessionId}/turns` | Exactly one `message` (up to 4,000 characters) or `answer` (`questionId`, `text` up to 2,000); returns SSE. |
 | `GET` | `/memory` | Read the learner's cross-session memory; an unset memory returns empty content and a null update time. |
 | `DELETE` | `/memory` | Clear the learner's memory and move its message cursor past all existing messages; 204. |
+| `GET` | `/usage` | Today's tutor turns and memory summaries against their daily limits, and when the day resets. |
 
 A turn emits `turn.started`, optional `assistant.message` and `tool.called`, and may emit `question`, `practice.questions`,
 `grading`, `path.reordered`, `profile.updated` or `note.draft` before `turn.completed` or `turn.failed`. Practice cards end the turn;
@@ -129,6 +130,28 @@ may also include the correct answer so the model can explain it. The prompt does
 user id, or bearer token. The API runs one instance: on restart it marks interrupted turns failed, and each session
 allows one running turn. If a client disconnects, the server finishes that turn; reload its result from `GET /sessions/{id}`.
 
+### Daily limits
+
+Each learner may open a limited number of tutor turns and memory summaries per day, so one account cannot run up
+provider cost. Counts live in `llm_daily_usage` and are taken with one guarded upsert, so concurrent requests never
+exceed a limit. The day is computed by PostgreSQL in the configured IANA time zone. The service refuses to start when
+the zone is not an IANA name in `pg_timezone_names` (POSIX forms such as `UTC+7` are refused because PostgreSQL reads
+their sign reversed) or when `llm_daily_usage` is missing.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `AI_LEARNING_TUTOR_TURNS_PER_DAY` | `50` | Tutor turns per learner per day; `0` = unlimited (still counted) |
+| `AI_LEARNING_MEMORY_SUMMARIES_PER_DAY` | `10` | Memory summaries per learner per day; `0` = unlimited |
+| `AI_LEARNING_QUOTA_TIMEZONE` | `Asia/Ho_Chi_Minh` | Time zone whose midnight starts a new day |
+
+A turn is counted after its session is found and free, so `404` and `409` cost nothing. Over the limit the turn is
+closed with `failure_code = quota_exceeded` and the request returns `429` with `resetsAt` and `Retry-After`; the model is
+never called. A turn is refunded, on the day it was counted, when it fails with `llm_not_configured` or when its first
+model call fails with `llm_error`; each refund is logged with the session, turn and code. Once the model has answered,
+a later failure still counts, because those calls were billed. A summary over its limit is skipped and its messages stay
+pending. Path ordering is not limited: it calls the model once per goal. Docker Compose passes the three variables
+through from the root `.env`.
+
 ## Mastery engine
 
 `app/mastery` is the adaptive engine: models, mastery scoring, gates, `next_objective()`,
@@ -156,7 +179,8 @@ The image installs only `requirements.txt` and the service code. The service
 configuration uses `AI_LEARNING_INTERNAL_JWT_SECRET`,
 `AI_LEARNING_DATABASE_URL`, `AI_LEARNING_USER_SERVICE_BASE_URL`, and
 `AI_LEARNING_CONTENT_SERVICE_BASE_URL`, plus the optional `AI_LEARNING_LLM_*`
-settings described under [LLM path ordering](#llm-path-ordering). The JWT secret must
+settings described under [LLM path ordering](#llm-path-ordering) and the daily limits under
+[Daily limits](#daily-limits). The JWT secret must
 be Base64 encoded and decode to at least 32 bytes. Supply secret values through
 runtime configuration; do not put them in this file or the image.
 
@@ -175,6 +199,7 @@ runtime configuration; do not put them in this file or the image.
 | `6` | `V6__practice_notebook.sql` | Content details snapshots, practice notebook entries, review state and idempotent review events |
 | `7` | `V7__learner_memory.sql` | One learner-owned memory summary and cross-session message cursor |
 | `8` | `V8__session_reading_material.sql` | Reading passage copy per session; notebook entries may belong to a passage |
+| `9` | `V9__llm_daily_usage.sql` | Per-learner daily counts of tutor turns and memory summaries |
 
 `V1` stops if the database already contains more than one path for a non-null
 `(user_id, learning_goal_id)` pair; reconcile those rows before retrying.
@@ -259,7 +284,7 @@ docker compose up -d --build rabbitmq ai-learning-db ai-learning-migrate ai-lear
 | --- | --- | --- |
 | `ai-learning-db` | PostgreSQL `ai_learning_db` on `127.0.0.1:5436` | `AI_LEARNING_DB_PASSWORD` |
 | `ai-learning-migrate` | `flyway migrate` once over `migrations/`, then exits 0 | JDBC URL, `postgres`, `AI_LEARNING_DB_PASSWORD` |
-| `ai-learning-api` | `uvicorn main:app` on `127.0.0.1:8000`, starts after the migration | `AI_LEARNING_INTERNAL_JWT_SECRET` (from `GATEWAY_INTERNAL_JWT_SECRET`), `AI_LEARNING_DATABASE_URL`, `AI_LEARNING_USER_SERVICE_BASE_URL`, `AI_LEARNING_CONTENT_SERVICE_BASE_URL`, `AI_LEARNING_LLM_*` |
+| `ai-learning-api` | `uvicorn main:app` on `127.0.0.1:8000`, starts after the migration | `AI_LEARNING_INTERNAL_JWT_SECRET` (from `GATEWAY_INTERNAL_JWT_SECRET`), `AI_LEARNING_DATABASE_URL`, `AI_LEARNING_USER_SERVICE_BASE_URL`, `AI_LEARNING_CONTENT_SERVICE_BASE_URL`, `AI_LEARNING_LLM_*`, daily limits (`AI_LEARNING_TUTOR_TURNS_PER_DAY`, `AI_LEARNING_MEMORY_SUMMARIES_PER_DAY`, `AI_LEARNING_QUOTA_TIMEZONE`) |
 | `ai-learning-consumer` | `python -m app.messaging.assessment_consumer`, restarted if it exits | `AI_LEARNING_DATABASE_URL`, `AI_LEARNING_AMQP_URL` only (no JWT secret) |
 
 The API forwards the learner's internal JWT straight to User (`8085`) and Content (`8082`),

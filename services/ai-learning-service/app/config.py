@@ -23,12 +23,24 @@ class Settings(BaseSettings):
     database_url: SecretStr
     user_service_base_url: str
     content_service_base_url: str
+    # Per learner per local day; 0 means unlimited (usage is still counted).
+    tutor_turns_per_day: int = 50
+    memory_summaries_per_day: int = 10
+    # IANA zone name that PostgreSQL resolves; the day resets at its midnight.
+    quota_timezone: str = "Asia/Ho_Chi_Minh"
 
-    @field_validator("internal_jwt_issuer", "user_service_base_url", "content_service_base_url")
+    @field_validator("internal_jwt_issuer", "user_service_base_url", "content_service_base_url", "quota_timezone")
     @classmethod
     def reject_blank_values(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("Configuration value must not be blank")
+        return value
+
+    @field_validator("tutor_turns_per_day", "memory_summaries_per_day")
+    @classmethod
+    def reject_negative_limits(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("Daily limits must be zero (unlimited) or positive")
         return value
 
     @field_validator("user_service_base_url", "content_service_base_url")

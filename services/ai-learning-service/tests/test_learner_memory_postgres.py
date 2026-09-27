@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from app.tutor.memory import BATCH_MESSAGES, LearnerMemoryService, LearnerMemoryStore
 from app.tutor.session_store import TutorSessionStore
+from app.usage.quota import DailyQuotaStore
 from tests.postgres_schema_support import PostgresSchema, database_url_or_skip
 
 
@@ -172,6 +173,24 @@ class LearnerMemoryPostgresTest(unittest.TestCase):
         self.assertNotIn("before-clear-secret", calls[0]["prompt"])
         self.assertIn("after-clear-0", calls[0]["prompt"])
         self.assertIn("after-clear-later-1", calls[0]["prompt"])
+
+    def test_summaries_over_the_daily_limit_are_skipped_without_calling_the_model(self):
+        user_id, session = self.learner()
+        service = LearnerMemoryService(self.store, quota=DailyQuotaStore(self.schema.url, "Asia/Ho_Chi_Minh"),
+                                       summaries_per_day=1)
+        self.add_messages(user_id, session, 8, "first-batch")
+        complete, calls = self.completion()
+
+        self.assertEqual(asyncio.run(service.update(user_id, complete)), "updated")
+        after_first = self.store.get(user_id)
+        self.add_messages(user_id, session, 8, "second-batch")
+        with self.assertLogs("app.tutor.memory", level="INFO") as logs:
+            skipped = asyncio.run(service.update(user_id, complete))
+
+        self.assertEqual(skipped, "skipped")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(self.store.get(user_id), after_first)
+        self.assertIn("Learner memory summary skipped reason=quota", "\n".join(logs.output))
 
     def test_memory_and_pending_messages_are_scoped_to_the_learner(self):
         first_user, first_session = self.learner()

@@ -136,6 +136,10 @@ services:
       AI_LEARNING_LLM_API_KEY: ${AI_LEARNING_LLM_API_KEY:-}
       AI_LEARNING_LLM_REASONING_EFFORT: ${AI_LEARNING_LLM_REASONING_EFFORT:-low}
       AI_LEARNING_LLM_TIMEOUT_SECONDS: ${AI_LEARNING_LLM_TIMEOUT_SECONDS:-20}
+      # Per-learner daily limits; 0 = unlimited. Defaults must stay non-empty: a blank value fails validation.
+      AI_LEARNING_TUTOR_TURNS_PER_DAY: ${AI_LEARNING_TUTOR_TURNS_PER_DAY:-50}
+      AI_LEARNING_MEMORY_SUMMARIES_PER_DAY: ${AI_LEARNING_MEMORY_SUMMARIES_PER_DAY:-10}
+      AI_LEARNING_QUOTA_TIMEZONE: ${AI_LEARNING_QUOTA_TIMEZONE:-Asia/Ho_Chi_Minh}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

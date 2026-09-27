@@ -82,8 +82,20 @@ class MigrationsPostgresTest(unittest.TestCase):
             {"mastery_paths", "mastery_interactions", "mastery_events",
              "mastery_learning_evidence", "formal_assessment_result_versions",
              "mastery_path_knowledge_point_details", "notebook_entries", "practice_review_state",
-             "practice_review_events", "learner_memory", "session_materials"} <= self._tables()
+             "practice_review_events", "learner_memory", "session_materials", "llm_daily_usage"} <= self._tables()
         )
+
+    def test_daily_usage_accepts_only_known_kinds_and_non_negative_counts(self):
+        import psycopg2
+
+        insert = "INSERT INTO llm_daily_usage (user_id, usage_date, kind, used) VALUES (%s, current_date, %s, %s)"
+        self.schema.execute(insert, (str(uuid4()), "tutor_turn", 0))
+        self.schema.execute(insert, (str(uuid4()), "memory_summary", 3))
+
+        with self.assertRaises(psycopg2.errors.CheckViolation):
+            self.schema.execute(insert, (str(uuid4()), "path_ordering", 1))
+        with self.assertRaises(psycopg2.errors.CheckViolation):
+            self.schema.execute(insert, (str(uuid4()), "tutor_turn", -1))
 
     def test_learner_memory_schema_has_one_owner_scoped_cursor_and_version(self):
         columns = {row[0] for row in self.schema.query(

@@ -14,6 +14,7 @@ from app.practice.store import PracticeStore
 from app.tutor.engine import Chat, TutorEngine
 from app.tutor.memory import Complete, LearnerMemoryService, LearnerMemoryStore
 from app.tutor.session_store import TutorSessionStore
+from app.usage.quota import DailyQuotaStore
 
 
 def get_path_service(settings: Settings = Depends(get_settings)) -> PathService:
@@ -42,10 +43,16 @@ def get_learner_memory_store(settings: Settings = Depends(get_settings)) -> Lear
     return LearnerMemoryStore(settings.database_url.get_secret_value())
 
 
+def get_quota_store(settings: Settings = Depends(get_settings)) -> DailyQuotaStore:
+    return DailyQuotaStore(settings.database_url.get_secret_value(), settings.quota_timezone)
+
+
 def get_tutor_engine(settings: Settings = Depends(get_settings)) -> TutorEngine:
     url = settings.database_url.get_secret_value()
+    memory = LearnerMemoryService(LearnerMemoryStore(url), quota=DailyQuotaStore(url, settings.quota_timezone),
+                                  summaries_per_day=settings.memory_summaries_per_day)
     return TutorEngine(TutorSessionStore(url), PostgresLearningStore(url), practice=PracticeStore(url),
-                       memory=LearnerMemoryService(LearnerMemoryStore(url)))
+                       memory=memory)
 
 
 def get_tutor_chat() -> Chat | None:

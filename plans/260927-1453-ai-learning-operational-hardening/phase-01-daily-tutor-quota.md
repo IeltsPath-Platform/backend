@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Hạn mức lượt tutor theo ngày"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 effort: "~1.5d"
@@ -153,11 +153,25 @@ xóa cache settings như `test_tutor_api_postgres.py`; mỗi test dùng học vi
 10. `summaries_per_day = 1`: đợt đầu `"updated"`; đợt sau (đủ 8 message mới) `"skipped"`, `complete` không được gọi, mốc giữ nguyên.
 
 ## Success Criteria
-- [ ] Vượt hạn mức lượt tutor bị chặn trước khi mở SSE và trước khi gọi LLM, trả `429` kèm thời điểm reset.
-- [ ] Đếm đúng khi đồng thời; 404/409 không tốn hạn mức; lượt lỗi do hệ thống (`llm_error`, `llm_not_configured`) được hoàn.
-- [ ] Tóm tắt memory bị giới hạn riêng; vượt thì bỏ qua, không lỗi.
-- [ ] Frontend đọc được usage qua `/tutor/usage`.
-- [ ] Toàn bộ test Python pass (0 fail, 0 skip); docs cập nhật.
+- [x] Vượt hạn mức lượt tutor bị chặn trước khi mở SSE và trước khi gọi LLM, trả `429` kèm thời điểm reset.
+- [x] Đếm đúng khi đồng thời; 404/409 không tốn hạn mức; lượt lỗi do hệ thống (`llm_error`, `llm_not_configured`) được hoàn.
+- [x] Tóm tắt memory bị giới hạn riêng; vượt thì bỏ qua, không lỗi.
+- [x] Frontend đọc được usage qua `/tutor/usage`.
+- [x] Toàn bộ test Python pass (0 fail, 0 skip); docs cập nhật.
+
+## Kết quả triển khai (2026-09-27)
+- Test: 432 passed, 0 fail, 0 skip (kể cả RabbitMQ), Python 3.11, PostgreSQL 17 local.
+- Thay đổi so với plan, đã được người dùng chốt sau code review:
+  - **Q1 thu hẹp**: chỉ hoàn lượt khi `llm_not_configured` hoặc `llm_error` **trước** event `tool.called`/`assistant.message`
+    đầu tiên (lỗi ở lần gọi model đầu). Model đã trả lời ít nhất một vòng thì lượt vẫn tính, vì các vòng đó đã bị tính phí.
+    Mỗi lần hoàn ghi log `Tutor turn refunded session turn code`.
+  - **Compose**: `ai-learning-api` nhận 3 biến hạn mức từ `.env` root (mặc định 50 / 10 / `Asia/Ho_Chi_Minh`).
+- Bổ sung từ mục Risk: khởi động gọi `DailyQuotaStore.check_ready()`; chỉ nhận tên IANA trong `pg_timezone_names`
+  (từ chối `UTC+7` vì Postgres đọc ngược dấu) và kiểm bảng `llm_daily_usage` tồn tại.
+- Lỗi khi `consume` → đóng lượt `failed/internal_error` rồi trả lỗi, session không bị kẹt. Lượt bị từ chối có log `reason=quota`.
+- Review: `plans/reports/code-reviewer-260927-2117-daily-tutor-quota-review-report.md`; còn mở (Low, chưa làm):
+  `Retry-After` chưa nằm trong CORS exposed headers của Gateway (frontend dùng `resetsAt`); tóm tắt memory lỗi không
+  được hoàn; bảng `llm_daily_usage` chưa có retention.
 
 ## Risk Assessment
 - **Múi giờ sai tên** → Postgres báo lỗi ở lần gọi đầu. Giảm: test khởi động gọi `usage()` một lần; README ghi rõ tên IANA.

@@ -15,6 +15,8 @@ from uuid import UUID
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
+from app.usage.quota import MEMORY_SUMMARY, DailyQuotaStore
+
 MEMORY_MAX_CHARS = 2000
 MIN_NEW_MESSAGES = 8
 BATCH_MESSAGES = 40
@@ -173,8 +175,11 @@ class LearnerMemoryStore:
 class LearnerMemoryService:
     """Batched, best-effort memory updates that never run in the tutor turn path."""
 
-    def __init__(self, store: LearnerMemoryStore) -> None:
+    def __init__(self, store: LearnerMemoryStore, quota: DailyQuotaStore | None = None,
+                 summaries_per_day: int = 0) -> None:
         self.store = store
+        self.quota = quota
+        self.summaries_per_day = summaries_per_day
 
     async def update(self, user_id: UUID | str, complete: Complete | None) -> str:
         if complete is None:
@@ -187,6 +192,12 @@ class LearnerMemoryService:
                                            BATCH_MESSAGES)
         if len(messages) < MIN_NEW_MESSAGES:
             return "skipped"
+        if self.quota is not None:
+            allowance = await asyncio.to_thread(self.quota.consume, user_id, MEMORY_SUMMARY, self.summaries_per_day)
+            if not allowance.allowed:
+                # The cursor stays put, so a later turn or the next day summarizes these messages.
+                logging.getLogger(__name__).info("Learner memory summary skipped reason=quota")
+                return "skipped"
         try:
             text = await complete(
                 system_prompt=MEMORY_SYSTEM_PROMPT,

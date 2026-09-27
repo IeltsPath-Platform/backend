@@ -26,6 +26,7 @@ from app.api.dto.responses import (
 from app.config import get_settings
 from app.security.internal_jwt import AuthenticatedUser, bearer_scheme, require_current_user
 from app.tutor.session_store import TutorSessionStore
+from app.usage.quota import DailyQuotaStore
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +35,14 @@ logger = logging.getLogger(__name__)
 async def lifespan(_app: FastAPI):
     # One API instance serves every tutor turn, so a turn still marked running at start-up died with the
     # previous process; failing it frees its session. Do not serve turns until recovery succeeds.
-    store = TutorSessionStore(get_settings().database_url.get_secret_value())
+    settings = get_settings()
+    database_url = settings.database_url.get_secret_value()
+    store = TutorSessionStore(database_url)
     recovered = await asyncio.to_thread(store.recover_interrupted_turns)
     if recovered:
         logger.warning("Failed %s tutor turns interrupted by the previous shutdown", recovered)
+    # An unknown zone or a missing usage table would fail every tutor turn; refuse to start instead.
+    await asyncio.to_thread(DailyQuotaStore(database_url, settings.quota_timezone).check_ready)
     yield
 
 

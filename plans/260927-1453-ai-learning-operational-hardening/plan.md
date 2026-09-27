@@ -1,7 +1,7 @@
 ---
 title: "Củng cố vận hành AI Learning: hạn mức LLM và E2E pha 5–10"
 description: "Chặn chi phí LLM tràn bằng hạn mức lượt tutor và tóm tắt memory theo ngày cho mỗi học viên; kiểm E2E qua Gateway toàn bộ tính năng pha 5–10 với service thật và LLM stub."
-status: pending
+status: in-progress
 priority: P2
 branch: "feat/ai-learning-service"
 tags: [ai-learning, operations, quota, e2e, tdd]
@@ -36,7 +36,7 @@ Làm theo **TDD**: mỗi phase viết test khóa hành vi hiện tại trước,
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Hạn mức lượt tutor theo ngày](./phase-01-daily-tutor-quota.md) | Pending |
+| 1 | [Hạn mức lượt tutor theo ngày](./phase-01-daily-tutor-quota.md) | Completed |
 | 2 | [E2E qua Gateway cho pha 5-10](./phase-02-gateway-e2e-phases-5-10.md) | Pending |
 
 Phase 2 phụ thuộc phase 1 (E2E kiểm cả endpoint `/tutor/usage`).
@@ -82,6 +82,13 @@ Phase 2 phụ thuộc phase 1 (E2E kiểm cả endpoint `/tutor/usage`).
 - Đã rà `plan.md`, phase 1 và phase 2 tìm "100", "20", "Lượt thất bại vẫn tính", "test_tutor_api_postgres.py (đặt".
 - Phase 2 (luồng 7) chỉ đọc `/tutor/usage`, không phụ thuộc mức mặc định hay chuyện hoàn lượt: không cần sửa.
 - Không còn mâu thuẫn chưa giải quyết.
+
+### Session 2 (2026-09-27, sau code review phase 1)
+
+| Câu hỏi | Trả lời | Ảnh hưởng |
+| --- | --- | --- |
+| `llm_error` ở vòng sau (đã tính phí) có hoàn không? | **Không**: chỉ hoàn khi lỗi trước khi model trả lời lần đầu; có log mỗi lần hoàn | Phase 1: Q1 thu hẹp |
+| Compose có truyền biến hạn mức? | **Có**, mặc định 50 / 10 / `Asia/Ho_Chi_Minh` | Phase 1 thêm `docker-compose.yml`; phase 2 chỉnh được mức cho E2E |
 
 ## Acceptance criteria
 - Vượt hạn mức lượt tutor → `429` trước khi mở SSE, không gọi LLM; tóm tắt memory vượt hạn mức thì bị bỏ qua;

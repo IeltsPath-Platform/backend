@@ -1625,6 +1625,25 @@ Bản sao không cập nhật khi Content sửa bài; mở session mới để c
 
 ---
 
+## 7.20 `llm_daily_usage`
+
+Được tạo bởi `V9__llm_daily_usage.sql`. Đếm số lần mỗi học viên dùng tác vụ có gọi LLM trong một ngày, để chặn chi phí
+nhà cung cấp tăng không giới hạn.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `user_id` | uuid | PK (1/3) | Học viên; không có FK tới database User Service. |
+| `usage_date` | date | PK (2/3) | Ngày theo múi giờ cấu hình (`AI_LEARNING_QUOTA_TIMEZONE`, mặc định `Asia/Ho_Chi_Minh`), do PostgreSQL tính. |
+| `kind` | varchar(30) | PK (3/3), CHECK `tutor_turn` \| `memory_summary` | Loại tác vụ được đếm. |
+| `used` | integer | NOT NULL, CHECK `>= 0` | Số lần đã dùng trong ngày. |
+
+Đếm bằng một câu `INSERT ... ON CONFLICT DO UPDATE ... WHERE used < limit`, nên request đồng thời không vượt mức.
+Lượt tutor bị hoàn (trừ 1, không xuống dưới 0) khi thất bại với `llm_not_configured`, hoặc với `llm_error` ngay ở lần
+gọi model đầu tiên; khi model đã trả lời ít nhất một vòng thì lượt vẫn bị tính. Dòng của ngày cũ không bị xóa và không ảnh
+hưởng ngày mới.
+
+---
+
 # 8. Learning Support — Tracking, Video Progress và Personal Library
 
 Phần này thuộc **`learning-support-service`**, database **`learning_support_db`**. Service này giữ learner-owned utility state và được tách khỏi `ai-learning-service` để AI Learning chỉ tập trung vào DeepTutor ADP/Tutor core.
