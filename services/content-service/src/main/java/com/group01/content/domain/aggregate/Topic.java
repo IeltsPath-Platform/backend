@@ -1,5 +1,6 @@
 package com.group01.content.domain.aggregate;
 
+import com.group01.content.domain.vo.BandRange;
 import com.group01.content.domain.vo.ContentStatus;
 
 import java.time.Instant;
@@ -13,11 +14,12 @@ public class Topic {
     private String name;
     private int sortOrder;
     private ContentStatus status;
+    private BandRange band;
     private final Instant createdAt;
     private Instant updatedAt;
 
     public Topic(UUID id, UUID parentTopicId, String code, String name, int sortOrder,
-                 ContentStatus status, Instant createdAt, Instant updatedAt) {
+                 ContentStatus status, BandRange band, Instant createdAt, Instant updatedAt) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.parentTopicId = parentTopicId;
         if (code == null || code.isBlank()) {
@@ -30,19 +32,26 @@ public class Topic {
         this.name = name.trim();
         this.sortOrder = sortOrder;
         this.status = status != null ? status : ContentStatus.ACTIVE;
+        this.band = band != null ? band : BandRange.UNBOUNDED;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.updatedAt = updatedAt != null ? updatedAt : this.createdAt;
     }
 
     public static Topic create(UUID parentTopicId, String code, String name, int sortOrder) {
-        Instant now = Instant.now();
-        return new Topic(UUID.randomUUID(), parentTopicId, code, name, sortOrder, ContentStatus.ACTIVE, now, now);
+        return create(parentTopicId, code, name, sortOrder, BandRange.UNBOUNDED);
     }
 
-    public void update(UUID parentTopicId, String name, int sortOrder, ContentStatus status) {
+    public static Topic create(UUID parentTopicId, String code, String name, int sortOrder, BandRange band) {
+        Instant now = Instant.now();
+        return new Topic(UUID.randomUUID(), parentTopicId, code, name, sortOrder, ContentStatus.ACTIVE, band, now, now);
+    }
+
+    /** Replaces every editable field, band included: a null band clears it. */
+    public void update(UUID parentTopicId, String name, int sortOrder, ContentStatus status, BandRange band) {
         this.parentTopicId = parentTopicId;
         this.name = Objects.requireNonNull(name, "name must not be null");
         this.sortOrder = sortOrder;
+        this.band = band != null ? band : BandRange.UNBOUNDED;
         if (status != null) {
             this.status = status;
         }
@@ -55,6 +64,7 @@ public class Topic {
     public String getName() { return name; }
     public int getSortOrder() { return sortOrder; }
     public ContentStatus getStatus() { return status; }
+    public BandRange getBand() { return band; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

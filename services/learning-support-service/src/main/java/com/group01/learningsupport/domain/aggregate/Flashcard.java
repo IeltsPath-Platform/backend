@@ -127,6 +127,15 @@ public class Flashcard {
                 this.vocabularySenseId = vocabularySenseId;
                 this.sourceReferenceId = sourceReferenceId;
             }
+            case PRACTICE_QUESTION -> {
+                // Points back at the AI Learning practice question the learner answered.
+                if (sourceReferenceId == null || vocabularySenseId != null || highlightedText != null) {
+                    throw new InvalidDataException("flashcard practice question không hợp lệ");
+                }
+                this.highlightedText = null;
+                this.vocabularySenseId = null;
+                this.sourceReferenceId = sourceReferenceId;
+            }
         }
         this.sourceType = sourceType;
         this.front = nextFront;

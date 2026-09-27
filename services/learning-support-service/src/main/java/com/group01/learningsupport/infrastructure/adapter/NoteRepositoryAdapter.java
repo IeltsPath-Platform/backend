@@ -4,6 +4,7 @@ import com.group01.learningsupport.domain.aggregate.Note;
 import com.group01.learningsupport.domain.repository.NoteRepository;
 import com.group01.learningsupport.domain.vo.LibraryStatus;
 import com.group01.learningsupport.domain.vo.OwnedPage;
+import com.group01.learningsupport.domain.vo.NoteSourceType;
 import com.group01.learningsupport.infrastructure.persistence.JpaSupport;
 import com.group01.learningsupport.infrastructure.persistence.entity.NoteJpaEntity;
 import com.group01.learningsupport.infrastructure.persistence.mapper.NoteMapper;
@@ -38,6 +39,28 @@ public class NoteRepositoryAdapter implements NoteRepository {
     public OwnedPage<Note> findByUserIdAndStatus(UUID userId, LibraryStatus status, int page, int size) {
         return JpaSupport.page(
                 repository.findByUserIdAndStatus(userId, status, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"))),
+                mapper::toDomain
+        );
+    }
+
+    @Override
+    public OwnedPage<Note> findByUserIdAndStatusAndSourceType(
+            UUID userId, LibraryStatus status, NoteSourceType sourceType, int page, int size) {
+        return JpaSupport.page(
+                repository.findByUserIdAndStatusAndSourceType(
+                        userId, status, sourceType, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"))),
+                mapper::toDomain
+        );
+    }
+
+    @Override
+    public OwnedPage<Note> findByUserIdAndStatusAndSourceTypeAndSourceReferenceId(
+            UUID userId, LibraryStatus status, NoteSourceType sourceType,
+            UUID sourceReferenceId, int page, int size) {
+        return JpaSupport.page(
+                repository.findByUserIdAndStatusAndSourceTypeAndSourceReferenceId(
+                        userId, status, sourceType, sourceReferenceId,
+                        PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"))),
                 mapper::toDomain
         );
     }

@@ -2,6 +2,7 @@ package com.group01.learningsupport.infrastructure.adapter;
 
 import com.group01.learningsupport.domain.aggregate.Flashcard;
 import com.group01.learningsupport.domain.repository.FlashcardRepository;
+import com.group01.learningsupport.domain.vo.FlashcardSourceType;
 import com.group01.learningsupport.domain.vo.LibraryStatus;
 import com.group01.learningsupport.domain.vo.OwnedPage;
 import com.group01.learningsupport.infrastructure.persistence.JpaSupport;
@@ -49,5 +50,12 @@ public class FlashcardRepositoryAdapter implements FlashcardRepository {
                 ),
                 mapper::toDomain
         );
+    }
+
+    @Override
+    public Optional<Flashcard> findLivePracticeQuestionCard(UUID userId, UUID practiceQuestionId) {
+        return repository.findFirstByUserIdAndSourceTypeAndSourceReferenceIdAndStatusNot(
+                userId, FlashcardSourceType.PRACTICE_QUESTION, practiceQuestionId, LibraryStatus.DELETED
+        ).map(mapper::toDomain);
     }
 }

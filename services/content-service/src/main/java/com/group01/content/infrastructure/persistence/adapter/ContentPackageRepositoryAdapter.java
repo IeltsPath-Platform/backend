@@ -41,6 +41,11 @@ public class ContentPackageRepositoryAdapter implements ContentPackageRepository
     }
 
     @Override
+    public Optional<ContentPackage> findBySectionId(UUID sectionId) {
+        return contentPackageJpaRepository.findDistinctByVersions_Sections_Id(sectionId).map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<ContentPackage> findByCode(String code) {
         return contentPackageJpaRepository.findByCode(code).map(mapper::toDomain);
     }

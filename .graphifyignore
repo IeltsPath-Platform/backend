@@ -2,3 +2,6 @@
 .graphify-tools/
 graphify-out/
 *.md
+# Vendored reference code (DeepTutor clone read while porting). No first-party code imports it; left in, it
+# outweighs the project about four to one and pulls every query toward it.
+third_party/

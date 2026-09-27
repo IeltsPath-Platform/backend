@@ -1,277 +1,104 @@
-# CLAUDE.md - Bộ nhớ ngữ cảnh dự án
+# CLAUDE.md — IELTSPath backend
 
-- Phiên bản: 1.0
-- Cập nhật lần cuối: 2026-09-18
-- Dự án: `IELTSPath` (Maven coordinates hiện tại: `com.group01:code-base:1.0-SNAPSHOT`)
+- Cập nhật lần cuối: 2026-09-27; dữ kiện đã kiểm với code tại commit `79f9fd6`. Về dữ kiện, code là nguồn đúng khi tài
+  liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
+- Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
+- Kiến trúc, flow, quyết định: `docs/system-architecture.md`. Làm việc trong `services/ai-learning-service/` thì đọc thêm
+  `services/ai-learning-service/CLAUDE.md` (tự nạp khi mở file trong service đó).
 
-## 1. TL;DR - Đọc trước trong 60 giây
+@AGENTS.md
 
-`IELTSPath` là backend Java 21/Spring Cloud theo kiến trúc microservices. Hiện chỉ
-có một bounded context nghiệp vụ đã triển khai: User. Hạ tầng gồm Config Server,
-Eureka và API Gateway; PostgreSQL `user_db` thuộc riêng `user-service`.
+## 1. Hệ thống
 
-Gateway WebFlux xác thực external JWT rồi ký internal JWT cho downstream servlet
-service. `common-security` là thư viện kỹ thuật dùng chung để downstream xác
-thực internal JWT và lấy `CurrentUser`. Chưa có frontend, messaging, cache,
-object storage hoặc CI workflow được track.
+Microservices cho nền tảng học IELTS. Client → API Gateway (8080) → service; Gateway xác thực external JWT rồi ký
+internal JWT cho downstream. 8 service Java (Spring Boot, Maven reactor, Eureka `lb://`) + 1 service Python (AI Learning,
+FastAPI, ngoài Maven, Gateway gọi bằng URI cố định). Assessment báo kết quả thi cho AI Learning qua outbox + RabbitMQ:
+exchange `assessment.events`, routing key `assessment.completed.v2`, queue `ai-learning.assessment-completed.v2` (có retry
+và DLQ). Mỗi service sở hữu một PostgreSQL DB.
 
-## 2. Bức Tranh Toàn Hệ Thống
+## 2. Module
 
-Đây là baseline để phát triển các business service độc lập trên hạ tầng Spring
-Cloud chung. Khả năng nghiệp vụ xác minh được hiện tại là đăng ký, đăng nhập,
-quản lý user/role, cấp access token và quản lý refresh token. Actor cụ thể ngoài
-người dùng có role `ADMIN` và `LEARNER` chưa được đặc tả thêm từ repository.
-
-Kiến trúc chủ đích: Domain-Driven Design, Clean Architecture và Microservices.
-Implementation hiện tại tập trung chứng minh các boundary này trong
-`user-service`; các service nghiệp vụ khác chưa tồn tại.
-
-## 3. Bản Đồ Service / Module
-
-| Service / module | Loại | Bounded context / trách nhiệm | Data ownership | Giao tiếp chính |
+| Module | Ngôn ngữ | Cổng | DB (nơi chạy) | Route Gateway |
 | --- | --- | --- | --- | --- |
-| `infra/config-server` | Infrastructure service | Phục vụ cấu hình runtime từ native `config-repo`. | Không có business data. | Các service lấy config khi khởi động. |
-| `infra/eureka-server` | Infrastructure service | Service registry. | Registry runtime. | Gateway và business service đăng ký/tìm instance. |
-| `infra/api-gateway` | Infrastructure service | Ingress WebFlux, CORS, JWT validation, routing và internal JWT. | Không có business data. | Client, Eureka, `USER-SERVICE`. |
-| `services/user-service` | Business service | User, role, authentication và refresh token. | PostgreSQL `user_db`. | Gateway, Config Server, Eureka. |
-| `shared/common-security` | Shared library | Servlet security auto-configuration, internal JWT, canonical roles, current-user access. | Không có data. | Dependency của downstream service. |
+| `infra/config-server` | Java | 8888 | — | — |
+| `infra/eureka-server` | Java | 8761 | — | — |
+| `infra/api-gateway` | Java (WebFlux) | 8080 | — | — |
+| `shared/common-security` | Java lib | — | — | — |
+| `services/user-service` | Java | 8085 | `user_db` (Postgres local 5432) | `/auth/**`, `/api/users/**` |
+| `services/content-service` | Java | 8082 | `content_db` (local 5432) | `/api/content/**` |
+| `services/assessment-service` | Java | 8083 | `assessment_db` (local 5432) | `/api/assessments/**` |
+| `services/access-service` | Java | 8084 | `access_db` (local 5432) | `/api/access/**` |
+| `services/learning-support-service` | Java | 8086 | `learning_support_db` (compose 5433) | `/api/learning-support/**` |
+| `services/game-service` | Java | 8087 | `game_db` (compose 5435) | `/api/games/**`, ws `/ws/games/**` |
+| `services/notification-service` | Java (khung) | 8088 | `notification_db` (local 5432) | `/api/notifications/**` |
+| `services/community-service` | Java | 8089 | `community_db` (compose 5434, cần `COMMUNITY_DB_URL`, xem §5) | `/api/community/**` |
+| `services/ai-learning-service` | Python 3.11 | 8000 | `ai_learning_db` (compose 5436) | `/api/ai-learning/**` |
+| `third_party/deeptutor` | Python | — | — | Chỉ để đọc khi port; không import |
 
-## 4. Kiến Trúc Hệ Thống
+Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/config-repo/*.yaml`, `docker-compose.yml`.
 
-```text
-                    config-repo
-                        |
-                        v
-                  Config Server
-                    |         \
-                    v          v
-                Eureka       Gateway <--- Client
-                  ^             |
-                  |             | external JWT verified,
-                  +--- User ----+ internal JWT forwarded
-                       |
-                       v
-                    user_db
+## 3. Chạy local
+
+- Postgres local cổng 5432 phải có `user_db`, `content_db`, `assessment_db`, và khi chạy access/notification thì thêm
+  `access_db`, `notification_db` (`CREATE DATABASE access_db;` …). Flyway của từng service tạo bảng khi khởi động.
+- `.env` ở root (gitignored) chứa mật khẩu và secret: compose nội suy nó; Gateway và mọi service Java nghiệp vụ import nó
+  (`optional:file:../../.env[.properties]`; config-server, eureka-server thì không). ai-learning khi chạy trên host đọc
+  `services/ai-learning-service/.env` riêng; container ai-learning nhận biến từ compose. Chỉ ghi tên biến, không ghi giá trị.
+- Compose chỉ chạy một phần stack, không chạy `docker compose up` toàn bộ:
+  `docker compose up -d --build rabbitmq ai-learning-db ai-learning-migrate ai-learning-api ai-learning-consumer`
+  (+ `learning-support-db`, `community-db`, `game-db` khi cần; `llm-stub` nằm sau profile: `docker compose --profile llm-stub up -d llm-stub`).
+- Service Java chạy trên host (IDE hoặc `java -jar`) theo thứ tự: config-server → eureka → api-gateway → user → content →
+  assessment → các service còn lại (kể cả game-service, xem §5).
+- AI Learning trong container gọi User/Content trên host qua `host.docker.internal`. RabbitMQ: AMQP `127.0.0.1:5672`,
+  UI `127.0.0.1:15672`.
+- Hướng dẫn luồng chính: `README.md` §6. README §4 còn mô tả compose cũ (config/eureka/gateway trong compose), đừng làm theo.
+
+## 4. Lệnh hay dùng
+
+```powershell
+mvn -q -pl services/<name>-service -am test     # test một service (Testcontainers cần Docker)
+mvn -q -pl shared/common-security test
+mvn -q -pl infra/api-gateway test
+mvn -q compile -DskipTests                       # cả reactor; tránh `clean` khi service đang chạy từ IDE
+docker compose config --quiet                    # kiểm compose + .env
+docker compose ps
 ```
 
-Gateway route hiện có chuyển `/auth/**` và `/api/users/**` đến `USER-SERVICE`
-qua `lb://` và Eureka. Config Server chạy native mode; Docker Compose khởi động
-theo thứ tự Config Server, Eureka, Gateway, User Service và `user-db`.
+Test Python và lệnh riêng của AI Learning: `services/ai-learning-service/CLAUDE.md`.
 
-## 5. DDD Trong Dự Án
+## 5. Cạm bẫy đã biết
 
-Bounded context hiện có là User. Các class trong `domain/aggregate` là `User`,
-`Role` và `RefreshToken`; code không đánh dấu aggregate root riêng. Value object
-gồm `Email`, `PhoneNumber`, `RoleName` và `UserStatus`. Repository abstraction
-gồm `UserRepository`, `RoleRepository` và `RefreshTokenRepository`.
+- `CONTENT_SERVICE_URL` của game-service trong config-repo mặc định `http://content-service:8082` (tên trong Docker) và ghi
+  đè default local → khi chạy game trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082`.
+- Container `game-service` trong compose trỏ `http://config-server:8888` mà compose không có config-server: đừng dùng
+  container này, chạy game-service trên host.
+- community-service mặc định `localhost:5432/community_db`; dùng DB compose thì đặt
+  `COMMUNITY_DB_URL=jdbc:postgresql://localhost:5434/community_db` (và mật khẩu) trong `.env`.
+- assessment dùng RabbitMQ với `RABBITMQ_USERNAME`/`RABBITMQ_PASSWORD` từ `.env`; mặc định `guest` sẽ bị broker từ chối.
+- `GATEWAY_INTERNAL_JWT_SECRET` phải giống nhau ở Gateway, mọi service Java và AI Learning, lệch là 401. Config-repo có giá
+  trị fallback cho secret (thiếu biến env thì chạy bằng secret công khai trong repo): không dựa vào, không tự sửa, báo người dùng.
+- Outbox của access/content/game chỉ ghi, chưa có relay: event của các service này không tới consumer.
+- notification-service chỉ là khung package; README user-service ghi `PATCH` cho đổi trạng thái user, controller là `PUT`.
+- Role chuẩn là `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF` (`LEARNER` cũ đã đổi thành `CUSTOMER`).
+- `.pyc` và `graphify-out/` không được commit; VS Code có thể tự chạy pytest discovery và sinh bytecode khi sửa file test.
 
-Business behavior hiện có nằm trong aggregate/value object (`User` cập nhật hồ
-sơ, role, trạng thái; `RefreshToken` kiểm tra/revoke) và các use case điều phối
-đăng ký, đăng nhập, refresh token, quản trị user. Không có domain event, domain
-service, factory, CQRS query object hay application port trong `user-service`
-hiện tại.
+## 6. Tài liệu tra cứu
 
-## 6. Clean Architecture Trong Dự Án
-
-`user-service` được chia thành `api`, `application`, `domain`, `infrastructure`
-và `config`:
-
-```text
-api ------------> application ------------> domain
-                                      ^         ^
-                                      |         |
-                         infrastructure (JPA adapters)
-```
-
-- `api`: controllers, DTO, validation boundary, servlet logging và exception handler.
-- `application`: `*UseCase`, command/result và transaction workflow.
-- `domain`: model, validation, exception và repository contract.
-- `infrastructure`: JPA entity/repository, MapStruct mapper và repository adapter.
-- `config`: Spring bean/property wiring.
-
-`UserRepositoryAdapter` maps `UserJpaEntity` through `UserMapper` rather than
-exposing JPA types to the domain. Application use cases call domain repository
-interfaces. Current implementation is pragmatic rather than framework-pure:
-application classes use Spring `@Service`/`@Transactional`, and authentication
-use cases depend on Spring security/configuration types.
-
-## 7. Các Flow Quan Trọng
-
-### Đăng nhập và cấp token
-
-```text
-Client -> Gateway public /auth/login -> User Service
-       -> LoginUseCase -> UserRepository
-       -> AuthTokenIssuer -> external JWT + hashed refresh token in user_db
-       -> Client
-```
-
-`RegisterUseCase` chỉ cho đăng ký public với role `LEARNER`. `RefreshTokenUseCase`
-hash token nhận vào, chỉ consume token còn hiệu lực một lần, kiểm tra user active,
-rồi phát hành cặp token mới.
-
-### Request protected qua Gateway
-
-```text
-Client external JWT -> Gateway validates issuer/UUID subject/roles
-                    -> Gateway signs short-lived internal JWT
-                    -> User Service validates internal JWT
-                    -> CurrentUserProvider -> controller -> use case -> repository
-```
-
-Downstream không dùng raw `X-User-*` header làm danh tính. Test MVC xác minh
-external token và các header giả mạo bị từ chối bởi `user-service`.
-
-## 8. Security Model
-
-`user-service` ký external HMAC JWT. Gateway là reactive resource server xác
-thực token này, sau đó `InternalJwtGatewayFilter` thay authorization header cho
-các downstream path đã cấu hình bằng internal HMAC JWT có thời gian sống ngắn.
-
-`CommonSecurityAutoConfiguration` là auto-configuration cho servlet downstream:
-nó tạo stateless `SecurityFilterChain`, decoder và converter sang authority.
-Internal JWT phải có issuer đúng, subject UUID, expiry và role hợp lệ.
-`CanonicalRoles` hiện có `ADMIN` và `LEARNER`. `CurrentUserProvider` đọc
-identity đã xác thực từ `SecurityContext`.
-
-Các tên cấu hình quan trọng là `EXTERNAL_JWT_SECRET` và
-`GATEWAY_INTERNAL_JWT_SECRET`; giá trị không được lưu trong tài liệu này.
-
-## 9. Data Và Persistence
-
-Chỉ `user-service` có database business: PostgreSQL `user_db`. Flyway dùng
-`src/main/resources/db/migration/V1__create_user_tables.sql` để tạo `users`,
-`roles`, `user_roles` và `refresh_tokens`, cùng seed role `ADMIN`/`LEARNER`.
-
-Persistence dùng Spring Data JPA. Domain model tách khỏi `*JpaEntity` và mapper
-MapStruct. `UserJpaRepository` dùng `@EntityGraph(attributePaths = "roles")`
-cho các read path hiện tại để nạp role chủ động. Transaction boundary hiện nằm
-trên application use case bằng `@Transactional`. Integration test Testcontainers
-kiểm tra Flyway và việc chỉ một request refresh concurrent có thể consume token.
-
-## 10. Giao Tiếp Giữa Các Service
-
-Giao tiếp runtime hiện có là HTTP qua Gateway; Gateway dùng Eureka để tìm instance
-`USER-SERVICE`. Config Server phân phối YAML theo application/profile khi service
-khởi động. Không có outbound HTTP client, gRPC, message broker, event, scheduler,
-cache, object storage hay service-to-service database access trong source hiện tại.
-
-## 11. Quyết Định Kiến Trúc Quan Trọng
-
-Không có ADR chính thức trong repository. Các mục sau là observed architectural
-decision, được suy ra từ code và tài liệu hiện tại.
-
-### Gateway-signed internal JWT
-
-- Quyết định: Gateway xác thực external JWT và downstream chỉ nhận internal JWT.
-- Lý do: README và test ghi rõ không tin raw identity header; `common-security`
-  tập trung validation và authority mapping.
-- Trade-off: Gateway và downstream phải cùng tuân theo contract claim/issuer/role.
-- Tham chiếu: `infra/api-gateway`, `shared/common-security`, test security của User Service.
-
-### Config Server + Eureka
-
-- Quyết định: dùng native Config Server và Eureka thay vì hard-code instance URL.
-- Lý do: module README mô tả config tập trung và Gateway route `lb://USER-SERVICE`.
-- Trade-off: startup và local runtime phụ thuộc thứ tự infrastructure service.
-- Tham chiếu: `infra/config-server/config-repo`, `infra/eureka-server`, Gateway config.
-
-### Domain model tách JPA model
-
-- Quyết định: `User`/`Role` domain type tách khỏi `*JpaEntity`, nối qua mapper/adapter.
-- Lý do: quan sát từ package và dependency hiện tại; không có ADR ghi lý do chi tiết.
-- Trade-off: tăng mapper và model duplication để giữ JPA ngoài domain.
-- Tham chiếu: `services/user-service/src/main/java/com/group01/user/infrastructure`.
-
-### Docker build dùng hai kiểu Dockerfile
-
-- Quyết định: service Spring thông thường dùng root `Dockerfile.spring-service` với
-  `MODULE_PATH`; Config Server có Dockerfile riêng.
-- Lý do: Config Server cần đóng gói thêm `config-repo`.
-- Tham chiếu: `Dockerfile.spring-service`, `infra/config-server/Dockerfile`, commit `dac8b03`.
-
-## 12. Pattern Đang Được Sử Dụng
-
-| Pattern | Nơi dùng | Mục đích |
-| --- | --- | --- |
-| API Gateway | `infra/api-gateway` | Ingress, security và discovery-based routing. |
-| Configuration Server | `infra/config-server` | Cấu hình runtime tập trung. |
-| Service Discovery | `infra/eureka-server` và Eureka client | Tìm service bằng tên thay vì host/port cố định. |
-| Repository Adapter | User infrastructure adapter | Che Spring Data JPA sau domain repository contract. |
-| Aggregate / Value Object | User domain | Mô hình hóa state và validation nghiệp vụ. |
-| Mapper | MapStruct mapper | Chuyển domain model và JPA entity. |
-| Shared auto-configuration | `common-security` | Tránh lặp servlet downstream security. |
-| Global exception handler | User API | Chuẩn hóa error response HTTP. |
-
-## 13. Các Điểm Chưa Nhất Quán Đã Biết
-
-- Application layer hiện import Spring qua `@Service`, `@Transactional`, security
-  encoder và auth properties; điều này khác với Clean Architecture thuần.
-- `services/user-service/README.md` ghi `PATCH` cho user status, nhưng
-  `UserController` expose `PUT /api/users/{id}/status`; controller là behavior hiện tại.
-- `GetAllUsersUseCase` dùng `findAll()` chưa phân trang; đây là giới hạn hiện tại
-  cho dữ liệu có thể tăng.
-- `graphify-out/graph.json` vẫn tham chiếu `services/user-service/.../SecurityConfig.java`
-  đã bị xóa trong commit `a18a44e`; source tree là nguồn đúng cho security hiện tại.
-- Template kiến trúc cho service mới có thể dùng `application/port` và
-  `infrastructure/config`, nhưng `user-service` hiện dùng `domain/repository` và
-  package `config` ở root. Đây là khác biệt giữa template tương lai và service hiện hữu.
-
-## 14. Bài Học Và Lịch Sử Kỹ Thuật
-
-### Gom downstream security vào `common-security`
-
-- Bối cảnh: `a18a44e` xóa `SecurityConfig` cũ của User Service.
-- Cách xử lý: thêm `CommonSecurityAutoConfiguration`, `CurrentUserProvider`,
-  validator/authority JWT và canonical role dùng chung.
-- Trạng thái: đang được User Service dùng; Gateway vẫn có security WebFlux riêng.
-- Tham chiếu: commit `a18a44e`, `shared/common-security`.
-
-### Đóng gói Docker theo Maven module
-
-- Bối cảnh: Docker setup được refactor ở `dac8b03`.
-- Cách xử lý: root Dockerfile nhận `MODULE_PATH`; Config Server giữ Dockerfile
-  riêng để mang `config-repo` vào image.
-- Trạng thái: Docker Compose dùng mô hình này cho các container hiện có.
-- Tham chiếu: commit `dac8b03`, `docker-compose.yml`.
-
-## 15. Trạng Thái Hiện Tại Của Dự Án
-
-- Maven reactor có 5 module: 3 infrastructure service, `user-service` và
-  `common-security`.
-- User là business service duy nhất; database baseline chỉ có migration `V1`.
-- Docker Compose mô tả full local stack và health check cho infrastructure/user DB.
-- Security shared refactor và Docker refactor đều đã có trong lịch sử Git gần nhất.
-- Graphify output tồn tại nhưng có ít nhất một đường dẫn security stale như mục 13.
-
-## 16. Nội Dung Chưa Xác Định
-
-- Production deployment target và secret-management strategy: Cần làm rõ.
-- Frontend/client application và actor ngoài role hiện tại: Cần làm rõ.
-- API versioning, pagination contract và compatibility policy: Cần làm rõ.
-- Messaging/event strategy, cache, object storage và external integration: Cần làm rõ.
-- CI policy, formatter, lint, coverage gate và API contract testing: Cần làm rõ.
-
-## 17. Tài Liệu Và File Quan Trọng
-
-| Path | Khi cần đọc |
+| Cần gì | Đọc |
 | --- | --- |
-| `AGENTS.md` | Quy tắc bắt buộc cho agent và template service mới. |
-| `README.md` | Khởi động local/Docker, flow tổng quan và cách thêm service. |
-| `infra/README.md` cùng README từng infra module | Vai trò và thứ tự khởi động hạ tầng. |
-| `services/user-service/README.md` | Capability User, route chính và security boundary. |
-| `infra/config-server/config-repo/` | Cấu hình runtime tập trung theo service. |
-| `services/user-service/src/main/resources/db/migration/` | Flyway schema của User Service. |
-| `shared/common-security/` | Internal JWT, role và servlet downstream security. |
-| `docker-compose.yml` | Thành phần local stack, dependency và health check. |
-| `graphify-out/graph.json` | Graph hỗ trợ khám phá source; kiểm tra freshness trước khi tin hoàn toàn. |
+| Kiến trúc, flow, giao tiếp, điểm chưa nhất quán | `docs/system-architecture.md` |
+| Invariant cấp dự án (ưu tiên cao nhất) | `.sdd/global/constitution.md`; các file khác trong `.sdd/global`, `.sdd/constraints` là baseline cũ |
+| Contract HTTP/SSE/event | `docs/contracts/` (`tutor-sse-v1`, `practice-v1`, `assessment-completed-v2`) |
+| Schema toàn bộ database | `.sdd/database/DATABASE_V5.md` |
+| Chạy local, biến môi trường | `README.md`, `infra/README.md`, README từng service |
+| Cấu hình runtime | `infra/config-server/config-repo/<service>.yaml` |
+| Kế hoạch và quyết định đang làm | `plans/` (mỗi plan có `plan.md` + phase), `plans/reports/` |
 
 ## graphify
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+Graph ở `graphify-out/` chỉ chứa code first-party (đã loại `third_party/` và `*.md` trong `.graphifyignore`).
 
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- Khi `graphify-out/graph.json` tồn tại, câu hỏi về codebase: chạy `graphify query "<câu hỏi>"`, `graphify explain "<Symbol>"` hoặc
+  `graphify path "<A>" "<B>"` trước khi grep/đọc nhiều file. Tên trùng thì dùng `path::Symbol`.
+- Chỉ đọc `graphify-out/GRAPH_REPORT.md` khi cần review kiến trúc rộng.
+- Sau khi sửa code: `graphify update .` (AST, không tốn API); thêm `--force` khi số node giảm có chủ đích.

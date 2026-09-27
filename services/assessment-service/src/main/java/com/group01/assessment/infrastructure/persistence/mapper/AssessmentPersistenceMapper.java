@@ -12,7 +12,7 @@ public class AssessmentPersistenceMapper {
     public AssessmentAttempt toDomain(AssessmentAttemptJpaEntity e) {
         return new AssessmentAttempt(e.getId(), e.getUserId(), e.getPackageVersionId(), e.getAttemptType(), e.getMode(),
                 e.getChannel(), e.getStatus(), e.getStartedAt(), e.getSubmittedAt(), e.getExpiresAt(),
-                e.getRowVersion(), e.getCreatedAt(), e.getUpdatedAt());
+                e.getRowVersion(), e.getCreatedAt(), e.getUpdatedAt(), e.getLearningGoalId());
     }
     public AssessmentAttemptJpaEntity toEntity(AssessmentAttempt d) {
         var e = new AssessmentAttemptJpaEntity();
@@ -20,6 +20,7 @@ public class AssessmentPersistenceMapper {
         e.setAttemptType(d.getAttemptType()); e.setMode(d.getMode()); e.setChannel(d.getChannel()); e.setStatus(d.getStatus());
         e.setStartedAt(d.getStartedAt()); e.setSubmittedAt(d.getSubmittedAt()); e.setExpiresAt(d.getExpiresAt());
         e.setRowVersion(d.getRowVersion()); e.setCreatedAt(d.getCreatedAt()); e.setUpdatedAt(d.getUpdatedAt());
+        e.setLearningGoalId(d.getLearningGoalId());
         return e;
     }
     public AttemptSection toDomain(AttemptSectionJpaEntity e) { return new AttemptSection(e.getId(), e.getAttemptId(), e.getContentSectionId(), e.getSortOrder(), e.getSnapshot()); }
@@ -74,7 +75,8 @@ public class AssessmentPersistenceMapper {
     }
 
     public ItemResult toDomain(ItemResultJpaEntity e) {
-        return new ItemResult(e.getId(), e.getResultId(), e.getAttemptItemId(), toDouble(e.getScore()), e.getCorrect(), e.getDurationMilliseconds(), e.getFeedbackSnapshot());
+        return new ItemResult(e.getId(), e.getResultId(), e.getAttemptItemId(), toDouble(e.getScore()),
+                toDouble(e.getMaxScore()), e.getCorrect(), e.getDurationMilliseconds(), e.getFeedbackSnapshot());
     }
 
     public ItemResultJpaEntity toEntity(ItemResult d) {
@@ -83,6 +85,7 @@ public class AssessmentPersistenceMapper {
         e.setResultId(d.resultId());
         e.setAttemptItemId(d.attemptItemId());
         e.setScore(toBigDecimal(d.score()));
+        e.setMaxScore(toBigDecimal(d.maxScore()));
         e.setCorrect(d.correct());
         e.setDurationMilliseconds(d.durationMilliseconds());
         e.setFeedbackSnapshot(d.feedbackSnapshot());
@@ -123,6 +126,47 @@ public class AssessmentPersistenceMapper {
         e.setCompletedAt(d.completedAt());
         e.setCreatedAt(d.createdAt());
         e.setResultPayload(d.resultPayload());
+        return e;
+    }
+
+    public AttemptItemKnowledgePoint toDomain(AttemptItemKnowledgePointJpaEntity e) {
+        return new AttemptItemKnowledgePoint(e.getId().getAttemptItemId(), e.getId().getKnowledgePointId(), e.getWeight());
+    }
+
+    public AttemptItemKnowledgePointJpaEntity toEntity(AttemptItemKnowledgePoint d) {
+        var e = new AttemptItemKnowledgePointJpaEntity();
+        e.setId(new AttemptItemKnowledgePointJpaEntity.Key(d.attemptItemId(), d.knowledgePointId()));
+        e.setWeight(d.weight());
+        return e;
+    }
+
+    public ItemResultKnowledgeJudgment toDomain(ItemResultKnowledgeJudgmentJpaEntity e) {
+        return new ItemResultKnowledgeJudgment(e.getId().getItemResultId(), e.getId().getKnowledgePointId(), e.getJudgment());
+    }
+
+    public ItemResultKnowledgeJudgmentJpaEntity toEntity(ItemResultKnowledgeJudgment d) {
+        var e = new ItemResultKnowledgeJudgmentJpaEntity();
+        e.setId(new ItemResultKnowledgeJudgmentJpaEntity.Key(d.itemResultId(), d.knowledgePointId()));
+        e.setJudgment(d.judgment());
+        return e;
+    }
+
+    public OutboxEvent toDomain(OutboxEventJpaEntity e) {
+        return new OutboxEvent(e.getId(), e.getAggregateType(), e.getAggregateId(), e.getEventType(), e.getPayload(),
+                e.getCreatedAt(), e.getPublishedAt(), e.getRetryCount(), e.getLastError());
+    }
+
+    public OutboxEventJpaEntity toEntity(OutboxEvent d) {
+        var e = new OutboxEventJpaEntity();
+        e.setId(d.id());
+        e.setAggregateType(d.aggregateType());
+        e.setAggregateId(d.aggregateId());
+        e.setEventType(d.eventType());
+        e.setPayload(d.payload());
+        e.setCreatedAt(d.createdAt());
+        e.setPublishedAt(d.publishedAt());
+        e.setRetryCount(d.retryCount());
+        e.setLastError(d.lastError());
         return e;
     }
 

@@ -1,9 +1,13 @@
 package com.group01.assessment.infrastructure.persistence.mapper;
 
+import com.group01.assessment.domain.entity.AttemptItemKnowledgePoint;
 import com.group01.assessment.domain.entity.ErrorAnalysisItem;
 import com.group01.assessment.domain.entity.ItemResult;
+import com.group01.assessment.domain.entity.ItemResultKnowledgeJudgment;
+import com.group01.assessment.domain.entity.OutboxEvent;
 import com.group01.assessment.domain.entity.VideoPracticeAttempt;
 import com.group01.assessment.domain.vo.PracticeStatus;
+import com.group01.assessment.domain.vo.QualitativeJudgment;
 import com.group01.assessment.domain.vo.PracticeType;
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +23,32 @@ class AssessmentPersistenceMapperTest {
     @Test
     void mapsV5ItemResultFields() {
         ItemResult domain = new ItemResult(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                4.25, true, 1200L, "{\"feedback\":\"ok\"}");
+                4.25, 5.0, true, 1200L, "{\"feedback\":\"ok\"}");
+
+        assertEquals(domain, mapper.toDomain(mapper.toEntity(domain)));
+    }
+
+    @Test
+    void mapsAttemptItemKnowledgePointSnapshot() {
+        AttemptItemKnowledgePoint domain = new AttemptItemKnowledgePoint(UUID.randomUUID(), UUID.randomUUID(),
+                new BigDecimal("0.75"));
+
+        assertEquals(domain, mapper.toDomain(mapper.toEntity(domain)));
+    }
+
+    @Test
+    void mapsExplicitKnowledgeJudgment() {
+        ItemResultKnowledgeJudgment domain = new ItemResultKnowledgeJudgment(UUID.randomUUID(), UUID.randomUUID(),
+                QualitativeJudgment.PASS);
+
+        assertEquals(domain, mapper.toDomain(mapper.toEntity(domain)));
+    }
+
+    @Test
+    void mapsOutboxEventForRelay() {
+        OutboxEvent domain = new OutboxEvent(UUID.randomUUID(), "AssessmentResult", UUID.randomUUID().toString(),
+                "AssessmentCompleted.v2", "{\"event_type\":\"AssessmentCompleted.v2\"}",
+                Instant.parse("2026-09-24T10:00:00Z"), null, 2, "broker unavailable");
 
         assertEquals(domain, mapper.toDomain(mapper.toEntity(domain)));
     }

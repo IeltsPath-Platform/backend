@@ -1,6 +1,7 @@
 package com.group01.user.infrastructure.adapter;
 
 import com.group01.user.domain.aggregate.LearningGoal;
+import com.group01.user.domain.exception.LearningGoalInvariantViolationException;
 import com.group01.user.domain.repository.LearningGoalRepository;
 import com.group01.user.domain.vo.GoalStatus;
 import com.group01.user.infrastructure.persistence.entity.LearningGoalJpaEntity;
@@ -27,7 +28,7 @@ public class LearningGoalRepositoryAdapter implements LearningGoalRepository {
         if (entity.getUser() == null && goal.getUserId() != null) {
             entity.setUser(userJpaRepository.getReferenceById(goal.getUserId()));
         }
-        return learningGoalMapper.toDomain(learningGoalJpaRepository.save(entity));
+        return learningGoalMapper.toDomain(learningGoalJpaRepository.saveAndFlush(entity));
     }
 
     @Override
@@ -44,8 +45,14 @@ public class LearningGoalRepositoryAdapter implements LearningGoalRepository {
 
     @Override
     public Optional<LearningGoal> findActiveByUserId(UUID userId) {
-        return learningGoalJpaRepository.findFirstByUser_IdAndStatusOrderByCreatedAtDesc(userId, GoalStatus.ACTIVE)
-                .map(learningGoalMapper::toDomain);
+        List<LearningGoalJpaEntity> activeGoals = learningGoalJpaRepository
+                .findAllByUser_IdAndStatusOrderByCreatedAtDescIdDesc(userId, GoalStatus.ACTIVE);
+        if (activeGoals.size() > 1) {
+            throw new LearningGoalInvariantViolationException(
+                    "Multiple active learning goals found for user " + userId
+            );
+        }
+        return activeGoals.stream().findFirst().map(learningGoalMapper::toDomain);
     }
 
     @Override

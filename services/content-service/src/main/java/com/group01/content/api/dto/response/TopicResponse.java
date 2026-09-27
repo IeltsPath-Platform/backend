@@ -1,5 +1,6 @@
 package com.group01.content.api.dto.response;
 
+import java.math.BigDecimal;
 import com.group01.content.application.result.TopicResult;
 import com.group01.content.domain.vo.ContentStatus;
 
@@ -14,7 +15,9 @@ public record TopicResponse(
         int sortOrder,
         ContentStatus status,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        BigDecimal bandMin,
+        BigDecimal bandMax
 ) {
     public static TopicResponse from(TopicResult result) {
         return new TopicResponse(
@@ -25,7 +28,9 @@ public record TopicResponse(
                 result.sortOrder(),
                 result.status(),
                 result.createdAt(),
-                result.updatedAt()
+                result.updatedAt(),
+                result.band().min(),
+                result.band().max()
         );
     }
 }

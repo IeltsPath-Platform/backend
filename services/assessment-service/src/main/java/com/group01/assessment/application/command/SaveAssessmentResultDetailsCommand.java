@@ -8,11 +8,13 @@ public record SaveAssessmentResultDetailsCommand(
         UUID attemptId,
         List<SkillScoreInput> skillScores,
         List<ItemResultInput> itemResults,
-        List<ErrorAnalysisInput> errors) {
+        List<ErrorAnalysisInput> errors,
+        List<KnowledgeJudgmentInput> knowledgeJudgments) {
 
     public SaveAssessmentResultDetailsCommand {
         skillScores = skillScores == null ? null : List.copyOf(skillScores);
         itemResults = itemResults == null ? null : List.copyOf(itemResults);
         errors = errors == null ? null : List.copyOf(errors);
+        knowledgeJudgments = knowledgeJudgments == null ? null : List.copyOf(knowledgeJudgments);
     }
 }

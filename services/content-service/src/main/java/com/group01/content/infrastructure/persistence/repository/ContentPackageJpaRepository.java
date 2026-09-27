@@ -25,6 +25,9 @@ public interface ContentPackageJpaRepository extends JpaRepository<ContentPackag
     @EntityGraph(attributePaths = {"versions"})
     Optional<ContentPackageJpaEntity> findDistinctByVersions_Id(UUID versionId);
 
+    @EntityGraph(attributePaths = {"versions"})
+    Optional<ContentPackageJpaEntity> findDistinctByVersions_Sections_Id(UUID sectionId);
+
     @Query("SELECT p FROM ContentPackageJpaEntity p WHERE (:featureRequired IS NULL OR (:featureRequired = true AND p.requiredFeatureKey IS NOT NULL) OR (:featureRequired = false AND p.requiredFeatureKey IS NULL)) AND (:status IS NULL OR p.status = :status) ORDER BY p.createdAt DESC")
     List<ContentPackageJpaEntity> findAllFiltered(@Param("featureRequired") Boolean featureRequired,
                                                   @Param("status") PublicationStatus status);
