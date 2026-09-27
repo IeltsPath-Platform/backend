@@ -1,6 +1,7 @@
 package com.group01.learningsupport.infrastructure.persistence.entity;
 
 import com.group01.learningsupport.domain.vo.LibraryStatus;
+import com.group01.learningsupport.domain.vo.NoteSourceType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -36,6 +37,11 @@ public class NoteJpaEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private LibraryStatus status;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_type", length = 50)
+    private NoteSourceType sourceType;
+    @Column(name = "source_reference_id")
+    private UUID sourceReferenceId;
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
     @Column(name = "updated_at", nullable = false)

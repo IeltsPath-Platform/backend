@@ -2,8 +2,12 @@ package com.group01.learningsupport.api.controller;
 
 import com.group01.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.group01.learningsupport.application.result.NoteResult;
+import com.group01.learningsupport.application.result.PageResult;
+import com.group01.learningsupport.application.query.PageQuery;
 import com.group01.learningsupport.application.usecase.*;
 import com.group01.learningsupport.domain.aggregate.Note;
+import com.group01.learningsupport.domain.vo.LibraryStatus;
+import com.group01.learningsupport.domain.vo.NoteSourceType;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.OctetSequenceKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -30,6 +34,9 @@ import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -89,6 +96,83 @@ class NoteSecurityTest {
                 .andExpect(jsonPath("$.body").value("Body"));
 
         verify(createNoteUseCase).execute(userId, "Note", "Body");
+    }
+
+    @Test
+    void createsSourcedNoteAndReturnsSource() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        when(createNoteUseCase.execute(userId, "Note", "Body", NoteSourceType.KNOWLEDGE_POINT, sourceId))
+                .thenReturn(NoteResult.from(Note.create(userId, "Note", "Body",
+                        NoteSourceType.KNOWLEDGE_POINT, sourceId)));
+
+        mockMvc.perform(post("/api/learning-support/notes")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedToken(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Note\",\"body\":\"Body\",\"sourceType\":\"KNOWLEDGE_POINT\",\"sourceReferenceId\":\"" + sourceId + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sourceType").value("KNOWLEDGE_POINT"))
+                .andExpect(jsonPath("$.sourceReferenceId").value(sourceId.toString()));
+        verify(createNoteUseCase).execute(userId, "Note", "Body", NoteSourceType.KNOWLEDGE_POINT, sourceId);
+    }
+
+    @Test
+    void rejectsUnknownOrIncompleteSource() throws Exception {
+        UUID userId = UUID.randomUUID();
+        String token = "Bearer " + signedToken(userId);
+        for (String json : List.of(
+                "{\"title\":\"Note\",\"body\":\"Body\",\"sourceType\":\"UNKNOWN\"}",
+                "{\"title\":\"Note\",\"body\":\"Body\",\"sourceType\":\"TUTOR_SESSION\"}",
+                "{\"title\":\"Note\",\"body\":\"Body\",\"sourceReferenceId\":\"" + UUID.randomUUID() + "\"}"
+        )) {
+            mockMvc.perform(post("/api/learning-support/notes")
+                            .header(HttpHeaders.AUTHORIZATION, token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    void listsBySourceTypeAndSourceReference() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        PageResult<NoteResult> emptyPage = new PageResult<>(List.of(), 0, 20, 0);
+        when(listNotesUseCase.execute(eq(userId), eq(LibraryStatus.ACTIVE), any(PageQuery.class),
+                eq(NoteSourceType.TUTOR_SESSION), eq(null))).thenReturn(emptyPage);
+        when(listNotesUseCase.execute(eq(userId), eq(LibraryStatus.ACTIVE), any(PageQuery.class),
+                eq(NoteSourceType.TUTOR_SESSION), eq(sourceId))).thenReturn(emptyPage);
+
+        mockMvc.perform(get("/api/learning-support/notes")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedToken(userId))
+                        .param("sourceType", "TUTOR_SESSION"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/learning-support/notes")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedToken(userId))
+                        .param("sourceType", "TUTOR_SESSION")
+                        .param("sourceReferenceId", sourceId.toString()))
+                .andExpect(status().isOk());
+
+        verify(listNotesUseCase).execute(userId, LibraryStatus.ACTIVE, new PageQuery(0, 20),
+                NoteSourceType.TUTOR_SESSION, null);
+        verify(listNotesUseCase).execute(userId, LibraryStatus.ACTIVE, new PageQuery(0, 20),
+                NoteSourceType.TUTOR_SESSION, sourceId);
+    }
+
+    @Test
+    void rejectsSourceReferenceWithoutType() throws Exception {
+        mockMvc.perform(get("/api/learning-support/notes")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedToken(UUID.randomUUID()))
+                        .param("sourceReferenceId", UUID.randomUUID().toString()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsUnknownSourceTypeFilter() throws Exception {
+        mockMvc.perform(get("/api/learning-support/notes")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedToken(UUID.randomUUID()))
+                        .param("sourceType", "UNKNOWN"))
+                .andExpect(status().isBadRequest());
     }
 
     private static String signedToken(UUID subject) {

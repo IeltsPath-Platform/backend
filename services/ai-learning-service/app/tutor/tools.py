@@ -149,6 +149,17 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             }},
         }, "required": ["knowledge_point_id", "questions"]},
     }},
+    {"type": "function", "function": {
+        "name": "save_note",
+        "description": "Offer a note draft only when the learner asks to save or remember something. "
+                       "The learner's app saves the draft to their notes. Do not include an answer "
+                       "to an open question.",
+        "parameters": {"type": "object", "properties": {
+            "title": {"type": "string", "description": "A short title for the learner's note."},
+            "body": {"type": "string", "description": "What the learner asked to keep, clear for later reading."},
+            "knowledge_point_id": {"type": "string", "description": "Optional id from this path when the note is about a knowledge point."},
+        }, "required": ["title", "body"]},
+    }},
 ]
 
 
@@ -217,7 +228,7 @@ class TutorTools:
             "mastery_grade": self._grade, "mastery_assess": self._assess,
             "path_outline": self._outline, "path_reorder": self._reorder,
             "learner_profile": self._profile, "knowledge_point_details": self._details,
-            "practice_questions": self._practice_questions,
+            "practice_questions": self._practice_questions, "save_note": self._save_note,
         }
         handler = handlers.get(name)
         if handler is None:
@@ -330,6 +341,43 @@ class TutorTools:
             "band_min": float(band.min) if band and band.min is not None else None,
             "band_max": float(band.max) if band and band.max is not None else None,
         })
+
+    def _save_note(self, arguments: dict[str, Any]) -> ToolOutcome:
+        raw_title, raw_body = arguments.get("title"), arguments.get("body")
+        if not isinstance(raw_title, str) or not raw_title.strip():
+            return _error("title must be non-empty.")
+        if not isinstance(raw_body, str) or not raw_body.strip():
+            return _error("body must be non-empty.")
+        title = raw_title.strip()[:255]
+        body = raw_body.strip()
+        if len(body) > 19900:
+            body = body[:19900] + "\n\n[truncated]"
+
+        # Models often send an optional field as null or ""; both mean "no knowledge point".
+        kp_id = arguments.get("knowledge_point_id")
+        if kp_id is not None and not isinstance(kp_id, str):
+            return _error("knowledge_point_id must be an id from path_outline.")
+        kp_id = (kp_id or "").strip()
+        has_kp = bool(kp_id)
+        with self._service.store.transaction(self._path_id) as tx:
+            if has_kp:
+                kp, _module_id, _module_name = find_knowledge_point(tx.progress, kp_id)
+                if kp is None:
+                    return _error(f"Unknown knowledge point {kp_id!r}; use an id from path_outline.")
+            active = tx.active_interaction()
+            if active is not None and active.status != InteractionStatus.GRADED and active.session_id == self._session_id:
+                expected = active.question.expected_answer.casefold()
+                if len(expected) >= 3 and (expected in title.casefold() or expected in body.casefold()):
+                    return _error("The note would reveal the answer to the open question; save it after grading.")
+
+        return ToolOutcome(
+            {"status": "offered", "note": "The learner's app saves this note."},
+            events=[("note.draft", {
+                "title": title, "body": body,
+                "source_type": "KNOWLEDGE_POINT" if has_kp else "TUTOR_SESSION",
+                "source_reference_id": kp.id if has_kp else self._session_id,
+            })],
+        )
 
     def _practice_questions(self, arguments: dict[str, Any]) -> ToolOutcome:
         if self._practice is None or self._user_id is None:

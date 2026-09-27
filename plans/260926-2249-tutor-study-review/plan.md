@@ -50,15 +50,15 @@ thì lượt vẫn chạy xong ở server; message tối đa 4.000 ký tự.
 | 5 | [Chỉnh lộ trình bằng hội thoại và hồ sơ học viên](./phase-05-outline-profile.md) | Complete |
 | 6 | [Luyện câu hỏi theo KP, sổ câu hỏi và ôn câu sai](./phase-06-question-practice.md) | Complete |
 | 7 | [Tutor nhớ học viên qua các buổi học](./phase-07-learner-memory.md) | Complete |
-| 8 | [Lưu ghi chú vào notes của learning-support](./phase-08-save-to-notes.md) | Pending (làm sau, sửa cả service Java) |
-| 9 | [Đọc bài Reading của Content cùng tutor](./phase-09-reading.md) | Blocked (Content chưa có API text bài đọc) |
+| 8 | [Lưu ghi chú vào notes của learning-support](./phase-08-save-to-notes.md) | Complete |
+| 9 | [Đọc bài Reading của Content cùng tutor](./phase-09-reading.md) | Pending (hết bị chặn 2026-09-27; sửa Content, AI Learning, learning-support) |
 | 10 | [Lưu câu luyện thành flashcard](./phase-10-practice-flashcards.md) | Pending (sau pha 6; chỉ sửa learning-support) |
 
 Đợt này làm pha 1 → 4 (study/review, khoảng 7–8 ngày công). Pha 5–9 đều phụ thuộc pha 4 và độc lập với nhau; pha 10 phụ thuộc pha 6; làm sau,
 theo thứ tự nhóm cần.
 
 Đợt study/review (pha 1–4) đã được kiểm chứng ngày 2026-09-26; xem
-[báo cáo E2E](./reports/e2e-verification-260926-tutor-study-review.md). Pha 5, 6, 7 đã xong (2026-09-27); pha 8–10 vẫn là backlog theo quyết định T1.
+[báo cáo E2E](./reports/e2e-verification-260926-tutor-study-review.md). Pha 5–8 đã xong (2026-09-27); pha 9–10 vẫn là backlog theo quyết định T1.
 
 ## Quy tắc cho người implement
 
@@ -78,6 +78,8 @@ Như plan gỡ phụ thuộc: `python -m pytest tests -rs` (0 fail, 0 skip, có 
 
 1. Stream từng token của LLM (đợt này stream theo từng bước).
 2. Giới hạn chi phí LLM theo học viên.
+3. Content chưa kiểm quyền gói PREMIUM ở chi tiết gói, asset và bài đọc (phát hiện khi lập pha 9).
+4. `ContentAssetController` không có `@PreAuthorize`: mọi người dùng đã đăng nhập đều tạo và link asset được.
 
 ## Rủi ro
 

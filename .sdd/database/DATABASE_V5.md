@@ -1698,7 +1698,7 @@ Bookmark learner-owned cho video segment; không sao chép video.
 
 ## 8.5 `notes`
 
-Ghi chú cá nhân của learner. Bảng lưu note tự do để learner tự ghi lại kiến thức, mẹo làm bài hoặc nội dung cần nhớ. MVP không dùng tag và không gắn note vào knowledge point.
+Ghi chú cá nhân của learner. Bảng lưu note tự do để learner tự ghi lại kiến thức, mẹo làm bài hoặc nội dung cần nhớ. Note có thể không có nguồn, hoặc gắn với một buổi học tutor hay một knowledge point. Không dùng tag.
 
 Thuộc tính chính:
 
@@ -1708,9 +1708,17 @@ Thuộc tính chính:
 | `user_id` | uuid | Logical ref ↗ `Identity.users` | Learner sở hữu note. |
 | `title` | varchar(255) | — | Tiêu đề note. |
 | `body` | text | — | Nội dung note. |
+| `source_type` | varchar(50) | Nullable; `TUTOR_SESSION` hoặc `KNOWLEDGE_POINT` | Loại nguồn của note; enum `NoteSourceType` xác thực giá trị. |
+| `source_reference_id` | uuid | Nullable; logical reference, không FK xuyên service | ID session hoặc knowledge point tương ứng. |
 | `status` | — | — | Trạng thái như `ACTIVE`, `ARCHIVED`, `DELETED`. |
 | `created_at` | timestamptz | — | Thời điểm tạo. |
 | `updated_at` | timestamptz | — | Thời điểm cập nhật gần nhất. |
+
+`chk_notes_source_pair` buộc `source_type` và `source_reference_id` cùng null hoặc cùng có giá trị. Index
+`idx_notes_user_source` trên `(user_id, source_type, source_reference_id, updated_at DESC)` cho các note có nguồn
+phục vụ lọc theo learner và nguồn. Nguồn bất biến sau khi tạo; note cũ giữ cặp nguồn null. Khi tutor phát
+`note.draft`, frontend gửi `title`, `body`, `sourceType`, `sourceReferenceId` tới API notes bằng token của learner.
+AI Learning không ghi trực tiếp vào bảng này.
 
 ## 8.6 `flashcard_decks`
 

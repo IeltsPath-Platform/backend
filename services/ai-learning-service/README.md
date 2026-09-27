@@ -37,7 +37,7 @@ All routes below begin with `/api/ai-learning/tutor`:
 | `DELETE` | `/memory` | Clear the learner's memory and move its message cursor past all existing messages; 204. |
 
 A turn emits `turn.started`, optional `assistant.message` and `tool.called`, and may emit `question`, `practice.questions`,
-`grading`, `path.reordered` or `profile.updated` before `turn.completed` or `turn.failed`. Practice cards end the turn;
+`grading`, `path.reordered`, `profile.updated` or `note.draft` before `turn.completed` or `turn.failed`. Practice cards end the turn;
 the learner answers them through the Practice API. Correct answers and explanations are omitted from practice SSE and
 from the tutor tool result. See
 [the SSE contract](../../docs/contracts/tutor-sse-v1.md) for payloads and errors.
@@ -50,6 +50,13 @@ Reordering accepts a full
 `module_ids` list and/or the full knowledge point order for only the modules being changed; the server fills in
 unchanged modules before validating. It cannot add, remove or move knowledge points between modules. An actual
 reorder emits `path.reordered`; a changed profile emits `profile.updated`. Neither changes mastery.
+
+When the learner asks to save something, `save_note` drafts a short titled note and emits `note.draft` with its content
+and one source: the requested knowledge point, or the current tutor session. The frontend immediately saves the draft
+through `POST /api/learning-support/notes` using the learner's current token, then reports “Đã lưu” with a link to the
+note. If saving fails, it shows the failure and offers a retry. AI Learning does not store drafts or call Learning
+Support. A draft containing the expected answer to an open, ungraded mastery question is rejected; the learner can
+ask to save it after grading.
 
 All Practice routes require the learner's bearer token through Gateway and start with
 `/api/ai-learning/practice`:

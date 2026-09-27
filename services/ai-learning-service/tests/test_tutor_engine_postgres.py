@@ -15,7 +15,7 @@ from app.application.path_service import PathService
 from app.llm.client import ChatReply, LlmApiError, ToolCall
 from app.persistence.postgres_learning_store import PostgresLearningStore
 from app.practice.store import PracticeStore
-from app.api.tutor_sse import stream_events
+from app.api.tutor_sse import format_event, stream_events
 from app.tutor.engine import CardAnswer, SessionNotFound, TutorEngine
 from app.tutor.session_store import ActiveTurnConflict, TutorSessionStore
 from tests.formal_assessment_support import event as formal_event, item, mapping
@@ -135,7 +135,7 @@ class TutorEngineTest(unittest.TestCase):
         self.assertNotIn("expected_answer", json.dumps([event.data for event in events]))
         self.assertEqual(quiz.requests[0]["tools"], [
             "mastery_status", "mastery_quiz", "mastery_grade", "mastery_assess",
-            "path_outline", "path_reorder", "learner_profile"])
+            "path_outline", "path_reorder", "learner_profile", "save_note"])
         self.assertEqual(self.status_of(quiz.requests[0])["objective"]["knowledge_point_id"], KP_BASIC)
 
         question_id = question["question_id"]
@@ -443,6 +443,94 @@ class TutorEngineTest(unittest.TestCase):
         with self.assertRaises(ActiveTurnConflict):
             asyncio.run(two_opens())
         self.sessions.recover_interrupted_turns()
+
+    def test_save_note_for_knowledge_point_streams_draft_then_completes(self):
+        user_id, _goal_id, _paths, session = self.learner()
+        chat = ScriptedChat(
+            ChatReply("", (call("save_note", title="  Perfect tense  ", body="  Use a past participle.  ",
+                                knowledge_point_id=KP_BASIC),)),
+            ChatReply("Your note is being saved."),
+        )
+
+        events = self.turn(user_id, session, chat, message="Save this explanation")
+
+        self.assertEqual([event.type for event in events], [
+            "turn.started", "tool.called", "note.draft", "assistant.message", "turn.completed",
+        ])
+        self.assertEqual(events[2].data, {
+            "title": "Perfect tense", "body": "Use a past participle.",
+            "source_type": "KNOWLEDGE_POINT", "source_reference_id": KP_BASIC,
+        })
+        self.assertIn('"sourceType":"KNOWLEDGE_POINT"', format_event(events[2]))
+        self.assertIn('"sourceReferenceId":"' + KP_BASIC + '"', format_event(events[2]))
+        self.assertEqual(json.loads(chat.requests[1]["messages"][-1]["content"]), {
+            "status": "offered", "note": "The learner's app saves this note.",
+        })
+        self.assertNotIn("body", chat.requests[1]["messages"][-1]["content"])
+
+    def test_save_note_without_kp_uses_current_session(self):
+        user_id, _goal_id, _paths, session = self.learner()
+        chat = ScriptedChat(ChatReply("", (call("save_note", title="Lesson", body="Remember this."),)),
+                            ChatReply("Your note is being saved."))
+
+        events = self.turn(user_id, session, chat, message="Save this")
+
+        draft = next(event.data for event in events if event.type == "note.draft")
+        self.assertEqual((draft["source_type"], draft["source_reference_id"]),
+                         ("TUTOR_SESSION", str(session.id)))
+
+    def test_save_note_invalid_input_returns_error_without_draft(self):
+        cases = [
+            {"title": "Title", "body": "Body", "knowledge_point_id": str(uuid4())},
+            {"title": "  ", "body": "Body"},
+            {"title": "Title", "body": "  "},
+        ]
+        for arguments in cases:
+            with self.subTest(arguments=arguments):
+                user_id, _goal_id, _paths, session = self.learner()
+                chat = ScriptedChat(ChatReply("", (call("save_note", **arguments),)), ChatReply("Cannot save it."))
+
+                events = self.turn(user_id, session, chat, message="Save this")
+
+                self.assertNotIn("note.draft", [event.type for event in events])
+                self.assertEqual(events[-1].type, "turn.completed")
+                self.assertIn("error", json.loads(chat.requests[1]["messages"][-1]["content"]))
+
+    def test_save_note_long_body_is_truncated_in_draft(self):
+        user_id, _goal_id, _paths, session = self.learner()
+        chat = ScriptedChat(ChatReply("", (call("save_note", title="Long note", body="x" * 25000),)),
+                            ChatReply("Your note is being saved."))
+
+        events = self.turn(user_id, session, chat, message="Save this")
+
+        body = next(event.data["body"] for event in events if event.type == "note.draft")
+        self.assertLessEqual(len(body), 19900 + len("\n\n[truncated]"))
+        self.assertTrue(body.endswith("[truncated]"))
+
+    def test_save_note_blocks_open_answer_then_allows_it_after_grading(self):
+        user_id, _goal_id, _paths, session = self.learner()
+        quiz = ScriptedChat(ChatReply("", (call(
+            "mastery_quiz", knowledge_point_id=KP_BASIC, question="Complete the phrase.",
+            expected_answer="has gone"),)))
+        question_id = next(event.data["question_id"] for event in self.turn(
+            user_id, session, quiz, message="Quiz me") if event.type == "question")
+        note_arguments = {"title": "Verb form", "body": "Use Has gone in this context."}
+        blocked = ScriptedChat(ChatReply("", (call("save_note", **note_arguments),)), ChatReply("Wait."))
+
+        blocked_events = self.turn(user_id, session, blocked, message="Save this answer")
+
+        self.assertNotIn("note.draft", [event.type for event in blocked_events])
+        self.assertEqual(json.loads(blocked.requests[1]["messages"][-1]["content"])["error"],
+                         "The note would reveal the answer to the open question; save it after grading.")
+        grade = ScriptedChat(ChatReply("", (call("mastery_grade", answer="has gone"),)),
+                             ChatReply("Correct."))
+        self.turn(user_id, session, grade, answer=CardAnswer(question_id, "has gone"))
+        retry = ScriptedChat(ChatReply("", (call("save_note", **note_arguments),)), ChatReply("Saved."))
+
+        retry_events = self.turn(user_id, session, retry, message="Now save that")
+
+        self.assertIn("note.draft", [event.type for event in retry_events])
+        self.assertEqual(retry_events[-1].type, "turn.completed")
 
 
 if __name__ == "__main__":

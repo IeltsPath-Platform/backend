@@ -27,12 +27,13 @@ and `X-Accel-Buffering: no`.
 | --- | --- |
 | `turn.started` | `{ "turnId": "uuid", "sessionId": "uuid" }` |
 | `assistant.message` | `{ "text": "..." }` |
-| `tool.called` | `{ "name": "mastery_status\|mastery_quiz\|mastery_grade\|mastery_assess\|path_outline\|path_reorder\|learner_profile\|knowledge_point_details\|practice_questions" }` |
+| `tool.called` | `{ "name": "mastery_status\|mastery_quiz\|mastery_grade\|mastery_assess\|path_outline\|path_reorder\|learner_profile\|knowledge_point_details\|practice_questions\|save_note" }` |
 | `question` | Public question: `questionId`, `knowledgePointId`, `prompt`, `questionType`, `options`, and other public question fields when present. |
 | `practice.questions` | `{ "knowledgePointId": "uuid", "questions": [{ "entryId": 1, "prompt": "...", "questionType": "short", "options": [], "difficulty": "easy" }] }`; the event poses saved practice cards and ends the turn. |
 | `grading` | For a quiz: `questionId`, `knowledgePointId`, `isCorrect`, `mastery`, `mastered`, `explanation`. For a qualitative assessment: `knowledgePointId`, `passed`, `mastered`, `mastery`. |
 | `path.reordered` | `{ "moduleCount": 2, "knowledgePointCount": 4 }` after an actual order change. |
 | `profile.updated` | `{ "fields": ["time_budget"] }` when at least one profile field changed. |
+| `note.draft` | `{ "title": "...", "body": "...", "sourceType": "KNOWLEDGE_POINT|TUTOR_SESSION", "sourceReferenceId": "uuid" }`; emitted only when the learner asks to save a note. |
 | `turn.completed` | `{ "turnId": "uuid" }`, with `questionId` when the turn placed a question. |
 | `turn.failed` | `{ "turnId": "uuid", "failureCode": "..." }` (for example `llm_error`, `llm_not_configured`, `too_many_rounds`, `internal_error`). |
 
@@ -57,3 +58,8 @@ question in `GET /sessions/{id}` belongs to that session; its `pendingQuestion` 
 its status, without the expected answer. A submitted answer is stored before the model runs. Grading updates the
 same path and its revision, including when a finalized assessment arrived between tutor turns. If the client
 disconnects, the turn continues on the server and the learner can fetch the session again.
+
+When the frontend receives `note.draft`, it immediately sends `POST /api/learning-support/notes` with the event's
+`title`, `body`, `sourceType`, and `sourceReferenceId`, using the learner's own valid bearer token. On success it tells
+the learner “Đã lưu” and links to the note. On failure it reports the error and offers a retry. The tutor event is a
+draft only; AI Learning does not persist it or call Learning Support. A lost draft can be requested again.
