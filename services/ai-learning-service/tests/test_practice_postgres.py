@@ -331,8 +331,10 @@ class PracticePostgresTest(unittest.TestCase):
                                            (wrong_id,)), [("went", "good")])
 
     def test_an_archived_session_rejects_practice_without_failing_the_tool_call(self):
-        user_id, _path_id, session, _turn_id, tools = self.learner()
-        self.sessions.archive_session(user_id, session.id)
+        user_id, _path_id, session, turn_id, tools = self.learner()
+        # A session with a running turn cannot be archived, so close the turn first.
+        self.schema.execute("UPDATE turns SET status = 'completed', finished_at = now() WHERE id = %s", (turn_id,))
+        self.assertTrue(self.sessions.archive_session(user_id, session.id))
 
         outcome = self.pose(tools)
 

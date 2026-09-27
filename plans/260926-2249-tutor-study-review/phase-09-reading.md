@@ -1,7 +1,7 @@
 ---
 phase: 9
 title: "Đọc bài Reading của Content cùng tutor"
-status: pending
+status: completed
 priority: P3
 dependencies: [4, 6, 8]
 effort: "~3d"
@@ -242,12 +242,12 @@ Postgres (theo mẫu `PostgresSchema`; Content giả qua class stub `get_reading
 6. **Một commit**: `feat(tutor): study Content reading passages with the tutor`.
 
 ## Success Criteria
-- [ ] Học viên mở session trên một bài Reading của gói PRACTICE_SET/LESSON; bài đề thi và placement bị từ chối (404).
-- [ ] Tutor thấy toàn văn bài ở mọi lượt mà không gọi Content giữa lượt.
-- [ ] Câu hỏi trên bài vào sổ câu hỏi, chấm và ôn như pha 6, không đổi mastery.
-- [ ] Note lưu từ buổi đọc có nguồn `READING`.
-- [ ] Session không có bài đọc và các API cũ giữ nguyên hành vi.
-- [ ] Không phụ thuộc DeepTutor; tài liệu đã cập nhật.
+- [x] Học viên mở session trên một bài Reading của gói PRACTICE_SET/LESSON; bài đề thi và placement bị từ chối (404).
+- [x] Tutor thấy toàn văn bài ở mọi lượt mà không gọi Content giữa lượt.
+- [x] Câu hỏi trên bài vào sổ câu hỏi, chấm và ôn như pha 6, không đổi mastery.
+- [x] Note lưu từ buổi đọc có nguồn `READING`.
+- [x] Session không có bài đọc và các API cũ giữ nguyên hành vi.
+- [x] Không phụ thuộc DeepTutor; tài liệu đã cập nhật.
 
 ## Risk Assessment
 - **Đổi `knowledge_point_id` thành nullable** trong `notebook_entries` và DTO: đổi hợp đồng `practice-v1`. Frontend đang giả

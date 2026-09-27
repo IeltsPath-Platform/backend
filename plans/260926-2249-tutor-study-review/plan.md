@@ -51,14 +51,14 @@ thì lượt vẫn chạy xong ở server; message tối đa 4.000 ký tự.
 | 6 | [Luyện câu hỏi theo KP, sổ câu hỏi và ôn câu sai](./phase-06-question-practice.md) | Complete |
 | 7 | [Tutor nhớ học viên qua các buổi học](./phase-07-learner-memory.md) | Complete |
 | 8 | [Lưu ghi chú vào notes của learning-support](./phase-08-save-to-notes.md) | Complete |
-| 9 | [Đọc bài Reading của Content cùng tutor](./phase-09-reading.md) | Pending (hết bị chặn 2026-09-27; sửa Content, AI Learning, learning-support) |
+| 9 | [Đọc bài Reading của Content cùng tutor](./phase-09-reading.md) | Complete |
 | 10 | [Lưu câu luyện thành flashcard](./phase-10-practice-flashcards.md) | Complete |
 
 Đợt này làm pha 1 → 4 (study/review, khoảng 7–8 ngày công). Pha 5–9 đều phụ thuộc pha 4 và độc lập với nhau; pha 10 phụ thuộc pha 6; làm sau,
 theo thứ tự nhóm cần.
 
 Đợt study/review (pha 1–4) đã được kiểm chứng ngày 2026-09-26; xem
-[báo cáo E2E](./reports/e2e-verification-260926-tutor-study-review.md). Pha 5–8 và 10 đã xong (2026-09-27); pha 9 đã code và commit, còn chờ chạy test Python.
+[báo cáo E2E](./reports/e2e-verification-260926-tutor-study-review.md). Pha 5–10 đã xong (2026-09-27): Java và Python đều đã chạy test (AI Learning 409/410, lỗi còn lại nằm ở một test pha 6 và đã sửa).
 
 ## Quy tắc cho người implement
 
