@@ -1,4 +1,4 @@
-"""The four study/review tools the tutor model may call, run against the learner's own path.
+"""Tutor tools for study, path ordering and profile updates on the learner's own path.
 
 The tool contracts follow the mastery tools of DeepTutor v1.6.9 (``capabilities/mastery/tools.py``, Apache-2.0):
 posing a question registers its expected answer server-side and ends the turn, grading is deterministic against
@@ -13,9 +13,12 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import uuid4
 
+from app.application.path_reorder import ReorderRejected, reorder_path
 from app.mastery.models import InteractionStatus, KnowledgeType, PendingOption, PendingQuestion
 from app.mastery.pending import canonical_labels, public_pending_question, resolve_answer
-from app.mastery.policy import display_mastery, find_knowledge_point, is_mastered, map_summary, next_objective
+from app.mastery.policy import (
+    display_mastery, find_knowledge_point, is_mastered, map_summary, next_objective,
+)
 from app.mastery.scheduler import SpacedRepetitionScheduler
 from app.mastery.service import LearningService, MasteryInteractionError
 from app.mastery.store import LearningStoreError
@@ -23,6 +26,19 @@ from app.mastery.store import LearningStoreError
 QUESTION_TYPES = ("short", "choice", "open")
 _QUIZ_TYPES = frozenset({KnowledgeType.MEMORY, KnowledgeType.PROCEDURE})
 _MAX_TEXT = 4000
+_PROFILE_FIELDS = ("prior_knowledge", "target_level", "time_budget", "preferences", "notes")
+_ONLY_REORDER = "Only reordering is allowed; content cannot be added, removed or moved between modules."
+_REORDER_MESSAGES = {
+    "empty": "Provide module_ids and/or knowledge_points to reorder the path.",
+    "malformed": "Use arrays of module ids and knowledge point ids from path_outline.",
+    "duplicate_module": "Each module may appear only once in an ordering request.",
+    "unknown_module": "A module id is not in this path; call path_outline for current ids.",
+    "missing_module": "Include every module id when changing module order. " + _ONLY_REORDER,
+    "duplicate_knowledge_point": "Each knowledge point may appear only once in its module.",
+    "unknown_knowledge_point": "A knowledge point id is not in this path. " + _ONLY_REORDER,
+    "moved_knowledge_point": "A knowledge point belongs to another module. " + _ONLY_REORDER,
+    "missing_knowledge_point": "Include every knowledge point in each changed module. " + _ONLY_REORDER,
+}
 
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {"type": "function", "function": {
@@ -72,6 +88,37 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "feedback": {"type": "string", "description": "What the learner showed or missed, briefly."},
         }, "required": ["knowledge_point_id", "passed"]},
     }},
+    {"type": "function", "function": {
+        "name": "path_outline",
+        "description": "Read the learner's current path in module and knowledge point order. Call this before path_reorder "
+                       "and use its ids verbatim. The result contains no question answer or evidence.",
+        "parameters": {"type": "object", "properties": {}},
+    }},
+    {"type": "function", "function": {
+        "name": "path_reorder",
+        "description": "Only change order when the learner clearly asks. Call path_outline first for current ids. "
+                       "This can reorder modules and knowledge points within each module only; it cannot add, "
+                       "remove or move knowledge points between modules. Send module_ids only for a changed module "
+                       "order, and knowledge_points only for modules whose inner order changes.",
+        "parameters": {"type": "object", "properties": {
+            "module_ids": {"type": "array", "description": "Every module id, in the requested order.",
+                           "items": {"type": "string"}},
+            "knowledge_points": {"type": "array", "description": "Only modules whose knowledge point order changes; "
+                                 "include every knowledge point id in each such module.",
+                                 "items": {"type": "object", "properties": {
+                                     "module_id": {"type": "string"},
+                                     "knowledge_point_ids": {"type": "array", "items": {"type": "string"}},
+                                 }, "required": ["module_id", "knowledge_point_ids"]}},
+        }},
+    }},
+    {"type": "function", "function": {
+        "name": "learner_profile",
+        "description": "Record only the learner's stated level, target, available time and study preferences. "
+                       "Send only non-empty fields they actually stated; never include identity or contact details.",
+        "parameters": {"type": "object", "properties": {
+            field_name: {"type": "string"} for field_name in _PROFILE_FIELDS
+        }},
+    }},
 ]
 
 
@@ -106,6 +153,8 @@ class TutorTools:
         handlers = {
             "mastery_status": self._status, "mastery_quiz": self._quiz,
             "mastery_grade": self._grade, "mastery_assess": self._assess,
+            "path_outline": self._outline, "path_reorder": self._reorder,
+            "learner_profile": self._profile,
         }
         handler = handlers.get(name)
         if handler is None:
@@ -145,6 +194,59 @@ class TutorTools:
 
     def _status(self, _arguments: dict[str, Any]) -> ToolOutcome:
         return ToolOutcome(self.status())
+
+    def _outline(self, _arguments: dict[str, Any]) -> ToolOutcome:
+        with self._service.store.transaction(self._path_id) as tx:
+            progress = tx.progress
+        attempted_ids = {attempt.knowledge_point_id for attempt in progress.quiz_attempts}
+
+        def point_row(point):
+            mastered = is_mastered(progress, point)
+            # Same three states as objective_status, with one scan of the attempt history.
+            status = ("mastered" if mastered else "learning"
+                      if point.id in attempted_ids or point.id in progress.qualitative_mastery else "new")
+            return {"id": point.id, "name": point.name[:120], "type": point.type.value,
+                    "status": status, "mastered": mastered}
+
+        modules = [{
+            "id": module.id, "name": module.name[:120], "order": module.order,
+            "knowledge_points": [point_row(point) for point in module.knowledge_points],
+        } for module in sorted(progress.modules, key=lambda entry: entry.order)]
+        return ToolOutcome({"modules": modules, "objective_id": next_objective(progress).knowledge_point_id or None})
+
+    def _reorder(self, arguments: dict[str, Any]) -> ToolOutcome:
+        try:
+            result = reorder_path(
+                self._service, self._path_id, module_ids=arguments.get("module_ids"),
+                knowledge_points=arguments.get("knowledge_points"),
+                session_id=self._session_id, turn_id=self._turn_id)
+        except ReorderRejected as exc:
+            return ToolOutcome({"error": _REORDER_MESSAGES[exc.reason], "reason": exc.reason})
+        if result.status == "unchanged":
+            return ToolOutcome({"status": "unchanged"})
+        progress = result.progress
+        modules = sorted(progress.modules, key=lambda entry: entry.order)
+        return ToolOutcome({
+            "status": "reordered", "objective_id": next_objective(progress).knowledge_point_id or None,
+            "modules": [{"id": module.id, "knowledge_point_ids": [point.id for point in module.knowledge_points]}
+                        for module in modules],
+        }, events=[("path.reordered", {
+            "module_count": len(modules),
+            "knowledge_point_count": sum(len(module.knowledge_points) for module in modules),
+        })])
+
+    def _profile(self, arguments: dict[str, Any]) -> ToolOutcome:
+        fields = {key: value.strip() for key, value in arguments.items()
+                  if key in _PROFILE_FIELDS and isinstance(value, str) and value.strip()}
+        if not fields:
+            return _error("Provide at least one non-empty learner profile field.")
+        progress, recorded = self._service.record_learner_profile(
+            self._path_id, fields=fields, session_id=self._session_id, turn_id=self._turn_id)
+        profile = progress.learner_profile
+        return ToolOutcome(
+            {"recorded": recorded, "learner_profile": profile.model_dump(mode="json", exclude={"updated_at"})},
+            events=[("profile.updated", {"fields": recorded})] if recorded else [],
+        )
 
     def _quiz(self, arguments: dict[str, Any]) -> ToolOutcome:
         kp_id = _text(arguments.get("knowledge_point_id"))

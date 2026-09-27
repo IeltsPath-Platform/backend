@@ -25,9 +25,11 @@ and `X-Accel-Buffering: no`.
 | --- | --- |
 | `turn.started` | `{ "turnId": "uuid", "sessionId": "uuid" }` |
 | `assistant.message` | `{ "text": "..." }` |
-| `tool.called` | `{ "name": "mastery_status\|mastery_quiz\|mastery_grade\|mastery_assess" }` |
+| `tool.called` | `{ "name": "mastery_status\|mastery_quiz\|mastery_grade\|mastery_assess\|path_outline\|path_reorder\|learner_profile" }` |
 | `question` | Public question: `questionId`, `knowledgePointId`, `prompt`, `questionType`, `options`, and other public question fields when present. |
 | `grading` | For a quiz: `questionId`, `knowledgePointId`, `isCorrect`, `mastery`, `mastered`, `explanation`. For a qualitative assessment: `knowledgePointId`, `passed`, `mastered`, `mastery`. |
+| `path.reordered` | `{ "moduleCount": 2, "knowledgePointCount": 4 }` after an actual order change. |
+| `profile.updated` | `{ "fields": ["time_budget"] }` when at least one profile field changed. |
 | `turn.completed` | `{ "turnId": "uuid" }`, with `questionId` when the turn placed a question. |
 | `turn.failed` | `{ "turnId": "uuid", "failureCode": "..." }` (for example `llm_error`, `llm_not_configured`, `too_many_rounds`, `internal_error`). |
 

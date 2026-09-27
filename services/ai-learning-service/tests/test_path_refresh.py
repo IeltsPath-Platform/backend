@@ -10,6 +10,8 @@ from app.adapters.formal_evidence_adapter import FormalEvidenceAdapter
 from app.application.formal_assessment_ingestion import FormalAssessmentIngestionService
 from app.application.path_service import PathService
 from app.learning.override_provenance import mastery_source
+from app.mastery.service import LearningService
+from app.tutor.tools import TutorTools
 
 from tests.formal_assessment_support import InMemoryLearningStore, event, item, mapping
 
@@ -18,6 +20,7 @@ TOPIC_B = "4ed3d7e1-7529-4572-921d-2e54403f7da2"
 KP_1 = "c5b2641f-28c8-467d-9d64-f52c8bdc1a01"
 KP_2 = "c5b2641f-28c8-467d-9d64-f52c8bdc1a02"
 KP_NEW = "c5b2641f-28c8-467d-9d64-f52c8bdc1a03"
+KP_A2 = "c5b2641f-28c8-467d-9d64-f52c8bdc1a04"
 
 
 class GoalClient:
@@ -150,6 +153,30 @@ class PathRefreshTest(unittest.TestCase):
         self.assertEqual([module.order for module in progress.modules], [0, 1])
         self.assertEqual(kp_ids(progress), [KP_1, KP_2])
         self.assertEqual((added, progress.version), (0, revision))
+
+    def test_refresh_keeps_learner_order_and_appends_new_point(self):
+        self.content.points.append(EditableContent.point(KP_A2, TOPIC_A))
+        self.refresh()
+        tools = TutorTools(LearningService(self.store), self.path_id, session_id="session", turn_id="turn")
+        reordered = tools.execute("path_reorder", {
+            "module_ids": [TOPIC_B, TOPIC_A],
+            "knowledge_points": [{"module_id": TOPIC_A, "knowledge_point_ids": [KP_A2, KP_1]}],
+        })
+        self.assertEqual(reordered.result["status"], "reordered")
+        revision = self.progress().version
+
+        _, unchanged, added = self.refresh()
+
+        self.assertEqual((added, unchanged.version), (0, revision))
+        self.assertEqual([module.id for module in unchanged.modules], [TOPIC_B, TOPIC_A])
+        self.assertEqual(kp_ids(unchanged), [KP_2, KP_A2, KP_1])
+
+        self.content.points.append(EditableContent.point(KP_NEW, TOPIC_A))
+        _, updated, added = self.refresh()
+
+        self.assertEqual((added, updated.version), (1, revision + 1))
+        self.assertEqual([module.id for module in updated.modules], [TOPIC_B, TOPIC_A])
+        self.assertEqual(kp_ids(updated), [KP_2, KP_A2, KP_1, KP_NEW])
 
     def test_new_points_append_even_when_their_content_creation_date_sorts_first(self):
         self.content.points[0]["createdAt"] = "2026-09-26"

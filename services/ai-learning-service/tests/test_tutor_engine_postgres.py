@@ -21,6 +21,8 @@ from tests.postgres_schema_support import PostgresSchema, database_url_or_skip
 from tests.test_goal_scoped_path import GoalClient, KP_BASIC, TOPIC_BASIC
 
 KP_CONCEPT = "c5b2641f-28c8-467d-9d64-f52c8bdc1503"
+TOPIC_SECOND = "c5b2641f-28c8-467d-9d64-f52c8bdc1504"
+KP_SECOND = "c5b2641f-28c8-467d-9d64-f52c8bdc1505"
 
 
 class CurriculumWithConcept:
@@ -39,6 +41,16 @@ class ConceptOnlyCurriculum(CurriculumWithConcept):
     async def get_curriculum(self, bearer_token):
         topics, points = await super().get_curriculum(bearer_token)
         return topics, [point for point in points if point["id"] == KP_CONCEPT]
+
+
+class TwoModuleCurriculum(CurriculumWithConcept):
+    async def get_curriculum(self, bearer_token):
+        topics, points = await super().get_curriculum(bearer_token)
+        topics.append({"id": TOPIC_SECOND, "name": "Second", "sortOrder": 1, "status": "ACTIVE"})
+        points.append({"id": KP_SECOND, "topicId": TOPIC_SECOND, "name": "Second KP",
+                       "learningType": "PROCEDURE", "status": "ACTIVE",
+                       "effectiveBandMin": 4.0, "effectiveBandMax": 5.0})
+        return topics, points
 
 
 def call(name, **arguments):
@@ -110,7 +122,9 @@ class TutorEngineTest(unittest.TestCase):
         self.assertEqual([option["label"] for option in question["options"]], ["A", "B"])
         self.assertNotIn("has gone\"", json.dumps([event.data for event in events if event.type != "question"]))
         self.assertNotIn("expected_answer", json.dumps([event.data for event in events]))
-        self.assertEqual(quiz.requests[0]["tools"], ["mastery_status", "mastery_quiz", "mastery_grade", "mastery_assess"])
+        self.assertEqual(quiz.requests[0]["tools"], [
+            "mastery_status", "mastery_quiz", "mastery_grade", "mastery_assess",
+            "path_outline", "path_reorder", "learner_profile"])
         self.assertEqual(self.status_of(quiz.requests[0])["objective"]["knowledge_point_id"], KP_BASIC)
 
         question_id = question["question_id"]
@@ -139,6 +153,43 @@ class TutorEngineTest(unittest.TestCase):
         events = self.turn(user_id, session, chat, message="Here is my explanation")
         grading = next(event.data for event in events if event.type == "grading")
         self.assertEqual((grading["passed"], grading["mastered"]), (True, True))
+
+    def test_outline_then_reorder_updates_sse_and_next_turn_objective(self):
+        user_id, _goal_id, _paths, session = self.learner(TwoModuleCurriculum())
+        chat = ScriptedChat(
+            ChatReply("", (call("path_outline"),)),
+            ChatReply("", (call("path_reorder", module_ids=[TOPIC_SECOND, TOPIC_BASIC]),)),
+            ChatReply("I moved the second module first."),
+        )
+
+        events = self.turn(user_id, session, chat, message="Move the second module first")
+
+        types = [event.type for event in events]
+        self.assertEqual(types.count("tool.called"), 2)
+        self.assertEqual(types.count("path.reordered"), 1)
+        self.assertEqual(types[-1], "turn.completed")
+        self.assertNotIn("expected_answer", json.dumps([event.data for event in events]))
+        progress = self.learning_store.get_owned_progress(session.path_id, user_id)
+        self.assertEqual([module.id for module in progress.modules], [TOPIC_SECOND, TOPIC_BASIC])
+
+        later = ScriptedChat(ChatReply("Let's start there."))
+        self.turn(user_id, session, later, message="What is next?")
+        self.assertEqual(self.status_of(later.requests[0])["objective"]["knowledge_point_id"], KP_SECOND)
+
+    def test_profile_update_emits_sse_and_appears_in_next_turn(self):
+        user_id, _goal_id, _paths, session = self.learner()
+        chat = ScriptedChat(ChatReply("", (call("learner_profile", time_budget="25 minutes daily"),)),
+                            ChatReply("I will keep that in mind."))
+
+        events = self.turn(user_id, session, chat, message="I have 25 minutes each day")
+
+        self.assertEqual([event.data for event in events if event.type == "profile.updated"],
+                         [{"fields": ["time_budget"]}])
+        self.assertEqual(events[-1].type, "turn.completed")
+        later = ScriptedChat(ChatReply("Ready."))
+        self.turn(user_id, session, later, message="Continue")
+        self.assertEqual(self.status_of(later.requests[0])["learner_profile"]["time_budget"],
+                         "25 minutes daily")
 
     def test_a_later_objective_cannot_be_assessed_early(self):
         user_id, _goal_id, _paths, session = self.learner()

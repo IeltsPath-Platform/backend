@@ -34,9 +34,17 @@ All routes below begin with `/api/ai-learning/tutor`:
 | `DELETE` | `/sessions/{sessionId}` | Archive the session; 204. |
 | `POST` | `/sessions/{sessionId}/turns` | Exactly one `message` (up to 4,000 characters) or `answer` (`questionId`, `text` up to 2,000); returns SSE. |
 
-A turn emits `turn.started`, optional `assistant.message` and `tool.called`, then `question` or `grading`, and
-`turn.completed` or `turn.failed`. The correct answer stays server-side until grading; SSE never includes an
-`expectedAnswer` field. See [the SSE contract](../../docs/contracts/tutor-sse-v1.md) for payloads and errors.
+A turn emits `turn.started`, optional `assistant.message` and `tool.called`, and may emit `question`, `grading`,
+`path.reordered` or `profile.updated` before `turn.completed` or `turn.failed`. The correct answer stays server-side
+until grading; SSE never includes an `expectedAnswer` field. See
+[the SSE contract](../../docs/contracts/tutor-sse-v1.md) for payloads and errors.
+
+The tutor also offers three tools in every session: `path_outline` shows the current module and knowledge point
+order, `path_reorder` changes that order when the learner asks, and `learner_profile` records the learner's stated
+level, target, available time or study preferences. There is no separate outline mode. Reordering accepts a full
+`module_ids` list and/or the full knowledge point order for only the modules being changed; the server fills in
+unchanged modules before validating. It cannot add, remove or move knowledge points between modules. An actual
+reorder emits `path.reordered`; a changed profile emits `profile.updated`. Neither changes mastery.
 
 Use `fetch` because browser `EventSource` cannot send the bearer `Authorization` header for this POST endpoint:
 

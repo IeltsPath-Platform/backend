@@ -47,7 +47,7 @@ thì lượt vẫn chạy xong ở server; message tối đa 4.000 ký tự.
 | 2 | [Tutor engine study/review](./phase-02-tutor-engine.md) | Complete |
 | 3 | [API tutor HTTP + SSE](./phase-03-tutor-api-sse.md) | Complete |
 | 4 | [Compose, E2E qua Gateway, tài liệu](./phase-04-compose-e2e-docs.md) | Complete |
-| 5 | [Chỉnh lộ trình bằng hội thoại và hồ sơ học viên](./phase-05-outline-profile.md) | Pending (làm sau) |
+| 5 | [Chỉnh lộ trình bằng hội thoại và hồ sơ học viên](./phase-05-outline-profile.md) | Complete |
 | 6 | [Luyện câu hỏi theo KP, sổ câu hỏi và ôn câu sai](./phase-06-question-practice.md) | Pending (làm sau) |
 | 7 | [Tutor nhớ học viên qua các buổi học](./phase-07-learner-memory.md) | Pending (làm sau) |
 | 8 | [Lưu ghi chú vào notes của learning-support](./phase-08-save-to-notes.md) | Pending (làm sau, sửa cả service Java) |
@@ -57,7 +57,7 @@ thì lượt vẫn chạy xong ở server; message tối đa 4.000 ký tự.
 theo thứ tự nhóm cần.
 
 Đợt study/review (pha 1–4) đã được kiểm chứng ngày 2026-09-26; xem
-[báo cáo E2E](./reports/e2e-verification-260926-tutor-study-review.md). Các pha 5–9 vẫn là backlog theo quyết định T1.
+[báo cáo E2E](./reports/e2e-verification-260926-tutor-study-review.md). Pha 5 đã xong (2026-09-27); các pha 6–9 vẫn là backlog theo quyết định T1.
 
 ## Quy tắc cho người implement
 
