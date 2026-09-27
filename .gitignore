@@ -39,6 +39,10 @@ build/
 ### Mac OS ###
 .DS_Store
 
+### Python ###
+__pycache__/
+*.py[cod]
+
 context
 .run-logs/
 *.log
