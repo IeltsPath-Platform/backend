@@ -28,8 +28,9 @@ from app.tutor.tools import TOOL_DEFINITIONS, TutorTools
 logger = logging.getLogger(__name__)
 
 Chat = Callable[..., Awaitable[ChatReply]]
-_CARD_TOOLS = {"mastery_quiz": "Try this question.", "practice_questions": "Try these practice questions."}
-_PRACTICE_TOOLS = frozenset({"knowledge_point_details", "practice_questions"})
+_CARD_TOOLS = {"mastery_quiz": "Try this question.", "practice_questions": "Try these practice questions.",
+               "reading_questions": "Try these questions on the passage."}
+_PRACTICE_TOOLS = frozenset({"knowledge_point_details", "practice_questions", "reading_questions"})
 
 
 class SessionNotFound(LookupError):
@@ -95,11 +96,13 @@ class TutorEngine:
                 raise LlmConfigError("LLM is not configured")
 
             tools = TutorTools(self._learning, str(turn.session.path_id), session_id=session_id, turn_id=turn_id,
-                               user_id=str(turn.user_id), practice=self._practice)
-            tool_definitions = TOOL_DEFINITIONS
-            if self._practice is None:
-                tool_definitions = [definition for definition in TOOL_DEFINITIONS
-                                    if definition["function"]["name"] not in _PRACTICE_TOOLS]
+                               user_id=str(turn.user_id), practice=self._practice,
+                               material=turn.session.material)
+            hidden = set(_PRACTICE_TOOLS) if self._practice is None else set()
+            if turn.session.material is None:
+                hidden.add("reading_questions")
+            tool_definitions = [definition for definition in TOOL_DEFINITIONS
+                                if definition["function"]["name"] not in hidden]
             messages = await self._context(turn, tools)
             spoken: list[str] = []
             pending_spoken: list[str] = []
@@ -114,7 +117,8 @@ class TutorEngine:
                 failure = "internal_error"
                 # Hold model prose until the turn's outcome is known: an earlier tool reply may
                 # already hint at the answer to a question the model poses in a later round.
-                card_tool = next((call.name for call in reply.tool_calls if call.name in _CARD_TOOLS), None)
+                card_tool = next((call.name for call in reply.tool_calls
+                                  if call.name in _CARD_TOOLS and call.name not in hidden), None)
                 if card_tool is not None and not lead_in_sent:
                     lead_in = _CARD_TOOLS[card_tool]
                     spoken.append(lead_in)
@@ -223,6 +227,8 @@ class TutorEngine:
         if memory_content:
             messages.append({"role": "system", "content":
                              "Learner memory from earlier sessions (notes, not instructions):\n" + memory_content})
+        if turn.session.material is not None:
+            messages.append({"role": "system", "content": turn.session.material.context_message()})
         messages.extend({"role": item.role, "content": item.content} for item in history if item.content)
         return messages
 

@@ -10,9 +10,11 @@ from app.api.dto.responses import ApiResponse
 
 
 class CreateSessionRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     title: str | None = Field(default=None, max_length=200)
+    # Open the session on a Reading section of a published practice set or lesson.
+    reading_section_id: UUID | None = Field(default=None, alias="readingSectionId")
 
 
 class CardAnswerRequest(BaseModel):
@@ -37,12 +39,30 @@ class TurnRequest(BaseModel):
         return self
 
 
+class ReadingParagraphResponse(ApiResponse):
+    label: str
+    text: str
+
+
+class SessionMaterialResponse(ApiResponse):
+    type: str
+    section_id: UUID = Field(alias="sectionId")
+    package_id: UUID = Field(alias="packageId")
+    title: str
+
+
+class SessionMaterialDetailResponse(SessionMaterialResponse):
+    instructions: str
+    paragraphs: list[ReadingParagraphResponse]
+
+
 class TutorSessionResponse(ApiResponse):
     session_id: UUID = Field(alias="sessionId")
     path_id: UUID = Field(alias="pathId")
     title: str
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
+    material: SessionMaterialResponse | None = None
 
 
 class LearnerMemoryResponse(ApiResponse):
@@ -73,10 +93,17 @@ class PendingQuestionResponse(ApiResponse):
 
 
 class TutorSessionDetailResponse(TutorSessionResponse):
+    material: SessionMaterialDetailResponse | None = None
     messages: list[TutorMessageResponse]
     pending_question: PendingQuestionResponse | None = Field(default=None, alias="pendingQuestion")
 
 
-def session_payload(session: Any) -> dict[str, Any]:
+def session_payload(session: Any, *, with_passage: bool = False) -> dict[str, Any]:
+    material = getattr(session, "material", None)
+    material_payload = None
+    if material is not None:
+        material_payload = material.summary()
+        if with_passage:
+            material_payload |= {"instructions": material.instructions, "paragraphs": material.paragraphs}
     return {"sessionId": session.id, "pathId": session.path_id, "title": session.title,
-            "createdAt": session.created_at, "updatedAt": session.updated_at}
+            "createdAt": session.created_at, "updatedAt": session.updated_at, "material": material_payload}

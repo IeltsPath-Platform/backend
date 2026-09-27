@@ -6,13 +6,16 @@ Every read and write is scoped to `user_id` stored on the notebook entry.
 
 | Method | Route | Request | Response |
 | --- | --- | --- | --- |
-| `GET` | `/notebook` | Optional `knowledgePointId`, `sessionId`, `status=open\|correct\|incorrect`; `limit` 1–100 (default 50) | `200` newest owned entries first |
+| `GET` | `/notebook` | Optional `knowledgePointId`, `sessionId`, `materialId`, `status=open\|correct\|incorrect`; `limit` 1–100 (default 50) | `200` newest owned entries first |
 | `POST` | `/entries/{entryId}/answer` | `{ "answer": "..." }`, 1–4,000 characters | `200` `{ entryId, questionId, isCorrect, correctAnswer, explanation, dueAt? }` |
 | `GET` | `/due` | `limit` 1–100 (default 20) | `200` currently due mistake entries, earliest due first |
 | `POST` | `/reviews` | `{ "requestId": "uuid", "entryId": 1, "answer": "...", "rating": "good" }`; `rating` is optional and defaults to `good` | `200` `{ entryId, questionId, isCorrect, rating, dueAt, resolved, correctAnswer, explanation }` |
 
-Entry responses contain `entryId`, `questionId`, `sessionId`, `knowledgePointId`, `knowledgePointName`, `prompt`, `questionType`,
-`options`, `difficulty`, `createdAt`, `answeredAt`, `userAnswer`, `isCorrect`, and `resolved`. `correctAnswer` and
+Entry responses contain `entryId`, `questionId`, `sessionId`, `knowledgePointId`, `knowledgePointName`, `materialId`,
+`materialTitle`, `source`, `prompt`, `questionType`, `options`, `difficulty`, `createdAt`, `answeredAt`, `userAnswer`,
+`isCorrect`, and `resolved`. `source` is `tutor_practice` for questions on a knowledge point and `tutor_reading` for
+questions on a reading passage; reading questions have no `knowledgePointId` (omitted) and carry `materialId`, the
+Content section id, and `materialTitle`. `correctAnswer` and
 `explanation` are omitted until the learner answers. Due cards also omit both answer fields while they are awaiting a
 review answer.
 

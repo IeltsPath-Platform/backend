@@ -117,6 +117,22 @@ class NoteSecurityTest {
     }
 
     @Test
+    void createsNoteFromAReadingPassage() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID sectionId = UUID.randomUUID();
+        when(createNoteUseCase.execute(userId, "Note", "Body", NoteSourceType.READING, sectionId))
+                .thenReturn(NoteResult.from(Note.create(userId, "Note", "Body", NoteSourceType.READING, sectionId)));
+
+        mockMvc.perform(post("/api/learning-support/notes")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedToken(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Note\",\"body\":\"Body\",\"sourceType\":\"READING\",\"sourceReferenceId\":\"" + sectionId + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sourceType").value("READING"))
+                .andExpect(jsonPath("$.sourceReferenceId").value(sectionId.toString()));
+    }
+
+    @Test
     void rejectsUnknownOrIncompleteSource() throws Exception {
         UUID userId = UUID.randomUUID();
         String token = "Bearer " + signedToken(userId);

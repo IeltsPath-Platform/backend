@@ -696,6 +696,10 @@ Thuộc tính chính:
 
 ## 5.8 `content_assets`
 
+Passage của section Reading được đọc qua `GET /api/content/reading/sections/{sectionId}`: chỉ section `READING` thuộc
+version đang publish của gói `PRACTICE_SET` hoặc `LESSON`; text của các asset `PASSAGE` (theo `sort_order` của link) được
+chia đoạn theo dòng trống và gán nhãn A, B, C... Mọi trường hợp khác trả 404.
+
 Lưu passage text hoặc metadata của audio/hình ảnh/media. Bảng quản lý passage, audio, image và media metadata dùng chung cho content mà không cần lưu binary trực tiếp trong PostgreSQL.
 
 Thuộc tính chính:
@@ -1390,7 +1394,9 @@ learner, không phải canonical IELTS question bank và không nhận formal as
 | `session_id` | uuid | FK → `sessions` ON DELETE CASCADE | Tutor session tạo entry. |
 | `turn_id` | uuid? | FK → `turns` ON DELETE SET NULL | Tutor turn tạo entry. |
 | `mastery_path_id` | uuid | FK → `mastery_paths` ON DELETE CASCADE | Path của session; practice không ghi mastery vào path. |
-| `knowledge_point_id` | uuid | NOT NULL, không FK xuyên service | KP trong path mà câu hỏi luyện tập. |
+| `knowledge_point_id` | uuid | Nullable (V8), không FK xuyên service | KP trong path mà câu hỏi luyện tập; null với câu hỏi trên bài đọc. |
+| `material_id` | uuid | Nullable (V8) | Section Reading của Content khi câu hỏi là `tutor_reading`. CHECK `chk_notebook_entries_subject`: phải có KP hoặc material. |
+| `material_title` | text | DEFAULT '' (V8) | Snapshot tiêu đề bài đọc. |
 | `knowledge_point_name` | text | NOT NULL DEFAULT '' | Tên KP tại thời điểm tạo entry. |
 | `question_id` | varchar(255) | NOT NULL | UUID do AI Learning sinh cho practice card. |
 | `question` | text | NOT NULL | Snapshot nội dung câu hỏi learner đã làm. |
@@ -1599,6 +1605,26 @@ nhất hiện có, vì vậy message cũ không được tóm tắt lại. Bản
 
 ---
 
+## 7.19 `session_materials`
+
+Được tạo bởi `V8__session_reading_material.sql`. Bản sao chỉ đọc của bài Reading mà một tutor session được mở trên đó,
+chép một lần lúc tạo session bằng token của learner (internal JWT chỉ sống 60 giây nên lượt tutor không gọi Content).
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `session_id` | uuid | PK, FK → `sessions` ON DELETE CASCADE | Một session có tối đa một bài đọc. |
+| `material_type` | varchar(20) | CHECK `READING` | Loại tài liệu. |
+| `section_id` | uuid | NOT NULL, logical ref ↗ `Content.content_sections` | Section Reading nguồn. |
+| `package_id` | uuid | NOT NULL, logical ref ↗ `Content.content_packages` | Gói chứa section. |
+| `title` | text | NOT NULL | Snapshot tiêu đề section. |
+| `instructions` | text | DEFAULT '' | Snapshot hướng dẫn của section. |
+| `paragraphs` | jsonb | NOT NULL | `[{label, text}]`, tối đa 20.000 ký tự, cắt ở ranh giới đoạn. |
+| `fetched_at` | timestamptz | NOT NULL | Thời điểm chép. |
+
+Bản sao không cập nhật khi Content sửa bài; mở session mới để có bản mới.
+
+---
+
 # 8. Learning Support — Tracking, Video Progress và Personal Library
 
 Phần này thuộc **`learning-support-service`**, database **`learning_support_db`**. Service này giữ learner-owned utility state và được tách khỏi `ai-learning-service` để AI Learning chỉ tập trung vào DeepTutor ADP/Tutor core.
@@ -1708,7 +1734,7 @@ Thuộc tính chính:
 | `user_id` | uuid | Logical ref ↗ `Identity.users` | Learner sở hữu note. |
 | `title` | varchar(255) | — | Tiêu đề note. |
 | `body` | text | — | Nội dung note. |
-| `source_type` | varchar(50) | Nullable; `TUTOR_SESSION` hoặc `KNOWLEDGE_POINT` | Loại nguồn của note; enum `NoteSourceType` xác thực giá trị. |
+| `source_type` | varchar(50) | Nullable; `TUTOR_SESSION`, `KNOWLEDGE_POINT` hoặc `READING` | Loại nguồn của note; enum `NoteSourceType` xác thực giá trị. `READING` trỏ tới id section Reading của Content. |
 | `source_reference_id` | uuid | Nullable; logical reference, không FK xuyên service | ID session hoặc knowledge point tương ứng. |
 | `status` | — | — | Trạng thái như `ACTIVE`, `ARCHIVED`, `DELETED`. |
 | `created_at` | timestamptz | — | Thời điểm tạo. |

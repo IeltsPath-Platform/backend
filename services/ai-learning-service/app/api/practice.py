@@ -31,6 +31,7 @@ def _store_error(error: PracticeNotFound | PracticeConflict) -> HTTPException:
 async def list_notebook(
     knowledge_point_id: UUID | None = Query(default=None, alias="knowledgePointId"),
     session_id: UUID | None = Query(default=None, alias="sessionId"),
+    material_id: UUID | None = Query(default=None, alias="materialId"),
     entry_status: Literal["open", "correct", "incorrect"] | None = Query(default=None, alias="status"),
     limit: int = Query(default=50, ge=1, le=100),
     user: AuthenticatedUser = Depends(require_current_user),
@@ -38,7 +39,7 @@ async def list_notebook(
 ):
     return await asyncio.to_thread(
         store.list_entries, user.user_id, kp_id=knowledge_point_id, session_id=session_id,
-        status=entry_status, limit=limit,
+        status=entry_status, limit=limit, material_id=material_id,
     )
 
 

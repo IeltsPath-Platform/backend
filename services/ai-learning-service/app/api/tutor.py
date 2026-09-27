@@ -6,15 +6,18 @@ The path is always the learner's active path, resolved by the server; no route a
 from __future__ import annotations
 
 import asyncio
+import logging
 from uuid import UUID
+
+import httpx
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app.api.dependencies import (
-    get_learner_memory_store, get_memory_complete, get_path_service, get_tutor_chat, get_tutor_engine,
-    get_tutor_sessions,
+    get_content_client, get_learner_memory_store, get_memory_complete, get_path_service, get_tutor_chat,
+    get_tutor_engine, get_tutor_sessions,
 )
 from app.api.dto.tutor import (
     CreateSessionRequest, LearnerMemoryResponse, TurnRequest, TutorSessionDetailResponse, TutorSessionResponse,
@@ -22,14 +25,17 @@ from app.api.dto.tutor import (
 )
 from app.api.tutor_sse import SSE_HEADERS, stream_events
 from app.application.path_service import PathService
+from app.clients.content_service import ContentServiceClient
 from app.security.internal_jwt import AuthenticatedUser, bearer_scheme, require_current_user
 from app.tutor.engine import CardAnswer, Chat, SessionNotFound, TutorEngine
 from app.tutor.memory import Complete, LearnerMemoryStore
+from app.tutor.reading import ReadingMaterialNotFound, material_from_content
 from app.tutor.session_store import ActiveTurnConflict, TutorSessionStore
 
 router = APIRouter(prefix="/api/ai-learning/tutor", tags=["tutor"])
 
 _SESSION_NOT_FOUND = HTTPException(status.HTTP_404_NOT_FOUND, detail="Tutor session not found")
+logger = logging.getLogger(__name__)
 
 
 @router.get("/memory", response_model=LearnerMemoryResponse)
@@ -57,10 +63,25 @@ async def create_session(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     paths: PathService = Depends(get_path_service),
     sessions: TutorSessionStore = Depends(get_tutor_sessions),
+    content: ContentServiceClient = Depends(get_content_client),
 ):
     path_id, _progress = await paths.ensure_active_path(user.user_id, credentials.credentials)
-    session = await asyncio.to_thread(sessions.create_session, user.user_id, path_id,
-                                      request.title if request else None)
+    title = request.title if request else None
+    material = None
+    if request is not None and request.reading_section_id is not None:
+        # Copy the passage now, while this request's token is valid; tutor turns never call Content.
+        try:
+            material = material_from_content(
+                await content.get_reading_passage(credentials.credentials, request.reading_section_id))
+        except ReadingMaterialNotFound:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Reading material not found") from None
+        except (httpx.HTTPError, ValueError) as error:
+            status_code = error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
+            logger.warning("Reading material fetch failed error_type=%s status=%s", type(error).__name__, status_code)
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
+                                detail="Content Service is unavailable") from None
+        title = title or material.title
+    session = await asyncio.to_thread(sessions.create_session, user.user_id, path_id, title, material)
     if session is None:
         raise _SESSION_NOT_FOUND
     return session_payload(session)
@@ -88,7 +109,7 @@ async def get_session(
     messages = await asyncio.to_thread(sessions.recent_messages, user.user_id, session_id, 200)
     pending = await engine.pending_question(session)
     return {
-        **session_payload(session),
+        **session_payload(session, with_passage=True),
         "messages": [{"id": message.id, "role": message.role, "content": message.content,
                       "createdAt": message.created_at, "questionId": message.metadata.get("question_id")}
                      for message in messages],

@@ -6,10 +6,28 @@ import httpx
 from uuid import UUID
 
 
+class ReadingMaterialNotFound(LookupError):
+    """Content has no readable passage for the section (unknown, unpublished, a test package, or not Reading)."""
+
+
 class ContentServiceClient:
     def __init__(self, base_url: str, *, timeout: float = 10.0) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
+
+    async def get_reading_passage(self, bearer_token: str, section_id: UUID | str) -> dict[str, Any]:
+        """The labelled paragraphs of a readable Reading section; ``ReadingMaterialNotFound`` when Content refuses it."""
+        headers = {"Authorization": f"Bearer {bearer_token}"}
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.get(
+                f"{self._base_url}/api/content/reading/sections/{UUID(str(section_id))}", headers=headers)
+        if response.status_code == 404:
+            raise ReadingMaterialNotFound(str(section_id))
+        response.raise_for_status()
+        body = response.json()
+        if not isinstance(body, dict):
+            raise ValueError("Content Service returned an invalid reading passage")
+        return body
 
     async def get_curriculum(self, bearer_token: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         headers = {"Authorization": f"Bearer {bearer_token}"}

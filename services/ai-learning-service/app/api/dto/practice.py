@@ -28,8 +28,12 @@ class PracticeEntryResponse(ApiResponse):
     entry_id: int = Field(alias="entryId")
     question_id: str = Field(alias="questionId")
     session_id: UUID = Field(alias="sessionId")
-    knowledge_point_id: UUID = Field(alias="knowledgePointId")
+    # Null for questions on a reading passage; those carry materialId instead.
+    knowledge_point_id: UUID | None = Field(default=None, alias="knowledgePointId")
     knowledge_point_name: str = Field(alias="knowledgePointName")
+    material_id: UUID | None = Field(default=None, alias="materialId")
+    material_title: str = Field(default="", alias="materialTitle")
+    source: str = "tutor_practice"
     prompt: str
     question_type: Literal["short", "choice"] = Field(alias="questionType")
     options: list[dict[str, str]] = Field(default_factory=list)

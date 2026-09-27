@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from app.application.path_reorder import ReorderRejected, reorder_path
 from app.practice.store import PracticeNotFound, PracticeStore
+from app.tutor.reading import SessionMaterial
 from app.mastery.models import InteractionStatus, KnowledgeType, PendingOption, PendingQuestion
 from app.mastery.pending import canonical_labels, public_pending_question, resolve_answer
 from app.mastery.policy import (
@@ -40,6 +41,20 @@ _REORDER_MESSAGES = {
     "moved_knowledge_point": "A knowledge point belongs to another module. " + _ONLY_REORDER,
     "missing_knowledge_point": "Include every knowledge point in each changed module. " + _ONLY_REORDER,
 }
+
+# The question batch of practice_questions and reading_questions: the same cards, validated the same way.
+_QUESTION_BATCH_SCHEMA: dict[str, Any] = {"type": "array", "minItems": 1, "maxItems": 5, "items": {
+    "type": "object", "properties": {
+        "question": {"type": "string"},
+        "question_type": {"type": "string", "enum": ["short", "choice"]},
+        "expected_answer": {"type": "string"},
+        "options": {"type": "array", "items": {"type": "object", "properties": {
+            "label": {"type": "string"}, "body": {"type": "string"},
+        }, "required": ["label", "body"]}},
+        "explanation": {"type": "string"},
+        "difficulty": {"type": "string", "enum": ["easy", "medium", "hard"]},
+    }, "required": ["question", "question_type", "expected_answer", "explanation"],
+}}
 
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {"type": "function", "function": {
@@ -135,19 +150,16 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                        "this tool ends the turn; the learner answers them outside the conversation.",
         "parameters": {"type": "object", "properties": {
             "knowledge_point_id": {"type": "string"},
-            "questions": {"type": "array", "minItems": 1, "maxItems": 5, "items": {
-                "type": "object", "properties": {
-                    "question": {"type": "string"},
-                    "question_type": {"type": "string", "enum": ["short", "choice"]},
-                    "expected_answer": {"type": "string"},
-                    "options": {"type": "array", "items": {"type": "object", "properties": {
-                        "label": {"type": "string"}, "body": {"type": "string"},
-                    }, "required": ["label", "body"]}},
-                    "explanation": {"type": "string"},
-                    "difficulty": {"type": "string", "enum": ["easy", "medium", "hard"]},
-                }, "required": ["question", "question_type", "expected_answer", "explanation"],
-            }},
+            "questions": _QUESTION_BATCH_SCHEMA,
         }, "required": ["knowledge_point_id", "questions"]},
+    }},
+    {"type": "function", "function": {
+        "name": "reading_questions",
+        "description": "Save and pose 1 to 5 short-answer or multiple-choice questions on this session's reading "
+                       "passage, answerable from the passage. Every question needs an explanation. They do not count "
+                       "toward mastery. The cards are shown without answers and this tool ends the turn.",
+        "parameters": {"type": "object", "properties": {"questions": _QUESTION_BATCH_SCHEMA},
+                       "required": ["questions"]},
     }},
     {"type": "function", "function": {
         "name": "save_note",
@@ -212,13 +224,15 @@ def _parse_question(arguments: dict[str, Any]) -> tuple[str, str, str, list[Pend
 
 class TutorTools:
     def __init__(self, service: LearningService, path_id: str, *, session_id: str, turn_id: str,
-                 user_id: str | None = None, practice: PracticeStore | None = None) -> None:
+                 user_id: str | None = None, practice: PracticeStore | None = None,
+                 material: SessionMaterial | None = None) -> None:
         self._service = service
         self._path_id = path_id
         self._session_id = session_id
         self._turn_id = turn_id
         self._user_id = user_id
         self._practice = practice
+        self._material = material
 
     def execute(self, name: str, arguments: dict[str, Any] | None) -> ToolOutcome:
         if arguments is None:
@@ -229,6 +243,7 @@ class TutorTools:
             "path_outline": self._outline, "path_reorder": self._reorder,
             "learner_profile": self._profile, "knowledge_point_details": self._details,
             "practice_questions": self._practice_questions, "save_note": self._save_note,
+            "reading_questions": self._reading_questions,
         }
         handler = handlers.get(name)
         if handler is None:
@@ -374,10 +389,23 @@ class TutorTools:
             {"status": "offered", "note": "The learner's app saves this note."},
             events=[("note.draft", {
                 "title": title, "body": body,
-                "source_type": "KNOWLEDGE_POINT" if has_kp else "TUTOR_SESSION",
-                "source_reference_id": kp.id if has_kp else self._session_id,
+                **self._note_source(kp.id if has_kp else None),
             })],
         )
+
+    def _note_source(self, kp_id: str | None) -> dict[str, str]:
+        if kp_id:
+            return {"source_type": "KNOWLEDGE_POINT", "source_reference_id": kp_id}
+        if self._material is not None:
+            return {"source_type": "READING", "source_reference_id": str(self._material.section_id)}
+        return {"source_type": "TUTOR_SESSION", "source_reference_id": self._session_id}
+
+    def _reading_questions(self, arguments: dict[str, Any]) -> ToolOutcome:
+        if self._practice is None or self._user_id is None:
+            return _error("Practice is not available.")
+        if self._material is None:
+            return _error("This session has no reading passage.")
+        return self._pose_questions(arguments.get("questions"), kp_id=None, kp_name="", material=self._material)
 
     def _practice_questions(self, arguments: dict[str, Any]) -> ToolOutcome:
         if self._practice is None or self._user_id is None:
@@ -387,8 +415,11 @@ class TutorTools:
             kp, _module_id, _module_name = find_knowledge_point(tx.progress, kp_id)
         if kp is None:
             return _error(f"Unknown knowledge point {kp_id!r}; use an id from path_outline.")
+        return self._pose_questions(arguments.get("questions"), kp_id=kp.id, kp_name=kp.name)
 
-        raw_questions = arguments.get("questions")
+    def _pose_questions(self, raw_questions: Any, *, kp_id: str | None, kp_name: str,
+                        material: SessionMaterial | None = None) -> ToolOutcome:
+        """Validate a whole batch, store it in the learner's notebook, and pose it on cards; nothing is stored on error."""
         if not isinstance(raw_questions, list) or not raw_questions:
             return _error("question 1: provide at least one practice question.")
         if len(raw_questions) > 5:
@@ -434,16 +465,22 @@ class TutorTools:
 
         try:
             entry_ids = self._practice.create_entries(
-                self._user_id, self._session_id, self._turn_id, self._path_id, kp.id, kp.name, questions,
+                self._user_id, self._session_id, self._turn_id, self._path_id, kp_id, kp_name, questions,
+                **({} if material is None else {
+                    "material_id": material.section_id, "material_title": material.title,
+                    "source": "tutor_reading"}),
             )
         except PracticeNotFound:
             return _error("This session can no longer hold practice questions.")
         for public_question, entry_id in zip(public_questions, entry_ids, strict=True):
             public_question["entry_id"] = entry_id
+        event = {"knowledge_point_id": kp_id, "questions": public_questions}
+        if material is not None:
+            event["material_id"] = str(material.section_id)
         return ToolOutcome(
             {"status": "posed", "entry_ids": entry_ids,
              "note": "The practice cards are shown. The turn ends now."},
-            events=[("practice.questions", {"knowledge_point_id": kp.id, "questions": public_questions})],
+            events=[("practice.questions", event)],
             ends_turn=True,
             entry_ids=entry_ids,
         )

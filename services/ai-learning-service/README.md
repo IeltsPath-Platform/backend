@@ -73,6 +73,17 @@ mistake. Practice does not call Learning Service or change mastery, path revisio
 entries return 404; answering twice, reviewing an entry outside the schedule, or reusing a review `requestId` for a
 different learner/entry returns 409. See [the Practice API contract](../../docs/contracts/practice-v1.md).
 
+### Reading sessions
+
+`POST /sessions` with `readingSectionId` opens a session on a Reading section of a published practice set or lesson.
+AI Learning fetches the passage from `GET /api/content/reading/sections/{id}` once, with the learner's token, and keeps a
+read-only copy in `session_materials` (at most 20,000 characters, cut at a paragraph boundary). Tutor turns never call
+Content, because the Gateway's internal token lives only 60 seconds. Every turn sends the passage to the model as
+curriculum data after the status. `reading_questions` poses 1–5 questions on the passage into the practice notebook
+(`source = tutor_reading`, no knowledge point, never mastery). `save_note` in such a session saves with source
+`READING` unless a knowledge point is named. Content returns 404 for mock tests, placement tests, unpublished packages
+and non-Reading sections, and the session is not created.
+
 ### Learner memory
 
 Memory belongs to the learner across paths and goals. After a completed turn, a background task summarizes up to 40
@@ -163,6 +174,7 @@ runtime configuration; do not put them in this file or the image.
 | `5` | `V5__tutor_sessions.sql` | Tutor sessions, turns, and learner/assistant messages |
 | `6` | `V6__practice_notebook.sql` | Content details snapshots, practice notebook entries, review state and idempotent review events |
 | `7` | `V7__learner_memory.sql` | One learner-owned memory summary and cross-session message cursor |
+| `8` | `V8__session_reading_material.sql` | Reading passage copy per session; notebook entries may belong to a passage |
 
 `V1` stops if the database already contains more than one path for a non-null
 `(user_id, learning_goal_id)` pair; reconcile those rows before retrying.

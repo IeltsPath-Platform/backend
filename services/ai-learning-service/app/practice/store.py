@@ -26,6 +26,7 @@ class PracticeConflict(RuntimeError):
 
 
 _ENTRY_COLUMNS = """e.id AS entry_id, e.question_id, e.session_id, e.knowledge_point_id, e.knowledge_point_name,
+    e.material_id, e.material_title, e.source,
     e.question AS prompt, e.question_type, e.options_json AS options, e.difficulty,
     e.created_at, e.answered_at, e.user_answer, e.is_correct, e.resolved,
     e.correct_answer, e.explanation"""
@@ -49,8 +50,11 @@ def _entry_payload(row: dict[str, Any], *, reveal_answer: bool) -> dict[str, Any
         "entry_id": int(row["entry_id"]),
         "question_id": row["question_id"],
         "session_id": row["session_id"],
-        "knowledge_point_id": str(row["knowledge_point_id"]),
+        "knowledge_point_id": None if row["knowledge_point_id"] is None else str(row["knowledge_point_id"]),
         "knowledge_point_name": row["knowledge_point_name"],
+        "material_id": None if row["material_id"] is None else str(row["material_id"]),
+        "material_title": row["material_title"],
+        "source": row["source"],
         "prompt": row["prompt"],
         "question_type": row["question_type"],
         "options": options,
@@ -103,13 +107,23 @@ class PracticeStore:
         session_id: UUID | str,
         turn_id: UUID | str,
         path_id: UUID | str,
-        kp_id: UUID | str,
+        kp_id: UUID | str | None,
         kp_name: str,
         questions: list[dict[str, Any]],
+        *,
+        material_id: UUID | str | None = None,
+        material_title: str = "",
+        source: str = "tutor_practice",
     ) -> list[int]:
-        """Insert a validated batch atomically and return its entry ids."""
-        user, session, turn, path, kp = map(lambda value: str(UUID(str(value))),
-                                            (user_id, session_id, turn_id, path_id, kp_id))
+        """Insert a validated batch atomically and return its entry ids.
+
+        A batch is about a knowledge point, or, for reading questions, about the session's passage (``material_id``).
+        """
+        if kp_id is None and material_id is None:
+            raise ValueError("a practice batch needs a knowledge point or a reading passage")
+        user, session, turn, path = map(lambda value: str(UUID(str(value))), (user_id, session_id, turn_id, path_id))
+        kp = None if kp_id is None else str(UUID(str(kp_id)))
+        material = None if material_id is None else str(UUID(str(material_id)))
         ids: list[int] = []
         with self._connect() as connection, connection, connection.cursor() as cursor:
             cursor.execute(
@@ -125,11 +139,12 @@ class PracticeStore:
                 cursor.execute(
                     """INSERT INTO notebook_entries
                        (user_id, session_id, turn_id, mastery_path_id, knowledge_point_id,
-                        knowledge_point_name, question_id, question, question_type, options_json,
-                        correct_answer, explanation, difficulty, created_at, updated_at)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now(), now())
+                        knowledge_point_name, material_id, material_title, source, question_id, question,
+                        question_type, options_json, correct_answer, explanation, difficulty, created_at, updated_at)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now(), now())
                        RETURNING id""",
-                    (user, session, turn, path, kp, kp_name, str(UUID(str(question["question_id"]))),
+                    (user, session, turn, path, kp, kp_name, material, material_title, source,
+                     str(UUID(str(question["question_id"]))),
                      question["question"], question["question_type"], Json(question["options"]),
                      question["correct_answer"], question["explanation"], question["difficulty"]),
                 )
@@ -196,6 +211,7 @@ class PracticeStore:
         session_id: UUID | str | None,
         status: str | None,
         limit: int,
+        material_id: UUID | str | None = None,
     ) -> list[dict[str, Any]]:
         if not 1 <= limit <= 100:
             raise ValueError("limit must be between 1 and 100")
@@ -208,6 +224,9 @@ class PracticeStore:
         if session_id is not None:
             clauses.append("e.session_id = %s")
             params.append(str(UUID(str(session_id))))
+        if material_id is not None:
+            clauses.append("e.material_id = %s")
+            params.append(str(UUID(str(material_id))))
         if status == "open":
             clauses.append("e.answered_at IS NULL")
         elif status == "correct":

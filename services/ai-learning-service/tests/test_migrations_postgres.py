@@ -82,7 +82,7 @@ class MigrationsPostgresTest(unittest.TestCase):
             {"mastery_paths", "mastery_interactions", "mastery_events",
              "mastery_learning_evidence", "formal_assessment_result_versions",
              "mastery_path_knowledge_point_details", "notebook_entries", "practice_review_state",
-             "practice_review_events", "learner_memory"} <= self._tables()
+             "practice_review_events", "learner_memory", "session_materials"} <= self._tables()
         )
 
     def test_learner_memory_schema_has_one_owner_scoped_cursor_and_version(self):

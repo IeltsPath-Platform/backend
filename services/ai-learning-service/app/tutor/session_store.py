@@ -15,9 +15,17 @@ from uuid import UUID, uuid4
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor
 
+from app.tutor.reading import SessionMaterial
+
 MESSAGE_ROLES = frozenset({"user", "assistant"})
 TURN_OUTCOMES = frozenset({"completed", "failed"})
 _OWNED_SESSION = "SELECT id FROM sessions WHERE id = %s AND user_id = %s AND archived_at IS NULL"
+_SESSION_COLUMNS = """s.id, s.path_id, s.title, s.created_at, s.updated_at,
+    m.section_id AS material_section_id, m.package_id AS material_package_id, m.title AS material_title,
+    m.instructions AS material_instructions, m.paragraphs AS material_paragraphs"""
+_SESSION_SUMMARY_COLUMNS = """s.id, s.path_id, s.title, s.created_at, s.updated_at,
+    m.section_id AS material_section_id, m.package_id AS material_package_id, m.title AS material_title"""
+_SESSION_FROM = "sessions s LEFT JOIN session_materials m ON m.session_id = s.id"
 
 
 class ActiveTurnConflict(RuntimeError):
@@ -31,6 +39,8 @@ class TutorSession:
     title: str
     created_at: datetime
     updated_at: datetime
+    # The Reading passage the session was opened on, if any.
+    material: SessionMaterial | None = None
 
 
 @dataclass(frozen=True)
@@ -53,7 +63,12 @@ def _uuid(value: UUID | str | None) -> UUID | None:
 
 
 def _session(row: dict[str, Any]) -> TutorSession:
-    return TutorSession(row["id"], row["path_id"], row["title"], row["created_at"], row["updated_at"])
+    material = None
+    if row.get("material_section_id") is not None:
+        # A listing reads the summary only; its material carries no passage text.
+        material = SessionMaterial(row["material_section_id"], row["material_package_id"], row["material_title"],
+                                   row.get("material_instructions") or "", list(row.get("material_paragraphs") or []))
+    return TutorSession(row["id"], row["path_id"], row["title"], row["created_at"], row["updated_at"], material)
 
 
 class TutorSessionStore:
@@ -65,8 +80,12 @@ class TutorSessionStore:
     def _connect(self):
         return closing(psycopg2.connect(self._database_url))
 
-    def create_session(self, user_id: UUID | str, path_id: UUID | str, title: str | None = None) -> TutorSession | None:
-        """Open a session on one of the learner's own paths; ``None`` when the path is not theirs."""
+    def create_session(self, user_id: UUID | str, path_id: UUID | str, title: str | None = None,
+                       material: SessionMaterial | None = None) -> TutorSession | None:
+        """Open a session on one of the learner's own paths; ``None`` when the path is not theirs.
+
+        A Reading passage, when given, is stored in the same transaction as the session.
+        """
         user, path = _uuid(user_id), _uuid(path_id)
         if user is None or path is None:
             return None
@@ -79,7 +98,18 @@ class TutorSessionStore:
                 (str(uuid4()), (title or "New session").strip()[:200] or "New session", str(path), str(user)),
             )
             row = cursor.fetchone()
-            return _session(row) if row else None
+            if row is None:
+                return None
+            if material is not None:
+                cursor.execute(
+                    """INSERT INTO session_materials (session_id, material_type, section_id, package_id, title,
+                                                      instructions, paragraphs, fetched_at)
+                       VALUES (%s, 'READING', %s, %s, %s, %s, %s, now())""",
+                    (str(row["id"]), str(material.section_id), str(material.package_id), material.title,
+                     material.instructions, Json(material.paragraphs)),
+                )
+            return TutorSession(row["id"], row["path_id"], row["title"], row["created_at"], row["updated_at"],
+                                material)
 
     def list_sessions(self, user_id: UUID | str, limit: int = 50) -> list[TutorSession]:
         user = _uuid(user_id)
@@ -87,8 +117,8 @@ class TutorSessionStore:
             return []
         with self._connect() as connection, connection.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute(
-                """SELECT id, path_id, title, created_at, updated_at FROM sessions
-                   WHERE user_id = %s AND archived_at IS NULL ORDER BY updated_at DESC, id LIMIT %s""",
+                f"""SELECT {_SESSION_SUMMARY_COLUMNS} FROM {_SESSION_FROM}
+                    WHERE s.user_id = %s AND s.archived_at IS NULL ORDER BY s.updated_at DESC, s.id LIMIT %s""",
                 (str(user), limit),
             )
             return [_session(row) for row in cursor.fetchall()]
@@ -99,8 +129,8 @@ class TutorSessionStore:
             return None
         with self._connect() as connection, connection.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute(
-                """SELECT id, path_id, title, created_at, updated_at FROM sessions
-                   WHERE id = %s AND user_id = %s AND archived_at IS NULL""",
+                f"""SELECT {_SESSION_COLUMNS} FROM {_SESSION_FROM}
+                    WHERE s.id = %s AND s.user_id = %s AND s.archived_at IS NULL""",
                 (str(session), str(user)),
             )
             row = cursor.fetchone()

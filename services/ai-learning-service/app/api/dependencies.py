@@ -26,6 +26,10 @@ def get_path_service(settings: Settings = Depends(get_settings)) -> PathService:
     )
 
 
+def get_content_client(settings: Settings = Depends(get_settings)) -> ContentServiceClient:
+    return ContentServiceClient(settings.content_service_base_url)
+
+
 def get_tutor_sessions(settings: Settings = Depends(get_settings)) -> TutorSessionStore:
     return TutorSessionStore(settings.database_url.get_secret_value())
 

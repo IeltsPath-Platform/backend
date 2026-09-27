@@ -6,7 +6,7 @@ server-generated UUIDs. The active learning path is selected by the server.
 
 | Method | Route | Request | Response |
 | --- | --- | --- | --- |
-| `POST` | `/sessions` | Optional `{ "title": "Study" }` | `201` session summary: `sessionId`, `pathId`, `title`, `createdAt`, `updatedAt` |
+| `POST` | `/sessions` | Optional `{ "title": "Study", "readingSectionId": "uuid" }` | `201` session summary: `sessionId`, `pathId`, `title`, `createdAt`, `updatedAt`, `material` (`null`, or `{ "type": "READING", "sectionId", "packageId", "title" }`); `404` when Content has no readable passage for the section, `503` when Content is unreachable. Neither creates a session. |
 | `GET` | `/sessions?limit=50` | Limit 1–100 | `200` array of newest unarchived summaries |
 | `GET` | `/sessions/{sessionId}` | None | `200` summary plus latest 200 `messages` and `pendingQuestion` |
 | `DELETE` | `/sessions/{sessionId}` | None | `204` |
@@ -27,13 +27,13 @@ and `X-Accel-Buffering: no`.
 | --- | --- |
 | `turn.started` | `{ "turnId": "uuid", "sessionId": "uuid" }` |
 | `assistant.message` | `{ "text": "..." }` |
-| `tool.called` | `{ "name": "mastery_status\|mastery_quiz\|mastery_grade\|mastery_assess\|path_outline\|path_reorder\|learner_profile\|knowledge_point_details\|practice_questions\|save_note" }` |
+| `tool.called` | `{ "name": "mastery_status\|mastery_quiz\|mastery_grade\|mastery_assess\|path_outline\|path_reorder\|learner_profile\|knowledge_point_details\|practice_questions\|reading_questions\|save_note" }` |
 | `question` | Public question: `questionId`, `knowledgePointId`, `prompt`, `questionType`, `options`, and other public question fields when present. |
-| `practice.questions` | `{ "knowledgePointId": "uuid", "questions": [{ "entryId": 1, "prompt": "...", "questionType": "short", "options": [], "difficulty": "easy" }] }`; the event poses saved practice cards and ends the turn. |
+| `practice.questions` | `{ "knowledgePointId": "uuid", "questions": [{ "entryId": 1, "prompt": "...", "questionType": "short", "options": [], "difficulty": "easy" }] }`; the event poses saved practice cards and ends the turn. Questions on a reading passage have `knowledgePointId: null` and a `materialId` (the section id). |
 | `grading` | For a quiz: `questionId`, `knowledgePointId`, `isCorrect`, `mastery`, `mastered`, `explanation`. For a qualitative assessment: `knowledgePointId`, `passed`, `mastered`, `mastery`. |
 | `path.reordered` | `{ "moduleCount": 2, "knowledgePointCount": 4 }` after an actual order change. |
 | `profile.updated` | `{ "fields": ["time_budget"] }` when at least one profile field changed. |
-| `note.draft` | `{ "title": "...", "body": "...", "sourceType": "KNOWLEDGE_POINT|TUTOR_SESSION", "sourceReferenceId": "uuid" }`; emitted only when the learner asks to save a note. |
+| `note.draft` | `{ "title": "...", "body": "...", "sourceType": "KNOWLEDGE_POINT|READING|TUTOR_SESSION", "sourceReferenceId": "uuid" }` (`READING` carries the section id); emitted only when the learner asks to save a note. |
 | `turn.completed` | `{ "turnId": "uuid" }`, with `questionId` when the turn placed a question. |
 | `turn.failed` | `{ "turnId": "uuid", "failureCode": "..." }` (for example `llm_error`, `llm_not_configured`, `too_many_rounds`, `internal_error`). |
 
@@ -50,6 +50,11 @@ event: turn.completed
 data: {"turnId":"00000000-0000-4000-8000-000000000001","questionId":"00000000-0000-4000-8000-000000000003"}
 
 ```
+
+A reading session (`readingSectionId`) copies the Content passage once, at creation, with the learner's token;
+`GET /sessions/{id}` returns it as `material.instructions` and `material.paragraphs` (`[{ "label": "A", "text": "..." }]`,
+at most 20,000 characters, ending in a `[passage truncated]` paragraph when cut). Turns never call Content. Only
+Reading sections of published practice sets and lessons can be opened.
 
 Practice tool results sent to the model contain only status, entry ids, and a note. `practice.questions` contains the
 knowledge point id and public card fields; neither it nor the tool result contains `expectedAnswer`, `correctAnswer`, or
