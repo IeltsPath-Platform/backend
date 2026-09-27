@@ -1513,7 +1513,7 @@ Không còn `topic_progress` table. Topic/path progress được derive từ Dee
 
 ### Learner Memory
 
-DeepTutor v1.6.9 có memory subsystem L1/L2/L3 riêng. V5 **chưa normalize memory thành OLTP tables**. `ai-learning-service` phải cung cấp production memory storage adapter tách biệt (object/document/vector storage tùy layer) và scope theo `user_id`. Không dùng local per-user workspace làm production authority.
+Database V5 ban đầu chưa normalize memory thành OLTP tables. Pha tutor memory chọn một bảng đơn giản do `ai-learning-service` sở hữu, không phải subsystem memory nhiều tầng. Schema và cursor được mô tả tại §7.18.
 
 ### RAG index
 
@@ -1577,6 +1577,25 @@ Refresh giữ lại band và details của KP đã rời curriculum, giống nh�
 không tăng. Path cũ nhận details lần đầu trong lần `POST /api/ai-learning/paths` refresh kế tiếp; trước đó
 `knowledge_point_details` trả skill null và description rỗng. `path_outline` không mang description; tutor chỉ đọc nó qua
 tool riêng. Những snapshot này không phải canonical source: Content vẫn sở hữu curriculum metadata.
+
+---
+
+## 7.18 `learner_memory`
+
+Được tạo bởi `V7__learner_memory.sql`. Đây là một đoạn ghi chú ngắn do tutor tóm tắt cho mỗi học viên, dùng chung qua mọi
+path và goal. Bảng không phụ thuộc session để nội dung vẫn tồn tại khi session bị xóa.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `user_id` | uuid | PK | Chủ sở hữu duy nhất; không có FK tới database User Service. |
+| `content` | text | NOT NULL DEFAULT `''`, tối đa 2.000 ký tự | Quan sát bền vững về việc học; learner có thể đọc và xóa. |
+| `last_message_id` | bigint | NOT NULL DEFAULT 0, CHECK `>= 0` | Mốc message lớn nhất đã tóm tắt trên mọi session của learner. |
+| `version` | bigint | NOT NULL DEFAULT 0 | Optimistic version để bỏ kết quả tóm tắt stale hoặc chạy đua với xóa. |
+| `updated_at` | timestamptz | NOT NULL | Thời điểm ghi hoặc xóa memory gần nhất. |
+
+Sau một turn completed, tác vụ nền chỉ gọi LLM khi có ít nhất tám message chưa tóm tắt; mỗi đợt lấy tối đa 40 message
+cũ nhất. Cập nhật và xóa dùng optimistic version. Khi xóa, nội dung trở thành chuỗi rỗng và cursor nhảy tới message lớn
+nhất hiện có, vì vậy message cũ không được tóm tắt lại. Bảng không lưu nội dung message riêng và không điều khiển mastery.
 
 ---
 

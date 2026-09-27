@@ -18,11 +18,12 @@ from jose import jwt
 from psycopg2 import OperationalError
 
 import main
-from app.api.dependencies import get_path_service, get_tutor_chat
+from app.api.dependencies import get_learner_memory_store, get_path_service, get_tutor_chat
 from app.application.path_service import PathService
 from app.config import get_settings
 from app.llm.client import ChatReply
 from app.persistence.postgres_learning_store import PostgresLearningStore
+from app.tutor.memory import LearnerMemoryStore
 from tests.postgres_schema_support import PostgresSchema, database_url_or_skip
 from tests.test_goal_scoped_path import GoalClient, KP_BASIC
 from tests.test_tutor_engine_postgres import CurriculumWithConcept, ScriptedChat, call
@@ -82,7 +83,11 @@ class TutorApiTest(unittest.TestCase):
                                                    "targetBand": 5.5})
             return PathService(PostgresLearningStore(self.schema.url), GoalClient(goal), CurriculumWithConcept())
 
-        main.app.dependency_overrides = {get_path_service: paths, get_tutor_chat: lambda: self.chat}
+        main.app.dependency_overrides = {
+            get_path_service: paths,
+            get_tutor_chat: lambda: self.chat,
+            get_learner_memory_store: lambda: LearnerMemoryStore(self.schema.url),
+        }
         self.client = TestClient(main.app)
 
     def as_user(self, user_id=None):
@@ -142,6 +147,32 @@ class TutorApiTest(unittest.TestCase):
         code, _type, _body = self.turn(other, session_id, {"message": "hi"})
         self.assertEqual(code, 404)
         self.assertEqual(self.client.get("/api/ai-learning/tutor/sessions", headers=other).json(), [])
+
+    def test_memory_get_delete_and_learner_ownership(self):
+        owner = self.as_user()
+        empty = self.client.get("/api/ai-learning/tutor/memory", headers=owner)
+        self.assertEqual(empty.status_code, 200, empty.text)
+        self.assertEqual(empty.json(), {"content": "", "updatedAt": None})
+        self.assertEqual(self.client.get("/api/ai-learning/tutor/memory").status_code, 401)
+        self.assertEqual(self.client.delete("/api/ai-learning/tutor/memory").status_code, 401)
+
+        store = LearnerMemoryStore(self.schema.url)
+        self.assertTrue(store.save(self.current_user, "- Prefers examples first.", 0, 0))
+        saved = self.client.get("/api/ai-learning/tutor/memory", headers=owner)
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertEqual(saved.json()["content"], "- Prefers examples first.")
+        self.assertIsNotNone(saved.json()["updatedAt"])
+
+        other = self.as_user()
+        other_empty = self.client.get("/api/ai-learning/tutor/memory", headers=other)
+        self.assertEqual(other_empty.json(), {"content": "", "updatedAt": None})
+        self.assertEqual(self.client.delete("/api/ai-learning/tutor/memory", headers=other).status_code, 204)
+        self.assertEqual(self.client.get("/api/ai-learning/tutor/memory", headers=owner).json()["content"],
+                         "- Prefers examples first.")
+
+        deleted = self.client.delete("/api/ai-learning/tutor/memory", headers=owner)
+        self.assertEqual(deleted.status_code, 204)
+        self.assertEqual(self.client.get("/api/ai-learning/tutor/memory", headers=owner).json()["content"], "")
 
     def test_invalid_turn_bodies_are_rejected_before_streaming(self):
         headers = self.as_user()

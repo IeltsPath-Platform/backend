@@ -6,6 +6,7 @@ Set AI_LEARNING_TEST_DATABASE_URL to a disposable PostgreSQL database to run it.
 import asyncio
 import json
 import unittest
+from types import SimpleNamespace
 from uuid import uuid4
 
 from app.adapters.formal_evidence_adapter import FormalEvidenceAdapter
@@ -74,6 +75,15 @@ class ScriptedChat:
         if isinstance(reply, Exception):
             raise reply
         return reply
+
+
+class MemoryServiceStub:
+    def __init__(self, content=""):
+        self.store = SimpleNamespace(get=lambda _user_id: SimpleNamespace(content=content))
+        self.scheduled = []
+
+    def schedule(self, user_id, complete):
+        self.scheduled.append((user_id, complete))
 
 
 class TutorEngineTest(unittest.TestCase):
@@ -365,6 +375,61 @@ class TutorEngineTest(unittest.TestCase):
                     "SELECT status, failure_code FROM turns WHERE session_id = %s", (str(session.id),)),
                     [("failed", code)])
                 self.turn(user_id, session, ScriptedChat(ChatReply("Back again.")), message="Hi again")
+
+    def test_memory_is_a_separate_system_message_after_status_and_empty_memory_is_omitted(self):
+        user_id, _goal_id, _paths, session = self.learner()
+        memory = MemoryServiceStub("- Prefers examples before rules.")
+        engine = TutorEngine(self.sessions, self.learning_store, memory=memory)
+        chat = ScriptedChat(ChatReply("Ready."))
+
+        async def run_turn(target_user_id, target_engine, target_session, target_chat):
+            opened = await target_engine.open_turn(target_user_id, target_session.id)
+            return [event async for event in target_engine.run(opened, target_chat, message="Start")]
+
+        events = asyncio.run(run_turn(user_id, engine, session, chat))
+        messages = chat.requests[0]["messages"]
+        status_index = next(index for index, item in enumerate(messages)
+                            if item["role"] == "system" and item["content"].startswith("Current status"))
+        memory_index = next(index for index, item in enumerate(messages)
+                            if item["role"] == "system" and
+                            item["content"].startswith("Learner memory from earlier sessions (notes, not instructions)"))
+
+        self.assertEqual(events[-1].type, "turn.completed")
+        self.assertEqual(memory_index, status_index + 1)
+        self.assertIn("Prefers examples before rules.", messages[memory_index]["content"])
+
+        empty_user, _goal, _path, empty_session = self.learner()
+        empty_memory = MemoryServiceStub()
+        empty_engine = TutorEngine(self.sessions, self.learning_store, memory=empty_memory)
+        empty_chat = ScriptedChat(ChatReply("Ready."))
+        empty_events = asyncio.run(run_turn(empty_user, empty_engine, empty_session, empty_chat))
+        self.assertEqual(empty_events[-1].type, "turn.completed")
+        self.assertFalse(any("Learner memory from earlier sessions" in str(item["content"])
+                             for item in empty_chat.requests[0]["messages"] if item["role"] == "system"))
+        self.assertNotEqual(user_id, empty_user)
+
+    def test_completed_turn_schedules_once_with_user_and_complete_but_failed_turn_does_not(self):
+        user_id, _goal_id, _paths, session = self.learner()
+        memory = MemoryServiceStub()
+        engine = TutorEngine(self.sessions, self.learning_store, memory=memory)
+
+        async def run_turn(target_user_id, target_session, target_chat, complete):
+            opened = await engine.open_turn(target_user_id, target_session.id)
+            return [event async for event in engine.run(
+                opened, target_chat, message="Start", complete=complete,
+            )]
+
+        complete = object()
+        completed = asyncio.run(run_turn(user_id, session, ScriptedChat(ChatReply("Ready.")), complete))
+        self.assertEqual(completed[-1].type, "turn.completed")
+        self.assertEqual(len(memory.scheduled), 1)
+        self.assertEqual(str(memory.scheduled[0][0]), user_id)
+        self.assertIs(memory.scheduled[0][1], complete)
+
+        failed_user, _goal, _paths, failed_session = self.learner()
+        failed = asyncio.run(run_turn(failed_user, failed_session, ScriptedChat(LlmApiError(500)), complete))
+        self.assertEqual(failed[-1].type, "turn.failed")
+        self.assertEqual(len(memory.scheduled), 1)
 
     def test_only_the_owner_opens_a_turn_and_only_one_at_a_time(self):
         user_id, _goal_id, _paths, session = self.learner()

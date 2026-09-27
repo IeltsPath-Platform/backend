@@ -45,6 +45,11 @@ class TutorSessionResponse(ApiResponse):
     updated_at: datetime = Field(alias="updatedAt")
 
 
+class LearnerMemoryResponse(ApiResponse):
+    content: str
+    updated_at: datetime | None = Field(default=None, alias="updatedAt")
+
+
 class TutorMessageResponse(ApiResponse):
     id: int
     role: str

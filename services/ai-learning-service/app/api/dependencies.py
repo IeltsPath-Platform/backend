@@ -12,6 +12,7 @@ from app.llm.client import ChatCompletionsClient
 from app.persistence.postgres_learning_store import PostgresLearningStore
 from app.practice.store import PracticeStore
 from app.tutor.engine import Chat, TutorEngine
+from app.tutor.memory import Complete, LearnerMemoryService, LearnerMemoryStore
 from app.tutor.session_store import TutorSessionStore
 
 
@@ -33,12 +34,23 @@ def get_practice_store(settings: Settings = Depends(get_settings)) -> PracticeSt
     return PracticeStore(settings.database_url.get_secret_value())
 
 
+def get_learner_memory_store(settings: Settings = Depends(get_settings)) -> LearnerMemoryStore:
+    return LearnerMemoryStore(settings.database_url.get_secret_value())
+
+
 def get_tutor_engine(settings: Settings = Depends(get_settings)) -> TutorEngine:
     url = settings.database_url.get_secret_value()
-    return TutorEngine(TutorSessionStore(url), PostgresLearningStore(url), practice=PracticeStore(url))
+    return TutorEngine(TutorSessionStore(url), PostgresLearningStore(url), practice=PracticeStore(url),
+                       memory=LearnerMemoryService(LearnerMemoryStore(url)))
 
 
 def get_tutor_chat() -> Chat | None:
     """The configured chat model, read per request like path ordering; ``None`` when no model or key is set."""
     settings = LlmSettings()
     return ChatCompletionsClient(settings).chat if settings.configured else None
+
+
+def get_memory_complete() -> Complete | None:
+    """The configured text completion client, using the same model and key as tutor chat."""
+    settings = LlmSettings()
+    return ChatCompletionsClient(settings).complete if settings.configured else None

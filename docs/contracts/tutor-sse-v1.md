@@ -11,6 +11,8 @@ server-generated UUIDs. The active learning path is selected by the server.
 | `GET` | `/sessions/{sessionId}` | None | `200` summary plus latest 200 `messages` and `pendingQuestion` |
 | `DELETE` | `/sessions/{sessionId}` | None | `204` |
 | `POST` | `/sessions/{sessionId}/turns` | Exactly one of `message` or `answer` | `200 text/event-stream` |
+| `GET` | `/memory` | None | `200` `{ "content": "...", "updatedAt": "..." }`; no stored memory returns empty content and `null` timestamp |
+| `DELETE` | `/memory` | None | `204`; clears the learner's memory and skips all messages that exist at deletion time |
 
 `message` must be 1–4,000 characters. `answer` is `{ "questionId": "uuid", "text": "..." }` with 1–2,000
 characters. An invalid body returns JSON `422` before streaming. Missing or invalid authentication returns `401`;

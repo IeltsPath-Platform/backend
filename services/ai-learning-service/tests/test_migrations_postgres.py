@@ -82,8 +82,15 @@ class MigrationsPostgresTest(unittest.TestCase):
             {"mastery_paths", "mastery_interactions", "mastery_events",
              "mastery_learning_evidence", "formal_assessment_result_versions",
              "mastery_path_knowledge_point_details", "notebook_entries", "practice_review_state",
-             "practice_review_events"} <= self._tables()
+             "practice_review_events", "learner_memory"} <= self._tables()
         )
+
+    def test_learner_memory_schema_has_one_owner_scoped_cursor_and_version(self):
+        columns = {row[0] for row in self.schema.query(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = %s AND table_name = 'learner_memory'", (self.schema.name,))}
+
+        self.assertTrue({"user_id", "content", "last_message_id", "version", "updated_at"} <= columns)
 
     def test_practice_schema_has_owner_answer_and_due_indexes(self):
         indexes = self._indexes()

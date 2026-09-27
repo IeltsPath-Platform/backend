@@ -12,19 +12,42 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials
 
-from app.api.dependencies import get_path_service, get_tutor_chat, get_tutor_engine, get_tutor_sessions
+from app.api.dependencies import (
+    get_learner_memory_store, get_memory_complete, get_path_service, get_tutor_chat, get_tutor_engine,
+    get_tutor_sessions,
+)
 from app.api.dto.tutor import (
-    CreateSessionRequest, TurnRequest, TutorSessionDetailResponse, TutorSessionResponse, session_payload,
+    CreateSessionRequest, LearnerMemoryResponse, TurnRequest, TutorSessionDetailResponse, TutorSessionResponse,
+    session_payload,
 )
 from app.api.tutor_sse import SSE_HEADERS, stream_events
 from app.application.path_service import PathService
 from app.security.internal_jwt import AuthenticatedUser, bearer_scheme, require_current_user
 from app.tutor.engine import CardAnswer, Chat, SessionNotFound, TutorEngine
+from app.tutor.memory import Complete, LearnerMemoryStore
 from app.tutor.session_store import ActiveTurnConflict, TutorSessionStore
 
 router = APIRouter(prefix="/api/ai-learning/tutor", tags=["tutor"])
 
 _SESSION_NOT_FOUND = HTTPException(status.HTTP_404_NOT_FOUND, detail="Tutor session not found")
+
+
+@router.get("/memory", response_model=LearnerMemoryResponse)
+async def get_learner_memory(
+    user: AuthenticatedUser = Depends(require_current_user),
+    store: LearnerMemoryStore = Depends(get_learner_memory_store),
+):
+    record = await asyncio.to_thread(store.get, user.user_id)
+    return {"content": record.content, "updatedAt": record.updated_at}
+
+
+@router.delete("/memory", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_learner_memory(
+    user: AuthenticatedUser = Depends(require_current_user),
+    store: LearnerMemoryStore = Depends(get_learner_memory_store),
+):
+    await asyncio.to_thread(store.clear, user.user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/sessions", response_model=TutorSessionResponse, status_code=status.HTTP_201_CREATED)
@@ -100,6 +123,7 @@ async def run_turn(
     user: AuthenticatedUser = Depends(require_current_user),
     engine: TutorEngine = Depends(get_tutor_engine),
     chat: Chat | None = Depends(get_tutor_chat),
+    complete: Complete | None = Depends(get_memory_complete),
 ):
     try:
         turn = await engine.open_turn(user.user_id, session_id)
@@ -108,5 +132,5 @@ async def run_turn(
     except ActiveTurnConflict:
         raise HTTPException(status.HTTP_409_CONFLICT, detail="This session already has a running turn") from None
     answer = CardAnswer(str(request.answer.question_id), request.answer.text) if request.answer else None
-    events = engine.run(turn, chat, message=request.message, answer=answer)
+    events = engine.run(turn, chat, message=request.message, answer=answer, complete=complete)
     return StreamingResponse(stream_events(events), media_type="text/event-stream", headers=SSE_HEADERS)

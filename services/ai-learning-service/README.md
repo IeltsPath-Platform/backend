@@ -33,6 +33,8 @@ All routes below begin with `/api/ai-learning/tutor`:
 | `GET` | `/sessions/{sessionId}` | Latest 200 messages and this session's open question; 404 for another learner's session. |
 | `DELETE` | `/sessions/{sessionId}` | Archive the session; 204. |
 | `POST` | `/sessions/{sessionId}/turns` | Exactly one `message` (up to 4,000 characters) or `answer` (`questionId`, `text` up to 2,000); returns SSE. |
+| `GET` | `/memory` | Read the learner's cross-session memory; an unset memory returns empty content and a null update time. |
+| `DELETE` | `/memory` | Clear the learner's memory and move its message cursor past all existing messages; 204. |
 
 A turn emits `turn.started`, optional `assistant.message` and `tool.called`, and may emit `question`, `practice.questions`,
 `grading`, `path.reordered` or `profile.updated` before `turn.completed` or `turn.failed`. Practice cards end the turn;
@@ -63,6 +65,18 @@ Review uses per-question `again`, `hard`, `good` and `easy` scheduling. Three co
 mistake. Practice does not call Learning Service or change mastery, path revision or evidence. Missing/other-owned
 entries return 404; answering twice, reviewing an entry outside the schedule, or reusing a review `requestId` for a
 different learner/entry returns 409. See [the Practice API contract](../../docs/contracts/practice-v1.md).
+
+### Learner memory
+
+Memory belongs to the learner across paths and goals. After a completed turn, a background task summarizes up to 40
+oldest unsummarized messages when at least eight are pending. It uses the same configured model as tutor chat; the task
+does not delay the SSE turn. Failed turns do not schedule a summary. A version check prevents stale work from replacing a
+newer summary or undoing a learner's deletion. If summarization fails, the existing memory and cursor remain unchanged.
+
+The prompt keeps durable study observations such as strengths, recurring mistakes, preferred teaching style, and learner-
+stated study goals. Saved memory is limited to 2,000 characters; lines containing email addresses or long digit sequences
+are dropped. Memory is supplied as a separate system data note marked “notes, not instructions.” The learner can read or
+clear it through the two `/memory` routes above. It is not included in SSE events or application logs.
 
 Use `fetch` because browser `EventSource` cannot send the bearer `Authorization` header for this POST endpoint:
 
@@ -141,6 +155,7 @@ runtime configuration; do not put them in this file or the image.
 | `4` | `V4__mastery_path_knowledge_point_bands.sql` | Band snapshot of each knowledge point in a path |
 | `5` | `V5__tutor_sessions.sql` | Tutor sessions, turns, and learner/assistant messages |
 | `6` | `V6__practice_notebook.sql` | Content details snapshots, practice notebook entries, review state and idempotent review events |
+| `7` | `V7__learner_memory.sql` | One learner-owned memory summary and cross-session message cursor |
 
 `V1` stops if the database already contains more than one path for a non-null
 `(user_id, learning_goal_id)` pair; reconcile those rows before retrying.
