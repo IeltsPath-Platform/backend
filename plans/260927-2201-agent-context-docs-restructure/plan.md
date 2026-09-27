@@ -45,7 +45,7 @@ graph**, không đổi code.
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | [Fact sheet and graphify scope](./phase-01-fact-sheet-and-graphify-scope.md) | Completed |
-| 2 | [System architecture doc](./phase-02-system-architecture-doc.md) | Pending |
+| 2 | [System architecture doc](./phase-02-system-architecture-doc.md) | Completed |
 | 3 | [AGENTS rules source](./phase-03-agents-rules-source.md) | Pending |
 | 4 | [Slim CLAUDE files](./phase-04-slim-claude-files.md) | Pending |
 

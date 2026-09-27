@@ -153,3 +153,13 @@ Lưu ý: `.venv` ở root (Python 3.14, uv) không có pytest; Python 3.13 hệ 
 | 10 | Secret có fallback default trong config-repo tracked (`GATEWAY_INTERNAL_JWT_SECRET`, `EXTERNAL_JWT_SECRET`, DB password) | Mới |
 | 11 | README root chỉ liệt kê 3 DB local; access/notification cần thêm `access_db`, `notification_db` | Mới |
 | 12 | Gateway CORS không expose `Retry-After` (429 của AI Learning) | Mới (Low, plan `260927-1453` mục "Làm sau") |
+| 13 | `services/ai-learning-service/README.md` ~dòng 500: event chưa có path "retry rồi DLQ"; code + dòng ~472 cùng README: lưu `pending_formal_assessment_results` và ACK | Mới (README tự mâu thuẫn) |
+
+## 10. Bổ sung khi viết phase 2
+
+- Role chuẩn (`CanonicalRoles.ALL`): `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF`; đăng ký công khai tạo
+  `CUSTOMER` (`RegisterUseCase`). `LEARNER` chỉ có ở V1, đã đổi thành `CUSTOMER` ở `V3__rename_learner_add_roles.sql`.
+  CLAUDE.md cũ ghi `ADMIN`/`LEARNER` là sai.
+- assessment và game gọi service khác kèm `Authorization` (bearer của request hiện tại) và `X-Correlation-Id`
+  (`GatewayRequestContext`, `ContentSnapshotClient`).
+- Game WebSocket: handshake kiểm ticket (`GameWebSocketHandshakeInterceptor`, `WebSocketTicketStore`), ticket cấp qua REST.

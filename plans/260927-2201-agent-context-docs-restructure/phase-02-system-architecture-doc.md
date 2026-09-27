@@ -1,10 +1,11 @@
 ---
 phase: 2
-title: "System architecture doc"
-status: pending
+title: System architecture doc
+status: completed
 priority: P2
-dependencies: [1]
-effort: "~0.5d"
+dependencies:
+  - 1
+effort: ~0.5d
 ---
 
 # Phase 2: System architecture doc
@@ -45,9 +46,16 @@ Mục lục đề xuất:
 5. Commit: `docs: describe the current system architecture across all services`.
 
 ## Success Criteria
-- [ ] Doc phủ đủ service và 10 mục; ≤ 800 dòng.
-- [ ] Mọi dữ kiện khớp fact sheet; 0 secret.
-- [ ] Mọi nội dung mô tả sẽ bị cắt khỏi CLAUDE.md/AGENTS.md ở phase 3–4 đã có mặt ở đây.
+- [x] Doc phủ đủ service và 10 mục; ≤ 800 dòng.
+- [x] Mọi dữ kiện khớp fact sheet; 0 secret.
+- [x] Mọi nội dung mô tả sẽ bị cắt khỏi CLAUDE.md/AGENTS.md ở phase 3–4 đã có mặt ở đây.
+
+## Kết quả (2026-09-27)
+- `docs/system-architecture.md`: 231 dòng, 11 mục (thêm mục "Chạy local" tóm tắt); secret scan sạch; đủ 16 cổng.
+- Kiểm thêm ngoài fact sheet (đã ghi vào fact sheet §10): role chuẩn `CUSTOMER` (V3 đổi từ `LEARNER`), assessment/game
+  forward bearer + correlation id, WebSocket dùng ticket.
+- Phát hiện: `services/ai-learning-service/README.md` tự mâu thuẫn về event chưa có path (dòng ~472 đúng, ~500 sai) —
+  chỉ ghi vào mục "Điểm chưa nhất quán", không sửa README (ngoài phạm vi).
 
 ## Risk Assessment
 - Doc dài và trùng README root: chấp nhận ở đợt này (README ngoài phạm vi); doc tham chiếu README cho hướng dẫn chạy chi tiết.
