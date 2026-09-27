@@ -29,7 +29,7 @@ public class RemoveFlashcardFromDeckUseCase {
     @Transactional
     public void execute(UUID userId, UUID deckId, UUID flashcardId) {
         ApplicationSupport.required(decks.findByIdAndUserId(deckId, userId));
-        ApplicationSupport.required(cards.findAvailableByIdAndUserId(flashcardId, userId));
+        ApplicationSupport.required(cards.findByIdAndUserId(flashcardId, userId));
         items.delete(deckId, flashcardId);
     }
 }

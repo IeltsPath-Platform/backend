@@ -12,10 +12,6 @@ import org.springframework.data.repository.query.Param;
 import java.util.UUID;
 
 public interface FlashcardDeckItemJpaRepository extends JpaRepository<FlashcardDeckItemJpaEntity, FlashcardDeckItemKey> {
-    void deleteByDeckId(UUID deckId);
-
-    void deleteByFlashcardId(UUID flashcardId);
-
     @Query(
             value = """
                     SELECT new com.group01.learningsupport.domain.aggregate.DeckItem(
@@ -26,6 +22,7 @@ public interface FlashcardDeckItemJpaRepository extends JpaRepository<FlashcardD
                       AND c.id = i.flashcardId
                       AND d.id = i.deckId
                       AND d.userId = :userId
+                      AND d.status = com.group01.learningsupport.domain.vo.LibraryStatus.ACTIVE
                       AND c.userId = :userId
                       AND c.status = com.group01.learningsupport.domain.vo.LibraryStatus.ACTIVE
                     ORDER BY i.sortOrder ASC NULLS LAST, i.flashcardId ASC
@@ -37,6 +34,7 @@ public interface FlashcardDeckItemJpaRepository extends JpaRepository<FlashcardD
                       AND c.id = i.flashcardId
                       AND d.id = i.deckId
                       AND d.userId = :userId
+                      AND d.status = com.group01.learningsupport.domain.vo.LibraryStatus.ACTIVE
                       AND c.userId = :userId
                       AND c.status = com.group01.learningsupport.domain.vo.LibraryStatus.ACTIVE
                     """

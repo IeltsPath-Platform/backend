@@ -25,6 +25,7 @@ public class FlashcardController {
     private final GetFlashcardUseCase getFlashcardUseCase;
     private final ListFlashcardsUseCase listFlashcardsUseCase;
     private final DeleteFlashcardUseCase deleteFlashcardUseCase;
+    private final RestoreFlashcardUseCase restoreFlashcardUseCase;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -76,5 +77,10 @@ public class FlashcardController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID id) {
         deleteFlashcardUseCase.execute(currentUserProvider.requireUserId(), id);
+    }
+
+    @PostMapping("/{id}/restore")
+    public FlashcardResponse restore(@PathVariable("id") UUID id) {
+        return FlashcardResponse.from(restoreFlashcardUseCase.execute(currentUserProvider.requireUserId(), id));
     }
 }

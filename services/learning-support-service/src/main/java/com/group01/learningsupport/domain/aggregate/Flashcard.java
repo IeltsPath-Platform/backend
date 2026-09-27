@@ -85,6 +85,13 @@ public class Flashcard {
         status = LibraryStatus.DELETED;
     }
 
+    public void restore() {
+        if (status != LibraryStatus.DELETED) {
+            throw new InvalidDataException("Only deleted flashcards can be restored");
+        }
+        status = LibraryStatus.ACTIVE;
+    }
+
     private void applySource(
             FlashcardSourceType sourceType,
             UUID vocabularySenseId,

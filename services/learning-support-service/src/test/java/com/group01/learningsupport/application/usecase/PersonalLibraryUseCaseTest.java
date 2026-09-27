@@ -72,11 +72,11 @@ class PersonalLibraryUseCaseTest {
     }
 
     @Test
-    void deleteDeckRemovesMembershipsAndKeepsFlashcards() {
+    void deleteDeckPreservesMembershipsForRestoration() {
         FlashcardDeckRepository decks = mock(FlashcardDeckRepository.class);
         FlashcardDeckItemRepository items = mock(FlashcardDeckItemRepository.class);
         FlashcardRepository cards = mock(FlashcardRepository.class);
-        DeleteFlashcardDeckUseCase useCase = new DeleteFlashcardDeckUseCase(decks, items);
+        DeleteFlashcardDeckUseCase useCase = new DeleteFlashcardDeckUseCase(decks);
         UUID userId = UUID.randomUUID();
         FlashcardDeck deck = FlashcardDeck.create(userId, "Deck", null);
         when(decks.findByIdAndUserId(deck.getId(), userId)).thenReturn(Optional.of(deck));
@@ -85,7 +85,7 @@ class PersonalLibraryUseCaseTest {
         useCase.execute(userId, deck.getId());
 
         assertEquals(LibraryStatus.DELETED, deck.getStatus());
-        verify(items).deleteByDeckId(deck.getId());
+        verifyNoInteractions(items);
         verifyNoInteractions(cards);
     }
 
@@ -146,10 +146,10 @@ class PersonalLibraryUseCaseTest {
     }
 
     @Test
-    void softDeleteHidesFlashcardAndRemovesDeckMemberships() {
+    void softDeleteHidesFlashcardAndPreservesDeckMemberships() {
         FlashcardRepository cards = mock(FlashcardRepository.class);
         FlashcardDeckItemRepository items = mock(FlashcardDeckItemRepository.class);
-        DeleteFlashcardUseCase useCase = new DeleteFlashcardUseCase(cards, items);
+        DeleteFlashcardUseCase useCase = new DeleteFlashcardUseCase(cards);
         UUID userId = UUID.randomUUID();
         Flashcard card = Flashcard.create(
                 userId, FlashcardSourceType.MANUAL, null, null, null, "front", "back"
@@ -161,7 +161,81 @@ class PersonalLibraryUseCaseTest {
 
         assertEquals(LibraryStatus.DELETED, card.getStatus());
         verify(cards).save(card);
-        verify(items).deleteByFlashcardId(card.getId());
+        verifyNoInteractions(items);
+    }
+
+    @Test
+    void restoringDeletedFlashcardKeepsItsOldMemberships() {
+        FlashcardRepository cards = mock(FlashcardRepository.class);
+        FlashcardDeckItemRepository items = mock(FlashcardDeckItemRepository.class);
+        UUID userId = UUID.randomUUID();
+        Flashcard card = Flashcard.create(userId, FlashcardSourceType.MANUAL, null, null, null, "front", "back");
+        card.delete();
+        when(cards.findByIdAndUserId(card.getId(), userId)).thenReturn(Optional.of(card));
+        when(cards.save(card)).thenReturn(card);
+
+        new RestoreFlashcardUseCase(cards).execute(userId, card.getId());
+
+        assertEquals(LibraryStatus.ACTIVE, card.getStatus());
+        verifyNoInteractions(items);
+    }
+
+    @Test
+    void restoringDeletedDeckKeepsItsOldMemberships() {
+        FlashcardDeckRepository decks = mock(FlashcardDeckRepository.class);
+        FlashcardDeckItemRepository items = mock(FlashcardDeckItemRepository.class);
+        UUID userId = UUID.randomUUID();
+        FlashcardDeck deck = FlashcardDeck.create(userId, "Deck", null);
+        deck.update(deck.getName(), deck.getDescription(), LibraryStatus.DELETED);
+        when(decks.findByIdAndUserId(deck.getId(), userId)).thenReturn(Optional.of(deck));
+        when(decks.save(deck)).thenReturn(deck);
+
+        new RestoreFlashcardDeckUseCase(decks).execute(userId, deck.getId());
+
+        assertEquals(LibraryStatus.ACTIVE, deck.getStatus());
+        verifyNoInteractions(items);
+    }
+
+    @Test
+    void deletedDeckCannotListItsPreservedItems() {
+        FlashcardDeckRepository decks = mock(FlashcardDeckRepository.class);
+        FlashcardDeckItemRepository items = mock(FlashcardDeckItemRepository.class);
+        UUID userId = UUID.randomUUID();
+        FlashcardDeck deck = FlashcardDeck.create(userId, "Deck", null);
+        deck.update(deck.getName(), deck.getDescription(), LibraryStatus.DELETED);
+        when(decks.findByIdAndUserId(deck.getId(), userId)).thenReturn(Optional.of(deck));
+
+        assertThrows(ResourceNotFoundException.class, () -> new ListDeckItemsUseCase(decks, items)
+                .execute(userId, deck.getId(), new com.group01.learningsupport.application.query.PageQuery(0, 20)));
+        verifyNoInteractions(items);
+    }
+
+    @Test
+    void anotherUserCannotRestoreDeletedFlashcard() {
+        FlashcardRepository cards = mock(FlashcardRepository.class);
+        UUID userId = UUID.randomUUID();
+        UUID cardId = UUID.randomUUID();
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> new RestoreFlashcardUseCase(cards).execute(userId, cardId));
+        verify(cards, never()).save(any());
+    }
+
+    @Test
+    void explicitRemovalStillWorksForDeletedFlashcard() {
+        FlashcardDeckRepository decks = mock(FlashcardDeckRepository.class);
+        FlashcardRepository cards = mock(FlashcardRepository.class);
+        FlashcardDeckItemRepository items = mock(FlashcardDeckItemRepository.class);
+        UUID userId = UUID.randomUUID();
+        FlashcardDeck deck = FlashcardDeck.create(userId, "Deck", null);
+        Flashcard card = Flashcard.create(userId, FlashcardSourceType.MANUAL, null, null, null, "front", "back");
+        card.delete();
+        when(decks.findByIdAndUserId(deck.getId(), userId)).thenReturn(Optional.of(deck));
+        when(cards.findByIdAndUserId(card.getId(), userId)).thenReturn(Optional.of(card));
+
+        new RemoveFlashcardFromDeckUseCase(decks, cards, items).execute(userId, deck.getId(), card.getId());
+
+        verify(items).delete(deck.getId(), card.getId());
     }
 
     @Test

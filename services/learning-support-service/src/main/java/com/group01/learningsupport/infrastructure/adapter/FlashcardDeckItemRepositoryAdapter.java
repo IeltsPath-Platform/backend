@@ -45,16 +45,6 @@ public class FlashcardDeckItemRepositoryAdapter implements FlashcardDeckItemRepo
     }
 
     @Override
-    public void deleteByDeckId(UUID deckId) {
-        repository.deleteByDeckId(deckId);
-    }
-
-    @Override
-    public void deleteByFlashcardId(UUID flashcardId) {
-        repository.deleteByFlashcardId(flashcardId);
-    }
-
-    @Override
     public OwnedPage<DeckItem> findActive(UUID deckId, UUID userId, int page, int size) {
         var result = repository.findActive(deckId, userId, PageRequest.of(page, size));
         return new OwnedPage<>(result.getContent(), result.getTotalElements());

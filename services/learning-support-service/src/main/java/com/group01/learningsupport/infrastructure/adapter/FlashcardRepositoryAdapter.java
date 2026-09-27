@@ -35,6 +35,11 @@ public class FlashcardRepositoryAdapter implements FlashcardRepository {
     }
 
     @Override
+    public Optional<Flashcard> findByIdAndUserId(UUID id, UUID userId) {
+        return repository.findByIdAndUserId(id, userId).map(mapper::toDomain);
+    }
+
+    @Override
     public OwnedPage<Flashcard> findByUserIdAndStatus(UUID userId, LibraryStatus status, int page, int size) {
         return JpaSupport.page(
                 repository.findByUserIdAndStatus(
