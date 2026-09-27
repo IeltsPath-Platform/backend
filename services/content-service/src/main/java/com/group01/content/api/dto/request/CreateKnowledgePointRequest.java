@@ -1,6 +1,10 @@
 package com.group01.content.api.dto.request;
 
+import java.math.BigDecimal;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.DecimalMax;
 import com.group01.content.domain.vo.KnowledgePointKind;
+import com.group01.content.domain.vo.LearningType;
 import com.group01.content.domain.vo.Skill;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -23,7 +27,16 @@ public record CreateKnowledgePointRequest(
         @NotNull(message = "kind is required")
         KnowledgePointKind kind,
 
+        @NotNull(message = "learningType is required")
+        LearningType learningType,
+
         Skill skill,
-        String description
+        String description,
+        @DecimalMin(value = "0.0", message = "bandMin must be at least 0.0")
+        @DecimalMax(value = "9.0", message = "bandMin must be at most 9.0")
+        BigDecimal bandMin,
+        @DecimalMin(value = "0.0", message = "bandMax must be at least 0.0")
+        @DecimalMax(value = "9.0", message = "bandMax must be at most 9.0")
+        BigDecimal bandMax
 ) {}
 

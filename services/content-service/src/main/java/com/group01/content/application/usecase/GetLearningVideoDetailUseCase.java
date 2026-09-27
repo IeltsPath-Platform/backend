@@ -1,6 +1,7 @@
 package com.group01.content.application.usecase;
 
 import com.group01.content.application.result.VideoDetailResult;
+import com.group01.content.application.result.VideoSegmentLexicalEntryResult;
 import com.group01.content.application.result.VideoSegmentResult;
 import com.group01.content.domain.aggregate.LearningVideo;
 import com.group01.content.domain.exception.VideoNotFoundException;

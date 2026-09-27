@@ -1,0 +1,3 @@
+[submodule "third_party/deeptutor"]
+	path = third_party/deeptutor
+	url = https://github.com/HKUDS/DeepTutor.git

@@ -8,6 +8,8 @@ import com.group01.learningsupport.api.dto.response.PageResponse;
 import com.group01.learningsupport.application.query.PageQuery;
 import com.group01.learningsupport.application.usecase.*;
 import com.group01.learningsupport.domain.vo.LibraryStatus;
+import com.group01.learningsupport.domain.vo.NoteSourceType;
+import com.group01.learningsupport.domain.exception.InvalidDataException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,19 +31,31 @@ public class NoteController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public NoteResponse create(@Valid @RequestBody CreateNoteRequest request) {
+        UUID userId = currentUserProvider.requireUserId();
+        if (request.sourceType() == null && request.sourceReferenceId() == null) {
+            return NoteResponse.from(createNoteUseCase.execute(userId, request.title(), request.body()));
+        }
         return NoteResponse.from(createNoteUseCase.execute(
-                currentUserProvider.requireUserId(), request.title(), request.body()
-        ));
+                userId, request.title(), request.body(), request.sourceType(), request.sourceReferenceId()));
     }
 
     @GetMapping
     public PageResponse<NoteResponse> list(
-            @RequestParam(defaultValue = "ACTIVE") LibraryStatus status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(name = "status", defaultValue = "ACTIVE") LibraryStatus status,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size,
+            @RequestParam(name = "sourceType", required = false) NoteSourceType sourceType,
+            @RequestParam(name = "sourceReferenceId", required = false) UUID sourceReferenceId
     ) {
+        if (sourceType == null && sourceReferenceId != null) {
+            throw new InvalidDataException("sourceType is required when sourceReferenceId is present");
+        }
+        UUID userId = currentUserProvider.requireUserId();
+        PageQuery query = new PageQuery(page, size);
         return PageResponse.from(
-                listNotesUseCase.execute(currentUserProvider.requireUserId(), status, new PageQuery(page, size)),
+                sourceType == null
+                        ? listNotesUseCase.execute(userId, status, query)
+                        : listNotesUseCase.execute(userId, status, query, sourceType, sourceReferenceId),
                 NoteResponse::from
         );
     }

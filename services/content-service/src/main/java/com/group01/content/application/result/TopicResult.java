@@ -1,5 +1,6 @@
 package com.group01.content.application.result;
 
+import com.group01.content.domain.vo.BandRange;
 import com.group01.content.domain.vo.ContentStatus;
 
 import java.time.Instant;
@@ -13,6 +14,7 @@ public record TopicResult(
         int sortOrder,
         ContentStatus status,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        BandRange band
 ) {}
 

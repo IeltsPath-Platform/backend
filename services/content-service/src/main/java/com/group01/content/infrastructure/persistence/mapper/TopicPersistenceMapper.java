@@ -1,6 +1,7 @@
 package com.group01.content.infrastructure.persistence.mapper;
 
 import com.group01.content.domain.aggregate.Topic;
+import com.group01.content.domain.vo.BandRange;
 import com.group01.content.infrastructure.persistence.entity.TopicJpaEntity;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,7 @@ public class TopicPersistenceMapper {
                 entity.getName(),
                 entity.getSortOrder(),
                 entity.getStatus(),
+                BandRange.of(entity.getBandMin(), entity.getBandMax()),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -30,6 +32,8 @@ public class TopicPersistenceMapper {
                 .name(domain.getName())
                 .sortOrder(domain.getSortOrder())
                 .status(domain.getStatus())
+                .bandMin(domain.getBand().min())
+                .bandMax(domain.getBand().max())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .build();

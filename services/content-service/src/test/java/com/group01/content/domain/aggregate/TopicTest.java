@@ -1,5 +1,8 @@
 package com.group01.content.domain.aggregate;
 
+import com.group01.content.domain.vo.BandRange;
+import java.math.BigDecimal;
+
 import com.group01.content.domain.vo.ContentStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,12 +43,18 @@ class TopicTest {
         Topic topic = Topic.create(null, "IELTS_READING", "Old Name", 1);
         UUID parentId = UUID.randomUUID();
 
-        topic.update(parentId, "New Name", 2, ContentStatus.INACTIVE);
+        topic.update(parentId, "New Name", 2, ContentStatus.INACTIVE,
+                BandRange.of(new BigDecimal("5.0"), new BigDecimal("6.0")));
 
         assertThat(topic.getParentTopicId()).isEqualTo(parentId);
         assertThat(topic.getName()).isEqualTo("New Name");
         assertThat(topic.getSortOrder()).isEqualTo(2);
         assertThat(topic.getStatus()).isEqualTo(ContentStatus.INACTIVE);
+        assertThat(topic.getBand()).isEqualTo(BandRange.of(new BigDecimal("5.0"), new BigDecimal("6.0")));
+
+        topic.update(parentId, "New Name", 2, null, null);
+
+        assertThat(topic.getBand()).isEqualTo(BandRange.UNBOUNDED);
     }
 }
 

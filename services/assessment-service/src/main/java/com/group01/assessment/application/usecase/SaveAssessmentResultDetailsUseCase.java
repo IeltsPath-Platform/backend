@@ -1,9 +1,15 @@
 package com.group01.assessment.application.usecase;
 
 import com.group01.assessment.application.command.ErrorAnalysisInput;
+import com.group01.assessment.application.command.ItemResultInput;
+import com.group01.assessment.application.command.KnowledgeJudgmentInput;
 import com.group01.assessment.application.command.SaveAssessmentResultDetailsCommand;
+import com.group01.assessment.application.command.SaveGradingDetailsCommand;
+import com.group01.assessment.application.command.SkillScoreInput;
+import com.group01.assessment.domain.entity.AssessmentResult;
 import com.group01.assessment.domain.entity.ErrorAnalysisItem;
 import com.group01.assessment.domain.entity.ItemResult;
+import com.group01.assessment.domain.entity.ItemResultKnowledgeJudgment;
 import com.group01.assessment.domain.entity.SkillScore;
 import com.group01.assessment.domain.exception.AssessmentNotFoundException;
 import com.group01.assessment.domain.exception.InvalidAssessmentStateException;
@@ -24,31 +30,71 @@ public class SaveAssessmentResultDetailsUseCase {
     private final SkillScoreRepository skills;
     private final ItemResultRepository items;
     private final ErrorAnalysisItemRepository errors;
+    private final AttemptItemKnowledgePointRepository knowledgeSnapshot;
+    private final ItemResultKnowledgeJudgmentRepository judgments;
 
     public SaveAssessmentResultDetailsUseCase(AssessmentAttemptRepository attempts,
                                               AssessmentResultRepository results,
                                               AttemptItemRepository attemptItems,
                                               SkillScoreRepository skills,
                                               ItemResultRepository items,
-                                              ErrorAnalysisItemRepository errors) {
+                                              ErrorAnalysisItemRepository errors,
+                                              AttemptItemKnowledgePointRepository knowledgeSnapshot,
+                                              ItemResultKnowledgeJudgmentRepository judgments) {
         this.attempts = attempts;
         this.results = results;
         this.attemptItems = attemptItems;
         this.skills = skills;
         this.items = items;
         this.errors = errors;
+        this.knowledgeSnapshot = knowledgeSnapshot;
+        this.judgments = judgments;
     }
 
+    /** Learner entry: the latest version of the caller's own attempt. The result's band is not changed. */
     @Transactional
     public void execute(SaveAssessmentResultDetailsCommand command) {
         var attempt = attempts.findByIdAndUserId(command.attemptId(), command.userId())
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
         var result = results.findLatestForUpdateByAttemptId(attempt.getId())
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
+        requireGradable(result);
+        saveDetails(attempt.getId(), result, command.skillScores(), command.itemResults(), command.errors(),
+                command.knowledgeJudgments());
+    }
 
-        if (command.skillScores() != null && !command.skillScores().isEmpty()) {
+    /**
+     * Grader entry (EXAMINER/ADMIN, enforced by the controller): any learner's result, which must be the latest
+     * version and still being graded. The grader's band always replaces the version's band, even when null, so a
+     * finalized result never carries a band the learner declared when opening it.
+     */
+    @Transactional
+    public void executeForGrader(SaveGradingDetailsCommand command) {
+        var result = results.findForUpdateById(command.resultId())
+                .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
+        requireGradable(result);
+        var latest = results.findLatestByAttemptId(result.attemptId()).orElse(result);
+        if (latest.resultVersion() != result.resultVersion()) {
+            throw new InvalidAssessmentStateException("Only the latest result version can be graded");
+        }
+        saveDetails(result.attemptId(), result, command.skillScores(), command.itemResults(), command.errors(),
+                command.knowledgeJudgments());
+        results.save(result.withGradedBand(command.overallBand()));
+    }
+
+    private static void requireGradable(AssessmentResult result) {
+        if (!result.isGradable()) {
+            throw new InvalidAssessmentStateException(
+                    "A finalized result cannot be changed; create a new result version to regrade");
+        }
+    }
+
+    private void saveDetails(UUID attemptId, AssessmentResult result, List<SkillScoreInput> skillScores,
+                             List<ItemResultInput> itemResults, List<ErrorAnalysisInput> errorInputs,
+                             List<KnowledgeJudgmentInput> knowledgeJudgments) {
+        if (skillScores != null && !skillScores.isEmpty()) {
             Set<Skill> submittedSkills = new HashSet<>();
-            for (var score : command.skillScores()) {
+            for (var score : skillScores) {
                 if (!submittedSkills.add(score.skill())) {
                     throw new InvalidAssessmentStateException("Only one score per skill is allowed");
                 }
@@ -56,7 +102,7 @@ public class SaveAssessmentResultDetailsUseCase {
 
             Map<Skill, SkillScore> existingBySkill = skills.findByResultId(result.id()).stream()
                     .collect(Collectors.toMap(SkillScore::skill, Function.identity()));
-            skills.saveAll(command.skillScores().stream()
+            skills.saveAll(skillScores.stream()
                     .map(score -> {
                         SkillScore existing = existingBySkill.get(score.skill());
                         return new SkillScore(existing == null ? UUID.randomUUID() : existing.id(), result.id(),
@@ -66,8 +112,8 @@ public class SaveAssessmentResultDetailsUseCase {
                     .toList());
         }
 
-        if (command.itemResults() != null && !command.itemResults().isEmpty()) {
-            List<UUID> submittedAttemptItemIds = command.itemResults().stream()
+        if (itemResults != null && !itemResults.isEmpty()) {
+            List<UUID> submittedAttemptItemIds = itemResults.stream()
                     .map(item -> item.attemptItemId())
                     .toList();
             Set<UUID> uniqueAttemptItemIds = new HashSet<>(submittedAttemptItemIds);
@@ -77,28 +123,36 @@ public class SaveAssessmentResultDetailsUseCase {
             }
 
             Set<UUID> existingAttemptItemIds = attemptItems.findExistingIdsByAttemptId(
-                    uniqueAttemptItemIds, attempt.getId());
+                    uniqueAttemptItemIds, attemptId);
             if (!existingAttemptItemIds.containsAll(uniqueAttemptItemIds)) {
                 throw new InvalidAssessmentStateException(
                         "Item results must reference items from this assessment attempt");
             }
 
+            for (var item : itemResults) {
+                if (item.maxScore() != null && (item.maxScore() <= 0
+                        || (item.score() != null && item.score() > item.maxScore()))) {
+                    throw new InvalidAssessmentStateException(
+                            "Item maximum score must be positive and not below the awarded score");
+                }
+            }
+
             Map<UUID, ItemResult> existingByAttemptItem = items.findByResultId(result.id()).stream()
                     .collect(Collectors.toMap(ItemResult::attemptItemId, Function.identity()));
-            List<ItemResult> itemResults = command.itemResults().stream()
+            List<ItemResult> graded = itemResults.stream()
                     .map(item -> {
                         ItemResult existing = existingByAttemptItem.get(item.attemptItemId());
                         return new ItemResult(existing == null ? UUID.randomUUID() : existing.id(), result.id(),
-                                item.attemptItemId(), item.score(), item.correct(), item.durationMilliseconds(),
-                                item.feedbackSnapshot());
+                                item.attemptItemId(), item.score(), item.maxScore(), item.correct(),
+                                item.durationMilliseconds(), item.feedbackSnapshot());
                     })
                     .toList();
-            items.saveAll(itemResults);
+            items.saveAll(graded);
         }
 
-        if (command.errors() != null && !command.errors().isEmpty()) {
+        if (errorInputs != null && !errorInputs.isEmpty()) {
             Set<UUID> submittedErrorIds = new HashSet<>();
-            for (ErrorAnalysisInput error : command.errors()) {
+            for (ErrorAnalysisInput error : errorInputs) {
                 if (error.id() == null || !submittedErrorIds.add(error.id())) {
                     throw new InvalidAssessmentStateException("Error analysis IDs must be present and unique");
                 }
@@ -109,7 +163,7 @@ public class SaveAssessmentResultDetailsUseCase {
             Set<UUID> validResultItemIds = itemResultByAttemptItemId.values().stream()
                     .map(ItemResult::id)
                     .collect(Collectors.toSet());
-            boolean referencesMissingItemResult = command.errors().stream()
+            boolean referencesMissingItemResult = errorInputs.stream()
                     .anyMatch(error -> !itemResultByAttemptItemId.containsKey(error.attemptItemId()));
             if (referencesMissingItemResult) {
                 throw new InvalidAssessmentStateException(
@@ -124,11 +178,48 @@ public class SaveAssessmentResultDetailsUseCase {
                         "Error analysis ID already belongs to another assessment result");
             }
 
-            errors.saveAll(command.errors().stream()
+            errors.saveAll(errorInputs.stream()
                     .map(error -> new ErrorAnalysisItem(error.id(),
                             itemResultByAttemptItemId.get(error.attemptItemId()).id(),
                             error.knowledgePointId(), error.errorType(), error.explanation()))
                     .toList());
         }
+
+        if (knowledgeJudgments != null && !knowledgeJudgments.isEmpty()) {
+            saveKnowledgeJudgments(result.id(), knowledgeJudgments);
+        }
+    }
+
+    private void saveKnowledgeJudgments(UUID resultId, List<KnowledgeJudgmentInput> inputs) {
+        Set<List<UUID>> submitted = new HashSet<>();
+        for (KnowledgeJudgmentInput input : inputs) {
+            if (input.attemptItemId() == null || input.knowledgePointId() == null || input.judgment() == null) {
+                throw new InvalidAssessmentStateException("Knowledge judgments require item, knowledge point and judgment");
+            }
+            if (!submitted.add(List.of(input.attemptItemId(), input.knowledgePointId()))) {
+                throw new InvalidAssessmentStateException("Only one judgment per item and knowledge point is allowed");
+            }
+        }
+
+        Map<UUID, ItemResult> itemResultByAttemptItemId = items.findByResultId(resultId).stream()
+                .collect(Collectors.toMap(ItemResult::attemptItemId, Function.identity()));
+        Set<UUID> judgedItems = inputs.stream().map(KnowledgeJudgmentInput::attemptItemId).collect(Collectors.toSet());
+        if (!itemResultByAttemptItemId.keySet().containsAll(judgedItems)) {
+            throw new InvalidAssessmentStateException("Knowledge judgments must reference a graded item of this result");
+        }
+        // A judgment is only meaningful for a knowledge point the item was attributed to when the attempt started.
+        Set<List<UUID>> snapshotted = knowledgeSnapshot.findByAttemptItemIds(judgedItems).stream()
+                .map(mapping -> List.of(mapping.attemptItemId(), mapping.knowledgePointId()))
+                .collect(Collectors.toSet());
+        if (!snapshotted.containsAll(submitted)) {
+            throw new InvalidAssessmentStateException(
+                    "Knowledge judgments must reference a knowledge point mapped to the item");
+        }
+
+        judgments.saveAll(inputs.stream()
+                .map(input -> new ItemResultKnowledgeJudgment(
+                        itemResultByAttemptItemId.get(input.attemptItemId()).id(),
+                        input.knowledgePointId(), input.judgment()))
+                .toList());
     }
 }

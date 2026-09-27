@@ -1,5 +1,6 @@
 package com.group01.learningsupport.infrastructure.persistence.repository;
 
+import com.group01.learningsupport.domain.vo.FlashcardSourceType;
 import com.group01.learningsupport.domain.vo.LibraryStatus;
 import com.group01.learningsupport.infrastructure.persistence.entity.FlashcardJpaEntity;
 import org.springframework.data.domain.Page;
@@ -13,4 +14,7 @@ public interface FlashcardJpaRepository extends JpaRepository<FlashcardJpaEntity
     Optional<FlashcardJpaEntity> findByIdAndUserId(UUID id, UUID userId);
 
     Page<FlashcardJpaEntity> findByUserIdAndStatus(UUID userId, LibraryStatus status, Pageable pageable);
+
+    Optional<FlashcardJpaEntity> findFirstByUserIdAndSourceTypeAndSourceReferenceIdAndStatusNot(
+            UUID userId, FlashcardSourceType sourceType, UUID sourceReferenceId, LibraryStatus status);
 }

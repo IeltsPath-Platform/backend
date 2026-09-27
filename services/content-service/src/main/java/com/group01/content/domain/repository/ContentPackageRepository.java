@@ -12,6 +12,8 @@ public interface ContentPackageRepository {
     Optional<ContentPackage> findById(UUID id);
 
     Optional<ContentPackage> findByVersionId(UUID versionId);
+
+    Optional<ContentPackage> findBySectionId(UUID sectionId);
     Optional<ContentPackage> findByCode(String code);
 
     List<ContentPackage> findAll(Boolean featureRequired, PublicationStatus status);

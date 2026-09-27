@@ -22,4 +22,8 @@ public interface AssessmentResultJpaRepository extends JpaRepository<AssessmentR
             + "order by result.resultVersion desc")
     List<AssessmentResultJpaEntity> findForUpdateByAttemptId(
             @Param("attemptId") UUID attemptId, Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select result from AssessmentResultJpaEntity result where result.id = :id")
+    Optional<AssessmentResultJpaEntity> findForUpdateById(@Param("id") UUID id);
 }

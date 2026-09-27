@@ -10,6 +10,6 @@ import java.util.UUID;
 
 public interface LearningGoalJpaRepository extends JpaRepository<LearningGoalJpaEntity, UUID> {
     List<LearningGoalJpaEntity> findByUser_Id(UUID userId);
-    Optional<LearningGoalJpaEntity> findFirstByUser_IdAndStatusOrderByCreatedAtDesc(UUID userId, GoalStatus status);
+    List<LearningGoalJpaEntity> findAllByUser_IdAndStatusOrderByCreatedAtDescIdDesc(UUID userId, GoalStatus status);
 }
 

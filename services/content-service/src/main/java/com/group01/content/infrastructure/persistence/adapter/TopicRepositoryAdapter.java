@@ -6,6 +6,7 @@ import com.group01.content.infrastructure.persistence.mapper.TopicPersistenceMap
 import com.group01.content.infrastructure.persistence.repository.TopicJpaRepository;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +42,11 @@ public class TopicRepositoryAdapter implements TopicRepository {
     @Override
     public List<Topic> findAll() {
         return topicJpaRepository.findAll().stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<Topic> findAllByIds(Collection<UUID> ids) {
+        return topicJpaRepository.findAllById(ids).stream().map(mapper::toDomain).toList();
     }
 
     @Override

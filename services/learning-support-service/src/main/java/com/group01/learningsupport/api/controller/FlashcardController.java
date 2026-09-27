@@ -6,11 +6,15 @@ import com.group01.learningsupport.api.dto.request.UpdateFlashcardRequest;
 import com.group01.learningsupport.api.dto.response.FlashcardResponse;
 import com.group01.learningsupport.api.dto.response.PageResponse;
 import com.group01.learningsupport.application.query.PageQuery;
+import com.group01.learningsupport.application.result.SavedFlashcard;
 import com.group01.learningsupport.application.usecase.*;
+import com.group01.learningsupport.domain.exception.InvalidDataException;
+import com.group01.learningsupport.domain.vo.FlashcardSourceType;
 import com.group01.learningsupport.domain.vo.LibraryStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -25,19 +29,31 @@ public class FlashcardController {
     private final GetFlashcardUseCase getFlashcardUseCase;
     private final ListFlashcardsUseCase listFlashcardsUseCase;
     private final DeleteFlashcardUseCase deleteFlashcardUseCase;
+    private final SavePracticeQuestionFlashcardUseCase savePracticeQuestionFlashcardUseCase;
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public FlashcardResponse create(@Valid @RequestBody CreateFlashcardRequest request) {
-        return FlashcardResponse.from(createFlashcardUseCase.execute(
-                currentUserProvider.requireUserId(),
+    public ResponseEntity<FlashcardResponse> create(@Valid @RequestBody CreateFlashcardRequest request) {
+        UUID userId = currentUserProvider.requireUserId();
+        if (request.sourceType() == FlashcardSourceType.PRACTICE_QUESTION) {
+            // Saving the same practice question again returns the existing card with 200 instead of a duplicate.
+            if (request.sourceReferenceId() == null || request.vocabularySenseId() != null
+                    || request.highlightedText() != null) {
+                throw new InvalidDataException("flashcard practice question không hợp lệ");
+            }
+            SavedFlashcard saved = savePracticeQuestionFlashcardUseCase.execute(
+                    userId, request.sourceReferenceId(), request.front(), request.back());
+            return ResponseEntity.status(saved.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                    .body(FlashcardResponse.from(saved.flashcard()));
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(FlashcardResponse.from(createFlashcardUseCase.execute(
+                userId,
                 request.sourceType(),
                 request.vocabularySenseId(),
                 request.sourceReferenceId(),
                 request.highlightedText(),
                 request.front(),
                 request.back()
-        ));
+        )));
     }
 
     @GetMapping
