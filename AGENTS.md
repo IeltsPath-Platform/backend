@@ -1,9 +1,13 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
-- Phiên bản: 2.0
-- Cập nhật lần cuối: 2026-09-27, commit `658a055`
+- Phiên bản: 2.1
+- Cập nhật lần cuối: 2026-09-27; dữ kiện đã kiểm với code tại commit `79f9fd6`
 - Dự án: `IELTSPath` (Maven coordinates: `com.group01:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
+
+**Thứ tự ưu tiên:** `.sdd/global/constitution.md` (invariant cấp dự án, LOCKED) → file này (quy tắc vận hành cho agent;
+các `CLAUDE.md` chỉ bổ sung ngữ cảnh chạy, không đặt quy tắc riêng) → tài liệu mô tả. `.sdd/global/system-architecture.md` và `.sdd/constraints/global.md` là baseline 2026-09-18, lỗi thời về
+messaging, AI Learning và danh sách service; khi lệch về dữ kiện thì code, file này và `docs/system-architecture.md` đúng.
 
 ## 1. Tổng quan dự án
 
@@ -103,8 +107,8 @@ src/main/java/com/group01/<service>
 ### 3.4 Ranh giới bảo mật
 
 - `user-service` phát hành external HMAC JWT; refresh token chỉ lưu dạng hash.
-- `api-gateway` xác thực external JWT, route qua Eureka và thay Authorization bằng internal HMAC JWT sống ngắn cho các path
-  trong `internal-jwt-paths`. Gateway dùng `SecurityWebFilterChain` riêng; không áp servlet auto-configuration cho Gateway.
+- `api-gateway` xác thực external JWT, route qua Eureka (riêng `/api/ai-learning/**` dùng URI cố định
+  `AI_LEARNING_SERVICE_URI`) và thay Authorization bằng internal HMAC JWT sống ngắn cho các path trong `internal-jwt-paths`. Gateway dùng `SecurityWebFilterChain` riêng; không áp servlet auto-configuration cho Gateway.
 - Service servlet dùng `CommonSecurityAutoConfiguration` để xác thực internal token (issuer đúng, subject UUID, có expiry,
   role thuộc `CanonicalRoles.ALL`: `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF`). Claim và role
   constant quản lý tập trung trong `common-security`.
@@ -116,7 +120,7 @@ src/main/java/com/group01/<service>
 
 - Mỗi service sở hữu bounded context và database; không đọc/ghi database hay dùng chung JPA entity của service khác.
 - Gọi đồng bộ service-to-service bằng HTTP tới endpoint nội bộ hoặc public của service đích, kèm bearer của request và
-  `X-Correlation-Id` (ví dụ assessment → content/user, game → content, ai-learning → content/user).
+  `X-Correlation-Id` (như assessment → content/user, game → content). ai-learning → content/user hiện chỉ gửi bearer.
 - Bất đồng bộ qua transactional outbox + RabbitMQ; event có version trong tên và contract ở `docs/contracts/`. Consumer
   phải idempotent và có retry/dead-letter (xem ai-learning).
 - `shared/` chỉ chứa technical concern dùng chung; không chuyển entity hay use case nghiệp vụ vào đó.
@@ -127,10 +131,12 @@ src/main/java/com/group01/<service>
 
 - Bootstrap setting ở `src/main/resources/application.y(a)ml` của module; runtime setting ở
   `infra/config-server/config-repo/<service>.yaml` (+ `application.yaml` dùng chung). Không lặp setting Eureka client toàn cục.
-- Mọi module Spring import `.env` ở root (`optional:file:../../.env[.properties]`); compose cũng nội suy file này. `.env`
-  không commit.
+- Gateway và mọi service Java nghiệp vụ import `.env` ở root (`optional:file:../../.env[.properties]`; config-server và
+  eureka-server thì không); compose cũng nội suy file này. ai-learning chạy trên host đọc `.env` riêng trong thư mục
+  service. `.env` không commit. community-service mặc định DB local 5432; dùng DB compose (5434) thì đặt `COMMUNITY_DB_URL`.
 - Chạy local: service Java trên host (Config Server → Eureka → Gateway → business service); compose chạy DB của
-  learning-support/community/game, RabbitMQ và stack AI Learning. Chi tiết: `README.md`, `docs/system-architecture.md` §7.
+  learning-support/community/game, RabbitMQ và stack AI Learning. Chi tiết: `README.md` §6, `docs/system-architecture.md` §7
+  (README §4 còn mô tả compose cũ).
 - `Dockerfile.spring-service` build module Maven theo `MODULE_PATH`; Config Server có Dockerfile riêng; ai-learning có
   `services/ai-learning-service/Dockerfile`.
 
@@ -149,9 +155,11 @@ src/main/java/com/group01/<service>
 - Layer: `app/api` (router, DTO camelCase alias) → `app/application` → `app/mastery`, `app/tutor`, `app/practice`,
   `app/usage`, `app/learning` → store/`app/persistence` (psycopg2, mở kết nối mỗi lần gọi), `app/clients` (httpx),
   `app/messaging` (pika). Cấu hình qua pydantic-settings, tiền tố `AI_LEARNING_`.
-- `app/mastery` là bản port DeepTutor v1.6.9 (Apache-2.0): giữ hành vi và ngưỡng; test engine giữ giá trị gốc; file port ghi nguồn.
+- `app/mastery` là bản port DeepTutor v1.6.9 (Apache-2.0): giữ hành vi và ngưỡng; test engine giữ giá trị gốc; mỗi file
+  port giữ comment ghi nguồn (bắt buộc theo giấy phép).
 - Một lượt tutor luôn được đóng (completed/failed), kể cả khi lỗi hay client ngắt; không để kẹt slot `running`.
-- Tác vụ gọi LLM phải qua hạn mức theo ngày (`app/usage`) khi áp dụng cho học viên.
+- Lượt tutor và tóm tắt learner memory phải qua hạn mức theo ngày (`app/usage`). Sắp thứ tự path bằng LLM không bị giới
+  hạn (một lần mỗi goal). Tác vụ LLM mới cho học viên phải được quyết định rõ có tính hạn mức hay không.
 - Migration: thêm `migrations/V<n>__<mô_tả>.sql` mới; test dựng schema từ đúng chuỗi migration này.
 
 ## 4. Quy tắc đặt tên file và cấu trúc dự án
@@ -160,7 +168,8 @@ src/main/java/com/group01/<service>
 shared/common-security/                 thư viện security dùng chung
 infra/{api-gateway,config-server,eureka-server}/
 infra/config-server/config-repo/        YAML runtime tập trung
-services/<name>-service/                service Java: src/main/java/com/group01/<name>/{api,application,domain,infrastructure}
+services/<name>-service/                service Java: src/main/java/com/group01/<package>/{api,application,domain,infrastructure}
+                                        (package bỏ gạch nối, ví dụ learningsupport; user-service có thêm config/)
                                         + src/main/resources/db/migration/
 services/ai-learning-service/           app/, migrations/, tests/, main.py
 docs/contracts/                         contract HTTP/SSE/event
@@ -192,8 +201,9 @@ Khi không có convention cụ thể, theo code lân cận trong cùng module.
 - TUYỆT ĐỐI KHÔNG bỏ qua use case để gọi thẳng JPA repository từ `api`.
 - TUYỆT ĐỐI KHÔNG tạo entity, table hoặc repository dùng chung giữa bounded context; không truy cập database service khác.
 - TUYỆT ĐỐI KHÔNG đổi architecture boundary, public route, event contract, JWT claim hoặc canonical role khi chưa được duyệt.
-- TUYỆT ĐỐI KHÔNG import hoặc tham chiếu `deeptutor` / `third_party/` từ code, image, requirements hay compose của service
-  (`tests/test_no_deeptutor_dependency.py` sẽ fail).
+- TUYỆT ĐỐI KHÔNG import `deeptutor`, và không đưa `deeptutor` / `third_party/` vào Dockerfile, entrypoint, requirements,
+  compose hay import path của service (`tests/test_no_deeptutor_dependency.py` sẽ fail). Comment ghi nguồn của file port
+  là được phép và phải giữ.
 
 ### Bảo mật
 
@@ -235,8 +245,12 @@ Khi không có convention cụ thể, theo code lân cận trong cùng module.
 graphify query "<câu hỏi về codebase>"
 graphify explain "<symbol>"
 graphify path "<symbol A>" "<symbol B>"
-graphify update .            # sau khi sửa code; thêm --force khi số node giảm có chủ đích
+graphify affected "<symbol thay đổi>"   # node bị ảnh hưởng khi đổi symbol
+graphify update .                       # sau khi sửa code; thêm --force khi số node giảm có chủ đích
 ```
+
+   Chỉ đọc `graphify-out/GRAPH_REPORT.md` khi query/explain/path chưa đủ. Chỉ chạy full build `graphify .` khi graph chưa
+   có, bị lỗi hoặc được yêu cầu. Không tự cài Graphify; không commit `.graphify-tools/` hay `graphify-out/`.
 
 4. Thêm test tập trung vào layer bị ảnh hưởng: Mockito cho use case, `@WebMvcTest` cho controller/security, Testcontainers
    cho persistence (cần Docker); ai-learning dùng test PostgreSQL với schema tạm.
@@ -244,24 +258,30 @@ graphify update .            # sau khi sửa code; thêm --force khi số node g
 
 ```powershell
 mvn -q -pl shared/common-security test
+mvn -q -pl infra/api-gateway test
 mvn -q -pl services/<name>-service -am test      # -am build kèm common-security
 mvn -q compile -DskipTests                        # cả reactor; không dùng clean khi service đang chạy từ IDE
 docker compose config --quiet
 ```
 
-   ai-learning (trong `services/ai-learning-service`, venv Python 3.11):
+   ai-learning: venv Python 3.11 riêng (ví dụ `uv venv --seed --python 3.11 <thư mục ngoài repo>`; `.venv` ở root không có
+   pytest), kích hoạt venv hoặc gọi thẳng `<venv>\Scripts\python`, chạy trong `services/ai-learning-service`. Lệnh PowerShell:
 
 ```powershell
 python -m pip install pytest -r requirements-test.txt
 $env:PYTHONDONTWRITEBYTECODE = "1"
-$env:AI_LEARNING_TEST_DATABASE_URL = "<PostgreSQL dùng để test>"   # thiếu thì test PostgreSQL bị skip
-$env:AI_LEARNING_TEST_AMQP_URL = "<RabbitMQ dùng để test>"          # thiếu thì test RabbitMQ bị skip
-python -m pytest tests
+$env:AI_LEARNING_TEST_DATABASE_URL = "postgresql://postgres:<password>@localhost:5432/<db dùng để test>"  # thiếu: skip test PostgreSQL
+$env:AI_LEARNING_TEST_AMQP_URL = "amqp://<user>:<password>@localhost:5672/%2F"                          # thiếu: skip test RabbitMQ
+python -m pytest tests -p no:cacheprovider
 ```
+
+   Git Bash: `export PYTHONDONTWRITEBYTECODE=1 AI_LEARNING_TEST_DATABASE_URL=... AI_LEARNING_TEST_AMQP_URL=...` rồi cùng
+   lệnh pytest. Mỗi lớp test tạo rồi xóa schema riêng; dùng DB không chứa dữ liệu cần giữ.
 
 6. Chỉ build/chạy Docker khi daemon khả dụng: `docker compose up -d --build <service...>`, `docker compose ps`.
 7. Không tuyên bố check nào đã chạy (CI, lint, coverage, contract test) khi chúng chưa tồn tại hoặc chưa thực sự chạy.
-8. Commit theo conventional commit; không nhắc AI, số phase hay mã plan trong commit, code comment, tên test hay migration.
+8. Commit theo conventional commit; không nhắc việc dùng AI/agent để viết code, số phase hay mã plan trong commit, code
+   comment, tên test hay migration (comment ghi nguồn port DeepTutor là chuyện khác và bắt buộc).
 
 ## 7. Điểm chưa nhất quán và nội dung cần làm rõ
 
@@ -273,5 +293,7 @@ Những điểm ảnh hưởng trực tiếp tới quy tắc:
 - `services/user-service/README.md` ghi `PATCH` cho cập nhật trạng thái user; controller là `PUT /api/users/{id}/status`
   (controller đúng).
 - Outbox của access/content/game đã ghi event nhưng chưa có relay; đừng giả định các event đó tới được consumer.
+- ai-learning chưa forward `X-Correlation-Id` khi gọi Content/User.
 - `requirements.txt` của ai-learning còn `sqlalchemy` nhưng code không import.
+- Config-repo có giá trị fallback cho secret; không dựa vào chúng và không tự sửa như side effect, báo người dùng.
 - Chưa xác định: production deployment, secret management, CI policy, frontend contract, API versioning, cache, object storage.

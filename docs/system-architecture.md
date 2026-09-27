@@ -1,6 +1,6 @@
 # Kiến trúc hệ thống IELTSPath (backend)
 
-- Cập nhật lần cuối: 2026-09-27, commit `9a1f5a8`
+- Cập nhật lần cuối: 2026-09-27; dữ kiện đã kiểm với code tại commit `79f9fd6`
 - Đọc khi cần hiểu toàn hệ thống. Quy tắc bắt buộc nằm ở [`AGENTS.md`](../AGENTS.md); hướng dẫn chạy chi tiết ở
   [`README.md`](../README.md). Code là nguồn đúng khi tài liệu này lệch.
 
@@ -43,7 +43,7 @@ assessment --HTTP--> content, user        game --HTTP--> content        ai-learn
 | `access-service` | Gói, subscription, activation key, ví điểm và sổ điểm | `access_db` (local 5432) | `/api/access/**` |
 | `learning-support-service` | Tiện ích của học viên: activity, streak, tiến độ video, đoạn video đã lưu, note, flashcard/deck | `learning_support_db` (compose 5433) | `/api/learning-support/**` |
 | `game-service` | Phòng game, trận, phiên chơi, WebSocket realtime | `game_db` (compose 5435) | `/api/games/**`, `/ws/games/**` |
-| `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (compose 5434) | `/api/community/**` |
+| `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (compose 5434; default code là local 5432, đổi bằng `COMMUNITY_DB_URL`) | `/api/community/**` |
 | `notification-service` | Chưa triển khai (chỉ khung package) | `notification_db` (local 5432) | `/api/notifications/**` |
 | `ai-learning-service` | Mastery path thích ứng, tutor study/review (SSE), practice notebook, learner memory, hạn mức LLM theo ngày; nhận kết quả thi chính thức | `ai_learning_db` (compose 5436) | `/api/ai-learning/**` |
 
@@ -62,9 +62,9 @@ Chi tiết schema: [`.sdd/database/DATABASE_V5.md`](../.sdd/database/DATABASE_V5
 | ai-learning | content | `/api/content/topics`, `/api/content/knowledge-points`, `/api/content/reading/sections/{id}` | `AI_LEARNING_CONTENT_SERVICE_BASE_URL` |
 | ai-learning | user | `/api/users/me/learning-goals/active` | `AI_LEARNING_USER_SERVICE_BASE_URL` |
 
-Assessment và game gọi thẳng service đích (không qua Gateway) và mang theo danh tính của request. AI Learning chuyển
-tiếp nguyên internal JWT của learner tới User/Content; token này sống ngắn (mặc định 60 giây), nên tutor copy bài đọc
-khi tạo session thay vì gọi Content trong từng lượt.
+Assessment và game gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`. AI Learning
+chuyển tiếp nguyên internal JWT của learner tới User/Content (chưa gửi `X-Correlation-Id`); token này sống ngắn (mặc định
+60 giây), nên tutor copy bài đọc khi tạo session thay vì gọi Content trong từng lượt.
 
 ### Bất đồng bộ (RabbitMQ)
 
@@ -170,11 +170,13 @@ Contract: [`tutor-sse-v1.md`](contracts/tutor-sse-v1.md), [`practice-v1.md`](con
 ## 7. Chạy local (tóm tắt)
 
 - Compose (`docker-compose.yml`): `learning-support-db`, `community-db`, `game-db`, `rabbitmq`, `ai-learning-db`,
-  `ai-learning-migrate`, `ai-learning-api`, `ai-learning-consumer`, `llm-stub`, `game-service`.
+  `ai-learning-migrate`, `ai-learning-api`, `ai-learning-consumer`, `game-service` (không dùng được, xem §11); `llm-stub`
+  nằm sau profile `llm-stub`. Chỉ bật các service cần, không `docker compose up` toàn bộ.
 - Trên host (IDE hoặc `java -jar`): config-server → eureka → api-gateway → các business service Java. Postgres local
   5432 cần `user_db`, `content_db`, `assessment_db`, `access_db`, `notification_db`.
-- `.env` ở root (gitignored) được compose nội suy và mọi module Spring import
-  (`optional:file:../../.env[.properties]`). Container AI Learning gọi User/Content trên host qua `host.docker.internal`.
+- `.env` ở root (gitignored) được compose nội suy; Gateway và mọi service Java nghiệp vụ import nó
+  (`optional:file:../../.env[.properties]`), config-server và eureka-server thì không. AI Learning chạy trên host đọc
+  `.env` riêng của service. Container AI Learning gọi User/Content trên host qua `host.docker.internal`.
 
 ## 8. Quyết định kiến trúc đã quan sát
 
@@ -228,4 +230,12 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | Compose `game-service` trỏ `http://config-server:8888` | Compose không có config-server |
 | Secret có giá trị fallback trong config-repo được track | Thiếu biến env thì service dùng secret công khai trong repo |
 | README root chỉ liệt kê 3 DB local | access, notification cần `access_db`, `notification_db` |
+| README root §4 mô tả compose cũ: `docker compose up -d --build` toàn bộ, config/eureka/gateway trong compose, "Community PostgreSQL 5433" | Thực tế compose chỉ có một phần stack; 5433 là learning-support, community ở 5434. Làm theo §6 |
+| community-service mặc định `localhost:5432/community_db`, DB compose ở 5434 | Đặt `COMMUNITY_DB_URL` khi dùng DB compose |
+| `.sdd/global/system-architecture.md`, `.sdd/constraints/global.md` (baseline 2026-09-18) ghi không có broker/outbox/AI Learning | Lỗi thời; `.sdd/global/constitution.md` vẫn là invariant cao nhất. Dữ kiện: code, `AGENTS.md`, tài liệu này |
+| AI Learning không gửi `X-Correlation-Id` khi gọi Content/User | Service Java có gửi |
+| Gateway CORS chỉ expose `Authorization`, `Content-Type` | Browser không đọc được `Retry-After` của 429 tutor; dùng `resetsAt` (việc tùy chọn trong plan hạn mức) |
+| community, learning-support có bảng `outbox_events` (V1) nhưng không dùng | Như outbox chưa relay của access/content/game |
+| `requirements.txt` của AI Learning có `sqlalchemy` nhưng code không import | Dependency thừa |
+| `tests/e2e/tutor_e2e.py` ghi chạy từ root repo; README root ghi chạy từ `services/ai-learning-service` | Chưa thống nhất |
 | `services/ai-learning-service/README.md` dòng ~500 nói event chưa có path "retry rồi vào DLQ" | Code (và dòng ~472 cùng README) lưu vào `pending_formal_assessment_results` và ACK; code đúng |

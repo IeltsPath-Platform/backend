@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: Slim CLAUDE files
-status: in-progress
+status: completed
 priority: P1
 dependencies:
   - 1
@@ -65,9 +65,23 @@ Viết lại `CLAUDE.md` root thành bản gọn (≤ 150 dòng) nạp `AGENTS.m
 6. Commit: `docs: slim CLAUDE.md and add ai-learning-service agent context`.
 
 ## Success Criteria
-- [ ] Root ≤ 150 dòng có `@AGENTS.md` và `## graphify`; nested ≤ 100 dòng.
-- [ ] Secret scan sạch; lệnh chạy được; dữ kiện khớp fact sheet.
-- [ ] Smoke test 6/6 câu đúng.
+- [x] Root ≤ 150 dòng có `@AGENTS.md` và `## graphify`; nested ≤ 100 dòng.
+- [x] Secret scan sạch; lệnh chạy được; dữ kiện khớp fact sheet.
+- [x] Smoke test 6/6 câu đúng.
+
+## Kết quả (2026-09-27)
+- Root `CLAUDE.md` 104 dòng (1 import `@AGENTS.md`, có `## graphify`); `services/ai-learning-service/CLAUDE.md` 77 dòng;
+  `AGENTS.md` 299 dòng (bằng bản gốc, do khôi phục quy tắc graphify + thêm hướng dẫn Git Bash/venv).
+- Commit nội dung đầu `253775d` (theo yêu cầu commit + push của người dùng, trước khi có kết quả review).
+- Smoke test lần 1 (chỉ đọc CLAUDE.md + import): 5/6 — thiếu exchange/routing key; nêu 7 điểm khó hiểu.
+- Code review: [report](./reports/code-reviewer-260927-2201-agent-context-docs-review-report.md) — 0 High, 7 Medium,
+  13 Low, 0 secret, 25/28 dữ kiện đúng. Đã sửa: M1 (thứ tự ưu tiên, `.sdd` baseline cũ — người dùng chọn constitution
+  đứng trên, không sửa `.sdd`), M2 (`-p no:cacheprovider`; người dùng chọn xóa `pyproject.toml`/`uv.lock` root →
+  commit `1703853`, thêm `.pytest_cache/` vào `.gitignore`), M3–M7, L1–L13.
+- Smoke test lần 2: 6/6 đúng (a–f) + (g) thứ tự ưu tiên đúng; 8/9 điểm nhỏ còn lại đã sửa. Giữ lặp công thức test giữa
+  `AGENTS.md` và CLAUDE.md của service (AGENTS phải tự đứng được cho Codex).
+- Kiểm lại: link tương đối OK, `docker compose config --quiet` OK, `llm-stub` qua profile OK, pytest thu 432 test không
+  sinh file trong repo sau khi xóa pyproject root.
 
 ## Risk Assessment
 - `@AGENTS.md` không được nạp (sai đường dẫn): kiểm bằng smoke test câu (e) (quy tắc chỉ có trong AGENTS.md).
