@@ -5,7 +5,7 @@ description: >-
   thành CLAUDE.md gọn + CLAUDE.md riêng cho ai-learning-service + AGENTS.md làm
   nguồn quy tắc + docs/system-architecture.md, và loại third_party khỏi
   graphify.
-status: in-progress
+status: completed
 priority: P2
 branch: feat/ai-learning-service
 tags:
@@ -47,7 +47,7 @@ graph**, không đổi code.
 | 1 | [Fact sheet and graphify scope](./phase-01-fact-sheet-and-graphify-scope.md) | Completed |
 | 2 | [System architecture doc](./phase-02-system-architecture-doc.md) | Completed |
 | 3 | [AGENTS rules source](./phase-03-agents-rules-source.md) | Completed |
-| 4 | [Slim CLAUDE files](./phase-04-slim-claude-files.md) | In Progress |
+| 4 | [Slim CLAUDE files](./phase-04-slim-claude-files.md) | Completed |
 
 Tuần tự: 1 → 2 → 3 → 4. Phase 1 tạo fact sheet đã kiểm chứng; mọi phase sau chỉ ghi dữ kiện có trong fact sheet.
 Phase 3 cần phase 2 (nội dung kiến trúc chuyển sang doc trước khi cắt khỏi AGENTS.md). Phase 4 cần phase 1 và 3.
