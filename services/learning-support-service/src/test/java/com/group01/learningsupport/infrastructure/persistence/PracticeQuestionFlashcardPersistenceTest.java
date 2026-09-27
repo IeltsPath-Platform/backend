@@ -90,8 +90,7 @@ class PracticeQuestionFlashcardPersistenceTest {
 
         assertThrows(ConflictException.class, () -> cards.save(practiceCard(userId, questionId)));
 
-        first.update(FlashcardSourceType.PRACTICE_QUESTION, null, questionId, null, "Front", "Back",
-                LibraryStatus.DELETED);
+        first.delete();
         cards.save(first);
         SavedFlashcard again = savePracticeQuestion.execute(userId, questionId, "Front", "Back");
         assertTrue(again.created());
@@ -128,6 +127,11 @@ class PracticeQuestionFlashcardPersistenceTest {
             @Override
             public Flashcard save(Flashcard flashcard) {
                 return cards.save(flashcard);
+            }
+
+            @Override
+            public Optional<Flashcard> findAvailableByIdAndUserId(UUID id, UUID owner) {
+                return cards.findAvailableByIdAndUserId(id, owner);
             }
 
             @Override
@@ -171,12 +175,10 @@ class PracticeQuestionFlashcardPersistenceTest {
         // Restoring a deleted card while a newer live card exists.
         UUID otherQuestion = UUID.randomUUID();
         Flashcard deleted = cards.save(practiceCard(userId, otherQuestion));
-        deleted.update(FlashcardSourceType.PRACTICE_QUESTION, null, otherQuestion, null, "Front", "Back",
-                LibraryStatus.DELETED);
+        deleted.delete();
         cards.save(deleted);
         cards.save(practiceCard(userId, otherQuestion));
-        deleted.update(FlashcardSourceType.PRACTICE_QUESTION, null, otherQuestion, null, "Front", "Back",
-                LibraryStatus.ACTIVE);
+        deleted.restore();
         assertThrows(ConflictException.class, () -> cards.save(deleted));
     }
 

@@ -6,6 +6,8 @@ import com.group01.learningsupport.application.result.DeckItemResult;
 import com.group01.learningsupport.application.result.PageResult;
 import com.group01.learningsupport.domain.repository.FlashcardDeckItemRepository;
 import com.group01.learningsupport.domain.repository.FlashcardDeckRepository;
+import com.group01.learningsupport.domain.exception.ResourceNotFoundException;
+import com.group01.learningsupport.domain.vo.LibraryStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +22,10 @@ public class ListDeckItemsUseCase {
 
     @Transactional(readOnly = true)
     public PageResult<DeckItemResult> execute(UUID userId, UUID deckId, PageQuery query) {
-        ApplicationSupport.required(decks.findByIdAndUserId(deckId, userId));
+        var deck = ApplicationSupport.required(decks.findByIdAndUserId(deckId, userId));
+        if (deck.getStatus() != LibraryStatus.ACTIVE) {
+            throw new ResourceNotFoundException();
+        }
         return ApplicationSupport.page(items.findActive(deckId, userId, query.page(), query.size()), query)
                 .map(DeckItemResult::from);
     }

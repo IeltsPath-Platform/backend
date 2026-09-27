@@ -10,9 +10,5 @@ public interface FlashcardDeckItemRepository {
 
     void delete(UUID deckId, UUID flashcardId);
 
-    void deleteByDeckId(UUID deckId);
-
-    void deleteByFlashcardId(UUID flashcardId);
-
     OwnedPage<DeckItem> findActive(UUID deckId, UUID userId, int page, int size);
 }

@@ -3,7 +3,6 @@ package com.group01.learningsupport.application.usecase;
 import com.group01.learningsupport.application.ApplicationSupport;
 import com.group01.learningsupport.application.result.FlashcardResult;
 import com.group01.learningsupport.domain.aggregate.Flashcard;
-import com.group01.learningsupport.domain.repository.FlashcardDeckItemRepository;
 import com.group01.learningsupport.domain.repository.FlashcardRepository;
 import com.group01.learningsupport.domain.vo.FlashcardSourceType;
 import com.group01.learningsupport.domain.vo.LibraryStatus;
@@ -17,7 +16,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class UpdateFlashcardUseCase {
     private final FlashcardRepository repository;
-    private final FlashcardDeckItemRepository items;
 
     @Transactional
     public FlashcardResult execute(
@@ -31,11 +29,8 @@ public class UpdateFlashcardUseCase {
             String back,
             LibraryStatus status
     ) {
-        Flashcard card = ApplicationSupport.required(repository.findByIdAndUserId(flashcardId, userId));
+        Flashcard card = ApplicationSupport.required(repository.findAvailableByIdAndUserId(flashcardId, userId));
         card.update(sourceType, vocabularySenseId, sourceReferenceId, highlightedText, front, back, status);
-        if (status != LibraryStatus.ACTIVE) {
-            items.deleteByFlashcardId(flashcardId);
-        }
         return FlashcardResult.from(repository.save(card));
     }
 }

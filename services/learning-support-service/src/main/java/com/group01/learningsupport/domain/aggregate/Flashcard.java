@@ -63,13 +63,33 @@ public class Flashcard {
             String back,
             LibraryStatus status
     ) {
+        if (this.status == LibraryStatus.DELETED) {
+            throw new InvalidDataException("Flashcard has been deleted");
+        }
         if (status == null) {
             throw new InvalidDataException("status không hợp lệ");
+        }
+        if (status == LibraryStatus.DELETED) {
+            throw new InvalidDataException("Use the delete operation to delete a flashcard");
         }
         applySource(sourceType, vocabularySenseId, sourceReferenceId, highlightedText, front, back);
         boolean dropLinks = this.status == LibraryStatus.ACTIVE && status != LibraryStatus.ACTIVE;
         this.status = status;
         return dropLinks;
+    }
+
+    public void delete() {
+        if (status == LibraryStatus.DELETED) {
+            throw new InvalidDataException("Flashcard has been deleted");
+        }
+        status = LibraryStatus.DELETED;
+    }
+
+    public void restore() {
+        if (status != LibraryStatus.DELETED) {
+            throw new InvalidDataException("Only deleted flashcards can be restored");
+        }
+        status = LibraryStatus.ACTIVE;
     }
 
     private void applySource(

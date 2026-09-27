@@ -31,6 +31,11 @@ public class FlashcardRepositoryAdapter implements FlashcardRepository {
     }
 
     @Override
+    public Optional<Flashcard> findAvailableByIdAndUserId(UUID id, UUID userId) {
+        return repository.findByIdAndUserIdAndStatusNot(id, userId, LibraryStatus.DELETED).map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<Flashcard> findByIdAndUserId(UUID id, UUID userId) {
         return repository.findByIdAndUserId(id, userId).map(mapper::toDomain);
     }
@@ -38,7 +43,11 @@ public class FlashcardRepositoryAdapter implements FlashcardRepository {
     @Override
     public OwnedPage<Flashcard> findByUserIdAndStatus(UUID userId, LibraryStatus status, int page, int size) {
         return JpaSupport.page(
-                repository.findByUserIdAndStatus(userId, status, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"))),
+                repository.findByUserIdAndStatus(
+                        userId,
+                        status,
+                        PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt", "id"))
+                ),
                 mapper::toDomain
         );
     }

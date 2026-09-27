@@ -7,6 +7,7 @@ import com.group01.learningsupport.application.usecase.CreateFlashcardUseCase;
 import com.group01.learningsupport.application.usecase.DeleteFlashcardUseCase;
 import com.group01.learningsupport.application.usecase.GetFlashcardUseCase;
 import com.group01.learningsupport.application.usecase.ListFlashcardsUseCase;
+import com.group01.learningsupport.application.usecase.RestoreFlashcardUseCase;
 import com.group01.learningsupport.application.usecase.SavePracticeQuestionFlashcardUseCase;
 import com.group01.learningsupport.application.usecase.UpdateFlashcardUseCase;
 import com.group01.learningsupport.domain.aggregate.Flashcard;
@@ -72,6 +73,8 @@ class FlashcardPracticeQuestionSecurityTest {
     private ListFlashcardsUseCase listFlashcardsUseCase;
     @MockBean
     private DeleteFlashcardUseCase deleteFlashcardUseCase;
+    @MockBean
+    private RestoreFlashcardUseCase restoreFlashcardUseCase;
     @MockBean
     private SavePracticeQuestionFlashcardUseCase savePracticeQuestionFlashcardUseCase;
 

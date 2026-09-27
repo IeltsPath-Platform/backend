@@ -45,4 +45,11 @@ public class FlashcardDeck {
         this.status = status;
         return dropLinks;
     }
+
+    public void restore() {
+        if (status != LibraryStatus.DELETED) {
+            throw new InvalidDataException("Only deleted decks can be restored");
+        }
+        status = LibraryStatus.ACTIVE;
+    }
 }

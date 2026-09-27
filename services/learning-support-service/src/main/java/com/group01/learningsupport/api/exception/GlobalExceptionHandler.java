@@ -4,6 +4,7 @@ import com.group01.learningsupport.domain.exception.ConflictException;
 import com.group01.learningsupport.domain.exception.InvalidDataException;
 import com.group01.learningsupport.domain.exception.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -28,6 +29,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     ResponseEntity<ErrorResponse> conflict(HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, "Dữ liệu đã tồn tại", request, null);
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ResponseEntity<ErrorResponse> staleWrite(HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "Dữ liệu vừa được thay đổi; vui lòng tải lại và thử lại", request, null);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

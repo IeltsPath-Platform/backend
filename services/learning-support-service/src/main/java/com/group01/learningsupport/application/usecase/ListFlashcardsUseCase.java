@@ -4,6 +4,7 @@ import com.group01.learningsupport.application.ApplicationSupport;
 import com.group01.learningsupport.application.query.PageQuery;
 import com.group01.learningsupport.application.result.FlashcardResult;
 import com.group01.learningsupport.application.result.PageResult;
+import com.group01.learningsupport.domain.exception.InvalidDataException;
 import com.group01.learningsupport.domain.repository.FlashcardRepository;
 import com.group01.learningsupport.domain.vo.LibraryStatus;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,9 @@ public class ListFlashcardsUseCase {
 
     @Transactional(readOnly = true)
     public PageResult<FlashcardResult> execute(UUID userId, LibraryStatus status, PageQuery query) {
+        if (status == null || status == LibraryStatus.DELETED) {
+            throw new InvalidDataException("Deleted flashcards cannot be listed");
+        }
         return ApplicationSupport.page(
                 repository.findByUserIdAndStatus(userId, status, query.page(), query.size()),
                 query
