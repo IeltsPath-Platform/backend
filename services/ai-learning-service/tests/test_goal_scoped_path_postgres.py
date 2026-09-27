@@ -44,6 +44,15 @@ class GoalScopedPathPostgresTest(unittest.TestCase):
         self.assertEqual(rows, [(KP_BASIC, Decimal("4.0"), Decimal("5.0")),
                                 (KP_ADVANCED, Decimal("7.0"), Decimal("8.0"))])
 
+    def test_details_snapshot_is_scoped_and_description_is_capped(self):
+        path_id, _ = self.progress_for(5.5)
+
+        rows = self.schema.query(
+            "SELECT knowledge_point_id::text, skill, length(description) "
+            "FROM mastery_path_knowledge_point_details WHERE path_id = %s", (path_id,))
+
+        self.assertEqual(rows, [(KP_BASIC, "writing", 1000)])
+
 
     def test_placement_test_out_survives_a_reload_from_postgres(self):
         from app.adapters.formal_evidence_adapter import FormalEvidenceAdapter

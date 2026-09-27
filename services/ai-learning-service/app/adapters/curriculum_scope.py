@@ -30,12 +30,20 @@ class KnowledgePointBand:
 
 
 @dataclass(frozen=True)
+class KnowledgePointDetails:
+    skill: str | None
+    description: str
+
+
+@dataclass(frozen=True)
 class ScopedCurriculum:
     topics: list[dict[str, Any]]
     knowledge_points: list[dict[str, Any]]
     # Effective band of every kept point, keyed by its canonical id.
     bands: dict[str, KnowledgePointBand] = field(default_factory=dict)
     excluded_count: int = 0
+    # Content metadata copied for the kept points so tutor tools need no Content token.
+    details: dict[str, KnowledgePointDetails] = field(default_factory=dict)
 
 
 def parse_band(value: Any, name: str) -> Decimal | None:
@@ -68,6 +76,7 @@ class CurriculumScope:
     ) -> ScopedCurriculum:
         kept: list[dict[str, Any]] = []
         bands: dict[str, KnowledgePointBand] = {}
+        details: dict[str, KnowledgePointDetails] = {}
         topics_with_points: set[str] = set()
         topics_kept: set[str] = set()
         for point in knowledge_points:
@@ -80,7 +89,12 @@ class CurriculumScope:
             if band.min is not None and band.min > target_band:
                 continue
             kept.append(point)
-            bands[str(point["id"])] = band
+            point_id = str(point["id"])
+            bands[point_id] = band
+            details[point_id] = KnowledgePointDetails(
+                skill=point.get("skill") or None,
+                description=(point.get("description") or "")[:1000],
+            )
             topics_kept.add(topic_id)
         if knowledge_points and not kept:
             raise NoCurriculumInScope
@@ -90,4 +104,4 @@ class CurriculumScope:
             topic for topic in topics
             if str(topic["id"]) in topics_kept or str(topic["id"]) not in topics_with_points
         ]
-        return ScopedCurriculum(scoped_topics, kept, bands, len(knowledge_points) - len(kept))
+        return ScopedCurriculum(scoped_topics, kept, bands, len(knowledge_points) - len(kept), details)

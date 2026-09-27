@@ -21,7 +21,7 @@ kèm nguồn (buổi học, KP). Ý tưởng từ Notebook của DeepTutor, như
 
 ## Requirements
 - **learning-support-service (Java)**:
-  - Migration `V2__note_source.sql`: `notes.source_type varchar(50) NULL` với CHECK trong `TUTOR_SESSION`, `KNOWLEDGE_POINT`,
+  - Migration `V{n}__note_source.sql` (`n` = số phiên bản kế tiếp còn trống; pha 10 cũng thêm migration ở service này): `notes.source_type varchar(50) NULL` với CHECK trong `TUTOR_SESSION`, `KNOWLEDGE_POINT`,
     `PRACTICE`, `READING`; `notes.source_reference_id varchar(255) NULL`; index `(user_id, source_type, source_reference_id)`.
   - `CreateNoteRequest` thêm hai trường tùy chọn; `NoteResponse` trả ra; `GET /notes` lọc được theo `sourceType`,
     `sourceReferenceId`. Note do tutor tạo vẫn sửa, xóa như note thường.

@@ -25,8 +25,9 @@ and `X-Accel-Buffering: no`.
 | --- | --- |
 | `turn.started` | `{ "turnId": "uuid", "sessionId": "uuid" }` |
 | `assistant.message` | `{ "text": "..." }` |
-| `tool.called` | `{ "name": "mastery_status\|mastery_quiz\|mastery_grade\|mastery_assess\|path_outline\|path_reorder\|learner_profile" }` |
+| `tool.called` | `{ "name": "mastery_status\|mastery_quiz\|mastery_grade\|mastery_assess\|path_outline\|path_reorder\|learner_profile\|knowledge_point_details\|practice_questions" }` |
 | `question` | Public question: `questionId`, `knowledgePointId`, `prompt`, `questionType`, `options`, and other public question fields when present. |
+| `practice.questions` | `{ "knowledgePointId": "uuid", "questions": [{ "entryId": 1, "prompt": "...", "questionType": "short", "options": [], "difficulty": "easy" }] }`; the event poses saved practice cards and ends the turn. |
 | `grading` | For a quiz: `questionId`, `knowledgePointId`, `isCorrect`, `mastery`, `mastered`, `explanation`. For a qualitative assessment: `knowledgePointId`, `passed`, `mastered`, `mastery`. |
 | `path.reordered` | `{ "moduleCount": 2, "knowledgePointCount": 4 }` after an actual order change. |
 | `profile.updated` | `{ "fields": ["time_budget"] }` when at least one profile field changed. |
@@ -47,7 +48,9 @@ data: {"turnId":"00000000-0000-4000-8000-000000000001","questionId":"00000000-00
 
 ```
 
-The `expectedAnswer` field, system prompt, provider key, and raw tool arguments never appear in SSE. The open
+Practice tool results sent to the model contain only status, entry ids, and a note. `practice.questions` contains the
+knowledge point id and public card fields; neither it nor the tool result contains `expectedAnswer`, `correctAnswer`, or
+`explanation`. The `expectedAnswer` field, system prompt, provider key, and raw tool arguments never appear in SSE. The open
 question in `GET /sessions/{id}` belongs to that session; its `pendingQuestion` contains the public question and
 its status, without the expected answer. A submitted answer is stored before the model runs. Grading updates the
 same path and its revision, including when a finalized assessment arrived between tutor turns. If the client

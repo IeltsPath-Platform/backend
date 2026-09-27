@@ -42,7 +42,8 @@ class EditableContent:
     @staticmethod
     def point(kp_id, topic_id, band_min=None, name=None):
         return {"id": kp_id, "topicId": topic_id, "name": name or kp_id[-4:], "learningType": "PROCEDURE",
-                "status": "ACTIVE", "effectiveBandMin": band_min, "effectiveBandMax": None}
+                "status": "ACTIVE", "effectiveBandMin": band_min, "effectiveBandMax": None,
+                "skill": None, "description": ""}
 
     async def get_curriculum(self, _bearer_token):
         return [dict(t) for t in self.topics], [dict(p) for p in self.points]
@@ -57,6 +58,9 @@ class PathRefreshTest(unittest.TestCase):
         self.store = InMemoryLearningStore()
         self.user_id, self.goal_id = str(uuid4()), str(uuid4())
         self.content = EditableContent()
+        self.content.points[0]["skill"] = "writing"
+        self.content.points[0]["description"] = "d" * 1200
+        self.content.points[1]["description"] = "Second point description"
         self.paths = PathService(self.store, GoalClient(
             {"id": self.goal_id, "userId": self.user_id, "status": "ACTIVE", "targetBand": 6.0}), self.content)
         self.path_id, _, self.created_added = self.refresh()
@@ -97,6 +101,30 @@ class PathRefreshTest(unittest.TestCase):
 
         self.assertEqual((added, self.progress().version, len(self.store.committed_events)), (0, revision, events))
 
+    def test_creation_snapshots_details_for_the_points_in_scope(self):
+        with self.store.transaction(self.path_id):
+            details = self.store.knowledge_point_details(self.path_id)
+
+        self.assertEqual(set(details), {KP_1, KP_2})
+        self.assertEqual((details[KP_1].skill, details[KP_1].description), ("writing", "d" * 1000))
+        self.assertEqual((details[KP_2].skill, details[KP_2].description), (None, "Second point description"))
+
+    def test_metadata_change_commits_a_revision_and_unchanged_refresh_does_not(self):
+        initial_revision = self.progress().version
+        self.content.points[0]["description"] = "Updated curriculum guidance"
+        self.content.points[0]["skill"] = "speaking"
+
+        _, changed, _ = self.refresh()
+
+        self.assertEqual(changed.version, initial_revision + 1)
+        with self.store.transaction(self.path_id):
+            snapshot = self.store.knowledge_point_details(self.path_id)[KP_1]
+        self.assertEqual((snapshot.skill, snapshot.description), ("speaking", "Updated curriculum guidance"))
+
+        _, unchanged, added = self.refresh()
+
+        self.assertEqual((added, unchanged.version), (0, changed.version))
+
     def test_a_renamed_point_is_renamed_in_the_path(self):
         self.content.points[0] = EditableContent.point(KP_1, TOPIC_A, name="Renamed")
 
@@ -106,6 +134,8 @@ class PathRefreshTest(unittest.TestCase):
 
     def test_a_point_that_left_the_curriculum_is_retired_not_removed(self):
         self.record(KP_1, correct=False)
+        with self.store.transaction(self.path_id):
+            original_details = self.store.knowledge_point_details(self.path_id)[KP_1]
         self.content.points = [p for p in self.content.points if p["id"] != KP_1]
 
         _, progress, _ = self.refresh()
@@ -114,6 +144,8 @@ class PathRefreshTest(unittest.TestCase):
         self.assertEqual([a.knowledge_point_id for a in progress.quiz_attempts], [KP_1])
         self.assertEqual(mastery_source(progress, self.kp(KP_1)), "retired")
         self.assertEqual(next_objective(progress).knowledge_point_id, KP_2)
+        with self.store.transaction(self.path_id):
+            self.assertEqual(self.store.knowledge_point_details(self.path_id)[KP_1], original_details)
 
     def test_a_point_whose_band_rose_above_the_target_is_retired(self):
         self.content.points[0] = EditableContent.point(KP_1, TOPIC_A, band_min=7.0)

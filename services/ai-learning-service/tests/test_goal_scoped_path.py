@@ -40,9 +40,11 @@ class BandedContentClient:
         ]
         points = [
             {"id": KP_BASIC, "topicId": TOPIC_BASIC, "name": "Basic KP", "learningType": "PROCEDURE",
-             "status": "ACTIVE", "effectiveBandMin": 4.0, "effectiveBandMax": 5.0},
+             "status": "ACTIVE", "effectiveBandMin": 4.0, "effectiveBandMax": 5.0,
+             "skill": "writing", "description": "b" * 1200},
             {"id": KP_ADVANCED, "topicId": TOPIC_ADVANCED, "name": "Advanced KP", "learningType": "PROCEDURE",
-             "status": "ACTIVE", "effectiveBandMin": 7.0, "effectiveBandMax": 8.0},
+             "status": "ACTIVE", "effectiveBandMin": 7.0, "effectiveBandMax": 8.0,
+             "skill": "reading", "description": "Advanced description"},
         ]
         return topics, points
 

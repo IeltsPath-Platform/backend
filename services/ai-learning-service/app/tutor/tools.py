@@ -14,6 +14,7 @@ from typing import Any
 from uuid import uuid4
 
 from app.application.path_reorder import ReorderRejected, reorder_path
+from app.practice.store import PracticeNotFound, PracticeStore
 from app.mastery.models import InteractionStatus, KnowledgeType, PendingOption, PendingQuestion
 from app.mastery.pending import canonical_labels, public_pending_question, resolve_answer
 from app.mastery.policy import (
@@ -119,6 +120,35 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             field_name: {"type": "string"} for field_name in _PROFILE_FIELDS
         }},
     }},
+    {"type": "function", "function": {
+        "name": "knowledge_point_details",
+        "description": "Read the saved Content description and skill for a knowledge point in the learner's path. "
+                       "Call this before writing extra practice questions.",
+        "parameters": {"type": "object", "properties": {
+            "knowledge_point_id": {"type": "string", "description": "A knowledge point id from path_outline."},
+        }, "required": ["knowledge_point_id"]},
+    }},
+    {"type": "function", "function": {
+        "name": "practice_questions",
+        "description": "Save and pose 1 to 5 extra short-answer or multiple-choice questions for any knowledge point "
+                       "in the path. Every question needs an explanation. The cards are shown without answers and "
+                       "this tool ends the turn; the learner answers them outside the conversation.",
+        "parameters": {"type": "object", "properties": {
+            "knowledge_point_id": {"type": "string"},
+            "questions": {"type": "array", "minItems": 1, "maxItems": 5, "items": {
+                "type": "object", "properties": {
+                    "question": {"type": "string"},
+                    "question_type": {"type": "string", "enum": ["short", "choice"]},
+                    "expected_answer": {"type": "string"},
+                    "options": {"type": "array", "items": {"type": "object", "properties": {
+                        "label": {"type": "string"}, "body": {"type": "string"},
+                    }, "required": ["label", "body"]}},
+                    "explanation": {"type": "string"},
+                    "difficulty": {"type": "string", "enum": ["easy", "medium", "hard"]},
+                }, "required": ["question", "question_type", "expected_answer", "explanation"],
+            }},
+        }, "required": ["knowledge_point_id", "questions"]},
+    }},
 ]
 
 
@@ -130,6 +160,7 @@ class ToolOutcome:
     events: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
     ends_turn: bool = False
     question_id: str | None = None
+    entry_ids: list[int] = field(default_factory=list)
 
 
 def _error(message: str) -> ToolOutcome:
@@ -140,12 +171,43 @@ def _text(value: Any) -> str:
     return str(value or "").strip()[:_MAX_TEXT]
 
 
+def _parse_question(arguments: dict[str, Any]) -> tuple[str, str, str, list[PendingOption]] | str:
+    """Parse the question fields shared by mastery_quiz and practice_questions."""
+    question = _text(arguments.get("question"))
+    expected = _text(arguments.get("expected_answer"))
+    question_type = _text(arguments.get("question_type")) or "short"
+    if not question or not expected:
+        return "question and expected_answer must be non-empty."
+    if question_type not in QUESTION_TYPES:
+        return f"question_type must be one of {', '.join(QUESTION_TYPES)}."
+
+    options: list[PendingOption] = []
+    if question_type == "choice":
+        raw_options = arguments.get("options")
+        if not isinstance(raw_options, list) or len(raw_options) < 2:
+            return "A choice question needs at least two options."
+        for raw in raw_options:
+            if not isinstance(raw, dict) or not _text(raw.get("label")) or not _text(raw.get("body")):
+                return "Every option needs a label and a body."
+            options.append(PendingOption(label=_text(raw["label"]).upper(), body=_text(raw["body"])))
+        if {option.label for option in options} != canonical_labels(len(options)):
+            return "Option labels must be A, B, C... in order, one per option."
+        label = resolve_answer(expected, {option.label: option.body for option in options})
+        if not label:
+            return "expected_answer must name exactly one of the options."
+        expected = label
+    return question, question_type, expected, options
+
+
 class TutorTools:
-    def __init__(self, service: LearningService, path_id: str, *, session_id: str, turn_id: str) -> None:
+    def __init__(self, service: LearningService, path_id: str, *, session_id: str, turn_id: str,
+                 user_id: str | None = None, practice: PracticeStore | None = None) -> None:
         self._service = service
         self._path_id = path_id
         self._session_id = session_id
         self._turn_id = turn_id
+        self._user_id = user_id
+        self._practice = practice
 
     def execute(self, name: str, arguments: dict[str, Any] | None) -> ToolOutcome:
         if arguments is None:
@@ -154,7 +216,8 @@ class TutorTools:
             "mastery_status": self._status, "mastery_quiz": self._quiz,
             "mastery_grade": self._grade, "mastery_assess": self._assess,
             "path_outline": self._outline, "path_reorder": self._reorder,
-            "learner_profile": self._profile,
+            "learner_profile": self._profile, "knowledge_point_details": self._details,
+            "practice_questions": self._practice_questions,
         }
         handler = handlers.get(name)
         if handler is None:
@@ -248,6 +311,95 @@ class TutorTools:
             events=[("profile.updated", {"fields": recorded})] if recorded else [],
         )
 
+    def _details(self, arguments: dict[str, Any]) -> ToolOutcome:
+        kp_id = _text(arguments.get("knowledge_point_id"))
+        with self._service.store.transaction(self._path_id) as tx:
+            kp, module_id, module_name = find_knowledge_point(tx.progress, kp_id)
+            if kp is None:
+                return _error(f"Unknown knowledge point {kp_id!r}; use an id from path_outline.")
+            detail = self._service.store.knowledge_point_details(self._path_id).get(kp.id)
+            band = self._service.store.knowledge_point_bands(self._path_id).get(kp.id)
+        return ToolOutcome({
+            "id": kp.id,
+            "name": kp.name,
+            "type": kp.type.value,
+            "module_id": module_id,
+            "module_name": module_name,
+            "skill": detail.skill if detail else None,
+            "description": detail.description if detail else "",
+            "band_min": float(band.min) if band and band.min is not None else None,
+            "band_max": float(band.max) if band and band.max is not None else None,
+        })
+
+    def _practice_questions(self, arguments: dict[str, Any]) -> ToolOutcome:
+        if self._practice is None or self._user_id is None:
+            return _error("Practice is not available.")
+        kp_id = _text(arguments.get("knowledge_point_id"))
+        with self._service.store.transaction(self._path_id) as tx:
+            kp, _module_id, _module_name = find_knowledge_point(tx.progress, kp_id)
+        if kp is None:
+            return _error(f"Unknown knowledge point {kp_id!r}; use an id from path_outline.")
+
+        raw_questions = arguments.get("questions")
+        if not isinstance(raw_questions, list) or not raw_questions:
+            return _error("question 1: provide at least one practice question.")
+        if len(raw_questions) > 5:
+            return _error("question 6: a practice batch can contain at most five questions.")
+
+        questions: list[dict[str, Any]] = []
+        public_questions: list[dict[str, Any]] = []
+        for index, raw in enumerate(raw_questions, start=1):
+            if not isinstance(raw, dict):
+                return _error(f"question {index}: each question must be a JSON object.")
+            if not isinstance(raw.get("question_type"), str) or not raw["question_type"].strip():
+                return _error(f"question {index}: question_type must be short or choice.")
+            parsed = _parse_question(raw)
+            if isinstance(parsed, str):
+                return _error(f"question {index}: {parsed}")
+            question, question_type, expected, options = parsed
+            if question_type not in {"short", "choice"}:
+                return _error(f"question {index}: question_type must be short or choice.")
+            explanation = _text(raw.get("explanation"))
+            if not explanation:
+                return _error(f"question {index}: explanation must be non-empty.")
+            question_id = str(uuid4())
+            option_rows = [{"label": option.label, "body": option.body} for option in options]
+            difficulty = _text(raw.get("difficulty"))
+            if difficulty and difficulty not in {"easy", "medium", "hard"}:
+                return _error(f"question {index}: difficulty must be easy, medium, or hard.")
+            questions.append({
+                "question_id": question_id,
+                "question": question,
+                "question_type": question_type,
+                "options": option_rows,
+                "correct_answer": expected,
+                "explanation": explanation,
+                "difficulty": difficulty,
+            })
+            public_questions.append({
+                "entry_id": None,
+                "prompt": question,
+                "question_type": question_type,
+                "options": option_rows,
+                "difficulty": difficulty,
+            })
+
+        try:
+            entry_ids = self._practice.create_entries(
+                self._user_id, self._session_id, self._turn_id, self._path_id, kp.id, kp.name, questions,
+            )
+        except PracticeNotFound:
+            return _error("This session can no longer hold practice questions.")
+        for public_question, entry_id in zip(public_questions, entry_ids, strict=True):
+            public_question["entry_id"] = entry_id
+        return ToolOutcome(
+            {"status": "posed", "entry_ids": entry_ids,
+             "note": "The practice cards are shown. The turn ends now."},
+            events=[("practice.questions", {"knowledge_point_id": kp.id, "questions": public_questions})],
+            ends_turn=True,
+            entry_ids=entry_ids,
+        )
+
     def _quiz(self, arguments: dict[str, Any]) -> ToolOutcome:
         kp_id = _text(arguments.get("knowledge_point_id"))
         question = _text(arguments.get("question"))
@@ -264,21 +416,10 @@ class TutorTools:
         if kp.type not in _QUIZ_TYPES:
             return _error(f"Objective {kp.name!r} is {kp.type.value}; judge it with mastery_assess instead.")
 
-        options: list[PendingOption] = []
-        if question_type == "choice":
-            raw_options = arguments.get("options")
-            if not isinstance(raw_options, list) or len(raw_options) < 2:
-                return _error("A choice question needs at least two options.")
-            for raw in raw_options:
-                if not isinstance(raw, dict) or not _text(raw.get("label")) or not _text(raw.get("body")):
-                    return _error("Every option needs a label and a body.")
-                options.append(PendingOption(label=_text(raw["label"]).upper(), body=_text(raw["body"])))
-            if {option.label for option in options} != canonical_labels(len(options)):
-                return _error("Option labels must be A, B, C... in order, one per option.")
-            label = resolve_answer(expected, {option.label: option.body for option in options})
-            if not label:
-                return _error("expected_answer must name exactly one of the options.")
-            expected = label
+        parsed = _parse_question(arguments)
+        if isinstance(parsed, str):
+            return _error(parsed)
+        question, question_type, expected, options = parsed
 
         pending = PendingQuestion(
             question_id=str(uuid4()), knowledge_point_id=kp.id, module_id=module_id, prompt=question,

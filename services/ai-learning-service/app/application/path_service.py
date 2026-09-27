@@ -10,7 +10,9 @@ from app.mastery.policy import map_summary, next_objective
 from app.mastery.service import LearningService
 
 from app.adapters.curriculum_adapter import CurriculumAdapter
-from app.adapters.curriculum_scope import CurriculumScope, KnowledgePointBand, ScopedCurriculum, target_band_of
+from app.adapters.curriculum_scope import (
+    CurriculumScope, KnowledgePointBand, KnowledgePointDetails, ScopedCurriculum, target_band_of,
+)
 from app.application.formal_result_applier import FormalResultApplier
 from app.application.path_orderer import OrderingOutcome, PathOrderer
 from app.clients.content_service import ContentServiceClient
@@ -94,7 +96,9 @@ class PathService:
         except PathNotBootstrapped:
             return await self._create_from_content(user_id, goal, bearer_token)
         modules, scoped, target_band = await self._scoped_curriculum(goal, bearer_token)
-        added = await run_in_threadpool(self._refresh_path, path_id, modules, scoped.bands, target_band)
+        added = await run_in_threadpool(
+            self._refresh_path, path_id, modules, scoped.bands, scoped.details, target_band
+        )
         progress = await run_in_threadpool(self._owned, path_id, user_id)
         return path_id, progress, added
 
@@ -127,8 +131,8 @@ class PathService:
             "excluded": scoped.excluded_count,
         }
         path_id, progress = await run_in_threadpool(
-            lambda: self.ensure_path(user_id, goal["id"], modules, bands=scoped.bands, scope=scope,
-                                     ordering=ordering)
+            lambda: self.ensure_path(user_id, goal["id"], modules, bands=scoped.bands, details=scoped.details,
+                                     scope=scope, ordering=ordering)
         )
         return path_id, progress, sum(len(module.knowledge_points) for module in modules)
 
@@ -139,6 +143,7 @@ class PathService:
         modules: list[Any] | None = None,
         *,
         bands: dict[str, KnowledgePointBand] | None = None,
+        details: dict[str, KnowledgePointDetails] | None = None,
         scope: dict[str, Any] | None = None,
         ordering: OrderingOutcome | None = None,
     ) -> tuple[str, Any]:
@@ -156,7 +161,8 @@ class PathService:
         path_id = str(uuid4())
         try:
             return path_id, self._create_path(
-                path_id, user_id, str(learning_goal_id), modules, bands=bands, scope=scope, ordering=ordering
+                path_id, user_id, str(learning_goal_id), modules, bands=bands, details=details,
+                scope=scope, ordering=ordering
             )
         except UniqueViolation as exc:
             # Two callers can pass the lookup together. The partial unique index
@@ -169,7 +175,8 @@ class PathService:
             return winner_path_id, self._owned(winner_path_id, user_id)
 
     def _refresh_path(
-        self, path_id: str, modules: list[Any], bands: dict[str, KnowledgePointBand], target_band: Any
+        self, path_id: str, modules: list[Any], bands: dict[str, KnowledgePointBand],
+        details: dict[str, KnowledgePointDetails], target_band: Any,
     ) -> int:
         """Merge the fresh curriculum into the path under its row lock; commit only a real change."""
         with self._store.transaction(path_id) as tx:
@@ -179,14 +186,20 @@ class PathService:
             # Missing points keep the band they had, so placement test-out still sees it.
             merged_bands = {kp_id: band for kp_id, band in current_bands.items() if kp_id in merge.missing}
             merged_bands.update(bands)
+            current_details = self._store.knowledge_point_details(path_id)
+            # Keep snapshots for retired points, just as we keep their band snapshots.
+            merged_details = {kp_id: detail for kp_id, detail in current_details.items() if kp_id in merge.missing}
+            merged_details.update(details)
             to_retire = [kp_id for kp_id in merge.missing if kp_id not in overrides]
             to_restore = [kp_id for kp_id, override in overrides.items()
                           if is_retired_override(override) and kp_id not in merge.missing]
             if (same_structure(tx.progress.modules, merge.modules) and merged_bands == current_bands
+                    and merged_details == current_details
                     and not to_retire and not to_restore):
                 return 0
             self._learning.replace_modules_for_path(path_id, merge.modules, append=False)
             self._store.replace_knowledge_point_bands(path_id, merged_bands)
+            self._store.replace_knowledge_point_details(path_id, merged_details)
             for kp_id in to_retire:
                 self._learning.set_learner_mastery_override(path_id, kp_id, mastered=True, note=RETIRED_NOTE)
             for kp_id in to_restore:
@@ -213,6 +226,7 @@ class PathService:
         modules: list[Any],
         *,
         bands: dict[str, KnowledgePointBand] | None = None,
+        details: dict[str, KnowledgePointDetails] | None = None,
         scope: dict[str, Any] | None = None,
         ordering: OrderingOutcome | None = None,
     ) -> Any:
@@ -227,6 +241,8 @@ class PathService:
             if bands is not None:
                 # Before parked results: placement test-out reads these bands.
                 self._store.replace_knowledge_point_bands(path_id, bands)
+            if details is not None:
+                self._store.replace_knowledge_point_details(path_id, details)
             if scope is not None:
                 tx.emit("path.scope_applied", scope)
             if ordering is not None:

@@ -10,6 +10,7 @@ from app.config import LlmSettings, Settings, get_settings
 from app.learning.ordering_llm import OrderingLlm
 from app.llm.client import ChatCompletionsClient
 from app.persistence.postgres_learning_store import PostgresLearningStore
+from app.practice.store import PracticeStore
 from app.tutor.engine import Chat, TutorEngine
 from app.tutor.session_store import TutorSessionStore
 
@@ -28,9 +29,13 @@ def get_tutor_sessions(settings: Settings = Depends(get_settings)) -> TutorSessi
     return TutorSessionStore(settings.database_url.get_secret_value())
 
 
+def get_practice_store(settings: Settings = Depends(get_settings)) -> PracticeStore:
+    return PracticeStore(settings.database_url.get_secret_value())
+
+
 def get_tutor_engine(settings: Settings = Depends(get_settings)) -> TutorEngine:
     url = settings.database_url.get_secret_value()
-    return TutorEngine(TutorSessionStore(url), PostgresLearningStore(url))
+    return TutorEngine(TutorSessionStore(url), PostgresLearningStore(url), practice=PracticeStore(url))
 
 
 def get_tutor_chat() -> Chat | None:

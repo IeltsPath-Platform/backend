@@ -13,6 +13,7 @@ from app.application.formal_assessment_ingestion import FormalAssessmentIngestio
 from app.application.path_service import PathService
 from app.llm.client import ChatReply, LlmApiError, ToolCall
 from app.persistence.postgres_learning_store import PostgresLearningStore
+from app.practice.store import PracticeStore
 from app.api.tutor_sse import stream_events
 from app.tutor.engine import CardAnswer, SessionNotFound, TutorEngine
 from app.tutor.session_store import ActiveTurnConflict, TutorSessionStore
@@ -213,6 +214,41 @@ class TutorEngineTest(unittest.TestCase):
         self.assertNotIn("secret-value", json.dumps([event.data for event in events]))
         self.assertNotIn("secret-value", " ".join(message.content for message in
                                                     self.sessions.recent_messages(user_id, session.id)))
+
+    def test_practice_card_ends_turn_and_suppresses_model_prose_and_answer(self):
+        user_id, _goal_id, _paths, session = self.learner()
+        practice = PracticeStore(self.schema.url)
+        engine = TutorEngine(self.sessions, self.learning_store, practice=practice)
+        chat = ScriptedChat(ChatReply(
+            "This prose must be discarded; the answer is hidden-answer-secret.",
+            (call("practice_questions", knowledge_point_id=KP_BASIC, questions=[{
+                "question": "Choose the correct form.", "question_type": "short",
+                "expected_answer": "hidden-answer-secret", "explanation": "hidden-explanation-secret",
+            }]),)))
+
+        async def run():
+            opened = await engine.open_turn(user_id, session.id)
+            return [event async for event in engine.run(opened, chat, message="Give me practice")]
+
+        events = asyncio.run(run())
+        entry_ids = self.schema.query(
+            "SELECT id FROM notebook_entries WHERE session_id = %s ORDER BY id", (str(session.id),))
+        assistant = self.schema.query(
+            "SELECT content, metadata_json FROM messages WHERE session_id = %s AND role = 'assistant' "
+            "ORDER BY id DESC LIMIT 1", (str(session.id),))[0]
+        rendered = json.dumps([{"type": event.type, "data": event.data} for event in events])
+
+        self.assertEqual([event.type for event in events], [
+            "turn.started", "assistant.message", "tool.called", "practice.questions", "turn.completed",
+        ])
+        self.assertEqual(events[1].data["text"], "Try these practice questions.")
+        self.assertNotIn("This prose must be discarded", rendered)
+        self.assertNotIn("hidden-answer-secret", rendered)
+        self.assertNotIn("hidden-explanation-secret", rendered)
+        self.assertEqual(assistant[0], "Try these practice questions.")
+        self.assertEqual(assistant[1]["practice_entry_ids"], [entry[0] for entry in entry_ids])
+        self.assertNotIn("hidden-answer-secret", assistant[0])
+        self.assertNotIn("hidden-explanation-secret", assistant[0])
 
     def test_open_question_stays_in_its_original_session(self):
         user_id, _goal_id, _paths, original = self.learner()

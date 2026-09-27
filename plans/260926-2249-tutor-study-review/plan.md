@@ -24,7 +24,7 @@ chấm tất định theo đáp án lưu ở server), **không import code DeepT
 
 Thay cho plan cũ `260926-0600-deeptutor-tutor-runtime` (chạy nguyên runtime DeepTutor trong service; đã xóa vì đi ngược
 yêu cầu không phụ thuộc DeepTutor, nội dung còn trong lịch sử git). Mọi tính năng của plan đó có mặt ở đây: study/review
-(pha 1–4) và năm tính năng còn lại (pha 5–9).
+(pha 1–4), năm tính năng còn lại (pha 5–9) và lưu câu luyện thành flashcard (pha 10).
 
 ## Quyết định đã chốt (hội thoại 2026-09-26)
 
@@ -48,16 +48,17 @@ thì lượt vẫn chạy xong ở server; message tối đa 4.000 ký tự.
 | 3 | [API tutor HTTP + SSE](./phase-03-tutor-api-sse.md) | Complete |
 | 4 | [Compose, E2E qua Gateway, tài liệu](./phase-04-compose-e2e-docs.md) | Complete |
 | 5 | [Chỉnh lộ trình bằng hội thoại và hồ sơ học viên](./phase-05-outline-profile.md) | Complete |
-| 6 | [Luyện câu hỏi theo KP, sổ câu hỏi và ôn câu sai](./phase-06-question-practice.md) | Pending (làm sau) |
+| 6 | [Luyện câu hỏi theo KP, sổ câu hỏi và ôn câu sai](./phase-06-question-practice.md) | Complete |
 | 7 | [Tutor nhớ học viên qua các buổi học](./phase-07-learner-memory.md) | Pending (làm sau) |
 | 8 | [Lưu ghi chú vào notes của learning-support](./phase-08-save-to-notes.md) | Pending (làm sau, sửa cả service Java) |
 | 9 | [Đọc bài Reading của Content cùng tutor](./phase-09-reading.md) | Blocked (Content chưa có API text bài đọc) |
+| 10 | [Lưu câu luyện thành flashcard](./phase-10-practice-flashcards.md) | Pending (sau pha 6; chỉ sửa learning-support) |
 
-Đợt này làm pha 1 → 4 (study/review, khoảng 7–8 ngày công). Pha 5–9 đều phụ thuộc pha 4 và độc lập với nhau; làm sau,
+Đợt này làm pha 1 → 4 (study/review, khoảng 7–8 ngày công). Pha 5–9 đều phụ thuộc pha 4 và độc lập với nhau; pha 10 phụ thuộc pha 6; làm sau,
 theo thứ tự nhóm cần.
 
 Đợt study/review (pha 1–4) đã được kiểm chứng ngày 2026-09-26; xem
-[báo cáo E2E](./reports/e2e-verification-260926-tutor-study-review.md). Pha 5 đã xong (2026-09-27); các pha 6–9 vẫn là backlog theo quyết định T1.
+[báo cáo E2E](./reports/e2e-verification-260926-tutor-study-review.md). Pha 5, 6 đã xong (2026-09-27); pha 7–10 vẫn là backlog theo quyết định T1.
 
 ## Quy tắc cho người implement
 

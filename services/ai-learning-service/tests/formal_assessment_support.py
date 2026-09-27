@@ -83,8 +83,9 @@ class InMemoryLearningStore:
         self.result_versions: dict[tuple[str, str], int] = {}
         # Parked results by event_id: {user_id, learning_goal_id, attempt_id, result_version, payload}.
         self.pending: dict[str, dict] = {}
-        # Band snapshot per path: {path_id: {knowledge_point_id: KnowledgePointBand}}.
+        # Curriculum snapshots per path: band and Content metadata keyed by KP id.
         self.bands: dict[str, dict] = {}
+        self.details: dict[str, dict] = {}
         self.committed_events: list[tuple[str, int, str, dict]] = []
         self.commits = 0
         self._lock = threading.RLock()
@@ -132,6 +133,8 @@ class InMemoryLearningStore:
                     self.pending.pop(event_id, None)
                 if "bands" in staged_bands:
                     self.bands[path_id] = staged_bands["bands"]
+                if "details" in staged_bands:
+                    self.details[path_id] = staged_bands["details"]
                 if tx.changed:
                     revision = tx.base_revision + 1
                     tx.progress.version = revision
@@ -210,6 +213,13 @@ class InMemoryLearningStore:
     def knowledge_point_bands(self, path_id):
         staged = self._active(path_id)[4]
         return dict(staged["bands"]) if "bands" in staged else dict(self.bands.get(str(path_id), {}))
+
+    def replace_knowledge_point_details(self, path_id, details):
+        self._active(path_id)[4]["details"] = dict(details)
+
+    def knowledge_point_details(self, path_id):
+        staged = self._active(path_id)[4]
+        return dict(staged["details"]) if "details" in staged else dict(self.details.get(str(path_id), {}))
 
     def delete_pending_formal_results(self, path_id, event_ids):
         self._active(path_id)[3].update(event_ids)

@@ -414,6 +414,31 @@ class PostgresLearningStore:
             )
             return {row[0]: KnowledgePointBand(row[1], row[2]) for row in cursor.fetchall()}
 
+    def replace_knowledge_point_details(self, path_id: str, details: Mapping[str, Any]) -> None:
+        """Replace the path's Content metadata snapshot inside its open transaction."""
+        path_id = self._validate_id(path_id)
+        with self._active_connection(path_id).cursor() as cursor:
+            cursor.execute("DELETE FROM mastery_path_knowledge_point_details WHERE path_id = %s", (path_id,))
+            for knowledge_point_id, detail in details.items():
+                cursor.execute(
+                    """INSERT INTO mastery_path_knowledge_point_details
+                       (path_id, knowledge_point_id, skill, description) VALUES (%s, %s, %s, %s)""",
+                    (path_id, str(UUID(str(knowledge_point_id))), detail.skill, detail.description),
+                )
+
+    def knowledge_point_details(self, path_id: str) -> dict[str, Any]:
+        """Read the path's Content metadata snapshot inside its open transaction."""
+        from app.adapters.curriculum_scope import KnowledgePointDetails
+
+        path_id = self._validate_id(path_id)
+        with self._active_connection(path_id).cursor() as cursor:
+            cursor.execute(
+                "SELECT knowledge_point_id::text, skill, description "
+                "FROM mastery_path_knowledge_point_details WHERE path_id = %s",
+                (path_id,),
+            )
+            return {row[0]: KnowledgePointDetails(row[1], row[2]) for row in cursor.fetchall()}
+
     def mutate(self, book_id: str, mutation: Any, *, create: bool = False) -> tuple[LearningProgress, Any]:
         with self.transaction(book_id, create=create) as tx:
             result = mutation(tx)

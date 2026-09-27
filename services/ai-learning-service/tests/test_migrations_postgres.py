@@ -80,8 +80,20 @@ class MigrationsPostgresTest(unittest.TestCase):
     def test_migrations_alone_create_the_mastery_tables(self):
         self.assertTrue(
             {"mastery_paths", "mastery_interactions", "mastery_events",
-             "mastery_learning_evidence", "formal_assessment_result_versions"} <= self._tables()
+             "mastery_learning_evidence", "formal_assessment_result_versions",
+             "mastery_path_knowledge_point_details", "notebook_entries", "practice_review_state",
+             "practice_review_events"} <= self._tables()
         )
+
+    def test_practice_schema_has_owner_answer_and_due_indexes(self):
+        indexes = self._indexes()
+
+        self.assertTrue({"idx_notebook_entries_user_created", "idx_notebook_entries_user_kp",
+                         "idx_practice_review_state_due", "idx_practice_review_events_entry"} <= indexes)
+        columns = {row[0] for row in self.schema.query(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = %s AND table_name = 'notebook_entries'", (self.schema.name,))}
+        self.assertTrue({"user_id", "answered_at", "correct_answer", "explanation", "resolved"} <= columns)
 
     def test_later_migrations_find_their_baseline_objects(self):
         indexes = self._indexes()

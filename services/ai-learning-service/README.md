@@ -17,8 +17,8 @@ Service chuyên trách **Adaptive Learning** cho nền tảng IELTSPath.
   finalized, pre-graded results through the mastery engine (see
   `docs/contracts/assessment-completed-v2.md`).
 
-Tutor study/review sessions are now available through the endpoints below. Question notebook and mistake practice
-remain separate follow-up work.
+Tutor study/review sessions, extra question practice, a learner-owned question notebook, and per-question mistake
+review are available through the endpoints below.
 
 ## Tutor study/review
 
@@ -34,17 +34,35 @@ All routes below begin with `/api/ai-learning/tutor`:
 | `DELETE` | `/sessions/{sessionId}` | Archive the session; 204. |
 | `POST` | `/sessions/{sessionId}/turns` | Exactly one `message` (up to 4,000 characters) or `answer` (`questionId`, `text` up to 2,000); returns SSE. |
 
-A turn emits `turn.started`, optional `assistant.message` and `tool.called`, and may emit `question`, `grading`,
-`path.reordered` or `profile.updated` before `turn.completed` or `turn.failed`. The correct answer stays server-side
-until grading; SSE never includes an `expectedAnswer` field. See
+A turn emits `turn.started`, optional `assistant.message` and `tool.called`, and may emit `question`, `practice.questions`,
+`grading`, `path.reordered` or `profile.updated` before `turn.completed` or `turn.failed`. Practice cards end the turn;
+the learner answers them through the Practice API. Correct answers and explanations are omitted from practice SSE and
+from the tutor tool result. See
 [the SSE contract](../../docs/contracts/tutor-sse-v1.md) for payloads and errors.
 
-The tutor also offers three tools in every session: `path_outline` shows the current module and knowledge point
-order, `path_reorder` changes that order when the learner asks, and `learner_profile` records the learner's stated
-level, target, available time or study preferences. There is no separate outline mode. Reordering accepts a full
+The tutor offers `path_outline` to show current module and knowledge point order, `path_reorder` to change that order
+when the learner asks, and `learner_profile` to record the learner's stated level, target, available time or study
+preferences. `knowledge_point_details` reads the saved Content description and skill for an in-path knowledge point;
+`practice_questions` stores and poses 1–5 short-answer or multiple-choice questions. There is no separate outline mode.
+Reordering accepts a full
 `module_ids` list and/or the full knowledge point order for only the modules being changed; the server fills in
 unchanged modules before validating. It cannot add, remove or move knowledge points between modules. An actual
 reorder emits `path.reordered`; a changed profile emits `profile.updated`. Neither changes mastery.
+
+All Practice routes require the learner's bearer token through Gateway and start with
+`/api/ai-learning/practice`:
+
+| Method | Route | Result |
+| --- | --- | --- |
+| `GET` | `/notebook?knowledgePointId=&sessionId=&status=&limit=50` | Newest owned entries; filters are optional and status is `open`, `correct` or `incorrect`. Unanswered entries omit the answer and explanation. |
+| `POST` | `/entries/{entryId}/answer` | Grade a card once with `{ "answer": "..." }`; wrong answers enter review due in 10 minutes. |
+| `GET` | `/due?limit=20` | Owned mistake cards currently due, earliest first. |
+| `POST` | `/reviews` | Review `{ "requestId": "uuid", "entryId": 1, "answer": "...", "rating": "good" }`; rating defaults to `good`. |
+
+Review uses per-question `again`, `hard`, `good` and `easy` scheduling. Three consecutive correct reviews resolve a
+mistake. Practice does not call Learning Service or change mastery, path revision or evidence. Missing/other-owned
+entries return 404; answering twice, reviewing an entry outside the schedule, or reusing a review `requestId` for a
+different learner/entry returns 409. See [the Practice API contract](../../docs/contracts/practice-v1.md).
 
 Use `fetch` because browser `EventSource` cannot send the bearer `Authorization` header for this POST endpoint:
 
@@ -122,6 +140,7 @@ runtime configuration; do not put them in this file or the image.
 | `3` | `V3__pending_formal_assessment_results.sql` | Results parked until the goal's path exists |
 | `4` | `V4__mastery_path_knowledge_point_bands.sql` | Band snapshot of each knowledge point in a path |
 | `5` | `V5__tutor_sessions.sql` | Tutor sessions, turns, and learner/assistant messages |
+| `6` | `V6__practice_notebook.sql` | Content details snapshots, practice notebook entries, review state and idempotent review events |
 
 `V1` stops if the database already contains more than one path for a non-null
 `(user_id, learning_goal_id)` pair; reconcile those rows before retrying.

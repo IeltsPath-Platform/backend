@@ -19,6 +19,7 @@ from app.llm.client import ChatReply, LlmApiError, LlmConfigError
 from app.mastery.pending import public_pending_question
 from app.mastery.service import LearningService, MasteryInteractionError
 from app.mastery.store import LearningStore
+from app.practice.store import PracticeStore
 from app.tutor.prompts import SYSTEM_PROMPT
 from app.tutor.session_store import ActiveTurnConflict, TutorSession, TutorSessionStore
 from app.tutor.tools import TOOL_DEFINITIONS, TutorTools
@@ -26,6 +27,8 @@ from app.tutor.tools import TOOL_DEFINITIONS, TutorTools
 logger = logging.getLogger(__name__)
 
 Chat = Callable[..., Awaitable[ChatReply]]
+_CARD_TOOLS = {"mastery_quiz": "Try this question.", "practice_questions": "Try these practice questions."}
+_PRACTICE_TOOLS = frozenset({"knowledge_point_details", "practice_questions"})
 
 
 class SessionNotFound(LookupError):
@@ -53,11 +56,12 @@ class OpenTurn:
 
 class TutorEngine:
     def __init__(self, sessions: TutorSessionStore, learning_store: LearningStore, *,
-                 max_rounds: int = 6, history: int = 20) -> None:
+                 max_rounds: int = 6, history: int = 20, practice: PracticeStore | None = None) -> None:
         self._sessions = sessions
         self._learning = LearningService(learning_store)
         self._max_rounds = max_rounds
         self._history = history
+        self._practice = practice
 
     async def open_turn(self, user_id: UUID | str, session_id: UUID | str) -> OpenTurn:
         """Claim the session's single running-turn slot; raises before any output is streamed."""
@@ -87,25 +91,33 @@ class TutorEngine:
                 failure = "llm_not_configured"
                 raise LlmConfigError("LLM is not configured")
 
-            tools = TutorTools(self._learning, str(turn.session.path_id), session_id=session_id, turn_id=turn_id)
+            tools = TutorTools(self._learning, str(turn.session.path_id), session_id=session_id, turn_id=turn_id,
+                               user_id=str(turn.user_id), practice=self._practice)
+            tool_definitions = TOOL_DEFINITIONS
+            if self._practice is None:
+                tool_definitions = [definition for definition in TOOL_DEFINITIONS
+                                    if definition["function"]["name"] not in _PRACTICE_TOOLS]
             messages = await self._context(turn, tools)
             spoken: list[str] = []
             pending_spoken: list[str] = []
             lead_in_sent = False
             question_id: str | None = None
+            practice_entry_ids: list[int] = []
+            card_posed = False
             ended = False
             for _round in range(self._max_rounds):
                 failure = "llm_error"
-                reply = await chat(messages, tools=TOOL_DEFINITIONS)
+                reply = await chat(messages, tools=tool_definitions)
                 failure = "internal_error"
                 # Hold model prose until the turn's outcome is known: an earlier tool reply may
                 # already hint at the answer to a question the model poses in a later round.
-                quiz_requested = any(call.name == "mastery_quiz" for call in reply.tool_calls)
-                if quiz_requested and not lead_in_sent:
-                    spoken.append("Try this question.")
-                    yield TutorEvent("assistant.message", {"text": "Try this question."})
+                card_tool = next((call.name for call in reply.tool_calls if call.name in _CARD_TOOLS), None)
+                if card_tool is not None and not lead_in_sent:
+                    lead_in = _CARD_TOOLS[card_tool]
+                    spoken.append(lead_in)
+                    yield TutorEvent("assistant.message", {"text": lead_in})
                     lead_in_sent = True
-                elif not quiz_requested and reply.content.strip():
+                elif card_tool is None and reply.content.strip():
                     pending_spoken.append(reply.content.strip())
                 if not reply.tool_calls:
                     ended = True
@@ -120,7 +132,9 @@ class TutorEngine:
                     for event_type, data in outcome.events:
                         yield TutorEvent(event_type, data)
                     if outcome.ends_turn:
+                        card_posed = True
                         question_id = outcome.question_id
+                        practice_entry_ids.extend(outcome.entry_ids)
                         ended = True
                         break
                 if ended:
@@ -129,14 +143,17 @@ class TutorEngine:
                 failure = "too_many_rounds"
                 raise RuntimeError("The tutor used every round without finishing")
 
-            if question_id is None:
+            if not card_posed:
                 for text in pending_spoken:
                     yield TutorEvent("assistant.message", {"text": text})
                 spoken.extend(pending_spoken)
-            if spoken or question_id:
+            if spoken or question_id or practice_entry_ids:
+                metadata = {"question_id": question_id} if question_id else {}
+                if practice_entry_ids:
+                    metadata["practice_entry_ids"] = practice_entry_ids
                 await asyncio.to_thread(
                     self._sessions.add_message, turn.user_id, turn.session.id, turn.turn_id, "assistant",
-                    "\n\n".join(spoken), {"question_id": question_id} if question_id else {})
+                    "\n\n".join(spoken), metadata)
             await asyncio.to_thread(self._sessions.finish_turn, turn.turn_id, "completed")
             closed = True
             logger.info("Tutor turn completed session=%s turn=%s", session_id, turn_id)

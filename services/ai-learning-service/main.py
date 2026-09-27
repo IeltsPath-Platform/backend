@@ -15,6 +15,7 @@ from app.adapters.curriculum_adapter import CurriculumContractError
 from app.adapters.curriculum_scope import NoCurriculumInScope
 from app.api.dependencies import get_path_service
 from app.api.tutor import router as tutor_router
+from app.api.practice import router as practice_router
 from app.application.path_service import ActiveGoalRequired, PathNotFound, PathService
 from app.api.dto.responses import (
     LearningPathMapResponse,
@@ -47,6 +48,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(tutor_router)
+app.include_router(practice_router)
 
 
 @app.exception_handler(ActiveGoalRequired)

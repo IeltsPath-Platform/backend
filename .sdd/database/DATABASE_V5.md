@@ -1379,64 +1379,53 @@ Append-only ordered event stream của một agent turn, dùng để stream/repl
 
 ## 7.11 `notebook_entries`
 
-**Chưa triển khai.** Question notebook thuộc pha follow-up, không phải study/review baseline.
-
-Durable Question Notebook của DeepTutor. Bảng này lưu **câu hỏi mà learner đã thực sự làm** sau khi interaction/assessment được grade. Nó khác `mastery_interactions`: `mastery_interactions` quản lý lifecycle câu hỏi đang chờ trả lời, còn `notebook_entries` là history/search/review source sau khi câu hỏi đã được materialize.
-
-Các nguồn điển hình gồm Tutor Mastery Path, generated quiz/deep question và — nếu product policy bật — formal assessment item được import sang mistake review. Canonical IELTS question bank vẫn thuộc `content-service`; bảng này chỉ giữ learner-specific attempt/question snapshot.
+Được tạo bởi `V6__practice_notebook.sql` cho question practice của tutor. Bảng này lưu các thẻ được soạn trong một lượt tutor
+và câu trả lời của learner; khác với `mastery_interactions`, bảng này không điều khiển mastery. Đây là snapshot riêng của
+learner, không phải canonical IELTS question bank và không nhận formal assessment imports.
 
 | Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
 | :--- | :--- | :--- | :--- |
 | `id` | bigint | PK identity | ID notebook entry. |
-| `session_id` | uuid | FK → `sessions` | Session sở hữu entry; với formal import có thể dùng system/import session theo application policy. |
-| `turn_id` | uuid? | Logical/FK → `turns` khi có | Tutor/agent turn tạo assessment. |
-| `question_id` | varchar(255) | NOT NULL | ID câu hỏi trong source runtime/canonical source. |
+| `user_id` | uuid | NOT NULL | Chủ sở hữu; mọi thao tác learner-facing được scope theo cột này. |
+| `session_id` | uuid | FK → `sessions` ON DELETE CASCADE | Tutor session tạo entry. |
+| `turn_id` | uuid? | FK → `turns` ON DELETE SET NULL | Tutor turn tạo entry. |
+| `mastery_path_id` | uuid | FK → `mastery_paths` ON DELETE CASCADE | Path của session; practice không ghi mastery vào path. |
+| `knowledge_point_id` | uuid | NOT NULL, không FK xuyên service | KP trong path mà câu hỏi luyện tập. |
+| `knowledge_point_name` | text | NOT NULL DEFAULT '' | Tên KP tại thời điểm tạo entry. |
+| `question_id` | varchar(255) | NOT NULL | UUID do AI Learning sinh cho practice card. |
 | `question` | text | NOT NULL | Snapshot nội dung câu hỏi learner đã làm. |
-| `question_type` | varchar(50) | DEFAULT '' | Loại câu hỏi. |
-| `options_json` | jsonb | DEFAULT `{}` | Options snapshot khi là choice question. |
-| `correct_answer` | text | DEFAULT '' | Đáp án đúng snapshot; không gửi ngược ra pending question trước khi learner trả lời. |
-| `explanation` | text | DEFAULT '' | Giải thích/reference explanation. |
-| `difficulty` | varchar(50) | DEFAULT '' | Difficulty metadata nếu có. |
-| `user_answer` | text | DEFAULT '' | Câu trả lời learner. |
-| `source` | varchar(50) | NOT NULL | Ví dụ `mastery_path`, `deep_question`; IELTSPath adapter có thể mở rộng cho formal assessment import. |
-| `material_id` | varchar(255) | DEFAULT '' | Source/material/path reference theo DeepTutor assessment semantics. |
-| `material_title` | text | DEFAULT '' | Snapshot title dùng hiển thị. |
-| `section_id` | varchar(255) | DEFAULT '' | Section/objective reference. |
-| `section_title` | text | DEFAULT '' | Snapshot section title. |
-| `assessment_type` | varchar(30) | DEFAULT '' | `quiz`, `qualitative`, `review` hoặc compatible adapter value. |
-| `result` | varchar(20) | DEFAULT '' | `correct`, `incorrect`, `partial`, `ungraded` theo assessment contract. |
-| `mastery_path_id?` | uuid | FK → `mastery_paths` khi source là mastery path | Path linkage cho Tutor Mastery. |
-| `knowledge_point_id?` | uuid | Logical ref ↗ `Content.knowledge_points` | KP linkage; không FK xuyên service. |
-| `attempt_count` | integer | DEFAULT 1, CHECK >= 1 | Số attempt liên quan. |
-| `hints_used` | integer | DEFAULT 0, CHECK >= 0 | Số hint đã dùng. |
-| `confidence?` | numeric(5,4) | `0..1` | Confidence nếu surface có thu thập. |
-| `response_time_seconds?` | numeric | — | Response time nếu có. |
-| `quality?` | numeric(5,4) | `0..1` | Normalized quality/evidence strength. |
-| `is_correct` | boolean | DEFAULT false | Compatibility/read filter; `result` là representation giàu hơn. |
+| `question_type` | varchar(20) | CHECK `short`, `choice` | Loại câu hỏi chấm tất định được. |
+| `options_json` | jsonb | DEFAULT `[]` | Options snapshot khi là choice question. |
+| `correct_answer` | text | NOT NULL | Answer key phía server; API không trả trước khi answer. |
+| `explanation` | text | NOT NULL DEFAULT '' | Giải thích phía server; API không trả trước khi answer. |
+| `difficulty` | varchar(20) | NOT NULL DEFAULT '' | Difficulty metadata nếu có. |
+| `source` | varchar(50) | NOT NULL DEFAULT `tutor_practice` | Nguồn tạo entry hiện tại. |
+| `user_answer` | text | NOT NULL DEFAULT '' | Câu trả lời lần đầu của learner; review không ghi đè (lịch sử review ở `practice_review_events`). |
+| `result` | varchar(20) | CHECK `''`, `correct`, `incorrect` | Kết quả của lần trả lời đầu; review chỉ đổi `resolved`. |
+| `is_correct` | boolean | NOT NULL DEFAULT false | Kết quả của lần trả lời gần nhất. |
+| `answered_at` | timestamptz? | NULL cho card chưa trả lời | Phân biệt card mới tạo và entry đã được trả lời. |
 | `resolved` | boolean | DEFAULT false | Mistake/question đã được giải quyết chưa. |
-| `bookmarked` | boolean | DEFAULT false | Learner bookmark entry. |
 | `created_at` | timestamptz | NOT NULL | Thời điểm tạo. |
 | `updated_at` | timestamptz | NOT NULL | Lần cập nhật gần nhất. |
 | `UQ(session_id, turn_id, question_id)` | — | UNIQUE | Giữ idempotency tương đương DeepTutor assessment notebook. |
 
-Index đề xuất:
+Index V6:
 
 ```text
-(session_id, created_at DESC)
-(source, mastery_path_id, knowledge_point_id)
-(result, resolved, updated_at DESC)
-(bookmarked, created_at DESC)
+(user_id, created_at DESC)
+(user_id, knowledge_point_id)
 ```
 
-Không dùng `notebook_entries` làm mastery authority. Mastery vẫn được mutation thông qua DeepTutor `LearningService` và `mastery_paths.state_json`.
+Khác schema dự kiến V5 §7.11: MVP chỉ hỗ trợ tutor practice, thêm `user_id` và `answered_at`, giới hạn `question_type`
+vào `short`/`choice`, và bỏ bookmark, material, hint, confidence, response-time, attempt-count, category cùng formal-import
+fields. Không dùng `notebook_entries` làm mastery authority; luyện thêm không đổi path revision, mastery hay evidence.
 
 ---
 
 ## 7.12 `practice_review_state`
 
-**Chưa triển khai.** Chỉ thêm khi triển khai question practice/review.
-
-Current review state cho **một question notebook entry cụ thể**. Đây là question-level spaced practice của DeepTutor, khác với KP-level `repetition_states/review_queue` nằm trong `LearningProgress`.
+Được tạo bởi V6. Đây là current review state cho **một question notebook entry cụ thể**. Question-level practice tách biệt
+với KP-level `repetition_states/review_queue` trong `LearningProgress`.
 
 ```text
 KP-level retention
@@ -1460,28 +1449,28 @@ Question-level mistake review
 | `last_review_at?` | timestamptz | — | Lần review gần nhất. |
 | `version` | bigint | DEFAULT 0 | Optimistic version, ngăn stale review submit. |
 
-Index:
+Index V6:
 
 ```text
-(due_at, entry_id)
-(is_mistake, due_at)
+(due_at) WHERE is_mistake
 ```
 
-Bảng này không thay thế DeepTutor Mastery scheduler. Hai scheduler phục vụ hai granularities khác nhau: **Knowledge Point** và **specific question/mistake**.
+Bảng này không thay thế mastery scheduler: hai lịch phục vụ hai granularity khác nhau, **Knowledge Point** và
+**specific question/mistake**. Ba review thành công liên tiếp resolve entry và gỡ nó khỏi due schedule.
 
 ---
 
 ## 7.13 `practice_review_events`
 
-**Chưa triển khai.** Chỉ thêm khi triển khai question practice/review.
-
-Append-only/idempotent history của từng lần learner review một `notebook_entries` item. `practice_review_state` là current state; bảng này giải thích state đã thay đổi qua những lần review nào.
+Được tạo bởi V6. Append-only/idempotent history của từng lần learner review một `notebook_entries` item.
+`practice_review_state` là current state; bảng này lưu idempotency result cho mỗi request.
 
 | Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
 | :--- | :--- | :--- | :--- |
 | `request_id` | uuid | PK | Idempotency key cho một review submission. |
 | `entry_id` | bigint | FK → `notebook_entries` ON DELETE CASCADE | Entry được review. |
-| `rating` | varchar(20) | NOT NULL | Rating theo Practice scheduler contract, ví dụ `again`, `hard`, `good`, `easy`. |
+| `user_id` | uuid | NOT NULL | Chủ sở hữu tại thời điểm review. |
+| `rating` | varchar(10) | CHECK `again`, `hard`, `good`, `easy` | Rating thực tế sau khi chấm; answer sai luôn thành `again`. |
 | `answer` | text | NOT NULL | Answer learner submit trong lần review. |
 | `reviewed_at` | timestamptz | NOT NULL | Thời điểm review. |
 | `outcome_json` | jsonb | NOT NULL | Snapshot kết quả schedule/state sau review để audit/idempotency. |
@@ -1559,16 +1548,35 @@ Cấm consumer update `mastery_paths.state_json` bằng ad-hoc SQL.
 Tutor study/review hiện dùng một giao dịch PostgreSQL ngắn cho mỗi mutation trên path; giao dịch này khóa hàng
 `mastery_paths` và commit `state_json`, revision, interaction, event và evidence cùng nhau. `turns` và `messages`
 được ghi bằng giao dịch riêng; failure sẽ đóng turn bằng `failure_code`, và startup recovery xử lý turn bị ngắt.
-Các bảng dự kiến sau chưa nằm trong transaction boundary hiện tại:
+Các bảng sau không nằm trong transaction của mastery path:
 
 ```text
 turn_events
-notebook_entries / practice review state-events
 mastery_path_leases
 ai_learning_db.outbox_events
 ```
 
-Không được tách interaction/evidence ra khỏi giao dịch mastery của tool; nếu cần atomicity của toàn turn, phải thiết kế thêm trước khi mở rộng runtime nhiều instance.
+Practice ghi notebook và review state bằng transaction riêng của `PracticeStore`; luồng này không gọi Learning Service và
+không thay đổi `mastery_paths`, revision, mastery hoặc evidence. Không được tách interaction/evidence ra khỏi giao dịch
+mastery của tool; nếu cần atomicity của toàn turn, phải thiết kế thêm trước khi mở rộng runtime nhiều instance.
+
+---
+
+## 7.17 Snapshot Content theo path
+
+AI Learning lưu metadata Content theo path để tutor có thể viết câu luyện mà không cần bearer token hoặc request Content
+thứ hai. Hai snapshot được thay thế trong transaction đang khóa `mastery_paths` khi tạo hoặc refresh path:
+
+| Bảng | Migration | Nội dung |
+| --- | --- | --- |
+| `mastery_path_knowledge_point_bands` | V4 | `knowledge_point_id`, `band_min`, `band_max` hiệu lực của KP được giữ trong scope. |
+| `mastery_path_knowledge_point_details` | V6 | `knowledge_point_id`, nullable `skill`, `description` tối đa 1.000 ký tự. |
+
+Refresh giữ lại band và details của KP đã rời curriculum, giống như path vẫn giữ KP retired. Thay đổi `skill` hoặc
+`description` là thay đổi snapshot thật và commit một revision mới; nếu không đổi curriculum hoặc metadata, revision
+không tăng. Path cũ nhận details lần đầu trong lần `POST /api/ai-learning/paths` refresh kế tiếp; trước đó
+`knowledge_point_details` trả skill null và description rỗng. `path_outline` không mang description; tutor chỉ đọc nó qua
+tool riêng. Những snapshot này không phải canonical source: Content vẫn sở hữu curriculum metadata.
 
 ---
 
