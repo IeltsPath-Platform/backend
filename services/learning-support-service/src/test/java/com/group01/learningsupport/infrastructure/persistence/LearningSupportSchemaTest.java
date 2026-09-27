@@ -67,6 +67,7 @@ class LearningSupportSchemaTest {
                 "idx_flashcard_decks_user_status_updated",
                 "uq_flashcard_decks_user_name_not_deleted",
                 "idx_flashcards_user_status_updated",
+                "uq_flashcards_user_practice_question",
                 "idx_flashcard_deck_items_deck_sort",
                 "idx_flashcard_deck_items_flashcard",
                 "idx_outbox_events_published_created"

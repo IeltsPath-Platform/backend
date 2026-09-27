@@ -1,7 +1,7 @@
 ---
 phase: 10
 title: "Lưu câu luyện thành flashcard"
-status: pending
+status: completed
 priority: P3
 dependencies: [6]
 effort: "~1d"
@@ -124,10 +124,21 @@ Trong repo root: `mvn -pl services/learning-support-service -am test` (0 fail; t
 skip. Không có Docker thì dừng và báo), `git diff --check`. Sau đó `graphify update .`.
 
 ## Success Criteria
-- [ ] Học viên lưu được câu luyện đã trả lời thành flashcard, truy ngược được bằng `sourceReferenceId`.
-- [ ] Bấm nhiều lần (kể cả đồng thời) chỉ ra một thẻ; thẻ đã xóa thì lưu lại được.
-- [ ] Hành vi các nguồn flashcard cũ không đổi; AI Learning không đổi.
-- [ ] DATABASE_V5 và hợp đồng practice đã cập nhật.
+- [x] Học viên lưu được câu luyện đã trả lời thành flashcard, truy ngược được bằng `sourceReferenceId`.
+- [x] Bấm nhiều lần (kể cả đồng thời) chỉ ra một thẻ; thẻ đã xóa thì lưu lại được.
+- [x] Hành vi các nguồn flashcard cũ không đổi; AI Learning không đổi.
+- [x] DATABASE_V5 và hợp đồng practice đã cập nhật.
+
+## Ghi chú khi implement (2026-09-27)
+- Migration là `V3__flashcard_practice_question_source.sql` (pha 8 đã dùng V2).
+- **Lệch spec có chủ đích:** thay vì thêm cờ `created` vào `CreateFlashcardUseCase` (bước 4), luồng `PRACTICE_QUESTION` dùng
+  use case riêng `SavePracticeQuestionFlashcardUseCase`, trả `SavedFlashcard(flashcard, created)`, và **không** `@Transactional`.
+  Lý do: bắt `ConflictException` bên trong một transaction đã flush lỗi sẽ để transaction ở trạng thái rollback-only, nên
+  bước đọc lại thẻ thắng race phải chạy trong transaction mới. Đừng bọc use case này trong `@Transactional`.
+- Test Testcontainers chứng minh index, luồng đọc lại khi thua race, và 409 khi `PUT` tạo thẻ sống thứ hai.
+- **Quyết định bổ sung (người dùng chốt 2026-09-27):** lưu lại một câu đã có thẻ `ARCHIVED` sẽ đưa thẻ đó về `ACTIVE` rồi trả
+  `200` (không tạo thẻ mới, giữ nguyên nội dung, không tự thêm lại vào deck). `ARCHIVED` là trạng thái có sẵn của learning-support
+  (`LibraryStatus`, từ V1) và được giữ nguyên.
 
 ## Risk Assessment
 - **Pha 6 chưa trả `questionId`** → frontend không có uuid để gửi. Đã ghi vào phase-06; kiểm lại trước khi làm.

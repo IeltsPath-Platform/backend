@@ -41,3 +41,22 @@ entry returns `409`.
 | `409` | Entry was already answered, is not in the review schedule, or a review `requestId` conflicts |
 | `422` | Invalid query, path id, request body, answer length, rating, or limit |
 
+## Save as flashcard
+
+After an answer (or from an answered notebook entry), the frontend may offer "Save as flashcard". It calls Learning
+Support directly with the learner's own token; AI Learning is not involved:
+
+```text
+POST /api/ai-learning/practice/entries/{entryId}/answer   → { questionId, isCorrect, correctAnswer, explanation, ... }
+POST /api/learning-support/flashcards
+     { "sourceType": "PRACTICE_QUESTION", "sourceReferenceId": questionId, "front": "...", "back": "..." }
+     → 201 new card | 200 the card already saved for this question
+(optional) POST /api/learning-support/decks/{deckId}/items { "flashcardId": "..." }
+```
+
+Offer it only after the learner has answered, since the back of the card holds the answer. Recommended format:
+`front` is the question followed by one `A. ...` line per option; `back` is `Answer: <answer>` (for choice questions
+`B. <option text>`), a blank line, then the explanation. `PRACTICE_QUESTION` requires `sourceReferenceId` and rejects
+`vocabularySenseId` and `highlightedText` (400). One live card per learner and question; a deleted card can be saved
+again, and saving a question whose card is archived restores that card to `ACTIVE` (200, content unchanged). Flashcards have no review schedule; spaced review of mistakes stays in `/practice/due`.
+

@@ -13,4 +13,7 @@ public interface FlashcardRepository {
     Optional<Flashcard> findByIdAndUserId(UUID id, UUID userId);
 
     OwnedPage<Flashcard> findByUserIdAndStatus(UUID userId, LibraryStatus status, int page, int size);
+
+    /** The learner's not-deleted flashcard saved from this practice question, if any. */
+    Optional<Flashcard> findLivePracticeQuestionCard(UUID userId, UUID practiceQuestionId);
 }

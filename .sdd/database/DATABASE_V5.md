@@ -1779,7 +1779,7 @@ Thuộc tính chính:
 | :--- | :--- | :--- | :--- |
 | `id` | uuid | PK | Định danh duy nhất của flashcard. |
 | `user_id` | uuid | Logical ref ↗ `Identity.users` | Learner sở hữu flashcard. |
-| `source_type` | varchar(50) | — | Nguồn tạo flashcard, ví dụ `MANUAL`, `VOCABULARY_SENSE`, `HIGHLIGHT`. |
+| `source_type` | varchar(50) | — | Nguồn tạo flashcard: `MANUAL`, `VOCABULARY_SENSE`, `HIGHLIGHT` hoặc `PRACTICE_QUESTION`. |
 | `vocabulary_sense_id?` | uuid | Logical ref ↗ `Content.vocabulary_senses` | Có giá trị khi flashcard được tạo từ một nghĩa/từ loại cụ thể trong kho vocabulary. Đây là field thay cho `entry_version_id`. |
 | `source_reference_id?` | uuid | — | ID nguồn khi cần truy ngược flashcard được highlight từ note/content nào; dùng cùng `source_type`, không tạo FK đa hình. |
 | `highlighted_text?` | text | — | Snapshot đoạn text learner đã highlight khi tạo flashcard bằng chức năng highlight. |
@@ -1794,6 +1794,12 @@ Quy ước nguồn:
 - `MANUAL`: learner tự nhập `front`/`back`; các field nguồn có thể để `NULL`.
 - `VOCABULARY_SENSE`: dùng `vocabulary_sense_id` để biết flashcard được tạo từ nghĩa/từ loại nào, nhưng `front`/`back` vẫn là snapshot.
 - `HIGHLIGHT`: lưu `highlighted_text` và có thể lưu `source_reference_id` để truy ngược nguồn highlight nếu sản phẩm cần.
+- `PRACTICE_QUESTION`: learner lưu một câu luyện đã trả lời của AI Learning; `source_reference_id` bắt buộc là `questionId` của
+  câu đó, `vocabulary_sense_id` và `highlighted_text` phải `NULL`. Frontend tạo thẻ bằng dữ liệu `/practice/.../answer` trả về;
+  learning-support không gọi AI Learning. `V3` thêm partial unique index `uq_flashcards_user_practice_question`
+  `(user_id, source_reference_id) WHERE source_type = 'PRACTICE_QUESTION' AND status <> 'DELETED'`: mỗi learner có tối đa
+  một thẻ chưa xóa cho một câu; lưu lại trả thẻ cũ với `200` (thẻ đang `ARCHIVED` được đưa về `ACTIVE`, giữ nguyên
+  nội dung), thẻ đã xóa thì lưu lại được.
 
 Không dùng `note_reference_id` riêng. Chức năng highlight có thể xuất phát từ note hoặc content khác; nếu cần truy nguồn thì dùng `source_type` + `source_reference_id`.
 
