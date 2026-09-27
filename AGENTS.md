@@ -1,298 +1,277 @@
-# AGENTS.md - Ngữ cảnh dự án dành cho AI Agent
+# AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
-- Phiên bản: 1.3
-- Cập nhật lần cuối: 2026-09-18
-- Dự án: `IELTSPath` (Maven coordinates hiện tại: `com.group01:code-base:1.0-SNAPSHOT`)
+- Phiên bản: 2.0
+- Cập nhật lần cuối: 2026-09-27, commit `658a055`
+- Dự án: `IELTSPath` (Maven coordinates: `com.group01:code-base:1.0-SNAPSHOT`)
+- Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
 ## 1. Tổng quan dự án
 
-`IELTSPath` là backend theo kiến trúc microservices. Dự án cung cấp hạ tầng Spring Cloud, cơ chế bảo mật JWT dùng chung cho các downstream service và một bounded context nghiệp vụ đã được triển khai: quản lý danh tính người dùng và quyền truy cập.
-
-Repository này không phải là đặc tả sản phẩm hoàn chỉnh; không được suy diễn thêm các khả năng nghiệp vụ ngoài các module được liệt kê bên dưới.
+`IELTSPath` là backend microservices cho nền tảng học IELTS. Repository không phải đặc tả sản phẩm hoàn chỉnh; không
+suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 
 | Module | Trách nhiệm |
 | --- | --- |
-| `infra/config-server` | Cung cấp cấu hình runtime tập trung từ thư mục native `config-repo/`. |
-| `infra/eureka-server` | Service Registry dùng cho Service Discovery. |
-| `infra/api-gateway` | Điểm vào WebFlux, xác thực JWT bên ngoài, routing và phát hành JWT nội bộ có thời gian sống ngắn. |
-| `services/user-service` | Quản lý người dùng, vai trò, đăng nhập, phát hành access token, vòng đời refresh token và quản trị người dùng. |
-| `services/learning-support-service` | Learner-owned utility state: activity, streak, video progress, saved segment, note, flashcard. Không phải mastery authority. |
-| `shared/common-security` | Auto-configuration bảo mật servlet dùng chung cho downstream service, xác thực JWT nội bộ, định nghĩa role chuẩn và truy cập thông tin người dùng hiện tại. Đây là thư viện dùng chung, không phải một service có thể deploy độc lập. |
+| `infra/config-server`, `infra/eureka-server` | Cấu hình tập trung (`config-repo/`), service registry. |
+| `infra/api-gateway` | Ingress WebFlux: xác thực external JWT, ký internal JWT, routing, CORS. |
+| `shared/common-security` | Thư viện security servlet dùng chung (internal JWT, `CanonicalRoles`, `CurrentUserProvider`); không deploy độc lập. |
+| `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal. |
+| `services/content-service` | Curriculum: topic, knowledge point, từ vựng, câu hỏi, gói nội dung, video, asset. |
+| `services/assessment-service` | Làm bài, chấm, kết quả; phát `AssessmentCompleted.v2`. |
+| `services/access-service` | Gói, subscription, activation key, điểm. |
+| `services/learning-support-service` | Tiện ích học viên: activity, streak, tiến độ video, note, flashcard. Không phải mastery authority. |
+| `services/game-service` | Phòng game, trận, phiên chơi, WebSocket. |
+| `services/community-service` | Bài viết, bình luận, reaction, kiểm duyệt. |
+| `services/notification-service` | Chưa triển khai (khung package). |
+| `services/ai-learning-service` | **Python/FastAPI**, ngoài Maven: mastery path, tutor SSE, practice, learner memory. |
+| `third_party/deeptutor` | Bản clone chỉ để đọc khi port. **Không phải dependency.** |
 
-`user-service` sở hữu `user_db`. `learning-support-service` sở hữu `learning_support_db`. Hai database tách trong Docker Compose.
+Mỗi business service sở hữu một database PostgreSQL riêng.
 
 ## 2. Tech Stack - Bắt buộc tuân thủ
 
-Chỉ sử dụng các công nghệ đã được xác minh đang tồn tại trong repository này. Không được thêm framework, thư viện lớn, database, công nghệ messaging, thành phần hạ tầng hoặc architectural pattern mới nếu chưa có sự phê duyệt rõ ràng.
+Chỉ dùng công nghệ đã có trong repository. Không thêm framework, thư viện lớn, database, công nghệ messaging, thành
+phần hạ tầng hoặc architectural pattern mới nếu chưa được phê duyệt rõ ràng.
 
 | Khu vực | Công nghệ đã được xác minh |
 | --- | --- |
-| Ngôn ngữ và build | Java 21; Maven multi-module project; Maven Compiler Plugin 3.14.0; Maven Surefire 3.5.3 tại những module đã cấu hình. |
-| Application Framework | Spring Boot 3.5.14; Spring Cloud 2025.0.0. |
-| Gateway | Spring Cloud Gateway Server WebFlux, Project Reactor, Spring Security Reactive Resource Server. |
-| Nền tảng service | Spring Cloud Config Server; Spring Cloud Netflix Eureka Server và Eureka Client. |
-| Persistence của User Service | Spring Data JPA, Hibernate thông qua Spring Boot, PostgreSQL JDBC, Flyway. |
-| Bảo mật | Spring Security, OAuth2 Resource Server, Nimbus JWT, HMAC-SHA256 JWT, BCrypt password hashing. |
+| Java build | Java 21; Maven multi-module (12 module trong reactor); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
+| Java framework | Spring Boot 3.5.14; Spring Cloud 2025.0.0 (Config, Netflix Eureka, Gateway Server WebFlux + Reactor). |
+| Persistence (Java) | Spring Data JPA, Hibernate, PostgreSQL JDBC, Flyway (chạy khi service khởi động). |
+| Bảo mật | Spring Security, OAuth2 Resource Server, Nimbus JWT, HMAC-SHA256 JWT, BCrypt. |
+| Messaging | RabbitMQ 3.13; Spring AMQP (`spring-boot-starter-amqp`, assessment); `pika` (ai-learning consumer). |
+| Realtime | Spring WebSocket (game-service); SSE (ai-learning tutor). |
 | Shared code | `common-security` auto-configuration; MapStruct 1.6.3; Lombok 1.18.46. |
-| Kiểm thử | JUnit Jupiter/Spring Boot Test, Mockito, Spring Security Test, Testcontainers PostgreSQL. |
-| Container | Docker, Docker Compose, `postgres:15-alpine`, Eclipse Temurin JDK/JRE 21 images. |
+| AI Learning | Python 3.11; FastAPI + uvicorn; pydantic v2 + pydantic-settings; psycopg2; httpx; python-jose; pika; Flyway 11 (container) cho `migrations/`. |
+| Kiểm thử | JUnit Jupiter, Spring Boot Test, Mockito, Spring Security Test, Testcontainers PostgreSQL; pytest/unittest cho ai-learning. |
+| Container | Docker Compose, `postgres:15-alpine`, `rabbitmq:3.13-management-alpine`, Eclipse Temurin 21, `python:3.11-slim`. |
 
-Repository hiện tại không có frontend, message broker, cache, object storage, OpenAPI/Swagger definition hoặc CI workflow được track. Mọi nhu cầu bổ sung các thành phần này phải được coi là một quyết định thiết kế rõ ràng, không phải phần mở rộng mặc định của codebase hiện tại.
+Repository **chưa có**: frontend, cache, object storage, file OpenAPI được track (FastAPI tự sinh `/openapi.json`), CI
+workflow, formatter, linter, coverage gate. Bổ sung các thành phần này là quyết định thiết kế, không phải mở rộng mặc định.
 
 ## 3. Nguyên tắc kiến trúc
 
-Dự án sử dụng Domain-Driven Design (DDD), Clean Architecture và Microservices Architecture. Đây là các ràng buộc kiến trúc bắt buộc. Phải duy trì các nguyên tắc này kể cả khi code hiện tại có một số điểm chưa nhất quán từ trước.
+Dự án dùng DDD, Clean Architecture và Microservices. Đây là ràng buộc bắt buộc, kể cả khi code hiện tại có điểm chưa
+nhất quán từ trước (xem §7).
 
-### 3.1 Các layer và hướng phụ thuộc của User Service
-
-Bounded context đã triển khai được tổ chức như sau:
+### 3.1 Layer và hướng phụ thuộc (service Java)
 
 ```text
 api -> application -> domain
-
-infrastructure -> domain
-
+infrastructure -> domain (và application/port nếu có)
 config -> framework wiring
 ```
 
-- `domain` là model lõi bên trong. Nó chứa aggregate, value object, domain exception và repository contract.
-- `application` chứa command/result record và logic điều phối `*UseCase`. Layer này phụ thuộc vào repository interface trong domain, không phụ thuộc vào JPA repository hoặc adapter.
-- `infrastructure` triển khai repository contract của domain bằng JPA entity, Spring Data repository, MapStruct mapper và repository adapter.
-- `api` chứa REST controller, request/response DTO, exception handling và servlet filter. Controller gọi các use case và ánh xạ domain object thành API response.
-- `config` chứa cấu hình bean và property đặc thù của Spring.
+- `domain`: aggregate, entity, value object, domain exception, repository contract.
+- `application`: command/result (query khi cần), `*UseCase`; phụ thuộc repository contract hoặc `application/port`, không
+  phụ thuộc JPA repository hay adapter.
+- `infrastructure`: JPA entity, Spring Data repository, MapStruct mapper, repository adapter, HTTP client, messaging.
+- `api`: controller, DTO, exception handler, filter; controller gọi use case và map sang response.
+- Code mới trong `domain` KHÔNG ĐƯỢC import `api`, `application`, `infrastructure`, Spring, JPA, HTTP hoặc class của gateway.
+- Code mới trong `application` KHÔNG ĐƯỢC import `api` hoặc `infrastructure`.
+- Infrastructure triển khai contract hướng vào trong; KHÔNG chứa business rule.
+- user-service dùng `domain/repository` làm persistence contract, không có `port`; assessment và game có `application/port`
+  cho client/outbox/ticket. Giữ convention của service đang sửa.
 
-Code mới trong `domain` KHÔNG ĐƯỢC import `api`, `application`, `infrastructure`, Spring, JPA, HTTP hoặc các class của gateway.
-
-Code mới trong `application` KHÔNG ĐƯỢC import `api` hoặc `infrastructure`.
-
-Infrastructure triển khai các contract hướng vào bên trong; Infrastructure KHÔNG ĐƯỢC trở thành nơi chứa business rule.
-
-`user-service` hiện không có package `ports` riêng: các interface trong `domain/repository` đóng vai trò persistence contract. Đây là convention của service hiện hữu, không phải lý do để đưa HTTP/SDK vào use case của service mới.
-
-### 3.1.1 Template bắt buộc cho business service mới
+### 3.1.1 Template bắt buộc cho business service Java mới
 
 ```text
 src/main/java/com/group01/<service>
-|
-|-- domain
-|   |-- aggregate
-|   |-- entity
-|   |-- vo
-|   |-- event
-|   |-- exception
-|   `-- repository
-|
-|-- application
-|   |-- command
-|   |-- query
-|   |-- result
-|   |-- usecase
-|   |-- port
-|   `-- exception
-|
-|-- api
-|   |-- controller
-|   `-- dto
-|
-`-- infrastructure
-    |-- persistence
-    |-- client
-    |-- messaging
-    |-- scheduler
-    `-- config
+|-- domain         aggregate, entity, vo, event, exception, repository
+|-- application    command, query, result, usecase, port, exception
+|-- api            controller, dto
+`-- infrastructure persistence, client, messaging, scheduler, config
 ```
 
-- `api`: controller và DTO; chỉ map request/query thành command/query, gọi use case rồi map response.
-- `application`: use case, command và result. Khi cần gọi service ngoài, broker, storage hoặc clock, định nghĩa `application/port`; adapter cụ thể nằm ở infrastructure.
-- `domain`: aggregate, value object, domain exception và repository contract; bảo vệ business invariant và state transition.
-- `infrastructure`: JPA entity/repository/mapper/adapter và các client kỹ thuật. Tách domain aggregate khỏi JPA entity.
-- Mỗi service mới sở hữu database và domain model riêng. Không tạo package `port`, `client`, `messaging`, `scheduler`, CQRS query hoặc domain event rỗng; chỉ thêm khi use case cần.
+- Khi cần service ngoài, broker, storage hoặc clock: định nghĩa `application/port`, adapter ở infrastructure.
+- Tách domain aggregate khỏi JPA entity. Mỗi service mới sở hữu database và domain model riêng.
+- Không tạo package `port`, `client`, `messaging`, `scheduler`, CQRS query hoặc domain event rỗng; chỉ thêm khi use case cần.
 
-### 3.2 Các building block DDD đang được sử dụng
+### 3.2 DDD building block
 
-- Aggregate: `User`, `Role` và `RefreshToken` trong `domain/aggregate`.
-- Value Object: `Email`, `PhoneNumber`, `RoleName` và `UserStatus` trong `domain/vo`.
-- Domain Exception: `domain/exception`.
-- Repository Abstraction: `domain/repository`.
-- Application Command/Result: `application/command` và `application/result`.
+- Business validation và state transition nằm trong aggregate/value object hoặc use case phù hợp.
+- Không tự tạo domain event, factory, CQRS query object hay domain service chỉ để cấu trúc trông đầy đủ/đối xứng.
 
-Đặt business validation và state transition trong aggregate/value object hoặc use case phù hợp.
+### 3.3 Presentation, validation, error handling và logging
 
-Code hiện tại không sử dụng domain event, factory, CQRS query object hoặc package domain service riêng; không được tự tạo thêm các khái niệm này chỉ để làm cấu trúc có vẻ đầy đủ hoặc đối xứng.
-
-### 3.3 Presentation, Validation, Error Handling và Logging
-
-- Các REST entry point hiện tại là `AuthController` (`/auth`) và `UserController` (`/api/users`). Mapping trong controller là nguồn tham chiếu chính thức cho API hiện tại.
-- Request DTO sử dụng Bean Validation và controller sử dụng `@Valid`. Domain value object và aggregate cũng phải bảo vệ các domain invariant.
-- `GlobalExceptionHandler` ánh xạ domain exception, validation error, authorization error và unexpected exception sang cấu trúc `ErrorResponse` hiện có. Hãy mở rộng cơ chế này thay vì trả về các error body tự phát, không thống nhất.
-- Log của Gateway và User Service có `X-Correlation-Id`. Phải duy trì và forward header này; không được log credential, token hoặc thông tin password.
-- Sử dụng `CurrentUserProvider` từ `common-security` để lấy danh tính đã được xác thực ở downstream service. Không được tin tưởng trực tiếp các header `X-User-*` do client gửi lên.
+- Mapping trong controller (hoặc FastAPI router) là nguồn tham chiếu chính thức của API; contract nằm ở `docs/contracts/`.
+- Request DTO dùng Bean Validation + `@Valid`; domain vẫn tự bảo vệ invariant.
+- Mở rộng `GlobalExceptionHandler` → `ErrorResponse` của service thay vì trả error body tự phát.
+- Giữ và forward `X-Correlation-Id`. Không log credential, token, password, nội dung hội thoại, prompt hay API key.
+- Lấy danh tính bằng `CurrentUserProvider` (`common-security`); không tin header `X-User-*` do client gửi.
 
 ### 3.4 Ranh giới bảo mật
 
-- `user-service` phát hành external HMAC JWT access token và chỉ lưu refresh token dưới dạng hash.
-- `api-gateway` xác thực external JWT, route thông qua Eureka, thay thế authorization value đầu vào cho các downstream path đã cấu hình và ký một internal HMAC JWT có thời gian sống ngắn.
-- Các downstream service dạng servlet sử dụng `CommonSecurityAutoConfiguration` của `common-security` để xác thực internal token và tạo Spring authorities. Auto-configuration này được thiết kế riêng cho servlet.
-- Gateway sử dụng WebFlux và có `SecurityWebFilterChain` riêng; không được áp dụng servlet auto-configuration cho Gateway.
-- Việc xác thực internal token yêu cầu issuer đúng theo cấu hình, subject là UUID, có expiry và role thuộc `CanonicalRoles.ALL` (`ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF`). Token claim và role constant phải được quản lý tập trung trong `common-security`.
-- External signing secret và internal signing secret phải tách biệt. Cấu hình sử dụng `EXTERNAL_JWT_SECRET` và `GATEWAY_INTERNAL_JWT_SECRET`; HMAC secret phải được encode bằng Base64 và có độ dài tối thiểu 32 byte. Không bao giờ sao chép giá trị thực của chúng vào code, tài liệu, test, log hoặc commit.
+- `user-service` phát hành external HMAC JWT; refresh token chỉ lưu dạng hash.
+- `api-gateway` xác thực external JWT, route qua Eureka và thay Authorization bằng internal HMAC JWT sống ngắn cho các path
+  trong `internal-jwt-paths`. Gateway dùng `SecurityWebFilterChain` riêng; không áp servlet auto-configuration cho Gateway.
+- Service servlet dùng `CommonSecurityAutoConfiguration` để xác thực internal token (issuer đúng, subject UUID, có expiry,
+  role thuộc `CanonicalRoles.ALL`: `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF`). Claim và role
+  constant quản lý tập trung trong `common-security`.
+- ai-learning kiểm internal JWT bằng `app/security/internal_jwt.py`; mọi thay đổi issuer/claim/role phải cập nhật cả hai bên.
+- `EXTERNAL_JWT_SECRET` và `GATEWAY_INTERNAL_JWT_SECRET` tách biệt, Base64, ≥ 32 byte. Không bao giờ chép giá trị thật vào
+  code, tài liệu, test, log hoặc commit.
 
-### 3.5 Ranh giới Microservice
+### 3.5 Ranh giới microservice
 
-- Mỗi business service sở hữu bounded context và persistence riêng. Không service nào được đọc hoặc ghi database của service khác hoặc dùng chung JPA entity với service khác.
-- Routing service-to-service hiện tại là đồng bộ thông qua Gateway, sử dụng Eureka và route `lb://`. Hiện chưa triển khai messaging mechanism.
-- Shared module chỉ dành cho các technical concern dùng chung. Không được chuyển entity thuộc user domain hoặc business use case vào `shared/`.
-- Các public route hiện tại ánh xạ `/auth/**` và `/api/users/**` tới `USER-SERVICE`. Hiện chưa có API version prefix. Phải duy trì các path tương thích và đánh giá tất cả consumer trước khi thay đổi API contract hoặc JWT claim contract.
-- Gateway chỉ chứa routing, security, CORS, filtering và observability. TUYỆT ĐỐI KHÔNG đặt business logic của user domain hoặc domain khác trong Gateway.
+- Mỗi service sở hữu bounded context và database; không đọc/ghi database hay dùng chung JPA entity của service khác.
+- Gọi đồng bộ service-to-service bằng HTTP tới endpoint nội bộ hoặc public của service đích, kèm bearer của request và
+  `X-Correlation-Id` (ví dụ assessment → content/user, game → content, ai-learning → content/user).
+- Bất đồng bộ qua transactional outbox + RabbitMQ; event có version trong tên và contract ở `docs/contracts/`. Consumer
+  phải idempotent và có retry/dead-letter (xem ai-learning).
+- `shared/` chỉ chứa technical concern dùng chung; không chuyển entity hay use case nghiệp vụ vào đó.
+- Chưa có API version prefix. Giữ path tương thích; đánh giá mọi consumer trước khi đổi API, event hoặc JWT claim contract.
+- Gateway chỉ chứa routing, security, CORS, filter, observability; KHÔNG chứa business logic.
 
-### 3.6 Configuration và Runtime
+### 3.6 Configuration và runtime
 
-- Bootstrap setting nằm trong `src/main/resources/application.yml` hoặc `src/main/resources/application.yaml` của từng module.
-- Shared runtime setting và service-specific runtime setting nằm trong `infra/config-server/config-repo/{application,api-gateway,eureka-server,user-service,learning-support-service}.yaml`. Tránh lặp lại global Eureka Client setting trong các file cấu hình riêng của từng service.
-- Thứ tự khởi động là Config Server, Eureka Server, Gateway, sau đó đến các business service.
-- Docker Compose khởi động `user-db`, `learning-support-db`, infrastructure, `user-service` và `learning-support-service`.
-- `Dockerfile.spring-service` build các Maven module thông thường được chọn bằng `MODULE_PATH`; Config Server có Dockerfile riêng vì cần đóng gói thêm `config-repo`.
+- Bootstrap setting ở `src/main/resources/application.y(a)ml` của module; runtime setting ở
+  `infra/config-server/config-repo/<service>.yaml` (+ `application.yaml` dùng chung). Không lặp setting Eureka client toàn cục.
+- Mọi module Spring import `.env` ở root (`optional:file:../../.env[.properties]`); compose cũng nội suy file này. `.env`
+  không commit.
+- Chạy local: service Java trên host (Config Server → Eureka → Gateway → business service); compose chạy DB của
+  learning-support/community/game, RabbitMQ và stack AI Learning. Chi tiết: `README.md`, `docs/system-architecture.md` §7.
+- `Dockerfile.spring-service` build module Maven theo `MODULE_PATH`; Config Server có Dockerfile riêng; ai-learning có
+  `services/ai-learning-service/Dockerfile`.
 
-### 3.7 Hiệu năng Persistence, N+1 và độ phức tạp
+### 3.7 Hiệu năng persistence, N+1 và độ phức tạp
 
-- `UserJpaEntity.roles` hiện là quan hệ `LAZY`. Các query đọc user cần role đã dùng `@EntityGraph(attributePaths = "roles")` trong `UserJpaRepository`. Giữ fetch plan tường minh theo nhu cầu response; không đổi toàn cục sang `EAGER` chỉ để che lỗi lazy loading hoặc N+1.
-- Trước khi thêm endpoint đọc collection hoặc relation, xác định dữ liệu nào response thực sự cần rồi tạo query/repository method có fetch plan tương ứng. Không tải toàn bộ entity graph khi chỉ cần một projection nhỏ.
-- TUYỆT ĐỐI KHÔNG gọi repository, external client hoặc lazy relation trong vòng lặp trên danh sách request/entity. Thu thập key trước, query theo tập key hoặc fetch relation một lần, sau đó ghép dữ liệu bằng `Map`/`Set`.
-- `findAll()` không phân trang là baseline hiện hữu. Không được nhân rộng nó cho dữ liệu có thể tăng không giới hạn; endpoint danh sách mới phải có pagination hoặc giới hạn rõ ràng và việc filter/sort phải diễn ra ở database.
-- Trên request path có dữ liệu biến thiên, ưu tiên độ phức tạp O(n) hoặc O(n log n). O(n^2) chỉ được chấp nhận khi tập dữ liệu có cận nhỏ được chứng minh, và phải giải thích lý do ngay gần code.
-- Dùng `HashSet`/`HashMap` cho membership check, deduplication hoặc join in-memory; không dùng nested loop hoặc `List.contains()` lặp lại khi kích thước dữ liệu có thể tăng.
-- Với query phức tạp hoặc có relation, bổ sung hoặc cập nhật integration test Testcontainers khi phù hợp và review SQL/fetch behavior. Repository hiện chưa có query-count gate tự động, nên không được tuyên bố N+1 đã được kiểm soát nếu chưa kiểm tra query thực tế.
+- Giữ fetch plan tường minh theo nhu cầu response (ví dụ `@EntityGraph(attributePaths = "roles")` ở `UserJpaRepository`);
+  không đổi toàn cục sang `EAGER` để che lazy loading hay N+1.
+- Trước khi thêm endpoint đọc collection/relation, xác định dữ liệu response cần và tạo query có fetch plan/projection tương ứng.
+- TUYỆT ĐỐI KHÔNG gọi repository, external client hoặc lazy relation trong vòng lặp; gom key, query theo tập, ghép bằng `Map`/`Set`.
+- `findAll()` không phân trang là baseline cũ; endpoint danh sách mới phải phân trang/giới hạn, filter/sort ở database.
+- Request path với dữ liệu biến thiên: ưu tiên O(n)/O(n log n); O(n^2) chỉ khi cận nhỏ được chứng minh và giải thích gần code.
+- Query phức tạp: thêm/cập nhật integration test Testcontainers và review SQL. Chưa có query-count gate tự động.
+
+### 3.8 AI Learning (Python)
+
+- Layer: `app/api` (router, DTO camelCase alias) → `app/application` → `app/mastery`, `app/tutor`, `app/practice`,
+  `app/usage`, `app/learning` → store/`app/persistence` (psycopg2, mở kết nối mỗi lần gọi), `app/clients` (httpx),
+  `app/messaging` (pika). Cấu hình qua pydantic-settings, tiền tố `AI_LEARNING_`.
+- `app/mastery` là bản port DeepTutor v1.6.9 (Apache-2.0): giữ hành vi và ngưỡng; test engine giữ giá trị gốc; file port ghi nguồn.
+- Một lượt tutor luôn được đóng (completed/failed), kể cả khi lỗi hay client ngắt; không để kẹt slot `running`.
+- Tác vụ gọi LLM phải qua hạn mức theo ngày (`app/usage`) khi áp dụng cho học viên.
+- Migration: thêm `migrations/V<n>__<mô_tả>.sql` mới; test dựng schema từ đúng chuỗi migration này.
 
 ## 4. Quy tắc đặt tên file và cấu trúc dự án
 
 ```text
-shared/common-security/                thư viện security kỹ thuật dùng chung
-
+shared/common-security/                 thư viện security dùng chung
 infra/{api-gateway,config-server,eureka-server}/
-
-services/user-service/
-  src/main/java/com/group01/user/
-    api/ application/ config/ domain/ infrastructure/
-  src/main/resources/db/migration/
-
-infra/config-server/config-repo/       YAML cấu hình runtime tập trung
-
-docker-compose.yml                     môi trường multi-container local
+infra/config-server/config-repo/        YAML runtime tập trung
+services/<name>-service/                service Java: src/main/java/com/group01/<name>/{api,application,domain,infrastructure}
+                                        + src/main/resources/db/migration/
+services/ai-learning-service/           app/, migrations/, tests/, main.py
+docs/contracts/                         contract HTTP/SSE/event
+docker-compose.yml                      stack local (một phần)
 ```
 
-Khi không có convention cụ thể được liệt kê, hãy tuân theo code lân cận trong cùng module.
+Khi không có convention cụ thể, theo code lân cận trong cùng module.
 
-| Thành phần | Convention hiện tại |
+| Thành phần | Convention |
 | --- | --- |
-| Java package | Tên package viết thường dưới `com.group01.<module>`. |
-| Java type | PascalCase; mỗi public type nằm trong một file có tên tương ứng. |
-| Aggregate và Value Object | `domain/aggregate/<Name>.java`, `domain/vo/<Name>.java`; Value Object có thể là record hoặc enum. |
-| Use Case và Command | `application/usecase/<Verb>NounUseCase.java`, `application/command/<Verb>NounCommand.java`, `application/result/<Name>Result.java`. |
-| Repository Boundary | `domain/repository/<Name>Repository.java`; implementation là `infrastructure/adapter/<Name>RepositoryAdapter.java`. |
-| JPA Persistence | `*JpaEntity`, `*JpaRepository`, `*Mapper` và `*Specifications` trong `infrastructure/persistence`. |
-| HTTP API | `*Controller`, `dto/request/*Request`, `dto/response/*Response` và `GlobalExceptionHandler`. |
-| Spring Configuration | `*Config`, `*Properties` và `*AutoConfiguration`. |
-| Test | Mirror package production dưới `src/test/java`; test class đặt tên `*Test`. |
-| Migration | Flyway SQL tại `src/main/resources/db/migration/V{number}__{description}.sql`; baseline hiện tại là `V1__create_user_tables.sql`. |
-| Tên service và artifact | Dùng kebab-case cho directory và Maven Artifact ID, ví dụ `user-service`. |
+| Java package / type | `com.group01.<module>` viết thường; type PascalCase, một public type mỗi file. |
+| Aggregate, VO | `domain/aggregate/<Name>.java`, `domain/vo/<Name>.java` (record hoặc enum). |
+| Use case | `application/usecase/<Verb><Noun>UseCase.java`, `application/command/...Command.java`, `application/result/...Result.java`. |
+| Repository | `domain/repository/<Name>Repository.java`; adapter `<Name>RepositoryAdapter` ở `infrastructure/adapter` hoặc `infrastructure/persistence` theo service. |
+| JPA | `*JpaEntity`, `*JpaRepository`, `*Mapper`, `*Specifications` trong `infrastructure/persistence`. |
+| HTTP API | `*Controller`, `*Request`, `*Response`, `GlobalExceptionHandler`. |
+| Spring config | `*Config`, `*Properties`, `*AutoConfiguration`. |
+| Test Java | Mirror package dưới `src/test/java`, lớp `*Test`. |
+| Python | Module snake_case; test `tests/test_*.py` (unittest style, chạy bằng pytest). |
+| Migration | `V{number}__{description}.sql` (Flyway), version tăng dần. |
+| Service/artifact | kebab-case, ví dụ `user-service`. |
 
 ## 5. Các pattern bị cấm
 
 ### Kiến trúc
 
 - TUYỆT ĐỐI KHÔNG đặt core business rule, persistence access hoặc cross-service call trong controller hoặc gateway filter.
-- TUYỆT ĐỐI KHÔNG để code domain phụ thuộc HTTP, Spring, JPA, adapter, Gateway hoặc service khác.
-- TUYỆT ĐỐI KHÔNG bỏ qua Application Use Case để gọi trực tiếp JPA Repository từ `api`.
-- TUYỆT ĐỐI KHÔNG tạo shared domain entity, table hoặc repository dùng chung giữa các bounded context.
-- TUYỆT ĐỐI KHÔNG truy cập trực tiếp database của microservice khác.
-- TUYỆT ĐỐI KHÔNG thay đổi architecture boundary, public route contract, JWT claim hoặc canonical role nếu chưa được review và phê duyệt có chủ đích.
+- TUYỆT ĐỐI KHÔNG để domain phụ thuộc HTTP, Spring, JPA, adapter, Gateway hoặc service khác.
+- TUYỆT ĐỐI KHÔNG bỏ qua use case để gọi thẳng JPA repository từ `api`.
+- TUYỆT ĐỐI KHÔNG tạo entity, table hoặc repository dùng chung giữa bounded context; không truy cập database service khác.
+- TUYỆT ĐỐI KHÔNG đổi architecture boundary, public route, event contract, JWT claim hoặc canonical role khi chưa được duyệt.
+- TUYỆT ĐỐI KHÔNG import hoặc tham chiếu `deeptutor` / `third_party/` từ code, image, requirements hay compose của service
+  (`tests/test_no_deeptutor_dependency.py` sẽ fail).
 
 ### Bảo mật
 
-- TUYỆT ĐỐI KHÔNG commit, hardcode, log, expose hoặc đưa giá trị secret vào file này.
-- TUYỆT ĐỐI KHÔNG coi raw identity header là danh tính đã được xác thực.
-- TUYỆT ĐỐI KHÔNG tái sử dụng external JWT signing secret làm Gateway internal JWT signing secret.
-- TUYỆT ĐỐI KHÔNG tắt JWT validation, method authorization hoặc request validation chỉ để feature chạy hoặc test pass.
-- TUYỆT ĐỐI KHÔNG thêm role chưa được review ngoài `CanonicalRoles.ALL` và role model của user domain.
+- TUYỆT ĐỐI KHÔNG commit, hardcode, log, expose hoặc ghi giá trị secret vào tài liệu.
+- TUYỆT ĐỐI KHÔNG coi raw identity header là danh tính đã xác thực.
+- TUYỆT ĐỐI KHÔNG dùng external JWT secret làm internal JWT secret.
+- TUYỆT ĐỐI KHÔNG tắt JWT validation, method authorization hoặc request validation để feature chạy hay test pass.
+- TUYỆT ĐỐI KHÔNG thêm role ngoài `CanonicalRoles.ALL` khi chưa review.
+- TUYỆT ĐỐI KHÔNG log nội dung hội thoại, câu trả lời, prompt hay API key của LLM; log chỉ mang id, loại event, mã lỗi.
 
 ### Database và API
 
-- TUYỆT ĐỐI KHÔNG chỉnh sửa, xóa hoặc rewrite một Flyway migration đã được apply một cách tùy tiện. Khi thay đổi schema, hãy thêm migration mới.
-- TUYỆT ĐỐI KHÔNG thực hiện destructive schema change hoặc destructive data change nếu chưa được phê duyệt rõ ràng.
-- TUYỆT ĐỐI KHÔNG expose JPA Entity trực tiếp làm request hoặc response DTO.
-- TUYỆT ĐỐI KHÔNG âm thầm thay đổi HTTP status code, response schema, HTTP method của endpoint hoặc inter-service contract.
-- TUYỆT ĐỐI KHÔNG lọc, sort hoặc phân trang một tập database không giới hạn trong Java sau khi đã `findAll()`.
-- TUYỆT ĐỐI KHÔNG tạo N+1 query bằng cách dereference relation `LAZY` hoặc gọi repository trong vòng lặp.
+- TUYỆT ĐỐI KHÔNG sửa, xóa hoặc rewrite migration đã áp dụng; thay đổi schema bằng migration mới.
+- TUYỆT ĐỐI KHÔNG destructive schema/data change khi chưa được phê duyệt rõ ràng.
+- TUYỆT ĐỐI KHÔNG expose JPA entity làm request/response DTO.
+- TUYỆT ĐỐI KHÔNG âm thầm đổi HTTP status, response schema, HTTP method hoặc inter-service/event contract.
+- TUYỆT ĐỐI KHÔNG filter, sort, phân trang tập không giới hạn trong bộ nhớ sau `findAll()`; không tạo N+1.
 
 ### Độ phức tạp thuật toán
 
-- TUYỆT ĐỐI KHÔNG đưa nested loop O(n^2), repeated sort, hoặc repeated linear lookup vào request path chỉ vì dữ liệu test còn nhỏ.
-- TUYỆT ĐỐI KHÔNG tối ưu bằng cách đổi fetch type toàn cục sang `EAGER`; lựa chọn fetch strategy phải nằm ở query/repository method đang phục vụ use case cụ thể.
+- TUYỆT ĐỐI KHÔNG đưa O(n^2), sort lặp hoặc lookup tuyến tính lặp vào request path chỉ vì dữ liệu test nhỏ.
+- TUYỆT ĐỐI KHÔNG tối ưu bằng cách đổi fetch type toàn cục sang `EAGER`.
 
-### Dependency và Delivery
+### Dependency, test và delivery
 
-- TUYỆT ĐỐI KHÔNG thêm dependency chỉ để tránh tự triển khai một hành vi local nhỏ.
-- TUYỆT ĐỐI KHÔNG sửa Docker, centralized configuration hoặc shared security như một side effect của task chỉ liên quan đến một service.
-- TUYỆT ĐỐI KHÔNG commit `.env`, credential, generated build output hoặc local graph artifact.
+- TUYỆT ĐỐI KHÔNG thêm dependency chỉ để tránh tự viết một hành vi nhỏ.
+- TUYỆT ĐỐI KHÔNG sửa Docker, config tập trung hoặc shared security như side effect của task chỉ liên quan một service.
+- TUYỆT ĐỐI KHÔNG để test gọi LLM thật; dùng model giả lập (`ScriptedChat`) hoặc stub OpenAI-compatible cục bộ.
+- TUYỆT ĐỐI KHÔNG commit `.env`, credential, build output, bytecode Python (`__pycache__/`, `*.pyc`) hoặc `graphify-out/`.
 
 ## 6. Quy trình phát triển và kiểm chứng
 
-1. Đọc file này, `README.md` và README/configuration của module bị ảnh hưởng trước khi thay đổi code.
-
-2. Giữ thay đổi trong đúng bounded context. Chỉ cập nhật `common-security`, Gateway, Config Server hoặc Docker khi contract được yêu cầu thực sự cần đến thay đổi đó.
-
-3. Khi cần hiểu quan hệ codebase và `graphify-out/graph.json` tồn tại, dùng Graphify trước khi đọc một lượng lớn source:
+1. Đọc file này, `README.md` và README/config của module bị ảnh hưởng trước khi sửa code.
+2. Giữ thay đổi trong đúng bounded context. Chỉ sửa `common-security`, Gateway, Config Server hoặc Docker khi contract thật sự cần.
+3. Khi `graphify-out/graph.json` tồn tại, định hướng bằng Graphify trước khi đọc nhiều source (graph đã loại `third_party/`
+   và `*.md`). Tên trùng nhau thì dùng dạng `path::Symbol`.
 
 ```powershell
 graphify query "<câu hỏi về codebase>"
-
-graphify explain "<khái niệm hoặc symbol>"
-
+graphify explain "<symbol>"
 graphify path "<symbol A>" "<symbol B>"
-
-graphify affected "<symbol thay đổi>"
+graphify update .            # sau khi sửa code; thêm --force khi số node giảm có chủ đích
 ```
 
-Chỉ đọc `graphify-out/GRAPH_REPORT.md` cho review kiến trúc rộng khi query/path/explain chưa đủ. Không cần chạy Graphify cho thay đổi Markdown vì `.graphifyignore` đang bỏ qua `*.md`.
-
-4. Sau khi thay đổi source code, chạy lệnh cập nhật incremental sau khi test:
-
-```powershell
-graphify update .
-```
-
-Chỉ chạy full build `graphify .` khi graph chưa tồn tại, graph bị lỗi, hoặc cần tái trích xuất semantic toàn diện theo yêu cầu. Sau refactor xóa nhiều file, dùng `graphify update . --force` khi đã kiểm tra việc graph có ít node hơn là đúng. Không tự cài Graphify hoặc không commit `.graphify-tools/` và `graphify-out/` nếu môi trường chưa có công cụ.
-
-5. Thêm test tập trung vào layer bị ảnh hưởng. Sử dụng Mockito cho Application Use Case, `@WebMvcTest` cho hành vi Controller/Security và Testcontainers PostgreSQL cho Persistence behavior khi Docker khả dụng.
-
-6. Chạy Maven command có phạm vi nhỏ nhất liên quan trước, sau đó mới mở rộng phạm vi khi shared contract thay đổi:
+4. Thêm test tập trung vào layer bị ảnh hưởng: Mockito cho use case, `@WebMvcTest` cho controller/security, Testcontainers
+   cho persistence (cần Docker); ai-learning dùng test PostgreSQL với schema tạm.
+5. Chạy lệnh hẹp nhất trước, mở rộng khi shared contract thay đổi:
 
 ```powershell
-mvn -pl shared/common-security test
-
-mvn -pl infra/api-gateway test
-
-mvn -pl services/user-service test
-
-mvn clean compile -DskipTests
-
+mvn -q -pl shared/common-security test
+mvn -q -pl services/<name>-service -am test      # -am build kèm common-security
+mvn -q compile -DskipTests                        # cả reactor; không dùng clean khi service đang chạy từ IDE
 docker compose config --quiet
 ```
 
-7. Chỉ build hoặc chạy Docker stack khi Docker daemon khả dụng:
+   ai-learning (trong `services/ai-learning-service`, venv Python 3.11):
 
 ```powershell
-docker compose up -d --build
-
-docker compose ps
+python -m pip install pytest -r requirements-test.txt
+$env:PYTHONDONTWRITEBYTECODE = "1"
+$env:AI_LEARNING_TEST_DATABASE_URL = "<PostgreSQL dùng để test>"   # thiếu thì test PostgreSQL bị skip
+$env:AI_LEARNING_TEST_AMQP_URL = "<RabbitMQ dùng để test>"          # thiếu thì test RabbitMQ bị skip
+python -m pytest tests
 ```
 
-Hiện chưa có CI workflow được track, formatter, linter, code-coverage gate hoặc OpenAPI contract test. Không được tuyên bố các check này đã chạy cho đến khi chúng thực sự được bổ sung.
+6. Chỉ build/chạy Docker khi daemon khả dụng: `docker compose up -d --build <service...>`, `docker compose ps`.
+7. Không tuyên bố check nào đã chạy (CI, lint, coverage, contract test) khi chúng chưa tồn tại hoặc chưa thực sự chạy.
+8. Commit theo conventional commit; không nhắc AI, số phase hay mã plan trong commit, code comment, tên test hay migration.
 
-## 7. Các điểm chưa nhất quán đã quan sát và nội dung cần làm rõ
+## 7. Điểm chưa nhất quán và nội dung cần làm rõ
 
-- Các Application Use Case hiện đang mang annotation Spring `@Service` và `@Transactional`. Đây là framework dependency đang tồn tại trong Application Layer; code mới vẫn phải giữ cho Application không phụ thuộc `api` và `infrastructure`, đồng thời không được thêm dependency dạng này vào Domain Layer.
+Danh sách đầy đủ: [`docs/system-architecture.md` §11](docs/system-architecture.md#11-điểm-chưa-nhất-quán-đã-biết).
+Những điểm ảnh hưởng trực tiếp tới quy tắc:
 
-- `services/user-service/README.md` mô tả endpoint cập nhật trạng thái người dùng bằng `PATCH`, trong khi `UserController` hiện expose `PUT /api/users/{id}/status`. Tạm thời coi Controller là nguồn tham chiếu chính xác cho behavior thực tế cho đến khi documentation được đồng bộ một cách có chủ đích.
-
-- Production deployment target, CI policy, frontend contract, API versioning, messaging, cache và object storage hiện chưa được thiết lập trong repository này. Cần làm rõ trước khi bổ sung các thành phần đó.
+- Use case Java mang `@Service`/`@Transactional` của Spring. Code mới vẫn giữ `application` không phụ thuộc `api`/
+  `infrastructure` và không đưa dependency dạng này vào `domain`.
+- `services/user-service/README.md` ghi `PATCH` cho cập nhật trạng thái user; controller là `PUT /api/users/{id}/status`
+  (controller đúng).
+- Outbox của access/content/game đã ghi event nhưng chưa có relay; đừng giả định các event đó tới được consumer.
+- `requirements.txt` của ai-learning còn `sqlalchemy` nhưng code không import.
+- Chưa xác định: production deployment, secret management, CI policy, frontend contract, API versioning, cache, object storage.

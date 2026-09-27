@@ -1,10 +1,12 @@
 ---
 phase: 3
-title: "AGENTS rules source"
-status: pending
+title: AGENTS rules source
+status: completed
 priority: P1
-dependencies: [1, 2]
-effort: "~0.5d"
+dependencies:
+  - 1
+  - 2
+effort: ~0.5d
 ---
 
 # Phase 3: AGENTS rules source
@@ -49,9 +51,19 @@ Thay đổi theo mục:
 7. Commit: `docs: make AGENTS.md the single source of agent rules for all services`.
 
 ## Success Criteria
-- [ ] Không còn khẳng định Java-only / không broker / không OpenAPI sai.
-- [ ] Có quy tắc AI Learning và các mục cấm mới; lệnh khớp fact sheet.
-- [ ] ~200–230 dòng; đọc độc lập vẫn đủ quy tắc (không phụ thuộc CLAUDE.md).
+- [x] Không còn khẳng định Java-only / không broker / không OpenAPI sai.
+- [x] Có quy tắc AI Learning và các mục cấm mới; lệnh khớp fact sheet.
+- [x] ~200–230 dòng; đọc độc lập vẫn đủ quy tắc (không phụ thuộc CLAUDE.md). *Thực tế: 277 dòng, 220 dòng có nội dung
+  (cũ 298); giữ toàn bộ quy tắc cũ + thêm quy tắc mới nên không cắt thêm.*
+
+## Kết quả (2026-09-27)
+- AGENTS.md v2.0: §1 bảng 13 module (+ `third_party/deeptutor` không phải dependency); §2 thêm Python/FastAPI, RabbitMQ,
+  WebSocket/SSE, bỏ "không có message broker"; §3.1 tổng quát cho service Java; §3.4 role đúng (`CUSTOMER`) + đồng bộ
+  internal JWT bản Python; §3.5 HTTP nội bộ + outbox/RabbitMQ; §3.6 `.env` import, chạy local; §3.8 mới cho AI Learning;
+  §5 thêm cấm `deeptutor`, log nội dung LLM, test gọi LLM thật, commit bytecode; §6 lệnh Maven/Python/graphify đã chạy
+  thử, commit convention; §7 trỏ danh sách đầy đủ trong `docs/system-architecture.md` §11.
+- Mục §3.2 (liệt kê aggregate của user-service) và §3.3 (tên controller cụ thể) bỏ phần liệt kê; code là nguồn.
+- Phát hiện thêm: `requirements.txt` ai-learning có `sqlalchemy` không dùng (ghi ở §7).
 
 ## Risk Assessment
 - Cắt quá tay làm Codex thiếu ngữ cảnh: giữ đủ quy tắc + con trỏ; chỉ cắt phần *mô tả* đã chuyển sang doc.
