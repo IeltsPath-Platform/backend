@@ -21,7 +21,7 @@ Khi code đã tách xong (library-service tồn tại, learning-support đã xó
 
 - Modify: `docs/system-architecture.md`:
   - §1 Tổng quan + sơ đồ: thêm library :8081, bỏ learning-support :8086; thêm mũi tên game → library, library → content.
-  - §2 bảng service: thêm dòng library; content (bỏ từ vựng/video, thêm bài học); user (thêm activity, streak); **xóa dòng** learning-support; ghi route Gateway theo nhóm path.
+  - §2 bảng service: thêm dòng library; content (bỏ từ vựng/video, thêm bài học); user (thêm activity, streak, `examiner_profiles` nếu đã có code); notification (bảng nếu đã có code); ai-learning và assessment (phần học bài, tự chấm đề cuối nếu đã có code); **xóa dòng** learning-support; ghi route Gateway theo nhóm path.
   - §3 giao tiếp HTTP: thêm library → content (`GET /api/content/topics/{id}`, `CONTENT_SERVICE_URL`), game → library (`LIBRARY_SERVICE_URL`); câu cuối §3 (outbox chưa relay) giữ access/content/game.
   - §5: bỏ "learning-support" khỏi câu `query` (kiểm lại library/user có `application/query` không).
   - §7: compose bỏ `learning-support-db`, thêm `library-db`; thứ tự chạy host có library sau content.

@@ -32,8 +32,8 @@ Nội dung §12 "Kiến trúc đích (đang triển khai)":
    assessment --HTTP--> content, user     game --HTTP--> content (GRAMMAR), library (VOCABULARY)
    library --HTTP--> content (kiểm topic khi ghi video)     ai-learning --HTTP--> content, user
    ```
-3. **Bảng service đích** (cùng cột với §2): library (bounded context: catalog video/từ vựng do admin soạn + dữ liệu học cá nhân flashcard/note/tiến độ video/đoạn đã lưu; `library_db` compose 5437; route như trên), content (curriculum, KP, câu hỏi, đề/gói, asset, **bài học**), user (+ nhật ký hoạt động, streak), learning-support (**xóa**).
-4. **Bảng dữ liệu theo DB đích:** `content_db` 14 bảng + outbox; `library_db` 11 bảng; `user_db` 10 bảng (liệt kê tên theo mục "Bảng theo DB" trong `plan.md`).
+3. **Bảng service đích** (cùng cột với §2): library (bounded context: catalog video/từ vựng do admin soạn + dữ liệu học cá nhân flashcard/note/tiến độ video/đoạn đã lưu; `library_db` compose 5437; route như trên), content (curriculum, KP, câu hỏi, đề/gói, asset, **bài học**), user (+ nhật ký hoạt động, streak, hồ sơ người chấm), notification (thông báo, lịch nhắc, thiết bị push, lần gửi), ai-learning (+ API học bài, chấm bài tập nhúng, tiến độ, mở khóa), assessment (+ tự chấm đề cuối chủ đề), learning-support (**xóa**).
+4. **Bảng dữ liệu theo service đích:** mọi service và DB, nhóm bảng theo chức năng, đánh dấu bảng mới/chuyển tới (chép từ mục "Bảng theo service" trong `plan.md`).
 5. **Giao tiếp mới** (bổ sung bảng §3): library → content `GET /api/content/topics/{id}` (`CONTENT_SERVICE_URL`); game → library `/internal/game-content/snapshots` (`LIBRARY_SERVICE_URL`, nhánh `VOCABULARY`).
 6. **Hiện tại → đích** (bảng ngắn): bảng nào chuyển từ đâu sang đâu; FK mới trong `library_db` (flashcard→sense, tiến độ/đoạn video→video/segment); path giữ nguyên; quyền ghi catalog chỉ `ADMIN`/`CONTENT_AUTHOR`.
 7. **Quyết định chính** (3–5 dòng, dạng bảng như §8): tách cụm không bám KP; gom dữ liệu người học có tham chiếu video/từ vựng để có FK; giải thể learning-support; giữ path bằng Gateway; kèm trade-off (library hai loại quyền; streak vẫn do client khai).
