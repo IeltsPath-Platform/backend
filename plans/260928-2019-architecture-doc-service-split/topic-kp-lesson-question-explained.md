@@ -36,10 +36,10 @@ Một câu để nhớ:
 | Câu | Nội dung | Kiểm KP (trọng số) | Được dùng ở |
 | --- | --- | --- | --- |
 | Q1 | "Câu nào là câu chủ đề của đoạn 2?" | KP-A (1.0) | Bài tập L1, đề cuối T1 |
-| Q2 | "What is the passage mainly about?" (câu seed có sẵn) | KP-A (0.5), KP-B (0.5) | Đề cuối T1, mock test |
+| Q2 | "What is the passage mainly about?" (câu seed có sẵn) | KP-A (1.0) | Đề cuối T1, mock test |
 | Q3 | "'Cây giảm nhiệt độ thành phố 2°C' là ý chính hay chi tiết?" | KP-B (1.0) | Bài tập L2, đề cuối T1 |
 
-Q2 kiểm cả hai KP: trả lời đúng hay sai thì mastery của **cả KP-A và KP-B** đều thay đổi, mỗi KP một nửa.
+Mỗi câu chỉ gắn KP mà nó thật sự đo, `weight` để 1.0. Engine mastery không dùng `weight`: một câu gắn hai KP thì mỗi KP được tính như một lần làm đầy đủ, nên gắn thêm KP phụ sẽ làm mastery KP đó lệch.
 
 ## 3. Sơ đồ quan hệ
 
@@ -63,7 +63,7 @@ erDiagram
 | Topic → KP | 1 topic, nhiều KP; **mỗi KP thuộc đúng 1 topic** | `knowledge_points.topic_id` ✅ | T1 có KP-A, KP-B |
 | Topic → Lesson | 1 topic, nhiều bài; mỗi bài thuộc đúng 1 topic | `lessons.topic_id` 🆕 | T1 có L1, L2 |
 | Lesson ↔ KP | nhiều – nhiều | `lesson_knowledge_points` 🆕 | L1 dạy KP-A |
-| Question ↔ KP | nhiều – nhiều, có trọng số | `question_knowledge_points` ✅ | Q2 kiểm KP-A 0.5 + KP-B 0.5 |
+| Question ↔ KP | nhiều – nhiều (một câu nên gắn KP chính) | `question_knowledge_points` ✅ | Q3 kiểm KP-B |
 | Lesson → Question | 1 bài, nhiều câu bài tập | `lesson_block_questions` 🆕 | L1 dùng Q1 |
 | Topic → đề cuối | 1 topic, 1 đề | `topics.test_package_id` 🆕 | Đề cuối T1 gồm Q1, Q2, Q3 và 7 câu khác |
 
@@ -83,22 +83,25 @@ Vì vậy:
 
 ## 5. Một câu trả lời đi qua các bảng thế nào
 
-Lan làm bài tập L2 và **sai Q3**:
+Lan đã xong L1, L2 và làm đề cuối T1, **sai Q3**:
 
 ```text
-① Lan sai Q3
-      │  question_knowledge_points: Q3 → KP-B (1.0)
+① Lan sai Q3 trong đề cuối (assessment chấm, gửi event cho ai-learning)
+      │  question_knowledge_points: Q3 → KP-B
       ▼
-② Mastery KP-B của Lan giảm (lưu ở ai-learning, theo từng học viên)
-      │  KP-B dưới ngưỡng?
-      │  lesson_knowledge_points: KP-B ← L2 (bài dạy KP-B)
+② Ghi bằng chứng: mastery KP-B của Lan giảm (lưu ở ai-learning, theo từng học viên)
+      │  Có kết quả đề → đánh giá lại path
+      │  KP-B dưới ngưỡng + có câu sai (Q3) + bài dạy KP-B đã hoàn thành?
+      │  lesson_knowledge_points: KP-B ← L2
       ▼
-③ L2 đã hoàn thành trước đó → chèn L2 làm bài ôn bắt buộc
+③ L2 đã hoàn thành → chèn L2 làm bài ôn bắt buộc
       │
       ▼
 ④ Độ yếu của T1 = mastery trung bình của KP-A và KP-B
    → dùng để xếp thứ tự các topic chưa học (chỉ trong cùng topic cha)
 ```
+
+Nếu Lan sai Q3 khi đang làm bài tập của L2, path **không** đổi ngay: nộp một khối bài tập chỉ ghi bằng chứng. Path chỉ được đánh giá lại khi L2 hoàn thành, và khi đó L2 là bài vừa xong nên không bị chèn làm bài ôn.
 
 ## 6. Ba thước đo khác nhau, đừng lẫn
 

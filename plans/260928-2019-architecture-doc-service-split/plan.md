@@ -115,10 +115,12 @@ Tên bảng lấy từ migration hiện tại (commit `2079964`). **Đậm** = b
 - `topics` + `required_feature_key` (NULL = miễn phí; premium theo chủ đề), + `test_package_id` (FK `content_packages`, đề cuối chủ đề).
 - `content_packages.package_type` bỏ `LESSON`, thêm `TOPIC_TEST`.
 - `lessons`: `id`, `topic_id` FK, `code` UNIQUE, `title`, `summary`, `sort_order` (UQ theo `topic_id`, thứ tự học tuần tự), `status` `DRAFT`/`PUBLISHED`/`ARCHIVED`, `created_at`, `updated_at`. Không versioning.
-- `lesson_blocks`: `id`, `lesson_id` FK, `sort_order`, `block_type` `TEXT`/`ASSET`/`VOCABULARY`/`EXERCISE`, `text_content` (markdown, cho TEXT), `asset_id` FK `content_assets` NULL (cho ASSET: IMAGE/AUDIO/PASSAGE); CHECK theo `block_type`.
-- `lesson_block_vocabulary`: `block_id` FK, `vocabulary_sense_id` (id logic → library), `sort_order`.
-- `lesson_block_questions`: `block_id` FK, `question_version_id` FK (ghim phiên bản đã publish), `sort_order`. Chỉ câu hỏi tự chấm được.
-- `lesson_knowledge_points`: `lesson_id` FK, `knowledge_point_id` FK (path tìm bài dạy KP yếu).
+- `lesson_blocks`: `id`, `lesson_id` FK, `sort_order` (UQ theo `lesson_id`), `block_type` `TEXT`/`ASSET`/`VOCABULARY`/`EXERCISE`, `text_content` (markdown cho TEXT; hướng dẫn tùy chọn cho EXERCISE), `asset_id` FK `content_assets` NULL (cho ASSET: IMAGE/AUDIO/PASSAGE); CHECK theo `block_type`.
+- `lesson_block_vocabulary`: PK(`block_id`, `vocabulary_sense_id`); `vocabulary_sense_id` là id logic → library; `sort_order`.
+- `lesson_block_questions`: PK(`block_id`, `question_version_id`), INDEX(`question_version_id`); ghim phiên bản đã publish; `sort_order`. Chỉ câu tự chấm; câu thuộc đề cuối của cùng chủ đề không được gắn vào đây và ngược lại (kiểm ở use case).
+- `lesson_knowledge_points`: PK(`lesson_id`, `knowledge_point_id`), INDEX(`knowledge_point_id`) (path tìm bài dạy KP yếu). KP cùng topic với bài (kiểm ở use case).
+- `question_knowledge_points` (đã có): mỗi câu chỉ gắn KP chính, `weight` 1.0 (engine không dùng `weight`).
+- Đặc tả đầy đủ và `answer_spec` theo dạng câu: `.sdd/database/DATABASE_V5.md` §5.5, §5.13–§5.17 (V5.1).
 
 **`library_db`**
 - Catalog: chỉ `ADMIN`, `CONTENT_AUTHOR` ghi; `learning_videos.topic_id` là id logic → content.
@@ -136,11 +138,11 @@ Tên bảng lấy từ migration hiện tại (commit `2079964`). **Đậm** = b
 
 **`ai_learning_db`** (tiến độ theo học viên, không theo goal)
 - `topic_progress`: PK(`user_id`, `topic_id`); `status` `IN_PROGRESS`/`PASSED`; `best_test_score_percent`; `passed_at`; `updated_at`.
-- `lesson_progress`: PK(`user_id`, `lesson_id`); `topic_id`; `best_score_percent` NULL; `completed_at` NULL; `updated_at`.
+- `lesson_progress`: PK(`user_id`, `lesson_id`); `topic_id`; `best_score_percent` NULL (trung bình điểm cao nhất các khối, chỉ hiển thị); `completed_at` NULL; `updated_at`. Hoàn thành tính theo từng khối từ `lesson_exercise_submissions`.
 - `lesson_exercise_submissions`: `id`; `user_id`; `lesson_id`; `block_id`; `request_id` UNIQUE (chống nộp trùng); `answers` JSONB; `correct_count`; `total_count`; `score_percent`; `submitted_at`.
 - `path_review_items`: `id`; `user_id`; `knowledge_point_id`; `lesson_id` (bài ôn); `status` `PENDING`/`DONE`; `created_at`; `done_at` NULL. UQ(`user_id`, `knowledge_point_id`) với `status = PENDING` (mỗi KP tối đa một bài ôn đang chờ).
 - `mastery_paths`, `pending_formal_assessment_results`: đổi từ theo (`user_id`, `learning_goal_id`) sang theo `user_id` (migration mới); một path mỗi học viên.
-- Luật tạo path, xếp lại, mở khóa, bài ôn bắt buộc: [main-learning-pipeline.md](./main-learning-pipeline.md) §4.
+- Luật tạo path, xếp lại, mở khóa, bài ôn bắt buộc: [main-learning-pipeline.md](./main-learning-pipeline.md) §4. Đặc tả bảng: `DATABASE_V5.md` §7.21–§7.24.
 
 ### Giao tiếp mới
 
@@ -168,7 +170,7 @@ Id logic đổi đích: `video_id` (assessment `video_practice_attempts`), `voca
 | Activity, streak sang user-service; giải thể learning-support | library chỉ gồm catalog + thư viện học cá nhân; user đã giữ learner profile, learning goal nên activity/streak hợp ở đó | Streak vẫn do client tự khai (`PUT /streak`); nếu sau này activity suy ra từ event của assessment/game/library thì user-service (lõi auth) thành consumer của nhiều service |
 | Catalog chỉ soft-delete, FK người học → catalog `RESTRICT` | Không mất dữ liệu người học khi sửa catalog; giữ invariant thẻ `VOCABULARY_SENSE` | Mục catalog đã dùng không xóa cứng được |
 | Bài học có model riêng gắn KP | Bài học không còn bị ép vào package/section | Không versioning bài học |
-| Học theo chủ đề → bài, tuần tự, khóa bài sau; một path mỗi học viên, tạo khi bắt đầu học, ban đầu theo `sort_order`; sau mỗi kết quả xếp lại chủ đề chưa học (cùng cha) và chèn bài ôn bắt buộc cho KP dưới ngưỡng | Học như web luyện thi; path khác dần theo kết quả; goal, band mục tiêu, ngày thi, số phút, placement không dùng để tạo path | Đổi hướng so với `FEATURE_TREE_V2.md` (tutor là nơi học chính) → spec cần cập nhật |
+| Học theo chủ đề → bài, tuần tự, khóa bài sau; một path mỗi học viên, tạo khi bắt đầu học, ban đầu theo `sort_order`; khi bài xong hoặc có kết quả đề thì xếp lại chủ đề chưa học (cùng cha) và chèn bài ôn bắt buộc cho KP yếu | Học như web luyện thi; path khác dần theo kết quả; goal, band mục tiêu, ngày thi, số phút, placement không dùng để tạo path | Đổi hướng so với `FEATURE_TREE_V2.md` (tutor là nơi học chính) → spec cần cập nhật |
 | ai-learning chấm bài tập nhúng, giữ tiến độ, là cổng mở bài; assessment chấm đề cuối chủ đề | Khớp spec V2 §7 (micro question không cần attempt formal); khóa và premium chặn ở server | Ba nơi chấm theo `answer_spec` (game, assessment, ai-learning); `grade_answer` (port DeepTutor) chấm gần đúng nên không dùng được |
 | Hồ sơ người chấm `examiner_profiles` ở user-service, gồm năng lực chấm | Hồ sơ người dùng thuộc context danh tính, cùng chỗ `learner_profiles` | Khi phân công, assessment phải gọi user-service để lấy người chấm đủ điều kiện (endpoint mới) |
 | Notification theo 5 bảng của V5, thêm khóa chống trùng, bỏ outbox | Đã thiết kế trong `DATABASE_V5.md`; consumer event phải idempotent | `push_devices`, `notification_deliveries` chỉ dùng được khi có nhà cung cấp gửi (FCM, email) |
@@ -179,7 +181,7 @@ Id logic đổi đích: `video_id` (assessment `video_practice_attempts`), `voca
 - Hồ sơ người chấm được tạo khi `ADMIN` gán role `EXAMINER`, hay người chấm tự tạo lần đầu đăng nhập?
 - Nguồn tạo notification: event nào (ví dụ `AssessmentCompleted.v2` → "bài đã được chấm", cần queue riêng cho notification trên exchange `assessment.events`) và reminder nào (học hằng ngày, thẻ đến hạn).
 - Nhà cung cấp gửi push/email (FCM, SMTP) là hạ tầng mới, cần duyệt riêng (AGENTS §2). Gửi token quên mật khẩu của user-service cũng phụ thuộc điểm này.
-- Bài học: các câu hỏi còn mở ghi ở [brainstorm bài học](../reports/brainstorm-260928-2215-lesson-learning-flow-report.md) (bài mới thêm vào chủ đề đã đạt, vai trò tutor trong bài, dạng câu hỏi của `answer_spec`, luật chấm điền từ). Tutor đọc bài qua `/reading/sections/{id}` vẫn chạy với package `PRACTICE_SET`; bỏ `LESSON` không ảnh hưởng vì không seed nào dùng.
+- Bài học: đã chốt ngày 2026-09-29 (bài mới thêm vào chủ đề đã đạt, dạng câu hỏi của `answer_spec`, luật chấm điền từ, luật bài ôn; xem [main-learning-pipeline.md](./main-learning-pipeline.md) §8). Còn mở: vai trò tutor trong bài. Tutor đọc bài qua `/reading/sections/{id}` vẫn chạy với package `PRACTICE_SET`; bỏ `LESSON` không ảnh hưởng vì không seed nào dùng.
 - Endpoint entitlement của access đang không có guard (P0 trong scout report) → phải sửa trước khi ai-learning dựa vào nó để kiểm premium.
 
 ## Phases
