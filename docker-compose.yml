@@ -18,6 +18,25 @@ services:
       timeout: 5s
       retries: 5
 
+  library-db:
+    image: postgres:15-alpine
+    container_name: library-db
+    environment:
+      POSTGRES_DB: library_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${LIBRARY_DB_PASSWORD:?Set LIBRARY_DB_PASSWORD}"
+    ports:
+      - "127.0.0.1:5437:5432"
+    networks:
+      - codebase-network
+    volumes:
+      - library-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d library_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   community-db:
     image: postgres:15-alpine
     container_name: community-db
@@ -197,6 +216,7 @@ services:
       GAME_DB_PASSWORD: "${GAME_DB_PASSWORD:?Set GAME_DB_PASSWORD}"
       GATEWAY_INTERNAL_JWT_SECRET: "${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}"
       CONTENT_SERVICE_URL: ${CONTENT_SERVICE_URL:-http://content-service:8082}
+      LIBRARY_SERVICE_URL: ${LIBRARY_SERVICE_URL:-http://library-service:8081}
     ports:
       - "127.0.0.1:8087:8087"
     networks:
@@ -210,6 +230,7 @@ networks:
     driver: bridge
 
 volumes:
+  library-db-data:
   learning-support-db-data:
   community-db-data:
   game-db-data:

@@ -15,6 +15,7 @@ import com.group01.content.application.result.TopicResult;
 import com.group01.content.application.result.TopicTreeResult;
 import com.group01.content.application.usecase.CreateTopicUseCase;
 import com.group01.content.application.usecase.GetTopicTreeUseCase;
+import com.group01.content.application.usecase.GetTopicUseCase;
 import com.group01.content.application.usecase.UpdateTopicUseCase;
 import com.group01.content.domain.exception.DuplicateCodeException;
 import com.group01.content.domain.vo.ContentStatus;
@@ -45,6 +46,8 @@ class TopicControllerTest {
 
     @Mock
     private GetTopicTreeUseCase getTopicTreeUseCase;
+    @Mock
+    private GetTopicUseCase getTopicUseCase;
 
     @Mock
     private CreateTopicUseCase createTopicUseCase;
@@ -82,6 +85,18 @@ class TopicControllerTest {
                 .andExpect(jsonPath("$[0].name").value("Reading"))
                 .andExpect(jsonPath("$[0].bandMin").value(5.0))
                 .andExpect(jsonPath("$[0].bandMax").value(6.5));
+    }
+
+    @Test
+    void shouldReturnTopicByIdForLibrary() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(getTopicUseCase.execute(id)).thenReturn(new TopicResult(
+                id, null, "READING", "Reading", 1, ContentStatus.ACTIVE,
+                Instant.now(), Instant.now(), BandRange.UNBOUNDED));
+
+        mockMvc.perform(get("/api/content/topics/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()));
     }
 
     @Test

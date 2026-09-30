@@ -52,6 +52,11 @@ spring:
               predicates:
                 - Path=/api/access/**
 
+            - id: library-service
+              uri: lb://LIBRARY-SERVICE
+              predicates:
+                - Path=/api/content/videos/**,/api/content/vocabulary/**,/api/content/admin/vocabulary/**
+
             - id: content-service
               uri: lb://CONTENT-SERVICE
               predicates:

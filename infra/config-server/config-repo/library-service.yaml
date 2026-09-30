@@ -1,0 +1,36 @@
+spring:
+  datasource:
+    url: ${LIBRARY_DB_URL:jdbc:postgresql://localhost:5437/library_db}
+    username: ${LIBRARY_DB_USERNAME:postgres}
+    password: ${LIBRARY_DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+app:
+  auth:
+    internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
+    internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
+  security:
+    public-endpoints:
+      - method: GET
+        patterns:
+          - /actuator/health
+          - /actuator/info
+
+library:
+  content:
+    base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,refresh
+  endpoint:
+    health:
+      probes:
+        enabled: true

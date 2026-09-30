@@ -25,11 +25,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             TopicNotFoundException.class,
             KnowledgePointNotFoundException.class,
-            VocabularyNotFoundException.class,
             ContentPackageNotFoundException.class,
             QuestionNotFoundException.class,
             AssetNotFoundException.class,
-            VideoNotFoundException.class,
             ReadingPassageNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFoundException(ContentDomainException ex, HttpServletRequest request) {
