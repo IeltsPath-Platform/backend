@@ -52,14 +52,14 @@ Id logic đổi đích (không đổi code, chỉ ghi tài liệu): `assessment.
 
 | # | PR | Điểm dừng | Trạng thái |
 | --- | --- | --- | --- |
-| S1 | library-service + catalog từ content; content V7; game `VOCABULARY` → library; Gateway | **Dừng trước khi chạy V7 trên DB dùng chung** | Xong (`465f543`); chờ người dùng duyệt V7 trên DB local |
+| S1 | library-service + catalog từ content; content V7; game `VOCABULARY` → library; Gateway | **Dừng trước khi chạy V7 trên DB dùng chung** | Xong (`465f543`); V7 được người dùng duyệt chạy trên DB local, bỏ dữ liệu (2026-10-01) |
 | S1b | Đổi content V13 → V7; `LIBRARY_SERVICE_URL` mặc định localhost | — | Xong (`0da2eb2`) |
 | S2 | Thư viện cá nhân từ learning-support → library (library V2, 4 FK RESTRICT); Gateway | — | Xong (`d762660`) |
 | S3 | activity/streak → user-service; gỡ learning-support | **Dừng trước khi xóa module** (báo danh sách file và route bị gỡ) | Xong (`fec5d14` chuyển, user V5; `ab613b1` gỡ module sau khi người dùng duyệt) |
 | S4 | Tài liệu | — | Xong (`9fd7ada`) |
 
 Nhánh: `feat/library-personal-library` chứa S1, S1b (cherry-pick) và S2; `feat/learning-support-removal` nối tiếp với S3, S4: **nhánh cần merge** (chứa đủ S1–S4). Chưa push.
-Còn lại ngoài code: người dùng duyệt content V7 trên `content_db` local trước khi chạy content-service từ nhánh này. `feat/lesson-library-catalog-split` là bản cũ
+Content V7 đã được duyệt (2026-10-01): chạy trên `content_db` local, không sao lưu, bỏ dữ liệu 5 bảng catalog. `feat/lesson-library-catalog-split` là bản cũ
 của S1/S1b (`99d5347`, `081f22a`), không merge nhánh đó để tránh trùng commit.
 
 Thứ tự `S1 → S1b → S2 → S3 → S4`. S1 + S1b merge vào `feat/main-follow` trước khi plan 1640 thêm migration content.
