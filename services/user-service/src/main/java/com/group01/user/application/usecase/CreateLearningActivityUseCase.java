@@ -1,0 +1,27 @@
+package com.group01.user.application.usecase;
+
+import com.group01.user.application.command.CreateLearningActivityCommand;
+import com.group01.user.application.result.LearningActivityResult;
+import com.group01.user.domain.aggregate.LearningActivity;
+import com.group01.user.domain.repository.LearningActivityRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class CreateLearningActivityUseCase {
+    private final LearningActivityRepository repository;
+
+    @Transactional
+    public LearningActivityResult execute(CreateLearningActivityCommand command) {
+        return LearningActivityResult.from(repository.save(LearningActivity.create(
+                command.userId(),
+                command.activityType(),
+                command.sourceType(),
+                command.sourceId(),
+                command.occurredAt(),
+                command.durationSeconds()
+        )));
+    }
+}
