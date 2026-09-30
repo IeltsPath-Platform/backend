@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class LearningSupportRouteConfigTest {
     @Test
-    void activityAndStreakRouteToUserBeforeLearningSupportFallback() throws Exception {
+    void activityAndStreakRouteToUserWithoutGeneralFallback() throws Exception {
         Path root = Path.of(System.getProperty("user.dir")).toAbsolutePath();
         while (root != null && !Files.exists(root.resolve("infra/config-server/config-repo/api-gateway.yaml"))) {
             root = root.getParent();
@@ -22,16 +22,15 @@ class LearningSupportRouteConfigTest {
                 new FileSystemResource(root.resolve("infra/config-server/config-repo/api-gateway.yaml"))).getFirst();
         String prefix = "spring.cloud.gateway.server.webflux.routes[";
         int userIndex = -1;
-        int fallbackIndex = -1;
         for (int index = 0; index < 30; index++) {
             Object id = yaml.getProperty(prefix + index + "].id");
-            if ("user-learning-support-service".equals(id)) userIndex = index;
-            if ("learning-support-service".equals(id)) fallbackIndex = index;
+            if ("user-activity-streak-service".equals(id)) userIndex = index;
+            assertNotEquals("Path=/api/learning-support/**",
+                    yaml.getProperty(prefix + index + "].predicates[0]"));
         }
-        assertTrue(userIndex >= 0 && userIndex < fallbackIndex);
+        assertTrue(userIndex >= 0);
         assertEquals("lb://USER-SERVICE", yaml.getProperty(prefix + userIndex + "].uri"));
         assertEquals("Path=/api/learning-support/activities/**,/api/learning-support/streak/**",
                 yaml.getProperty(prefix + userIndex + "].predicates[0]"));
-        assertEquals("Path=/api/learning-support/**", yaml.getProperty(prefix + fallbackIndex + "].predicates[0]"));
     }
 }

@@ -1,23 +1,4 @@
 services:
-  learning-support-db:
-    image: postgres:15-alpine
-    container_name: learning-support-db
-    environment:
-      POSTGRES_DB: learning_support_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}"
-    ports:
-      - "127.0.0.1:5433:5432"
-    networks:
-      - codebase-network
-    volumes:
-      - learning-support-db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d learning_support_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   library-db:
     image: postgres:15-alpine
     container_name: library-db
@@ -231,7 +212,6 @@ networks:
 
 volumes:
   library-db-data:
-  learning-support-db-data:
   community-db-data:
   game-db-data:
   rabbitmq-data:

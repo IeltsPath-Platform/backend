@@ -72,15 +72,10 @@ spring:
               predicates:
                 - Path=/api/learning-support/flashcards/**,/api/learning-support/decks/**,/api/learning-support/notes/**,/api/learning-support/video-progress/**,/api/learning-support/saved-segments/**
 
-            - id: user-learning-support-service
+            - id: user-activity-streak-service
               uri: lb://USER-SERVICE
               predicates:
                 - Path=/api/learning-support/activities/**,/api/learning-support/streak/**
-
-            - id: learning-support-service
-              uri: lb://LEARNING-SUPPORT-SERVICE
-              predicates:
-                - Path=/api/learning-support/**
 
             - id: game-service
               uri: lb://GAME-SERVICE
