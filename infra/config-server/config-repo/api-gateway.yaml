@@ -67,6 +67,11 @@ spring:
               predicates:
                 - Path=/api/assessments/**
 
+            - id: library-personal-service
+              uri: lb://LIBRARY-SERVICE
+              predicates:
+                - Path=/api/learning-support/flashcards/**,/api/learning-support/decks/**,/api/learning-support/notes/**,/api/learning-support/video-progress/**,/api/learning-support/saved-segments/**
+
             - id: learning-support-service
               uri: lb://LEARNING-SUPPORT-SERVICE
               predicates:
