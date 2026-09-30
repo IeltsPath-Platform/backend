@@ -26,7 +26,7 @@ game:
   content:
     base-url: ${CONTENT_SERVICE_URL:http://content-service:8082}
   library:
-    base-url: ${LIBRARY_SERVICE_URL:http://library-service:8081}
+    base-url: ${LIBRARY_SERVICE_URL:http://localhost:8081}
   websocket:
     allowed-origins: ${GAME_WEBSOCKET_ALLOWED_ORIGINS:http://localhost:5173}
 
