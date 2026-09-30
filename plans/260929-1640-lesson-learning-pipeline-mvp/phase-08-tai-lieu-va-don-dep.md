@@ -11,7 +11,7 @@ effort: "0.5 ngày"
 
 ## Overview
 
-Đưa tài liệu khớp code sau phase 2–7 và kiểm toàn repo. **Không** viết lại `docs/system-architecture.md`: plan `260928-2019-architecture-doc-service-split` giữ việc đó (phase 2 của plan ấy, sau khi tách library-service). Ở đây chỉ sửa những mục mô tả sai hành vi hiện tại.
+Đưa tài liệu khớp code sau phase 2–7 và kiểm toàn repo. **Không** viết lại `docs/system-architecture.md` (việc chia service có plan riêng và viết lại tài liệu này khi tách xong). Ở đây chỉ sửa những mục mô tả sai hành vi hiện tại.
 
 ## Requirements
 
@@ -22,7 +22,8 @@ effort: "0.5 ngày"
 
 - Modify:
   - `docs/system-architecture.md`: chỉ §6 (luồng tạo path, kết quả thi → mastery, luồng bài học) và §11 (bỏ mục đã giải; thêm: "cổng bài học là nguồn quyết định luồng học, `next_objective` chỉ là gợi ý cho tutor"). Dòng bảng HTTP §3 cho `/internal/learning-content` và bỏ endpoint KP mapping.
-  - `.sdd/database/DATABASE_V5.md`: content (bảng bài học, `content_packages.topic_id`, `knowledge_points` bỏ band), ai-learning bỏ `mastery_path_knowledge_point_bands`, assessment (`answer_snapshot` chứa đáp án và lời giải), ai-learning (bảng V10–V11).
+  - `.sdd/database/DATABASE_V5.md`: content (bảng bài học, `content_packages.topic_id`, `knowledge_points` bỏ band), ai-learning bỏ `mastery_path_knowledge_point_bands`, assessment (`answer_snapshot` chứa đáp án và lời giải), ai-learning (bảng V10–V11). Theo Validation Session 1: §7.21 `topic_progress` bỏ cột `status` (suy ra khi đọc, chỉ lưu `passed_at`); §7.24 `path_review_items.status` thêm `SKIPPED`; §7.23 ghi "chỉ lần nộp đầu ghi bằng chứng"; dòng V5.3 ghi 0908 đã hoãn.
+  - `docs/ai-learning-database.md` (bỏ goal và band, thêm bảng V11) và `.sdd/database/mvp-database.md` (đã đồng bộ thiết kế ở phase 1 lộ trình 2026-10-01; ở đây chỉ đánh dấu mục nào đã có migration).
   - `.sdd/specs/FEATURE_TREE_V2.md` `:11`, `:269`, `:330`, `:472`, `:591`: bài học là nơi học chính.
   - `AGENTS.md` §3.8: bỏ câu "Sắp thứ tự path bằng LLM không bị giới hạn (một lần mỗi goal)"; thêm "path theo user, không LLM; luật bài học trong `app/lessons`". Cập nhật dòng "Cập nhật lần cuối … commit".
   - `CLAUDE.md` §1, §5 nếu có dữ kiện đổi; `services/ai-learning-service/CLAUDE.md`.
@@ -30,7 +31,7 @@ effort: "0.5 ngày"
 
 ## Implementation Steps
 
-1. Grep kiểm các dữ kiện sắp ghi: route, tên bảng, setting, migration content V7–V8 và ai-learning V10–V11; assessment không migration mới.
+1. Grep kiểm các dữ kiện sắp ghi: route, tên bảng, setting, migration content V8–V9 và ai-learning V10–V11; assessment không migration mới.
 2. Sửa từng tài liệu ở trên.
 3. `graphify update .` (thêm `--force` vì số node giảm có chủ đích).
 4. Kiểm toàn repo:
@@ -52,5 +53,5 @@ docker compose config --quiet
 
 ## Risk Assessment
 
-- **Chồng chéo với plan kiến trúc:** chỉ sửa §3 (một dòng), §6, §11; ghi vào plan kiến trúc rằng đặc tả §12 đã cập nhật ở phase 1.
+- **Phạm vi sửa `docs/system-architecture.md`:** chỉ §3 (một dòng), §6, §11; phần kiến trúc chia service do plan chia service làm.
 - **`.sdd/global`** là baseline LOCKED: không sửa constitution.

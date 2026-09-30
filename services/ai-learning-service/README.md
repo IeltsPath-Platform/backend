@@ -188,6 +188,8 @@ runtime configuration; do not put them in this file or the image.
 
 `ai_learning_db` is migrated by Flyway from `migrations/`, in numeric version order:
 
+For table purposes, relationships, and concrete examples, see [the AI Learning database guide](../../docs/ai-learning-database.md).
+
 | Version | File | Creates |
 | --- | --- | --- |
 | `0.1` | `V0_1__create_v5_mastery_tables.sql` | V5 `mastery_paths`, `mastery_interactions`, `mastery_events` |
