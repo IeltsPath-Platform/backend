@@ -15,8 +15,9 @@ from app.application.path_service import PathService
 from app.learning.ordering_llm import LlmProposal, OrderingLlm
 from app.learning.path_ordering import PayloadTooLarge
 from tests.formal_assessment_support import InMemoryLearningStore, event, item, mapping
+from tests.test_ordering_validator import valid_proposal
 from tests.test_path_ordering import (
-    KP_A, KP_B, KP_C, MODULE_A, MODULE_B, TODAY, goal, ordering_curriculum, valid_proposal,
+    KP_A, KP_B, KP_C, MODULE_A, MODULE_B, TODAY, goal, ordering_curriculum,
 )
 
 
@@ -277,7 +278,7 @@ class OrderedPathCreationTest(unittest.TestCase):
                 self.assertEqual((event_data["source"], event_data["reason"]), ("content", reason))
                 self.assertEqual(progress.learner_profile.target_level, "IELTS band 6.5")
 
-    def test_pending_placement_informs_prompt_and_is_still_applied_after_ordering(self):
+    def test_pending_placement_informs_prompt_but_never_changes_mastery(self):
         payload = event(user_id=self.goal["userId"], goal_id=self.goal["id"], attempt_id=str(uuid4()),
                         items=[item([mapping(KP_C)], is_correct=True), item([mapping(KP_B)], is_correct=False)],
                         assessment_type="PLACEMENT")
@@ -291,14 +292,14 @@ class OrderedPathCreationTest(unittest.TestCase):
         placements = {point["id"]: point["placement"] for module in data["modules"]
                       for point in module["knowledge_points"]}
         self.assertEqual(placements, {KP_A: "not_tested", KP_B: "incorrect", KP_C: "correct"})
-        self.assertEqual(set(progress.learner_mastery_overrides), {KP_A, KP_C})
-        self.assertEqual(len(progress.learning_evidence), 2)
+        # The placement is consumed but never changes mastery or skips a knowledge point.
+        self.assertEqual(progress.learner_mastery_overrides, {})
+        self.assertEqual(len(progress.learning_evidence), 0)
         self.assertEqual(self.store.pending, {})
         _, status = asyncio.run(self.paths.active_status(self.goal["userId"], "internal-token"))
-        self.assertEqual(status["knowledgePointId"], KP_B)
+        self.assertEqual(status["knowledgePointId"], KP_C)
         self.assertEqual(ordered_ids(progress), LLM_ORDER)
-        self.assertTrue(any(pid == path_id and name == "placement.tested_out"
-                            for pid, _, name, _ in self.store.committed_events))
+        self.assertFalse(any(name == "placement.tested_out" for _, _, name, _ in self.store.committed_events))
 
     def test_existing_path_reads_and_refresh_do_not_call_llm_or_reset_created_order(self):
         path_id, _ = self.create()

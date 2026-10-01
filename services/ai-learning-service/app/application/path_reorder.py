@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.application.curriculum_refresh import same_structure
-from app.learning.path_ordering import InvalidOrdering, OrderingValidator
+from app.learning.ordering_validator import InvalidOrdering, OrderingValidator
 from app.mastery.models import LearningProgress
 from app.mastery.service import LearningService
 

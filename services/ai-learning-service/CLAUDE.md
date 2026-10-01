@@ -26,7 +26,7 @@
 | `tutor/` | `TutorEngine` (vòng tool-calling ≤ 6 vòng), tools, prompts, session store, learner memory, bài đọc |
 | `practice/` | Practice notebook và lịch ôn theo câu |
 | `usage/` | Hạn mức lượt tutor/tóm tắt memory theo ngày (`DailyQuotaStore`) |
-| `learning/` | LLM sắp thứ tự, provenance, placement test-out |
+| `learning/` | LLM sắp thứ tự, kiểm hoán vị thứ tự (`ordering_validator.py`), provenance |
 | `llm/` | Client OpenAI-compatible (`AI_LEARNING_LLM_*`) |
 | `messaging/` | Consumer `AssessmentCompleted.v2` và topology retry/DLQ |
 | `persistence/`, `security/` | `PostgresLearningStore`; kiểm internal JWT |

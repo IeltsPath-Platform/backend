@@ -6,17 +6,16 @@ policy alone decides what to learn next inside the scoped path.
 
 Rule: a knowledge point is in scope when its effective ``bandMin`` (from
 Content Service) is empty or not above the goal's target band. There is no
-upper bound: points easier than the target stay in the path, and placement
-test-out lets a learner skip them.
+upper bound: points easier than the target stay in the path.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any
 
-_HIGHEST_BAND = Decimal("9.0")
+from app.adapters.knowledge_point_details import KnowledgePointDetails, details_from_content, parse_band
 
 
 class NoCurriculumInScope(Exception):
@@ -30,12 +29,6 @@ class KnowledgePointBand:
 
 
 @dataclass(frozen=True)
-class KnowledgePointDetails:
-    skill: str | None
-    description: str
-
-
-@dataclass(frozen=True)
 class ScopedCurriculum:
     topics: list[dict[str, Any]]
     knowledge_points: list[dict[str, Any]]
@@ -44,21 +37,6 @@ class ScopedCurriculum:
     excluded_count: int = 0
     # Content metadata copied for the kept points so tutor tools need no Content token.
     details: dict[str, KnowledgePointDetails] = field(default_factory=dict)
-
-
-def parse_band(value: Any, name: str) -> Decimal | None:
-    """An IELTS band (0.0-9.0, half-band steps) or ``None``; anything else is a contract error."""
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        raise ValueError(f"{name} must be a number")
-    try:
-        band = Decimal(str(value))
-    except InvalidOperation as exc:
-        raise ValueError(f"{name} must be a number") from exc
-    if not band.is_finite() or band < 0 or band > _HIGHEST_BAND or (band * 2) % 1 != 0:
-        raise ValueError(f"{name} must be an IELTS band between 0.0 and 9.0 in half-band steps")
-    return band.quantize(Decimal("0.1"))
 
 
 def target_band_of(goal: dict[str, Any]) -> Decimal:
@@ -91,10 +69,7 @@ class CurriculumScope:
             kept.append(point)
             point_id = str(point["id"])
             bands[point_id] = band
-            details[point_id] = KnowledgePointDetails(
-                skill=point.get("skill") or None,
-                description=(point.get("description") or "")[:1000],
-            )
+            details[point_id] = details_from_content(point)
             topics_kept.add(topic_id)
         if knowledge_points and not kept:
             raise NoCurriculumInScope

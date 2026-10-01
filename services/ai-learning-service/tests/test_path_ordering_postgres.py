@@ -18,7 +18,8 @@ from tests.llm_test_support import OpenAiStub, TEST_API_KEY, TEST_MODEL, isolate
 from tests.formal_assessment_support import event, item, mapping
 from tests.postgres_schema_support import PostgresSchema, database_url_or_skip
 from tests.test_path_orderer import CONTENT_ORDER, LLM_ORDER, ContentClient, GoalClient, ordered_ids
-from tests.test_path_ordering import KP_A, KP_B, KP_C, TODAY, goal, valid_proposal
+from tests.test_ordering_validator import valid_proposal
+from tests.test_path_ordering import KP_A, KP_B, KP_C, TODAY, goal
 
 
 class PathOrderingPostgresTest(unittest.TestCase):
@@ -89,15 +90,15 @@ class PathOrderingPostgresTest(unittest.TestCase):
                 self.assertNotIn(TEST_API_KEY, json.dumps(events))
                 reloaded = self.service(learner)
                 _, status = asyncio.run(reloaded.active_status(learner["userId"], "internal-token"))
-                expected_next = KP_B if learner is with_placement else KP_C
-                self.assertEqual(status["knowledgePointId"], expected_next)
+                # A placement never skips knowledge points, so both learners start at the same point.
+                self.assertEqual(status["knowledgePointId"], KP_C)
                 _, refreshed, added = asyncio.run(reloaded.refresh_active_path(learner["userId"], "internal-token"))
                 self.assertEqual((ordered_ids(refreshed), added, refreshed.version), (LLM_ORDER, 0, progress.version))
         self.assertEqual(len(server.requests), 2)
         self.assertNotEqual(*path_ids)
         first = PostgresLearningStore(self.schema.url).get_owned_progress(path_ids[0], with_placement["userId"])
-        self.assertEqual(set(first.learner_mastery_overrides), {KP_A, KP_C})
-        self.assertEqual(len(first.learning_evidence), 2)
+        self.assertEqual(first.learner_mastery_overrides, {})
+        self.assertEqual(len(first.learning_evidence), 0)
         self.assertIn("Placement band 5.0", first.learner_profile.prior_knowledge)
         self.assertEqual(self.schema.query("SELECT count(*) FROM pending_formal_assessment_results "
                                            "WHERE user_id = %s AND learning_goal_id = %s",
