@@ -1,5 +1,8 @@
 package com.group01.content.api.controller;
 
+import com.group01.content.domain.vo.BandRange;
+import java.math.BigDecimal;
+
 import com.group01.content.api.exception.GlobalExceptionHandler;
 import com.group01.content.application.result.KnowledgePointResult;
 import com.group01.content.application.usecase.CreateKnowledgePointUseCase;
@@ -67,9 +70,8 @@ class KnowledgePointControllerTest {
                 .andExpect(jsonPath("$[2].learningType").value("PROCEDURE"))
                 .andExpect(jsonPath("$[3].learningType").value("DESIGN"))
                 .andExpect(jsonPath("$[0].bandMin").doesNotExist())
-                .andExpect(jsonPath("$[0].bandMax").doesNotExist())
-                .andExpect(jsonPath("$[0].effectiveBandMin").doesNotExist())
-                .andExpect(jsonPath("$[0].effectiveBandMax").doesNotExist());
+                .andExpect(jsonPath("$[0].effectiveBandMin").value(4.0))
+                .andExpect(jsonPath("$[0].effectiveBandMax").value(5.0));
     }
 
     @Test
@@ -97,19 +99,16 @@ class KnowledgePointControllerTest {
     }
 
     @Test
-    void ignoresLegacyBandFieldsOnKnowledgePointCreation() throws Exception {
-        when(createKnowledgePointUseCase.execute(any())).thenReturn(result(UUID.randomUUID(), LearningType.MEMORY));
-
+    void rejectsAnInvalidBandRangeOnKnowledgePointCreation() throws Exception {
         mockMvc.perform(post("/api/content/knowledge-points")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"topicId":"%s","code":"KP-1","name":"Example","kind":"GRAMMAR","learningType":"MEMORY",
                                  "bandMin":6.0,"bandMax":5.0}
                                 """.formatted(UUID.randomUUID())))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.bandMin").doesNotExist());
+                .andExpect(status().isBadRequest());
 
-        verify(createKnowledgePointUseCase).execute(any());
+        verify(createKnowledgePointUseCase, never()).execute(any());
     }
 
     private KnowledgePointResult result(UUID id, LearningType learningType) {
@@ -125,7 +124,9 @@ class KnowledgePointControllerTest {
                 null,
                 ContentStatus.ACTIVE,
                 now,
-                now
+                now,
+                BandRange.UNBOUNDED,
+                BandRange.of(new BigDecimal("4.0"), new BigDecimal("5.0"))
         );
     }
 }

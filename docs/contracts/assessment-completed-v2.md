@@ -3,16 +3,14 @@
 Integration contract between Assessment Service (producer) and AI Learning
 Service (consumer). Assessment Service is the formal grading authority; DeepTutor,
 inside AI Learning, is the only adaptive engine (mastery, repetition, review queue,
-next objective). **The nullable-goal and package-version contract changes were approved
-2026-10-01; the current producer and consumer still use the earlier contract until implementation.**
+next objective).
 
 ## When it is emitted
 
 The event is emitted when a result version is finalized:
 
 ```text
-POST /api/assessments/attempts                                  capture Content package, item and KP snapshots; no goal lookup
-POST /api/assessments/attempts/{id}/submit                       objective items: auto-grade -> COMPLETED + outbox in one transaction
+POST /api/assessments/attempts                                  capture active learning goal + Content KP snapshot
 POST /api/assessments/grading/attempts/{attemptId}/results      EXAMINER/ADMIN opens a DRAFT version
 PUT  /api/assessments/grading/results/{resultId}/details        item results, max scores, judgments, band (still DRAFT)
 POST /api/assessments/grading/results/{resultId}/finalize       FinalizeAssessmentResultUseCase: DRAFT/PROCESSING -> COMPLETED
@@ -24,8 +22,8 @@ OutboxRelay                                                     committed row ->
   item to have an item result with `score` and `max_score`.
 - A COMPLETED version is immutable. A regrade opens the next `result_version` for the
   same attempt, and that version is finalized and announced on its own.
-- Every completed result version emits an event, including an attempt without an active
-  goal. The new producer always sends `learning_goal_id: null`; it does not query User Service.
+- An attempt started while the learner had no active goal is finalized without an
+  event, because it cannot be attributed to a learning path.
 - `uq_outbox_assessment_completed_result` allows at most one `AssessmentCompleted.v2`
   row per result version.
 
@@ -44,15 +42,14 @@ OutboxRelay                                                     committed row ->
 | Field | Type | Notes |
 | --- | --- | --- |
 | `user_id` | UUID | Learner. |
-| `learning_goal_id` | UUID or null; key may be absent on older events | The new producer always sends `null`. The consumer accepts `null` or a missing key and locates the path by `user_id`; a legacy non-null value is retained as metadata but does not select a path. |
-| `package_version_id` | UUID; key may be absent on older events | The new producer always sends the Content package version used to create the attempt. The consumer tolerates a missing key and skips package-specific topic handling; it does **not** DLQ solely for absence. |
+| `learning_goal_id` | UUID | **Required.** The goal captured when the attempt started. It is never replaced by whichever goal is active later. |
 | `attempt_id` | UUID | Regrade lineage: every version of one attempt's result shares it. |
 | `result_id` | UUID | The versioned result row (a new id for each version). |
 | `result_version` | integer >= 1 | Monotonic per attempt. |
 | `assessment_type` | string | `PLACEMENT`, `OFFICIAL_PRACTICE`, `MOCK`, `TOPIC_GATE`, `QUIZ` |
 | `status` | string | Always `COMPLETED`. |
 | `completed_at` | ISO-8601 instant | |
-| `overall_band` | number or null | The grader's band for this version (0.0–9.0, half-band steps); `null` when none was recorded. Optional on older events. Placement no longer writes mastery or tests out KPs; the field remains for compatibility. |
+| `overall_band` | number or null | The grader's band for this version (0.0–9.0, half-band steps); `null` when none was recorded. **Optional and additive:** events published before it existed have no such key, and consumers read a missing key as `null`. AI Learning uses it only for `PLACEMENT` test-out. |
 | `item_results[]` | array | One entry per attempt item. |
 
 Each `item_results[]` entry:
@@ -76,18 +73,6 @@ Each `knowledge_point_mappings[]` entry:
 
 The event carries no correct answers, expected answers or examiner reasoning.
 
-Example for seed code `X1`, with Q15 answered wrongly. The seed assigns codes but not UUIDs, so UUIDs and timestamps below illustrate the envelope and relationships:
-
-```json
-{
-  "event_id":"20000000-0000-4000-8000-000000000991","event_type":"AssessmentCompleted.v2","occurred_at":"2026-10-01T09:10:00Z","source":"assessment-service",
-  "data":{"user_id":"20000000-0000-4000-8000-000000000981","learning_goal_id":null,"package_version_id":"20000000-0000-4000-8000-000000000401","attempt_id":"20000000-0000-4000-8000-000000000971","result_id":"20000000-0000-4000-8000-000000000975","result_version":1,"assessment_type":"TOPIC_GATE","status":"COMPLETED","completed_at":"2026-10-01T09:10:00Z","overall_band":null,
-    "item_results":[{"item_result_id":"20000000-0000-4000-8000-000000000998","question_version_id":"20000000-0000-4000-8000-000000000015","is_correct":false,"score":0,"max_score":1,"knowledge_point_mappings":[{"knowledge_point_id":"20000000-0000-4000-8000-000000000006","weight":1.0,"qualitative_judgment":null,"error_type":null}]}]}
-}
-```
-
-The example shows Q15 only; the actual X1 result contains Q2, Q14, Q15 and Q16. For `TOPIC_GATE`, only the **first completed submission** for `(user_id, package_version_id)` after the matching assignment's `assigned_at` consumes that assignment and may open the topic. Other attempts of the same version for that assignment do not open the topic, but their results still contribute mastery evidence. When all package codes have been used, the learner is assigned the least recently used code again; its new `assigned_at` starts a new assignment window, and prior knowledge of the answers is an accepted MVP limit. No `assignmentId` is added to the Assessment start request. Item evidence and review evaluation use the Content KP snapshot.
-
 ## RabbitMQ topology
 
 | Object | Name | Owner |
@@ -101,7 +86,7 @@ The example shows Q15 only; the actual X1 result contains Q2, Q14, Q15 and Q16. 
 Consumer delivery rules:
 
 - ACK only after the path's PostgreSQL transaction commits.
-- No path yet for `user_id`: the event is parked in
+- No path yet for `(user_id, learning_goal_id)`: the event is parked in
   `pending_formal_assessment_results` (keyed by `event_id`, so a redelivery keeps one
   row) and ACKed. It is not retried and never reaches the DLQ. See below.
 - Transient failure: NACK without requeue, so the message waits in the retry queue.
@@ -125,38 +110,38 @@ Consumer delivery rules:
     `calculate_mastery` and `scheduler.replay`, then the new version is applied.
 - `UNIQUE (path_id, source, source_reference_id)` on `mastery_learning_evidence` is the
   database backstop against a duplicated outcome.
-- The consumer applies the `TOPIC_GATE` assignment rule above by learner and package
-  version. Later completed attempts of the same version still pass through evidence
-  and review processing, while the topic transition remains one-way.
 
-`PLACEMENT` records only the processed result version. It writes no mastery evidence and performs no test-out.
+## Placement test-out
+
+For `assessment_type = PLACEMENT`, AI Learning also tests out knowledge points, after recording the evidence and in
+the same transaction:
+
+- every point of the path whose effective band (snapshot taken from Content when the path was built) has an upper
+  end not above `overall_band`;
+- every point that at least one item of this placement maps to, with no item answered wrong or judged `FAIL`.
+
+A tested-out point is a DeepTutor learner mastery override noted `placement:{attempt_id}:v{result_version}`. A higher
+result version of the same attempt replaces the earlier test-out. Points already mastered by evidence, and points
+with a learner's own override, are left as they are. Other assessment types never test out.
 
 ## Results that arrive before the learning path
 
 The consumer cannot create a path: that needs the learner's token to read the
-curriculum. A result for a user whose path does not exist yet is parked. Path creation
-or loading an existing path applies pending results for the user; learner `GET /topics`
-also refreshes the path.
+curriculum. A result for a goal whose path does not exist yet is therefore parked,
+and the learner's first path request (`POST /paths`, `GET /progress` or `GET /status`)
+applies it.
 
-- Parking and path creation both take a transaction-scoped advisory lock keyed by
-  `user_id`. Either the row is parked before
+- Parking and path creation both take `pg_advisory_xact_lock` on
+  `hashtextextended('{user_id}:{learning_goal_id}', 0)`. Either the row is parked before
   the path commits, and creation applies it, or parking sees the committed path and
   applies the result normally.
-- The transaction that creates or loads the path applies every parked result of that
-  `user_id` in `(attempt_id, result_version)` order through the same
+- The transaction that creates the path applies every parked result of that
+  `(user_id, learning_goal_id)` in `(attempt_id, result_version)` order through the same
   pipeline and ledger as a live event, deletes them, and commits path, curriculum and
   results as one revision. Only the latest version of an attempt remains in effect.
-- A legacy non-null `learning_goal_id` does not prevent applying a result to the user's
-  one path; results belonging to another user are never applied.
+- Parked results of another goal are never applied to the path.
 - A parked payload that no longer parses stays parked, is logged, and does not block
   the path. Rows are kept until the path is created; there is no expiry yet.
 - If applying a parked result fails, the whole path creation rolls back (no partial
   state) and the request fails, with 503 when the database is unavailable; the next
   request retries it.
-
-## Rollout and DLQ replay
-
-1. Deploy AI Learning's consumer/adapter accepting `learning_goal_id` as null or missing and `package_version_id` as optional **before** deploying Assessment's new producer. Also deploy the one-path-per-user pending lookup before allowing goal-less results. An old consumer treats a goal-less event as a contract violation and can send it to `ai-learning.assessment-completed.v2.dlq`.
-2. Pause the Assessment outbox relay or producer while recovering from a mixed-version rollout. Inspect the DLQ count and the `x-ai-learning-failure` header without logging payload answers or tokens. Confirm the new consumer and path schema are healthy, then resume normal publication.
-3. For each DLQ message caused by the old consumer's nullable-goal rejection, preserve the **original body, `event_id`, AMQP `message_id`, `event_type`, and `result_version`** and republish to `assessment.events` with routing key `assessment.completed.v2` and publisher confirmation. ACK/remove the DLQ copy only after confirmed routing. Do not rewrite `learning_goal_id` or invent a goal. Other contract failures require investigation before replay.
-4. Verify the main/retry/DLQ counts settle and `formal_assessment_result_versions` advances or the event is parked in `pending_formal_assessment_results` for its `user_id`. A later path load must drain parked rows. Redelivery is safe under `event_id` parking and result-version idempotency; keep the DLQ copy when publish confirmation fails.

@@ -103,7 +103,7 @@ class AssessmentRabbitMqTest(unittest.TestCase):
     def test_invalid_contract_reaches_the_dead_letter_queue(self):
         payload = event(user_id=self.user_id, goal_id=self.goal_id, attempt_id=str(uuid4()),
                         items=[item([mapping(VOCABULARY_KP)], is_correct=True)])
-        del payload["data"]["user_id"]
+        del payload["data"]["learning_goal_id"]
         self.publish(json.dumps(payload).encode())
 
         method, properties, body = self.consume_one(self.topology.queue)

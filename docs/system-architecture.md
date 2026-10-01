@@ -1,6 +1,6 @@
 # Kiến trúc hệ thống IELTSPath (backend)
 
-- Cập nhật lần cuối: 2026-10-01; dữ kiện đã kiểm với code tại commit `ab613b1`
+- Cập nhật lần cuối: 2026-09-27; dữ kiện đã kiểm với code tại commit `79f9fd6`
 - Đọc khi cần hiểu toàn hệ thống. Quy tắc bắt buộc nằm ở [`AGENTS.md`](../AGENTS.md); hướng dẫn chạy chi tiết ở
   [`README.md`](../README.md). Code là nguồn đúng khi tài liệu này lệch.
 
@@ -18,14 +18,13 @@ Maven). Mỗi business service sở hữu database PostgreSQL riêng. Client ch�
                    Eureka :8761      (mọi service Java đọc config khi khởi động)
                         ^
                         | đăng ký / tìm instance (lb://)
-Client --> API Gateway :8080 --(internal JWT)--> user :8085, content :8082, library :8081,
-               |                                 assessment :8083, access :8084, game :8087 (+ws), notification :8088,
+Client --> API Gateway :8080 --(internal JWT)--> user :8085, content :8082, assessment :8083, access :8084,
+               |                                 learning-support :8086, game :8087 (+ws), notification :8088,
                |                                 community :8089
                +--(URI cố định, không Eureka)--> ai-learning :8000 (Python)
 
 assessment --outbox--> RabbitMQ exchange assessment.events --assessment.completed.v2--> ai-learning consumer
-assessment --HTTP--> content, user        game --HTTP--> library, content
-library --HTTP--> content                 ai-learning --HTTP--> content, user
+assessment --HTTP--> content, user        game --HTTP--> content        ai-learning --HTTP--> content, user
 ```
 
 `third_party/deeptutor` là bản clone DeepTutor dùng để đọc khi port; không service nào import nó.
@@ -38,11 +37,11 @@ library --HTTP--> content                 ai-learning --HTTP--> content, user
 | `infra/eureka-server` | Service registry | — | — |
 | `infra/api-gateway` | Ingress WebFlux: xác thực external JWT, ký internal JWT, routing, CORS, correlation id | — | — |
 | `shared/common-security` | Thư viện: security servlet cho downstream, internal JWT, `CanonicalRoles`, `CurrentUserProvider` | — | — |
-| `user-service` | Tài khoản, role, đăng nhập/refresh/logout, hồ sơ học viên, learning goal, activity và streak | `user_db` (Postgres local 5432; V5 tạo `learning_activities`, `streaks`) | `/auth/**`, `/api/users/**`, `/api/learning-support/{activities,streak}/**` |
-| `content-service` | Chủ đề, knowledge point, câu hỏi (có version), gói nội dung/bài đọc, asset; kiểm topic cho library và snapshot grammar cho game | `content_db` (local 5432; V7 xóa năm bảng catalog) | `/api/content/**` trừ nhóm từ vựng/video |
-| `library-service` | Catalog từ vựng/video (V1, năm bảng), flashcard/deck, note, tiến độ video và đoạn đã lưu (V2, sáu bảng) | `library_db` (compose host 5437) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
+| `user-service` | Tài khoản, role, đăng nhập/refresh/logout, quên/đặt lại mật khẩu, OAuth identity, hồ sơ học viên, learning goal | `user_db` (Postgres local 5432) | `/auth/**`, `/api/users/**` |
+| `content-service` | Chủ đề, knowledge point, từ vựng, câu hỏi (có version), gói nội dung/bài đọc, video, asset; API nội bộ cho assessment và game | `content_db` (local 5432) | `/api/content/**` |
 | `assessment-service` | Lượt làm bài, chấm, kết quả (có version), bài nộp, video practice; phát `AssessmentCompleted.v2` | `assessment_db` (local 5432) | `/api/assessments/**` |
 | `access-service` | Gói, subscription, activation key, ví điểm và sổ điểm | `access_db` (local 5432) | `/api/access/**` |
+| `learning-support-service` | Tiện ích của học viên: activity, streak, tiến độ video, đoạn video đã lưu, note, flashcard/deck | `learning_support_db` (compose 5433) | `/api/learning-support/**` |
 | `game-service` | Phòng game, trận, phiên chơi, WebSocket realtime | `game_db` (compose 5435) | `/api/games/**`, `/ws/games/**` |
 | `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (compose 5434; default code là local 5432, đổi bằng `COMMUNITY_DB_URL`) | `/api/community/**` |
 | `notification-service` | Chưa triển khai (chỉ khung package) | `notification_db` (local 5432) | `/api/notifications/**` |
@@ -50,8 +49,6 @@ library --HTTP--> content                 ai-learning --HTTP--> content, user
 
 Chi tiết schema: [`.sdd/database/DATABASE_V5.md`](../.sdd/database/DATABASE_V5.md). Service Java tự chạy Flyway khi khởi
 động (`src/main/resources/db/migration`); AI Learning dùng container `ai-learning-migrate` (Flyway) trên `migrations/`.
-Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở hữu mới; không còn route tổng quát
-`/api/learning-support/**`. Library V2 có bốn FK `ON DELETE RESTRICT` tới catalog; không có bảng `outbox_events`.
 
 ## 3. Giao tiếp giữa service
 
@@ -61,15 +58,11 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | --- | --- | --- | --- |
 | assessment | content | `/internal/assessment-content/knowledge-point-mappings` | `CONTENT_SERVICE_URL` |
 | assessment | user | `/api/users/me/learning-goals/active` | `USER_SERVICE_URL` |
-| library | content | `GET /api/content/topics/{id}` khi ghi video | `CONTENT_SERVICE_URL` (mặc định `http://localhost:8082`) |
-| game (`VOCABULARY`) | library | `POST /internal/game-content/snapshots` | `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) |
-| game (`GRAMMAR`) | content | `POST /internal/game-content/snapshots` | `CONTENT_SERVICE_URL` |
+| game | content | `/internal/game-content/snapshots` | `CONTENT_SERVICE_URL` |
 | ai-learning | content | `/api/content/topics`, `/api/content/knowledge-points`, `/api/content/reading/sections/{id}` | `AI_LEARNING_CONTENT_SERVICE_BASE_URL` |
 | ai-learning | user | `/api/users/me/learning-goals/active` | `AI_LEARNING_USER_SERVICE_BASE_URL` |
 
-Assessment, library và game gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`.
-Library dùng timeout kết nối 2 giây, đọc 5 giây; lỗi Content khi kiểm topic trả 503. Hai nơi cài snapshot game theo
-cùng [contract](contracts/game-content-snapshot-v1.md). AI Learning
+Assessment và game gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`. AI Learning
 chuyển tiếp nguyên internal JWT của learner tới User/Content (chưa gửi `X-Correlation-Id`); token này sống ngắn (mặc định
 60 giây), nên tutor copy bài đọc khi tạo session thay vì gọi Content trong từng lượt.
 
@@ -120,7 +113,7 @@ api ----------> application ----------> domain
 ```
 
 - `domain`: aggregate, entity, value object, domain exception, repository contract. Không phụ thuộc Spring/JPA/HTTP.
-- `application`: `*UseCase`, command/result (và query ở community, library); gọi repository contract. Assessment
+- `application`: `*UseCase`, command/result (và query ở community, learning-support); gọi repository contract. Assessment
   và game có thêm `application/port` cho client, outbox, WebSocket ticket; user-service dùng `domain/repository`.
 - `infrastructure`: `*JpaEntity`, `*JpaRepository`, MapStruct mapper, `*RepositoryAdapter`, HTTP client, messaging.
 - `api`: controller, DTO, `GlobalExceptionHandler` → `ErrorResponse`, filter log có `X-Correlation-Id`.
@@ -156,19 +149,6 @@ POST /api/ai-learning/paths -> PathService: goal đang active (User) -> curricul
   -> CurriculumAdapter -> mastery path (một path mỗi learning goal) -> PathOrderer (LLM, tùy chọn; lỗi thì giữ thứ tự Content)
 ```
 
-### Catalog, thư viện cá nhân và game
-
-```text
-Client -> Gateway -> library: từ vựng/video, flashcard/deck, note, tiến độ và đoạn video đã lưu
-                              -> content: GET /api/content/topics/{id} khi ghi video
-Client -> Gateway -> user: POST/GET activity, GET streak (giữ prefix /api/learning-support)
-Client -> Gateway -> game: tạo phòng/phiên chơi -> chọn snapshot theo learningDomain
-                              VOCABULARY -> library; GRAMMAR -> content
-```
-
-Năm bảng catalog và sáu bảng thư viện cá nhân thuộc `library_db`; `learning_activities` và `streaks` thuộc `user_db`.
-Game lưu snapshot để chơi; hai service cung cấp cùng request/response nội bộ.
-
 ### Kết quả thi → mastery
 
 Học viên làm bài ở assessment → chấm → `FinalizeAssessmentResultUseCase` → `AssessmentCompleted.v2` (mục 3) → AI Learning
@@ -189,16 +169,14 @@ Contract: [`tutor-sse-v1.md`](contracts/tutor-sse-v1.md), [`practice-v1.md`](con
 
 ## 7. Chạy local (tóm tắt)
 
-- Compose (`docker-compose.yml`): `library-db` (host 5437), `community-db`, `game-db`, `rabbitmq`, `ai-learning-db`,
+- Compose (`docker-compose.yml`): `learning-support-db`, `community-db`, `game-db`, `rabbitmq`, `ai-learning-db`,
   `ai-learning-migrate`, `ai-learning-api`, `ai-learning-consumer`, `game-service` (không dùng được, xem §11); `llm-stub`
   nằm sau profile `llm-stub`. Chỉ bật các service cần, không `docker compose up` toàn bộ.
 - Trên host (IDE hoặc `java -jar`): config-server → eureka → api-gateway → các business service Java. Postgres local
   5432 cần `user_db`, `content_db`, `assessment_db`, `access_db`, `notification_db`.
 - `.env` ở root (gitignored) được compose nội suy; Gateway và mọi service Java nghiệp vụ import nó
   (`optional:file:../../.env[.properties]`), config-server và eureka-server thì không. AI Learning chạy trên host đọc
-  `.env` riêng của service. Compose yêu cầu `LIBRARY_DB_PASSWORD` dù không bật `library-db`. Container AI Learning gọi
-  User/Content trên host qua `host.docker.internal`. Game trên host cần đặt `CONTENT_SERVICE_URL=http://localhost:8082`;
-  `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
+  `.env` riêng của service. Container AI Learning gọi User/Content trên host qua `host.docker.internal`.
 
 ## 8. Quyết định kiến trúc đã quan sát
 
@@ -214,7 +192,6 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | Port engine mastery từ DeepTutor v1.6.9 vào `app/mastery`, bỏ phụ thuộc runtime (`3b97191`) | Kiểm soát code, image nhỏ, không kéo cả DeepTutor | Tự bảo trì bản port; test giữ giá trị gốc để phát hiện lệch |
 | Outbox + RabbitMQ cho assessment → AI Learning; consumer có retry/DLQ | Không mất kết quả thi khi AI Learning tạm lỗi | Thêm broker; outbox các service khác chưa có relay |
 | Hạn mức lượt tutor/tóm tắt memory theo ngày trong AI Learning | Chặn chi phí LLM theo học viên | Chưa trừ AI Points (làm sau) |
-| Tách catalog/thư viện cá nhân sang library, activity/streak sang user | Mỗi nhóm dữ liệu có service và DB sở hữu rõ ràng, giữ public path | Gateway cần route theo nhóm; game chọn hai nguồn snapshot |
 
 ## 9. Pattern đang dùng
 
@@ -222,7 +199,7 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | --- | --- |
 | API Gateway, Configuration Server, Service Discovery | `infra/*` |
 | Repository Adapter, Aggregate/Value Object, Mapper | Service Java |
-| Ports & adapters (`application/port`) | assessment, game, library |
+| Ports & adapters (`application/port`) | assessment, game |
 | Transactional outbox + relay có publisher confirm | assessment (access/content/game mới có phần ghi) |
 | Consumer với retry queue TTL và dead-letter queue | ai-learning |
 | Shared auto-configuration | `common-security` |
@@ -244,21 +221,21 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | Điểm | Ghi chú |
 | --- | --- |
 | Application layer user-service import Spring | Khác Clean Architecture thuần; là baseline hiện hữu |
+| `services/user-service/README.md` ghi `PATCH /api/users/{id}/status` | Controller là `PUT`; controller đúng |
 | `GetAllUsersUseCase` dùng `findAll()` không phân trang | Giới hạn hiện tại |
 | Template service mới dùng `application/port`; user-service dùng `domain/repository` | Khác biệt template/hiện hữu |
 | `CONTENT_SERVICE_URL` của game trong config-repo mặc định `http://content-service:8082` | Sai khi game chạy trên host; đặt biến này thành `http://localhost:8082` |
-| `GlobalExceptionHandler` của user-service phân nhánh theo path `/api/learning-support/` | Giữ định dạng lỗi cũ sau khi activity/streak chuyển sang user; còn nợ kỹ thuật path-specific trong handler |
-| Content V7 xóa vĩnh viễn năm bảng catalog | Chỉ chạy trên Testcontainers cho tới khi duyệt chạy trên `content_db` dùng chung |
 | Outbox của access/content/game không có relay | Event chưa được phát |
 | notification-service chỉ là khung | Route Gateway đã có |
 | Compose `game-service` trỏ `http://config-server:8888` | Compose không có config-server |
 | Secret có giá trị fallback trong config-repo được track | Thiếu biến env thì service dùng secret công khai trong repo |
 | README root chỉ liệt kê 3 DB local | access, notification cần `access_db`, `notification_db` |
+| README root §4 mô tả compose cũ: `docker compose up -d --build` toàn bộ, config/eureka/gateway trong compose, "Community PostgreSQL 5433" | Thực tế compose chỉ có một phần stack; 5433 là learning-support, community ở 5434. Làm theo §6 |
 | community-service mặc định `localhost:5432/community_db`, DB compose ở 5434 | Đặt `COMMUNITY_DB_URL` khi dùng DB compose |
 | `.sdd/global/system-architecture.md`, `.sdd/constraints/global.md` (baseline 2026-09-18) ghi không có broker/outbox/AI Learning | Lỗi thời; `.sdd/global/constitution.md` vẫn là invariant cao nhất. Dữ kiện: code, `AGENTS.md`, tài liệu này |
 | AI Learning không gửi `X-Correlation-Id` khi gọi Content/User | Service Java có gửi |
 | Gateway CORS chỉ expose `Authorization`, `Content-Type` | Browser không đọc được `Retry-After` của 429 tutor; dùng `resetsAt` (việc tùy chọn trong plan hạn mức) |
-| community có bảng `outbox_events` (V1) nhưng không dùng | Library không tạo bảng này; outbox của access/content/game chưa có relay |
+| community, learning-support có bảng `outbox_events` (V1) nhưng không dùng | Như outbox chưa relay của access/content/game |
 | `requirements.txt` của AI Learning có `sqlalchemy` nhưng code không import | Dependency thừa |
 | `tests/e2e/tutor_e2e.py` ghi chạy từ root repo; README root ghi chạy từ `services/ai-learning-service` | Chưa thống nhất |
 | `services/ai-learning-service/README.md` dòng ~500 nói event chưa có path "retry rồi vào DLQ" | Code (và dòng ~472 cùng README) lưu vào `pending_formal_assessment_results` và ACK; code đúng |

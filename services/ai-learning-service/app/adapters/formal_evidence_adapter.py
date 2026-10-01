@@ -14,7 +14,7 @@ from uuid import UUID
 
 from app.mastery.models import ErrorType
 
-from app.adapters.knowledge_point_details import parse_band
+from app.adapters.curriculum_scope import parse_band
 from app.learning.formal_provenance import FormalProvenance, source_reference_id
 
 EVENT_TYPE = "AssessmentCompleted.v2"
@@ -50,8 +50,7 @@ class ItemObservation:
 class FormalAssessmentCommand:
     event_id: str
     user_id: str
-    # None for results not taken under a learning goal (the lesson flow has no goal).
-    learning_goal_id: str | None
+    learning_goal_id: str
     attempt_id: str
     result_id: str
     result_version: int
@@ -60,8 +59,6 @@ class FormalAssessmentCommand:
     items: tuple[ItemObservation, ...]
     # The grader's band for this result version; None when absent or not recorded.
     overall_band: Decimal | None = None
-    # The Content package version that was taken; None in events published before it was added.
-    package_version_id: str | None = None
     # The validated event as received, kept so a parked result can be re-read later.
     raw_event: dict[str, Any] | None = field(default=None, compare=False, repr=False)
 
@@ -107,7 +104,8 @@ class FormalEvidenceAdapter:
         return FormalAssessmentCommand(
             event_id=event_id,
             user_id=_uuid(data, "user_id"),
-            learning_goal_id=_optional_uuid(data, "learning_goal_id"),
+            # Required: a result stays attributed to the goal it was taken under.
+            learning_goal_id=_uuid(data, "learning_goal_id"),
             attempt_id=_uuid(data, "attempt_id"),
             result_id=result_id,
             result_version=result_version,
@@ -115,7 +113,6 @@ class FormalEvidenceAdapter:
             completed_at=_timestamp(data, "completed_at"),
             items=tuple(items),
             overall_band=_band(data, "overall_band"),
-            package_version_id=_optional_uuid(data, "package_version_id"),
             raw_event=envelope,
         )
 
@@ -202,13 +199,6 @@ def _uuid(container: dict[str, Any], key: str) -> str:
         return str(UUID(str(value)))
     except (TypeError, ValueError, AttributeError) as exc:
         raise ContractError(f"{key} must be a UUID") from exc
-
-
-def _optional_uuid(container: dict[str, Any], key: str) -> str | None:
-    """A UUID when present; a missing or null field is absent, a malformed one is a contract error."""
-    if container.get(key) is None:
-        return None
-    return _uuid(container, key)
 
 
 def _text(container: dict[str, Any], key: str) -> str:

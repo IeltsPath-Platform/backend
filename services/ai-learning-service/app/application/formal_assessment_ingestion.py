@@ -18,17 +18,9 @@ from app.application.formal_result_applier import FormalResultApplier, Ingestion
 from app.application.path_service import PathNotBootstrapped, PathService
 from app.learning.external_assessment import ExternalAssessmentLearningService
 
-__all__ = ["FormalAssessmentIngestionService", "GoallessResultUnsupported", "IngestionOutcome"]
+__all__ = ["FormalAssessmentIngestionService", "IngestionOutcome"]
 
 logger = logging.getLogger(__name__)
-
-
-class GoallessResultUnsupported(RuntimeError):
-    """A valid result without a learning goal, while paths are still keyed by goal.
-
-    Not a contract error: the consumer retries and then dead-letters the event, so it can be replayed once
-    paths are kept per learner.
-    """
 
 
 class FormalAssessmentIngestionService:
@@ -45,8 +37,6 @@ class FormalAssessmentIngestionService:
         self._applier = applier or FormalResultApplier(store, learning, scheduler)
 
     def ingest(self, command: FormalAssessmentCommand) -> IngestionOutcome:
-        if command.learning_goal_id is None:
-            raise GoallessResultUnsupported(f"AssessmentCompleted.v2 {command.event_id} has no learning goal")
         try:
             path_id, _ = self._paths.ensure_path(command.user_id, command.learning_goal_id)
         except PathNotBootstrapped:

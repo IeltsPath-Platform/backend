@@ -16,11 +16,11 @@ from app.mastery.scheduler import SpacedRepetitionScheduler
 
 from app.adapters.formal_evidence_adapter import FormalAssessmentCommand, FormalEvidenceAdapter
 from app.learning.external_assessment import ExternalAssessmentLearningService
+from app.learning.placement_test_out import PLACEMENT, PlacementTestOut
 
 logger = logging.getLogger(__name__)
 
 EXPLICIT_QUALITATIVE_JUDGMENTS = {"PASS": True, "FAIL": False}
-PLACEMENT = "PLACEMENT"
 
 
 @dataclass(frozen=True)
@@ -44,6 +44,7 @@ class FormalResultApplier:
         self._store = store
         self._learning = learning or ExternalAssessmentLearningService(store)
         self._scheduler = scheduler or SpacedRepetitionScheduler()
+        self._placement = PlacementTestOut(self._learning)
 
     def apply_pending(self, path_id: str, user_id: str, learning_goal_id: str) -> list[IngestionOutcome]:
         """Apply the parked results of ``(user_id, learning_goal_id)`` inside the open path transaction.
@@ -88,12 +89,10 @@ class FormalResultApplier:
                 superseded = self._learning.supersede_external_assessment(
                     tx.progress, attempt_id=command.attempt_id, scheduler=self._scheduler
                 )
+            recorded, unknown = self._apply(tx, command)
             if command.assessment_type == PLACEMENT:
-                # A placement only marks the version as seen: it never writes mastery evidence or skips
-                # knowledge points, so a placement can never move a learner through the lesson flow.
-                recorded, unknown = [], set()
-            else:
-                recorded, unknown = self._apply(tx, command)
+                # After the evidence: a point the evidence already masters needs no test-out.
+                self._placement.apply(tx, path_id, command, self._store.knowledge_point_bands(path_id))
             self._store.record_applied_result(
                 path_id,
                 attempt_id=command.attempt_id,

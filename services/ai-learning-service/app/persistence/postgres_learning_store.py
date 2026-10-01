@@ -11,7 +11,7 @@ from typing import Any, Iterator, Mapping
 from uuid import UUID
 
 import psycopg2
-from psycopg2.extras import RealDictCursor, execute_values
+from psycopg2.extras import RealDictCursor
 
 from app.mastery.models import LearningProgress
 from app.mastery.store import (
@@ -238,40 +238,33 @@ class PostgresLearningStore:
         ``(path_id, source, source_reference_id)`` rejects a duplicated outcome.
         """
         cursor.execute("DELETE FROM mastery_learning_evidence WHERE path_id = %s", (path_id,))
-        rows = []
         for ordinal, evidence in enumerate(progress.learning_evidence):
             reference = formal_source_reference(evidence)
-            rows.append((
-                path_id,
-                ordinal,
-                str(UUID(evidence.knowledge_point_id)),
-                evidence.timestamp,
-                evidence.source,
-                reference,
-                evidence.assessment_type,
-                evidence.result,
-                evidence.quality,
-                evidence.hints_used,
-                evidence.attempt_count,
-                evidence.confidence,
-                evidence.response_time,
-                # Formal evidence carries provenance in these fields, not tutor ids.
-                None if reference else _uuid_or_none(evidence.session_id),
-                None if reference else _uuid_or_none(evidence.turn_id),
-                json.dumps(evidence.model_dump(mode="json"), ensure_ascii=False),
-            ))
-        if rows:
-            # One statement per page of rows, not one per evidence: every commit rewrites the projection.
-            execute_values(
-                cursor,
+            cursor.execute(
                 """INSERT INTO mastery_learning_evidence
                    (path_id, ordinal, knowledge_point_id, occurred_at, source, source_reference_id,
                     assessment_type, result, quality, hints_used, attempt_count, confidence,
                     response_time_seconds, session_id, turn_id, evidence_json)
-                   VALUES %s""",
-                rows,
-                template="(%s, %s, %s, to_timestamp(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)",
-                page_size=500,
+                   VALUES (%s, %s, %s, to_timestamp(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)""",
+                (
+                    path_id,
+                    ordinal,
+                    str(UUID(evidence.knowledge_point_id)),
+                    evidence.timestamp,
+                    evidence.source,
+                    reference,
+                    evidence.assessment_type,
+                    evidence.result,
+                    evidence.quality,
+                    evidence.hints_used,
+                    evidence.attempt_count,
+                    evidence.confidence,
+                    evidence.response_time,
+                    # Formal evidence carries provenance in these fields, not tutor ids.
+                    None if reference else _uuid_or_none(evidence.session_id),
+                    None if reference else _uuid_or_none(evidence.turn_id),
+                    json.dumps(evidence.model_dump(mode="json"), ensure_ascii=False),
+                ),
             )
 
     def _active_connection(self, path_id: str) -> Any:
@@ -426,20 +419,16 @@ class PostgresLearningStore:
         path_id = self._validate_id(path_id)
         with self._active_connection(path_id).cursor() as cursor:
             cursor.execute("DELETE FROM mastery_path_knowledge_point_details WHERE path_id = %s", (path_id,))
-            rows = [(path_id, str(UUID(str(knowledge_point_id))), detail.skill, detail.description)
-                    for knowledge_point_id, detail in details.items()]
-            if rows:
-                execute_values(
-                    cursor,
+            for knowledge_point_id, detail in details.items():
+                cursor.execute(
                     """INSERT INTO mastery_path_knowledge_point_details
-                       (path_id, knowledge_point_id, skill, description) VALUES %s""",
-                    rows,
-                    page_size=500,
+                       (path_id, knowledge_point_id, skill, description) VALUES (%s, %s, %s, %s)""",
+                    (path_id, str(UUID(str(knowledge_point_id))), detail.skill, detail.description),
                 )
 
     def knowledge_point_details(self, path_id: str) -> dict[str, Any]:
         """Read the path's Content metadata snapshot inside its open transaction."""
-        from app.adapters.knowledge_point_details import KnowledgePointDetails
+        from app.adapters.curriculum_scope import KnowledgePointDetails
 
         path_id = self._validate_id(path_id)
         with self._active_connection(path_id).cursor() as cursor:

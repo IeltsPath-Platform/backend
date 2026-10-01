@@ -1,5 +1,6 @@
 package com.group01.assessment.application.usecase;
 
+import com.group01.assessment.application.command.CreateAssessmentResultCommand;
 import com.group01.assessment.application.result.AssessmentResultResult;
 import com.group01.assessment.domain.aggregate.AssessmentAttempt;
 import com.group01.assessment.domain.entity.AssessmentResult;
@@ -18,6 +19,12 @@ import java.util.UUID;
 public class CreateAssessmentResultUseCase {
     private final AssessmentAttemptRepository attempts; private final AssessmentResultRepository results;
     public CreateAssessmentResultUseCase(AssessmentAttemptRepository attempts, AssessmentResultRepository results){this.attempts=attempts;this.results=results;}
+    /** Learner entry: the attempt must belong to the caller. */
+    @Transactional
+    public AssessmentResultResult execute(CreateAssessmentResultCommand c){
+        var attempt=attempts.findByIdAndUserId(c.attemptId(),c.userId()).orElseThrow(()->new AssessmentNotFoundException("Assessment attempt not found"));
+        return openNextVersion(attempt,c.overallBand());
+    }
     /** Grader entry (EXAMINER/ADMIN, enforced by the controller): any learner's attempt. */
     @Transactional
     public AssessmentResultResult executeForGrader(UUID attemptId, Double overallBand){

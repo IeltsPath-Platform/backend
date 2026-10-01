@@ -54,7 +54,7 @@ class GoalScopedPathPostgresTest(unittest.TestCase):
         self.assertEqual(rows, [(KP_BASIC, "writing", 1000)])
 
 
-    def test_placement_result_leaves_mastery_unchanged_after_a_reload(self):
+    def test_placement_test_out_survives_a_reload_from_postgres(self):
         from app.adapters.formal_evidence_adapter import FormalEvidenceAdapter
         from app.application.formal_assessment_ingestion import FormalAssessmentIngestionService
         from tests.formal_assessment_support import event, item, mapping
@@ -63,27 +63,20 @@ class GoalScopedPathPostgresTest(unittest.TestCase):
         goal = {"id": goal_id, "userId": user_id, "status": "ACTIVE", "targetBand": 8.0}
         store = PostgresLearningStore(self.schema.url)
         paths = PathService(store, GoalClient(goal), BandedContentClient())
-        path_id, before = asyncio.run(paths.active_progress(user_id, "internal-token"))
+        path_id, _ = asyncio.run(paths.active_progress(user_id, "internal-token"))
         payload = event(user_id=user_id, goal_id=goal_id, attempt_id=str(uuid4()),
-                        items=[item([mapping(KP_BASIC)], is_correct=True),
-                               item([mapping(KP_ADVANCED)], is_correct=False)], assessment_type="PLACEMENT")
+                        items=[item([mapping(KP_ADVANCED)], is_correct=False)], assessment_type="PLACEMENT")
         payload["data"]["overall_band"] = 6.0
 
-        outcome = FormalAssessmentIngestionService(store, paths).ingest(FormalEvidenceAdapter.to_command(payload))
+        FormalAssessmentIngestionService(store, paths).ingest(FormalEvidenceAdapter.to_command(payload))
 
-        self.assertEqual(outcome.status, "applied")
-        self.assertEqual(outcome.recorded_evidence, ())
         reloaded = PathService(PostgresLearningStore(self.schema.url), GoalClient(goal), BandedContentClient())
         _, progress = asyncio.run(reloaded.active_progress(user_id, "internal-token"))
-        self.assertEqual(progress["mastery"], before["mastery"])
         sources = {kp["id"]: kp["mastery_source"]
                    for module in progress["mastery"]["modules"] for kp in module["knowledge_points"]}
-        self.assertEqual(sources, {KP_BASIC: "", KP_ADVANCED: ""})
-        self.assertEqual(self.schema.query(
-            "SELECT count(*) FROM mastery_learning_evidence WHERE path_id = %s", (path_id,))[0][0], 0)
-        # The version is still recorded, so a redelivery is a duplicate rather than a second placement.
-        duplicate = FormalAssessmentIngestionService(store, paths).ingest(FormalEvidenceAdapter.to_command(payload))
-        self.assertEqual(duplicate.status, "duplicate")
+        self.assertEqual(sources, {KP_BASIC: "placement", KP_ADVANCED: ""})
+        _, status = asyncio.run(reloaded.active_status(user_id, "internal-token"))
+        self.assertEqual(status["knowledgePointId"], KP_ADVANCED)
 
 
     def test_a_refresh_racing_the_consumer_loses_neither_update(self):

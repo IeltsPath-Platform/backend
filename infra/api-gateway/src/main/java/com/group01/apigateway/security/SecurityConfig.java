@@ -94,9 +94,6 @@ public class SecurityConfig {
 
                 // Khai bao route nao public, route nao can JWT.
                 .authorizeExchange(exchange -> {
-                    // Internal service endpoints must never be reachable through the public gateway.
-                    exchange.pathMatchers("/internal/**").denyAll();
-
                     // Cho phep preflight CORS.
                     exchange.pathMatchers(HttpMethod.OPTIONS, "/**").permitAll();
 

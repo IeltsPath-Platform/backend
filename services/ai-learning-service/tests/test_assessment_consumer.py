@@ -108,7 +108,7 @@ class AssessmentCompletedConsumerTest(unittest.TestCase):
     def test_invalid_contract_is_dead_lettered_without_retry(self):
         channel = FakeChannel()
         payload = json.loads(self.body())
-        del payload["data"]["user_id"]
+        del payload["data"]["learning_goal_id"]
 
         self.consumer.on_message(channel, SimpleNamespace(delivery_tag=3), properties(), json.dumps(payload).encode())
 

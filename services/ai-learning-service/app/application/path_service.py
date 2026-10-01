@@ -10,8 +10,9 @@ from app.mastery.policy import map_summary, next_objective
 from app.mastery.service import LearningService
 
 from app.adapters.curriculum_adapter import CurriculumAdapter
-from app.adapters.curriculum_scope import CurriculumScope, KnowledgePointBand, ScopedCurriculum, target_band_of
-from app.adapters.knowledge_point_details import KnowledgePointDetails
+from app.adapters.curriculum_scope import (
+    CurriculumScope, KnowledgePointBand, KnowledgePointDetails, ScopedCurriculum, target_band_of,
+)
 from app.application.formal_result_applier import FormalResultApplier
 from app.application.path_orderer import OrderingOutcome, PathOrderer
 from app.clients.content_service import ContentServiceClient
@@ -182,7 +183,7 @@ class PathService:
             merge = merge_curriculum(tx.progress.modules, modules)
             overrides = tx.progress.learner_mastery_overrides
             current_bands = self._store.knowledge_point_bands(path_id)
-            # Missing points keep the band they had.
+            # Missing points keep the band they had, so placement test-out still sees it.
             merged_bands = {kp_id: band for kp_id, band in current_bands.items() if kp_id in merge.missing}
             merged_bands.update(bands)
             current_details = self._store.knowledge_point_details(path_id)
@@ -238,6 +239,7 @@ class PathService:
             self._learning.get_or_create(path_id)
             self._learning.replace_modules_for_path(path_id, modules, append=False)
             if bands is not None:
+                # Before parked results: placement test-out reads these bands.
                 self._store.replace_knowledge_point_bands(path_id, bands)
             if details is not None:
                 self._store.replace_knowledge_point_details(path_id, details)
