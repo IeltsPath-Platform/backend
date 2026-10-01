@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "AI Learning: path theo user"
-status: pending
+status: in-progress
 priority: P1
 dependencies: [1]
 effort: "2–3 ngày"
@@ -132,6 +132,18 @@ Chạy kèm `AI_LEARNING_TEST_DATABASE_URL` và `AI_LEARNING_TEST_AMQP_URL`. `te
 - [ ] Tutor vẫn có chi tiết KP; tool reorder vẫn chạy.
 - [ ] Consumer nhận event không có goal.
 - [ ] Test bước 1–11 pass; người dùng đã duyệt V10.
+
+## Kết quả phần a (2026-10-01, PR 4, nhánh `feat/ai-learning-module-split`)
+
+- Tách `app/adapters/knowledge_point_details.py` (`KnowledgePointDetails` thêm `has_practice_set`, `details_from_content`,
+  `parse_band`) và `app/learning/ordering_validator.py`; test validator chuyển sang `tests/test_ordering_validator.py`.
+- Adapter: `learning_goal_id` null/thiếu hợp lệ, `package_version_id` đọc nếu có; UUID sai định dạng vẫn là `ContractError`.
+- PLACEMENT chỉ ghi version đã xử lý; xóa `placement_test_out.py` và test của nó.
+- Chiếu evidence và snapshot details ghi bằng `execute_values` (test 1.200 dòng).
+- **Tạm thời tới phần b:** path còn theo goal, nên ingestion ném `GoallessResultUnsupported` cho event không có goal
+  (consumer thử lại rồi đưa vào DLQ, phát lại sau phần b). Chưa nơi nào phát event không goal (assessment đổi ở PR 8).
+  Store chưa ghi `has_practice_set` (cột thêm ở V10). Phần b xóa `GoallessResultUnsupported`.
+- Test: 427 pass, 0 skip (PostgreSQL và RabbitMQ thật).
 
 ## Risk Assessment
 

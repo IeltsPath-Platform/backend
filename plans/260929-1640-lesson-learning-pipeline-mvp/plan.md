@@ -65,7 +65,7 @@ Chế độ `--tdd`: mỗi phase code theo trình tự test giữ hành vi cũ �
 | 2 | [Chặn lộ đáp án](./phase-02-chan-lo-dap-an.md) | Completed (`34335aa`, nhánh `feat/lesson-answer-guard`) |
 | 3 | [Content: bài học, gói, endpoint nội bộ, seed](./phase-03-content-bai-hoc-va-goi.md) | Completed (nhánh `feat/lesson-content`) |
 | 4 | [Assessment: tự chấm, lấy đề từ content, event](./phase-04-assessment-tu-cham-va-ma-de.md) | Pending |
-| 5 | [AI Learning: path theo user](./phase-05-ai-learning-path-theo-user.md) | Pending |
+| 5 | [AI Learning: path theo user](./phase-05-ai-learning-path-theo-user.md) | In progress (phần a xong: PR 4, `feat/ai-learning-module-split`; còn phần b: path theo user, V10) |
 | 6 | [AI Learning: API bài học, bài ôn, giao mã đề](./phase-06-ai-learning-api-bai-hoc-va-bai-on.md) | Pending |
 | 7 | [AI Learning: consumer kết quả đề](./phase-07-ai-learning-consumer-ket-qua-de.md) | Pending |
 | 8 | [Tài liệu và dọn dẹp](./phase-08-tai-lieu-va-don-dep.md) | Pending |
