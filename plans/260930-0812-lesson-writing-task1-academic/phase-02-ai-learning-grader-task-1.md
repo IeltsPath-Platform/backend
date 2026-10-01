@@ -9,6 +9,8 @@ effort: "1 ngày"
 
 # Phase 2: AI Learning: grader Task 1
 
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md)). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
+
 ## Context Links
 
 - Đợt 1: `plans/260930-0737-lesson-writing-task2-essay/phase-03-*.md` (`grade_task2`, schema kết quả), `phase-04-*.md`

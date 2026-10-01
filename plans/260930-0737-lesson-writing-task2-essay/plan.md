@@ -5,7 +5,7 @@ status: pending
 priority: P2
 branch: "feat/main-follow"
 tags: [feature, backend, ai-learning, access, content, writing, tdd]
-blockedBy: [260929-1640-lesson-learning-pipeline-mvp]
+blockedBy: [261001-1228-learning-service-java, 260929-1640-lesson-learning-pipeline-mvp]
 blocks: [260930-0812-lesson-writing-task1-academic]
 created: "2026-09-30T00:56:09.778Z"
 createdBy: "ck:plan"
@@ -14,6 +14,8 @@ mode: "tdd"
 ---
 
 # Writing Task 2 trong bài học (khối essay, AI chấm, trừ point)
+
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java, route `/api/learning/**` (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md), làm trước plan này). Phần ai-learning của plan đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md).
 
 ## Overview
 
@@ -29,10 +31,10 @@ Chế độ `--tdd`: mỗi phase theo trình tự test giữ hành vi cũ → s�
 | Chủ đề | Quyết định |
 | --- | --- |
 | Phạm vi | Chỉ Writing Task 2, khối essay trong bài học. Không làm Task 1, Writing trong đề cuối, Speaking, EXAMINER |
-| Nơi chấm | ai-learning (`app/writing/`), bảng mới `lesson_writing_submissions` (V12). Không dùng `learner_submissions`/`grading_jobs` của assessment |
+| Nơi chấm | learning-service (Java, gói `writing`), bảng mới `lesson_writing_submissions` (migration learning-service **V2**). Không dùng `learner_submissions`/`grading_jobs` của assessment |
 | Luồng chấm | **Ngay trong request** (thay worker trong brainstorm). Lý do: internal JWT sống 60s, ai-learning không có credential riêng, nên worker nền không gọi được access. Không worker, không lease, không hoàn point |
 | Thứ tự | Kiểm số dư → transaction path ngắn tạo dòng `GRADING` → LLM (ngoài transaction) → debit (idempotent) → transaction path ngắn ghi `GRADED` + evidence |
-| Point | 3 point mỗi lần chấm thành công (`AI_LEARNING_WRITING_POINT_COST`). LLM lỗi thì không trừ. Không tính `llm_daily_usage` |
+| Point | 3 point mỗi lần chấm thành công (`AI_LEARNING_WRITING_POINT_COST`). LLM lỗi thì không trừ. **Có hạn mức chấm theo ngày** (đổi 2026-10-01, mặc định 10 lần/ngày, hết → 429 `DAILY_LIMIT_REACHED`; chi tiết ở [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md)) |
 | Cổng | Dùng `authorize_lesson_access`. Khối essay không tính vào điều kiện hoàn thành bài |
 | Mastery | Đúng khi `overall_band ≥ passBand` của câu; ghi `source = lesson_writing` ở **mọi lần nộp tới khi khối đạt**. Đây là ngoại lệ có lý do so với luật "chỉ lần nộp đầu" của bài tập tự chấm (1640): mỗi lần nộp là một bài viết mới, không phải đoán loại trừ. Không chèn bài ôn |
 | Bài mẫu | `explanation` chỉ trả khi đã đạt, giống luật giấu đáp án |
@@ -57,7 +59,7 @@ Thứ tự: `1 → (2 ∥ 3) → 4 → 5`. Phase 2 và 3 chạy song song đư�
   - Kiểm media: một hàm ở content domain, một mã lỗi `INVALID_MEDIA_REFERENCE`. 0812 viết hàm (nhận `https://` và `data:image/(png|jpeg|svg+xml);base64,…` cho IMAGE); 0851 mở rộng cho AUDIO (key + `CONTENT_MEDIA_BASE_URL`). DB lưu `content_assets.media_reference` (giá trị gốc: URL, data URI hoặc key); content resolve thành `mediaUrl` (URL đầy đủ) ngay trong payload nội bộ; ai-learning chỉ chuyển `mediaUrl` cho học viên, cho cả ảnh và audio.
   - Test tập key của response học viên: kiểm "không chứa key cấm" (`answerSpec`, `chartFacts`, `explanation`/`transcript`/`solution` trước khi đạt) thay vì so bằng đúng một tập key, để plan sau thêm trường không làm vỡ test plan trước.
   - Số migration cố định: content V7 (chia service S1, merge trước), V8/V9 (1640), V10 (0737), V11 (0812),
-    V12 (0851), V13 (1006); ai-learning V12 (0737).
+    V12 (0851), V13 (1006); learning-service V2 (0737).
 - **blockedBy `260929-1640-lesson-learning-pipeline-mvp`:** cần `V11__lesson_learning.sql`, `app/lessons/`,
   `practice_evidence.py`, `authorize_lesson_access`, endpoint `/internal/learning-content/*`, content V8/V9, Gateway
   chặn `/internal/**` (phase 2 của plan đó).

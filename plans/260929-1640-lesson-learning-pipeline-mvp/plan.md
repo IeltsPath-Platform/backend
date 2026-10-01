@@ -5,7 +5,7 @@ status: in-progress
 priority: P2
 branch: "feat/main-follow"
 tags: [ai-learning, content, assessment, lesson, mastery, tdd]
-blockedBy: [261001-0205-mvp-service-split-library]
+blockedBy: [261001-0205-mvp-service-split-library, 261001-1228-learning-service-java]
 blocks: [260930-0737-lesson-writing-task2-essay, 260930-0851-listening-topic-audio-lessons, 260930-1006-reading-question-hints]
 created: "2026-09-29T09:22:17.145Z"
 createdBy: "ck:plan"
@@ -14,6 +14,8 @@ mode: "tdd"
 ---
 
 # Triển khai pipeline học chính (bài học, bài ôn, đề cuối)
+
+> **Đổi 2026-10-01:** người dùng bỏ ai-learning Python. Phase 5–7 (path, API bài học/bài ôn/mã đề, consumer) do plan [`261001-1228`](../261001-1228-learning-service-java/plan.md) làm bằng Java (`learning-service`, route `/api/learning/**`, mô hình `kp_evidence` thay path DeepTutor). Luật nghiệp vụ trong plan này vẫn là nguồn. Plan này còn phase 4 (assessment) và phase 8 (tài liệu), làm sau phase 4 của `261001-1228`.
 
 ## Overview
 
@@ -64,10 +66,10 @@ Chế độ `--tdd`: mỗi phase code theo trình tự test giữ hành vi cũ �
 | 1 | [Contract và đặc tả](./phase-01-contract-va-dac-ta.md) | Completed (duyệt 2026-10-01) |
 | 2 | [Chặn lộ đáp án](./phase-02-chan-lo-dap-an.md) | Completed (`34335aa`, merge PR #23) |
 | 3 | [Content: bài học, gói, endpoint nội bộ, seed](./phase-03-content-bai-hoc-va-goi.md) | Completed (merge PR #24, `d7ea05f`) |
-| 4 | [Assessment: tự chấm, lấy đề từ content, event](./phase-04-assessment-tu-cham-va-ma-de.md) | Pending |
-| 5 | [AI Learning: path theo user](./phase-05-ai-learning-path-theo-user.md) | In progress (phần a xong, merge PR #25 `90fd390`; phần b (path theo user, V10) đã giao Codex, chờ báo cáo) |
-| 6 | [AI Learning: API bài học, bài ôn, giao mã đề](./phase-06-ai-learning-api-bai-hoc-va-bai-on.md) | Pending |
-| 7 | [AI Learning: consumer kết quả đề](./phase-07-ai-learning-consumer-ket-qua-de.md) | Pending |
+| 4 | [Assessment: tự chấm, lấy đề từ content, event](./phase-04-assessment-tu-cham-va-ma-de.md) | Pending (làm sau phase 4 của `261001-1228`) |
+| 5 | [AI Learning: path theo user](./phase-05-ai-learning-path-theo-user.md) | Superseded (phần a merge PR #25; còn lại thay bởi `261001-1228`) |
+| 6 | [AI Learning: API bài học, bài ôn, giao mã đề](./phase-06-ai-learning-api-bai-hoc-va-bai-on.md) | Superseded (`261001-1228` phase 2–3) |
+| 7 | [AI Learning: consumer kết quả đề](./phase-07-ai-learning-consumer-ket-qua-de.md) | Superseded (`261001-1228` phase 4) |
 | 8 | [Tài liệu và dọn dẹp](./phase-08-tai-lieu-va-don-dep.md) | Pending |
 
 Thứ tự:

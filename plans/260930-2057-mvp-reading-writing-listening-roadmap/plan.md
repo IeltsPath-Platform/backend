@@ -1,6 +1,6 @@
 ---
 title: "MVP học Reading, Writing, Listening (lộ trình tổng)"
-description: "Lộ trình gom các plan con thành một MVP: ai-learning chỉ tạo path, cập nhật path, điều phối làm bài và chấm Writing. Chốt phạm vi, thứ tự merge, số migration, tài liệu, và nghiệm thu E2E cho ba kỹ năng. Không chép lại nội dung plan con."
+description: "Lộ trình gom các plan con thành một MVP: learning-service (Java) chỉ tạo path, cập nhật path, điều phối làm bài và chấm Writing. Chốt phạm vi, thứ tự merge, số migration, tài liệu, và nghiệm thu E2E cho ba kỹ năng. Không chép lại nội dung plan con."
 status: in-progress
 priority: P1
 branch: "feat/main-follow"
@@ -19,11 +19,12 @@ source: skill
 Plan điều phối, không có code riêng. Mỗi phase triển khai trỏ tới một plan con; chi tiết kỹ thuật nằm ở plan con. Plan này giữ:
 phạm vi MVP, thứ tự merge, số migration cố định, các điểm chạm chung giữa plan con, và nghiệm thu cuối.
 
-**AI Learning trong MVP chỉ làm:**
+**Learning Service (Java, thay ai-learning Python từ 2026-10-01) trong MVP chỉ làm:**
 1. Tạo path (mỗi học viên một path, theo `sort_order`, không LLM).
 2. Cập nhật path (bằng chứng từ bài tập, bài ôn, đề cuối, Writing; chèn bài ôn khi KP yếu).
 3. Điều phối làm bài (thứ tự topic → bài → bài ôn → đề cuối; cổng mở bài; giấu đáp án tới khi đạt).
-4. Chấm Writing bằng LLM (Task 1 Academic và Task 2), trừ point qua access.
+4. Chấm Writing bằng LLM (Task 1 Academic và Task 2), trừ point qua access, có hạn mức chấm theo ngày.
+5. API xem mastery theo KP (`GET /api/learning/mastery`).
 
 Kỹ năng MVP: **Reading, Writing, Listening**. Speaking ngoài phạm vi.
 
@@ -31,7 +32,8 @@ Kỹ năng MVP: **Reading, Writing, Listening**. Speaking ngoài phạm vi.
 
 | Plan | Nội dung | MVP |
 | --- | --- | --- |
-| [`260929-1640`](../260929-1640-lesson-learning-pipeline-mvp/plan.md) | Nền: path, bài học, bài ôn, đề cuối, Reading | Có (đã validate Session 1) |
+| [`261001-1228`](../261001-1228-learning-service-java/plan.md) learning-service Java | Xóa ai-learning Python; path theo user, bài học, bài ôn, mã đề, consumer, `/mastery` bằng Java (thay phase 5–7 của 1640) | Có (chốt 2026-10-01) |
+| [`260929-1640`](../260929-1640-lesson-learning-pipeline-mvp/plan.md) | Nền: contract, chặn lộ đáp án, content bài học, assessment tự chấm, Reading | Có; phase 5–7 thay bởi `261001-1228` |
 | [`260930-0737`](../260930-0737-lesson-writing-task2-essay/plan.md) | Writing Task 2, LLM chấm, trừ 3 point qua access | Có; refund không mở cho service |
 | [`260930-0812`](../260930-0812-lesson-writing-task1-academic/plan.md) | Writing Task 1 Academic (biểu đồ, `chartFacts`) | Có |
 | [`260930-0851`](../260930-0851-listening-topic-audio-lessons/plan.md) | Listening (audio, transcript ẩn tới khi đạt) | Có, không chờ 0908 |
@@ -40,8 +42,7 @@ Kỹ năng MVP: **Reading, Writing, Listening**. Speaking ngoài phạm vi.
 | ~~`260930-0908`~~ (đã xóa) | Chọn gói luyện theo độ khó và dạng câu | **Hoãn**; ý tưởng ở `plans/reports/brainstorm-260930-0908-listening-adaptive-path-report.md` |
 
 **Ngoài MVP (không làm, không gỡ):**
-- Tutor chat, learner memory, practice notebook, sắp path bằng LLM: **code giữ nguyên và test vẫn pass**, nhưng app MVP không
-  gọi `/tutor/**`, `/practice/**`, `/status`, `/progress`. Không gỡ router, không bỏ startup recovery hay quota tutor.
+- Tutor chat, learner memory, practice notebook, sắp path bằng LLM, `/status`, `/progress`: **xóa hẳn** cùng service Python (đổi 2026-10-01).
 - Speaking, Writing trong đề cuối, EXAMINER chấm tay Writing, upload/signed URL audio, giới hạn lượt nghe.
 - Chọn gói theo độ khó (0908), premium/entitlement topic.
 - Trong kiến trúc đích cũ nhưng ngoài MVP: bảng `examiner_profiles` (user-service) và 5 bảng của notification-service.
@@ -49,14 +50,14 @@ Kỹ năng MVP: **Reading, Writing, Listening**. Speaking ngoài phạm vi.
 ## Thứ tự merge và số migration (cố định)
 
 ```text
-Chia service S1 ──► 1640 ──► 0737 Writing T2 ──► 0812 Writing T1 ──► 0851 Listening ──► 1006 Gợi ý Reading
+Chia service S1 ──► 1640 (phase 1–3) ──► 1228 learning-service ──► 1640 (phase 4, 8) ──► 0737 Writing T2 ──► 0812 Writing T1 ──► 0851 Listening ──► 1006 Gợi ý Reading
 Chia service S2 ──► S3 ──► S4: không đụng migration content/ai-learning, merge xen vào lúc nào cũng được
 ```
 
 | Service | Số migration |
 | --- | --- |
 | content | V7 xóa 5 bảng từ vựng/video (chia service S1; phá hủy, cần duyệt) · V8 bảng bài học, V9 seed Reading (1640) · V10 seed Writing T2 (0737) · V11 seed Writing T1 (0812) · V12 seed Listening (0851) · V13 cột `hint` + seed (1006) |
-| ai-learning | V10 path theo user, V11 bảng bài học (1640) · V12 `lesson_writing_submissions` (0737). Plan khác không có migration |
+| learning-service (mới) | V1 toàn bộ schema lõi (1228) · V2 `lesson_writing_submissions`, `llm_daily_usage` (0737). Plan khác không có migration. ai-learning Python bị xóa (không còn V10–V12) |
 | assessment, access | Không migration mới |
 | user | V5 `learning_activities`, `streaks` (chia service) |
 | library (mới) | V1 trở đi: 5 bảng catalog + 6 bảng thư viện cá nhân (chia service) |
@@ -71,7 +72,7 @@ Plan vào sau không đổi số của plan vào trước. Nếu buộc phải �
 |-------|------|--------|
 | 1 | [Chốt phạm vi và đồng bộ plan con](./phase-01-chot-pham-vi-va-dong-bo-plan-con.md) | Completed |
 | 2 | [Validate lại plan con](./phase-02-validate-lai-plan-con.md) | Completed |
-| 3 | [Triển khai nền 1640](./phase-03-trien-khai-nen-1640.md) | In progress (PR 1–4 của 1640 xong; đang PR 5) |
+| 3 | [Triển khai nền 1640](./phase-03-trien-khai-nen-1640.md) | In progress (1640 PR 1–4 xong; tiếp theo plan `261001-1228` rồi 1640 PR 8, 10) |
 | 4 | [Triển khai Writing Task 2](./phase-04-trien-khai-writing-task-2.md) | Pending |
 | 5 | [Triển khai Writing Task 1](./phase-05-trien-khai-writing-task-1.md) | Pending |
 | 6 | [Triển khai Listening](./phase-06-trien-khai-listening.md) | Pending |
@@ -87,15 +88,15 @@ Phase 1–2 chỉ sửa tài liệu và plan. Phase 3–7 theo đúng thứ tự
   `260928-2019` (tài liệu chia service; chia service giờ thuộc MVP, cần plan triển khai mới). Nội dung còn trong git history (commit `6506d5e` cho 1830 và 2019; 0908 chưa
   từng commit, ý tưởng giữ ở brainstorm report). Thư mục `plans/` còn 5 plan con MVP + plan tổng này.
 - Hạ tầng: bucket cloud có URL công khai cho mp3 Listening (`CONTENT_MEDIA_BASE_URL`); model LLM OpenAI-compatible cho
-  Writing (`AI_LEARNING_LLM_*`).
+  Writing (`LEARNING_LLM_*`).
 
 ## Tiêu chí nghiệm thu MVP
 
 - Học viên mới đi hết: Reading → Writing → Listening theo thứ tự topic, qua bài học, bài ôn (khi yếu) và đề cuối, chỉ bằng API
-  `/api/ai-learning/*` (topic, bài, bài ôn, giao mã đề, nộp Writing) và `/api/assessments/*` (làm đề).
+  `/api/learning/*` (topic, bài, bài ôn, giao mã đề, nộp Writing) và `/api/assessments/*` (làm đề).
 - Không response nào cho học viên chứa `answerSpec`, `chartFacts`, `explanation` trước khi đạt, hay transcript trước khi đạt.
 - Chấm Writing trừ đúng 3 point mỗi lần chấm thành công; hết point vẫn học hết topic (khối essay không chặn).
-- Toàn bộ test ai-learning (gồm test tutor), content, assessment, access, Gateway pass.
+- Toàn bộ test learning-service, content, assessment, access, Gateway pass.
 
 ## Nội dung seed
 

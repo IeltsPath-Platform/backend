@@ -9,6 +9,8 @@ effort: "2 ngày"
 
 # Phase 4: Assessment: tự chấm, lấy đề từ content, event
 
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md)). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
+
 ## Overview
 
 - App chỉ gửi `packageVersionId`. Assessment lấy đề và đáp án từ content, và tự quyết `attemptType` theo loại gói.

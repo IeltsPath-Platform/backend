@@ -1,13 +1,15 @@
 ---
 phase: 7
 title: "AI Learning: consumer kết quả đề"
-status: pending
+status: superseded
 priority: P1
 dependencies: [4, 5, 6]
 effort: "1.5 ngày"
 ---
 
 # Phase 7: AI Learning: consumer kết quả đề
+
+> **Đã thay (2026-10-01):** phase này do plan [`261001-1228`](../261001-1228-learning-service-java/plan.md) làm bằng Java (learning-service). Không code theo file này; giữ lại làm nguồn luật nghiệp vụ.
 
 ## Overview
 

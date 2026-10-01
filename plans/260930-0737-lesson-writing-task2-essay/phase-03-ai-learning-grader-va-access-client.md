@@ -9,6 +9,8 @@ effort: "1.5 ngày"
 
 # Phase 3: AI Learning: grader và access client
 
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md)). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
+
 ## Context Links
 
 - `services/ai-learning-service/app/llm/client.py` (`ChatCompletionsClient`, `json_with_reasoning_retry`,
@@ -78,7 +80,8 @@ Phase 4 ghép hai khối này vào luồng nộp bài.
   writing_grading_timeout_seconds})`, vì timeout nằm trong `LlmSettings` và được đọc mỗi lần gọi.
   <!-- Updated: Validation Session 1 - chốt dùng chung model LLM -->
 - `writing_stale_grading_seconds: int = 120`.
-- Hạn mức: **không** thêm kind vào `llm_daily_usage`; point là giới hạn (quyết định theo AGENTS §3.8).
+- Hạn mức: **có** hạn mức chấm theo ngày (đổi 2026-10-01; luật ở mục "Đổi quyết định của 0737" trong
+  [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md)), cộng với trừ point.
 
 **Compose:** `ai-learning-api` thêm `AI_LEARNING_ACCESS_SERVICE_BASE_URL:
 ${AI_LEARNING_ACCESS_SERVICE_BASE_URL:-http://host.docker.internal:8084}`. Đây là thay đổi cần cho tính năng, không phải

@@ -9,6 +9,8 @@ effort: "0.5 ngày"
 
 # Phase 5: Tài liệu
 
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md)). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
+
 ## Overview
 
 Ghi Listening, media URL và luật giấu transcript vào tài liệu nguồn. Chỉ ghi điều code đã làm.

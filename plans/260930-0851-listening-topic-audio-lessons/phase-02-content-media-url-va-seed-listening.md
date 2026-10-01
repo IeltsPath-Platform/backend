@@ -9,6 +9,8 @@ effort: "2 ngày"
 
 # Phase 2: Content: media URL và seed Listening
 
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md)). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
+
 ## Context Links
 
 - Plan 1640 phase 3 (V8 bảng bài học, V9 seed Reading, `InternalLearningContentController`, luật gói `PRACTICE_SET`)
