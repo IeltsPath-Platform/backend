@@ -2,6 +2,8 @@
 
 **Status: approved 2026-10-01.** This document describes the intended learner HTTP API; it does not claim it is deployed. Examples use actual lesson/question/package codes and text from [`seed-content.md`](../../plans/260930-2057-mvp-reading-writing-listening-roadmap/seed-content.md). The existing V4 UUIDs for DEMO_READING and KP1 are real; other UUIDs and timestamps illustrate relationships because the V9 seed leaves their assignment to the migration.
 
+**Implementation status (2026-10-01):** Java Learning Service implements `GET /topics`, `GET /mastery`, `GET /topics/{id}/lessons`, `GET /lessons/{id}`, exercise submission and lesson completion below, including review insertion after lesson completion. Review GET/submission and test-assignment routes remain planned for the next PR; the assessment consumer follows separately. These pending sections retain their approved v1 behavior.
+
 The MVP app displays topic and lesson status. The Java Learning Service owns progress, mastery evidence, reviews and test assignments. Tutor, practice notebook, learner memory, learning goals and LLM ordering are removed. Reviews use new `PRACTICE_SET` questions, solutions stay hidden until the relevant block or set is passed, and a final test assignment uses a package code once before selecting another package. Topic order is stored in `topic_progress.sequence_order`; only `passed_at` is persisted. No `topics.test_package_id`, assessment schema migration, premium gate, or unpublished content authoring API is introduced here.
 
 ## Learner routes
@@ -21,7 +23,7 @@ Refreshes the shared `knowledge_point_catalog` and the user's `topic_progress.se
 
 ### `GET /mastery`
 
-Returns `[{knowledgePointId, topicId, mastery, evidenceCount}]` for KPs in `knowledge_point_catalog`, using only the verified user's `kp_evidence`. `mastery` is a number from 0 to 1; `evidenceCount` counts the user's stored evidence for that KP. No learning goal or aggregate learning state is required. This endpoint is implemented with the learner APIs in the next PR.
+Returns `[{knowledgePointId, topicId, mastery, evidenceCount}]` for KPs in `knowledge_point_catalog`, using only the verified user's `kp_evidence`. `mastery` is a number from 0 to 1; `evidenceCount` counts the user's stored evidence for that KP. No learning goal or aggregate learning state is required.
 
 Example after Lan completes L1:
 

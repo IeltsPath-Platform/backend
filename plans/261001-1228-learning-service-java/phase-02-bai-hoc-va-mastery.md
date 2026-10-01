@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Thứ tự học, bài học, nộp bài, cổng, mastery"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 effort: "3 ngày"
@@ -50,5 +50,17 @@ Làm phần "6a" của `260929-1640/phase-06` bằng Java: `GET /topics`, `GET /
 
 ## Success Criteria
 
-- [ ] 5 endpoint bài học + `/mastery` đúng contract; cổng áp cho mọi đường đọc và ghi.
-- [ ] Không N+1; test trên pass.
+- [x] 5 endpoint bài học + `/mastery` đúng contract; cổng áp cho mọi đường đọc và ghi.
+- [x] Không N+1; test trên pass.
+
+## Kết quả ngày 2026-10-01
+
+Hoàn tất trên `feat/learning-lessons`, tạo từ `feat/main-follow` mới nhất tại `9d6f192` (đã fetch origin).
+Năm lớp domain thuần, client Content, sáu route, khóa transaction theo user, bằng chứng lần nộp đầu, đọc mastery theo
+ordinal và chèn review đều đã triển khai. Giữ nguyên số Lan và comment nguồn DeepTutor Apache-2.0.
+
+`mvn -q -pl services/learning-service -am test`: **125 pass, 0 fail/error/skip** (Learning 117, common-security 8).
+Docker chạy thật: 12 ca integration PostgreSQL và 1 ca context/Flyway. Review không còn blocker; Graphify đã cập nhật.
+Phase 3–5 còn pending; không triển khai route bài ôn, giao mã đề hoặc consumer trong phase này.
+
+Chi tiết file, lệnh và bằng chứng: [learning-lessons-verification.md](./reports/learning-lessons-verification.md).
