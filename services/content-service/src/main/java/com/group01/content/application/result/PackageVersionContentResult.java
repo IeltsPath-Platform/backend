@@ -18,7 +18,12 @@ public record PackageVersionContentResult(
         String rulesJson,
         List<Section> sections
 ) {
-    /** {@code passage}: text of the section's PASSAGE asset, or null. */
+    public PackageVersionContentResult withSections(List<Section> newSections) {
+        return new PackageVersionContentResult(packageVersionId, packageId, packageType, topicId, rulesJson,
+                newSections);
+    }
+
+    /** {@code passage}: text of the section's PASSAGE asset, or null; {@code audio}: its AUDIO asset, or null. */
     public record Section(
             UUID sectionId,
             String title,
@@ -26,8 +31,21 @@ public record PackageVersionContentResult(
             String instructions,
             int sortOrder,
             String passage,
+            SectionAudio audio,
             List<Item> items
-    ) {}
+    ) {
+        public Section withAudio(SectionAudio newAudio) {
+            return new Section(sectionId, title, skill, instructions, sortOrder, passage, newAudio, items);
+        }
+    }
+
+    /** {@code mediaUrl} is set once the use case has checked the stored reference; the transcript is an answer. */
+    public record SectionAudio(UUID assetId, String mediaReference, String mediaUrl, Integer durationSeconds,
+                               String transcript) {
+        public SectionAudio withMediaUrl(String url) {
+            return new SectionAudio(assetId, mediaReference, url, durationSeconds, transcript);
+        }
+    }
 
     public record Item(
             UUID questionVersionId,

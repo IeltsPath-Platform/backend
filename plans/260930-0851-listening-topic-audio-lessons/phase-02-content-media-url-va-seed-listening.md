@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Content: media URL và seed Listening"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 effort: "2 ngày"
@@ -10,6 +10,14 @@ effort: "2 ngày"
 # Phase 2: Content: media URL và seed Listening
 
 > **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md)). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
+
+## Kết quả (2026-10-01, nhánh `feat/writing-access-content`)
+
+- `MediaReferencePolicy` thành bean nhận `content.media.base-url` (env `CONTENT_MEDIA_BASE_URL`, phải là https), thêm nhánh AUDIO (URL https hoặc key ghép base; chặn `..`, `/`, scheme lạ; base rỗng + key → lỗi). V12 seed đúng `seed-content.md`: 8 audio, LS1/LS2, 4 gói × 3 câu, X3/X4 × 4 câu (27 câu). README content có bảng 8 key mp3. Content 138 test pass, 0 skip.
+- Lệch plan (đều là thêm field, không đổi field cũ, để không làm vỡ client của Codex):
+  - khối `ASSET` giữ `{id, assetType, textContent, mediaReference, durationSeconds}` và thêm `mediaUrl`; với AUDIO thì `textContent` là transcript (không thêm khóa `transcript`).
+  - section của package version thêm `audio {assetId, mediaUrl, durationSeconds, transcript}` thay vì `assets[]`; audio lấy bằng `LEFT JOIN LATERAL` trong cùng query section, không thêm hàm repository.
+  - bean dùng `@Value`, không tạo lớp `ContentMediaProperties`.
 
 ## Context Links
 

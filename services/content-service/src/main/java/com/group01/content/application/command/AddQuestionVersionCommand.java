@@ -14,6 +14,7 @@ public record AddQuestionVersionCommand(
         List<QuestionOptionPayload> options,
         String answerSpecJson,
         String explanation,
+        String hint,
         QuestionDifficulty difficulty,
         List<KnowledgePointInput> knowledgePoints
 ) {

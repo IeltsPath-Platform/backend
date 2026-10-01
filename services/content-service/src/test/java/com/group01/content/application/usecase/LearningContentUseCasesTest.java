@@ -3,6 +3,7 @@ package com.group01.content.application.usecase;
 import com.group01.content.application.command.CreateContentPackageCommand;
 import com.group01.content.application.command.SearchPracticeSetsCommand;
 import com.group01.content.application.port.LearningContentReader;
+import com.group01.content.domain.vo.MediaReferencePolicy;
 import com.group01.content.domain.exception.LessonNotFoundException;
 import com.group01.content.domain.exception.PackageVersionNotFoundException;
 import com.group01.content.domain.exception.TopicNotFoundException;
@@ -64,9 +65,9 @@ class LearningContentUseCasesTest {
 
         assertThrows(TopicNotFoundException.class, () -> new GetTopicLessonsUseCase(reader).execute(id));
         assertThrows(TopicNotFoundException.class, () -> new GetTopicTestPackagesUseCase(reader).execute(id));
-        assertThrows(LessonNotFoundException.class, () -> new GetLessonContentUseCase(reader).execute(id));
+        assertThrows(LessonNotFoundException.class, () -> new GetLessonContentUseCase(reader, new MediaReferencePolicy("")).execute(id));
         assertThrows(PackageVersionNotFoundException.class,
-                () -> new GetPackageVersionContentUseCase(reader).execute(id));
+                () -> new GetPackageVersionContentUseCase(reader, new MediaReferencePolicy("")).execute(id));
         verify(reader, never()).publishedLessons(id);
         verify(reader, never()).publishedTestPackages(id);
     }

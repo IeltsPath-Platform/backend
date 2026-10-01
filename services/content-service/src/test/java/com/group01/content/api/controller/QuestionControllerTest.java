@@ -92,6 +92,7 @@ class QuestionControllerTest {
                 List.of(new QuestionOptionPayload("A", "Paris", 1), new QuestionOptionPayload("B", "London", 2)),
                 "{\"correct\": \"A\"}",
                 "Paris is the capital of France.",
+                "Think about the largest city.",
                 QuestionDifficulty.EASY,
                 PublicationStatus.PUBLISHED,
                 Instant.now(), Instant.now(),
@@ -111,7 +112,8 @@ class QuestionControllerTest {
                 .andExpect(jsonPath("$.id").value(questionId.toString()))
                 .andExpect(jsonPath("$.versions[0].stem").value("What is the capital of France?"))
                 .andExpect(jsonPath("$.versions[0].answerSpecJson").value("{\"correct\": \"A\"}"))
-                .andExpect(jsonPath("$.versions[0].explanation").value("Paris is the capital of France."));
+                .andExpect(jsonPath("$.versions[0].explanation").value("Paris is the capital of France."))
+                .andExpect(jsonPath("$.versions[0].hint").value("Think about the largest city."));
     }
 
     @Test

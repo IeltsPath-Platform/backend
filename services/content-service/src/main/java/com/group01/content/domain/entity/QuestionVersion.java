@@ -20,6 +20,7 @@ public class QuestionVersion {
     private String answerSpecJson;
     private int schemaVersion;
     private String explanation;
+    private String hint;
     private QuestionDifficulty difficulty;
     private PublicationStatus status;
     private final Instant createdAt;
@@ -28,7 +29,7 @@ public class QuestionVersion {
 
     public QuestionVersion(UUID id, UUID questionId, int versionNumber, String stem,
                            List<QuestionOptionPayload> options, String answerSpecJson,
-                           int schemaVersion, String explanation, QuestionDifficulty difficulty,
+                           int schemaVersion, String explanation, String hint, QuestionDifficulty difficulty,
                            PublicationStatus status, Instant createdAt, Instant updatedAt,
                            List<QuestionKnowledgePoint> knowledgePoints) {
         this.id = Objects.requireNonNull(id, "id must not be null");
@@ -39,6 +40,7 @@ public class QuestionVersion {
         this.answerSpecJson = answerSpecJson != null ? answerSpecJson : "{}";
         this.schemaVersion = schemaVersion > 0 ? schemaVersion : 1;
         this.explanation = explanation;
+        this.hint = normalizeHint(hint);
         this.difficulty = difficulty;
         this.status = status != null ? status : PublicationStatus.DRAFT;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
@@ -49,9 +51,20 @@ public class QuestionVersion {
     public static QuestionVersion create(UUID questionId, int versionNumber, String stem,
                                          List<QuestionOptionPayload> options, String answerSpecJson,
                                          String explanation, QuestionDifficulty difficulty) {
+        return create(questionId, versionNumber, stem, options, answerSpecJson, explanation, null, difficulty);
+    }
+
+    public static QuestionVersion create(UUID questionId, int versionNumber, String stem,
+                                         List<QuestionOptionPayload> options, String answerSpecJson,
+                                         String explanation, String hint, QuestionDifficulty difficulty) {
         Instant now = Instant.now();
         return new QuestionVersion(UUID.randomUUID(), questionId, versionNumber, stem, options,
-                answerSpecJson, 1, explanation, difficulty, PublicationStatus.DRAFT, now, now, new ArrayList<>());
+                answerSpecJson, 1, explanation, hint, difficulty, PublicationStatus.DRAFT, now, now, new ArrayList<>());
+    }
+
+    /** A blank hint is no hint; Learning Service shows a hint only when the question is eligible. */
+    private static String normalizeHint(String hint) {
+        return hint == null || hint.isBlank() ? null : hint.strip();
     }
 
     public void addKnowledgePoint(QuestionKnowledgePoint kp) {
@@ -72,6 +85,7 @@ public class QuestionVersion {
     public String getAnswerSpecJson() { return answerSpecJson; }
     public int getSchemaVersion() { return schemaVersion; }
     public String getExplanation() { return explanation; }
+    public String getHint() { return hint; }
     public QuestionDifficulty getDifficulty() { return difficulty; }
     public PublicationStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }

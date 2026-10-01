@@ -28,6 +28,28 @@ Rules:
 - `POST`/`PUT /api/content/topics` and `POST /api/content/knowledge-points` accept `bandMin`/`bandMax`. An invalid
   range returns 400. `PUT /topics` replaces the whole topic, so omitting the band clears it.
 
+## Media
+
+- `GET /api/content/assets/{id}` is for `ADMIN` and `CONTENT_AUTHOR` only: asset text can be a transcript. Learners
+  receive media through the internal lesson and package payloads that Learning Service and Assessment relay.
+- Content is the only place that builds media URLs (`MediaReferencePolicy`). Images use an `https://` URL or a
+  `data:image/png|jpeg|svg+xml;base64,` URI; audio uses an `https://` URL or an object key joined to
+  `content.media.base-url` (env `CONTENT_MEDIA_BASE_URL`, an https prefix; blank means keys cannot resolve and the
+  read fails with `INVALID_MEDIA_REFERENCE`).
+- The V12 Listening seed references 8 files to upload under the base URL (record them from the transcripts in the
+  seed; mp3 files are not committed):
+
+  | Key | Seconds | Used by |
+  | --- | --- | --- |
+  | `listening/demo/ls1.mp3` | 45 | lesson LS1 |
+  | `listening/demo/ls2.mp3` | 50 | lesson LS2 |
+  | `listening/demo/numM.mp3` | 30 | practice set PS-NUM |
+  | `listening/demo/spellM.mp3` | 35 | practice set PS-SPELL |
+  | `listening/demo/museum.mp3` | 50 | practice set PS-PARA |
+  | `listening/demo/trapM.mp3` | 30 | practice set PS-TRAP |
+  | `listening/demo/hotel.mp3` | 45 | final test X3 |
+  | `listening/demo/tour.mp3` | 40 | final test X4 |
+
 ## Verification
 
 ```powershell

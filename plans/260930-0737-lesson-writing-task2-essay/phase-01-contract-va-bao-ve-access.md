@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Contract và bảo vệ access"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 effort: "1.5 ngày"

@@ -9,6 +9,7 @@ import com.group01.content.application.result.TopicSequenceResult;
 import com.group01.content.application.result.TopicTestPackageResult;
 import com.group01.content.domain.vo.AssetType;
 import com.group01.content.domain.vo.BlockType;
+import com.group01.content.domain.vo.LessonBlockKind;
 import com.group01.content.domain.vo.LearningType;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.Skill;
@@ -190,10 +191,28 @@ public class JdbcLearningContentReader implements LearningContentReader {
                     .add(uuid(rs, "knowledge_point_id"));
         });
 
+        Map<UUID, List<LessonContentResult.QuestionAsset>> questionAssets = new LinkedHashMap<>();
+        jdbc.query("""
+                SELECT l.question_version_id, a.id, a.asset_type, a.media_reference, a.text_content, l.sort_order
+                FROM content_asset_links l
+                JOIN content_assets a ON a.id = l.asset_id
+                JOIN lesson_block_questions bq ON bq.question_version_id = l.question_version_id
+                JOIN lesson_blocks b ON b.id = bq.block_id
+                WHERE b.lesson_id = :lessonId
+                ORDER BY l.question_version_id, l.sort_order, a.id
+                """, byLesson, rs -> {
+            questionAssets.computeIfAbsent(uuid(rs, "question_version_id"), ignored -> new ArrayList<>())
+                    .add(new LessonContentResult.QuestionAsset(uuid(rs, "id"),
+                            AssetType.valueOf(rs.getString("asset_type")), rs.getString("media_reference"), null,
+                            rs.getString("text_content"), rs.getInt("sort_order")));
+        });
+
         Map<UUID, List<LessonContentResult.Question>> questionsByBlock = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT bq.block_id, bq.sort_order, qv.id, qv.stem, qv.options::text AS options,
-                       qv.answer_spec::text AS answer_spec, qv.explanation
+                       qv.answer_spec::text AS answer_spec, qv.explanation, qv.hint,
+                       qv.answer_spec->>'type' AS spec_type, qv.answer_spec->>'task' AS spec_task,
+                       qv.answer_spec->>'passBand' AS spec_pass_band, qv.answer_spec->>'chartFacts' AS spec_chart_facts
                 FROM lesson_block_questions bq
                 JOIN lesson_blocks b ON b.id = bq.block_id
                 JOIN question_versions qv ON qv.id = bq.question_version_id
@@ -201,10 +220,15 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 ORDER BY bq.block_id, bq.sort_order
                 """, byLesson, rs -> {
             UUID versionId = uuid(rs, "id");
+            List<LessonContentResult.QuestionAsset> assets = questionAssets.getOrDefault(versionId, List.of());
             questionsByBlock.computeIfAbsent(uuid(rs, "block_id"), ignored -> new ArrayList<>())
                     .add(new LessonContentResult.Question(versionId, rs.getInt("sort_order"), rs.getString("stem"),
                             rs.getString("options"), rs.getString("answer_spec"), rs.getString("explanation"),
-                            questionPoints.getOrDefault(versionId, List.of())));
+                            rs.getString("hint"), questionPoints.getOrDefault(versionId, List.of()),
+                            new LessonBlockKind.QuestionSpec(rs.getString("spec_type"), rs.getString("spec_task"),
+                                    rs.getString("spec_pass_band"), rs.getString("spec_chart_facts"),
+                                    assets.stream().map(LessonContentResult.QuestionAsset::assetType).toList()),
+                            assets));
         });
 
         Map<UUID, List<UUID>> sensesByBlock = new LinkedHashMap<>();
@@ -231,9 +255,9 @@ public class JdbcLearningContentReader implements LearningContentReader {
             LessonContentResult.Asset asset = type == BlockType.ASSET
                     ? new LessonContentResult.Asset(uuid(rs, "asset_id"),
                     AssetType.valueOf(rs.getString("asset_type")), rs.getString("asset_text"),
-                    rs.getString("media_reference"), (Integer) rs.getObject("duration_seconds"))
+                    rs.getString("media_reference"), (Integer) rs.getObject("duration_seconds"), null)
                     : null;
-            return new LessonContentResult.Block(blockId, type, rs.getInt("sort_order"),
+            return new LessonContentResult.Block(blockId, type, null, rs.getInt("sort_order"),
                     type == BlockType.TEXT ? rs.getString("text_content") : null,
                     asset,
                     type == BlockType.VOCABULARY ? sensesByBlock.getOrDefault(blockId, List.of()) : null,
@@ -340,8 +364,14 @@ public class JdbcLearningContentReader implements LearningContentReader {
                        (SELECT a.text_content FROM content_asset_links al
                         JOIN content_assets a ON a.id = al.asset_id
                         WHERE al.section_id = s.id AND a.asset_type = 'PASSAGE'
-                        ORDER BY al.sort_order, a.id LIMIT 1) AS passage
+                        ORDER BY al.sort_order, a.id LIMIT 1) AS passage,
+                       audio.id AS audio_id, audio.media_reference AS audio_reference,
+                       audio.duration_seconds AS audio_duration, audio.text_content AS audio_transcript
                 FROM content_sections s
+                LEFT JOIN LATERAL (SELECT a.id, a.media_reference, a.duration_seconds, a.text_content
+                                   FROM content_asset_links al JOIN content_assets a ON a.id = al.asset_id
+                                   WHERE al.section_id = s.id AND a.asset_type = 'AUDIO'
+                                   ORDER BY al.sort_order, a.id LIMIT 1) audio ON TRUE
                 WHERE s.package_version_id = :versionId
                 ORDER BY s.sort_order
                 """, byVersion, (rs, i) -> {
@@ -349,6 +379,9 @@ public class JdbcLearningContentReader implements LearningContentReader {
             return new PackageVersionContentResult.Section(sectionId, rs.getString("title"),
                     enumOrNull(Skill.class, rs.getString("skill")), rs.getString("instructions"),
                     rs.getInt("sort_order"), rs.getString("passage"),
+                    rs.getObject("audio_id") == null ? null : new PackageVersionContentResult.SectionAudio(
+                            uuid(rs, "audio_id"), rs.getString("audio_reference"), null,
+                            (Integer) rs.getObject("audio_duration"), rs.getString("audio_transcript")),
                     itemsBySection.getOrDefault(sectionId, List.of()));
         });
 

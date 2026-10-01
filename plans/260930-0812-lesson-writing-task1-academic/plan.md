@@ -1,7 +1,7 @@
 ---
 title: "Writing Task 1 Academic trong bài học (biểu đồ + chartFacts)"
 description: "Mở rộng khối essay của đợt 1 sang Writing Task 1 Academic: ảnh biểu đồ gắn vào câu, grader chấm TA/CC/LR/GRA dựa trên chartFacts; không migration, không đổi luồng trừ point."
-status: pending
+status: in-progress
 priority: P2
 branch: "feat/main-follow"
 tags: [feature, backend, ai-learning, content, writing, tdd]
@@ -48,7 +48,7 @@ Chế độ `--tdd`.
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Contract va content Task 1](./phase-01-contract-va-content-task-1.md) | Pending |
+| 1 | [Contract va content Task 1](./phase-01-contract-va-content-task-1.md) | Completed (nhánh `feat/writing-access-content`) |
 | 2 | [AI Learning grader Task 1](./phase-02-ai-learning-grader-task-1.md) | Pending |
 | 3 | [Tai lieu](./phase-03-tai-lieu.md) | Pending |
 

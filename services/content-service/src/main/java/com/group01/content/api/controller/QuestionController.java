@@ -74,6 +74,7 @@ public class QuestionController {
                 request.options(),
                 request.answerSpecJson(),
                 request.explanation(),
+                request.hint(),
                 request.difficulty(),
                 request.knowledgePoints() == null ? null : request.knowledgePoints().stream()
                         .map(kp -> new AddQuestionVersionCommand.KnowledgePointInput(

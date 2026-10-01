@@ -1,7 +1,7 @@
 ---
 title: "Gợi ý câu Reading sau lần sai đầu"
 description: "Câu điền từ và câu chọn có từ 3 phương án (kể cả True/False/Not Given) trong bài tập bài học có gợi ý (hint) do người soạn viết; học viên làm sai một lần thì thấy gợi ý tới khi khối đạt. Content thêm cột question_versions.hint; ai-learning trả gợi ý, không ghi hints_used; không đổi công thức mastery; không áp dụng cho gói luyện thêm và đề cuối."
-status: pending
+status: in-progress
 priority: P2
 branch: "feat/main-follow"
 tags: [feature, backend, ai-learning, content, reading, tdd]
@@ -44,7 +44,7 @@ Nguồn: trao đổi với người dùng ngày 2026-09-30 (chọn Reading trư�
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Contract va content hint](./phase-01-contract-va-content-hint.md) | Pending |
+| 1 | [Contract va content hint](./phase-01-contract-va-content-hint.md) | Completed (nhánh `feat/writing-access-content`; phần học viên của `lesson-learning-v1` chờ Codex) |
 | 2 | [AI Learning tra hint](./phase-02-ai-learning-tra-hint.md) | Pending |
 | 3 | [Tai lieu](./phase-03-tai-lieu.md) | Pending |
 

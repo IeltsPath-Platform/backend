@@ -26,7 +26,9 @@ public class ContentAssetController {
     private final CreateContentAssetUseCase createContentAssetUseCase;
     private final LinkAssetUseCase linkAssetUseCase;
 
+    /** Authoring only: asset text can be a transcript, so learners get media through lessons and tests. */
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public ContentAssetResponse getAssetById(@PathVariable("id") UUID id) {
         ContentAssetResult result = getContentAssetUseCase.execute(id);
         return ContentAssetResponse.from(result);

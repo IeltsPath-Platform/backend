@@ -41,7 +41,7 @@ class AddQuestionVersionUseCaseTest {
         UUID knowledgePointId = UUID.randomUUID();
 
         addQuestionVersionUseCase.execute(new AddQuestionVersionCommand(question.getId(), 1, "Stem", null, null,
-                null, null, List.of(new AddQuestionVersionCommand.KnowledgePointInput(
+                null, null, null, List.of(new AddQuestionVersionCommand.KnowledgePointInput(
                         null, knowledgePointId, new BigDecimal("0.50")))));
 
         QuestionVersion version = question.getVersions().get(0);
@@ -60,11 +60,27 @@ class AddQuestionVersionUseCaseTest {
         when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
 
         addQuestionVersionUseCase.execute(new AddQuestionVersionCommand(question.getId(), 1, "Stem", null, null,
-                null, null, List.of(new AddQuestionVersionCommand.KnowledgePointInput(
+                null, null, null, List.of(new AddQuestionVersionCommand.KnowledgePointInput(
                         UUID.randomUUID(), UUID.randomUUID(), null))));
 
         QuestionVersion version = question.getVersions().get(0);
         assertThat(version.getKnowledgePoints()).singleElement()
                 .extracting(QuestionKnowledgePoint::getQuestionVersionId).isEqualTo(version.getId());
+    }
+
+    @Test
+    @DisplayName("A hint is stored trimmed, and a blank hint is stored as none")
+    void storesTrimmedHintAndBlankAsNone() {
+        Question question = Question.create(QuestionType.MULTIPLE_CHOICE, Skill.READING, null);
+        when(questionRepository.findById(question.getId())).thenReturn(Optional.of(question));
+        when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        addQuestionVersionUseCase.execute(new AddQuestionVersionCommand(question.getId(), 1, "Stem", null, null,
+                null, "  Read paragraph C again.  ", null, null));
+        addQuestionVersionUseCase.execute(new AddQuestionVersionCommand(question.getId(), 2, "Stem", null, null,
+                null, "   ", null, null));
+
+        assertThat(question.getVersions()).extracting(QuestionVersion::getHint)
+                .containsExactly("Read paragraph C again.", null);
     }
 }

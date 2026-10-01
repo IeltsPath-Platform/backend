@@ -2,12 +2,10 @@ package com.group01.access.application.usecase;
 
 import com.group01.access.application.command.DebitPointsCommand;
 import com.group01.access.application.result.PointLedgerResult;
-import com.group01.access.domain.aggregate.PointWallet;
 import com.group01.access.domain.entity.PointLedgerEntry;
-import com.group01.access.domain.exception.InsufficientPointsException;
-import com.group01.access.domain.repository.OutboxEventRepository;
+import com.group01.access.domain.exception.DuplicateIdempotencyException;
+import com.group01.access.domain.exception.PointsActorMismatchException;
 import com.group01.access.domain.repository.PointLedgerRepository;
-import com.group01.access.domain.repository.PointWalletRepository;
 import com.group01.access.domain.vo.PointTransactionType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -29,71 +28,84 @@ import static org.mockito.Mockito.*;
 class DebitPointsUseCaseTest {
 
     @Mock
-    private PointWalletRepository pointWalletRepository;
-    @Mock
     private PointLedgerRepository pointLedgerRepository;
     @Mock
-    private OutboxEventRepository outboxEventRepository;
+    private PointDebitWriter pointDebitWriter;
 
     @InjectMocks
     private DebitPointsUseCase debitPointsUseCase;
 
-    @Test
-    @DisplayName("Should successfully debit points when balance is sufficient")
-    void shouldDebitPointsSuccessfully() {
-        UUID userId = UUID.randomUUID();
-        UUID refId = UUID.randomUUID();
-        PointWallet wallet = new PointWallet(userId, 50, 50, 0, 0, Instant.now());
+    private final UUID userId = UUID.randomUUID();
+    private final UUID refId = UUID.randomUUID();
 
-        when(pointLedgerRepository.findByIdempotencyKey("idem-debit")).thenReturn(Optional.empty());
-        when(pointWalletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
-        when(pointLedgerRepository.save(any(PointLedgerEntry.class))).thenAnswer(inv -> inv.getArgument(0));
+    private DebitPointsCommand command(UUID actor, long amount, UUID reference) {
+        return new DebitPointsCommand(actor, userId, amount, "LESSON_WRITING", reference, "idem-1", "Writing grading");
+    }
 
-        PointLedgerResult result = debitPointsUseCase.execute(new DebitPointsCommand(
-                userId, 10, "GRADING_JOB", refId, "idem-debit", "AI Speaking grading"
-        ));
-
-        assertThat(result).isNotNull();
-        assertThat(result.delta()).isEqualTo(-10);
-        assertThat(result.balanceAfter()).isEqualTo(40);
-        assertThat(result.transactionType()).isEqualTo(PointTransactionType.AI_GRADING_DEBIT);
-
-        verify(pointWalletRepository).save(wallet);
-        verify(pointLedgerRepository).save(any(PointLedgerEntry.class));
-        verify(outboxEventRepository).save(any());
+    private PointLedgerEntry entry(long delta) {
+        return new PointLedgerEntry(UUID.randomUUID(), userId, delta, 17, PointTransactionType.AI_GRADING_DEBIT,
+                "LESSON_WRITING", refId, "idem-1", "Writing grading", Instant.now());
     }
 
     @Test
-    @DisplayName("Should return existing result on duplicate idempotency key")
-    void shouldReturnExistingOnDuplicate() {
-        UUID userId = UUID.randomUUID();
-        UUID refId = UUID.randomUUID();
-        PointLedgerEntry existing = new PointLedgerEntry(
-                UUID.randomUUID(), userId, -10, 40, PointTransactionType.AI_GRADING_DEBIT,
-                "GRADING_JOB", refId, "idem-dup", "AI Speaking grading", Instant.now()
-        );
-        when(pointLedgerRepository.findByIdempotencyKey("idem-dup")).thenReturn(Optional.of(existing));
-
-        PointLedgerResult result = debitPointsUseCase.execute(new DebitPointsCommand(
-                userId, 10, "GRADING_JOB", refId, "idem-dup", "AI Speaking grading"
-        ));
-
-        assertThat(result.id()).isEqualTo(existing.getId());
-        assertThat(result.balanceAfter()).isEqualTo(40);
-        verifyNoInteractions(pointWalletRepository);
+    @DisplayName("Debit for another user is rejected before touching the wallet")
+    void rejectsDebitForAnotherUser() {
+        assertThatThrownBy(() -> debitPointsUseCase.execute(command(UUID.randomUUID(), 3, refId)))
+                .isInstanceOf(PointsActorMismatchException.class);
+        verifyNoInteractions(pointLedgerRepository, pointDebitWriter);
     }
 
     @Test
-    @DisplayName("Should throw InsufficientPointsException when balance is less than required")
-    void shouldThrowWhenInsufficientBalance() {
-        UUID userId = UUID.randomUUID();
-        PointWallet wallet = new PointWallet(userId, 5, 5, 0, 0, Instant.now());
+    @DisplayName("New key is written by the writer")
+    void writesNewDebit() {
+        PointLedgerResult written = DebitPointsUseCase.toResult(entry(-3));
+        when(pointLedgerRepository.findByIdempotencyKey("idem-1")).thenReturn(Optional.empty());
+        when(pointDebitWriter.debit(any())).thenReturn(written);
 
-        when(pointLedgerRepository.findByIdempotencyKey("idem-insuf")).thenReturn(Optional.empty());
-        when(pointWalletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        assertThat(debitPointsUseCase.execute(command(userId, 3, refId))).isEqualTo(written);
+    }
 
-        assertThatThrownBy(() -> debitPointsUseCase.execute(new DebitPointsCommand(
-                userId, 10, "GRADING_JOB", UUID.randomUUID(), "idem-insuf", "AI Speaking"
-        ))).isInstanceOf(InsufficientPointsException.class);
+    @Test
+    @DisplayName("Replaying the same debit returns the existing entry without writing")
+    void replaysSameDebit() {
+        PointLedgerEntry existing = entry(-3);
+        when(pointLedgerRepository.findByIdempotencyKey("idem-1")).thenReturn(Optional.of(existing));
+
+        assertThat(debitPointsUseCase.execute(command(userId, 3, refId)).id()).isEqualTo(existing.getId());
+        verifyNoInteractions(pointDebitWriter);
+    }
+
+    @Test
+    @DisplayName("Reusing a key for a different amount or reference is a conflict")
+    void rejectsKeyReuseWithDifferentContent() {
+        when(pointLedgerRepository.findByIdempotencyKey("idem-1")).thenReturn(Optional.of(entry(-3)));
+
+        assertThatThrownBy(() -> debitPointsUseCase.execute(command(userId, 5, refId)))
+                .isInstanceOf(DuplicateIdempotencyException.class);
+        assertThatThrownBy(() -> debitPointsUseCase.execute(command(userId, 3, UUID.randomUUID())))
+                .isInstanceOf(DuplicateIdempotencyException.class);
+        verifyNoInteractions(pointDebitWriter);
+    }
+
+    @Test
+    @DisplayName("A concurrent duplicate that loses the unique race replays the winning entry")
+    void concurrentDuplicateReplaysWinner() {
+        PointLedgerEntry winner = entry(-3);
+        when(pointLedgerRepository.findByIdempotencyKey("idem-1"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(winner));
+        when(pointDebitWriter.debit(any())).thenThrow(new DataIntegrityViolationException("uq idempotency_key"));
+
+        assertThat(debitPointsUseCase.execute(command(userId, 3, refId)).id()).isEqualTo(winner.getId());
+    }
+
+    @Test
+    @DisplayName("An integrity error without a committed entry is not hidden")
+    void integrityErrorWithoutEntryIsRethrown() {
+        when(pointLedgerRepository.findByIdempotencyKey("idem-1")).thenReturn(Optional.empty());
+        when(pointDebitWriter.debit(any())).thenThrow(new DataIntegrityViolationException("other"));
+
+        assertThatThrownBy(() -> debitPointsUseCase.execute(command(userId, 3, refId)))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

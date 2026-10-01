@@ -4,6 +4,7 @@ import com.group01.content.domain.vo.QuestionDifficulty;
 import com.group01.content.domain.vo.QuestionOptionPayload;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -19,6 +20,10 @@ public record AddQuestionVersionRequest(
         List<QuestionOptionPayload> options,
         String answerSpecJson,
         String explanation,
+
+        @Size(max = 500, message = "hint must be at most 500 characters")
+        String hint,
+
         QuestionDifficulty difficulty,
         List<KnowledgePointRequest> knowledgePoints
 ) {

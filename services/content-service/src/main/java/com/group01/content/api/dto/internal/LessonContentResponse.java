@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonRawValue;
 import com.group01.content.application.result.LessonContentResult;
 import com.group01.content.domain.vo.AssetType;
 import com.group01.content.domain.vo.BlockType;
+import com.group01.content.domain.vo.LessonBlockKind;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,11 +21,12 @@ public record LessonContentResponse(
         List<UUID> knowledgePointIds,
         List<Block> blocks
 ) {
-    /** A block shows only the field of its type. */
+    /** A block shows only the field of its type; {@code blockKind} appears on EXERCISE blocks. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Block(
             UUID blockId,
             BlockType blockType,
+            LessonBlockKind blockKind,
             int sortOrder,
             String textContent,
             Asset asset,
@@ -32,10 +34,14 @@ public record LessonContentResponse(
             List<Question> questions
     ) {}
 
+    /** For AUDIO, {@code textContent} is the transcript and {@code mediaUrl} the playable URL. */
     public record Asset(UUID id, AssetType assetType, String textContent, String mediaReference,
-                        Integer durationSeconds) {}
+                        Integer durationSeconds, String mediaUrl) {}
 
-    /** {@code options} is null for a fill question; {@code answerSpec} follows answer spec v1. */
+    /**
+     * {@code options} is null for a fill question; {@code answerSpec} follows answer spec v1. {@code assets} appears
+     * only on questions of an essay block.
+     */
     public record Question(
             UUID questionVersionId,
             int sortOrder,
@@ -43,8 +49,12 @@ public record LessonContentResponse(
             @JsonRawValue String options,
             @JsonRawValue String answerSpec,
             String explanation,
-            List<UUID> knowledgePointIds
+            String hint,
+            List<UUID> knowledgePointIds,
+            @JsonInclude(JsonInclude.Include.NON_NULL) List<QuestionAsset> assets
     ) {}
+
+    public record QuestionAsset(UUID assetId, AssetType assetType, String mediaUrl, String altText, int sortOrder) {}
 
     public static LessonContentResponse from(LessonContentResult result) {
         return new LessonContentResponse(result.lessonId(), result.topicId(), result.code(), result.title(),
@@ -54,13 +64,17 @@ public record LessonContentResponse(
 
     private static Block block(LessonContentResult.Block block) {
         LessonContentResult.Asset asset = block.asset();
-        return new Block(block.blockId(), block.blockType(), block.sortOrder(), block.textContent(),
+        return new Block(block.blockId(), block.blockType(), block.blockKind(), block.sortOrder(), block.textContent(),
                 asset == null ? null : new Asset(asset.id(), asset.assetType(), asset.textContent(),
-                        asset.mediaReference(), asset.durationSeconds()),
+                        asset.mediaReference(), asset.durationSeconds(), asset.mediaUrl()),
                 block.vocabularySenseIds(),
                 block.questions() == null ? null : block.questions().stream()
                         .map(q -> new Question(q.questionVersionId(), q.sortOrder(), q.stem(), q.optionsJson(),
-                                q.answerSpecJson(), q.explanation(), q.knowledgePointIds()))
+                                q.answerSpecJson(), q.explanation(), q.hint(), q.knowledgePointIds(),
+                                q.assets() == null ? null : q.assets().stream()
+                                        .map(a -> new QuestionAsset(a.assetId(), a.assetType(), a.mediaUrl(),
+                                                a.altText(), a.sortOrder()))
+                                        .toList()))
                         .toList());
     }
 }

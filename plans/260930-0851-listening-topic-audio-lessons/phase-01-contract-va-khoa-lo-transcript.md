@@ -1,13 +1,18 @@
 ---
 phase: 1
 title: "Contract và khóa lộ transcript"
-status: pending
+status: in-progress
 priority: P1
 dependencies: []
 effort: "1 ngày"
 ---
 
 # Phase 1: Contract và khóa lộ transcript
+
+## Tiến độ (2026-10-01)
+
+- Xong: `GET /api/content/assets/{id}` chỉ `ADMIN`/`CONTENT_AUTHOR` (CUSTOMER 403, không token 401; chỉ test gọi path này); contract `learning-content-internal-v1` có audio của bài học và section.
+- Còn: phần học viên trong `lesson-learning-v1.md` (audio, transcript sau khi đạt, cấu trúc attempt của assessment). Làm sau khi PR của Codex sửa file này đã merge, để không xung đột.
 
 ## Context Links
 

@@ -1,7 +1,7 @@
 ---
 title: "Writing Task 2 trong bài học (khối essay, AI chấm, trừ point)"
 description: "Khối essay Task 2 trong bài học, không chặn học tiếp; ai-learning chấm bằng LLM ngay trong request, chấm xong mới trừ 3 point qua access; ghi evidence mastery; content không đổi schema."
-status: pending
+status: in-progress
 priority: P2
 branch: "feat/main-follow"
 tags: [feature, backend, ai-learning, access, content, writing, tdd]
@@ -44,13 +44,15 @@ Chế độ `--tdd`: mỗi phase theo trình tự test giữ hành vi cũ → s�
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Contract va bao ve access](./phase-01-contract-va-bao-ve-access.md) | Pending |
-| 2 | [Content seed khoi essay](./phase-02-content-seed-khoi-essay.md) | Pending |
+| 1 | [Contract va bao ve access](./phase-01-contract-va-bao-ve-access.md) | Completed (nhánh `feat/writing-access-content`; contract `lesson-writing-v1` duyệt 2026-10-01) |
+| 2 | [Content seed khoi essay](./phase-02-content-seed-khoi-essay.md) | Completed (nhánh `feat/writing-access-content`) |
 | 3 | [AI Learning grader va access client](./phase-03-ai-learning-grader-va-access-client.md) | Pending |
 | 4 | [AI Learning API nop essay va evidence](./phase-04-ai-learning-api-nop-essay-va-evidence.md) | Pending |
 | 5 | [Tai lieu](./phase-05-tai-lieu.md) | Pending |
 
 Thứ tự: `1 → (2 ∥ 3) → 4 → 5`. Phase 2 và 3 chạy song song được sau phase 1.
+
+**Thứ tự merge (2026-10-01):** content V10 thêm khối essay vào L4. Learning-service phải coi khối `blockKind = ESSAY` là không tính vào hoàn thành bài **trước hoặc cùng lúc** V10 lên `feat/main-follow`; nếu không, L4 không bao giờ xong. Cách nhẹ nhất: thêm luật này vào PR 3 của `261001-1228` (một dòng lọc khối), hoặc giữ nhánh này tới khi phase 4 của plan này xong.
 
 ## Dependencies
 
