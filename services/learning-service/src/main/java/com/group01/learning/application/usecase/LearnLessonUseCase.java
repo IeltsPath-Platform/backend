@@ -1,5 +1,6 @@
 package com.group01.learning.application.usecase;
 
+import com.group01.learning.application.AnswerSheet;
 import com.group01.learning.application.LessonEvidenceReference;
 import com.group01.learning.application.ReviewReevaluation;
 import com.group01.learning.application.command.SubmitExerciseCommand;
@@ -22,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -71,7 +73,8 @@ public class LearnLessonUseCase {
         refreshMetadata(userId, context.lesson());
         Set<UUID> passed = passedBlocks(context.progress());
         List<LessonResult.Block> blocks = orderedBlocks(context.lesson()).stream()
-                .map(block -> blockResult(block, passed.contains(block.blockId()))).toList();
+                .map(block -> blockResult(block, passed.contains(block.blockId()), completed(context.progress())))
+                .toList();
         Lesson lesson = context.lesson();
         return new LessonResult(lesson.lessonId(), lesson.topicId(), lesson.code(), lesson.title(), lesson.summary(),
                 lesson.sortOrder(), completed(context.progress()) ? "COMPLETED" : "AVAILABLE", blocks);
@@ -92,8 +95,12 @@ public class LearnLessonUseCase {
         Block block = lesson.blocks().stream().filter(item -> item.blockId().equals(blockId)
                         && "EXERCISE".equals(item.blockType())).findFirst()
                 .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Exercise block was not found"));
+        if (block.isEssay()) {
+            throw new LearningRequestException(409, "ESSAY_BLOCK", "Essay blocks are submitted as essays");
+        }
         List<Question> questions = orderedQuestions(block);
-        Map<UUID, Object> answers = validateAnswers(questions, command);
+        Map<UUID, Object> answers = AnswerSheet.require(
+                questions.stream().map(Question::questionVersionId).toList(), command.answers());
         List<AnswerSpecGrader.Grade> grades = questions.stream()
                 .map(question -> grader.grade(question.answerSpec(), answers.get(question.questionVersionId()))).toList();
         if (grades.stream().anyMatch(grade -> !grade.gradable())) {
@@ -105,8 +112,8 @@ public class LearnLessonUseCase {
         if (firstSubmission) gate.authorize(store.findPendingReviews(userId), null,
                 status(userId, lesson.topicId()), context.previousLessonsComplete());
         refreshMetadata(userId, lesson);
-        boolean blockPassed = grades.stream().filter(AnswerSpecGrader.Grade::correct).count() * 10L
-                >= questions.size() * 7L;
+        boolean blockPassed = AnswerSheet.passes(
+                grades.stream().filter(AnswerSpecGrader.Grade::correct).count(), questions.size());
         Set<UUID> passed = new HashSet<>(passedBlocks(context.progress()));
         if (blockPassed) {
             store.passBlock(userId, lessonId, blockId);
@@ -128,8 +135,9 @@ public class LearnLessonUseCase {
             }
             store.appendEvidence(userId, evidence);
         }
+        // Essay blocks never gate completion: a learner without points can still finish every lesson.
         boolean lessonCompleted = completed(context.progress()) || lesson.blocks().stream()
-                .filter(item -> "EXERCISE".equals(item.blockType())).allMatch(item -> passed.contains(item.blockId()));
+                .filter(Block::isExercise).allMatch(item -> passed.contains(item.blockId()));
         List<SubmissionResult.AnswerResult> results = new ArrayList<>();
         for (int index = 0; index < questions.size(); index++) {
             var question = questions.get(index);
@@ -147,7 +155,7 @@ public class LearnLessonUseCase {
     public UUID complete(UUID userId, UUID lessonId) {
         store.lockUser(userId);
         Lesson lesson = authorize(userId, lessonId).lesson();
-        if (lesson.blocks().stream().anyMatch(block -> "EXERCISE".equals(block.blockType()))) {
+        if (lesson.blocks().stream().anyMatch(Block::isExercise)) {
             throw new LearningRequestException(409, "LESSON_HAS_EXERCISES", "Lesson contains exercise blocks");
         }
         refreshMetadata(userId, lesson);
@@ -182,7 +190,7 @@ public class LearnLessonUseCase {
     private Set<UUID> knownKnowledgePoints(UUID userId, Lesson lesson) {
         Set<UUID> known = store.findMastery(userId).stream().map(history -> history.knowledgePointId())
                 .collect(Collectors.toSet());
-        Set<UUID> needed = lesson.blocks().stream().filter(block -> "EXERCISE".equals(block.blockType()))
+        Set<UUID> needed = lesson.blocks().stream().filter(Block::isExercise)
                 .flatMap(block -> block.questions().stream()).flatMap(question -> question.knowledgePointIds().stream())
                 .collect(Collectors.toSet());
         if (!known.containsAll(needed)) {
@@ -194,29 +202,13 @@ public class LearnLessonUseCase {
 
     private void reevaluate(UUID userId, Lesson lesson) {
         Map<UUID, List<UUID>> kpsByQuestion = lesson.blocks().stream()
-                .filter(block -> "EXERCISE".equals(block.blockType())).flatMap(block -> block.questions().stream())
+                .filter(Block::isExercise).flatMap(block -> block.questions().stream())
                 .collect(Collectors.toMap(Question::questionVersionId, Question::knowledgePointIds, (first, second) -> first));
         Set<UUID> wrong = store.findFirstSubmissions(userId, lesson.lessonId()).stream()
                 .flatMap(submission -> submission.results().stream()).filter(result -> !result.correct())
                 .flatMap(result -> kpsByQuestion.getOrDefault(result.questionVersionId(), List.of()).stream())
                 .collect(Collectors.toSet());
         reviews.execute(userId, new HashSet<>(lesson.knowledgePointIds()), wrong);
-    }
-
-    private Map<UUID, Object> validateAnswers(List<Question> questions, SubmitExerciseCommand command) {
-        Map<UUID, Object> answers = new HashMap<>();
-        Set<UUID> ids = new HashSet<>();
-        for (var answer : command.answers()) {
-            if (!ids.add(answer.questionVersionId())) throw invalidAnswers();
-            answers.put(answer.questionVersionId(), answer.answer());
-        }
-        Set<UUID> required = questions.stream().map(Question::questionVersionId).collect(Collectors.toSet());
-        if (questions.isEmpty() || !ids.equals(required)) throw invalidAnswers();
-        return answers;
-    }
-
-    private LearningRequestException invalidAnswers() {
-        return new LearningRequestException(422, "INVALID_ANSWERS", "Submit one answer for every exercise question");
     }
 
     private LearningRequestException requestConflict() {
@@ -238,10 +230,13 @@ public class LearnLessonUseCase {
                 .thenComparing(question -> question.questionVersionId().toString())).toList();
     }
 
-    private LessonResult.Block blockResult(Block block, boolean passed) {
-        var asset = block.asset() == null ? null : new LessonResult.Asset(block.asset().id(), block.asset().assetType(),
-                block.asset().textContent(), block.asset().mediaReference(), block.asset().durationSeconds());
-        boolean exercise = "EXERCISE".equals(block.blockType());
+    private LessonResult.Block blockResult(Block block, boolean passed, boolean lessonCompleted) {
+        var asset = block.asset() == null ? null : learnerAsset(block.asset(), lessonCompleted);
+        if (block.isEssay()) {
+            return new LessonResult.Block(block.blockId(), block.blockType(), "ESSAY", block.sortOrder(), null, null,
+                    null, null, null, null, essayQuestion(block));
+        }
+        boolean exercise = block.isExercise();
         var questions = exercise ? orderedQuestions(block).stream().map(question -> new LessonResult.Question(
                 question.questionVersionId(), question.sortOrder(), question.stem(), question.options() == null ? null
                 : question.options().stream().map(option -> new LessonResult.Option(option.optionKey(), option.content(),
@@ -249,9 +244,34 @@ public class LearnLessonUseCase {
         var solutions = exercise && passed ? orderedQuestions(block).stream().map(question -> new LessonResult.Solution(
                 question.questionVersionId(), grader.grade(question.answerSpec(), null).correctAnswer(),
                 question.explanation())).toList() : null;
-        return new LessonResult.Block(block.blockId(), block.blockType(), block.sortOrder(), block.textContent(), asset,
-                block.vocabularySenseIds(), exercise ? passed : null, questions, solutions);
+        return new LessonResult.Block(block.blockId(), block.blockType(), exercise ? "EXERCISE" : null,
+                block.sortOrder(), block.textContent(), asset, block.vocabularySenseIds(), exercise ? passed : null,
+                questions, solutions, null);
     }
 
+    /** Passage text is shown as is; an audio transcript gives the answers away, so it waits for completion. */
+    private static LessonResult.Asset learnerAsset(Asset asset, boolean lessonCompleted) {
+        if ("PASSAGE".equals(asset.assetType())) {
+            return new LessonResult.Asset(asset.id(), asset.assetType(), asset.textContent(), null, null, null);
+        }
+        String transcript = "AUDIO".equals(asset.assetType()) && lessonCompleted ? asset.textContent() : null;
+        return new LessonResult.Asset(asset.id(), asset.assetType(), null, asset.mediaUrl(), asset.durationSeconds(),
+                transcript);
+    }
+
+    /** The learner sees the prompt and images only; never the answer spec, chart facts or model answer. */
+    private static LessonResult.EssayQuestion essayQuestion(Block block) {
+        Question question = block.questions().getFirst();
+        Map<String, Object> spec = question.answerSpec() == null ? Map.of() : question.answerSpec();
+        List<LessonResult.Image> images = question.assets() == null ? List.of() : question.assets().stream()
+                .filter(asset -> "IMAGE".equals(asset.assetType()))
+                .sorted(Comparator.comparingInt(QuestionAsset::sortOrder))
+                .map(asset -> new LessonResult.Image(asset.mediaUrl(), asset.altText())).toList();
+        return new LessonResult.EssayQuestion(question.questionVersionId(), question.stem(),
+                spec.get("task") instanceof String task ? task : null,
+                spec.get("minWords") instanceof Number words ? words.intValue() : null,
+                spec.get("passBand") instanceof Number band ? new BigDecimal(band.toString()) : null,
+                images);
+    }
     private record LessonContext(Lesson lesson, LessonProgress progress, boolean previousLessonsComplete) {}
 }

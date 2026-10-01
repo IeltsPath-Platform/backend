@@ -1,7 +1,7 @@
 ---
 title: "Thay ai-learning (Python) bằng learning-service (Java), chỉ giữ tính năng MVP"
 description: "Xóa service Python, dựng learning-service Spring Boot (port 8086, route /api/learning/**) làm path theo user, bài học, bài ôn, giao mã đề, consumer kết quả đề và API xem mastery; tutor, practice, learner memory, sắp path bằng LLM bị bỏ."
-status: in-progress
+status: completed
 priority: P1
 branch: "feat/learning-lessons"
 tags: [learning-service, java, mvp, ai-learning-removal, lesson, mastery]
@@ -56,9 +56,9 @@ Vì bằng chứng gắn user, consumer **không cần path**: không có bảng
 |-------|------|--------|
 | 1 | [Xóa Python, dựng khung learning-service](./phase-01-xoa-python-dung-khung.md) | Done |
 | 2 | [Thứ tự học, bài học, nộp bài, cổng, mastery](./phase-02-bai-hoc-va-mastery.md) | Done |
-| 3 | [Bài ôn và giao mã đề](./phase-03-bai-on-va-ma-de.md) | Pending |
-| 4 | [Consumer AssessmentCompleted.v2](./phase-04-consumer-ket-qua-de.md) | Pending |
-| 5 | [Tài liệu repo](./phase-05-tai-lieu-va-plan-con.md) (plan con đã đồng bộ 2026-10-01) | Pending |
+| 3 | [Bài ôn và giao mã đề](./phase-03-bai-on-va-ma-de.md) | Done (nhánh `feat/learning-reviews-tests`) |
+| 4 | [Consumer AssessmentCompleted.v2](./phase-04-consumer-ket-qua-de.md) | Done (nhánh `feat/learning-reviews-tests`) |
+| 5 | [Tài liệu repo](./phase-05-tai-lieu-va-plan-con.md) (plan con đã đồng bộ 2026-10-01) | Done (nhánh `feat/learning-reviews-tests`) |
 
 Tiến độ ngày 2026-10-01: **2/5 phase hoàn tất (40%)**. Phase 2 đã hoàn tất trên `feat/learning-lessons`:
 sáu API, domain, Content client, transaction/evidence/review; regression **125 pass, 0 fail/error/skip**, Docker chạy thật.

@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Tài liệu repo"
-status: pending
+status: completed
 priority: P2
 dependencies: [4]
 effort: "0.5 ngày"
@@ -11,6 +11,10 @@ effort: "0.5 ngày"
 
 Plan con đã được đồng bộ ngày 2026-10-01 (chú thích đầu phase + [`python-to-java-mapping.md`](./python-to-java-mapping.md));
 phase này chỉ sửa tài liệu của repo.
+
+## Kết quả (2026-10-01)
+
+- Sửa `AGENTS.md` (bỏ §3.8 Python, thêm §3.8 Learning Service), `CLAUDE.md`, `README.md` §6, `docs/system-architecture.md`, `.sdd/database/DATABASE_V5.md` (§7 thay bằng schema V1 9 bảng), README learning-service. `assessment-completed-v2` sửa thứ tự bằng chứng theo `ordinal`. Các chỗ còn chữ Python/ai-learning là ghi chú lịch sử.
 
 ## Requirements
 

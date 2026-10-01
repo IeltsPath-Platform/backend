@@ -9,11 +9,24 @@ import java.util.UUID;
 public final class LessonEvidenceReference {
     private static final UUID DNS_NAMESPACE = UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
     private static final UUID LESSON_NAMESPACE = uuid5(DNS_NAMESPACE, "ielts-path:lesson_exercise");
+    private static final UUID REVIEW_NAMESPACE = uuid5(DNS_NAMESPACE, "ielts-path:review_set");
+    /** Fixed by the AssessmentCompleted.v2 contract. */
+    private static final UUID ASSESSMENT_NAMESPACE = UUID.fromString("6f0c1b2e-3d7a-4e59-9b8a-2c4d5e6f7a81");
 
     private LessonEvidenceReference() {}
 
     public static UUID create(UUID requestId, UUID questionVersionId, UUID kpId) {
         return uuid5(LESSON_NAMESPACE, requestId + ":" + questionVersionId + ":" + kpId);
+    }
+
+    /** Reference of review-set evidence; a separate namespace keeps it apart from lesson evidence. */
+    public static UUID forReviewSet(UUID requestId, UUID questionVersionId, UUID kpId) {
+        return uuid5(REVIEW_NAMESPACE, requestId + ":" + questionVersionId + ":" + kpId);
+    }
+
+    /** Reference of formal-result evidence: one per result version, item and knowledge point. */
+    public static UUID forAssessment(UUID resultId, int resultVersion, UUID itemResultId, UUID kpId) {
+        return uuid5(ASSESSMENT_NAMESPACE, resultId + ":" + resultVersion + ":" + itemResultId + ":" + kpId);
     }
 
     private static UUID uuid5(UUID namespace, String name) {
