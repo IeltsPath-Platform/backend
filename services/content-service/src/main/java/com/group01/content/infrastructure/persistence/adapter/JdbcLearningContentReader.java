@@ -193,7 +193,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
         Map<UUID, List<LessonContentResult.Question>> questionsByBlock = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT bq.block_id, bq.sort_order, qv.id, qv.stem, qv.options::text AS options,
-                       qv.answer_spec::text AS answer_spec, qv.explanation
+                       qv.answer_spec::text AS answer_spec, qv.explanation,
+                       qv.answer_spec->>'type' AS spec_type, qv.answer_spec->>'passBand' AS spec_pass_band
                 FROM lesson_block_questions bq
                 JOIN lesson_blocks b ON b.id = bq.block_id
                 JOIN question_versions qv ON qv.id = bq.question_version_id
@@ -204,7 +205,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
             questionsByBlock.computeIfAbsent(uuid(rs, "block_id"), ignored -> new ArrayList<>())
                     .add(new LessonContentResult.Question(versionId, rs.getInt("sort_order"), rs.getString("stem"),
                             rs.getString("options"), rs.getString("answer_spec"), rs.getString("explanation"),
-                            questionPoints.getOrDefault(versionId, List.of())));
+                            questionPoints.getOrDefault(versionId, List.of()),
+                            rs.getString("spec_type"), rs.getString("spec_pass_band")));
         });
 
         Map<UUID, List<UUID>> sensesByBlock = new LinkedHashMap<>();
@@ -233,7 +235,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
                     AssetType.valueOf(rs.getString("asset_type")), rs.getString("asset_text"),
                     rs.getString("media_reference"), (Integer) rs.getObject("duration_seconds"))
                     : null;
-            return new LessonContentResult.Block(blockId, type, rs.getInt("sort_order"),
+            return new LessonContentResult.Block(blockId, type, null, rs.getInt("sort_order"),
                     type == BlockType.TEXT ? rs.getString("text_content") : null,
                     asset,
                     type == BlockType.VOCABULARY ? sensesByBlock.getOrDefault(blockId, List.of()) : null,

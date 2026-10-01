@@ -69,6 +69,13 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.FORBIDDEN, "Access denied", request.getRequestURI(), null);
     }
 
+    @ExceptionHandler(InvalidLessonBlockException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidLessonBlock(InvalidLessonBlockException ex, HttpServletRequest request) {
+        log.error("Lesson data breaks a block rule at {}: {}", request.getRequestURI(), ex.getMessage());
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "INVALID_LESSON_BLOCK"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
         log.error("Unhandled exception processing request: {}", request.getRequestURI(), ex);

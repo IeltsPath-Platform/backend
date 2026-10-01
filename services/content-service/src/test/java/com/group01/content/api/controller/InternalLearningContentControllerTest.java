@@ -13,6 +13,7 @@ import com.group01.content.domain.exception.LessonNotFoundException;
 import com.group01.content.domain.exception.TopicNotFoundException;
 import com.group01.content.domain.vo.AssetType;
 import com.group01.content.domain.vo.BlockType;
+import com.group01.content.domain.vo.LessonBlockKind;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.Skill;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,13 +58,13 @@ class InternalLearningContentControllerTest {
         UUID lessonId = UUID.randomUUID();
         when(lessonContent.execute(lessonId)).thenReturn(new LessonContentResult(lessonId, UUID.randomUUID(), "L1",
                 "Câu chủ đề nằm ở đâu", null, 1, List.of(), List.of(
-                new LessonContentResult.Block(UUID.randomUUID(), BlockType.TEXT, 1, "Mẹo", null, null, null),
-                new LessonContentResult.Block(UUID.randomUUID(), BlockType.ASSET, 2, null,
+                new LessonContentResult.Block(UUID.randomUUID(), BlockType.TEXT, null, 1, "Mẹo", null, null, null),
+                new LessonContentResult.Block(UUID.randomUUID(), BlockType.ASSET, null, 2, null,
                         new LessonContentResult.Asset(UUID.randomUUID(), AssetType.PASSAGE, "A. Text", null, null),
                         null, null),
-                new LessonContentResult.Block(UUID.randomUUID(), BlockType.EXERCISE, 3, null, null, null, List.of(
+                new LessonContentResult.Block(UUID.randomUUID(), BlockType.EXERCISE, LessonBlockKind.EXERCISE, 3, null, null, null, List.of(
                         new LessonContentResult.Question(UUID.randomUUID(), 1, "Complete ______.", null,
-                                "{\"type\":\"FILL\",\"accepted\":[\"critics\"]}", "Đoạn D.", List.of()))))));
+                                "{\"type\":\"FILL\",\"accepted\":[\"critics\"]}", "Đoạn D.", List.of(), "FILL", null))))));
 
         mockMvc.perform(get("/internal/learning-content/lessons/{id}", lessonId))
                 .andExpect(status().isOk())
@@ -71,6 +72,9 @@ class InternalLearningContentControllerTest {
                 .andExpect(jsonPath("$.blocks[0].textContent").value("Mẹo"))
                 .andExpect(jsonPath("$.blocks[0].asset").doesNotExist())
                 .andExpect(jsonPath("$.blocks[0].questions").doesNotExist())
+                .andExpect(jsonPath("$.blocks[0].blockKind").doesNotExist())
+                .andExpect(jsonPath("$.blocks[2].blockKind").value("EXERCISE"))
+                .andExpect(jsonPath("$.blocks[2].questions[0].specType").doesNotExist())
                 .andExpect(jsonPath("$.blocks[1].asset.assetType").value("PASSAGE"))
                 .andExpect(jsonPath("$.blocks[1].asset.mediaReference").value((Object) null))
                 .andExpect(jsonPath("$.blocks[2].textContent").doesNotExist())

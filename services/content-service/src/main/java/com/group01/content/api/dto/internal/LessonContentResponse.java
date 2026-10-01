@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonRawValue;
 import com.group01.content.application.result.LessonContentResult;
 import com.group01.content.domain.vo.AssetType;
 import com.group01.content.domain.vo.BlockType;
+import com.group01.content.domain.vo.LessonBlockKind;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,11 +21,12 @@ public record LessonContentResponse(
         List<UUID> knowledgePointIds,
         List<Block> blocks
 ) {
-    /** A block shows only the field of its type. */
+    /** A block shows only the field of its type; {@code blockKind} appears on EXERCISE blocks. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Block(
             UUID blockId,
             BlockType blockType,
+            LessonBlockKind blockKind,
             int sortOrder,
             String textContent,
             Asset asset,
@@ -54,7 +56,7 @@ public record LessonContentResponse(
 
     private static Block block(LessonContentResult.Block block) {
         LessonContentResult.Asset asset = block.asset();
-        return new Block(block.blockId(), block.blockType(), block.sortOrder(), block.textContent(),
+        return new Block(block.blockId(), block.blockType(), block.blockKind(), block.sortOrder(), block.textContent(),
                 asset == null ? null : new Asset(asset.id(), asset.assetType(), asset.textContent(),
                         asset.mediaReference(), asset.durationSeconds()),
                 block.vocabularySenseIds(),

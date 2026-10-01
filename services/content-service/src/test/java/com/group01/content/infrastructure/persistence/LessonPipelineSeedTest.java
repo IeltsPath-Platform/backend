@@ -7,7 +7,9 @@ import com.group01.content.application.result.LessonSummaryResult;
 import com.group01.content.application.result.PackageVersionContentResult;
 import com.group01.content.application.result.PracticeSetResult;
 import com.group01.content.application.result.TopicSequenceResult;
+import com.group01.content.application.usecase.GetLessonContentUseCase;
 import com.group01.content.domain.vo.BlockType;
+import com.group01.content.domain.vo.LessonBlockKind;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import org.flywaydb.core.Flyway;
@@ -158,8 +160,10 @@ class LessonPipelineSeedTest {
         assertThat(sequence).extracting(TopicSequenceResult::code).containsExactly("DEMO_READING", "TFNG_SKILLS");
         assertThat(sequence.get(0).knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::code)
                 .containsExactly("DEMO_READING_MAIN_IDEA", "DR_IDEA_OR_DETAIL", "DR_TOPIC_SENTENCE",
-                        "DR_MATCHING_HEADINGS");
-        assertThat(sequence.get(0).knowledgePoints()).allMatch(TopicSequenceResult.KnowledgePointEntry::hasPracticeSet);
+                        "DR_MATCHING_HEADINGS", "DEMO_READING_W2_OPINION");
+        // Reading KPs have practice sets; the Writing KP added with the essay block has none.
+        assertThat(sequence.get(0).knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::hasPracticeSet)
+                .containsExactly(true, true, true, true, false);
         assertThat(sequence.get(1).knowledgePoints()).singleElement()
                 .satisfies(kp -> {
                     assertThat(kp.code()).isEqualTo("TFNG_FALSE_VS_NOT_GIVEN");
@@ -219,7 +223,8 @@ class LessonPipelineSeedTest {
         assertThat(lessons).extracting(LessonSummaryResult::code).containsExactly("L1", "L2", "L3", "L4");
         assertThat(lessons.get(0).exerciseBlockIds()).hasSize(2);
         assertThat(lessons.get(3).knowledgePointIds())
-                .containsExactly(kpId("DEMO_READING_MAIN_IDEA"), kpId("DR_MATCHING_HEADINGS"));
+                .containsExactly(kpId("DEMO_READING_MAIN_IDEA"), kpId("DR_MATCHING_HEADINGS"),
+                        kpId("DEMO_READING_W2_OPINION"));
     }
 
     @Test
@@ -240,6 +245,28 @@ class LessonPipelineSeedTest {
         assertThat(fill.knowledgePointIds()).containsExactly(kpId("DR_TOPIC_SENTENCE"));
         assertThat(lesson.knowledgePointIds()).containsExactly(kpId("DR_TOPIC_SENTENCE"));
         assertThat(reader.publishedLesson(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    void everySeededExerciseBlockFollowsTheBlockRuleAndL4EndsWithTheTask2Essay() {
+        GetLessonContentUseCase lessons = new GetLessonContentUseCase(reader);
+        List<UUID> lessonIds = jdbc.queryForList("SELECT id FROM lessons", Map.of(), UUID.class);
+        List<LessonBlockKind> kinds = new ArrayList<>();
+        for (UUID lessonId : lessonIds) {
+            lessons.execute(lessonId).blocks().stream()
+                    .filter(block -> block.blockType() == BlockType.EXERCISE)
+                    .forEach(block -> kinds.add(block.blockKind()));
+        }
+        assertThat(kinds).doesNotContainNull().containsOnlyOnce(LessonBlockKind.ESSAY);
+
+        UUID l4 = jdbc.queryForObject("SELECT id FROM lessons WHERE code = 'L4'", Map.of(), UUID.class);
+        LessonContentResult.Block essay = lessons.execute(l4).blocks().get(4);
+        assertThat(essay.blockKind()).isEqualTo(LessonBlockKind.ESSAY);
+        assertThat(essay.questions()).singleElement().satisfies(q -> {
+            assertThat(q.answerSpecJson()).contains("\"task\": \"TASK_2\"");
+            assertThat(q.explanation()).startsWith("Many cities now face hotter summers");
+            assertThat(q.knowledgePointIds()).containsExactly(kpId("DEMO_READING_W2_OPINION"));
+        });
     }
 
     @Test
@@ -269,8 +296,8 @@ class LessonPipelineSeedTest {
     void lessonPracticeAndTestQuestionsAreReservedForLearning() {
         List<UUID> all = jdbc.queryForList("SELECT id FROM question_versions", Map.of(), UUID.class);
         Set<UUID> reserved = reader.questionVersionsReservedForLearning(all);
-        // 43 seeded questions plus the V4 practice-set question.
-        assertThat(reserved).hasSize(44);
+        // 43 seeded reading questions, the Task 2 essay and the V4 practice-set question.
+        assertThat(reserved).hasSize(45);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }
 
