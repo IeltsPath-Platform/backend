@@ -1,6 +1,6 @@
 # CLAUDE.md — IELTSPath backend
 
-- Cập nhật lần cuối: 2026-10-01; dữ kiện đã kiểm với code sau khi learning-service có consumer. Về dữ kiện, code là nguồn đúng khi tài
+- Cập nhật lần cuối: 2026-10-02; dữ kiện đã kiểm với code sau khi learning-service có consumer. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
 - Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
@@ -84,8 +84,8 @@ Test service học: `mvn -q -pl services/learning-service -am test` (Testcontain
 - notification-service chỉ là khung package.
 - Role chuẩn là `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF` (`LEARNER` cũ đã đổi thành `CUSTOMER`).
 - `graphify-out/` không được commit.
-- Bài Listening (content V12) trả 500 `INVALID_MEDIA_REFERENCE` khi thiếu `CONTENT_MEDIA_BASE_URL`; 8 file mp3 phải upload
-  đúng key (bảng trong `services/content-service/README.md`).
+- Bài Listening seed (content V12, reference dạng key) trả 500 `INVALID_MEDIA_REFERENCE` khi thiếu `CONTENT_MEDIA_BASE_URL`;
+  URL `https://` đầy đủ không cần base. 8 file mp3 phải upload đúng key (bảng trong `services/content-service/README.md`).
 
 ## 6. Tài liệu tra cứu
 

@@ -92,6 +92,16 @@ further lesson access until it is `DONE` or `SKIPPED`.
 
 ## Writing essays
 
+Lessons support `TASK_1` (Academic chart description) and `TASK_2`. Task 1 prompts include
+`images[{mediaUrl, altText}]` in Content order; image URLs may be `https://` or Base64 data URIs
+(`image/png`, `image/jpeg`, `image/svg+xml`). Clients render them through an image element.
+Content requires exactly one essay question per essay block, nonblank `chartFacts` of 1–2,000 characters
+and at least one attached `IMAGE` for Task 1; invalid blocks return `INVALID_LESSON_BLOCK`, invalid
+media references return `INVALID_MEDIA_REFERENCE`. These are Content validation errors; Learning maps
+Content failures as described below. Learners never receive `chartFacts` or `answerSpec`.
+The seeded prompts set `minWords` to 150 for Task 1 and 250 for Task 2; submission validation accepts
+50–1,000 words for either task.
+
 Contract: [`lesson-writing-v1`](../../docs/contracts/lesson-writing-v1.md). Order: validate (50–1,000 words,
 ≤ 10,000 characters) → look up `requestId` → load the lesson → check the balance (Access `GET /api/access/me/points`)
 → transaction: lesson gate and a `GRADING` row → daily limit (`llm_daily_usage`, 10 per day in `Asia/Ho_Chi_Minh`)
@@ -101,10 +111,16 @@ the learner's own bearer. A resend with the same `requestId` continues where the
 called twice for one grade and points are charged once. LLM failure charges nothing; a grading older than 120 s no
 longer blocks the block.
 
-`EssayGrader` sends the essay (and Task 1 chart facts) as tagged data, accepts exactly the task's criteria
-(`TR`/`TA`, `CC`, `LR`, `GRA`) in 0–9 half bands, retries one malformed reply with low reasoning effort, trims free
+`EssayGrader` sends the essay and Task 1 `chartFacts` as tagged text; it does not send images to the LLM.
+The criteria are exactly `TA`, `CC`, `LR`, `GRA` for `TASK_1` (Task Achievement against the chart facts),
+and `TR`, `CC`, `LR`, `GRA` for `TASK_2` (Task Response). It accepts 0–9 half bands,
+retries one malformed reply with low reasoning effort, trims free
 text, and computes the overall band itself. Essays, prompts and LLM output are never logged. The essay block in
 `GET /lessons/{id}` shows `latestSubmission` (grade only once `GRADED`) and `sampleAnswer` after the block is passed.
+
+The stored `EssayPrompt` snapshot contains `questionVersionId`, `stem`, `task`, `minWords`, `passBand`,
+`chartFacts`, `sampleAnswer`, `images` and `knowledgePointIds`, so retries keep the original prompt.
+Writing in final topic tests remains outside the MVP pending the fee policy; essay blocks do not block lesson completion.
 
 ## Assessment results
 
