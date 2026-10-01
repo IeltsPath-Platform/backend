@@ -8,16 +8,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Duration;
 import java.util.List;
@@ -105,23 +100,9 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     private void forwardRequestHeaders(HttpHeaders headers) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (!(authentication instanceof JwtAuthenticationToken token) || !authentication.isAuthenticated()) {
-            throw new LearningRequestException(401, "UNAUTHORIZED", "Authenticated gateway JWT required");
-        }
-        headers.setBearerAuth(token.getToken().getTokenValue());
-        headers.set(SecurityHeaders.CORRELATION_ID, correlationId());
-    }
-
-    private String correlationId() {
-        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
-            String value = attributes.getRequest().getHeader(SecurityHeaders.CORRELATION_ID);
-            if (value != null && !value.isBlank() && value.length() <= 128
-                    && value.chars().allMatch(character -> character >= 32 && character <= 126)) {
-                return value;
-            }
-        }
-        return UUID.randomUUID().toString();
+        headers.setBearerAuth(GatewayRequestHeaders.bearerToken().orElseThrow(
+                () -> new LearningRequestException(401, "UNAUTHORIZED", "Authenticated gateway JWT required")));
+        headers.set(SecurityHeaders.CORRELATION_ID, GatewayRequestHeaders.correlationId());
     }
 
     private LearningRequestException contentUnavailable() {
