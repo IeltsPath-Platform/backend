@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Content: bài học, gói, endpoint nội bộ, seed"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 effort: "2–3 ngày"
@@ -143,6 +143,20 @@ mvn -q -pl services/content-service -am test
 - [ ] 6 endpoint nội bộ đúng `learning-content-internal-v1.md`; không N+1 (review SQL).
 - [ ] Seed đủ cho kịch bản Lan và cho một lần ôn trượt KP2.
 - [ ] Reading và game vẫn chạy; game không lấy được câu của đề, gói ôn, bài học.
+
+## Kết quả (2026-10-01, nhánh `feat/lesson-content`)
+
+- V8, V9 và 6 endpoint đã làm; 93 test content pass, 0 skip (12 ca Testcontainers cho schema, seed và truy vấn). Khởi động
+  thử jar trên PostgreSQL tạm: Flyway V1–V9, Hibernate `validate` qua, 6 endpoint trả đúng seed, thiếu token → 401.
+- **Lệch plan (có chủ đích):** không tạo aggregate `Lesson`/`LessonBlock`, JPA entity hay `LessonRepository`, vì MVP không có
+  API ghi bài học (chỉ seed) nên chúng sẽ là code chết. Đọc qua port `application/port/LearningContentReader`, triển khai
+  `JdbcLearningContentReader` bằng SQL theo lô (mỗi endpoint số query cố định). Có `BlockType`, `LessonNotFoundException`,
+  thêm `PackageVersionNotFoundException`.
+- Luật gói luyện đủ điều kiện nằm ở **một** đoạn SQL dùng chung cho `hasPracticeSet` và search.
+- Seed V9 sinh từ các bảng "V9 (1640)" trong `seed-content.md` (43 câu, 10 đoạn văn); fixture
+  `src/test/resources/seed/lesson-pipeline-demo-expected.json` để test đối chiếu đáp án và KP từng câu sau khi Flyway chạy.
+- UUID seed: `20000000-0000-4000-8000-TTNNNNNNNNNN` (`TT` = loại bản ghi), khác ví dụ minh họa trong contract (contract ghi
+  rõ UUID ví dụ không cố định). Test và consumer tra theo `code`.
 
 ## Risk Assessment
 
