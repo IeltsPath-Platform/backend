@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Triển khai Writing Task 2"
-status: in-progress
+status: completed
 priority: P1
 dependencies: [3]
 effort: "~4–5 ngày"
