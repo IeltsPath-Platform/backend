@@ -43,9 +43,9 @@ Không còn aggregate path của DeepTutor. Thứ tự học suy từ content; b
   `topic-sequence` mỗi lần `GET /topics`; consumer đọc `has_practice_set` không gọi HTTP.
 - `topic_progress`, `lesson_progress`, `lesson_exercise_submissions`, `review_items`, `review_sets`, `topic_test_assignments`:
   như V11 trong `260929-1640/phase-06` (bỏ chữ `path_`).
-- `kp_evidence(id, user_id, kp_id, correct, source, source_reference_id, attempt_id NULL, result_version NULL, created_at)`;
+- `kp_evidence(id, ordinal, user_id, kp_id, correct, source, source_reference_id, attempt_id NULL, result_version NULL, created_at)`;
   `source ∈ lesson_exercise | review_set | assessment`; UQ(`user_id`, `source`, `source_reference_id`). Mastery của KP =
-  `compute_mastery(correct theo created_at, id)`.
+  `compute_mastery(correct theo ordinal)` (ordinal là identity: `created_at` trùng nhau trong một transaction).
 - `assessment_result_versions(user_id, attempt_id, result_version, processed_at)` PK(`user_id`, `attempt_id`): idempotency và chấm lại.
 
 Vì bằng chứng gắn user, consumer **không cần path**: không có bảng pending, không advisory lock tạo path.

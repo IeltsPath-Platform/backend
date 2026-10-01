@@ -34,7 +34,7 @@ Mỗi PR một **phiên agent mới**, dán nguyên khối "Prompt". Prompt tr�
 
 | # | PR | Phase | Cần có trước | Trạng thái |
 | --- | --- | --- | --- | --- |
-| 1 | Xóa Python, khung learning-service | 1 | — | Chưa |
+| 1 | Xóa Python, khung learning-service | 1 | — | Xong (`d96ab9e` + sửa thứ tự `kp_evidence`), chờ merge |
 | 2 | Bài học, nộp bài, cổng, mastery | 2 | PR 1 | Chưa |
 | 3 | Bài ôn, giao mã đề | 3 | PR 2 | Chưa |
 | 4 | Consumer AssessmentCompleted.v2 | 4 | PR 3 | Chưa |

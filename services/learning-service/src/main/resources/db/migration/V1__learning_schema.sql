@@ -89,6 +89,8 @@ CREATE INDEX idx_topic_test_assignments_user_version
 
 CREATE TABLE kp_evidence (
     id UUID PRIMARY KEY,
+    -- Insertion order; mastery weights recent answers, and created_at is shared by one transaction.
+    ordinal BIGINT GENERATED ALWAYS AS IDENTITY,
     user_id UUID NOT NULL,
     kp_id UUID NOT NULL,
     correct BOOLEAN NOT NULL,
@@ -99,7 +101,7 @@ CREATE TABLE kp_evidence (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, source, source_reference_id)
 );
-CREATE INDEX idx_kp_evidence_mastery ON kp_evidence (user_id, kp_id, created_at, id);
+CREATE INDEX idx_kp_evidence_mastery ON kp_evidence (user_id, kp_id, ordinal);
 CREATE INDEX idx_kp_evidence_assessment ON kp_evidence (user_id, attempt_id, result_version)
     WHERE source = 'assessment';
 
