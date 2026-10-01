@@ -26,7 +26,7 @@ external_baseline: HKUDS/DeepTutor v1.6.9
 | **V5** | **Bỏ Adaptive Engine cũ và `ai-assistant-service`**. Learning chuyển sang DeepTutor core. Xóa 6 bảng adaptive cũ + `topic_gate_attempts` + `mistake_notebook_entries` + 2 bảng AI Chat; thêm persistence cho DeepTutor Mastery Path, interaction/evidence/event, tutor session/message/turn runtime và Question Notebook practice. Adaptive core được tách thành `learning-service`/`ai_learning_db`; utility state từng thuộc service hỗ trợ học viên cũ (đã gỡ trong đợt chia service). Content MVP bỏ adaptive topic graph/gate, bỏ vocab↔KP mapping, nhúng question options vào version, gộp asset links và defer package↔vocabulary mapping. Baseline lịch sử: **85 bảng nghiệp vụ + 9 outbox = 94 bảng vật lý**. |
 | **V5.1** (quyết định 2026-09-29) | Thiết kế ban đầu cho học topic → bài: năm bảng Content (§5.13–§5.17), tiến độ bài và bài ôn. Các đề xuất `topics.test_package_id`, thay `LESSON`, mastery path Python là lịch sử, đã được V5.2 và bản Java thay thế. Migration hiện thực: Content V8–V9 và Learning V1 (§7.2–§7.7). Luật: `plans/260929-1640-lesson-learning-pipeline-mvp/plan.md` (bản gốc `main-learning-pipeline.md` ở git history, commit `6506d5e`). |
 | **V5.2** (quyết định 2026-09-29) | Hiện thực bằng Content V8–V9 và Learning V1: một topic nhiều mã đề qua `content_packages.topic_id`; giữ `LESSON`, thêm `TOPIC_TEST`, bỏ band KP. Assessment dùng schema sẵn có: snapshot `{answerSpec, explanation, maxScore}`, suy attempt type, tự chấm và outbox cùng transaction. Learning Java không dùng path Python: topic chỉ lưu `passed_at` (§7.2), evidence lần nộp đầu mỗi khối (§7.4, §7.8), review `DONE`/`SKIPPED` (§7.5–§7.6), assignment dùng một lần (§7.7). Plan: `plans/260929-1640-lesson-learning-pipeline-mvp`. |
-| **V5.3** (quyết định 2026-09-30; seed Content V12 đã triển khai) | Listening đi trọn luồng học. **Không thêm bảng, không thêm cột.** Content: asset `AUDIO` lưu key file ở `media_reference` (content ghép `CONTENT_MEDIA_BASE_URL`, học viên nhận `mediaUrl`), transcript ở `text_content` và giấu tới khi đạt; khối `ASSET` AUDIO trong bài học; section `skill = LISTENING` gắn audio; KP Listening dùng `PROCEDURE`, `kind = STRATEGY`. Assessment: `attempt_sections.section_snapshot` thêm `skill`, `audio`, `solution` (§6.2). AI Learning: chọn gói theo luật V5.2, gói không gắn độ khó (1 gói mỗi KP trong seed). Plan: `plans/260930-0851-listening-topic-audio-lessons`. Chọn gói theo dạng câu và độ khó (cột `path_review_items.wrong_question_types`, mức của gói ở §5.18) **hoãn ngoài MVP** (ý tưởng: `plans/reports/brainstorm-260930-0908-listening-adaptive-path-report.md`). |
+| **V5.3** (quyết định 2026-09-30; Listening đã triển khai) | Listening đi trọn luồng học, seed Content V12. **Không thêm bảng, không thêm cột.** Content: asset `AUDIO` lưu key hoặc URL `https://` ở `media_reference` (Content ghép key với `CONTENT_MEDIA_BASE_URL`, học viên nhận `mediaUrl`), transcript ở `text_content` và giấu tới khi đạt; khối `ASSET` AUDIO trong bài học; section `skill = LISTENING` gắn audio; KP Listening dùng `PROCEDURE`, `kind = STRATEGY`. Assessment: `attempt_sections.section_snapshot` thêm `skill`, `audio`, `solution`; transcript trả riêng trong `sectionSolutions` khi kết quả ≥ 70% (§6.2). Learning Service Java: chọn gói theo luật V5.2, gói không gắn độ khó (1 gói mỗi KP trong seed). Plan: `plans/260930-0851-listening-topic-audio-lessons`. Chọn gói theo dạng câu và độ khó **hoãn ngoài MVP** (§5.18; ý tưởng: `plans/reports/brainstorm-260930-0908-listening-adaptive-path-report.md`). |
 | **Chia service** (đã triển khai 2026-10-01) | Library V1 tạo 5 bảng catalog từ vựng/video; library V2 tạo 6 bảng thư viện cá nhân và 4 FK `ON DELETE RESTRICT` tới catalog (§4.3–§4.4, §5.10–§5.12, §8). User V5 tạo `learning_activities`, `streaks` (§8.1–§8.2), không FK tới `users`. Content V7 xóa 5 bảng catalog cũ. Không chép dữ liệu, không tạo outbox ở library; service và DB hỗ trợ học viên cũ đã gỡ. Commit: `465f543`, `0da2eb2`, `d762660`, `fec5d14`, `ab613b1`. |
 | **Learning Service** (đã triển khai 2026-10-01) | Bỏ `ai-learning-service` Python và `ai_learning_db`; `learning-service` Java (`learning_db`, Flyway V1) có 9 bảng (§7): tiến độ topic/bài, bài nộp, bài ôn, mã đề, bằng chứng theo user, version kết quả thi, catalog KP. Không chuyển dữ liệu cũ. Content V10–V13: essay Writing Task 2/Task 1, Listening, cột `question_versions.hint`. Plan `261001-1228`. |
 | **Writing trong bài học** (đã triển khai 2026-10-01) | Learning V2 thêm `lesson_writing_submissions`, `llm_daily_usage` (§7.10–7.11) và source `lesson_writing`: bài luận Task 1/Task 2 chấm bằng LLM trong request, trừ 3 point qua access sau khi chấm, tối đa 10 lần/ngày. Không qua `grading_jobs` của assessment. Plan `260930-0737`, `260930-0812`. |
@@ -516,7 +516,9 @@ V5.2 thay: bỏ `test_package_id` của V5.1. Một topic có nhiều mã đề;
 
 ## 4.2 `knowledge_points`
 
-Định nghĩa canonical knowledge point trong curriculum. `content-service` chỉ sở hữu định nghĩa và metadata của KP; `learning-service` map các KP này sang DeepTutor `KnowledgePoint` để theo dõi mastery và quyết định adaptive learning.
+Định nghĩa canonical knowledge point trong curriculum. `content-service` chỉ sở hữu định nghĩa và metadata của KP;
+Learning Service Java tính mastery từ bằng chứng đúng/sai theo user (§7), không phân nhánh theo `learning_type`.
+Ánh xạ sang DeepTutor `KnowledgePoint` bên dưới là thiết kế lịch sử V5.
 
 Thuộc tính chính:
 
@@ -526,7 +528,7 @@ Thuộc tính chính:
 | `topic_id` | uuid | FK → `topics` | Định danh topic liên quan. |
 | `code` | — | — | Mã nghiệp vụ ổn định. |
 | `name` | — | — | Tên hiển thị. |
-| `learning_type` | varchar(20) | CHECK | DeepTutor `KnowledgeType`: `MEMORY`, `CONCEPT`, `PROCEDURE`, `DESIGN`. Đây là type dùng cho mastery/policy trong `learning-service`. |
+| `learning_type` | varchar(20) | CHECK | Metadata `MEMORY`, `CONCEPT`, `PROCEDURE`, `DESIGN`; ánh xạ DeepTutor `KnowledgeType` thuộc thiết kế lịch sử, không điều khiển mastery Java hiện tại. |
 | `skill?` | — | — | Thuộc tính nghiệp vụ của bảng. |
 | `description` | — | — | Mô tả chi tiết. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
@@ -535,11 +537,13 @@ Thuộc tính chính:
 
 V5.2: KP không còn band (bỏ `band_min`, `band_max` và luật "band hiệu lực"). API không trả `bandMin`, `bandMax`, `effectiveBandMin`, `effectiveBandMax`. Band chỉ còn ở `topics` để hiển thị.
 
-`learning_type` phải map 1:1 sang DeepTutor `KnowledgeType`. Các category nghiệp vụ như Grammar/Vocabulary/Strategy (nếu bổ sung sau) chỉ là metadata phân loại content, không thay thế `learning_type`.
+Thiết kế lịch sử V5 ánh xạ `learning_type` 1:1 sang DeepTutor `KnowledgeType`. Các category nghiệp vụ như Grammar/Vocabulary/Strategy chỉ là metadata phân loại content, không thay thế `learning_type`.
 
 `learning_type` là `MEMORY | CONCEPT | PROCEDURE | DESIGN`, ánh xạ 1:1 sang DeepTutor `KnowledgeType`; không suy ra từ `kind`. Trạng thái `ACTIVE` yêu cầu `learning_type IS NOT NULL`. Migration V2 chuyển các Knowledge Point active chưa được phân loại sang `INACTIVE`, giữ nguyên dữ liệu và chờ content editor phân loại trước khi publish lại.
 
-V5.3: KP đo bằng câu tự chấm (Listening, Reading) nên là `MEMORY` hoặc `PROCEDURE`. DeepTutor coi `CONCEPT`/`DESIGN` là đạt chỉ khi tutor chấm một lời giải thích (`mastery_assess`), nên làm bài đúng bao nhiêu cũng không hiện "đã nắm".
+Listening seed dùng `learning_type = PROCEDURE`, `kind = STRATEGY` cho `LS_NUM`, `LS_SPELL`, `LS_PARA`, `LS_TRAP`.
+Luật DeepTutor cũ yêu cầu tutor chấm lời giải thích cho `CONCEPT`/`DESIGN` là thiết kế lịch sử;
+runtime Java không có tutor và `MasteryCalculator` chỉ nhận các kết quả đúng/sai.
 
 ## 4.3 `vocabulary_items`
 
@@ -746,9 +750,9 @@ Thuộc tính chính:
 | :--- | :--- | :--- | :--- |
 | `id` | uuid | PK | Định danh duy nhất của bản ghi. |
 | `asset_type` | — | — | Thuộc tính nghiệp vụ của bảng. |
-| `text_content?` | — | — | Thuộc tính nghiệp vụ của bảng. |
-| `media_reference?` | — | — | Thuộc tính nghiệp vụ của bảng. |
-| `duration_seconds?` | — | — | Thuộc tính nghiệp vụ của bảng. |
+| `text_content?` | — | — | Passage text; với AUDIO là transcript, không trả cho học viên trước khi đạt. |
+| `media_reference?` | — | — | AUDIO lưu key hoặc URL `https://`; Content resolve thành `mediaUrl` (§5.18). |
+| `duration_seconds?` | — | — | Thời lượng media tính bằng giây. |
 | `checksum` | — | — | Thuộc tính nghiệp vụ của bảng. |
 | `validation_status` | — | — | Thuộc tính nghiệp vụ của bảng. |
 | `created_at` | — | — | Thời điểm tạo bản ghi. |
@@ -925,6 +929,10 @@ Thân bài: chuỗi khối theo thứ tự. Bài không chép đoạn văn, từ
 
 CHECK theo `block_type`: `TEXT` cần `text_content` và không có `asset_id`; `ASSET` cần `asset_id` và không có `text_content`; `VOCABULARY`, `EXERCISE` không có cả hai. Nội dung khối `VOCABULARY`, `EXERCISE` nằm ở §5.15, §5.16.
 
+Bài Listening dùng khối `ASSET` tham chiếu asset `AUDIO` giữa khối `TEXT` và `EXERCISE`.
+API học viên trả `mediaUrl`, `durationSeconds`; không trả `text_content` của AUDIO.
+Trường `transcript` chỉ xuất hiện khi bài đã `COMPLETED`.
+
 ## 5.15 `lesson_block_vocabulary` (V5.1)
 
 Các từ trong một khối `VOCABULARY`. Nghĩa, ví dụ, phát âm nằm ở `vocabulary_senses`; "thêm vào flashcard" dùng đúng `vocabulary_sense_id` này.
@@ -972,30 +980,29 @@ Không thêm bảng hay cột. Listening dùng lại các bảng content hiện 
 | Bảng | Dữ liệu Listening |
 | :--- | :--- |
 | `topics` | Topic Listening, vào thứ tự học như topic khác (seed demo: `DEMO_LISTENING`, `sort_order` 920, sau `TFNG_SKILLS`). |
-| `knowledge_points` | KP theo kỹ năng con, `skill = LISTENING`, `learning_type = PROCEDURE`: `LS_NUM` (số, ngày, giờ, giá), `LS_SPELL` (đánh vần tên, địa chỉ, mã), `LS_PARA` (bắt ý qua paraphrase), `LS_TRAP` (tránh bẫy đổi ý). |
+| `knowledge_points` | KP theo kỹ năng con, `skill = LISTENING`, `learning_type = PROCEDURE`, `kind = STRATEGY`: `LS_NUM` (số, ngày, giờ, giá), `LS_SPELL` (đánh vần tên, địa chỉ, mã), `LS_PARA` (bắt ý qua paraphrase), `LS_TRAP` (tránh bẫy đổi ý). |
 | `lessons`, `lesson_blocks`, `lesson_block_questions`, `lesson_knowledge_points` | Bài nghe: khối `TEXT` → khối `ASSET` (asset `AUDIO`) → khối `EXERCISE`. |
-| `questions`, `question_versions`, `question_knowledge_points` | Câu `FILL_IN_BLANK` (form, note completion) và `MULTIPLE_CHOICE`, chấm theo `answer_spec` như Reading; mỗi câu 1 KP chính; câu trong gói luyện có `difficulty`. |
-| `content_assets` | `asset_type = AUDIO`: `media_reference` = key file, `duration_seconds`, `text_content` = transcript. |
-| `content_packages`, `content_package_versions`, `content_sections`, `section_questions`, `content_asset_links` | Gói `PRACTICE_SET` theo mức và mã `TOPIC_TEST`; section `skill = LISTENING` gắn một asset AUDIO qua `content_asset_links.section_id`. |
+| `questions`, `question_versions`, `question_knowledge_points` | Câu `FILL_IN_BLANK` (form, note completion) và `MULTIPLE_CHOICE`, chấm theo `answer_spec` như Reading; mỗi câu 1 KP chính; seed không gắn độ khó. |
+| `content_assets` | `asset_type = AUDIO`: `media_reference` = key hoặc URL `https://`, `duration_seconds`, `text_content` = transcript. |
+| `content_packages`, `content_package_versions`, `content_sections`, `section_questions`, `content_asset_links` | Một gói `PRACTICE_SET` mỗi KP trong seed và hai mã `TOPIC_TEST`; section `skill = LISTENING` gắn một asset AUDIO qua `content_asset_links.section_id`. |
 
 Luật:
 
-- **`media_reference` của AUDIO:** key (không scheme, không `..`, không bắt đầu bằng `/`) hoặc URL `https://`. Content ghép key với
-  `CONTENT_MEDIA_BASE_URL` khi trả ra; DB không lưu URL bucket, nên đổi bucket chỉ cần đổi env. File mp3 nằm trên object storage
-  (MVP: bucket public-read), không lưu binary trong DB.
-- **Transcript là đáp án:** `text_content` của AUDIO chỉ đi qua endpoint nội bộ `/internal/learning-content/*`.
+- **`media_reference` của AUDIO:** key chỉ chứa chữ/số ASCII, `.`, `_`, `-` và `/` ngăn cách các đoạn;
+  không scheme, không `..`, không bắt đầu bằng `/`. Key cần `CONTENT_MEDIA_BASE_URL` là prefix `https://`;
+  Content ghép thành `mediaUrl`. Thiếu base hoặc reference sai → `INVALID_MEDIA_REFERENCE`.
+  URL `https://` đầy đủ được giữ nguyên và không cần base. Seed lưu key nên đổi bucket chỉ cần đổi env.
+  Team tự upload mp3 lên bucket public-read; không lưu binary trong DB hay git, chưa có upload API hoặc signed URL.
+- **Transcript là đáp án:** trong luồng học, Content gửi `text_content` của AUDIO qua endpoint nội bộ `/internal/learning-content/*`.
   `GET /api/content/assets/{id}` chỉ cho `ADMIN`, `CONTENT_AUTHOR`. Học viên thấy transcript khi bài xong (§7.3), khi gói
   đạt ≥ 70% (§7.6) hoặc khi đề đạt ≥ 70% (§6.2).
-- **Mức của gói:** mức cao nhất trong `question_versions.difficulty` của các câu trong gói (`EASY < MEDIUM < HARD`); câu không
-  có `difficulty` tính là `MEDIUM`. Endpoint nội bộ tìm gói và package version trả kèm `difficulty`; tìm gói trả thêm
-  `questionTypes` (các `questions.question_type` khác nhau trong gói). Content chỉ trả metadata; chọn gói là việc của
-  learning-service (§7.6).
-- **Dạng câu Listening:** 6 dạng IELTS đều biểu diễn được bằng loại câu sẵn có: multiple choice → `MULTIPLE_CHOICE`; matching
+- **Chọn gói hiện tại:** seed có một gói mỗi KP, không gắn mức. Learning chọn gói chưa giao trước,
+  hết thì gói giao lâu nhất; trượt ba set thì review thành `SKIPPED` (§7.6). API nội bộ không nhận hoặc trả
+  `difficulty`, `questionTypes`; chọn theo dạng câu hay độ khó và luật soạn audio theo mức hoãn ngoài MVP.
+- **Hướng mở rộng dạng câu (chưa triển khai trong seed Listening):** multiple choice → `MULTIPLE_CHOICE`; matching
   và plan/map/diagram labelling → `MATCHING` (ảnh qua `content_asset_links`); form/note/table/flow-chart/summary completion
   và sentence completion → `FILL_IN_BLANK`; short answer → `SHORT_ANSWER`. Dạng "chọn HAI đáp án" chưa có trong
   `answer-spec-v1`.
-- **Luật soạn gói luyện:** mọi câu trong một gói cùng KP và cùng mức. Audio theo mức: `EASY` một người nói, chậm và rõ, không
-  bẫy; `MEDIUM` hai người nói, tốc độ thường, một bẫy; `HARD` nhanh hơn, giọng khác, từ hai bẫy trở lên.
 
 ---
 # 6. Assessment — Làm bài, nộp bài và kết quả
@@ -1041,8 +1048,12 @@ Thuộc tính chính:
 | `UQ(attempt_id, sort_order)` | — | `UQ(attempt_id, sort_order)` | Ràng buộc duy nhất cho tổ hợp cột. |
 
 V5.3: `section_snapshot` có dạng `{title, skill, instructions, passage?, audio?: {url, durationSeconds}, solution?: {transcript}}`.
-`audio.url` là URL đầy đủ content đã ghép. `solution` chỉ server đọc: cấu trúc attempt trả section cho học viên theo danh
-sách trường cho phép, không bao giờ có `solution`; transcript chỉ nằm trong lời giải khi kết quả ≥ 70%. Không migration.
+`audio.url` lấy từ `audio.mediaUrl` Content đã resolve. `solution` chỉ server đọc: cấu trúc attempt trả `snapshot`
+là object theo danh sách trường cho phép `{title, skill, instructions, passage?, audio?}`, không có `solution` hoặc
+`transcript`. Snapshot cũ thiếu `skill` mặc định `READING`; snapshot JSON không đọc được trả các trường null, không lỗi server.
+Kết quả ≥ 70% trả riêng `sectionSolutions[{attemptSectionId, transcript}]` cho các section có transcript dạng string
+(`[]` nếu không có); dưới 70% không có trường này. `solutions` của từng câu giữ nguyên.
+`AssessmentCompleted.v2` không chứa transcript. Không migration schema.
 
 
 ## 6.3 `attempt_items`

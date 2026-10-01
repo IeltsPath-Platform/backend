@@ -35,6 +35,13 @@ clears the range.
   `data:image/png|jpeg|svg+xml;base64,` URI; audio uses an `https://` URL or an object key joined to
   `content.media.base-url` (env `CONTENT_MEDIA_BASE_URL`, an https prefix; blank means keys cannot resolve and the
   read fails with `INVALID_MEDIA_REFERENCE`).
+- Audio keys contain ASCII letters/digits, `.`, `_`, `-` and `/` between path segments; they cannot start with `/`
+  or contain `..`. A full `https://` reference works without a base URL. Learning Service and Assessment forward
+  the resolved URL; they do not build it themselves.
+- The team uploads mp3 files to a public-read cloud bucket. The backend has no upload API, signed URLs or listen-count
+  limit. Keep audio binaries out of Git; the media host must serve `audio/mpeg` and support range requests for playback.
+- Audio `text_content` is the transcript. Learning reveals it only after lesson completion or a passed review set
+  (≥ 70%); Assessment keeps it out of attempt structure and returns it in `sectionSolutions` only at ≥ 70%.
 - The V12 Listening seed references 8 files to upload under the base URL (record them from the transcripts in the
   seed; mp3 files are not committed):
 

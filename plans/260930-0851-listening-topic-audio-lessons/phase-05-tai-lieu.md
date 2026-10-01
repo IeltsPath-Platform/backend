@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Tài liệu"
-status: pending
+status: completed
 priority: P3
 dependencies: [3, 4]
 effort: "0.5 ngày"
@@ -48,8 +48,17 @@ làm các tài liệu còn lại trong danh sách dưới.
 
 ## Success Criteria
 
-- [ ] Tài liệu khớp code; không có giá trị secret hay URL bucket thật trong tài liệu nếu bucket là của cá nhân.
+- [x] Tài liệu khớp code; không thêm giá trị secret hay URL bucket của cá nhân vào tài liệu.
 
 ## Risk Assessment
 
 - Trùng chỗ sửa với phase tài liệu của các plan Writing và plan chia service: sửa sau khi các plan đó merge, chỉ thêm mục Listening.
+
+## Kết quả
+
+- Hoàn tất 2026-10-02 trên nhánh `feat/lesson-writing-listening-docs`, sau khi hoàn tất tài liệu Writing Task 1; không push.
+- Đồng bộ Listening trong `DATABASE_V5.md` và các mục Listening của `SERVICE_ARCHITECTURE_V3.md`: schema hiện thực, audio key/https, transcript, snapshot allowlist và `sectionSolutions` khi kết quả ≥70%. Chọn gói theo dạng câu/độ khó vẫn hoãn ngoài MVP.
+- Kiến trúc, README Content và `CLAUDE.md` ghi rõ Content là nơi duy nhất ghép URL; thiếu base chỉ lỗi với reference dạng key; mp3 do team upload, chưa có upload API/signed URL. Đối chiếu đủ 8 key và thời lượng V12, không đổi bảng seed đã đúng.
+- Đối chiếu `lesson-learning-v1`, `learning-content-internal-v1`, `assessment-completed-v2` với resolver, DTO và use case Java; contract đã khớp nên không sửa. Event không chứa transcript, lời giải từng câu giữ nguyên.
+- Kiểm nguồn, link Markdown, UTF-8, `git diff --check` và `graphify update .`; không chạy lại Maven/E2E cho thay đổi chỉ ở tài liệu theo yêu cầu kiểm tra vừa đủ. Không sửa code, config hoặc migration.
+- Validator tài liệu exit 0, 7 internal link hợp lệ; còn 47 warning về tên Java/config (15/32) do giới hạn scanner với layout Maven/config-repo, không coi là một lần kiểm sạch warning. Các phần thêm đã được đối chiếu trực tiếp với nguồn.
