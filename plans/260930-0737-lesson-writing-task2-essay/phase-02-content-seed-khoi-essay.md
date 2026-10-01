@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Content: seed khối essay"
-status: pending
+status: completed
 priority: P2
 dependencies: [1]
 effort: "1 ngày"
