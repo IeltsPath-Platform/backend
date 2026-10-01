@@ -6,10 +6,24 @@ import java.util.UUID;
 
 public record LessonResult(UUID lessonId, UUID topicId, String code, String title, String summary,
                            int sortOrder, String status, List<Block> blocks) {
-    /** {@code blockKind} is set on exercise blocks; an essay block carries {@code essay} instead of questions. */
+    /**
+     * {@code blockKind} is set on exercise blocks; an essay block carries {@code essay} instead of questions, the
+     * learner's {@code latestSubmission} (null when none) and {@code sampleAnswer} once the block has been passed.
+     */
     public record Block(UUID blockId, String blockType, String blockKind, int sortOrder, String textContent,
                         Asset asset, List<UUID> vocabularySenseIds, Boolean passed,
-                        List<Question> questions, List<Solution> solutions, EssayQuestion essay) {}
+                        List<Question> questions, List<Solution> solutions, EssayQuestion essay,
+                        LatestSubmission latestSubmission, String sampleAnswer) {
+        public Block(UUID blockId, String blockType, String blockKind, int sortOrder, String textContent,
+                     Asset asset, List<UUID> vocabularySenseIds, Boolean passed,
+                     List<Question> questions, List<Solution> solutions, EssayQuestion essay) {
+            this(blockId, blockType, blockKind, sortOrder, textContent, asset, vocabularySenseIds, passed, questions,
+                    solutions, essay, null, null);
+        }
+    }
+
+    /** {@code overallBand} and {@code passed} are null unless the submission is GRADED (points debited). */
+    public record LatestSubmission(UUID id, String status, BigDecimal overallBand, Boolean passed) {}
 
     /**
      * {@code textContent} is passage text; media assets carry {@code mediaUrl}. An audio transcript is set only once

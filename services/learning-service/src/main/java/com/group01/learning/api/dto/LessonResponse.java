@@ -5,6 +5,7 @@ import com.group01.learning.application.result.LessonResult;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public record LessonResponse(UUID lessonId, UUID topicId, String code, String title, String summary,
@@ -12,17 +13,27 @@ public record LessonResponse(UUID lessonId, UUID topicId, String code, String ti
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Block(UUID blockId, String blockType, String blockKind, int sortOrder, String textContent,
                         Asset asset, List<UUID> vocabularySenseIds, Boolean passed, List<Question> questions,
-                        List<Solution> solutions, EssayQuestion question) {
+                        List<Solution> solutions, EssayQuestion question,
+                        Optional<LatestSubmission> latestSubmission, String sampleAnswer) {
+        /** Essay blocks always carry {@code latestSubmission}, as {@code null} when the learner has none. */
         static Block from(LessonResult.Block result) {
+            boolean essay = result.essay() != null;
+            var latest = result.latestSubmission() == null ? null : new LatestSubmission(
+                    result.latestSubmission().id(), result.latestSubmission().status(),
+                    result.latestSubmission().overallBand(), result.latestSubmission().passed());
             return new Block(result.blockId(), result.blockType(), result.blockKind(), result.sortOrder(),
                     result.textContent(), result.asset() == null ? null : Asset.from(result.asset()),
                     result.vocabularySenseIds(), result.passed(),
                     result.questions() == null ? null : result.questions().stream().map(Question::from).toList(),
                     result.solutions() == null ? null : result.solutions().stream().map(solution -> new Solution(
                             solution.questionVersionId(), solution.correctAnswer(), solution.explanation())).toList(),
-                    result.essay() == null ? null : EssayQuestion.from(result.essay()));
+                    result.essay() == null ? null : EssayQuestion.from(result.essay()),
+                    essay ? Optional.ofNullable(latest) : null, result.sampleAnswer());
         }
     }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record LatestSubmission(UUID id, String status, BigDecimal overallBand, Boolean passed) {}
 
     /** A media asset has {@code mediaUrl}; {@code transcript} appears only once the lesson is completed. */
     @JsonInclude(JsonInclude.Include.NON_NULL)

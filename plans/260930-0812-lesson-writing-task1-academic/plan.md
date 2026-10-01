@@ -5,7 +5,7 @@ status: in-progress
 priority: P2
 branch: "feat/main-follow"
 tags: [feature, backend, ai-learning, content, writing, tdd]
-blockedBy: [261001-1228-learning-service-java, 260930-0737-lesson-writing-task2-essay]
+blockedBy: []
 blocks: [260930-0851-listening-topic-audio-lessons]
 created: "2026-09-30T01:18:27.049Z"
 createdBy: "ck:plan"
@@ -15,7 +15,7 @@ mode: "tdd"
 
 # Writing Task 1 Academic trong bài học (biểu đồ + chartFacts)
 
-> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java, route `/api/learning/**` (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md), làm trước plan này). Phần ai-learning của plan đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md).
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java, route `/api/learning/**` (plan `261001-1228`, làm trước plan này). Phần ai-learning của plan đọc theo [bảng ánh xạ](../260930-2057-mvp-reading-writing-listening-roadmap/python-to-java-mapping.md).
 
 ## Overview
 
@@ -27,7 +27,7 @@ mode: "tdd"
 Toàn bộ luồng nộp bài, trừ 3 point, evidence và cổng bài học dùng lại nguyên của đợt 1.
 
 Nguồn:
-- plan đợt 1 [260930-0737-lesson-writing-task2-essay](../260930-0737-lesson-writing-task2-essay/plan.md);
+- plan đợt 1 260930-0737-lesson-writing-task2-essay;
 - quyết định ngày 2026-09-30 (bên dưới).
 
 Chế độ `--tdd`.
@@ -49,7 +49,7 @@ Chế độ `--tdd`.
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | [Contract va content Task 1](./phase-01-contract-va-content-task-1.md) | Completed (nhánh `feat/writing-access-content`) |
-| 2 | [AI Learning grader Task 1](./phase-02-ai-learning-grader-task-1.md) | Pending |
+| 2 | [AI Learning grader Task 1](./phase-02-ai-learning-grader-task-1.md) | Completed (cùng grader với 0737, nhánh `feat/lesson-writing-grading`) |
 | 3 | [Tai lieu](./phase-03-tai-lieu.md) | Pending |
 
 Thứ tự: `1 → 2 → 3`. Phase 2 có thể viết grader song song với phase 1, sau khi contract được duyệt.

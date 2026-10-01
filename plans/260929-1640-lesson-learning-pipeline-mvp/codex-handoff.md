@@ -53,8 +53,8 @@ nên agent phải đọc file này trước.
 | 10 | Tài liệu, kiểm toàn repo | 8 | PR 8, `261001-1228` | E2E thủ công do người dùng chạy | Chưa |
 
 **Đổi 2026-10-01:** ai-learning Python bị bỏ; prompt PR 5–7, 9 bên dưới không dùng nữa. PR 8, PR 10 đọc phần ai-learning theo
-[bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md); prompt learning-service ở
-[`261001-1228/codex-handoff.md`](../261001-1228-learning-service-java/codex-handoff.md).
+[bảng ánh xạ](../260930-2057-mvp-reading-writing-listening-roadmap/python-to-java-mapping.md); prompt learning-service ở
+`261001-1228/codex-handoff.md`.
 
 PR 2, 3, 4 làm song song được sau khi PR 1 được duyệt, nếu mỗi PR một nhánh và không sửa cùng file.
 

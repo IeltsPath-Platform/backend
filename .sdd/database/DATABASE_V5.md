@@ -29,6 +29,7 @@ external_baseline: HKUDS/DeepTutor v1.6.9
 | **V5.3** (2026-09-30, thiết kế đích, chưa có migration) | Listening đi trọn luồng học. **Không thêm bảng, không thêm cột.** Content: asset `AUDIO` lưu key file ở `media_reference` (content ghép `CONTENT_MEDIA_BASE_URL`, học viên nhận `mediaUrl`), transcript ở `text_content` và giấu tới khi đạt; khối `ASSET` AUDIO trong bài học; section `skill = LISTENING` gắn audio; KP Listening dùng `PROCEDURE`, `kind = STRATEGY`. Assessment: `attempt_sections.section_snapshot` thêm `skill`, `audio`, `solution` (§6.2). AI Learning: chọn gói theo luật V5.2, gói không gắn độ khó (1 gói mỗi KP trong seed). Plan: `plans/260930-0851-listening-topic-audio-lessons`. Chọn gói theo dạng câu và độ khó (cột `path_review_items.wrong_question_types`, mức của gói ở §5.18) **hoãn ngoài MVP** (ý tưởng: `plans/reports/brainstorm-260930-0908-listening-adaptive-path-report.md`). |
 | **Chia service** (đã triển khai 2026-10-01) | Library V1 tạo 5 bảng catalog từ vựng/video; library V2 tạo 6 bảng thư viện cá nhân và 4 FK `ON DELETE RESTRICT` tới catalog (§4.3–§4.4, §5.10–§5.12, §8). User V5 tạo `learning_activities`, `streaks` (§8.1–§8.2), không FK tới `users`. Content V7 xóa 5 bảng catalog cũ. Không chép dữ liệu, không tạo outbox ở library; service và DB hỗ trợ học viên cũ đã gỡ. Commit: `465f543`, `0da2eb2`, `d762660`, `fec5d14`, `ab613b1`. |
 | **Learning Service** (đã triển khai 2026-10-01) | Bỏ `ai-learning-service` Python và `ai_learning_db`; `learning-service` Java (`learning_db`, Flyway V1) có 9 bảng (§7): tiến độ topic/bài, bài nộp, bài ôn, mã đề, bằng chứng theo user, version kết quả thi, catalog KP. Không chuyển dữ liệu cũ. Content V10–V13: essay Writing Task 2/Task 1, Listening, cột `question_versions.hint`. Plan `261001-1228`. |
+| **Writing trong bài học** (đã triển khai 2026-10-01) | Learning V2 thêm `lesson_writing_submissions`, `llm_daily_usage` (§7.10–7.11) và source `lesson_writing`: bài luận Task 1/Task 2 chấm bằng LLM trong request, trừ 3 point qua access sau khi chấm, tối đa 10 lần/ngày. Không qua `grading_jobs` của assessment. Plan `260930-0737`, `260930-0812`. |
 
 ---
 
@@ -691,6 +692,7 @@ Thuộc tính chính:
 | `TRUE_FALSE_NOT_GIVEN` | NULL | `{"correct":"NOT_GIVEN"}` | Chọn đúng `TRUE`, `FALSE` hoặc `NOT_GIVEN`. |
 | `FILL_IN_BLANK`, `SHORT_ANSWER` | NULL | `{"accepted":["two decades","20 years"]}` | Khớp một đáp án sau khi bỏ phân biệt hoa thường và khoảng trắng thừa; sai chính tả là sai. |
 | `MATCHING` | Danh sách heading dùng chung | `{"correct":"iii"}` | Mỗi câu chỉ một cặp (một đoạn ↔ một heading); một câu một điểm. |
+| Bài luận Writing (Content V10–V11) | NULL | `{"type":"ESSAY","task":"TASK_2","minWords":250,"passBand":6.0}`; Task 1 thêm `chartFacts` | **Không tự chấm.** Learning Service chấm bằng LLM (§7.10); khối chứa câu này có `blockKind = ESSAY`, đúng một câu, không tính vào hoàn thành bài. |
 
 
 ## 5.6 `section_questions`
@@ -1226,7 +1228,7 @@ pronunciationScore = 82
 
 # 7. Learning Service — tiến độ học, bằng chứng mastery, bài ôn, mã đề
 
-`learning-service` (Java, `learning_db`, Flyway V1) thay `learning-service` Python từ 2026-10-01 (plan
+`learning-service` (Java, `learning_db`, Flyway V1–V2) thay `learning-service` Python từ 2026-10-01 (plan
 `261001-1228`). Toàn bộ schema `ai_learning_db` cũ (mastery path DeepTutor, tutor, practice notebook, learner memory,
 hạn mức tutor) đã bị bỏ, không chuyển dữ liệu. Không có aggregate path: bằng chứng gắn với user; mastery của KP tính khi
 đọc bằng `compute_mastery` (port từ DeepTutor v1.6.9: 5 lần gần nhất, trọng số 0.5→1.0, trần 0.5/0.8 khi có 1/2 lần).
@@ -1321,13 +1323,14 @@ Trượt set thứ 3 hoặc không còn gói nào thì `SKIPPED`.
 | `ordinal` | bigint | IDENTITY | Thứ tự chèn; mastery đọc theo cột này vì `created_at` trùng trong một transaction |
 | `user_id`, `kp_id` | uuid | NOT NULL | INDEX (`user_id`, `kp_id`, `ordinal`) |
 | `correct` | boolean | NOT NULL | |
-| `source` | varchar(30) | CHECK `lesson_exercise`, `review_set`, `assessment` | UNIQUE (`user_id`, `source`, `source_reference_id`) |
+| `source` | varchar(30) | CHECK `lesson_exercise`, `review_set`, `assessment`, `lesson_writing` (V2) | UNIQUE (`user_id`, `source`, `source_reference_id`) |
 | `source_reference_id` | uuid | NOT NULL | UUIDv5 tất định theo request/kết quả, câu, KP |
 | `attempt_id`, `result_version` | | NULL | Chỉ với `assessment`; chấm lại thì xóa bằng chứng của version cũ |
 | `created_at` | timestamptz | NOT NULL | |
 
 Bài học ghi ở lần nộp đầu của khối; bài ôn ghi mỗi set; kết quả thi ghi mỗi KP của item (`is_correct`, hoặc judgment
-`PASS`/`FAIL`). `PLACEMENT` không ghi.
+`PASS`/`FAIL`). `PLACEMENT` không ghi. Bài luận ghi mỗi KP của câu ở mọi bài đã chấm (`correct` = đạt `passBand`) tới khi
+khối được đạt lần đầu, sau đó không ghi nữa.
 
 ## 7.9 `assessment_result_versions`
 
@@ -1337,8 +1340,35 @@ Bài học ghi ở lần nộp đầu của khối; bài ôn ghi mỗi set; kế
 | `result_version` | int | CHECK ≥ 1 | Version đã áp; bằng hoặc thấp hơn thì bỏ qua, cao hơn thì thay bằng chứng |
 | `processed_at` | timestamptz | NOT NULL | |
 
-Kế tiếp (plan 0737): migration V2 thêm `lesson_writing_submissions`, `llm_daily_usage` (hạn mức chấm Writing) và giá trị
-`lesson_writing` cho `kp_evidence.source`.
+## 7.10 `lesson_writing_submissions` (V2)
+
+Một bài luận (Task 1 hoặc Task 2) được chấm bằng LLM ngay trong request. Kết quả được lưu trước khi trừ point để gửi lại
+không gọi LLM lần hai, nhưng chỉ trả cho học viên khi đã `GRADED`.
+
+| Cột | Kiểu | Ràng buộc | Ghi chú |
+| --- | --- | --- | --- |
+| `id` | uuid | PK | `referenceId` khi trừ point |
+| `user_id`, `lesson_id`, `block_id`, `question_version_id` | uuid | NOT NULL | INDEX (`user_id`, `lesson_id`, `block_id`, `submitted_at` DESC) |
+| `knowledge_point_ids` | uuid[] | NOT NULL | KP của câu, dùng ghi bằng chứng |
+| `request_id` | uuid | UNIQUE | Idempotency; gửi lại chạy tiếp từ bước dang dở |
+| `essay_text` | text | NOT NULL | Không bao giờ ghi log |
+| `word_count` | int | CHECK ≥ 0 | Đếm bằng code (50–1.000 từ, ≤ 10.000 ký tự) |
+| `prompt_snapshot` | jsonb | NOT NULL | `stem, task, minWords, passBand, chartFacts, sampleAnswer, images, knowledgePointIds`; `chartFacts` không ra ngoài |
+| `status` | varchar(20) | CHECK `GRADING`, `GRADED`, `FAILED`, `PAYMENT_PENDING` | Partial UNIQUE (`user_id`, `block_id`) WHERE `GRADING` |
+| `point_cost` | int | CHECK > 0 | 3 mặc định |
+| `debit_ledger_entry_id` | uuid | NULL | Bắt buộc khi `GRADED` |
+| `failure_code` | varchar(50) | NULL | `LLM_UNAVAILABLE`, `INVALID_GRADE`, `INVALID_PROMPT`, `DAILY_LIMIT_REACHED`, `GRADING_ABANDONED`; hoặc lý do trừ point lỗi khi `PAYMENT_PENDING` |
+| `result` | jsonb | NULL | `{criteria, corrections, summary}`; bắt buộc khi `PAYMENT_PENDING`/`GRADED` |
+| `overall_band` | numeric(2,1) | CHECK 0–9 | Do code tính từ 4 tiêu chí |
+| `passed` | boolean | NULL | `overall_band ≥ passBand` |
+| `grading_started_at`, `submitted_at`, `graded_at` | timestamptz | | Dòng `GRADING` quá 120 s thành `FAILED` (`GRADING_ABANDONED`) |
+
+## 7.11 `llm_daily_usage` (V2)
+
+| Cột | Kiểu | Ràng buộc | Ghi chú |
+| --- | --- | --- | --- |
+| `user_id`, `usage_date`, `kind` | uuid, date, varchar(30) | PK | `usage_date` theo `Asia/Ho_Chi_Minh`; `kind = writing_grading` |
+| `count` | int | CHECK ≥ 0 | Tăng có điều kiện `count < limit` ngay trước khi gọi LLM (mặc định 10/ngày); hết lượt → 429 |
 
 ---
 

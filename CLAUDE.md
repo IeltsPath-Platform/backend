@@ -42,7 +42,9 @@ Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/c
   `access_db`, `notification_db` (`CREATE DATABASE access_db;` …). Flyway của từng service tạo bảng khi khởi động.
 - `.env` ở root (gitignored) chứa mật khẩu và secret: compose nội suy nó; Gateway và mọi service Java nghiệp vụ import nó
   (`optional:file:../../.env[.properties]`; config-server, eureka-server thì không). Chỉ ghi tên biến, không ghi giá trị. Learning Service
-  cần `LEARNING_DB_PASSWORD`, `RABBITMQ_PASSWORD`; content cần `CONTENT_MEDIA_BASE_URL` (https của bucket mp3) cho bài Listening.
+  cần `LEARNING_DB_PASSWORD`, `RABBITMQ_PASSWORD`; chấm bài luận cần thêm `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`,
+  `LEARNING_LLM_MODEL` (thiếu thì nộp bài luận trả 503, phần khác vẫn chạy) và access-service đang chạy
+  (`ACCESS_SERVICE_URL`, mặc định `http://localhost:8084`); content cần `CONTENT_MEDIA_BASE_URL` (https của bucket mp3) cho bài Listening.
 - Compose yêu cầu `LIBRARY_DB_PASSWORD` trong `.env` dù chỉ bật một phần stack. Chỉ chạy các container cần dùng:
   `docker compose up -d rabbitmq learning-db`
   (+ `library-db`, `community-db`, `game-db` khi cần).

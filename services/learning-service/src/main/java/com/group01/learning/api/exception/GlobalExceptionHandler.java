@@ -33,7 +33,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(LearningRequestException.class)
     public ResponseEntity<LearningErrorResponse> learningRequest(LearningRequestException exception) {
         return ResponseEntity.status(exception.getStatus())
-                .body(new LearningErrorResponse(exception.getMessage(), exception.getCode(), null));
+                .body(new LearningErrorResponse(exception.getMessage(), exception.getCode(), null,
+                        exception.getSubmissionId()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

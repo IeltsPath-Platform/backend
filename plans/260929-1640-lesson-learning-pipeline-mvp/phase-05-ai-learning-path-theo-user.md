@@ -9,7 +9,7 @@ effort: "2–3 ngày"
 
 # Phase 5: AI Learning: path theo user
 
-> **Đã thay (2026-10-01):** phase này do plan [`261001-1228`](../261001-1228-learning-service-java/plan.md) làm bằng Java (learning-service). Không code theo file này; giữ lại làm nguồn luật nghiệp vụ.
+> **Đã thay (2026-10-01):** phase này do plan `261001-1228` làm bằng Java (learning-service). Không code theo file này; giữ lại làm nguồn luật nghiệp vụ.
 
 ## Overview
 

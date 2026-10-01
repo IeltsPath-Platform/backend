@@ -41,7 +41,7 @@ trước phase con nào nhắc `services/ai-learning-service`. Gặp chỗ khôn
 ## Đổi quyết định của 0737 (người dùng chốt 2026-10-01)
 
 - **Có hạn mức chấm Writing theo ngày** (trước đây "không tính `llm_daily_usage`"): bảng `llm_daily_usage(user_id, usage_date,
-  kind, count)` PK(`user_id`, `usage_date`, `kind`); ngày theo `learning.quota-timezone` (mặc định `Asia/Ho_Chi_Minh`);
+  kind, count)` PK(`user_id`, `usage_date`, `kind`); ngày theo `learning.writing.quota-timezone` (mặc định `Asia/Ho_Chi_Minh`; đặt cạnh các setting Writing khi triển khai);
   `learning.writing.daily-grading-limit` mặc định 10. Tăng đếm (có điều kiện `count < limit`) ngay trước khi gọi LLM, trong
   transaction ngắn riêng; hết lượt → 429 `DAILY_LIMIT_REACHED`, không gọi LLM, không trừ point. LLM lỗi không trả lại lượt.
   Áp cho cả Task 1 (0812).

@@ -1,6 +1,7 @@
 package com.group01.learning.application.usecase;
 
 import com.group01.learning.application.AnswerSheet;
+import com.group01.learning.application.LessonAccess;
 import com.group01.learning.application.LessonEvidenceReference;
 import com.group01.learning.application.ReviewReevaluation;
 import com.group01.learning.application.command.SubmitExerciseCommand;
@@ -9,13 +10,12 @@ import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.application.port.LearningContentClient.*;
 import com.group01.learning.application.port.LearningProgressStore;
 import com.group01.learning.application.port.LearningProgressStore.NewEvidence;
+import com.group01.learning.application.port.WritingSubmissionStore;
 import com.group01.learning.application.result.LessonResult;
 import com.group01.learning.application.result.SubmissionResult;
 import com.group01.learning.application.result.TopicLessonsResult;
 import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.service.AnswerSpecGrader;
-import com.group01.learning.domain.service.LessonAccessGate;
-import com.group01.learning.domain.service.TopicStatusDeriver;
 import com.group01.learning.domain.vo.LessonProgress;
 import com.group01.learning.domain.vo.TopicStatus;
 import org.slf4j.Logger;
@@ -32,25 +32,25 @@ public class LearnLessonUseCase {
     private static final Logger log = LoggerFactory.getLogger(LearnLessonUseCase.class);
     private final LearningContentClient content;
     private final LearningProgressStore store;
-    private final RefreshLearningTopicsUseCase refreshTopics;
+    private final LessonAccess access;
     private final ReviewReevaluation reviews;
+    private final WritingSubmissionStore essays;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
-    private final LessonAccessGate gate = new LessonAccessGate();
-    private final TopicStatusDeriver topicStatuses = new TopicStatusDeriver();
 
-    public LearnLessonUseCase(LearningContentClient content, LearningProgressStore store,
-                              RefreshLearningTopicsUseCase refreshTopics, ReviewReevaluation reviews) {
+    public LearnLessonUseCase(LearningContentClient content, LearningProgressStore store, LessonAccess access,
+                              ReviewReevaluation reviews, WritingSubmissionStore essays) {
         this.content = content;
         this.store = store;
-        this.refreshTopics = refreshTopics;
+        this.access = access;
         this.reviews = reviews;
+        this.essays = essays;
     }
 
     @Transactional(readOnly = true)
     public TopicLessonsResult list(UUID userId, UUID topicId) {
-        TopicStatus topicStatus = status(userId, topicId);
+        TopicStatus topicStatus = access.status(userId, topicId);
         if (topicStatus == TopicStatus.LOCKED) throw new LearningGateException("TOPIC_LOCKED", List.of());
-        var lessons = orderedLessons(content.getTopicLessons(topicId));
+        var lessons = LessonAccess.orderedLessons(content.getTopicLessons(topicId));
         var progress = store.findLessons(userId, topicId);
         boolean previousComplete = true;
         List<TopicLessonsResult.LessonSummary> summaries = new ArrayList<>();
@@ -69,11 +69,14 @@ public class LearnLessonUseCase {
     @Transactional
     public LessonResult get(UUID userId, UUID lessonId) {
         store.lockUser(userId);
-        LessonContext context = authorize(userId, lessonId);
-        refreshMetadata(userId, context.lesson());
+        LessonAccess.Context context = access.authorize(userId, lessonId);
+        access.refresh(userId, context.lesson());
         Set<UUID> passed = passedBlocks(context.progress());
+        Map<UUID, WritingSubmissionStore.BlockSummary> essaySummaries = essays.summarizeBlocks(userId,
+                context.lesson().blocks().stream().filter(Block::isEssay).map(Block::blockId).toList());
         List<LessonResult.Block> blocks = orderedBlocks(context.lesson()).stream()
-                .map(block -> blockResult(block, passed.contains(block.blockId()), completed(context.progress())))
+                .map(block -> blockResult(block, passed.contains(block.blockId()), completed(context.progress()),
+                        essaySummaries.get(block.blockId())))
                 .toList();
         Lesson lesson = context.lesson();
         return new LessonResult(lesson.lessonId(), lesson.topicId(), lesson.code(), lesson.title(), lesson.summary(),
@@ -90,7 +93,7 @@ public class LearnLessonUseCase {
                     || !submission.blockId().equals(blockId)) throw requestConflict();
             return submission.response();
         }
-        LessonContext context = authorize(userId, lessonId);
+        LessonAccess.Context context = access.authorize(userId, lessonId);
         Lesson lesson = context.lesson();
         Block block = lesson.blocks().stream().filter(item -> item.blockId().equals(blockId)
                         && "EXERCISE".equals(item.blockType())).findFirst()
@@ -107,11 +110,11 @@ public class LearnLessonUseCase {
             throw new LearningRequestException(422, "UNGRADABLE_EXERCISE", "Exercise contains unsupported questions");
         }
         boolean firstSubmission = !store.hasSubmission(userId, lessonId, blockId);
-        Set<UUID> knownKps = firstSubmission ? knownKnowledgePoints(userId, lesson) : Set.of();
+        Set<UUID> knownKps = firstSubmission ? access.knownKnowledgePoints(userId, exerciseKnowledgePoints(lesson))
+                : Set.of();
         // Refresh may change the first unpassed topic; authorize again before changing progress.
-        if (firstSubmission) gate.authorize(store.findPendingReviews(userId), null,
-                status(userId, lesson.topicId()), context.previousLessonsComplete());
-        refreshMetadata(userId, lesson);
+        if (firstSubmission) access.reauthorize(userId, context);
+        access.refresh(userId, lesson);
         boolean blockPassed = AnswerSheet.passes(
                 grades.stream().filter(AnswerSpecGrader.Grade::correct).count(), questions.size());
         Set<UUID> passed = new HashSet<>(passedBlocks(context.progress()));
@@ -154,52 +157,21 @@ public class LearnLessonUseCase {
     @Transactional
     public UUID complete(UUID userId, UUID lessonId) {
         store.lockUser(userId);
-        Lesson lesson = authorize(userId, lessonId).lesson();
+        Lesson lesson = access.authorize(userId, lessonId).lesson();
         if (lesson.blocks().stream().anyMatch(Block::isExercise)) {
             throw new LearningRequestException(409, "LESSON_HAS_EXERCISES", "Lesson contains exercise blocks");
         }
-        refreshMetadata(userId, lesson);
+        access.refresh(userId, lesson);
         if (store.completeLesson(userId, lessonId)) reviews.execute(userId,
                 new HashSet<>(lesson.knowledgePointIds()), Set.of());
         return lessonId;
     }
 
-    private LessonContext authorize(UUID userId, UUID lessonId) {
-        Lesson lesson = content.getLesson(lessonId);
-        var summaries = orderedLessons(content.getTopicLessons(lesson.topicId()));
-        var progress = store.findLessons(userId, lesson.topicId());
-        boolean previousComplete = true;
-        boolean found = false;
-        for (var summary : summaries) {
-            if (summary.lessonId().equals(lessonId)) { found = true; break; }
-            previousComplete &= completed(progress.get(summary.lessonId()));
-        }
-        gate.authorize(store.findPendingReviews(userId), null, status(userId, lesson.topicId()), previousComplete);
-        if (!found) throw new LearningRequestException(404, "NOT_FOUND", "Lesson was not found");
-        return new LessonContext(lesson, progress.get(lessonId), previousComplete);
-    }
-
-    private TopicStatus status(UUID userId, UUID topicId) {
-        return topicStatuses.derive(store.findTopics(userId)).getOrDefault(topicId, TopicStatus.LOCKED);
-    }
-
-    private void refreshMetadata(UUID userId, Lesson lesson) {
-        store.refreshLesson(userId, lesson.lessonId(), lesson.topicId(), lesson.sortOrder(), lesson.knowledgePointIds());
-    }
-
-    private Set<UUID> knownKnowledgePoints(UUID userId, Lesson lesson) {
-        Set<UUID> known = store.findMastery(userId).stream().map(history -> history.knowledgePointId())
-                .collect(Collectors.toSet());
-        Set<UUID> needed = lesson.blocks().stream().filter(Block::isExercise)
+    private static Set<UUID> exerciseKnowledgePoints(Lesson lesson) {
+        return lesson.blocks().stream().filter(Block::isExercise)
                 .flatMap(block -> block.questions().stream()).flatMap(question -> question.knowledgePointIds().stream())
                 .collect(Collectors.toSet());
-        if (!known.containsAll(needed)) {
-            refreshTopics.execute(userId);
-            known = store.findMastery(userId).stream().map(history -> history.knowledgePointId()).collect(Collectors.toSet());
-        }
-        return known;
     }
-
     private void reevaluate(UUID userId, Lesson lesson) {
         Map<UUID, List<UUID>> kpsByQuestion = lesson.blocks().stream()
                 .filter(Block::isExercise).flatMap(block -> block.questions().stream())
@@ -215,12 +187,8 @@ public class LearnLessonUseCase {
         return new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
     }
 
-    private boolean completed(LessonProgress progress) { return progress != null && progress.completedAt() != null; }
+    private static boolean completed(LessonProgress progress) { return LessonAccess.completed(progress); }
     private Set<UUID> passedBlocks(LessonProgress progress) { return progress == null ? Set.of() : progress.passedBlockIds(); }
-    private List<LessonSummary> orderedLessons(List<LessonSummary> lessons) {
-        return lessons.stream().sorted(Comparator.comparingInt(LessonSummary::sortOrder)
-                .thenComparing(lesson -> lesson.lessonId().toString())).toList();
-    }
     private List<Block> orderedBlocks(Lesson lesson) {
         return lesson.blocks().stream().sorted(Comparator.comparingInt(Block::sortOrder)
                 .thenComparing(block -> block.blockId().toString())).toList();
@@ -230,11 +198,17 @@ public class LearnLessonUseCase {
                 .thenComparing(question -> question.questionVersionId().toString())).toList();
     }
 
-    private LessonResult.Block blockResult(Block block, boolean passed, boolean lessonCompleted) {
+    private LessonResult.Block blockResult(Block block, boolean passed, boolean lessonCompleted,
+                                           WritingSubmissionStore.BlockSummary essay) {
         var asset = block.asset() == null ? null : learnerAsset(block.asset(), lessonCompleted);
         if (block.isEssay()) {
+            // The model answer stays hidden until the learner has passed the block once.
+            boolean essayPassed = essay != null && essay.passed();
+            var latest = essay == null ? null : new LessonResult.LatestSubmission(essay.latestId(),
+                    essay.latestStatus(), essay.latestOverallBand(), essay.latestPassed());
             return new LessonResult.Block(block.blockId(), block.blockType(), "ESSAY", block.sortOrder(), null, null,
-                    null, null, null, null, essayQuestion(block));
+                    null, null, null, null, essayQuestion(block), latest,
+                    essayPassed ? block.questions().getFirst().explanation() : null);
         }
         boolean exercise = block.isExercise();
         var questions = exercise ? orderedQuestions(block).stream().map(question -> new LessonResult.Question(
@@ -273,5 +247,4 @@ public class LearnLessonUseCase {
                 spec.get("passBand") instanceof Number band ? new BigDecimal(band.toString()) : null,
                 images);
     }
-    private record LessonContext(Lesson lesson, LessonProgress progress, boolean previousLessonsComplete) {}
 }
