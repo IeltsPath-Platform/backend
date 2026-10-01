@@ -1,5 +1,6 @@
 package com.group01.content.api.dto.internal;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonRawValue;
 import com.group01.content.application.result.PackageVersionContentResult;
 import com.group01.content.domain.vo.PackageType;
@@ -17,8 +18,11 @@ public record PackageVersionContentResponse(
         @JsonRawValue String rules,
         List<Section> sections
 ) {
+    /** {@code audio} appears only on sections with an AUDIO asset; its transcript is internal-only. */
     public record Section(UUID sectionId, String title, Skill skill, String instructions, int sortOrder,
-                          String passage, List<Item> items) {}
+                          String passage, @JsonInclude(JsonInclude.Include.NON_NULL) Audio audio, List<Item> items) {}
+
+    public record Audio(UUID assetId, String mediaUrl, Integer durationSeconds, String transcript) {}
 
     public record Item(
             UUID questionVersionId,
@@ -38,7 +42,10 @@ public record PackageVersionContentResponse(
                 result.topicId(), result.rulesJson(),
                 result.sections().stream()
                         .map(s -> new Section(s.sectionId(), s.title(), s.skill(), s.instructions(), s.sortOrder(),
-                                s.passage(), s.items().stream()
+                                s.passage(),
+                                s.audio() == null ? null : new Audio(s.audio().assetId(), s.audio().mediaUrl(),
+                                        s.audio().durationSeconds(), s.audio().transcript()),
+                                s.items().stream()
                                 .map(i -> new Item(i.questionVersionId(), i.sortOrder(), i.stem(), i.optionsJson(),
                                         i.answerSpecJson(), i.explanation(), i.maxScore(),
                                         i.knowledgePointMappings().stream()

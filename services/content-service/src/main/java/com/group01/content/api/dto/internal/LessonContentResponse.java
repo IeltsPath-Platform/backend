@@ -34,8 +34,9 @@ public record LessonContentResponse(
             List<Question> questions
     ) {}
 
+    /** For AUDIO, {@code textContent} is the transcript and {@code mediaUrl} the playable URL. */
     public record Asset(UUID id, AssetType assetType, String textContent, String mediaReference,
-                        Integer durationSeconds) {}
+                        Integer durationSeconds, String mediaUrl) {}
 
     /**
      * {@code options} is null for a fill question; {@code answerSpec} follows answer spec v1. {@code assets} appears
@@ -64,7 +65,7 @@ public record LessonContentResponse(
         LessonContentResult.Asset asset = block.asset();
         return new Block(block.blockId(), block.blockType(), block.blockKind(), block.sortOrder(), block.textContent(),
                 asset == null ? null : new Asset(asset.id(), asset.assetType(), asset.textContent(),
-                        asset.mediaReference(), asset.durationSeconds()),
+                        asset.mediaReference(), asset.durationSeconds(), asset.mediaUrl()),
                 block.vocabularySenseIds(),
                 block.questions() == null ? null : block.questions().stream()
                         .map(q -> new Question(q.questionVersionId(), q.sortOrder(), q.stem(), q.optionsJson(),

@@ -60,7 +60,7 @@ class InternalLearningContentControllerTest {
                 "Câu chủ đề nằm ở đâu", null, 1, List.of(), List.of(
                 new LessonContentResult.Block(UUID.randomUUID(), BlockType.TEXT, null, 1, "Mẹo", null, null, null),
                 new LessonContentResult.Block(UUID.randomUUID(), BlockType.ASSET, null, 2, null,
-                        new LessonContentResult.Asset(UUID.randomUUID(), AssetType.PASSAGE, "A. Text", null, null),
+                        new LessonContentResult.Asset(UUID.randomUUID(), AssetType.PASSAGE, "A. Text", null, null, null),
                         null, null),
                 new LessonContentResult.Block(UUID.randomUUID(), BlockType.EXERCISE, LessonBlockKind.EXERCISE, 3, null, null, null, List.of(
                         new LessonContentResult.Question(UUID.randomUUID(), 1, "Complete ______.", null,
@@ -91,7 +91,7 @@ class InternalLearningContentControllerTest {
         when(packageVersion.execute(versionId)).thenReturn(new PackageVersionContentResult(versionId,
                 UUID.randomUUID(), PackageType.TOPIC_TEST, UUID.randomUUID(), "{}", List.of(
                 new PackageVersionContentResult.Section(UUID.randomUUID(), "Street trees", Skill.READING, null, 1,
-                        "A. City trees", List.of(new PackageVersionContentResult.Item(UUID.randomUUID(), 1,
+                        "A. City trees", null, List.of(new PackageVersionContentResult.Item(UUID.randomUUID(), 1,
                         "What is the passage mainly about?",
                         "[{\"optionKey\":\"A\",\"content\":\"x\",\"sortOrder\":1}]",
                         "{\"type\":\"CHOICE\",\"correct\":\"A\"}", "x", 1.0,

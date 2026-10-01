@@ -44,14 +44,24 @@ public record LessonContentResult(
             return new Block(blockId, blockType, kind, sortOrder, textContent, asset, vocabularySenseIds, questions);
         }
 
+        public Block withAsset(Asset newAsset) {
+            return new Block(blockId, blockType, blockKind, sortOrder, textContent, newAsset, vocabularySenseIds,
+                    questions);
+        }
+
         public Block withQuestions(List<Question> newQuestions) {
             return new Block(blockId, blockType, blockKind, sortOrder, textContent, asset, vocabularySenseIds,
                     newQuestions);
         }
     }
 
+    /** {@code mediaUrl} is set for media assets once the use case has checked the stored reference. */
     public record Asset(UUID id, AssetType assetType, String textContent, String mediaReference,
-                        Integer durationSeconds) {}
+                        Integer durationSeconds, String mediaUrl) {
+        public Asset withMediaUrl(String url) {
+            return new Asset(id, assetType, textContent, mediaReference, durationSeconds, url);
+        }
+    }
 
     /**
      * {@code spec} holds the answer-spec facts used to classify the block. {@code assets} are the images attached to

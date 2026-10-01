@@ -8,9 +8,11 @@ import com.group01.content.application.result.PackageVersionContentResult;
 import com.group01.content.application.result.PracticeSetResult;
 import com.group01.content.application.result.TopicSequenceResult;
 import com.group01.content.application.usecase.GetLessonContentUseCase;
+import com.group01.content.application.usecase.GetPackageVersionContentUseCase;
 import com.group01.content.domain.vo.AssetType;
 import com.group01.content.domain.vo.BlockType;
 import com.group01.content.domain.vo.LessonBlockKind;
+import com.group01.content.domain.vo.MediaReferencePolicy;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import org.flywaydb.core.Flyway;
@@ -44,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class LessonPipelineSeedTest {
     private static final UUID DEMO_READING = UUID.fromString("10000000-0000-4000-8000-000000000001");
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final MediaReferencePolicy MEDIA = new MediaReferencePolicy("https://media.example.test/ieltspath");
 
     @Container
     private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:15-alpine");
@@ -160,7 +163,8 @@ class LessonPipelineSeedTest {
     void topicSequenceListsTopicsWithLessonsAndTestsAndTheirActiveKnowledgePoints() {
         List<TopicSequenceResult> sequence = reader.topicSequence(3);
 
-        assertThat(sequence).extracting(TopicSequenceResult::code).containsExactly("DEMO_READING", "TFNG_SKILLS");
+        assertThat(sequence).extracting(TopicSequenceResult::code)
+                .containsExactly("DEMO_READING", "TFNG_SKILLS", "DEMO_LISTENING");
         assertThat(sequence.get(0).knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::code)
                 .containsExactly("DEMO_READING_MAIN_IDEA", "DR_IDEA_OR_DETAIL", "DR_TOPIC_SENTENCE",
                         "DR_MATCHING_HEADINGS", "DEMO_READING_W2_OPINION",
@@ -253,7 +257,7 @@ class LessonPipelineSeedTest {
 
     @Test
     void everySeededExerciseBlockFollowsTheBlockRuleAndL3AndL4EndWithEssays() {
-        GetLessonContentUseCase lessons = new GetLessonContentUseCase(reader);
+        GetLessonContentUseCase lessons = new GetLessonContentUseCase(reader, MEDIA);
         List<UUID> lessonIds = jdbc.queryForList("SELECT id FROM lessons", Map.of(), UUID.class);
         List<LessonBlockKind> kinds = new ArrayList<>();
         for (UUID lessonId : lessonIds) {
@@ -276,7 +280,7 @@ class LessonPipelineSeedTest {
     @Test
     void task1EssayCarriesItsChartImageWhoseFiguresMatchTheChartFacts() throws Exception {
         UUID l3 = jdbc.queryForObject("SELECT id FROM lessons WHERE code = 'L3'", Map.of(), UUID.class);
-        LessonContentResult.Block essay = new GetLessonContentUseCase(reader).execute(l3).blocks().get(4);
+        LessonContentResult.Block essay = new GetLessonContentUseCase(reader, MEDIA).execute(l3).blocks().get(4);
 
         assertThat(essay.blockKind()).isEqualTo(LessonBlockKind.ESSAY);
         LessonContentResult.Question question = essay.questions().get(0);
@@ -299,6 +303,62 @@ class LessonPipelineSeedTest {
             assertThat(spec.get("chartFacts").asText()).contains(figure);
             assertThat(drawn).as("chart shows " + figure).contains(">" + figure + "<");
         }
+    }
+    @Test
+    void listeningTopicHasAudioLessonsOnePracticeSetPerKnowledgePointAndTwoAudioTests() throws Exception {
+        TopicSequenceResult listening = reader.topicSequence(3).get(2);
+        assertThat(listening.knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::code)
+                .containsExactly("LS_NUM", "LS_SPELL", "LS_PARA", "LS_TRAP");
+        assertThat(listening.knowledgePoints()).allMatch(TopicSequenceResult.KnowledgePointEntry::hasPracticeSet);
+
+        UUID ls1 = jdbc.queryForObject("SELECT id FROM lessons WHERE code = 'LS1'", Map.of(), UUID.class);
+        LessonContentResult lesson = new GetLessonContentUseCase(reader, MEDIA).execute(ls1);
+        assertThat(lesson.blocks()).extracting(LessonContentResult.Block::blockType)
+                .containsExactly(BlockType.TEXT, BlockType.ASSET, BlockType.EXERCISE);
+        LessonContentResult.Asset audio = lesson.blocks().get(1).asset();
+        assertThat(audio.assetType()).isEqualTo(AssetType.AUDIO);
+        assertThat(audio.mediaUrl()).isEqualTo("https://media.example.test/ieltspath/listening/demo/ls1.mp3");
+        assertThat(audio.durationSeconds()).isEqualTo(45);
+        assertThat(audio.textContent()).startsWith("Librarian: Good morning, Riverside Library.")
+                .contains("Caller: Yes, it is Thompson. T, H, O, M, P, S, O, N.");
+        LessonContentResult.Block exercise = lesson.blocks().get(2);
+        assertThat(exercise.blockKind()).isEqualTo(LessonBlockKind.EXERCISE);
+        assertThat(exercise.questions()).hasSize(4);
+        JsonNode lq2 = JSON.readTree(exercise.questions().get(1).answerSpecJson());
+        assertThat(grade(lq2, "  The   Fifteenth  ")).isTrue();
+
+        // Each listening KP has exactly one three-question practice set, every set and test has one audio section.
+        List<Map<String, Object>> packages = jdbc.queryForList("""
+                SELECT p.code, p.package_type, count(DISTINCT sq.question_version_id) AS questions,
+                       count(DISTINCT qkp.knowledge_point_id) AS kps, min(a.media_reference) AS audio_key
+                FROM content_packages p
+                JOIN content_sections s ON s.package_version_id = p.current_published_version_id
+                JOIN section_questions sq ON sq.section_id = s.id
+                JOIN question_knowledge_points qkp ON qkp.question_version_id = sq.question_version_id
+                JOIN content_asset_links al ON al.section_id = s.id
+                JOIN content_assets a ON a.id = al.asset_id AND a.asset_type = 'AUDIO'
+                WHERE s.skill = 'LISTENING'
+                GROUP BY p.code, p.package_type ORDER BY p.code
+                """, Map.of());
+        assertThat(packages).extracting(r -> r.get("code"))
+                .containsExactly("PS-NUM", "PS-PARA", "PS-SPELL", "PS-TRAP", "X3", "X4");
+        assertThat(packages).allSatisfy(r -> {
+            boolean test = "TOPIC_TEST".equals(r.get("package_type"));
+            assertThat(((Number) r.get("questions")).intValue()).isEqualTo(test ? 4 : 3);
+            assertThat(((Number) r.get("kps")).intValue()).isEqualTo(test ? 4 : 1);
+            assertThat((String) r.get("audio_key")).matches("listening/demo/\\w+\\.mp3");
+        });
+
+        UUID x3Version = reader.publishedTestPackages(listening.topicId()).stream()
+                .filter(p -> p.code().equals("X3")).findFirst().orElseThrow().packageVersionId();
+        PackageVersionContentResult x3 = new GetPackageVersionContentUseCase(reader, MEDIA).execute(x3Version);
+        assertThat(x3.sections()).singleElement().satisfies(section -> {
+            assertThat(section.passage()).isNull();
+            assertThat(section.audio().mediaUrl())
+                    .isEqualTo("https://media.example.test/ieltspath/listening/demo/hotel.mp3");
+            assertThat(section.audio().transcript()).contains("Delaney. D, E, L, A, N, E, Y.");
+            assertThat(section.items()).hasSize(4);
+        });
     }
     @Test
     void topicTestPackagesAndTheirVersionContent() {
@@ -327,8 +387,8 @@ class LessonPipelineSeedTest {
     void lessonPracticeAndTestQuestionsAreReservedForLearning() {
         List<UUID> all = jdbc.queryForList("SELECT id FROM question_versions", Map.of(), UUID.class);
         Set<UUID> reserved = reader.questionVersionsReservedForLearning(all);
-        // 43 seeded reading questions, the Task 1 and Task 2 essays and the V4 practice-set question.
-        assertThat(reserved).hasSize(46);
+        // 43 reading questions, the Task 1 and Task 2 essays, 27 listening questions and the V4 practice-set question.
+        assertThat(reserved).hasSize(73);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }
 

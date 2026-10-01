@@ -255,7 +255,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
             LessonContentResult.Asset asset = type == BlockType.ASSET
                     ? new LessonContentResult.Asset(uuid(rs, "asset_id"),
                     AssetType.valueOf(rs.getString("asset_type")), rs.getString("asset_text"),
-                    rs.getString("media_reference"), (Integer) rs.getObject("duration_seconds"))
+                    rs.getString("media_reference"), (Integer) rs.getObject("duration_seconds"), null)
                     : null;
             return new LessonContentResult.Block(blockId, type, null, rs.getInt("sort_order"),
                     type == BlockType.TEXT ? rs.getString("text_content") : null,
@@ -364,8 +364,14 @@ public class JdbcLearningContentReader implements LearningContentReader {
                        (SELECT a.text_content FROM content_asset_links al
                         JOIN content_assets a ON a.id = al.asset_id
                         WHERE al.section_id = s.id AND a.asset_type = 'PASSAGE'
-                        ORDER BY al.sort_order, a.id LIMIT 1) AS passage
+                        ORDER BY al.sort_order, a.id LIMIT 1) AS passage,
+                       audio.id AS audio_id, audio.media_reference AS audio_reference,
+                       audio.duration_seconds AS audio_duration, audio.text_content AS audio_transcript
                 FROM content_sections s
+                LEFT JOIN LATERAL (SELECT a.id, a.media_reference, a.duration_seconds, a.text_content
+                                   FROM content_asset_links al JOIN content_assets a ON a.id = al.asset_id
+                                   WHERE al.section_id = s.id AND a.asset_type = 'AUDIO'
+                                   ORDER BY al.sort_order, a.id LIMIT 1) audio ON TRUE
                 WHERE s.package_version_id = :versionId
                 ORDER BY s.sort_order
                 """, byVersion, (rs, i) -> {
@@ -373,6 +379,9 @@ public class JdbcLearningContentReader implements LearningContentReader {
             return new PackageVersionContentResult.Section(sectionId, rs.getString("title"),
                     enumOrNull(Skill.class, rs.getString("skill")), rs.getString("instructions"),
                     rs.getInt("sort_order"), rs.getString("passage"),
+                    rs.getObject("audio_id") == null ? null : new PackageVersionContentResult.SectionAudio(
+                            uuid(rs, "audio_id"), rs.getString("audio_reference"), null,
+                            (Integer) rs.getObject("audio_duration"), rs.getString("audio_transcript")),
                     itemsBySection.getOrDefault(sectionId, List.of()));
         });
 

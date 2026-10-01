@@ -51,7 +51,7 @@ Returns `{lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds,
 | `blockType` | Additional fields | Rule |
 | --- | --- | --- |
 | `TEXT` | `textContent: string` | Lesson prose. |
-| `ASSET` | `asset: {id, assetType, textContent, mediaReference, durationSeconds}` | `PASSAGE` uses `textContent`; media uses `mediaReference`. Unused values are `null`. |
+| `ASSET` | `asset: {id, assetType, textContent, mediaReference, durationSeconds, mediaUrl}` | `PASSAGE` uses `textContent`; media uses `mediaReference`. Unused values are `null`. For `AUDIO` (added 2026-10-01) `mediaUrl` is the playable URL resolved by Content (an `https://` reference unchanged, or an object key joined to `content.media.base-url`; anything else fails with `INVALID_MEDIA_REFERENCE`) and `textContent` is the transcript, which is an answer: learners see it only after passing. |
 | `VOCABULARY` | `vocabularySenseIds: UUID[]` | Ordered logical IDs in Library Service; MVP seed has no such block. |
 | `EXERCISE` | `blockKind: "EXERCISE" \| "ESSAY"`, `questions: Question[]` | Ordered by `sortOrder`. `blockKind` (added 2026-10-01): `ESSAY` when the block holds exactly one question whose `answerSpec.type` is `ESSAY`, otherwise `EXERCISE` (only auto-gradable questions). Content rejects any other mix. Consumers trust `blockKind` and do not classify again. |
 
@@ -105,7 +105,7 @@ The request/response illustrates KP1 and its `PS-KP1-A` package. The V4 one-ques
 
 ## `GET /package-versions/{id}`
 
-Returns one PUBLISHED version with `{packageVersionId, packageId, packageType, topicId, rules, sections}`. `topicId` is required for `TOPIC_TEST` and nullable for other types. `rules` is the parsed version rules object; the V9 seed versions use `{}`. MVP final tests have no time limit: when `rules` has no time key, Assessment sets `expiresAt=null`. Defining a timed package rule is deferred beyond MVP. Sections have `{sectionId, title, skill, instructions, sortOrder, passage, items}`; `passage` is the full text of the attached `PASSAGE` asset or `null`. Items have `{questionVersionId, sortOrder, stem, options, answerSpec, explanation, maxScore, knowledgePointMappings}`. Each mapping has `{knowledgePointId, weight}`; weight does not affect grading or mastery.
+Returns one PUBLISHED version with `{packageVersionId, packageId, packageType, topicId, rules, sections}`. `topicId` is required for `TOPIC_TEST` and nullable for other types. `rules` is the parsed version rules object; the V9 seed versions use `{}`. MVP final tests have no time limit: when `rules` has no time key, Assessment sets `expiresAt=null`. Defining a timed package rule is deferred beyond MVP. Sections have `{sectionId, title, skill, instructions, sortOrder, passage, audio?, items}`; `passage` is the full text of the attached `PASSAGE` asset or `null`. `audio` (added 2026-10-01, absent when the section has no `AUDIO` asset) is `{assetId, mediaUrl, durationSeconds, transcript}`, resolved like a lesson audio block; the transcript must not reach a learner before the result allows it. Items have `{questionVersionId, sortOrder, stem, options, answerSpec, explanation, maxScore, knowledgePointMappings}`. Each mapping has `{knowledgePointId, weight}`; weight does not affect grading or mastery.
 
 X1 example (one representative item shown; the actual version contains Q2, Q14, Q15, Q16):
 

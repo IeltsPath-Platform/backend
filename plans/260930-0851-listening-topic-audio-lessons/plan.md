@@ -1,7 +1,7 @@
 ---
 title: "Listening trong luồng học (topic riêng, audio mp3 qua URL)"
 description: "Topic Listening đi trọn pipeline: bài học có khối audio + bài tập tự chấm, gói luyện thêm/ôn có audio, đề cuối có audio; mp3 trên cloud, DB lưu key, transcript ẩn tới khi đạt; không migration schema."
-status: pending
+status: in-progress
 priority: P2
 branch: "feat/main-follow"
 tags: [feature, backend, content, assessment, ai-learning, listening, tdd]
@@ -46,8 +46,8 @@ Scope đã chốt với người dùng ngày 2026-09-30 (HOLD). Chế độ `--t
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Contract va khoa lo transcript](./phase-01-contract-va-khoa-lo-transcript.md) | Pending |
-| 2 | [Content media URL va seed Listening](./phase-02-content-media-url-va-seed-listening.md) | Pending |
+| 1 | [Contract va khoa lo transcript](./phase-01-contract-va-khoa-lo-transcript.md) | In progress (khóa asset + contract nội bộ xong trên `feat/writing-access-content`; phần học viên của `lesson-learning-v1` chờ Codex xong file đó) |
+| 2 | [Content media URL va seed Listening](./phase-02-content-media-url-va-seed-listening.md) | Completed (nhánh `feat/writing-access-content`) |
 | 3 | [Assessment de cuoi co audio](./phase-03-assessment-de-cuoi-co-audio.md) | Pending |
 | 4 | [AI Learning bai hoc va goi on co audio](./phase-04-ai-learning-bai-hoc-va-goi-on-co-audio.md) | Pending |
 | 5 | [Tai lieu](./phase-05-tai-lieu.md) | Pending |

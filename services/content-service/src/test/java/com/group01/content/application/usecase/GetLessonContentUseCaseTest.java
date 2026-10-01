@@ -6,6 +6,7 @@ import com.group01.content.domain.exception.InvalidMediaReferenceException;
 import com.group01.content.domain.vo.AssetType;
 import com.group01.content.domain.vo.BlockType;
 import com.group01.content.domain.vo.LessonBlockKind;
+import com.group01.content.domain.vo.MediaReferencePolicy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -20,6 +21,7 @@ import static org.mockito.Mockito.when;
 class GetLessonContentUseCaseTest {
     private final LearningContentReader reader = mock(LearningContentReader.class);
     private final UUID lessonId = UUID.randomUUID();
+    private final MediaReferencePolicy policy = new MediaReferencePolicy("https://media.example.test/ieltspath");
 
     private LessonContentResult.Question question(String specType, List<LessonContentResult.QuestionAsset> assets) {
         LessonBlockKind.QuestionSpec spec = specType.equals("ESSAY")
@@ -46,14 +48,14 @@ class GetLessonContentUseCaseTest {
         String svg = "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=";
         when(reader.publishedLesson(lessonId)).thenReturn(Optional.of(lessonWith(question("ESSAY", List.of(image(svg))))));
 
-        LessonContentResult.Block essay = new GetLessonContentUseCase(reader).execute(lessonId).blocks().get(1);
+        LessonContentResult.Block essay = new GetLessonContentUseCase(reader, policy).execute(lessonId).blocks().get(1);
 
         assertThat(essay.blockKind()).isEqualTo(LessonBlockKind.ESSAY);
         assertThat(essay.questions().get(0).assets()).singleElement()
                 .satisfies(asset -> assertThat(asset.mediaUrl()).isEqualTo(svg));
 
         when(reader.publishedLesson(lessonId)).thenReturn(Optional.of(lessonWith(question("CHOICE", List.of()))));
-        LessonContentResult.Block exercise = new GetLessonContentUseCase(reader).execute(lessonId).blocks().get(1);
+        LessonContentResult.Block exercise = new GetLessonContentUseCase(reader, policy).execute(lessonId).blocks().get(1);
         assertThat(exercise.blockKind()).isEqualTo(LessonBlockKind.EXERCISE);
         assertThat(exercise.questions().get(0).assets()).isNull();
     }
@@ -63,7 +65,7 @@ class GetLessonContentUseCaseTest {
         when(reader.publishedLesson(lessonId))
                 .thenReturn(Optional.of(lessonWith(question("ESSAY", List.of(image("javascript:alert(1)"))))));
 
-        assertThatThrownBy(() -> new GetLessonContentUseCase(reader).execute(lessonId))
+        assertThatThrownBy(() -> new GetLessonContentUseCase(reader, policy).execute(lessonId))
                 .isInstanceOf(InvalidMediaReferenceException.class);
     }
 }
