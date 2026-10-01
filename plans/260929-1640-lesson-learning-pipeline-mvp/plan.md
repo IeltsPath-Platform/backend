@@ -66,7 +66,7 @@ Chế độ `--tdd`: mỗi phase code theo trình tự test giữ hành vi cũ �
 | 1 | [Contract và đặc tả](./phase-01-contract-va-dac-ta.md) | Completed (duyệt 2026-10-01) |
 | 2 | [Chặn lộ đáp án](./phase-02-chan-lo-dap-an.md) | Completed (`34335aa`, merge PR #23) |
 | 3 | [Content: bài học, gói, endpoint nội bộ, seed](./phase-03-content-bai-hoc-va-goi.md) | Completed (merge PR #24, `d7ea05f`) |
-| 4 | [Assessment: tự chấm, lấy đề từ content, event](./phase-04-assessment-tu-cham-va-ma-de.md) | Pending (làm sau phase 4 của `261001-1228`) |
+| 4 | [Assessment: tự chấm, lấy đề từ content, event](./phase-04-assessment-tu-cham-va-ma-de.md) | Completed (nhánh `feat/assessment-auto-grading`; assessment 102 test, content 138 test pass) |
 | 5 | [AI Learning: path theo user](./phase-05-ai-learning-path-theo-user.md) | Superseded (phần a merge PR #25; còn lại thay bởi `261001-1228`) |
 | 6 | [AI Learning: API bài học, bài ôn, giao mã đề](./phase-06-ai-learning-api-bai-hoc-va-bai-on.md) | Superseded (`261001-1228` phase 2–3) |
 | 7 | [AI Learning: consumer kết quả đề](./phase-07-ai-learning-consumer-ket-qua-de.md) | Superseded (`261001-1228` phase 4) |
