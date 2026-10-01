@@ -99,7 +99,7 @@ class LessonLearningWebMvcTest {
         JsonNode passage = response.path("blocks").get(0).path("asset");
         assertEquals("Passage text", passage.path("textContent").asText());
         JsonNode block = response.path("blocks").get(1);
-        assertEquals(Set.of("blockId", "blockType", "sortOrder", "passed", "questions"), keys(block));
+        assertEquals(Set.of("blockId", "blockType", "blockKind", "sortOrder", "passed", "questions"), keys(block));
         assertFalse(block.path("passed").asBoolean());
         assertFalse(block.has("solutions"));
         assertQuestionAllowlist(block.path("questions").get(0));
@@ -288,13 +288,13 @@ class LessonLearningWebMvcTest {
         var choice = new LessonResult.Question(QUESTION, 1, "Choose the main idea",
                 List.of(new LessonResult.Option("A", "Main idea", 1)));
         var fill = new LessonResult.Question(FILL_QUESTION, 2, "Complete one word", null);
-        var asset = new LessonResult.Asset(UUID.randomUUID(), "PASSAGE", "Passage text", null, null);
-        var passage = new LessonResult.Block(UUID.randomUUID(), "ASSET", 1, null, asset, null,
-                null, null, null);
-        var exercise = new LessonResult.Block(BLOCK, "EXERCISE", 2, null, null, null,
+        var asset = new LessonResult.Asset(UUID.randomUUID(), "PASSAGE", "Passage text", null, null, null);
+        var passage = new LessonResult.Block(UUID.randomUUID(), "ASSET", null, 1, null, asset, null,
+                null, null, null, null);
+        var exercise = new LessonResult.Block(BLOCK, "EXERCISE", "EXERCISE", 2, null, null, null,
                 passed, List.of(choice, fill), passed ? List.of(
                 new LessonResult.Solution(QUESTION, "A", "The main idea"),
-                new LessonResult.Solution(FILL_QUESTION, "critics", "A word from the passage")) : null);
+                new LessonResult.Solution(FILL_QUESTION, "critics", "A word from the passage")) : null, null);
         return new LessonResult(LESSON, TOPIC, "L1", "First lesson", null, 1, "AVAILABLE",
                 List.of(passage, exercise));
     }

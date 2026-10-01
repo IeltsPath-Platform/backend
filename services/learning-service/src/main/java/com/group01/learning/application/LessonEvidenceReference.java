@@ -9,11 +9,17 @@ import java.util.UUID;
 public final class LessonEvidenceReference {
     private static final UUID DNS_NAMESPACE = UUID.fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
     private static final UUID LESSON_NAMESPACE = uuid5(DNS_NAMESPACE, "ielts-path:lesson_exercise");
+    private static final UUID REVIEW_NAMESPACE = uuid5(DNS_NAMESPACE, "ielts-path:review_set");
 
     private LessonEvidenceReference() {}
 
     public static UUID create(UUID requestId, UUID questionVersionId, UUID kpId) {
         return uuid5(LESSON_NAMESPACE, requestId + ":" + questionVersionId + ":" + kpId);
+    }
+
+    /** Reference of review-set evidence; a separate namespace keeps it apart from lesson evidence. */
+    public static UUID forReviewSet(UUID requestId, UUID questionVersionId, UUID kpId) {
+        return uuid5(REVIEW_NAMESPACE, requestId + ":" + questionVersionId + ":" + kpId);
     }
 
     private static UUID uuid5(UUID namespace, String name) {

@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Bài ôn và giao mã đề"
-status: pending
+status: completed
 priority: P1
 dependencies: [2]
 effort: "1.5 ngày"
@@ -15,6 +15,12 @@ Làm phần "6b" của `260929-1640/phase-06` bằng Java: `GET /reviews/{id}`, 
 `POST /topics/{id}/test-assignments`. Luật giữ nguyên phase 6 (một set mở mỗi review, hết gói lấy gói lâu nhất, không có gói
 → `SKIPPED`, trượt set thứ 3 → `SKIPPED` với hằng số `MAX_FAILED_REVIEW_SETS = 3`, mã đề idempotent, mã chưa dùng trước, hết
 thì mã dùng lâu nhất, version đang publish, không có mã → 409 `TEST_UNAVAILABLE`).
+
+## Kết quả (2026-10-01, nhánh `feat/learning-reviews-tests`)
+
+- `ReviewUseCase` (GET/POST review), `AssignTopicTestUseCase`, `ReviewStore` + `JdbcReviewStore`, `ReviewController`. Gói chưa giao (tính trên mọi review của user) đi trước; hết thì lấy gói giao lâu nhất; trượt set thứ 3 → `SKIPPED`; không còn gói nào → `SKIPPED`. Mã đề: `REVIEW_REQUIRED` → `TEST_LOCKED` → trả lần giao còn mở → gói chưa dùng (theo `code`) → gói dùng lâu nhất.
+- Sửa thêm trong `LearnLessonUseCase` (content V10–V12 đã merge): khối `blockKind = ESSAY` không tính hoàn thành bài, nộp bài tập vào đó → 409 `ESSAY_BLOCK`, `GET` trả đề essay theo `lesson-writing-v1` (`latestSubmission` chưa có, chờ 0737 phase 4); asset audio trả `mediaUrl`, transcript chỉ khi bài xong; set ôn Listening có `audio`, nộp đạt thì trả `transcript`. `AnswerSheet` dùng chung luật kiểm câu trả lời và mốc 70%.
+- Test: 126 pass, 0 skip (6 ca Testcontainers mới trong `ReviewAndTestAssignmentIntegrationTest`). Chưa có `@WebMvcTest` riêng cho 3 route mới.
 
 ## Requirements
 

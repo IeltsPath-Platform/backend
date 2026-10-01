@@ -35,8 +35,8 @@ Mỗi PR một **phiên agent mới**, dán nguyên khối "Prompt". Prompt tr�
 | # | PR | Phase | Cần có trước | Trạng thái |
 | --- | --- | --- | --- | --- |
 | 1 | Xóa Python, khung learning-service | 1 | — | Xong (merge #26 nhầm vào main, revert #27; khôi phục #28 `07324d9`) |
-| 2 | Bài học, nộp bài, cổng, mastery | 2 | PR 1 | Xong (`feat/learning-lessons`, 125 test pass, Docker chạy thật; chưa push) |
-| 3 | Bài ôn, giao mã đề | 3 | PR 2 | Chưa |
+| 2 | Bài học, nộp bài, cổng, mastery | 2 | PR 1 | Xong (merge #29) |
+| 3 | Bài ôn, giao mã đề | 3 | PR 2 | Xong (Claude làm vì Codex hết token; nhánh `feat/learning-reviews-tests`, kèm sửa khối essay và audio) |
 | 4 | Consumer AssessmentCompleted.v2 | 4 | PR 3 | Chưa |
 | 5 | Tài liệu repo | 5 | PR 4 | Chưa |
 
