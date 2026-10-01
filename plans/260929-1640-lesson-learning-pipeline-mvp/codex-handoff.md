@@ -39,18 +39,18 @@ nên agent phải đọc file này trước.
 
 ## Thứ tự PR
 
-| # | PR | Phase | Cần có trước | Điểm dừng |
-| --- | --- | --- | --- | --- |
-| 1 | Contract | 1 | — | **Dừng: người dùng duyệt contract** |
-| 2 | Chặn lộ đáp án | 2 | PR 1 duyệt | — |
-| 3 | Content bài học, gói, seed | 3 | PR 1 duyệt | — |
-| 4 | AI Learning: tách module, adapter, placement | 5 (phần a) | PR 1 duyệt | — |
-| 5 | AI Learning: path theo user, V10 | 5 (phần b) | PR 3, PR 4 | **Dừng: người dùng duyệt V10 trước khi chạy trên DB dùng chung** |
-| 6 | AI Learning: bài học, nộp bài, cổng | 6 (phần a) | PR 3, PR 5 | — |
-| 7 | AI Learning: bài ôn, giao mã đề | 6 (phần b) | PR 6 | — |
-| 8 | Assessment tự chấm, event | 4 | PR 3, PR 5 (consumer nhận event không goal phải lên trước) | — |
-| 9 | Consumer kết quả đề | 7 | PR 7, PR 8 | — |
-| 10 | Tài liệu, kiểm toàn repo | 8 | PR 2–9 | E2E thủ công do người dùng chạy |
+| # | PR | Phase | Cần có trước | Điểm dừng | Trạng thái |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Contract | 1 | — | **Dừng: người dùng duyệt contract** | Xong (duyệt 2026-10-01) |
+| 2 | Chặn lộ đáp án | 2 | PR 1 duyệt | — | Xong (merge #23) |
+| 3 | Content bài học, gói, seed | 3 | PR 1 duyệt | — | Xong (merge #24) |
+| 4 | AI Learning: tách module, adapter, placement | 5 (phần a) | PR 1 duyệt | — | Xong (merge #25) |
+| 5 | AI Learning: path theo user, V10 | 5 (phần b) | PR 3, PR 4 | **Dừng: người dùng duyệt V10 trước khi chạy trên DB dùng chung** | Đang làm (Codex) |
+| 6 | AI Learning: bài học, nộp bài, cổng | 6 (phần a) | PR 3, PR 5 | — | Chưa |
+| 7 | AI Learning: bài ôn, giao mã đề | 6 (phần b) | PR 6 | — | Chưa |
+| 8 | Assessment tự chấm, event | 4 | PR 3, PR 5 (consumer nhận event không goal phải lên trước) | — | Chưa |
+| 9 | Consumer kết quả đề | 7 | PR 7, PR 8 | — | Chưa |
+| 10 | Tài liệu, kiểm toàn repo | 8 | PR 2–9 | E2E thủ công do người dùng chạy | Chưa |
 
 PR 2, 3, 4 làm song song được sau khi PR 1 được duyệt, nếu mỗi PR một nhánh và không sửa cùng file.
 
@@ -129,15 +129,39 @@ Regression Gate: pytest ai-learning đủ biến DB và AMQP.
 Làm PHẦN B của phase 5 plan 1640: plans/260929-1640-lesson-learning-pipeline-mvp/phase-05-ai-learning-path-theo-user.md
 (phần A đã merge). Đọc mục "Quy tắc chung" trong plans/260929-1640-lesson-learning-pipeline-mvp/codex-handoff.md và làm theo.
 
-Phần B gồm: ContentServiceClient.get_topic_sequence; tạo/gộp path từ một lần gọi topic-sequence (không goal, không LLM, không
-band); lock theo user; pending theo user; V10 (một path mỗi user, bỏ bảng band, thêm has_practice_set vào
-mastery_path_knowledge_point_details, pending cho learning_goal_id null); xóa PathOrderer, ordering LLM, curriculum_scope,
-placement_test_out, user_service client, ActiveGoalRequired và setting user_service_base_url (grep xác nhận không còn nơi đọc).
-Danh sách chỗ gọi và test phải sửa ở mục "Toàn bộ chỗ gọi phải sửa" của phase.
+Phần A ĐÃ XONG (xem mục "Kết quả phần a" của phase), không làm lại: knowledge_point_details.py, ordering_validator.py,
+adapter chịu goal null + package_version_id, PLACEMENT không ghi evidence, placement_test_out đã xóa, execute_values.
 
-V10 xóa dữ liệu (cascade phiên tutor, sổ luyện tập của path bị bỏ): chỉ chạy trên schema test tạm. TRƯỚC KHI chạy trên DB dev
-dùng chung: DỪNG, báo Status: NEEDS_DECISION kèm query đếm path trùng và lệnh pg_dump để người dùng tự chạy và duyệt.
-Regression Gate: pytest ai-learning đủ biến DB và AMQP; test_mastery_* và test_no_deeptutor_dependency.py pass không sửa.
+Phần B gồm:
+- ContentServiceClient.get_topic_sequence (GET /internal/learning-content/topic-sequence, contract
+  docs/contracts/learning-content-internal-v1.md); đổi response sang topics + knowledgePoints rồi qua CurriculumAdapter.to_modules
+  như cũ; snapshot details lấy từ cùng response (details_from_content đã đọc hasPracticeSet).
+- PathService: ensure_path/ensure_active_path theo user, không goal, không LLM, không band; refresh gộp từ cùng topic-sequence.
+  Constructor chỉ nhận keyword. Bỏ user_client, _active_goal, _scoped_curriculum, PathOrderer, ActiveGoalRequired.
+- Store: find_path_by_user; advisory lock theo user; bắt UniqueViolation trên index mới; pending theo user (áp khi tạo path và
+  khi nạp path có sẵn); replace_knowledge_point_details ghi thêm has_practice_set, knowledge_point_details đọc thêm cột; xóa
+  replace_knowledge_point_bands / knowledge_point_bands và mọi tham số bands, band_min/band_max trong tool tutor.
+- Ingestion: xóa GoallessResultUnsupported; event không goal đi đường bình thường theo user.
+- migrations/V10__one_mastery_path_per_user.sql đúng mục Architecture của phase (giữ path nhiều evidence nhất, RAISE NOTICE,
+  unique index theo user, pending.learning_goal_id nullable + index không unique, DROP bảng band, thêm has_practice_set).
+- Xóa: path_orderer.py, ordering_llm.py, path_ordering.py (import nào còn trỏ tới nó thì đổi sang ordering_validator), curriculum_scope.py,
+  clients/user_service.py, handler NoCurriculumInScope/ActiveGoalRequired trong main.py, setting user_service_base_url +
+  validator + biến env trong docker-compose.yml (grep xác nhận không còn nơi đọc). Xóa test tương ứng: test_path_orderer.py,
+  test_ordering_llm.py, test_path_ordering_postgres.py, test_curriculum_scope.py, test_path_ordering.py (phần còn lại),
+  test_mastery_path_goal_uniqueness.py. Chỗ gọi phải sửa: mục "Toàn bộ chỗ gọi phải sửa" của phase (số dòng có thể lệch).
+- Cập nhật bảng migration trong README service, .sdd/database/DATABASE_V5.md mục AI Learning, CLAUDE.md của service
+  (bảng package: bỏ "LLM sắp thứ tự", path_orderer).
+
+Test: KHÔNG cần TDD đầy đủ, không cần test mới cho từng nhánh. Bắt buộc:
+- sửa test cũ cho chạy được với API mới (goal → user, bỏ band); test goal-scoped viết lại thành theo user, đổi tên file;
+- thêm tối thiểu 4 test: (1) user không goal → path theo sortOrder, details có has_practice_set; (2) hai ensure_active_path
+  song song trên PostgreSQL → một path; (3) migration: 2 path cùng user, giữ path có evidence, index unique tồn tại;
+  (4) pending đỗ theo user rồi được áp khi tạo path.
+
+V10 xóa dữ liệu (cascade phiên tutor, sổ luyện tập của path bị bỏ): chỉ chạy trên schema test tạm. KHÔNG chạy trên DB dev
+dùng chung (ai-learning-db compose). Xong thì báo Status: NEEDS_DECISION kèm query đếm path trùng và lệnh pg_dump để người dùng
+tự chạy và duyệt V10.
+Regression Gate: pytest ai-learning đủ biến DB và AMQP (0 skip); test_mastery_* và test_no_deeptutor_dependency.py pass không sửa.
 ```
 
 ## PR 6 — AI Learning: bài học, nộp bài, cổng (phase 6a)

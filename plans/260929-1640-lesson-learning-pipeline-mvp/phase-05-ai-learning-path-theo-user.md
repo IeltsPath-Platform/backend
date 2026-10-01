@@ -133,7 +133,7 @@ Chạy kèm `AI_LEARNING_TEST_DATABASE_URL` và `AI_LEARNING_TEST_AMQP_URL`. `te
 - [ ] Consumer nhận event không có goal.
 - [ ] Test bước 1–11 pass; người dùng đã duyệt V10.
 
-## Kết quả phần a (2026-10-01, PR 4, nhánh `feat/ai-learning-module-split`)
+## Kết quả phần a (2026-10-01, PR 4, nhánh `feat/ai-learning-module-split`, merge PR #25 `90fd390`)
 
 - Tách `app/adapters/knowledge_point_details.py` (`KnowledgePointDetails` thêm `has_practice_set`, `details_from_content`,
   `parse_band`) và `app/learning/ordering_validator.py`; test validator chuyển sang `tests/test_ordering_validator.py`.
