@@ -62,7 +62,7 @@ Chế độ `--tdd`: mỗi phase code theo trình tự test giữ hành vi cũ �
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | [Contract và đặc tả](./phase-01-contract-va-dac-ta.md) | Completed (duyệt 2026-10-01) |
-| 2 | [Chặn lộ đáp án](./phase-02-chan-lo-dap-an.md) | Pending |
+| 2 | [Chặn lộ đáp án](./phase-02-chan-lo-dap-an.md) | Completed (`34335aa`, nhánh `feat/lesson-answer-guard`) |
 | 3 | [Content: bài học, gói, endpoint nội bộ, seed](./phase-03-content-bai-hoc-va-goi.md) | Pending |
 | 4 | [Assessment: tự chấm, lấy đề từ content, event](./phase-04-assessment-tu-cham-va-ma-de.md) | Pending |
 | 5 | [AI Learning: path theo user](./phase-05-ai-learning-path-theo-user.md) | Pending |

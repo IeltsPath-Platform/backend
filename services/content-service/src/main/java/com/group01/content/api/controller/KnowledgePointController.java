@@ -10,6 +10,7 @@ import com.group01.content.application.usecase.GetKnowledgePointsUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,6 +35,7 @@ public class KnowledgePointController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public KnowledgePointResponse createKnowledgePoint(@Valid @RequestBody CreateKnowledgePointRequest request) {
         KnowledgePointResult result = createKnowledgePointUseCase.execute(new CreateKnowledgePointCommand(
                 request.topicId(),

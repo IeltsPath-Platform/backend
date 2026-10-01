@@ -22,7 +22,7 @@ import java.util.UUID;
 
 /**
  * A grader's details for one result version. {@code overallBand} always replaces the version's band; omitting it
- * clears the band. Same band bounds as {@link CreateAssessmentResultRequest}.
+ * clears the band. Same band bounds as {@link OpenResultVersionRequest}.
  */
 public record SaveGradingDetailsRequest(
         @DecimalMin("0.0") @DecimalMax("9.0") Double overallBand,
