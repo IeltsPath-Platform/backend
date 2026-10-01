@@ -16,7 +16,7 @@ Content có bài học (5 bảng mới), gói `TOPIC_TEST` gắn topic, 6 endpoi
 ## Requirements
 
 - Functional: đủ 6 endpoint của `learning-content-internal-v1.md`. Chỉ trả bài, gói, câu hỏi đã `PUBLISHED`.
-- `GET /topic-sequence`: topic ACTIVE có ≥ 1 bài PUBLISHED và ≥ 1 gói `TOPIC_TEST` PUBLISHED, theo `sort_order`. Topic cha hoặc topic không có bài không vào thứ tự học. Mỗi topic **kèm KP ACTIVE** (Validation Session 2): `[{topicId, code, name, skill, sortOrder, knowledgePoints: [{id, code, name, learningType, skill, description, hasPracticeSet}]}]`; KP ACTIVE của topic, sắp theo `created_at` rồi `id`; không `answerSpec`, không band. `hasPracticeSet` xem mục dưới seed.
+- `GET /topic-sequence`: topic ACTIVE có ≥ 1 bài PUBLISHED và ≥ 1 gói `TOPIC_TEST` PUBLISHED, theo `sort_order`. Topic cha hoặc topic không có bài không vào thứ tự học. Mỗi topic **kèm KP ACTIVE** (Validation Session 2): `[{topicId, code, name, sortOrder, knowledgePoints: [{id, code, name, learningType, skill, description, hasPracticeSet}]}]`; KP ACTIVE của topic, sắp theo `created_at` rồi `id`; không `answerSpec`, không band. `hasPracticeSet` xem mục dưới seed.
 - `POST /practice-sets/search`:
   - gói `PRACTICE_SET` PUBLISHED có ≥ `minQuestions` (mặc định 3) câu, trong đó có câu đo KP;
   - loại `excludePackageIds`;

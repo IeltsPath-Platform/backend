@@ -58,7 +58,7 @@ Id logic đổi đích (không đổi code, chỉ ghi tài liệu): `assessment.
 | S3 | activity/streak → user-service; gỡ learning-support | **Dừng trước khi xóa module** (báo danh sách file và route bị gỡ) | Xong (`fec5d14` chuyển, user V5; `ab613b1` gỡ module sau khi người dùng duyệt) |
 | S4 | Tài liệu | — | Xong (`9fd7ada`) |
 
-Nhánh: `feat/library-personal-library` chứa S1, S1b (cherry-pick) và S2; `feat/learning-support-removal` nối tiếp với S3, S4: **nhánh cần merge** (chứa đủ S1–S4). Chưa push.
+Nhánh: `feat/library-personal-library` chứa S1, S1b (cherry-pick) và S2; `feat/learning-support-removal` nối tiếp với S3, S4: **đã merge vào `feat/main-follow`** (PR #21, `8bf3fd1`, 2026-10-01).
 Content V7 đã được duyệt (2026-10-01): chạy trên `content_db` local, không sao lưu, bỏ dữ liệu 5 bảng catalog. `feat/lesson-library-catalog-split` là bản cũ
 của S1/S1b (`99d5347`, `081f22a`), không merge nhánh đó để tránh trùng commit.
 

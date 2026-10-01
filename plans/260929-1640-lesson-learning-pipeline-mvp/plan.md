@@ -1,7 +1,7 @@
 ---
 title: "Triển khai pipeline học chính (bài học, bài ôn, đề cuối)"
 description: "MVP luồng học topic → bài → bài ôn → đề cuối: path theo user, chấm theo answer_spec, giấu đáp án tới khi đạt, bài ôn dùng gói PRACTICE_SET mới, mã đề TOPIC_TEST dùng một lần, assessment tự chấm và tự quyết loại attempt, consumer ghi trong cùng transaction và không gọi HTTP."
-status: pending
+status: in-progress
 priority: P2
 branch: "feat/main-follow"
 tags: [ai-learning, content, assessment, lesson, mastery, tdd]
@@ -61,7 +61,7 @@ Chế độ `--tdd`: mỗi phase code theo trình tự test giữ hành vi cũ �
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Contract và đặc tả](./phase-01-contract-va-dac-ta.md) | Pending |
+| 1 | [Contract và đặc tả](./phase-01-contract-va-dac-ta.md) | Completed (duyệt 2026-10-01) |
 | 2 | [Chặn lộ đáp án](./phase-02-chan-lo-dap-an.md) | Pending |
 | 3 | [Content: bài học, gói, endpoint nội bộ, seed](./phase-03-content-bai-hoc-va-goi.md) | Pending |
 | 4 | [Assessment: tự chấm, lấy đề từ content, event](./phase-04-assessment-tu-cham-va-ma-de.md) | Pending |
@@ -292,3 +292,25 @@ Quyết định của người dùng trong phiên: đề cuối **giữ đúng/s
 #### Whole-Plan Consistency Sweep
 - Đã tìm "đủ cả ba", "demo tương tác", "Nội dung lấy từ", `knowledgePoints: [{id, code, name, learningType, skill, description}]` trong plan.md và phase 1–8; đã sửa hết chỗ mô tả luật hay contract cũ.
 - Unresolved contradictions: 0.
+
+### Session 4 — 2026-10-01 (duyệt contract PR 1)
+**Trigger:** agent code viết xong bản nháp contract (nhánh `feat/lesson-contracts`) và nêu 3 điểm mở.
+**Questions asked:** 3
+
+#### Verification Results
+- `topics` (content V1) không có cột `skill`; `DEMO_READING` có KP Reading lẫn Writing nên topic không có một skill duy nhất.
+- Phase 7: consumer tiêu lần giao bằng lần nộp hoàn thành **đầu tiên** của (`user_id`, `package_version_id`) sau `assigned_at`;
+  attempt sau không mở topic. Dò đáp án bằng attempt song song không qua được cổng; rủi ro còn lại là giao lại mã cũ khi hết mã
+  (đã chấp nhận).
+- Seed đề cuối dùng `rules = {}`; phase 4 đã ghi `expiresAt` null khi không có luật.
+
+#### Questions & Answers
+1. **[Contract]** `skill` cấp topic trong `topic-sequence`? **Answer:** bỏ; skill chỉ ở KP.
+2. **[Security]** Attempt đề cuối gắn `assignmentId`? **Answer:** không; contract ghi rõ luật "lần nộp hoàn thành đầu tiên của
+   version đã giao mới tính".
+3. **[Scope]** Giới hạn thời gian đề cuối? **Answer:** không trong MVP; `expiresAt` = null, luật tính giờ để sau.
+
+#### Impact
+- Phase 1, 3: bỏ `skill` khỏi topic trong `topic-sequence`.
+- Contract: bỏ 3 mục "Open decision"; `POST /lessons/{id}/complete` trên bài có bài tập dùng mã riêng `LESSON_HAS_EXERCISES` (409)
+  thay vì dùng lại `REQUEST_CONFLICT`.

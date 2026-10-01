@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Contract và đặc tả"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 effort: "1 ngày"
@@ -74,7 +74,7 @@ Viết contract cho mọi thay đổi HTTP/event trước khi code (AGENTS §3.3
 - Band của topic giữ nguyên.
 
 **Content nội bộ** (`learning-content-internal-v1.md`):
-- `GET /topic-sequence`: topic ACTIVE có ≥ 1 bài PUBLISHED **và** ≥ 1 gói `TOPIC_TEST` PUBLISHED, theo `sort_order`, **kèm KP** (Validation Session 2): `[{topicId, code, name, skill, sortOrder, knowledgePoints: [{id, code, name, learningType, skill, description, hasPracticeSet}]}]`; KP ACTIVE của topic, sắp theo `created_at` rồi `id`; không `answerSpec`, không band. `hasPracticeSet` = có ít nhất một gói thỏa điều kiện của `POST /practice-sets/search` (Validation Session 3). Là nguồn duy nhất để AI Learning dựng path và thứ tự học trong MVP.
+- `GET /topic-sequence`: topic ACTIVE có ≥ 1 bài PUBLISHED **và** ≥ 1 gói `TOPIC_TEST` PUBLISHED, theo `sort_order`, **kèm KP** (Validation Session 2): `[{topicId, code, name, sortOrder, knowledgePoints: [{id, code, name, learningType, skill, description, hasPracticeSet}]}]`; KP ACTIVE của topic, sắp theo `created_at` rồi `id`; không `answerSpec`, không band. `hasPracticeSet` = có ít nhất một gói thỏa điều kiện của `POST /practice-sets/search` (Validation Session 3). Là nguồn duy nhất để AI Learning dựng path và thứ tự học trong MVP.
 <!-- Updated: Validation Session 2 - topic-sequence trả kèm KP, thay get_curriculum trong luồng MVP -->
 - `GET /topics/{id}/lessons`
 - `GET /lessons/{id}`
@@ -107,9 +107,9 @@ Viết contract cho mọi thay đổi HTTP/event trước khi code (AGENTS §3.3
 
 ## Success Criteria
 
-- [ ] 4 file mới và 1 file sửa có đủ ví dụ JSON; tên trường khớp code ở phần giữ nguyên.
-- [ ] File vectors là JSON hợp lệ, ≥ 15 ca.
-- [ ] Người dùng đã duyệt contract (ghi ngày duyệt đầu `lesson-learning-v1.md`).
+- [x] 4 file mới và 1 file sửa có đủ ví dụ JSON; tên trường khớp code ở phần giữ nguyên.
+- [x] File vectors là JSON hợp lệ, ≥ 15 ca.
+- [x] Người dùng đã duyệt contract (2026-10-01, ghi đầu `lesson-learning-v1.md`).
 
 ## Risk Assessment
 
