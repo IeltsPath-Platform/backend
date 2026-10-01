@@ -244,6 +244,8 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | Consumer học chưa có automated integration test với RabbitMQ thật | Logic ack/nack/DLQ có unit test với channel giả; áp kết quả có test Postgres thật. [Live E2E 2026-10-02](../plans/260929-1640-lesson-learning-pipeline-mvp/reports/e2e-261002-foundation-learning-pipeline.md) đã kiểm outbox → broker → consumer và replay DLQ với broker thật |
 | Giá chấm Writing nằm ở hai nơi | Learning `learning.writing.point-cost` (3) cho bài luận trong bài học; assessment `grading_point_costs.WRITING` cho chấm qua `grading_jobs`. Đổi giá phải sửa cả hai |
 | Bài Writing lưu ở hai nơi | Bài luận trong bài học ở `learning_db.lesson_writing_submissions`; Writing trong đề (sau MVP) ở `assessment_db.learner_submissions` |
+| Ảnh biểu đồ Task 1 mới dùng tham chiếu media | Content nhận URL `https://` hoặc data URI ảnh Base64 và trả `mediaUrl`; chưa có luồng upload hay tích hợp object storage cho ảnh. Seed dùng SVG data URI; grader đọc `chartFacts`, không đọc ảnh |
+| Writing trong đề cuối chưa thuộc MVP | Bài luận Task 1/Task 2 chỉ ở bài học; đưa Writing vào đề cuối chờ chốt chính sách phí để tránh tạo tường phí tại cổng topic |
 | Một số ghi Writing chưa theo quy tắc khóa mọi lượt ghi theo user | Bắt đầu/kết thúc chấm có transaction và advisory lock; quota, lưu grade và lỗi trung gian dùng SQL nguyên tử có điều kiện ngoài các transaction này. Dữ kiện hiện tại, không thay quy tắc AGENTS.md §3.8 |
 | Cổng bài học là authority cho luồng học | `LessonAccessGate` kiểm review/topic/bài trước; runtime Java MVP không có tutor hay `next_objective` |
 | Sơ đồ §1 còn cạnh assessment → user từ baseline cũ | Tạo attempt hiện chỉ đọc Content; không gọi User để lấy goal (xem §3 và §6) |

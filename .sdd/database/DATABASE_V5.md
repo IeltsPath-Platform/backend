@@ -692,7 +692,12 @@ Thuộc tính chính:
 | `TRUE_FALSE_NOT_GIVEN` | NULL | `{"correct":"NOT_GIVEN"}` | Chọn đúng `TRUE`, `FALSE` hoặc `NOT_GIVEN`. |
 | `FILL_IN_BLANK`, `SHORT_ANSWER` | NULL | `{"accepted":["two decades","20 years"]}` | Khớp một đáp án sau khi bỏ phân biệt hoa thường và khoảng trắng thừa; sai chính tả là sai. |
 | `MATCHING` | Danh sách heading dùng chung | `{"correct":"iii"}` | Mỗi câu chỉ một cặp (một đoạn ↔ một heading); một câu một điểm. |
-| Bài luận Writing (Content V10–V11) | NULL | `{"type":"ESSAY","task":"TASK_2","minWords":250,"passBand":6.0}`; Task 1 thêm `chartFacts` | **Không tự chấm.** Learning Service chấm bằng LLM (§7.10); khối chứa câu này có `blockKind = ESSAY`, đúng một câu, không tính vào hoàn thành bài. |
+| Bài luận Writing (Content V10–V11) | NULL | `type = ESSAY`, `task = TASK_1 \| TASK_2`, `minWords`, `passBand`; `chartFacts` bắt buộc với `TASK_1` | **Không tự chấm.** Learning Service chấm bằng LLM (§7.10); khối chứa câu này có `blockKind = ESSAY`, đúng một câu, không tính vào hoàn thành bài. |
+
+Task 1 Academic dùng `chartFacts` không rỗng, dài 1–2.000 ký tự để mô tả số liệu và đặc điểm chính của biểu đồ;
+grader đọc dữ kiện này thay vì ảnh. `chartFacts` nằm trong `answer_spec`, không bao giờ trả cho học viên.
+Seed dùng `minWords = 150` cho `TASK_1`, `250` cho `TASK_2`; đây là yêu cầu của đề, khác giới hạn nhận bài
+50–1.000 từ ở §7.10. `passBand` phải từ 4.0 đến 9.0, bước 0.5.
 
 
 ## 5.6 `section_questions`
@@ -776,6 +781,12 @@ exactly one of:
 ```
 
 Không cho phép cả hai cùng `NULL` hoặc cùng có giá trị. Có unique constraint/index riêng cho `(section_id, asset_id)` và `(question_version_id, asset_id)` khi cột owner tương ứng không `NULL`.
+
+Ảnh biểu đồ Task 1 dùng `asset_type = IMAGE`, gắn qua `question_version_id` (không qua `section_id`).
+`content_assets.text_content` là alt text, trả thành `altText`; link `sort_order` quyết định thứ tự ảnh.
+`media_reference` của IMAGE chỉ nhận URL `https://` hoặc data URI Base64 với MIME `image/png`, `image/jpeg`,
+`image/svg+xml`. Content kiểm bằng `MediaReferencePolicy`, giữ nguyên giá trị hợp lệ trong `mediaUrl`;
+tham chiếu sai trả `INVALID_MEDIA_REFERENCE`. API học viên nhận `images[{mediaUrl, altText}]`.
 
 `topic_prerequisites` và `topic_gate_rules` **không còn trong V5**. IELTSPath không duy trì một topic-unlock engine song song; thứ tự objective, mastery gate, review và `next_objective()` thuộc DeepTutor trong `learning-service`.
 
@@ -927,7 +938,7 @@ Các từ trong một khối `VOCABULARY`. Nghĩa, ví dụ, phát âm nằm ở
 
 ## 5.16 `lesson_block_questions` (V5.1)
 
-Các câu trong một khối `EXERCISE`, theo thứ tự. Học viên nộp và được chấm theo từng khối; bài hoàn thành khi mỗi khối bài tập có một lần nộp ≥ 70%. Câu hỏi không có `lesson_id`: bài biết câu nào qua bảng này, không suy qua KP.
+Các câu trong một khối `EXERCISE`, theo thứ tự. Content phân loại thành `blockKind = EXERCISE` (tự chấm) hoặc `ESSAY` (bài luận). Học viên nộp theo từng khối; bài hoàn thành khi mỗi khối tự chấm có một lần nộp ≥ 70%, khối essay không tính vào hoàn thành bài. Câu hỏi không có `lesson_id`: bài biết câu nào qua bảng này, không suy qua KP.
 
 | Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
 | :--- | :--- | :--- | :--- |
@@ -936,7 +947,11 @@ Các câu trong một khối `EXERCISE`, theo thứ tự. Học viên nộp và 
 | `sort_order` | integer | NOT NULL | Thứ tự câu trong khối. |
 | `PK(block_id, question_version_id)` | — | INDEX(`question_version_id`) | Index để biết một câu đang được bài nào dùng. |
 
-Luật kiểm ở use case: chỉ câu tự chấm (bảng `answer_spec` ở §5.5); câu thuộc đề cuối (`TOPIC_TEST`) hoặc gói luyện tập (`PRACTICE_SET`) của cùng topic không được gắn vào khối bài tập, và ngược lại (V5.2 thêm gói luyện tập).
+Luật kiểm khi đọc bài: khối essay có đúng một câu `answer_spec.type = ESSAY`, không trộn với câu tự chấm.
+`TASK_1` cần `chartFacts` không rỗng dài 1–2.000 ký tự và ít nhất một asset `IMAGE` gắn vào version của câu (§5.9);
+thiếu dữ kiện hoặc ảnh → `INVALID_LESSON_BLOCK`. Media không hợp lệ dùng mã riêng `INVALID_MEDIA_REFERENCE`.
+Câu thuộc đề cuối (`TOPIC_TEST`) hoặc gói luyện tập (`PRACTICE_SET`) của cùng topic không được gắn vào khối bài tập,
+và ngược lại (V5.2 thêm gói luyện tập).
 
 ## 5.17 `lesson_knowledge_points` (V5.1)
 
@@ -1355,7 +1370,7 @@ không gọi LLM lần hai, nhưng chỉ trả cho học viên khi đã `GRADED`
 | `request_id` | uuid | UNIQUE | Idempotency; gửi lại chạy tiếp từ bước dang dở |
 | `essay_text` | text | NOT NULL | Không bao giờ ghi log |
 | `word_count` | int | CHECK ≥ 0 | Đếm bằng code (50–1.000 từ, ≤ 10.000 ký tự) |
-| `prompt_snapshot` | jsonb | NOT NULL | `stem, task, minWords, passBand, chartFacts, sampleAnswer, images, knowledgePointIds`; `chartFacts` không ra ngoài |
+| `prompt_snapshot` | jsonb | NOT NULL | `questionVersionId, stem, task, minWords, passBand, chartFacts, sampleAnswer, images, knowledgePointIds`; `images` chứa `{mediaUrl, altText}`; `chartFacts` không ra ngoài |
 | `status` | varchar(20) | CHECK `GRADING`, `GRADED`, `FAILED`, `PAYMENT_PENDING` | Partial UNIQUE (`user_id`, `block_id`) WHERE `GRADING` |
 | `point_cost` | int | CHECK > 0 | 3 mặc định |
 | `debit_ledger_entry_id` | uuid | NULL | Bắt buộc khi `GRADED` |
@@ -1364,6 +1379,11 @@ không gọi LLM lần hai, nhưng chỉ trả cho học viên khi đã `GRADED`
 | `overall_band` | numeric(2,1) | CHECK 0–9 | Do code tính từ 4 tiêu chí |
 | `passed` | boolean | NULL | `overall_band ≥ passBand` |
 | `grading_started_at`, `submitted_at`, `graded_at` | timestamptz | | Dòng `GRADING` quá 120 s thành `FAILED` (`GRADING_ABANDONED`) |
+
+`prompt_snapshot` lưu `EssayPrompt` tại lúc nộp; gửi lại dùng snapshot thay vì đọc lại Content.
+`result.criteria` có đúng bốn mã theo task, theo thứ tự: `TASK_1` → `TA`, `CC`, `LR`, `GRA`;
+`TASK_2` → `TR`, `CC`, `LR`, `GRA`. `TA` (Task Achievement) đối chiếu với `chartFacts`,
+`TR` là Task Response. Ảnh chỉ dùng để hiển thị đề, không gửi cho LLM.
 
 ## 7.11 `llm_daily_usage` (V2)
 
