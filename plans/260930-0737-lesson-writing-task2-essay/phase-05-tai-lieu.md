@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Tài liệu"
-status: pending
+status: completed
 priority: P3
 dependencies: [4]
 effort: "0.5 ngày"

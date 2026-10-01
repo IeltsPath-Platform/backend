@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "AI Learning: grader Task 1"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 effort: "1 ngày"

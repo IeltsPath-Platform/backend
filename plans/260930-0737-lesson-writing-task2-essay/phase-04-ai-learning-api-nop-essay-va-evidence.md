@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "AI Learning: API nộp essay và evidence"
-status: pending
+status: completed
 priority: P1
 dependencies: [2, 3]
 effort: "3 ngày"

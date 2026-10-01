@@ -1,7 +1,7 @@
 ---
 title: "Writing Task 2 trong bài học (khối essay, AI chấm, trừ point)"
 description: "Khối essay Task 2 trong bài học, không chặn học tiếp; ai-learning chấm bằng LLM ngay trong request, chấm xong mới trừ 3 point qua access; ghi evidence mastery; content không đổi schema."
-status: in-progress
+status: completed
 priority: P2
 branch: "feat/main-follow"
 tags: [feature, backend, ai-learning, access, content, writing, tdd]
@@ -46,9 +46,9 @@ Chế độ `--tdd`: mỗi phase theo trình tự test giữ hành vi cũ → s�
 |-------|------|--------|
 | 1 | [Contract va bao ve access](./phase-01-contract-va-bao-ve-access.md) | Completed (nhánh `feat/writing-access-content`; contract `lesson-writing-v1` duyệt 2026-10-01) |
 | 2 | [Content seed khoi essay](./phase-02-content-seed-khoi-essay.md) | Completed (nhánh `feat/writing-access-content`) |
-| 3 | [AI Learning grader va access client](./phase-03-ai-learning-grader-va-access-client.md) | Pending |
-| 4 | [AI Learning API nop essay va evidence](./phase-04-ai-learning-api-nop-essay-va-evidence.md) | Pending |
-| 5 | [Tai lieu](./phase-05-tai-lieu.md) | Pending |
+| 3 | [AI Learning grader va access client](./phase-03-ai-learning-grader-va-access-client.md) | Completed (learning-service Java, nhánh `feat/lesson-writing-grading`) |
+| 4 | [AI Learning API nop essay va evidence](./phase-04-ai-learning-api-nop-essay-va-evidence.md) | Completed (nhánh `feat/lesson-writing-grading`; learning-service 175 test pass) |
+| 5 | [Tai lieu](./phase-05-tai-lieu.md) | Completed (DATABASE_V5 §5.5/§7.10–7.11, system-architecture, README learning, CLAUDE.md, contract) |
 
 Thứ tự: `1 → (2 ∥ 3) → 4 → 5`. Phase 2 và 3 chạy song song được sau phase 1.
 

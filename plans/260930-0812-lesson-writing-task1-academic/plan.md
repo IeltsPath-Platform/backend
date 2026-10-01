@@ -49,7 +49,7 @@ Chế độ `--tdd`.
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | [Contract va content Task 1](./phase-01-contract-va-content-task-1.md) | Completed (nhánh `feat/writing-access-content`) |
-| 2 | [AI Learning grader Task 1](./phase-02-ai-learning-grader-task-1.md) | Pending |
+| 2 | [AI Learning grader Task 1](./phase-02-ai-learning-grader-task-1.md) | Completed (cùng grader với 0737, nhánh `feat/lesson-writing-grading`) |
 | 3 | [Tai lieu](./phase-03-tai-lieu.md) | Pending |
 
 Thứ tự: `1 → 2 → 3`. Phase 2 có thể viết grader song song với phase 1, sau khi contract được duyệt.

@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "AI Learning: grader và access client"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 effort: "1.5 ngày"
