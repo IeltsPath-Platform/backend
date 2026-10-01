@@ -1,7 +1,7 @@
 # Lesson writing API v1
 
 **Status: approved 2026-10-01.** Owner: Learning Service (`/api/learning`). Extends
-[`lesson-learning-v1.md`](lesson-learning-v1.md) with Writing Task 2 essay blocks; plan `260930-0737`.
+[`lesson-learning-v1.md`](lesson-learning-v1.md) with Writing essay blocks: Task 2 (plan `260930-0737`) and Task 1 Academic (plan `260930-0812`, added 2026-10-01).
 
 Band scores are an **estimate** produced by an LLM against the public IELTS band descriptors. They are not an official
 IELTS result.
@@ -13,7 +13,8 @@ Content marks an `EXERCISE` block that holds exactly one `ESSAY` question with `
 `lesson-learning-v1`:
 
 - `GET /lessons/{id}` returns an essay block as
-  `{blockId, blockType: "EXERCISE", blockKind: "ESSAY", sortOrder, question: {questionVersionId, stem, task, minWords, passBand}, latestSubmission, sampleAnswer?}`.
+  `{blockId, blockType: "EXERCISE", blockKind: "ESSAY", sortOrder, question: {questionVersionId, stem, task, minWords, passBand, images}, latestSubmission, sampleAnswer?}`.
+  `images` is `[{mediaUrl, altText}]` in Content `sortOrder` (empty for Task 2). Clients render it only through `<img src>`, never as inline SVG, because `mediaUrl` may be a `data:image/svg+xml` URI. `chartFacts` is never returned.
   `latestSubmission` is `{id, status, overallBand, passed}` of the learner's newest submission for the block, or `null`.
   `sampleAnswer` (the Content `explanation`) is present only after the learner has passed the block. `answerSpec` is
   never returned. Auto-graded blocks gain `blockKind: "EXERCISE"` and are otherwise unchanged.
@@ -47,7 +48,7 @@ Response 200:
 }
 ```
 
-- `criteria`: exactly `TR`, `CC`, `LR`, `GRA`; each band is 0–9 in steps of 0.5; `strengths` and `improvements` hold at
+- `criteria`: exactly `TR`, `CC`, `LR`, `GRA` for `TASK_2`, and `TA`, `CC`, `LR`, `GRA` for `TASK_1` (Task Achievement, judged against the question's `chartFacts`); each band is 0–9 in steps of 0.5; `strengths` and `improvements` hold at
   most 3 items of ≤ 300 characters.
 - `overallBand` is computed by Learning Service, not taken from the LLM: the mean of the four bands rounded to the
   nearest half band, with .25 rounding up to .5 and .75 up to the next whole band.

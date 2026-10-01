@@ -37,7 +37,10 @@ public record LessonContentResponse(
     public record Asset(UUID id, AssetType assetType, String textContent, String mediaReference,
                         Integer durationSeconds) {}
 
-    /** {@code options} is null for a fill question; {@code answerSpec} follows answer spec v1. */
+    /**
+     * {@code options} is null for a fill question; {@code answerSpec} follows answer spec v1. {@code assets} appears
+     * only on questions of an essay block.
+     */
     public record Question(
             UUID questionVersionId,
             int sortOrder,
@@ -45,8 +48,11 @@ public record LessonContentResponse(
             @JsonRawValue String options,
             @JsonRawValue String answerSpec,
             String explanation,
-            List<UUID> knowledgePointIds
+            List<UUID> knowledgePointIds,
+            @JsonInclude(JsonInclude.Include.NON_NULL) List<QuestionAsset> assets
     ) {}
+
+    public record QuestionAsset(UUID assetId, AssetType assetType, String mediaUrl, String altText, int sortOrder) {}
 
     public static LessonContentResponse from(LessonContentResult result) {
         return new LessonContentResponse(result.lessonId(), result.topicId(), result.code(), result.title(),
@@ -62,7 +68,11 @@ public record LessonContentResponse(
                 block.vocabularySenseIds(),
                 block.questions() == null ? null : block.questions().stream()
                         .map(q -> new Question(q.questionVersionId(), q.sortOrder(), q.stem(), q.optionsJson(),
-                                q.answerSpecJson(), q.explanation(), q.knowledgePointIds()))
+                                q.answerSpecJson(), q.explanation(), q.knowledgePointIds(),
+                                q.assets() == null ? null : q.assets().stream()
+                                        .map(a -> new QuestionAsset(a.assetId(), a.assetType(), a.mediaUrl(),
+                                                a.altText(), a.sortOrder()))
+                                        .toList()))
                         .toList());
     }
 }

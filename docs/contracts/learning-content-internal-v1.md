@@ -57,6 +57,8 @@ Returns `{lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds,
 
 `Question` is `{questionVersionId, sortOrder, stem, options, answerSpec, explanation, knowledgePointIds}`. `options` is the Content option array `{optionKey, content, sortOrder}[]`, or **`null` for a fill answer**. A non-null array represents a choice question, including True/False/Not Given (all three keys appear). `answerSpec` is a JSON object conforming to [answer spec v1](answer-spec-v1.md), not a JSON-encoded string.
 
+Questions in an `ESSAY` block also carry `assets: [{assetId, assetType, mediaUrl, altText, sortOrder}]` (added 2026-10-01), the images attached to the question version in `sortOrder`; questions in `EXERCISE` blocks do not have the key. `mediaUrl` is resolved by Content from the stored media reference (for `IMAGE`: an `https://` URL or a `data:image/png|jpeg|svg+xml;base64,` URI, returned unchanged; any other value fails with `INVALID_MEDIA_REFERENCE`). `altText` is the asset's text. A `TASK_1` essay must have `chartFacts` and at least one `IMAGE`, otherwise the lesson fails with `INVALID_LESSON_BLOCK`.
+
 L1 example, using its Q12 fill block and roof passage:
 
 ```json

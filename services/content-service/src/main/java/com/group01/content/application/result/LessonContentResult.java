@@ -43,12 +43,20 @@ public record LessonContentResult(
         public Block withBlockKind(LessonBlockKind kind) {
             return new Block(blockId, blockType, kind, sortOrder, textContent, asset, vocabularySenseIds, questions);
         }
+
+        public Block withQuestions(List<Question> newQuestions) {
+            return new Block(blockId, blockType, blockKind, sortOrder, textContent, asset, vocabularySenseIds,
+                    newQuestions);
+        }
     }
 
     public record Asset(UUID id, AssetType assetType, String textContent, String mediaReference,
                         Integer durationSeconds) {}
 
-    /** {@code specType} and {@code specPassBand} are read from the answer spec only to classify the block. */
+    /**
+     * {@code spec} holds the answer-spec facts used to classify the block. {@code assets} are the images attached to
+     * the question version; {@code mediaUrl} is set once the use case has checked the stored reference.
+     */
     public record Question(
             UUID questionVersionId,
             int sortOrder,
@@ -57,7 +65,19 @@ public record LessonContentResult(
             String answerSpecJson,
             String explanation,
             List<UUID> knowledgePointIds,
-            String specType,
-            String specPassBand
-    ) {}
+            LessonBlockKind.QuestionSpec spec,
+            List<QuestionAsset> assets
+    ) {
+        public Question withAssets(List<QuestionAsset> newAssets) {
+            return new Question(questionVersionId, sortOrder, stem, optionsJson, answerSpecJson, explanation,
+                    knowledgePointIds, spec, newAssets);
+        }
+    }
+
+    public record QuestionAsset(UUID assetId, AssetType assetType, String mediaReference, String mediaUrl,
+                                String altText, int sortOrder) {
+        public QuestionAsset withMediaUrl(String url) {
+            return new QuestionAsset(assetId, assetType, mediaReference, url, altText, sortOrder);
+        }
+    }
 }

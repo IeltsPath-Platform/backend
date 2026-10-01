@@ -9,6 +9,7 @@ import com.group01.content.application.result.TopicSequenceResult;
 import com.group01.content.application.result.TopicTestPackageResult;
 import com.group01.content.domain.vo.AssetType;
 import com.group01.content.domain.vo.BlockType;
+import com.group01.content.domain.vo.LessonBlockKind;
 import com.group01.content.domain.vo.LearningType;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.Skill;
@@ -190,11 +191,28 @@ public class JdbcLearningContentReader implements LearningContentReader {
                     .add(uuid(rs, "knowledge_point_id"));
         });
 
+        Map<UUID, List<LessonContentResult.QuestionAsset>> questionAssets = new LinkedHashMap<>();
+        jdbc.query("""
+                SELECT l.question_version_id, a.id, a.asset_type, a.media_reference, a.text_content, l.sort_order
+                FROM content_asset_links l
+                JOIN content_assets a ON a.id = l.asset_id
+                JOIN lesson_block_questions bq ON bq.question_version_id = l.question_version_id
+                JOIN lesson_blocks b ON b.id = bq.block_id
+                WHERE b.lesson_id = :lessonId
+                ORDER BY l.question_version_id, l.sort_order, a.id
+                """, byLesson, rs -> {
+            questionAssets.computeIfAbsent(uuid(rs, "question_version_id"), ignored -> new ArrayList<>())
+                    .add(new LessonContentResult.QuestionAsset(uuid(rs, "id"),
+                            AssetType.valueOf(rs.getString("asset_type")), rs.getString("media_reference"), null,
+                            rs.getString("text_content"), rs.getInt("sort_order")));
+        });
+
         Map<UUID, List<LessonContentResult.Question>> questionsByBlock = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT bq.block_id, bq.sort_order, qv.id, qv.stem, qv.options::text AS options,
                        qv.answer_spec::text AS answer_spec, qv.explanation,
-                       qv.answer_spec->>'type' AS spec_type, qv.answer_spec->>'passBand' AS spec_pass_band
+                       qv.answer_spec->>'type' AS spec_type, qv.answer_spec->>'task' AS spec_task,
+                       qv.answer_spec->>'passBand' AS spec_pass_band, qv.answer_spec->>'chartFacts' AS spec_chart_facts
                 FROM lesson_block_questions bq
                 JOIN lesson_blocks b ON b.id = bq.block_id
                 JOIN question_versions qv ON qv.id = bq.question_version_id
@@ -202,11 +220,15 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 ORDER BY bq.block_id, bq.sort_order
                 """, byLesson, rs -> {
             UUID versionId = uuid(rs, "id");
+            List<LessonContentResult.QuestionAsset> assets = questionAssets.getOrDefault(versionId, List.of());
             questionsByBlock.computeIfAbsent(uuid(rs, "block_id"), ignored -> new ArrayList<>())
                     .add(new LessonContentResult.Question(versionId, rs.getInt("sort_order"), rs.getString("stem"),
                             rs.getString("options"), rs.getString("answer_spec"), rs.getString("explanation"),
                             questionPoints.getOrDefault(versionId, List.of()),
-                            rs.getString("spec_type"), rs.getString("spec_pass_band")));
+                            new LessonBlockKind.QuestionSpec(rs.getString("spec_type"), rs.getString("spec_task"),
+                                    rs.getString("spec_pass_band"), rs.getString("spec_chart_facts"),
+                                    assets.stream().map(LessonContentResult.QuestionAsset::assetType).toList()),
+                            assets));
         });
 
         Map<UUID, List<UUID>> sensesByBlock = new LinkedHashMap<>();

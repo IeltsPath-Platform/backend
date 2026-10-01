@@ -76,6 +76,13 @@ public class GlobalExceptionHandler {
                 Map.of("code", "INVALID_LESSON_BLOCK"));
     }
 
+    @ExceptionHandler(InvalidMediaReferenceException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidMediaReference(InvalidMediaReferenceException ex, HttpServletRequest request) {
+        log.error("Stored media reference rejected at {}: {}", request.getRequestURI(), ex.getMessage());
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "INVALID_MEDIA_REFERENCE"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
         log.error("Unhandled exception processing request: {}", request.getRequestURI(), ex);

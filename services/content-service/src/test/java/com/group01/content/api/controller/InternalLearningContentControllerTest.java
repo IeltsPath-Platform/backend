@@ -64,7 +64,8 @@ class InternalLearningContentControllerTest {
                         null, null),
                 new LessonContentResult.Block(UUID.randomUUID(), BlockType.EXERCISE, LessonBlockKind.EXERCISE, 3, null, null, null, List.of(
                         new LessonContentResult.Question(UUID.randomUUID(), 1, "Complete ______.", null,
-                                "{\"type\":\"FILL\",\"accepted\":[\"critics\"]}", "Đoạn D.", List.of(), "FILL", null))))));
+                                "{\"type\":\"FILL\",\"accepted\":[\"critics\"]}", "Đoạn D.", List.of(),
+                                new LessonBlockKind.QuestionSpec("FILL", null, null, null, List.of()), null))))));
 
         mockMvc.perform(get("/internal/learning-content/lessons/{id}", lessonId))
                 .andExpect(status().isOk())
@@ -74,7 +75,8 @@ class InternalLearningContentControllerTest {
                 .andExpect(jsonPath("$.blocks[0].questions").doesNotExist())
                 .andExpect(jsonPath("$.blocks[0].blockKind").doesNotExist())
                 .andExpect(jsonPath("$.blocks[2].blockKind").value("EXERCISE"))
-                .andExpect(jsonPath("$.blocks[2].questions[0].specType").doesNotExist())
+                .andExpect(jsonPath("$.blocks[2].questions[0].spec").doesNotExist())
+                .andExpect(jsonPath("$.blocks[2].questions[0].assets").doesNotExist())
                 .andExpect(jsonPath("$.blocks[1].asset.assetType").value("PASSAGE"))
                 .andExpect(jsonPath("$.blocks[1].asset.mediaReference").value((Object) null))
                 .andExpect(jsonPath("$.blocks[2].textContent").doesNotExist())

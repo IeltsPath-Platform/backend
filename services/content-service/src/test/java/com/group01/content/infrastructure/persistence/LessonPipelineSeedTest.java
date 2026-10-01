@@ -8,6 +8,7 @@ import com.group01.content.application.result.PackageVersionContentResult;
 import com.group01.content.application.result.PracticeSetResult;
 import com.group01.content.application.result.TopicSequenceResult;
 import com.group01.content.application.usecase.GetLessonContentUseCase;
+import com.group01.content.domain.vo.AssetType;
 import com.group01.content.domain.vo.BlockType;
 import com.group01.content.domain.vo.LessonBlockKind;
 import com.group01.content.domain.vo.PackageType;
@@ -25,8 +26,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.nio.charset.StandardCharsets;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -160,10 +163,11 @@ class LessonPipelineSeedTest {
         assertThat(sequence).extracting(TopicSequenceResult::code).containsExactly("DEMO_READING", "TFNG_SKILLS");
         assertThat(sequence.get(0).knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::code)
                 .containsExactly("DEMO_READING_MAIN_IDEA", "DR_IDEA_OR_DETAIL", "DR_TOPIC_SENTENCE",
-                        "DR_MATCHING_HEADINGS", "DEMO_READING_W2_OPINION");
-        // Reading KPs have practice sets; the Writing KP added with the essay block has none.
+                        "DR_MATCHING_HEADINGS", "DEMO_READING_W2_OPINION",
+                        "DEMO_READING_W1_CHART");
+        // Reading KPs have practice sets; the Writing KPs added with the essay blocks have none.
         assertThat(sequence.get(0).knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::hasPracticeSet)
-                .containsExactly(true, true, true, true, false);
+                .containsExactly(true, true, true, true, false, false);
         assertThat(sequence.get(1).knowledgePoints()).singleElement()
                 .satisfies(kp -> {
                     assertThat(kp.code()).isEqualTo("TFNG_FALSE_VS_NOT_GIVEN");
@@ -248,7 +252,7 @@ class LessonPipelineSeedTest {
     }
 
     @Test
-    void everySeededExerciseBlockFollowsTheBlockRuleAndL4EndsWithTheTask2Essay() {
+    void everySeededExerciseBlockFollowsTheBlockRuleAndL3AndL4EndWithEssays() {
         GetLessonContentUseCase lessons = new GetLessonContentUseCase(reader);
         List<UUID> lessonIds = jdbc.queryForList("SELECT id FROM lessons", Map.of(), UUID.class);
         List<LessonBlockKind> kinds = new ArrayList<>();
@@ -257,7 +261,7 @@ class LessonPipelineSeedTest {
                     .filter(block -> block.blockType() == BlockType.EXERCISE)
                     .forEach(block -> kinds.add(block.blockKind()));
         }
-        assertThat(kinds).doesNotContainNull().containsOnlyOnce(LessonBlockKind.ESSAY);
+        assertThat(kinds).doesNotContainNull().filteredOn(LessonBlockKind.ESSAY::equals).hasSize(2);
 
         UUID l4 = jdbc.queryForObject("SELECT id FROM lessons WHERE code = 'L4'", Map.of(), UUID.class);
         LessonContentResult.Block essay = lessons.execute(l4).blocks().get(4);
@@ -269,6 +273,33 @@ class LessonPipelineSeedTest {
         });
     }
 
+    @Test
+    void task1EssayCarriesItsChartImageWhoseFiguresMatchTheChartFacts() throws Exception {
+        UUID l3 = jdbc.queryForObject("SELECT id FROM lessons WHERE code = 'L3'", Map.of(), UUID.class);
+        LessonContentResult.Block essay = new GetLessonContentUseCase(reader).execute(l3).blocks().get(4);
+
+        assertThat(essay.blockKind()).isEqualTo(LessonBlockKind.ESSAY);
+        LessonContentResult.Question question = essay.questions().get(0);
+        assertThat(question.knowledgePointIds()).containsExactly(kpId("DEMO_READING_W1_CHART"));
+        assertThat(question.explanation()).startsWith("The chart compares how hot three kinds of roof");
+        JsonNode spec = JSON.readTree(question.answerSpecJson());
+        assertThat(spec.get("task").asText()).isEqualTo("TASK_1");
+        assertThat(spec.get("minWords").asInt()).isEqualTo(150);
+
+        LessonContentResult.QuestionAsset chart = question.assets().get(0);
+        assertThat(question.assets()).hasSize(1);
+        assertThat(chart.assetType()).isEqualTo(AssetType.IMAGE);
+        assertThat(chart.altText()).startsWith("Bar chart of July afternoon roof temperatures");
+        String prefix = "data:image/svg+xml;base64,";
+        assertThat(chart.mediaUrl()).startsWith(prefix);
+        byte[] svg = Base64.getDecoder().decode(chart.mediaUrl().substring(prefix.length()));
+        assertThat(svg.length).isLessThanOrEqualTo(8 * 1024);
+        String drawn = new String(svg, StandardCharsets.UTF_8);
+        for (String figure : List.of("82", "45", "33", "74", "41", "30", "61", "35", "25")) {
+            assertThat(spec.get("chartFacts").asText()).contains(figure);
+            assertThat(drawn).as("chart shows " + figure).contains(">" + figure + "<");
+        }
+    }
     @Test
     void topicTestPackagesAndTheirVersionContent() {
         assertThat(reader.publishedTestPackages(DEMO_READING)).extracting(p -> p.code())
@@ -296,8 +327,8 @@ class LessonPipelineSeedTest {
     void lessonPracticeAndTestQuestionsAreReservedForLearning() {
         List<UUID> all = jdbc.queryForList("SELECT id FROM question_versions", Map.of(), UUID.class);
         Set<UUID> reserved = reader.questionVersionsReservedForLearning(all);
-        // 43 seeded reading questions, the Task 2 essay and the V4 practice-set question.
-        assertThat(reserved).hasSize(45);
+        // 43 seeded reading questions, the Task 1 and Task 2 essays and the V4 practice-set question.
+        assertThat(reserved).hasSize(46);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }
 
