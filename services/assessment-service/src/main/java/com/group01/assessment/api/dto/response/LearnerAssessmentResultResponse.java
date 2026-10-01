@@ -7,14 +7,17 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** Learner-only result. The {@code solutions} key is absent below the pass mark. */
+/** Learner-only result. Both solution keys are absent below the pass mark. */
 public record LearnerAssessmentResultResponse(UUID id, UUID attemptId, int resultVersion, String status,
                                               Instant completedAt, double score, double maxScore, double percent,
                                               List<Item> items,
-                                              @JsonInclude(JsonInclude.Include.NON_NULL) List<Solution> solutions) {
+                                              @JsonInclude(JsonInclude.Include.NON_NULL) List<Solution> solutions,
+                                              @JsonInclude(JsonInclude.Include.NON_NULL) List<SectionSolution> sectionSolutions) {
     public record Item(UUID attemptItemId, UUID questionVersionId, Boolean correct) {}
 
     public record Solution(UUID attemptItemId, UUID questionVersionId, String correctAnswer, String explanation) {}
+
+    public record SectionSolution(UUID attemptSectionId, String transcript) {}
 
     public static LearnerAssessmentResultResponse from(LearnerAssessmentResult r) {
         return new LearnerAssessmentResultResponse(r.id(), r.attemptId(), r.resultVersion(), r.status(),
@@ -23,6 +26,8 @@ public record LearnerAssessmentResultResponse(UUID id, UUID attemptId, int resul
                 r.solutions() == null ? null : r.solutions().stream()
                         .map(s -> new Solution(s.attemptItemId(), s.questionVersionId(), s.correctAnswer(),
                                 s.explanation()))
-                        .toList());
+                        .toList(),
+                r.sectionSolutions() == null ? null : r.sectionSolutions().stream()
+                        .map(s -> new SectionSolution(s.attemptSectionId(), s.transcript())).toList());
     }
 }

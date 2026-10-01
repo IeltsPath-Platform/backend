@@ -2,6 +2,7 @@ package com.group01.assessment.application.usecase;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.group01.assessment.api.dto.response.LearnerAssessmentResultResponse;
 import com.group01.assessment.application.command.SaveAttemptResponseCommand;
 import com.group01.assessment.application.command.StartAssessmentAttemptCommand;
 import com.group01.assessment.application.command.SubmitAssessmentAttemptCommand;
@@ -17,6 +18,8 @@ import com.group01.assessment.domain.vo.AttemptChannel;
 import com.group01.assessment.domain.vo.AttemptMode;
 import com.group01.assessment.domain.vo.AttemptStatus;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -73,6 +76,65 @@ class AutoGradingIntegrationTest {
     private final ObjectMapper json = new ObjectMapper();
     private final UUID userId = UUID.randomUUID();
 
+    @ParameterizedTest
+    @ValueSource(ints = {6, 7})
+    void listeningSubmitKeepsTranscriptPrivateUntilSeventyPercent(int correctCount) throws Exception {
+        UUID versionId = UUID.randomUUID();
+        UUID contentSectionId = UUID.randomUUID();
+        String transcript = "The library closes at six.";
+        List<Item> questions = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            questions.add(new Item(UUID.randomUUID(), i + 1, "Listening question",
+                    i % 2 == 0 ? List.of(new Option("B", "six", 1)) : null,
+                    i % 2 == 0 ? Q1 : Map.of("type", "FILL", "accepted", List.of("six")),
+                    "Listen for the closing time", BigDecimal.ONE,
+                    List.of(new KnowledgePointWeight(UUID.randomUUID(), BigDecimal.ONE))));
+        }
+        Section section = new Section(contentSectionId, "Library", "LISTENING", "Listen and answer", 1, null,
+                new ContentPackageProvider.Audio(UUID.randomUUID(), "https://cdn/library.mp3", 95, transcript), questions);
+        when(content.findPackageVersion(versionId)).thenReturn(Optional.of(
+                new PackageVersion(versionId, "TOPIC_TEST", List.of(section))));
+        UUID attemptId = start.execute(new StartAssessmentAttemptCommand(userId, versionId, AttemptMode.STANDARD,
+                AttemptChannel.WEB)).id();
+        UUID sectionId = jdbc.queryForObject("SELECT id FROM attempt_sections WHERE attempt_id = ?",
+                UUID.class, attemptId);
+        var snapshot = json.readTree(jdbc.queryForObject(
+                "SELECT section_snapshot::text FROM attempt_sections WHERE id = ?", String.class, sectionId));
+        assertEquals("LISTENING", snapshot.path("skill").asText());
+        assertEquals("https://cdn/library.mp3", snapshot.path("audio").path("url").asText());
+        assertEquals(95, snapshot.path("audio").path("durationSeconds").asInt());
+        assertEquals(transcript, snapshot.path("solution").path("transcript").asText());
+        assertFalse(snapshot.has("passage"));
+
+        List<UUID> items = itemIds(attemptId);
+        for (int i = 0; i < correctCount; i++) {
+            answer(attemptId, items.get(i), i % 2 == 0 ? "{\"answer\":\"B\"}" : "{\"answer\":\"six\"}");
+        }
+        submit.execute(new SubmitAssessmentAttemptCommand(userId, attemptId));
+        submit.execute(new SubmitAssessmentAttemptCommand(userId, attemptId));
+        var result = learnerResult.execute(userId, attemptId);
+        assertEquals(correctCount * 10.0, result.percent());
+        var response = json.copy().findAndRegisterModules().valueToTree(LearnerAssessmentResultResponse.from(result));
+        if (correctCount < 7) {
+            assertNull(result.solutions());
+            assertFalse(response.has("solutions"));
+            assertFalse(response.has("sectionSolutions"));
+        } else {
+            assertEquals(10, result.solutions().size());
+            assertEquals(1, response.path("sectionSolutions").size());
+            assertEquals(sectionId.toString(), response.path("sectionSolutions").get(0).path("attemptSectionId").asText());
+            assertEquals(transcript, response.path("sectionSolutions").get(0).path("transcript").asText());
+        }
+        assertEquals(1, events(attemptId).size());
+        JsonNode event = json.readTree(events(attemptId).getFirst());
+        assertTrue(event.findValues("transcript").isEmpty());
+        assertTrue(event.findValues("solution").isEmpty());
+        assertFalse(event.toString().contains(transcript));
+        assertEquals("TOPIC_GATE", event.path("data").path("assessment_type").asText());
+        assertEquals(versionId.toString(), event.path("data").path("package_version_id").asText());
+        assertEquals(10, event.path("data").path("item_results").size());
+    }
+
     @Test
     void passingSubmitCompletesVersionOneWithOneEventAndShowsSolutions() throws Exception {
         UUID versionId = UUID.randomUUID();
@@ -109,6 +171,10 @@ class AutoGradingIntegrationTest {
         assertEquals(List.of("B", "critics", "NOT_GIVEN", "A"),
                 result.solutions().stream().map(LearnerAssessmentResult.Solution::correctAnswer).toList());
         assertEquals("Explanation 4", result.solutions().get(3).explanation());
+        var readingResponse = json.copy().findAndRegisterModules()
+                .valueToTree(LearnerAssessmentResultResponse.from(result));
+        assertTrue(readingResponse.path("sectionSolutions").isArray());
+        assertEquals(0, readingResponse.path("sectionSolutions").size());
 
         // A regrade still being graded does not replace what the learner sees.
         createResult.executeForGrader(attemptId, null);
@@ -168,7 +234,7 @@ class AutoGradingIntegrationTest {
                     List.of(new KnowledgePointWeight(UUID.randomUUID(), BigDecimal.ONE))));
         }
         when(content.findPackageVersion(versionId)).thenReturn(Optional.of(new PackageVersion(versionId, packageType,
-                List.of(new Section(UUID.randomUUID(), "Section", "READING", null, 1, "Passage", items)))));
+                List.of(new Section(UUID.randomUUID(), "Section", "READING", null, 1, "Passage", null, items)))));
         return start.execute(new StartAssessmentAttemptCommand(userId, versionId, AttemptMode.STANDARD,
                 AttemptChannel.WEB)).id();
     }

@@ -20,7 +20,10 @@ public interface ContentPackageProvider {
     record PackageVersion(UUID packageVersionId, String packageType, List<Section> sections) {}
 
     record Section(UUID sectionId, String title, String skill, String instructions, int sortOrder, String passage,
-                   List<Item> items) {}
+                   Audio audio, List<Item> items) {}
+
+    /** Duration and transcript may be absent on older Content assets. */
+    record Audio(UUID assetId, String mediaUrl, Integer durationSeconds, String transcript) {}
 
     /** {@code options} is null for a fill question; {@code answerSpec} follows answer-spec v1. */
     record Item(UUID questionVersionId, int sortOrder, String stem, List<Option> options,

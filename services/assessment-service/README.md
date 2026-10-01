@@ -21,12 +21,21 @@ in one transaction:
 
 - the attempt type derived from the package type (`TOPIC_TEST`→`TOPIC_GATE`, `MOCK_TEST`→`MOCK`,
   `PLACEMENT_TEST`→`PLACEMENT`, `QUIZ`→`QUIZ`; `PRACTICE_SET` and `LESSON` → `422 PACKAGE_NOT_ATTEMPTABLE`);
-- `section_snapshot` `{title, skill, instructions, passage?}` and `question_snapshot` `{stem, options}` (no answer);
+- Reading `section_snapshot` `{title, skill, instructions, passage?}`; an audio section instead stores
+  `{title, skill, instructions, audio:{url,durationSeconds}, solution:{transcript}}`, using Content's resolved `mediaUrl`;
+- `question_snapshot` `{stem, options}` (no answer);
 - `answer_snapshot` `{answerSpec, explanation, maxScore}`, which never reaches the learner before a passing result;
 - the knowledge-point mapping (`attempt_item_knowledge_points` and `knowledge_snapshot`).
 
 None of it is re-read from Content later. MVP packages have no time limit, so `expiresAt` is null. No learning goal is
 looked up; `learning_goal_id` stays null on new attempts.
+
+The learner structure maps each section snapshot to an allowlist object `{title, skill, instructions, passage?,
+audio?:{url,durationSeconds}}`; it never returns `solution` or `transcript`. An older JSON snapshot missing `skill`
+defaults to `READING`; an unparseable snapshot produces null fields. The latest completed learner result adds
+`sectionSolutions:[{attemptSectionId,transcript}]` alongside the unchanged item `solutions` only when `percent ≥ 70`.
+Both keys are absent below 70; a passing result without section transcripts has `sectionSolutions:[]`.
+`AssessmentCompleted.v2` carries no transcript.
 
 ### Grading
 

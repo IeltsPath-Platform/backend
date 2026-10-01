@@ -1,6 +1,7 @@
 package com.group01.assessment.application.usecase;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.group01.assessment.application.result.LearnerAssessmentResult;
 import com.group01.assessment.domain.entity.AttemptItem;
 import com.group01.assessment.domain.entity.ItemResult;
@@ -8,6 +9,7 @@ import com.group01.assessment.domain.exception.AssessmentNotFoundException;
 import com.group01.assessment.domain.repository.AssessmentAttemptRepository;
 import com.group01.assessment.domain.repository.AssessmentResultRepository;
 import com.group01.assessment.domain.repository.AttemptItemRepository;
+import com.group01.assessment.domain.repository.AttemptSectionRepository;
 import com.group01.assessment.domain.repository.ItemResultRepository;
 import com.group01.assessment.domain.service.AnswerSpecGrader;
 import org.springframework.stereotype.Service;
@@ -34,16 +36,18 @@ public class GetAssessmentResultUseCase {
     private final AssessmentResultRepository results;
     private final AttemptItemRepository attemptItems;
     private final ItemResultRepository itemResults;
+    private final AttemptSectionRepository sections;
     private final ObjectMapper json;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
 
     public GetAssessmentResultUseCase(AssessmentAttemptRepository attempts, AssessmentResultRepository results,
                                       AttemptItemRepository attemptItems, ItemResultRepository itemResults,
-                                      ObjectMapper json) {
+                                      AttemptSectionRepository sections, ObjectMapper json) {
         this.attempts = attempts;
         this.results = results;
         this.attemptItems = attemptItems;
         this.itemResults = itemResults;
+        this.sections = sections;
         this.json = json;
     }
 
@@ -74,7 +78,26 @@ public class GetAssessmentResultUseCase {
 
         return new LearnerAssessmentResult(result.id(), result.attemptId(), result.resultVersion(), result.status(),
                 result.completedAt(), score.doubleValue(), maxScore.doubleValue(), percent, itemViews,
-                percent >= SOLUTIONS_PERCENT ? solutions(items) : null);
+                percent >= SOLUTIONS_PERCENT ? solutions(items) : null,
+                percent >= SOLUTIONS_PERCENT ? sectionSolutions(attemptId) : null);
+    }
+
+    private List<LearnerAssessmentResult.SectionSolution> sectionSolutions(UUID attemptId) {
+        var solutions = new ArrayList<LearnerAssessmentResult.SectionSolution>();
+        for (var section : sections.findByAttemptId(attemptId)) {
+            if (section.snapshot() == null) continue;
+            try {
+                var snapshot = json.readTree(section.snapshot());
+                if (snapshot == null) continue;
+                var transcript = snapshot.path("solution").path("transcript");
+                if (transcript.isTextual()) {
+                    solutions.add(new LearnerAssessmentResult.SectionSolution(section.id(), transcript.textValue()));
+                }
+            } catch (JsonProcessingException exception) {
+                // Older snapshots without valid JSON have no section solution.
+            }
+        }
+        return List.copyOf(solutions);
     }
 
     private List<LearnerAssessmentResult.Solution> solutions(List<AttemptItem> items) {

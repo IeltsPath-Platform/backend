@@ -1,5 +1,8 @@
 package com.group01.assessment.infrastructure.client;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import com.group01.assessment.application.exception.ContentUnavailableException;
 import com.group01.assessment.application.port.ContentPackageProvider;
 import com.sun.net.httpserver.HttpServer;
@@ -85,6 +88,11 @@ class ContentPackageClientTest {
         assertEquals("TOPIC_TEST", version.packageType());
         ContentPackageProvider.Section section = version.sections().getFirst();
         assertEquals("A. City trees.", section.passage());
+        var audio = new ObjectMapper().valueToTree(section).path("audio");
+        assertEquals("20000000-0000-4000-8000-000000000702", audio.path("assetId").asText());
+        assertEquals("https://cdn/a.mp3", audio.path("mediaUrl").asText());
+        assertEquals(60, audio.path("durationSeconds").asInt());
+        assertEquals("secret", audio.path("transcript").asText());
         ContentPackageProvider.Item choice = section.items().get(0);
         assertEquals(Map.of("type", "CHOICE", "correct", "B"), choice.answerSpec());
         assertEquals("B", choice.options().get(1).optionKey());
@@ -92,6 +100,35 @@ class ContentPackageClientTest {
         ContentPackageProvider.Item fill = section.items().get(1);
         assertNull(fill.options());
         assertEquals(List.of("critics"), fill.answerSpec().get("accepted"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{}",
+            "{\"assetId\":\"20000000-0000-4000-8000-000000000702\",\"mediaUrl\":\"\"}",
+            "{\"assetId\":\"20000000-0000-4000-8000-000000000702\",\"mediaUrl\":\"https://cdn/a.mp3\",\"durationSeconds\":-1}"
+    })
+    void rejectsMalformedAudio(String audio) {
+        body.set("""
+                {"packageVersionId":"%s","packageType":"TOPIC_TEST","sections":[{
+                  "sectionId":"20000000-0000-4000-8000-000000000701","audio":%s,"items":[]}]}
+                """.formatted(VERSION, audio));
+        assertThrows(ContentUnavailableException.class, () -> client().findPackageVersion(VERSION));
+    }
+
+    @Test
+    void acceptsSectionsWithoutAudioAndAudioWithOptionalMetadata() {
+        String section = """
+                {"sectionId":"20000000-0000-4000-8000-000000000701","items":[]%s}
+                """;
+        for (String field : List.of("", ",\"audio\":null", """
+                ,"audio":{"assetId":"20000000-0000-4000-8000-000000000702",
+                          "mediaUrl":"https://cdn/a.mp3","durationSeconds":null,"transcript":null}
+                """)) {
+            body.set("{\"packageVersionId\":\"" + VERSION + "\",\"packageType\":\"TOPIC_TEST\",\"sections\":["
+                    + section.formatted(field) + "]}");
+            assertTrue(client().findPackageVersion(VERSION).isPresent());
+        }
     }
 
     @Test

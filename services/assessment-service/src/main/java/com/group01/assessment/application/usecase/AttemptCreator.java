@@ -83,13 +83,21 @@ public class AttemptCreator {
         return AssessmentAttemptResult.from(attempt);
     }
 
-    /** {@code passage} is omitted when the section has none. */
+    /** Audio transcripts are frozen server-side, separately from the learner's audio metadata. */
     private String sectionSnapshot(ContentPackageProvider.Section section) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("title", section.title());
         snapshot.put("skill", section.skill());
         snapshot.put("instructions", section.instructions());
-        if (section.passage() != null) {
+        if (section.audio() != null) {
+            Map<String, Object> audio = new LinkedHashMap<>();
+            audio.put("url", section.audio().mediaUrl());
+            audio.put("durationSeconds", section.audio().durationSeconds());
+            snapshot.put("audio", audio);
+            Map<String, Object> solution = new LinkedHashMap<>();
+            solution.put("transcript", section.audio().transcript());
+            snapshot.put("solution", solution);
+        } else if (section.passage() != null) {
             snapshot.put("passage", section.passage());
         }
         return write(snapshot);

@@ -1,5 +1,6 @@
 package com.group01.assessment.api.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.group01.assessment.api.dto.request.SaveAttemptResponseRequest;
 import com.group01.assessment.api.dto.request.StartAssessmentAttemptRequest;
 import com.group01.assessment.api.dto.response.AssessmentAttemptResponse;
@@ -35,6 +36,7 @@ import java.util.UUID;
 public class AssessmentAttemptController {
 
     private final CurrentUserProvider currentUser;
+    private final ObjectMapper json;
     private final StartAssessmentAttemptUseCase startAssessmentAttemptUseCase;
     private final GetAssessmentAttemptUseCase getAssessmentAttemptUseCase;
     private final GetAttemptStructureUseCase getAttemptStructureUseCase;
@@ -63,7 +65,7 @@ public class AssessmentAttemptController {
 
     @GetMapping("/{id}/structure")
     public AttemptStructureResponse structure(@PathVariable("id") UUID id) {
-        return AttemptStructureResponse.from(getAttemptStructureUseCase.execute(currentUser.requireUserId(), id));
+        return AttemptStructureResponse.from(getAttemptStructureUseCase.execute(currentUser.requireUserId(), id), json);
     }
 
     @PostMapping("/{id}/submit")

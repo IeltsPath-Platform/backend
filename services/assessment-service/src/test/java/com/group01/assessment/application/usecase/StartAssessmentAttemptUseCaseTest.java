@@ -130,7 +130,7 @@ class StartAssessmentAttemptUseCaseTest {
                 Map.of("type", "CHOICE", "correct", "B"), "All three paragraphs describe benefits.", BigDecimal.ONE,
                 List.of(new KnowledgePointWeight(knowledgePointId, BigDecimal.ONE)));
         return new PackageVersion(versionId, type, List.of(new Section(UUID.randomUUID(), "Street trees", "READING",
-                null, 1, passage, List.of(item))));
+                null, 1, passage, null, List.of(item))));
     }
 
     private StartAssessmentAttemptUseCase useCase() {

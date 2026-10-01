@@ -63,8 +63,17 @@ public class ContentPackageClient implements ContentPackageProvider {
             throw invalid();
         }
         return new Section(section.sectionId(), section.title(), section.skill(), section.instructions(),
-                section.sortOrder(), section.passage(),
+                section.sortOrder(), section.passage(), toAudio(section.audio()),
                 section.items().stream().map(ContentPackageClient::toItem).toList());
+    }
+
+    private static Audio toAudio(AudioResponse audio) {
+        if (audio == null) return null;
+        if (audio.assetId() == null || audio.mediaUrl() == null || audio.mediaUrl().isBlank()
+                || (audio.durationSeconds() != null && audio.durationSeconds() < 0)) {
+            throw invalid();
+        }
+        return new Audio(audio.assetId(), audio.mediaUrl(), audio.durationSeconds(), audio.transcript());
     }
 
     private static Item toItem(ItemResponse item) {
@@ -96,7 +105,10 @@ public class ContentPackageClient implements ContentPackageProvider {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record SectionResponse(UUID sectionId, String title, String skill, String instructions, int sortOrder,
-                                   String passage, List<ItemResponse> items) {}
+                                   String passage, AudioResponse audio, List<ItemResponse> items) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record AudioResponse(UUID assetId, String mediaUrl, Integer durationSeconds, String transcript) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record ItemResponse(UUID questionVersionId, int sortOrder, String stem, List<OptionResponse> options,
