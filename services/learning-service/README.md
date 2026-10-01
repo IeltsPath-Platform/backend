@@ -62,9 +62,20 @@ minimum words, pass band and images, never count toward completion and reject ex
 submissions with `409 ESSAY_BLOCK`. Media assets expose `mediaUrl`; an audio transcript
 appears only once the lesson is completed.
 
-Question objects contain only `questionVersionId`, `sortOrder`, `stem`, `options`.
+Question objects contain only `questionVersionId`, `sortOrder`, `stem`, `options`, `hint`.
 `options: null` represents a fill answer. `answerSpec` and KP mappings are never
 returned to learners; solutions and explanations appear only after a block passes.
+
+Content V13 supplies nullable Reading hints through the internal lesson response.
+Learning opens a hint only for a valid auto-gradable `FILL`, or a valid `CHOICE` with at least
+three options; TFNG also works with absent/empty options. Two-choice questions and
+essays receive no hint. A question that was wrong in any submission for the same
+user, lesson and block keeps its hint while that block has not passed, including a
+later correct answer in a failed block. New responses for a passed block have
+`hint: null` for every question. Lesson GET questions and exercise POST results
+always include the `hint` key, with `null` when hidden or unavailable. Review
+questions/results reuse these DTOs with `hint: null`; Content package and game
+responses do not supply hints, so practice packages and final assessments receive none.
 
 ## Submission, mastery and review state
 
@@ -72,11 +83,15 @@ Submissions require a UUID `requestId` and exactly one answer per block question
 Missing, duplicate or foreign question ids return `422 INVALID_ANSWERS`; unsupported
 answer specs return `422 UNGRADABLE_EXERCISE`. A block passes at 70% correct or more.
 Reuse of a request id within the same user, lesson and block returns its saved
-response; reuse in another scope returns `409 REQUEST_CONFLICT`. Reattempts use a
-new request id and resubmit the whole block.
+response, including its original hints even if the block has since passed; reuse
+in another scope returns `409 REQUEST_CONFLICT`. Reattempts use a new request id
+and resubmit the whole block.
 
 Only the first submission for a user and block writes `lesson_exercise` evidence,
 including wrong answers. Later attempts can pass the block without adding evidence.
+Hint history separately reads wrong entries from every saved `response.results`,
+scoped by user and lesson and grouped by block; it needs no new Learning migration
+or `hints_used` field and does not change mastery.
 Progress, evidence, submission response and reviews are committed in one transaction,
 serialized by a PostgreSQL transaction-scoped advisory lock for the user.
 

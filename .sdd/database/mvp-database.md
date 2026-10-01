@@ -88,9 +88,11 @@ Request lặp tiếp tục bước còn dang dở; grade chỉ được lộ khi
 
 Content V12 seed audio; `media_reference` là key hoặc https, Content ghép key với `CONTENT_MEDIA_BASE_URL` và trả `mediaUrl`. File mp3 upload riêng theo [bảng key](../../services/content-service/README.md#media), không lưu binary trong DB. Transcript chỉ hiện khi bài xong, review set đạt ≥70%, hoặc result Assessment đạt ≥70%. Dùng lại progress, submissions, review và assignments ở V1.
 
-### Reading hints còn pending ở learner flow
+### Reading hints đã triển khai, không thêm schema Learning
 
-Content V13 đã thêm `question_versions.hint`; learner question DTO/flow hiện chưa trả hint theo lịch sử câu sai. Không thêm `hints_used` vào `kp_evidence`.
+Content V13 thêm `question_versions.hint` nullable và seed gợi ý Reading; API thêm version giới hạn 500 ký tự. Content trả hint qua lesson nội bộ, Learning Java quyết định hiển thị: answer spec hợp lệ `FILL` hoặc `CHOICE` có ≥3 lựa chọn (TFNG hỗ trợ options thiếu/rỗng), câu từng sai trong cùng user/bài/khối chưa đạt. Gợi ý giữ cả khi lần sau câu đúng nhưng khối vẫn trượt; khối đạt thì mọi hint null. GET câu hỏi và POST results luôn có khóa `hint`; DTO dùng chung cho review luôn null, package/đề cuối/game không cấp gợi ý.
+
+Lịch sử câu sai đọc từ `lesson_exercise_submissions.response.results` của mọi lần nộp; dùng index (`user_id`, `lesson_id`, `block_id`) đã có ở V1, không lưu cột trạng thái riêng. Replay `requestId` trả nguyên response đã lưu, kể cả hint cũ sau khi khối đạt. Evidence/mastery vẫn dùng lần nộp đầu; không thêm `hints_used` vào `kp_evidence`. Xem [contract bài học](../../docs/contracts/lesson-learning-v1.md).
 
 ## Nguồn đã đối chiếu
 

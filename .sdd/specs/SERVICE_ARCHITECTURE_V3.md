@@ -258,6 +258,15 @@ content_assets AUDIO (V3, bổ sung 2026-09-30)
 = text_content là transcript = đáp án; chỉ đi qua /internal/learning-content/*;
   GET /api/content/assets/{id} chỉ ADMIN, CONTENT_AUTHOR
 
+question_versions.hint (Content V13; learner flow triển khai 2026-10-02)
+= Content lưu gợi ý không chứa đáp án, tối đa 500 ký tự qua API thêm version;
+  trả qua /internal/learning-content/lessons/{id}, không trả trong package/game
+= Learning Service Java quyết định hiển thị: FILL hoặc CHOICE hợp lệ có ≥3 lựa chọn
+  (TFNG hỗ trợ options thiếu/rỗng), câu từng sai trong cùng user/bài/khối chưa đạt;
+  giữ cả khi câu đúng ở lần sau nhưng khối vẫn trượt, khối đạt thì hint = null
+= lịch sử từ mọi lesson_exercise_submissions.response.results; không thêm schema
+  Learning, không ghi hints_used và không đổi luật evidence/mastery lần nộp đầu
+
 question_versions.difficulty
 = chọn gói luyện theo độ khó hoãn ngoài MVP (2026-10-01); gói luyện không gắn độ khó
 ```
