@@ -52,11 +52,6 @@ spring:
               predicates:
                 - Path=/api/access/**
 
-            - id: library-service
-              uri: lb://LIBRARY-SERVICE
-              predicates:
-                - Path=/api/content/videos/**,/api/content/vocabulary/**,/api/content/admin/vocabulary/**
-
             - id: content-service
               uri: lb://CONTENT-SERVICE
               predicates:
@@ -67,15 +62,10 @@ spring:
               predicates:
                 - Path=/api/assessments/**
 
-            - id: library-personal-service
-              uri: lb://LIBRARY-SERVICE
+            - id: learning-support-service
+              uri: lb://LEARNING-SUPPORT-SERVICE
               predicates:
-                - Path=/api/learning-support/flashcards/**,/api/learning-support/decks/**,/api/learning-support/notes/**,/api/learning-support/video-progress/**,/api/learning-support/saved-segments/**
-
-            - id: user-activity-streak-service
-              uri: lb://USER-SERVICE
-              predicates:
-                - Path=/api/learning-support/activities/**,/api/learning-support/streak/**
+                - Path=/api/learning-support/**
 
             - id: game-service
               uri: lb://GAME-SERVICE
@@ -97,10 +87,10 @@ spring:
               predicates:
                 - Path=/api/community/**
 
-            - id: learning-service
-              uri: lb://learning-service
+            - id: ai-learning-service
+              uri: ${AI_LEARNING_SERVICE_URI:http://localhost:8000}
               predicates:
-                - Path=/api/learning/**
+                - Path=/api/ai-learning/**
 
 app:
   auth:
@@ -121,7 +111,7 @@ app:
       - /api/games
       - /api/notifications
       - /api/community
-      - /api/learning
+      - /api/ai-learning
 
     frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
 

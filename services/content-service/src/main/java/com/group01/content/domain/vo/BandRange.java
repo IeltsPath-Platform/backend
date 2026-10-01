@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 /**
- * An IELTS band range a topic is meant for. Either end may be open; an unbounded range means
+ * An IELTS band range a topic or knowledge point is meant for. Either end may be open; an unbounded range means
  * "every band". Values are 0.0-9.0 in half-band steps.
  */
 public record BandRange(BigDecimal min, BigDecimal max) {
@@ -28,6 +28,14 @@ public record BandRange(BigDecimal min, BigDecimal max) {
 
     public boolean isUnbounded() {
         return min == null && max == null;
+    }
+
+    /**
+     * The band that applies to a knowledge point: its own range when it has one, otherwise its topic's. An own
+     * range replaces the topic's as a whole, so an override can never combine into an inverted range.
+     */
+    public BandRange orInherit(BandRange topicBand) {
+        return isUnbounded() ? topicBand : this;
     }
 
     /** Validates a band and fixes its scale to one decimal, so 5, 5.0 and 5.00 are the same value. */

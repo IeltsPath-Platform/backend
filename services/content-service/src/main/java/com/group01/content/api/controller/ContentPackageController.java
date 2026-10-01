@@ -21,7 +21,6 @@ import com.group01.content.domain.vo.PublicationStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -40,7 +39,6 @@ public class ContentPackageController {
     private final PublishContentPackageUseCase publishContentPackageUseCase;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public List<ContentPackageResponse> listPackages(
             @RequestParam(value = "accessLevel", required = false) AccessLevel accessLevel,
             @RequestParam(value = "status", required = false) PublicationStatus status
@@ -53,7 +51,6 @@ public class ContentPackageController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public ContentPackageDetailResponse getPackageDetail(@PathVariable("id") UUID id) {
         ContentPackageDetailResult result = getContentPackageDetailUseCase.execute(id);
         return ContentPackageDetailResponse.from(result);
@@ -61,7 +58,6 @@ public class ContentPackageController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public ContentPackageResponse createPackage(@Valid @RequestBody CreateContentPackageRequest request) {
         ContentPackageResult result = createContentPackageUseCase.execute(new CreateContentPackageCommand(
                 request.code(),
@@ -74,7 +70,6 @@ public class ContentPackageController {
 
     @PostMapping("/{id}/versions")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public ContentPackageResponse addVersion(
             @PathVariable("id") UUID id,
             @Valid @RequestBody AddPackageVersionRequest request
@@ -89,7 +84,6 @@ public class ContentPackageController {
 
     @PostMapping("/versions/{versionId}/sections")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public ContentSectionResponse addSection(
             @PathVariable("versionId") UUID versionId,
             @Valid @RequestBody AddContentSectionRequest request
@@ -106,7 +100,6 @@ public class ContentPackageController {
     }
 
     @PostMapping("/{id}/publish")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public ContentPackageResponse publishPackage(
             @PathVariable("id") UUID id,
             @Valid @RequestBody PublishPackageRequest request

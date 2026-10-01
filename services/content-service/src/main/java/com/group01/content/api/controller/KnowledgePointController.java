@@ -1,5 +1,6 @@
 package com.group01.content.api.controller;
 
+import com.group01.content.domain.vo.BandRange;
 import com.group01.content.api.dto.request.CreateKnowledgePointRequest;
 import com.group01.content.api.dto.response.KnowledgePointResponse;
 import com.group01.content.application.command.CreateKnowledgePointCommand;
@@ -9,7 +10,6 @@ import com.group01.content.application.usecase.GetKnowledgePointsUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,7 +34,6 @@ public class KnowledgePointController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public KnowledgePointResponse createKnowledgePoint(@Valid @RequestBody CreateKnowledgePointRequest request) {
         KnowledgePointResult result = createKnowledgePointUseCase.execute(new CreateKnowledgePointCommand(
                 request.topicId(),
@@ -43,7 +42,8 @@ public class KnowledgePointController {
                 request.kind(),
                 request.learningType(),
                 request.skill(),
-                request.description()
+                request.description(),
+                BandRange.of(request.bandMin(), request.bandMax())
         ));
         return KnowledgePointResponse.from(result);
     }

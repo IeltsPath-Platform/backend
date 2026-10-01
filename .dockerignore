@@ -6,7 +6,7 @@
 .codex
 .codex-tmp
 .env
-**/deeptutor-data
+services/ai-learning-service/deeptutor-data
 third_party
 **/.venv
 .env.*

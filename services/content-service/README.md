@@ -1,14 +1,8 @@
 # Content Service
 
-Content Service owns the IELTS curriculum: topics, knowledge points (KPs), the question bank, content packages,
-reading content and assets. It is a Spring MVC downstream service on port `8082`, reached through the Gateway at
-`/api/content/**` except the vocabulary and video paths routed to Library Service. Schema migrations live in
-`src/main/resources/db/migration`.
-
-Library Service owns the five vocabulary/video catalog tables. Content V7 drops those tables; run that destructive
-migration only in Testcontainers until its use on a shared `content_db` is approved. Library checks a video's topic
-through `GET /api/content/topics/{id}`. Content implements `POST /internal/game-content/snapshots` only for `GRAMMAR`;
-Library implements the same [snapshot contract](../../docs/contracts/game-content-snapshot-v1.md) for `VOCABULARY`.
+Content Service owns the canonical IELTS curriculum: topics, knowledge points (KPs), the question bank, content
+packages, vocabulary and learning videos. It is a Spring MVC downstream service on port `8082`, reached through the
+Gateway at `/api/content/**`. Schema migrations live in `src/main/resources/db/migration`.
 
 ## Band ranges
 
@@ -34,5 +28,5 @@ Rules:
 mvn -pl services/content-service -am test
 ```
 
-The Testcontainers migration tests (including `CatalogRemovalMigrationTest`) are skipped
+The Testcontainers migration tests (`KnowledgePointLearningTypeMigrationTest`, `BandRangeMigrationTest`) are skipped
 when Docker is unavailable.

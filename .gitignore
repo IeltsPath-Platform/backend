@@ -50,7 +50,8 @@ context
 payload.json
 
 .env
-**/deeptutor-data/
+# Legacy local runtime folder from the DeepTutor catalog setup; it may still hold a provider key.
+services/ai-learning-service/deeptutor-data/
 .codex-tmp/
 .m2-test-repository/
 

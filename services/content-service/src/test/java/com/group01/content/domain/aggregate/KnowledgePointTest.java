@@ -23,7 +23,7 @@ class KnowledgePointTest {
         KnowledgePoint knowledgePoint = new KnowledgePoint(
                 UUID.randomUUID(), UUID.randomUUID(), "KP-LEGACY", "Legacy",
                 KnowledgePointKind.VOCABULARY, null, null, null,
-                com.group01.content.domain.vo.ContentStatus.INACTIVE, null, null
+                com.group01.content.domain.vo.ContentStatus.INACTIVE, null, null, null
         );
 
         assertEquals(com.group01.content.domain.vo.ContentStatus.INACTIVE, knowledgePoint.getStatus());

@@ -12,7 +12,6 @@ import com.group01.content.application.usecase.LinkAssetUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -34,7 +33,6 @@ public class ContentAssetController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public ContentAssetResponse createAsset(@Valid @RequestBody CreateContentAssetRequest request) {
         ContentAssetResult result = createContentAssetUseCase.execute(new CreateContentAssetCommand(
                 request.assetType(),
@@ -48,7 +46,6 @@ public class ContentAssetController {
 
     @PostMapping("/links")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public void linkAsset(@Valid @RequestBody LinkAssetRequest request) {
         linkAssetUseCase.execute(new LinkAssetCommand(
                 request.assetId(),

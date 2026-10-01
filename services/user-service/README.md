@@ -1,6 +1,6 @@
 # User Service
 
-`user-service` quản lý người dùng, đăng nhập, refresh token, phát hành external JWT và lưu activity/streak của học viên.
+`user-service` quản lý người dùng, đăng nhập, refresh token và phát hành external JWT cho client.
 
 ## Vai trò
 
@@ -10,7 +10,6 @@
 - Lưu refresh token dạng hash trong database.
 - Verify internal JWT do API Gateway ký khi nhận request protected.
 - Cung cấp API quản lý user/role cho `ADMIN`.
-- Ghi `learning_activities`, đọc streak theo cùng public path `/api/learning-support/{activities,streak}`; Gateway route hai nhóm này tới user-service.
 
 ## Luồng đăng nhập
 
@@ -95,7 +94,6 @@ Migration chính:
 
 ```text
 src/main/resources/db/migration/V1__create_user_tables.sql
-src/main/resources/db/migration/V5__create_learning_activity_and_streak_tables.sql
 ```
 
 Các bảng chính:
@@ -105,12 +103,7 @@ users
 roles
 user_roles
 refresh_tokens
-learning_activities
-streaks
 ```
-
-V5 tạo hai bảng activity/streak trong `user_db`; `user_id` là ID logic, không có FK tới `users`. `GlobalExceptionHandler`
-phân nhánh theo path `/api/learning-support/` để giữ định dạng lỗi của các endpoint cũ.
 
 ## Cấu hình quan trọng
 
@@ -137,11 +130,8 @@ GET  /api/users
 GET  /api/users/{id}
 PUT  /api/users/{id}
 PUT  /api/users/{id}/roles
-PUT  /api/users/{id}/status
+PATCH /api/users/{id}/status
 DELETE /api/users/{id}
-POST /api/learning-support/activities
-GET  /api/learning-support/activities
-GET  /api/learning-support/streak
 ```
 
 ## Chạy local
