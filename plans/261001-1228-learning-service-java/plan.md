@@ -1,9 +1,9 @@
 ---
 title: "Thay ai-learning (Python) bằng learning-service (Java), chỉ giữ tính năng MVP"
 description: "Xóa service Python, dựng learning-service Spring Boot (port 8086, route /api/learning/**) làm path theo user, bài học, bài ôn, giao mã đề, consumer kết quả đề và API xem mastery; tutor, practice, learner memory, sắp path bằng LLM bị bỏ."
-status: pending
+status: in-progress
 priority: P1
-branch: "feat/main-follow"
+branch: "feat/learning-service-skeleton"
 tags: [learning-service, java, mvp, ai-learning-removal, lesson, mastery]
 blockedBy: []
 blocks: [260929-1640-lesson-learning-pipeline-mvp, 260930-0737-lesson-writing-task2-essay, 260930-0812-lesson-writing-task1-academic, 260930-0851-listening-topic-audio-lessons, 260930-1006-reading-question-hints]
@@ -54,11 +54,16 @@ Vì bằng chứng gắn user, consumer **không cần path**: không có bảng
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Xóa Python, dựng khung learning-service](./phase-01-xoa-python-dung-khung.md) | Pending |
+| 1 | [Xóa Python, dựng khung learning-service](./phase-01-xoa-python-dung-khung.md) | Done |
 | 2 | [Thứ tự học, bài học, nộp bài, cổng, mastery](./phase-02-bai-hoc-va-mastery.md) | Pending |
 | 3 | [Bài ôn và giao mã đề](./phase-03-bai-on-va-ma-de.md) | Pending |
 | 4 | [Consumer AssessmentCompleted.v2](./phase-04-consumer-ket-qua-de.md) | Pending |
 | 5 | [Tài liệu repo](./phase-05-tai-lieu-va-plan-con.md) (plan con đã đồng bộ 2026-10-01) | Pending |
+
+Tiến độ ngày 2026-10-01: **1/5 phase hoàn tất (20%)**. Phase 1 đã hoàn tất phạm vi code trên nhánh
+`feat/learning-service-skeleton`; Maven test và compile pass. `docker compose config --quiet` còn cần người dùng thêm
+`LEARNING_DB_PASSWORD` vào `.env`; chưa được ghi nhận pass. Chi tiết kiểm chứng và tài liệu còn chờ phase 5:
+[`learning-service-skeleton-verification.md`](./reports/learning-service-skeleton-verification.md).
 
 Thứ tự: 1 → 2 → 3 → 4 → 5. Sau phase 4 mới làm phase 4 của 1640 (assessment tự chấm, phát event không goal, có
 `package_version_id`; người dùng chốt làm tuần tự), rồi E2E.

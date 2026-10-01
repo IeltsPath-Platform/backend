@@ -1,10 +1,10 @@
 # AssessmentCompleted.v2
 
-Integration contract between Assessment Service (producer) and AI Learning
-Service (consumer). Assessment Service is the formal grading authority; DeepTutor,
-inside AI Learning, is the only adaptive engine (mastery, repetition, review queue,
-next objective). **The nullable-goal and package-version contract changes were approved
-2026-10-01; the current producer and consumer still use the earlier contract until implementation.**
+Integration contract between Assessment Service (producer) and the Java Learning
+Service (consumer). Assessment Service owns formal grading; Learning Service stores
+per-user mastery evidence, reviews and topic progress. **The nullable-goal and
+package-version changes were approved 2026-10-01; the consumer and producer updates
+are deployed in that order. The service skeleton does not yet consume events.**
 
 ## When it is emitted
 
@@ -44,7 +44,7 @@ OutboxRelay                                                     committed row ->
 | Field | Type | Notes |
 | --- | --- | --- |
 | `user_id` | UUID | Learner. |
-| `learning_goal_id` | UUID or null; key may be absent on older events | The new producer always sends `null`. The consumer accepts `null` or a missing key and locates the path by `user_id`; a legacy non-null value is retained as metadata but does not select a path. |
+| `learning_goal_id` | UUID or null; key may be absent on older events | The new producer always sends `null`. The consumer accepts `null` or a missing key and scopes processing by `user_id`; a legacy non-null value is ignored for learner selection. |
 | `package_version_id` | UUID; key may be absent on older events | The new producer always sends the Content package version used to create the attempt. The consumer tolerates a missing key and skips package-specific topic handling; it does **not** DLQ solely for absence. |
 | `attempt_id` | UUID | Regrade lineage: every version of one attempt's result shares it. |
 | `result_id` | UUID | The versioned result row (a new id for each version). |
@@ -69,10 +69,10 @@ Each `knowledge_point_mappings[]` entry:
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `knowledge_point_id` | UUID | Content `knowledge_points.id` = DeepTutor `KnowledgePoint.id`. `KP.code` is never identity. |
+| `knowledge_point_id` | UUID | Content `knowledge_points.id`. `KP.code` is never identity. |
 | `weight` | number >= 0 | Attribution metadata only. It does not scale mastery, evidence quality or scheduling, and every mapped KP receives its own evidence. |
 | `qualitative_judgment` | `PASS`, `FAIL`, `NOT_ASSESSED` or null | Explicit per-KP grader outcome. |
-| `error_type` | string or null | Assessment error analysis. Only DeepTutor categories (`structural`, `deviation`, `application`, `metacognitive`) are used. |
+| `error_type` | string or null | Assessment error-analysis metadata. Legacy categories (`structural`, `deviation`, `application`, `metacognitive`) are retained for compatibility. |
 
 The event carries no correct answers, expected answers or examiner reasoning.
 
@@ -94,69 +94,59 @@ The example shows Q15 only; the actual X1 result contains Q2, Q14, Q15 and Q16. 
 | --- | --- | --- |
 | Topic exchange (durable) | `assessment.events` | Assessment Service |
 | Routing key | `assessment.completed.v2` | Assessment Service |
-| Main queue | `ai-learning.assessment-completed.v2` (dead-letters to the retry exchange) | AI Learning |
-| Retry exchange and queue | `ai-learning.assessment-completed.retry` / `ai-learning.assessment-completed.v2.retry` (TTL `AI_LEARNING_RETRY_DELAY_MS`, default 30 s, then back to the main queue) | AI Learning |
-| Dead-letter exchange and queue | `ai-learning.assessment-completed.dlx` / `ai-learning.assessment-completed.v2.dlq` | AI Learning |
+| Main queue | `learning.assessment-completed.v2` (dead-letters to the retry exchange) | Learning Service |
+| Retry exchange and queue | `learning.assessment-completed.retry` / `learning.assessment-completed.v2.retry` (TTL `LEARNING_RETRY_DELAY_MS`, default 30 s, then back to the main queue) | Learning Service |
+| Dead-letter exchange and queue | `learning.assessment-completed.dlx` / `learning.assessment-completed.v2.dlq` | Learning Service |
 
 Consumer delivery rules:
 
-- ACK only after the path's PostgreSQL transaction commits.
-- No path yet for `user_id`: the event is parked in
-  `pending_formal_assessment_results` (keyed by `event_id`, so a redelivery keeps one
-  row) and ACKed. It is not retried and never reaches the DLQ. See below.
+- ACK only after the user's PostgreSQL transaction commits, including evidence,
+  topic/review changes and the processed result version.
+- Evidence can be applied before the learner first calls the API. There is no
+  pending-results table or dependency on creating learner aggregate state.
 - Transient failure: NACK without requeue, so the message waits in the retry queue.
-- After `AI_LEARNING_MAX_DELIVERY_ATTEMPTS` failures (default 5), or on any contract
-  violation, the message is published to the DLQ with an `x-ai-learning-failure`
-  header and the original is ACKed. If the DLQ publish fails, the message is retried
-  instead of being dropped.
+- After `LEARNING_MAX_DELIVERY_ATTEMPTS` failures (default 5), or on a contract
+  violation, publish to the DLQ with an `x-learning-failure` header and ACK the original.
+  If the DLQ publish fails, retry the original instead of dropping it.
+- The consumer makes no HTTP calls. Review eligibility comes from
+  `knowledge_point_catalog.has_practice_set` and completed `lesson_progress`.
 
 ## Consumer idempotency and regrades
 
-- Evidence identity: `source_reference_id = UUIDv5(6f0c1b2e-3d7a-4e59-9b8a-2c4d5e6f7a81,
-  "{result_id}:{result_version}:{item_result_id}:{knowledge_point_id}")`, using canonical
-  lower-case UUIDs and a decimal version.
-- `formal_assessment_result_versions(path_id, attempt_id)` records the applied version.
-  It is read and advanced under the `mastery_paths` row lock, and its upsert only
-  accepts a higher version.
+- Processing identity is `(user_id, attempt_id, result_version)`.
+  `assessment_result_versions` has primary key `(user_id, attempt_id)` and stores the
+  latest applied version. Read and advance it in the same transaction as all other
+  writes, serialized by a transaction-scoped advisory lock for the user.
   - Same version: duplicate, no effect.
   - Lower version: stale, ignored.
-  - Higher version: accepted. The attempt's earlier formal outcomes are removed from
-    the aggregate and the affected knowledge points are rebuilt with DeepTutor's
-    `calculate_mastery` and `scheduler.replay`, then the new version is applied.
-- `UNIQUE (path_id, source, source_reference_id)` on `mastery_learning_evidence` is the
-  database backstop against a duplicated outcome.
+  - Higher version: accepted. Remove only the earlier `kp_evidence` rows with
+    `source=assessment` for that user and attempt, then apply the new version.
+    Lesson and review evidence stays intact. Mastery uses the remaining evidence
+    ordered by `created_at, id`.
+- Evidence identity remains
+  `source_reference_id = UUIDv5(6f0c1b2e-3d7a-4e59-9b8a-2c4d5e6f7a81, "{result_id}:{result_version}:{item_result_id}:{knowledge_point_id}")`,
+  using canonical lower-case UUIDs and a decimal version.
+  `UNIQUE (user_id, source, source_reference_id)` on `kp_evidence` prevents duplicated outcomes.
 - The consumer applies the `TOPIC_GATE` assignment rule above by learner and package
-  version. Later completed attempts of the same version still pass through evidence
-  and review processing, while the topic transition remains one-way.
-
-`PLACEMENT` records only the processed result version. It writes no mastery evidence and performs no test-out.
-
-## Results that arrive before the learning path
-
-The consumer cannot create a path: that needs the learner's token to read the
-curriculum. A result for a user whose path does not exist yet is parked. Path creation
-or loading an existing path applies pending results for the user; learner `GET /topics`
-also refreshes the path.
-
-- Parking and path creation both take a transaction-scoped advisory lock keyed by
-  `user_id`. Either the row is parked before
-  the path commits, and creation applies it, or parking sees the committed path and
-  applies the result normally.
-- The transaction that creates or loads the path applies every parked result of that
-  `user_id` in `(attempt_id, result_version)` order through the same
-  pipeline and ledger as a live event, deletes them, and commits path, curriculum and
-  results as one revision. Only the latest version of an attempt remains in effect.
-- A legacy non-null `learning_goal_id` does not prevent applying a result to the user's
-  one path; results belonging to another user are never applied.
-- A parked payload that no longer parses stays parked, is logged, and does not block
-  the path. Rows are kept until the path is created; there is no expiry yet.
-- If applying a parked result fails, the whole path creation rolls back (no partial
-  state) and the request fails, with 503 when the database is unavailable; the next
-  request retries it.
+  version. Later completed attempts of that version still contribute evidence and
+  review evaluation. Topic `PASSED` is one-way; a regrade does not revoke it or
+  consume another assignment.
+- `PLACEMENT` records only the processed result version. It writes no mastery evidence.
 
 ## Rollout and DLQ replay
 
-1. Deploy AI Learning's consumer/adapter accepting `learning_goal_id` as null or missing and `package_version_id` as optional **before** deploying Assessment's new producer. Also deploy the one-path-per-user pending lookup before allowing goal-less results. An old consumer treats a goal-less event as a contract violation and can send it to `ai-learning.assessment-completed.v2.dlq`.
-2. Pause the Assessment outbox relay or producer while recovering from a mixed-version rollout. Inspect the DLQ count and the `x-ai-learning-failure` header without logging payload answers or tokens. Confirm the new consumer and path schema are healthy, then resume normal publication.
-3. For each DLQ message caused by the old consumer's nullable-goal rejection, preserve the **original body, `event_id`, AMQP `message_id`, `event_type`, and `result_version`** and republish to `assessment.events` with routing key `assessment.completed.v2` and publisher confirmation. ACK/remove the DLQ copy only after confirmed routing. Do not rewrite `learning_goal_id` or invent a goal. Other contract failures require investigation before replay.
-4. Verify the main/retry/DLQ counts settle and `formal_assessment_result_versions` advances or the event is parked in `pending_formal_assessment_results` for its `user_id`. A later path load must drain parked rows. Redelivery is safe under `event_id` parking and result-version idempotency; keep the DLQ copy when publish confirmation fails.
+1. Deploy Learning Service's consumer accepting `learning_goal_id` as null or missing
+   and `package_version_id` as optional before Assessment's new producer. The consumer
+   declares the main, retry and dead-letter topology above.
+2. While only the service skeleton exists, no new Learning Service queue is declared.
+   The development rollout accepts this gap until the consumer is implemented.
+3. Pause the Assessment outbox relay or producer during recovery. Inspect queue counts
+   and `x-learning-failure` without logging payloads or tokens; confirm the consumer
+   and schema are healthy before resuming publication.
+4. Preserve each DLQ message's original body, `event_id`, AMQP `message_id`,
+   `event_type` and `result_version`. Republish to `assessment.events` with routing key
+   `assessment.completed.v2` and publisher confirmation. ACK the DLQ copy only after
+   confirmed routing. Do not invent a learning goal or rewrite the event.
+5. Verify queue counts settle and `assessment_result_versions` advances.
+   Result-version and evidence idempotency make redelivery safe; keep the DLQ copy
+   when publication confirmation fails.

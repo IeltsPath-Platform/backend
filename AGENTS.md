@@ -27,7 +27,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `services/game-service` | Phòng game, trận, phiên chơi, WebSocket. |
 | `services/community-service` | Bài viết, bình luận, reaction, kiểm duyệt. |
 | `services/notification-service` | Chưa triển khai (khung package). |
-| `services/ai-learning-service` | **Python/FastAPI**, ngoài Maven: mastery path, tutor SSE, practice, learner memory. |
+| `services/learning-service` | **Java/Spring Boot**, cổng 8086, `learning_db` (Compose host 5436): khung service học; API bài học và consumer triển khai ở các PR sau. |
 | `third_party/deeptutor` | Bản clone chỉ để đọc khi port. **Không phải dependency.** |
 
 Mỗi business service sở hữu một database PostgreSQL riêng. Gateway chuyển hai nhóm activity/streak tới user-service;
@@ -40,7 +40,7 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 
 | Khu vực | Công nghệ đã được xác minh |
 | --- | --- |
-| Java build | Java 21; Maven multi-module (12 module trong reactor: 3 infra, 1 shared, 8 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
+| Java build | Java 21; Maven multi-module (13 module trong reactor: 3 infra, 1 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
 | Java framework | Spring Boot 3.5.14; Spring Cloud 2025.0.0 (Config, Netflix Eureka, Gateway Server WebFlux + Reactor). |
 | Persistence (Java) | Spring Data JPA, Hibernate, PostgreSQL JDBC, Flyway (chạy khi service khởi động). |
 | Bảo mật | Spring Security, OAuth2 Resource Server, Nimbus JWT, HMAC-SHA256 JWT, BCrypt. |
@@ -267,19 +267,8 @@ mvn -q compile -DskipTests                        # cả reactor; không dùng c
 docker compose config --quiet
 ```
 
-   ai-learning: venv Python 3.11 riêng (ví dụ `uv venv --seed --python 3.11 <thư mục ngoài repo>`; `.venv` ở root không có
-   pytest), kích hoạt venv hoặc gọi thẳng `<venv>\Scripts\python`, chạy trong `services/ai-learning-service`. Lệnh PowerShell:
-
-```powershell
-python -m pip install pytest -r requirements-test.txt
-$env:PYTHONDONTWRITEBYTECODE = "1"
-$env:AI_LEARNING_TEST_DATABASE_URL = "postgresql://postgres:<password>@localhost:5432/<db dùng để test>"  # thiếu: skip test PostgreSQL
-$env:AI_LEARNING_TEST_AMQP_URL = "amqp://<user>:<password>@localhost:5672/%2F"                          # thiếu: skip test RabbitMQ
-python -m pytest tests -p no:cacheprovider
-```
-
-   Git Bash: `export PYTHONDONTWRITEBYTECODE=1 AI_LEARNING_TEST_DATABASE_URL=... AI_LEARNING_TEST_AMQP_URL=...` rồi cùng
-   lệnh pytest. Mỗi lớp test tạo rồi xóa schema riêng; dùng DB không chứa dữ liệu cần giữ.
+   Learning Service dùng `mvn -q -pl services/learning-service -am test`. Test context và Flyway chạy với
+   Testcontainers PostgreSQL; thiếu Docker thì báo rõ test bị skip.
 
 6. Chỉ build/chạy Docker khi daemon khả dụng: `docker compose up -d --build <service...>`, `docker compose ps`.
 7. Không tuyên bố check nào đã chạy (CI, lint, coverage, contract test) khi chúng chưa tồn tại hoặc chưa thực sự chạy.

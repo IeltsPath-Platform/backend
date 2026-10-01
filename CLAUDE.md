@@ -3,8 +3,7 @@
 - Cập nhật lần cuối: 2026-10-01; dữ kiện đã kiểm với code tại commit `ab613b1`. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
-- Kiến trúc, flow, quyết định: `docs/system-architecture.md`. Làm việc trong `services/ai-learning-service/` thì đọc thêm
-  `services/ai-learning-service/CLAUDE.md` (tự nạp khi mở file trong service đó).
+- Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
 
 @AGENTS.md
 
@@ -32,7 +31,7 @@ và DLQ). Mỗi service sở hữu một PostgreSQL DB.
 | `services/game-service` | Java | 8087 | `game_db` (compose 5435) | `/api/games/**`, ws `/ws/games/**` |
 | `services/notification-service` | Java (khung) | 8088 | `notification_db` (local 5432) | `/api/notifications/**` |
 | `services/community-service` | Java | 8089 | `community_db` (compose 5434, cần `COMMUNITY_DB_URL`, xem §5) | `/api/community/**` |
-| `services/ai-learning-service` | Python 3.11 | 8000 | `ai_learning_db` (compose 5436) | `/api/ai-learning/**` |
+| `services/learning-service` | Java (khung) | 8086 | `learning_db` (compose 5436) | `/api/learning/**` |
 | `third_party/deeptutor` | Python | — | — | Chỉ để đọc khi port; không import |
 
 Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/config-repo/*.yaml`, `docker-compose.yml`.
@@ -45,8 +44,8 @@ Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/c
   (`optional:file:../../.env[.properties]`; config-server, eureka-server thì không). ai-learning khi chạy trên host đọc
   `services/ai-learning-service/.env` riêng; container ai-learning nhận biến từ compose. Chỉ ghi tên biến, không ghi giá trị.
 - Compose yêu cầu `LIBRARY_DB_PASSWORD` trong `.env` dù chỉ bật một phần stack. Chỉ chạy các container cần dùng:
-  `docker compose up -d --build rabbitmq ai-learning-db ai-learning-migrate ai-learning-api ai-learning-consumer`
-  (+ `library-db`, `community-db`, `game-db` khi cần; `llm-stub` nằm sau profile: `docker compose --profile llm-stub up -d llm-stub`).
+  `docker compose up -d rabbitmq learning-db`
+  (+ `library-db`, `community-db`, `game-db` khi cần).
 - Service Java chạy trên host (IDE hoặc `java -jar`) theo thứ tự: config-server → eureka → api-gateway → user → content →
   library → assessment → các service còn lại (kể cả game-service, xem §5).
 - AI Learning trong container gọi User/Content trên host qua `host.docker.internal`. RabbitMQ: AMQP `127.0.0.1:5672`,
@@ -64,7 +63,7 @@ docker compose config --quiet                    # kiểm compose + .env
 docker compose ps
 ```
 
-Test Python và lệnh riêng của AI Learning: `services/ai-learning-service/CLAUDE.md`.
+Test service học: `mvn -q -pl services/learning-service -am test` (Testcontainers cần Docker).
 
 ## 5. Cạm bẫy đã biết
 

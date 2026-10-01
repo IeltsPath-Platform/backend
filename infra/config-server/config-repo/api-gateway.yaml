@@ -97,10 +97,10 @@ spring:
               predicates:
                 - Path=/api/community/**
 
-            - id: ai-learning-service
-              uri: ${AI_LEARNING_SERVICE_URI:http://localhost:8000}
+            - id: learning-service
+              uri: lb://learning-service
               predicates:
-                - Path=/api/ai-learning/**
+                - Path=/api/learning/**
 
 app:
   auth:
@@ -121,7 +121,7 @@ app:
       - /api/games
       - /api/notifications
       - /api/community
-      - /api/ai-learning
+      - /api/learning
 
     frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
 

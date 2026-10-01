@@ -1,22 +1,32 @@
 # Lesson learning API v1 — proposed contract
 
-**Status: approved 2026-10-01.** This document describes the intended HTTP changes for phases 2–7; it does not claim they are deployed. Examples use actual lesson/question/package codes and text from [`seed-content.md`](../../plans/260930-2057-mvp-reading-writing-listening-roadmap/seed-content.md). The existing V4 UUIDs for DEMO_READING and KP1 are real; other UUIDs and timestamps illustrate relationships because the V9 seed leaves their assignment to the migration.
+**Status: approved 2026-10-01.** This document describes the intended learner HTTP API; it does not claim it is deployed. Examples use actual lesson/question/package codes and text from [`seed-content.md`](../../plans/260930-2057-mvp-reading-writing-listening-roadmap/seed-content.md). The existing V4 UUIDs for DEMO_READING and KP1 are real; other UUIDs and timestamps illustrate relationships because the V9 seed leaves their assignment to the migration.
 
-The MVP app displays topic and lesson status. Tutor `/status`, `/progress` (mastery display threshold 0.9), and `/practice/*` remain tutor APIs; `next_objective` is advice for the tutor, not the lesson gate. Reviews use new `PRACTICE_SET` questions, solutions stay hidden until the relevant block or set is passed, and a final test assignment uses a package code once before selecting another package. Topic order is stored separately from mastery path order in `topic_progress.sequence_order`; only `passed_at` is persisted. Reordering by a tutor does not open lessons. No `topics.test_package_id`, assessment schema migration, premium gate, or unpublished content authoring API is introduced here.
+The MVP app displays topic and lesson status. The Java Learning Service owns progress, mastery evidence, reviews and test assignments. Tutor, practice notebook, learner memory, learning goals and LLM ordering are removed. Reviews use new `PRACTICE_SET` questions, solutions stay hidden until the relevant block or set is passed, and a final test assignment uses a package code once before selecting another package. Topic order is stored in `topic_progress.sequence_order`; only `passed_at` is persisted. No `topics.test_package_id`, assessment schema migration, premium gate, or unpublished content authoring API is introduced here.
 
 ## Learner routes
 
-All routes in this section have prefix `/api/ai-learning`, require the learner bearer token through Gateway, and are scoped to the verified user id. Response JSON uses camelCase. Content reads forward the bearer; a Content `404` becomes `404 NOT_FOUND`, and other dependency failures remain `502`/`503`. Lists are ordered by the Content `sortOrder` and stable ids. Learners cannot call Content's internal API or list packages/questions through public `/api/content` routes.
+All routes in this section have prefix `/api/learning`, require the learner bearer token through Gateway, and are scoped to the verified user id. Response JSON uses camelCase. Content reads forward the bearer and `X-Correlation-Id`; a Content `404` becomes `404 NOT_FOUND`, and other dependency failures remain `502`/`503`. Lists are ordered by the Content `sortOrder` and stable ids. Learners cannot call Content's internal API or list packages/questions through public `/api/content` routes.
 
 ### `GET /topics`
 
-Creates or refreshes the one mastery path per user from one Content `topic-sequence` read, with no goal or LLM ordering. Returns `[{topicId, code, name, sequenceOrder, status, completedLessonCount}]`. A topic is `PASSED` when `passed_at` exists; otherwise the first unpassed topic in current `sequenceOrder` is `IN_PROGRESS` and the others are `LOCKED`. Removed topics have no sequence order and are omitted. A newly inserted topic can become the first unpassed one without leaving another topic stuck as `LOCKED`.
+Refreshes the shared `knowledge_point_catalog` and the user's `topic_progress.sequence_order` from one Content `topic-sequence` read. Returns `[{topicId, code, name, sequenceOrder, status, completedLessonCount}]`. A topic is `PASSED` when `passed_at` exists; otherwise the first unpassed topic in current `sequenceOrder` is `IN_PROGRESS` and the others are `LOCKED`. Removed topics have no sequence order and are omitted. A newly inserted topic can become the first unpassed one without leaving another topic stuck as `LOCKED`.
 
 ```json
 [
   {"topicId":"10000000-0000-4000-8000-000000000001","code":"DEMO_READING","name":"Demo IELTS Reading","sequenceOrder":1,"status":"IN_PROGRESS","completedLessonCount":0},
   {"topicId":"20000000-0000-4000-8000-000000000002","code":"TFNG_SKILLS","name":"True / False / Not Given","sequenceOrder":2,"status":"LOCKED","completedLessonCount":0}
 ]
+```
+
+### `GET /mastery`
+
+Returns `[{knowledgePointId, topicId, mastery, evidenceCount}]` for KPs in `knowledge_point_catalog`, using only the verified user's `kp_evidence`. `mastery` is a number from 0 to 1; `evidenceCount` counts the user's stored evidence for that KP. No learning goal or aggregate learning state is required. This endpoint is implemented with the learner APIs in the next PR.
+
+Example after Lan completes L1:
+
+```json
+[{"knowledgePointId":"20000000-0000-4000-8000-020000000003","topicId":"10000000-0000-4000-8000-000000000001","mastery":0.729,"evidenceCount":4}]
 ```
 
 ### `GET /topics/{id}/lessons`
@@ -56,7 +66,7 @@ The following is the L1-B5 portion of L1. The full response also contains L1's t
 
 ### `POST /lessons/{id}/exercises/{blockId}/submissions`
 
-Request: `{requestId, answers:[{questionVersionId, answer}]}`. `requestId` is a UUID; one answer for **every** question in the block is required (`422` if missing/duplicate/foreign). Reuse of a request id for the same user, lesson, and block returns the saved response; reuse in a different scope is `409 REQUEST_CONFLICT`. Reattempts submit the whole same block with a new request id. The pass threshold is at least 70% of possible score; for L1-B5's three one-point questions, 2/3 fails and 3/3 passes. Only the **first submission** for a user and block contributes mastery evidence, whether it passed or failed. Later attempts can complete the block but never add evidence. If the block completes the lesson, mark the lesson complete and evaluate reviews in the same path transaction.
+Request: `{requestId, answers:[{questionVersionId, answer}]}`. `requestId` is a UUID; one answer for **every** question in the block is required (`422` if missing/duplicate/foreign). Reuse of a request id for the same user, lesson, and block returns the saved response; reuse in a different scope is `409 REQUEST_CONFLICT`. Reattempts submit the whole same block with a new request id. The pass threshold is at least 70% of possible score; for L1-B5's three one-point questions, 2/3 fails and 3/3 passes. Only the **first submission** for a user and block contributes mastery evidence, whether it passed or failed. Later attempts can complete the block but never add evidence. If the block completes the lesson, mark the lesson complete and evaluate reviews in the same PostgreSQL transaction, serialized by a transaction-scoped advisory lock for the user.
 
 ```json
 {"requestId":"20000000-0000-4000-8000-000000000801","answers":[{"questionVersionId":"20000000-0000-4000-8000-000000000001","answer":"A"},{"questionVersionId":"20000000-0000-4000-8000-000000000011","answer":"B"},{"questionVersionId":"20000000-0000-4000-8000-000000000012","answer":"critics"}]}
@@ -138,7 +148,7 @@ New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: ar
 | 409 | `REVIEW_SET_CLOSED` | `{"detail":"Review set is closed","code":"REVIEW_SET_CLOSED"}` |
 | 404 | `NOT_FOUND` | `{"detail":"Lesson was not found","code":"NOT_FOUND"}` |
 
-Review insertion requires **all four**: current mastery for the KP below `AI_LEARNING_REVIEW_MASTERY_THRESHOLD` (default `0.6`), a wrong answer for that KP in the just-considered result, a completed lesson teaching the KP (including a lesson just completed), and `hasPracticeSet=true` in the path's Content snapshot. A KP with no eligible package, such as KP5 in `TFNG_SKILLS`, never creates a review; the final test still checks it. With only one or two first-attempt evidence items, the mastery formula caps mastery at 0.5 or 0.8, so at the default threshold the wrong-answer condition largely determines whether a review is inserted. Only first submissions of lesson blocks contribute that evidence. Reassessment runs after a lesson completes and after `TOPIC_GATE`, `MOCK`, `OFFICIAL_PRACTICE`, or `QUIZ` results; it inserts reviews only. Topic `PASSED` is one-way.
+Review insertion requires **all four**: current mastery for the KP below `learning.review-mastery-threshold` (default `0.6`), a wrong answer for that KP in the just-considered result, a completed lesson teaching the KP (including a lesson just completed), and `has_practice_set=true` in `knowledge_point_catalog`. A KP with no eligible package, such as KP5 in `TFNG_SKILLS`, never creates a review; the final test still checks it. With only one or two first-attempt evidence items, the mastery formula caps mastery at 0.5 or 0.8, so at the default threshold the wrong-answer condition largely determines whether a review is inserted. Only first submissions of lesson blocks contribute that evidence. Reassessment runs after a lesson completes and after `TOPIC_GATE`, `MOCK`, `OFFICIAL_PRACTICE`, or `QUIZ` results; it inserts reviews only. Topic `PASSED` is one-way.
 
 ## Assessment changes requiring approval
 
@@ -191,4 +201,4 @@ The item/solution arrays above are excerpts; the actual response includes all fo
 
 ## Delivery order
 
-The AI Learning consumer must accept a nullable `learning_goal_id` and missing `package_version_id` before Assessment starts emitting goal-less events. Deploy the consumer change (phase 5) before the producer change (phase 4). See [AssessmentCompleted.v2](assessment-completed-v2.md) for pending results and DLQ replay. Learner access restrictions in phase 2 and internal Content endpoints in phase 3 precede opening this learner API.
+Deploy the Java Learning Service consumer accepting a nullable `learning_goal_id` and missing `package_version_id` before Assessment starts emitting goal-less events. See [AssessmentCompleted.v2](assessment-completed-v2.md) for retry, idempotency and DLQ replay. Learner access restrictions and internal Content endpoints precede opening this learner API.

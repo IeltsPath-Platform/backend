@@ -57,7 +57,7 @@ services:
       retries: 5
 
   # Integration event broker. Assessment publishes AssessmentCompleted.v2 to the "assessment.events" topic
-  # exchange; AI Learning declares and consumes its own durable queue, retry queue and DLQ.
+  # exchange; Learning Service declares and consumes its own durable queue, retry queue and DLQ.
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     container_name: rabbitmq
@@ -77,110 +77,24 @@ services:
       timeout: 5s
       retries: 6
 
-  # AI Learning: its own database, migrated once by Flyway, then the API and the
-  # AssessmentCompleted.v2 consumer from the same image. The Java services run on the host (IDE).
-  ai-learning-db:
+  learning-db:
     image: postgres:15-alpine
-    container_name: ai-learning-db
+    container_name: learning-db
     environment:
-      POSTGRES_DB: ai_learning_db
+      POSTGRES_DB: learning_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "${AI_LEARNING_DB_PASSWORD:?Set AI_LEARNING_DB_PASSWORD}"
+      POSTGRES_PASSWORD: "${LEARNING_DB_PASSWORD:?Set LEARNING_DB_PASSWORD}"
     ports:
       - "127.0.0.1:5436:5432"
     networks:
       - codebase-network
     volumes:
-      - ai-learning-db-data:/var/lib/postgresql/data
+      - learning-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_learning_db"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d learning_db"]
       interval: 5s
       timeout: 5s
       retries: 5
-
-  ai-learning-migrate:
-    # Same Flyway major as the Java services (Spring Boot 3.5 BOM).
-    image: flyway/flyway:11-alpine
-    container_name: ai-learning-migrate
-    command: migrate
-    environment:
-      FLYWAY_URL: jdbc:postgresql://ai-learning-db:5432/ai_learning_db
-      FLYWAY_USER: postgres
-      FLYWAY_PASSWORD: "${AI_LEARNING_DB_PASSWORD:?Set AI_LEARNING_DB_PASSWORD}"
-      FLYWAY_LOCATIONS: filesystem:/flyway/sql
-    volumes:
-      - ./services/ai-learning-service/migrations:/flyway/sql:ro
-    networks:
-      - codebase-network
-    depends_on:
-      ai-learning-db:
-        condition: service_healthy
-
-  ai-learning-api:
-    build: &ai-learning-build
-      context: .
-      dockerfile: services/ai-learning-service/Dockerfile
-    container_name: ai-learning-api
-    restart: unless-stopped
-    environment:
-      # Must equal the Gateway's value: the API validates the Gateway-signed internal JWT.
-      AI_LEARNING_INTERNAL_JWT_SECRET: "${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}"
-      AI_LEARNING_DATABASE_URL: "postgresql://postgres:${AI_LEARNING_DB_PASSWORD:?Set AI_LEARNING_DB_PASSWORD}@ai-learning-db:5432/ai_learning_db"
-      # The learner's internal JWT is forwarded straight to User and Content on the host, not through the Gateway.
-      AI_LEARNING_USER_SERVICE_BASE_URL: ${AI_LEARNING_USER_SERVICE_BASE_URL:-http://host.docker.internal:8085}
-      AI_LEARNING_CONTENT_SERVICE_BASE_URL: ${AI_LEARNING_CONTENT_SERVICE_BASE_URL:-http://host.docker.internal:8082}
-      # Path ordering LLM (OpenAI-compatible chat completions). Without a key the API keeps the
-      # deterministic Content order.
-      AI_LEARNING_LLM_BASE_URL: ${AI_LEARNING_LLM_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
-      AI_LEARNING_LLM_MODEL: ${AI_LEARNING_LLM_MODEL:-gemini-3.8-flash}
-      AI_LEARNING_LLM_API_KEY: ${AI_LEARNING_LLM_API_KEY:-}
-      AI_LEARNING_LLM_REASONING_EFFORT: ${AI_LEARNING_LLM_REASONING_EFFORT:-low}
-      AI_LEARNING_LLM_TIMEOUT_SECONDS: ${AI_LEARNING_LLM_TIMEOUT_SECONDS:-20}
-      # Per-learner daily limits; 0 = unlimited. Defaults must stay non-empty: a blank value fails validation.
-      AI_LEARNING_TUTOR_TURNS_PER_DAY: ${AI_LEARNING_TUTOR_TURNS_PER_DAY:-50}
-      AI_LEARNING_MEMORY_SUMMARIES_PER_DAY: ${AI_LEARNING_MEMORY_SUMMARIES_PER_DAY:-10}
-      AI_LEARNING_QUOTA_TIMEZONE: ${AI_LEARNING_QUOTA_TIMEZONE:-Asia/Ho_Chi_Minh}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      - "127.0.0.1:8000:8000"
-    networks:
-      - codebase-network
-    depends_on:
-      ai-learning-migrate:
-        condition: service_completed_successfully
-
-  ai-learning-consumer:
-    build: *ai-learning-build
-    container_name: ai-learning-consumer
-    command: ["python", "-m", "app.messaging.assessment_consumer"]
-    # Database and broker only: the consumer never needs the JWT secret.
-    environment:
-      AI_LEARNING_DATABASE_URL: "postgresql://postgres:${AI_LEARNING_DB_PASSWORD:?Set AI_LEARNING_DB_PASSWORD}@ai-learning-db:5432/ai_learning_db"
-      AI_LEARNING_AMQP_URL: "amqp://${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME}:${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}@rabbitmq:5672/%2F"
-    networks:
-      - codebase-network
-    # The pika process exits when it loses the broker for good; compose brings it back.
-    restart: unless-stopped
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      ai-learning-migrate:
-        condition: service_completed_successfully
-
-  llm-stub:
-    profiles: ["llm-stub"]
-    image: python:3.11-slim
-    command: ["python", "/stub/llm_stub.py"]
-    environment:
-      LLM_STUB_MODE: ${LLM_STUB_MODE:-reverse}
-      LLM_STUB_SCRIPT: ${LLM_STUB_SCRIPT:-/stub/tutor-stub-script.json}
-      PYTHONDONTWRITEBYTECODE: "1"
-    volumes:
-      - ./services/ai-learning-service/tests/e2e/llm_stub.py:/stub/llm_stub.py:ro
-      - ./services/ai-learning-service/tests/e2e/tutor-stub-script.json:/stub/tutor-stub-script.json:ro
-    networks:
-      - codebase-network
 
   game-service:
     build:
@@ -215,4 +129,4 @@ volumes:
   community-db-data:
   game-db-data:
   rabbitmq-data:
-  ai-learning-db-data:
+  learning-db-data:

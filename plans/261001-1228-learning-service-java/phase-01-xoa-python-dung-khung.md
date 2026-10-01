@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Xóa Python, dựng khung learning-service"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 effort: "1 ngày"
@@ -13,6 +13,19 @@ effort: "1 ngày"
 
 Một PR: gỡ toàn bộ ai-learning Python và dựng service Java rỗng nhưng chạy được (khởi động, Flyway, security, health),
 có route Gateway và DB compose. Chưa có nghiệp vụ.
+
+## Kết quả ngày 2026-10-01
+
+Hoàn tất phạm vi code trên nhánh `feat/learning-service-skeleton`: xóa 135 file được Git quản lý của service Python và
+ba tài liệu cũ; thêm khung Java, Flyway chín bảng, cấu hình và route `/api/learning/**`; đồng bộ hai contract.
+Chưa triển khai API bài học/mastery hoặc consumer.
+
+Maven learning-service cùng common-security: 11 test pass; Gateway: 8 test pass; không failure, error hay skip.
+Compile cả reactor pass. `docker compose config --quiet` chưa pass vì thiếu `LEARNING_DB_PASSWORD`; người dùng tự thêm
+biến vào `.env`. Đây là điều kiện cấu hình local còn lại, không ghi giá trị thay người dùng.
+
+[`Báo cáo kiểm chứng`](./reports/learning-service-skeleton-verification.md) ghi các gate và reference Python còn chờ
+phase 5. Review đã hoàn tất, không còn finding cần xử lý; test learning-service cùng common-security đã chạy lại và pass.
 
 ## Requirements
 
