@@ -36,7 +36,7 @@ Kỹ năng MVP: **Reading, Writing, Listening**. Speaking ngoài phạm vi.
 | [`260930-0812`](../260930-0812-lesson-writing-task1-academic/plan.md) | Writing Task 1 Academic (biểu đồ, `chartFacts`) | Có |
 | [`260930-0851`](../260930-0851-listening-topic-audio-lessons/plan.md) | Listening (audio, transcript ẩn tới khi đạt) | Có, không chờ 0908 |
 | [`260930-1006`](../260930-1006-reading-question-hints/plan.md) | Gợi ý câu Reading sau lần sai đầu | Có; bỏ `hints_used` |
-| [`261001-0205`](../261001-0205-mvp-service-split-library/plan.md) Chia lại service | Tạo `library-service`, giải thể learning-support, activity/streak sang user-service (`.sdd/specs/SERVICE_ARCHITECTURE_V3.md` §1, §4, §9) | Có (chốt 2026-10-01); S1 merge **trước** 1640 (đổi 2026-10-01), S2–S4 lúc nào cũng được. Tiến độ: **xong** S1–S4 (nhánh `feat/learning-support-removal`, chưa merge) |
+| [`261001-0205`](../261001-0205-mvp-service-split-library/plan.md) Chia lại service | Tạo `library-service`, giải thể learning-support, activity/streak sang user-service (`.sdd/specs/SERVICE_ARCHITECTURE_V3.md` §1, §4, §9) | Có (chốt 2026-10-01); S1 merge **trước** 1640 (đổi 2026-10-01), S2–S4 lúc nào cũng được. Tiến độ: **xong** S1–S4, đã merge vào `feat/main-follow` (PR #21) |
 | ~~`260930-0908`~~ (đã xóa) | Chọn gói luyện theo độ khó và dạng câu | **Hoãn**; ý tưởng ở `plans/reports/brainstorm-260930-0908-listening-adaptive-path-report.md` |
 
 **Ngoài MVP (không làm, không gỡ):**
