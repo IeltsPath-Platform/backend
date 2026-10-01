@@ -5,6 +5,8 @@ public enum PackageType {
     PLACEMENT_TEST,
     PRACTICE_SET,
     QUIZ,
-    LESSON
+    LESSON,
+    /** A topic's final test; created only by seed, always attached to a topic. */
+    TOPIC_TEST
 }
 

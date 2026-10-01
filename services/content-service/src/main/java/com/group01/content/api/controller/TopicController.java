@@ -10,6 +10,7 @@ import com.group01.content.application.command.UpdateTopicCommand;
 import com.group01.content.application.result.TopicResult;
 import com.group01.content.application.usecase.CreateTopicUseCase;
 import com.group01.content.application.usecase.GetTopicTreeUseCase;
+import com.group01.content.application.usecase.GetTopicUseCase;
 import com.group01.content.application.usecase.UpdateTopicUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ import java.util.UUID;
 public class TopicController {
 
     private final GetTopicTreeUseCase getTopicTreeUseCase;
+    private final GetTopicUseCase getTopicUseCase;
     private final CreateTopicUseCase createTopicUseCase;
     private final UpdateTopicUseCase updateTopicUseCase;
 
@@ -42,6 +44,12 @@ public class TopicController {
         return getTopicTreeUseCase.execute().stream()
                 .map(TopicTreeResponse::from)
                 .toList();
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    public TopicResponse getTopic(@PathVariable("id") UUID id) {
+        return TopicResponse.from(getTopicUseCase.execute(id));
     }
 
     @PostMapping

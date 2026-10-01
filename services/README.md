@@ -6,7 +6,18 @@ Thư mục `services/` chứa các microservice xử lý nghiệp vụ của h�
 
 | Module | Vai trò |
 | --- | --- |
-| `user-service` | Quản lý người dùng, đăng nhập, refresh token và phát hành external JWT cho client |
+| `user-service` | Tài khoản, đăng nhập, refresh token, learning goal, activity và streak |
+| `content-service` | Topic, knowledge point, câu hỏi, gói nội dung và asset |
+| `library-service` | Catalog từ vựng/video và thư viện cá nhân (flashcard, deck, note, tiến độ video, đoạn đã lưu) |
+| `assessment-service` | Bài làm, chấm điểm và kết quả thi |
+| `access-service` | Gói, subscription, activation key và điểm |
+| `game-service` | Phòng game, phiên chơi và WebSocket |
+| `community-service` | Bài viết, bình luận và kiểm duyệt |
+| `notification-service` | Khung service thông báo |
+| `learning-service` | Java, cổng 8086: khung service học với schema tiến độ, bài ôn và mastery |
+
+Gateway giữ các path `/api/learning-support/**`: `activities` và `streak` tới user-service; `flashcards`, `decks`,
+`notes`, `video-progress` và `saved-segments` tới library-service. Không có route tổng quát cho prefix này.
 
 ## Nguyên tắc bảo mật
 
@@ -93,3 +104,7 @@ mvn -pl services/user-service spring-boot:run
 ## Tài liệu chi tiết
 
 - [User Service](user-service/README.md)
+- [Content Service](content-service/README.md)
+- [Library Service](library-service/README.md)
+- [Learning Service](learning-service/README.md)
+- [Game Service](game-service/README.md)

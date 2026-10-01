@@ -1,38 +1,32 @@
 package com.group01.content.application.usecase;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.group01.content.application.command.GetGameContentSnapshotCommand;
+import com.group01.content.application.port.LearningContentReader;
 import com.group01.content.application.result.GameContentSnapshotResult;
 import com.group01.content.domain.aggregate.Question;
-import com.group01.content.domain.aggregate.VocabularyItem;
 import com.group01.content.domain.entity.QuestionVersion;
-import com.group01.content.domain.entity.VocabularySense;
 import com.group01.content.domain.repository.QuestionRepository;
-import com.group01.content.domain.repository.VocabularyRepository;
-import com.group01.content.domain.vo.ContentStatus;
 import com.group01.content.domain.vo.PublicationStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
 public class GetGameContentSnapshotUseCase {
-    private final VocabularyRepository vocabularyRepository;
     private final QuestionRepository questionRepository;
-    private final ObjectMapper objectMapper;
+    private final LearningContentReader learningContentReader;
 
-    public GetGameContentSnapshotUseCase(VocabularyRepository vocabularyRepository,
-                                         QuestionRepository questionRepository, ObjectMapper objectMapper) {
-        this.vocabularyRepository = vocabularyRepository;
+    public GetGameContentSnapshotUseCase(QuestionRepository questionRepository,
+                                         LearningContentReader learningContentReader) {
         this.questionRepository = questionRepository;
-        this.objectMapper = objectMapper;
+        this.learningContentReader = learningContentReader;
     }
 
     public GameContentSnapshotResult execute(GetGameContentSnapshotCommand command) {
@@ -40,34 +34,9 @@ public class GetGameContentSnapshotUseCase {
             throw new IllegalArgumentException("contentIds must not contain duplicates");
         }
         return switch (command.learningDomain()) {
-            case "VOCABULARY" -> vocabularySnapshot(command.gameType(), command.contentIds());
             case "GRAMMAR" -> grammarSnapshot(command.gameType(), command.contentIds());
-            default -> throw new IllegalArgumentException("learningDomain must be VOCABULARY or GRAMMAR");
+            default -> throw new IllegalArgumentException("content-service supports GRAMMAR snapshots only");
         };
-    }
-
-    private GameContentSnapshotResult vocabularySnapshot(String gameType, List<UUID> ids) {
-        if (!List.of("WORD_MEANING_MATCH", "SPELLING").contains(gameType)) {
-            throw new IllegalArgumentException("gameType is unsupported for vocabulary");
-        }
-        List<VocabularyItem> items = vocabularyRepository.findByIds(ids);
-        if (items.size() != ids.size()) throw new IllegalArgumentException("One or more vocabulary items do not exist");
-        List<GameContentSnapshotResult.GameContentItem> snapshots = new ArrayList<>(items.size());
-        for (VocabularyItem item : items) {
-            if (item.getStatus() != ContentStatus.ACTIVE) continue;
-            item.getSenses().stream()
-                    .filter(sense -> sense.getStatus() == ContentStatus.ACTIVE)
-                    .filter(sense -> sense.getEnglishDefinition() != null && !sense.getEnglishDefinition().isBlank())
-                    .min(Comparator.comparingInt(VocabularySense::getSortOrder))
-                    .ifPresent(sense -> snapshots.add(new GameContentSnapshotResult.GameContentItem(
-                            item.getId(), sense.getId(), null,
-                            "SPELLING".equals(gameType) ? sense.getEnglishDefinition()
-                                    : item.getLemma() + " — " + sense.getEnglishDefinition(), List.of(),
-                            answerSpec("SPELLING".equals(gameType) ? item.getLemma() : sense.getVietnameseMeaning()),
-                            sense.getExampleSentence()
-                    )));
-        }
-        return new GameContentSnapshotResult(snapshots);
     }
 
     private GameContentSnapshotResult grammarSnapshot(String gameType, List<UUID> ids) {
@@ -86,6 +55,14 @@ public class GetGameContentSnapshotUseCase {
                     .findFirst()
                     .ifPresent(version -> snapshots.add(toSnapshot(question, version)));
         }
+        // A game reveals right and wrong answers, so it must not become a way to probe lesson, review or test items.
+        Set<UUID> versionIds = snapshots.stream()
+                .map(GameContentSnapshotResult.GameContentItem::questionVersionId)
+                .collect(Collectors.toSet());
+        if (!learningContentReader.questionVersionsReservedForLearning(versionIds).isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Questions used by lessons, practice sets or topic tests cannot be used in games");
+        }
         return new GameContentSnapshotResult(snapshots);
     }
 
@@ -96,11 +73,4 @@ public class GetGameContentSnapshotUseCase {
         );
     }
 
-    private String answerSpec(String answer) {
-        try {
-            return objectMapper.writeValueAsString(java.util.Map.of("answer", answer));
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("Unable to snapshot vocabulary answer", exception);
-        }
-    }
 }

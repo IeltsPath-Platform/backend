@@ -2,16 +2,16 @@
 type: database-design
 version: V5
 status: deeptutor-core-baseline
-updated: 2026-09-22
+updated: 2026-10-01
 scope: IELTSPath MVP
 external_baseline: HKUDS/DeepTutor v1.6.9
 ---
 
 # Database — IELTSPath V5
 
-> V5 **xóa hoàn toàn Adaptive Engine tự thiết kế ở V4**. `ai_learning_db` được thiết kế lại quanh persistence semantics của **DeepTutor Mastery Path + session runtime**. Không còn `mastery_records`, `review_events`, `topic_progress`, `daily_plans`, `daily_tasks`, `ai_conversations`, `ai_messages` hay `ai_assistant_db`.
+> V5 **xóa hoàn toàn Adaptive Engine tự thiết kế ở V4**. `ai_learning_db` được thiết kế lại quanh persistence semantics của **DeepTutor Mastery Path + session runtime**. Không còn `mastery_records`, `review_events`, `topic_progress`, `daily_plans`, `daily_tasks`, `ai_conversations`, `ai_messages` hay `ai_assistant_db`. (V5.1 thêm lại `topic_progress` với nghĩa khác, chỉ là tiến độ học bài, xem §7.21.)
 
-> DeepTutor là adaptive learning engine duy nhất. `content_db` vẫn là canonical IELTS curriculum/content; `assessment_db` vẫn là formal assessment; `user_db` vẫn là identity/profile/learning goal. `ai_learning_db` chỉ giữ **Adaptive Learning Core / Tutor Runtime** của DeepTutor. Learning activity, streak, video progress, note và flashcard được tách sang `learning_support_db`, thuộc `learning-support-service`, để AI Learning không mang learner utility state không liên quan đến ADP core.
+> DeepTutor là adaptive learning engine duy nhất. `content_db` sở hữu IELTS curriculum, question bank và bài học; `library_db` sở hữu catalog từ vựng/video và thư viện học cá nhân. `assessment_db` vẫn là formal assessment; `user_db` sở hữu identity/profile/learning goal cùng activity/streak. `ai_learning_db` chỉ giữ **Adaptive Learning Core / Tutor Runtime** của DeepTutor. Service hỗ trợ học viên cũ đã gỡ.
 
 ## 0. Lịch sử phiên bản
 
@@ -21,13 +21,17 @@ external_baseline: HKUDS/DeepTutor v1.6.9
 | **V2** | Review business MVP: Activation Key + Point + Premium; AI grading dùng point; Human Grading dùng Premium quota; ADP cũ dùng DeepTutor-driven mastery; hoàn thiện vocabulary và role nghiệp vụ. |
 | **V3** | Tách `game-service`/`game_db`; thêm realtime multiplayer; Personal Library gộp vào `learning-service`. |
 | **V4** | Thêm Video Learning qua YouTube URL/Video ID; baseline **87 bảng nghiệp vụ + 9 outbox = 96 bảng vật lý**. |
-| **V5** | **Bỏ Adaptive Engine cũ và `ai-assistant-service`**. Learning chuyển sang DeepTutor core. Xóa 6 bảng adaptive cũ + `topic_gate_attempts` + `mistake_notebook_entries` + 2 bảng AI Chat; thêm persistence cho DeepTutor Mastery Path, interaction/evidence/event, tutor session/message/turn runtime và Question Notebook practice. Adaptive core được tách thành `ai-learning-service`/`ai_learning_db`; activity/streak/video progress/note/flashcard chuyển sang `learning-support-service`/`learning_support_db`. Content MVP bỏ adaptive topic graph/gate, bỏ vocab↔KP mapping, nhúng question options vào version, gộp asset links và defer package↔vocabulary mapping. Còn **85 bảng nghiệp vụ + 9 outbox = 94 bảng vật lý**. |
+| **V5** | **Bỏ Adaptive Engine cũ và `ai-assistant-service`**. Learning chuyển sang DeepTutor core. Xóa 6 bảng adaptive cũ + `topic_gate_attempts` + `mistake_notebook_entries` + 2 bảng AI Chat; thêm persistence cho DeepTutor Mastery Path, interaction/evidence/event, tutor session/message/turn runtime và Question Notebook practice. Adaptive core được tách thành `ai-learning-service`/`ai_learning_db`; utility state từng thuộc service hỗ trợ học viên cũ (đã gỡ trong đợt chia service). Content MVP bỏ adaptive topic graph/gate, bỏ vocab↔KP mapping, nhúng question options vào version, gộp asset links và defer package↔vocabulary mapping. Baseline lịch sử: **85 bảng nghiệp vụ + 9 outbox = 94 bảng vật lý**. |
+| **V5.1** (2026-09-29, thiết kế đích, chưa có migration) | Học theo chủ đề → bài. Content thêm 5 bảng bài học (§5.13–§5.17); `topics` thêm `required_feature_key`, `test_package_id`; `content_packages.package_type` thay `LESSON` bằng `TOPIC_TEST`; mỗi câu hỏi chỉ gắn KP chính. AI Learning thêm 4 bảng tiến độ học bài (§7.21–§7.24); `topic_progress` quay lại nhưng chỉ lưu học viên đã học tới đâu, mastery vẫn do DeepTutor core giữ. Luật đầy đủ: `plans/260929-1640-lesson-learning-pipeline-mvp/plan.md` (bản gốc `main-learning-pipeline.md` ở git history, commit `6506d5e`). |
+| **V5.2** (2026-09-29, thiết kế đích, chưa có migration) | Sửa V5.1 sau red-team. Content: một topic nhiều mã đề qua `content_packages.topic_id` (bỏ `topics.test_package_id`); **giữ** `LESSON` và thêm `TOPIC_TEST`; `knowledge_points` bỏ band. Assessment: không thêm cột; `answer_snapshot` chứa đáp án, `attempt_type` suy từ loại gói. AI Learning: `mastery_paths` một path mỗi học viên; bỏ `mastery_path_knowledge_point_bands`; thêm `path_review_sets` (§7.25), `topic_test_assignments` (§7.26); sửa cột §7.21–§7.23; bài ôn và luyện thêm dùng gói `PRACTICE_SET` câu mới, tính cả bài vừa học; giấu đáp án tới khi đạt. Plan triển khai: `plans/260929-1640-lesson-learning-pipeline-mvp`. |
+| **V5.3** (2026-09-30, thiết kế đích, chưa có migration) | Listening đi trọn luồng học. **Không thêm bảng, không thêm cột.** Content: asset `AUDIO` lưu key file ở `media_reference` (content ghép `CONTENT_MEDIA_BASE_URL`, học viên nhận `mediaUrl`), transcript ở `text_content` và giấu tới khi đạt; khối `ASSET` AUDIO trong bài học; section `skill = LISTENING` gắn audio; KP Listening dùng `PROCEDURE`, `kind = STRATEGY`. Assessment: `attempt_sections.section_snapshot` thêm `skill`, `audio`, `solution` (§6.2). AI Learning: chọn gói theo luật V5.2, gói không gắn độ khó (1 gói mỗi KP trong seed). Plan: `plans/260930-0851-listening-topic-audio-lessons`. Chọn gói theo dạng câu và độ khó (cột `path_review_items.wrong_question_types`, mức của gói ở §5.18) **hoãn ngoài MVP** (ý tưởng: `plans/reports/brainstorm-260930-0908-listening-adaptive-path-report.md`). |
+| **Chia service** (đã triển khai 2026-10-01) | Library V1 tạo 5 bảng catalog từ vựng/video; library V2 tạo 6 bảng thư viện cá nhân và 4 FK `ON DELETE RESTRICT` tới catalog (§4.3–§4.4, §5.10–§5.12, §8). User V5 tạo `learning_activities`, `streaks` (§8.1–§8.2), không FK tới `users`. Content V7 xóa 5 bảng catalog cũ. Không chép dữ liệu, không tạo outbox ở library; service và DB hỗ trợ học viên cũ đã gỡ. Commit: `465f543`, `0da2eb2`, `d762660`, `fec5d14`, `ab613b1`. |
 
 ---
 
 ## 1. Mục đích
 
-Tài liệu này là baseline database cho kiến trúc IELTSPath V2, trong đó `ai-learning-service` chạy Python/FastAPI và DeepTutor là lõi Adaptive Learning duy nhất; `learning-support-service` giữ learner-owned utility state ngoài ADP core.
+Tài liệu này giữ baseline V5 cho kiến trúc DeepTutor và các mục tiêu V5.1–V5.3. Phần chia service đã triển khai: `library-service` giữ catalog và thư viện cá nhân, `user-service` giữ activity/streak; service hỗ trợ học viên cũ đã gỡ. Các số đếm baseline lịch sử bên dưới không phải kiểm kê schema đang chạy.
 
 ### Nguyên tắc chung
 
@@ -42,7 +46,7 @@ Tài liệu này là baseline database cho kiến trúc IELTSPath V2, trong đó
 | Event/history | Ưu tiên append-only |
 | DeepTutor aggregate | Giữ revision/CAS semantics; không normalize tùy tiện làm mất atomicity |
 | AI/RAG vector data | Tách khỏi OLTP khi dùng vector store chuyên dụng |
-| Canonical IELTS content | Chỉ `content_db` sở hữu |
+| Canonical IELTS curriculum, bài học và câu hỏi | Chỉ `content_db` sở hữu; catalog từ vựng/video thuộc `library_db` |
 | Formal assessment | Chỉ `assessment_db` sở hữu |
 
 ## 1.1 Tổng quan baseline V5
@@ -54,7 +58,7 @@ Tài liệu này là baseline database cho kiến trúc IELTSPath V2, trong đó
 | Content | **16** |
 | Assessment | 10 |
 | AI Learning / DeepTutor Core | **13** |
-| Learning Support | **8** |
+| Learning Support (baseline lịch sử, đã chia sang User/Library) | **8** |
 | Game học tập | 7 |
 | Notification | 5 |
 | Community | 3 |
@@ -63,6 +67,8 @@ Tài liệu này là baseline database cho kiến trúc IELTSPath V2, trong đó
 | **Tổng nghiệp vụ** | **85** |
 | Transactional Outbox | **9 bảng vật lý** |
 | **Tổng baseline** | **94 bảng** |
+
+Số đếm trên là baseline V5 gốc, chưa gồm các bảng AI Learning thêm sau (§7.18–§7.20), thiết kế V5.1 (+5 bảng Content, +4 bảng AI Learning), V5.2 (+2 bảng AI Learning, −1 bảng AI Learning) hoặc phân bố bảng sau chia service. V5.3 không đổi số bảng.
 
 ## 1.2 Các bảng V4 bị xóa
 
@@ -86,7 +92,13 @@ Không tạo bảng rename tương đương để tiếp tục chạy engine cũ
 
 ```text
 content_db
-= canonical IELTS topics / KPs / question bank / video metadata
+= canonical IELTS topics / KPs / question bank / bài học
+
+library_db
+= vocabulary_items / vocabulary_senses / learning_videos / video_segments /
+  video_segment_lexical_entries (library V1)
++ flashcard_decks / flashcards / flashcard_deck_items / notes /
+  video_learning_progress / saved_video_segments (library V2)
 
 assessment_db
 = formal attempts / results / item results / formal error analysis
@@ -95,12 +107,9 @@ ai_learning_db
 = DeepTutor LearningProgress + mastery evidence + review/runtime state
 + tutor sessions/turns
 
-learning_support_db
-= learning activity + streak + video learner progress/bookmark
-+ personal notes/flashcards
-
 user_db
 = identity / learner profile / learning goal
++ learning_activities / streaks (user V5)
 ```
 
 ---
@@ -472,11 +481,13 @@ Khi activate key `PREMIUM`, `access-service` ghi activation và publish event. `
 ---
 
 ---
-# 4. Content — Chủ đề, knowledge point và từ vựng
+# 4. Content curriculum và Library vocabulary catalog
+
+`topics`, `knowledge_points` (§4.1–§4.2) thuộc `content_db`; `vocabulary_items`, `vocabulary_senses` (§4.3–§4.4) thuộc `library_db` từ library V1. Content V7 đã xóa hai bảng từ vựng cũ.
 
 ## 4.1 `topics`
 
-Lưu taxonomy chủ đề chuẩn của IELTSPath để phân loại content. `topics` chỉ mô tả nội dung/curriculum; nó **không** biểu diễn prerequisite, trạng thái unlock hay adaptive progression. `parent_topic_id` nếu dùng chỉ phục vụ phân cấp hiển thị/phân loại.
+Lưu taxonomy chủ đề chuẩn của IELTSPath để phân loại content. `topics` chỉ mô tả nội dung/curriculum; nó **không** biểu diễn prerequisite hay trạng thái học của từng học viên. Từ V5.1: `sort_order` là thứ tự học ban đầu, giống mọi học viên; thứ tự hiện tại và việc mở khóa theo từng học viên do `ai-learning-service` quyết định. V5.2: thứ tự học chỉ gồm topic có ≥ 1 bài `PUBLISHED` và ≥ 1 gói `TOPIC_TEST` `PUBLISHED`, theo `sort_order`, lưu theo học viên ở `topic_progress.sequence_order` (§7.21); xếp lại thứ tự trong cùng `parent_topic_id` hoãn khỏi MVP.
 
 Thuộc tính chính:
 
@@ -490,10 +501,13 @@ Thuộc tính chính:
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
 | `band_min?` | numeric(2,1) | CHECK 0.0–9.0, bội số 0.5, `≤ band_max` | Band IELTS thấp nhất mà topic hướng tới. NULL = không giới hạn dưới. |
 | `band_max?` | numeric(2,1) | CHECK 0.0–9.0, bội số 0.5 | Band IELTS cao nhất mà topic hướng tới. NULL = không giới hạn trên. |
+| `required_feature_key?` | varchar(100) | Logical ref ↗ `Access.plan_features.feature_key` | V5.1. Topic trả phí; `NULL` = miễn phí. Premium tính theo topic: danh sách vẫn hiện topic, nội dung bài bị chặn. V5.2: chưa dùng trong MVP (premium hoãn). |
 | `created_at` | — | — | Thời điểm tạo bản ghi. |
 | `updated_at` | — | — | Thời điểm cập nhật gần nhất. |
 
-Khoảng band là metadata nội dung, không phải trạng thái học. `ai-learning-service` dùng nó để chọn phạm vi path theo band mục tiêu của goal, và để test-out từ placement. Cả hai đầu NULL nghĩa là "mọi band".
+Khoảng band là metadata nội dung, không phải trạng thái học, chỉ để hiển thị. Cả hai đầu NULL nghĩa là "mọi band". Từ V5.1 path không dùng band: không lọc topic theo band mục tiêu của goal, không test-out từ placement.
+
+V5.2 thay: bỏ `test_package_id` của V5.1. Một topic có nhiều mã đề; mỗi gói `TOPIC_TEST` trỏ về topic qua `content_packages.topic_id` (§5.1).
 
 
 ## 4.2 `knowledge_points`
@@ -512,16 +526,16 @@ Thuộc tính chính:
 | `skill?` | — | — | Thuộc tính nghiệp vụ của bảng. |
 | `description` | — | — | Mô tả chi tiết. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
-| `band_min?` | numeric(2,1) | CHECK như `topics` | Khoảng band riêng của KP (xem dưới). |
-| `band_max?` | numeric(2,1) | CHECK như `topics` | Khoảng band riêng của KP (xem dưới). |
 | `created_at` | — | — | Thời điểm tạo bản ghi. |
 | `updated_at` | — | — | Thời điểm cập nhật gần nhất. |
 
-Band hiệu lực của KP: nếu KP có khoảng band riêng (ít nhất một đầu khác NULL) thì dùng **trọn** khoảng đó, ngược lại dùng khoảng của topic. Không ghép một đầu của KP với đầu kia của topic, để không bao giờ ra khoảng ngược (`min > max`). Topic con không kế thừa band của topic cha. API trả cả khoảng riêng (`bandMin`/`bandMax`) và khoảng hiệu lực (`effectiveBandMin`/`effectiveBandMax`).
+V5.2: KP không còn band (bỏ `band_min`, `band_max` và luật "band hiệu lực"). API không trả `bandMin`, `bandMax`, `effectiveBandMin`, `effectiveBandMax`. Band chỉ còn ở `topics` để hiển thị.
 
 `learning_type` phải map 1:1 sang DeepTutor `KnowledgeType`. Các category nghiệp vụ như Grammar/Vocabulary/Strategy (nếu bổ sung sau) chỉ là metadata phân loại content, không thay thế `learning_type`.
 
 `learning_type` là `MEMORY | CONCEPT | PROCEDURE | DESIGN`, ánh xạ 1:1 sang DeepTutor `KnowledgeType`; không suy ra từ `kind`. Trạng thái `ACTIVE` yêu cầu `learning_type IS NOT NULL`. Migration V2 chuyển các Knowledge Point active chưa được phân loại sang `INACTIVE`, giữ nguyên dữ liệu và chờ content editor phân loại trước khi publish lại.
+
+V5.3: KP đo bằng câu tự chấm (Listening, Reading) nên là `MEMORY` hoặc `PROCEDURE`. DeepTutor coi `CONCEPT`/`DESIGN` là đạt chỉ khi tutor chấm một lời giải thích (`mastery_assess`), nên làm bài đúng bao nhiêu cũng không hiện "đã nắm".
 
 ## 4.3 `vocabulary_items`
 
@@ -566,11 +580,13 @@ Thuộc tính chính:
 
 Ví dụ từ `record` có thể có một sense `NOUN` với nghĩa "bản ghi" và một sense `VERB` với nghĩa "ghi lại"; mỗi sense có ví dụ riêng.
 
-# 5. Content — Đề, bài học và câu hỏi
+# 5. Content — Đề, bài học, câu hỏi; Library — video catalog
+
+Content sở hữu §5.1–§5.9 và §5.13–§5.18. `learning_videos`, `video_segments`, `video_segment_lexical_entries` (§5.10–§5.12) thuộc `library_db` từ library V1; content V7 đã xóa ba bảng video cũ. Số mục giữ nguyên để không làm gãy các tham chiếu nội bộ.
 
 ## 5.1 `content_packages`
 
-Đại diện cho một bộ nội dung hoàn chỉnh như mock test, placement test, practice set, quiz, game set hoặc lesson. Content không sở hữu khái niệm plan `FREE/PREMIUM`; nếu package cần entitlement thì chỉ khai báo `required_feature_key`, còn quyết định user có quyền truy cập thuộc `access-service`.
+Đại diện cho một bộ nội dung hoàn chỉnh như mock test, placement test, practice set, quiz hoặc đề cuối topic. V5.1 thêm `TOPIC_TEST`. V5.2 **giữ** `LESSON` (V5.1 định bỏ; luồng đọc bài của tutor còn dùng; bài học mới dùng bảng riêng §5.13). V5.2: `PRACTICE_SET` có ≥ 3 câu là ngân hàng câu cho bài ôn và luyện thêm (§7.25), không trùng câu với bài học hay đề cuối của cùng topic; `TOPIC_TEST` chỉ tạo bằng seed, không qua API. Content không sở hữu khái niệm plan `FREE/PREMIUM`; nếu package cần entitlement thì chỉ khai báo `required_feature_key`, còn quyết định user có quyền truy cập thuộc `access-service`.
 
 Thuộc tính chính:
 
@@ -579,7 +595,8 @@ Thuộc tính chính:
 | `id` | uuid | PK | Định danh duy nhất của bản ghi. |
 | `code` | — | — | Mã nghiệp vụ ổn định. |
 | `title` | — | — | Tiêu đề. |
-| `package_type` | — | — | Loại package. |
+| `package_type` | varchar(50) | CHECK `MOCK_TEST`/`PLACEMENT_TEST`/`PRACTICE_SET`/`QUIZ`/`LESSON`/`TOPIC_TEST` | Loại package. `TOPIC_TEST` là một mã đề cuối của topic. |
+| `topic_id?` | uuid | FK → `topics`; CHECK bắt buộc khi `package_type = 'TOPIC_TEST'` | V5.2. Topic mà mã đề thuộc về. Một topic có nhiều mã đề; ai-learning giao mã đề cho học viên (§7.26). |
 | `required_feature_key?` | varchar(100) | Logical ref ↗ `Access.plan_features.feature_key` | Feature cần có để truy cập package; `NULL` nếu không có feature gate riêng. Không FK xuyên service. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
 | `current_published_version_id?` | — | — | Phiên bản đang publish. |
@@ -663,6 +680,15 @@ Thuộc tính chính:
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
 | `UQ(question_id, version_number)` | — | `UQ(question_id, version_number)` | Ràng buộc duy nhất cho tổ hợp cột. |
 
+`answer_spec` theo dạng câu tự chấm (V5.1; contract ghi vào `docs/contracts/` khi triển khai, dùng chung cho game, assessment, ai-learning):
+
+| `question_type` | `options` | `answer_spec` | Đúng khi |
+| :--- | :--- | :--- | :--- |
+| `MULTIPLE_CHOICE` | `[{optionKey, content, sortOrder}]` | `{"correct":"A"}` | Chọn đúng `optionKey`. |
+| `TRUE_FALSE_NOT_GIVEN` | NULL | `{"correct":"NOT_GIVEN"}` | Chọn đúng `TRUE`, `FALSE` hoặc `NOT_GIVEN`. |
+| `FILL_IN_BLANK`, `SHORT_ANSWER` | NULL | `{"accepted":["two decades","20 years"]}` | Khớp một đáp án sau khi bỏ phân biệt hoa thường và khoảng trắng thừa; sai chính tả là sai. |
+| `MATCHING` | Danh sách heading dùng chung | `{"correct":"iii"}` | Mỗi câu chỉ một cặp (một đoạn ↔ một heading); một câu một điểm. |
+
 
 ## 5.6 `section_questions`
 
@@ -690,8 +716,10 @@ Thuộc tính chính:
 | :--- | :--- | :--- | :--- |
 | `question_version_id` | uuid | FK → `question_versions` | Định danh phiên bản câu hỏi liên quan. |
 | `knowledge_point_id` | uuid | FK → `knowledge_points` | Định danh đối tượng `knowledge_point` liên quan. |
-| `weight` | — | — | Thuộc tính nghiệp vụ của bảng. |
+| `weight` | numeric(5,2) | mặc định 1.00 | Trọng số khai báo. Engine mastery hiện không dùng giá trị này. |
 | `PK(question_version_id, knowledge_point_id)` | — | `PK(question_version_id, knowledge_point_id)` | Khóa chính tổng hợp. |
+
+V5.1: mỗi câu chỉ gắn KP mà nó thật sự đo, `weight` để 1.00. Engine mastery (`compute_mastery`) chỉ nhận đúng/sai: mỗi cặp (câu, KP) được tính là một lần làm đầy đủ, nên gắn thêm KP phụ sẽ làm mastery KP đó lệch.
 
 
 ## 5.8 `content_assets`
@@ -763,7 +791,7 @@ Thuộc tính chính:
 | `description?` | text | — | Mô tả ngắn về nội dung học. |
 | `thumbnail_url?` | varchar(500) | — | Thumbnail dùng cho danh sách video. |
 | `duration_seconds?` | integer | CHECK >= 0 | Thời lượng video nếu đã biết. |
-| `topic_id?` | uuid | FK → `topics` | Topic chính liên quan tới video nếu cần phân loại/recommend. |
+| `topic_id?` | uuid | Logical ref ↗ `Content.topics`, không FK xuyên DB | Topic chính liên quan tới video. Khi ghi video, library kiểm tra bằng `GET /api/content/topics/{id}`. |
 | `level?` | varchar(20) | — | Mức độ nội dung, ví dụ `A2`, `B1`, `B2`, `C1`. |
 | `required_feature_key?` | varchar(100) | Logical ref ↗ `Access.plan_features.feature_key` | Feature cần có để truy cập video; `NULL` nếu không có gate riêng. Không FK xuyên service. |
 | `status` | varchar(30) | — | Trạng thái như `DRAFT`, `PUBLISHED`, `ARCHIVED`. |
@@ -846,6 +874,109 @@ Khi learner click lexical entry, frontend có thể mở `vocabulary_sense` tư�
 
 V4 **không có bảng `video_questions`**. Baseline hiện tại chỉ chốt Watch/Subtitle, interactive vocabulary, saved segment, Dictation và Shadowing. Nếu sau này bổ sung comprehension question, hệ thống sẽ ưu tiên tái sử dụng `questions` và `question_versions` (options nằm trong `question_versions.options`) rồi chỉ thiết kế mapping video ↔ question khi business flow được chốt.
 
+## 5.13 `lessons` (V5.1)
+
+Một bài học trong topic. Học viên học các bài theo `sort_order`; bài sau mở khi bài trước hoàn thành (luật và tiến độ ở `ai-learning-service`). Bài học không versioning.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh bài. |
+| `topic_id` | uuid | FK → `topics` | Topic sở hữu bài; mỗi bài thuộc đúng một topic. |
+| `code` | varchar(100) | UNIQUE | Mã nghiệp vụ ổn định. |
+| `title` | varchar(255) | NOT NULL | Tên bài. |
+| `summary?` | text | — | Mô tả ngắn, mục tiêu hiển thị. |
+| `sort_order` | integer | NOT NULL | Thứ tự học trong topic. |
+| `status` | varchar(20) | CHECK `DRAFT`/`PUBLISHED`/`ARCHIVED` | Chỉ bài `PUBLISHED` xuất hiện với học viên. |
+| `created_at`, `updated_at` | timestamptz | NOT NULL | |
+| `UQ(topic_id, sort_order)` | — | — | Mỗi vị trí trong topic một bài. |
+
+Thêm bài mới vào topic học viên đã `PASSED` không khóa lại topic; bài mới hiện `AVAILABLE`, không bắt buộc.
+
+## 5.14 `lesson_blocks` (V5.1)
+
+Thân bài: chuỗi khối theo thứ tự. Bài không chép đoạn văn, từ vựng hay câu hỏi; mỗi khối chỉ giữ thứ tự và tham chiếu. Chỉ khối `TEXT` tự chứa nội dung.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh khối. |
+| `lesson_id` | uuid | FK → `lessons` ON DELETE CASCADE | Bài chứa khối. |
+| `sort_order` | integer | NOT NULL | Thứ tự hiển thị trong bài. |
+| `block_type` | varchar(20) | CHECK `TEXT`/`ASSET`/`VOCABULARY`/`EXERCISE` | Loại khối. |
+| `text_content?` | text | — | Markdown của khối `TEXT` (bắt buộc); hướng dẫn tùy chọn của khối `EXERCISE`. |
+| `asset_id?` | uuid | FK → `content_assets` | Bắt buộc với khối `ASSET` (`PASSAGE`, `IMAGE`, `AUDIO`). |
+| `created_at`, `updated_at` | timestamptz | NOT NULL | |
+| `UQ(lesson_id, sort_order)` | — | — | |
+
+CHECK theo `block_type`: `TEXT` cần `text_content` và không có `asset_id`; `ASSET` cần `asset_id`; `VOCABULARY` không có cả hai; `EXERCISE` không có `asset_id`. Nội dung khối `VOCABULARY`, `EXERCISE` nằm ở §5.15, §5.16.
+
+## 5.15 `lesson_block_vocabulary` (V5.1)
+
+Các từ trong một khối `VOCABULARY`. Nghĩa, ví dụ, phát âm nằm ở `vocabulary_senses`; "thêm vào flashcard" dùng đúng `vocabulary_sense_id` này.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `block_id` | uuid | FK → `lesson_blocks` ON DELETE CASCADE | Khối từ vựng. |
+| `vocabulary_sense_id` | uuid | Logical ref ↗ `Library.vocabulary_senses`, không FK xuyên DB | Nghĩa từ được học. |
+| `sort_order` | integer | NOT NULL | Thứ tự trong khối. |
+| `PK(block_id, vocabulary_sense_id)` | — | — | |
+
+## 5.16 `lesson_block_questions` (V5.1)
+
+Các câu trong một khối `EXERCISE`, theo thứ tự. Học viên nộp và được chấm theo từng khối; bài hoàn thành khi mỗi khối bài tập có một lần nộp ≥ 70%. Câu hỏi không có `lesson_id`: bài biết câu nào qua bảng này, không suy qua KP.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `block_id` | uuid | FK → `lesson_blocks` ON DELETE CASCADE | Khối bài tập. |
+| `question_version_id` | uuid | FK → `question_versions` | Ghim version đã publish; câu được sửa thì khối vẫn trỏ version cũ tới khi author đổi. |
+| `sort_order` | integer | NOT NULL | Thứ tự câu trong khối. |
+| `PK(block_id, question_version_id)` | — | INDEX(`question_version_id`) | Index để biết một câu đang được bài nào dùng. |
+
+Luật kiểm ở use case: chỉ câu tự chấm (bảng `answer_spec` ở §5.5); câu thuộc đề cuối (`TOPIC_TEST`) hoặc gói luyện tập (`PRACTICE_SET`) của cùng topic không được gắn vào khối bài tập, và ngược lại (V5.2 thêm gói luyện tập).
+
+## 5.17 `lesson_knowledge_points` (V5.1)
+
+Bài dạy KP nào. `ai-learning-service` dùng bảng này để tìm bài ôn khi KP yếu và để hiện mục tiêu của bài.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `lesson_id` | uuid | FK → `lessons` ON DELETE CASCADE | Bài dạy. |
+| `knowledge_point_id` | uuid | FK → `knowledge_points` | KP được dạy. |
+| `PK(lesson_id, knowledge_point_id)` | — | INDEX(`knowledge_point_id`) | Index cho câu hỏi "KP này do bài nào dạy". |
+
+KP phải cùng topic với bài (kiểm ở use case). Một bài dạy được nhiều KP; một KP có thể được nhiều bài dạy. V5.2: ai-learning chép danh sách KP của bài vào `lesson_progress.knowledge_point_ids` (§7.22) mỗi khi học viên mở hoặc nộp bài, để tìm bài dạy KP mà không gọi Content.
+
+## 5.18 Listening và độ khó của gói (V5.3)
+
+Không thêm bảng hay cột. Listening dùng lại các bảng content hiện có:
+
+| Bảng | Dữ liệu Listening |
+| :--- | :--- |
+| `topics` | Topic Listening, vào thứ tự học như topic khác (seed demo: `DEMO_LISTENING`, `sort_order` 920, sau `TFNG_SKILLS`). |
+| `knowledge_points` | KP theo kỹ năng con, `skill = LISTENING`, `learning_type = PROCEDURE`: `LS_NUM` (số, ngày, giờ, giá), `LS_SPELL` (đánh vần tên, địa chỉ, mã), `LS_PARA` (bắt ý qua paraphrase), `LS_TRAP` (tránh bẫy đổi ý). |
+| `lessons`, `lesson_blocks`, `lesson_block_questions`, `lesson_knowledge_points` | Bài nghe: khối `TEXT` → khối `ASSET` (asset `AUDIO`) → khối `EXERCISE`. |
+| `questions`, `question_versions`, `question_knowledge_points` | Câu `FILL_IN_BLANK` (form, note completion) và `MULTIPLE_CHOICE`, chấm theo `answer_spec` như Reading; mỗi câu 1 KP chính; câu trong gói luyện có `difficulty`. |
+| `content_assets` | `asset_type = AUDIO`: `media_reference` = key file, `duration_seconds`, `text_content` = transcript. |
+| `content_packages`, `content_package_versions`, `content_sections`, `section_questions`, `content_asset_links` | Gói `PRACTICE_SET` theo mức và mã `TOPIC_TEST`; section `skill = LISTENING` gắn một asset AUDIO qua `content_asset_links.section_id`. |
+
+Luật:
+
+- **`media_reference` của AUDIO:** key (không scheme, không `..`, không bắt đầu bằng `/`) hoặc URL `https://`. Content ghép key với
+  `CONTENT_MEDIA_BASE_URL` khi trả ra; DB không lưu URL bucket, nên đổi bucket chỉ cần đổi env. File mp3 nằm trên object storage
+  (MVP: bucket public-read), không lưu binary trong DB.
+- **Transcript là đáp án:** `text_content` của AUDIO chỉ đi qua endpoint nội bộ `/internal/learning-content/*`.
+  `GET /api/content/assets/{id}` chỉ cho `ADMIN`, `CONTENT_AUTHOR`. Học viên thấy transcript khi bài xong (§7.22), khi gói
+  đạt ≥ 70% (§7.25) hoặc khi đề đạt ≥ 70% (§6.2).
+- **Mức của gói:** mức cao nhất trong `question_versions.difficulty` của các câu trong gói (`EASY < MEDIUM < HARD`); câu không
+  có `difficulty` tính là `MEDIUM`. Endpoint nội bộ tìm gói và package version trả kèm `difficulty`; tìm gói trả thêm
+  `questionTypes` (các `questions.question_type` khác nhau trong gói). Content chỉ trả metadata; chọn gói là việc của
+  ai-learning (§7.25).
+- **Dạng câu Listening:** 6 dạng IELTS đều biểu diễn được bằng loại câu sẵn có: multiple choice → `MULTIPLE_CHOICE`; matching
+  và plan/map/diagram labelling → `MATCHING` (ảnh qua `content_asset_links`); form/note/table/flow-chart/summary completion
+  và sentence completion → `FILL_IN_BLANK`; short answer → `SHORT_ANSWER`. Dạng "chọn HAI đáp án" chưa có trong
+  `answer-spec-v1`.
+- **Luật soạn gói luyện:** mọi câu trong một gói cùng KP và cùng mức. Audio theo mức: `EASY` một người nói, chậm và rõ, không
+  bẫy; `MEDIUM` hai người nói, tốc độ thường, một bẫy; `HARD` nhanh hơn, giọng khác, từ hai bẫy trở lên.
+
 ---
 # 6. Assessment — Làm bài, nộp bài và kết quả
 
@@ -860,13 +991,13 @@ Thuộc tính chính:
 | `id` | uuid | PK | Định danh duy nhất của bản ghi. |
 | `user_id` | uuid | Logical ref ↗ `Identity.users` | Định danh user liên quan. |
 | `package_version_id` | uuid | Logical ref ↗ `Content` | Định danh phiên bản package liên quan. |
-| `attempt_type` | — | — | Thuộc tính nghiệp vụ của bảng. |
+| `attempt_type` | — | — | V5.2: assessment suy từ loại gói (`TOPIC_TEST` → `TOPIC_GATE`, `MOCK_TEST` → `MOCK`, `PLACEMENT_TEST` → `PLACEMENT`, `QUIZ` → `QUIZ`); `PRACTICE_SET`, `LESSON` bị từ chối. Không nhận từ app. |
 | `mode` | — | — | Thuộc tính nghiệp vụ của bảng. |
 | `channel` | — | — | Thuộc tính nghiệp vụ của bảng. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
 | `started_at?` | — | — | Thời điểm bắt đầu nếu có. |
 | `submitted_at?` | — | — | Thời điểm submit nếu có. |
-| `expires_at?` | — | — | Thời điểm hết hạn nếu áp dụng. |
+| `expires_at?` | — | — | Thời điểm hết hạn nếu áp dụng. V5.2: lấy từ luật của package version, không nhận từ app. |
 | `row_version` | bigint | — | Version dùng cho optimistic locking. |
 | `created_at` | — | — | Thời điểm tạo bản ghi. |
 | `updated_at` | — | — | Thời điểm cập nhật gần nhất. |
@@ -889,6 +1020,10 @@ Thuộc tính chính:
 | `completed_at?` | — | — | Thời điểm hoàn thành nếu đã hoàn thành. |
 | `UQ(attempt_id, sort_order)` | — | `UQ(attempt_id, sort_order)` | Ràng buộc duy nhất cho tổ hợp cột. |
 
+V5.3: `section_snapshot` có dạng `{title, skill, instructions, passage?, audio?: {url, durationSeconds}, solution?: {transcript}}`.
+`audio.url` là URL đầy đủ content đã ghép. `solution` chỉ server đọc: cấu trúc attempt trả section cho học viên theo danh
+sách trường cho phép, không bao giờ có `solution`; transcript chỉ nằm trong lời giải khi kết quả ≥ 70%. Không migration.
+
 
 ## 6.3 `attempt_items`
 
@@ -902,8 +1037,8 @@ Thuộc tính chính:
 | `attempt_section_id` | uuid | FK → `attempt_sections` | Định danh đối tượng `attempt_section` liên quan. |
 | `question_version_id` | uuid | Logical ref ↗ `Content` | Định danh phiên bản câu hỏi liên quan. |
 | `sort_order` | — | — | Thứ tự hiển thị/xử lý. |
-| `question_snapshot` | jsonb | — | Tham chiếu tới đối tượng liên quan. |
-| `answer_snapshot` | jsonb | — | Tham chiếu tới đối tượng liên quan. |
+| `question_snapshot` | jsonb | — | V5.2: đề và lựa chọn, **không** có đáp án. Assessment tự lấy từ Content khi tạo attempt. |
+| `answer_snapshot` | jsonb | — | V5.2: `{answerSpec, explanation, maxScore}` chép từ Content khi tạo attempt; dùng để tự chấm; không bao giờ trả cho học viên. |
 | `knowledge_snapshot` | jsonb | — | Tham chiếu tới đối tượng liên quan. |
 | `UQ(attempt_section_id, sort_order)` | — | `UQ(attempt_section_id, sort_order)` | Ràng buộc duy nhất cho tổ hợp cột. |
 
@@ -974,6 +1109,8 @@ Thuộc tính chính:
 | `completed_at?` | — | — | Thời điểm hoàn thành nếu đã hoàn thành. |
 | `UQ(attempt_id, result_version)` | — | `UQ(attempt_id, result_version)` | Ràng buộc duy nhất cho tổ hợp cột. |
 
+V5.2: attempt mà mọi câu tự chấm được thì khi nộp tự tạo version 1 `COMPLETED` và outbox `AssessmentCompleted.v2` (có `package_version_id`, `learning_goal_id` null) trong cùng transaction. Điểm trả học viên tính từ `item_results` (đúng/sai từng câu); lời giải chỉ trả khi ≥ 70%. Không thêm cột.
+
 
 ## 6.7 `skill_scores`
 
@@ -1039,8 +1176,8 @@ Thuộc tính chính:
 | :--- | :--- | :--- | :--- |
 | `id` | uuid | PK | Định danh lần luyện video. |
 | `user_id` | uuid | Logical ref ↗ `Identity.users` | Learner thực hiện practice. |
-| `video_id` | uuid | Logical ref ↗ `Content.learning_videos` | Video đang luyện. |
-| `segment_id` | uuid | Logical ref ↗ `Content.video_segments` | Segment cụ thể được dùng cho attempt. |
+| `video_id` | uuid | Logical ref ↗ `Library.learning_videos` | Video đang luyện. |
+| `segment_id` | uuid | Logical ref ↗ `Library.video_segments` | Segment cụ thể được dùng cho attempt. |
 | `practice_type` | varchar(30) | — | Loại practice; baseline V4 dùng `DICTATION`, `SHADOWING`. |
 | `reference_text_snapshot` | text | — | Snapshot transcript chuẩn tại thời điểm learner luyện để kết quả cũ không thay đổi nếu content được sửa sau này. |
 | `response_text?` | text | — | Câu learner nhập khi `DICTATION`. |
@@ -1161,11 +1298,10 @@ Index đề xuất:
 
 ```text
 (user_id, updated_at DESC)
-(learning_goal_id)
-UNIQUE (user_id, learning_goal_id) WHERE learning_goal_id IS NOT NULL
+UNIQUE (user_id)
 ```
 
-Partial unique index trên bảo đảm mỗi learning goal có tối đa một mastery path thuộc learner đó. Các path không gắn goal (`learning_goal_id IS NULL`) vẫn có thể tồn tại nhiều bản ghi cho cùng user.
+V5.2 thay: một path mỗi học viên (`UNIQUE (user_id)`), thay cho `UNIQUE (user_id, learning_goal_id) WHERE learning_goal_id IS NOT NULL`. `learning_goal_id` giữ cột nhưng không dùng để tìm hay tạo path. Path tạo từ Content theo `sort_order`: không goal, không lọc band, không LLM. Migration gộp path trùng giữ path có nhiều evidence nhất.
 
 Không tạo các cột `WEAK / LEARNING / MASTERED` riêng. Display status được derive bằng DeepTutor policy từ aggregate.
 
@@ -1249,7 +1385,7 @@ Projection/index của DeepTutor `LearningEvidence`. Aggregate `state_json` vẫ
 | `ordinal` | bigint | NOT NULL | Thứ tự evidence ổn định trong aggregate. |
 | `knowledge_point_id` | uuid | Logical ref ↗ `Content.knowledge_points` | KP chịu tác động. |
 | `occurred_at` | timestamptz | NOT NULL | Thời điểm evidence xảy ra. |
-| `source` | varchar(50) | NOT NULL | Ví dụ `mastery_path`, `placement`, `practice`, `mock`, `topic_gate`. |
+| `source` | varchar(50) | NOT NULL | Ví dụ `mastery_path`, `placement`, `practice`, `mock`, `topic_gate`. V5.2 thêm `lesson_exercise` (bài tập trong bài học) và `review_set` (gói ôn, luyện thêm). |
 | `source_reference_id?` | uuid | IELTSPath extension | ID formal source như `item_result_id`; dùng idempotency/correlation. |
 | `assessment_type` | varchar(30) | NOT NULL | DeepTutor baseline: `quiz`, `qualitative`, `review`; adapter có thể map formal evidence vào type tương thích. |
 | `result` | varchar(20) | NOT NULL | `correct`, `incorrect`, `partial`. |
@@ -1270,7 +1406,7 @@ Index:
 (path_id, source, source_reference_id)
 ```
 
-`source_reference_id` là extension của IELTSPath để ingest event từ `assessment-service` idempotently. Nếu model DeepTutor được mở rộng, field này phải nằm trong fork/model adapter chứ không được tạo một mastery pipeline riêng.
+`source_reference_id` là extension của IELTSPath để ingest event từ `assessment-service` idempotently. V5.2: `(path_id, source, source_reference_id)` là unique cho cả `lesson_exercise` và `review_set`; reference tất định theo `request_id` + câu + KP, nên gửi lại không ghi trùng. Khối bài tập đã từng đạt nộp lại thì không ghi evidence. Nếu model DeepTutor được mở rộng, field này phải nằm trong fork/model adapter chứ không được tạo một mastery pipeline riêng.
 
 ---
 
@@ -1515,7 +1651,7 @@ Không còn `daily_plans` / `daily_tasks`. `GET /learning/today` là projection 
 
 ### Topic Progress
 
-Không còn `topic_progress` table. Topic/path progress được derive từ DeepTutor map/progress. Formal Topic Gate result nằm ở Assessment và được ingest vào DeepTutor.
+V5 bỏ `topic_progress` của engine V4. V5.1 thêm lại một bảng cùng tên với nghĩa khác (§7.21): chỉ lưu học viên đã mở hay đã qua topic trong luồng học bài. Mastery và evidence vẫn nằm ở DeepTutor core; kết quả đề cuối vẫn nằm ở Assessment và được ingest vào DeepTutor.
 
 ### Learner Memory
 
@@ -1547,6 +1683,12 @@ PostgreSQL AI LearningStore transaction
 
 Cấm consumer update `mastery_paths.state_json` bằng ad-hoc SQL.
 
+V5.2:
+- `learning_goal_id` trong event có thể null; path và pending tìm theo `user_id`.
+- `PLACEMENT`: chỉ ghi version đã xử lý, không ghi evidence, không test-out.
+- `TOPIC_GATE`: tra `topic_test_assignments` (§7.26) theo `package_version_id`, đánh dấu đã dùng, cập nhật `topic_progress`, rồi áp luật bài ôn (§7.24). `MOCK`, `OFFICIAL_PRACTICE`, `QUIZ`: chỉ áp luật bài ôn.
+- Mọi bước trên chạy **trong cùng transaction** với evidence và trước khi ghi version đã áp, nên nhận lại event không mất hay nhân đôi kết quả. Consumer không gọi HTTP.
+
 ---
 
 ## 7.16 Transaction boundary
@@ -1566,6 +1708,8 @@ Practice ghi notebook và review state bằng transaction riêng của `Practice
 không thay đổi `mastery_paths`, revision, mastery hoặc evidence. Không được tách interaction/evidence ra khỏi giao dịch
 mastery của tool; nếu cần atomicity của toàn turn, phải thiết kế thêm trước khi mở rộng runtime nhiều instance.
 
+V5.2: mọi thay đổi tiến độ bài học (§7.21–§7.26) chạy trong transaction đang khóa `mastery_paths` của học viên, trên cùng connection với evidence. Nộp bài, bài ôn, giao mã đề của cùng học viên vì vậy chạy tuần tự.
+
 ---
 
 ## 7.17 Snapshot Content theo path
@@ -1575,10 +1719,15 @@ thứ hai. Hai snapshot được thay thế trong transaction đang khóa `maste
 
 | Bảng | Migration | Nội dung |
 | --- | --- | --- |
-| `mastery_path_knowledge_point_bands` | V4 | `knowledge_point_id`, `band_min`, `band_max` hiệu lực của KP được giữ trong scope. |
-| `mastery_path_knowledge_point_details` | V6 | `knowledge_point_id`, nullable `skill`, `description` tối đa 1.000 ký tự. |
+| `mastery_path_knowledge_point_details` | V6, V10 | `knowledge_point_id`, nullable `skill`, `description` tối đa 1.000 ký tự; `has_practice_set` (V10, mặc định false). |
 
-Refresh giữ lại band và details của KP đã rời curriculum, giống như path vẫn giữ KP retired. Thay đổi `skill` hoặc
+V5.2 xóa bảng `mastery_path_knowledge_point_bands` (V4), vì KP không còn band.
+
+MVP (chốt 2026-10-01): snapshot ghi từ `GET /internal/learning-content/topic-sequence` (một lần gọi Content ở `GET /topics`).
+`has_practice_set` = content có gói `PRACTICE_SET` đủ điều kiện cho KP; luật chèn bài ôn (§7.24) đọc cột này để consumer
+không phải gọi HTTP. Đổi cờ cũng là thay đổi snapshot và được ghi ở lần refresh kế tiếp.
+
+Refresh giữ lại details của KP đã rời curriculum, giống như path vẫn giữ KP retired. Thay đổi `skill` hoặc
 `description` là thay đổi snapshot thật và commit một revision mới; nếu không đổi curriculum hoặc metadata, revision
 không tăng. Path cũ nhận details lần đầu trong lần `POST /api/ai-learning/paths` refresh kế tiếp; trước đó
 `knowledge_point_details` trả skill null và description rỗng. `path_outline` không mang description; tutor chỉ đọc nó qua
@@ -1644,33 +1793,173 @@ hưởng ngày mới.
 
 ---
 
-# 8. Learning Support — Tracking, Video Progress và Personal Library
+## 7.21 `topic_progress` (V5.1, sửa V5.2)
 
-Phần này thuộc **`learning-support-service`**, database **`learning_support_db`**. Service này giữ learner-owned utility state và được tách khỏi `ai-learning-service` để AI Learning chỉ tập trung vào DeepTutor ADP/Tutor core.
+Tiến độ topic theo học viên trong luồng học bài. Mỗi topic trong thứ tự học có một dòng. **Chỉ lưu `passed_at`; trạng thái suy ra khi đọc** (chốt 2026-09-30), nên content thêm topic ở bất kỳ vị trí nào cũng không làm kẹt học viên. Cùng thiết kế, `mastery_paths` (§7.1) chuyển từ theo (`user_id`, `learning_goal_id`) sang một path mỗi học viên.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `user_id` | uuid | PK (1/2) | Học viên; không FK sang User Service. |
+| `topic_id` | uuid | PK (2/2), logical ref ↗ `Content.topics` | Topic. |
+| `sequence_order?` | integer | — | V5.2. Vị trí của topic trong thứ tự học (topic có bài và có đề, theo `sort_order`). NULL khi topic không còn trong thứ tự học (bỏ qua khi suy trạng thái). |
+| `passed_at?` | timestamptz | — | Lúc qua topic. |
+| `updated_at` | timestamptz | NOT NULL | |
+
+V5.2 thay: bỏ `best_test_score_percent` (không nơi nào đọc; điểm từng lần nằm ở §7.26).
+Chốt 2026-09-30: bỏ cột `status` (V5.2 định lưu `LOCKED`/`IN_PROGRESS`/`PASSED`).
+- Ghi ở `GET /topics`: upsert dòng cho mọi topic trong thứ tự học với `sequence_order`; topic không còn trong danh sách → `sequence_order = NULL`.
+- Trạng thái trả API: `PASSED` nếu `passed_at` có giá trị; topic đầu tiên theo `sequence_order` chưa PASSED là `IN_PROGRESS`; còn lại `LOCKED`.
+- Ghi khi nhận `AssessmentCompleted.v2` của mã đề đã giao (§7.26): ≥ 70% → `passed_at` (`WHERE passed_at IS NULL`). Không có bước mở topic kế.
+- `passed_at` chỉ đi một chiều; chấm lại ra điểm thấp hơn cũng không gỡ.
+
+## 7.22 `lesson_progress` (V5.1, sửa V5.2)
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `user_id` | uuid | PK (1/2) | Học viên. |
+| `lesson_id` | uuid | PK (2/2), logical ref ↗ `Content.lessons` | Bài. |
+| `topic_id` | uuid | logical ref ↗ `Content.topics` | Topic của bài, để lọc theo topic không cần gọi Content. |
+| `lesson_sort_order` | integer | NOT NULL | V5.2. Thứ tự bài trong topic, để chọn bài ôn có thứ tự nhỏ nhất. |
+| `knowledge_point_ids` | uuid[] | NOT NULL, GIN index | V5.2. KP bài dạy, chép từ Content (§5.17) mỗi lần mở hoặc nộp bài. Consumer dùng để tìm bài dạy KP mà không gọi Content. |
+| `passed_block_ids` | text[] | NOT NULL, mặc định rỗng | V5.2. Các khối bài tập đã từng đạt ≥ 70%. Cập nhật có điều kiện (`array_append … WHERE NOT … RETURNING`) để biết khối đạt lần đầu. |
+| `completed_at?` | timestamptz | — | NULL = chưa xong. Xong rồi thì giữ. |
+| `updated_at` | timestamptz | NOT NULL | |
+
+V5.2 thay: bỏ `best_score_percent`. Bài hoàn thành khi mọi khối bài tập nằm trong `passed_block_ids`; bài không có bài tập thì học viên bấm hoàn thành. Bài vừa hoàn thành thì áp luật bài ôn (§7.24).
+
+## 7.23 `lesson_exercise_submissions` (V5.1, sửa V5.2)
+
+Nhật ký từng lần nộp một khối bài tập, append-only.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | |
+| `user_id` | uuid | NOT NULL | Học viên. |
+| `lesson_id` | uuid | logical ref ↗ `Content.lessons` | Bài. |
+| `block_id` | uuid | logical ref ↗ `Content.lesson_blocks` | Khối bài tập được nộp. |
+| `request_id` | varchar(100) | UNIQUE | Chống nộp trùng: gửi lại cùng `request_id` thì trả kết quả cũ, không ghi thêm. |
+| `answers` | jsonb | NOT NULL | `question_version_id` → câu trả lời. |
+| `block_passed` | boolean | NOT NULL | V5.2. Lần nộp này đạt ≥ 70%. |
+| `response` | jsonb | NOT NULL | V5.2. Response đã trả (điểm, đúng/sai từng câu, lời giải nếu đạt); gửi lại cùng `request_id` thì trả lại đúng response này. |
+| `submitted_at` | timestamptz | NOT NULL | |
+| `INDEX(user_id, lesson_id, block_id)` | — | index | Tìm lần nộp đầu của khối (quyết định ghi bằng chứng và `wrong_kps`); gom câu từng sai của khối (gợi ý đã mở). |
+
+V5.2 thay: bỏ `correct_count`, `total_count`, `score_percent` (đã nằm trong `response`).
+- Mỗi lần nộp: chấm theo `answer_spec`.
+- **Chưa đạt:** chỉ trả đúng/sai từng câu, không trả đáp án hay `explanation`.
+- **Đạt:** trả thêm đáp án và `explanation`.
+- Ghi bằng chứng mastery (`source = lesson_exercise`) cho từng cặp (câu, KP) theo `sort_order` của câu, **chỉ ở lần nộp đầu của khối** (chốt 2026-09-30); mọi lần nộp sau (sửa câu sai hay nộp lại khối đã đạt) chỉ để qua khối, không ghi bằng chứng. Lý do: làm lại sau khi biết đúng/sai là loại trừ, không phải bằng chứng hiểu bài.
+- Nộp một khối không làm path đổi.
+
+## 7.24 `path_review_items` (V5.1, sửa V5.2)
+
+Bài ôn hoặc luyện thêm bắt buộc, đang chờ hoặc đã xong.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | |
+| `user_id` | uuid | NOT NULL | Học viên. |
+| `knowledge_point_id` | uuid | logical ref ↗ `Content.knowledge_points` | KP yếu. |
+| `lesson_id` | uuid | logical ref ↗ `Content.lessons` | Bài dạy KP; học viên xem lại lý thuyết của bài này. |
+| `status` | varchar(20) | CHECK `PENDING`/`DONE`/`SKIPPED` | `SKIPPED` (chốt 2026-09-30): trượt set thứ 3, học viên học tiếp. |
+| `created_at` | timestamptz | NOT NULL | |
+| `done_at?` | timestamptz | — | Lúc rời `PENDING` (`DONE` hoặc `SKIPPED`). |
+| `UQ(user_id, knowledge_point_id) WHERE status = 'PENDING'` | — | — | Mỗi KP tối đa một bài ôn đang chờ. |
+
+Path được đánh giá lại khi bài vừa hoàn thành, khi có kết quả đề cuối, mock, luyện đề hoặc quiz.
+
+**Luật chèn (V5.2, thêm điều kiện 4 ngày 2026-10-01):** một KP được chèn khi thỏa cả bốn:
+1. mastery < ngưỡng (setting `AI_LEARNING_REVIEW_MASTERY_THRESHOLD`, mặc định 0.6);
+2. có câu sai đo KP đó trong kết quả vừa xét (bài học: lần nộp đầu của mỗi khối);
+3. có bài dạy KP đó (§5.17) đã hoàn thành, **tính cả bài vừa xong**;
+4. content có gói luyện cho KP (`mastery_path_knowledge_point_details.has_practice_set`, §7.17). KP không có gói thì không chèn; đề cuối vẫn kiểm KP đó.
+
+Nhiều bài thì lấy bài có thứ tự nhỏ nhất. Khi bài được chọn chính là bài vừa xong, đó là **luyện thêm theo mastery**: học viên làm tốt thì đi thẳng, học viên yếu được giao gói câu mới trước khi học tiếp.
+
+- Còn dòng `PENDING` thì mở hay nộp bài khác, hoặc nhận mã đề, đều trả 403 `REVIEW_REQUIRED`.
+- Dòng chuyển `DONE` khi **một gói luyện tập** (§7.25) đạt ≥ 70%; không làm lại bài tập cũ. Làm xong không đánh giá lại path.
+- Trượt set thứ 3 của cùng bài ôn → `SKIPPED`, học viên học tiếp; mastery KP vẫn thấp nên đề cuối hoặc lần đánh giá sau có thể chèn bài ôn mới.
+
+V5.2 thay luật V5.1 ("không phải bài vừa xong"; "làm lại bài tập của bài ôn").
+
+Ôn theo lịch (spaced repetition) của engine không tạo dòng ở bảng này; MVP không cập nhật lịch ôn của engine (chốt 2026-10-01). V5.3 định thêm cột `wrong_question_types` để chọn gói theo dạng câu: hoãn ngoài MVP, không có cột này. Placement không ghi vào mastery nên không làm path đổi.
+
+## 7.25 `path_review_sets` (V5.2)
+
+Mỗi gói `PRACTICE_SET` đã giao cho một dòng `path_review_items`. Gói gồm một đoạn văn và ≥ 3 câu đo KP, không trùng câu bài học hay đề cuối.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | |
+| `review_item_id` | uuid | FK → `path_review_items` | Bài ôn hoặc luyện thêm. |
+| `user_id` | uuid | NOT NULL | Học viên; chỉ chủ sở hữu đọc và nộp. |
+| `package_id` | uuid | logical ref ↗ `Content.content_packages` | Gói đã giao. |
+| `package_version_id` | uuid | logical ref ↗ `Content.content_package_versions` | Version đã giao. |
+| `assigned_at` | timestamptz | NOT NULL | |
+| `submitted_at?` | timestamptz | — | NULL = set đang mở. |
+| `passed?` | boolean | — | Đạt ≥ 70%. |
+| `request_id?` | varchar(100) | UNIQUE | Chống nộp trùng. |
+| `response?` | jsonb | — | Response đã trả, dùng khi nộp trùng. |
+| `UQ(review_item_id) WHERE submitted_at IS NULL` | — | — | Mỗi bài ôn tối đa một set đang mở. |
+| `INDEX(user_id, package_id)` | — | — | Tìm gói học viên đã làm. |
+
+Chọn gói: gói chưa từng giao cho học viên, có câu đo KP; hết thì lấy gói giao lâu nhất. Trượt thì set đóng, lần mở sau giao gói khác. Mỗi lần nộp ghi evidence `source = review_set`.
+
+Không còn gói nào để giao (content gỡ gói sau khi bài ôn được chèn) → bài ôn `SKIPPED`. Chọn gói theo dạng câu và độ khó (V5.3) **hoãn ngoài MVP**: gói không gắn độ khó, chọn như trên.
+- Gói Listening trả `audio`, không có transcript; transcript nằm trong lời giải khi set đạt ≥ 70%.
+
+## 7.26 `topic_test_assignments` (V5.2)
+
+Mã đề cuối (`TOPIC_TEST`) đã giao cho học viên. Mỗi lần giao dùng một lần.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | |
+| `user_id` | uuid | NOT NULL | Học viên. |
+| `topic_id` | uuid | logical ref ↗ `Content.topics` | Topic của mã đề. |
+| `package_id` | uuid | logical ref ↗ `Content.content_packages` | Mã đề. |
+| `package_version_id` | uuid | logical ref ↗ `Content.content_package_versions` | Version đang publish lúc giao. |
+| `assigned_at` | timestamptz | NOT NULL | |
+| `consumed_attempt_id?` | uuid | logical ref ↗ `Assessment.assessment_attempts` | Attempt đã dùng lần giao này. |
+| `consumed_at?` | timestamptz | — | NULL = chưa dùng. |
+| `percent?` | numeric(5,2) | — | Điểm của lần dùng. |
+| `UQ(user_id, topic_id) WHERE consumed_at IS NULL` | — | — | Mỗi topic tối đa một lần giao chưa dùng. |
+
+- **Giao mã** (`POST /topics/{id}/test-assignments`, idempotent): chỉ khi topic `IN_PROGRESS`, mọi bài đã xong và không còn bài ôn chờ. Chọn `package_id` chưa từng dùng; hết thì lấy mã dùng lâu nhất.
+- **Consumer:** chỉ áp kết quả topic cho lần giao còn mở có `assigned_at ≤ completed_at`. Làm lại mã cũ trực tiếp qua assessment không mở được topic.
+- Đây cũng là nơi consumer tra topic của một `package_version_id`, không cần gọi Content.
+
+---
+
+# 8. Activity/Streak ở User; Video Progress và Personal Library ở Library
+
+Service hỗ trợ học viên cũ đã gỡ. User V5 tạo `learning_activities`, `streaks` trong **`user_db`**; library V2 tạo sáu bảng còn lại trong **`library_db`**. Không chép dữ liệu cũ và không có migration trên DB cũ. AI Learning không sở hữu các bảng tiện ích này.
 
 Ownership boundary:
 
 ```text
-learning-support-service
-├── Learning Tracking
-│   ├── learning_activities
-│   ├── streaks
-│   ├── video_learning_progress
-│   └── saved_video_segments
-└── Personal Library
-    ├── notes
-    ├── flashcard_decks
-    ├── flashcards
-    └── flashcard_deck_items
+user_db (user-service, V5)
+├── learning_activities
+└── streaks
+
+library_db (library-service, V2)
+├── video_learning_progress
+├── saved_video_segments
+├── notes
+├── flashcard_decks
+├── flashcards
+└── flashcard_deck_items
 ```
 
 Quy tắc:
 
-- không bảng nào trong `learning_support_db` là mastery authority;
-- service này không chạy DeepTutor policy/scheduler và không quyết định `next_objective()`;
-- video canonical metadata/segment vẫn thuộc `content_db`;
-- activity phát sinh từ Tutor/Assessment/Game được nhận qua API/event contract, không query database service khác;
-- `user_id`, `video_id`, `vocabulary_sense_id` và các source ID xuyên service chỉ là logical reference, không physical FK.
+- không bảng tiện ích nào là mastery authority; User/Library không chạy DeepTutor policy/scheduler hoặc quyết định `next_objective()`;
+- video canonical metadata/segment thuộc `library_db` (§5.10–§5.12);
+- activity phát sinh từ Tutor/Assessment/Game dùng API/event contract khi tích hợp, không query database service khác;
+- `user_id` trong hai DB này là logical reference, không FK xuyên DB; user V5 không FK tới `users`;
+- library V2 có bốn FK nội bộ `ON DELETE RESTRICT`: `flashcards.vocabulary_sense_id` → `vocabulary_senses`,
+  `video_learning_progress.video_id` và `saved_video_segments.video_id` → `learning_videos`,
+  `saved_video_segments.segment_id` → `video_segments`.
 
 ## 8.1 `learning_activities`
 
@@ -1711,7 +2000,7 @@ Giữ learner-owned progress của YouTube learning. Bảng này không phải D
 | :--- | :--- | :--- | :--- |
 | `id` | uuid | PK | Progress ID. |
 | `user_id` | uuid | Logical ref ↗ `Identity.users` | Learner. |
-| `video_id` | uuid | Logical ref ↗ `Content.learning_videos` | Video. |
+| `video_id` | uuid | FK → `Library.learning_videos` (`ON DELETE RESTRICT`) | Video. |
 | `last_position_ms` | integer | DEFAULT 0, CHECK >= 0 | Vị trí phát gần nhất. |
 | `watched_duration_seconds` | integer | DEFAULT 0, CHECK >= 0 | Tổng thời lượng đã ghi nhận. |
 | `progress_percent` | numeric(5,2) | `0..100` | UI progress. |
@@ -1732,8 +2021,8 @@ Bookmark learner-owned cho video segment; không sao chép video.
 | :--- | :--- | :--- | :--- |
 | `id` | uuid | PK | Bookmark ID. |
 | `user_id` | uuid | Logical ref ↗ `Identity.users` | Learner. |
-| `video_id` | uuid | Logical ref ↗ `Content.learning_videos` | Video nguồn. |
-| `segment_id` | uuid | Logical ref ↗ `Content.video_segments` | Segment. |
+| `video_id` | uuid | FK → `Library.learning_videos` (`ON DELETE RESTRICT`) | Video nguồn. |
+| `segment_id` | uuid | FK → `Library.video_segments` (`ON DELETE RESTRICT`) | Segment. |
 | `transcript_snapshot` | text | — | Snapshot đoạn được lưu. |
 | `note?` | text | — | Ghi chú learner. |
 | `created_at` | timestamptz | NOT NULL | Thời điểm lưu. |
@@ -1799,7 +2088,7 @@ Thuộc tính chính:
 | `id` | uuid | PK | Định danh duy nhất của flashcard. |
 | `user_id` | uuid | Logical ref ↗ `Identity.users` | Learner sở hữu flashcard. |
 | `source_type` | varchar(50) | — | Nguồn tạo flashcard: `MANUAL`, `VOCABULARY_SENSE`, `HIGHLIGHT` hoặc `PRACTICE_QUESTION`. |
-| `vocabulary_sense_id?` | uuid | Logical ref ↗ `Content.vocabulary_senses` | Có giá trị khi flashcard được tạo từ một nghĩa/từ loại cụ thể trong kho vocabulary. Đây là field thay cho `entry_version_id`. |
+| `vocabulary_sense_id?` | uuid | FK → `Library.vocabulary_senses` (`ON DELETE RESTRICT`) | Có giá trị khi flashcard được tạo từ một nghĩa/từ loại cụ thể trong kho vocabulary. Đây là field thay cho `entry_version_id`. |
 | `source_reference_id?` | uuid | — | ID nguồn khi cần truy ngược flashcard được highlight từ note/content nào; dùng cùng `source_type`, không tạo FK đa hình. |
 | `highlighted_text?` | text | — | Snapshot đoạn text learner đã highlight khi tạo flashcard bằng chức năng highlight. |
 | `front` | text | — | Mặt trước của flashcard; lưu snapshot trực tiếp. |
@@ -1815,7 +2104,7 @@ Quy ước nguồn:
 - `HIGHLIGHT`: lưu `highlighted_text` và có thể lưu `source_reference_id` để truy ngược nguồn highlight nếu sản phẩm cần.
 - `PRACTICE_QUESTION`: learner lưu một câu luyện đã trả lời của AI Learning; `source_reference_id` bắt buộc là `questionId` của
   câu đó, `vocabulary_sense_id` và `highlighted_text` phải `NULL`. Frontend tạo thẻ bằng dữ liệu `/practice/.../answer` trả về;
-  learning-support không gọi AI Learning. `V3` thêm partial unique index `uq_flashcards_user_practice_question`
+  library không gọi AI Learning. Library V2 tạo partial unique index `uq_flashcards_user_practice_question`
   `(user_id, source_reference_id) WHERE source_type = 'PRACTICE_QUESTION' AND status <> 'DELETED'`: mỗi learner có tối đa
   một thẻ chưa xóa cho một câu; lưu lại trả thẻ cũ với `200` (thẻ đang `ARCHIVED` được đưa về `ACTIVE`, giữ nguyên
   nội dung), thẻ đã xóa thì lưu lại được.
@@ -1853,7 +2142,7 @@ Game hỗ trợ cả **Vocabulary** và **Grammar**, nhưng **không liên kết
 
 - Vocabulary game lấy dữ liệu từ `vocabulary_items`, `vocabulary_senses`, ảnh minh họa và audio pronunciation khi cần.
 - Grammar game có thể lấy câu từ `questions/question_versions` hoặc dùng item grammar được sinh riêng rồi snapshot vào game session.
-- Khi bắt đầu match, `game-service` nên lấy/snapshot đủ content cần thiết thay vì gọi `content-service` cho từng WebSocket message.
+- Khi bắt đầu match, `game-service` lấy snapshot từ `library-service` nếu `learningDomain = VOCABULARY`, từ `content-service` nếu `GRAMMAR`, qua cùng contract `POST /internal/game-content/snapshots`; không gọi service cho từng WebSocket message.
 - Realtime state ngắn hạn như connection, ready state, countdown, current question và temporary live score có thể đặt ở Redis.
 - PostgreSQL `game_db` lưu dữ liệu bền vững như room, match, player, answer và các game event nghiệp vụ cần audit.
 - Không lưu heartbeat/timer tick liên tục vào PostgreSQL.
@@ -1894,7 +2183,7 @@ Thuộc tính chính:
 | `id` | uuid | PK | Định danh câu/item trong lịch sử game. |
 | `session_id` | uuid | FK → `game_sessions` | Game session chứa item này. |
 | `item_sequence` | integer | — | Thứ tự item trong session. |
-| `vocabulary_sense_id?` | uuid | Logical ref ↗ `Content.vocabulary_senses` | Nghĩa/từ loại cụ thể nếu item thuộc Vocabulary. Có thể để `NULL` với Grammar game. |
+| `vocabulary_sense_id?` | uuid | Logical ref ↗ `Library.vocabulary_senses` | Nghĩa/từ loại cụ thể nếu item thuộc Vocabulary. Có thể để `NULL` với Grammar game. |
 | `question_version_id?` | uuid | Logical ref ↗ `Content.question_versions` | Câu grammar nguồn nếu item được lấy từ question bank; có thể `NULL` nếu item được sinh riêng rồi chỉ lưu snapshot. |
 | `item_snapshot` | jsonb | — | Snapshot nội dung learner đã nhìn thấy, gồm prompt/options/image/audio metadata khi cần. |
 | `response_payload` | jsonb | — | Câu trả lời learner gửi cho item. |
@@ -2412,7 +2701,7 @@ Index ưu tiên:
 (published_at, created_at)
 ```
 
-Các database có outbox trong V5:
+Các database có outbox trong thiết kế đích V3 sau chia service:
 
 ```text
 user_db.outbox_events
@@ -2420,13 +2709,11 @@ access_db.outbox_events
 content_db.outbox_events
 assessment_db.outbox_events
 ai_learning_db.outbox_events
-learning_support_db.outbox_events
 game_db.outbox_events
-notification_db.outbox_events
 community_db.outbox_events
 ```
 
-Tổng **9 bảng outbox vật lý**. Không còn `ai_assistant_db.outbox_events` vì `ai-assistant-service` đã bị xóa.
+Baseline V5 lịch sử có **9 bảng outbox vật lý**; thiết kế đích V3 còn **7**. Library V1/V2 không tạo `outbox_events`; notification cũng chưa có outbox. Service hỗ trợ học viên cũ đã gỡ. Đây là số đếm thiết kế, không phải kiểm kê các DB đang chạy. Không còn `ai_assistant_db.outbox_events` vì `ai-assistant-service` đã bị xóa.
 
 ---
 
@@ -2483,27 +2770,29 @@ DeepTutor Memory v2 là subsystem L1/L2/L3 với trace/consolidation/snapshot se
 
 | Database | Owner service | Nhóm dữ liệu chính |
 | :--- | :--- | :--- |
-| `user_db` | `user-service` | identity, roles, learner profile, learning goal |
+| `user_db` | `user-service` | identity, roles, learner profile, learning goal, `learning_activities`, `streaks` (user V5) |
 | `access_db` | `access-service` | plans, subscriptions, activation key, point wallet |
-| `content_db` | `content-service` | curriculum, KP, vocabulary, packages, question bank, video metadata |
+| `content_db` | `content-service` | curriculum, KP, packages, question bank, bài học (V5.1); content V7 xóa 5 bảng catalog cũ |
 | `assessment_db` | `assessment-service` | formal attempts/results/error analysis/grading |
-| `ai_learning_db` | `ai-learning-service` | DeepTutor adaptive learning, mastery, tutor runtime, Question Notebook review |
-| `learning_support_db` | `learning-support-service` | learning activity, streak, video progress/bookmarks, notes, flashcards |
+| `ai_learning_db` | `ai-learning-service` | DeepTutor adaptive learning, mastery, tutor runtime, Question Notebook review, tiến độ học bài và bài ôn (V5.1) |
+| `library_db` | `library-service` | 5 bảng catalog từ vựng/video (library V1), 6 bảng thư viện cá nhân (library V2) |
 | `game_db` | `game-service` | game/realtime durable state |
 | `notification_db` | `notification-service` | notification/reminder/delivery |
 | `community_db` | `community-service` | post/comment/reaction |
 
-Không có `ai_assistant_db`.
+Không có `ai_assistant_db`; service và DB hỗ trợ học viên cũ đã gỡ.
 
 ---
 
 # 17. Baseline cuối
 
 ```text
-Business tables: 85
-Outbox tables:    9
-Physical total: 94
+Business tables: 85  (baseline V5 lịch sử)
+Outbox tables:    9  (baseline V5 lịch sử)
+Physical total: 94  (baseline V5 lịch sử)
 ```
+
+V5.1 (thiết kế đích, chưa có migration): +5 bảng Content (§5.13–§5.17), +4 bảng AI Learning (§7.21–§7.24).
 
 Quan trọng hơn số lượng bảng là boundary:
 
@@ -2517,8 +2806,11 @@ content_db
 assessment_db
         = formal measurement authority
 
-learning_support_db
-        = learner-owned utility state, not adaptive authority
+library_db
+        = vocabulary/video catalog + personal library, not adaptive authority
+
+user_db
+        = identity + learning activity/streak, not adaptive authority
 ```
 
 Đây là Database V5 baseline cho kiến trúc DeepTutor-core.

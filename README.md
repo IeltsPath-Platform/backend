@@ -37,9 +37,11 @@ IELTSPath/
 │   └── common-security/        # CanonicalRoles, InternalJwtClaims, InternalJwtAuthorities, InternalJwtValidators
 ├── services/                   # Chứa các microservice nghiệp vụ
 │   ├── ai-learning-service/    # [Port 8000] FastAPI + mastery engine riêng, build bằng Dockerfile riêng
-│   ├── user-service/           # User identity, roles, auth và learning goals
-│   └── learning-support-service/ # Learner-owned utility state
-├── services/community-service  # Bài viết, bình luận, reaction và moderation
+│   ├── user-service/           # Identity, auth, learning goals, activity và streak
+│   ├── content-service/        # Topic, knowledge point, câu hỏi, gói nội dung và asset
+│   ├── library-service/        # Catalog từ vựng/video và thư viện học cá nhân
+│   ├── game-service/           # Phòng game, phiên chơi và WebSocket
+│   └── community-service/      # Bài viết, bình luận, reaction và moderation
 ├── docker-compose.yml          # File Docker Compose khởi chạy hạ tầng (Postgres, Infrastructure)
 ├── pom.xml                     # Root POM quản lý phiên bản và danh sách module
 └── README.md                   # Tài liệu hướng dẫn dự án
@@ -197,29 +199,17 @@ mvn clean compile -DskipTests
 
 ### 4. Khởi Chạy Hạ Tầng Với Docker
 
-Trước khi chạy, đảm bảo Docker Desktop đang bật và file `.env` ở root có đủ
-các biến bắt buộc:
+Compose cung cấp các DB `library-db` (host 5437), `community-db` (5434), `game-db` (5435), RabbitMQ và stack
+AI Learning. Các service Java, Config Server, Eureka và Gateway chạy trên host; Compose không có ba container hạ tầng
+này. Đặt đủ biến môi trường của §6 trong `.env` ở root, kiểm cấu hình rồi chỉ bật container cần dùng:
 
-```env
-POSTGRES_PASSWORD=<set-a-local-password>
-EXTERNAL_JWT_SECRET=<base64-32-bytes>
-GATEWAY_INTERNAL_JWT_SECRET=<base64-32-bytes>
+```powershell
+docker compose config --quiet
+docker compose up -d library-db
 ```
 
-Build và chạy toàn bộ hệ thống:
-
-```bash
-docker compose up -d --build
-```
-
-Các URL/port sau khi chạy:
-
-- **API Gateway**: `http://localhost:8080`
-- **Eureka Server Dashboard**: `http://localhost:8761`
-- **Config Server**: `http://localhost:8888`
-- **User PostgreSQL Database**: `localhost:5432`
-- **Community PostgreSQL Database**: `localhost:5433`
-- **Community API (qua Gateway)**: `http://localhost:8080/api/community/**`
+`LIBRARY_DB_PASSWORD` bắt buộc ngay cả khi chỉ chạy một container khác vì Compose nội suy toàn bộ file. Hướng dẫn
+khởi động luồng chính và các cổng còn lại ở §6.
 
 ### 5. Quản Lý Schema Bằng Flyway
 
@@ -238,7 +228,7 @@ Phần AI Learning chạy bằng compose; các service Java chạy trên host (I
 
 | Biến | Dùng cho |
 | --- | --- |
-| `POSTGRES_PASSWORD`, `GAME_DB_PASSWORD` | Compose nội suy toàn bộ file, nên phải có dù không chạy các DB đó |
+| `LIBRARY_DB_PASSWORD`, `POSTGRES_PASSWORD`, `GAME_DB_PASSWORD` | Compose nội suy toàn bộ file, nên phải có dù không chạy các DB đó; library dùng DB ở host 5437 |
 | `AI_LEARNING_DB_PASSWORD` | `ai-learning-db`, Flyway migrate, API và consumer |
 | `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | Broker trong compose. Assessment trên host phải dùng đúng cặp này (mặc định `guest` sẽ fail) |
 | `GATEWAY_INTERNAL_JWT_SECRET` | Gateway và toàn bộ downstream service phải dùng cùng giá trị, lệch sẽ trả 401 |
@@ -249,13 +239,24 @@ Nếu mật khẩu có ký tự đặc biệt, hãy percent-encode hoặc chọn
 **Thứ tự khởi động:**
 
 1. PostgreSQL local (`localhost:5432`) có sẵn `user_db`, `content_db`, `assessment_db`. Flyway của từng service tự áp khi khởi động.
-2. AI Learning và RabbitMQ:
+2. Library DB, AI Learning và RabbitMQ:
    ```bash
-   docker compose up -d --build rabbitmq ai-learning-db ai-learning-migrate ai-learning-api ai-learning-consumer
+   docker compose up -d --build library-db rabbitmq ai-learning-db ai-learning-migrate ai-learning-api ai-learning-consumer
    ```
    `ai-learning-migrate` chạy Flyway một lần (`0.1 → 1 → 2 → 3`) rồi thoát với exit 0; API (`127.0.0.1:8000`) và consumer chờ bước này xong.
    Consumer tự khai báo queue chính, retry, DLQ và binding `assessment.completed.v2`.
-3. Service Java trên host: config-server → eureka → api-gateway → user → content → assessment. Các Spring module tự nạp `.env` ở root repository (khi working directory là root hoặc thư mục module), nên không cần khai báo secret khác nhau ở từng Run Configuration.
+3. Service Java trên host: config-server → eureka → api-gateway → user → content → library → assessment → game (khi cần).
+   Library dùng `LIBRARY_DB_URL` mặc định `jdbc:postgresql://localhost:5437/library_db`. Các Spring module tự nạp
+   `.env` ở root repository (khi working directory là root hoặc thư mục module), nên không cần khai báo secret khác
+   nhau ở từng Run Configuration.
+
+Gateway giữ path công khai: `/api/content/videos/**`, `/api/content/vocabulary/**` và
+`/api/content/admin/vocabulary/**` tới library; `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**`
+tới library; `/api/learning-support/{activities,streak}/**` tới user. Không còn route tổng quát cho prefix này. Game
+chọn snapshot `VOCABULARY` từ library (`LIBRARY_SERVICE_URL` mặc định `http://localhost:8081`), `GRAMMAR` từ content.
+Khi game chạy trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082` vì Config Server vẫn mặc định địa chỉ
+`http://content-service:8082`. Library kiểm topic video qua Content. Content V7 xóa năm bảng catalog; chỉ cho Flyway
+chạy migration phá hủy này trên Testcontainers cho tới khi có duyệt riêng đối với `content_db` dùng chung.
 
 Container AI Learning gọi User (`8085`) và Content (`8082`) trên host qua `host.docker.internal`, và chuyển tiếp thẳng internal JWT của learner. Trên Windows, firewall có thể chặn đường này: cho Java đi qua firewall (mạng private), hoặc chạy API bằng `uvicorn` trên host.
 

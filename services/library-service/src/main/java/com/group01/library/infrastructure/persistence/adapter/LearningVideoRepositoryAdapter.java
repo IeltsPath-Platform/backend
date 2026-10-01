@@ -1,0 +1,58 @@
+package com.group01.library.infrastructure.persistence.adapter;
+
+import com.group01.library.domain.aggregate.LearningVideo;
+import com.group01.library.domain.repository.LearningVideoRepository;
+import com.group01.library.domain.vo.PublicationStatus;
+import com.group01.library.infrastructure.persistence.mapper.LearningVideoPersistenceMapper;
+import com.group01.library.infrastructure.persistence.repository.LearningVideoJpaRepository;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Component
+public class LearningVideoRepositoryAdapter implements LearningVideoRepository {
+
+    private final LearningVideoJpaRepository learningVideoJpaRepository;
+    private final LearningVideoPersistenceMapper mapper;
+
+    public LearningVideoRepositoryAdapter(LearningVideoJpaRepository learningVideoJpaRepository,
+                                          LearningVideoPersistenceMapper mapper) {
+        this.learningVideoJpaRepository = learningVideoJpaRepository;
+        this.mapper = mapper;
+    }
+
+    @Override
+    public LearningVideo save(LearningVideo video) {
+        var entity = mapper.toEntity(video);
+        var saved = learningVideoJpaRepository.save(entity);
+        return mapper.toDomain(saved);
+    }
+
+    @Override
+    public Optional<LearningVideo> findById(UUID id) {
+        return learningVideoJpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<LearningVideo> findBySegmentId(UUID segmentId) {
+        return learningVideoJpaRepository.findDistinctBySegments_Id(segmentId).map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<LearningVideo> findByYoutubeVideoId(String youtubeVideoId) {
+        return learningVideoJpaRepository.findByYoutubeVideoId(youtubeVideoId).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<LearningVideo> findAll(Boolean featureRequired, PublicationStatus status) {
+        return learningVideoJpaRepository.findAllFiltered(featureRequired, status).stream()
+                .map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public boolean existsByYoutubeVideoId(String youtubeVideoId) {
+        return learningVideoJpaRepository.existsByYoutubeVideoId(youtubeVideoId);
+    }
+}

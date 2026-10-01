@@ -1,6 +1,5 @@
 package com.group01.content.application.command;
 
-import com.group01.content.domain.vo.BandRange;
 import com.group01.content.domain.vo.KnowledgePointKind;
 import com.group01.content.domain.vo.LearningType;
 import com.group01.content.domain.vo.Skill;
@@ -14,7 +13,5 @@ public record CreateKnowledgePointCommand(
         KnowledgePointKind kind,
         LearningType learningType,
         Skill skill,
-        String description,
-        BandRange band
+        String description
 ) {}
-

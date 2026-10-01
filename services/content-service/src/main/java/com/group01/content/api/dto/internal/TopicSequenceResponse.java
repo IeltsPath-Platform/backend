@@ -1,0 +1,27 @@
+package com.group01.content.api.dto.internal;
+
+import com.group01.content.application.result.TopicSequenceResult;
+import com.group01.content.domain.vo.LearningType;
+import com.group01.content.domain.vo.Skill;
+
+import java.util.List;
+import java.util.UUID;
+
+public record TopicSequenceResponse(
+        UUID topicId,
+        String code,
+        String name,
+        int sortOrder,
+        List<KnowledgePoint> knowledgePoints
+) {
+    public record KnowledgePoint(UUID id, String code, String name, LearningType learningType, Skill skill,
+                                 String description, boolean hasPracticeSet) {}
+
+    public static TopicSequenceResponse from(TopicSequenceResult result) {
+        return new TopicSequenceResponse(result.topicId(), result.code(), result.name(), result.sortOrder(),
+                result.knowledgePoints().stream()
+                        .map(kp -> new KnowledgePoint(kp.id(), kp.code(), kp.name(), kp.learningType(), kp.skill(),
+                                kp.description(), kp.hasPracticeSet()))
+                        .toList());
+    }
+}
