@@ -31,6 +31,7 @@ public class AddQuestionVersionUseCase {
                 command.options(),
                 command.answerSpecJson(),
                 command.explanation(),
+                command.hint(),
                 command.difficulty()
         );
 

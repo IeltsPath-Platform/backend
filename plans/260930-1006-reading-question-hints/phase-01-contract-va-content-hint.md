@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Contract và content: cột hint"
-status: pending
+status: completed
 priority: P2
 dependencies: []
 effort: "1 ngày"
@@ -12,6 +12,11 @@ effort: "1 ngày"
 <!-- Updated: Validation Session 1 - hint rỗng lưu NULL -->
 <!-- Updated: Validation Session 2 - câu CHOICE từ 3 phương án (kể cả TFNG) có gợi ý; chỉ câu 2 phương án không; seed điền 7/8 câu -->
 
+
+## Kết quả (2026-10-01, nhánh `feat/writing-access-content`)
+
+- V13: cột `hint` + 7 gợi ý (Q3 không có), nội dung đúng `seed-content.md`. `QuestionVersion`, API admin (`@Size(max = 500)`, rỗng → `null`, trim), payload nội bộ bài học có `hint`. Content 140 test pass, 0 skip.
+- Lệch plan: test seed đặt trong `LessonPipelineSeedTest` (dùng chung container), không tạo `QuestionHintSeedTest`; chưa có test 400 cho hint 501 ký tự (chỉ có `@Size` trên request). Phần học viên trong `lesson-learning-v1.md` (hint ở `GET /lessons` và `results[]`) làm sau khi Codex xong file đó; luật đã ghi trong `learning-content-internal-v1`.
 
 ## Context Links
 

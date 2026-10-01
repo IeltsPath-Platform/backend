@@ -49,6 +49,7 @@ public record LessonContentResponse(
             @JsonRawValue String options,
             @JsonRawValue String answerSpec,
             String explanation,
+            String hint,
             List<UUID> knowledgePointIds,
             @JsonInclude(JsonInclude.Include.NON_NULL) List<QuestionAsset> assets
     ) {}
@@ -69,7 +70,7 @@ public record LessonContentResponse(
                 block.vocabularySenseIds(),
                 block.questions() == null ? null : block.questions().stream()
                         .map(q -> new Question(q.questionVersionId(), q.sortOrder(), q.stem(), q.optionsJson(),
-                                q.answerSpecJson(), q.explanation(), q.knowledgePointIds(),
+                                q.answerSpecJson(), q.explanation(), q.hint(), q.knowledgePointIds(),
                                 q.assets() == null ? null : q.assets().stream()
                                         .map(a -> new QuestionAsset(a.assetId(), a.assetType(), a.mediaUrl(),
                                                 a.altText(), a.sortOrder()))

@@ -361,6 +361,56 @@ class LessonPipelineSeedTest {
         });
     }
     @Test
+    void readingLessonHintsExistOnlyForEligibleQuestionsAndNeverGiveTheAnswer() throws Exception {
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                SELECT qv.stem, qv.options::text AS options, qv.answer_spec::text AS spec, qv.hint
+                FROM lesson_block_questions bq
+                JOIN lesson_blocks b ON b.id = bq.block_id
+                JOIN lessons l ON l.id = b.lesson_id
+                JOIN topics t ON t.id = l.topic_id
+                JOIN question_versions qv ON qv.id = bq.question_version_id
+                WHERE t.code IN ('DEMO_READING', 'TFNG_SKILLS')
+                """, Map.of());
+        int hinted = 0;
+        for (Map<String, Object> row : rows) {
+            JsonNode spec = JSON.readTree((String) row.get("spec"));
+            JsonNode options = row.get("options") == null ? null : JSON.readTree((String) row.get("options"));
+            String hint = (String) row.get("hint");
+            String type = spec.path("type").asText();
+            boolean eligible = type.equals("FILL")
+                    || (type.equals("CHOICE") && (options == null || options.isEmpty() || options.size() >= 3));
+            String question = (String) row.get("stem");
+            if (!eligible) {
+                assertThat(hint).as("no hint for " + question).isNull();
+                continue;
+            }
+            assertThat(hint).as("hint for " + question).isNotBlank().hasSizeLessThanOrEqualTo(500);
+            hinted++;
+            String normalizedHint = " " + normalize(hint).replaceAll("[^\\p{L}\\p{N}_ ]", " ") + " ";
+            if (type.equals("FILL")) {
+                for (JsonNode accepted : spec.get("accepted")) {
+                    assertThat(normalizedHint).as(question).doesNotContain(" " + normalize(accepted.asText()) + " ");
+                }
+                continue;
+            }
+            String correct = spec.get("correct").asText();
+            for (JsonNode option : options) {
+                if (option.get("optionKey").asText().equals(correct)) {
+                    assertThat(normalize(hint)).as(question).doesNotContain(normalize(option.get("content").asText()));
+                }
+            }
+            if (correct.length() >= 2) {
+                assertThat(normalizedHint).as(question).doesNotContain(" " + normalize(correct) + " ");
+            }
+            for (String verdict : List.of("true", "false", "not given", "not_given")) {
+                assertThat(normalizedHint).as(question).doesNotContain(" " + verdict + " ");
+            }
+        }
+        // Q13, Q1, Q11, Q12, Q5, Q4 and QT1; Q3 offers only two choices.
+        assertThat(hinted).isEqualTo(7);
+    }
+
+    @Test
     void topicTestPackagesAndTheirVersionContent() {
         assertThat(reader.publishedTestPackages(DEMO_READING)).extracting(p -> p.code())
                 .containsExactlyInAnyOrder("X1", "X2");

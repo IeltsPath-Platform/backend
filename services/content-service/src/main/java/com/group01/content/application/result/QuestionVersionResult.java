@@ -16,6 +16,7 @@ public record QuestionVersionResult(
         List<QuestionOptionPayload> options,
         String answerSpecJson,
         String explanation,
+        String hint,
         QuestionDifficulty difficulty,
         PublicationStatus status,
         Instant createdAt,

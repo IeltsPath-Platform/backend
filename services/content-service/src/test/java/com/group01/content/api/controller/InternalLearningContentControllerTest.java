@@ -64,7 +64,7 @@ class InternalLearningContentControllerTest {
                         null, null),
                 new LessonContentResult.Block(UUID.randomUUID(), BlockType.EXERCISE, LessonBlockKind.EXERCISE, 3, null, null, null, List.of(
                         new LessonContentResult.Question(UUID.randomUUID(), 1, "Complete ______.", null,
-                                "{\"type\":\"FILL\",\"accepted\":[\"critics\"]}", "Đoạn D.", List.of(),
+                                "{\"type\":\"FILL\",\"accepted\":[\"critics\"]}", "Đoạn D.", "Đọc câu thứ hai của đoạn D.", List.of(),
                                 new LessonBlockKind.QuestionSpec("FILL", null, null, null, List.of()), null))))));
 
         mockMvc.perform(get("/internal/learning-content/lessons/{id}", lessonId))
@@ -82,7 +82,8 @@ class InternalLearningContentControllerTest {
                 .andExpect(jsonPath("$.blocks[2].textContent").doesNotExist())
                 .andExpect(jsonPath("$.blocks[2].questions[0].options").value((Object) null))
                 .andExpect(jsonPath("$.blocks[2].questions[0].answerSpec.type").value("FILL"))
-                .andExpect(jsonPath("$.blocks[2].questions[0].answerSpec.accepted[0]").value("critics"));
+                .andExpect(jsonPath("$.blocks[2].questions[0].answerSpec.accepted[0]").value("critics"))
+                .andExpect(jsonPath("$.blocks[2].questions[0].hint").value("Đọc câu thứ hai của đoạn D."));
     }
 
     @Test

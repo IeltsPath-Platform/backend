@@ -28,7 +28,7 @@ class GetLessonContentUseCaseTest {
                 ? new LessonBlockKind.QuestionSpec("ESSAY", "TASK_1", "6", "Madrid: black roof 82.",
                 assets.stream().map(LessonContentResult.QuestionAsset::assetType).toList())
                 : new LessonBlockKind.QuestionSpec(specType, null, null, null, List.of());
-        return new LessonContentResult.Question(UUID.randomUUID(), 1, "Stem", null, "{}", "Model", List.of(), spec,
+        return new LessonContentResult.Question(UUID.randomUUID(), 1, "Stem", null, "{}", "Model", null, List.of(), spec,
                 assets);
     }
 

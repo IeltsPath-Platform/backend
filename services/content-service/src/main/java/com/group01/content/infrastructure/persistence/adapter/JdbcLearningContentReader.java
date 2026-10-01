@@ -210,7 +210,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
         Map<UUID, List<LessonContentResult.Question>> questionsByBlock = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT bq.block_id, bq.sort_order, qv.id, qv.stem, qv.options::text AS options,
-                       qv.answer_spec::text AS answer_spec, qv.explanation,
+                       qv.answer_spec::text AS answer_spec, qv.explanation, qv.hint,
                        qv.answer_spec->>'type' AS spec_type, qv.answer_spec->>'task' AS spec_task,
                        qv.answer_spec->>'passBand' AS spec_pass_band, qv.answer_spec->>'chartFacts' AS spec_chart_facts
                 FROM lesson_block_questions bq
@@ -224,7 +224,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
             questionsByBlock.computeIfAbsent(uuid(rs, "block_id"), ignored -> new ArrayList<>())
                     .add(new LessonContentResult.Question(versionId, rs.getInt("sort_order"), rs.getString("stem"),
                             rs.getString("options"), rs.getString("answer_spec"), rs.getString("explanation"),
-                            questionPoints.getOrDefault(versionId, List.of()),
+                            rs.getString("hint"), questionPoints.getOrDefault(versionId, List.of()),
                             new LessonBlockKind.QuestionSpec(rs.getString("spec_type"), rs.getString("spec_task"),
                                     rs.getString("spec_pass_band"), rs.getString("spec_chart_facts"),
                                     assets.stream().map(LessonContentResult.QuestionAsset::assetType).toList()),

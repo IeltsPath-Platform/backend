@@ -74,12 +74,13 @@ public record LessonContentResult(
             String optionsJson,
             String answerSpecJson,
             String explanation,
+            String hint,
             List<UUID> knowledgePointIds,
             LessonBlockKind.QuestionSpec spec,
             List<QuestionAsset> assets
     ) {
         public Question withAssets(List<QuestionAsset> newAssets) {
-            return new Question(questionVersionId, sortOrder, stem, optionsJson, answerSpecJson, explanation,
+            return new Question(questionVersionId, sortOrder, stem, optionsJson, answerSpecJson, explanation, hint,
                     knowledgePointIds, spec, newAssets);
         }
     }
