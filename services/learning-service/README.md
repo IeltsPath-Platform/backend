@@ -3,9 +3,9 @@
 Spring Boot service on port 8086, registered in Eureka as `learning-service`.
 Gateway forwards `/api/learning/**` and supplies the internal JWT validated by
 `common-security`. The verified JWT subject scopes all learner progress and mastery.
-The module implements topic ordering, lesson reads, exercise submissions, lesson
-completion and mastery reads. Review submission, test assignment and the
-`AssessmentCompleted.v2` consumer are not implemented yet.
+The module implements topic ordering, lessons (exercise and essay blocks, audio),
+exercise submissions, mastery reads, review sets, final-test assignment and the
+`AssessmentCompleted.v2` consumer. Writing essay grading comes with plan 0737.
 
 ## Local runtime
 
@@ -41,14 +41,19 @@ to refresh the user's curriculum order before opening lessons. See the
 | GET | `/lessons/{id}` | Applies the lesson gate and returns ordered blocks; a passed exercise block includes its solutions. |
 | POST | `/lessons/{id}/exercises/{blockId}/submissions` | Grades every question in the block, saves an idempotent response and completes the lesson when all exercise blocks have passed. |
 | POST | `/lessons/{id}/complete` | Idempotently completes a lesson with no exercise blocks; lessons with exercises return `409 LESSON_HAS_EXERCISES`. |
+| GET | `/reviews/{id}` | Owned review only (else 404): theory of the teaching lesson and one open practice set (unused package first, otherwise the one given longest ago). No package left: `SKIPPED`. |
+| POST | `/reviews/{id}/submissions` | Submits the open set once (`REVIEW_SET_CLOSED` otherwise); writes `review_set` evidence; 70% → `DONE` with solutions (and the audio transcript), third failed set → `SKIPPED`. |
+| POST | `/topics/{id}/test-assignments` | `REVIEW_REQUIRED` / `TEST_LOCKED` gates, then returns the open assignment or assigns an unused test code (the least recently used one when all were used); none → `409 TEST_UNAVAILABLE`. |
 | GET | `/mastery` | Returns `{knowledgePointId, topicId, mastery, evidenceCount}` for catalog KPs using only the current user's evidence; makes no Content request. |
 
 Topics derive `PASSED` from `passed_at`; the first unpassed topic is `IN_PROGRESS`
 and later topics are `LOCKED`. Removed topics lose their sequence order and leave
 the topic list. Lessons become available in order after earlier lessons complete.
 Lesson GET, submission and completion apply errors in this order:
-`REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`. Topic lesson lists expose test
-availability, but no route currently creates a test assignment or passes a topic.
+`REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`. Exercise blocks carry `blockKind`: essay blocks show only the prompt, task,
+minimum words, pass band and images, never count toward completion and reject exercise
+submissions with `409 ESSAY_BLOCK`. Media assets expose `mediaUrl`; an audio transcript
+appears only once the lesson is completed.
 
 Question objects contain only `questionVersionId`, `sortOrder`, `stem`, `options`.
 `options: null` represents a fill answer. `answerSpec` and KP mappings are never
@@ -76,7 +81,18 @@ Lesson completion reevaluates reviews from the first submission of each block. A
 requires all four: mastery below `learning.review-mastery-threshold` (default `0.6`),
 a wrong answer for that KP, a completed teaching lesson, and an eligible practice set
 in the catalog. Existing pending reviews are not duplicated. A pending review blocks
-further lesson access; completing it requires the review API planned for the next PR.
+further lesson access until it is `DONE` or `SKIPPED`.
+
+## Assessment results
+
+The consumer reads queue `learning.assessment-completed.v2` (bound to `assessment.events` /
+`assessment.completed.v2`), with a TTL retry queue and a DLQ. Each result version is applied in one transaction
+under the user lock and acknowledged after commit: versions are idempotent per attempt and a higher version replaces
+the attempt's `assessment` evidence. `TOPIC_GATE` consumes the open assignment of the package version given before
+the attempt completed and passes the topic at 70% (one way); `TOPIC_GATE`, `MOCK`, `OFFICIAL_PRACTICE` and `QUIZ`
+reevaluate reviews; `PLACEMENT` only records its version. Contract violations and the last failed attempt go to the
+DLQ with header `x-learning-failure`. Settings: `LEARNING_RETRY_DELAY_MS` (30 s), `LEARNING_MAX_DELIVERY_ATTEMPTS`
+(5), `LEARNING_CONSUMER_ENABLED` (true).
 
 Learning errors use `{detail, code}`; `REVIEW_REQUIRED` additionally includes
 `reviews` with `reviewId`, `lessonId`, `knowledgePointId`. Malformed requests return
@@ -87,7 +103,7 @@ missing content maps to `404 NOT_FOUND`, transport/unavailability errors to
 ## Structure and references
 
 Layers follow `api → application → domain`, with HTTP and JDBC adapters under
-`infrastructure`. The five domain services contain no Spring or persistence imports.
+`infrastructure`. The domain services contain no Spring or persistence imports.
 The service owns its nine tables and does not read other services' databases.
 
 - [Internal Content contract](../../docs/contracts/learning-content-internal-v1.md)

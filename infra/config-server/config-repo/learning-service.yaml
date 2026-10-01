@@ -30,6 +30,11 @@ learning:
   content:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
   review-mastery-threshold: 0.6
+  messaging:
+    # AssessmentCompleted.v2 consumer: delay before a failed event is retried, and attempts before the DLQ.
+    retry-delay-ms: ${LEARNING_RETRY_DELAY_MS:30000}
+    max-delivery-attempts: ${LEARNING_MAX_DELIVERY_ATTEMPTS:5}
+    consumer-enabled: ${LEARNING_CONSUMER_ENABLED:true}
 
 management:
   endpoints:
