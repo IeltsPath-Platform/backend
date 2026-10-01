@@ -26,8 +26,9 @@
         <module>services/user-service</module>
         <module>services/access-service</module>
         <module>services/content-service</module>
+        <module>services/library-service</module>
+        <module>services/learning-service</module>
         <module>services/assessment-service</module>
-        <module>services/learning-support-service</module>
         <module>services/game-service</module>
         <module>services/notification-service</module>
         <module>services/community-service</module>

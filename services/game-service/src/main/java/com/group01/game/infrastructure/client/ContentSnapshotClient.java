@@ -18,14 +18,17 @@ import java.util.UUID;
 
 @Component
 public class ContentSnapshotClient implements GameContentProvider {
-    private final RestClient restClient;
+    private final RestClient contentClient;
+    private final RestClient libraryClient;
 
     public ContentSnapshotClient(RestClient.Builder builder,
-                                 @Value("${game.content.base-url:http://localhost:8082}") String contentBaseUrl) {
+                                 @Value("${game.content.base-url:http://localhost:8082}") String contentBaseUrl,
+                                 @Value("${game.library.base-url:http://localhost:8081}") String libraryBaseUrl) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
         requestFactory.setReadTimeout(Duration.ofSeconds(5));
-        this.restClient = builder.requestFactory(requestFactory).baseUrl(contentBaseUrl).build();
+        this.contentClient = builder.clone().requestFactory(requestFactory).baseUrl(contentBaseUrl).build();
+        this.libraryClient = builder.clone().requestFactory(requestFactory).baseUrl(libraryBaseUrl).build();
     }
 
     @Override
@@ -35,7 +38,12 @@ public class ContentSnapshotClient implements GameContentProvider {
                 || !authentication.isAuthenticated()) {
             throw new IllegalStateException("Authenticated gateway JWT is required to read game content");
         }
-        ContentSnapshotResponse response = restClient.post()
+        RestClient target = switch (learningDomain) {
+            case "VOCABULARY" -> libraryClient;
+            case "GRAMMAR" -> contentClient;
+            default -> throw new IllegalArgumentException("Unsupported learningDomain: " + learningDomain);
+        };
+        ContentSnapshotResponse response = target.post()
                 .uri("/internal/game-content/snapshots")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwtAuthenticationToken.getToken().getTokenValue())
                 .header("X-Correlation-Id", correlationId())

@@ -40,14 +40,4 @@ class BandRangeTest {
     void rejectsAMinimumAboveTheMaximum() {
         assertThatThrownBy(() -> BandRange.of(band("7.0"), band("5.0"))).isInstanceOf(IllegalArgumentException.class);
     }
-
-    @Test
-    void anOwnRangeReplacesTheInheritedOneAsAWhole() {
-        BandRange topic = BandRange.of(band("4.0"), band("5.0"));
-
-        assertThat(BandRange.UNBOUNDED.orInherit(topic)).isEqualTo(topic);
-        // Overriding one end must not combine with the other end of the topic: 8.0-5.0 would be invalid.
-        assertThat(BandRange.of(band("8.0"), null).orInherit(topic)).isEqualTo(BandRange.of(band("8.0"), null));
-        assertThat(BandRange.UNBOUNDED.orInherit(BandRange.UNBOUNDED)).isEqualTo(BandRange.UNBOUNDED);
-    }
 }

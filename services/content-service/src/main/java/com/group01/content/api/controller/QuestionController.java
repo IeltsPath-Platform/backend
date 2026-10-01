@@ -14,6 +14,7 @@ import com.group01.content.domain.vo.Skill;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,6 +32,7 @@ public class QuestionController {
     private final ArchiveQuestionUseCase archiveQuestionUseCase;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public List<QuestionResponse> listQuestions(
             @RequestParam(value = "skill", required = false) Skill skill
     ) {
@@ -40,6 +42,7 @@ public class QuestionController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public QuestionDetailResponse getQuestionDetail(@PathVariable("id") UUID id) {
         QuestionDetailResult result = getQuestionDetailUseCase.execute(id);
         return QuestionDetailResponse.from(result);
@@ -47,6 +50,7 @@ public class QuestionController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public QuestionResponse createQuestion(@Valid @RequestBody CreateQuestionRequest request) {
         QuestionResult result = createQuestionUseCase.execute(new CreateQuestionCommand(
                 request.questionType(),
@@ -58,6 +62,7 @@ public class QuestionController {
 
     @PostMapping("/{id}/versions")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public QuestionResponse addVersion(
             @PathVariable("id") UUID id,
             @Valid @RequestBody AddQuestionVersionRequest request
@@ -79,6 +84,7 @@ public class QuestionController {
     }
 
     @PostMapping("/{id}/archive")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public QuestionResponse archiveQuestion(@PathVariable("id") UUID id) {
         QuestionResult result = archiveQuestionUseCase.execute(id);
         return QuestionResponse.from(result);
