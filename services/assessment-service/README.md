@@ -116,7 +116,7 @@ api -> application -> domain
 infrastructure -> domain
 ```
 
-Controllers map validated HTTP requests to application commands. Use cases coordinate domain objects, repository contracts, and the `application/port` interfaces for User and Content lookups. JPA entities, Spring Data repositories, mappers, adapters, the HTTP clients (`infrastructure/client`), and the outbox relay (`infrastructure/messaging`) stay in infrastructure.
+Controllers map validated HTTP requests to application commands. Use cases coordinate domain objects, repository contracts, and the `application/port` interfaces for Content snapshots and outbox publishing. Attempt creation does not call User Service or require a learning goal. JPA entities, Spring Data repositories, mappers, adapters, the HTTP client (`infrastructure/client`), and the outbox relay (`infrastructure/messaging`) stay in infrastructure.
 
 ## Verification
 

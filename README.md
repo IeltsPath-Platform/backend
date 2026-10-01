@@ -259,7 +259,8 @@ tới library; `/api/learning-support/{activities,streak}/**` tới user; `/api/
 mặc định địa chỉ `http://content-service:8082`. Library kiểm topic video qua Content. Content V7 xóa năm bảng catalog;
 chỉ cho Flyway chạy migration phá hủy này trên Testcontainers cho tới khi có duyệt riêng đối với `content_db` dùng chung.
 
-Nội dung demo (Reading, Writing, Listening, gợi ý) nằm trong migration content V9–V13. Listening cần 8 file mp3 upload
+Nội dung demo Reading, Writing và Listening nằm trong migration content V9–V12. V13 thêm cột hint ở Content;
+luồng trả gợi ý theo câu sai cho học viên vẫn pending trong Learning Service. Listening cần 8 file mp3 upload
 đúng key dưới `CONTENT_MEDIA_BASE_URL` (danh sách trong `services/content-service/README.md`). Thư mục
 `third_party/deeptutor` chỉ là bản clone để **đọc**: công thức mastery của Learning Service được port từ đó, không
 service nào build hay import thư mục này.

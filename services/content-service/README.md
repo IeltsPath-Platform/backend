@@ -10,23 +10,22 @@ migration only in Testcontainers until its use on a shared `content_db` is appro
 through `GET /api/content/topics/{id}`. Content implements `POST /internal/game-content/snapshots` only for `GRAMMAR`;
 Library implements the same [snapshot contract](../../docs/contracts/game-content-snapshot-v1.md) for `VOCABULARY`.
 
-## Band ranges
+## Lessons and curriculum order
 
-Topics and knowledge points carry an optional IELTS band range (`bandMin`, `bandMax`), in 0.0–9.0 and half-band
-steps. AI Learning uses it to build a learner's path:
+V8 implements `lessons`, `lesson_blocks`, `lesson_block_vocabulary`, `lesson_block_questions` and
+`lesson_knowledge_points`. `content_packages.topic_id` links each `TOPIC_TEST` to its topic; a topic can have
+multiple test codes. `LESSON` remains a valid package type for existing reading packages. V9 seeds the Reading
+lesson pipeline. These are implemented migrations; their presence does not confirm they ran on a shared database.
 
-- a KP is in the path when its effective `bandMin` is empty or not above the goal's target band;
-- a KP whose effective `bandMax` is not above the learner's placement band is tested out.
+Learning reads the six `/internal/learning-content/**` routes in the
+[internal contract](../../docs/contracts/learning-content-internal-v1.md). `topic-sequence` returns ordered active
+topics with published lessons and topic tests, including active KPs and `hasPracticeSet`. Learning owns learner
+progress, gates and mastery; Assessment reads package snapshots when it creates an attempt.
 
-Rules:
-
-- Either end may be empty (open). Both empty means "every band", so content without a band reaches every learner.
-- A KP's **effective** range is its own range when it has one, otherwise its topic's range. An own range replaces the
-  topic's as a whole; the two are never combined end by end. Child topics do not inherit their parent's range.
-- `GET /api/content/knowledge-points` returns both the own range (`bandMin`/`bandMax`) and the effective range
-  (`effectiveBandMin`/`effectiveBandMax`). `GET /api/content/topics` returns each topic's range.
-- `POST`/`PUT /api/content/topics` and `POST /api/content/knowledge-points` accept `bandMin`/`bandMax`. An invalid
-  range returns 400. `PUT /topics` replaces the whole topic, so omitting the band clears it.
+Topics retain optional `bandMin`/`bandMax` metadata (0–9, half-band steps). V8 removes KP band columns and the KP
+API no longer accepts or returns own/effective band ranges. The current learning sequence uses topic `sort_order`,
+without goal-band filtering or placement test-out. Topic create/update still validate bands; omitting them on update
+clears the range.
 
 ## Media
 

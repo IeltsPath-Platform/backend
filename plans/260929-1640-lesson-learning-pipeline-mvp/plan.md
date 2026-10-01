@@ -1,7 +1,7 @@
 ---
 title: "Triển khai pipeline học chính (bài học, bài ôn, đề cuối)"
 description: "MVP luồng học topic → bài → bài ôn → đề cuối: path theo user, chấm theo answer_spec, giấu đáp án tới khi đạt, bài ôn dùng gói PRACTICE_SET mới, mã đề TOPIC_TEST dùng một lần, assessment tự chấm và tự quyết loại attempt, consumer ghi trong cùng transaction và không gọi HTTP."
-status: in-progress
+status: completed
 priority: P2
 branch: "feat/main-follow"
 tags: [ai-learning, content, assessment, lesson, mastery, tdd]
@@ -15,7 +15,7 @@ mode: "tdd"
 
 # Triển khai pipeline học chính (bài học, bài ôn, đề cuối)
 
-> **Đổi 2026-10-01:** người dùng bỏ ai-learning Python. Phase 5–7 (path, API bài học/bài ôn/mã đề, consumer) do plan `261001-1228` làm bằng Java (`learning-service`, route `/api/learning/**`, mô hình `kp_evidence` thay path DeepTutor). Luật nghiệp vụ trong plan này vẫn là nguồn. Plan này còn phase 4 (assessment) và phase 8 (tài liệu), làm sau phase 4 của `261001-1228`.
+> **Đổi 2026-10-01:** người dùng bỏ ai-learning Python. Phase 5–7 (path, API bài học/bài ôn/mã đề, consumer) do plan `261001-1228` làm bằng Java (`learning-service`, route `/api/learning/**`, mô hình `kp_evidence` thay path DeepTutor). Luật nghiệp vụ trong plan này vẫn là nguồn. **2026-10-02:** phase 4 và 8 đã hoàn tất; nền pipeline có [report live E2E](./reports/e2e-261002-foundation-learning-pipeline.md). Các quyết định và Validation Log nhắc runtime Python bên dưới được đọc theo ánh xạ Java, không phải mô tả runtime hiện tại.
 
 ## Overview
 
@@ -70,7 +70,7 @@ Chế độ `--tdd`: mỗi phase code theo trình tự test giữ hành vi cũ �
 | 5 | [AI Learning: path theo user](./phase-05-ai-learning-path-theo-user.md) | Superseded (phần a merge PR #25; còn lại thay bởi `261001-1228`) |
 | 6 | [AI Learning: API bài học, bài ôn, giao mã đề](./phase-06-ai-learning-api-bai-hoc-va-bai-on.md) | Superseded (`261001-1228` phase 2–3) |
 | 7 | [AI Learning: consumer kết quả đề](./phase-07-ai-learning-consumer-ket-qua-de.md) | Superseded (`261001-1228` phase 4) |
-| 8 | [Tài liệu và dọn dẹp](./phase-08-tai-lieu-va-don-dep.md) | Pending |
+| 8 | [Tài liệu và dọn dẹp](./phase-08-tai-lieu-va-don-dep.md) | Completed (2026-10-02; 693 test, 0 fail/error/skip; live E2E 7/7) |
 
 Thứ tự:
 

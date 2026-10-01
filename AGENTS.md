@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.1
-- Cập nhật lần cuối: 2026-10-01; dữ kiện đã kiểm với code sau khi learning-service có consumer (nhánh `feat/learning-reviews-tests`)
+- Cập nhật lần cuối: 2026-10-02; dữ kiện pipeline đã kiểm với code Java trên nhánh `feat/lesson-pipeline-docs`
 - Dự án: `IELTSPath` (Maven coordinates: `com.group01:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -152,6 +152,8 @@ src/main/java/com/group01/<service>
 
 - Không còn path DeepTutor: bằng chứng học lưu theo user ở `kp_evidence`; mastery của KP tính khi đọc bằng
   `MasteryCalculator` (port `compute_mastery` của DeepTutor v1.6.9, Apache-2.0; giữ comment ghi nguồn và giá trị test gốc).
+- Thứ tự topic theo user từ Content `topic-sequence`, không LLM, không goal/band. `LessonAccessGate` và use case trong
+  `services/learning-service/src/main/java/com/group01/learning/` quyết định cổng bài; trạng thái topic suy ra khi đọc.
 - Mọi lượt ghi của một học viên chạy trong một `@Transactional` mở đầu bằng `pg_advisory_xact_lock` theo user.
 - Bằng chứng bài học chỉ ghi ở lần nộp đầu của mỗi khối; bài ôn ghi mỗi set (nộp một lần); kết quả thi ghi theo
   `(attempt_id, result_version)`, chấm lại thì thay bằng chứng của version cũ.

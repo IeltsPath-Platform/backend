@@ -143,7 +143,8 @@ GET /api/learning/topics -> một lần gọi Content topic-sequence -> knowledg
   -> trạng thái suy ra khi đọc: PASSED (passed_at) / IN_PROGRESS (topic đầu chưa đạt) / LOCKED
 POST /api/learning/lessons/{id}/exercises/{blockId}/submissions -> khóa theo user -> cổng (REVIEW_REQUIRED, TOPIC_LOCKED,
   LESSON_LOCKED) -> chấm answer-spec-v1 -> bằng chứng lần nộp đầu -> bài xong thì ReviewRule chèn bài ôn khi KP yếu
-GET/POST /api/learning/reviews/{id} -> lý thuyết + một gói PRACTICE_SET; trượt 3 set -> SKIPPED
+GET /api/learning/reviews/{id} -> lý thuyết + một gói PRACTICE_SET (không còn gói -> SKIPPED)
+POST /api/learning/reviews/{id}/submissions -> mỗi set một lần; >=70% -> DONE; trượt 3 set -> SKIPPED
 POST /api/learning/topics/{id}/test-assignments -> một mã đề dùng một lần, xoay vòng theo package
 ```
 ### Catalog, thư viện cá nhân và game
@@ -166,6 +167,12 @@ Học viên lấy mã đề từ learning (`POST /api/learning/topics/{id}/test-
 (câu không chấm được thì chờ người chấm) → `AssessmentCompleted.v2` (mục 3) → Learning Service ghi bằng chứng, đề cuối đạt
 ≥ 70% thì topic PASSED; `GET /api/learning/mastery` và `GET /api/learning/topics` phản ánh kết quả. Học viên xem điểm,
 đúng/sai ở `GET /api/assessments/attempts/{id}/result`; lời giải chỉ hiện khi đạt ≥ 70%.
+
+Assessment không gọi User lấy goal; attempt mới và event có `learning_goal_id` null. Consumer Learning không gọi
+HTTP và không cần path hoặc trạng thái học có sẵn. Trong một transaction khóa theo user, version bằng/cũ bị bỏ qua;
+version cao hơn thay evidence của attempt. `PLACEMENT` chỉ ghi version. `TOPIC_GATE` tìm assignment cùng user/package
+version, `consumed_at IS NULL` và `assigned_at <= completed_at`, lấy lần giao mới nhất thỏa điều kiện. Lần giao được
+consume cả khi trượt; đạt ≥70% ghi `passed_at` một chiều. ACK sau commit; topic kế mở theo trạng thái suy ra khi đọc.
 
 ## 7. Chạy local (tóm tắt)
 
@@ -234,6 +241,9 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | `.sdd/global/system-architecture.md`, `.sdd/constraints/global.md` (baseline 2026-09-18) ghi không có broker/outbox/learning service | Lỗi thời; `.sdd/global/constitution.md` vẫn là invariant cao nhất. Dữ kiện: code, `AGENTS.md`, tài liệu này |
 | Gateway CORS chỉ expose `Authorization`, `Content-Type` | Browser không đọc được header khác (ví dụ `Retry-After`) |
 | community có bảng `outbox_events` (V1) nhưng không dùng | Library không tạo bảng này; outbox của access/content/game chưa có relay |
-| Consumer học chưa có test với RabbitMQ thật | Logic ack/nack/DLQ có unit test với channel giả; áp kết quả có test Postgres thật |
+| Consumer học chưa có automated integration test với RabbitMQ thật | Logic ack/nack/DLQ có unit test với channel giả; áp kết quả có test Postgres thật. [Live E2E 2026-10-02](../plans/260929-1640-lesson-learning-pipeline-mvp/reports/e2e-261002-foundation-learning-pipeline.md) đã kiểm outbox → broker → consumer và replay DLQ với broker thật |
 | Giá chấm Writing nằm ở hai nơi | Learning `learning.writing.point-cost` (3) cho bài luận trong bài học; assessment `grading_point_costs.WRITING` cho chấm qua `grading_jobs`. Đổi giá phải sửa cả hai |
 | Bài Writing lưu ở hai nơi | Bài luận trong bài học ở `learning_db.lesson_writing_submissions`; Writing trong đề (sau MVP) ở `assessment_db.learner_submissions` |
+| Một số ghi Writing chưa theo quy tắc khóa mọi lượt ghi theo user | Bắt đầu/kết thúc chấm có transaction và advisory lock; quota, lưu grade và lỗi trung gian dùng SQL nguyên tử có điều kiện ngoài các transaction này. Dữ kiện hiện tại, không thay quy tắc AGENTS.md §3.8 |
+| Cổng bài học là authority cho luồng học | `LessonAccessGate` kiểm review/topic/bài trước; runtime Java MVP không có tutor hay `next_objective` |
+| Sơ đồ §1 còn cạnh assessment → user từ baseline cũ | Tạo attempt hiện chỉ đọc Content; không gọi User để lấy goal (xem §3 và §6) |

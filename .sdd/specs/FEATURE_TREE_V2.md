@@ -1,18 +1,40 @@
 ---
 type: feature-tree
 version: V2
-status: deeptutor-core-baseline
-updated: 2026-09-22
+status: historical-baseline-with-current-mvp-overlay
+updated: 2026-10-02
 scope: IELTSPath MVP
 ---
 
 # IELTSPath — Feature Tree V2
 
-> V2 giữ business scope IELTSPath nhưng **xóa Adaptive Engine tự thiết kế và xóa AI Assistant như một feature/service độc lập**. Adaptive Learning trở thành **DeepTutor-driven Adaptive Learning & AI Tutoring**. Tutor Session là learning surface chính; mastery, review và next objective do DeepTutor điều khiển.
+> **Baseline lịch sử 2026-09-22:** V2 từng chọn DeepTutor-driven Adaptive Learning & AI Tutoring, với Tutor Session là learning surface chính. Quyết định này đã được thay bằng MVP Java dưới đây; cây feature giữ lại để tra cứu phạm vi sản phẩm, không phải danh sách tính năng đã triển khai.
+
+# 0. MVP hiện tại — cập nhật 2026-10-02
+
+**Bài học trong Content là nơi học chính.** `learning-service` Java lưu tiến độ theo user và `kp_evidence` trong
+`learning_db` (V1–V2, 11 bảng); không có tutor runtime, path DeepTutor, notebook, learner memory hay `next_objective`.
+Chỉ công thức `compute_mastery` được port từ DeepTutor; mastery tính khi đọc, không điều khiển unlock bằng ngưỡng 0.9.
+
+- `GET /api/learning/topics` lấy Content `topic-sequence` một lần và dựng thứ tự từ `sort_order`; không cần goal,
+  placement hoặc LLM. Topic `PASSED` từ `passed_at`; topic đầu chưa đạt là `IN_PROGRESS`, các topic sau `LOCKED`.
+- `LessonAccessGate` quyết định cổng review/topic/bài trước. Khối tự chấm đạt ≥70%; chỉ lần nộp đầu mỗi khối ghi
+  evidence, nộp lại chỉ để qua khối. Đáp án/lời giải giấu tới khi đạt; transcript giấu tới khi bài hoặc bài thi đạt.
+- KP yếu, có câu sai, đã có bài dạy hoàn thành và có gói luyện thì tạo review. Gói `PRACTICE_SET` ≥70% → `DONE`;
+  trượt set thứ ba hoặc không còn gói → `SKIPPED`; `PENDING` chặn học tiếp.
+- Đề cuối được giao qua `topic_test_assignments`. Assessment suy `TOPIC_TEST` → `TOPIC_GATE`, không gọi User lấy goal;
+  câu khách quan tự chấm khi submit, rồi outbox → RabbitMQ → consumer Learning không gọi HTTP.
+- Consumer bỏ version bằng/cũ, thay evidence khi version cao hơn; `PLACEMENT` chỉ lưu version. Assignment cùng
+  user/version, chưa consume và `assigned_at <= completed_at` mới được consume; ≥70% ghi `passed_at` một chiều.
+- Writing Task 1/2 và Listening đã có trong luồng bài học. Writing chấm LLM có quota ngày và trừ point sau khi lưu grade;
+  essay không chặn hoàn thành bài. Content V13 có cột hint; trả Reading hint theo câu sai cho learner còn pending.
+
+Nguồn hiện tại: [Learning README](../../services/learning-service/README.md), [schema/flow MVP](../database/mvp-database.md)
+và [contract bài học](../../docs/contracts/lesson-learning-v1.md). Các mục lịch sử bên dưới không thay thế các cổng này.
 
 ---
 
-# 1. Feature Tree
+# 1. Feature Tree (baseline lịch sử; không phải implementation checklist)
 
 ```text
 IELTSPath
@@ -268,6 +290,16 @@ IELTSPath
 
 # 2. Core learner journey V2
 
+Luồng MVP hiện tại:
+
+```text
+Register / Login → GET /api/learning/topics → học bài → ôn KP yếu → nhận mã đề cuối
+→ Assessment submit / auto-grade → AssessmentCompleted.v2 → Learning cập nhật evidence và passed_at
+→ GET /api/learning/topics mở topic kế theo trạng thái suy ra
+```
+
+Luồng Tutor dưới đây là lịch sử, không chạy trong MVP Java:
+
 ```text
 Register / Login
       ↓
@@ -311,7 +343,7 @@ Official Practice / Mock / Topic Gate
 
 ---
 
-# 3. Thay đổi quan trọng so với Feature Tree V1
+# 3. Thay đổi quan trọng so với Feature Tree V1 (lịch sử)
 
 | V1 | V2 |
 | :--- | :--- |
@@ -327,7 +359,7 @@ Official Practice / Mock / Topic Gate
 
 ---
 
-# 4. Adaptive Learning V2 hoạt động thế nào
+# 4. Adaptive Learning V2 hoạt động thế nào (lịch sử)
 
 Không còn flow:
 
@@ -375,7 +407,9 @@ IELTSPath được phép extend policy để yêu cầu formal Topic Gate hoặc
 
 ---
 
-# 5. Mastery behavior
+# 5. Mastery behavior (baseline DeepTutor lịch sử)
+
+MVP hiện tại dùng evidence theo user và công thức mastery ở §0; cổng bài học và đề cuối quyết định tiến độ.
 
 DeepTutor baseline có hai gate:
 
@@ -402,7 +436,7 @@ Review due
 
 ---
 
-# 6. Tutor behavior
+# 6. Tutor behavior (lịch sử, ngoài runtime MVP)
 
 Tutor Agent không chỉ trả lời chat. Mỗi turn có thể chọn behavior phù hợp với current objective:
 
@@ -453,6 +487,9 @@ ASK harder practice
 
 # 7. Formal Assessment boundary
 
+Trong MVP hiện tại, bài tập lesson/review được Learning chấm; attempt/result đề cuối thuộc Assessment.
+Consumer Learning nhận `AssessmentCompleted.v2` trực tiếp theo user; không cần path/goal. Các mô tả Tutor bên dưới là lịch sử.
+
 Các feature sau vẫn thuộc Assessment, không bị DeepTutor nuốt:
 
 ```text
@@ -470,6 +507,10 @@ Tutor-generated micro questions không cần tạo `assessment_attempt` formal c
 ---
 
 # 8. Topic Gate V2
+
+MVP hiện tại: mọi bài hoàn thành và không còn review `PENDING` → giao mã đề → Assessment chấm → consumer consume
+assignment đủ điều kiện → ≥70% ghi `topic_progress.passed_at`. Cổng bài học và trạng thái topic suy ra là authority;
+không có policy Tutor chạy song song. Flow DeepTutor dưới đây là lịch sử:
 
 Business rule MVP vẫn có thể giữ:
 
@@ -498,7 +539,7 @@ Không còn `topic_progress` engine độc lập quyết định unlock song son
 
 ---
 
-# 9. “Today” experience
+# 9. “Today” experience (lịch sử)
 
 V2 không còn yêu cầu một Daily Plan persisted để làm adaptive authority.
 
@@ -521,7 +562,7 @@ Sau đó DeepTutor điều phối session.
 
 ---
 
-# 10. Mistake Review
+# 10. Mistake Review (lịch sử)
 
 Mistake history của Tutor được derive từ DeepTutor:
 
@@ -542,7 +583,7 @@ UI có thể hợp nhất hai nguồn thành Mistake Review nhưng không cần 
 
 ---
 
-# 11. RAG và generation
+# 11. RAG và generation (lịch sử, ngoài runtime MVP)
 
 RAG là một tool của Tutor:
 
@@ -570,25 +611,30 @@ Không tự publish vào canonical Question Bank.
 
 ---
 
-# 12. Service ownership
+# 12. Service ownership hiện tại
 
 | Feature Group | Owner |
 | :--- | :--- |
 | Account / Role / Profile / Learning Goal | `user-service` |
 | Premium / Activation Key / Point | `access-service` |
-| Curriculum / Vocabulary / Question Bank / Video metadata | `content-service` |
+| Curriculum / Lessons / Question Bank / Assets | `content-service` |
+| Vocabulary / Video metadata / Notes / Flashcards / learner video progress | `library-service` |
 | Placement / Practice / Mock / Formal Gate / Grading | `assessment-service` |
-| DeepTutor Mastery / Review / Tutor / RAG / Memory / Sessions | `learning-service` |
-| Notes / Flashcards / learner video progress | `learning-service` |
+| Topic/lesson progress / KP evidence and mastery / Review sets / Test assignments / Lesson Writing | `learning-service` (Java) |
+| Learning activity / Streak | `user-service` |
 | Game | `game-service` |
 | Notification | `notification-service` |
 | Community | `community-service` |
 
-Không còn feature group `AI Assistant` riêng.
+Ownership không khẳng định toàn bộ feature trong baseline đã triển khai. Tutor/RAG/memory/session của DeepTutor đã
+bị gỡ cùng service Python; thư mục `third_party/deeptutor` chỉ là nguồn tham khảo công thức mastery.
 
 ---
 
 # 13. MVP boundaries
+
+MVP Java hiện tại có giới hạn ở §0 và contract bài học: không Tutor Session WebSocket, RAG hay DeepTutor scheduler.
+Các yêu cầu sau là baseline V2 lịch sử, đã được thay thế; không dùng làm acceptance criteria cho MVP hiện tại.
 
 MVP V2 **không** yêu cầu:
 
@@ -617,7 +663,7 @@ learner context integration
 
 ---
 
-# 14. Product definition sau V2
+# 14. Product definition sau V2 (baseline lịch sử)
 
 IELTSPath không còn là:
 

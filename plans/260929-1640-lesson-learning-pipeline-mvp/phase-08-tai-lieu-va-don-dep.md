@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: "Tài liệu và dọn dẹp"
-status: pending
+status: completed
 priority: P2
 dependencies: [2, 3, 4, 5, 6, 7]
 effort: "0.5 ngày"
@@ -49,11 +49,19 @@ docker compose config --quiet
 
 ## Success Criteria
 
-- [ ] Không tài liệu nào còn ghi path theo goal, sắp thứ tự bằng LLM, `topics.test_package_id`, bài ôn là "làm lại bài tập cũ", hay assessment gọi user-service lấy goal.
-- [ ] Compile cả reactor và toàn bộ test pass; không `.pyc` hay `graphify-out/` trong diff.
-- [ ] Có report E2E.
+- [x] Tài liệu runtime hiện tại ghi đúng Java; các mô tả Python/DeepTutor cũ trong baseline được đánh dấu lịch sử, không phải hành vi đang chạy.
+- [x] Compile cả reactor và toàn bộ test pass; không `.pyc` hay `graphify-out/` trong diff.
+- [x] Có report E2E.
 
 ## Risk Assessment
 
 - **Phạm vi sửa `docs/system-architecture.md`:** chỉ §3 (một dòng), §6, §11; phần kiến trúc chia service do plan chia service làm.
 - **`.sdd/global`** là baseline LOCKED: không sửa constitution.
+
+## Kết quả
+
+- Hoàn tất 2026-10-02 trên nhánh `feat/lesson-pipeline-docs`, nền `feat/main-follow` commit `896fa2c`; không push.
+- Đồng bộ schema Java, feature tree, quy tắc Learning, luồng kiến trúc và README root/Content/Assessment/Learning. `CLAUDE.md` đã đúng nên giữ nguyên; không tái tạo tài liệu Python đã xóa.
+- `mvn -q compile -DskipTests`, `mvn -q test` (693 test, 0 fail/error/skip), `docker compose config --quiet` và `graphify update .` đều exit 0.
+- Live Gateway/Content/Assessment/Learning/PostgreSQL/RabbitMQ: 7/7 kiểm tra pass; Lan X1 75%, KP2 mastery 0.487, chèn review và mở topic kế; DLQ replay không ghi trùng. [Report và giới hạn kiểm chứng](./reports/e2e-261002-foundation-learning-pipeline.md).
+- Thực hiện theo ánh xạ Java thay Python; dùng database/container tạm riêng, không áp migration lên DB dùng chung. Reading hints và E2E toàn MVP vẫn thuộc roadmap tiếp theo.
