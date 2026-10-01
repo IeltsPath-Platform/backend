@@ -58,8 +58,7 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 
 | Caller | Callee | Endpoint | Cấu hình base URL |
 | --- | --- | --- | --- |
-| assessment | content | `/internal/assessment-content/knowledge-point-mappings` | `CONTENT_SERVICE_URL` |
-| assessment | user | `/api/users/me/learning-goals/active` | `USER_SERVICE_URL` |
+| assessment | content | `GET /internal/learning-content/package-versions/{id}` khi tạo attempt (ngoài transaction) | `CONTENT_SERVICE_URL` |
 | library | content | `GET /api/content/topics/{id}` khi ghi video | `CONTENT_SERVICE_URL` (mặc định `http://localhost:8082`) |
 | game (`VOCABULARY`) | library | `POST /internal/game-content/snapshots` | `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) |
 | game (`GRAMMAR`) | content | `POST /internal/game-content/snapshots` | `CONTENT_SERVICE_URL` |
@@ -75,8 +74,9 @@ contract [`learning-content-internal-v1`](contracts/learning-content-internal-v1
 ### Bất đồng bộ (RabbitMQ)
 
 ```text
-assessment: FinalizeAssessmentResultUseCase
-  -> AssessmentCompletedEventFactory -> outbox_events (cùng transaction)
+assessment: SubmitAssessmentAttemptUseCase -> AutoGradeAttemptService (mọi câu tự chấm được)
+            hoặc FinalizeAssessmentResultUseCase (người chấm)
+  -> AssessmentResultCompleter -> AssessmentCompletedEventFactory -> outbox_events (cùng transaction)
   -> OutboxRelayScheduler / OutboxRelay -> RabbitOutboxEventPublisher (publisher confirm)
   -> exchange assessment.events, routing key assessment.completed.v2
 learning: AssessmentCompletedListener (ack thủ công)
@@ -161,9 +161,11 @@ Game lưu snapshot để chơi; hai service cung cấp cùng request/response n�
 
 ### Kết quả thi → mastery
 
-Học viên làm bài ở assessment → chấm → `FinalizeAssessmentResultUseCase` → `AssessmentCompleted.v2` (mục 3) → Learning
-Service ghi bằng chứng, đề cuối đạt ≥ 70% thì topic PASSED; `GET /api/learning/mastery` và `GET /api/learning/topics`
-phản ánh kết quả.
+Học viên lấy mã đề từ learning (`POST /api/learning/topics/{id}/test-assignments`), tạo attempt bằng
+`packageVersionId` (assessment đọc đề từ content, tự suy loại attempt), nộp bài → assessment tự chấm câu khách quan
+(câu không chấm được thì chờ người chấm) → `AssessmentCompleted.v2` (mục 3) → Learning Service ghi bằng chứng, đề cuối đạt
+≥ 70% thì topic PASSED; `GET /api/learning/mastery` và `GET /api/learning/topics` phản ánh kết quả. Học viên xem điểm,
+đúng/sai ở `GET /api/assessments/attempts/{id}/result`; lời giải chỉ hiện khi đạt ≥ 70%.
 
 ## 7. Chạy local (tóm tắt)
 
@@ -232,7 +234,6 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | `.sdd/global/system-architecture.md`, `.sdd/constraints/global.md` (baseline 2026-09-18) ghi không có broker/outbox/learning service | Lỗi thời; `.sdd/global/constitution.md` vẫn là invariant cao nhất. Dữ kiện: code, `AGENTS.md`, tài liệu này |
 | Gateway CORS chỉ expose `Authorization`, `Content-Type` | Browser không đọc được header khác (ví dụ `Retry-After`) |
 | community có bảng `outbox_events` (V1) nhưng không dùng | Library không tạo bảng này; outbox của access/content/game chưa có relay |
-| Assessment vẫn gọi user lấy goal active khi tạo attempt | Bỏ ở phase 4 của plan 1640 (assessment tự chấm, event không goal) |
 | Consumer học chưa có test với RabbitMQ thật | Logic ack/nack/DLQ có unit test với channel giả; áp kết quả có test Postgres thật |
 | Giá chấm Writing nằm ở hai nơi | Learning `learning.writing.point-cost` (3) cho bài luận trong bài học; assessment `grading_point_costs.WRITING` cho chấm qua `grading_jobs`. Đổi giá phải sửa cả hai |
 | Bài Writing lưu ở hai nơi | Bài luận trong bài học ở `learning_db.lesson_writing_submissions`; Writing trong đề (sau MVP) ở `assessment_db.learner_submissions` |

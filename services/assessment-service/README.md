@@ -6,20 +6,41 @@ Assessment Service owns assessment attempts and their local assessment history. 
 
 The service currently supports:
 
-- creating, reading, submitting, expiring, and saving responses for assessment attempts;
-- materializing section and item snapshots supplied by the caller;
-- creating and reading local assessment results;
+- creating attempts from a published Content package version, reading, submitting, expiring, and saving responses;
+- grading objective (`CHOICE`/`FILL`) attempts automatically at submit;
+- the learner result view and the human grading flow for everything else;
 - creating learner submissions and local grading job state;
 - creating video practice attempts.
 
-When an attempt starts, the service captures two things by forwarding the caller's gateway JWT:
+### Starting an attempt
 
-- the learner's active learning goal, from User Service `GET /api/users/me/learning-goals/active`;
-- the question to knowledge-point mapping, from Content Service `POST /internal/assessment-content/knowledge-point-mappings`.
+The client sends only `{packageVersionId, mode, channel}`. Before opening a transaction, the service reads Content
+Service `GET /internal/learning-content/package-versions/{id}`, forwarding the caller's gateway JWT and
+`X-Correlation-Id` (unknown version → `404`, Content failure → `503 CONTENT_UNAVAILABLE`). `AttemptCreator` then writes,
+in one transaction:
 
-Both are stored with the attempt (`assessment_attempts.learning_goal_id`, `attempt_item_knowledge_points`) and are never re-resolved later.
+- the attempt type derived from the package type (`TOPIC_TEST`→`TOPIC_GATE`, `MOCK_TEST`→`MOCK`,
+  `PLACEMENT_TEST`→`PLACEMENT`, `QUIZ`→`QUIZ`; `PRACTICE_SET` and `LESSON` → `422 PACKAGE_NOT_ATTEMPTABLE`);
+- `section_snapshot` `{title, skill, instructions, passage?}` and `question_snapshot` `{stem, options}` (no answer);
+- `answer_snapshot` `{answerSpec, explanation, maxScore}`, which never reaches the learner before a passing result;
+- the knowledge-point mapping (`attempt_item_knowledge_points` and `knowledge_snapshot`).
 
-A created result is a DRAFT. Grading saves item results, including `max_score` and optional per-knowledge-point `PASS`/`FAIL`/`NOT_ASSESSED` judgments. `FinalizeAssessmentResultUseCase` then moves the result to COMPLETED and writes `AssessmentCompleted.v2` to `outbox_events` in the same transaction. `OutboxRelay` publishes committed rows to the RabbitMQ exchange `assessment.events` with routing key `assessment.completed.v2`, using publisher confirms. See `docs/contracts/assessment-completed-v2.md`.
+None of it is re-read from Content later. MVP packages have no time limit, so `expiresAt` is null. No learning goal is
+looked up; `learning_goal_id` stays null on new attempts.
+
+### Grading
+
+- **Automatic:** when every item's answer spec is gradable (answer spec v1, `docs/contracts/answer-spec-v1.md`), submit
+  writes result version 1 `COMPLETED`, one `item_results` row per item (correct = `maxScore`, wrong or omitted = 0) and
+  the outbox row, all in the submit transaction. A repeated submit changes nothing.
+- **Human:** if any item is ungradable (for example an essay), submit only records `SUBMITTED` and graders use the
+  endpoints below.
+- Submitting at or after `expiresAt` commits `EXPIRED` and returns `409 ATTEMPT_EXPIRED`.
+
+Both paths complete the result through `AssessmentResultCompleter`, which moves it to COMPLETED and writes
+`AssessmentCompleted.v2` (with `package_version_id`, `learning_goal_id: null`) to `outbox_events` in the same
+transaction. `OutboxRelay` publishes committed rows to the RabbitMQ exchange `assessment.events` with routing key
+`assessment.completed.v2`, using publisher confirms. See `docs/contracts/assessment-completed-v2.md`.
 
 IDs such as package, question and video references stay local logical references. Point debit, entitlement checks and provider execution are still follow-up work.
 
@@ -29,14 +50,13 @@ All assessment routes require an authenticated internal JWT. The authenticated s
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/assessments/attempts` | Create an attempt from section/item snapshots |
+| `POST` | `/api/assessments/attempts` | Create an attempt from a Content package version |
 | `GET` | `/api/assessments/attempts/{id}` | Read an owned attempt |
 | `GET` | `/api/assessments/attempts/{id}/structure` | Read the owned attempt structure |
 | `PUT` | `/api/assessments/attempts/{id}/items/{itemId}/response` | Save a response with an expected revision |
-| `POST` | `/api/assessments/attempts/{id}/submit` | Submit an attempt |
+| `POST` | `/api/assessments/attempts/{id}/submit` | Submit an attempt; auto-grades objective attempts |
 | `POST` | `/api/assessments/attempts/{id}/expire` | Expire an attempt |
-| `POST` | `/api/assessments/attempts/{id}/result` | Create a local result |
-| `GET` | `/api/assessments/attempts/{id}/result` | Read an owned result |
+| `GET` | `/api/assessments/attempts/{id}/result` | Learner view of the latest COMPLETED version: `score`, `maxScore`, `percent`, per-item `correct`; `solutions[]` only when `percent ≥ 70` |
 | `POST` | `/api/assessments/submissions` | Create a Writing or Speaking submission |
 | `POST` | `/api/assessments/grading-jobs` | Create local grading job state |
 | `GET` | `/api/assessments/grading-jobs/{id}` | Read an owned grading job |
@@ -56,9 +76,8 @@ All assessment routes require an authenticated internal JWT. The authenticated s
 - Details apply only to the latest version while it is still being graded, with the same checks as the learner
   flow: items belong to the attempt, `score ≤ maxScore`, judgments only for knowledge points snapshotted on the item.
   Each item result needs `score` and `maxScore`; an omitted `feedbackSnapshot` is stored as `{}`.
-- `overallBand` in the details always replaces the version's band, and omitting it clears the band. A learner may
-  still open a DRAFT with a self-declared band through `POST /attempts/{id}/result`; the grader then saves details and
-  finalizes that same DRAFT, so a finalized result only ever carries the grader's band.
+- `overallBand` in the details always replaces the version's band, and omitting it clears the band, so a finalized
+  result only ever carries the grader's band. Learners cannot open result versions.
 - Finalize is idempotent: finalizing a COMPLETED result returns it and writes no second outbox row.
 - Any EXAMINER can grade any result. There is no assignment model (`human_reviews`) yet.
 
@@ -74,7 +93,7 @@ The service owns the `assessment_db` PostgreSQL database. Flyway migrations are 
 - `GATEWAY_INTERNAL_JWT_SECRET`
 - `INTERNAL_JWT_ISSUER`
 - `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`
-- `USER_SERVICE_URL`, `CONTENT_SERVICE_URL`
+- `CONTENT_SERVICE_URL`
 - `ASSESSMENT_OUTBOX_RELAY_ENABLED` (default `true`)
 
 The service imports configuration from Config Server and registers with Eureka using the shared project runtime configuration. Do not put credentials or JWT secret values in source or documentation.

@@ -1,5 +1,6 @@
 package com.group01.assessment.domain.aggregate;
 
+import com.group01.assessment.domain.exception.AttemptExpiredException;
 import com.group01.assessment.domain.exception.InvalidAssessmentStateException;
 import com.group01.assessment.domain.vo.*;
 
@@ -20,8 +21,8 @@ public final class AssessmentAttempt {
     private long rowVersion;
     private final Instant createdAt;
     private Instant updatedAt;
-    // The learner's active goal when the attempt started. Null means the learner had no active goal,
-    // in which case the finalized result is not attributed to any adaptive learning path.
+    // Kept only for attempts started before goals stopped being captured; new attempts store null and
+    // AssessmentCompleted.v2 always announces a null goal.
     private final UUID learningGoalId;
 
     public AssessmentAttempt(UUID id, UUID userId, UUID packageVersionId, AttemptType attemptType,
@@ -54,25 +55,26 @@ public final class AssessmentAttempt {
 
     public static AssessmentAttempt start(UUID userId, UUID packageVersionId, AttemptType type,
                                           AttemptMode mode, AttemptChannel channel, Instant expiresAt) {
-        return start(userId, packageVersionId, type, mode, channel, expiresAt, null);
-    }
-
-    public static AssessmentAttempt start(UUID userId, UUID packageVersionId, AttemptType type,
-                                          AttemptMode mode, AttemptChannel channel, Instant expiresAt,
-                                          UUID learningGoalId) {
         Instant now = Instant.now();
         return new AssessmentAttempt(UUID.randomUUID(), userId, packageVersionId, type, mode, channel,
-                AttemptStatus.IN_PROGRESS, now, null, expiresAt, 0, now, now, learningGoalId);
+                AttemptStatus.IN_PROGRESS, now, null, expiresAt, 0, now, now, null);
     }
 
+    /**
+     * A submit at or after the deadline moves the attempt to EXPIRED before throwing, so the caller can persist the
+     * expiry rather than lose it with the failed submit.
+     */
     public void submit(Instant now) {
         if (status == AttemptStatus.SUBMITTED) return;
+        if (status == AttemptStatus.EXPIRED) {
+            throw new AttemptExpiredException();
+        }
         if (status != AttemptStatus.IN_PROGRESS) {
             throw new InvalidAssessmentStateException("Only an in-progress attempt can be submitted");
         }
         if (expiresAt != null && !now.isBefore(expiresAt)) {
             expire(now);
-            throw new InvalidAssessmentStateException("Attempt has expired");
+            throw new AttemptExpiredException();
         }
         status = AttemptStatus.SUBMITTED;
         submittedAt = now;

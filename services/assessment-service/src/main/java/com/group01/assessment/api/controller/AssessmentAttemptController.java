@@ -47,31 +47,11 @@ public class AssessmentAttemptController {
     public AssessmentAttemptResponse start(
             @Valid @RequestBody StartAssessmentAttemptRequest request
     ) {
-        var sections = request.sections().stream()
-                .map(section -> new StartAssessmentAttemptCommand.SectionInput(
-                        section.contentSectionId(),
-                        section.sortOrder(),
-                        section.snapshot(),
-                        section.items().stream()
-                                .map(item -> new StartAssessmentAttemptCommand.ItemInput(
-                                        item.questionVersionId(),
-                                        item.sortOrder(),
-                                        item.questionSnapshot(),
-                                        item.answerSnapshot(),
-                                        item.knowledgeSnapshot()
-                                ))
-                                .toList()
-                ))
-                .toList();
-
         var result = startAssessmentAttemptUseCase.execute(new StartAssessmentAttemptCommand(
                 currentUser.requireUserId(),
                 request.packageVersionId(),
-                request.attemptType(),
                 request.mode(),
-                request.channel(),
-                request.expiresAt(),
-                sections
+                request.channel()
         ));
         return AssessmentAttemptResponse.from(result);
     }

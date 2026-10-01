@@ -118,7 +118,7 @@ src/main/java/com/group01/<service>
 
 - Mỗi service sở hữu bounded context và database; không đọc/ghi database hay dùng chung JPA entity của service khác.
 - Gọi đồng bộ service-to-service bằng HTTP tới endpoint nội bộ hoặc public của service đích, kèm bearer của request và
-  `X-Correlation-Id` (như assessment → content/user, library → content, game → library/content). learning-service → content cũng gửi cả hai.
+  `X-Correlation-Id` (như assessment → content, library → content, game → library/content). learning-service → content cũng gửi cả hai.
 - Bất đồng bộ qua transactional outbox + RabbitMQ; event có version trong tên và contract ở `docs/contracts/`. Consumer
   phải idempotent và có retry/dead-letter (xem consumer của learning-service).
 - `shared/` chỉ chứa technical concern dùng chung; không chuyển entity hay use case nghiệp vụ vào đó.

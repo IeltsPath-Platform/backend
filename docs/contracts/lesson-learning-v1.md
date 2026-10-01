@@ -2,7 +2,7 @@
 
 **Status: approved 2026-10-01.** This document describes the intended learner HTTP API; it does not claim it is deployed. Examples use actual lesson/question/package codes and text from [`seed-content.md`](../../plans/260930-2057-mvp-reading-writing-listening-roadmap/seed-content.md). The existing V4 UUIDs for DEMO_READING and KP1 are real; other UUIDs and timestamps illustrate relationships because the V9 seed leaves their assignment to the migration.
 
-**Implementation status (2026-10-01):** Java Learning Service implements every route below, including review sets and final-test assignment. The assessment consumer that consumes assignments and passes topics follows separately.
+**Implementation status (2026-10-01):** Java Learning Service implements every route below, including review sets and final-test assignment. Learning Service consumes `AssessmentCompleted.v2` to use assignments and pass topics, and Assessment auto-grades final tests (section "Assessment changes" below).
 
 The MVP app displays topic and lesson status. The Java Learning Service owns progress, mastery evidence, reviews and test assignments. Tutor, practice notebook, learner memory, learning goals and LLM ordering are removed. Reviews use new `PRACTICE_SET` questions, solutions stay hidden until the relevant block or set is passed, and a final test assignment uses a package code once before selecting another package. Topic order is stored in `topic_progress.sequence_order`; only `passed_at` is persisted. No `topics.test_package_id`, assessment schema migration, premium gate, or unpublished content authoring API is introduced here.
 
@@ -154,6 +154,13 @@ New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: ar
 Review insertion requires **all four**: current mastery for the KP below `learning.review-mastery-threshold` (default `0.6`), a wrong answer for that KP in the just-considered result, a completed lesson teaching the KP (including a lesson just completed), and `has_practice_set=true` in `knowledge_point_catalog`. A KP with no eligible package, such as KP5 in `TFNG_SKILLS`, never creates a review; the final test still checks it. With only one or two first-attempt evidence items, the mastery formula caps mastery at 0.5 or 0.8, so at the default threshold the wrong-answer condition largely determines whether a review is inserted. Only first submissions of lesson blocks contribute that evidence. Reassessment runs after a lesson completes and after `TOPIC_GATE`, `MOCK`, `OFFICIAL_PRACTICE`, or `QUIZ` results; it inserts reviews only. Topic `PASSED` is one-way.
 
 ## Assessment changes requiring approval
+
+**Implemented 2026-10-01** as described below. Errors use Assessment's `ErrorResponse`
+(`timestamp,status,error,message,path,details`) plus a `code` key on these cases: `409 ATTEMPT_EXPIRED` (submit at or
+after `expiresAt`; the attempt is left `EXPIRED`), `422 PACKAGE_NOT_ATTEMPTABLE` (`PRACTICE_SET`, `LESSON`, or a version
+with an empty section), `503 CONTENT_UNAVAILABLE` (Content failed or returned an unusable version). An unknown or
+unpublished `packageVersionId` is `404`; a result not yet `COMPLETED` is `404` on `GET /attempts/{attemptId}/result`.
+`knowledgeSnapshot` is `[{knowledgePointId, weight}]`. A stored `answer` that is not a JSON string scores zero.
 
 These are proposed changes to existing `/api/assessments` routes. The current controller/DTO names are preserved where behavior is unchanged; grader DTOs and `GradingController` stay as they are.
 
