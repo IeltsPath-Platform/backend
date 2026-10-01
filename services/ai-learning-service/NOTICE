@@ -1,6 +1,0 @@
-IELTSPath AI Learning Service
-
-This product includes software derived from DeepTutor v1.6.9
-(https://github.com/HKUDS/DeepTutor, commit da856ad), licensed under the
-Apache License 2.0 and modified for IELTSPath. See licenses/DeepTutor-LICENSE.txt.
-Ported files carry a header naming their DeepTutor source.

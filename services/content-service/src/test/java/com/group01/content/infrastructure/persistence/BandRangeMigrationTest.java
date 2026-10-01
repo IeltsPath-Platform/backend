@@ -41,11 +41,23 @@ class BandRangeMigrationTest {
     }
 
     @Test
-    void validBandRangesAreStored() throws Exception {
-        UUID topicId = insertTopic("4.0", "5.5");
-        execute("INSERT INTO knowledge_points (id, topic_id, code, name, kind, learning_type, band_min, band_max) "
-                + "VALUES ('" + UUID.randomUUID() + "', '" + topicId + "', 'KP-" + UUID.randomUUID()
-                + "', 'Kp', 'GRAMMAR', 'PROCEDURE', 6.0, NULL)");
+    void validTopicBandRangesAreStored() throws Exception {
+        insertTopic("4.0", "5.5");
+    }
+
+    @Test
+    void knowledgePointsNoLongerHaveABandButTopicsDo() throws Exception {
+        assertEquals(0, countColumns("knowledge_points"));
+        assertEquals(2, countColumns("topics"));
+    }
+
+    private static int countColumns(String table) throws SQLException {
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            var rows = statement.executeQuery("SELECT count(*) FROM information_schema.columns WHERE table_name = '"
+                    + table + "' AND column_name IN ('band_min', 'band_max')");
+            rows.next();
+            return rows.getInt(1);
+        }
     }
 
     @Test

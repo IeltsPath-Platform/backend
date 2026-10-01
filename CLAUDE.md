@@ -1,10 +1,9 @@
 # CLAUDE.md — IELTSPath backend
 
-- Cập nhật lần cuối: 2026-09-27; dữ kiện đã kiểm với code tại commit `79f9fd6`. Về dữ kiện, code là nguồn đúng khi tài
+- Cập nhật lần cuối: 2026-10-01; dữ kiện đã kiểm với code tại commit `ab613b1`. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
-- Kiến trúc, flow, quyết định: `docs/system-architecture.md`. Làm việc trong `services/ai-learning-service/` thì đọc thêm
-  `services/ai-learning-service/CLAUDE.md` (tự nạp khi mở file trong service đó).
+- Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
 
 @AGENTS.md
 
@@ -24,15 +23,15 @@ và DLQ). Mỗi service sở hữu một PostgreSQL DB.
 | `infra/eureka-server` | Java | 8761 | — | — |
 | `infra/api-gateway` | Java (WebFlux) | 8080 | — | — |
 | `shared/common-security` | Java lib | — | — | — |
-| `services/user-service` | Java | 8085 | `user_db` (Postgres local 5432) | `/auth/**`, `/api/users/**` |
-| `services/content-service` | Java | 8082 | `content_db` (local 5432) | `/api/content/**` |
+| `services/user-service` | Java | 8085 | `user_db` (Postgres local 5432) | `/auth/**`, `/api/users/**`, `/api/learning-support/{activities,streak}/**` |
+| `services/content-service` | Java | 8082 | `content_db` (local 5432) | `/api/content/**` trừ ba nhóm catalog chuyển tới library |
+| `services/library-service` | Java | 8081 | `library_db` (compose host 5437) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
 | `services/assessment-service` | Java | 8083 | `assessment_db` (local 5432) | `/api/assessments/**` |
 | `services/access-service` | Java | 8084 | `access_db` (local 5432) | `/api/access/**` |
-| `services/learning-support-service` | Java | 8086 | `learning_support_db` (compose 5433) | `/api/learning-support/**` |
 | `services/game-service` | Java | 8087 | `game_db` (compose 5435) | `/api/games/**`, ws `/ws/games/**` |
 | `services/notification-service` | Java (khung) | 8088 | `notification_db` (local 5432) | `/api/notifications/**` |
 | `services/community-service` | Java | 8089 | `community_db` (compose 5434, cần `COMMUNITY_DB_URL`, xem §5) | `/api/community/**` |
-| `services/ai-learning-service` | Python 3.11 | 8000 | `ai_learning_db` (compose 5436) | `/api/ai-learning/**` |
+| `services/learning-service` | Java (khung) | 8086 | `learning_db` (compose 5436) | `/api/learning/**` |
 | `third_party/deeptutor` | Python | — | — | Chỉ để đọc khi port; không import |
 
 Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/config-repo/*.yaml`, `docker-compose.yml`.
@@ -44,14 +43,14 @@ Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/c
 - `.env` ở root (gitignored) chứa mật khẩu và secret: compose nội suy nó; Gateway và mọi service Java nghiệp vụ import nó
   (`optional:file:../../.env[.properties]`; config-server, eureka-server thì không). ai-learning khi chạy trên host đọc
   `services/ai-learning-service/.env` riêng; container ai-learning nhận biến từ compose. Chỉ ghi tên biến, không ghi giá trị.
-- Compose chỉ chạy một phần stack, không chạy `docker compose up` toàn bộ:
-  `docker compose up -d --build rabbitmq ai-learning-db ai-learning-migrate ai-learning-api ai-learning-consumer`
-  (+ `learning-support-db`, `community-db`, `game-db` khi cần; `llm-stub` nằm sau profile: `docker compose --profile llm-stub up -d llm-stub`).
+- Compose yêu cầu `LIBRARY_DB_PASSWORD` trong `.env` dù chỉ bật một phần stack. Chỉ chạy các container cần dùng:
+  `docker compose up -d rabbitmq learning-db`
+  (+ `library-db`, `community-db`, `game-db` khi cần).
 - Service Java chạy trên host (IDE hoặc `java -jar`) theo thứ tự: config-server → eureka → api-gateway → user → content →
-  assessment → các service còn lại (kể cả game-service, xem §5).
+  library → assessment → các service còn lại (kể cả game-service, xem §5).
 - AI Learning trong container gọi User/Content trên host qua `host.docker.internal`. RabbitMQ: AMQP `127.0.0.1:5672`,
   UI `127.0.0.1:15672`.
-- Hướng dẫn luồng chính: `README.md` §6. README §4 còn mô tả compose cũ (config/eureka/gateway trong compose), đừng làm theo.
+- Hướng dẫn luồng chính và cấu hình Compose: `README.md` §6.
 
 ## 4. Lệnh hay dùng
 
@@ -64,12 +63,15 @@ docker compose config --quiet                    # kiểm compose + .env
 docker compose ps
 ```
 
-Test Python và lệnh riêng của AI Learning: `services/ai-learning-service/CLAUDE.md`.
+Test service học: `mvn -q -pl services/learning-service -am test` (Testcontainers cần Docker).
 
 ## 5. Cạm bẫy đã biết
 
 - `CONTENT_SERVICE_URL` của game-service trong config-repo mặc định `http://content-service:8082` (tên trong Docker) và ghi
   đè default local → khi chạy game trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082`.
+- Game gọi library qua `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) cho `VOCABULARY`, gọi content qua
+  `CONTENT_SERVICE_URL` cho `GRAMMAR`. Library gọi `GET /api/content/topics/{id}` để kiểm topic khi ghi video.
+- Compose yêu cầu `LIBRARY_DB_PASSWORD` ngay cả khi chưa bật `library-db`, vì Compose nội suy toàn bộ file.
 - Container `game-service` trong compose trỏ `http://config-server:8888` mà compose không có config-server: đừng dùng
   container này, chạy game-service trên host.
 - community-service mặc định `localhost:5432/community_db`; dùng DB compose thì đặt
@@ -78,7 +80,7 @@ Test Python và lệnh riêng của AI Learning: `services/ai-learning-service/C
 - `GATEWAY_INTERNAL_JWT_SECRET` phải giống nhau ở Gateway, mọi service Java và AI Learning, lệch là 401. Config-repo có giá
   trị fallback cho secret (thiếu biến env thì chạy bằng secret công khai trong repo): không dựa vào, không tự sửa, báo người dùng.
 - Outbox của access/content/game chỉ ghi, chưa có relay: event của các service này không tới consumer.
-- notification-service chỉ là khung package; README user-service ghi `PATCH` cho đổi trạng thái user, controller là `PUT`.
+- notification-service chỉ là khung package.
 - Role chuẩn là `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF` (`LEARNER` cũ đã đổi thành `CUSTOMER`).
 - `.pyc` và `graphify-out/` không được commit; VS Code có thể tự chạy pytest discovery và sinh bytecode khi sửa file test.
 
