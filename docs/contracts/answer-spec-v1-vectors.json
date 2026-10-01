@@ -25,5 +25,6 @@
   {"name":"Q12 assessment payload missing answer","spec":{"type":"FILL","accepted":["critics"]},"response":{},"correct":false},
   {"name":"Q12 assessment payload null answer","spec":{"type":"FILL","accepted":["critics"]},"response":{"answer":null},"correct":false},
   {"name":"Listening LQ2 accepted alternative whitespace","spec":{"type":"FILL","accepted":["15","15th","fifteenth","the 15th","the fifteenth"]},"response":"  The   Fifteenth  ","correct":true},
-  {"name":"empty spec is ungradable","spec":{},"response":"A","correct":false,"gradable":false}
+  {"name":"empty spec is ungradable","spec":{},"response":"A","correct":false,"gradable":false},
+  {"name":"essay spec is ungradable","spec":{"type":"ESSAY","task":"TASK_2","minWords":250,"passBand":6.0},"response":"Green roofs should be required because...","correct":false,"gradable":false}
 ]
