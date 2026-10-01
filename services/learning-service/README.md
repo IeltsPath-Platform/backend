@@ -111,8 +111,10 @@ text, and computes the overall band itself. Essays, prompts and LLM output are n
 The consumer reads queue `learning.assessment-completed.v2` (bound to `assessment.events` /
 `assessment.completed.v2`), with a TTL retry queue and a DLQ. Each result version is applied in one transaction
 under the user lock and acknowledged after commit: versions are idempotent per attempt and a higher version replaces
-the attempt's `assessment` evidence. `TOPIC_GATE` consumes the open assignment of the package version given before
-the attempt completed and passes the topic at 70% (one way); `TOPIC_GATE`, `MOCK`, `OFFICIAL_PRACTICE` and `QUIZ`
+the attempt's `assessment` evidence. Equal or older versions are ignored. No learning goal or existing learning
+progress is required, and the consumer makes no HTTP calls. `TOPIC_GATE` selects the latest assignment for the same
+user/package version with `consumed_at IS NULL` and `assigned_at <= completed_at`, consumes it even on failure and
+passes the topic at 70% (one way); `TOPIC_GATE`, `MOCK`, `OFFICIAL_PRACTICE` and `QUIZ`
 reevaluate reviews; `PLACEMENT` only records its version. Contract violations and the last failed attempt go to the
 DLQ with header `x-learning-failure`. Settings: `LEARNING_RETRY_DELAY_MS` (30 s), `LEARNING_MAX_DELIVERY_ATTEMPTS`
 (5), `LEARNING_CONSUMER_ENABLED` (true).

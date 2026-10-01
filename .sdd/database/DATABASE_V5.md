@@ -1,8 +1,8 @@
 ---
 type: database-design
 version: V5
-status: deeptutor-core-baseline
-updated: 2026-10-01
+status: historical-baseline-with-current-java-schema
+updated: 2026-10-02
 scope: IELTSPath MVP
 external_baseline: HKUDS/DeepTutor v1.6.9
 ---
@@ -11,9 +11,9 @@ external_baseline: HKUDS/DeepTutor v1.6.9
 
 > **2026-10-01:** `ai_learning_db` và `ai-learning-service` (Python) đã bị thay bằng `learning_db`/`learning-service` (Java, §7). Các đoạn nhắc DeepTutor state, tutor hay `ai_learning_db` bên dưới là thiết kế lịch sử của V5.
 
-> V5 **xóa hoàn toàn Adaptive Engine tự thiết kế ở V4**. `ai_learning_db` được thiết kế lại quanh persistence semantics của **DeepTutor Mastery Path + session runtime**. Không còn `mastery_records`, `review_events`, `topic_progress`, `daily_plans`, `daily_tasks`, `ai_conversations`, `ai_messages` hay `ai_assistant_db`. (V5.1 thêm lại `topic_progress` với nghĩa khác, chỉ là tiến độ học bài, xem §7.21.)
+> V5 **xóa hoàn toàn Adaptive Engine tự thiết kế ở V4**. `ai_learning_db` được thiết kế lại quanh persistence semantics của **DeepTutor Mastery Path + session runtime**. Không còn `mastery_records`, `review_events`, `topic_progress`, `daily_plans`, `daily_tasks`, `ai_conversations`, `ai_messages` hay `ai_assistant_db`. (V5.1 thêm lại `topic_progress` với nghĩa khác, chỉ là tiến độ học bài, xem §7.2.)
 
-> DeepTutor là adaptive learning engine duy nhất. `content_db` sở hữu IELTS curriculum, question bank và bài học; `library_db` sở hữu catalog từ vựng/video và thư viện học cá nhân. `assessment_db` vẫn là formal assessment; `user_db` sở hữu identity/profile/learning goal cùng activity/streak. `ai_learning_db` chỉ giữ **Adaptive Learning Core / Tutor Runtime** của DeepTutor. Service hỗ trợ học viên cũ đã gỡ.
+> **Thiết kế lịch sử V5:** DeepTutor từng là adaptive learning engine duy nhất; `ai_learning_db` giữ Adaptive Learning Core / Tutor Runtime. Hiện tại `content_db` sở hữu IELTS curriculum, question bank và bài học; `library_db` sở hữu catalog từ vựng/video và thư viện học cá nhân; `assessment_db` sở hữu formal assessment; `user_db` sở hữu identity/profile/learning goal cùng activity/streak. Learning Java dùng schema §7, không có tutor runtime. Service hỗ trợ học viên cũ đã gỡ.
 
 ## 0. Lịch sử phiên bản
 
@@ -24,9 +24,9 @@ external_baseline: HKUDS/DeepTutor v1.6.9
 | **V3** | Tách `game-service`/`game_db`; thêm realtime multiplayer; Personal Library gộp vào `learning-service`. |
 | **V4** | Thêm Video Learning qua YouTube URL/Video ID; baseline **87 bảng nghiệp vụ + 9 outbox = 96 bảng vật lý**. |
 | **V5** | **Bỏ Adaptive Engine cũ và `ai-assistant-service`**. Learning chuyển sang DeepTutor core. Xóa 6 bảng adaptive cũ + `topic_gate_attempts` + `mistake_notebook_entries` + 2 bảng AI Chat; thêm persistence cho DeepTutor Mastery Path, interaction/evidence/event, tutor session/message/turn runtime và Question Notebook practice. Adaptive core được tách thành `learning-service`/`ai_learning_db`; utility state từng thuộc service hỗ trợ học viên cũ (đã gỡ trong đợt chia service). Content MVP bỏ adaptive topic graph/gate, bỏ vocab↔KP mapping, nhúng question options vào version, gộp asset links và defer package↔vocabulary mapping. Baseline lịch sử: **85 bảng nghiệp vụ + 9 outbox = 94 bảng vật lý**. |
-| **V5.1** (2026-09-29, thiết kế đích, chưa có migration) | Học theo chủ đề → bài. Content thêm 5 bảng bài học (§5.13–§5.17); `topics` thêm `required_feature_key`, `test_package_id`; `content_packages.package_type` thay `LESSON` bằng `TOPIC_TEST`; mỗi câu hỏi chỉ gắn KP chính. AI Learning thêm 4 bảng tiến độ học bài (§7.21–§7.24); `topic_progress` quay lại nhưng chỉ lưu học viên đã học tới đâu, mastery vẫn do DeepTutor core giữ. Luật đầy đủ: `plans/260929-1640-lesson-learning-pipeline-mvp/plan.md` (bản gốc `main-learning-pipeline.md` ở git history, commit `6506d5e`). |
-| **V5.2** (2026-09-29, thiết kế đích, chưa có migration) | Sửa V5.1 sau red-team. Content: một topic nhiều mã đề qua `content_packages.topic_id` (bỏ `topics.test_package_id`); **giữ** `LESSON` và thêm `TOPIC_TEST`; `knowledge_points` bỏ band. Assessment: không thêm cột; `answer_snapshot` chứa đáp án, `attempt_type` suy từ loại gói. AI Learning: `mastery_paths` một path mỗi học viên; bỏ `mastery_path_knowledge_point_bands`; thêm `path_review_sets` (§7.25), `topic_test_assignments` (§7.26); sửa cột §7.21–§7.23; bài ôn và luyện thêm dùng gói `PRACTICE_SET` câu mới, tính cả bài vừa học; giấu đáp án tới khi đạt. Plan triển khai: `plans/260929-1640-lesson-learning-pipeline-mvp`. |
-| **V5.3** (2026-09-30, thiết kế đích, chưa có migration) | Listening đi trọn luồng học. **Không thêm bảng, không thêm cột.** Content: asset `AUDIO` lưu key file ở `media_reference` (content ghép `CONTENT_MEDIA_BASE_URL`, học viên nhận `mediaUrl`), transcript ở `text_content` và giấu tới khi đạt; khối `ASSET` AUDIO trong bài học; section `skill = LISTENING` gắn audio; KP Listening dùng `PROCEDURE`, `kind = STRATEGY`. Assessment: `attempt_sections.section_snapshot` thêm `skill`, `audio`, `solution` (§6.2). AI Learning: chọn gói theo luật V5.2, gói không gắn độ khó (1 gói mỗi KP trong seed). Plan: `plans/260930-0851-listening-topic-audio-lessons`. Chọn gói theo dạng câu và độ khó (cột `path_review_items.wrong_question_types`, mức của gói ở §5.18) **hoãn ngoài MVP** (ý tưởng: `plans/reports/brainstorm-260930-0908-listening-adaptive-path-report.md`). |
+| **V5.1** (quyết định 2026-09-29) | Thiết kế ban đầu cho học topic → bài: năm bảng Content (§5.13–§5.17), tiến độ bài và bài ôn. Các đề xuất `topics.test_package_id`, thay `LESSON`, mastery path Python là lịch sử, đã được V5.2 và bản Java thay thế. Migration hiện thực: Content V8–V9 và Learning V1 (§7.2–§7.7). Luật: `plans/260929-1640-lesson-learning-pipeline-mvp/plan.md` (bản gốc `main-learning-pipeline.md` ở git history, commit `6506d5e`). |
+| **V5.2** (quyết định 2026-09-29) | Hiện thực bằng Content V8–V9 và Learning V1: một topic nhiều mã đề qua `content_packages.topic_id`; giữ `LESSON`, thêm `TOPIC_TEST`, bỏ band KP. Assessment dùng schema sẵn có: snapshot `{answerSpec, explanation, maxScore}`, suy attempt type, tự chấm và outbox cùng transaction. Learning Java không dùng path Python: topic chỉ lưu `passed_at` (§7.2), evidence lần nộp đầu mỗi khối (§7.4, §7.8), review `DONE`/`SKIPPED` (§7.5–§7.6), assignment dùng một lần (§7.7). Plan: `plans/260929-1640-lesson-learning-pipeline-mvp`. |
+| **V5.3** (quyết định 2026-09-30; seed Content V12 đã triển khai) | Listening đi trọn luồng học. **Không thêm bảng, không thêm cột.** Content: asset `AUDIO` lưu key file ở `media_reference` (content ghép `CONTENT_MEDIA_BASE_URL`, học viên nhận `mediaUrl`), transcript ở `text_content` và giấu tới khi đạt; khối `ASSET` AUDIO trong bài học; section `skill = LISTENING` gắn audio; KP Listening dùng `PROCEDURE`, `kind = STRATEGY`. Assessment: `attempt_sections.section_snapshot` thêm `skill`, `audio`, `solution` (§6.2). AI Learning: chọn gói theo luật V5.2, gói không gắn độ khó (1 gói mỗi KP trong seed). Plan: `plans/260930-0851-listening-topic-audio-lessons`. Chọn gói theo dạng câu và độ khó (cột `path_review_items.wrong_question_types`, mức của gói ở §5.18) **hoãn ngoài MVP** (ý tưởng: `plans/reports/brainstorm-260930-0908-listening-adaptive-path-report.md`). |
 | **Chia service** (đã triển khai 2026-10-01) | Library V1 tạo 5 bảng catalog từ vựng/video; library V2 tạo 6 bảng thư viện cá nhân và 4 FK `ON DELETE RESTRICT` tới catalog (§4.3–§4.4, §5.10–§5.12, §8). User V5 tạo `learning_activities`, `streaks` (§8.1–§8.2), không FK tới `users`. Content V7 xóa 5 bảng catalog cũ. Không chép dữ liệu, không tạo outbox ở library; service và DB hỗ trợ học viên cũ đã gỡ. Commit: `465f543`, `0da2eb2`, `d762660`, `fec5d14`, `ab613b1`. |
 | **Learning Service** (đã triển khai 2026-10-01) | Bỏ `ai-learning-service` Python và `ai_learning_db`; `learning-service` Java (`learning_db`, Flyway V1) có 9 bảng (§7): tiến độ topic/bài, bài nộp, bài ôn, mã đề, bằng chứng theo user, version kết quả thi, catalog KP. Không chuyển dữ liệu cũ. Content V10–V13: essay Writing Task 2/Task 1, Listening, cột `question_versions.hint`. Plan `261001-1228`. |
 | **Writing trong bài học** (đã triển khai 2026-10-01) | Learning V2 thêm `lesson_writing_submissions`, `llm_daily_usage` (§7.10–7.11) và source `lesson_writing`: bài luận Task 1/Task 2 chấm bằng LLM trong request, trừ 3 point qua access sau khi chấm, tối đa 10 lần/ngày. Không qua `grading_jobs` của assessment. Plan `260930-0737`, `260930-0812`. |
@@ -491,7 +491,7 @@ Khi activate key `PREMIUM`, `access-service` ghi activation và publish event. `
 
 ## 4.1 `topics`
 
-Lưu taxonomy chủ đề chuẩn của IELTSPath để phân loại content. `topics` chỉ mô tả nội dung/curriculum; nó **không** biểu diễn prerequisite hay trạng thái học của từng học viên. Từ V5.1: `sort_order` là thứ tự học ban đầu, giống mọi học viên; thứ tự hiện tại và việc mở khóa theo từng học viên do `learning-service` quyết định. V5.2: thứ tự học chỉ gồm topic có ≥ 1 bài `PUBLISHED` và ≥ 1 gói `TOPIC_TEST` `PUBLISHED`, theo `sort_order`, lưu theo học viên ở `topic_progress.sequence_order` (§7.21); xếp lại thứ tự trong cùng `parent_topic_id` hoãn khỏi MVP.
+Lưu taxonomy chủ đề chuẩn của IELTSPath để phân loại content. `topics` chỉ mô tả nội dung/curriculum; nó **không** biểu diễn prerequisite hay trạng thái học của từng học viên. Từ V5.1: `sort_order` là thứ tự học ban đầu, giống mọi học viên; thứ tự hiện tại và việc mở khóa theo từng học viên do `learning-service` quyết định. V5.2: thứ tự học chỉ gồm topic có ≥ 1 bài `PUBLISHED` và ≥ 1 gói `TOPIC_TEST` `PUBLISHED`, theo `sort_order`, lưu theo học viên ở `topic_progress.sequence_order` (§7.2); xếp lại thứ tự trong cùng `parent_topic_id` hoãn khỏi MVP.
 
 Thuộc tính chính:
 
@@ -590,7 +590,7 @@ Content sở hữu §5.1–§5.9 và §5.13–§5.18. `learning_videos`, `video_
 
 ## 5.1 `content_packages`
 
-Đại diện cho một bộ nội dung hoàn chỉnh như mock test, placement test, practice set, quiz hoặc đề cuối topic. V5.1 thêm `TOPIC_TEST`. V5.2 **giữ** `LESSON` (V5.1 định bỏ; luồng đọc bài của tutor còn dùng; bài học mới dùng bảng riêng §5.13). V5.2: `PRACTICE_SET` có ≥ 3 câu là ngân hàng câu cho bài ôn và luyện thêm (§7.25), không trùng câu với bài học hay đề cuối của cùng topic; `TOPIC_TEST` chỉ tạo bằng seed, không qua API. Content không sở hữu khái niệm plan `FREE/PREMIUM`; nếu package cần entitlement thì chỉ khai báo `required_feature_key`, còn quyết định user có quyền truy cập thuộc `access-service`.
+Đại diện cho một bộ nội dung hoàn chỉnh như mock test, placement test, practice set, quiz hoặc đề cuối topic. V5.1 thêm `TOPIC_TEST`. V5.2 **giữ** `LESSON` (V5.1 định bỏ; luồng đọc bài của tutor còn dùng; bài học mới dùng bảng riêng §5.13). V5.2: `PRACTICE_SET` có ≥ 3 câu là ngân hàng câu cho bài ôn và luyện thêm (§7.6), không trùng câu với bài học hay đề cuối của cùng topic; `TOPIC_TEST` chỉ tạo bằng seed, không qua API. Content không sở hữu khái niệm plan `FREE/PREMIUM`; nếu package cần entitlement thì chỉ khai báo `required_feature_key`, còn quyết định user có quyền truy cập thuộc `access-service`.
 
 Thuộc tính chính:
 
@@ -600,7 +600,7 @@ Thuộc tính chính:
 | `code` | — | — | Mã nghiệp vụ ổn định. |
 | `title` | — | — | Tiêu đề. |
 | `package_type` | varchar(50) | CHECK `MOCK_TEST`/`PLACEMENT_TEST`/`PRACTICE_SET`/`QUIZ`/`LESSON`/`TOPIC_TEST` | Loại package. `TOPIC_TEST` là một mã đề cuối của topic. |
-| `topic_id?` | uuid | FK → `topics`; CHECK bắt buộc khi `package_type = 'TOPIC_TEST'` | V5.2. Topic mà mã đề thuộc về. Một topic có nhiều mã đề; learning-service giao mã đề cho học viên (§7.26). |
+| `topic_id?` | uuid | FK → `topics`; CHECK bắt buộc khi `package_type = 'TOPIC_TEST'` | V5.2. Topic mà mã đề thuộc về. Một topic có nhiều mã đề; learning-service giao mã đề cho học viên (§7.7). |
 | `required_feature_key?` | varchar(100) | Logical ref ↗ `Access.plan_features.feature_key` | Feature cần có để truy cập package; `NULL` nếu không có feature gate riêng. Không FK xuyên service. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
 | `current_published_version_id?` | — | — | Phiên bản đang publish. |
@@ -907,12 +907,12 @@ Thân bài: chuỗi khối theo thứ tự. Bài không chép đoạn văn, từ
 | `lesson_id` | uuid | FK → `lessons` ON DELETE CASCADE | Bài chứa khối. |
 | `sort_order` | integer | NOT NULL | Thứ tự hiển thị trong bài. |
 | `block_type` | varchar(20) | CHECK `TEXT`/`ASSET`/`VOCABULARY`/`EXERCISE` | Loại khối. |
-| `text_content?` | text | — | Markdown của khối `TEXT` (bắt buộc); hướng dẫn tùy chọn của khối `EXERCISE`. |
+| `text_content?` | text | — | Markdown của khối `TEXT` (bắt buộc); NULL với các loại khối khác theo CHECK ở Content V8. |
 | `asset_id?` | uuid | FK → `content_assets` | Bắt buộc với khối `ASSET` (`PASSAGE`, `IMAGE`, `AUDIO`). |
 | `created_at`, `updated_at` | timestamptz | NOT NULL | |
 | `UQ(lesson_id, sort_order)` | — | — | |
 
-CHECK theo `block_type`: `TEXT` cần `text_content` và không có `asset_id`; `ASSET` cần `asset_id`; `VOCABULARY` không có cả hai; `EXERCISE` không có `asset_id`. Nội dung khối `VOCABULARY`, `EXERCISE` nằm ở §5.15, §5.16.
+CHECK theo `block_type`: `TEXT` cần `text_content` và không có `asset_id`; `ASSET` cần `asset_id` và không có `text_content`; `VOCABULARY`, `EXERCISE` không có cả hai. Nội dung khối `VOCABULARY`, `EXERCISE` nằm ở §5.15, §5.16.
 
 ## 5.15 `lesson_block_vocabulary` (V5.1)
 
@@ -948,7 +948,7 @@ Bài dạy KP nào. `learning-service` dùng bảng này để tìm bài ôn khi
 | `knowledge_point_id` | uuid | FK → `knowledge_points` | KP được dạy. |
 | `PK(lesson_id, knowledge_point_id)` | — | INDEX(`knowledge_point_id`) | Index cho câu hỏi "KP này do bài nào dạy". |
 
-KP phải cùng topic với bài (kiểm ở use case). Một bài dạy được nhiều KP; một KP có thể được nhiều bài dạy. V5.2: learning-service chép danh sách KP của bài vào `lesson_progress.knowledge_point_ids` (§7.22) mỗi khi học viên mở hoặc nộp bài, để tìm bài dạy KP mà không gọi Content.
+KP phải cùng topic với bài (kiểm ở use case). Một bài dạy được nhiều KP; một KP có thể được nhiều bài dạy. V5.2: learning-service chép danh sách KP của bài vào `lesson_progress.knowledge_point_ids` (§7.3) mỗi khi học viên mở hoặc nộp bài, để tìm bài dạy KP mà không gọi Content.
 
 ## 5.18 Listening và độ khó của gói (V5.3)
 
@@ -1228,11 +1228,13 @@ pronunciationScore = 82
 
 # 7. Learning Service — tiến độ học, bằng chứng mastery, bài ôn, mã đề
 
-`learning-service` (Java, `learning_db`, Flyway V1–V2) thay `learning-service` Python từ 2026-10-01 (plan
+`learning-service` (Java, `learning_db`, Flyway V1–V2) thay `ai-learning-service` Python từ 2026-10-01 (plan
 `261001-1228`). Toàn bộ schema `ai_learning_db` cũ (mastery path DeepTutor, tutor, practice notebook, learner memory,
 hạn mức tutor) đã bị bỏ, không chuyển dữ liệu. Không có aggregate path: bằng chứng gắn với user; mastery của KP tính khi
 đọc bằng `compute_mastery` (port từ DeepTutor v1.6.9: 5 lần gần nhất, trọng số 0.5→1.0, trần 0.5/0.8 khi có 1/2 lần).
-Mọi lượt ghi của một học viên chạy trong một transaction mở đầu bằng `pg_advisory_xact_lock(hashtext(user_id))`.
+Ghi progress/evidence, bài ôn, giao đề và các transaction bắt đầu/kết thúc chấm Writing mở đầu bằng
+`pg_advisory_xact_lock(hashtext(user_id))`. Quota và trạng thái trung gian Writing hiện dùng SQL cập nhật nguyên tử
+có điều kiện ngoài các transaction khóa này; đây là dữ kiện code hiện tại, không thay quy tắc ghi trong AGENTS.md.
 Không có FK sang DB khác; id của topic, bài, khối, câu, gói, KP là id logic của Content.
 
 ## 7.1 `knowledge_point_catalog`
@@ -1313,7 +1315,7 @@ Trượt set thứ 3 hoặc không còn gói nào thì `SKIPPED`.
 | `id` | uuid | PK | |
 | `user_id`, `topic_id`, `package_id`, `package_version_id` | uuid | NOT NULL | Partial UNIQUE (`user_id`, `topic_id`) WHERE `consumed_at IS NULL` |
 | `assigned_at` | timestamptz | NOT NULL | INDEX (`user_id`, `package_version_id`, `assigned_at`) |
-| `consumed_attempt_id`, `consumed_at`, `percent` | | NULL | Attempt đầu tiên hoàn thành sau `assigned_at` dùng hết lần giao; ≥ 70% thì topic `PASSED` |
+| `consumed_attempt_id`, `consumed_at`, `percent` | | NULL | Consumer tìm lần giao mới nhất cùng user/version với `consumed_at IS NULL`, `assigned_at <= completed_at`; consume cả khi trượt; ≥ 70% ghi `passed_at` một chiều |
 
 ## 7.8 `kp_evidence`
 
@@ -2232,7 +2234,7 @@ Outbox tables:    9  (baseline V5 lịch sử)
 Physical total: 94  (baseline V5 lịch sử)
 ```
 
-V5.1–V5.3 đã triển khai: +5 bảng Content (§5.13–§5.17, content V8). Learning Service thay toàn bộ nhóm AI Learning bằng 9 bảng (§7, learning V1).
+Pipeline đã triển khai bằng Content V8–V9 (+5 bảng bài học, §5.13–§5.17) và Learning V1 (9 bảng lõi, §7). Learning V2 thêm 2 bảng Writing: hiện có 11 bảng. Đây là kiểm kê migration trong repo, không xác nhận đã áp trên database của lập trình viên.
 
 Quan trọng hơn số lượng bảng là boundary:
 
