@@ -72,9 +72,9 @@ Plan vào sau không đổi số của plan vào trước. Nếu buộc phải �
 |-------|------|--------|
 | 1 | [Chốt phạm vi và đồng bộ plan con](./phase-01-chot-pham-vi-va-dong-bo-plan-con.md) | Completed |
 | 2 | [Validate lại plan con](./phase-02-validate-lai-plan-con.md) | Completed |
-| 3 | [Triển khai nền 1640](./phase-03-trien-khai-nen-1640.md) | In progress (1640 PR 1–4 xong; tiếp theo plan `261001-1228` rồi 1640 PR 8, 10) |
-| 4 | [Triển khai Writing Task 2](./phase-04-trien-khai-writing-task-2.md) | Pending |
-| 5 | [Triển khai Writing Task 1](./phase-05-trien-khai-writing-task-1.md) | Pending |
+| 3 | [Triển khai nền 1640](./phase-03-trien-khai-nen-1640.md) | In progress (1640 PR 1–4 xong; `261001-1228` PR 1 xong, PR 2 đang làm; sau đó 1640 PR 8, 10) |
+| 4 | [Triển khai Writing Task 2](./phase-04-trien-khai-writing-task-2.md) | In progress (0737 phase 1–2 xong trên `feat/writing-access-content`, chưa merge; phase 3–4 chờ learning-service) |
+| 5 | [Triển khai Writing Task 1](./phase-05-trien-khai-writing-task-1.md) | In progress (0812 phase 1 xong trên `feat/writing-access-content`, chưa merge; phase 2 chờ 0737) |
 | 6 | [Triển khai Listening](./phase-06-trien-khai-listening.md) | Pending |
 | 7 | [Triển khai gợi ý Reading](./phase-07-trien-khai-goi-y-reading.md) | Pending |
 | 8 | [Nghiệm thu E2E MVP](./phase-08-nghiem-thu-e2e-mvp.md) | Pending |
