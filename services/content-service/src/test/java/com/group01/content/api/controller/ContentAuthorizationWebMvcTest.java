@@ -178,7 +178,7 @@ class ContentAuthorizationWebMvcTest {
                 PackageType.PRACTICE_SET, null, PublicationStatus.DRAFT, null, Instant.now(), Instant.now()));
         when(createKnowledgePoint.execute(any())).thenReturn(new KnowledgePointResult(id, id, "KP1", "KP1",
                 KnowledgePointKind.GRAMMAR, LearningType.CONCEPT, null, null, ContentStatus.ACTIVE,
-                Instant.now(), Instant.now(), BandRange.UNBOUNDED, BandRange.UNBOUNDED));
+                Instant.now(), Instant.now()));
         when(createAsset.execute(any())).thenReturn(new ContentAssetResult(
                 id, AssetType.PASSAGE, "Paragraph", null, null, null, AssetValidationStatus.VALID, Instant.now()));
 

@@ -1,6 +1,5 @@
 package com.group01.content.application.usecase;
 
-import com.group01.content.domain.aggregate.Topic;
 import com.group01.content.application.command.CreateKnowledgePointCommand;
 import com.group01.content.application.result.KnowledgePointResult;
 import com.group01.content.domain.aggregate.KnowledgePoint;
@@ -28,8 +27,9 @@ public class CreateKnowledgePointUseCase {
         if (knowledgePointRepository.existsByCode(command.code())) {
             throw new DuplicateCodeException("KnowledgePoint", command.code());
         }
-        Topic topic = topicRepository.findById(command.topicId())
-                .orElseThrow(() -> new TopicNotFoundException(command.topicId()));
+        if (topicRepository.findById(command.topicId()).isEmpty()) {
+            throw new TopicNotFoundException(command.topicId());
+        }
 
         KnowledgePoint kp = KnowledgePoint.create(
                 command.topicId(),
@@ -38,26 +38,8 @@ public class CreateKnowledgePointUseCase {
                 command.kind(),
                 command.learningType(),
                 command.skill(),
-                command.description(),
-                command.band()
+                command.description()
         );
-
-        KnowledgePoint saved = knowledgePointRepository.save(kp);
-        return new KnowledgePointResult(
-                saved.getId(),
-                saved.getTopicId(),
-                saved.getCode(),
-                saved.getName(),
-                saved.getKind(),
-                saved.getLearningType(),
-                saved.getSkill(),
-                saved.getDescription(),
-                saved.getStatus(),
-                saved.getCreatedAt(),
-                saved.getUpdatedAt(),
-                saved.getBand(),
-                saved.getBand().orInherit(topic.getBand())
-        );
+        return KnowledgePointResult.from(knowledgePointRepository.save(kp));
     }
 }
-

@@ -28,7 +28,9 @@ public class GlobalExceptionHandler {
             ContentPackageNotFoundException.class,
             QuestionNotFoundException.class,
             AssetNotFoundException.class,
-            ReadingPassageNotFoundException.class
+            ReadingPassageNotFoundException.class,
+            LessonNotFoundException.class,
+            PackageVersionNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFoundException(ContentDomainException ex, HttpServletRequest request) {
         log.warn("Resource not found: {}", ex.getMessage());

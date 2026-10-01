@@ -1,6 +1,5 @@
 package com.group01.content.api.controller;
 
-import com.group01.content.domain.vo.BandRange;
 import com.group01.content.api.dto.request.CreateKnowledgePointRequest;
 import com.group01.content.api.dto.response.KnowledgePointResponse;
 import com.group01.content.application.command.CreateKnowledgePointCommand;
@@ -44,8 +43,7 @@ public class KnowledgePointController {
                 request.kind(),
                 request.learningType(),
                 request.skill(),
-                request.description(),
-                BandRange.of(request.bandMin(), request.bandMax())
+                request.description()
         ));
         return KnowledgePointResponse.from(result);
     }
