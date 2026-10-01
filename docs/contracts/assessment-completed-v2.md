@@ -4,7 +4,8 @@ Integration contract between Assessment Service (producer) and the Java Learning
 Service (consumer). Assessment Service owns formal grading; Learning Service stores
 per-user mastery evidence, reviews and topic progress. **The nullable-goal and
 package-version changes were approved 2026-10-01; the consumer and producer updates
-are deployed in that order. The service skeleton does not yet consume events.**
+are deployed in that order. Both are implemented: Learning Service consumes the event,
+and Assessment emits `package_version_id` with `learning_goal_id: null`.**
 
 ## When it is emitted
 

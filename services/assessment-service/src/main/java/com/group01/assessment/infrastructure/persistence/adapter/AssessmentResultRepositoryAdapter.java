@@ -11,6 +11,7 @@ import java.util.Optional; import java.util.UUID;
  public AssessmentResultRepositoryAdapter(AssessmentResultJpaRepository repository, AssessmentPersistenceMapper mapper){this.repository=repository;this.mapper=mapper;}
  public AssessmentResult save(AssessmentResult value){return mapper.toDomain(repository.save(mapper.toEntity(value)));}
  public Optional<AssessmentResult> findLatestByAttemptId(UUID id){return repository.findTopByAttemptIdOrderByResultVersionDesc(id).map(mapper::toDomain);}
+ public Optional<AssessmentResult> findLatestCompletedByAttemptId(UUID id){return repository.findTopByAttemptIdAndStatusOrderByResultVersionDesc(id,AssessmentResult.COMPLETED).map(mapper::toDomain);}
 
     public Optional<AssessmentResult> findLatestForUpdateByAttemptId(UUID id) {
         return repository.findForUpdateByAttemptId(id, PageRequest.of(0, 1)).stream().findFirst().map(mapper::toDomain);
