@@ -1,7 +1,6 @@
 package com.group01.content.infrastructure.persistence.mapper;
 
 import com.group01.content.domain.aggregate.KnowledgePoint;
-import com.group01.content.domain.vo.BandRange;
 import com.group01.content.infrastructure.persistence.entity.KnowledgePointJpaEntity;
 import org.springframework.stereotype.Component;
 
@@ -20,7 +19,6 @@ public class KnowledgePointPersistenceMapper {
                 entity.getSkill(),
                 entity.getDescription(),
                 entity.getStatus(),
-                BandRange.of(entity.getBandMin(), entity.getBandMax()),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -38,11 +36,8 @@ public class KnowledgePointPersistenceMapper {
                 .skill(domain.getSkill())
                 .description(domain.getDescription())
                 .status(domain.getStatus())
-                .bandMin(domain.getBand().min())
-                .bandMax(domain.getBand().max())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .build();
     }
 }
-

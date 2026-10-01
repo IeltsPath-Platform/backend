@@ -5,6 +5,7 @@ import com.group01.content.application.result.ContentPackageResult;
 import com.group01.content.domain.aggregate.ContentPackage;
 import com.group01.content.domain.exception.DuplicateCodeException;
 import com.group01.content.domain.repository.ContentPackageRepository;
+import com.group01.content.domain.vo.PackageType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,10 @@ public class CreateContentPackageUseCase {
     }
 
     public ContentPackageResult execute(CreateContentPackageCommand command) {
+        if (command.packageType() == PackageType.TOPIC_TEST) {
+            // A final test must belong to a topic; only the curriculum seed creates them.
+            throw new IllegalArgumentException("TOPIC_TEST packages cannot be created through this API");
+        }
         if (contentPackageRepository.existsByCode(command.code())) {
             throw new DuplicateCodeException("ContentPackage", command.code());
         }
