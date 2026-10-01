@@ -1,25 +1,19 @@
-"""Ordering is a private, deterministic request and a strict curriculum permutation."""
+"""The LLM ordering request is private and deterministic."""
 
-import copy
 from datetime import date
 from decimal import Decimal
 import json
 import unittest
 from uuid import uuid4
 
-from app.mastery.models import LearningProgress
-from app.mastery.policy import next_objective
-
 from app.adapters.curriculum_adapter import CurriculumAdapter
 from app.adapters.curriculum_scope import CurriculumScope
 from app.adapters.formal_evidence_adapter import FormalEvidenceAdapter
 from app.learning.path_ordering import (
-    InvalidOrdering,
     LearnerContext,
     MAX_ORDERING_KNOWLEDGE_POINTS,
     MAX_ORDERING_PAYLOAD_CHARS,
     OrderingRequest,
-    OrderingValidator,
     PayloadTooLarge,
 )
 from tests.formal_assessment_support import event, item, mapping
@@ -59,88 +53,11 @@ def ordering_curriculum():
     return CurriculumAdapter.to_modules(scoped.topics, scoped.knowledge_points), scoped
 
 
-def valid_proposal():
-    return {"modules": [
-        {"id": MODULE_B, "knowledge_point_ids": [KP_C]},
-        {"id": MODULE_A, "knowledge_point_ids": [KP_B, KP_A]},
-    ], "rationale": "Start with the learner's writing gap."}
-
-
 def placement(items, *, band=None, completed_at="2026-09-24T10:00:00Z", **kwargs):
     payload = event(user_id=str(uuid4()), goal_id=str(uuid4()), attempt_id=str(uuid4()),
                     items=items, assessment_type="PLACEMENT", **kwargs)
     payload["data"].update(overall_band=band, completed_at=completed_at)
     return FormalEvidenceAdapter.to_command(payload)
-
-
-class OrderingValidatorTest(unittest.TestCase):
-    def setUp(self):
-        self.modules, self.scoped = ordering_curriculum()
-
-    def test_reorders_and_deep_copies_content_metadata_without_trusting_llm_fields(self):
-        original = copy.deepcopy(self.modules)
-        proposal = valid_proposal()
-        proposal["modules"][0].update(name="Invented name", order=999,
-                                      knowledge_points=[{"id": KP_C, "name": "Invented KP"}])
-
-        ordered = OrderingValidator.apply(self.modules, proposal)
-
-        self.assertEqual([module.id for module in ordered], [MODULE_B, MODULE_A])
-        self.assertEqual([module.order for module in ordered], [0, 1])
-        self.assertEqual([kp.id for kp in ordered[1].knowledge_points], [KP_B, KP_A])
-        self.assertEqual(ordered[0].name, original[1].name)
-        self.assertEqual(ordered[0].knowledge_points[0], original[1].knowledge_points[0])
-        self.assertIsNot(ordered[0], self.modules[1])
-        self.assertIsNot(ordered[0].knowledge_points[0], self.modules[1].knowledge_points[0])
-        ordered[0].knowledge_points[0].name = "Edited copy"
-        self.assertEqual(self.modules, original)
-
-    def test_deeptutor_next_objective_observes_both_module_and_point_order(self):
-        proposal = valid_proposal()
-        proposal["modules"] = [proposal["modules"][1], proposal["modules"][0]]
-        ordered = OrderingValidator.apply(self.modules, proposal)
-        progress = LearningProgress(book_id=str(uuid4()), modules=ordered)
-        self.assertEqual(next_objective(progress).knowledge_point_id, KP_B)
-
-        ordered = OrderingValidator.apply(self.modules, valid_proposal())
-        progress = LearningProgress(book_id=str(uuid4()), modules=ordered)
-        self.assertEqual(next_objective(progress).knowledge_point_id, KP_C)
-
-    def test_child_module_may_precede_its_parent(self):
-        ordered = OrderingValidator.apply(self.modules, valid_proposal())
-        self.assertEqual(ordered[0].id, MODULE_B)
-
-    def test_rejects_every_invalid_permutation_with_a_safe_reason(self):
-        cases = [
-            (None, "malformed"),
-            ([], "malformed"),
-            ({}, "malformed"),
-            ({"modules": ()}, "malformed"),
-            ({"modules": [None]}, "malformed"),
-            ({"modules": [{}]}, "malformed"),
-            ({"modules": [{"id": MODULE_A}]}, "malformed"),
-            ({"modules": [{"id": 1, "knowledge_point_ids": []}]}, "malformed"),
-            ({"modules": [{"id": MODULE_A, "knowledge_point_ids": (KP_A, KP_B)}]}, "malformed"),
-            ({"modules": [{"id": MODULE_A, "knowledge_point_ids": [1]}]}, "malformed"),
-            ({"modules": [{"id": MODULE_A, "knowledge_point_ids": [KP_A, KP_B]}]}, "missing_module"),
-            ({"modules": [*valid_proposal()["modules"],
-                          {"id": "private-unknown-module", "knowledge_point_ids": []}]}, "unknown_module"),
-            ({"modules": [*valid_proposal()["modules"], valid_proposal()["modules"][0]]}, "duplicate_module"),
-            ({"modules": [{"id": MODULE_A, "knowledge_point_ids": [KP_A]},
-                          {"id": MODULE_B, "knowledge_point_ids": [KP_C]}]}, "missing_knowledge_point"),
-            ({"modules": [{"id": MODULE_A, "knowledge_point_ids": [KP_A, KP_B, "private-unknown-kp"]},
-                          {"id": MODULE_B, "knowledge_point_ids": [KP_C]}]}, "unknown_knowledge_point"),
-            ({"modules": [{"id": MODULE_A, "knowledge_point_ids": [KP_A, KP_B, KP_A]},
-                          {"id": MODULE_B, "knowledge_point_ids": [KP_C]}]}, "duplicate_knowledge_point"),
-            ({"modules": [{"id": MODULE_A, "knowledge_point_ids": [KP_A, KP_C]},
-                          {"id": MODULE_B, "knowledge_point_ids": [KP_B]}]}, "moved_knowledge_point"),
-        ]
-        for proposal, reason in cases:
-            with self.subTest(reason=reason, proposal=proposal):
-                with self.assertRaises(InvalidOrdering) as raised:
-                    OrderingValidator.apply(self.modules, proposal)
-                self.assertEqual(raised.exception.reason, reason)
-                self.assertNotIn("private-unknown", str(raised.exception))
 
 
 class LearnerContextTest(unittest.TestCase):

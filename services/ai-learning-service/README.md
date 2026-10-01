@@ -234,22 +234,17 @@ The active-goal and curriculum contracts also depend on User Service
 
 A new path contains only the knowledge points in scope for the active goal's `targetBand`: a point is kept when
 its effective `bandMin` from Content Service is empty or not above the target band. There is no upper bound; easier
-points stay in the path and placement test-out skips them. A topic whose points were all left out is dropped, and
+points stay in the path. A topic whose points were all left out is dropped, and
 if nothing is left the path API returns 409. The effective band of every kept point is stored with the path
 (`mastery_path_knowledge_point_bands`) in the creating transaction, before parked results are applied. The applied
 scope is recorded as a `path.scope_applied` event. Scoping decides what the path contains; which point to learn next
 is still decided only by the engine's `next_objective()`. An existing path is returned as is, without reading
 Content again.
 
-A finalized `PLACEMENT` result tests out the points the learner already masters, in the same transaction as its
-evidence: points whose effective `bandMax` is not above the placement's `overall_band`, and points every placement
-item answered correctly (or judged PASS). Test-out is a learner mastery override, so `next_objective()`
-skips the point; the placement evidence is still recorded and no mastery score, gate, policy or scheduler changes.
-The override model keeps DeepTutor v1.6.9's shape so stored paths stay readable, so provenance is kept in the override note
-(`placement:{attemptId}:v{version}`) and `/progress` and `/map` report `masterySource: "placement"` for it
-(`system` = cleared by evidence, `learner` = the learner's own claim). A regraded placement replaces that attempt's
-test-out; a learner's own override is never replaced or cleared. Tested-out points have no repetition state, so
-they are not scheduled for review.
+A finalized `PLACEMENT` result only records that its version was processed: it writes no mastery evidence and tests
+out no knowledge point, so a placement never moves a learner through the path. Placement results still inform the
+LLM ordering prompt of a new path. Overrides that an earlier version wrote (note `placement:{attemptId}:v{version}`,
+reported as `masterySource: "placement"`) stay readable.
 
 The Content fallback order follows sibling `sortOrder` in topic-tree preorder.
 Knowledge Points are ordered by `createdAt` ascending, with UUID as a stable
@@ -306,7 +301,7 @@ ordering through an OpenAI-compatible chat completions call (`app/llm/client.py`
 The response must contain exactly the same modules and exactly the same Knowledge
 Points in each module: it cannot add, remove, duplicate, or move a point between
 modules. Names and learning types remain those supplied by Content. The mastery
-engine still computes mastery, gates, test-out, review scheduling, and
+engine still computes mastery, gates, review scheduling, and
 `next_objective()`.
 
 Ordering happens only at creation, outside the database transaction, with a total
@@ -314,7 +309,7 @@ LLM timeout of 20 seconds. If the first response is not usable JSON, the client 
 once more with reasoning effort `low` within that same timeout; HTTP errors are not
 retried. Concurrent creation requests can each make a call, but only one path and its
 ordering are committed. Later assessment results update learning state without
-reordering. Placement arriving after creation still applies test-out, but does
+reordering. Placement arriving after creation is recorded without evidence and does
 not trigger another ordering call. Refresh preserves existing order and appends
 new points as described above.
 
@@ -432,7 +427,7 @@ Create the fresh goal's path with `POST /api/ai-learning/paths`, then read
 
 | Case | Expected path and status | Expected event |
 | --- | --- | --- |
-| `reverse`, with placement | Module and point order reversed from Content; status follows the first eligible point in that order; placement test-out still skips mastered points | `source=llm` |
+| `reverse`, with placement | Module and point order reversed from Content; status follows the first eligible point in that order; the placement changes no mastery | `source=llm` |
 | `unknown_kp` | Path created in Content order | `source=content`, `reason=invalid_ordering`, `detail=unknown_knowledge_point` |
 | `slow` | Path created in Content order after about 20 seconds of LLM wait (stub waits 30 seconds) | `source=content`, `reason=llm_timeout` |
 | `error` | Path created in Content order after the stub's HTTP 500 response | `source=content`, `reason=llm_error` |

@@ -53,12 +53,32 @@ class FormalEvidenceAdapterContractTest(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ContractError):
                 FormalEvidenceAdapter.to_command(valid_event(overall_band=bad))
 
-    def test_missing_learning_goal_is_rejected_instead_of_using_the_current_goal(self):
-        payload = valid_event()
-        del payload["data"]["learning_goal_id"]
+    def test_missing_or_null_learning_goal_is_a_goalless_result(self):
+        for absent in ("missing", "null"):
+            with self.subTest(absent=absent):
+                payload = valid_event()
+                if absent == "missing":
+                    del payload["data"]["learning_goal_id"]
+                else:
+                    payload["data"]["learning_goal_id"] = None
 
-        with self.assertRaises(ContractError):
-            FormalEvidenceAdapter.to_command(payload)
+                self.assertIsNone(FormalEvidenceAdapter.to_command(payload).learning_goal_id)
+
+    def test_package_version_is_read_when_present(self):
+        payload = valid_event()
+        self.assertIsNone(FormalEvidenceAdapter.to_command(payload).package_version_id)
+
+        version_id = "33333333-3333-4333-8333-333333333333"
+        payload["data"]["package_version_id"] = version_id
+        self.assertEqual(FormalEvidenceAdapter.to_command(payload).package_version_id, version_id)
+
+    def test_malformed_optional_ids_are_still_rejected(self):
+        for key in ("learning_goal_id", "package_version_id"):
+            with self.subTest(key=key):
+                payload = valid_event()
+                payload["data"][key] = "not-a-uuid"
+                with self.assertRaises(ContractError):
+                    FormalEvidenceAdapter.to_command(payload)
 
     def test_unsupported_event_version_is_rejected(self):
         payload = valid_event()
