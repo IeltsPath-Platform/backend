@@ -5,8 +5,8 @@ status: in-progress
 priority: P2
 branch: "feat/main-follow"
 tags: [ai-learning, content, assessment, lesson, mastery, tdd]
-blockedBy: [261001-0205-mvp-service-split-library, 261001-1228-learning-service-java]
-blocks: [260930-0737-lesson-writing-task2-essay, 260930-0851-listening-topic-audio-lessons, 260930-1006-reading-question-hints]
+blockedBy: []
+blocks: [260930-0851-listening-topic-audio-lessons, 260930-1006-reading-question-hints]
 created: "2026-09-29T09:22:17.145Z"
 createdBy: "ck:plan"
 source: skill
@@ -15,7 +15,7 @@ mode: "tdd"
 
 # Triển khai pipeline học chính (bài học, bài ôn, đề cuối)
 
-> **Đổi 2026-10-01:** người dùng bỏ ai-learning Python. Phase 5–7 (path, API bài học/bài ôn/mã đề, consumer) do plan [`261001-1228`](../261001-1228-learning-service-java/plan.md) làm bằng Java (`learning-service`, route `/api/learning/**`, mô hình `kp_evidence` thay path DeepTutor). Luật nghiệp vụ trong plan này vẫn là nguồn. Plan này còn phase 4 (assessment) và phase 8 (tài liệu), làm sau phase 4 của `261001-1228`.
+> **Đổi 2026-10-01:** người dùng bỏ ai-learning Python. Phase 5–7 (path, API bài học/bài ôn/mã đề, consumer) do plan `261001-1228` làm bằng Java (`learning-service`, route `/api/learning/**`, mô hình `kp_evidence` thay path DeepTutor). Luật nghiệp vụ trong plan này vẫn là nguồn. Plan này còn phase 4 (assessment) và phase 8 (tài liệu), làm sau phase 4 của `261001-1228`.
 
 ## Overview
 
@@ -124,7 +124,7 @@ Thứ tự:
 ## Dependencies
 
 - Không chặn plan nào. Plan kiến trúc chia service (library-service) và plan đồng bộ tài liệu cũ đã xóa (2026-09-30); việc chia service thuộc MVP, làm ở plan riêng (chốt 2026-10-01).
-- **Chờ PR S1 của [`261001-0205`](../261001-0205-mvp-service-split-library/plan.md) merge trước** (đổi 2026-10-01): S1 chiếm content V7
+- **Chờ PR S1 của `261001-0205` merge trước** (đổi 2026-10-01): S1 chiếm content V7
   (xóa 5 bảng từ vựng/video), nên migration content của plan này là V8 (bảng bài học) và V9 (seed). Ai-learning giữ V10, V11.
   Validation log bên dưới ghi số cũ (V7/V8) theo thời điểm viết.
 - Cần duyệt contract (cuối phase 1) và migration V10 (phase 5).

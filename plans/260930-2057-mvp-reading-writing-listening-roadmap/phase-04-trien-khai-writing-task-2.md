@@ -11,7 +11,7 @@ effort: "~4–5 ngày"
 
 ## Overview
 
-Triển khai plan [`260930-0737-lesson-writing-task2-essay`](../260930-0737-lesson-writing-task2-essay/plan.md): khối essay
+Triển khai plan `260930-0737-lesson-writing-task2-essay`: khối essay
 trong bài học, ai-learning chấm bằng LLM, chấm xong trừ 3 point qua access, ghi bằng chứng. Khối essay không chặn học tiếp.
 
 ## Requirements

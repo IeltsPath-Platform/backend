@@ -9,7 +9,7 @@ effort: "4 ngày (2 PR)"
 
 # Phase 6: AI Learning: API bài học, bài ôn, giao mã đề
 
-> **Đã thay (2026-10-01):** phase này do plan [`261001-1228`](../261001-1228-learning-service-java/plan.md) làm bằng Java (learning-service). Không code theo file này; giữ lại làm nguồn luật nghiệp vụ.
+> **Đã thay (2026-10-01):** phase này do plan `261001-1228` làm bằng Java (learning-service). Không code theo file này; giữ lại làm nguồn luật nghiệp vụ.
 
 ## Overview
 

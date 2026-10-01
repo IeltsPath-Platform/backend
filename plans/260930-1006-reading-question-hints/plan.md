@@ -5,7 +5,7 @@ status: in-progress
 priority: P2
 branch: "feat/main-follow"
 tags: [feature, backend, ai-learning, content, reading, tdd]
-blockedBy: [261001-1228-learning-service-java, 260929-1640-lesson-learning-pipeline-mvp, 260930-0851-listening-topic-audio-lessons]
+blockedBy: [260929-1640-lesson-learning-pipeline-mvp, 260930-0851-listening-topic-audio-lessons]
 blocks: []
 created: "2026-09-30T03:12:28.903Z"
 createdBy: "ck:plan"
@@ -15,7 +15,7 @@ mode: "tdd"
 
 # Gợi ý câu Reading sau lần sai đầu
 
-> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java, route `/api/learning/**` (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md), làm trước plan này). Phần ai-learning của plan đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md).
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java, route `/api/learning/**` (plan `261001-1228`, làm trước plan này). Phần ai-learning của plan đọc theo [bảng ánh xạ](../260930-2057-mvp-reading-writing-listening-roadmap/python-to-java-mapping.md).
 
 ## Overview
 
