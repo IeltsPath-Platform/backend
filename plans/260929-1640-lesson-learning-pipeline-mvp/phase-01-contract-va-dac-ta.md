@@ -11,7 +11,7 @@ effort: "1 ngày"
 
 ## Overview
 
-Viết contract cho mọi thay đổi HTTP/event trước khi code (AGENTS §3.3, §5). Viết bộ test vector `answer_spec` dùng chung cho Java và Python. Cập nhật đặc tả trong plan kiến trúc. Cuối phase **dừng để người dùng duyệt contract**.
+Viết contract cho mọi thay đổi HTTP/event trước khi code (AGENTS §3.3, §5). Viết bộ test vector `answer_spec` dùng chung cho Java và Python. Cuối phase **dừng để người dùng duyệt contract**.
 
 ## Requirements
 
@@ -44,7 +44,17 @@ Viết contract cho mọi thay đổi HTTP/event trước khi code (AGENTS §3.3
 - Body lỗi: `{ "detail", "code", "reviews"? }`. Code: `REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`, `TEST_LOCKED`, `TEST_UNAVAILABLE`, `REQUEST_CONFLICT`, `REVIEW_SET_CLOSED`, `NOT_FOUND`.
 - Response nộp khối và bài ôn:
   - chưa đạt: `results[{questionVersionId, correct}]`;
-  - đạt: mỗi phần tử thêm `correctAnswer` và `explanation`.
+  - đạt: mỗi phần tử thêm `correctAnswer` và `explanation`;
+  - bài ôn thêm `reviewStatus` (`PENDING|DONE|SKIPPED`; `SKIPPED` = trượt 3 set, cho học tiếp).
+- Luật ghi trong contract (Validation Session 1):
+  - `status` của topic (`LOCKED|IN_PROGRESS|PASSED`) được suy ra khi đọc, không phải trạng thái lưu;
+  - mastery chỉ tính lần nộp đầu của mỗi khối bài tập; làm lại chỉ để qua khối;
+  - với KP có ít câu, luật chèn luyện thêm thực chất là "có câu sai ở lần đầu" (giải thích công thức mastery);
+  - KP không có gói luyện (`hasPracticeSet = false`) không bao giờ bị chèn bài ôn; đề cuối vẫn kiểm KP đó (Validation Session 3);
+  - câu hỏi có `options = null` là câu điền; có `options` là câu chọn (kể cả True/False/Not Given, seed ghi đủ 3 lựa chọn);
+  - app MVP chỉ hiển thị trạng thái topic và bài; `/status`, `/progress`, `/practice/*` là của tutor.
+<!-- Updated: Validation Session 1 - luật trạng thái topic, bằng chứng lần đầu, reviewStatus, hiển thị MVP -->
+
 
 **Thay đổi assessment** (ghi trong `lesson-learning-v1.md`):
 - Tạo attempt: `{ packageVersionId, mode, channel }`. `attemptType` **suy từ loại gói**:
@@ -64,7 +74,8 @@ Viết contract cho mọi thay đổi HTTP/event trước khi code (AGENTS §3.3
 - Band của topic giữ nguyên.
 
 **Content nội bộ** (`learning-content-internal-v1.md`):
-- `GET /topic-sequence`: topic có ≥ 1 bài PUBLISHED **và** ≥ 1 gói `TOPIC_TEST` PUBLISHED, theo `sort_order`.
+- `GET /topic-sequence`: topic ACTIVE có ≥ 1 bài PUBLISHED **và** ≥ 1 gói `TOPIC_TEST` PUBLISHED, theo `sort_order`, **kèm KP** (Validation Session 2): `[{topicId, code, name, skill, sortOrder, knowledgePoints: [{id, code, name, learningType, skill, description, hasPracticeSet}]}]`; KP ACTIVE của topic, sắp theo `created_at` rồi `id`; không `answerSpec`, không band. `hasPracticeSet` = có ít nhất một gói thỏa điều kiện của `POST /practice-sets/search` (Validation Session 3). Là nguồn duy nhất để AI Learning dựng path và thứ tự học trong MVP.
+<!-- Updated: Validation Session 2 - topic-sequence trả kèm KP, thay get_curriculum trong luồng MVP -->
 - `GET /topics/{id}/lessons`
 - `GET /lessons/{id}`
 - `GET /topics/{id}/test-packages`
@@ -75,7 +86,7 @@ Viết contract cho mọi thay đổi HTTP/event trước khi code (AGENTS §3.3
 
 - Create: `docs/contracts/answer-spec-v1.md`, `docs/contracts/answer-spec-v1-vectors.json`, `docs/contracts/lesson-learning-v1.md`, `docs/contracts/learning-content-internal-v1.md`
 - Modify: `docs/contracts/assessment-completed-v2.md`
-- Modify: `plans/260928-2019-architecture-doc-service-split/plan.md` (§ đặc tả bảng), `main-learning-pipeline.md`: ghi chú "thay bởi" cho các điểm đổi, gồm:
+- ~~Modify plan kiến trúc `260928-2019` và `main-learning-pipeline.md`~~: plan đó đã xóa (2026-09-30), không làm bước này. Các điểm đổi so với thiết kế gốc (ghi trong contract thay vì tài liệu cũ):
   - bài ôn = gói mới;
   - giấu đáp án;
   - mã đề dùng một lần;
@@ -91,7 +102,7 @@ Viết contract cho mọi thay đổi HTTP/event trước khi code (AGENTS §3.3
 3. Viết `lesson-learning-v1.md` theo bảng trên, có ví dụ JSON cho từng endpoint và từng lỗi.
 4. Viết `learning-content-internal-v1.md`: schema các khối `TEXT`, `ASSET`, `VOCABULARY`, `EXERCISE`; payload package version (kèm `packageId`, `packageType`, `topicId`, `rules`).
 5. Sửa `assessment-completed-v2.md`, thêm mục runbook replay DLQ.
-6. Cập nhật đặc tả trong plan kiến trúc và `main-learning-pipeline.md`.
+6. (Bỏ: plan kiến trúc đã xóa.) Ghi các điểm đổi ở trên vào phần mở đầu `lesson-learning-v1.md`.
 7. **Dừng, trình người dùng duyệt** các thay đổi contract: event, request/response assessment, bỏ endpoint học viên mở result, API học viên mới.
 
 ## Success Criteria

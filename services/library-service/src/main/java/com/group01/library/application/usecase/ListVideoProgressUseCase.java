@@ -1,0 +1,24 @@
+package com.group01.library.application.usecase;
+
+import com.group01.library.application.ApplicationSupport;
+import com.group01.library.application.query.PageQuery;
+import com.group01.library.application.result.PageResult;
+import com.group01.library.application.result.VideoLearningProgressResult;
+import com.group01.library.domain.repository.VideoLearningProgressRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class ListVideoProgressUseCase {
+    private final VideoLearningProgressRepository repository;
+
+    @Transactional(readOnly = true)
+    public PageResult<VideoLearningProgressResult> execute(UUID userId, PageQuery query) {
+        return ApplicationSupport.page(repository.findByUserId(userId, query.page(), query.size()), query)
+                .map(VideoLearningProgressResult::from);
+    }
+}

@@ -1,19 +1,19 @@
 services:
-  learning-support-db:
+  library-db:
     image: postgres:15-alpine
-    container_name: learning-support-db
+    container_name: library-db
     environment:
-      POSTGRES_DB: learning_support_db
+      POSTGRES_DB: library_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}"
+      POSTGRES_PASSWORD: "${LIBRARY_DB_PASSWORD:?Set LIBRARY_DB_PASSWORD}"
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:5437:5432"
     networks:
       - codebase-network
     volumes:
-      - learning-support-db-data:/var/lib/postgresql/data
+      - library-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d learning_support_db"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d library_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -197,6 +197,7 @@ services:
       GAME_DB_PASSWORD: "${GAME_DB_PASSWORD:?Set GAME_DB_PASSWORD}"
       GATEWAY_INTERNAL_JWT_SECRET: "${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}"
       CONTENT_SERVICE_URL: ${CONTENT_SERVICE_URL:-http://content-service:8082}
+      LIBRARY_SERVICE_URL: ${LIBRARY_SERVICE_URL:-http://library-service:8081}
     ports:
       - "127.0.0.1:8087:8087"
     networks:
@@ -210,7 +211,7 @@ networks:
     driver: bridge
 
 volumes:
-  learning-support-db-data:
+  library-db-data:
   community-db-data:
   game-db-data:
   rabbitmq-data:

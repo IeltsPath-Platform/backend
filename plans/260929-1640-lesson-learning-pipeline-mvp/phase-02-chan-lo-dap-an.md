@@ -64,7 +64,9 @@ mvn -q -pl infra/api-gateway test
 
 ## Success Criteria
 
-- [ ] Test bước 1–10 pass; không test cũ nào bị xóa hay nới lỏng để pass.
+- [ ] Test bước 1–10 pass; không test cũ nào bị nới lỏng để pass. Chỉ xóa test của hành vi bị bỏ có chủ đích: các test gọi `execute` của học viên trong `CreateAssessmentResultUseCaseTest` (`:39-76`), thay bằng test bước 9. Test đường của người chấm giữ nguyên.
+<!-- Updated: Validation Session 1 - xóa test của hành vi bị bỏ có chủ đích -->
+
 - [ ] Học viên không đọc được `answerSpec`, `explanation`, danh sách gói hay danh sách câu qua API công khai.
 
 ## Risk Assessment

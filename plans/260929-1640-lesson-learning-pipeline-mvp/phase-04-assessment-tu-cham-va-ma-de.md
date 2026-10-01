@@ -23,8 +23,12 @@ effort: "2 ngày"
 
 - **Tạo attempt** `{ packageVersionId, mode, channel }`:
   - Gọi `GET /internal/learning-content/package-versions/{id}` **trước** khi mở transaction, để không giữ connection DB trong lúc gọi HTTP. Forward bearer và `X-Correlation-Id`.
+  - Hiện `StartAssessmentAttemptUseCase.execute` mang `@Transactional` (`:32`), và gọi hàm khác trong cùng bean thì proxy không mở transaction mới. Vì vậy: bỏ `@Transactional` khỏi `execute` (gọi content), phần ghi DB chuyển sang bean riêng `AttemptCreator` có `@Transactional`.
   - `attemptType` suy từ `packageType`: `TOPIC_TEST` → `TOPIC_GATE`, `MOCK_TEST` → `MOCK`, `PLACEMENT_TEST` → `PLACEMENT`, `QUIZ` → `QUIZ`. `PRACTICE_SET` và `LESSON` → 422, vì bài ôn chấm ở ai-learning và không cho làm nháp gói ôn qua assessment.
   - `expiresAt` lấy từ `rules` của package version (không có thì null). Không nhận từ client.
+  - Mỗi section lưu `section_snapshot` = JSON `{"title", "skill", "instructions", "passage"}` lấy từ section của payload
+    content (thiếu `passage` thì bỏ khóa). `AttemptStructureResponse.Section.snapshot` vẫn là chuỗi JSON này, không đổi schema
+    ở plan này; plan Listening thêm `audio`, `solution` và đổi sang DTO allowlist.
   - Mỗi item lưu `question_snapshot` = stem + options (**không** đáp án) và `answer_snapshot` = `{answerSpec, explanation, maxScore}`. Cột đã có (`V1:36`); sau phase 2 cột này không còn trả cho học viên. KP lấy từ payload.
 - **Submit:**
   - Nếu **mọi** item có `answerSpec` chấm được: lấy câu trả lời từ `attempt_responses.payload` theo `answer-spec-v1`, rồi chấm; câu bỏ trống được 0.
@@ -61,10 +65,14 @@ effort: "2 ngày"
   - `application/event/AssessmentCompletedV2.java`, `application/event/AssessmentCompletedEventFactory.java`
   - `application/usecase/GetAssessmentResultUseCase.java`
   - `api/controller/AssessmentResultController.java:40-43`
-- Delete: `application/port/{KnowledgeMappingProvider,LearningGoalProvider}.java`, `infrastructure/client/{ContentKnowledgeMappingClient,UserLearningGoalClient}.java`; content: `api/controller/InternalAssessmentContentController.java`, `application/usecase/GetQuestionKnowledgePointMappingsUseCase.java` + test + DTO nội bộ liên quan
+  - `api/exception/GlobalExceptionHandler.java:24`: hiện `InvalidAssessmentStateException` → 400. Thêm exception riêng cho attempt hết hạn → 409 kèm mã, gói không cho làm → 422, content lỗi → 503.
+  - Create thêm: `application/usecase/AttemptCreator.java` (phần ghi `@Transactional` tách khỏi `execute`); query lấy result COMPLETED mới nhất cho `GetAssessmentResultUseCase` (hiện chỉ có `findLatestByAttemptId`).
+- Delete: `application/port/{KnowledgeMappingProvider,LearningGoalProvider}.java`, `infrastructure/client/{ContentKnowledgeMappingClient,UserLearningGoalClient}.java`; content: `api/controller/InternalAssessmentContentController.java`, `application/usecase/GetQuestionKnowledgePointMappingsUseCase.java` + test + `api/dto/internal/KnowledgePointMappingResponse`. **Không** xóa `QuestionKnowledgePointResponse/Result`: `GetQuestionDetailUseCase` còn dùng.
 - Tests:
   - sửa: `StartAssessmentAttemptUseCaseTest` (`:32-33,45`), `FinalizeAssessmentResultUseCaseTest` (test "không có goal" ở `:168` đảo kỳ vọng), `AssessmentOutboxIntegrationTest`, `AssessmentAttemptTest`;
-  - giữ nguyên: `GradingControllerTest` (`:159,200`), `CreateAssessmentResultUseCaseTest`.
+  - giữ nguyên: `GradingControllerTest` (`:159,200`); phần người chấm của `CreateAssessmentResultUseCaseTest` (test `execute` của học viên đã xóa ở phase 2).
+<!-- Updated: Validation Session 1 - khớp phase 2 về CreateAssessmentResultUseCaseTest; tách transaction khi tạo attempt; mapping lỗi -->
+
 
 ## Implementation Steps
 

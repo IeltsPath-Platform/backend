@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.1
-- Cập nhật lần cuối: 2026-09-27; dữ kiện đã kiểm với code tại commit `79f9fd6`
+- Cập nhật lần cuối: 2026-10-01; dữ kiện đã kiểm với code tại commit `ab613b1`
 - Dự án: `IELTSPath` (Maven coordinates: `com.group01:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -19,18 +19,19 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `infra/config-server`, `infra/eureka-server` | Cấu hình tập trung (`config-repo/`), service registry. |
 | `infra/api-gateway` | Ingress WebFlux: xác thực external JWT, ký internal JWT, routing, CORS. |
 | `shared/common-security` | Thư viện security servlet dùng chung (internal JWT, `CanonicalRoles`, `CurrentUserProvider`); không deploy độc lập. |
-| `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal. |
-| `services/content-service` | Curriculum: topic, knowledge point, từ vựng, câu hỏi, gói nội dung, video, asset. |
+| `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity và streak tại `/api/learning-support/{activities,streak}`. |
+| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset; kiểm topic cho library. |
+| `services/library-service` | Cổng 8081, `library_db` (Compose host 5437): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
 | `services/assessment-service` | Làm bài, chấm, kết quả; phát `AssessmentCompleted.v2`. |
 | `services/access-service` | Gói, subscription, activation key, điểm. |
-| `services/learning-support-service` | Tiện ích học viên: activity, streak, tiến độ video, note, flashcard. Không phải mastery authority. |
 | `services/game-service` | Phòng game, trận, phiên chơi, WebSocket. |
 | `services/community-service` | Bài viết, bình luận, reaction, kiểm duyệt. |
 | `services/notification-service` | Chưa triển khai (khung package). |
 | `services/ai-learning-service` | **Python/FastAPI**, ngoài Maven: mastery path, tutor SSE, practice, learner memory. |
 | `third_party/deeptutor` | Bản clone chỉ để đọc khi port. **Không phải dependency.** |
 
-Mỗi business service sở hữu một database PostgreSQL riêng.
+Mỗi business service sở hữu một database PostgreSQL riêng. Gateway chuyển hai nhóm activity/streak tới user-service;
+không còn route tổng quát `/api/learning-support/**`.
 
 ## 2. Tech Stack - Bắt buộc tuân thủ
 
@@ -39,7 +40,7 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 
 | Khu vực | Công nghệ đã được xác minh |
 | --- | --- |
-| Java build | Java 21; Maven multi-module (12 module trong reactor); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
+| Java build | Java 21; Maven multi-module (12 module trong reactor: 3 infra, 1 shared, 8 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
 | Java framework | Spring Boot 3.5.14; Spring Cloud 2025.0.0 (Config, Netflix Eureka, Gateway Server WebFlux + Reactor). |
 | Persistence (Java) | Spring Data JPA, Hibernate, PostgreSQL JDBC, Flyway (chạy khi service khởi động). |
 | Bảo mật | Spring Security, OAuth2 Resource Server, Nimbus JWT, HMAC-SHA256 JWT, BCrypt. |
@@ -120,7 +121,7 @@ src/main/java/com/group01/<service>
 
 - Mỗi service sở hữu bounded context và database; không đọc/ghi database hay dùng chung JPA entity của service khác.
 - Gọi đồng bộ service-to-service bằng HTTP tới endpoint nội bộ hoặc public của service đích, kèm bearer của request và
-  `X-Correlation-Id` (như assessment → content/user, game → content). ai-learning → content/user hiện chỉ gửi bearer.
+  `X-Correlation-Id` (như assessment → content/user, library → content, game → library/content). ai-learning → content/user hiện chỉ gửi bearer.
 - Bất đồng bộ qua transactional outbox + RabbitMQ; event có version trong tên và contract ở `docs/contracts/`. Consumer
   phải idempotent và có retry/dead-letter (xem ai-learning).
 - `shared/` chỉ chứa technical concern dùng chung; không chuyển entity hay use case nghiệp vụ vào đó.
@@ -133,10 +134,12 @@ src/main/java/com/group01/<service>
   `infra/config-server/config-repo/<service>.yaml` (+ `application.yaml` dùng chung). Không lặp setting Eureka client toàn cục.
 - Gateway và mọi service Java nghiệp vụ import `.env` ở root (`optional:file:../../.env[.properties]`; config-server và
   eureka-server thì không); compose cũng nội suy file này. ai-learning chạy trên host đọc `.env` riêng trong thư mục
-  service. `.env` không commit. community-service mặc định DB local 5432; dùng DB compose (5434) thì đặt `COMMUNITY_DB_URL`.
+  service. `.env` không commit. Compose yêu cầu `LIBRARY_DB_PASSWORD` kể cả khi chỉ bật một phần stack;
+  community-service mặc định DB local 5432, dùng DB compose (5434) thì đặt `COMMUNITY_DB_URL`.
 - Chạy local: service Java trên host (Config Server → Eureka → Gateway → business service); compose chạy DB của
-  learning-support/community/game, RabbitMQ và stack AI Learning. Chi tiết: `README.md` §6, `docs/system-architecture.md` §7
-  (README §4 còn mô tả compose cũ).
+  library/community/game, RabbitMQ và stack AI Learning. Library dùng `library_db` qua host 5437.
+  Game chọn snapshot `VOCABULARY` từ library và `GRAMMAR` từ content; `LIBRARY_SERVICE_URL` mặc định
+  `http://localhost:8081` trong config-repo. Chi tiết: `README.md` §6, `docs/system-architecture.md` §7.
 - `Dockerfile.spring-service` build module Maven theo `MODULE_PATH`; Config Server có Dockerfile riêng; ai-learning có
   `services/ai-learning-service/Dockerfile`.
 
@@ -169,7 +172,7 @@ shared/common-security/                 thư viện security dùng chung
 infra/{api-gateway,config-server,eureka-server}/
 infra/config-server/config-repo/        YAML runtime tập trung
 services/<name>-service/                service Java: src/main/java/com/group01/<package>/{api,application,domain,infrastructure}
-                                        (package bỏ gạch nối, ví dụ learningsupport; user-service có thêm config/)
+                                        (package bỏ gạch nối, ví dụ library; user-service có thêm config/)
                                         + src/main/resources/db/migration/
 services/ai-learning-service/           app/, migrations/, tests/, main.py
 docs/contracts/                         contract HTTP/SSE/event
@@ -290,8 +293,8 @@ Những điểm ảnh hưởng trực tiếp tới quy tắc:
 
 - Use case Java mang `@Service`/`@Transactional` của Spring. Code mới vẫn giữ `application` không phụ thuộc `api`/
   `infrastructure` và không đưa dependency dạng này vào `domain`.
-- `services/user-service/README.md` ghi `PATCH` cho cập nhật trạng thái user; controller là `PUT /api/users/{id}/status`
-  (controller đúng).
+- `CONTENT_SERVICE_URL` của game mặc định `http://content-service:8082` trong config-repo; khi chạy game trên host,
+  đặt `http://localhost:8082`. `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
 - Outbox của access/content/game đã ghi event nhưng chưa có relay; đừng giả định các event đó tới được consumer.
 - ai-learning chưa forward `X-Correlation-Id` khi gọi Content/User.
 - `requirements.txt` của ai-learning còn `sqlalchemy` nhưng code không import.
