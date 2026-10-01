@@ -55,7 +55,13 @@ public interface LearningContentClient {
     /** {@code assets} are the images of an essay question; Content omits them elsewhere. */
     record Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
                     Map<String, Object> answerSpec, String explanation, List<UUID> knowledgePointIds,
-                    List<QuestionAsset> assets) {
+                    List<QuestionAsset> assets, String hint) {
+        public Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
+                        Map<String, Object> answerSpec, String explanation, List<UUID> knowledgePointIds,
+                        List<QuestionAsset> assets) {
+            this(questionVersionId, sortOrder, stem, options, answerSpec, explanation, knowledgePointIds, assets, null);
+        }
+
         public Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
                         Map<String, Object> answerSpec, String explanation, List<UUID> knowledgePointIds) {
             this(questionVersionId, sortOrder, stem, options, answerSpec, explanation, knowledgePointIds, null);

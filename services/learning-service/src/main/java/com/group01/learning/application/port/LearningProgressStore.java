@@ -8,6 +8,7 @@ import com.group01.learning.domain.vo.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface LearningProgressStore {
@@ -22,6 +23,7 @@ public interface LearningProgressStore {
     Optional<StoredSubmission> findSubmission(UUID requestId);
     boolean hasSubmission(UUID userId, UUID lessonId, UUID blockId);
     List<SubmissionResult> findFirstSubmissions(UUID userId, UUID lessonId);
+    Map<UUID, Set<UUID>> findWrongQuestions(UUID userId, UUID lessonId);
     boolean passBlock(UUID userId, UUID lessonId, UUID blockId);
     boolean completeLesson(UUID userId, UUID lessonId);
     void appendEvidence(UUID userId, List<NewEvidence> evidence);

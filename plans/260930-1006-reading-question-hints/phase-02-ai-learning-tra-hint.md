@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "AI Learning: trả hint"
-status: pending
+status: completed
 priority: P2
 dependencies: [1]
 effort: "1 ngày"
@@ -10,6 +10,14 @@ effort: "1 ngày"
 # Phase 2: AI Learning: trả hint
 
 > **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan `261001-1228`). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../260930-2057-mvp-reading-writing-listening-roadmap/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
+
+## Kết quả (2026-10-02)
+
+- `LessonHintPolicy` thuần domain: FILL/CHOICE hợp lệ, ≥3 options hoặc TFNG thiếu/rỗng; 1–2 options và spec không chấm được không mở hint. Giữ quy ước CHOICE mặc định của grader cho spec legacy thiếu `type`.
+- `LearningProgressStore`/`JdbcLearningProgressStore` đọc câu sai từ mọi `response.results` trong một query theo user/bài/khối, tách khỏi evidence lần nộp đầu. Dùng index có sẵn trong `V1__learning_schema.sql`; không migration mới, không HTTP thêm trong vòng lặp.
+- `LearnLessonUseCase`, result và DTO thêm `hint` nullable luôn hiện ở GET/POST. Câu đã mở giữ hint khi lần sau đúng nhưng khối vẫn trượt; khối từng đạt không mở lại hint khi lần sau trượt. Replay giữ nguyên response cũ, kể cả sau khi đạt hoặc Content sửa.
+- Port Content đọc hint bài học; mapping gói bỏ qua hint. Review dùng DTO chung, hint luôn null. Evidence chỉ lần nộp đầu và mastery giữ nguyên; không ghi `hints_used`.
+- Baseline: 175 Learning + 8 common-security, 0 fail/error/skip. RED thiếu policy trước code; focused 76 pass. Regression `mvn -q -pl services/learning-service -am test`: 183 Learning + 8 common-security, 0 fail/error/skip, Docker/Testcontainers thực chạy. Assertion persistence cuối: 1 pass. Reviewer không finding; không chạy full reactor/live E2E.
 
 <!-- Updated: Validation Session 3 - bỏ hints_used; query tập đã mở là query riêng -->
 
@@ -20,7 +28,8 @@ effort: "1 ngày"
 
 - Plan 1640 phase 6: thứ tự nộp khối (`phase-06-ai-learning-api-bai-hoc-va-bai-on.md:30-42`), `GET /lessons/{id}` (`:66-69`),
   schema V11 (`:108-114`, có INDEX(`user_id`, `lesson_id`, `block_id`) của `lesson_exercise_submissions`), test allowlist (`:175`)
-- Không ghi `hints_used` (Validation Session 3): cột `mastery_learning_evidence.hints_used` giữ mặc định 0.
+- Bản Java hiện tại: `V1__learning_schema.sql` đã có index `(user_id, lesson_id, block_id)`; schema mô tả tại DATABASE_V5 §7.4. Tham chiếu V11/Python phía dưới là thiết kế lịch sử.
+- Không ghi `hints_used` (Validation Session 3); Learning Java dùng `kp_evidence`, không thay schema hoặc công thức mastery.
 
 ## Overview
 
@@ -79,10 +88,13 @@ GET /lessons/{id}
 
 ## Related Code Files
 
-- Create: `app/lessons/hints.py` (`hint_eligible`, ghép gợi ý theo tập đã mở), `tests/test_lesson_hints.py`
-- Modify (file của 1640): `app/lessons/service.py`, `app/lessons/store.py` (query tập đã mở), `app/api/dto/lessons.py`
-  (`hint` ở câu hỏi và `results[]`), `app/clients/content_service.py` (đọc `hint`)
-- Tests: cập nhật `tests/test_lesson_api.py` (allowlist), `tests/test_review_sets.py`
+- Java hiện thực dưới `services/learning-service/src/main/java/com/group01/learning/`:
+  - Create: `domain/service/LessonHintPolicy.java`.
+  - Modify: `application/port/{LearningContentClient,LearningProgressStore}.java`, `application/usecase/LearnLessonUseCase.java`,
+    `application/result/{LessonResult,SubmissionResult}.java`, `api/dto/{LessonResponse,SubmissionResponse}.java`,
+    `infrastructure/persistence/JdbcLearningProgressStore.java`.
+- Tests dưới package tương ứng: `LessonHintPolicyTest`, `LessonLearningWebMvcTest`, `RestLearningContentClientTest`,
+  `LessonSubmissionIntegrationTest`, `ReviewAndTestAssignmentIntegrationTest`. Tên Python trong bước thiết kế dưới đây đọc theo mapping đã chấp nhận.
 
 ## Implementation Steps
 
@@ -111,23 +123,20 @@ GET /lessons/{id}
 
 **Regression Gate:**
 ```powershell
-$env:PYTHONDONTWRITEBYTECODE = "1"
-python -m pytest tests -p no:cacheprovider
+mvn -q -pl services/learning-service -am test
 ```
 
 ## Success Criteria
 
-- [ ] Gợi ý chỉ ra cho câu đủ điều kiện, đã sai ít nhất một lần trong khối chưa đạt; server quyết định.
-- [ ] Mỗi lần nộp hoặc `GET` thêm tối đa một query; không gọi content thêm; không migration ai-learning.
-- [ ] Không ghi `hints_used`; mastery không đổi; không sửa `app/mastery` hay `practice_evidence.py`.
-- [ ] Kịch bản Lan của 1640 vẫn pass.
+- [x] Gợi ý chỉ ra cho câu đủ điều kiện, đã sai ít nhất một lần trong khối chưa từng đạt; server quyết định.
+- [x] Mỗi lần nộp mới hoặc `GET` thêm tối đa một query; replay không đọc Content/hint; không migration Learning.
+- [x] Không ghi `hints_used`; evidence lần nộp đầu và mastery không đổi; không sửa `MasteryCalculator`.
+- [x] Kịch bản Lan của 1640 vẫn pass trong regression Learning (183 test).
 
 ## Risk Assessment
 
-- **Đọc `response` JSONB phụ thuộc tên key đã lưu** (`results`, `questionVersionId`, `correct`, camelCase theo DTO): test bước 2
-  dùng đúng đường lưu thật; đổi DTO thì test vỡ ngay.
-- **Luật đủ điều kiện ở hai nơi** (test seed Java và `hint_eligible` Python): contract là nguồn; `hint_eligible` là nơi quyết định
-  lúc chạy, test seed chỉ giữ dữ liệu sạch.
+- **Đọc `response` JSONB:** đã kiểm bằng persistence Testcontainers trên response thật, cả câu sai ở lần nộp sau và cách ly user/bài/khối. Đổi key DTO tương lai phải cập nhật query/test cùng lúc.
+- **Luật đủ điều kiện:** đã khớp contract, seed Content và `LessonHintPolicy` Java; policy test kiểm TFNG fallback/spec không hợp lệ, review integration kiểm hint null.
 - **Chuỗi gợi ý bị chép vào `response`:** là nội dung học, không phải dữ liệu cá nhân hay bí mật; cần để replay trả y hệt.
 
 ## Security Considerations

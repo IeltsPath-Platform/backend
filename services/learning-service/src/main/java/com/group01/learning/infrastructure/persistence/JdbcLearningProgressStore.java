@@ -156,6 +156,24 @@ public class JdbcLearningProgressStore implements LearningProgressStore {
     }
 
     @Override
+    public Map<UUID, Set<UUID>> findWrongQuestions(UUID userId, UUID lessonId) {
+        // Hints use every submission; mastery and review evidence still use only the first submission.
+        return jdbc.query("""
+                SELECT DISTINCT s.block_id, (r->>'questionVersionId')::uuid AS question_version_id
+                FROM lesson_exercise_submissions s
+                CROSS JOIN LATERAL jsonb_array_elements(s.response->'results') r
+                WHERE s.user_id = ? AND s.lesson_id = ? AND r->>'correct' = 'false'
+                """, (org.springframework.jdbc.core.ResultSetExtractor<Map<UUID, Set<UUID>>>) rows -> {
+            Map<UUID, Set<UUID>> wrong = new HashMap<>();
+            while (rows.next()) {
+                wrong.computeIfAbsent(rows.getObject("block_id", UUID.class), ignored -> new HashSet<>())
+                        .add(rows.getObject("question_version_id", UUID.class));
+            }
+            return wrong;
+        }, userId, lessonId);
+    }
+
+    @Override
     public boolean passBlock(UUID userId, UUID lessonId, UUID blockId) {
         return jdbc.update("""
                 UPDATE lesson_progress SET passed_block_ids = array_append(passed_block_ids, ?),
