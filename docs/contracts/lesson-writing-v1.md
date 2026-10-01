@@ -1,6 +1,6 @@
 # Lesson writing API v1
 
-**Status: proposed 2026-10-01, awaiting approval.** Owner: Learning Service (`/api/learning`). Extends
+**Status: approved 2026-10-01.** Owner: Learning Service (`/api/learning`). Extends
 [`lesson-learning-v1.md`](lesson-learning-v1.md) with Writing Task 2 essay blocks; plan `260930-0737`.
 
 Band scores are an **estimate** produced by an LLM against the public IELTS band descriptors. They are not an official

@@ -44,7 +44,7 @@ Chế độ `--tdd`: mỗi phase theo trình tự test giữ hành vi cũ → s�
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Contract va bao ve access](./phase-01-contract-va-bao-ve-access.md) | Completed (nhánh `feat/writing-access-content`; contract `lesson-writing-v1` **chờ duyệt**) |
+| 1 | [Contract va bao ve access](./phase-01-contract-va-bao-ve-access.md) | Completed (nhánh `feat/writing-access-content`; contract `lesson-writing-v1` duyệt 2026-10-01) |
 | 2 | [Content seed khoi essay](./phase-02-content-seed-khoi-essay.md) | Completed (nhánh `feat/writing-access-content`) |
 | 3 | [AI Learning grader va access client](./phase-03-ai-learning-grader-va-access-client.md) | Pending |
 | 4 | [AI Learning API nop essay va evidence](./phase-04-ai-learning-api-nop-essay-va-evidence.md) | Pending |
