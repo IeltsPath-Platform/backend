@@ -17,6 +17,8 @@ import java.util.UUID;
 public interface AssessmentResultJpaRepository extends JpaRepository<AssessmentResultJpaEntity, UUID> {
     Optional<AssessmentResultJpaEntity> findTopByAttemptIdOrderByResultVersionDesc(UUID attemptId);
 
+    Optional<AssessmentResultJpaEntity> findTopByAttemptIdAndStatusOrderByResultVersionDesc(UUID attemptId, String status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select result from AssessmentResultJpaEntity result where result.attemptId = :attemptId "
             + "order by result.resultVersion desc")

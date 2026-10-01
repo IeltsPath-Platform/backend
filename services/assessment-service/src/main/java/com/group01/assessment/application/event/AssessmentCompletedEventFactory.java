@@ -26,7 +26,6 @@ public class AssessmentCompletedEventFactory {
                                         List<AttemptItemKnowledgePoint> snapshot,
                                         List<ItemResultKnowledgeJudgment> judgments,
                                         List<ErrorAnalysisItem> errors) {
-        Objects.requireNonNull(attempt.getLearningGoalId(), "An attempt without a learning goal cannot be announced");
         Map<UUID, ItemResult> resultByItem = itemResults.stream()
                 .collect(Collectors.toMap(ItemResult::attemptItemId, value -> value));
         Map<UUID, List<AttemptItemKnowledgePoint>> snapshotByItem = snapshot.stream()
@@ -61,7 +60,7 @@ public class AssessmentCompletedEventFactory {
 
         return new AssessmentCompletedV2(eventId, AssessmentCompletedV2.EVENT_TYPE, occurredAt,
                 AssessmentCompletedV2.SOURCE, new AssessmentCompletedV2.Data(attempt.getUserId(),
-                attempt.getLearningGoalId(), attempt.getId(), result.id(), result.resultVersion(),
+                null, attempt.getPackageVersionId(), attempt.getId(), result.id(), result.resultVersion(),
                 attempt.getAttemptType().name(), result.status(), result.completedAt(), decimal(result.overallBand()),
                 List.copyOf(eventItems)));
     }

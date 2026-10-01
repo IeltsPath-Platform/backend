@@ -21,8 +21,6 @@ spring:
       mandatory: true
 
 assessment:
-  user:
-    base-url: ${USER_SERVICE_URL:http://localhost:8085}
   content:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
   messaging:

@@ -1,6 +1,6 @@
 package com.group01.assessment.domain.aggregate;
 
-import com.group01.assessment.domain.exception.InvalidAssessmentStateException;
+import com.group01.assessment.domain.exception.AttemptExpiredException;
 import com.group01.assessment.domain.vo.*;
 import org.junit.jupiter.api.Test;
 import java.time.Instant;
@@ -13,8 +13,15 @@ class AssessmentAttemptTest {
         attempt.submit(Instant.now());
         assertEquals(AttemptStatus.SUBMITTED,attempt.getStatus()); assertNotNull(attempt.getSubmittedAt());
     }
-    @Test void expiredAttemptCannotBeSubmitted(){
+    @Test void lateSubmitExpiresTheAttemptAndEverySubmitAfterThatFailsTheSameWay(){
         var attempt=AssessmentAttempt.start(UUID.randomUUID(),UUID.randomUUID(),AttemptType.QUIZ,AttemptMode.STANDARD,AttemptChannel.API,Instant.now().minusSeconds(1));
-        assertThrows(InvalidAssessmentStateException.class,()->attempt.submit(Instant.now())); assertEquals(AttemptStatus.EXPIRED,attempt.getStatus());
+        assertThrows(AttemptExpiredException.class,()->attempt.submit(Instant.now())); assertEquals(AttemptStatus.EXPIRED,attempt.getStatus());
+        assertThrows(AttemptExpiredException.class,()->attempt.submit(Instant.now())); assertNull(attempt.getSubmittedAt());
+    }
+    @Test void typeComesFromTheContentPackage(){
+        assertEquals(AttemptType.TOPIC_GATE,AttemptType.forContentPackageType("TOPIC_TEST"));
+        assertEquals(AttemptType.MOCK,AttemptType.forContentPackageType("MOCK_TEST"));
+        assertEquals(AttemptType.PLACEMENT,AttemptType.forContentPackageType("PLACEMENT_TEST"));
+        assertEquals(AttemptType.QUIZ,AttemptType.forContentPackageType("QUIZ"));
     }
 }

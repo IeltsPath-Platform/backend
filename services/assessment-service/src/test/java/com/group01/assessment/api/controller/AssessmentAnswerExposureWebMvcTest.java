@@ -1,6 +1,15 @@
 package com.group01.assessment.api.controller;
 
+import com.group01.assessment.application.command.StartAssessmentAttemptCommand;
+import com.group01.assessment.application.command.SubmitAssessmentAttemptCommand;
+import com.group01.assessment.application.result.AssessmentAttemptResult;
 import com.group01.assessment.application.result.AttemptStructureResult;
+import com.group01.assessment.application.result.LearnerAssessmentResult;
+import com.group01.assessment.domain.exception.AttemptExpiredException;
+import com.group01.assessment.domain.vo.AttemptChannel;
+import com.group01.assessment.domain.vo.AttemptMode;
+import com.group01.assessment.domain.vo.AttemptStatus;
+import com.group01.assessment.domain.vo.AttemptType;
 import com.group01.assessment.application.usecase.*;
 import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import org.junit.jupiter.api.Test;
@@ -82,4 +91,52 @@ class AssessmentAnswerExposureWebMvcTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"overallBand\":6.0}"))
                 .andExpect(status().isMethodNotAllowed());
     }
-}
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void startTrustsOnlyThePackageVersionAndIgnoresClientSuppliedStructure() throws Exception {
+        UUID versionId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(userId);
+        java.time.Instant now = java.time.Instant.now();
+        when(startAttempt.execute(org.mockito.ArgumentMatchers.any())).thenReturn(new AssessmentAttemptResult(attemptId,
+                userId, versionId, AttemptType.TOPIC_GATE, AttemptMode.STANDARD, AttemptChannel.WEB,
+                AttemptStatus.IN_PROGRESS, now, null, null, 0, now, now));
+
+        mockMvc.perform(post("/api/assessments/attempts").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"packageVersionId":"%s","mode":"STANDARD","channel":"WEB","attemptType":"QUIZ",
+                         "expiresAt":"2099-01-01T00:00:00Z","sections":[{"contentSectionId":"%s","items":[]}]}
+                        """.formatted(versionId, UUID.randomUUID())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.attemptType").value("TOPIC_GATE"));
+
+        org.mockito.Mockito.verify(startAttempt).execute(new StartAssessmentAttemptCommand(userId, versionId,
+                AttemptMode.STANDARD, AttemptChannel.WEB));
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void lateSubmitIsAConflictWithAStableCode() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(userId);
+        when(submitAttempt.execute(new SubmitAssessmentAttemptCommand(userId, attemptId)))
+                .thenThrow(new AttemptExpiredException());
+
+        mockMvc.perform(post("/api/assessments/attempts/{id}/submit", attemptId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ATTEMPT_EXPIRED"));
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void failedResultShowsCorrectnessWithoutTheSolutionsKey() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(userId);
+        when(getResult.execute(userId, attemptId)).thenReturn(new LearnerAssessmentResult(UUID.randomUUID(),
+                attemptId, 1, "COMPLETED", java.time.Instant.now(), 1.0, 2.0, 50.0,
+                List.of(new LearnerAssessmentResult.Item(itemId, UUID.randomUUID(), false)), null));
+
+        mockMvc.perform(get("/api/assessments/attempts/{id}/result", attemptId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.percent").value(50.0))
+                .andExpect(jsonPath("$.items[0].correct").value(false))
+                .andExpect(jsonPath("$.solutions").doesNotExist())
+                .andExpect(jsonPath("$.overallBand").doesNotExist());
+    }}
