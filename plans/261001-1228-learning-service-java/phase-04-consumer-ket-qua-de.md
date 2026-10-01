@@ -1,13 +1,18 @@
 ---
 phase: 4
 title: "Consumer AssessmentCompleted.v2"
-status: pending
+status: completed
 priority: P1
 dependencies: [3]
 effort: "1.5 ngày"
 ---
 
 # Phase 4: Consumer AssessmentCompleted.v2
+
+## Kết quả (2026-10-01)
+
+- `AssessmentCompletedListener` (ack thủ công), `AssessmentCompletedParser`, `AssessmentMessagingConfig` (`Declarables`), `ApplyAssessmentResultUseCase`, `JdbcAssessmentResultStore`. Số lần thử đếm bằng header `x-death` của queue chính; copy vào DLQ có publisher confirm, lỗi thì nack để thử lại.
+- Test: 11 ca mới (parse, listener với channel giả, 5 ca Postgres thật). Lệch plan: chưa có test với RabbitMQ thật (learning-service chưa có module Testcontainers RabbitMQ); E2E qua Gateway chờ phase 4 của 1640.
 
 ## Overview
 
