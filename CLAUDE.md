@@ -1,6 +1,6 @@
 # CLAUDE.md — IELTSPath backend
 
-- Cập nhật lần cuối: 2026-10-02; dữ kiện đã kiểm với code sau khi learning-service có consumer. Về dữ kiện, code là nguồn đúng khi tài
+- Cập nhật lần cuối: 2026-10-02; dữ kiện đã kiểm với code tại commit `2226a25`. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
 - Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
@@ -45,7 +45,8 @@ Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/c
   cần `LEARNING_DB_PASSWORD`, `RABBITMQ_PASSWORD`; chấm bài luận cần thêm `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`,
   `LEARNING_LLM_MODEL` (thiếu thì nộp bài luận trả 503, phần khác vẫn chạy) và access-service đang chạy
   (`ACCESS_SERVICE_URL`, mặc định `http://localhost:8084`); content cần `CONTENT_MEDIA_BASE_URL` (https của bucket mp3) cho bài Listening.
-- Compose yêu cầu `LIBRARY_DB_PASSWORD` trong `.env` dù chỉ bật một phần stack. Chỉ chạy các container cần dùng:
+- Compose yêu cầu mọi biến `${VAR:?}` trong `.env` dù chỉ bật một phần stack (danh sách ở `AGENTS.md` §3.6; hay thiếu
+  `LIBRARY_DB_PASSWORD`, `LEARNING_DB_PASSWORD` trên `.env` tạo trước khi chia service). Chỉ chạy các container cần dùng:
   `docker compose up -d rabbitmq learning-db`
   (+ `library-db`, `community-db`, `game-db` khi cần).
 - Service Java chạy trên host (IDE hoặc `java -jar`) theo thứ tự: config-server → eureka → api-gateway → user → content →
@@ -72,7 +73,12 @@ Test service học: `mvn -q -pl services/learning-service -am test` (Testcontain
   đè default local → khi chạy game trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082`.
 - Game gọi library qua `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) cho `VOCABULARY`, gọi content qua
   `CONTENT_SERVICE_URL` cho `GRAMMAR`. Library gọi `GET /api/content/topics/{id}` để kiểm topic khi ghi video.
-- Compose yêu cầu `LIBRARY_DB_PASSWORD` ngay cả khi chưa bật `library-db`, vì Compose nội suy toàn bộ file.
+- Compose báo `required variable ... is missing` (ví dụ `LIBRARY_DB_PASSWORD`, `LEARNING_DB_PASSWORD`) ngay cả khi chưa bật
+  DB đó, vì Compose nội suy toàn bộ file.
+- Jar build bằng `package` không `clean` sau khi code bị xóa/chuyển service vẫn chứa class cũ trong `target/classes` (content
+  từng chết khi khởi động vì `VocabularyRepositoryAdapter`): dùng `mvn clean package` khi không có service nào chạy từ IDE.
+- Entity map cột `jsonb` từ `String` phải có `@JdbcTypeCode(SqlTypes.JSON)`; thiếu thì PostgreSQL từ chối khi ghi (outbox
+  access từng làm mọi lần trừ point lỗi 500). Test Mockito không bắt được, cần test Testcontainers.
 - Container `game-service` trong compose trỏ `http://config-server:8888` mà compose không có config-server: đừng dùng
   container này, chạy game-service trên host.
 - community-service mặc định `localhost:5432/community_db`; dùng DB compose thì đặt

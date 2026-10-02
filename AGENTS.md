@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
-- Phiên bản: 2.1
-- Cập nhật lần cuối: 2026-10-02; dữ kiện pipeline đã kiểm với code Java trên nhánh `feat/lesson-pipeline-docs`
+- Phiên bản: 2.2
+- Cập nhật lần cuối: 2026-10-02; dữ kiện đã kiểm với code tại commit `2226a25` (sau gợi ý Reading và E2E MVP)
 - Dự án: `IELTSPath` (Maven coordinates: `com.group01:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -74,8 +74,8 @@ config -> framework wiring
 - Code mới trong `domain` KHÔNG ĐƯỢC import `api`, `application`, `infrastructure`, Spring, JPA, HTTP hoặc class của gateway.
 - Code mới trong `application` KHÔNG ĐƯỢC import `api` hoặc `infrastructure`.
 - Infrastructure triển khai contract hướng vào trong; KHÔNG chứa business rule.
-- user-service dùng `domain/repository` làm persistence contract, không có `port`; assessment và game có `application/port`
-  cho client/outbox/ticket. Giữ convention của service đang sửa.
+- user-service dùng `domain/repository` làm persistence contract, không có `port`; assessment, game và learning có
+  `application/port` cho client/outbox/ticket/store. Giữ convention của service đang sửa.
 
 ### 3.1.1 Template bắt buộc cho business service Java mới
 
@@ -98,7 +98,7 @@ src/main/java/com/group01/<service>
 
 ### 3.3 Presentation, validation, error handling và logging
 
-- Mapping trong controller (hoặc FastAPI router) là nguồn tham chiếu chính thức của API; contract nằm ở `docs/contracts/`.
+- Mapping trong controller là nguồn tham chiếu chính thức của API; contract nằm ở `docs/contracts/`.
 - Request DTO dùng Bean Validation + `@Valid`; domain vẫn tự bảo vệ invariant.
 - Mở rộng `GlobalExceptionHandler` → `ErrorResponse` của service thay vì trả error body tự phát.
 - Giữ và forward `X-Correlation-Id`. Không log credential, token, password, nội dung hội thoại, prompt hay API key.
@@ -118,7 +118,7 @@ src/main/java/com/group01/<service>
 
 - Mỗi service sở hữu bounded context và database; không đọc/ghi database hay dùng chung JPA entity của service khác.
 - Gọi đồng bộ service-to-service bằng HTTP tới endpoint nội bộ hoặc public của service đích, kèm bearer của request và
-  `X-Correlation-Id` (như assessment → content, library → content, game → library/content). learning-service → content cũng gửi cả hai.
+  `X-Correlation-Id` (như assessment → content, library → content, game → library/content, learning → content/access).
 - Bất đồng bộ qua transactional outbox + RabbitMQ; event có version trong tên và contract ở `docs/contracts/`. Consumer
   phải idempotent và có retry/dead-letter (xem consumer của learning-service).
 - `shared/` chỉ chứa technical concern dùng chung; không chuyển entity hay use case nghiệp vụ vào đó.
@@ -130,7 +130,9 @@ src/main/java/com/group01/<service>
 - Bootstrap setting ở `src/main/resources/application.y(a)ml` của module; runtime setting ở
   `infra/config-server/config-repo/<service>.yaml` (+ `application.yaml` dùng chung). Không lặp setting Eureka client toàn cục.
 - Gateway và mọi service Java nghiệp vụ import `.env` ở root (`optional:file:../../.env[.properties]`; config-server và
-  eureka-server thì không); compose cũng nội suy file này. `.env` không commit. Compose yêu cầu `LIBRARY_DB_PASSWORD` kể cả khi chỉ bật một phần stack;
+  eureka-server thì không); compose cũng nội suy file này. `.env` không commit. Compose nội suy cả file nên mọi biến
+  `${VAR:?}` (`LIBRARY_DB_PASSWORD`, `LEARNING_DB_PASSWORD`, `GAME_DB_PASSWORD`, `POSTGRES_PASSWORD`, `RABBITMQ_USERNAME`,
+  `RABBITMQ_PASSWORD`, `GATEWAY_INTERNAL_JWT_SECRET`) phải có trong `.env` kể cả khi chỉ bật một phần stack;
   community-service mặc định DB local 5432, dùng DB compose (5434) thì đặt `COMMUNITY_DB_URL`.
 - Chạy local: service Java trên host (Config Server → Eureka → Gateway → business service); compose chạy DB của
   library/community/game/learning và RabbitMQ. Library dùng `library_db` qua host 5437.
@@ -226,7 +228,7 @@ Khi không có convention cụ thể, theo code lân cận trong cùng module.
 
 - TUYỆT ĐỐI KHÔNG thêm dependency chỉ để tránh tự viết một hành vi nhỏ.
 - TUYỆT ĐỐI KHÔNG sửa Docker, config tập trung hoặc shared security như side effect của task chỉ liên quan một service.
-- TUYỆT ĐỐI KHÔNG để test gọi LLM thật; dùng model giả lập (`ScriptedChat`) hoặc stub OpenAI-compatible cục bộ.
+- TUYỆT ĐỐI KHÔNG để test gọi LLM thật; dùng `MockRestServiceServer`, `LlmClient` giả hoặc stub OpenAI-compatible cục bộ.
 - TUYỆT ĐỐI KHÔNG commit `.env`, credential, build output, bytecode (`__pycache__/`, `*.pyc`) hoặc `graphify-out/`.
 
 ## 6. Quy trình phát triển và kiểm chứng
@@ -258,6 +260,9 @@ mvn -q -pl services/<name>-service -am test      # -am build kèm common-securit
 mvn -q compile -DskipTests                        # cả reactor; không dùng clean khi service đang chạy từ IDE
 docker compose config --quiet
 ```
+
+   Build boot jar để chạy (`package`) thì dùng `mvn clean package`: `target/classes` cũ còn class của code đã xóa
+   (ví dụ catalog từ vựng chuyển sang library) và làm service không khởi động.
 
    Learning Service dùng `mvn -q -pl services/learning-service -am test`. Test context và Flyway chạy với
    Testcontainers PostgreSQL; thiếu Docker thì báo rõ test bị skip.

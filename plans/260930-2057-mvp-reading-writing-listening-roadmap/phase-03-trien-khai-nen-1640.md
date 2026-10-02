@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Triển khai nền 1640"
-status: in-progress
+status: completed
 priority: P1
 dependencies: [2]
 effort: "~2 tuần (theo 8 phase của 1640)"
