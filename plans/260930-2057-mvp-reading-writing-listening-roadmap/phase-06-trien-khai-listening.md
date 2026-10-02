@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Triển khai Listening"
-status: in-progress
+status: completed
 priority: P1
 dependencies: [5]
 effort: "~4 ngày"

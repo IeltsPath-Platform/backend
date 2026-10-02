@@ -1,7 +1,7 @@
 ---
 title: "MVP học Reading, Writing, Listening (lộ trình tổng)"
 description: "Lộ trình gom các plan con thành một MVP: learning-service (Java) chỉ tạo path, cập nhật path, điều phối làm bài và chấm Writing. Chốt phạm vi, thứ tự merge, số migration, tài liệu, và nghiệm thu E2E cho ba kỹ năng. Không chép lại nội dung plan con."
-status: in-progress
+status: completed
 priority: P1
 branch: "feat/main-follow"
 tags: [mvp, roadmap, ai-learning, content, assessment, access, reading, writing, listening]
@@ -72,12 +72,12 @@ Plan vào sau không đổi số của plan vào trước. Nếu buộc phải �
 |-------|------|--------|
 | 1 | [Chốt phạm vi và đồng bộ plan con](./phase-01-chot-pham-vi-va-dong-bo-plan-con.md) | Completed |
 | 2 | [Validate lại plan con](./phase-02-validate-lai-plan-con.md) | Completed |
-| 3 | [Triển khai nền 1640](./phase-03-trien-khai-nen-1640.md) | In progress (1640 phase 1–4 xong, assessment tự chấm merge PR #32; `261001-1228` hoàn thành; còn 1640 phase 8 tài liệu) |
+| 3 | [Triển khai nền 1640](./phase-03-trien-khai-nen-1640.md) | Completed (1640 phase 1–4, 8 xong; assessment tự chấm PR #32; `261001-1228` hoàn thành; E2E nền Reading 7/7, report trong `260929-1640/reports/`) |
 | 4 | [Triển khai Writing Task 2](./phase-04-trien-khai-writing-task-2.md) | Completed (0737 xong 5/5 phase, plan đã xóa; chấm bài luận ở learning-service) |
-| 5 | [Triển khai Writing Task 1](./phase-05-trien-khai-writing-task-1.md) | In progress (0812 phase 1–2 xong, grader dùng chung với 0737; còn phase 3 tài liệu) |
-| 6 | [Triển khai Listening](./phase-06-trien-khai-listening.md) | In progress (0851 phase 1, 2, 4 xong; phase 3 đề cuối có audio đang giao Codex; phase 5 tài liệu) |
-| 7 | [Triển khai gợi ý Reading](./phase-07-trien-khai-goi-y-reading.md) | In progress (1006 phase 1 xong, merge PR #30; phase 2 trả gợi ý ở learning-service chưa làm; phase 3 tài liệu) |
-| 8 | [Nghiệm thu E2E MVP](./phase-08-nghiem-thu-e2e-mvp.md) | Pending |
+| 5 | [Triển khai Writing Task 1](./phase-05-trien-khai-writing-task-1.md) | Completed (0812 xong 3/3 phase, grader dùng chung với 0737; tài liệu PR #35) |
+| 6 | [Triển khai Listening](./phase-06-trien-khai-listening.md) | Completed (0851 xong 5/5 phase; đề cuối có audio, tài liệu PR #35) |
+| 7 | [Triển khai gợi ý Reading](./phase-07-trien-khai-goi-y-reading.md) | Completed (1006 xong 3/3 phase; trả gợi ý ở learning-service PR #36) |
+| 8 | [Nghiệm thu E2E MVP](./phase-08-nghiem-thu-e2e-mvp.md) | Completed (2026-10-02; live E2E 95/95, reactor 703 test pass; sửa access outbox jsonb; [report](./reports/e2e-261002-mvp-reading-writing-listening.md)) |
 
 Phase 1–2 chỉ sửa tài liệu và plan. Phase 3–7 theo đúng thứ tự merge; mỗi phase xong thì merge rồi mới sang phase kế.
 
@@ -105,7 +105,7 @@ Phase 1–2 chỉ sửa tài liệu và plan. Phase 3–7 theo đúng thứ tự
 ## Câu hỏi mở
 
 - Chọn dịch vụ cloud cho mp3 và người thu âm 8 file seed Listening (không ảnh hưởng code).
-- Ai soạn `chartFacts` và ảnh SVG cho seed Task 1.
+- ~~Ai soạn `chartFacts` và ảnh SVG cho seed Task 1.~~ Đã có trong content V11 (`chartFacts` + một ảnh data URI).
 
 ## Validation Log
 
