@@ -27,7 +27,9 @@ Chỉ công thức `compute_mastery` được port từ DeepTutor; mastery tính
 - Consumer bỏ version bằng/cũ, thay evidence khi version cao hơn; `PLACEMENT` chỉ lưu version. Assignment cùng
   user/version, chưa consume và `assigned_at <= completed_at` mới được consume; ≥70% ghi `passed_at` một chiều.
 - Writing Task 1/2 và Listening đã có trong luồng bài học. Writing chấm LLM có quota ngày và trừ point sau khi lưu grade;
-  essay không chặn hoàn thành bài. Content V13 có cột hint; trả Reading hint theo câu sai cho learner còn pending.
+  essay không chặn hoàn thành bài. Content V13 lưu Reading hint; Learning Java mở cho câu điền/chọn ≥3 phương án
+  hợp lệ (TFNG hỗ trợ options thiếu/rỗng) từng sai trong cùng user/bài/khối chưa đạt, giữ tới khi khối đạt.
+  Lịch sử dùng mọi submission, không đổi evidence/mastery lần nộp đầu; gói luyện, đề cuối và game không cấp gợi ý.
 
 Nguồn hiện tại: [Learning README](../../services/learning-service/README.md), [schema/flow MVP](../database/mvp-database.md)
 và [contract bài học](../../docs/contracts/lesson-learning-v1.md). Các mục lịch sử bên dưới không thay thế các cổng này.

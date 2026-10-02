@@ -37,6 +37,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -116,6 +117,164 @@ class LessonSubmissionIntegrationTest {
                 List.of(question));
         when(content.getLesson(LESSON)).thenReturn(new LearningContentClient.Lesson(
                 LESSON, TOPIC, "L1", "First lesson", null, 1, List.of(KP), List.of(block)));
+    }
+
+    @Test
+    void hintsOpenOnWrongAnswersPersistAcrossAllAttemptsAndDisappearAfterPassing() {
+        UUID second = UUID.randomUUID();
+        UUID third = UUID.randomUUID();
+        var questions = List.of(fillQuestion(QUESTION, 1, "Find the noun near the contrast."),
+                fillQuestion(second, 2, "Look for the phrase after however."),
+                fillQuestion(third, 3, "Read the final sentence."));
+        hintLesson(List.of(new LearningContentClient.Block(BLOCK, "EXERCISE", 1, null, null, null, questions)));
+        topics.execute(USER);
+        assertTrue(lessons.get(USER, LESSON).blocks().getFirst().questions().stream().allMatch(q -> q.hint() == null));
+
+        UUID firstRequest = UUID.randomUUID();
+        var first = lessons.submit(USER, LESSON, BLOCK, hintCommand(firstRequest, questions, "wrong", "word", "wrong"));
+        assertFalse(first.blockPassed());
+        assertEquals(questions.getFirst().hint(), first.results().getFirst().hint());
+        assertNull(first.results().get(1).hint());
+        assertNull(first.results().getFirst().correctAnswer());
+        assertNull(first.results().getFirst().explanation());
+        assertEquals(Map.of(BLOCK, Set.of(QUESTION, third)), store.findWrongQuestions(USER, LESSON));
+        var firstRead = lessons.get(USER, LESSON).blocks().getFirst().questions();
+        assertEquals(questions.getFirst().hint(), firstRead.getFirst().hint());
+        assertNull(firstRead.get(1).hint());
+        var firstMastery = mastery.execute(USER);
+
+        var secondAttempt = lessons.submit(USER, LESSON, BLOCK,
+                hintCommand(UUID.randomUUID(), questions, "word", "wrong", "wrong"));
+        assertFalse(secondAttempt.blockPassed());
+        assertTrue(secondAttempt.results().getFirst().correct());
+        assertEquals(questions.getFirst().hint(), secondAttempt.results().getFirst().hint());
+        assertEquals(questions.get(1).hint(), secondAttempt.results().get(1).hint());
+        assertEquals(Map.of(BLOCK, Set.of(QUESTION, second, third)), store.findWrongQuestions(USER, LESSON));
+        assertEquals(questions.stream().map(LearningContentClient.Question::hint).toList(),
+                lessons.get(USER, LESSON).blocks().getFirst().questions().stream().map(q -> q.hint()).toList());
+        assertEquals(3, count("kp_evidence"));
+        assertEquals(firstMastery, mastery.execute(USER));
+
+        var thirdAttempt = lessons.submit(USER, LESSON, BLOCK,
+                hintCommand(UUID.randomUUID(), questions, "wrong", "word", "wrong"));
+        assertFalse(thirdAttempt.blockPassed());
+        assertTrue(thirdAttempt.results().get(1).correct());
+        assertEquals(questions.get(1).hint(), thirdAttempt.results().get(1).hint());
+
+        var passed = lessons.submit(USER, LESSON, BLOCK,
+                hintCommand(UUID.randomUUID(), questions, "word", "word", "word"));
+        assertTrue(passed.blockPassed());
+        assertTrue(passed.results().stream().allMatch(q -> q.hint() == null));
+        assertTrue(passed.results().stream().allMatch(q -> "word".equals(q.correctAnswer()) && q.explanation() != null));
+        jdbc.update("UPDATE review_items SET status = 'SKIPPED'");
+        var after = lessons.get(USER, LESSON).blocks().getFirst();
+        assertTrue(after.questions().stream().allMatch(q -> q.hint() == null));
+        assertEquals(3, after.solutions().size());
+        assertEquals(3, count("kp_evidence"));
+        assertEquals(firstMastery, mastery.execute(USER));
+
+        var wrongAfterPass = lessons.submit(USER, LESSON, BLOCK,
+                hintCommand(UUID.randomUUID(), questions, "wrong", "wrong", "wrong"));
+        assertFalse(wrongAfterPass.blockPassed());
+        assertTrue(wrongAfterPass.results().stream().allMatch(q -> q.hint() == null));
+        assertTrue(lessons.get(USER, LESSON).blocks().getFirst().questions().stream().allMatch(q -> q.hint() == null));
+
+        var edited = List.of(fillQuestion(QUESTION, 1, "Edited hint."), questions.get(1), questions.get(2));
+        hintLesson(List.of(new LearningContentClient.Block(BLOCK, "EXERCISE", 1, null, null, null, edited)));
+        clearInvocations(content);
+        assertEquals(first, lessons.submit(USER, LESSON, BLOCK,
+                hintCommand(firstRequest, questions, "word", "word", "word")));
+        verifyNoInteractions(content);
+    }
+
+    @Test
+    void hintEligibilityAndMissingContentAreAppliedToSubmissionAndLessonRead() {
+        var three = new LearningContentClient.Question(UUID.randomUUID(), 1, "Choose one", List.of(
+                new LearningContentClient.Option("A", "First", 1), new LearningContentClient.Option("B", "Second", 2),
+                new LearningContentClient.Option("C", "Third", 3)), Map.of("type", "CHOICE", "correct", "A"),
+                "Explanation", List.of(KP), null, "Compare the scope of the options.");
+        var two = new LearningContentClient.Question(UUID.randomUUID(), 2, "Choose one", three.options().subList(0, 2),
+                three.answerSpec(), three.explanation(), List.of(KP), null, "This must stay hidden.");
+        var tfng = new LearningContentClient.Question(UUID.randomUUID(), 3, "Is the statement supported?", List.of(),
+                Map.of("type", "CHOICE", "correct", "TRUE"), "Explanation", List.of(KP), null, "Check what is stated.");
+        var noHint = fillQuestion(UUID.randomUUID(), 4, null);
+        var questions = List.of(three, two, tfng, noHint);
+        hintLesson(List.of(new LearningContentClient.Block(BLOCK, "EXERCISE", 1, null, null, null, questions)));
+        topics.execute(USER);
+        clearInvocations(content);
+        var failed = lessons.submit(USER, LESSON, BLOCK,
+                hintCommand(UUID.randomUUID(), questions, "B", "B", "FALSE", "wrong"));
+        assertEquals(three.hint(), failed.results().get(0).hint());
+        assertNull(failed.results().get(1).hint());
+        assertEquals(tfng.hint(), failed.results().get(2).hint());
+        assertNull(failed.results().get(3).hint());
+        verify(content, times(1)).getLesson(LESSON);
+        clearInvocations(content);
+        var read = lessons.get(USER, LESSON).blocks().getFirst().questions();
+        assertEquals(three.hint(), read.get(0).hint());
+        assertNull(read.get(1).hint());
+        assertEquals(tfng.hint(), read.get(2).hint());
+        assertNull(read.get(3).hint());
+        verify(content, times(1)).getLesson(LESSON);
+    }
+
+    @Test
+    void wrongQuestionHistoryIsScopedByUserLessonAndBlock() {
+        UUID otherBlock = UUID.randomUUID();
+        var question = fillQuestion(QUESTION, 1, "Find the relevant phrase.");
+        hintLesson(List.of(new LearningContentClient.Block(BLOCK, "EXERCISE", 1, null, null, null, List.of(question)),
+                new LearningContentClient.Block(otherBlock, "EXERCISE", 2, null, null, null, List.of(question))));
+        topics.execute(USER);
+        topics.execute(OTHER_USER);
+        lessons.submit(USER, LESSON, BLOCK, hintCommand(UUID.randomUUID(), List.of(question), "wrong"));
+        assertEquals(Map.of(BLOCK, Set.of(QUESTION)), store.findWrongQuestions(USER, LESSON));
+        assertTrue(store.findWrongQuestions(OTHER_USER, LESSON).isEmpty());
+        assertTrue(store.findWrongQuestions(USER, UUID.randomUUID()).isEmpty());
+        var own = lessons.get(USER, LESSON);
+        assertEquals(question.hint(), own.blocks().getFirst().questions().getFirst().hint());
+        assertNull(own.blocks().get(1).questions().getFirst().hint());
+        assertTrue(lessons.get(OTHER_USER, LESSON).blocks().stream()
+                .flatMap(block -> block.questions().stream()).allMatch(q -> q.hint() == null));
+    }
+
+    @Test
+    void hintsDoNotChangeFirstAttemptEvidenceOrMastery() {
+        var withHint = fillQuestion(QUESTION, 1, "Find the relevant phrase.");
+        hintLesson(List.of(new LearningContentClient.Block(BLOCK, "EXERCISE", 1, null, null, null, List.of(withHint))));
+        topics.execute(USER);
+        topics.execute(OTHER_USER);
+        lessons.submit(USER, LESSON, BLOCK, hintCommand(UUID.randomUUID(), List.of(withHint), "wrong"));
+        var withoutHint = fillQuestion(QUESTION, 1, null);
+        hintLesson(List.of(new LearningContentClient.Block(BLOCK, "EXERCISE", 1, null, null, null, List.of(withoutHint))));
+        lessons.submit(OTHER_USER, LESSON, BLOCK, hintCommand(UUID.randomUUID(), List.of(withoutHint), "wrong"));
+        assertEquals(mastery.execute(USER), mastery.execute(OTHER_USER));
+        var before = mastery.execute(USER);
+        lessons.submit(USER, LESSON, BLOCK, hintCommand(UUID.randomUUID(), List.of(withHint), "word"));
+        assertEquals(before, mastery.execute(USER));
+        assertEquals(2, count("kp_evidence"));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE correct = false", Integer.class));
+    }
+
+    private LearningContentClient.Question fillQuestion(UUID id, int order, String hint) {
+        return new LearningContentClient.Question(id, order, "Complete one word", null,
+                Map.of("type", "FILL", "accepted", List.of("word")), "Explanation", List.of(KP), null, hint);
+    }
+
+    private void hintLesson(List<LearningContentClient.Block> blocks) {
+        when(content.getTopicLessons(TOPIC)).thenReturn(List.of(new LearningContentClient.LessonSummary(
+                LESSON, TOPIC, "L1", "First lesson", null, 1, List.of(KP), blocks.stream()
+                .map(LearningContentClient.Block::blockId).toList())));
+        when(content.getLesson(LESSON)).thenReturn(new LearningContentClient.Lesson(
+                LESSON, TOPIC, "L1", "First lesson", null, 1, List.of(KP), blocks));
+    }
+
+    private SubmitExerciseCommand hintCommand(UUID request, List<LearningContentClient.Question> questions,
+                                               String... answers) {
+        List<SubmitExerciseCommand.Answer> results = new ArrayList<>();
+        for (int i = 0; i < questions.size(); i++) {
+            results.add(new SubmitExerciseCommand.Answer(questions.get(i).questionVersionId(), answers[i]));
+        }
+        return new SubmitExerciseCommand(request, results);
     }
 
     @Test

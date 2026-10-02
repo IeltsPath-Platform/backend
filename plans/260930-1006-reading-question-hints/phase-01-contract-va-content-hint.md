@@ -16,7 +16,8 @@ effort: "1 ngày"
 ## Kết quả (2026-10-01, nhánh `feat/writing-access-content`)
 
 - V13: cột `hint` + 7 gợi ý (Q3 không có), nội dung đúng `seed-content.md`. `QuestionVersion`, API admin (`@Size(max = 500)`, rỗng → `null`, trim), payload nội bộ bài học có `hint`. Content 140 test pass, 0 skip.
-- Lệch plan: test seed đặt trong `LessonPipelineSeedTest` (dùng chung container), không tạo `QuestionHintSeedTest`; chưa có test 400 cho hint 501 ký tự (chỉ có `@Size` trên request). Phần học viên trong `lesson-learning-v1.md` (hint ở `GET /lessons` và `results[]`) làm sau khi Codex xong file đó; luật đã ghi trong `learning-content-internal-v1`.
+- Lệch plan: test seed đặt trong `LessonPipelineSeedTest` (dùng chung container), không tạo `QuestionHintSeedTest`; chưa có test 400 cho hint 501 ký tự (chỉ có `@Size` trên request). Khoảng trống test này vẫn còn, không tuyên bố đã kiểm trong phiên 2026-10-02.
+- Đồng bộ 2026-10-02: phần học viên trong `lesson-learning-v1.md` đã hoàn thành: `hint` nullable luôn có ở GET bài và `results[]`; bài ôn luôn null; giữ tới khi khối từng đạt; replay trả response đã lưu. Contract được giao cùng code Learning. Content 140 test là bằng chứng phiên trước, không chạy lại trong phiên này.
 
 ## Context Links
 
@@ -132,15 +133,16 @@ mvn -q -pl services/content-service -am test
 
 ## Success Criteria
 
-- [ ] Một migration content, chỉ thêm cột và `UPDATE` seed; không sửa migration cũ.
-- [ ] Gợi ý chỉ ra ngoài content qua API admin và endpoint nội bộ của bài học.
-- [ ] Test seed chặn gợi ý chứa đáp án và gợi ý đặt nhầm vào câu không đủ điều kiện.
+- [x] Một migration content, chỉ thêm cột và `UPDATE` seed; không sửa migration cũ.
+- [x] Gợi ý chỉ ra ngoài content qua API admin và endpoint nội bộ của bài học.
+- [x] Test seed chặn gợi ý chứa đáp án và gợi ý đặt nhầm vào câu không đủ điều kiện.
 
 ## Risk Assessment
 
 - **Gợi ý lộ đáp án bằng cách diễn đạt khác** (test chỉ bắt chuỗi trùng): người soạn duyệt gợi ý; luật soạn ghi trong contract.
-- **Đổi constructor `QuestionVersion` làm vỡ nhiều chỗ gọi:** sửa hết trong cùng commit; compile cả reactor (`mvn -q compile -DskipTests`).
-- **Id câu trong V9 chưa biết lúc lập plan:** lấy từ V9 khi 1640 đã merge; test ở bước 2 bắt thiếu.
+- **Constructor `QuestionVersion`:** call site đã đồng bộ và Content 140 test pass ở phiên trước; full reactor compile chưa chạy trong phiên này.
+- **Id câu V9:** đã giải quyết bằng V13 và test seed; 7 câu có hint, Q3 null.
+- **Thiếu test hint 501 ký tự:** còn mở; owner Content maintainer, bổ sung `QuestionControllerTest` xác nhận HTTP 400 khi xử lý coverage Content tiếp theo. Không chặn 3 tiêu chí nghiệm thu trên; validation request đã có `@Size(max = 500)`.
 - **Gợi ý True/False/Not Given dễ thành lời giải** (ví dụ nói thẳng "đoạn văn không nhắc tới"): gợi ý chỉ nói chỗ cần so,
   không nói kết luận; test seed chặn chuỗi `TRUE`, `FALSE`, `NOT GIVEN`.
 

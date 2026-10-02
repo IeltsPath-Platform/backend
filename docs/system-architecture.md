@@ -152,6 +152,13 @@ GET /api/learning/reviews/{id} -> lý thuyết + một gói PRACTICE_SET (không
 POST /api/learning/reviews/{id}/submissions -> mỗi set một lần; >=70% -> DONE; trượt 3 set -> SKIPPED
 POST /api/learning/topics/{id}/test-assignments -> một mã đề dùng một lần, xoay vòng theo package
 ```
+
+Gợi ý Reading (`question_versions.hint`, Content V13) do Content lưu và trả qua
+`/internal/learning-content/lessons/{id}`; Learning Service Java quyết định hiển thị cho câu `FILL` hoặc `CHOICE`
+hợp lệ có ≥3 lựa chọn (TFNG hỗ trợ options thiếu/rỗng). Câu từng sai trong cùng user/bài/khối mở gợi ý khi khối chưa đạt,
+giữ cả khi câu đúng ở lần sau nhưng khối vẫn trượt; khối đạt thì `hint = null`. Lịch sử lấy từ mọi
+`lesson_exercise_submissions.response.results`; replay `requestId` trả response đã lưu, không đổi evidence/mastery lần nộp đầu.
+
 ### Catalog, thư viện cá nhân và game
 
 ```text

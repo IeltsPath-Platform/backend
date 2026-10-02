@@ -31,7 +31,11 @@ public record LessonResult(UUID lessonId, UUID topicId, String code, String titl
      */
     public record Asset(UUID id, String assetType, String textContent, String mediaUrl, Integer durationSeconds,
                         String transcript) {}
-    public record Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options) {}
+    public record Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options, String hint) {
+        public Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options) {
+            this(questionVersionId, sortOrder, stem, options, null);
+        }
+    }
     public record Option(String optionKey, String content, int sortOrder) {}
     public record Solution(UUID questionVersionId, String correctAnswer, String explanation) {}
     public record EssayQuestion(UUID questionVersionId, String stem, String task, Integer minWords,

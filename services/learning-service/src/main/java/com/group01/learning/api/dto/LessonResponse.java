@@ -46,10 +46,15 @@ public record LessonResponse(UUID lessonId, UUID topicId, String code, String ti
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options) {
+    public record Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options, String hint) {
+        public Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options) {
+            this(questionVersionId, sortOrder, stem, options, null);
+        }
+
         static Question from(LessonResult.Question result) {
             return new Question(result.questionVersionId(), result.sortOrder(), result.stem(), result.options() == null ? null
-                    : result.options().stream().map(option -> new Option(option.optionKey(), option.content(), option.sortOrder())).toList());
+                    : result.options().stream().map(option -> new Option(option.optionKey(), option.content(), option.sortOrder())).toList(),
+                    result.hint());
         }
     }
 

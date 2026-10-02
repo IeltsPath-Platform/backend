@@ -16,6 +16,7 @@ import com.group01.learning.application.result.SubmissionResult;
 import com.group01.learning.application.result.TopicLessonsResult;
 import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.service.AnswerSpecGrader;
+import com.group01.learning.domain.service.LessonHintPolicy;
 import com.group01.learning.domain.vo.LessonProgress;
 import com.group01.learning.domain.vo.TopicStatus;
 import org.slf4j.Logger;
@@ -36,6 +37,7 @@ public class LearnLessonUseCase {
     private final ReviewReevaluation reviews;
     private final WritingSubmissionStore essays;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
+    private final LessonHintPolicy hints = new LessonHintPolicy();
 
     public LearnLessonUseCase(LearningContentClient content, LearningProgressStore store, LessonAccess access,
                               ReviewReevaluation reviews, WritingSubmissionStore essays) {
@@ -72,11 +74,12 @@ public class LearnLessonUseCase {
         LessonAccess.Context context = access.authorize(userId, lessonId);
         access.refresh(userId, context.lesson());
         Set<UUID> passed = passedBlocks(context.progress());
+        Map<UUID, Set<UUID>> openedByBlock = store.findWrongQuestions(userId, lessonId);
         Map<UUID, WritingSubmissionStore.BlockSummary> essaySummaries = essays.summarizeBlocks(userId,
                 context.lesson().blocks().stream().filter(Block::isEssay).map(Block::blockId).toList());
         List<LessonResult.Block> blocks = orderedBlocks(context.lesson()).stream()
                 .map(block -> blockResult(block, passed.contains(block.blockId()), completed(context.progress()),
-                        essaySummaries.get(block.blockId())))
+                        essaySummaries.get(block.blockId()), openedByBlock.getOrDefault(block.blockId(), Set.of())))
                 .toList();
         Lesson lesson = context.lesson();
         return new LessonResult(lesson.lessonId(), lesson.topicId(), lesson.code(), lesson.title(), lesson.summary(),
@@ -104,6 +107,8 @@ public class LearnLessonUseCase {
         List<Question> questions = orderedQuestions(block);
         Map<UUID, Object> answers = AnswerSheet.require(
                 questions.stream().map(Question::questionVersionId).toList(), command.answers());
+        Set<UUID> opened = new HashSet<>(store.findWrongQuestions(userId, lessonId)
+                .getOrDefault(blockId, Set.of()));
         List<AnswerSpecGrader.Grade> grades = questions.stream()
                 .map(question -> grader.grade(question.answerSpec(), answers.get(question.questionVersionId()))).toList();
         if (grades.stream().anyMatch(grade -> !grade.gradable())) {
@@ -145,8 +150,10 @@ public class LearnLessonUseCase {
         for (int index = 0; index < questions.size(); index++) {
             var question = questions.get(index);
             var grade = grades.get(index);
+            if (!grade.correct()) opened.add(question.questionVersionId());
             results.add(new SubmissionResult.AnswerResult(question.questionVersionId(), grade.correct(),
-                    blockPassed ? grade.correctAnswer() : null, blockPassed ? question.explanation() : null));
+                    blockPassed ? grade.correctAnswer() : null, blockPassed ? question.explanation() : null,
+                    hintFor(question, passed.contains(blockId), opened)));
         }
         SubmissionResult response = new SubmissionResult(blockPassed, lessonCompleted, List.copyOf(results));
         if (!store.saveSubmission(userId, lessonId, blockId, command, response)) throw requestConflict();
@@ -199,7 +206,7 @@ public class LearnLessonUseCase {
     }
 
     private LessonResult.Block blockResult(Block block, boolean passed, boolean lessonCompleted,
-                                           WritingSubmissionStore.BlockSummary essay) {
+                                           WritingSubmissionStore.BlockSummary essay, Set<UUID> opened) {
         var asset = block.asset() == null ? null : learnerAsset(block.asset(), lessonCompleted);
         if (block.isEssay()) {
             // The model answer stays hidden until the learner has passed the block once.
@@ -214,13 +221,19 @@ public class LearnLessonUseCase {
         var questions = exercise ? orderedQuestions(block).stream().map(question -> new LessonResult.Question(
                 question.questionVersionId(), question.sortOrder(), question.stem(), question.options() == null ? null
                 : question.options().stream().map(option -> new LessonResult.Option(option.optionKey(), option.content(),
-                        option.sortOrder())).toList())).toList() : null;
+                        option.sortOrder())).toList(), hintFor(question, passed, opened))).toList() : null;
         var solutions = exercise && passed ? orderedQuestions(block).stream().map(question -> new LessonResult.Solution(
                 question.questionVersionId(), grader.grade(question.answerSpec(), null).correctAnswer(),
                 question.explanation())).toList() : null;
         return new LessonResult.Block(block.blockId(), block.blockType(), exercise ? "EXERCISE" : null,
                 block.sortOrder(), block.textContent(), asset, block.vocabularySenseIds(), exercise ? passed : null,
                 questions, solutions, null);
+    }
+
+    private String hintFor(Question question, boolean passed, Set<UUID> opened) {
+        if (passed || !opened.contains(question.questionVersionId())) return null;
+        int optionCount = question.options() == null ? 0 : question.options().size();
+        return hints.eligible(question.answerSpec(), optionCount) ? question.hint() : null;
     }
 
     /** Passage text is shown as is; an audio transcript gives the answers away, so it waits for completion. */

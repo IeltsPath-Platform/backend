@@ -159,11 +159,13 @@ class ReviewAndTestAssignmentIntegrationTest {
         assertEquals(PACKAGE_A, first.set().packageId());
         assertEquals("https://media.example.test/numM.mp3", first.set().audio().mediaUrl());
         assertEquals(3, first.set().questions().size());
+        assertTrue(first.set().questions().stream().allMatch(question -> question.hint() == null));
         assertEquals(first.set().reviewSetId(), reviews.get(USER, review).set().reviewSetId());
 
         ReviewSubmissionResult failed = submit(review, first.set().reviewSetId(), "B");
         assertEquals("PENDING", failed.reviewStatus());
         assertNull(failed.results().getFirst().correctAnswer());
+        assertTrue(failed.results().stream().allMatch(answer -> answer.hint() == null));
         assertNull(failed.transcript());
 
         ReviewResult second = reviews.get(USER, review);
@@ -192,6 +194,7 @@ class ReviewAndTestAssignmentIntegrationTest {
         ReviewSubmissionResult passed = reviews.submit(USER, review, command(set, requestId, "A"));
         assertEquals("DONE", passed.reviewStatus());
         assertEquals("A", passed.results().getFirst().correctAnswer());
+        assertTrue(passed.results().stream().allMatch(answer -> answer.hint() == null));
         assertEquals("Clerk: nine thirty.", passed.transcript());
         assertEquals(passed, reviews.submit(USER, review, command(set, requestId, "B")));
 

@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.group01.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import com.group01.learning.api.controller.LessonLearningController;
+import com.group01.learning.api.dto.ReviewResponse;
+import com.group01.learning.api.dto.ReviewSubmissionResponse;
 import com.group01.learning.application.command.SubmitExerciseCommand;
 import com.group01.learning.application.exception.LearningRequestException;
 import com.group01.learning.application.result.*;
@@ -140,10 +142,52 @@ class LessonLearningWebMvcTest {
         JsonNode response = body(mvc.perform(authenticated(submission(validBody())))
                 .andExpect(status().isOk()).andReturn());
         assertEquals(Set.of("blockPassed", "lessonCompleted", "results"), keys(response));
-        assertEquals(Set.of("questionVersionId", "correct"), keys(response.path("results").get(0)));
+        assertEquals(Set.of("questionVersionId", "correct", "hint"), keys(response.path("results").get(0)));
+        assertTrue(response.path("results").get(0).path("hint").isNull());
         assertFalse(response.path("results").get(0).path("correct").asBoolean());
         verify(lessons).submit(USER, LESSON, BLOCK,
                 new SubmitExerciseCommand(REQUEST, List.of(new SubmitExerciseCommand.Answer(QUESTION, "A"))));
+    }
+
+    @Test
+    void openedHintsAreReturnedInFailedSubmissionAndLessonQuestions() throws Exception {
+        String hint = "Compare the scope of the options.";
+        when(lessons.submit(eq(USER), eq(LESSON), eq(BLOCK), any())).thenReturn(new SubmissionResult(
+                false, false, List.of(new SubmissionResult.AnswerResult(QUESTION, false, "A", "Explanation", hint))));
+        JsonNode answer = body(mvc.perform(authenticated(submission(validBody())))
+                .andExpect(status().isOk()).andReturn()).path("results").get(0);
+        assertEquals(Set.of("questionVersionId", "correct", "hint"), keys(answer));
+        assertEquals(hint, answer.path("hint").asText());
+
+        var exercise = new LessonResult.Block(BLOCK, "EXERCISE", "EXERCISE", 1, null, null, null,
+                false, List.of(new LessonResult.Question(QUESTION, 1, "Choose the main idea", null, hint)), null, null);
+        when(lessons.get(USER, LESSON)).thenReturn(new LessonResult(LESSON, TOPIC, "L1", "Lesson", null, 1,
+                "AVAILABLE", List.of(exercise)));
+        JsonNode question = body(mvc.perform(authenticated(get("/api/learning/lessons/{id}", LESSON)))
+                .andExpect(status().isOk()).andReturn()).path("blocks").get(0).path("questions").get(0);
+        assertEquals(Set.of("questionVersionId", "sortOrder", "stem", "options", "hint"), keys(question));
+        assertEquals(hint, question.path("hint").asText());
+    }
+
+    @Test
+    void sharedReviewDtosKeepHintsNullEvenIfAnInternalResultContainsOne() {
+        var question = new LessonResult.Question(QUESTION, 1, "Choose one", null, "Must remain private to lessons.");
+        var review = new ReviewResult(REVIEW, "PENDING", LESSON, List.of(), new ReviewResult.ReviewSet(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Passage", null, List.of(question)));
+        JsonNode reviewQuestion = json.valueToTree(ReviewResponse.from(review)).path("set").path("questions").get(0);
+        assertQuestionAllowlist(reviewQuestion);
+        for (boolean passed : List.of(false, true)) {
+            var result = new ReviewSubmissionResult(passed ? "DONE" : "PENDING", passed,
+                    List.of(new SubmissionResult.AnswerResult(QUESTION, false, "A", "Explanation", "Hidden hint")), null);
+            JsonNode answer = json.valueToTree(ReviewSubmissionResponse.from(result)).path("results").get(0);
+            assertTrue(answer.has("hint"));
+            assertTrue(answer.path("hint").isNull());
+            assertFalse(answer.has("answerSpec"));
+            if (!passed) {
+                assertFalse(answer.has("correctAnswer"));
+                assertFalse(answer.has("explanation"));
+            }
+        }
     }
 
     @Test
@@ -154,7 +198,8 @@ class LessonLearningWebMvcTest {
         JsonNode response = body(mvc.perform(authenticated(submission(validBody())))
                 .andExpect(status().isOk()).andReturn());
         JsonNode answer = response.path("results").get(0);
-        assertEquals(Set.of("questionVersionId", "correct", "correctAnswer", "explanation"), keys(answer));
+        assertEquals(Set.of("questionVersionId", "correct", "correctAnswer", "explanation", "hint"), keys(answer));
+        assertTrue(answer.path("hint").isNull());
         assertEquals("A", answer.path("correctAnswer").asText());
     }
 
@@ -332,6 +377,7 @@ class LessonLearningWebMvcTest {
     }
 
     private void assertQuestionAllowlist(JsonNode question) {
-        assertEquals(Set.of("questionVersionId", "sortOrder", "stem", "options"), keys(question));
+        assertEquals(Set.of("questionVersionId", "sortOrder", "stem", "options", "hint"), keys(question));
+        assertTrue(question.path("hint").isNull());
     }
 }

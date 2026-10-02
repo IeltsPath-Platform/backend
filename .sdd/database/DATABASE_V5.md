@@ -27,6 +27,7 @@ external_baseline: HKUDS/DeepTutor v1.6.9
 | **V5.1** (quyết định 2026-09-29) | Thiết kế ban đầu cho học topic → bài: năm bảng Content (§5.13–§5.17), tiến độ bài và bài ôn. Các đề xuất `topics.test_package_id`, thay `LESSON`, mastery path Python là lịch sử, đã được V5.2 và bản Java thay thế. Migration hiện thực: Content V8–V9 và Learning V1 (§7.2–§7.7). Luật: `plans/260929-1640-lesson-learning-pipeline-mvp/plan.md` (bản gốc `main-learning-pipeline.md` ở git history, commit `6506d5e`). |
 | **V5.2** (quyết định 2026-09-29) | Hiện thực bằng Content V8–V9 và Learning V1: một topic nhiều mã đề qua `content_packages.topic_id`; giữ `LESSON`, thêm `TOPIC_TEST`, bỏ band KP. Assessment dùng schema sẵn có: snapshot `{answerSpec, explanation, maxScore}`, suy attempt type, tự chấm và outbox cùng transaction. Learning Java không dùng path Python: topic chỉ lưu `passed_at` (§7.2), evidence lần nộp đầu mỗi khối (§7.4, §7.8), review `DONE`/`SKIPPED` (§7.5–§7.6), assignment dùng một lần (§7.7). Plan: `plans/260929-1640-lesson-learning-pipeline-mvp`. |
 | **V5.3** (quyết định 2026-09-30; Listening đã triển khai) | Listening đi trọn luồng học, seed Content V12. **Không thêm bảng, không thêm cột.** Content: asset `AUDIO` lưu key hoặc URL `https://` ở `media_reference` (Content ghép key với `CONTENT_MEDIA_BASE_URL`, học viên nhận `mediaUrl`), transcript ở `text_content` và giấu tới khi đạt; khối `ASSET` AUDIO trong bài học; section `skill = LISTENING` gắn audio; KP Listening dùng `PROCEDURE`, `kind = STRATEGY`. Assessment: `attempt_sections.section_snapshot` thêm `skill`, `audio`, `solution`; transcript trả riêng trong `sectionSolutions` khi kết quả ≥ 70% (§6.2). Learning Service Java: chọn gói theo luật V5.2, gói không gắn độ khó (1 gói mỗi KP trong seed). Plan: `plans/260930-0851-listening-topic-audio-lessons`. Chọn gói theo dạng câu và độ khó **hoãn ngoài MVP** (§5.18; ý tưởng: `plans/reports/brainstorm-260930-0908-listening-adaptive-path-report.md`). |
+| **V5.4** (đã triển khai 2026-10-02) | Content V13 thêm `question_versions.hint` và seed gợi ý Reading. Learning Service Java mở gợi ý theo lịch sử câu sai của cùng user/bài/khối chưa đạt, giữ tới khi khối đạt; không thêm bảng/cột Learning, không ghi `hints_used` và không đổi mastery. Plan: `plans/260930-1006-reading-question-hints`. |
 | **Chia service** (đã triển khai 2026-10-01) | Library V1 tạo 5 bảng catalog từ vựng/video; library V2 tạo 6 bảng thư viện cá nhân và 4 FK `ON DELETE RESTRICT` tới catalog (§4.3–§4.4, §5.10–§5.12, §8). User V5 tạo `learning_activities`, `streaks` (§8.1–§8.2), không FK tới `users`. Content V7 xóa 5 bảng catalog cũ. Không chép dữ liệu, không tạo outbox ở library; service và DB hỗ trợ học viên cũ đã gỡ. Commit: `465f543`, `0da2eb2`, `d762660`, `fec5d14`, `ab613b1`. |
 | **Learning Service** (đã triển khai 2026-10-01) | Bỏ `ai-learning-service` Python và `ai_learning_db`; `learning-service` Java (`learning_db`, Flyway V1) có 9 bảng (§7): tiến độ topic/bài, bài nộp, bài ôn, mã đề, bằng chứng theo user, version kết quả thi, catalog KP. Không chuyển dữ liệu cũ. Content V10–V13: essay Writing Task 2/Task 1, Listening, cột `question_versions.hint`. Plan `261001-1228`. |
 | **Writing trong bài học** (đã triển khai 2026-10-01) | Learning V2 thêm `lesson_writing_submissions`, `llm_daily_usage` (§7.10–7.11) và source `lesson_writing`: bài luận Task 1/Task 2 chấm bằng LLM trong request, trừ 3 point qua access sau khi chấm, tối đa 10 lần/ngày. Không qua `grading_jobs` của assessment. Plan `260930-0737`, `260930-0812`. |
@@ -684,6 +685,7 @@ Thuộc tính chính:
 | `answer_spec` | jsonb | — | Đáp án chuẩn/rule chấm của question version. |
 | `schema_version` | integer | — | Phiên bản schema của payload. |
 | `explanation` | — | — | Thuộc tính nghiệp vụ của bảng. |
+| `hint?` | text | NULL được phép; API thêm version giới hạn 500 ký tự | Content V13. Gợi ý hướng dẫn đọc lại, không chứa đáp án. Learning chỉ mở cho answer spec tự chấm hợp lệ: `FILL` hoặc `CHOICE` có ≥3 lựa chọn; TFNG hỗ trợ options thiếu/rỗng. Câu hai lựa chọn không hiện gợi ý. Mở sau khi câu đó từng sai trong cùng user/bài/khối chưa đạt, giữ cả khi lần sau trả lời đúng nhưng khối vẫn trượt; khối đạt thì `hint = null`. Không dùng cho gói luyện, đề cuối hay game. |
 | `difficulty?` | — | — | Thuộc tính nghiệp vụ của bảng. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
 | `UQ(question_id, version_number)` | — | `UQ(question_id, version_number)` | Ràng buộc duy nhất cho tổ hợp cột. |
@@ -1303,11 +1305,11 @@ Không lưu trạng thái: `PASSED` khi có `passed_at`, topic đầu chưa đ�
 | Cột | Kiểu | Ràng buộc | Ghi chú |
 | --- | --- | --- | --- |
 | `id` | uuid | PK | |
-| `user_id`, `lesson_id`, `block_id` | uuid | NOT NULL | INDEX (`user_id`, `lesson_id`, `block_id`): xác định lần nộp đầu của khối |
+| `user_id`, `lesson_id`, `block_id` | uuid | NOT NULL | INDEX (`user_id`, `lesson_id`, `block_id`) ở Learning V1: xác định lần nộp đầu và đọc lịch sử câu sai của khối |
 | `request_id` | uuid | UNIQUE | Idempotency; trùng thì trả `response` cũ |
 | `answers` | jsonb | NOT NULL | |
 | `block_passed` | boolean | NOT NULL | ≥ 70% |
-| `response` | jsonb | NOT NULL | Response đã trả, dùng để replay và tìm câu sai lần đầu |
+| `response` | jsonb | NOT NULL | Response đã trả, replay nguyên trạng theo `request_id`. Gợi ý đã mở suy từ `response.results` có `correct = false` của mọi lần nộp cùng user/bài/khối; không lưu cột riêng. Evidence/mastery vẫn chỉ dùng lần nộp đầu. |
 | `submitted_at` | timestamptz | NOT NULL | Ghi bằng `clock_timestamp()` sau khi khóa |
 
 ## 7.5 `review_items`

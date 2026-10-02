@@ -140,12 +140,12 @@ class RestLearningContentClientTest {
                                "sortOrder":1,"stem":"Which sentence is the topic sentence?",
                                "options":[{"optionKey":"A","content":"Main idea","sortOrder":1}],
                                "answerSpec":{"type":"CHOICE","correct":"A"},
-                               "explanation":"A states the main idea.",
+                               "explanation":"A states the main idea.","hint":"Compare the scope of the options.",
                                "knowledgePointIds":["20000000-0000-4000-8000-000000000003"]},
                               {"questionVersionId":"20000000-0000-4000-8000-000000000012",
                                "sortOrder":2,"stem":"People who doubt are called ____.","options":null,
                                "answerSpec":{"type":"FILL","accepted":["critics"]},
-                               "explanation":"The passage says critics.",
+                               "explanation":"The passage says critics.","hint":"Find the noun near the contrast.",
                                "knowledgePointIds":["20000000-0000-4000-8000-000000000003"]}]}]}
                         """, MediaType.APPLICATION_JSON));
 
@@ -168,6 +168,8 @@ class RestLearningContentClientTest {
         assertEquals("Main idea", questions.getFirst().options().getFirst().content());
         assertEquals("A", questions.getFirst().answerSpec().get("correct"));
         assertEquals("A states the main idea.", questions.getFirst().explanation());
+        assertEquals("Compare the scope of the options.", questions.getFirst().hint());
+        assertEquals("Find the noun near the contrast.", questions.get(1).hint());
         assertEquals(List.of(KP_ID), questions.getFirst().knowledgePointIds());
         assertNull(questions.get(1).options());
         assertEquals("FILL", questions.get(1).answerSpec().get("type"));
@@ -233,7 +235,7 @@ class RestLearningContentClientTest {
                              "sortOrder":1,"stem":"What is the passage mainly about?",
                              "options":[{"optionKey":"B","content":"City life","sortOrder":2}],
                              "answerSpec":{"type":"CHOICE","correct":"B"},
-                             "explanation":"The passage describes benefits.","maxScore":1.5,
+                             "explanation":"The passage describes benefits.","hint":"Package hints stay ignored.","maxScore":1.5,
                              "knowledgePointMappings":[{
                                "knowledgePointId":"20000000-0000-4000-8000-000000000003","weight":0.75}]}]}]}
                         """, MediaType.APPLICATION_JSON));
@@ -255,6 +257,8 @@ class RestLearningContentClientTest {
         assertEquals(new BigDecimal("1.5"), item.maxScore());
         assertEquals(KP_ID, item.knowledgePointMappings().getFirst().knowledgePointId());
         assertEquals(new BigDecimal("0.75"), item.knowledgePointMappings().getFirst().weight());
+        assertFalse(java.util.Arrays.stream(item.getClass().getRecordComponents())
+                .anyMatch(component -> component.getName().equals("hint")));
     }
 
     @ParameterizedTest
