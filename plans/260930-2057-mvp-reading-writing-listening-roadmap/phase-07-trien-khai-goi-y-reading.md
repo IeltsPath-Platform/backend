@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "Triển khai gợi ý Reading"
-status: pending
+status: completed
 priority: P2
 dependencies: [6]
 effort: "~2 ngày"

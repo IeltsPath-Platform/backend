@@ -1,5 +1,6 @@
 package com.group01.assessment.api.exception;
 
+import com.group01.assessment.application.exception.ContentUnavailableException;
 import com.group01.assessment.domain.exception.*;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +26,23 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({InvalidAssessmentStateException.class, IllegalArgumentException.class})
     public ResponseEntity<ErrorResponse> bad(Exception e, HttpServletRequest r) {
         return build(HttpStatus.BAD_REQUEST, e.getMessage(), r.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(AttemptExpiredException.class)
+    public ResponseEntity<ErrorResponse> expired(AttemptExpiredException e, HttpServletRequest r) {
+        return build(HttpStatus.CONFLICT, e.getMessage(), r.getRequestURI(), null, "ATTEMPT_EXPIRED");
+    }
+
+    @ExceptionHandler(PackageNotAttemptableException.class)
+    public ResponseEntity<ErrorResponse> notAttemptable(PackageNotAttemptableException e, HttpServletRequest r) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage(), r.getRequestURI(), null,
+                "PACKAGE_NOT_ATTEMPTABLE");
+    }
+
+    @ExceptionHandler(ContentUnavailableException.class)
+    public ResponseEntity<ErrorResponse> contentUnavailable(ContentUnavailableException e, HttpServletRequest r) {
+        return build(HttpStatus.SERVICE_UNAVAILABLE, "Content Service is unavailable", r.getRequestURI(), null,
+                "CONTENT_UNAVAILABLE");
     }
 
     @ExceptionHandler({RevisionConflictException.class, OptimisticLockException.class})
@@ -70,6 +88,11 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ErrorResponse> build(HttpStatus s, String m, String p, Map<String, String> d) {
-        return ResponseEntity.status(s).body(new ErrorResponse(LocalDateTime.now(), s.value(), s.getReasonPhrase(), m, p, d));
+        return build(s, m, p, d, null);
+    }
+
+    private ResponseEntity<ErrorResponse> build(HttpStatus s, String m, String p, Map<String, String> d, String code) {
+        return ResponseEntity.status(s)
+                .body(new ErrorResponse(LocalDateTime.now(), s.value(), s.getReasonPhrase(), m, p, d, code));
     }
 }

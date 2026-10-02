@@ -1,6 +1,6 @@
 # CLAUDE.md — IELTSPath backend
 
-- Cập nhật lần cuối: 2026-10-01; dữ kiện đã kiểm với code tại commit `ab613b1`. Về dữ kiện, code là nguồn đúng khi tài
+- Cập nhật lần cuối: 2026-10-02; dữ kiện đã kiểm với code tại commit `2226a25`. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
 - Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
@@ -10,9 +10,9 @@
 ## 1. Hệ thống
 
 Microservices cho nền tảng học IELTS. Client → API Gateway (8080) → service; Gateway xác thực external JWT rồi ký
-internal JWT cho downstream. 8 service Java (Spring Boot, Maven reactor, Eureka `lb://`) + 1 service Python (AI Learning,
-FastAPI, ngoài Maven, Gateway gọi bằng URI cố định). Assessment báo kết quả thi cho AI Learning qua outbox + RabbitMQ:
-exchange `assessment.events`, routing key `assessment.completed.v2`, queue `ai-learning.assessment-completed.v2` (có retry
+internal JWT cho downstream. 9 service Java nghiệp vụ (Spring Boot, Maven reactor, Eureka `lb://`). Assessment báo kết quả
+thi cho Learning Service qua outbox + RabbitMQ: exchange `assessment.events`, routing key `assessment.completed.v2`,
+queue `learning.assessment-completed.v2` (có retry
 và DLQ). Mỗi service sở hữu một PostgreSQL DB.
 
 ## 2. Module
@@ -31,8 +31,8 @@ và DLQ). Mỗi service sở hữu một PostgreSQL DB.
 | `services/game-service` | Java | 8087 | `game_db` (compose 5435) | `/api/games/**`, ws `/ws/games/**` |
 | `services/notification-service` | Java (khung) | 8088 | `notification_db` (local 5432) | `/api/notifications/**` |
 | `services/community-service` | Java | 8089 | `community_db` (compose 5434, cần `COMMUNITY_DB_URL`, xem §5) | `/api/community/**` |
-| `services/learning-service` | Java (khung) | 8086 | `learning_db` (compose 5436) | `/api/learning/**` |
-| `third_party/deeptutor` | Python | — | — | Chỉ để đọc khi port; không import |
+| `services/learning-service` | Java | 8086 | `learning_db` (compose 5436) | `/api/learning/**` |
+| `third_party/deeptutor` | Python (chỉ đọc) | — | — | Nguồn của công thức mastery đã port; không build, không import |
 
 Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/config-repo/*.yaml`, `docker-compose.yml`.
 
@@ -41,15 +41,17 @@ Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/c
 - Postgres local cổng 5432 phải có `user_db`, `content_db`, `assessment_db`, và khi chạy access/notification thì thêm
   `access_db`, `notification_db` (`CREATE DATABASE access_db;` …). Flyway của từng service tạo bảng khi khởi động.
 - `.env` ở root (gitignored) chứa mật khẩu và secret: compose nội suy nó; Gateway và mọi service Java nghiệp vụ import nó
-  (`optional:file:../../.env[.properties]`; config-server, eureka-server thì không). ai-learning khi chạy trên host đọc
-  `services/ai-learning-service/.env` riêng; container ai-learning nhận biến từ compose. Chỉ ghi tên biến, không ghi giá trị.
-- Compose yêu cầu `LIBRARY_DB_PASSWORD` trong `.env` dù chỉ bật một phần stack. Chỉ chạy các container cần dùng:
+  (`optional:file:../../.env[.properties]`; config-server, eureka-server thì không). Chỉ ghi tên biến, không ghi giá trị. Learning Service
+  cần `LEARNING_DB_PASSWORD`, `RABBITMQ_PASSWORD`; chấm bài luận cần thêm `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`,
+  `LEARNING_LLM_MODEL` (thiếu thì nộp bài luận trả 503, phần khác vẫn chạy) và access-service đang chạy
+  (`ACCESS_SERVICE_URL`, mặc định `http://localhost:8084`); content cần `CONTENT_MEDIA_BASE_URL` (https của bucket mp3) cho bài Listening.
+- Compose yêu cầu mọi biến `${VAR:?}` trong `.env` dù chỉ bật một phần stack (danh sách ở `AGENTS.md` §3.6; hay thiếu
+  `LIBRARY_DB_PASSWORD`, `LEARNING_DB_PASSWORD` trên `.env` tạo trước khi chia service). Chỉ chạy các container cần dùng:
   `docker compose up -d rabbitmq learning-db`
   (+ `library-db`, `community-db`, `game-db` khi cần).
 - Service Java chạy trên host (IDE hoặc `java -jar`) theo thứ tự: config-server → eureka → api-gateway → user → content →
   library → assessment → các service còn lại (kể cả game-service, xem §5).
-- AI Learning trong container gọi User/Content trên host qua `host.docker.internal`. RabbitMQ: AMQP `127.0.0.1:5672`,
-  UI `127.0.0.1:15672`.
+- RabbitMQ: AMQP `127.0.0.1:5672`, UI `127.0.0.1:15672`. Learning Service tự khai báo queue, retry queue và DLQ khi khởi động.
 - Hướng dẫn luồng chính và cấu hình Compose: `README.md` §6.
 
 ## 4. Lệnh hay dùng
@@ -71,18 +73,25 @@ Test service học: `mvn -q -pl services/learning-service -am test` (Testcontain
   đè default local → khi chạy game trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082`.
 - Game gọi library qua `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) cho `VOCABULARY`, gọi content qua
   `CONTENT_SERVICE_URL` cho `GRAMMAR`. Library gọi `GET /api/content/topics/{id}` để kiểm topic khi ghi video.
-- Compose yêu cầu `LIBRARY_DB_PASSWORD` ngay cả khi chưa bật `library-db`, vì Compose nội suy toàn bộ file.
+- Compose báo `required variable ... is missing` (ví dụ `LIBRARY_DB_PASSWORD`, `LEARNING_DB_PASSWORD`) ngay cả khi chưa bật
+  DB đó, vì Compose nội suy toàn bộ file.
+- Jar build bằng `package` không `clean` sau khi code bị xóa/chuyển service vẫn chứa class cũ trong `target/classes` (content
+  từng chết khi khởi động vì `VocabularyRepositoryAdapter`): dùng `mvn clean package` khi không có service nào chạy từ IDE.
+- Entity map cột `jsonb` từ `String` phải có `@JdbcTypeCode(SqlTypes.JSON)`; thiếu thì PostgreSQL từ chối khi ghi (outbox
+  access từng làm mọi lần trừ point lỗi 500). Test Mockito không bắt được, cần test Testcontainers.
 - Container `game-service` trong compose trỏ `http://config-server:8888` mà compose không có config-server: đừng dùng
   container này, chạy game-service trên host.
 - community-service mặc định `localhost:5432/community_db`; dùng DB compose thì đặt
   `COMMUNITY_DB_URL=jdbc:postgresql://localhost:5434/community_db` (và mật khẩu) trong `.env`.
 - assessment dùng RabbitMQ với `RABBITMQ_USERNAME`/`RABBITMQ_PASSWORD` từ `.env`; mặc định `guest` sẽ bị broker từ chối.
-- `GATEWAY_INTERNAL_JWT_SECRET` phải giống nhau ở Gateway, mọi service Java và AI Learning, lệch là 401. Config-repo có giá
+- `GATEWAY_INTERNAL_JWT_SECRET` phải giống nhau ở Gateway, mọi service Java, lệch là 401. Config-repo có giá
   trị fallback cho secret (thiếu biến env thì chạy bằng secret công khai trong repo): không dựa vào, không tự sửa, báo người dùng.
 - Outbox của access/content/game chỉ ghi, chưa có relay: event của các service này không tới consumer.
 - notification-service chỉ là khung package.
 - Role chuẩn là `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF` (`LEARNER` cũ đã đổi thành `CUSTOMER`).
-- `.pyc` và `graphify-out/` không được commit; VS Code có thể tự chạy pytest discovery và sinh bytecode khi sửa file test.
+- `graphify-out/` không được commit.
+- Bài Listening seed (content V12, reference dạng key) trả 500 `INVALID_MEDIA_REFERENCE` khi thiếu `CONTENT_MEDIA_BASE_URL`;
+  URL `https://` đầy đủ không cần base. 8 file mp3 phải upload đúng key (bảng trong `services/content-service/README.md`).
 
 ## 6. Tài liệu tra cứu
 
@@ -90,7 +99,7 @@ Test service học: `mvn -q -pl services/learning-service -am test` (Testcontain
 | --- | --- |
 | Kiến trúc, flow, giao tiếp, điểm chưa nhất quán | `docs/system-architecture.md` |
 | Invariant cấp dự án (ưu tiên cao nhất) | `.sdd/global/constitution.md`; các file khác trong `.sdd/global`, `.sdd/constraints` là baseline cũ |
-| Contract HTTP/SSE/event | `docs/contracts/` (`tutor-sse-v1`, `practice-v1`, `assessment-completed-v2`) |
+| Contract HTTP/event | `docs/contracts/` (`lesson-learning-v1`, `lesson-writing-v1`, `learning-content-internal-v1`, `answer-spec-v1`, `assessment-completed-v2`) |
 | Schema toàn bộ database | `.sdd/database/DATABASE_V5.md` |
 | Chạy local, biến môi trường | `README.md`, `infra/README.md`, README từng service |
 | Cấu hình runtime | `infra/config-server/config-repo/<service>.yaml` |

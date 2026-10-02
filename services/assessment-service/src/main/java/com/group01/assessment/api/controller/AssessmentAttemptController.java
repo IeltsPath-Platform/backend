@@ -1,5 +1,6 @@
 package com.group01.assessment.api.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.group01.assessment.api.dto.request.SaveAttemptResponseRequest;
 import com.group01.assessment.api.dto.request.StartAssessmentAttemptRequest;
 import com.group01.assessment.api.dto.response.AssessmentAttemptResponse;
@@ -35,6 +36,7 @@ import java.util.UUID;
 public class AssessmentAttemptController {
 
     private final CurrentUserProvider currentUser;
+    private final ObjectMapper json;
     private final StartAssessmentAttemptUseCase startAssessmentAttemptUseCase;
     private final GetAssessmentAttemptUseCase getAssessmentAttemptUseCase;
     private final GetAttemptStructureUseCase getAttemptStructureUseCase;
@@ -47,31 +49,11 @@ public class AssessmentAttemptController {
     public AssessmentAttemptResponse start(
             @Valid @RequestBody StartAssessmentAttemptRequest request
     ) {
-        var sections = request.sections().stream()
-                .map(section -> new StartAssessmentAttemptCommand.SectionInput(
-                        section.contentSectionId(),
-                        section.sortOrder(),
-                        section.snapshot(),
-                        section.items().stream()
-                                .map(item -> new StartAssessmentAttemptCommand.ItemInput(
-                                        item.questionVersionId(),
-                                        item.sortOrder(),
-                                        item.questionSnapshot(),
-                                        item.answerSnapshot(),
-                                        item.knowledgeSnapshot()
-                                ))
-                                .toList()
-                ))
-                .toList();
-
         var result = startAssessmentAttemptUseCase.execute(new StartAssessmentAttemptCommand(
                 currentUser.requireUserId(),
                 request.packageVersionId(),
-                request.attemptType(),
                 request.mode(),
-                request.channel(),
-                request.expiresAt(),
-                sections
+                request.channel()
         ));
         return AssessmentAttemptResponse.from(result);
     }
@@ -83,7 +65,7 @@ public class AssessmentAttemptController {
 
     @GetMapping("/{id}/structure")
     public AttemptStructureResponse structure(@PathVariable("id") UUID id) {
-        return AttemptStructureResponse.from(getAttemptStructureUseCase.execute(currentUser.requireUserId(), id));
+        return AttemptStructureResponse.from(getAttemptStructureUseCase.execute(currentUser.requireUserId(), id), json);
     }
 
     @PostMapping("/{id}/submit")

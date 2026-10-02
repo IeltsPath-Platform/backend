@@ -2,7 +2,7 @@
 type: service-architecture
 version: V3
 status: target-design
-updated: 2026-10-01
+updated: 2026-10-02
 scope: IELTSPath MVP
 ---
 # Backend Service Architecture — IELTSPath V3
@@ -30,8 +30,10 @@ V2 có hai thay đổi kiến trúc chính so với V1: `ai-assistant-service` b
 Phần chia service đã triển khai qua các commit `465f543`, `0da2eb2`, `d762660`, `fec5d14`, `ab613b1`.
 Các mục học theo topic và bỏ band vẫn là thiết kế đích của V3, không được suy là đã triển khai từ các commit này.
 
-Bổ sung 2026-09-30 (không thêm service, database hay bảng): **Listening** đi trọn luồng học (bài nghe, gói luyện và đề cuối có
-audio). Gói luyện chọn theo độ khó **hoãn ngoài MVP**. Audio mp3 nằm trên object storage, DB chỉ lưu key.
+Bổ sung 2026-09-30, đã triển khai: **Listening** đi trọn luồng học (bài nghe, gói luyện và đề cuối có audio), không thêm
+service, database hay bảng. Runtime học hiện tại là Learning Service Java, không phải Python/DeepTutor ở baseline bên dưới.
+Gói luyện chọn theo độ khó **hoãn ngoài MVP**. Audio mp3 do team upload lên bucket public-read;
+DB lưu key hoặc URL `https://`, Content là nơi duy nhất resolve thành URL.
 
 Nguồn: `plans/260929-1640-lesson-learning-pipeline-mvp/plan.md`, `plans/260930-0851-listening-topic-audio-lessons/plan.md`,
 `plans/260930-2057-mvp-reading-writing-listening-roadmap/plan.md` (plan tài liệu chia service cũ ở git history, commit `6506d5e`); **chia service thuộc MVP** (chốt 2026-10-01);
@@ -256,6 +258,15 @@ content_assets AUDIO (V3, bổ sung 2026-09-30)
 = text_content là transcript = đáp án; chỉ đi qua /internal/learning-content/*;
   GET /api/content/assets/{id} chỉ ADMIN, CONTENT_AUTHOR
 
+question_versions.hint (Content V13; learner flow triển khai 2026-10-02)
+= Content lưu gợi ý không chứa đáp án, tối đa 500 ký tự qua API thêm version;
+  trả qua /internal/learning-content/lessons/{id}, không trả trong package/game
+= Learning Service Java quyết định hiển thị: FILL hoặc CHOICE hợp lệ có ≥3 lựa chọn
+  (TFNG hỗ trợ options thiếu/rỗng), câu từng sai trong cùng user/bài/khối chưa đạt;
+  giữ cả khi câu đúng ở lần sau nhưng khối vẫn trượt, khối đạt thì hint = null
+= lịch sử từ mọi lesson_exercise_submissions.response.results; không thêm schema
+  Learning, không ghi hints_used và không đổi luật evidence/mastery lần nộp đầu
+
 question_versions.difficulty
 = chọn gói luyện theo độ khó hoãn ngoài MVP (2026-10-01); gói luyện không gắn độ khó
 ```
@@ -293,8 +304,10 @@ outbox_events
 
 V3 chuyển sang `library-service`: `vocabulary_items`, `vocabulary_senses`, `learning_videos`, `video_segments`, `video_segment_lexical_entries`. `lesson_block_vocabulary.vocabulary_sense_id` là logical reference tới library.
 
-Listening (2026-09-30) không thêm bảng: dùng `content_assets` (AUDIO), khối `ASSET` của `lesson_blocks` và section
-`skill = LISTENING` có sẵn. Chọn gói theo độ khó (`question_versions.difficulty`, `DATABASE_V5.md` §5.18) hoãn ngoài MVP.
+Listening đã triển khai, không thêm bảng: dùng `content_assets` (AUDIO), khối `ASSET` của `lesson_blocks` và section
+`skill = LISTENING` có sẵn. Content trả `mediaUrl` từ key + `CONTENT_MEDIA_BASE_URL` hoặc giữ nguyên URL `https://`;
+transcript nằm ở `text_content`, chỉ đi qua API nội bộ hoặc API asset dành cho `ADMIN`/`CONTENT_AUTHOR`.
+Seed có một gói luyện mỗi KP; chọn gói theo độ khó (`DATABASE_V5.md` §5.18) hoãn ngoài MVP.
 
 `ai-learning-service` có thể đọc curriculum/content qua API/tool adapter nhưng không sở hữu bản canonical của các bảng này.
 
@@ -359,9 +372,11 @@ V3 (không đổi bảng):
 - **Đáp án:** nằm trong `attempt_items.answer_snapshot`, không bao giờ trả cho học viên.
 - **Nộp bài:** câu khách quan được tự chấm; kết quả `COMPLETED` và outbox cùng transaction. Lời giải chỉ trả khi ≥ 70%.
 - **Không gọi user-service:** `AssessmentCompleted.v2` có `package_version_id`, `learning_goal_id` null.
-- **Đề Listening (bổ sung 2026-09-30):** `attempt_sections.section_snapshot` có `audio {url, durationSeconds}` và
-  `solution.transcript`. Học viên nhận section theo danh sách trường cho phép, không bao giờ thấy `solution`; transcript chỉ
-  nằm trong lời giải khi ≥ 70%. Không migration.
+- **Đề Listening (đã triển khai):** `attempt_sections.section_snapshot` có `audio {url, durationSeconds}` và
+  `solution.transcript`. Học viên nhận `snapshot` dạng object theo danh sách trường cho phép, không thấy `solution` hay
+  transcript trong cấu trúc attempt. Kết quả ≥ 70% trả riêng `sectionSolutions[{attemptSectionId, transcript}]`;
+  dưới 70% không có trường này. Lời giải từng câu và event `AssessmentCompleted.v2` giữ nguyên; event không có transcript.
+  Không migration schema.
 
 ---
 
@@ -400,7 +415,7 @@ Luyện thêm / ôn bắt buộc bằng gói PRACTICE_SET câu mới
 Chọn gói luyện: gói chưa giao có câu đo KP, hết thì gói giao lâu nhất; KP không có gói thì không chèn bài ôn
   (chọn theo dạng câu và độ khó hoãn ngoài MVP)
 Giao mã đề cuối (mỗi lần giao dùng một lần), nhận kết quả đề qua event
-Listening: chuyển audio cho học viên, giấu transcript tới khi đạt (bổ sung 2026-09-30)
+Listening (đã triển khai ở Learning Service Java): chuyển mediaUrl đã resolve; transcript chỉ hiện khi bài hoàn thành hoặc review set đạt ≥70%
 ```
 
 DeepTutor là adaptive learning authority duy nhất; không tồn tại Java Adaptive Engine hoặc planner thứ hai chạy song song. V3: con số mastery do DeepTutor core tính. Luật luồng học (khóa bài, chèn luyện thêm/ôn khi KP dưới ngưỡng và có câu sai) là code riêng của IELTSPath, đặt ngoài `app/mastery`. Path một mỗi học viên, tạo theo `sort_order`, không goal, không LLM.

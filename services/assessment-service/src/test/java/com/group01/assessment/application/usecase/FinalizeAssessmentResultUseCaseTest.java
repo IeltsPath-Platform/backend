@@ -45,6 +45,7 @@ class FinalizeAssessmentResultUseCaseTest {
     private final UUID userId = UUID.randomUUID();
     private final UUID goalId = UUID.randomUUID();
     private final UUID attemptId = UUID.randomUUID();
+    private final UUID packageVersionId = UUID.randomUUID();
     private final UUID resultId = UUID.randomUUID();
     private final UUID itemId = UUID.randomUUID();
     private final UUID itemResultId = UUID.randomUUID();
@@ -80,7 +81,9 @@ class FinalizeAssessmentResultUseCaseTest {
         assertEquals("assessment-service", json.get("source").asText());
         JsonNode data = json.get("data");
         assertEquals(userId.toString(), data.get("user_id").asText());
-        assertEquals(goalId.toString(), data.get("learning_goal_id").asText());
+        assertTrue(data.has("learning_goal_id"));
+        assertTrue(data.get("learning_goal_id").isNull());
+        assertEquals(packageVersionId.toString(), data.get("package_version_id").asText());
         assertEquals(attemptId.toString(), data.get("attempt_id").asText());
         assertEquals(resultId.toString(), data.get("result_id").asText());
         assertEquals(1, data.get("result_version").asInt());
@@ -165,14 +168,14 @@ class FinalizeAssessmentResultUseCaseTest {
     }
 
     @Test
-    void attemptWithoutLearningGoalIsFinalizedButNotAttributedToAnyPath() {
+    void attemptWithoutLearningGoalIsStillAnnounced() {
         stubGradedAttempt(null);
 
         var result = useCase().execute(new FinalizeAssessmentResultCommand(resultId));
 
         assertEquals(AssessmentResult.COMPLETED, result.status());
         verify(results).save(argThat(AssessmentResult::isCompleted));
-        verifyNoInteractions(outbox);
+        verify(outbox).save(any());
     }
 
     @Test
@@ -203,12 +206,13 @@ class FinalizeAssessmentResultUseCaseTest {
 
     private AssessmentAttempt attempt(UUID learningGoalId) {
         Instant now = Instant.now();
-        return new AssessmentAttempt(attemptId, userId, UUID.randomUUID(), AttemptType.MOCK, AttemptMode.STANDARD,
+        return new AssessmentAttempt(attemptId, userId, packageVersionId, AttemptType.MOCK, AttemptMode.STANDARD,
                 AttemptChannel.WEB, AttemptStatus.SUBMITTED, now, now, null, 1, now, now, learningGoalId);
     }
 
     private FinalizeAssessmentResultUseCase useCase() {
-        return new FinalizeAssessmentResultUseCase(results, attempts, attemptItems, itemResults, knowledgeSnapshot,
-                judgments, errors, outbox, new AssessmentCompletedEventFactory(objectMapper));
+        return new FinalizeAssessmentResultUseCase(results, attempts, attemptItems, itemResults,
+                new AssessmentResultCompleter(results, knowledgeSnapshot, judgments, errors, outbox,
+                        new AssessmentCompletedEventFactory(objectMapper)));
     }
 }

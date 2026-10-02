@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Tài liệu"
-status: pending
+status: completed
 priority: P3
 dependencies: [2]
 effort: "0,5 ngày"
@@ -9,7 +9,15 @@ effort: "0,5 ngày"
 
 # Phase 3: Tài liệu
 
-> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md)). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan `261001-1228`). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../260930-2057-mvp-reading-writing-listening-roadmap/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
+
+## Kết quả (2026-10-02)
+
+- 7 tài liệu scoped đã đồng bộ: `.sdd/database/{DATABASE_V5,mvp-database}.md`, `.sdd/specs/{SERVICE_ARCHITECTURE_V3,FEATURE_TREE_V2}.md`, `docs/system-architecture.md`, `README.md`, `services/learning-service/README.md`.
+- DATABASE_V5: V5.4 là triển khai thực tế 2026-10-02, `hint` ở §5.5, lịch sử mọi response tại Java §7.4; index đã có trong Learning `V1__learning_schema.sql`. Không thêm bảng/cột Learning. V11/§7.23 bên dưới là thiết kế Python lịch sử, không phải schema chạy hiện tại.
+- Ranh giới rõ: Content lưu và trả hint qua endpoint nội bộ bài học; Learning Java quyết định theo user/bài/khối. Pending note đã reconciled với code; review DTO hint luôn null; replay/evidence/mastery giữ nguyên. Contract học viên hoàn thành cùng code (phase 1).
+- Reviewer không finding. Graphify update exit 0: 8.147 node, 28.230 edge. Validator `docs/system-architecture.md`: 7 link OK, 49 warning (15 code reference + 34 config key, gồm FILL/CHOICE bị hiểu là env và reference ngoài source Learning đã chọn). Không tuyên bố validator clean.
+- 19 JSON example trong contract parse hợp lệ; `git diff --check` pass. 20 file sửa không có UTF-8 BOM trước lượt sync plan; không chạy full reactor/live E2E, không push.
 
 ## Overview
 
@@ -43,9 +51,11 @@ Ghi cột `hint` và luật hiện gợi ý vào tài liệu DB, `.sdd/specs/SER
 
 ## Success Criteria
 
-- [ ] DATABASE_V5 có `hint` ở §5.5, dòng V5.4 ở §0.
-- [ ] `SERVICE_ARCHITECTURE_V3.md` và `docs/system-architecture.md` ghi rõ content lưu, ai-learning quyết định hiện.
+- [x] DATABASE_V5 có `hint` ở §5.5, dòng V5.4 thực tế ở §0; lịch sử và index Learning Java tại §7.4/V1.
+- [x] `SERVICE_ARCHITECTURE_V3.md` và `docs/system-architecture.md` ghi rõ Content lưu, Learning Service Java quyết định hiện.
 
 ## Risk Assessment
 
-- **Số phiên bản V5.4 trùng với thay đổi khác merge trước:** lấy số kế tiếp lúc sửa tài liệu.
+- **Trùng phiên bản V5.4:** đã giải quyết; dòng V5.4 hiện ghi đúng triển khai Reading hints 2026-10-02.
+- **Validator warning:** còn 49 cảnh báo; owner maintainer tài liệu/tooling, kiểm lại với đúng source scope hoặc sửa nhận diện enum khi thực hiện cải tiến validator. Link đã kiểm OK; cảnh báo không bị ghi thành kết quả clean.
+- **Thay đổi phạm vi đã chấp nhận:** mapping Python sang Java; từ 3 tài liệu gốc mở thành 7 tài liệu hiện hành để khép pending note và hướng dẫn người chạy. Không đổi nghiệp vụ hoặc schema Learning.

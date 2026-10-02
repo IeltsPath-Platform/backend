@@ -10,23 +10,51 @@ migration only in Testcontainers until its use on a shared `content_db` is appro
 through `GET /api/content/topics/{id}`. Content implements `POST /internal/game-content/snapshots` only for `GRAMMAR`;
 Library implements the same [snapshot contract](../../docs/contracts/game-content-snapshot-v1.md) for `VOCABULARY`.
 
-## Band ranges
+## Lessons and curriculum order
 
-Topics and knowledge points carry an optional IELTS band range (`bandMin`, `bandMax`), in 0.0–9.0 and half-band
-steps. AI Learning uses it to build a learner's path:
+V8 implements `lessons`, `lesson_blocks`, `lesson_block_vocabulary`, `lesson_block_questions` and
+`lesson_knowledge_points`. `content_packages.topic_id` links each `TOPIC_TEST` to its topic; a topic can have
+multiple test codes. `LESSON` remains a valid package type for existing reading packages. V9 seeds the Reading
+lesson pipeline. These are implemented migrations; their presence does not confirm they ran on a shared database.
 
-- a KP is in the path when its effective `bandMin` is empty or not above the goal's target band;
-- a KP whose effective `bandMax` is not above the learner's placement band is tested out.
+Learning reads the six `/internal/learning-content/**` routes in the
+[internal contract](../../docs/contracts/learning-content-internal-v1.md). `topic-sequence` returns ordered active
+topics with published lessons and topic tests, including active KPs and `hasPracticeSet`. Learning owns learner
+progress, gates and mastery; Assessment reads package snapshots when it creates an attempt.
 
-Rules:
+Topics retain optional `bandMin`/`bandMax` metadata (0–9, half-band steps). V8 removes KP band columns and the KP
+API no longer accepts or returns own/effective band ranges. The current learning sequence uses topic `sort_order`,
+without goal-band filtering or placement test-out. Topic create/update still validate bands; omitting them on update
+clears the range.
 
-- Either end may be empty (open). Both empty means "every band", so content without a band reaches every learner.
-- A KP's **effective** range is its own range when it has one, otherwise its topic's range. An own range replaces the
-  topic's as a whole; the two are never combined end by end. Child topics do not inherit their parent's range.
-- `GET /api/content/knowledge-points` returns both the own range (`bandMin`/`bandMax`) and the effective range
-  (`effectiveBandMin`/`effectiveBandMax`). `GET /api/content/topics` returns each topic's range.
-- `POST`/`PUT /api/content/topics` and `POST /api/content/knowledge-points` accept `bandMin`/`bandMax`. An invalid
-  range returns 400. `PUT /topics` replaces the whole topic, so omitting the band clears it.
+## Media
+
+- `GET /api/content/assets/{id}` is for `ADMIN` and `CONTENT_AUTHOR` only: asset text can be a transcript. Learners
+  receive media through the internal lesson and package payloads that Learning Service and Assessment relay.
+- Content is the only place that builds media URLs (`MediaReferencePolicy`). Images use an `https://` URL or a
+  `data:image/png|jpeg|svg+xml;base64,` URI; audio uses an `https://` URL or an object key joined to
+  `content.media.base-url` (env `CONTENT_MEDIA_BASE_URL`, an https prefix; blank means keys cannot resolve and the
+  read fails with `INVALID_MEDIA_REFERENCE`).
+- Audio keys contain ASCII letters/digits, `.`, `_`, `-` and `/` between path segments; they cannot start with `/`
+  or contain `..`. A full `https://` reference works without a base URL. Learning Service and Assessment forward
+  the resolved URL; they do not build it themselves.
+- The team uploads mp3 files to a public-read cloud bucket. The backend has no upload API, signed URLs or listen-count
+  limit. Keep audio binaries out of Git; the media host must serve `audio/mpeg` and support range requests for playback.
+- Audio `text_content` is the transcript. Learning reveals it only after lesson completion or a passed review set
+  (≥ 70%); Assessment keeps it out of attempt structure and returns it in `sectionSolutions` only at ≥ 70%.
+- The V12 Listening seed references 8 files to upload under the base URL (record them from the transcripts in the
+  seed; mp3 files are not committed):
+
+  | Key | Seconds | Used by |
+  | --- | --- | --- |
+  | `listening/demo/ls1.mp3` | 45 | lesson LS1 |
+  | `listening/demo/ls2.mp3` | 50 | lesson LS2 |
+  | `listening/demo/numM.mp3` | 30 | practice set PS-NUM |
+  | `listening/demo/spellM.mp3` | 35 | practice set PS-SPELL |
+  | `listening/demo/museum.mp3` | 50 | practice set PS-PARA |
+  | `listening/demo/trapM.mp3` | 30 | practice set PS-TRAP |
+  | `listening/demo/hotel.mp3` | 45 | final test X3 |
+  | `listening/demo/tour.mp3` | 40 | final test X4 |
 
 ## Verification
 

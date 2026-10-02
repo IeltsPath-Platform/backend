@@ -48,13 +48,13 @@ nên agent phải đọc file này trước.
 | 5 | AI Learning: path theo user, V10 | 5 (phần b) | PR 3, PR 4 | **Dừng: người dùng duyệt V10 trước khi chạy trên DB dùng chung** | **Bỏ** (thay bởi `261001-1228`) |
 | 6 | AI Learning: bài học, nộp bài, cổng | 6 (phần a) | PR 3, PR 5 | — | **Bỏ** (thay bởi `261001-1228`) |
 | 7 | AI Learning: bài ôn, giao mã đề | 6 (phần b) | PR 6 | — | **Bỏ** (thay bởi `261001-1228`) |
-| 8 | Assessment tự chấm, event | 4 | PR 3 và phase 4 của `261001-1228` (consumer Java nhận event không goal) | — | Chưa (làm sau `261001-1228` phase 4) |
+| 8 | Assessment tự chấm, event | 4 | PR 3 và phase 4 của `261001-1228` (consumer Java nhận event không goal) | — | Xong (Claude làm, nhánh `feat/assessment-auto-grading`) |
 | 9 | Consumer kết quả đề | 7 | PR 7, PR 8 | — | **Bỏ** (thay bởi `261001-1228`) |
-| 10 | Tài liệu, kiểm toàn repo | 8 | PR 8, `261001-1228` | E2E thủ công do người dùng chạy | Chưa |
+| 10 | Tài liệu, kiểm toàn repo | 8 | PR 8, `261001-1228` | Live E2E với database/broker riêng | Xong (2026-10-02; [report](./reports/e2e-261002-foundation-learning-pipeline.md), 693 test và E2E 7/7) |
 
 **Đổi 2026-10-01:** ai-learning Python bị bỏ; prompt PR 5–7, 9 bên dưới không dùng nữa. PR 8, PR 10 đọc phần ai-learning theo
-[bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md); prompt learning-service ở
-[`261001-1228/codex-handoff.md`](../261001-1228-learning-service-java/codex-handoff.md).
+[bảng ánh xạ](../260930-2057-mvp-reading-writing-listening-roadmap/python-to-java-mapping.md); prompt learning-service ở
+`261001-1228/codex-handoff.md`.
 
 PR 2, 3, 4 làm song song được sau khi PR 1 được duyệt, nếu mỗi PR một nhánh và không sửa cùng file.
 

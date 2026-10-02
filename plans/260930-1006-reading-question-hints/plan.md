@@ -1,11 +1,12 @@
 ---
 title: "Gợi ý câu Reading sau lần sai đầu"
-description: "Câu điền từ và câu chọn có từ 3 phương án (kể cả True/False/Not Given) trong bài tập bài học có gợi ý (hint) do người soạn viết; học viên làm sai một lần thì thấy gợi ý tới khi khối đạt. Content thêm cột question_versions.hint; ai-learning trả gợi ý, không ghi hints_used; không đổi công thức mastery; không áp dụng cho gói luyện thêm và đề cuối."
-status: pending
+description: "Câu điền từ và câu chọn có từ 3 phương án (kể cả True/False/Not Given) trong bài tập bài học có gợi ý (hint) do người soạn viết; học viên làm sai một lần thì thấy gợi ý tới khi khối đạt. Content thêm cột question_versions.hint; Learning Service Java trả gợi ý, không ghi hints_used; không đổi công thức mastery; không áp dụng cho gói luyện thêm và đề cuối."
+status: completed
 priority: P2
-branch: "feat/main-follow"
-tags: [feature, backend, ai-learning, content, reading, tdd]
-blockedBy: [261001-1228-learning-service-java, 260929-1640-lesson-learning-pipeline-mvp, 260930-0851-listening-topic-audio-lessons]
+effort: "2,5 ngày"
+branch: "feat/lesson-reading-hints"
+tags: [feature, backend, learning, content, reading, tdd]
+blockedBy: []
 blocks: []
 created: "2026-09-30T03:12:28.903Z"
 createdBy: "ck:plan"
@@ -15,7 +16,15 @@ mode: "tdd"
 
 # Gợi ý câu Reading sau lần sai đầu
 
-> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java, route `/api/learning/**` (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md), làm trước plan này). Phần ai-learning của plan đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md).
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java, route `/api/learning/**` (plan `261001-1228`, làm trước plan này). Phần ai-learning của plan đọc theo [bảng ánh xạ](../260930-2057-mvp-reading-writing-listening-roadmap/python-to-java-mapping.md).
+
+## Kết quả (2026-10-02)
+
+- Hoàn thành 3/3 phase, 9/9 tiêu chí: Content V13 và seed; Learning Java mở/giữ/đóng hint theo lịch sử mọi lần nộp; contract học viên và 7 tài liệu đồng bộ.
+- Baseline: 175 Learning + 8 common-security pass. RED thiếu `LessonHintPolicy` được quan sát trước code; focused 76 pass; regression 183 Learning + 8 common-security, 0 fail/error/skip, có Docker; assertion DB cuối 1 pass.
+- Reviewer: không finding. Graphify update thành công (8.147 node, 28.230 edge); 19 JSON example contract hợp lệ; `git diff --check` pass. Validator kiến trúc: 7 link OK, 49 warning (15 code reference, 34 config key), không phải clean.
+- Khoảng trống đã ghi từ phase 1: chưa có test HTTP 400 cho hint 501 ký tự; `@Size(max = 500)` đã có. Không chạy lại Content 140 test của nhánh trước; không chạy full reactor hay live E2E. Không push.
+- Thay đổi plan đã chấp nhận: thực thi Java thay Python; index Learning nằm trong V1 và schema §7.4. Các tiền đề 1640/0851 đã có trong baseline `0ffb101`, không còn blocker.
 
 ## Overview
 
@@ -44,9 +53,9 @@ Nguồn: trao đổi với người dùng ngày 2026-09-30 (chọn Reading trư�
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Contract va content hint](./phase-01-contract-va-content-hint.md) | Pending |
-| 2 | [AI Learning tra hint](./phase-02-ai-learning-tra-hint.md) | Pending |
-| 3 | [Tai lieu](./phase-03-tai-lieu.md) | Pending |
+| 1 | [Contract va content hint](./phase-01-contract-va-content-hint.md) | Completed |
+| 2 | [AI Learning tra hint](./phase-02-ai-learning-tra-hint.md) | Completed |
+| 3 | [Tai lieu](./phase-03-tai-lieu.md) | Completed |
 
 Thứ tự: `1 → 2 → 3`.
 
@@ -76,7 +85,7 @@ Thứ tự: `1 → 2 → 3`.
 - Nộp lại cùng `requestId` → response y hệt, kể cả `hint`.
 - Lần sai của học viên B không mở gợi ý cho học viên A.
 - Lần nộp thứ hai sau khi gợi ý Q12 đã mở → không ghi bằng chứng (luật lần nộp đầu của 1640); mastery không đổi.
-- Bài ôn và đề cuối không bao giờ trả `hint`.
+- Bài ôn và đề cuối không trả nội dung gợi ý: bài ôn dùng DTO chung luôn có `hint = null`; contract đề cuối không đổi.
 - Seed: mọi câu đủ điều kiện trong khối bài tập của bài Reading có `hint`; câu không đủ điều kiện có `hint = NULL`; không gợi ý nào
   chứa đáp án được chấp nhận.
 

@@ -10,6 +10,11 @@ spring:
   flyway:
     enabled: true
 
+content:
+  media:
+    # Public https prefix of the bucket holding audio keys such as listening/demo/ls1.mp3; blank = keys cannot resolve.
+    base-url: ${CONTENT_MEDIA_BASE_URL:}
+
 app:
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}

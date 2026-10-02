@@ -35,6 +35,7 @@ public class GetQuestionDetailUseCase {
                         v.getOptions(),
                         v.getAnswerSpecJson(),
                         v.getExplanation(),
+                        v.getHint(),
                         v.getDifficulty(),
                         v.getStatus(),
                         v.getCreatedAt(),

@@ -18,11 +18,14 @@ public record AssessmentCompletedV2(UUID eventId, String eventType, Instant occu
     public static final String EVENT_TYPE = "AssessmentCompleted.v2";
     public static final String SOURCE = "assessment-service";
 
-    /** {@code overallBand} is the grader's band for this version, or null when none was recorded. */
+    /**
+     * {@code learningGoalId} is always null: goals no longer scope learning. {@code packageVersionId} is the Content
+     * version the attempt was created from. {@code overallBand} is the grader's band, or null when none was recorded.
+     */
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Data(UUID userId, UUID learningGoalId, UUID attemptId, UUID resultId, int resultVersion,
-                       String assessmentType, String status, Instant completedAt, BigDecimal overallBand,
+    public record Data(UUID userId, UUID learningGoalId, UUID packageVersionId, UUID attemptId, UUID resultId,
+                       int resultVersion, String assessmentType, String status, Instant completedAt, BigDecimal overallBand,
                        List<ItemResult> itemResults) {}
 
     /** {@code isCorrect} is null when the item was not graded as right/wrong (for example an essay). */

@@ -50,6 +50,9 @@ public class QuestionVersionJpaEntity {
     @Column(name = "explanation", columnDefinition = "TEXT")
     private String explanation;
 
+    @Column(name = "hint", columnDefinition = "TEXT")
+    private String hint;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "difficulty", length = 50)
     private QuestionDifficulty difficulty;

@@ -198,4 +198,27 @@ class ContentAuthorizationWebMvcTest {
                 .content("{\"topicId\":\"" + id + "\",\"code\":\"KP1\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\"}"))
                 .andExpect(status().isCreated());
     }
-}
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void learnerCannotReadAnAssetDirectly() throws Exception {
+        mockMvc.perform(get("/api/content/assets/{id}", UUID.randomUUID())).andExpect(status().isForbidden());
+        verifyNoInteractions(getAsset);
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void contentAuthorCanReadAnAsset() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(getAsset.execute(id)).thenReturn(new ContentAssetResult(id, AssetType.AUDIO, "Librarian: Good morning.",
+                "listening/demo/ls1.mp3", 45, null, AssetValidationStatus.VALID, Instant.now()));
+
+        mockMvc.perform(get("/api/content/assets/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assetType").value("AUDIO"));
+    }
+
+    @Test
+    void anonymousCannotReadAnAsset() throws Exception {
+        mockMvc.perform(get("/api/content/assets/{id}", UUID.randomUUID())).andExpect(status().isUnauthorized());
+    }}

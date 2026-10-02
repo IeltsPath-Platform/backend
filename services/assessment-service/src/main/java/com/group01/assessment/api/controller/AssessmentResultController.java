@@ -1,6 +1,6 @@
 package com.group01.assessment.api.controller;
 
-import com.group01.assessment.api.dto.response.AssessmentResultResponse;
+import com.group01.assessment.api.dto.response.LearnerAssessmentResultResponse;
 import com.group01.assessment.application.usecase.GetAssessmentResultUseCase;
 import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,8 @@ public class AssessmentResultController {
     private final GetAssessmentResultUseCase getAssessmentResultUseCase;
 
     @GetMapping
-    public AssessmentResultResponse get(@PathVariable("attemptId") UUID attemptId) {
-        return AssessmentResultResponse.from(getAssessmentResultUseCase.execute(currentUser.requireUserId(), attemptId));
+    public LearnerAssessmentResultResponse get(@PathVariable("attemptId") UUID attemptId) {
+        return LearnerAssessmentResultResponse.from(
+                getAssessmentResultUseCase.execute(currentUser.requireUserId(), attemptId));
     }
 }

@@ -89,6 +89,7 @@ public class QuestionPersistenceMapper {
                 entity.getAnswerSpec(),
                 entity.getSchemaVersion(),
                 entity.getExplanation(),
+                entity.getHint(),
                 entity.getDifficulty(),
                 entity.getStatus(),
                 entity.getCreatedAt(),
@@ -123,6 +124,7 @@ public class QuestionPersistenceMapper {
                 .answerSpec(domain.getAnswerSpecJson())
                 .schemaVersion(domain.getSchemaVersion())
                 .explanation(domain.getExplanation())
+                .hint(domain.getHint())
                 .difficulty(domain.getDifficulty())
                 .status(domain.getStatus())
                 .createdAt(domain.getCreatedAt())

@@ -1,11 +1,11 @@
 ---
 title: "Listening trong luồng học (topic riêng, audio mp3 qua URL)"
 description: "Topic Listening đi trọn pipeline: bài học có khối audio + bài tập tự chấm, gói luyện thêm/ôn có audio, đề cuối có audio; mp3 trên cloud, DB lưu key, transcript ẩn tới khi đạt; không migration schema."
-status: pending
+status: completed
 priority: P2
 branch: "feat/main-follow"
 tags: [feature, backend, content, assessment, ai-learning, listening, tdd]
-blockedBy: [261001-1228-learning-service-java, 260929-1640-lesson-learning-pipeline-mvp, 260930-0812-lesson-writing-task1-academic]
+blockedBy: [260929-1640-lesson-learning-pipeline-mvp, 260930-0812-lesson-writing-task1-academic]
 blocks: [260930-1006-reading-question-hints]
 created: "2026-09-30T01:59:09.555Z"
 createdBy: "ck:plan"
@@ -15,7 +15,7 @@ mode: "tdd"
 
 # Listening trong luồng học (topic riêng, audio mp3 qua URL)
 
-> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java, route `/api/learning/**` (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md), làm trước plan này). Phần ai-learning của plan đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md).
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java, route `/api/learning/**` (plan `261001-1228`, làm trước plan này). Phần ai-learning của plan đọc theo [bảng ánh xạ](../260930-2057-mvp-reading-writing-listening-roadmap/python-to-java-mapping.md).
 
 ## Overview
 
@@ -46,11 +46,11 @@ Scope đã chốt với người dùng ngày 2026-09-30 (HOLD). Chế độ `--t
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Contract va khoa lo transcript](./phase-01-contract-va-khoa-lo-transcript.md) | Pending |
-| 2 | [Content media URL va seed Listening](./phase-02-content-media-url-va-seed-listening.md) | Pending |
-| 3 | [Assessment de cuoi co audio](./phase-03-assessment-de-cuoi-co-audio.md) | Pending |
-| 4 | [AI Learning bai hoc va goi on co audio](./phase-04-ai-learning-bai-hoc-va-goi-on-co-audio.md) | Pending |
-| 5 | [Tai lieu](./phase-05-tai-lieu.md) | Pending |
+| 1 | [Contract va khoa lo transcript](./phase-01-contract-va-khoa-lo-transcript.md) | Completed (khóa asset + contract nội bộ ở #30; phần học viên của `lesson-learning-v1` ở `feat/learning-reviews-tests`) |
+| 2 | [Content media URL va seed Listening](./phase-02-content-media-url-va-seed-listening.md) | Completed (nhánh `feat/writing-access-content`) |
+| 3 | [Assessment de cuoi co audio](./phase-03-assessment-de-cuoi-co-audio.md) | Completed (nhánh `feat/lesson-listening-final-test`; regression 125 pass, 0 skip) |
+| 4 | [AI Learning bai hoc va goi on co audio](./phase-04-ai-learning-bai-hoc-va-goi-on-co-audio.md) | Completed (learning-service, nhánh `feat/learning-reviews-tests`) |
+| 5 | [Tai lieu](./phase-05-tai-lieu.md) | Completed (2026-10-02; đối chiếu source/contract Java và kiểm tài liệu) |
 
 Thứ tự: `1 → 2 → (3 ∥ 4) → 5`.
 

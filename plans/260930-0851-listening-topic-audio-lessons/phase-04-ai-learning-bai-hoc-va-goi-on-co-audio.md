@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "AI Learning: bài học và gói ôn có audio"
-status: pending
+status: completed
 priority: P1
 dependencies: [2]
 effort: "1 ngày"
@@ -9,7 +9,12 @@ effort: "1 ngày"
 
 # Phase 4: AI Learning: bài học và gói ôn có audio
 
-> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md)). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan `261001-1228`). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../260930-2057-mvp-reading-writing-listening-roadmap/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
+
+## Kết quả (2026-10-01, cùng PR 3 của `261001-1228`)
+
+- Khối AUDIO: `mediaUrl`, `durationSeconds`; khóa `transcript` chỉ có khi bài xong. Set ôn: `audio {mediaUrl, durationSeconds}`; nộp đạt ≥ 70% trả `transcript`.
+- Lệch plan: `transcript` của set ôn đặt ở cấp response (cạnh `results`), không nằm trong `solutions`; test dùng content giả trong `ReviewAndTestAssignmentIntegrationTest`, chưa chạy kịch bản LS1/LS2 với seed thật.
 
 ## Context Links
 

@@ -29,7 +29,26 @@ app:
 learning:
   content:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
+  access:
+    base-url: ${ACCESS_SERVICE_URL:http://localhost:8084}
+  # OpenAI-compatible chat completions used to grade lesson essays. Blank values turn grading off (503).
+  llm:
+    base-url: ${LEARNING_LLM_BASE_URL:}
+    api-key: ${LEARNING_LLM_API_KEY:}
+    model: ${LEARNING_LLM_MODEL:}
+    reasoning-effort: ${LEARNING_LLM_REASONING_EFFORT:}
+  writing:
+    point-cost: ${LEARNING_WRITING_POINT_COST:3}
+    # LLM gradings per learner and calendar day in quota-timezone.
+    daily-grading-limit: ${LEARNING_WRITING_DAILY_GRADING_LIMIT:10}
+    quota-timezone: Asia/Ho_Chi_Minh
+    grading-timeout-seconds: 20
   review-mastery-threshold: 0.6
+  messaging:
+    # AssessmentCompleted.v2 consumer: delay before a failed event is retried, and attempts before the DLQ.
+    retry-delay-ms: ${LEARNING_RETRY_DELAY_MS:30000}
+    max-delivery-attempts: ${LEARNING_MAX_DELIVERY_ATTEMPTS:5}
+    consumer-enabled: ${LEARNING_CONSUMER_ENABLED:true}
 
 management:
   endpoints:

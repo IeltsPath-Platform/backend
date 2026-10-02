@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Assessment: tự chấm, lấy đề từ content, event"
-status: pending
+status: completed
 priority: P1
 dependencies: [1, 3, 5]
 effort: "2 ngày"
@@ -9,7 +9,7 @@ effort: "2 ngày"
 
 # Phase 4: Assessment: tự chấm, lấy đề từ content, event
 
-> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan [`261001-1228`](../261001-1228-learning-service-java/plan.md)). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../261001-1228-learning-service-java/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
+> **Đổi 2026-10-01:** ai-learning Python đã được thay bằng `learning-service` Java (plan `261001-1228`). Mọi tên file, lệnh và API Python dưới đây đọc theo [bảng ánh xạ](../260930-2057-mvp-reading-writing-listening-roadmap/python-to-java-mapping.md); luật nghiệp vụ, mã lỗi và test case giữ nguyên.
 
 ## Overview
 
@@ -113,9 +113,25 @@ mvn -q -pl services/content-service -am test
 
 ## Success Criteria
 
-- [ ] Test bước 2–10 pass.
-- [ ] Học viên không làm nháp được mã đề hay gói ôn bằng loại attempt khác; không đọc được đáp án trước khi đạt.
-- [ ] Event khớp `assessment-completed-v2.md`; không migration mới.
+- [x] Test bước 2–10 pass.
+- [x] Học viên không làm nháp được mã đề hay gói ôn bằng loại attempt khác; không đọc được đáp án trước khi đạt.
+- [x] Event khớp `assessment-completed-v2.md`; không migration mới.
+
+## Kết quả (2026-10-01, nhánh `feat/assessment-auto-grading`)
+
+- Tạo attempt: `StartAssessmentAttemptUseCase` (không transaction) gọi `ContentPackageClient`, rồi `AttemptCreator`
+  (`@Transactional`) ghi snapshot. `expiresAt` luôn null vì contract hoãn luật thời gian của gói.
+- Nộp bài: `SubmitAssessmentAttemptUseCase` (`noRollbackFor = AttemptExpiredException`) → `AutoGradeAttemptService`;
+  hoàn tất result + outbox dùng chung `AssessmentResultCompleter` với `FinalizeAssessmentResultUseCase`.
+- Mã lỗi: `409 ATTEMPT_EXPIRED`, `422 PACKAGE_NOT_ATTEMPTABLE`, `503 CONTENT_UNAVAILABLE` (trường `code` mới trong
+  `ErrorResponse`, chỉ có ở các lỗi này).
+- Câu trả lời có `answer` không phải chuỗi được 0 điểm, không chặn nộp bài.
+- Xóa thêm `QuestionKnowledgePointRepository` (+ adapter, JPA repository) ở content: chỉ phục vụ endpoint đã xóa.
+  Bỏ `assessment.user.base-url` khỏi config-repo.
+- Test: assessment 102 pass, 0 skip (mới: `AnswerSpecGraderTest` 34 ca, `AutoGradingIntegrationTest` 4 ca Postgres
+  thật, `ContentPackageClientTest` 2 ca HTTP với server giả, 3 ca WebMvc, 4 ca start); content 138 pass, 0 skip;
+  compile cả reactor qua.
+- Chưa kiểm: gọi content-service thật đang chạy; E2E qua RabbitMQ sang learning-service thuộc phase 8.
 
 ## Risk Assessment
 

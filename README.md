@@ -1,6 +1,6 @@
 # 🚀 IELTSPath
 
-IELTSPath là backend microservices gồm các dịch vụ **Java 21 / Spring Cloud** và dịch vụ **Python / FastAPI**. Hệ thống tích hợp Gateway, Service Discovery, Config Server và module bảo mật dùng chung.
+IELTSPath là backend microservices gồm các dịch vụ **Java 21 / Spring Cloud**. Hệ thống tích hợp Gateway, Service Discovery, Config Server và module bảo mật dùng chung.
 
 ---
 
@@ -8,24 +8,23 @@ IELTSPath là backend microservices gồm các dịch vụ **Java 21 / Spring Cl
 
 | Thành phần                | Công nghệ / Thư viện                | Phiên bản          | Chức năng chính                                                                                                                        |
 | :-------------------------- | :-------------------------------------- | :------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
-| **Language**          | Java, Python                            | **OpenJDK 21, Python 3.11+** | Ngôn ngữ triển khai các microservice                                                                                              |
+| **Language**          | Java                                    | **OpenJDK 21**       | Ngôn ngữ triển khai các microservice                                                                                              |
 | **Framework**         | Spring Boot                             | **3.5.14**     | Framework ứng dụng nền tảng                                                                                                           |
 | **Cloud Ecosystem**   | Spring Cloud                            | **2025.0.0**   | Hệ sinh thái dịch vụ đám mây                                                                                                       |
 | **API Gateway**       | Spring Cloud Gateway (WebFlux Reactive) | 2025.0.0             | Quản lý định tuyến API, xác thực & phân quyền tập trung dựa trên kiến trúc Phản ứng (Reactive, Non-blocking Netty Engine) |
-| **AI Learning API**  | FastAPI, mastery engine port từ DeepTutor | Python 3.11+         | Adaptive Learning và Mastery Path                                        |
 | **Service Discovery** | Spring Cloud Netflix Eureka             | 2025.0.0             | Đăng ký và phát hiện dịch vụ tự động                                                                                           |
 | **Config Management** | Spring Cloud Config Server              | 2025.0.0             | Quản lý cấu hình tập trung cho toàn bộ microservices                                                                               |
 | **Security & Auth**   | Spring Security & OAuth2 (Reactive)     | 3.5.14               | Xử lý token JWT và Context người dùng bất đồng bộ                                                                               |
 | **Shared Common**     | Custom`common-security`               | 1.0-SNAPSHOT         | Module dùng chung:`CanonicalRoles`, `InternalJwtClaims`, `InternalJwtAuthorities`, `InternalJwtValidators`                       |
 | **Database**          | PostgreSQL                              | 15-alpine            | Hệ quản trị cơ sở dữ liệu quan hệ                                                                                                 |
 | **Containerization**  | Docker & Docker Compose                 | Latest               | Đóng gói và chạy môi trường hạ tầng nhanh chóng                                                                                |
-| **Build Tool**        | Maven, pip                               | Maven 3.9+, pip       | Maven cho Java services; pip requirements và Dockerfile riêng cho AI Learning                                                   |
+| **Build Tool**        | Maven                                   | Maven 3.9+           | Maven multi-module cho mọi service                                                                                    |
 
 ---
 
 ## 📁 Cấu Trúc Dự Án (Project Architecture)
 
-Dịch vụ Java dùng **Maven Multi-module**; `ai-learning-service` là Python/FastAPI service riêng.
+Mọi dịch vụ dùng **Maven Multi-module**.
 
 ```text
 IELTSPath/
@@ -36,7 +35,7 @@ IELTSPath/
 ├── shared/                     # Chứa các module dùng chung giữa các microservices
 │   └── common-security/        # CanonicalRoles, InternalJwtClaims, InternalJwtAuthorities, InternalJwtValidators
 ├── services/                   # Chứa các microservice nghiệp vụ
-│   ├── ai-learning-service/    # [Port 8000] FastAPI + mastery engine riêng, build bằng Dockerfile riêng
+│   ├── learning-service/       # [Port 8086] Thứ tự topic, bài học, mastery, bài ôn, mã đề, consumer kết quả thi
 │   ├── user-service/           # Identity, auth, learning goals, activity và streak
 │   ├── content-service/        # Topic, knowledge point, câu hỏi, gói nội dung và asset
 │   ├── library-service/        # Catalog từ vựng/video và thư viện học cá nhân
@@ -97,7 +96,6 @@ Dịch vụ **API Gateway** (`infra/api-gateway`) được xây dựng 100% dự
 ### 1. Yêu Cầu Môi Trường (Prerequisites)
 
 - **Java Development Kit (JDK)**: Version 21.
-- **Python**: Version 3.11+ để chạy hoặc build `ai-learning-service`.
 - **Maven**: Version 3.9+.
 - **Docker & Docker Desktop**: Để chạy ứng dụng hạ tầng và Cơ sở dữ liệu.
 
@@ -199,8 +197,8 @@ mvn clean compile -DskipTests
 
 ### 4. Khởi Chạy Hạ Tầng Với Docker
 
-Compose cung cấp các DB `library-db` (host 5437), `community-db` (5434), `game-db` (5435), RabbitMQ và stack
-AI Learning. Các service Java, Config Server, Eureka và Gateway chạy trên host; Compose không có ba container hạ tầng
+Compose cung cấp các DB `library-db` (host 5437), `community-db` (5434), `game-db` (5435), `learning-db` (5436)
+và RabbitMQ. Các service Java, Config Server, Eureka và Gateway chạy trên host; Compose không có ba container hạ tầng
 này. Đặt đủ biến môi trường của §6 trong `.env` ở root, kiểm cấu hình rồi chỉ bật container cần dùng:
 
 ```powershell
@@ -219,97 +217,55 @@ Với service sử dụng Flyway, migration tự chạy khi service khởi độ
 2. Đặt tên theo mẫu `V<version>__<short_description>.sql`: version tăng dần, mô tả viết thường và dùng dấu gạch dưới; ví dụ `V1__create_initial_schema.sql`.
 3. Không sửa migration đã được áp dụng; tạo migration mới với version tiếp theo cho mọi thay đổi schema.
 
-### 6. Chạy Luồng Chính Local (Assessment → AI Learning)
+### 6. Chạy Luồng Chính Local (học bài → đề cuối → Learning Service)
 
-Luồng: learner làm bài → grader finalize → outbox → RabbitMQ → consumer → mastery engine → `GET /api/ai-learning/status`.
-Phần AI Learning chạy bằng compose; các service Java chạy trên host (IDE hoặc `java -jar`).
+Luồng: học viên gọi `GET /api/learning/topics` → học từng bài, nộp khối bài tập (`/api/learning/lessons/**`) → bài ôn khi
+KP yếu (`/api/learning/reviews/**`) → nhận mã đề (`POST /api/learning/topics/{id}/test-assignments`) → làm đề ở
+`/api/assessments/**` → outbox → RabbitMQ → consumer của Learning Service ghi bằng chứng và mở topic kế. Mọi service
+Java chạy trên host (IDE hoặc `java -jar`); Compose chỉ chạy DB và RabbitMQ. Contract: `docs/contracts/lesson-learning-v1.md`,
+`lesson-writing-v1.md`, `assessment-completed-v2.md`.
 
 **Biến môi trường** (đặt trong `.env` ở root, file này đã được gitignore; không commit giá trị):
 
 | Biến | Dùng cho |
 | --- | --- |
 | `LIBRARY_DB_PASSWORD`, `POSTGRES_PASSWORD`, `GAME_DB_PASSWORD` | Compose nội suy toàn bộ file, nên phải có dù không chạy các DB đó; library dùng DB ở host 5437 |
-| `AI_LEARNING_DB_PASSWORD` | `ai-learning-db`, Flyway migrate, API và consumer |
-| `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | Broker trong compose. Assessment trên host phải dùng đúng cặp này (mặc định `guest` sẽ fail) |
+| `LEARNING_DB_PASSWORD` | `learning-db` (host 5436) và Learning Service |
+| `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | Broker trong compose; assessment và Learning Service trên host phải dùng đúng cặp này (mặc định `guest` sẽ fail) |
 | `GATEWAY_INTERNAL_JWT_SECRET` | Gateway và toàn bộ downstream service phải dùng cùng giá trị, lệch sẽ trả 401 |
 | `EXTERNAL_JWT_SECRET` | User Service ký token, Gateway xác thực |
+| `CONTENT_MEDIA_BASE_URL` | Prefix https của bucket chứa mp3 Listening; thiếu thì bài Listening trả 500 `INVALID_MEDIA_REFERENCE` |
+| `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` | Endpoint OpenAI-compatible để Learning Service chấm bài luận Writing; thiếu thì nộp bài luận trả 503 `GRADING_UNAVAILABLE`. API key là secret |
 
 Nếu mật khẩu có ký tự đặc biệt, hãy percent-encode hoặc chọn giá trị an toàn cho URL, vì nó nằm trong URL DB/AMQP.
 
 **Thứ tự khởi động:**
 
 1. PostgreSQL local (`localhost:5432`) có sẵn `user_db`, `content_db`, `assessment_db`. Flyway của từng service tự áp khi khởi động.
-2. Library DB, AI Learning và RabbitMQ:
+2. DB trong Compose và RabbitMQ:
    ```bash
-   docker compose up -d --build library-db rabbitmq ai-learning-db ai-learning-migrate ai-learning-api ai-learning-consumer
+   docker compose up -d library-db learning-db rabbitmq
    ```
-   `ai-learning-migrate` chạy Flyway một lần (`0.1 → 1 → 2 → 3`) rồi thoát với exit 0; API (`127.0.0.1:8000`) và consumer chờ bước này xong.
-   Consumer tự khai báo queue chính, retry, DLQ và binding `assessment.completed.v2`.
-3. Service Java trên host: config-server → eureka → api-gateway → user → content → library → assessment → game (khi cần).
-   Library dùng `LIBRARY_DB_URL` mặc định `jdbc:postgresql://localhost:5437/library_db`. Các Spring module tự nạp
-   `.env` ở root repository (khi working directory là root hoặc thư mục module), nên không cần khai báo secret khác
-   nhau ở từng Run Configuration.
+3. Service Java trên host: config-server → eureka → api-gateway → user → content → library → assessment →
+   learning → game (khi cần). Learning Service tự khai báo queue `learning.assessment-completed.v2`, retry queue và DLQ.
+   Các Spring module tự nạp `.env` ở root repository (khi working directory là root hoặc thư mục module), nên không cần
+   khai báo secret khác nhau ở từng Run Configuration.
 
 Gateway giữ path công khai: `/api/content/videos/**`, `/api/content/vocabulary/**` và
 `/api/content/admin/vocabulary/**` tới library; `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**`
-tới library; `/api/learning-support/{activities,streak}/**` tới user. Không còn route tổng quát cho prefix này. Game
-chọn snapshot `VOCABULARY` từ library (`LIBRARY_SERVICE_URL` mặc định `http://localhost:8081`), `GRAMMAR` từ content.
-Khi game chạy trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082` vì Config Server vẫn mặc định địa chỉ
-`http://content-service:8082`. Library kiểm topic video qua Content. Content V7 xóa năm bảng catalog; chỉ cho Flyway
-chạy migration phá hủy này trên Testcontainers cho tới khi có duyệt riêng đối với `content_db` dùng chung.
+tới library; `/api/learning-support/{activities,streak}/**` tới user; `/api/learning/**` tới learning. Gateway chặn
+`/internal/**`. Game chọn snapshot `VOCABULARY` từ library (`LIBRARY_SERVICE_URL` mặc định `http://localhost:8081`),
+`GRAMMAR` từ content. Khi game chạy trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082` vì Config Server vẫn
+mặc định địa chỉ `http://content-service:8082`. Library kiểm topic video qua Content. Content V7 xóa năm bảng catalog;
+chỉ cho Flyway chạy migration phá hủy này trên Testcontainers cho tới khi có duyệt riêng đối với `content_db` dùng chung.
 
-Container AI Learning gọi User (`8085`) và Content (`8082`) trên host qua `host.docker.internal`, và chuyển tiếp thẳng internal JWT của learner. Trên Windows, firewall có thể chặn đường này: cho Java đi qua firewall (mạng private), hoặc chạy API bằng `uvicorn` trên host.
-
-**Sắp xếp path bằng Gemini (tùy chọn):**
-
-AI Learning gọi Gemini qua API chuẩn OpenAI khi tạo path cho goal mới. Đặt key trong
-`.env` ở root (đã git-ignore), rồi tạo lại container API:
-
-```powershell
-# trong .env: AI_LEARNING_LLM_API_KEY=<key của nhóm>
-docker compose up -d ai-learning-api
-```
-
-Model mặc định là `gemini-3.8-flash` với `AI_LEARNING_LLM_REASONING_EFFORT=low`; đổi bằng
-`AI_LEARNING_LLM_MODEL`, `AI_LEARNING_LLM_BASE_URL`, `AI_LEARNING_LLM_REASONING_EFFORT`.
-Không có key hoặc LLM lỗi thì vẫn tạo path theo thứ tự Content. Thứ tự đã lưu được giữ
-nguyên khi nhận kết quả thi hoặc refresh; KP mới được thêm cuối module. Xem
-[LLM path ordering](services/ai-learning-service/README.md#llm-path-ordering) để biết dữ
-liệu gửi ra ngoài, bảng biến cấu hình, bảng lý do fallback và năm kịch bản E2E bằng stub
-không cần key thật.
-
-Thư mục `third_party/deeptutor` chỉ là bản clone DeepTutor để **đọc tham khảo**. Engine
-mastery của AI Learning (`services/ai-learning-service/app/mastery`) được port từ đó;
-service không import, không build và không test dựa vào thư mục này.
-
-**Kiểm chứng tutor study/review qua Gateway:** khởi động các Java service theo thứ tự ở trên, rồi chạy
-`ai-learning-db`, `ai-learning-migrate`, `ai-learning-api`, `ai-learning-consumer` và `llm-stub` trong Compose.
-Đặt `LLM_STUB_MODE=script`, `AI_LEARNING_LLM_BASE_URL=http://llm-stub:8090/v1beta/openai/`,
-`AI_LEARNING_LLM_MODEL=stub-model`, `AI_LEARNING_LLM_API_KEY=stub-only` và
-`AI_LEARNING_LLM_TIMEOUT_SECONDS=45` trong môi trường của lệnh Compose. Sau đó, từ
-`services/ai-learning-service`, chạy `python tests/e2e/tutor_e2e.py` với
-`TUTOR_E2E_USER_A_EMAIL/PASSWORD` và `TUTOR_E2E_USER_B_EMAIL/PASSWORD` của hai tài khoản test có goal active.
-Có thể dùng `--register-disposable` để script tự tạo hai tài khoản test và goal local; bản ghi của chúng vẫn ở
-`user_db` sau khi chạy. Script kiểm HTTP + SSE, keep-alive qua Gateway, cách ly session, formal result qua RabbitMQ,
-mastery và file write trong container. Xem [Tutor study/review](services/ai-learning-service/README.md#tutor-studyreview)
-và [SSE contract](docs/contracts/tutor-sse-v1.md).
-
-**Chạy test Python AI Learning:**
-
-Từ thư mục gốc, dùng virtual environment Python của dự án:
-
-```powershell
-Set-Location services/ai-learning-service
-python -m pip install pytest -r requirements-test.txt
-$env:PYTHONDONTWRITEBYTECODE = "1"
-python -m pytest tests
-Set-Location ../..
-```
-
-Đặt `AI_LEARNING_TEST_DATABASE_URL` và `AI_LEARNING_TEST_AMQP_URL` tới PostgreSQL
-và RabbitMQ local dành cho test để chạy đủ integration suite; thiếu chúng thì các
-case tương ứng bị skip. Test LLM dùng biến `AI_LEARNING_LLM_*` tạm và server giả, không gọi Gemini.
-
+Nội dung demo Reading, Writing và Listening nằm trong migration content V9–V12. V13 thêm gợi ý Reading ở Content;
+Learning Service trả `hint` cho câu từng sai trong cùng user/bài/khối chưa đạt (câu điền hoặc chọn ≥3 phương án,
+TFNG hỗ trợ options thiếu/rỗng), giữ tới khi khối đạt. Contract: [lesson-learning-v1](docs/contracts/lesson-learning-v1.md).
+Listening cần 8 file mp3 upload
+đúng key dưới `CONTENT_MEDIA_BASE_URL` (danh sách trong `services/content-service/README.md`). Thư mục
+`third_party/deeptutor` chỉ là bản clone để **đọc**: công thức mastery của Learning Service được port từ đó, không
+service nào build hay import thư mục này.
 **Tài khoản có quyền (chỉ dev, chỉ trên DB local):**
 
 1. Đăng ký tài khoản qua `POST /api/users/register`. Mọi tài khoản mới đều nhận role `CUSTOMER`.

@@ -1,12 +1,12 @@
 ---
 title: "Triển khai pipeline học chính (bài học, bài ôn, đề cuối)"
 description: "MVP luồng học topic → bài → bài ôn → đề cuối: path theo user, chấm theo answer_spec, giấu đáp án tới khi đạt, bài ôn dùng gói PRACTICE_SET mới, mã đề TOPIC_TEST dùng một lần, assessment tự chấm và tự quyết loại attempt, consumer ghi trong cùng transaction và không gọi HTTP."
-status: in-progress
+status: completed
 priority: P2
 branch: "feat/main-follow"
 tags: [ai-learning, content, assessment, lesson, mastery, tdd]
-blockedBy: [261001-0205-mvp-service-split-library, 261001-1228-learning-service-java]
-blocks: [260930-0737-lesson-writing-task2-essay, 260930-0851-listening-topic-audio-lessons, 260930-1006-reading-question-hints]
+blockedBy: []
+blocks: [260930-0851-listening-topic-audio-lessons, 260930-1006-reading-question-hints]
 created: "2026-09-29T09:22:17.145Z"
 createdBy: "ck:plan"
 source: skill
@@ -15,7 +15,7 @@ mode: "tdd"
 
 # Triển khai pipeline học chính (bài học, bài ôn, đề cuối)
 
-> **Đổi 2026-10-01:** người dùng bỏ ai-learning Python. Phase 5–7 (path, API bài học/bài ôn/mã đề, consumer) do plan [`261001-1228`](../261001-1228-learning-service-java/plan.md) làm bằng Java (`learning-service`, route `/api/learning/**`, mô hình `kp_evidence` thay path DeepTutor). Luật nghiệp vụ trong plan này vẫn là nguồn. Plan này còn phase 4 (assessment) và phase 8 (tài liệu), làm sau phase 4 của `261001-1228`.
+> **Đổi 2026-10-01:** người dùng bỏ ai-learning Python. Phase 5–7 (path, API bài học/bài ôn/mã đề, consumer) do plan `261001-1228` làm bằng Java (`learning-service`, route `/api/learning/**`, mô hình `kp_evidence` thay path DeepTutor). Luật nghiệp vụ trong plan này vẫn là nguồn. **2026-10-02:** phase 4 và 8 đã hoàn tất; nền pipeline có [report live E2E](./reports/e2e-261002-foundation-learning-pipeline.md). Các quyết định và Validation Log nhắc runtime Python bên dưới được đọc theo ánh xạ Java, không phải mô tả runtime hiện tại.
 
 ## Overview
 
@@ -66,11 +66,11 @@ Chế độ `--tdd`: mỗi phase code theo trình tự test giữ hành vi cũ �
 | 1 | [Contract và đặc tả](./phase-01-contract-va-dac-ta.md) | Completed (duyệt 2026-10-01) |
 | 2 | [Chặn lộ đáp án](./phase-02-chan-lo-dap-an.md) | Completed (`34335aa`, merge PR #23) |
 | 3 | [Content: bài học, gói, endpoint nội bộ, seed](./phase-03-content-bai-hoc-va-goi.md) | Completed (merge PR #24, `d7ea05f`) |
-| 4 | [Assessment: tự chấm, lấy đề từ content, event](./phase-04-assessment-tu-cham-va-ma-de.md) | Pending (làm sau phase 4 của `261001-1228`) |
+| 4 | [Assessment: tự chấm, lấy đề từ content, event](./phase-04-assessment-tu-cham-va-ma-de.md) | Completed (nhánh `feat/assessment-auto-grading`; assessment 102 test, content 138 test pass) |
 | 5 | [AI Learning: path theo user](./phase-05-ai-learning-path-theo-user.md) | Superseded (phần a merge PR #25; còn lại thay bởi `261001-1228`) |
 | 6 | [AI Learning: API bài học, bài ôn, giao mã đề](./phase-06-ai-learning-api-bai-hoc-va-bai-on.md) | Superseded (`261001-1228` phase 2–3) |
 | 7 | [AI Learning: consumer kết quả đề](./phase-07-ai-learning-consumer-ket-qua-de.md) | Superseded (`261001-1228` phase 4) |
-| 8 | [Tài liệu và dọn dẹp](./phase-08-tai-lieu-va-don-dep.md) | Pending |
+| 8 | [Tài liệu và dọn dẹp](./phase-08-tai-lieu-va-don-dep.md) | Completed (2026-10-02; 693 test, 0 fail/error/skip; live E2E 7/7) |
 
 Thứ tự:
 
@@ -124,7 +124,7 @@ Thứ tự:
 ## Dependencies
 
 - Không chặn plan nào. Plan kiến trúc chia service (library-service) và plan đồng bộ tài liệu cũ đã xóa (2026-09-30); việc chia service thuộc MVP, làm ở plan riêng (chốt 2026-10-01).
-- **Chờ PR S1 của [`261001-0205`](../261001-0205-mvp-service-split-library/plan.md) merge trước** (đổi 2026-10-01): S1 chiếm content V7
+- **Chờ PR S1 của `261001-0205` merge trước** (đổi 2026-10-01): S1 chiếm content V7
   (xóa 5 bảng từ vựng/video), nên migration content của plan này là V8 (bảng bài học) và V9 (seed). Ai-learning giữ V10, V11.
   Validation log bên dưới ghi số cũ (V7/V8) theo thời điểm viết.
 - Cần duyệt contract (cuối phase 1) và migration V10 (phase 5).

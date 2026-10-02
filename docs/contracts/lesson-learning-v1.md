@@ -2,6 +2,10 @@
 
 **Status: approved 2026-10-01.** This document describes the intended learner HTTP API; it does not claim it is deployed. Examples use actual lesson/question/package codes and text from [`seed-content.md`](../../plans/260930-2057-mvp-reading-writing-listening-roadmap/seed-content.md). The existing V4 UUIDs for DEMO_READING and KP1 are real; other UUIDs and timestamps illustrate relationships because the V9 seed leaves their assignment to the migration.
 
+**Implementation status (2026-10-01):** Java Learning Service implements every route below, including review sets and final-test assignment. Learning Service consumes `AssessmentCompleted.v2` to use assignments and pass topics, and Assessment auto-grades final tests (section "Assessment changes" below).
+
+**Reading hints (2026-10-02):** lesson exercise questions and submission results add an always-present nullable `hint` field, with the policy below. Review DTOs share this field but always return `null`; final assessments are unchanged.
+
 The MVP app displays topic and lesson status. The Java Learning Service owns progress, mastery evidence, reviews and test assignments. Tutor, practice notebook, learner memory, learning goals and LLM ordering are removed. Reviews use new `PRACTICE_SET` questions, solutions stay hidden until the relevant block or set is passed, and a final test assignment uses a package code once before selecting another package. Topic order is stored in `topic_progress.sequence_order`; only `passed_at` is persisted. No `topics.test_package_id`, assessment schema migration, premium gate, or unpublished content authoring API is introduced here.
 
 ## Learner routes
@@ -21,7 +25,7 @@ Refreshes the shared `knowledge_point_catalog` and the user's `topic_progress.se
 
 ### `GET /mastery`
 
-Returns `[{knowledgePointId, topicId, mastery, evidenceCount}]` for KPs in `knowledge_point_catalog`, using only the verified user's `kp_evidence`. `mastery` is a number from 0 to 1; `evidenceCount` counts the user's stored evidence for that KP. No learning goal or aggregate learning state is required. This endpoint is implemented with the learner APIs in the next PR.
+Returns `[{knowledgePointId, topicId, mastery, evidenceCount}]` for KPs in `knowledge_point_catalog`, using only the verified user's `kp_evidence`. `mastery` is a number from 0 to 1; `evidenceCount` counts the user's stored evidence for that KP. No learning goal or aggregate learning state is required.
 
 Example after Lan completes L1:
 
@@ -47,7 +51,9 @@ The topic must be `IN_PROGRESS` or `PASSED`; otherwise `403 TOPIC_LOCKED`. Retur
 
 ### `GET /lessons/{id}`
 
-The same lesson gate applies to this GET, submissions, and completion. Error precedence: pending review (`REVIEW_REQUIRED`), topic not current (`TOPIC_LOCKED`), then earlier lesson incomplete (`LESSON_LOCKED`). Returns metadata and ordered `blocks`. A question object has **only** `questionVersionId`, `sortOrder`, `stem`, `options`; an asset can provide passage text alongside it. Do not pass through Content's `answerSpec`, `explanation`, KP mappings, or solution fields. `options=null` means a fill response; a non-null array means choose an `optionKey`, including the three TFNG keys. A passed exercise block gains a separate `solutions` array of `{questionVersionId, correctAnswer, explanation}`; an unpassed block omits the `solutions` key entirely.
+The same lesson gate applies to this GET, submissions, and completion. Error precedence: pending review (`REVIEW_REQUIRED`), topic not current (`TOPIC_LOCKED`), then earlier lesson incomplete (`LESSON_LOCKED`). Returns metadata and ordered `blocks`. A question object has **only** `questionVersionId`, `sortOrder`, `stem`, `options`, `hint`; an asset can provide passage text alongside it. Exercise blocks carry `blockKind`: `EXERCISE` for auto-graded questions, `ESSAY` for a Writing essay block shaped as in [`lesson-writing-v1`](lesson-writing-v1.md) (an essay block never counts toward lesson completion, and exercise submissions to it return `409 ESSAY_BLOCK`). An `ASSET` block gives `{id, assetType, textContent?, mediaUrl?, durationSeconds?, transcript?}`: a `PASSAGE` has `textContent`; media has `mediaUrl` (never the stored reference); an `AUDIO` asset gains `transcript` only once the lesson is completed, and before that the key is absent because the transcript gives the answers away. Do not pass through Content's `answerSpec`, `explanation`, KP mappings, or solution fields. `options=null` means a fill response; a non-null array means choose an `optionKey`, including the three TFNG keys. A passed exercise block gains a separate `solutions` array of `{questionVersionId, correctAnswer, explanation}`; an unpassed block omits the `solutions` key entirely.
+
+`hint` is always present, including when `null`, so the key does not disclose which questions have author-written hints. Learning Service reveals Content's hint only for a gradable `FILL`, or a gradable `CHOICE` with at least three options (including TFNG). Empty/absent CHOICE options are treated as the fixed three-choice TFNG fallback; one or two options and unsupported/ungradable specs are ineligible. Legacy gradable specs without `type` follow the grader's CHOICE default. A question must have been answered incorrectly in **any** saved submission for the same verified user, lesson and block, and the block must not have passed. Once opened, its hint remains even after a later correct answer while the block still fails. Before the first wrong answer, without a Content hint, or after the block has passed, `hint=null`. The runtime rule does not filter by skill; current Content seed supplies Reading hints and leaves Listening hints null. Essay prompts do not use this field.
 
 The following is the L1-B5 portion of L1. The full response also contains L1's text, roof passage, and L1-B2 exercise; it contains all Q1, Q11, Q12 in L1-B5.
 
@@ -56,9 +62,9 @@ The following is the L1-B5 portion of L1. The full response also contains L1's t
   "lessonId":"20000000-0000-4000-8000-000000000101","topicId":"10000000-0000-4000-8000-000000000001","code":"L1","title":"Câu chủ đề nằm ở đâu","sortOrder":1,"status":"AVAILABLE",
   "blocks":[
     {"blockId":"20000000-0000-4000-8000-000000000205","blockType":"EXERCISE","sortOrder":5,"passed":false,"questions":[
-      {"questionVersionId":"20000000-0000-4000-8000-000000000001","sortOrder":1,"stem":"Which sentence is the topic sentence of paragraph C?","options":[{"optionKey":"A","content":"Green roofs also manage rainwater.","sortOrder":1},{"optionKey":"B","content":"The soil soaks up much of a heavy shower and releases it slowly…","sortOrder":2},{"optionKey":"C","content":"In Copenhagen, new flat roofs must now be planted for this reason.","sortOrder":3}]},
-      {"questionVersionId":"20000000-0000-4000-8000-000000000011","sortOrder":2,"stem":"Which sentence tells you what paragraph D is about?","options":[{"optionKey":"A","content":"Not everyone is convinced.","sortOrder":1},{"optionKey":"B","content":"Critics point out that green roofs are expensive to install and need regular care…","sortOrder":2},{"optionKey":"C","content":"…many older buildings are not strong enough to carry the extra weight.","sortOrder":3}]},
-      {"questionVersionId":"20000000-0000-4000-8000-000000000012","sortOrder":3,"stem":"Complete with ONE WORD from paragraph D: people who doubt green roofs are called ______.","options":null}
+      {"questionVersionId":"20000000-0000-4000-8000-000000000001","sortOrder":1,"stem":"Which sentence is the topic sentence of paragraph C?","options":[{"optionKey":"A","content":"Green roofs also manage rainwater.","sortOrder":1},{"optionKey":"B","content":"The soil soaks up much of a heavy shower and releases it slowly…","sortOrder":2},{"optionKey":"C","content":"In Copenhagen, new flat roofs must now be planted for this reason.","sortOrder":3}],"hint":null},
+      {"questionVersionId":"20000000-0000-4000-8000-000000000011","sortOrder":2,"stem":"Which sentence tells you what paragraph D is about?","options":[{"optionKey":"A","content":"Not everyone is convinced.","sortOrder":1},{"optionKey":"B","content":"Critics point out that green roofs are expensive to install and need regular care…","sortOrder":2},{"optionKey":"C","content":"…many older buildings are not strong enough to carry the extra weight.","sortOrder":3}],"hint":null},
+      {"questionVersionId":"20000000-0000-4000-8000-000000000012","sortOrder":3,"stem":"Complete with ONE WORD from paragraph D: people who doubt green roofs are called ______.","options":null,"hint":null}
     ]}
   ]
 }
@@ -68,6 +74,8 @@ The following is the L1-B5 portion of L1. The full response also contains L1's t
 
 Request: `{requestId, answers:[{questionVersionId, answer}]}`. `requestId` is a UUID; one answer for **every** question in the block is required (`422` if missing/duplicate/foreign). Reuse of a request id for the same user, lesson, and block returns the saved response; reuse in a different scope is `409 REQUEST_CONFLICT`. Reattempts submit the whole same block with a new request id. The pass threshold is at least 70% of possible score; for L1-B5's three one-point questions, 2/3 fails and 3/3 passes. Only the **first submission** for a user and block contributes mastery evidence, whether it passed or failed. Later attempts can complete the block but never add evidence. If the block completes the lesson, mark the lesson complete and evaluate reviews in the same PostgreSQL transaction, serialized by a transaction-scoped advisory lock for the user.
 
+Every result carries `hint`. On failure, it is `{questionVersionId, correct, hint}`: apply the GET policy to the union of previously wrong questions and this submission's wrong answers, including previously wrong questions now answered correctly. On passing, it is `{questionVersionId, correct, correctAnswer, explanation, hint:null}`. A block that passed earlier keeps hints null even if a later attempt fails. Replaying a `requestId` returns its original saved response, including hints, even after passing or Content edits. Hint history uses one extra query per GET or new submission; replay needs no Content read or hint query. Mastery evidence and the formula do not change, and no `hints_used` is recorded.
+
 ```json
 {"requestId":"20000000-0000-4000-8000-000000000801","answers":[{"questionVersionId":"20000000-0000-4000-8000-000000000001","answer":"A"},{"questionVersionId":"20000000-0000-4000-8000-000000000011","answer":"B"},{"questionVersionId":"20000000-0000-4000-8000-000000000012","answer":"critics"}]}
 ```
@@ -75,13 +83,13 @@ Request: `{requestId, answers:[{questionVersionId, answer}]}`. `requestId` is a 
 The first response, 2/3, is:
 
 ```json
-{"blockPassed":false,"lessonCompleted":false,"results":[{"questionVersionId":"20000000-0000-4000-8000-000000000001","correct":true},{"questionVersionId":"20000000-0000-4000-8000-000000000011","correct":false},{"questionVersionId":"20000000-0000-4000-8000-000000000012","correct":true}]}
+{"blockPassed":false,"lessonCompleted":false,"results":[{"questionVersionId":"20000000-0000-4000-8000-000000000001","correct":true,"hint":null},{"questionVersionId":"20000000-0000-4000-8000-000000000011","correct":false,"hint":"Câu báo trước nội dung cả đoạn D thường ngắn và khái quát. Câu nêu một lý do cụ thể chỉ là chi tiết."},{"questionVersionId":"20000000-0000-4000-8000-000000000012","correct":true,"hint":null}]}
 ```
 
 A new request with Q11=`A` passes 3/3; each result then adds the solution. Q12's `correctAnswer` is `critics` (the first accepted answer):
 
 ```json
-{"blockPassed":true,"lessonCompleted":true,"results":[{"questionVersionId":"20000000-0000-4000-8000-000000000001","correct":true,"correctAnswer":"A","explanation":"\"Green roofs also manage rainwater\" nêu chủ đề. Câu B giải thích cách làm, câu C là ví dụ."},{"questionVersionId":"20000000-0000-4000-8000-000000000011","correct":true,"correctAnswer":"A","explanation":"\"Not everyone is convinced\" báo trước cả đoạn nói về ý kiến phản đối. Câu B chỉ là một lý do cụ thể."},{"questionVersionId":"20000000-0000-4000-8000-000000000012","correct":true,"correctAnswer":"critics","explanation":"Đoạn D: \"Critics point out that…\". Không phân biệt hoa thường."}]}
+{"blockPassed":true,"lessonCompleted":true,"results":[{"questionVersionId":"20000000-0000-4000-8000-000000000001","correct":true,"hint":null,"correctAnswer":"A","explanation":"\"Green roofs also manage rainwater\" nêu chủ đề. Câu B giải thích cách làm, câu C là ví dụ."},{"questionVersionId":"20000000-0000-4000-8000-000000000011","correct":true,"hint":null,"correctAnswer":"A","explanation":"\"Not everyone is convinced\" báo trước cả đoạn nói về ý kiến phản đối. Câu B chỉ là một lý do cụ thể."},{"questionVersionId":"20000000-0000-4000-8000-000000000012","correct":true,"hint":null,"correctAnswer":"critics","explanation":"Đoạn D: \"Critics point out that…\". Không phân biệt hoa thường."}]}
 ```
 
 ### `POST /lessons/{id}/complete`
@@ -94,15 +102,17 @@ Only a lesson with **no** `EXERCISE` block can be completed this way; a lesson w
 
 ### `GET /reviews/{reviewId}`
 
-`reviewId` is a UUID. An unknown review or another learner's review returns `404 NOT_FOUND`. Returns the teaching lesson's theory and the one open review set, assigning an eligible `PRACTICE_SET` if necessary. Repeated GETs return the same open set. If all packages were removed before the first set could be assigned, mark the review `SKIPPED` and return no set. A review set contains questions with the same learner allowlist as a lesson; its solutions are omitted until the set is passed.
+`reviewId` is a UUID. An unknown review or another learner's review returns `404 NOT_FOUND`. Returns the teaching lesson's theory and the one open review set, assigning an eligible `PRACTICE_SET` if necessary. Repeated GETs return the same open set. If all packages were removed before the first set could be assigned, mark the review `SKIPPED` and return no set. A review set contains questions with the same learner allowlist as a lesson; its solutions are omitted until the set is passed. A Listening set adds `audio: {mediaUrl, durationSeconds}` next to `passage` (no transcript).
 
 After Lan misses L2 Q5, she can receive `PS-KP1-A` and L2 theory:
+
+Review questions and results reuse the lesson DTOs and always carry `hint:null`. Review sets do not fetch hints; Content package versions, final assessments and game snapshots do not expose them.
 
 ```json
 {
   "reviewId":"20000000-0000-4000-8000-000000000901","reviewStatus":"PENDING","lessonId":"20000000-0000-4000-8000-000000000102",
   "theory":["Ý chính của cả bài là điều mọi đoạn cùng góp vào. Đọc câu chủ đề của từng đoạn rồi tìm điểm chung. Mẹo: Đáp án đúng thường khái quát; đáp án bẫy chỉ đúng với một đoạn."],
-  "set":{"reviewSetId":"20000000-0000-4000-8000-000000000902","packageId":"20000000-0000-4000-8000-000000000501","packageVersionId":"20000000-0000-4000-8000-000000000601","passage":"A. Beekeeping is no longer only a country pursuit. In London, Paris and New York, thousands of hives now sit on rooftops and in backyards, kept by office workers, schools and even hotels.\n\nB. Supporters say city bees do well because parks and gardens offer a wide variety of flowers throughout the year. Honey from urban hives often wins prizes for its complex flavour.\n\nC. However, scientists warn that too many hives can harm wild bees. When honeybees are crowded into a small area, they compete with native species for the same limited flowers.","questions":[{"questionVersionId":"20000000-0000-4000-8000-000000000051","sortOrder":1,"stem":"What is the passage mainly about?","options":[{"optionKey":"A","content":"City honey tastes better than country honey","sortOrder":1},{"optionKey":"B","content":"Urban beekeeping is growing, with benefits and risks","sortOrder":2},{"optionKey":"C","content":"Wild bees are disappearing from London","sortOrder":3}]}]}
+  "set":{"reviewSetId":"20000000-0000-4000-8000-000000000902","packageId":"20000000-0000-4000-8000-000000000501","packageVersionId":"20000000-0000-4000-8000-000000000601","passage":"A. Beekeeping is no longer only a country pursuit. In London, Paris and New York, thousands of hives now sit on rooftops and in backyards, kept by office workers, schools and even hotels.\n\nB. Supporters say city bees do well because parks and gardens offer a wide variety of flowers throughout the year. Honey from urban hives often wins prizes for its complex flavour.\n\nC. However, scientists warn that too many hives can harm wild bees. When honeybees are crowded into a small area, they compete with native species for the same limited flowers.","questions":[{"questionVersionId":"20000000-0000-4000-8000-000000000051","sortOrder":1,"stem":"What is the passage mainly about?","options":[{"optionKey":"A","content":"City honey tastes better than country honey","sortOrder":1},{"optionKey":"B","content":"Urban beekeeping is growing, with benefits and risks","sortOrder":2},{"optionKey":"C","content":"Wild bees are disappearing from London","sortOrder":3}],"hint":null}]}
 }
 ```
 
@@ -110,14 +120,14 @@ The example shows BE1; the actual set includes BE1–BE4. `PS-KP1-A` is the seed
 
 ### `POST /reviews/{reviewId}/submissions`
 
-Request: `{reviewSetId, requestId, answers}` with the same answer array shape as a lesson submission and all set questions required. Only the owned, currently open set may be submitted; a different or closed set gives `409 REVIEW_SET_CLOSED`. A set is submitted once, and its first answers write `review_set` mastery evidence. At least 70% makes the review `DONE`; a failure leaves it `PENDING` and next GET selects another unused package, or the oldest package if exhausted. After the **third failed set**, status becomes `SKIPPED` and the learner may continue. This response includes `reviewStatus`; `results` reveal solutions only on a passed set.
+Request: `{reviewSetId, requestId, answers}` with the same answer array shape as a lesson submission and all set questions required. Only the owned, currently open set may be submitted; a different or closed set gives `409 REVIEW_SET_CLOSED`. A set is submitted once, and its first answers write `review_set` mastery evidence. At least 70% makes the review `DONE`; a failure leaves it `PENDING` and next GET selects another unused package, or the oldest package if exhausted. After the **third failed set**, status becomes `SKIPPED` and the learner may continue. This response includes `reviewStatus`; `results` reveal solutions only on a passed set, and a passed Listening set also returns the section `transcript`.
 
 ```json
 {"reviewSetId":"20000000-0000-4000-8000-000000000902","requestId":"20000000-0000-4000-8000-000000000803","answers":[{"questionVersionId":"20000000-0000-4000-8000-000000000051","answer":"B"},{"questionVersionId":"20000000-0000-4000-8000-000000000052","answer":"A"},{"questionVersionId":"20000000-0000-4000-8000-000000000053","answer":"A"},{"questionVersionId":"20000000-0000-4000-8000-000000000054","answer":"A"}]}
 ```
 
 ```json
-{"reviewStatus":"DONE","results":[{"questionVersionId":"20000000-0000-4000-8000-000000000051","correct":true,"correctAnswer":"B","explanation":"Đoạn A: đang phát triển; B: lợi ích; C: rủi ro."},{"questionVersionId":"20000000-0000-4000-8000-000000000052","correct":true,"correctAnswer":"A","explanation":"Cả đoạn giải thích vì sao ong thành phố phát triển tốt."},{"questionVersionId":"20000000-0000-4000-8000-000000000053","correct":true,"correctAnswer":"A","explanation":"\"However… can harm wild bees\" là mặt trái."},{"questionVersionId":"20000000-0000-4000-8000-000000000054","correct":true,"correctAnswer":"A","explanation":"Tiêu đề phải bao cả lợi ích lẫn rủi ro."}]}
+{"reviewStatus":"DONE","results":[{"questionVersionId":"20000000-0000-4000-8000-000000000051","correct":true,"hint":null,"correctAnswer":"B","explanation":"Đoạn A: đang phát triển; B: lợi ích; C: rủi ro."},{"questionVersionId":"20000000-0000-4000-8000-000000000052","correct":true,"hint":null,"correctAnswer":"A","explanation":"Cả đoạn giải thích vì sao ong thành phố phát triển tốt."},{"questionVersionId":"20000000-0000-4000-8000-000000000053","correct":true,"hint":null,"correctAnswer":"A","explanation":"\"However… can harm wild bees\" là mặt trái."},{"questionVersionId":"20000000-0000-4000-8000-000000000054","correct":true,"hint":null,"correctAnswer":"A","explanation":"Tiêu đề phải bao cả lợi ích lẫn rủi ro."}]}
 ```
 
 ### `POST /topics/{id}/test-assignments`
@@ -146,21 +156,29 @@ New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: ar
 | 409 | `REQUEST_CONFLICT` | `{"detail":"requestId belongs to another submission","code":"REQUEST_CONFLICT"}` |
 | 409 | `LESSON_HAS_EXERCISES` | `{"detail":"L1 contains exercise blocks","code":"LESSON_HAS_EXERCISES"}` |
 | 409 | `REVIEW_SET_CLOSED` | `{"detail":"Review set is closed","code":"REVIEW_SET_CLOSED"}` |
+| 409 | `ESSAY_BLOCK` | `{"detail":"Essay blocks are submitted as essays","code":"ESSAY_BLOCK"}` |
 | 404 | `NOT_FOUND` | `{"detail":"Lesson was not found","code":"NOT_FOUND"}` |
 
 Review insertion requires **all four**: current mastery for the KP below `learning.review-mastery-threshold` (default `0.6`), a wrong answer for that KP in the just-considered result, a completed lesson teaching the KP (including a lesson just completed), and `has_practice_set=true` in `knowledge_point_catalog`. A KP with no eligible package, such as KP5 in `TFNG_SKILLS`, never creates a review; the final test still checks it. With only one or two first-attempt evidence items, the mastery formula caps mastery at 0.5 or 0.8, so at the default threshold the wrong-answer condition largely determines whether a review is inserted. Only first submissions of lesson blocks contribute that evidence. Reassessment runs after a lesson completes and after `TOPIC_GATE`, `MOCK`, `OFFICIAL_PRACTICE`, or `QUIZ` results; it inserts reviews only. Topic `PASSED` is one-way.
 
 ## Assessment changes requiring approval
 
+**Implemented 2026-10-01** as described below. Errors use Assessment's `ErrorResponse`
+(`timestamp,status,error,message,path,details`) plus a `code` key on these cases: `409 ATTEMPT_EXPIRED` (submit at or
+after `expiresAt`; the attempt is left `EXPIRED`), `422 PACKAGE_NOT_ATTEMPTABLE` (`PRACTICE_SET`, `LESSON`, or a version
+with an empty section), `503 CONTENT_UNAVAILABLE` (Content failed or returned an unusable version). An unknown or
+unpublished `packageVersionId` is `404`; a result not yet `COMPLETED` is `404` on `GET /attempts/{attemptId}/result`.
+`knowledgeSnapshot` is `[{knowledgePointId, weight}]`. A stored `answer` that is not a JSON string scores zero.
+
 These are proposed changes to existing `/api/assessments` routes. The current controller/DTO names are preserved where behavior is unchanged; grader DTOs and `GradingController` stay as they are.
 
 | Route | Contract |
 | --- | --- |
 | `POST /attempts` | Request becomes `{packageVersionId, mode, channel}`. `mode` remains `STANDARD|TIMED`; `channel` remains `WEB|MOBILE|API`. Assessment fetches the Content package version before writing. It derives `attemptType`: `TOPIC_TEST→TOPIC_GATE`, `MOCK_TEST→MOCK`, `PLACEMENT_TEST→PLACEMENT`, `QUIZ→QUIZ`; `PRACTICE_SET` and `LESSON` return 422. MVP final tests have no time limit, so `expiresAt=null` when version `rules` has no time key. Old `attemptType`, `expiresAt`, `sections` are ignored if sent (Jackson unknown-field behavior), never trusted. The existing `AssessmentAttemptResponse` field names remain `id,userId,packageVersionId,attemptType,mode,channel,status,startedAt,submittedAt,expiresAt,rowVersion,createdAt,updatedAt`. |
-| `GET /attempts/{id}/structure` | Existing `sections[].{id,contentSectionId,sortOrder,snapshot,items[]}` and item `{id,questionVersionId,sortOrder,questionSnapshot,knowledgeSnapshot}` names remain. **Remove `answerSnapshot`** from the learner DTO. `snapshot` remains a JSON **string** holding `{title,skill,instructions,passage?}`; `questionSnapshot` remains a string containing stem/options only. |
+| `GET /attempts/{id}/structure` | Existing `sections[].{id,contentSectionId,sortOrder,snapshot,items[]}` and item `{id,questionVersionId,sortOrder,questionSnapshot,knowledgeSnapshot}` names remain. **Remove `answerSnapshot`** from the learner DTO. `snapshot` is now an allowlist **object** `{title,skill,instructions,passage?,audio?}`; `audio` is `{url,durationSeconds}` using Content's resolved `audio.mediaUrl`. `solution` and `transcript` are never exposed here. Missing `skill` in an older JSON snapshot defaults to `READING`; an unparseable snapshot returns null fields without a server error. `questionSnapshot` remains a string containing stem/options only. |
 | `PUT /attempts/{id}/items/{itemId}/response` | Existing request remains `{payload,schemaVersion,expectedRevision}`. `payload` remains a string containing JSON `{"answer":"…"}`; see [answer spec](answer-spec-v1.md). Existing `AttemptResponseResponse` field names remain unchanged. |
 | `POST /attempts/{id}/submit` | If every item is objectively gradable, save result version 1 as `COMPLETED`, item scores, and outbox in the same transaction. If any item is ungradable, retain the human grading flow. Submitting after expiry persists `EXPIRED` and responds 409 with an expiry code. |
-| `GET /attempts/{attemptId}/result` | Learner-only DTO for latest **COMPLETED** version, ignoring a newer DRAFT. It has `id,attemptId,resultVersion,status,completedAt,score,maxScore,percent,items[{attemptItemId,questionVersionId,correct}]`. `solutions[]` with `{attemptItemId,questionVersionId,correctAnswer,explanation}` exists only when `percent >= 70`; below 70 the key is absent. Examiner DTO `AssessmentResultResponse` remains `id,attemptId,resultVersion,status,overallBand,completedAt`. |
+| `GET /attempts/{attemptId}/result` | Learner-only DTO for latest **COMPLETED** version, ignoring a newer DRAFT. It has `id,attemptId,resultVersion,status,completedAt,score,maxScore,percent,items[{attemptItemId,questionVersionId,correct}]`. `solutions[]` with `{attemptItemId,questionVersionId,correctAnswer,explanation}` exists only when `percent >= 70`; below 70 the key is absent. A separate `sectionSolutions[]` with `{attemptSectionId,transcript}` is also present only when `percent >= 70`, for sections whose stored `solution.transcript` is a string; it is `[]` when no section has a transcript and absent below 70. The existing `solutions[]` array is unchanged. Examiner DTO `AssessmentResultResponse` remains `id,attemptId,resultVersion,status,overallBand,completedAt`. |
 | `POST /attempts/{attemptId}/result` | Remove the learner route and its learner use-case path. Grader routes under `/api/assessments/grading/**` remain. |
 
 X1/X2/X5 seed versions use `rules={}`, so their `expiresAt` is `null`. The time-limit calculation rule is deferred beyond MVP; a missing time key in `rules` always yields `expiresAt=null`.
@@ -178,7 +196,7 @@ Example creation from assigned seed code `X1`:
 Structure excerpt for X1's Q2 (the full version includes Q14–Q16):
 
 ```json
-{"sections":[{"id":"20000000-0000-4000-8000-000000000972","contentSectionId":"20000000-0000-4000-8000-000000000701","sortOrder":1,"snapshot":"{\"title\":\"Street trees\",\"skill\":\"READING\",\"instructions\":null,\"passage\":\"A. City trees do more than make streets look pleasant. They are one of the cheapest ways to improve life in a crowded city.\\n\\nB. Trees filter the air. Their leaves trap fine dust from traffic, and a single mature oak can remove several kilograms of pollutants a year.\\n\\nC. Trees also calm people. In a 2019 study in Toronto, residents of tree-lined streets reported lower stress than people living just two blocks away.\"}","items":[{"id":"20000000-0000-4000-8000-000000000973","questionVersionId":"20000000-0000-4000-8000-000000000002","sortOrder":1,"questionSnapshot":"{\"stem\":\"What is the passage mainly about?\",\"options\":[{\"optionKey\":\"A\",\"content\":\"How oak trees grow in cities\",\"sortOrder\":1},{\"optionKey\":\"B\",\"content\":\"The ways street trees improve city life\",\"sortOrder\":2},{\"optionKey\":\"C\",\"content\":\"A 2019 study of stress in Toronto\",\"sortOrder\":3}]}","knowledgeSnapshot":"[{\"knowledgePointId\":\"10000000-0000-4000-8000-000000000002\",\"weight\":1.0}]"}]}]}
+{"sections":[{"id":"20000000-0000-4000-8000-000000000972","contentSectionId":"20000000-0000-4000-8000-000000000701","sortOrder":1,"snapshot":{"title":"Street trees","skill":"READING","instructions":null,"passage":"A. City trees do more than make streets look pleasant. They are one of the cheapest ways to improve life in a crowded city.\n\nB. Trees filter the air. Their leaves trap fine dust from traffic, and a single mature oak can remove several kilograms of pollutants a year.\n\nC. Trees also calm people. In a 2019 study in Toronto, residents of tree-lined streets reported lower stress than people living just two blocks away."},"items":[{"id":"20000000-0000-4000-8000-000000000973","questionVersionId":"20000000-0000-4000-8000-000000000002","sortOrder":1,"questionSnapshot":"{\"stem\":\"What is the passage mainly about?\",\"options\":[{\"optionKey\":\"A\",\"content\":\"How oak trees grow in cities\",\"sortOrder\":1},{\"optionKey\":\"B\",\"content\":\"The ways street trees improve city life\",\"sortOrder\":2},{\"optionKey\":\"C\",\"content\":\"A 2019 study of stress in Toronto\",\"sortOrder\":3}]}","knowledgeSnapshot":"[{\"knowledgePointId\":\"10000000-0000-4000-8000-000000000002\",\"weight\":1.0}]"}]}]}
 ```
 
 Saving Q2's answer uses the existing request schema:
@@ -190,10 +208,24 @@ Saving Q2's answer uses the existing request schema:
 At 3/4 on X1 (Q15 wrong), `percent=75`, so solutions appear while each item still reports correctness:
 
 ```json
-{"id":"20000000-0000-4000-8000-000000000975","attemptId":"20000000-0000-4000-8000-000000000971","resultVersion":1,"status":"COMPLETED","completedAt":"2026-10-01T09:10:00Z","score":3,"maxScore":4,"percent":75,"items":[{"attemptItemId":"20000000-0000-4000-8000-000000000973","questionVersionId":"20000000-0000-4000-8000-000000000002","correct":true},{"attemptItemId":"20000000-0000-4000-8000-000000000974","questionVersionId":"20000000-0000-4000-8000-000000000015","correct":false}],"solutions":[{"attemptItemId":"20000000-0000-4000-8000-000000000974","questionVersionId":"20000000-0000-4000-8000-000000000015","correctAnswer":"DETAIL","explanation":"Kết quả nghiên cứu ở Toronto là bằng chứng cho ý \"Trees also calm people\"."}]}
+{"id":"20000000-0000-4000-8000-000000000975","attemptId":"20000000-0000-4000-8000-000000000971","resultVersion":1,"status":"COMPLETED","completedAt":"2026-10-01T09:10:00Z","score":3,"maxScore":4,"percent":75,"items":[{"attemptItemId":"20000000-0000-4000-8000-000000000973","questionVersionId":"20000000-0000-4000-8000-000000000002","correct":true},{"attemptItemId":"20000000-0000-4000-8000-000000000974","questionVersionId":"20000000-0000-4000-8000-000000000015","correct":false}],"solutions":[{"attemptItemId":"20000000-0000-4000-8000-000000000974","questionVersionId":"20000000-0000-4000-8000-000000000015","correctAnswer":"DETAIL","explanation":"Kết quả nghiên cứu ở Toronto là bằng chứng cho ý \"Trees also calm people\"."}],"sectionSolutions":[]}
 ```
 
-The item/solution arrays above are excerpts; the actual response includes all four X1 items and, on a passing result, all four solutions. On a 2/4 result, `percent=50`, correctness remains available for every item and `solutions` is absent.
+The item/solution arrays above are excerpts; the actual response includes all four X1 items and, on a passing result, all four solutions. On a 2/4 result, `percent=50`, correctness remains available for every item and both `solutions` and `sectionSolutions` are absent.
+
+Listening sections are stored server-side as `{title,skill,instructions,audio:{url,durationSeconds},solution:{transcript}}`; sections without audio keep `{title,skill,instructions,passage?}`. The learner structure exposes only the audio URL and duration, for example:
+
+```json
+{"snapshot":{"title":"Listening","skill":"LISTENING","instructions":"Listen and answer","audio":{"url":"https://cdn.example.com/listening/demo/ls1.mp3","durationSeconds":95}}}
+```
+
+On a passing Listening result, section solutions are separate from item solutions:
+
+```json
+{"sectionSolutions":[{"attemptSectionId":"20000000-0000-4000-8000-000000000972","transcript":"The library closes at six."}]}
+```
+
+These excerpts illustrate the new section fields. Auto-grading, attempt types, outbox and `AssessmentCompleted.v2` are unchanged; the event never includes a transcript.
 
 ## Public Content knowledge point API change
 

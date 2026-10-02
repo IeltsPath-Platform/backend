@@ -4,7 +4,8 @@ Integration contract between Assessment Service (producer) and the Java Learning
 Service (consumer). Assessment Service owns formal grading; Learning Service stores
 per-user mastery evidence, reviews and topic progress. **The nullable-goal and
 package-version changes were approved 2026-10-01; the consumer and producer updates
-are deployed in that order. The service skeleton does not yet consume events.**
+are deployed in that order. Both are implemented: Learning Service consumes the event,
+and Assessment emits `package_version_id` with `learning_goal_id: null`.**
 
 ## When it is emitted
 
@@ -122,7 +123,7 @@ Consumer delivery rules:
   - Higher version: accepted. Remove only the earlier `kp_evidence` rows with
     `source=assessment` for that user and attempt, then apply the new version.
     Lesson and review evidence stays intact. Mastery uses the remaining evidence
-    ordered by `created_at, id`.
+    in insertion order (`kp_evidence.ordinal`).
 - Evidence identity remains
   `source_reference_id = UUIDv5(6f0c1b2e-3d7a-4e59-9b8a-2c4d5e6f7a81, "{result_id}:{result_version}:{item_result_id}:{knowledge_point_id}")`,
   using canonical lower-case UUIDs and a decimal version.

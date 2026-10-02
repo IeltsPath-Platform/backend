@@ -1,14 +1,14 @@
 # Kiến trúc hệ thống IELTSPath (backend)
 
-- Cập nhật lần cuối: 2026-10-01; dữ kiện đã kiểm với code tại commit `ab613b1`
+- Cập nhật lần cuối: 2026-10-01; dữ kiện đã kiểm với code sau khi learning-service có consumer kết quả thi
 - Đọc khi cần hiểu toàn hệ thống. Quy tắc bắt buộc nằm ở [`AGENTS.md`](../AGENTS.md); hướng dẫn chạy chi tiết ở
   [`README.md`](../README.md). Code là nguồn đúng khi tài liệu này lệch.
 
 ## 1. Tổng quan
 
 IELTSPath là backend microservices cho nền tảng học IELTS: 3 service hạ tầng Spring Cloud, 1 thư viện bảo mật dùng
-chung, 8 business service Java (Spring Boot, Maven reactor) và 1 business service Python (AI Learning, FastAPI, ngoài
-Maven). Mỗi business service sở hữu database PostgreSQL riêng. Client chỉ gọi qua API Gateway.
+chung và 9 business service Java (Spring Boot, Maven reactor). Service học AI Learning viết bằng Python đã được thay bằng
+`learning-service` Java ngày 2026-10-01. Mỗi business service sở hữu database PostgreSQL riêng. Client chỉ gọi qua API Gateway.
 
 ```text
                         config-repo (native)
@@ -20,15 +20,14 @@ Maven). Mỗi business service sở hữu database PostgreSQL riêng. Client ch�
                         | đăng ký / tìm instance (lb://)
 Client --> API Gateway :8080 --(internal JWT)--> user :8085, content :8082, library :8081,
                |                                 assessment :8083, access :8084, game :8087 (+ws), notification :8088,
-               |                                 community :8089
-               +--(URI cố định, không Eureka)--> ai-learning :8000 (Python)
+               |                                 community :8089, learning :8086
 
-assessment --outbox--> RabbitMQ exchange assessment.events --assessment.completed.v2--> ai-learning consumer
+assessment --outbox--> RabbitMQ exchange assessment.events --assessment.completed.v2--> learning consumer
 assessment --HTTP--> content, user        game --HTTP--> library, content
-library --HTTP--> content                 ai-learning --HTTP--> content, user
+library --HTTP--> content                 learning --HTTP--> content (/internal/learning-content/*)
 ```
 
-`third_party/deeptutor` là bản clone DeepTutor dùng để đọc khi port; không service nào import nó.
+`third_party/deeptutor` là bản clone DeepTutor dùng để đọc; công thức mastery của learning-service được port từ đó, không service nào build hay import thư mục này.
 
 ## 2. Service và dữ liệu
 
@@ -46,10 +45,10 @@ library --HTTP--> content                 ai-learning --HTTP--> content, user
 | `game-service` | Phòng game, trận, phiên chơi, WebSocket realtime | `game_db` (compose 5435) | `/api/games/**`, `/ws/games/**` |
 | `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (compose 5434; default code là local 5432, đổi bằng `COMMUNITY_DB_URL`) | `/api/community/**` |
 | `notification-service` | Chưa triển khai (chỉ khung package) | `notification_db` (local 5432) | `/api/notifications/**` |
-| `ai-learning-service` | Mastery path thích ứng, tutor study/review (SSE), practice notebook, learner memory, hạn mức LLM theo ngày; nhận kết quả thi chính thức | `ai_learning_db` (compose 5436) | `/api/ai-learning/**` |
+| `learning-service` | Thứ tự topic theo user, bài học và nộp khối bài tập, cổng mở bài, mastery theo KP, bài ôn bằng gói luyện, giao mã đề cuối; nhận kết quả thi chính thức | `learning_db` (compose 5436) | `/api/learning/**` |
 
 Chi tiết schema: [`.sdd/database/DATABASE_V5.md`](../.sdd/database/DATABASE_V5.md). Service Java tự chạy Flyway khi khởi
-động (`src/main/resources/db/migration`); AI Learning dùng container `ai-learning-migrate` (Flyway) trên `migrations/`.
+động (`src/main/resources/db/migration`).
 Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở hữu mới; không còn route tổng quát
 `/api/learning-support/**`. Library V2 có bốn FK `ON DELETE RESTRICT` tới catalog; không có bảng `outbox_events`.
 
@@ -59,34 +58,40 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 
 | Caller | Callee | Endpoint | Cấu hình base URL |
 | --- | --- | --- | --- |
-| assessment | content | `/internal/assessment-content/knowledge-point-mappings` | `CONTENT_SERVICE_URL` |
-| assessment | user | `/api/users/me/learning-goals/active` | `USER_SERVICE_URL` |
+| assessment | content | `GET /internal/learning-content/package-versions/{id}` khi tạo attempt (ngoài transaction) | `CONTENT_SERVICE_URL` |
 | library | content | `GET /api/content/topics/{id}` khi ghi video | `CONTENT_SERVICE_URL` (mặc định `http://localhost:8082`) |
 | game (`VOCABULARY`) | library | `POST /internal/game-content/snapshots` | `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) |
 | game (`GRAMMAR`) | content | `POST /internal/game-content/snapshots` | `CONTENT_SERVICE_URL` |
-| ai-learning | content | `/api/content/topics`, `/api/content/knowledge-points`, `/api/content/reading/sections/{id}` | `AI_LEARNING_CONTENT_SERVICE_BASE_URL` |
-| ai-learning | user | `/api/users/me/learning-goals/active` | `AI_LEARNING_USER_SERVICE_BASE_URL` |
+| learning | content | `/internal/learning-content/{topic-sequence,topics/{id}/lessons,lessons/{id},topics/{id}/test-packages,practice-sets/search,package-versions/{id}}` | `CONTENT_SERVICE_URL` (mặc định `http://localhost:8082`) |
+| learning | access | `GET /api/access/me/points` (số dư), `POST /internal/access/points/debit` (trừ 3 point sau khi chấm bài luận), bearer của học viên | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
+| learning | LLM (ngoài hệ thống) | `POST {base}/chat/completions` (OpenAI-compatible) khi chấm bài luận, ngoài mọi transaction | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` |
 
-Assessment, library và game gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`.
+Assessment, library, game và learning gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`.
 Library dùng timeout kết nối 2 giây, đọc 5 giây; lỗi Content khi kiểm topic trả 503. Hai nơi cài snapshot game theo
-cùng [contract](contracts/game-content-snapshot-v1.md). AI Learning
-chuyển tiếp nguyên internal JWT của learner tới User/Content (chưa gửi `X-Correlation-Id`); token này sống ngắn (mặc định
-60 giây), nên tutor copy bài đọc khi tạo session thay vì gọi Content trong từng lượt.
+cùng [contract](contracts/game-content-snapshot-v1.md). Learning gọi Content qua API nội bộ (Gateway chặn `/internal/**`,
+contract [`learning-content-internal-v1`](contracts/learning-content-internal-v1.md)); Content là nơi duy nhất ghép URL media.
+
+Listening dùng mp3 do team tự upload lên bucket cloud public-read. Content resolve key với `CONTENT_MEDIA_BASE_URL`
+(prefix `https://`) thành `mediaUrl`; URL `https://` đầy đủ được giữ nguyên, không cần base. Learning và Assessment
+chuyển tiếp URL đã resolve, không ghép lại. Transcript nằm trong `content_assets.text_content`: Learning chỉ trả khi
+bài hoàn thành hoặc review set đạt ≥ 70%; Assessment giữ trong snapshot server và trả `sectionSolutions` khi kết quả ≥ 70%.
 
 ### Bất đồng bộ (RabbitMQ)
 
 ```text
-assessment: FinalizeAssessmentResultUseCase
-  -> AssessmentCompletedEventFactory -> outbox_events (cùng transaction)
+assessment: SubmitAssessmentAttemptUseCase -> AutoGradeAttemptService (mọi câu tự chấm được)
+            hoặc FinalizeAssessmentResultUseCase (người chấm)
+  -> AssessmentResultCompleter -> AssessmentCompletedEventFactory -> outbox_events (cùng transaction)
   -> OutboxRelayScheduler / OutboxRelay -> RabbitOutboxEventPublisher (publisher confirm)
   -> exchange assessment.events, routing key assessment.completed.v2
-ai-learning: app/messaging/assessment_consumer.py
-  -> queue ai-learning.assessment-completed.v2 (retry qua ...v2.retry có TTL, hết lượt -> ...v2.dlq)
-  -> FormalEvidenceAdapter -> FormalAssessmentIngestionService -> PathService (mastery path của goal)
+learning: AssessmentCompletedListener (ack thủ công)
+  -> queue learning.assessment-completed.v2 (retry qua ...v2.retry có TTL, vi phạm contract/hết lượt -> ...v2.dlq)
+  -> AssessmentCompletedParser -> ApplyAssessmentResultUseCase (một transaction, khóa theo user):
+     version theo (attempt, result_version) -> kp_evidence -> TOPIC_GATE dùng lần giao mã đề -> chèn bài ôn
 ```
 
-Contract: [`docs/contracts/assessment-completed-v2.md`](contracts/assessment-completed-v2.md). Kết quả cho một goal chưa
-có path được giữ lại và áp dụng khi path được tạo. access, content và game có bảng outbox và ghi event nhưng chưa có
+Contract: [`docs/contracts/assessment-completed-v2.md`](contracts/assessment-completed-v2.md). Bằng chứng gắn với user nên áp
+dụng được ngay, kể cả khi học viên chưa gọi API học. access, content và game có bảng outbox và ghi event nhưng chưa có
 relay, nên các event đó chưa được phát.
 
 ## 4. Mô hình bảo mật
@@ -95,7 +100,6 @@ relay, nên các event đó chưa được phát.
 Client --external JWT--> Gateway: kiểm issuer, subject UUID, role hợp lệ
        Gateway --ký internal JWT (HMAC, issuer riêng, ~60 s)--> service trong internal-jwt-paths
        Service Java: CommonSecurityAutoConfiguration -> CurrentUserProvider -> controller
-       AI Learning: app/security/internal_jwt.py kiểm cùng issuer/claim/role
 ```
 
 - `user-service` ký external HMAC JWT và chỉ lưu refresh token dạng hash; refresh token dùng một lần.
@@ -126,18 +130,6 @@ api ----------> application ----------> domain
 - `api`: controller, DTO, `GlobalExceptionHandler` → `ErrorResponse`, filter log có `X-Correlation-Id`.
 - Thực tế còn thực dụng: use case dùng `@Service`/`@Transactional` của Spring.
 
-### AI Learning (Python)
-
-```text
-app/api (FastAPI routes, DTO camelCase, SSE) -> app/application (path service, ingestion, ordering)
-   -> app/mastery (engine port từ DeepTutor v1.6.9), app/tutor (engine, tools, memory, session store),
-      app/practice, app/usage (hạn mức ngày), app/learning (ordering LLM, provenance)
-   -> app/persistence, stores (psycopg2, mở kết nối mỗi lần gọi), app/clients (httpx), app/messaging (pika)
-```
-
-`main.py` khai báo app FastAPI; lúc khởi động đánh dấu các lượt tutor bị gián đoạn là failed và kiểm múi giờ/bảng hạn
-mức. Cấu hình qua pydantic-settings, tiền tố `AI_LEARNING_`.
-
 ## 6. Luồng chính
 
 ### Đăng nhập và token
@@ -149,12 +141,23 @@ Client -> Gateway (public /auth/login) -> user-service LoginUseCase -> UserRepos
 
 `RefreshTokenUseCase` hash token nhận vào, chỉ consume token còn hiệu lực một lần, kiểm user active rồi phát cặp mới.
 
-### Tạo lộ trình học (AI Learning)
+### Học topic và bài (Learning Service)
 
 ```text
-POST /api/ai-learning/paths -> PathService: goal đang active (User) -> curriculum trong band (Content)
-  -> CurriculumAdapter -> mastery path (một path mỗi learning goal) -> PathOrderer (LLM, tùy chọn; lỗi thì giữ thứ tự Content)
+GET /api/learning/topics -> một lần gọi Content topic-sequence -> knowledge_point_catalog + topic_progress.sequence_order
+  -> trạng thái suy ra khi đọc: PASSED (passed_at) / IN_PROGRESS (topic đầu chưa đạt) / LOCKED
+POST /api/learning/lessons/{id}/exercises/{blockId}/submissions -> khóa theo user -> cổng (REVIEW_REQUIRED, TOPIC_LOCKED,
+  LESSON_LOCKED) -> chấm answer-spec-v1 -> bằng chứng lần nộp đầu -> bài xong thì ReviewRule chèn bài ôn khi KP yếu
+GET /api/learning/reviews/{id} -> lý thuyết + một gói PRACTICE_SET (không còn gói -> SKIPPED)
+POST /api/learning/reviews/{id}/submissions -> mỗi set một lần; >=70% -> DONE; trượt 3 set -> SKIPPED
+POST /api/learning/topics/{id}/test-assignments -> một mã đề dùng một lần, xoay vòng theo package
 ```
+
+Gợi ý Reading (`question_versions.hint`, Content V13) do Content lưu và trả qua
+`/internal/learning-content/lessons/{id}`; Learning Service Java quyết định hiển thị cho câu `FILL` hoặc `CHOICE`
+hợp lệ có ≥3 lựa chọn (TFNG hỗ trợ options thiếu/rỗng). Câu từng sai trong cùng user/bài/khối mở gợi ý khi khối chưa đạt,
+giữ cả khi câu đúng ở lần sau nhưng khối vẫn trượt; khối đạt thì `hint = null`. Lịch sử lấy từ mọi
+`lesson_exercise_submissions.response.results`; replay `requestId` trả response đã lưu, không đổi evidence/mastery lần nộp đầu.
 
 ### Catalog, thư viện cá nhân và game
 
@@ -171,33 +174,27 @@ Game lưu snapshot để chơi; hai service cung cấp cùng request/response n�
 
 ### Kết quả thi → mastery
 
-Học viên làm bài ở assessment → chấm → `FinalizeAssessmentResultUseCase` → `AssessmentCompleted.v2` (mục 3) → AI Learning
-ghi bằng chứng chính thức vào path của goal; `GET /api/ai-learning/status` phản ánh kết quả.
+Học viên lấy mã đề từ learning (`POST /api/learning/topics/{id}/test-assignments`), tạo attempt bằng
+`packageVersionId` (assessment đọc đề từ content, tự suy loại attempt), nộp bài → assessment tự chấm câu khách quan
+(câu không chấm được thì chờ người chấm) → `AssessmentCompleted.v2` (mục 3) → Learning Service ghi bằng chứng, đề cuối đạt
+≥ 70% thì topic PASSED; `GET /api/learning/mastery` và `GET /api/learning/topics` phản ánh kết quả. Học viên xem điểm,
+đúng/sai ở `GET /api/assessments/attempts/{id}/result`; lời giải chỉ hiện khi đạt ≥ 70%.
 
-### Lượt tutor (SSE)
-
-```text
-POST /api/ai-learning/tutor/sessions/{id}/turns
-  -> open_turn (404 session lạ, 409 lượt đang chạy)
-  -> tiêu hạn mức ngày (hết: 429 + resetsAt, không gọi LLM)
-  -> TutorEngine.run: vòng tool-calling tối đa 6 vòng (mastery_*, path_*, practice/reading, save_note)
-  -> SSE turn.started ... turn.completed | turn.failed; lượt luôn được đóng
-  -> tóm tắt learner memory chạy nền (có hạn mức riêng)
-```
-
-Contract: [`tutor-sse-v1.md`](contracts/tutor-sse-v1.md), [`practice-v1.md`](contracts/practice-v1.md).
+Assessment không gọi User lấy goal; attempt mới và event có `learning_goal_id` null. Consumer Learning không gọi
+HTTP và không cần path hoặc trạng thái học có sẵn. Trong một transaction khóa theo user, version bằng/cũ bị bỏ qua;
+version cao hơn thay evidence của attempt. `PLACEMENT` chỉ ghi version. `TOPIC_GATE` tìm assignment cùng user/package
+version, `consumed_at IS NULL` và `assigned_at <= completed_at`, lấy lần giao mới nhất thỏa điều kiện. Lần giao được
+consume cả khi trượt; đạt ≥70% ghi `passed_at` một chiều. ACK sau commit; topic kế mở theo trạng thái suy ra khi đọc.
 
 ## 7. Chạy local (tóm tắt)
 
-- Compose (`docker-compose.yml`): `library-db` (host 5437), `community-db`, `game-db`, `rabbitmq`, `ai-learning-db`,
-  `ai-learning-migrate`, `ai-learning-api`, `ai-learning-consumer`, `game-service` (không dùng được, xem §11); `llm-stub`
-  nằm sau profile `llm-stub`. Chỉ bật các service cần, không `docker compose up` toàn bộ.
+- Compose (`docker-compose.yml`): `library-db` (host 5437), `community-db`, `game-db`, `learning-db` (host 5436), `rabbitmq`,
+  `game-service` (không dùng được, xem §11). Chỉ bật các service cần, không `docker compose up` toàn bộ.
 - Trên host (IDE hoặc `java -jar`): config-server → eureka → api-gateway → các business service Java. Postgres local
   5432 cần `user_db`, `content_db`, `assessment_db`, `access_db`, `notification_db`.
 - `.env` ở root (gitignored) được compose nội suy; Gateway và mọi service Java nghiệp vụ import nó
-  (`optional:file:../../.env[.properties]`), config-server và eureka-server thì không. AI Learning chạy trên host đọc
-  `.env` riêng của service. Compose yêu cầu `LIBRARY_DB_PASSWORD` dù không bật `library-db`. Container AI Learning gọi
-  User/Content trên host qua `host.docker.internal`. Game trên host cần đặt `CONTENT_SERVICE_URL=http://localhost:8082`;
+  (`optional:file:../../.env[.properties]`), config-server và eureka-server thì không. Compose yêu cầu `LIBRARY_DB_PASSWORD`
+  dù không bật `library-db`. Bài Listening cần `CONTENT_MEDIA_BASE_URL`. Game trên host cần đặt `CONTENT_SERVICE_URL=http://localhost:8082`;
   `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
 
 ## 8. Quyết định kiến trúc đã quan sát
@@ -206,14 +203,13 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 
 | Quyết định | Lý do | Trade-off |
 | --- | --- | --- |
-| Gateway ký internal JWT; downstream chỉ tin internal JWT | Không tin identity header; tập trung validation trong `common-security` | Gateway và service phải cùng contract claim/issuer/role (kể cả bản Python) |
+| Gateway ký internal JWT; downstream chỉ tin internal JWT | Không tin identity header; tập trung validation trong `common-security` | Gateway và service phải cùng contract claim/issuer/role |
 | Config Server native + Eureka | Cấu hình tập trung, route `lb://` thay host cố định | Khởi động phụ thuộc thứ tự hạ tầng |
 | Domain model tách JPA entity (mapper + adapter) | Giữ JPA ngoài domain | Thêm mapper, lặp model |
 | `Dockerfile.spring-service` theo `MODULE_PATH`; Config Server có Dockerfile riêng | Config Server cần đóng gói `config-repo` | Hai kiểu Dockerfile |
-| AI Learning viết bằng Python, ngoài Maven và Eureka, route URI cố định | Engine mastery/tutor gốc là Python | Không discovery/load-balancing; contract internal JWT phải giữ đồng bộ bằng tay |
-| Port engine mastery từ DeepTutor v1.6.9 vào `app/mastery`, bỏ phụ thuộc runtime (`3b97191`) | Kiểm soát code, image nhỏ, không kéo cả DeepTutor | Tự bảo trì bản port; test giữ giá trị gốc để phát hiện lệch |
-| Outbox + RabbitMQ cho assessment → AI Learning; consumer có retry/DLQ | Không mất kết quả thi khi AI Learning tạm lỗi | Thêm broker; outbox các service khác chưa có relay |
-| Hạn mức lượt tutor/tóm tắt memory theo ngày trong AI Learning | Chặn chi phí LLM theo học viên | Chưa trừ AI Points (làm sau) |
+| Thay AI Learning Python bằng `learning-service` Java, chỉ giữ tính năng MVP (2026-10-01) | Một stack, dùng chung `common-security`, Eureka, Spring AMQP | Bỏ tutor, practice notebook, learner memory, sắp path bằng LLM |
+| Bằng chứng theo user (`kp_evidence`), mastery tính khi đọc bằng `compute_mastery` port từ DeepTutor | Không cần aggregate path; consumer áp dụng được khi chưa có trạng thái học | Thứ tự bằng chứng dựa vào cột `ordinal` |
+| Outbox + RabbitMQ cho assessment → learning; consumer có retry/DLQ | Không mất kết quả thi khi learning tạm lỗi | Thêm broker; outbox các service khác chưa có relay |
 | Tách catalog/thư viện cá nhân sang library, activity/streak sang user | Mỗi nhóm dữ liệu có service và DB sở hữu rõ ràng, giữ public path | Gateway cần route theo nhóm; game chọn hai nguồn snapshot |
 
 ## 9. Pattern đang dùng
@@ -222,12 +218,11 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | --- | --- |
 | API Gateway, Configuration Server, Service Discovery | `infra/*` |
 | Repository Adapter, Aggregate/Value Object, Mapper | Service Java |
-| Ports & adapters (`application/port`) | assessment, game, library |
+| Ports & adapters (`application/port`) | assessment, game, library, learning, content (đọc nội dung học) |
 | Transactional outbox + relay có publisher confirm | assessment (access/content/game mới có phần ghi) |
-| Consumer với retry queue TTL và dead-letter queue | ai-learning |
+| Consumer với retry queue TTL và dead-letter queue | learning |
 | Shared auto-configuration | `common-security` |
 | Global exception handler → `ErrorResponse` | Service Java |
-| Server-sent events, tool-calling loop | AI Learning tutor |
 | WebSocket với ticket ngắn hạn | game |
 
 ## 10. Bài học kỹ thuật
@@ -235,8 +230,8 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 - **Gom security downstream vào `common-security`** (`a18a44e`): bỏ `SecurityConfig` riêng của user-service, thêm
   auto-configuration, `CurrentUserProvider`, validator và role chuẩn dùng chung.
 - **Docker theo Maven module** (`dac8b03`): root Dockerfile nhận `MODULE_PATH`; Config Server có Dockerfile riêng.
-- **Bỏ phụ thuộc DeepTutor** (`3b97191`): port engine mastery, thêm test chặn mọi import/tham chiếu `deeptutor`.
-- **Không track bytecode Python** (`ad0a19b`): `.pyc` từng được commit và bị IDE ghi đè liên tục.
+- **Bỏ service Python** (2026-10-01): sau khi đã port engine mastery (`3b97191`), MVP chỉ cần công thức `compute_mastery`;
+  viết lại bằng Java bỏ được pipeline test, container và quy tắc riêng của Python.
 - **Graph chỉ chứa code first-party** (`9a1f5a8`): `third_party/` từng chiếm ~80% node graphify.
 
 ## 11. Điểm chưa nhất quán đã biết
@@ -255,10 +250,15 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | Secret có giá trị fallback trong config-repo được track | Thiếu biến env thì service dùng secret công khai trong repo |
 | README root chỉ liệt kê 3 DB local | access, notification cần `access_db`, `notification_db` |
 | community-service mặc định `localhost:5432/community_db`, DB compose ở 5434 | Đặt `COMMUNITY_DB_URL` khi dùng DB compose |
-| `.sdd/global/system-architecture.md`, `.sdd/constraints/global.md` (baseline 2026-09-18) ghi không có broker/outbox/AI Learning | Lỗi thời; `.sdd/global/constitution.md` vẫn là invariant cao nhất. Dữ kiện: code, `AGENTS.md`, tài liệu này |
-| AI Learning không gửi `X-Correlation-Id` khi gọi Content/User | Service Java có gửi |
-| Gateway CORS chỉ expose `Authorization`, `Content-Type` | Browser không đọc được `Retry-After` của 429 tutor; dùng `resetsAt` (việc tùy chọn trong plan hạn mức) |
+| `.sdd/global/system-architecture.md`, `.sdd/constraints/global.md` (baseline 2026-09-18) ghi không có broker/outbox/learning service | Lỗi thời; `.sdd/global/constitution.md` vẫn là invariant cao nhất. Dữ kiện: code, `AGENTS.md`, tài liệu này |
+| Gateway CORS chỉ expose `Authorization`, `Content-Type` | Browser không đọc được header khác (ví dụ `Retry-After`) |
 | community có bảng `outbox_events` (V1) nhưng không dùng | Library không tạo bảng này; outbox của access/content/game chưa có relay |
-| `requirements.txt` của AI Learning có `sqlalchemy` nhưng code không import | Dependency thừa |
-| `tests/e2e/tutor_e2e.py` ghi chạy từ root repo; README root ghi chạy từ `services/ai-learning-service` | Chưa thống nhất |
-| `services/ai-learning-service/README.md` dòng ~500 nói event chưa có path "retry rồi vào DLQ" | Code (và dòng ~472 cùng README) lưu vào `pending_formal_assessment_results` và ACK; code đúng |
+| Consumer học chưa có automated integration test với RabbitMQ thật | Logic ack/nack/DLQ có unit test với channel giả; áp kết quả có test Postgres thật. [Live E2E 2026-10-02](../plans/260929-1640-lesson-learning-pipeline-mvp/reports/e2e-261002-foundation-learning-pipeline.md) đã kiểm outbox → broker → consumer và replay DLQ với broker thật |
+| Giá chấm Writing nằm ở hai nơi | Learning `learning.writing.point-cost` (3) cho bài luận trong bài học; assessment `grading_point_costs.WRITING` cho chấm qua `grading_jobs`. Đổi giá phải sửa cả hai |
+| Bài Writing lưu ở hai nơi | Bài luận trong bài học ở `learning_db.lesson_writing_submissions`; Writing trong đề (sau MVP) ở `assessment_db.learner_submissions` |
+| Ảnh biểu đồ Task 1 mới dùng tham chiếu media | Content nhận URL `https://` hoặc data URI ảnh Base64 và trả `mediaUrl`; chưa có luồng upload hay tích hợp object storage cho ảnh. Seed dùng SVG data URI; grader đọc `chartFacts`, không đọc ảnh |
+| Media Listening dùng bucket public-read | Team tự upload 8 mp3 của seed; backend chưa có upload API, signed URL hay giới hạn lượt nghe. Thiếu `CONTENT_MEDIA_BASE_URL` thì các reference dạng key không resolve được (`INVALID_MEDIA_REFERENCE`); URL `https://` đầy đủ không cần base |
+| Writing trong đề cuối chưa thuộc MVP | Bài luận Task 1/Task 2 chỉ ở bài học; đưa Writing vào đề cuối chờ chốt chính sách phí để tránh tạo tường phí tại cổng topic |
+| Một số ghi Writing chưa theo quy tắc khóa mọi lượt ghi theo user | Bắt đầu/kết thúc chấm có transaction và advisory lock; quota, lưu grade và lỗi trung gian dùng SQL nguyên tử có điều kiện ngoài các transaction này. Dữ kiện hiện tại, không thay quy tắc AGENTS.md §3.8 |
+| Cổng bài học là authority cho luồng học | `LessonAccessGate` kiểm review/topic/bài trước; runtime Java MVP không có tutor hay `next_objective` |
+| Sơ đồ §1 còn cạnh assessment → user từ baseline cũ | Tạo attempt hiện chỉ đọc Content; không gọi User để lấy goal (xem §3 và §6) |

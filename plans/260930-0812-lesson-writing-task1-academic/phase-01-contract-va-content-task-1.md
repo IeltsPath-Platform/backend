@@ -1,13 +1,21 @@
 ---
 phase: 1
 title: "Contract và content Task 1"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 effort: "1 ngày"
 ---
 
 # Phase 1: Contract và content Task 1
+
+## Kết quả (2026-10-01, nhánh `feat/writing-access-content`)
+
+- Contract: `answer-spec-v1` (ESSAY `TASK_1`, 2 vector), `learning-content-internal-v1` (`assets[]` của câu essay), `lesson-writing-v1` (`images`, tiêu chí `TA`). Content V11 seed L3-W1 (SVG 2,8 KB, số khớp `chartFacts`). Content 124 test pass, 0 skip.
+- Lệch plan:
+  - Phần học viên (`images` của khối essay) ghi ở `lesson-writing-v1.md`, không sửa `lesson-learning-v1.md` (Codex đang sửa file đó ở plan `261001-1228`).
+  - Asset của câu load bằng **một** query trong `JdbcLearningContentReader` (đường đọc bài học của 1640), không thêm hàm vào `ContentAssetRepository`.
+  - `MediaReferencePolicy` là hàm tĩnh, chưa nhận base URL (YAGNI); 0851 thêm AUDIO và `CONTENT_MEDIA_BASE_URL`.
 
 ## Context Links
 
