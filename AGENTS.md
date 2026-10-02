@@ -47,6 +47,7 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 | Messaging | RabbitMQ 3.13; Spring AMQP (`spring-boot-starter-amqp`): assessment phát, learning-service nhận. |
 | Realtime | Spring WebSocket (game-service). |
 | Shared code | `common-security` auto-configuration; MapStruct 1.6.3; Lombok 1.18.46. |
+| API docs | springdoc-openapi 2.8.17 (duyệt 2026-10-02): `webmvc-api` ở user/access/assessment/learning, `webflux-ui` ở Gateway gom Swagger UI; chỉ route luồng chính, không `/internal/**`. |
 | Kiểm thử | JUnit Jupiter, Spring Boot Test, Mockito, Spring Security Test, Testcontainers PostgreSQL. |
 | Container | Docker Compose, `postgres:15-alpine`, `rabbitmq:3.13-management-alpine`, Eclipse Temurin 21. |
 
@@ -152,6 +153,9 @@ src/main/java/com/group01/<service>
 
 ### 3.8 Learning Service
 
+- Trạng thái nằm trong aggregate (`LessonProgress`, `LearnerCurriculum`, `ReviewItem`, `TopicTestAssignment`,
+  `WritingSubmission`); thay đổi trạng thái qua method của aggregate rồi lưu bằng `domain/repository`, adapter JDBC
+  không chứa luật. Khóa, replay theo `requestId`, hạn mức LLM là port ở `application/port`.
 - Không còn path DeepTutor: bằng chứng học lưu theo user ở `kp_evidence`; mastery của KP tính khi đọc bằng
   `MasteryCalculator` (port `compute_mastery` của DeepTutor v1.6.9, Apache-2.0; giữ comment ghi nguồn và giá trị test gốc).
 - Thứ tự topic theo user từ Content `topic-sequence`, không LLM, không goal/band. `LessonAccessGate` và use case trong

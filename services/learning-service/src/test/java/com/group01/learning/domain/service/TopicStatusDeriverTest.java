@@ -1,6 +1,6 @@
 package com.group01.learning.domain.service;
 
-import com.group01.learning.domain.vo.TopicProgress;
+import com.group01.learning.domain.entity.TopicProgress;
 import com.group01.learning.domain.vo.TopicStatus;
 import org.junit.jupiter.api.Test;
 

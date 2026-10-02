@@ -19,8 +19,12 @@ public interface LearningContentClient {
 
     PackageVersion getPackageVersion(UUID versionId);
 
-    record Topic(UUID topicId, String code, String name, int sortOrder,
+    /** {@code requiredFeatureKey} is the Access feature needed to learn the topic; null means free. */
+    record Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                  List<KnowledgePoint> knowledgePoints) {
+        public Topic(UUID topicId, String code, String name, int sortOrder, List<KnowledgePoint> knowledgePoints) {
+            this(topicId, code, name, sortOrder, null, knowledgePoints);
+        }
     }
 
     record KnowledgePoint(UUID id, String code, String name, String learningType, String skill,

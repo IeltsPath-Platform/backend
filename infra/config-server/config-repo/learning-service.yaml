@@ -25,6 +25,8 @@ app:
         patterns:
           - /actuator/health
           - /actuator/info
+          - /v3/api-docs
+          - /v3/api-docs/**
 
 learning:
   content:
@@ -49,6 +51,13 @@ learning:
     retry-delay-ms: ${LEARNING_RETRY_DELAY_MS:30000}
     max-delivery-attempts: ${LEARNING_MAX_DELIVERY_ATTEMPTS:5}
     consumer-enabled: ${LEARNING_CONSUMER_ENABLED:true}
+
+springdoc:
+  # OpenAPI for the Gateway Swagger UI; set API_DOCS_ENABLED=false outside local development.
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:true}
+  paths-to-match:
+    - /api/learning/**
 
 management:
   endpoints:

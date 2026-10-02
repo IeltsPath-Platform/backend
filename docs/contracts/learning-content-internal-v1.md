@@ -14,14 +14,14 @@ Returns an array of ACTIVE topics with at least one PUBLISHED lesson **and** one
 [
   {
     "topicId": "10000000-0000-4000-8000-000000000001",
-    "code": "DEMO_READING", "name": "Demo IELTS Reading", "sortOrder": 900,
+    "code": "DEMO_READING", "name": "Demo IELTS Reading", "sortOrder": 900, "requiredFeatureKey": null,
     "knowledgePoints": [
       {"id":"20000000-0000-4000-8000-000000000003","code":"DR_TOPIC_SENTENCE","name":"Câu chủ đề","learningType":"PROCEDURE","skill":"READING","description":null,"hasPracticeSet":true}
     ]
   },
   {
     "topicId": "20000000-0000-4000-8000-000000000002",
-    "code": "TFNG_SKILLS", "name": "True / False / Not Given", "sortOrder": 910,
+    "code": "TFNG_SKILLS", "name": "True / False / Not Given", "sortOrder": 910, "requiredFeatureKey": null,
     "knowledgePoints": [
       {"id":"20000000-0000-4000-8000-000000000005","code":"TFNG_FALSE_VS_NOT_GIVEN","name":"False hay Not Given","learningType":"PROCEDURE","skill":"READING","description":null,"hasPracticeSet":false}
     ]
@@ -29,7 +29,7 @@ Returns an array of ACTIVE topics with at least one PUBLISHED lesson **and** one
 ]
 ```
 
-The example shows representative KPs; the real response includes **all** ACTIVE KPs of each returned topic (KP1–KP4 for `DEMO_READING`, KP5 for `TFNG_SKILLS`). `hasPracticeSet` uses the same eligible-package predicate as search, including the no-overlap rule below. It is computed in a batched query, not by one query per KP. The topic object is `{topicId, code, name, sortOrder, knowledgePoints}`; `skill` belongs only to each KP.
+The example shows representative KPs; the real response includes **all** ACTIVE KPs of each returned topic (KP1–KP4 for `DEMO_READING`, KP5 for `TFNG_SKILLS`). `hasPracticeSet` uses the same eligible-package predicate as search, including the no-overlap rule below. It is computed in a batched query, not by one query per KP. The topic object is `{topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints}`; `skill` belongs only to each KP. `requiredFeatureKey` (added 2026-10-02) is the Access feature needed to learn the topic, `null` when free; the seed marks `PREMIUM_MATCHING_INFO` and `PREMIUM_SENTENCE_COMPLETION` (sort 930, 940) with `PREMIUM_CONTENT`.
 
 ## `GET /topics/{id}/lessons`
 

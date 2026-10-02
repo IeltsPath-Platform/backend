@@ -10,10 +10,14 @@ import com.group01.learning.application.exception.LearningRequestException;
 import com.group01.learning.application.result.LessonResult;
 import com.group01.learning.application.result.WritingSubmissionResult;
 import com.group01.learning.application.usecase.GetMasteryUseCase;
-import com.group01.learning.application.usecase.LearnLessonUseCase;
-import com.group01.learning.application.usecase.LessonEssayUseCase;
+import com.group01.learning.application.usecase.GetTopicLessonsUseCase;
+import com.group01.learning.application.usecase.GetLessonUseCase;
+import com.group01.learning.application.usecase.SubmitLessonExerciseUseCase;
+import com.group01.learning.application.usecase.CompleteLessonUseCase;
+import com.group01.learning.application.usecase.GetWritingSubmissionUseCase;
+import com.group01.learning.application.usecase.SubmitLessonEssayUseCase;
 import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
-import com.group01.learning.application.writing.WritingGrade;
+import com.group01.learning.domain.vo.WritingGrade;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,8 +74,12 @@ class WritingWebMvcTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @MockitoBean CurrentUserProvider currentUser;
-    @MockitoBean LessonEssayUseCase essays;
-    @MockitoBean LearnLessonUseCase lessons;
+    @MockitoBean GetWritingSubmissionUseCase getWritingSubmissionUseCase;
+    @MockitoBean SubmitLessonEssayUseCase submitLessonEssayUseCase;
+    @MockitoBean GetTopicLessonsUseCase getTopicLessonsUseCase;
+    @MockitoBean GetLessonUseCase getLessonUseCase;
+    @MockitoBean SubmitLessonExerciseUseCase submitLessonExerciseUseCase;
+    @MockitoBean CompleteLessonUseCase completeLessonUseCase;
     @MockitoBean RefreshLearningTopicsUseCase topics;
     @MockitoBean GetMasteryUseCase mastery;
 
@@ -85,7 +93,7 @@ class WritingWebMvcTest {
         var grade = new WritingGrade(List.of(new WritingGrade.Criterion("TR", new BigDecimal("6.5"), List.of("s"),
                 List.of("i"))), List.of(new WritingGrade.Correction("peoples", "people", "GRAMMAR")), "ok",
                 new BigDecimal("6.5"));
-        when(essays.submit(eq(USER), eq(LESSON), eq(BLOCK), any(), eq("essay"))).thenReturn(new WritingSubmissionResult(
+        when(submitLessonEssayUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any(), eq("essay"))).thenReturn(new WritingSubmissionResult(
                 SUBMISSION, "GRADED", "TASK_2", 260, new BigDecimal("6.5"), true, grade, 3, "Model", null, null));
 
         JsonNode body = json.readTree(mvc.perform(authenticated(post(
@@ -102,13 +110,13 @@ class WritingWebMvcTest {
 
     @Test
     void pendingPaymentShowsOnlyTheCodeAndErrorsCarryTheSubmission() throws Exception {
-        when(essays.get(USER, SUBMISSION)).thenReturn(new WritingSubmissionResult(SUBMISSION, "PAYMENT_PENDING",
+        when(getWritingSubmissionUseCase.execute(USER, SUBMISSION)).thenReturn(new WritingSubmissionResult(SUBMISSION, "PAYMENT_PENDING",
                 "TASK_2", null, null, null, null, null, null, "INSUFFICIENT_POINTS", null));
         JsonNode pending = json.readTree(mvc.perform(authenticated(get("/api/learning/writing-submissions/{id}",
                 SUBMISSION))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertEquals(Set.of("submissionId", "status", "code"), keys(pending));
 
-        when(essays.submit(any(), any(), any(), any(), any())).thenThrow(new LearningRequestException(402,
+        when(submitLessonEssayUseCase.execute(any(), any(), any(), any(), any())).thenThrow(new LearningRequestException(402,
                 "INSUFFICIENT_POINTS", "Not enough points", SUBMISSION));
         JsonNode error = json.readTree(mvc.perform(authenticated(post(
                         "/api/learning/lessons/{lessonId}/essays/{blockId}/submissions", LESSON, BLOCK)
@@ -127,7 +135,7 @@ class WritingWebMvcTest {
         var latest = new LessonResult.Block(UUID.randomUUID(), "EXERCISE", "ESSAY", 2, null, null, null, null, null,
                 null, question, new LessonResult.LatestSubmission(SUBMISSION, "GRADED", new BigDecimal("7.0"), true),
                 "Model");
-        when(lessons.get(USER, LESSON)).thenReturn(new LessonResult(LESSON, UUID.randomUUID(), "L3", "Chart", null, 1,
+        when(getLessonUseCase.execute(USER, LESSON)).thenReturn(new LessonResult(LESSON, UUID.randomUUID(), "L3", "Chart", null, 1,
                 "AVAILABLE", List.of(none, latest)));
 
         String raw = mvc.perform(authenticated(get("/api/learning/lessons/{id}", LESSON)))

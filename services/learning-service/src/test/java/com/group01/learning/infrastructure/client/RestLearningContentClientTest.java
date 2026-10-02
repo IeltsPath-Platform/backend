@@ -74,6 +74,7 @@ class RestLearningContentClientTest {
                 .andRespond(withSuccess("""
                         [{"topicId":"10000000-0000-4000-8000-000000000001",
                           "code":"DEMO_READING","name":"Demo IELTS Reading","sortOrder":900,
+                          "requiredFeatureKey":"PREMIUM_CONTENT",
                           "knowledgePoints":[{"id":"20000000-0000-4000-8000-000000000003",
                             "code":"DR_TOPIC_SENTENCE","name":"Topic sentence","learningType":"PROCEDURE",
                             "skill":"READING","description":null,"hasPracticeSet":true}]}]
@@ -86,6 +87,7 @@ class RestLearningContentClientTest {
         assertEquals(TOPIC_ID, topic.topicId());
         assertEquals("DEMO_READING", topic.code());
         assertEquals(900, topic.sortOrder());
+        assertEquals("PREMIUM_CONTENT", topic.requiredFeatureKey());
         var knowledgePoint = topic.knowledgePoints().getFirst();
         assertEquals(KP_ID, knowledgePoint.id());
         assertEquals("PROCEDURE", knowledgePoint.learningType());

@@ -14,12 +14,13 @@ All routes in this section have prefix `/api/learning`, require the learner bear
 
 ### `GET /topics`
 
-Refreshes the shared `knowledge_point_catalog` and the user's `topic_progress.sequence_order` from one Content `topic-sequence` read. Returns `[{topicId, code, name, sequenceOrder, status, completedLessonCount}]`. A topic is `PASSED` when `passed_at` exists; otherwise the first unpassed topic in current `sequenceOrder` is `IN_PROGRESS` and the others are `LOCKED`. Removed topics have no sequence order and are omitted. A newly inserted topic can become the first unpassed one without leaving another topic stuck as `LOCKED`.
+Refreshes the shared `knowledge_point_catalog` and the user's `topic_progress.sequence_order` from one Content `topic-sequence` read. Returns `[{topicId, code, name, sequenceOrder, status, completedLessonCount, accessLevel}]`. `accessLevel` (added 2026-10-02) is `FREE`, or `PREMIUM` when Content requires a paid feature for the topic (`requiredFeatureKey`); clients show a `PREMIUM` topic as paid and disabled. It does not change `status`, and Learning does not check the learner's plan yet. Paid demo topics come after every free topic. A topic is `PASSED` when `passed_at` exists; otherwise the first unpassed topic in current `sequenceOrder` is `IN_PROGRESS` and the others are `LOCKED`. Removed topics have no sequence order and are omitted. A newly inserted topic can become the first unpassed one without leaving another topic stuck as `LOCKED`.
 
 ```json
 [
-  {"topicId":"10000000-0000-4000-8000-000000000001","code":"DEMO_READING","name":"Demo IELTS Reading","sequenceOrder":1,"status":"IN_PROGRESS","completedLessonCount":0},
-  {"topicId":"20000000-0000-4000-8000-000000000002","code":"TFNG_SKILLS","name":"True / False / Not Given","sequenceOrder":2,"status":"LOCKED","completedLessonCount":0}
+  {"topicId":"10000000-0000-4000-8000-000000000001","code":"DEMO_READING","name":"Demo IELTS Reading","sequenceOrder":1,"status":"IN_PROGRESS","completedLessonCount":0,"accessLevel":"FREE"},
+  {"topicId":"20000000-0000-4000-8000-000000000002","code":"TFNG_SKILLS","name":"True / False / Not Given","sequenceOrder":2,"status":"LOCKED","completedLessonCount":0,"accessLevel":"FREE"},
+  {"topicId":"24000000-0000-4000-8000-010000000001","code":"PREMIUM_MATCHING_INFO","name":"Matching Information","sequenceOrder":4,"status":"LOCKED","completedLessonCount":0,"accessLevel":"PREMIUM"}
 ]
 ```
 

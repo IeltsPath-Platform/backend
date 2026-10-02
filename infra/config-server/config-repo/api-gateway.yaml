@@ -101,6 +101,31 @@ spring:
               uri: lb://learning-service
               predicates:
                 - Path=/api/learning/**
+            # OpenAPI documents of the main learner flow, proxied for the Gateway Swagger UI.
+            - id: api-docs-user-service
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/api-docs/user-service
+              filters:
+                - RewritePath=/api-docs/user-service, /v3/api-docs
+            - id: api-docs-access-service
+              uri: lb://ACCESS-SERVICE
+              predicates:
+                - Path=/api-docs/access-service
+              filters:
+                - RewritePath=/api-docs/access-service, /v3/api-docs
+            - id: api-docs-assessment-service
+              uri: lb://ASSESSMENT-SERVICE
+              predicates:
+                - Path=/api-docs/assessment-service
+              filters:
+                - RewritePath=/api-docs/assessment-service, /v3/api-docs
+            - id: api-docs-learning-service
+              uri: lb://learning-service
+              predicates:
+                - Path=/api-docs/learning-service
+              filters:
+                - RewritePath=/api-docs/learning-service, /v3/api-docs
 
 app:
   auth:
@@ -135,6 +160,27 @@ gateway:
       - /auth/reset-password
       - /api/users/register
       - /ws/games/**
+      - /swagger-ui.html
+      - /swagger-ui/**
+      - /v3/api-docs/**
+      - /api-docs/**
+      - /webjars/**
+
+springdoc:
+  # Swagger UI for the main learner flow; set API_DOCS_ENABLED=false outside local development.
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:true}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:true}
+    urls:
+      - name: user-service
+        url: /api-docs/user-service
+      - name: access-service
+        url: /api-docs/access-service
+      - name: assessment-service
+        url: /api-docs/assessment-service
+      - name: learning-service
+        url: /api-docs/learning-service
 
 management:
   endpoints:

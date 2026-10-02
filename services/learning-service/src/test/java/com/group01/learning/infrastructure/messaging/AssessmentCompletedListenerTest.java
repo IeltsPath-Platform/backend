@@ -38,7 +38,7 @@ class AssessmentCompletedListenerTest {
     @Test
     void appliedEventIsAcknowledged() throws Exception {
         listener.onMessage(message(AssessmentCompletedParserTest.event(""), 0), channel);
-        verify(apply).apply(any());
+        verify(apply).execute(any());
         verify(channel).basicAck(7L, false);
     }
 
@@ -58,7 +58,7 @@ class AssessmentCompletedListenerTest {
 
     @Test
     void transientFailureIsRetriedUntilTheLastAttemptIsParked() throws Exception {
-        doThrow(new IllegalStateException("database down")).when(apply).apply(any());
+        doThrow(new IllegalStateException("database down")).when(apply).execute(any());
 
         listener.onMessage(message(AssessmentCompletedParserTest.event(""), 3), channel);
         verify(channel).basicNack(7L, false, false);

@@ -8,9 +8,11 @@ import com.group01.learning.application.port.LearningContentClient.*;
 import com.group01.learning.application.result.ReviewResult;
 import com.group01.learning.application.result.ReviewSubmissionResult;
 import com.group01.learning.application.usecase.AssignTopicTestUseCase;
-import com.group01.learning.application.usecase.LearnLessonUseCase;
+import com.group01.learning.application.usecase.GetLessonUseCase;
+import com.group01.learning.application.usecase.SubmitLessonExerciseUseCase;
 import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
-import com.group01.learning.application.usecase.ReviewUseCase;
+import com.group01.learning.application.usecase.GetReviewUseCase;
+import com.group01.learning.application.usecase.SubmitReviewUseCase;
 import com.group01.learning.domain.exception.LearningGateException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,9 +80,11 @@ class ReviewAndTestAssignmentIntegrationTest {
     private static final UUID TEST_Y = UUID.randomUUID();
 
     @Autowired JdbcTemplate jdbc;
-    @Autowired ReviewUseCase reviews;
+    @Autowired GetReviewUseCase getReviewUseCase;
+    @Autowired SubmitReviewUseCase submitReviewUseCase;
     @Autowired AssignTopicTestUseCase tests;
-    @Autowired LearnLessonUseCase lessons;
+    @Autowired GetLessonUseCase getLessonUseCase;
+    @Autowired SubmitLessonExerciseUseCase submitLessonExerciseUseCase;
     @Autowired RefreshLearningTopicsUseCase topics;
     @MockitoBean LearningContentClient content;
 
@@ -119,7 +123,7 @@ class ReviewAndTestAssignmentIntegrationTest {
 
     @Test
     void essayBlockNeitherBlocksCompletionNorAcceptsExerciseAnswersAndTranscriptWaitsForCompletion() {
-        var before = lessons.get(USER, LESSON);
+        var before = getLessonUseCase.execute(USER, LESSON);
         var audio = before.blocks().get(1).asset();
         assertEquals("https://media.example.test/listening/demo/ls1.mp3", audio.mediaUrl());
         assertNull(audio.transcript());
@@ -134,13 +138,13 @@ class ReviewAndTestAssignmentIntegrationTest {
         var essayAnswer = new SubmitExerciseCommand(UUID.randomUUID(),
                 List.of(new SubmitExerciseCommand.Answer(essay.essay().questionVersionId(), "An essay")));
         var conflict = assertThrows(LearningRequestException.class,
-                () -> lessons.submit(USER, LESSON, ESSAY_BLOCK, essayAnswer));
+                () -> submitLessonExerciseUseCase.execute(USER, LESSON, ESSAY_BLOCK, essayAnswer));
         assertEquals("ESSAY_BLOCK", conflict.getCode());
 
-        var result = lessons.submit(USER, LESSON, EXERCISE_BLOCK, new SubmitExerciseCommand(UUID.randomUUID(),
+        var result = submitLessonExerciseUseCase.execute(USER, LESSON, EXERCISE_BLOCK, new SubmitExerciseCommand(UUID.randomUUID(),
                 List.of(new SubmitExerciseCommand.Answer(QUESTION, "A"))));
         assertTrue(result.lessonCompleted());
-        assertEquals("Caller: It is Thompson.", lessons.get(USER, LESSON).blocks().get(1).asset().transcript());
+        assertEquals("Caller: It is Thompson.", getLessonUseCase.execute(USER, LESSON).blocks().get(1).asset().transcript());
     }
 
     // ---- reviews ----
@@ -154,13 +158,13 @@ class ReviewAndTestAssignmentIntegrationTest {
                     .filter(set -> !excluded.contains(set.packageId())).toList();
         });
 
-        ReviewResult first = reviews.get(USER, review);
+        ReviewResult first = getReviewUseCase.execute(USER, review);
         assertEquals(List.of("Read the gaps first."), first.theory());
         assertEquals(PACKAGE_A, first.set().packageId());
         assertEquals("https://media.example.test/numM.mp3", first.set().audio().mediaUrl());
         assertEquals(3, first.set().questions().size());
         assertTrue(first.set().questions().stream().allMatch(question -> question.hint() == null));
-        assertEquals(first.set().reviewSetId(), reviews.get(USER, review).set().reviewSetId());
+        assertEquals(first.set().reviewSetId(), getReviewUseCase.execute(USER, review).set().reviewSetId());
 
         ReviewSubmissionResult failed = submit(review, first.set().reviewSetId(), "B");
         assertEquals("PENDING", failed.reviewStatus());
@@ -168,49 +172,49 @@ class ReviewAndTestAssignmentIntegrationTest {
         assertTrue(failed.results().stream().allMatch(answer -> answer.hint() == null));
         assertNull(failed.transcript());
 
-        ReviewResult second = reviews.get(USER, review);
+        ReviewResult second = getReviewUseCase.execute(USER, review);
         assertEquals(PACKAGE_B, second.set().packageId());
         assertEquals("PENDING", submit(review, second.set().reviewSetId(), "B").reviewStatus());
 
         // Every package was used: the one given longest ago comes back.
-        ReviewResult third = reviews.get(USER, review);
+        ReviewResult third = getReviewUseCase.execute(USER, review);
         assertEquals(PACKAGE_A, third.set().packageId());
         assertEquals("SKIPPED", submit(review, third.set().reviewSetId(), "B").reviewStatus());
-        assertEquals("SKIPPED", reviews.get(USER, review).reviewStatus());
-        assertNull(reviews.get(USER, review).set());
+        assertEquals("SKIPPED", getReviewUseCase.execute(USER, review).reviewStatus());
+        assertNull(getReviewUseCase.execute(USER, review).set());
         assertEquals(9, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'review_set'",
                 Integer.class));
         // A skipped review no longer gates lessons.
-        assertDoesNotThrow(() -> lessons.get(USER, LESSON));
+        assertDoesNotThrow(() -> getLessonUseCase.execute(USER, LESSON));
     }
 
     @Test
     void passedSetFinishesTheReviewWithSolutionsAndTranscriptAndReplaysByRequestId() {
         UUID review = pendingReview(USER);
         when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt())).thenReturn(List.of(practice(PACKAGE_A)));
-        UUID set = reviews.get(USER, review).set().reviewSetId();
+        UUID set = getReviewUseCase.execute(USER, review).set().reviewSetId();
         UUID requestId = UUID.randomUUID();
 
-        ReviewSubmissionResult passed = reviews.submit(USER, review, command(set, requestId, "A"));
+        ReviewSubmissionResult passed = submitReviewUseCase.execute(USER, review, command(set, requestId, "A"));
         assertEquals("DONE", passed.reviewStatus());
         assertEquals("A", passed.results().getFirst().correctAnswer());
         assertTrue(passed.results().stream().allMatch(answer -> answer.hint() == null));
         assertEquals("Clerk: nine thirty.", passed.transcript());
-        assertEquals(passed, reviews.submit(USER, review, command(set, requestId, "B")));
+        assertEquals(passed, submitReviewUseCase.execute(USER, review, command(set, requestId, "B")));
 
         var closed = assertThrows(LearningRequestException.class,
-                () -> reviews.submit(USER, review, command(set, UUID.randomUUID(), "A")));
+                () -> submitReviewUseCase.execute(USER, review, command(set, UUID.randomUUID(), "A")));
         assertEquals("REVIEW_SET_CLOSED", closed.getCode());
     }
 
     @Test
     void reviewOfAnotherLearnerIsNotFoundAndNoPackageSkipsTheReview() {
         UUID review = pendingReview(USER);
-        var notFound = assertThrows(LearningRequestException.class, () -> reviews.get(OTHER_USER, review));
+        var notFound = assertThrows(LearningRequestException.class, () -> getReviewUseCase.execute(OTHER_USER, review));
         assertEquals(404, notFound.getStatus());
 
         when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt())).thenReturn(List.of());
-        ReviewResult skipped = reviews.get(USER, review);
+        ReviewResult skipped = getReviewUseCase.execute(USER, review);
         assertEquals("SKIPPED", skipped.reviewStatus());
         assertNull(skipped.set());
     }
@@ -219,32 +223,32 @@ class ReviewAndTestAssignmentIntegrationTest {
 
     @Test
     void testAssignmentIsGatedIdempotentAndRotatesThroughPackages() {
-        var locked = assertThrows(LearningRequestException.class, () -> tests.assign(USER, TOPIC));
+        var locked = assertThrows(LearningRequestException.class, () -> tests.execute(USER, TOPIC));
         assertEquals("TEST_LOCKED", locked.getCode());
 
         completeLesson();
         UUID review = pendingReview(USER);
-        var gate = assertThrows(LearningGateException.class, () -> tests.assign(USER, TOPIC));
+        var gate = assertThrows(LearningGateException.class, () -> tests.execute(USER, TOPIC));
         assertEquals("REVIEW_REQUIRED", gate.getCode());
         jdbc.update("UPDATE review_items SET status = 'DONE' WHERE id = ?", review);
 
-        var first = tests.assign(USER, TOPIC);
+        var first = tests.execute(USER, TOPIC);
         assertEquals(TEST_X, first.packageId());
-        assertEquals(first, tests.assign(USER, TOPIC));
+        assertEquals(first, tests.execute(USER, TOPIC));
 
         consume(first.assignmentId());
-        var second = tests.assign(USER, TOPIC);
+        var second = tests.execute(USER, TOPIC);
         assertEquals(TEST_Y, second.packageId());
 
         consume(second.assignmentId());
-        assertEquals(TEST_X, tests.assign(USER, TOPIC).packageId());
+        assertEquals(TEST_X, tests.execute(USER, TOPIC).packageId());
     }
 
     @Test
     void topicWithoutTestPackagesIsUnavailable() {
         completeLesson();
         when(content.getTopicTestPackages(TOPIC)).thenReturn(List.of());
-        var unavailable = assertThrows(LearningRequestException.class, () -> tests.assign(USER, TOPIC));
+        var unavailable = assertThrows(LearningRequestException.class, () -> tests.execute(USER, TOPIC));
         assertEquals("TEST_UNAVAILABLE", unavailable.getCode());
     }
 
@@ -258,7 +262,7 @@ class ReviewAndTestAssignmentIntegrationTest {
     }
 
     private void completeLesson() {
-        lessons.submit(USER, LESSON, EXERCISE_BLOCK, new SubmitExerciseCommand(UUID.randomUUID(),
+        submitLessonExerciseUseCase.execute(USER, LESSON, EXERCISE_BLOCK, new SubmitExerciseCommand(UUID.randomUUID(),
                 List.of(new SubmitExerciseCommand.Answer(QUESTION, "A"))));
     }
 
@@ -268,7 +272,7 @@ class ReviewAndTestAssignmentIntegrationTest {
     }
 
     private ReviewSubmissionResult submit(UUID review, UUID set, String answer) {
-        return reviews.submit(USER, review, command(set, UUID.randomUUID(), answer));
+        return submitReviewUseCase.execute(USER, review, command(set, UUID.randomUUID(), answer));
     }
 
     private SubmitReviewCommand command(UUID set, UUID requestId, String answer) {

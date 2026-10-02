@@ -52,7 +52,7 @@ public class AssessmentCompletedListener {
             return;
         }
         try {
-            apply.apply(result);
+            apply.execute(result);
             channel.basicAck(tag, false);
         } catch (RuntimeException failure) {
             int attempt = previousFailures(message.getMessageProperties()) + 1;

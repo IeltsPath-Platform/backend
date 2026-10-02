@@ -158,9 +158,21 @@ missing content maps to `404 NOT_FOUND`, transport/unavailability errors to
 
 ## Structure and references
 
-Layers follow `api → application → domain`, with HTTP and JDBC adapters under
-`infrastructure`. The domain services contain no Spring or persistence imports.
+Layers follow `api → application → domain`, with HTTP, RabbitMQ and JDBC adapters under
+`infrastructure`. The domain has no Spring or persistence imports.
 The service owns its eleven tables (Flyway V1–V2) and does not read other services' databases.
+
+| Layer | Contents |
+| --- | --- |
+| `domain/aggregate` | `LessonProgress` (blocks passed, completion once), `LearnerCurriculum` (topic order, one-way pass; entity `TopicProgress`), `ReviewItem` (open set, DONE / SKIPPED after three failed sets; entity `ReviewSet`), `TopicTestAssignment` (consumed once, 70% passes), `WritingSubmission` (GRADING → PAYMENT_PENDING → GRADED, GRADING → FAILED → GRADING) |
+| `domain/repository` | One repository per aggregate, plus `KnowledgeEvidenceRepository` (evidence and mastery history) and `KnowledgePointCatalogRepository` |
+| `domain/service`, `domain/vo` | Pure rules (`MasteryCalculator`, `ReviewRule`, `AnswerSpecGrader`, `PassMark`, `PackageRotation`, …) and value objects (statuses, `KnowledgeEvidence`, `EssayPrompt`, `WritingGrade`) |
+| `application/port` | Content, Access and LLM clients; `LearnerLock`, the submission logs replayed by `requestId`, `AssessmentResultLog`, `LlmUsageQuota` |
+| `application/service`, `application/usecase` | Lesson gate (`LessonAccess`), review insertion, essay grading, the learner's lesson view (`LessonViewAssembler`, `WritingSubmissionViewAssembler`); one use case per action, invoked via `execute`; controllers map application results to response DTOs |
+
+State changes go through aggregate methods; adapters only read and write rows. Writes of one learner run under
+`LearnerLock`. Writing moves out of GRADING without that lock, so `WritingSubmissionRepository.save` writes only if
+the row still has the status it was loaded with and returns false otherwise.
 
 - [Internal Content contract](../../docs/contracts/learning-content-internal-v1.md)
 - [Answer grading contract](../../docs/contracts/answer-spec-v1.md)

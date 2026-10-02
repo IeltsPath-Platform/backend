@@ -9,8 +9,10 @@ import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.application.port.LlmClient;
 import com.group01.learning.application.result.LessonResult;
 import com.group01.learning.application.result.WritingSubmissionResult;
-import com.group01.learning.application.usecase.LearnLessonUseCase;
-import com.group01.learning.application.usecase.LessonEssayUseCase;
+import com.group01.learning.application.usecase.GetLessonUseCase;
+import com.group01.learning.application.usecase.SubmitLessonExerciseUseCase;
+import com.group01.learning.application.usecase.GetWritingSubmissionUseCase;
+import com.group01.learning.application.usecase.SubmitLessonEssayUseCase;
 import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
 import com.group01.learning.domain.exception.LearningGateException;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,8 +83,10 @@ class LessonWritingIntegrationTest {
             + "and make people calmer. ").repeat(4);
 
     @Autowired JdbcTemplate jdbc;
-    @Autowired LessonEssayUseCase essays;
-    @Autowired LearnLessonUseCase lessons;
+    @Autowired GetWritingSubmissionUseCase getWritingSubmissionUseCase;
+    @Autowired SubmitLessonEssayUseCase submitLessonEssayUseCase;
+    @Autowired GetLessonUseCase getLessonUseCase;
+    @Autowired SubmitLessonExerciseUseCase submitLessonExerciseUseCase;
     @Autowired RefreshLearningTopicsUseCase topics;
     @MockitoBean LearningContentClient content;
     @MockitoBean AccessClient access;
@@ -121,7 +125,7 @@ class LessonWritingIntegrationTest {
         llmReplies(grade("6.5"));
         UUID request = UUID.randomUUID();
 
-        WritingSubmissionResult result = essays.submit(USER, LESSON, ESSAY_BLOCK, request, ESSAY);
+        WritingSubmissionResult result = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, request, ESSAY);
 
         assertEquals("GRADED", result.status());
         assertEquals(new BigDecimal("6.5"), result.overallBand());
@@ -135,22 +139,22 @@ class LessonWritingIntegrationTest {
                 "SELECT source, kp_id, correct FROM kp_evidence"));
 
         clearInvocations(llm, access, content);
-        assertEquals(result, essays.submit(USER, LESSON, ESSAY_BLOCK, request, ESSAY));
+        assertEquals(result, submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, request, ESSAY));
         verifyNoInteractions(llm, access, content);
-        assertEquals(result, essays.get(USER, result.submissionId()));
+        assertEquals(result, getWritingSubmissionUseCase.execute(USER, result.submissionId()));
         assertEquals(404, assertThrows(LearningRequestException.class,
-                () -> essays.get(OTHER_USER, result.submissionId())).getStatus());
+                () -> getWritingSubmissionUseCase.execute(OTHER_USER, result.submissionId())).getStatus());
     }
 
     @Test
     void essayValidationAndBalanceRunBeforeAnyRowOrLlmCall() {
-        assertCode(422, "ESSAY_EMPTY", () -> essays.submit(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), "  "));
-        assertCode(422, "ESSAY_TOO_SHORT", () -> essays.submit(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(),
+        assertCode(422, "ESSAY_EMPTY", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), "  "));
+        assertCode(422, "ESSAY_TOO_SHORT", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(),
                 "Too short."));
-        assertCode(422, "ESSAY_TOO_LONG", () -> essays.submit(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(),
+        assertCode(422, "ESSAY_TOO_LONG", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(),
                 "word ".repeat(1001)));
         when(access.balance()).thenReturn(2L);
-        assertCode(402, "INSUFFICIENT_POINTS", () -> essays.submit(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
+        assertCode(402, "INSUFFICIENT_POINTS", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
 
         assertEquals(0, count("lesson_writing_submissions"));
         verify(llm, never()).completeJson(any(), any(), anyBoolean());
@@ -162,7 +166,7 @@ class LessonWritingIntegrationTest {
         when(llm.completeJson(any(), any(), anyBoolean())).thenThrow(new LlmUnavailableException(500));
         UUID request = UUID.randomUUID();
 
-        assertCode(503, "GRADING_UNAVAILABLE", () -> essays.submit(USER, LESSON, ESSAY_BLOCK, request, ESSAY));
+        assertCode(503, "GRADING_UNAVAILABLE", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, request, ESSAY));
         assertEquals("FAILED", status());
         assertEquals("LLM_UNAVAILABLE", jdbc.queryForObject("SELECT failure_code FROM lesson_writing_submissions",
                 String.class));
@@ -171,7 +175,7 @@ class LessonWritingIntegrationTest {
         reset(llm);
         when(llm.configured()).thenReturn(true);
         llmReplies(grade("5.5"));
-        WritingSubmissionResult retried = essays.submit(USER, LESSON, ESSAY_BLOCK, request, ESSAY);
+        WritingSubmissionResult retried = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, request, ESSAY);
         assertEquals("GRADED", retried.status());
         assertFalse(retried.passed());
         assertNull(retried.sampleAnswer());
@@ -185,27 +189,27 @@ class LessonWritingIntegrationTest {
         UUID request = UUID.randomUUID();
 
         LearningRequestException refused = assertCode(402, "INSUFFICIENT_POINTS",
-                () -> essays.submit(USER, LESSON, ESSAY_BLOCK, request, ESSAY));
+                () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, request, ESSAY));
         UUID submission = refused.getSubmissionId();
         assertNotNull(submission);
-        WritingSubmissionResult pending = essays.get(USER, submission);
+        WritingSubmissionResult pending = getWritingSubmissionUseCase.execute(USER, submission);
         assertEquals("PAYMENT_PENDING", pending.status());
         assertEquals("INSUFFICIENT_POINTS", pending.code());
         assertNull(pending.overallBand());
         assertNull(pending.grade());
-        LessonResult.Block block = essayBlock(lessons.get(USER, LESSON));
+        LessonResult.Block block = essayBlock(getLessonUseCase.execute(USER, LESSON));
         assertEquals("PAYMENT_PENDING", block.latestSubmission().status());
         assertNull(block.latestSubmission().overallBand(), "a withheld grade does not leak through the lesson");
         assertEquals(0, count("kp_evidence WHERE source = 'lesson_writing'"));
 
         reset(access);
         when(access.debit(any(), anyInt(), any(), anyString(), any())).thenThrow(new AccessUnavailableException(401));
-        assertCode(503, "PAYMENT_UNAVAILABLE", () -> essays.submit(USER, LESSON, ESSAY_BLOCK, request, ESSAY));
+        assertCode(503, "PAYMENT_UNAVAILABLE", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, request, ESSAY));
 
         reset(access, llm);
         UUID ledger = UUID.randomUUID();
         when(access.debit(any(), anyInt(), any(), anyString(), any())).thenReturn(ledger);
-        WritingSubmissionResult paid = essays.submit(USER, LESSON, ESSAY_BLOCK, request, ESSAY);
+        WritingSubmissionResult paid = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, request, ESSAY);
         assertEquals("GRADED", paid.status());
         assertEquals(new BigDecimal("7.0"), paid.overallBand());
         verifyNoInteractions(llm);
@@ -218,12 +222,12 @@ class LessonWritingIntegrationTest {
     @Test
     void evidenceIsRecordedForEveryEssayUntilTheBlockIsFirstPassed() {
         llmReplies(grade("5"), grade("6.5"), grade("8"));
-        for (int i = 0; i < 3; i++) essays.submit(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY);
+        for (int i = 0; i < 3; i++) submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY);
 
         assertEquals(List.of(false, true), jdbc.queryForList(
                 "SELECT correct FROM kp_evidence WHERE source = 'lesson_writing' ORDER BY ordinal", Boolean.class));
         assertEquals(0, count("review_items"), "essays never insert reviews");
-        LessonResult.Block block = essayBlock(lessons.get(USER, LESSON));
+        LessonResult.Block block = essayBlock(getLessonUseCase.execute(USER, LESSON));
         assertEquals("Model essay", block.sampleAnswer());
         assertEquals(new BigDecimal("8.0"), block.latestSubmission().overallBand());
     }
@@ -233,7 +237,7 @@ class LessonWritingIntegrationTest {
         jdbc.update("INSERT INTO llm_daily_usage (user_id, usage_date, kind, count) VALUES (?, ?, 'writing_grading', 10)",
                 USER, LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")));
 
-        assertCode(429, "DAILY_LIMIT_REACHED", () -> essays.submit(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
+        assertCode(429, "DAILY_LIMIT_REACHED", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
         verify(llm, never()).completeJson(any(), any(), anyBoolean());
         assertEquals("FAILED", status());
     }
@@ -243,16 +247,16 @@ class LessonWritingIntegrationTest {
         jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status) VALUES (?, ?, ?, ?, 'PENDING')",
                 UUID.randomUUID(), USER, KP, LESSON);
         assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
-                () -> essays.submit(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY)).getCode());
+                () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY)).getCode());
         assertEquals(0, count("lesson_writing_submissions"));
         jdbc.update("DELETE FROM review_items");
 
-        assertCode(409, "NOT_ESSAY_BLOCK", () -> essays.submit(USER, LESSON, EXERCISE_BLOCK, UUID.randomUUID(), ESSAY));
+        assertCode(409, "NOT_ESSAY_BLOCK", () -> submitLessonEssayUseCase.execute(USER, LESSON, EXERCISE_BLOCK, UUID.randomUUID(), ESSAY));
 
         llmReplies(grade("6"));
         UUID request = UUID.randomUUID();
-        essays.submit(USER, LESSON, ESSAY_BLOCK, request, ESSAY);
-        assertCode(409, "REQUEST_CONFLICT", () -> essays.submit(OTHER_USER, LESSON, ESSAY_BLOCK, request, ESSAY));
+        submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, request, ESSAY);
+        assertCode(409, "REQUEST_CONFLICT", () -> submitLessonEssayUseCase.execute(OTHER_USER, LESSON, ESSAY_BLOCK, request, ESSAY));
     }
 
     @Test
@@ -267,13 +271,13 @@ class LessonWritingIntegrationTest {
                 """, abandoned, USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), UUID.randomUUID());
 
         llmReplies(grade("6"));
-        assertEquals("GRADED", essays.submit(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY).status());
+        assertEquals("GRADED", submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY).status());
         assertEquals("GRADING_ABANDONED", jdbc.queryForObject(
                 "SELECT failure_code FROM lesson_writing_submissions WHERE id = ?", String.class, abandoned));
 
         jdbc.update("UPDATE lesson_writing_submissions SET status = 'GRADING', grading_started_at = now() WHERE id = ?",
                 abandoned);
-        assertCode(409, "GRADING_IN_PROGRESS", () -> essays.submit(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
+        assertCode(409, "GRADING_IN_PROGRESS", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
     }
 
     @Test
@@ -287,10 +291,10 @@ class LessonWritingIntegrationTest {
         });
         var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
         try {
-            var first = executor.submit(() -> essays.submit(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
+            var first = executor.submit(() -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
             assertTrue(grading.await(20, java.util.concurrent.TimeUnit.SECONDS));
             assertCode(409, "GRADING_IN_PROGRESS",
-                    () -> essays.submit(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
+                    () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
             release.countDown();
             assertEquals("GRADED", first.get(30, java.util.concurrent.TimeUnit.SECONDS).status());
         } finally {
@@ -303,16 +307,16 @@ class LessonWritingIntegrationTest {
 
     @Test
     void theEssayBlockNeverBlocksLessonCompletion() {
-        var lesson = lessons.get(USER, LESSON);
+        var lesson = getLessonUseCase.execute(USER, LESSON);
         assertNull(essayBlock(lesson).latestSubmission());
         assertNull(essayBlock(lesson).sampleAnswer());
         var exercise = lesson.blocks().stream().filter(block -> "EXERCISE".equals(block.blockKind())).findFirst()
                 .orElseThrow();
-        var submitted = lessons.submit(USER, LESSON, EXERCISE_BLOCK, new com.group01.learning.application.command
+        var submitted = submitLessonExerciseUseCase.execute(USER, LESSON, EXERCISE_BLOCK, new com.group01.learning.application.command
                 .SubmitExerciseCommand(UUID.randomUUID(), List.of(new com.group01.learning.application.command
                 .SubmitExerciseCommand.Answer(exercise.questions().getFirst().questionVersionId(), "A"))));
         assertTrue(submitted.lessonCompleted());
-        assertCode(409, "ESSAY_BLOCK", () -> lessons.submit(USER, LESSON, ESSAY_BLOCK,
+        assertCode(409, "ESSAY_BLOCK", () -> submitLessonExerciseUseCase.execute(USER, LESSON, ESSAY_BLOCK,
                 new com.group01.learning.application.command.SubmitExerciseCommand(UUID.randomUUID(), List.of())));
     }
 

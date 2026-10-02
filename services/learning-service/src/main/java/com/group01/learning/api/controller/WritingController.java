@@ -1,36 +1,40 @@
 package com.group01.learning.api.controller;
 
 import com.group01.commonsecurity.currentuser.CurrentUserProvider;
-import com.group01.learning.api.dto.SubmitEssayRequest;
-import com.group01.learning.api.dto.WritingSubmissionResponse;
-import com.group01.learning.application.usecase.LessonEssayUseCase;
+import com.group01.learning.api.dto.request.SubmitEssayRequest;
+import com.group01.learning.api.dto.response.WritingSubmissionResponse;
+import com.group01.learning.application.usecase.GetWritingSubmissionUseCase;
+import com.group01.learning.application.usecase.SubmitLessonEssayUseCase;
 import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
 /** Lesson essays, graded by the LLM within the request (contract {@code lesson-writing-v1}). */
 @RestController
 @RequestMapping("/api/learning")
+@RequiredArgsConstructor
 public class WritingController {
     private final CurrentUserProvider currentUser;
-    private final LessonEssayUseCase essays;
-
-    public WritingController(CurrentUserProvider currentUser, LessonEssayUseCase essays) {
-        this.currentUser = currentUser;
-        this.essays = essays;
-    }
+    private final GetWritingSubmissionUseCase getWritingSubmissionUseCase;
+    private final SubmitLessonEssayUseCase submitLessonEssayUseCase;
 
     @PostMapping("/lessons/{lessonId}/essays/{blockId}/submissions")
     public WritingSubmissionResponse submit(@PathVariable("lessonId") UUID lessonId,
                                             @PathVariable("blockId") UUID blockId,
                                             @Valid @RequestBody SubmitEssayRequest request) {
-        return WritingSubmissionResponse.from(essays.submit(currentUser.requireUserId(), lessonId, blockId,
+        return WritingSubmissionResponse.from(submitLessonEssayUseCase.execute(currentUser.requireUserId(), lessonId, blockId,
                 request.requestId(), request.essayText()));
     }
 
     @GetMapping("/writing-submissions/{id}")
     public WritingSubmissionResponse get(@PathVariable("id") UUID id) {
-        return WritingSubmissionResponse.from(essays.get(currentUser.requireUserId(), id));
+        return WritingSubmissionResponse.from(getWritingSubmissionUseCase.execute(currentUser.requireUserId(), id));
     }
 }

@@ -6,12 +6,16 @@ import com.group01.content.domain.vo.Skill;
 import java.util.List;
 import java.util.UUID;
 
-/** A topic in the learning order, with the active knowledge points it measures. */
+/**
+ * A topic in the learning order, with the active knowledge points it measures. {@code requiredFeatureKey} is the
+ * Access feature needed to learn it; null means free.
+ */
 public record TopicSequenceResult(
         UUID topicId,
         String code,
         String name,
         int sortOrder,
+        String requiredFeatureKey,
         List<KnowledgePointEntry> knowledgePoints
 ) {
     /** {@code hasPracticeSet}: at least one practice set is eligible for review of this knowledge point. */

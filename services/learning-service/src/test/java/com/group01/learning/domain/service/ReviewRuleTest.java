@@ -4,7 +4,7 @@ import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.service.ReviewRule.CompletedLesson;
 import com.group01.learning.domain.service.ReviewRule.ReviewCandidate;
 import com.group01.learning.domain.vo.PendingReview;
-import com.group01.learning.domain.vo.TopicProgress;
+import com.group01.learning.domain.entity.TopicProgress;
 import com.group01.learning.domain.vo.TopicStatus;
 import org.junit.jupiter.api.Test;
 
