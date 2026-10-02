@@ -1,4 +1,4 @@
-package com.group01.learning.api.dto;
+package com.group01.learning.api.dto.response;
 
 import com.group01.learning.application.result.TopicLessonsResult;
 import java.util.List;

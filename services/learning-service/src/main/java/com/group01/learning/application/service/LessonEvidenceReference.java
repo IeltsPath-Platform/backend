@@ -1,4 +1,4 @@
-package com.group01.learning.application;
+package com.group01.learning.application.service;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;

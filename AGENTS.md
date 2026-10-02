@@ -153,6 +153,9 @@ src/main/java/com/group01/<service>
 
 ### 3.8 Learning Service
 
+- Trạng thái nằm trong aggregate (`LessonProgress`, `LearnerCurriculum`, `ReviewItem`, `TopicTestAssignment`,
+  `WritingSubmission`); thay đổi trạng thái qua method của aggregate rồi lưu bằng `domain/repository`, adapter JDBC
+  không chứa luật. Khóa, replay theo `requestId`, hạn mức LLM là port ở `application/port`.
 - Không còn path DeepTutor: bằng chứng học lưu theo user ở `kp_evidence`; mastery của KP tính khi đọc bằng
   `MasteryCalculator` (port `compute_mastery` của DeepTutor v1.6.9, Apache-2.0; giữ comment ghi nguồn và giá trị test gốc).
 - Thứ tự topic theo user từ Content `topic-sequence`, không LLM, không goal/band. `LessonAccessGate` và use case trong

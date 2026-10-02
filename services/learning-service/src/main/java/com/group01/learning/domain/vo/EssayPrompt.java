@@ -1,4 +1,4 @@
-package com.group01.learning.application.writing;
+package com.group01.learning.domain.vo;
 
 import java.math.BigDecimal;
 import java.util.List;

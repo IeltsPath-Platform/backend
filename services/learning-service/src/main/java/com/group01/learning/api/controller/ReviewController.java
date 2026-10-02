@@ -1,47 +1,47 @@
 package com.group01.learning.api.controller;
 
 import com.group01.commonsecurity.currentuser.CurrentUserProvider;
-import com.group01.learning.api.dto.ReviewResponse;
-import com.group01.learning.api.dto.ReviewSubmissionResponse;
-import com.group01.learning.api.dto.SubmitReviewRequest;
-import com.group01.learning.application.port.ReviewStore;
+import com.group01.learning.api.dto.response.ReviewResponse;
+import com.group01.learning.api.dto.response.ReviewSubmissionResponse;
+import com.group01.learning.api.dto.request.SubmitReviewRequest;
+import com.group01.learning.api.dto.response.TestAssignmentResponse;
 import com.group01.learning.application.usecase.AssignTopicTestUseCase;
-import com.group01.learning.application.usecase.ReviewUseCase;
+import com.group01.learning.application.usecase.GetReviewUseCase;
+import com.group01.learning.application.usecase.SubmitReviewUseCase;
 import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/learning")
+@RequiredArgsConstructor
 public class ReviewController {
     private final CurrentUserProvider currentUser;
-    private final ReviewUseCase reviews;
-    private final AssignTopicTestUseCase tests;
-
-    public ReviewController(CurrentUserProvider currentUser, ReviewUseCase reviews, AssignTopicTestUseCase tests) {
-        this.currentUser = currentUser;
-        this.reviews = reviews;
-        this.tests = tests;
-    }
+    private final GetReviewUseCase getReviewUseCase;
+    private final SubmitReviewUseCase submitReviewUseCase;
+    private final AssignTopicTestUseCase assignTopicTestUseCase;
 
     @GetMapping("/reviews/{reviewId}")
     public ReviewResponse review(@PathVariable("reviewId") UUID reviewId) {
-        return ReviewResponse.from(reviews.get(currentUser.requireUserId(), reviewId));
+        return ReviewResponse.from(getReviewUseCase.execute(currentUser.requireUserId(), reviewId));
     }
 
     @PostMapping("/reviews/{reviewId}/submissions")
     public ReviewSubmissionResponse submit(@PathVariable("reviewId") UUID reviewId,
                                            @Valid @RequestBody SubmitReviewRequest request) {
-        return ReviewSubmissionResponse.from(reviews.submit(currentUser.requireUserId(), reviewId, request.toCommand()));
+        return ReviewSubmissionResponse.from(submitReviewUseCase.execute(
+                currentUser.requireUserId(), reviewId, request.toCommand()));
     }
 
     @PostMapping("/topics/{id}/test-assignments")
     public TestAssignmentResponse assignTest(@PathVariable("id") UUID topicId) {
-        ReviewStore.TestAssignment assignment = tests.assign(currentUser.requireUserId(), topicId);
-        return new TestAssignmentResponse(assignment.assignmentId(), assignment.packageId(),
-                assignment.packageVersionId());
+        return TestAssignmentResponse.from(assignTopicTestUseCase.execute(currentUser.requireUserId(), topicId));
     }
-
-    public record TestAssignmentResponse(UUID assignmentId, UUID packageId, UUID packageVersionId) {}
 }

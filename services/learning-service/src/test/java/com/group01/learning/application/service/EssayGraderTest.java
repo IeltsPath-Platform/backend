@@ -1,4 +1,7 @@
-package com.group01.learning.application.writing;
+package com.group01.learning.application.service;
+
+import com.group01.learning.domain.vo.EssayPrompt;
+import com.group01.learning.domain.vo.WritingGrade;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.group01.learning.application.exception.LlmUnavailableException;

@@ -235,7 +235,8 @@ Java chạy trên host (IDE hoặc `java -jar`); Compose chỉ chạy DB và Rab
 | `GATEWAY_INTERNAL_JWT_SECRET` | Gateway và toàn bộ downstream service phải dùng cùng giá trị, lệch sẽ trả 401 |
 | `EXTERNAL_JWT_SECRET` | User Service ký token, Gateway xác thực |
 | `CONTENT_MEDIA_BASE_URL` | Prefix https của bucket chứa mp3 Listening; thiếu thì bài Listening trả 500 `INVALID_MEDIA_REFERENCE` |
-| `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` | Endpoint OpenAI-compatible để Learning Service chấm bài luận Writing; thiếu thì nộp bài luận trả 503 `GRADING_UNAVAILABLE`. API key là secret |
+| `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` | Endpoint OpenAI-compatible để Learning Service chấm bài luận Writing; thiếu thì nộp bài luận trả 503 `GRADING_UNAVAILABLE`. API key là secret. Gemini: base URL `https://generativelanguage.googleapis.com/v1beta/openai`, model `gemini-3.8-flash` (đã thử 2026-10-02; `gemini-2.5-flash` không còn cấp cho key mới) |
+| `LEARNING_LLM_REASONING_EFFORT` | Mức suy luận gửi cho model. Với `gemini-3.8-flash` đặt `low`: mặc định của client cho `gemini-3*` là `minimal`, model này trả 400 |
 
 Nếu mật khẩu có ký tự đặc biệt, hãy percent-encode hoặc chọn giá trị an toàn cho URL, vì nó nằm trong URL DB/AMQP.
 
@@ -266,6 +267,19 @@ Listening cần 8 file mp3 upload
 đúng key dưới `CONTENT_MEDIA_BASE_URL` (danh sách trong `services/content-service/README.md`). Thư mục
 `third_party/deeptutor` chỉ là bản clone để **đọc**: công thức mastery của Learning Service được port từ đó, không
 service nào build hay import thư mục này.
+**Tài khoản demo cho frontend (chỉ dev/demo, mật khẩu công khai):** bật `DEMO_DATA_ENABLED=true` thì user-service và
+access-service tự ghi tài khoản demo sau mỗi lần Flyway chạy (callback `db/callback/afterMigrate__demo_data.sql`). Mặc
+định là `false`; `docker-compose.mvp.yml` bật sẵn (đặt `DEMO_DATA_ENABLED=false` để có DB trống); chạy service từ IDE thì
+thêm `DEMO_DATA_ENABLED=true` vào `.env`. Ghi một lần, khởi động lại không ghi trùng và không nạp lại point đã dùng.
+
+| Tài khoản | userId | Mật khẩu | Ghi chú |
+| --- | --- | --- | --- |
+| `learner@ielts.demo` | `00000000-0000-0000-0000-000000000001` | `Demo@123` | CUSTOMER, ví 30 point (10 lần chấm Writing) |
+| `admin@ielts.demo` | `00000000-0000-0000-0000-000000000002` | `Demo@123` | ADMIN, nạp point qua `POST /api/access/admin/points/adjust` |
+
+Content đã có sẵn bài demo (V9–V13), Learning tự tạo lộ trình khi học viên gọi `GET /api/learning/topics` lần đầu, nên
+không cần seed thêm. Không bật cờ này trên database dùng chung hoặc production.
+
 **Tài khoản có quyền (chỉ dev, chỉ trên DB local):**
 
 1. Đăng ký tài khoản qua `POST /api/users/register`. Mọi tài khoản mới đều nhận role `CUSTOMER`.
@@ -282,6 +296,23 @@ service nào build hay import thư mục này.
 Grader (`EXAMINER`/`ADMIN`) chấm qua `/api/assessments/grading/**`, xem `services/assessment-service/README.md`.
 Bằng chứng E2E của lần kiểm chứng gần nhất:
 `plans/260930-2057-mvp-reading-writing-listening-roadmap/reports/e2e-261002-mvp-reading-writing-listening.md`.
+
+**Chạy cả luồng chính bằng Docker** (không cần IDE, không cần Postgres local): `docker-compose.mvp.yml` dựng
+config-server, eureka, Gateway, user, content, access, assessment, learning, một Postgres (5 database, script
+`infra/postgres/mvp-init-databases.sql`) và RabbitMQ; không gồm library, game, community, notification.
+
+```bash
+docker compose -f docker-compose.mvp.yml up -d --build   # lần đầu build lâu; sau đó bỏ --build
+docker compose -f docker-compose.mvp.yml down            # thêm -v để xóa dữ liệu (bắt buộc khi đổi mật khẩu)
+```
+
+Cần trong `.env`: `POSTGRES_PASSWORD`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `EXTERNAL_JWT_SECRET`,
+`GATEWAY_INTERNAL_JWT_SECRET`; tùy chọn `LEARNING_LLM_*` (chấm Writing) và `CONTENT_MEDIA_BASE_URL` (mặc định là URL
+giữ chỗ, audio chưa phát được). Cổng host: Gateway 8080, Eureka 8761, Postgres 5440, RabbitMQ UI 15673; nếu đang chạy
+service từ IDE thì đổi bằng `MVP_GATEWAY_PORT`, `MVP_EUREKA_PORT`, `MVP_POSTGRES_PORT`, `MVP_RABBITMQ_UI_PORT`.
+Config-repo được mount chỉ đọc, sửa YAML xong chỉ cần restart service.
+
+**Ghép FE:** thứ tự gọi API và kịch bản luồng học chính ở [`docs/fe-main-flow-guide.md`](docs/fe-main-flow-guide.md).
 
 **Swagger UI của luồng chính:** khi Gateway và các service đã chạy, mở `http://localhost:8080/swagger-ui.html`, chọn
 tài liệu (user, access, assessment, learning) ở ô "Select a definition". Đăng nhập bằng `POST /auth/login`, bấm

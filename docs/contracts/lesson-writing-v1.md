@@ -3,7 +3,7 @@
 **Status: approved 2026-10-01.** Owner: Learning Service (`/api/learning`). Extends
 [`lesson-learning-v1.md`](lesson-learning-v1.md) with Writing essay blocks: Task 2 (plan `260930-0737`) and Task 1 Academic (plan `260930-0812`, added 2026-10-01).
 
-**Implemented 2026-10-01** in `learning-service` (`LessonEssayUseCase`, `EssayGrader`), Task 1 and Task 2 alike.
+**Implemented 2026-10-01** in `learning-service` (`SubmitLessonEssayUseCase`, `GetWritingSubmissionUseCase`, `EssayGrader`), Task 1 and Task 2 alike.
 In `latestSubmission`, `overallBand` and `passed` are `null` unless the submission is `GRADED`, so a withheld grade is
 never visible. `failureCode` values: `LLM_UNAVAILABLE`, `INVALID_GRADE`, `INVALID_PROMPT`, `DAILY_LIMIT_REACHED`,
 `GRADING_ABANDONED`. A resend of a `FAILED` `requestId` grades the essay text stored with it, not a new text.

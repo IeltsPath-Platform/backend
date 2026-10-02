@@ -12,6 +12,7 @@ public record TopicSequenceResponse(
         String code,
         String name,
         int sortOrder,
+        String requiredFeatureKey,
         List<KnowledgePoint> knowledgePoints
 ) {
     public record KnowledgePoint(UUID id, String code, String name, LearningType learningType, Skill skill,
@@ -19,6 +20,7 @@ public record TopicSequenceResponse(
 
     public static TopicSequenceResponse from(TopicSequenceResult result) {
         return new TopicSequenceResponse(result.topicId(), result.code(), result.name(), result.sortOrder(),
+                result.requiredFeatureKey(),
                 result.knowledgePoints().stream()
                         .map(kp -> new KnowledgePoint(kp.id(), kp.code(), kp.name(), kp.learningType(), kp.skill(),
                                 kp.description(), kp.hasPracticeSet()))

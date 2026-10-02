@@ -81,9 +81,9 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
     @Override
     public List<TopicSequenceResult> topicSequence(int minPracticeQuestions) {
-        record TopicRow(UUID id, String code, String name, int sortOrder) {}
+        record TopicRow(UUID id, String code, String name, int sortOrder, String requiredFeatureKey) {}
         List<TopicRow> topics = jdbc.query("""
-                SELECT t.id, t.code, t.name, t.sort_order
+                SELECT t.id, t.code, t.name, t.sort_order, t.required_feature_key
                 FROM topics t
                 WHERE t.status = 'ACTIVE'
                   AND EXISTS (SELECT 1 FROM lessons l WHERE l.topic_id = t.id AND l.status = 'PUBLISHED')
@@ -92,7 +92,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
                                 AND p.status = 'PUBLISHED' AND p.current_published_version_id IS NOT NULL)
                 ORDER BY t.sort_order, t.id
                 """, Map.of(), (rs, i) -> new TopicRow(uuid(rs, "id"), rs.getString("code"), rs.getString("name"),
-                rs.getInt("sort_order")));
+                rs.getInt("sort_order"), rs.getString("required_feature_key")));
         if (topics.isEmpty()) {
             return List.of();
         }
@@ -119,7 +119,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 });
 
         return topics.stream()
-                .map(t -> new TopicSequenceResult(t.id(), t.code(), t.name(), t.sortOrder(),
+                .map(t -> new TopicSequenceResult(t.id(), t.code(), t.name(), t.sortOrder(), t.requiredFeatureKey(),
                         pointsByTopic.getOrDefault(t.id(), List.of())))
                 .toList();
     }

@@ -1,4 +1,4 @@
-package com.group01.learning.application;
+package com.group01.learning.application.service;
 
 import com.group01.learning.application.command.SubmitExerciseCommand;
 import com.group01.learning.application.exception.LearningRequestException;
@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** Rules shared by lesson blocks and review sets: one answer per question, and the 70% pass mark. */
+/** Rules shared by lesson blocks and review sets: one answer per question, (the pass mark is {@link com.group01.learning.domain.service.PassMark}). */
 public final class AnswerSheet {
     private AnswerSheet() {}
 
@@ -26,9 +26,6 @@ public final class AnswerSheet {
         return byQuestion;
     }
 
-    public static boolean passes(long correct, int total) {
-        return correct * 10L >= total * 7L;
-    }
 
     private static LearningRequestException invalid() {
         return new LearningRequestException(422, "INVALID_ANSWERS", "Submit one answer for every exercise question");

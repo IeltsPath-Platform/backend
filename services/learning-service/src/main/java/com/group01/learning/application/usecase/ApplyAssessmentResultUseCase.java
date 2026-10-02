@@ -1,12 +1,18 @@
 package com.group01.learning.application.usecase;
 
-import com.group01.learning.application.LessonEvidenceReference;
-import com.group01.learning.application.ReviewReevaluation;
 import com.group01.learning.application.command.AssessmentResult;
 import com.group01.learning.application.command.AssessmentResult.ItemResult;
 import com.group01.learning.application.command.AssessmentResult.KnowledgePointJudgment;
-import com.group01.learning.application.port.AssessmentResultStore;
-import com.group01.learning.application.port.LearningProgressStore;
+import com.group01.learning.application.port.AssessmentResultLog;
+import com.group01.learning.application.port.LearnerLock;
+import com.group01.learning.application.service.LessonEvidenceReference;
+import com.group01.learning.application.service.ReviewReevaluation;
+import com.group01.learning.domain.aggregate.LearnerCurriculum;
+import com.group01.learning.domain.aggregate.TopicTestAssignment;
+import com.group01.learning.domain.repository.KnowledgeEvidenceRepository;
+import com.group01.learning.domain.repository.LearnerCurriculumRepository;
+import com.group01.learning.domain.repository.TopicTestAssignmentRepository;
+import com.group01.learning.domain.vo.KnowledgeEvidence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -14,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -30,34 +37,40 @@ import java.util.UUID;
 public class ApplyAssessmentResultUseCase {
     private static final Logger log = LoggerFactory.getLogger(ApplyAssessmentResultUseCase.class);
     private static final Set<String> REVIEWED_TYPES = Set.of("TOPIC_GATE", "MOCK", "OFFICIAL_PRACTICE", "QUIZ");
-    private static final BigDecimal PASS_PERCENT = BigDecimal.valueOf(70);
 
-    private final LearningProgressStore progress;
-    private final AssessmentResultStore results;
+    private final LearnerLock lock;
+    private final KnowledgeEvidenceRepository evidence;
+    private final LearnerCurriculumRepository curricula;
+    private final AssessmentResultLog results;
+    private final TopicTestAssignmentRepository assignments;
     private final ReviewReevaluation reviews;
+    private final Clock clock = Clock.systemUTC();
 
-    public ApplyAssessmentResultUseCase(LearningProgressStore progress, AssessmentResultStore results,
-                                        ReviewReevaluation reviews) {
-        this.progress = progress;
+    public ApplyAssessmentResultUseCase(LearnerLock lock, KnowledgeEvidenceRepository evidence,
+                                        LearnerCurriculumRepository curricula, AssessmentResultLog results,
+                                        TopicTestAssignmentRepository assignments, ReviewReevaluation reviews) {
+        this.lock = lock;
+        this.evidence = evidence;
+        this.curricula = curricula;
         this.results = results;
+        this.assignments = assignments;
         this.reviews = reviews;
     }
 
     @Transactional
-    public void apply(AssessmentResult result) {
+    public void execute(AssessmentResult result) {
         UUID userId = result.userId();
-        progress.lockUser(userId);
+        lock.lock(userId);
         Optional<Integer> applied = results.appliedVersion(userId, result.attemptId());
         if (applied.isPresent() && applied.get() >= result.resultVersion()) {
             log.info("Assessment result already applied: eventId={}, attemptId={}, version={}",
                     result.eventId(), result.attemptId(), result.resultVersion());
             return;
         }
-        if (applied.isPresent()) results.removeAttemptEvidence(userId, result.attemptId());
+        if (applied.isPresent()) evidence.removeAssessmentEvidence(userId, result.attemptId());
         results.recordVersion(userId, result.attemptId(), result.resultVersion());
         if ("PLACEMENT".equals(result.assessmentType())) return;
-
-        List<AssessmentResultStore.Evidence> evidence = new ArrayList<>();
+        List<KnowledgeEvidence> judged = new ArrayList<>();
         Set<UUID> considered = new LinkedHashSet<>();
         Set<UUID> wrong = new HashSet<>();
         for (ItemResult item : result.items()) {
@@ -67,12 +80,12 @@ public class ApplyAssessmentResultUseCase {
                 Boolean correct = item.correctnessFor(judgment);
                 if (correct == null) continue;
                 if (!correct) wrong.add(kpId);
-                evidence.add(new AssessmentResultStore.Evidence(kpId, correct, LessonEvidenceReference.forAssessment(
-                        result.resultId(), result.resultVersion(), item.itemResultId(), kpId)));
+                judged.add(KnowledgeEvidence.assessment(kpId, correct, LessonEvidenceReference.forAssessment(
+                        result.resultId(), result.resultVersion(), item.itemResultId(), kpId),
+                        result.attemptId(), result.resultVersion()));
             }
         }
-        results.appendEvidence(userId, result.attemptId(), result.resultVersion(), evidence);
-
+        evidence.append(userId, judged);
         if ("TOPIC_GATE".equals(result.assessmentType())) applyTopicGate(result);
         if (REVIEWED_TYPES.contains(result.assessmentType())) reviews.execute(userId, considered, wrong);
     }
@@ -83,8 +96,8 @@ public class ApplyAssessmentResultUseCase {
             log.info("Topic gate result without package version: eventId={}", result.eventId());
             return;
         }
-        var assignment = results.findOpenAssignment(result.userId(), result.packageVersionId(), result.completedAt());
-        if (assignment.isEmpty()) {
+        var open = assignments.findOpenForAttempt(result.userId(), result.packageVersionId(), result.completedAt());
+        if (open.isEmpty()) {
             log.info("Topic gate result without an open assignment: eventId={}", result.eventId());
             return;
         }
@@ -92,7 +105,12 @@ public class ApplyAssessmentResultUseCase {
         BigDecimal max = result.items().stream().map(ItemResult::maxScore).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal percent = max.signum() == 0 ? BigDecimal.ZERO
                 : score.multiply(BigDecimal.valueOf(100)).divide(max, 4, RoundingMode.HALF_UP);
-        results.consumeAssignment(assignment.get().assignmentId(), result.attemptId(), percent.doubleValue());
-        if (percent.compareTo(PASS_PERCENT) >= 0) results.passTopic(result.userId(), assignment.get().topicId());
+        TopicTestAssignment assignment = open.get();
+        boolean passed = assignment.consume(result.attemptId(), percent);
+        assignments.save(assignment);
+        if (passed) {
+            LearnerCurriculum curriculum = curricula.find(result.userId());
+            if (curriculum.pass(assignment.topicId(), clock.instant())) curricula.save(curriculum);
+        }
     }
 }

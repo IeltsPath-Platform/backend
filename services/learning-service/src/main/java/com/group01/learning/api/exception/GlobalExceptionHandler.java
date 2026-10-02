@@ -67,8 +67,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> unexpected(Exception exception, HttpServletRequest request) {
-        log.error("Unexpected request failure: type={}, correlationId={}",
-                exception.getClass().getName(), request.getHeader("X-Correlation-Id"));
+        String path = request.getRequestURI();
+        if ("/v3/api-docs".equals(path) || path.startsWith("/v3/api-docs/")) {
+            log.error("OpenAPI generation failed: correlationId={}",
+                    request.getHeader("X-Correlation-Id"), exception);
+        } else {
+            log.error("Unexpected request failure: type={}, correlationId={}",
+                    exception.getClass().getName(), request.getHeader("X-Correlation-Id"));
+        }
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected internal error occurred", request, null);
     }
 

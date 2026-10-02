@@ -118,7 +118,7 @@ class AssessmentResultIntegrationTest {
     @Test
     void passingTopicGatePassesTopicConsumesAssignmentAndInsertsReviewForTheMissedKp() {
         AssessmentResult passed = result("TOPIC_GATE", UUID.randomUUID(), 1, 3, VERSION);
-        apply.apply(passed);
+        apply.execute(passed);
 
         assertNotNull(jdbc.queryForObject("SELECT passed_at FROM topic_progress WHERE user_id = ? AND topic_id = ?",
                 Timestamp.class, USER, TOPIC));
@@ -129,14 +129,14 @@ class AssessmentResultIntegrationTest {
         assertEquals(4, assessmentEvidence());
 
         // Redelivery of the same version changes nothing.
-        apply.apply(passed);
+        apply.execute(passed);
         assertEquals(4, assessmentEvidence());
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items", Integer.class));
     }
 
     @Test
     void failingTopicGateConsumesTheAssignmentButKeepsTheTopicOpen() {
-        apply.apply(result("TOPIC_GATE", UUID.randomUUID(), 1, 1, VERSION));
+        apply.execute(result("TOPIC_GATE", UUID.randomUUID(), 1, 1, VERSION));
         assertNull(jdbc.queryForObject("SELECT passed_at FROM topic_progress WHERE user_id = ? AND topic_id = ?",
                 Timestamp.class, USER, TOPIC));
         assertEquals(50.0, jdbc.queryForObject("SELECT percent FROM topic_test_assignments WHERE id = ?",
@@ -146,8 +146,8 @@ class AssessmentResultIntegrationTest {
     @Test
     void regradeReplacesTheAttemptEvidenceAndNeverRevokesThePass() {
         UUID attempt = UUID.randomUUID();
-        apply.apply(result("TOPIC_GATE", attempt, 1, 3, VERSION));
-        apply.apply(result("TOPIC_GATE", attempt, 2, 1, VERSION));
+        apply.execute(result("TOPIC_GATE", attempt, 1, 3, VERSION));
+        apply.execute(result("TOPIC_GATE", attempt, 2, 1, VERSION));
 
         assertEquals(2, jdbc.queryForObject(
                 "SELECT count(*) FROM kp_evidence WHERE attempt_id = ? AND result_version = 2", Integer.class, attempt));
@@ -157,7 +157,7 @@ class AssessmentResultIntegrationTest {
                 Timestamp.class, USER, TOPIC));
 
         // A stale version arriving late is ignored.
-        apply.apply(result("TOPIC_GATE", attempt, 1, 3, VERSION));
+        apply.execute(result("TOPIC_GATE", attempt, 1, 3, VERSION));
         assertEquals(2, jdbc.queryForObject("SELECT result_version FROM assessment_result_versions WHERE attempt_id = ?",
                 Integer.class, attempt));
         assertEquals(2, assessmentEvidence());
@@ -165,13 +165,13 @@ class AssessmentResultIntegrationTest {
 
     @Test
     void placementRecordsOnlyTheVersionAndAnAttemptBeforeTheAssignmentDoesNotOpenTheTopic() {
-        apply.apply(result("PLACEMENT", UUID.randomUUID(), 1, 3, VERSION));
+        apply.execute(result("PLACEMENT", UUID.randomUUID(), 1, 3, VERSION));
         assertEquals(0, assessmentEvidence());
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM assessment_result_versions", Integer.class));
 
         jdbc.update("UPDATE topic_test_assignments SET assigned_at = ? WHERE id = ?",
                 Timestamp.from(COMPLETED.plusSeconds(60)), assignment);
-        apply.apply(result("TOPIC_GATE", UUID.randomUUID(), 1, 3, VERSION));
+        apply.execute(result("TOPIC_GATE", UUID.randomUUID(), 1, 3, VERSION));
         assertNull(jdbc.queryForObject("SELECT consumed_at FROM topic_test_assignments WHERE id = ?",
                 Timestamp.class, assignment));
         assertEquals(4, assessmentEvidence());
@@ -179,7 +179,7 @@ class AssessmentResultIntegrationTest {
 
     @Test
     void mockResultWithoutPackageVersionStillAddsEvidenceAndReviews() {
-        apply.apply(result("MOCK", UUID.randomUUID(), 1, 1, null));
+        apply.execute(result("MOCK", UUID.randomUUID(), 1, 1, null));
         assertEquals(2, assessmentEvidence());
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE knowledge_point_id = ?",
                 Integer.class, KP_WRONG));

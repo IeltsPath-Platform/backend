@@ -118,11 +118,20 @@ class LessonPipelineSeedTest {
 
     @Test
     void everySeedAnswerSpecIsAValidV1Spec() throws Exception {
+        assertValidV1Specs("20000000-%", 43);
+    }
+
+    @Test
+    void premiumTopicSeedAnswerSpecsAreValidV1Specs() throws Exception {
+        assertValidV1Specs("24000000-%", 10);
+    }
+
+    private static void assertValidV1Specs(String idPattern, int expectedCount) throws Exception {
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT qv.options::text AS options, qv.answer_spec::text AS spec FROM question_versions qv
-                WHERE qv.id::text LIKE '20000000-%'
-                """, Map.of());
-        assertThat(rows).hasSize(43);
+                WHERE qv.id::text LIKE :idPattern
+                """, Map.of("idPattern", idPattern));
+        assertThat(rows).hasSize(expectedCount);
         for (Map<String, Object> row : rows) {
             JsonNode spec = JSON.readTree((String) row.get("spec"));
             String type = spec.path("type").asText();
@@ -164,7 +173,11 @@ class LessonPipelineSeedTest {
         List<TopicSequenceResult> sequence = reader.topicSequence(3);
 
         assertThat(sequence).extracting(TopicSequenceResult::code)
-                .containsExactly("DEMO_READING", "TFNG_SKILLS", "DEMO_LISTENING");
+                .containsExactly("DEMO_READING", "TFNG_SKILLS", "DEMO_LISTENING",
+                        "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION");
+        // Paid topics come after every free one, so a free learner never has to pass one to continue.
+        assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
+                .containsExactly(null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT");
         assertThat(sequence.get(0).knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::code)
                 .containsExactly("DEMO_READING_MAIN_IDEA", "DR_IDEA_OR_DETAIL", "DR_TOPIC_SENTENCE",
                         "DR_MATCHING_HEADINGS", "DEMO_READING_W2_OPINION",
@@ -437,8 +450,9 @@ class LessonPipelineSeedTest {
     void lessonPracticeAndTestQuestionsAreReservedForLearning() {
         List<UUID> all = jdbc.queryForList("SELECT id FROM question_versions", Map.of(), UUID.class);
         Set<UUID> reserved = reader.questionVersionsReservedForLearning(all);
-        // 43 reading questions, the Task 1 and Task 2 essays, 27 listening questions and the V4 practice-set question.
-        assertThat(reserved).hasSize(73);
+        // 43 reading questions, the Task 1 and Task 2 essays, 27 listening questions, the V4 practice-set question
+        // and the 10 questions of the paid topics.
+        assertThat(reserved).hasSize(83);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }
 

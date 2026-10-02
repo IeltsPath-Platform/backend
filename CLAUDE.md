@@ -53,6 +53,10 @@ Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/c
   library → assessment → các service còn lại (kể cả game-service, xem §5).
 - RabbitMQ: AMQP `127.0.0.1:5672`, UI `127.0.0.1:15672`. Learning Service tự khai báo queue, retry queue và DLQ khi khởi động.
 - Hướng dẫn luồng chính và cấu hình Compose: `README.md` §6.
+- Cả luồng chính trong container: `docker compose -f docker-compose.mvp.yml up -d --build` (stack riêng project
+  `ieltspath-mvp`, Postgres 5 DB + RabbitMQ + 8 module Java; không có library/game/community/notification). Cổng 8080/8761
+  trùng service chạy từ IDE thì đặt `MVP_GATEWAY_PORT`/`MVP_EUREKA_PORT`. `infra/config-server/Dockerfile` đã cũ (chỉ chép
+  pom vài module); compose MVP build config-server bằng `Dockerfile.spring-service`.
 - Swagger UI luồng chính: `http://localhost:8080/swagger-ui.html` (Gateway proxy `/api-docs/<service>` → `/v3/api-docs`
   của user/access/assessment/learning). Thêm route vào tài liệu thì sửa `springdoc.paths-to-match` trong config-repo của
   service đó.

@@ -1,6 +1,6 @@
-package com.group01.learning.api.dto;
+package com.group01.learning.api.dto.request;
 
-import com.group01.learning.api.dto.SubmitExerciseRequest.Answer;
+import com.group01.learning.api.dto.request.SubmitExerciseRequest.Answer;
 import com.group01.learning.application.command.SubmitExerciseCommand;
 import com.group01.learning.application.command.SubmitReviewCommand;
 import jakarta.validation.Valid;

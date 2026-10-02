@@ -1,4 +1,4 @@
-package com.group01.learning.application.writing;
+package com.group01.learning.application.service;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;

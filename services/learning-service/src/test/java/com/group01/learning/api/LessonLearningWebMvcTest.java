@@ -5,13 +5,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.group01.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import com.group01.learning.api.controller.LessonLearningController;
-import com.group01.learning.api.dto.ReviewResponse;
-import com.group01.learning.api.dto.ReviewSubmissionResponse;
+import com.group01.learning.api.dto.response.ReviewResponse;
+import com.group01.learning.api.dto.response.ReviewSubmissionResponse;
 import com.group01.learning.application.command.SubmitExerciseCommand;
 import com.group01.learning.application.exception.LearningRequestException;
 import com.group01.learning.application.result.*;
 import com.group01.learning.application.usecase.GetMasteryUseCase;
-import com.group01.learning.application.usecase.LearnLessonUseCase;
+import com.group01.learning.application.usecase.GetTopicLessonsUseCase;
+import com.group01.learning.application.usecase.GetLessonUseCase;
+import com.group01.learning.application.usecase.SubmitLessonExerciseUseCase;
+import com.group01.learning.application.usecase.CompleteLessonUseCase;
 import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
 import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.vo.PendingReview;
@@ -83,7 +86,10 @@ class LessonLearningWebMvcTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @MockitoBean CurrentUserProvider currentUser;
-    @MockitoBean LearnLessonUseCase lessons;
+    @MockitoBean GetTopicLessonsUseCase getTopicLessonsUseCase;
+    @MockitoBean GetLessonUseCase getLessonUseCase;
+    @MockitoBean SubmitLessonExerciseUseCase submitLessonExerciseUseCase;
+    @MockitoBean CompleteLessonUseCase completeLessonUseCase;
     @MockitoBean RefreshLearningTopicsUseCase topics;
     @MockitoBean GetMasteryUseCase mastery;
 
@@ -94,7 +100,7 @@ class LessonLearningWebMvcTest {
 
     @Test
     void unpassedQuestionsHaveExactAllowlistAndPreserveNullFillOptions() throws Exception {
-        when(lessons.get(USER, LESSON)).thenReturn(lesson(false));
+        when(getLessonUseCase.execute(USER, LESSON)).thenReturn(lesson(false));
         JsonNode response = body(mvc.perform(authenticated(get("/api/learning/lessons/{id}", LESSON)))
                 .andExpect(status().isOk()).andReturn());
 
@@ -119,7 +125,7 @@ class LessonLearningWebMvcTest {
 
     @Test
     void passedBlockRevealsSolutionsSeparatelyFromAllowlistedQuestions() throws Exception {
-        when(lessons.get(USER, LESSON)).thenReturn(lesson(true));
+        when(getLessonUseCase.execute(USER, LESSON)).thenReturn(lesson(true));
         JsonNode response = body(mvc.perform(authenticated(get("/api/learning/lessons/{id}", LESSON)))
                 .andExpect(status().isOk()).andReturn());
         JsonNode block = response.path("blocks").get(1);
@@ -136,7 +142,7 @@ class LessonLearningWebMvcTest {
 
     @Test
     void failedSubmissionReturnsCorrectnessWithoutAnswerOrExplanation() throws Exception {
-        when(lessons.submit(eq(USER), eq(LESSON), eq(BLOCK), any())).thenReturn(new SubmissionResult(
+        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenReturn(new SubmissionResult(
                 false, false, List.of(new SubmissionResult.AnswerResult(QUESTION, false,
                 "A", "The main idea"))));
         JsonNode response = body(mvc.perform(authenticated(submission(validBody())))
@@ -145,14 +151,14 @@ class LessonLearningWebMvcTest {
         assertEquals(Set.of("questionVersionId", "correct", "hint"), keys(response.path("results").get(0)));
         assertTrue(response.path("results").get(0).path("hint").isNull());
         assertFalse(response.path("results").get(0).path("correct").asBoolean());
-        verify(lessons).submit(USER, LESSON, BLOCK,
+        verify(submitLessonExerciseUseCase).execute(USER, LESSON, BLOCK,
                 new SubmitExerciseCommand(REQUEST, List.of(new SubmitExerciseCommand.Answer(QUESTION, "A"))));
     }
 
     @Test
     void openedHintsAreReturnedInFailedSubmissionAndLessonQuestions() throws Exception {
         String hint = "Compare the scope of the options.";
-        when(lessons.submit(eq(USER), eq(LESSON), eq(BLOCK), any())).thenReturn(new SubmissionResult(
+        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenReturn(new SubmissionResult(
                 false, false, List.of(new SubmissionResult.AnswerResult(QUESTION, false, "A", "Explanation", hint))));
         JsonNode answer = body(mvc.perform(authenticated(submission(validBody())))
                 .andExpect(status().isOk()).andReturn()).path("results").get(0);
@@ -161,7 +167,7 @@ class LessonLearningWebMvcTest {
 
         var exercise = new LessonResult.Block(BLOCK, "EXERCISE", "EXERCISE", 1, null, null, null,
                 false, List.of(new LessonResult.Question(QUESTION, 1, "Choose the main idea", null, hint)), null, null);
-        when(lessons.get(USER, LESSON)).thenReturn(new LessonResult(LESSON, TOPIC, "L1", "Lesson", null, 1,
+        when(getLessonUseCase.execute(USER, LESSON)).thenReturn(new LessonResult(LESSON, TOPIC, "L1", "Lesson", null, 1,
                 "AVAILABLE", List.of(exercise)));
         JsonNode question = body(mvc.perform(authenticated(get("/api/learning/lessons/{id}", LESSON)))
                 .andExpect(status().isOk()).andReturn()).path("blocks").get(0).path("questions").get(0);
@@ -192,7 +198,7 @@ class LessonLearningWebMvcTest {
 
     @Test
     void passedSubmissionIncludesAnswerAndExplanation() throws Exception {
-        when(lessons.submit(eq(USER), eq(LESSON), eq(BLOCK), any())).thenReturn(new SubmissionResult(
+        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenReturn(new SubmissionResult(
                 true, true, List.of(new SubmissionResult.AnswerResult(QUESTION, true,
                 "A", "The main idea"))));
         JsonNode response = body(mvc.perform(authenticated(submission(validBody())))
@@ -209,9 +215,9 @@ class LessonLearningWebMvcTest {
     @EnumSource(LessonAction.class)
     void reviewGateUsesExactErrorShapeForEveryLessonAction(LessonAction action) throws Exception {
         var gate = new LearningGateException("REVIEW_REQUIRED", List.of(new PendingReview(REVIEW, LESSON, KP)));
-        when(lessons.get(USER, LESSON)).thenThrow(gate);
-        when(lessons.submit(eq(USER), eq(LESSON), eq(BLOCK), any())).thenThrow(gate);
-        when(lessons.complete(USER, LESSON)).thenThrow(gate);
+        when(getLessonUseCase.execute(USER, LESSON)).thenThrow(gate);
+        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenThrow(gate);
+        when(completeLessonUseCase.execute(USER, LESSON)).thenThrow(gate);
 
         JsonNode response = body(mvc.perform(authenticated(lessonAction(action)))
                 .andExpect(status().isForbidden()).andReturn());
@@ -228,7 +234,7 @@ class LessonLearningWebMvcTest {
     @ParameterizedTest
     @ValueSource(strings = {"TOPIC_LOCKED", "LESSON_LOCKED"})
     void otherGatesOmitReviews(String code) throws Exception {
-        when(lessons.get(USER, LESSON)).thenThrow(new LearningGateException(code, List.of()));
+        when(getLessonUseCase.execute(USER, LESSON)).thenThrow(new LearningGateException(code, List.of()));
         JsonNode response = body(mvc.perform(authenticated(get("/api/learning/lessons/{id}", LESSON)))
                 .andExpect(status().isForbidden()).andReturn());
         assertEquals(Set.of("detail", "code"), keys(response));
@@ -251,7 +257,7 @@ class LessonLearningWebMvcTest {
                 .andExpect(status().isUnprocessableEntity()).andReturn());
         assertEquals(Set.of("detail"), keys(response));
         assertEquals("Invalid request", response.path("detail").asText());
-        verifyNoInteractions(lessons);
+        verifyNoInteractions(getTopicLessonsUseCase, getLessonUseCase, submitLessonExerciseUseCase, completeLessonUseCase);
     }
 
     static Stream<List<Map<String, Object>>> invalidAnswerSets() {
@@ -264,19 +270,19 @@ class LessonLearningWebMvcTest {
     @MethodSource("invalidAnswerSets")
     void missingDuplicateAndForeignAnswersMapUseCaseFailureTo422(List<Map<String, Object>> answers)
             throws Exception {
-        when(lessons.submit(eq(USER), eq(LESSON), eq(BLOCK), any())).thenThrow(new LearningRequestException(
+        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenThrow(new LearningRequestException(
                 422, "INVALID_ANSWERS", "Submit one answer for every exercise question"));
         String request = json.writeValueAsString(Map.of("requestId", REQUEST, "answers", answers));
         JsonNode response = body(mvc.perform(authenticated(submission(request)))
                 .andExpect(status().isUnprocessableEntity()).andReturn());
         assertEquals(Set.of("detail", "code"), keys(response));
         assertEquals("INVALID_ANSWERS", response.path("code").asText());
-        verify(lessons).submit(eq(USER), eq(LESSON), eq(BLOCK), any());
+        verify(submitLessonExerciseUseCase).execute(eq(USER), eq(LESSON), eq(BLOCK), any());
     }
 
     @Test
     void requestConflictMapsTo409WithoutReviews() throws Exception {
-        when(lessons.submit(eq(USER), eq(LESSON), eq(BLOCK), any())).thenThrow(new LearningRequestException(
+        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenThrow(new LearningRequestException(
                 409, "REQUEST_CONFLICT", "requestId belongs to another submission"));
         JsonNode response = body(mvc.perform(authenticated(submission(validBody())))
                 .andExpect(status().isConflict()).andReturn());
@@ -286,17 +292,21 @@ class LessonLearningWebMvcTest {
 
     @Test
     void listMasteryAndCompletionRoutesUseVerifiedIdentity() throws Exception {
-        when(topics.execute(USER)).thenReturn(List.of(new TopicResult(TOPIC, "FIRST", "First topic",
-                1, TopicStatus.IN_PROGRESS, 2)));
-        when(lessons.list(USER, TOPIC)).thenReturn(new TopicLessonsResult(TOPIC,
+        when(topics.execute(USER)).thenReturn(List.of(
+                new TopicResult(TOPIC, "FIRST", "First topic", 1, TopicStatus.IN_PROGRESS, 2, null),
+                new TopicResult(UUID.randomUUID(), "PAID", "Paid topic", 2, TopicStatus.LOCKED, 0,
+                        "PREMIUM_CONTENT")));
+        when(getTopicLessonsUseCase.execute(USER, TOPIC)).thenReturn(new TopicLessonsResult(TOPIC,
                 List.of(new TopicLessonsResult.LessonSummary(LESSON, "L1", "First lesson", 1, "COMPLETED")),
                 "AVAILABLE"));
         when(mastery.execute(USER)).thenReturn(List.of(new MasteryResult(KP, TOPIC, 0.729, 4)));
-        when(lessons.complete(USER, LESSON)).thenReturn(LESSON);
+        when(completeLessonUseCase.execute(USER, LESSON)).thenReturn(LESSON);
 
         mvc.perform(authenticated(get("/api/learning/topics")).header("X-User-Id", UUID.randomUUID()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("IN_PROGRESS"))
-                .andExpect(jsonPath("$[0].completedLessonCount").value(2));
+                .andExpect(jsonPath("$[0].completedLessonCount").value(2))
+                .andExpect(jsonPath("$[0].accessLevel").value("FREE"))
+                .andExpect(jsonPath("$[1].accessLevel").value("PREMIUM"));
         mvc.perform(authenticated(get("/api/learning/topics/{id}/lessons", TOPIC)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.testStatus").value("AVAILABLE"))
                 .andExpect(jsonPath("$.lessons[0].status").value("COMPLETED"));
@@ -307,9 +317,9 @@ class LessonLearningWebMvcTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.lessonId").value(LESSON.toString()))
                 .andExpect(jsonPath("$.status").value("COMPLETED"));
         verify(topics).execute(USER);
-        verify(lessons).list(USER, TOPIC);
+        verify(getTopicLessonsUseCase).execute(USER, TOPIC);
         verify(mastery).execute(USER);
-        verify(lessons).complete(USER, LESSON);
+        verify(completeLessonUseCase).execute(USER, LESSON);
     }
 
     enum ProtectedRoute { TOPICS, TOPIC_LESSONS, LESSON, SUBMISSION, COMPLETE, MASTERY }
@@ -326,7 +336,8 @@ class LessonLearningWebMvcTest {
             case MASTERY -> get("/api/learning/mastery");
         };
         mvc.perform(request).andExpect(status().isUnauthorized());
-        verifyNoInteractions(topics, lessons, mastery, currentUser);
+        verifyNoInteractions(topics, getTopicLessonsUseCase, getLessonUseCase, submitLessonExerciseUseCase,
+                completeLessonUseCase, mastery, currentUser);
     }
 
     private LessonResult lesson(boolean passed) {

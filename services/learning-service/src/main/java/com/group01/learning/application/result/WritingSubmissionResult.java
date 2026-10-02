@@ -1,6 +1,6 @@
 package com.group01.learning.application.result;
 
-import com.group01.learning.application.writing.WritingGrade;
+import com.group01.learning.domain.vo.WritingGrade;
 
 import java.math.BigDecimal;
 import java.util.UUID;
