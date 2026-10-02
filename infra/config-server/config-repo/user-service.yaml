@@ -37,6 +37,19 @@ app:
           - /auth/forgot-password
           - /auth/reset-password
           - /api/users/register
+      - method: GET
+        patterns:
+          - /v3/api-docs
+          - /v3/api-docs/**
+
+springdoc:
+  # OpenAPI for the Gateway Swagger UI; set API_DOCS_ENABLED=false outside local development.
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:true}
+  paths-to-match:
+    - /auth/**
+    - /api/users/register
+    - /api/users/me
 
 management:
   endpoints:

@@ -280,7 +280,14 @@ service nào build hay import thư mục này.
 3. Admin đăng nhập lại (`POST /auth/login`) để token mang role mới, rồi cấp role khác (ví dụ `EXAMINER`) qua `PUT /api/users/{id}/roles`. Người được cấp cũng phải đăng nhập lại.
 
 Grader (`EXAMINER`/`ADMIN`) chấm qua `/api/assessments/grading/**`, xem `services/assessment-service/README.md`.
-Bằng chứng E2E của lần kiểm chứng gần nhất nằm trong `plans/260924-2135-main-flow-blockers/reports/`.
+Bằng chứng E2E của lần kiểm chứng gần nhất:
+`plans/260930-2057-mvp-reading-writing-listening-roadmap/reports/e2e-261002-mvp-reading-writing-listening.md`.
+
+**Swagger UI của luồng chính:** khi Gateway và các service đã chạy, mở `http://localhost:8080/swagger-ui.html`, chọn
+tài liệu (user, access, assessment, learning) ở ô "Select a definition". Đăng nhập bằng `POST /auth/login`, bấm
+**Authorize** và dán `accessToken` (không kèm chữ `Bearer`); "Try it out" đi qua Gateway như client thật. Tài liệu chỉ
+gồm các route của luồng chính (auth, `/api/learning/**`, `/api/assessments/attempts/**`, point của access) và không có
+`/internal/**`. Schema sinh từ code, mã lỗi nghiệp vụ xem contract. Tắt bằng `API_DOCS_ENABLED=false` ngoài môi trường dev.
 
 ## 🌿 Quy Chuẩn Đặt Tên Nhánh (Branch Naming Convention)
 

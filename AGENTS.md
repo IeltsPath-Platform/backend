@@ -47,6 +47,7 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 | Messaging | RabbitMQ 3.13; Spring AMQP (`spring-boot-starter-amqp`): assessment phát, learning-service nhận. |
 | Realtime | Spring WebSocket (game-service). |
 | Shared code | `common-security` auto-configuration; MapStruct 1.6.3; Lombok 1.18.46. |
+| API docs | springdoc-openapi 2.8.17 (duyệt 2026-10-02): `webmvc-api` ở user/access/assessment/learning, `webflux-ui` ở Gateway gom Swagger UI; chỉ route luồng chính, không `/internal/**`. |
 | Kiểm thử | JUnit Jupiter, Spring Boot Test, Mockito, Spring Security Test, Testcontainers PostgreSQL. |
 | Container | Docker Compose, `postgres:15-alpine`, `rabbitmq:3.13-management-alpine`, Eclipse Temurin 21. |
 
