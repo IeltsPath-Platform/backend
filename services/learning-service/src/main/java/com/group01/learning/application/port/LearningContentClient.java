@@ -16,8 +16,20 @@ public interface LearningContentClient {
 
     List<TestPackage> getTopicTestPackages(UUID topicId);
 
+    List<LessonPracticeSet> lessonPracticeSets(UUID lessonId);
+
+    TopicPracticeSets topicPracticeSets(UUID topicId);
+
+    Map<UUID, Integer> practiceSetAvailability(List<UUID> knowledgePointIds, List<UUID> excludePackageIds,
+                                                int minQuestions);
+
     List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
                                        int minQuestions, int limit);
+
+    default List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
+                                                 int minQuestions, int limit, UUID preferredLessonId) {
+        return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit);
+    }
 
     PackageVersion getPackageVersion(UUID versionId);
 
@@ -103,6 +115,13 @@ public interface LearningContentClient {
                        int matchedQuestionCount) {
     }
 
+    record LessonPracticeSet(UUID packageId, UUID packageVersionId, String code, String title,
+                             int questionCount, List<UUID> knowledgePointIds, String requiredFeatureKey) {}
+
+    record TopicPracticeSets(List<LessonSets> lessons) {
+        public record LessonSets(UUID lessonId, List<LessonPracticeSet> practiceSets) {}
+    }
+
     record PackageVersion(UUID packageVersionId, UUID packageId, String packageType, UUID topicId,
                           Map<String, Object> rules, List<Section> sections) {
     }
@@ -115,13 +134,19 @@ public interface LearningContentClient {
         }
     }
 
-    /** The transcript is an answer: learners see it only after passing. */
+    /** The transcript is an answer: learner responses expose it only after the permitted submission. */
     record SectionAudio(UUID assetId, String mediaUrl, Integer durationSeconds, String transcript) {
     }
 
     record Item(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
-                Map<String, Object> answerSpec, String explanation, BigDecimal maxScore,
+                Map<String, Object> answerSpec, String explanation, String hint, BigDecimal maxScore,
                 List<KnowledgePointMapping> knowledgePointMappings) {
+        public Item(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
+                    Map<String, Object> answerSpec, String explanation, BigDecimal maxScore,
+                    List<KnowledgePointMapping> knowledgePointMappings) {
+            this(questionVersionId, sortOrder, stem, options, answerSpec, explanation, null, maxScore,
+                    knowledgePointMappings);
+        }
     }
 
     record KnowledgePointMapping(UUID knowledgePointId, BigDecimal weight) {

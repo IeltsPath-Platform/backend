@@ -153,4 +153,4 @@ Gateway: các route nằm dưới `/api/learning/**` đã route sẵn – Codex 
 
 ## Verification
 
-(Codex điền.)
+Files changed: `services/learning-service` (V4 migration, Content client, practice catalog/attempt API, one-way clearance, review selection, topic-test gate, and focused tests), `docs/contracts/lesson-learning-v1.md`, and the learning-service README. Focused unit/MVC tests: 38 passed; focused integration tests: 24 passed with Docker. The single full-suite run executed 211 tests with 2 failed assertions (the client DTO gained `hint`; schema version/table count advanced). After correcting those assertions, only the two failing classes were rerun: 24 passed, 0 failed. Current Surefire reports total 211 passed, 0 failed, 0 skipped; the full command was not rerun.

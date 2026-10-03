@@ -6,6 +6,7 @@ import com.group01.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import com.group01.learning.api.controller.LessonLearningController;
 import com.group01.learning.api.controller.ReviewController;
+import com.group01.learning.api.controller.PracticeController;
 import com.group01.learning.api.dto.response.ReviewResponse;
 import com.group01.learning.api.dto.response.ReviewSubmissionResponse;
 import com.group01.learning.application.command.SubmitExerciseCommand;
@@ -21,6 +22,10 @@ import com.group01.learning.application.usecase.ListReviewsUseCase;
 import com.group01.learning.application.usecase.GetReviewUseCase;
 import com.group01.learning.application.usecase.SubmitReviewUseCase;
 import com.group01.learning.application.usecase.AssignTopicTestUseCase;
+import com.group01.learning.application.usecase.GetLessonPracticeSetsUseCase;
+import com.group01.learning.application.usecase.StartPracticeAttemptUseCase;
+import com.group01.learning.application.usecase.GetPracticeAttemptUseCase;
+import com.group01.learning.application.usecase.SubmitPracticeAttemptUseCase;
 import com.group01.learning.domain.vo.ReviewListEntry;
 import com.group01.learning.domain.vo.ReviewStatus;
 import com.group01.learning.domain.vo.LearningSkill;
@@ -63,7 +68,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {LessonLearningController.class, ReviewController.class}, properties = {
+@WebMvcTest(controllers = {LessonLearningController.class, ReviewController.class, PracticeController.class}, properties = {
         "spring.config.import=",
         "spring.cloud.config.enabled=false",
         "eureka.client.enabled=false",
@@ -105,10 +110,34 @@ class LessonLearningWebMvcTest {
     @MockitoBean GetReviewUseCase getReviewUseCase;
     @MockitoBean SubmitReviewUseCase submitReviewUseCase;
     @MockitoBean AssignTopicTestUseCase assignTopicTestUseCase;
+    @MockitoBean GetLessonPracticeSetsUseCase practiceCatalog;
+    @MockitoBean StartPracticeAttemptUseCase startPractice;
+    @MockitoBean GetPracticeAttemptUseCase getPractice;
+    @MockitoBean SubmitPracticeAttemptUseCase submitPractice;
 
     @BeforeEach
     void verifiedIdentity() {
         when(currentUser.requireUserId()).thenReturn(USER);
+    }
+
+    @Test
+    void practiceStartAndReadHideAnswersBeforeSubmission() throws Exception {
+        UUID attemptId = UUID.randomUUID();
+        UUID packageId = UUID.randomUUID();
+        var view = new PracticeAttemptView(attemptId, packageId, UUID.randomUUID(), "Passage", null,
+                List.of(new LessonResult.Question(QUESTION, 1, "Question", null, "Hint")));
+        when(startPractice.execute(USER, LESSON, packageId)).thenReturn(view);
+        when(getPractice.execute(USER, attemptId)).thenReturn(new GetPracticeAttemptUseCase.Result(view, null));
+        var started = body(mvc.perform(authenticated(post("/api/learning/lessons/{id}/practice-attempts", LESSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"packageId\":\"" + packageId + "\"}")))
+                .andExpect(status().isCreated()).andReturn());
+        var fetched = body(mvc.perform(authenticated(get("/api/learning/practice-attempts/{id}", attemptId)))
+                .andExpect(status().isOk()).andReturn());
+        assertEquals("Hint", started.path("questions").get(0).path("hint").asText());
+        assertFalse(started.toString().contains("answerSpec"));
+        assertFalse(started.toString().contains("explanation"));
+        assertFalse(fetched.toString().contains("answerSpec"));
+        assertFalse(fetched.toString().contains("explanation"));
     }
 
     @Test

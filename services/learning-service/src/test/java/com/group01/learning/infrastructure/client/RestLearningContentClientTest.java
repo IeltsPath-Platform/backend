@@ -259,8 +259,7 @@ class RestLearningContentClientTest {
         assertEquals(new BigDecimal("1.5"), item.maxScore());
         assertEquals(KP_ID, item.knowledgePointMappings().getFirst().knowledgePointId());
         assertEquals(new BigDecimal("0.75"), item.knowledgePointMappings().getFirst().weight());
-        assertFalse(java.util.Arrays.stream(item.getClass().getRecordComponents())
-                .anyMatch(component -> component.getName().equals("hint")));
+        assertEquals("Package hints stay ignored.", item.hint());
     }
 
     @ParameterizedTest

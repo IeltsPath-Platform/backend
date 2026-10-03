@@ -8,6 +8,9 @@ import com.group01.learning.domain.vo.PendingReview;
 import com.group01.learning.domain.vo.ReviewStatus;
 import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.domain.vo.ReviewListEntry;
+import com.group01.learning.domain.vo.PracticeReviewState;
+import com.group01.learning.domain.vo.PracticeReviewCandidate;
+import com.group01.learning.domain.vo.TopicReviewSnapshot;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -54,6 +57,60 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
     }
 
     @Override
+    public List<PracticeReviewState> findPracticeByLessons(UUID userId, Collection<UUID> lessonIds) {
+        if (lessonIds.isEmpty()) return List.of();
+        return jdbc.query("""
+                SELECT lesson_id, knowledge_point_id, status FROM review_items
+                WHERE user_id = :userId AND lesson_id IN (:lessonIds) AND trigger_kind = 'PRACTICE'
+                """, Map.of("userId", userId, "lessonIds", lessonIds), (row, index) ->
+                new PracticeReviewState(row.getObject("lesson_id", UUID.class),
+                        row.getObject("knowledge_point_id", UUID.class),
+                        ReviewStatus.valueOf(row.getString("status"))));
+    }
+
+    @Override
+    public TopicReviewSnapshot findForTopic(UUID userId, Collection<UUID> lessonIds) {
+        List<PendingReview> pending = new ArrayList<>();
+        List<PracticeReviewState> practice = new ArrayList<>();
+        if (lessonIds.isEmpty()) return new TopicReviewSnapshot(findPending(userId), List.of());
+        jdbc.query("""
+                SELECT id, lesson_id, knowledge_point_id, status, skill, trigger_kind
+                FROM review_items
+                WHERE user_id = :userId
+                  AND (status = 'PENDING' OR (lesson_id IN (:lessonIds) AND trigger_kind = 'PRACTICE'))
+                ORDER BY created_at, id
+                """, Map.of("userId", userId, "lessonIds", lessonIds), (RowCallbackHandler) row -> {
+            UUID lessonId = row.getObject("lesson_id", UUID.class);
+            UUID kpId = row.getObject("knowledge_point_id", UUID.class);
+            ReviewStatus status = ReviewStatus.valueOf(row.getString("status"));
+            if (status == ReviewStatus.PENDING) pending.add(new PendingReview(row.getObject("id", UUID.class),
+                    lessonId, kpId, row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill"))));
+            if ("PRACTICE".equals(row.getString("trigger_kind")) && lessonIds.contains(lessonId)) {
+                practice.add(new PracticeReviewState(lessonId, kpId, status));
+            }
+        });
+        return new TopicReviewSnapshot(List.copyOf(pending), List.copyOf(practice));
+    }
+
+    @Override
+    public void insertPracticePending(UUID userId, List<PracticeReviewCandidate> candidates) {
+        if (candidates.isEmpty()) return;
+        jdbc.getJdbcOperations().batchUpdate("""
+                INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill,
+                                          trigger_kind, source_attempt_id)
+                VALUES (?, ?, ?, ?, 'PENDING', ?, 'PRACTICE', ?)
+                ON CONFLICT (user_id, knowledge_point_id) WHERE status = 'PENDING' DO NOTHING
+                """, candidates, candidates.size(), (statement, review) -> {
+            statement.setObject(1, review.reviewId());
+            statement.setObject(2, userId);
+            statement.setObject(3, review.knowledgePointId());
+            statement.setObject(4, review.lessonId());
+            statement.setString(5, review.skill().name());
+            statement.setObject(6, review.sourceAttemptId());
+        });
+    }
+
+    @Override
     public List<ReviewListEntry> list(UUID userId, ReviewStatus status, LearningSkill skill, int limit) {
         Map<String, Object> params = new HashMap<>();
         params.put("userId", userId);
@@ -86,8 +143,8 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
     public void insertPending(UUID userId, List<ReviewCandidate> candidates) {
         if (candidates.isEmpty()) return;
         jdbc.getJdbcOperations().batchUpdate("""
-                INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill)
-                VALUES (?, ?, ?, ?, 'PENDING', ?)
+                INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind)
+                VALUES (?, ?, ?, ?, 'PENDING', ?, 'ASSESSMENT')
                 ON CONFLICT (user_id, knowledge_point_id) WHERE status = 'PENDING' DO NOTHING
                 """, candidates, candidates.size(), (statement, review) -> {
             statement.setObject(1, UUID.randomUUID());
@@ -116,6 +173,16 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
                     WHERE id = :reviewId AND status = 'PENDING'
                     """, Map.of("reviewId", review.id(), "status", review.status().name()));
         }
+    }
+
+    @Override
+    public void deleteOpenSet(UUID userId, UUID reviewId, UUID setId) {
+        int deleted = jdbc.update("""
+                DELETE FROM review_sets
+                WHERE id = :setId AND user_id = :userId AND review_item_id = :reviewId
+                  AND submitted_at IS NULL
+                """, Map.of("setId", setId, "userId", userId, "reviewId", reviewId));
+        if (deleted != 1) throw new IllegalStateException("Review set changed while replacing it");
     }
 
     @Override

@@ -12,10 +12,13 @@ import com.group01.learning.application.result.ReviewSubmissionResult;
 import com.group01.learning.application.result.SubmissionResult;
 import com.group01.learning.application.service.AnswerSheet;
 import com.group01.learning.application.service.LessonEvidenceReference;
+import com.group01.learning.application.service.ItemGrading;
+import com.group01.learning.application.service.PracticeProgress;
 import com.group01.learning.domain.aggregate.ReviewItem;
 import com.group01.learning.domain.entity.ReviewSet;
 import com.group01.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.group01.learning.domain.repository.ReviewItemRepository;
+import com.group01.learning.domain.repository.PracticeAttemptRepository;
 import com.group01.learning.domain.service.AnswerSpecGrader;
 import com.group01.learning.domain.service.PassMark;
 import com.group01.learning.domain.vo.EvidenceSource;
@@ -42,16 +45,22 @@ public class SubmitReviewUseCase {
     private final LearnerLock lock;
     private final KnowledgeEvidenceRepository evidence;
     private final ReviewItemRepository reviews;
+    private final PracticeAttemptRepository attempts;
     private final ReviewSubmissionLog submissions;
-    private final AnswerSpecGrader grader = new AnswerSpecGrader();
+    private final PracticeProgress practice;
+    private final ItemGrading grading = new ItemGrading();
 
     public SubmitReviewUseCase(LearningContentClient content, LearnerLock lock, KnowledgeEvidenceRepository evidence,
-                               ReviewItemRepository reviews, ReviewSubmissionLog submissions) {
+                               ReviewItemRepository reviews, PracticeAttemptRepository attempts,
+                               ReviewSubmissionLog submissions,
+                               PracticeProgress practice) {
         this.content = content;
         this.lock = lock;
         this.evidence = evidence;
         this.reviews = reviews;
+        this.attempts = attempts;
         this.submissions = submissions;
+        this.practice = practice;
     }
 
     @Transactional
@@ -71,17 +80,14 @@ public class SubmitReviewUseCase {
             throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review set is closed");
         }
         ReviewSet set = review.openSet().orElseThrow();
-        PackageVersion version = content.getPackageVersion(set.packageVersionId());
-        List<Item> items = orderedItems(version);
-        Map<UUID, Object> answers = AnswerSheet.require(
-                items.stream().map(Item::questionVersionId).toList(), command.answers());
-        List<AnswerSpecGrader.Grade> grades = items.stream()
-                .map(item -> grader.grade(item.answerSpec(), answers.get(item.questionVersionId()))).toList();
-        if (grades.stream().anyMatch(grade -> !grade.gradable())) {
-            throw new LearningRequestException(422, "UNGRADABLE_EXERCISE", "Review set contains unsupported questions");
+        if (attempts.revealedPackageIds(userId).contains(set.packageId())) {
+            throw new LearningRequestException(409, "REVIEW_SET_CLOSED", "Review set is closed");
         }
-        boolean passed = PassMark.passes(grades.stream().filter(AnswerSpecGrader.Grade::correct).count(),
-                items.size());
+        PackageVersion version = content.getPackageVersion(set.packageVersionId());
+        var graded = grading.grade(version, command.answers(), "Review set");
+        List<Item> items = graded.items();
+        var grades = graded.grades();
+        boolean passed = graded.passed();
 
         // A set is answered once, so every set contributes its first answers as evidence.
         List<KnowledgeEvidence> setAnswers = new ArrayList<>();
@@ -100,12 +106,13 @@ public class SubmitReviewUseCase {
         evidence.append(userId, setAnswers);
 
         ReviewStatus status = review.recordSetResult(set.id(), command.requestId(), passed);
-        Section first = orderedSections(version).stream().findFirst().orElse(null);
+        Section first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);
         String transcript = passed && first != null && first.audio() != null ? first.audio().transcript() : null;
         ReviewSubmissionResult response = new ReviewSubmissionResult(status.name(), passed, List.copyOf(results),
                 transcript);
         reviews.save(review);
         submissions.save(set.id(), response);
+        if (status != ReviewStatus.PENDING) practice.refreshPassForLesson(userId, review.lessonId());
         return response;
     }
 
@@ -114,14 +121,4 @@ public class SubmitReviewUseCase {
                 .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Review was not found"));
     }
 
-    private static List<Section> orderedSections(PackageVersion version) {
-        return version.sections().stream().sorted(Comparator.comparingInt(Section::sortOrder)
-                .thenComparing(section -> section.sectionId().toString())).toList();
-    }
-
-    private static List<Item> orderedItems(PackageVersion version) {
-        return orderedSections(version).stream().flatMap(section -> section.items().stream()
-                .sorted(Comparator.comparingInt(Item::sortOrder)
-                        .thenComparing(item -> item.questionVersionId().toString()))).toList();
-    }
 }

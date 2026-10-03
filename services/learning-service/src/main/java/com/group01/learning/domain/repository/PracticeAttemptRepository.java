@@ -1,0 +1,27 @@
+package com.group01.learning.domain.repository;
+
+import com.group01.learning.domain.aggregate.PracticeAttempt;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+public interface PracticeAttemptRepository {
+    Optional<PracticeAttempt> findOwned(UUID userId, UUID attemptId);
+    Optional<PracticeAttempt> findOpen(UUID userId, UUID packageId);
+    Optional<PracticeAttempt> findByRequestId(UUID requestId);
+    List<PracticeAttempt> findByLessons(UUID userId, Collection<UUID> lessonIds);
+    TopicAttempts findForTopic(UUID userId, Collection<UUID> lessonIds, Collection<UUID> packageIds);
+    List<PackageSummary> summarizeForLesson(UUID userId, UUID lessonId, Collection<UUID> packageIds);
+    Set<UUID> revealedPackageIds(UUID userId);
+    Set<UUID> revealedPackageIds(UUID userId, Collection<UUID> packageIds);
+    void insert(PracticeAttempt attempt);
+    void saveResult(PracticeAttempt attempt);
+
+    record FirstPass(UUID lessonId, UUID packageId) {}
+    record TopicAttempts(List<FirstPass> firstPasses, Set<UUID> revealedPackageIds) {}
+    record PackageSummary(UUID packageId, UUID lastAttemptId, boolean open, boolean passed,
+                          boolean attempted, Double bestPercent) {}
+}

@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClientResponseException;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
 import java.util.function.Supplier;
 
 @Component
@@ -58,12 +59,39 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public List<LessonPracticeSet> lessonPracticeSets(UUID lessonId) {
+        return get("/lessons/{id}/practice-sets", new ParameterizedTypeReference<>() { }, lessonId);
+    }
+
+    @Override
+    public TopicPracticeSets topicPracticeSets(UUID topicId) {
+        return get("/topics/{id}/practice-sets", new ParameterizedTypeReference<>() { }, topicId);
+    }
+
+    @Override
+    public Map<UUID, Integer> practiceSetAvailability(List<UUID> knowledgePointIds,
+                                                       List<UUID> excludePackageIds, int minQuestions) {
+        Availability response = response(() -> restClient.post()
+                .uri(INTERNAL_PATH + "/practice-sets/availability")
+                .headers(this::forwardRequestHeaders)
+                .body(new AvailabilityRequest(knowledgePointIds, excludePackageIds, minQuestions))
+                .retrieve().body(Availability.class));
+        return response.counts();
+    }
+
+    @Override
     public List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
                                                int minQuestions, int limit) {
+        return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit, null);
+    }
+
+    @Override
+    public List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
+                                               int minQuestions, int limit, UUID preferredLessonId) {
         return response(() -> restClient.post()
                 .uri(INTERNAL_PATH + "/practice-sets/search")
                 .headers(this::forwardRequestHeaders)
-                .body(new PracticeSearch(knowledgePointId, excludePackageIds, minQuestions, limit))
+                .body(new PracticeSearch(knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId))
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<PracticeSet>>() { }));
     }
@@ -114,6 +142,8 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     private record PracticeSearch(UUID knowledgePointId, List<UUID> excludePackageIds,
-                                  int minQuestions, int limit) {
-    }
+                                  int minQuestions, int limit, UUID preferredLessonId) {}
+    private record AvailabilityRequest(List<UUID> knowledgePointIds, List<UUID> excludePackageIds,
+                                       int minQuestions) {}
+    private record Availability(Map<UUID, Integer> counts) {}
 }

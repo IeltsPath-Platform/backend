@@ -57,6 +57,15 @@ public final class ReviewItem {
         return openSet;
     }
 
+    /** Removes an unanswered set whose package was revealed by another submission. */
+    public ReviewSet discardOpenSet() {
+        requirePending();
+        if (openSet == null) throw new IllegalStateException("Review has no open set");
+        ReviewSet discarded = openSet;
+        openSet = null;
+        return discarded;
+    }
+
     /** Content has no practice package left for the knowledge point: let the learner continue. */
     public void skip() {
         requirePending();

@@ -127,7 +127,7 @@ là lần 2, set ôn sau lý thuyết trượt là lần 3 ⇒ `MAX_FAILED_REVIE
 | P2 ✓ | content | `lesson_block_knowledge_points`, `content_packages.lesson_id`, API practice theo lesson | [phase-02](phase-02-content-block-kp-practice-link.md) |
 | P2b ✓ | content | Mỗi câu hỏi một chủ; `questions.purpose` phân biệt học/thi, chặn sai loại khi publish | [phase-02b](phase-02b-content-question-exclusivity.md) |
 | P3 ✓ | learning | Lộ trình theo skill, gate review theo skill, topic không có test | [phase-03](phase-03-learning-skill-tracks.md) |
-| P4 | learning | Catalog Practice + practice attempts | [phase-04](phase-04-learning-practice-attempts.md) |
+| P4 ✓ | learning | Catalog Practice + practice attempts | [phase-04](phase-04-learning-practice-attempts.md) |
 | P5 | learning | Thang ôn tập: stage, lý thuyết theo KP, quick-check, hint/giải thích | [phase-05](phase-05-learning-remediation-ladder.md) |
 | P6 | cả hai | Contract, README, E2E runbook, graphify | [phase-06](phase-06-contracts-docs-e2e.md) |
 

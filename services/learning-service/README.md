@@ -42,16 +42,20 @@ to refresh the user's curriculum order before opening lessons. See the
 | Method | Path | Behavior |
 | --- | --- | --- |
 | GET | `/topics` | One Content `topic-sequence` read refreshes the shared KP catalog and the user's topic order; returns `skill`, `hasTopicTest`, statuses and completed lesson counts. |
-| GET | `/topics/{id}/lessons` | Lists lessons, `skill`, `hasTopicTest`, and `testStatus` for an `IN_PROGRESS` or `PASSED` topic. |
+| GET | `/topics/{id}/lessons` | Lists lessons with `practiceStatus` and `practicePassReason`, plus topic `skill`, `hasTopicTest`, and `testStatus`. |
 | GET | `/lessons/{id}` | Applies the lesson gate and returns ordered blocks; a passed exercise block includes its solutions. |
 | POST | `/lessons/{id}/exercises/{blockId}/submissions` | Grades every question in the block, saves an idempotent response and completes the lesson when all exercise blocks have passed. |
 | POST | `/lessons/{id}/essays/{blockId}/submissions` | `{requestId, essayText}`: grades the essay within the request (see below) and returns the band, four criteria, corrections and summary once points are charged. |
 | GET | `/writing-submissions/{id}` | Owner only; the grade appears only when `GRADED` (`PAYMENT_PENDING` shows `code`, `GRADING`/`FAILED` show `failureCode`). |
 | POST | `/lessons/{id}/complete` | Idempotently completes a lesson with no exercise blocks; lessons with exercises return `409 LESSON_HAS_EXERCISES`. |
-| GET | `/reviews/{id}` | Owned review only (else 404): theory of the teaching lesson and one open practice set (unused package first, otherwise the one given longest ago). No package left: `SKIPPED`. |
+| GET | `/lessons/{id}/practice-sets` | Lists lesson practice packages with access level, attempt and clearance status, and whether a package's answers were revealed. |
+| POST | `/lessons/{id}/practice-attempts` | Starts or returns the open attempt for a lesson package after lesson completion. |
+| GET | `/practice-attempts/{id}` | Returns an owned attempt's questions, or its saved result after submission. |
+| POST | `/practice-attempts/{id}/submissions` | Grades every question once per request id, reveals solutions, and may record evidence and a practice review. |
+| GET | `/reviews/{id}` | Owned review only (else 404): theory and one open unrevealed practice set, preferring the teaching lesson. No eligible package left: `SKIPPED`. |
 | GET | `/reviews` | Lists owned reviews oldest first; `status` defaults to `PENDING`, optional `skill` filters by skill (and includes legacy unassigned reviews), `limit` defaults to 20 and is capped at 100 (`400` above that). |
 | POST | `/reviews/{id}/submissions` | Submits the open set once (`REVIEW_SET_CLOSED` otherwise); writes `review_set` evidence; 70% → `DONE` with solutions (and the audio transcript), third failed set → `SKIPPED`. |
-| POST | `/topics/{id}/test-assignments` | `REVIEW_REQUIRED` / `TEST_LOCKED` gates, then returns the open assignment or assigns an unused test code (the least recently used one when all were used); none → `409 TEST_UNAVAILABLE`. |
+| POST | `/topics/{id}/test-assignments` | `REVIEW_REQUIRED`, `PRACTICE_REQUIRED`, and `TEST_LOCKED` gates, then returns the open assignment or assigns an unused test code (the least recently used one when all were used); none → `409 TEST_UNAVAILABLE`. |
 | GET | `/mastery` | Returns `{knowledgePointId, topicId, skill, mastery, evidenceCount}` for catalog KPs using only the current user's evidence; makes no Content request. |
 
 Topics derive `PASSED` from `passed_at`; the first unpassed topic in each skill is `IN_PROGRESS`
@@ -81,8 +85,8 @@ user, lesson and block keeps its hint while that block has not passed, including
 later correct answer in a failed block. New responses for a passed block have
 `hint: null` for every question. Lesson GET questions and exercise POST results
 always include the `hint` key, with `null` when hidden or unavailable. Review
-questions/results reuse these DTOs with `hint: null`; Content package and game
-responses do not supply hints, so practice packages and final assessments receive none.
+questions/results currently reuse these DTOs with `hint: null`; practice attempt
+questions can carry Content package hints. Final assessments do not expose hints.
 
 ## Submission, mastery and review state
 
@@ -99,19 +103,26 @@ including wrong answers. Later attempts can pass the block without adding eviden
 Hint history separately reads wrong entries from every saved `response.results`,
 scoped by user and lesson and grouped by block; it needs no new Learning migration
 or `hints_used` field and does not change mastery.
-Progress, evidence, submission response and reviews are committed in one transaction,
+Progress, evidence, submission response and practice clearance are committed in one transaction,
 serialized by a PostgreSQL transaction-scoped advisory lock for the user.
 
 Mastery uses the latest five outcomes ordered by `kp_evidence.ordinal`, with recency
 weights `0.5, 0.7, 0.85, 0.95, 1.0`. One and two outcomes cap mastery at `0.5` and
 `0.8`; no evidence yields `0`. `evidenceCount` counts all stored outcomes for the KP.
 
-Lesson completion reevaluates reviews from the first submission of each block. A review
-requires all four: mastery below `learning.review-mastery-threshold` (default `0.6`),
-a wrong answer for that KP, a completed teaching lesson, and an eligible practice set
-in the catalog. Existing pending reviews are not duplicated. A pending review blocks
-further lesson access in its skill until it is `DONE` or `SKIPPED`; a legacy review
-without a skill blocks every skill until curriculum refresh can backfill it.
+Lesson completion no longer creates reviews. The first submission of an unrevealed
+practice package writes `practice_set` evidence. A counted practice submission below
+70% can create a `PRACTICE` review for KPs below 70% in that attempt, if the KP has
+no pending review and an unrevealed eligible set remains. A package is revealed after
+either a submitted practice attempt or a submitted review set; later practice of it
+still returns solutions but writes no evidence or review. Assessment results retain
+the mastery-based review rule. A pending review blocks lesson and practice access in
+its skill until `DONE` or `SKIPPED`; a legacy review without a skill blocks every skill.
+
+The final topic test needs every lesson completed and practice-cleared. Clearance is
+stored on write paths and never revoked by later package publication. Reasons, in
+priority order, are `FIRST_SUBMISSION`, `REVIEW_FINISHED`, `ALL_SETS_ATTEMPTED`, and
+`NO_PRACTICE`. Catalog and topic reads calculate status without writing pass rows.
 
 ## Writing essays
 
@@ -160,7 +171,8 @@ DLQ with header `x-learning-failure`. Settings: `LEARNING_RETRY_DELAY_MS` (30 s)
 
 Learning errors use `{detail, code}`; `REVIEW_REQUIRED` additionally includes
 `reviews` with `reviewId`, `lessonId`, `knowledgePointId`, and `skill` when known. Malformed requests return
-422. Content reads forward the authenticated internal bearer and `X-Correlation-Id`;
+422. `REVIEW_REQUIRED` remains HTTP 403; `PRACTICE_LOCKED`, `PRACTICE_REQUIRED`
+(with `lessonIds`), and `ATTEMPT_ALREADY_SUBMITTED` return HTTP 409. Content reads forward the authenticated internal bearer and `X-Correlation-Id`;
 missing content maps to `404 NOT_FOUND`, transport/unavailability errors to
 `503 CONTENT_UNAVAILABLE`, and other Content failures to `502 CONTENT_FAILURE`.
 

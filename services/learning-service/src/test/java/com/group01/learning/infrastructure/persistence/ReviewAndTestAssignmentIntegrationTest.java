@@ -95,7 +95,8 @@ class ReviewAndTestAssignmentIntegrationTest {
     @BeforeEach
     void resetDataAndCurriculum() {
         jdbc.execute("""
-                TRUNCATE review_sets, review_items, lesson_exercise_submissions, kp_evidence,
+                TRUNCATE review_sets, review_items, practice_attempts, lesson_practice_passes,
+                lesson_exercise_submissions, kp_evidence,
                 lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments,
                 assessment_result_versions RESTART IDENTITY
                 """);
@@ -155,9 +156,9 @@ class ReviewAndTestAssignmentIntegrationTest {
     // ---- reviews ----
 
     @Test
-    void reviewAssignsOneSetAtATimeMovesToUnusedPackagesAndSkipsAfterThreeFailedSets() {
+    void reviewAssignsUnusedPackagesAndSkipsWhenNoneRemain() {
         UUID review = pendingReview(USER);
-        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt())).thenAnswer(invocation -> {
+        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt(), eq(LESSON))).thenAnswer(invocation -> {
             List<UUID> excluded = invocation.getArgument(1);
             return List.of(practice(PACKAGE_A), practice(PACKAGE_B)).stream()
                     .filter(set -> !excluded.contains(set.packageId())).toList();
@@ -181,13 +182,13 @@ class ReviewAndTestAssignmentIntegrationTest {
         assertEquals(PACKAGE_B, second.set().packageId());
         assertEquals("PENDING", submit(review, second.set().reviewSetId(), "B").reviewStatus());
 
-        // Every package was used: the one given longest ago comes back.
+        // Every package has been revealed, so no further set is assigned.
         ReviewResult third = getReviewUseCase.execute(USER, review);
-        assertEquals(PACKAGE_A, third.set().packageId());
-        assertEquals("SKIPPED", submit(review, third.set().reviewSetId(), "B").reviewStatus());
+        assertEquals("SKIPPED", third.reviewStatus());
+        assertNull(third.set());
         assertEquals("SKIPPED", getReviewUseCase.execute(USER, review).reviewStatus());
         assertNull(getReviewUseCase.execute(USER, review).set());
-        assertEquals(9, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'review_set'",
+        assertEquals(6, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'review_set'",
                 Integer.class));
         // A skipped review no longer gates lessons.
         assertDoesNotThrow(() -> getLessonUseCase.execute(USER, LESSON));
@@ -196,7 +197,7 @@ class ReviewAndTestAssignmentIntegrationTest {
     @Test
     void passedSetFinishesTheReviewWithSolutionsAndTranscriptAndReplaysByRequestId() {
         UUID review = pendingReview(USER);
-        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt())).thenReturn(List.of(practice(PACKAGE_A)));
+        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt(), eq(LESSON))).thenReturn(List.of(practice(PACKAGE_A)));
         UUID set = getReviewUseCase.execute(USER, review).set().reviewSetId();
         UUID requestId = UUID.randomUUID();
 
@@ -218,7 +219,7 @@ class ReviewAndTestAssignmentIntegrationTest {
         var notFound = assertThrows(LearningRequestException.class, () -> getReviewUseCase.execute(OTHER_USER, review));
         assertEquals(404, notFound.getStatus());
 
-        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt())).thenReturn(List.of());
+        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt(), eq(LESSON))).thenReturn(List.of());
         ReviewResult skipped = getReviewUseCase.execute(USER, review);
         assertEquals("SKIPPED", skipped.reviewStatus());
         assertNull(skipped.set());

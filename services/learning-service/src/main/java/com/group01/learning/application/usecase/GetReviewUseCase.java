@@ -3,7 +3,6 @@ package com.group01.learning.application.usecase;
 import com.group01.learning.application.exception.LearningRequestException;
 import com.group01.learning.application.port.LearnerLock;
 import com.group01.learning.application.port.LearningContentClient;
-import com.group01.learning.application.port.LearningContentClient.Item;
 import com.group01.learning.application.port.LearningContentClient.PackageVersion;
 import com.group01.learning.application.port.LearningContentClient.PracticeSet;
 import com.group01.learning.application.port.LearningContentClient.Section;
@@ -12,14 +11,18 @@ import com.group01.learning.application.result.ReviewResult;
 import com.group01.learning.domain.aggregate.ReviewItem;
 import com.group01.learning.domain.entity.ReviewSet;
 import com.group01.learning.domain.repository.ReviewItemRepository;
-import com.group01.learning.domain.service.PackageRotation;
+import com.group01.learning.domain.repository.PracticeAttemptRepository;
+import com.group01.learning.application.service.PracticeProgress;
+import com.group01.learning.application.service.ItemGrading;
 import com.group01.learning.domain.vo.ReviewStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -29,16 +32,20 @@ import java.util.UUID;
 @Service
 public class GetReviewUseCase {
     private static final int MIN_SET_QUESTIONS = 3;
-    private static final int PACKAGE_CANDIDATES = 10;
 
     private final LearningContentClient content;
     private final LearnerLock lock;
     private final ReviewItemRepository reviews;
+    private final PracticeAttemptRepository attempts;
+    private final PracticeProgress practice;
 
-    public GetReviewUseCase(LearningContentClient content, LearnerLock lock, ReviewItemRepository reviews) {
+    public GetReviewUseCase(LearningContentClient content, LearnerLock lock, ReviewItemRepository reviews,
+                            PracticeAttemptRepository attempts, PracticeProgress practice) {
         this.content = content;
         this.lock = lock;
         this.reviews = reviews;
+        this.attempts = attempts;
+        this.practice = practice;
     }
 
     @Transactional
@@ -52,12 +59,18 @@ public class GetReviewUseCase {
         if (review.status() != ReviewStatus.PENDING) {
             return new ReviewResult(reviewId, review.status().name(), review.lessonId(), theory, null);
         }
+        Set<UUID> revealed = attempts.revealedPackageIds(userId);
+        if (review.openSet().isPresent() && revealed.contains(review.openSet().orElseThrow().packageId())) {
+            ReviewSet stale = review.discardOpenSet();
+            reviews.deleteOpenSet(userId, reviewId, stale.id());
+        }
         if (review.openSet().isEmpty()) {
-            Optional<PracticeSet> next = nextPackage(userId, review.knowledgePointId());
+            Optional<PracticeSet> next = nextPackage(userId, review.knowledgePointId(), review.lessonId(), revealed);
             if (next.isEmpty()) {
-                // Content removed every package for this KP: let the learner continue.
+                // No unrevealed eligible package remains, so the learner can continue.
                 review.skip();
                 reviews.save(review);
+                practice.refreshPassForLesson(userId, review.lessonId());
                 return new ReviewResult(reviewId, review.status().name(), review.lessonId(), theory, null);
             }
             review.assignSet(UUID.randomUUID(), next.get().packageId(), next.get().packageVersionId());
@@ -65,8 +78,8 @@ public class GetReviewUseCase {
         }
         ReviewSet set = review.openSet().orElseThrow();
         PackageVersion version = content.getPackageVersion(set.packageVersionId());
-        Section first = orderedSections(version).stream().findFirst().orElse(null);
-        List<LessonResult.Question> questions = orderedItems(version).stream()
+        Section first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);
+        List<LessonResult.Question> questions = ItemGrading.orderedItems(version).stream()
                 .map(item -> new LessonResult.Question(item.questionVersionId(), item.sortOrder(), item.stem(),
                         item.options() == null ? null : item.options().stream().map(option -> new LessonResult.Option(
                                 option.optionKey(), option.content(), option.sortOrder())).toList()))
@@ -83,27 +96,11 @@ public class GetReviewUseCase {
                 .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Review was not found"));
     }
 
-    /** A package the learner has never been given, otherwise the one given longest ago. */
-    private Optional<PracticeSet> nextPackage(UUID userId, UUID knowledgePointId) {
-        List<PracticeSet> unused = content.searchPracticeSets(knowledgePointId, reviews.assignedPackageIds(userId),
-                MIN_SET_QUESTIONS, 1);
-        if (!unused.isEmpty()) return Optional.of(unused.getFirst());
-        List<PracticeSet> all = content.searchPracticeSets(knowledgePointId, List.of(), MIN_SET_QUESTIONS,
-                PACKAGE_CANDIDATES);
-        return PackageRotation.leastRecentlyUsed(
-                        all.stream().map(set -> new PackageRotation.Candidate(set.packageId(), null)).toList(),
-                        reviews.lastAssignedAt(userId, all.stream().map(PracticeSet::packageId).toList()))
-                .flatMap(id -> all.stream().filter(set -> set.packageId().equals(id)).findFirst());
-    }
-
-    private static List<Section> orderedSections(PackageVersion version) {
-        return version.sections().stream().sorted(Comparator.comparingInt(Section::sortOrder)
-                .thenComparing(section -> section.sectionId().toString())).toList();
-    }
-
-    private static List<Item> orderedItems(PackageVersion version) {
-        return orderedSections(version).stream().flatMap(section -> section.items().stream()
-                .sorted(Comparator.comparingInt(Item::sortOrder)
-                        .thenComparing(item -> item.questionVersionId().toString()))).toList();
+    /** Only a package whose answers the learner has not seen can be assigned. */
+    private Optional<PracticeSet> nextPackage(UUID userId, UUID knowledgePointId, UUID lessonId, Set<UUID> revealed) {
+        Set<UUID> excluded = new HashSet<>(revealed);
+        excluded.addAll(reviews.assignedPackageIds(userId));
+        return content.searchPracticeSets(knowledgePointId, excluded.stream().toList(), MIN_SET_QUESTIONS, 1, lessonId)
+                .stream().findFirst();
     }
 }

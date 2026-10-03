@@ -4,6 +4,7 @@ package com.group01.learning.domain.vo;
 public enum EvidenceSource {
     LESSON_EXERCISE("lesson_exercise"),
     REVIEW_SET("review_set"),
+    PRACTICE_SET("practice_set"),
     LESSON_WRITING("lesson_writing"),
     ASSESSMENT("assessment");
 
