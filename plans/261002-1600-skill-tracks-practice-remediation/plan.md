@@ -62,8 +62,10 @@ là lần 2, set ôn sau lý thuyết trượt là lần 3 ⇒ `MAX_FAILED_REVIE
   Review chờ chỉ chặn lesson, practice, topic test **cùng skill**. Review cũ có `skill IS NULL` vẫn chặn mọi skill
   (an toàn) cho tới khi được backfill.
 - **D7 – Practice attempt.** Learner tự chọn practice set của lesson đã COMPLETED. Practice **bắt buộc** để mở topic
-  test (D13). Chỉ **attempt nộp đầu tiên của mỗi package** ghi evidence (`practice_set`); các lần sau vẫn
-  chấm và hiện lời giải nhưng không ghi evidence. Sau khi nộp luôn hiện đáp án + giải thích (D11). Premium: Learning
+  test (D13). Chỉ **lần nộp đầu tiên của mỗi package với learner** ghi evidence (`practice_set`). "Lần nộp đầu" xét
+  **cả Practice lẫn set ôn**: package đã nộp trong set ôn (đã lộ lời giải, D11) thì practice attempt của nó luôn là
+  lần làm lại. Lần làm lại vẫn chấm và hiện lời giải nhưng không ghi evidence, không tạo review, không tính
+  `FIRST_SUBMISSION`. Sau khi nộp luôn hiện đáp án + giải thích (D11). Premium: Learning
   **không** kiểm gói của learner (giống lesson hiện nay, contract ghi "Learning does not check the learner's plan
   yet"); chỉ trả `accessLevel`.
 - **D8 – Thang ôn tập.** `review_items.stage` (`PRACTICE|THEORY`) + `theory_reason`. Review chỉ còn hai nguồn:
@@ -94,10 +96,12 @@ là lần 2, set ôn sau lý thuyết trượt là lần 3 ⇒ `MAX_FAILED_REVIE
   SKIPPED sớm hơn hoặc không được tạo – chấp nhận, ghi trong contract.
 - **D13 – Topic test cần "qua Practice".** Topic test (`AssignTopicTestUseCase`, `testStatus`) chỉ mở khi mọi
   lesson PUBLISHED của topic đã COMPLETED **và** `practiceStatus = PASSED`. Lesson PASSED với `practicePassReason`:
-  1. `FIRST_SUBMISSION` – một practice set của lesson đạt ≥ 70% **ở lần nộp đầu** của package đó (làm lại không tính);
+  1. `FIRST_SUBMISSION` – một practice set của lesson đạt ≥ 70% **ở lần nộp đầu** của package đó (D7: package đã
+     nộp trong set ôn không còn lần nộp đầu; làm lại không tính);
   2. `REVIEW_FINISHED` – một review sinh từ practice attempt của lesson (`trigger_kind='PRACTICE'`, `lesson_id` =
      lesson) đã kết thúc `DONE` hoặc `SKIPPED`;
-  3. `ALL_SETS_ATTEMPTED` (chống kẹt) – **mỗi** package PRACTICE_SET PUBLISHED đang gắn lesson có ≥ 1 attempt đã nộp
+  3. `ALL_SETS_ATTEMPTED` (chống kẹt) – **mỗi** package PRACTICE_SET PUBLISHED đang gắn lesson đã được learner nộp
+     (practice attempt **hoặc** set ôn)
      **và** không có review PENDING nào tạo từ Practice của lesson này;
   4. `NO_PRACTICE` – lesson không có package PRACTICE_SET PUBLISHED nào (Writing, lesson tương lai chưa có đề).
   **Đơn điệu**: lần đầu thoả điều kiện thì lưu vào bảng `lesson_practice_passes` (P4) và không bao giờ quay lại chưa

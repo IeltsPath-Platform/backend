@@ -11,7 +11,10 @@ Service: `learning-service`. Phụ thuộc: P2 (internal `lessons/{id}/practice-
 4. Mỗi lần "bắt đầu" tạo một attempt gắn `package_version_id` hiện tại. Mỗi (user, package) chỉ có **một attempt mở**
    (chưa nộp); bắt đầu lại khi đang mở ⇒ trả attempt đang mở (idempotent).
 5. Nộp: chấm bằng `AnswerSpecGrader` như review set; `passed = PassMark` (≥ 70%). `percent` = đúng / tổng.
-6. Evidence: **chỉ attempt nộp đầu tiên của mỗi (user, package)** ghi `kp_evidence` source `practice_set`,
+6. Evidence: **chỉ lần nộp đầu tiên của mỗi (user, package)** ghi `kp_evidence` source `practice_set`. Package
+   "đã lộ" = có practice attempt đã nộp **hoặc** `review_sets` đã nộp (`submitted_at IS NOT NULL`) với cùng
+   `package_id`; nộp practice cho package đã lộ ⇒ `countedAsEvidence = false` (kể cả lần practice đầu tiên của package
+   đó). Lần được tính ghi
    mỗi item × mỗi KP mapping (giống `SubmitReviewUseCase`). `source_reference_id` =
    `LessonEvidenceReference.forPracticeSet(requestId, questionVersionId, kpId)` – **namespace UUIDv5 mới**
    `ielts-path:practice_set`, vì `kp_evidence` có `UNIQUE(user_id, source, source_reference_id)` và một attempt sinh
@@ -27,7 +30,7 @@ Service: `learning-service`. Phụ thuộc: P2 (internal `lessons/{id}/practice-
      package vừa nộp, MIN_SET_QUESTIONS)` (route P2). Hết package ⇒ không tạo.
    Review tạo với `lesson_id` = lesson của attempt, `skill` = skill lesson, `trigger_kind = 'PRACTICE'`,
    `source_attempt_id` = attempt, kèm `kpPercent` để P5 tính stage ban đầu (P4: stage mặc định PRACTICE).
-   Attempt làm lại không tạo review.
+   Attempt không được tính (`countedAsEvidence = false`, gồm package đã lộ qua set ôn) không tạo review.
 9. **Bỏ review khi hoàn thành lesson**: `CompleteLessonUseCase`, `SubmitLessonExerciseUseCase` không gọi
    `ReviewReevaluation` nữa (vẫn ghi evidence `lesson_exercise` lần nộp đầu). `ReviewReevaluation` chỉ còn caller
    `ApplyAssessmentResultUseCase` (luật mastery < 0.6 giữ nguyên). Sửa test cũ kỳ vọng review sau khi hoàn thành lesson.
@@ -99,7 +102,7 @@ ALTER TABLE kp_evidence ADD CONSTRAINT kp_evidence_source_check
 | `application/port/LearningContentClient` | thêm `lessonPracticeSets(lessonId)`, `topicPracticeSets(topicId)`, `practiceSetAvailability(kps, exclude, minQuestions)`; thêm `preferredLessonId` vào `searchPracticeSets`. Cài ở `infrastructure/client`. |
 | `domain/service/PracticeReviewRule`, `domain/service/PracticeClearance` | luật 8 và 10, thuần Java. |
 | `domain/aggregate/PracticeAttempt` | `start(...)`, `acceptsAnswers(requestId)`, `recordResult(correct, total, countedAsEvidence)`; bất biến: không nộp 2 lần với request khác nhau (trả 409 `ATTEMPT_ALREADY_SUBMITTED`), cùng `requestId` ⇒ trả lại `response` đã lưu. |
-| `domain/repository/PracticeAttemptRepository` + `infrastructure/persistence/JdbcPracticeAttemptRepository` | lưu/đọc; `hasCountedEvidence(userId, packageId)`; `latestByLesson(userId, lessonId)`; `submittedPackageIds(userId)` (package đã lộ, dùng ở P5 – D11). Mọi hàm đọc theo tập, không gọi trong vòng lặp. |
+| `domain/repository/PracticeAttemptRepository` + `infrastructure/persistence/JdbcPracticeAttemptRepository` | lưu/đọc; `latestByLesson(userId, lessonId)`; `revealedPackageIds(userId)` = package có practice attempt đã nộp ∪ `review_sets` đã nộp (một query UNION; dùng cho `countedAsEvidence`, luật 8, `ALL_SETS_ATTEMPTED`, và P5 chọn set ôn – D11). Mọi hàm đọc theo tập, không gọi trong vòng lặp. |
 | `application/service/LessonEvidenceReference` | thêm `forPracticeSet` (namespace riêng). |
 | `application/service/PracticeAccess` | luật 1–2, dùng lại `LessonAccess` cho lesson và gate. |
 | `application/service/ItemGrading` (tách từ `SubmitReviewUseCase`) | chấm một `PackageVersion` theo `AnswerSheet`, trả item kết quả + KP sai; dùng chung cho review set, practice, quick-check (P5). Không đổi output của review. |
@@ -113,7 +116,7 @@ ALTER TABLE kp_evidence ADD CONSTRAINT kp_evidence_source_check
 
 | Route | Mô tả |
 | --- | --- |
-| `GET /api/learning/lessons/{id}/practice-sets` | `{lessonId, skill, lessonCompleted, items:[{packageId, code, title, questionCount, accessLevel, status, bestPercent, lastAttemptId}]}`. Số package mỗi lesson nhỏ (seed ≤ 4); vẫn đặt trần 50 ở Content. `status`: `LOCKED` (lesson chưa xong hoặc review chờ cùng skill), `AVAILABLE`, `IN_PROGRESS` (có attempt mở), `PASSED` (có attempt đạt), `ATTEMPTED` (đã làm, chưa đạt). Không lỗi khi lesson chưa xong – trả LOCKED. |
+| `GET /api/learning/lessons/{id}/practice-sets` | `{lessonId, skill, lessonCompleted, items:[{packageId, code, title, questionCount, accessLevel, status, bestPercent, lastAttemptId}]}`. Số package mỗi lesson nhỏ (seed ≤ 4); vẫn đặt trần 50 ở Content. `status`: `LOCKED` (lesson chưa xong hoặc review chờ cùng skill), `AVAILABLE`, `IN_PROGRESS` (có attempt mở), `PASSED` (có attempt đạt), `ATTEMPTED` (đã làm, chưa đạt). Thêm `revealed: boolean` (đã nộp ở Practice hoặc set ôn ⇒ lần nộp tới không tính điểm). Không lỗi khi lesson chưa xong – trả LOCKED. |
 | `POST /api/learning/lessons/{id}/practice-attempts` body `{packageId}` | 201 `{attemptId, packageId, packageVersionId, passage?, audio?, questions}` – cùng shape với `set` của `GET /reviews/{id}` (allowlist câu hỏi của lesson `{questionVersionId, sortOrder, stem, options, hint}`, `audio` không có transcript); lỗi 409 `PRACTICE_LOCKED` / `REVIEW_REQUIRED`, 404 nếu package không thuộc lesson. |
 | `GET /api/learning/practice-attempts/{id}` | như trên, hoặc kết quả đã lưu nếu đã nộp. 404 nếu không phải của user. |
 | `POST /api/learning/practice-attempts/{id}/submissions` body `{requestId, answers}` (answers cùng shape lesson submission, đủ mọi câu) | `{attemptId, correct, total, percent, passed, countedAsEvidence, results:[{questionVersionId, correct, correctAnswer, explanation, hint:null}], transcript?, reviewsCreated:[{reviewId, knowledgePointId, stage}]}` – `results` dùng lại `SubmissionResponse.SolvedAnswer`. |
@@ -133,7 +136,9 @@ Gateway: các route nằm dưới `/api/learning/**` đã route sẵn – Codex 
   1. Lesson chưa xong ⇒ catalog LOCKED, start 409 PRACTICE_LOCKED.
   2. Xong lesson ⇒ AVAILABLE ⇒ start ⇒ submit 100% ⇒ PASSED, evidence `practice_set` ghi đúng số dòng.
   3. Submit lần 2 cùng requestId trả cùng body; requestId khác ⇒ 409.
-  4. Attempt thứ hai cùng package ⇒ `countedAsEvidence=false`, không thêm `kp_evidence`.
+  4. Attempt thứ hai cùng package ⇒ `countedAsEvidence=false`, không thêm `kp_evidence`. Package đã nộp trong set ôn
+     (insert `review_sets` đã nộp) ⇒ practice attempt đầu tiên của nó cũng `countedAsEvidence=false`, trượt không
+     tạo review, đạt không cho `FIRST_SUBMISSION`.
   5. Submit 50% (mastery KP vẫn ≥ 0.6) ⇒ review PENDING vẫn được tạo cho KP < 70%, `reviewsCreated` không rỗng,
      `trigger_kind=PRACTICE`; practice khác cùng skill ⇒ LOCKED; lesson skill khác vẫn vào được.
   6. Hoàn thành lesson có câu sai ⇒ **không** tạo review; evidence `lesson_exercise` vẫn ghi.
