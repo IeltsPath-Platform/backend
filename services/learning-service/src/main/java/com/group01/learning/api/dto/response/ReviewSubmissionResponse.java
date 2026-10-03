@@ -5,16 +5,15 @@ import com.group01.learning.application.result.ReviewSubmissionResult;
 
 import java.util.List;
 
-/** Solutions and the audio transcript appear only for a passed set. */
+/** Every answered set shows its solutions and the audio transcript, passed or not. */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ReviewSubmissionResponse(String reviewStatus, List<SubmissionResponse.Result> results,
-                                       String transcript) {
+                                       String transcript, String stage, Integer failedSets) {
     public static ReviewSubmissionResponse from(ReviewSubmissionResult result) {
         List<SubmissionResponse.Result> answers = result.results().stream().<SubmissionResponse.Result>map(answer ->
-                result.setPassed()
-                        ? new SubmissionResponse.SolvedAnswer(answer.questionVersionId(), answer.correct(),
-                        answer.correctAnswer(), answer.explanation())
-                        : new SubmissionResponse.Correctness(answer.questionVersionId(), answer.correct())).toList();
-        return new ReviewSubmissionResponse(result.reviewStatus(), answers, result.transcript());
+                new SubmissionResponse.SolvedAnswer(answer.questionVersionId(), answer.correct(),
+                        answer.correctAnswer(), answer.explanation())).toList();
+        return new ReviewSubmissionResponse(result.reviewStatus(), answers, result.transcript(), result.stage(),
+                result.failedSets());
     }
 }

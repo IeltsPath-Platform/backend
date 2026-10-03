@@ -10,10 +10,8 @@ import com.group01.learning.domain.vo.PracticeReviewState;
 import com.group01.learning.domain.vo.PracticeReviewCandidate;
 import com.group01.learning.domain.vo.TopicReviewSnapshot;
 
-import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -43,7 +41,4 @@ public interface ReviewItemRepository {
 
     /** Packages the learner has been given in any review. */
     List<UUID> assignedPackageIds(UUID userId);
-
-    /** Latest time each given package was assigned to the learner; packages never assigned are absent. */
-    Map<UUID, Instant> lastAssignedAt(UUID userId, Collection<UUID> packageIds);
 }

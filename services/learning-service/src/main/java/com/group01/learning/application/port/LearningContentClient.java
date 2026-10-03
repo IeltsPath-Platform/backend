@@ -62,8 +62,15 @@ public interface LearningContentClient {
     }
 
     /** {@code blockKind} is {@code EXERCISE} or {@code ESSAY} on exercise blocks; absent means {@code EXERCISE}. */
+    /** {@code knowledgePointIds}: the KPs a TEXT block teaches, or the KPs of an exercise block's questions. */
     record Block(UUID blockId, String blockType, int sortOrder, String textContent, Asset asset,
-                 List<UUID> vocabularySenseIds, List<Question> questions, String blockKind) {
+                 List<UUID> vocabularySenseIds, List<Question> questions, String blockKind,
+                 List<UUID> knowledgePointIds) {
+        public Block(UUID blockId, String blockType, int sortOrder, String textContent, Asset asset,
+                     List<UUID> vocabularySenseIds, List<Question> questions, String blockKind) {
+            this(blockId, blockType, sortOrder, textContent, asset, vocabularySenseIds, questions, blockKind, null);
+        }
+
         public Block(UUID blockId, String blockType, int sortOrder, String textContent, Asset asset,
                      List<UUID> vocabularySenseIds, List<Question> questions) {
             this(blockId, blockType, sortOrder, textContent, asset, vocabularySenseIds, questions, null);

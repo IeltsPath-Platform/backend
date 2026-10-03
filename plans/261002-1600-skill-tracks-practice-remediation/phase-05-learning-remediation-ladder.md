@@ -178,4 +178,24 @@ nhiều kịch bản vào một test method).
 
 ## Verification
 
-(Codex điền.)
+- Code: V5 migration; `ReviewStage`, `TheoryReason`; `ReviewRule` (`MAX_FAILED_REVIEW_SETS = 2`, `initialStage`);
+  `ReviewItem` (stage, `recordSetResult(correct, total)`, `completeTheory`, `startWithTheory`); `ReviewSet`
+  correct/total; `TheoryBlockSelector` (domain) + `TheoryFocus`, `FirstAttemptMistakes` (application);
+  `SubmitTheoryCheckUseCase`, `ReviewTheoryCheckLog` + JDBC; `GetReviewUseCase`, `SubmitReviewUseCase`,
+  `SubmitPracticeAttemptUseCase` (stage when created), `GET /reviews` real `stage`; route
+  `POST /reviews/{id}/theory-check`; content client `Block.knowledgePointIds`.
+- Lệch spec (có chủ đích): `ReviewTrigger` không tạo vì P4 đã có `trigger_kind`; review từ assessment xét
+  `WRONG_IN_LESSON` lúc học viên mở review lần đầu (khi review còn "fresh"), vì consumer RabbitMQ không được gọi
+  HTTP (AGENTS §3.8). Review từ Practice xét khi tạo. `PackageRotation` giữ lại vì giao mã đề cuối vẫn dùng;
+  bỏ `ReviewItemRepository.lastAssignedAt` (không còn caller).
+- Test mới: `ReviewRuleTest` (bảng 1.1), `ReviewItemTest` (bảng 1.2 + guard stage), `TheoryBlockSelectorTest` (2),
+  `RemediationLadderIntegrationTest` (2 method: thang đầy đủ PRACTICE → THEORY → quick-check → set mới chưa lộ →
+  SKIPPED; stage ban đầu LOW_SCORE / WRONG_IN_LESSON khi tạo từ Practice và khi mở review assessment).
+- Test cũ sửa (thay đổi chủ đích D8, D9, D11): `ReviewItemTest` (chữ ký `recordSetResult`, giới hạn 2),
+  `ReviewRuleTest` (giới hạn 2), `LessonLearningWebMvcTest` (review set có hint, set trượt có lời giải; stage thật
+  trong `GET /reviews`; mock use case mới), `ReviewAndTestAssignmentIntegrationTest.reviewAssignsUnusedPackagesAndSkipsWhenNoneRemain`
+  (trượt ⇒ THEORY, có lời giải và transcript, quick-check rồi hết đề ⇒ SKIPPED), `LearningServiceApplicationTests`
+  (Flyway 5, 14 bảng), bốn test integration thêm `review_theory_checks` vào TRUNCATE.
+- Chạy: unit + MVC 4 class xanh; `RemediationLadderIntegrationTest` 2/2; toàn bộ learning-service 216 test, lần
+  chạy đầy đủ có 2 fail (hai test cũ nêu trên), sửa xong chạy lại hai class đó 8/8 xanh. Docker/Testcontainers chạy,
+  không skip.

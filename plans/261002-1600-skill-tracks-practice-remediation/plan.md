@@ -128,7 +128,7 @@ là lần 2, set ôn sau lý thuyết trượt là lần 3 ⇒ `MAX_FAILED_REVIE
 | P2b ✓ | content | Mỗi câu hỏi một chủ; `questions.purpose` phân biệt học/thi, chặn sai loại khi publish | [phase-02b](phase-02b-content-question-exclusivity.md) |
 | P3 ✓ | learning | Lộ trình theo skill, gate review theo skill, topic không có test | [phase-03](phase-03-learning-skill-tracks.md) |
 | P4 ✓ | learning | Catalog Practice + practice attempts | [phase-04](phase-04-learning-practice-attempts.md) |
-| P5 | learning | Thang ôn tập: stage, lý thuyết theo KP, quick-check, hint/giải thích | [phase-05](phase-05-learning-remediation-ladder.md) |
+| P5 ✓ | learning | Thang ôn tập: stage, lý thuyết theo KP, quick-check, hint/giải thích | [phase-05](phase-05-learning-remediation-ladder.md) |
 | P6 | cả hai | Contract, README, E2E runbook, graphify | [phase-06](phase-06-contracts-docs-e2e.md) |
 
 Thứ tự bắt buộc: P1 → P2 → P2b → P3 → P4 → P5 → P6. P3 cần P1 (skill trong topic-sequence). P4 cần P2. P5 cần P2 + P4.

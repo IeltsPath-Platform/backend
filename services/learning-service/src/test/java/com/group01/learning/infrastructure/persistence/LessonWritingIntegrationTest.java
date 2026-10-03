@@ -96,7 +96,7 @@ class LessonWritingIntegrationTest {
     @BeforeEach
     void seed() {
         jdbc.execute("""
-                TRUNCATE review_sets, review_items, lesson_exercise_submissions, kp_evidence, lesson_progress,
+                TRUNCATE review_theory_checks, review_sets, review_items, lesson_exercise_submissions, kp_evidence, lesson_progress,
                 topic_progress, knowledge_point_catalog, topic_test_assignments, assessment_result_versions,
                 lesson_writing_submissions, llm_daily_usage RESTART IDENTITY
                 """);

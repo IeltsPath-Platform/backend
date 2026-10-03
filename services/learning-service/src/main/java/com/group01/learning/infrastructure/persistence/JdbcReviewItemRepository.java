@@ -5,7 +5,9 @@ import com.group01.learning.domain.entity.ReviewSet;
 import com.group01.learning.domain.repository.ReviewItemRepository;
 import com.group01.learning.domain.service.ReviewRule.ReviewCandidate;
 import com.group01.learning.domain.vo.PendingReview;
+import com.group01.learning.domain.vo.ReviewStage;
 import com.group01.learning.domain.vo.ReviewStatus;
+import com.group01.learning.domain.vo.TheoryReason;
 import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.domain.vo.ReviewListEntry;
 import com.group01.learning.domain.vo.PracticeReviewState;
@@ -15,7 +17,6 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
 import java.util.*;
 
 @Repository
@@ -29,8 +30,8 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
     @Override
     public Optional<ReviewItem> findOwned(UUID userId, UUID reviewId) {
         return jdbc.query("""
-                SELECT r.id, r.knowledge_point_id, r.lesson_id, r.status, r.skill,
-                s.id AS set_id, s.package_id, s.package_version_id,
+                SELECT r.id, r.knowledge_point_id, r.lesson_id, r.status, r.skill, r.stage, r.theory_reason,
+                r.theory_completed_count, r.trigger_kind, s.id AS set_id, s.package_id, s.package_version_id,
                 (SELECT count(*) FROM review_sets f WHERE f.review_item_id = r.id AND f.passed = FALSE) AS failed_sets
                 FROM review_items r
                 LEFT JOIN review_sets s ON s.review_item_id = r.id AND s.submitted_at IS NULL
@@ -42,7 +43,10 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
             return ReviewItem.restore(row.getObject("id", UUID.class), userId,
                     row.getObject("knowledge_point_id", UUID.class), row.getObject("lesson_id", UUID.class),
                     ReviewStatus.valueOf(row.getString("status")), open, row.getInt("failed_sets"),
-                    row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")));
+                    row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")),
+                    ReviewStage.valueOf(row.getString("stage")),
+                    row.getString("theory_reason") == null ? null : TheoryReason.valueOf(row.getString("theory_reason")),
+                    row.getInt("theory_completed_count"), row.getString("trigger_kind"));
         }).stream().findFirst();
     }
 
@@ -97,8 +101,8 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         if (candidates.isEmpty()) return;
         jdbc.getJdbcOperations().batchUpdate("""
                 INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill,
-                                          trigger_kind, source_attempt_id)
-                VALUES (?, ?, ?, ?, 'PENDING', ?, 'PRACTICE', ?)
+                                          trigger_kind, source_attempt_id, stage, theory_reason)
+                VALUES (?, ?, ?, ?, 'PENDING', ?, 'PRACTICE', ?, ?, ?)
                 ON CONFLICT (user_id, knowledge_point_id) WHERE status = 'PENDING' DO NOTHING
                 """, candidates, candidates.size(), (statement, review) -> {
             statement.setObject(1, review.reviewId());
@@ -107,6 +111,8 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
             statement.setObject(4, review.lessonId());
             statement.setString(5, review.skill().name());
             statement.setObject(6, review.sourceAttemptId());
+            statement.setString(7, review.stage().name());
+            statement.setString(8, review.theoryReason() == null ? null : review.theoryReason().name());
         });
     }
 
@@ -118,14 +124,14 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         params.put("skill", skill == null ? null : skill.name());
         params.put("limit", limit);
         return jdbc.query("""
-                SELECT id, knowledge_point_id, lesson_id, skill, created_at FROM review_items
+                SELECT id, knowledge_point_id, lesson_id, skill, stage, created_at FROM review_items
                 WHERE user_id = :userId AND status = :status
                   AND (CAST(:skill AS varchar) IS NULL OR skill = :skill OR skill IS NULL)
                 ORDER BY created_at, id LIMIT :limit
                 """, params, (row, index) -> new ReviewListEntry(row.getObject("id", UUID.class),
                 row.getObject("knowledge_point_id", UUID.class), row.getObject("lesson_id", UUID.class),
                 row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")),
-                row.getTimestamp("created_at").toInstant()));
+                ReviewStage.valueOf(row.getString("stage")), row.getTimestamp("created_at").toInstant()));
     }
 
     @Override
@@ -164,15 +170,23 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
                 """, Map.of("id", set.id(), "reviewId", review.id(), "userId", review.userId(),
                 "packageId", set.packageId(), "versionId", set.packageVersionId())));
         review.answeredSet().ifPresent(set -> jdbc.update("""
-                UPDATE review_sets SET submitted_at = clock_timestamp(), passed = :passed, request_id = :requestId
+                UPDATE review_sets SET submitted_at = clock_timestamp(), passed = :passed, request_id = :requestId,
+                correct_count = :correct, total_count = :total
                 WHERE id = :setId AND submitted_at IS NULL
-                """, Map.of("setId", set.id(), "passed", set.passed(), "requestId", set.requestId())));
-        if (review.status() != ReviewStatus.PENDING) {
-            jdbc.update("""
-                    UPDATE review_items SET status = :status, done_at = clock_timestamp()
-                    WHERE id = :reviewId AND status = 'PENDING'
-                    """, Map.of("reviewId", review.id(), "status", review.status().name()));
-        }
+                """, Map.of("setId", set.id(), "passed", set.passed(), "requestId", set.requestId(),
+                "correct", set.correct(), "total", set.total())));
+        Map<String, Object> state = new HashMap<>();
+        state.put("reviewId", review.id());
+        state.put("status", review.status().name());
+        state.put("stage", review.stage().name());
+        state.put("reason", review.theoryReason() == null ? null : review.theoryReason().name());
+        state.put("theoryCount", review.theoryCompletedCount());
+        jdbc.update("""
+                UPDATE review_items SET status = :status, stage = :stage, theory_reason = :reason,
+                theory_completed_count = :theoryCount,
+                done_at = CASE WHEN :status = 'PENDING' THEN NULL ELSE clock_timestamp() END
+                WHERE id = :reviewId AND status = 'PENDING'
+                """, state);
     }
 
     @Override
@@ -189,17 +203,5 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
     public List<UUID> assignedPackageIds(UUID userId) {
         return jdbc.queryForList("SELECT DISTINCT package_id FROM review_sets WHERE user_id = :userId",
                 Map.of("userId", userId), UUID.class);
-    }
-
-    @Override
-    public Map<UUID, Instant> lastAssignedAt(UUID userId, Collection<UUID> packageIds) {
-        Map<UUID, Instant> latest = new HashMap<>();
-        if (packageIds.isEmpty()) return latest;
-        jdbc.query("""
-                SELECT package_id, max(assigned_at) AS last_assigned FROM review_sets
-                WHERE user_id = :userId AND package_id IN (:packageIds) GROUP BY package_id
-                """, Map.of("userId", userId, "packageIds", packageIds), (RowCallbackHandler) row -> latest.put(
-                row.getObject("package_id", UUID.class), row.getTimestamp("last_assigned").toInstant()));
-        return latest;
     }
 }

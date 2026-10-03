@@ -13,6 +13,7 @@ import com.group01.learning.application.usecase.SubmitLessonExerciseUseCase;
 import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
 import com.group01.learning.application.usecase.GetReviewUseCase;
 import com.group01.learning.application.usecase.SubmitReviewUseCase;
+import com.group01.learning.application.usecase.SubmitTheoryCheckUseCase;
 import com.group01.learning.application.usecase.CompleteLessonUseCase;
 import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.domain.vo.TopicStatus;
@@ -84,6 +85,7 @@ class ReviewAndTestAssignmentIntegrationTest {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired GetReviewUseCase getReviewUseCase;
+    @Autowired SubmitTheoryCheckUseCase theoryCheck;
     @Autowired SubmitReviewUseCase submitReviewUseCase;
     @Autowired AssignTopicTestUseCase tests;
     @Autowired GetLessonUseCase getLessonUseCase;
@@ -95,7 +97,7 @@ class ReviewAndTestAssignmentIntegrationTest {
     @BeforeEach
     void resetDataAndCurriculum() {
         jdbc.execute("""
-                TRUNCATE review_sets, review_items, practice_attempts, lesson_practice_passes,
+                TRUNCATE review_theory_checks, review_sets, review_items, practice_attempts, lesson_practice_passes,
                 lesson_exercise_submissions, kp_evidence,
                 lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments,
                 assessment_result_versions RESTART IDENTITY
@@ -160,7 +162,7 @@ class ReviewAndTestAssignmentIntegrationTest {
         UUID review = pendingReview(USER);
         when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt(), eq(LESSON))).thenAnswer(invocation -> {
             List<UUID> excluded = invocation.getArgument(1);
-            return List.of(practice(PACKAGE_A), practice(PACKAGE_B)).stream()
+            return List.of(practice(PACKAGE_A)).stream()
                     .filter(set -> !excluded.contains(set.packageId())).toList();
         });
 
@@ -172,23 +174,26 @@ class ReviewAndTestAssignmentIntegrationTest {
         assertTrue(first.set().questions().stream().allMatch(question -> question.hint() == null));
         assertEquals(first.set().reviewSetId(), getReviewUseCase.execute(USER, review).set().reviewSetId());
 
+        // A failed set shows its solutions and transcript, then sends the review to the theory.
         ReviewSubmissionResult failed = submit(review, first.set().reviewSetId(), "B");
         assertEquals("PENDING", failed.reviewStatus());
-        assertNull(failed.results().getFirst().correctAnswer());
+        assertEquals("THEORY", failed.stage());
+        assertNotNull(failed.results().getFirst().correctAnswer());
         assertTrue(failed.results().stream().allMatch(answer -> answer.hint() == null));
-        assertNull(failed.transcript());
+        assertNotNull(failed.transcript());
 
-        ReviewResult second = getReviewUseCase.execute(USER, review);
-        assertEquals(PACKAGE_B, second.set().packageId());
-        assertEquals("PENDING", submit(review, second.set().reviewSetId(), "B").reviewStatus());
+        ReviewResult theory = getReviewUseCase.execute(USER, review);
+        assertNull(theory.set());
+        theoryCheck.execute(USER, review, new SubmitExerciseCommand(UUID.randomUUID(), theory.quickCheck().stream()
+                .map(question -> new SubmitExerciseCommand.Answer(question.questionVersionId(), "A")).toList()));
 
-        // Every package has been revealed, so no further set is assigned.
+        // The only package has been revealed, so no further set is assigned.
         ReviewResult third = getReviewUseCase.execute(USER, review);
         assertEquals("SKIPPED", third.reviewStatus());
         assertNull(third.set());
         assertEquals("SKIPPED", getReviewUseCase.execute(USER, review).reviewStatus());
         assertNull(getReviewUseCase.execute(USER, review).set());
-        assertEquals(6, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'review_set'",
+        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'review_set'",
                 Integer.class));
         // A skipped review no longer gates lessons.
         assertDoesNotThrow(() -> getLessonUseCase.execute(USER, LESSON));

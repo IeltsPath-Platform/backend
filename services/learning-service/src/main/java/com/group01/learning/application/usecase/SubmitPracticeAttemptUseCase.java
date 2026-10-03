@@ -4,6 +4,7 @@ import com.group01.learning.application.command.SubmitExerciseCommand;
 import com.group01.learning.application.exception.LearningRequestException;
 import com.group01.learning.application.port.LearnerLock;
 import com.group01.learning.application.port.LearningContentClient;
+import com.group01.learning.application.service.FirstAttemptMistakes;
 import com.group01.learning.application.service.ItemGrading;
 import com.group01.learning.application.service.LessonEvidenceReference;
 import com.group01.learning.application.service.PracticeAccess;
@@ -13,6 +14,7 @@ import com.group01.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.group01.learning.domain.repository.PracticeAttemptRepository;
 import com.group01.learning.domain.repository.ReviewItemRepository;
 import com.group01.learning.domain.service.PracticeReviewRule;
+import com.group01.learning.domain.service.ReviewRule;
 import com.group01.learning.domain.vo.EvidenceSource;
 import com.group01.learning.domain.vo.KnowledgeEvidence;
 import com.group01.learning.domain.vo.PracticeReviewCandidate;
@@ -33,13 +35,15 @@ public class SubmitPracticeAttemptUseCase {
     private final ReviewItemRepository reviews;
     private final KnowledgeEvidenceRepository evidence;
     private final PracticeProgress progress;
+    private final FirstAttemptMistakes mistakes;
     private final ItemGrading grading = new ItemGrading();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final Clock clock = Clock.systemUTC();
 
     public SubmitPracticeAttemptUseCase(LearnerLock lock, PracticeAccess access, LearningContentClient content,
                                         PracticeAttemptRepository attempts, ReviewItemRepository reviews,
-                                        KnowledgeEvidenceRepository evidence, PracticeProgress progress) {
+                                        KnowledgeEvidenceRepository evidence, PracticeProgress progress,
+                                        FirstAttemptMistakes mistakes) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -47,6 +51,7 @@ public class SubmitPracticeAttemptUseCase {
         this.reviews = reviews;
         this.evidence = evidence;
         this.progress = progress;
+        this.mistakes = mistakes;
     }
 
     @Transactional
@@ -58,7 +63,7 @@ public class SubmitPracticeAttemptUseCase {
         if (attempts.findByRequestId(command.requestId()).isPresent()) {
             throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
         }
-        access.require(userId, attempt.lessonId());
+        var lesson = access.require(userId, attempt.lessonId());
         var version = content.getPackageVersion(attempt.packageVersionId());
         var graded = grading.grade(version, command.answers());
         Set<UUID> revealed = attempts.revealedPackageIds(userId);
@@ -89,15 +94,19 @@ public class SubmitPracticeAttemptUseCase {
                     excluded.stream().sorted(Comparator.comparing(UUID::toString)).toList(), MIN_SET_QUESTIONS);
             Set<UUID> pending = new HashSet<>();
             reviews.findPending(userId).forEach(review -> pending.add(review.knowledgePointId()));
-            candidates = reviewRule.derive(graded.percent(), true, outcomes, pending, availability).stream()
-                    .map(need -> new PracticeReviewCandidate(UUID.randomUUID(), attempt.lessonId(),
-                            need.knowledgePointId(), attempt.skill(), attempt.id(), need.kpPercent())).toList();
+            var needs = reviewRule.derive(graded.percent(), true, outcomes, pending, availability);
+            Set<UUID> wrongInLesson = needs.isEmpty() ? Set.of() : mistakes.of(userId, lesson);
+            candidates = needs.stream().map(need -> {
+                var start = ReviewRule.initialStage(need.kpPercent(), wrongInLesson.contains(need.knowledgePointId()));
+                return new PracticeReviewCandidate(UUID.randomUUID(), attempt.lessonId(), need.knowledgePointId(),
+                        attempt.skill(), attempt.id(), need.kpPercent(), start.stage(), start.theoryReason());
+            }).toList();
         }
         var first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);
         String transcript = first == null || first.audio() == null ? null : first.audio().transcript();
         List<PracticeSubmission.ReviewCreated> created = candidates.stream()
                 .map(candidate -> new PracticeSubmission.ReviewCreated(candidate.reviewId(),
-                        candidate.knowledgePointId(), "PRACTICE")).toList();
+                        candidate.knowledgePointId(), candidate.stage().name())).toList();
         PracticeSubmission response = new PracticeSubmission(attemptId, graded.correct(), graded.total(),
                 graded.percent(), graded.passed(), counted, List.copyOf(results), transcript, created);
         attempt.recordResult(command.requestId(), response, clock.instant());

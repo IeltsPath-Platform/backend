@@ -9,6 +9,9 @@ import com.group01.learning.application.usecase.AssignTopicTestUseCase;
 import com.group01.learning.application.usecase.GetReviewUseCase;
 import com.group01.learning.application.usecase.SubmitReviewUseCase;
 import com.group01.learning.application.usecase.ListReviewsUseCase;
+import com.group01.learning.application.usecase.SubmitTheoryCheckUseCase;
+import com.group01.learning.api.dto.request.SubmitExerciseRequest;
+import com.group01.learning.api.dto.response.TheoryCheckResponse;
 import com.group01.learning.api.dto.response.ReviewListResponse;
 import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.domain.vo.ReviewStatus;
@@ -35,6 +38,7 @@ public class ReviewController {
     private final SubmitReviewUseCase submitReviewUseCase;
     private final AssignTopicTestUseCase assignTopicTestUseCase;
     private final ListReviewsUseCase listReviewsUseCase;
+    private final SubmitTheoryCheckUseCase submitTheoryCheckUseCase;
 
     @GetMapping("/reviews")
     public List<ReviewListResponse> reviews(@RequestParam(name = "status", defaultValue = "PENDING") ReviewStatus status,
@@ -56,6 +60,13 @@ public class ReviewController {
     public ReviewSubmissionResponse submit(@PathVariable("reviewId") UUID reviewId,
                                            @Valid @RequestBody SubmitReviewRequest request) {
         return ReviewSubmissionResponse.from(submitReviewUseCase.execute(
+                currentUser.requireUserId(), reviewId, request.toCommand()));
+    }
+
+    @PostMapping("/reviews/{reviewId}/theory-check")
+    public TheoryCheckResponse theoryCheck(@PathVariable("reviewId") UUID reviewId,
+                                           @Valid @RequestBody SubmitExerciseRequest request) {
+        return TheoryCheckResponse.from(submitTheoryCheckUseCase.execute(
                 currentUser.requireUserId(), reviewId, request.toCommand()));
     }
 

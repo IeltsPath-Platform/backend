@@ -8,17 +8,21 @@ import com.group01.learning.application.port.LearningContentClient.PracticeSet;
 import com.group01.learning.application.port.LearningContentClient.Section;
 import com.group01.learning.application.result.LessonResult;
 import com.group01.learning.application.result.ReviewResult;
+import com.group01.learning.application.service.FirstAttemptMistakes;
+import com.group01.learning.application.service.ItemGrading;
+import com.group01.learning.application.service.PracticeProgress;
+import com.group01.learning.application.service.TheoryFocus;
 import com.group01.learning.domain.aggregate.ReviewItem;
 import com.group01.learning.domain.entity.ReviewSet;
-import com.group01.learning.domain.repository.ReviewItemRepository;
 import com.group01.learning.domain.repository.PracticeAttemptRepository;
-import com.group01.learning.application.service.PracticeProgress;
-import com.group01.learning.application.service.ItemGrading;
+import com.group01.learning.domain.repository.ReviewItemRepository;
+import com.group01.learning.domain.service.ReviewRule;
+import com.group01.learning.domain.vo.ReviewStage;
 import com.group01.learning.domain.vo.ReviewStatus;
+import com.group01.learning.domain.vo.TheoryReason;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -26,8 +30,9 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * A pending review gives the theory of the lesson that teaches the weak knowledge point and one practice set of new
- * questions. The review's own rules ({@link ReviewItem}) decide DONE, another set, or SKIPPED.
+ * A pending review shows the theory of its knowledge point and, at the practice stage, one set of a package whose
+ * answers the learner has never seen; at the theory stage it shows a quick check instead of a set. The review's own
+ * rules ({@link ReviewItem}) decide DONE, the theory step, or SKIPPED.
  */
 @Service
 public class GetReviewUseCase {
@@ -38,26 +43,38 @@ public class GetReviewUseCase {
     private final ReviewItemRepository reviews;
     private final PracticeAttemptRepository attempts;
     private final PracticeProgress practice;
+    private final FirstAttemptMistakes mistakes;
+    private final TheoryFocus theoryFocus = new TheoryFocus();
 
     public GetReviewUseCase(LearningContentClient content, LearnerLock lock, ReviewItemRepository reviews,
-                            PracticeAttemptRepository attempts, PracticeProgress practice) {
+                            PracticeAttemptRepository attempts, PracticeProgress practice,
+                            FirstAttemptMistakes mistakes) {
         this.content = content;
         this.lock = lock;
         this.reviews = reviews;
         this.attempts = attempts;
         this.practice = practice;
+        this.mistakes = mistakes;
     }
 
     @Transactional
     public ReviewResult execute(UUID userId, UUID reviewId) {
         lock.lock(userId);
         ReviewItem review = ownedReview(userId, reviewId);
-        List<String> theory = content.getLesson(review.lessonId()).blocks().stream()
-                .filter(block -> "TEXT".equals(block.blockType()) && block.textContent() != null)
-                .sorted(Comparator.comparingInt(LearningContentClient.Block::sortOrder))
-                .map(LearningContentClient.Block::textContent).toList();
-        if (review.status() != ReviewStatus.PENDING) {
-            return new ReviewResult(reviewId, review.status().name(), review.lessonId(), theory, null);
+        var lesson = content.getLesson(review.lessonId());
+        var focus = theoryFocus.of(lesson, review.knowledgePointId());
+        if (review.status() != ReviewStatus.PENDING) return result(review, focus, null, List.of());
+        // Practice reviews choose their stage when created; reviews from assessment results are created by the
+        // event consumer, which cannot read lessons, so the lesson check happens on first open.
+        if (review.isFresh() && !"PRACTICE".equals(review.triggerKind())
+                && mistakes.of(userId, lesson).contains(review.knowledgePointId())) {
+            review.startWithTheory(TheoryReason.WRONG_IN_LESSON);
+            reviews.save(review);
+        }
+        if (review.stage() == ReviewStage.THEORY) {
+            return result(review, focus, null, focus.quickCheck().stream()
+                    .map(question -> new LessonResult.Question(question.questionVersionId(), question.sortOrder(),
+                            question.stem(), options(question.options()), question.hint())).toList());
         }
         Set<UUID> revealed = attempts.revealedPackageIds(userId);
         if (review.openSet().isPresent() && revealed.contains(review.openSet().orElseThrow().packageId())) {
@@ -71,7 +88,7 @@ public class GetReviewUseCase {
                 review.skip();
                 reviews.save(review);
                 practice.refreshPassForLesson(userId, review.lessonId());
-                return new ReviewResult(reviewId, review.status().name(), review.lessonId(), theory, null);
+                return result(review, focus, null, List.of());
             }
             review.assignSet(UUID.randomUUID(), next.get().packageId(), next.get().packageVersionId());
             reviews.save(review);
@@ -81,14 +98,26 @@ public class GetReviewUseCase {
         Section first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);
         List<LessonResult.Question> questions = ItemGrading.orderedItems(version).stream()
                 .map(item -> new LessonResult.Question(item.questionVersionId(), item.sortOrder(), item.stem(),
-                        item.options() == null ? null : item.options().stream().map(option -> new LessonResult.Option(
-                                option.optionKey(), option.content(), option.sortOrder())).toList()))
+                        options(item.options()), item.hint()))
                 .toList();
         ReviewResult.Audio audio = first == null || first.audio() == null ? null
                 : new ReviewResult.Audio(first.audio().mediaUrl(), first.audio().durationSeconds());
-        return new ReviewResult(reviewId, ReviewStatus.PENDING.name(), review.lessonId(), theory,
-                new ReviewResult.ReviewSet(set.id(), set.packageId(), set.packageVersionId(),
-                        first == null ? null : first.passage(), audio, questions));
+        return result(review, focus, new ReviewResult.ReviewSet(set.id(), set.packageId(), set.packageVersionId(),
+                first == null ? null : first.passage(), audio, questions), List.of());
+    }
+
+    private static ReviewResult result(ReviewItem review, TheoryFocus.Focus focus, ReviewResult.ReviewSet set,
+                                       List<LessonResult.Question> quickCheck) {
+        return new ReviewResult(review.id(), review.status().name(), review.lessonId(), focus.theory(), set,
+                review.knowledgePointId(), review.skill(), review.stage().name(),
+                review.theoryReason() == null ? null : review.theoryReason().name(), focus.scope(),
+                review.failedSets(), ReviewRule.MAX_FAILED_REVIEW_SETS, quickCheck);
+    }
+
+    private static List<LessonResult.Option> options(List<LearningContentClient.Option> options) {
+        return options == null ? null : options.stream()
+                .map(option -> new LessonResult.Option(option.optionKey(), option.content(), option.sortOrder()))
+                .toList();
     }
 
     private ReviewItem ownedReview(UUID userId, UUID reviewId) {
@@ -96,7 +125,7 @@ public class GetReviewUseCase {
                 .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Review was not found"));
     }
 
-    /** Only a package whose answers the learner has not seen can be assigned. */
+    /** Only a package whose answers the learner has not seen and that no earlier set gave can be assigned. */
     private Optional<PracticeSet> nextPackage(UUID userId, UUID knowledgePointId, UUID lessonId, Set<UUID> revealed) {
         Set<UUID> excluded = new HashSet<>(revealed);
         excluded.addAll(reviews.assignedPackageIds(userId));

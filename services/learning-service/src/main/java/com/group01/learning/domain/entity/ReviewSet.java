@@ -10,6 +10,8 @@ public final class ReviewSet {
     private final UUID packageVersionId;
     private UUID requestId;
     private Boolean passed;
+    private Integer correct;
+    private Integer total;
 
     public ReviewSet(UUID id, UUID packageId, UUID packageVersionId) {
         this.id = Objects.requireNonNull(id, "id");
@@ -22,11 +24,15 @@ public final class ReviewSet {
     public UUID packageVersionId() { return packageVersionId; }
     public UUID requestId() { return requestId; }
     public Boolean passed() { return passed; }
+    public Integer correct() { return correct; }
+    public Integer total() { return total; }
     public boolean isOpen() { return passed == null; }
 
-    public void close(UUID requestId, boolean passed) {
+    public void close(UUID requestId, int correct, int total, boolean passed) {
         if (!isOpen()) throw new IllegalStateException("Review set is already answered");
         this.requestId = Objects.requireNonNull(requestId, "requestId");
+        this.correct = correct;
+        this.total = total;
         this.passed = passed;
     }
 }

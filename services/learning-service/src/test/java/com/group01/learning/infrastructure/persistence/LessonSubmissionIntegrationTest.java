@@ -107,7 +107,7 @@ class LessonSubmissionIntegrationTest {
     @BeforeEach
     void resetDataAndCurriculum() {
         jdbc.execute("""
-                TRUNCATE review_sets, review_items, practice_attempts, lesson_practice_passes,
+                TRUNCATE review_theory_checks, review_sets, review_items, practice_attempts, lesson_practice_passes,
                 lesson_exercise_submissions, kp_evidence,
                 lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments,
                 assessment_result_versions RESTART IDENTITY

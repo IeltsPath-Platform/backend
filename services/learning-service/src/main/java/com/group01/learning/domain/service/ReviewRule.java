@@ -8,9 +8,14 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import com.group01.learning.domain.vo.LearningSkill;
+import com.group01.learning.domain.vo.ReviewStage;
+import com.group01.learning.domain.vo.TheoryReason;
 
 public final class ReviewRule {
-    public static final int MAX_FAILED_REVIEW_SETS = 3;
+    /** The failure that created the review is the first; the second sends to theory, the third skips the review. */
+    public static final int MAX_FAILED_REVIEW_SETS = 2;
+    /** Below this share of correct answers a learner reads the theory before any practice set. */
+    public static final double LOW_SCORE = 0.40;
 
     private static final Comparator<CompletedLesson> LESSON_ORDER = Comparator
             .comparing(CompletedLesson::sequenceOrder, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -41,6 +46,23 @@ public final class ReviewRule {
                     .ifPresent(lesson -> candidates.add(new ReviewCandidate(kp, lesson.lessonId(), lesson.skill())));
         }
         return List.copyOf(candidates);
+    }
+
+    /**
+     * Stage of a new review: a knowledge point scored below {@link #LOW_SCORE} in the practice attempt that created
+     * it, or answered wrong on the first submission of the lesson's exercises, starts with the theory.
+     * {@code kpPercent} is null for reviews not created by a practice attempt.
+     */
+    public static Start initialStage(Double kpPercent, boolean wrongInLesson) {
+        if (kpPercent != null && kpPercent < LOW_SCORE) return new Start(ReviewStage.THEORY, TheoryReason.LOW_SCORE);
+        if (wrongInLesson) return new Start(ReviewStage.THEORY, TheoryReason.WRONG_IN_LESSON);
+        return new Start(ReviewStage.PRACTICE, null);
+    }
+
+    public record Start(ReviewStage stage, TheoryReason theoryReason) {
+        public Start {
+            Objects.requireNonNull(stage, "stage");
+        }
     }
 
     /** Each entry represents a lesson whose completed timestamp has already been recorded. */

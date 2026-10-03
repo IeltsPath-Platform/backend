@@ -52,9 +52,10 @@ to refresh the user's curriculum order before opening lessons. See the
 | POST | `/lessons/{id}/practice-attempts` | Starts or returns the open attempt for a lesson package after lesson completion. |
 | GET | `/practice-attempts/{id}` | Returns an owned attempt's questions, or its saved result after submission. |
 | POST | `/practice-attempts/{id}/submissions` | Grades every question once per request id, reveals solutions, and may record evidence and a practice review. |
-| GET | `/reviews/{id}` | Owned review only (else 404): theory and one open unrevealed practice set, preferring the teaching lesson. No eligible package left: `SKIPPED`. |
+| GET | `/reviews/{id}` | Owned review only (else 404): the theory blocks of its KP, then by `stage`: `PRACTICE` gives one open set of a package never given or revealed (with hints), preferring the teaching lesson, none left → `SKIPPED`; `THEORY` gives up to 3 quick-check questions instead. |
 | GET | `/reviews` | Lists owned reviews oldest first; `status` defaults to `PENDING`, optional `skill` filters by skill (and includes legacy unassigned reviews), `limit` defaults to 20 and is capped at 100 (`400` above that). |
-| POST | `/reviews/{id}/submissions` | Submits the open set once (`REVIEW_SET_CLOSED` otherwise); writes `review_set` evidence; 70% → `DONE` with solutions (and the audio transcript), third failed set → `SKIPPED`. |
+| POST | `/reviews/{id}/submissions` | Submits the open set once (`REVIEW_SET_CLOSED` otherwise, `THEORY_REQUIRED` at the theory stage); writes `review_set` evidence; always returns solutions and the audio transcript; 70% → `DONE`, a failure → `THEORY`, the second failed set → `SKIPPED`. |
+| POST | `/reviews/{id}/theory-check` | Grades the quick check (`THEORY_NOT_REQUIRED` outside the theory stage), returns solutions, writes no evidence, and moves the review back to `PRACTICE`. |
 | POST | `/topics/{id}/test-assignments` | `REVIEW_REQUIRED`, `PRACTICE_REQUIRED`, and `TEST_LOCKED` gates, then returns the open assignment or assigns an unused test code (the least recently used one when all were used); none → `409 TEST_UNAVAILABLE`. |
 | GET | `/mastery` | Returns `{knowledgePointId, topicId, skill, mastery, evidenceCount}` for catalog KPs using only the current user's evidence; makes no Content request. |
 
@@ -84,9 +85,9 @@ essays receive no hint. A question that was wrong in any submission for the same
 user, lesson and block keeps its hint while that block has not passed, including a
 later correct answer in a failed block. New responses for a passed block have
 `hint: null` for every question. Lesson GET questions and exercise POST results
-always include the `hint` key, with `null` when hidden or unavailable. Review
-questions/results currently reuse these DTOs with `hint: null`; practice attempt
-questions can carry Content package hints. Final assessments do not expose hints.
+always include the `hint` key, with `null` when hidden or unavailable. Review set,
+quick-check and practice attempt questions carry Content hints; their results keep
+`hint: null`. Final assessments do not expose hints.
 
 ## Submission, mastery and review state
 
@@ -118,6 +119,15 @@ either a submitted practice attempt or a submitted review set; later practice of
 still returns solutions but writes no evidence or review. Assessment results retain
 the mastery-based review rule. A pending review blocks lesson and practice access in
 its skill until `DONE` or `SKIPPED`; a legacy review without a skill blocks every skill.
+
+A pending review is at stage `PRACTICE` (one set) or `THEORY` (read the KP's TEXT
+blocks, tagged in Content, then a quick check of up to 3 lesson questions). It starts
+at `THEORY` when the KP scored below 40% in the practice attempt that created it or
+was wrong in the first submission of the lesson's exercises; assessment reviews make
+that lesson check on first open, because the event consumer does not call Content. A
+failed set moves it to `THEORY`; the quick check (right or wrong, no evidence) moves it
+back to `PRACTICE`; the second failed set skips it. A set never reuses a package the
+learner was given in a review or submitted in practice (`ReviewRule.MAX_FAILED_REVIEW_SETS`).
 
 The final topic test needs every lesson completed and practice-cleared. Clearance is
 stored on write paths and never revoked by later package publication. Reasons, in

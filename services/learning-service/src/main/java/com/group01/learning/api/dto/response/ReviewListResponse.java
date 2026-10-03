@@ -10,6 +10,6 @@ public record ReviewListResponse(UUID reviewId, UUID knowledgePointId, UUID less
                                  LearningSkill skill, String stage, Instant createdAt) {
     public static ReviewListResponse from(ReviewListEntry entry) {
         return new ReviewListResponse(entry.reviewId(), entry.knowledgePointId(), entry.lessonId(),
-                entry.skill(), "PRACTICE", entry.createdAt());
+                entry.skill(), entry.stage().name(), entry.createdAt());
     }
 }
