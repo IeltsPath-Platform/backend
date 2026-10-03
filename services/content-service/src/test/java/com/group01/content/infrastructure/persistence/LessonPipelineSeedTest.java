@@ -16,6 +16,8 @@ import com.group01.content.domain.vo.BlockType;
 import com.group01.content.domain.vo.LessonBlockKind;
 import com.group01.content.domain.vo.MediaReferencePolicy;
 import com.group01.content.domain.vo.PackageType;
+import com.group01.content.domain.vo.QuestionUsageConflict;
+import com.group01.content.domain.vo.QuestionPurpose;
 import com.group01.content.domain.vo.Skill;
 import com.group01.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import org.flywaydb.core.Flyway;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
+import org.springframework.dao.DataAccessException;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -148,6 +151,196 @@ class LessonPipelineSeedTest {
                 JSON.readTree((String) row.get("options")).forEach(o -> keys.add(o.get("optionKey").asText()));
                 assertThat(keys).contains(spec.get("correct").asText());
             }
+        }
+    }
+
+    @Test
+    void seededQuestionsHaveOneOwnerAndMockTestsDetectLessonQuestions() {
+        List<Map<String, Object>> conflicts = jdbc.queryForList("""
+                WITH owners AS (
+                    SELECT qv.question_id, 'LESSON' AS owner_type, l.id AS owner_id, l.code AS owner_code
+                    FROM lesson_block_questions bq
+                    JOIN question_versions qv ON qv.id = bq.question_version_id
+                    JOIN lesson_blocks b ON b.id = bq.block_id
+                    JOIN lessons l ON l.id = b.lesson_id
+                    UNION
+                    SELECT qv.question_id, 'PACKAGE' AS owner_type, p.id AS owner_id, p.code AS owner_code
+                    FROM section_questions sq
+                    JOIN question_versions qv ON qv.id = sq.question_version_id
+                    JOIN content_sections s ON s.id = sq.section_id
+                    JOIN content_package_versions v ON v.id = s.package_version_id
+                    JOIN content_packages p ON p.id = v.package_id
+                    WHERE v.status = 'PUBLISHED'
+                      AND p.package_type IN ('PRACTICE_SET', 'TOPIC_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
+                )
+                SELECT question_id, string_agg(owner_type || ' ' || owner_code, ', '
+                                               ORDER BY owner_type, owner_code) AS owners
+                FROM owners
+                GROUP BY question_id HAVING count(*) > 1
+                ORDER BY question_id
+                """, Map.of());
+        assertThat(conflicts).as("Seed questions with multiple owners").isEmpty();
+
+        List<QuestionUsageConflict> mockConflicts = rollbackAfter(connection -> {
+            update(connection, """
+                    INSERT INTO content_packages (id, code, title, package_type, status)
+                    VALUES ('90000000-0000-4000-8000-000000000001', 'MOCK-LESSON', 'Mock', 'MOCK_TEST', 'PUBLISHED');
+                    INSERT INTO content_package_versions (id, package_id, version_number, status)
+                    VALUES ('90000000-0000-4000-8000-000000000002', '90000000-0000-4000-8000-000000000001', 1, 'PUBLISHED');
+                    UPDATE content_packages SET current_published_version_id = '90000000-0000-4000-8000-000000000002'
+                    WHERE id = '90000000-0000-4000-8000-000000000001';
+                    INSERT INTO content_sections (id, package_version_id, title, skill, sort_order)
+                    VALUES ('90000000-0000-4000-8000-000000000003', '90000000-0000-4000-8000-000000000002', 'S', 'READING', 1);
+                    INSERT INTO section_questions (section_id, question_version_id, sort_order)
+                    SELECT '90000000-0000-4000-8000-000000000003', bq.question_version_id, 1
+                    FROM lesson_block_questions bq
+                    JOIN lesson_blocks b ON b.id = bq.block_id
+                    JOIN lessons l ON l.id = b.lesson_id
+                    WHERE l.code = 'L1' ORDER BY b.sort_order, bq.sort_order LIMIT 1;
+                    """);
+            UUID mockVersion = UUID.fromString("90000000-0000-4000-8000-000000000002");
+            JdbcLearningContentReader sameTransaction = readerOn(connection);
+            List<QuestionUsageConflict> lessonConflicts = sameTransaction.questionsUsedElsewhere(mockVersion);
+            assertThat(sameTransaction.questionsWithWrongPurpose(mockVersion, QuestionPurpose.EXAM)).hasSize(1);
+            update(connection, """
+                    UPDATE section_questions SET question_version_id = (
+                        SELECT sq.question_version_id FROM section_questions sq
+                        JOIN content_sections s ON s.id = sq.section_id
+                        JOIN content_package_versions v ON v.id = s.package_version_id
+                        JOIN content_packages p ON p.id = v.package_id
+                        WHERE p.code = 'PS-KP1-A' ORDER BY sq.sort_order LIMIT 1)
+                    WHERE section_id = '90000000-0000-4000-8000-000000000003';
+                    """);
+            assertThat(sameTransaction.questionsUsedElsewhere(mockVersion)).singleElement().satisfies(conflict -> {
+                assertThat(conflict.ownerType()).isEqualTo(QuestionUsageConflict.OwnerType.PACKAGE);
+                assertThat(conflict.ownerCode()).isEqualTo("PS-KP1-A");
+            });
+            UUID kp1 = kpId("DEMO_READING_MAIN_IDEA");
+            for (String type : List.of("MOCK_TEST", "PLACEMENT_TEST")) {
+                update(connection, "UPDATE content_packages SET package_type = '" + type + "' WHERE code = 'MOCK-LESSON'");
+                assertThat(sameTransaction.searchPracticeSets(kp1, List.of(), 3, 10, null))
+                        .extracting(PracticeSetResult::code).doesNotContain("PS-KP1-A");
+                assertThat(sameTransaction.countEligiblePracticeSets(List.of(kp1), List.of(), 3).get(kp1)).isEqualTo(3);
+            }
+            update(connection, """
+                    INSERT INTO questions (id, question_type, skill, purpose)
+                    VALUES ('90000000-0000-4000-8000-000000000004', 'MULTIPLE_CHOICE', 'READING', 'EXAM');
+                    INSERT INTO question_versions (id, question_id, version_number, stem, answer_spec)
+                    VALUES ('90000000-0000-4000-8000-000000000005', '90000000-0000-4000-8000-000000000004', 1,
+                            'New exam question', '{"type":"CHOICE","correct":"A"}');
+                    UPDATE section_questions SET question_version_id = '90000000-0000-4000-8000-000000000005'
+                    WHERE section_id = '90000000-0000-4000-8000-000000000003';
+                    INSERT INTO content_package_versions (id, package_id, version_number)
+                    VALUES ('90000000-0000-4000-8000-000000000006', '90000000-0000-4000-8000-000000000001', 2);
+                    INSERT INTO content_sections (id, package_version_id, title, sort_order)
+                    VALUES ('90000000-0000-4000-8000-000000000007', '90000000-0000-4000-8000-000000000006', 'S2', 1);
+                    INSERT INTO question_versions (id, question_id, version_number, stem, answer_spec)
+                    VALUES ('90000000-0000-4000-8000-000000000008', '90000000-0000-4000-8000-000000000004', 2,
+                            'Revised exam question', '{"type":"CHOICE","correct":"A"}');
+                    INSERT INTO section_questions (section_id, question_version_id, sort_order)
+                    VALUES ('90000000-0000-4000-8000-000000000007', '90000000-0000-4000-8000-000000000008', 1);
+                    """);
+            UUID newQuestion = UUID.fromString("90000000-0000-4000-8000-000000000004");
+            UUID newVersion = UUID.fromString("90000000-0000-4000-8000-000000000005");
+            UUID samePackageVersion = UUID.fromString("90000000-0000-4000-8000-000000000006");
+            assertThat(sameTransaction.questionsUsedElsewhere(mockVersion)).isEmpty();
+            assertThat(sameTransaction.questionsUsedElsewhere(samePackageVersion)).isEmpty();
+            assertThat(sameTransaction.questionsWithWrongPurpose(mockVersion, QuestionPurpose.EXAM)).isEmpty();
+            assertThat(sameTransaction.questionsWithWrongPurpose(mockVersion, QuestionPurpose.LEARNING))
+                    .containsExactly(newQuestion);
+            assertThat(sameTransaction.questionVersionsReservedForLearning(List.of(newVersion)))
+                    .containsExactly(newVersion);
+            update(connection, """
+                    INSERT INTO content_packages (id, code, title, package_type)
+                    VALUES ('90000000-0000-4000-8000-000000000009', 'MOCK-OTHER', 'Other', 'MOCK_TEST');
+                    UPDATE content_package_versions SET package_id = '90000000-0000-4000-8000-000000000009'
+                    WHERE id = '90000000-0000-4000-8000-000000000006';
+                    """);
+            assertThat(sameTransaction.questionsUsedElsewhere(mockVersion)).isEmpty();
+            update(connection, "UPDATE content_package_versions SET status = 'PUBLISHED' WHERE id = '" + samePackageVersion + "'");
+            assertThat(sameTransaction.questionsUsedElsewhere(mockVersion))
+                    .containsExactly(new QuestionUsageConflict(newQuestion, QuestionUsageConflict.OwnerType.PACKAGE, "MOCK-OTHER"));
+            return lessonConflicts;
+        });
+        assertThat(mockConflicts).singleElement().satisfies(conflict -> {
+            assertThat(conflict.questionId()).isNotNull();
+            assertThat(conflict.ownerType()).isEqualTo(QuestionUsageConflict.OwnerType.LESSON);
+            assertThat(conflict.ownerCode()).isEqualTo("L1");
+        });
+    }
+
+    @Test
+    void seedQuestionsMatchTheirOwnersPurposeAndPublishingLocksHoldUntilRollback() {
+        List<UUID> wrongPurpose = jdbc.queryForList("""
+                SELECT q.id FROM lesson_block_questions bq
+                JOIN question_versions qv ON qv.id = bq.question_version_id
+                JOIN questions q ON q.id = qv.question_id WHERE q.purpose <> 'LEARNING'
+                UNION
+                SELECT q.id FROM section_questions sq
+                JOIN question_versions qv ON qv.id = sq.question_version_id
+                JOIN questions q ON q.id = qv.question_id
+                JOIN content_sections s ON s.id = sq.section_id
+                JOIN content_package_versions v ON v.id = s.package_version_id
+                JOIN content_packages p ON p.id = v.package_id
+                WHERE v.status = 'PUBLISHED'
+                  AND p.package_type IN ('PRACTICE_SET', 'TOPIC_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
+                  AND q.purpose <> CASE WHEN p.package_type IN ('MOCK_TEST', 'PLACEMENT_TEST')
+                                       THEN 'EXAM' ELSE 'LEARNING' END
+                """, Map.of(), UUID.class);
+        assertThat(wrongPurpose).as("Seed questions with incorrect purpose").isEmpty();
+        UUID versionId = reader.publishedTestPackages(DEMO_READING).get(0).packageVersionId();
+        rollbackAfter(first -> {
+            readerOn(first).lockQuestionsForPublishing(versionId);
+            rollbackAfter(second -> {
+                update(second, "SET LOCAL lock_timeout = '100ms'");
+                DataAccessException lockFailure = assertThrows(DataAccessException.class,
+                        () -> readerOn(second).lockQuestionsForPublishing(versionId));
+                assertThat(lockFailure.getMostSpecificCause()).isInstanceOf(SQLException.class);
+                assertThat(((SQLException) lockFailure.getMostSpecificCause()).getSQLState()).isEqualTo("55P03");
+                return null;
+            });
+            return null;
+        });
+        rollbackAfter(connection -> {
+            readerOn(connection).lockQuestionsForPublishing(versionId);
+            return null;
+        });
+    }
+
+    @Test
+    void questionPurposeMigrationBackfillsExistingExamQuestionsAndDefaultsNewQuestions() throws Exception {
+        try {
+            Flyway.configure().dataSource(dataSource).schemas("purpose_backfill").defaultSchema("purpose_backfill")
+                    .locations("classpath:db/migration").target("16").load().migrate();
+            try (Connection connection = dataSource.getConnection()) {
+                update(connection, """
+                        SET search_path TO purpose_backfill;
+                        INSERT INTO content_packages (id, code, title, package_type)
+                        VALUES ('90000000-0000-4000-8000-000000000001', 'OLD-MOCK', 'Mock', 'MOCK_TEST');
+                        INSERT INTO content_package_versions (id, package_id, version_number)
+                        VALUES ('90000000-0000-4000-8000-000000000002', '90000000-0000-4000-8000-000000000001', 1);
+                        INSERT INTO content_sections (id, package_version_id, title, sort_order)
+                        VALUES ('90000000-0000-4000-8000-000000000003', '90000000-0000-4000-8000-000000000002', 'S', 1);
+                        INSERT INTO questions (id, question_type)
+                        VALUES ('90000000-0000-4000-8000-000000000004', 'MULTIPLE_CHOICE');
+                        INSERT INTO question_versions (id, question_id, version_number, stem, answer_spec)
+                        VALUES ('90000000-0000-4000-8000-000000000005', '90000000-0000-4000-8000-000000000004', 1,
+                                'Legacy exam question', '{"type":"CHOICE","correct":"A"}');
+                        INSERT INTO section_questions (section_id, question_version_id, sort_order)
+                        VALUES ('90000000-0000-4000-8000-000000000003', '90000000-0000-4000-8000-000000000005', 1);
+                        """);
+            }
+            Flyway.configure().dataSource(dataSource).schemas("purpose_backfill").defaultSchema("purpose_backfill")
+                    .locations("classpath:db/migration").load().migrate();
+            assertThat(jdbc.queryForObject("SELECT purpose FROM purpose_backfill.questions WHERE id = :id",
+                    Map.of("id", UUID.fromString("90000000-0000-4000-8000-000000000004")), String.class)).isEqualTo("EXAM");
+            execute("INSERT INTO purpose_backfill.questions (id, question_type) "
+                    + "VALUES ('90000000-0000-4000-8000-000000000006', 'MULTIPLE_CHOICE')");
+            assertThat(jdbc.queryForObject("SELECT purpose FROM purpose_backfill.questions WHERE id = :id",
+                    Map.of("id", UUID.fromString("90000000-0000-4000-8000-000000000006")), String.class)).isEqualTo("LEARNING");
+            assertThrows(SQLException.class, () -> execute("UPDATE purpose_backfill.questions SET purpose = 'INVALID'"));
+        } finally {
+            execute("DROP SCHEMA IF EXISTS purpose_backfill CASCADE");
         }
     }
 

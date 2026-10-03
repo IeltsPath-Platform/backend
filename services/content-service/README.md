@@ -34,6 +34,10 @@ V16 adds `lesson_block_knowledge_points` (the KPs each TEXT block teaches) and `
 
 Còn thiếu: mỗi KP Listening (`LS_NUM`, `LS_SPELL`, `LS_PARA`, `LS_TRAP`) chỉ có một đề Practice, vì chưa có file mp3 mới. Practice Listening trượt nên không tạo được bài ôn (hết đề chưa lộ lời giải). Cần thêm audio để thang ôn tập của Listening đủ bước.
 
+Each question (`question_id`, across all its versions) has at most one owner: any lesson, or one `PRACTICE_SET`, `TOPIC_TEST`, `MOCK_TEST` or `PLACEMENT_TEST` package. Publishing checks every lesson and PUBLISHED versions of other covered packages; drafts do not reserve questions, and versions of the same package may share them. A conflict returns `422` with `details.code = QUESTION_ALREADY_USED`, listing at most 10 conflicts, without saving or publishing. `QUIZ` and legacy `LESSON` packages are outside this rule.
+
+V17 adds immutable `questions.purpose`: `LEARNING` for lessons, practice and topic tests; `EXAM` for mock and placement tests. Existing questions default to `LEARNING`; those already attached to any mock or placement test are backfilled to `EXAM`. Question creation accepts optional `purpose` (default `LEARNING`), question responses include it, and the catalog accepts `?purpose=LEARNING|EXAM` with optional `skill`, filtering in the database. Adding a version preserves purpose. Publishing locks question rows in id order until commit before checking ownership and purpose; the wrong purpose returns `422` with `details.code = QUESTION_PURPOSE_MISMATCH` without saving. Invalid purpose input returns `400`.
+
 Topics retain optional `bandMin`/`bandMax` metadata (0–9, half-band steps). V8 removes KP band columns and the KP
 API no longer accepts or returns own/effective band ranges. The current learning sequence uses topic `sort_order`,
 without goal-band filtering or placement test-out. Topic create/update still validate bands; omitting them on update

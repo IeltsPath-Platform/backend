@@ -11,6 +11,7 @@ import com.group01.content.application.result.QuestionDetailResult;
 import com.group01.content.application.result.QuestionResult;
 import com.group01.content.application.usecase.*;
 import com.group01.content.domain.vo.Skill;
+import com.group01.content.domain.vo.QuestionPurpose;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,9 +35,10 @@ public class QuestionController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public List<QuestionResponse> listQuestions(
-            @RequestParam(value = "skill", required = false) Skill skill
+            @RequestParam(value = "skill", required = false) Skill skill,
+            @RequestParam(value = "purpose", required = false) QuestionPurpose purpose
     ) {
-        return listQuestionsUseCase.execute(skill).stream()
+        return listQuestionsUseCase.execute(skill, purpose).stream()
                 .map(QuestionResponse::from)
                 .toList();
     }
@@ -55,7 +57,8 @@ public class QuestionController {
         QuestionResult result = createQuestionUseCase.execute(new CreateQuestionCommand(
                 request.questionType(),
                 request.skill(),
-                AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT")
+                AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT"),
+                request.purpose()
         ));
         return QuestionResponse.from(result);
     }

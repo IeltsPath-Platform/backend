@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -28,6 +29,8 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -73,7 +76,7 @@ class QuestionControllerTest {
                 PublicationStatus.PUBLISHED, UUID.randomUUID(), Instant.now(), Instant.now()
         );
 
-        when(listQuestionsUseCase.execute(Skill.READING)).thenReturn(List.of(qResult));
+        when(listQuestionsUseCase.execute(Skill.READING, null)).thenReturn(List.of(qResult));
 
         mockMvc.perform(get("/api/content/questions?skill=READING"))
                 .andExpect(status().isOk())
@@ -147,7 +150,11 @@ class QuestionControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(questionId.toString()))
-                .andExpect(jsonPath("$.skill").value("LISTENING"));
+                .andExpect(jsonPath("$.skill").value("LISTENING"))
+                .andExpect(jsonPath("$.purpose").value("LEARNING"));
+        ArgumentCaptor<CreateQuestionCommand> command = ArgumentCaptor.forClass(CreateQuestionCommand.class);
+        verify(createQuestionUseCase).execute(command.capture());
+        assertThat(command.getValue().purpose()).isEqualTo(QuestionPurpose.LEARNING);
     }
 
     @Test
@@ -165,5 +172,29 @@ class QuestionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(questionId.toString()))
                 .andExpect(jsonPath("$.status").value("ARCHIVED"));
+    }
+
+    @Test
+    void examQuestionsCanBeCreatedAndFilteredByPurpose() throws Exception {
+        UUID questionId = UUID.randomUUID();
+        QuestionResult exam = new QuestionResult(questionId, QuestionType.MULTIPLE_CHOICE, Skill.READING, null,
+                PublicationStatus.DRAFT, null, Instant.now(), Instant.now(), QuestionPurpose.EXAM);
+        when(createQuestionUseCase.execute(any())).thenReturn(exam);
+        when(listQuestionsUseCase.execute(Skill.READING, QuestionPurpose.EXAM)).thenReturn(List.of(exam));
+
+        mockMvc.perform(post("/api/content/questions").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"questionType\":\"MULTIPLE_CHOICE\",\"skill\":\"READING\",\"purpose\":\"EXAM\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.purpose").value("EXAM"));
+        ArgumentCaptor<CreateQuestionCommand> command = ArgumentCaptor.forClass(CreateQuestionCommand.class);
+        verify(createQuestionUseCase).execute(command.capture());
+        assertThat(command.getValue().purpose()).isEqualTo(QuestionPurpose.EXAM);
+        mockMvc.perform(get("/api/content/questions?skill=READING&purpose=EXAM"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].purpose").value("EXAM"));
+    }
+
+    @Test
+    void invalidPurposeFilterReturns400() throws Exception {
+        mockMvc.perform(get("/api/content/questions?purpose=INVALID"))
+                .andExpect(status().isBadRequest());
     }
 }

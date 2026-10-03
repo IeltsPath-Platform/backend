@@ -8,6 +8,8 @@ import com.group01.content.application.result.PackageVersionContentResult;
 import com.group01.content.application.result.PracticeSetResult;
 import com.group01.content.application.result.TopicSequenceResult;
 import com.group01.content.application.result.TopicTestPackageResult;
+import com.group01.content.domain.vo.QuestionUsageConflict;
+import com.group01.content.domain.vo.QuestionPurpose;
 
 import java.util.Collection;
 import java.util.List;
@@ -22,7 +24,8 @@ import java.util.UUID;
  *
  * <p>A practice set is <em>eligible</em> for a knowledge point when it is a published {@code PRACTICE_SET} whose
  * current version has at least {@code minQuestions} questions, at least one of them measuring the knowledge point,
- * and none of them used by a lesson or by any {@code TOPIC_TEST} package. {@link #topicSequence} and
+ * and none of them used by a lesson or by any {@code TOPIC_TEST}, {@code MOCK_TEST} or {@code PLACEMENT_TEST}
+ * package. {@link #topicSequence} and
  * {@link #searchPracticeSets} share this rule.
  */
 public interface LearningContentReader {
@@ -56,6 +59,19 @@ public interface LearningContentReader {
     /** Whether a question of the package version has a skill other than that of the lesson's topic. */
     boolean packageVersionLeavesLessonSkill(UUID packageVersionId, UUID lessonId);
 
+    /**
+     * Questions of this version used by any lesson or a published version of another {@code PRACTICE_SET},
+     * {@code TOPIC_TEST}, {@code MOCK_TEST} or {@code PLACEMENT_TEST} package, compared by question id across all
+     * question versions. Versions of the same package are not conflicts. Loaded in one query.
+     */
+    List<QuestionUsageConflict> questionsUsedElsewhere(UUID packageVersionId);
+
+    /** Lock this version's question rows in id order until transaction commit, before checking ownership. */
+    void lockQuestionsForPublishing(UUID packageVersionId);
+
+    /** Distinct question ids in this version whose purpose differs from the required package purpose. */
+    List<UUID> questionsWithWrongPurpose(UUID packageVersionId, QuestionPurpose requiredPurpose);
+
     List<TopicTestPackageResult> publishedTestPackages(UUID topicId);
 
     /**
@@ -67,6 +83,6 @@ public interface LearningContentReader {
 
     Optional<PackageVersionContentResult> publishedPackageVersion(UUID packageVersionId);
 
-    /** The given question versions that a lesson, a practice set or a final test uses. */
+    /** The given question versions that a lesson, practice set, final test, mock test or placement test uses. */
     Set<UUID> questionVersionsReservedForLearning(Collection<UUID> questionVersionIds);
 }

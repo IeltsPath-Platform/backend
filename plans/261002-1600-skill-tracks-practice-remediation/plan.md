@@ -109,6 +109,11 @@ là lần 2, set ôn sau lý thuyết trượt là lần 3 ⇒ `MAX_FAILED_REVIE
   ngay (kể cả topic test đòi Practice với lesson đã COMPLETED trước nâng cấp).
 - **D15 – Nội dung đề mới do Codex viết**, theo mẫu seed hiện có; liệt kê toàn văn từng câu (stem, đáp án, giải
   thích, hint) trong Verification của P2 để chủ dự án duyệt trong PR.
+- **D16 – Mỗi câu hỏi chỉ thuộc một nơi dùng** (một lesson hoặc một package `PRACTICE_SET`/`TOPIC_TEST`/`MOCK_TEST`/
+  `PLACEMENT_TEST`). Dùng chung ngân hàng câu hỏi, không tách bảng cho thi thử, không trigger DB: kiểm tra khi publish
+  (`422 QUESTION_ALREADY_USED`) và bằng test seed. Thêm cột `questions.purpose` (`LEARNING`/`EXAM`, migration V17):
+  lesson, Practice, thi cuối topic dùng câu `LEARNING`; thi thử, thi xếp lớp dùng câu `EXAM`
+  (`422 QUESTION_PURPOSE_MISMATCH`) (P2b).
 
 ## 4. Phases
 
@@ -116,12 +121,13 @@ là lần 2, set ôn sau lý thuyết trượt là lần 3 ⇒ `MAX_FAILED_REVIE
 | --- | --- | --- | --- |
 | P1 ✓ | content | `topics.skill`, topic `DEMO_WRITING`, tách essay khỏi Reading, `topic-sequence` mới | [phase-01](phase-01-content-topic-skill.md) |
 | P2 ✓ | content | `lesson_block_knowledge_points`, `content_packages.lesson_id`, API practice theo lesson | [phase-02](phase-02-content-block-kp-practice-link.md) |
+| P2b ✓ | content | Mỗi câu hỏi một chủ; `questions.purpose` phân biệt học/thi, chặn sai loại khi publish | [phase-02b](phase-02b-content-question-exclusivity.md) |
 | P3 | learning | Lộ trình theo skill, gate review theo skill, topic không có test | [phase-03](phase-03-learning-skill-tracks.md) |
 | P4 | learning | Catalog Practice + practice attempts | [phase-04](phase-04-learning-practice-attempts.md) |
 | P5 | learning | Thang ôn tập: stage, lý thuyết theo KP, quick-check, hint/giải thích | [phase-05](phase-05-learning-remediation-ladder.md) |
 | P6 | cả hai | Contract, README, E2E runbook, graphify | [phase-06](phase-06-contracts-docs-e2e.md) |
 
-Thứ tự bắt buộc: P1 → P2 → P3 → P4 → P5 → P6. P3 cần P1 (skill trong topic-sequence). P4 cần P2. P5 cần P2 + P4.
+Thứ tự bắt buộc: P1 → P2 → P2b → P3 → P4 → P5 → P6. P3 cần P1 (skill trong topic-sequence). P4 cần P2. P5 cần P2 + P4.
 Mỗi phase là một commit (hoặc vài commit) build xanh độc lập; không gộp phase.
 
 ## 5. Đọc trước khi code
@@ -191,7 +197,8 @@ learning V3; block ID essay giữ nguyên không vướng `uq_lesson_blocks_sort
 
 ## 7. Ngoài phạm vi
 
-Mock Test 4 kỹ năng (seed, learner flow, chấm Writing/Speaking trong assessment); chấm Speaking; Practice cho Writing
+Mock Test 4 kỹ năng (seed, learner flow, giao mã đề chưa làm, quy đổi band, chấm Writing/Speaking trong assessment;
+riêng luật chặn trùng câu hỏi đã nằm ở P2b); chấm Speaking; Practice cho Writing
 (essay LLM) và Speaking; ôn tập lặp lại theo thời gian (spaced repetition); `/learning/today`; frontend.
 
 ## 8. Tiêu chí hoàn thành tổng

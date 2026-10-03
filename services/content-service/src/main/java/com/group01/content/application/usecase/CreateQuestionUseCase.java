@@ -21,7 +21,8 @@ public class CreateQuestionUseCase {
         Question question = Question.create(
                 command.questionType(),
                 command.skill(),
-                command.requiredFeatureKey()
+                command.requiredFeatureKey(),
+                command.purpose()
         );
 
         Question saved = questionRepository.save(question);
@@ -33,7 +34,8 @@ public class CreateQuestionUseCase {
                 saved.getStatus(),
                 saved.getCurrentPublishedVersionId(),
                 saved.getCreatedAt(),
-                saved.getUpdatedAt()
+                saved.getUpdatedAt(),
+                saved.getPurpose()
         );
     }
 }

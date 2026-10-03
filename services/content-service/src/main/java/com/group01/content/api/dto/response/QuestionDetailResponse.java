@@ -5,6 +5,7 @@ import com.group01.content.api.dto.AccessLevel;
 import com.group01.content.application.result.QuestionDetailResult;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.domain.vo.QuestionType;
+import com.group01.content.domain.vo.QuestionPurpose;
 import com.group01.content.domain.vo.Skill;
 
 import java.time.Instant;
@@ -20,7 +21,8 @@ public record QuestionDetailResponse(
         UUID currentPublishedVersionId,
         Instant createdAt,
         Instant updatedAt,
-        List<QuestionVersionResponse> versions
+        List<QuestionVersionResponse> versions,
+        QuestionPurpose purpose
 ) {
     public static QuestionDetailResponse from(QuestionDetailResult result) {
         List<QuestionVersionResponse> versionResponses = result.versions() != null
@@ -35,7 +37,8 @@ public record QuestionDetailResponse(
                 result.currentPublishedVersionId(),
                 result.createdAt(),
                 result.updatedAt(),
-                versionResponses
+                versionResponses,
+                result.purpose()
         );
     }
 }

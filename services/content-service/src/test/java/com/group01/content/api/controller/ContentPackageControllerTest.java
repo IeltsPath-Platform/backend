@@ -2,6 +2,10 @@ package com.group01.content.api.controller;
 
 import org.mockito.ArgumentCaptor;
 import com.group01.content.domain.exception.InvalidPackageLessonException;
+import com.group01.content.domain.exception.QuestionAlreadyUsedException;
+import com.group01.content.domain.exception.QuestionPurposeMismatchException;
+import com.group01.content.domain.vo.QuestionUsageConflict;
+import com.group01.content.domain.vo.QuestionPurpose;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -141,6 +145,23 @@ class ContentPackageControllerTest {
                         + UUID.randomUUID() + "\"}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.details.code").value("INVALID_PACKAGE_LESSON"));
+    }
+
+    @Test
+    void publishingRejectsOwnershipAndPurposeConflictsWith422() throws Exception {
+        UUID questionId = UUID.randomUUID();
+        when(publishContentPackageUseCase.execute(any()))
+                .thenThrow(new QuestionAlreadyUsedException(List.of(
+                        new QuestionUsageConflict(questionId, QuestionUsageConflict.OwnerType.LESSON, "L1"))))
+                .thenThrow(new QuestionPurposeMismatchException(QuestionPurpose.EXAM, List.of(questionId)));
+        String path = "/api/content/packages/" + UUID.randomUUID() + "/publish";
+        String request = "{\"versionId\":\"" + UUID.randomUUID() + "\"}";
+        mockMvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(request))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.details.code").value("QUESTION_ALREADY_USED"));
+        mockMvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(request))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.details.code").value("QUESTION_PURPOSE_MISMATCH"));
     }
 
     @Test

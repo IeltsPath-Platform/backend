@@ -2,6 +2,7 @@ package com.group01.content.infrastructure.persistence.entity;
 
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.domain.vo.QuestionType;
+import com.group01.content.domain.vo.QuestionPurpose;
 import com.group01.content.domain.vo.Skill;
 import jakarta.persistence.*;
 import lombok.*;
@@ -29,6 +30,11 @@ public class QuestionJpaEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "question_type", nullable = false, length = 50)
     private QuestionType questionType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", nullable = false, length = 20, updatable = false)
+    @Builder.Default
+    private QuestionPurpose purpose = QuestionPurpose.LEARNING;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "skill", length = 50)

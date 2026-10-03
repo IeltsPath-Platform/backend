@@ -103,6 +103,8 @@ Request is `{knowledgePointId, excludePackageIds, minQuestions, limit, preferred
 [{"packageId":"20000000-0000-4000-8000-000000000501","packageVersionId":"20000000-0000-4000-8000-000000000601","code":"PS-KP1-A","questionCount":4,"matchedQuestionCount":4}]
 ```
 
+Practice search eligibility also excludes question versions used by `MOCK_TEST` or `PLACEMENT_TEST` packages. The same exclusion applies to availability counts and `hasPracticeSet`.
+
 The request/response illustrates KP1 and its `PS-KP1-A` package. The V4 one-question package is ineligible with the default `minQuestions=3`.
 
 ## `GET /lessons/{id}/practice-sets`
@@ -142,3 +144,5 @@ X1 example (one representative item shown; the actual version contains Q2, Q14, 
 ```
 
 These are new internal DTOs. Existing public Content DTO names such as `answerSpecJson` and `rulesJson` are unchanged by this contract. Error responses follow Content Service's existing `ErrorResponse` shape; a missing/unpublished resource is `404` and invalid search input is `400`.
+
+Package publishing enforces one owner per `question_id` across its versions: any lesson or a published version of one `PRACTICE_SET`, `TOPIC_TEST`, `MOCK_TEST` or `PLACEMENT_TEST` package; versions of the same package may share questions and drafts do not reserve them. Conflicts return `422` with `details.code = QUESTION_ALREADY_USED`. The question bank's immutable `purpose` (V17) is `LEARNING` for lessons, practice and topic tests, and `EXAM` for mock/placement tests; publishing the wrong purpose returns `422` with `details.code = QUESTION_PURPOSE_MISMATCH`. Public question creation accepts optional `purpose` (default `LEARNING`), public question responses include it, and `GET /api/content/questions` accepts a purpose filter; the internal lesson/package payloads remain as defined above. `QUIZ` and legacy `LESSON` packages are outside these publishing checks.

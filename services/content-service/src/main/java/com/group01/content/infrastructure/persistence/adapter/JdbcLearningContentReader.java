@@ -14,6 +14,8 @@ import com.group01.content.domain.vo.BlockType;
 import com.group01.content.domain.vo.LessonBlockKind;
 import com.group01.content.domain.vo.LearningType;
 import com.group01.content.domain.vo.PackageType;
+import com.group01.content.domain.vo.QuestionUsageConflict;
+import com.group01.content.domain.vo.QuestionPurpose;
 import com.group01.content.domain.vo.Skill;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -38,7 +40,7 @@ import java.util.UUID;
 @Component
 public class JdbcLearningContentReader implements LearningContentReader {
 
-    /** Question versions that a lesson or any final test uses; review material must not repeat them. */
+    /** Question versions used by a lesson, final test, mock test or placement test; review must not repeat them. */
     private static final String LESSON_OR_TEST_QUESTION_VERSIONS = """
             SELECT bq.question_version_id FROM lesson_block_questions bq
             UNION
@@ -47,7 +49,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
             JOIN content_sections ts ON ts.id = tsq.section_id
             JOIN content_package_versions tv ON tv.id = ts.package_version_id
             JOIN content_packages tp ON tp.id = tv.package_id
-            WHERE tp.package_type = 'TOPIC_TEST'
+            WHERE tp.package_type IN ('TOPIC_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
             """;
 
     /**
@@ -414,6 +416,65 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     @Override
+    public List<QuestionUsageConflict> questionsUsedElsewhere(UUID packageVersionId) {
+        return jdbc.query("""
+                WITH target_questions AS (
+                    SELECT DISTINCT qv.question_id, v.package_id
+                    FROM content_package_versions v
+                    JOIN content_sections s ON s.package_version_id = v.id
+                    JOIN section_questions sq ON sq.section_id = s.id
+                    JOIN question_versions qv ON qv.id = sq.question_version_id
+                    WHERE v.id = :versionId
+                )
+                SELECT tq.question_id, 'LESSON' AS owner_type, l.code AS owner_code
+                FROM target_questions tq
+                JOIN question_versions qv ON qv.question_id = tq.question_id
+                JOIN lesson_block_questions bq ON bq.question_version_id = qv.id
+                JOIN lesson_blocks b ON b.id = bq.block_id
+                JOIN lessons l ON l.id = b.lesson_id
+                UNION
+                SELECT tq.question_id, 'PACKAGE' AS owner_type, p.code AS owner_code
+                FROM target_questions tq
+                JOIN question_versions qv ON qv.question_id = tq.question_id
+                JOIN section_questions sq ON sq.question_version_id = qv.id
+                JOIN content_sections s ON s.id = sq.section_id
+                JOIN content_package_versions v ON v.id = s.package_version_id
+                JOIN content_packages p ON p.id = v.package_id
+                WHERE p.id <> tq.package_id AND v.status = 'PUBLISHED'
+                  AND p.package_type IN ('PRACTICE_SET', 'TOPIC_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
+                ORDER BY question_id, owner_type, owner_code
+                """, Map.of("versionId", packageVersionId), (rs, i) -> new QuestionUsageConflict(
+                uuid(rs, "question_id"), QuestionUsageConflict.OwnerType.valueOf(rs.getString("owner_type")),
+                rs.getString("owner_code")));
+    }
+
+    @Override
+    public void lockQuestionsForPublishing(UUID packageVersionId) {
+        jdbc.query("""
+                SELECT q.id FROM questions q
+                WHERE q.id IN (SELECT qv.question_id FROM content_sections s
+                               JOIN section_questions sq ON sq.section_id = s.id
+                               JOIN question_versions qv ON qv.id = sq.question_version_id
+                               WHERE s.package_version_id = :versionId)
+                ORDER BY q.id
+                FOR UPDATE
+                """, Map.of("versionId", packageVersionId), rs -> { });
+    }
+
+    @Override
+    public List<UUID> questionsWithWrongPurpose(UUID packageVersionId, QuestionPurpose requiredPurpose) {
+        return jdbc.query("""
+                SELECT DISTINCT q.id FROM content_sections s
+                JOIN section_questions sq ON sq.section_id = s.id
+                JOIN question_versions qv ON qv.id = sq.question_version_id
+                JOIN questions q ON q.id = qv.question_id
+                WHERE s.package_version_id = :versionId AND q.purpose <> :purpose
+                ORDER BY q.id
+                """, Map.of("versionId", packageVersionId, "purpose", requiredPurpose.name()),
+                (rs, i) -> uuid(rs, "id"));
+    }
+
+    @Override
     public List<TopicTestPackageResult> publishedTestPackages(UUID topicId) {
         return jdbc.query("""
                 SELECT p.id, p.current_published_version_id, p.code
@@ -551,7 +612,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 JOIN content_sections s ON s.id = sq.section_id
                 JOIN content_package_versions v ON v.id = s.package_version_id
                 JOIN content_packages p ON p.id = v.package_id
-                WHERE sq.question_version_id IN (:ids) AND p.package_type IN ('TOPIC_TEST', 'PRACTICE_SET')
+                WHERE sq.question_version_id IN (:ids)
+                  AND p.package_type IN ('TOPIC_TEST', 'MOCK_TEST', 'PLACEMENT_TEST', 'PRACTICE_SET')
                 """, Map.of("ids", questionVersionIds), (rs, i) -> uuid(rs, "id")));
     }
 
