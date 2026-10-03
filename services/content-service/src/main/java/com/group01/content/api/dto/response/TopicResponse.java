@@ -3,6 +3,7 @@ package com.group01.content.api.dto.response;
 import java.math.BigDecimal;
 import com.group01.content.application.result.TopicResult;
 import com.group01.content.domain.vo.ContentStatus;
+import com.group01.content.domain.vo.Skill;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -17,7 +18,8 @@ public record TopicResponse(
         Instant createdAt,
         Instant updatedAt,
         BigDecimal bandMin,
-        BigDecimal bandMax
+        BigDecimal bandMax,
+        Skill skill
 ) {
     public static TopicResponse from(TopicResult result) {
         return new TopicResponse(
@@ -30,7 +32,8 @@ public record TopicResponse(
                 result.createdAt(),
                 result.updatedAt(),
                 result.band().min(),
-                result.band().max()
+                result.band().max(),
+                result.skill()
         );
     }
 }

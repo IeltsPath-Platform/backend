@@ -2,6 +2,7 @@ package com.group01.content.application.result;
 
 import com.group01.content.domain.vo.BandRange;
 import com.group01.content.domain.vo.ContentStatus;
+import com.group01.content.domain.vo.Skill;
 
 import java.time.Instant;
 import java.util.List;
@@ -17,6 +18,7 @@ public record TopicTreeResult(
         Instant createdAt,
         Instant updatedAt,
         BandRange band,
+        Skill skill,
         List<TopicTreeResult> children
 ) {}
 

@@ -3,6 +3,7 @@ package com.group01.content.api.dto.response;
 import java.math.BigDecimal;
 import com.group01.content.application.result.TopicTreeResult;
 import com.group01.content.domain.vo.ContentStatus;
+import com.group01.content.domain.vo.Skill;
 
 import java.time.Instant;
 import java.util.List;
@@ -19,6 +20,7 @@ public record TopicTreeResponse(
         Instant updatedAt,
         BigDecimal bandMin,
         BigDecimal bandMax,
+        Skill skill,
         List<TopicTreeResponse> children
 ) {
     public static TopicTreeResponse from(TopicTreeResult result) {
@@ -36,6 +38,7 @@ public record TopicTreeResponse(
                 result.updatedAt(),
                 result.band().min(),
                 result.band().max(),
+                result.skill(),
                 childResponses
         );
     }

@@ -8,13 +8,14 @@ Examples use real codes, stems, answers, and passages from [`seed-content.md`](.
 
 ## `GET /topic-sequence`
 
-Returns an array of ACTIVE topics with at least one PUBLISHED lesson **and** one PUBLISHED `TOPIC_TEST` package, ordered by `sortOrder`, then `topicId`. This is the single curriculum read used to build and refresh the MVP path. Each topic includes its ACTIVE knowledge points, ordered by `created_at`, then `id`; no band or answer key is returned. `hasPracticeSet` is true exactly when at least one package matches `POST /practice-sets/search` for that KP with `excludePackageIds=[]` and default `minQuestions=3`. KP5 has no eligible practice package, so it is false and cannot create a review, although the TFNG test still measures it.
+Returns an array of ACTIVE topics that have a `skill` and at least one PUBLISHED lesson, ordered by `skill`, then `sortOrder`, then `topicId` (changed 2026-10-03: a PUBLISHED `TOPIC_TEST` is no longer required). `skill` is the one skill the topic's lessons teach (`LISTENING`, `READING`, `WRITING` or `SPEAKING`; never `ALL`). `hasTopicTest` is true when the topic has a PUBLISHED `TOPIC_TEST` package with a current version; a topic without one (the demo `DEMO_WRITING`) is passed by completing its lessons. This is the single curriculum read used to build and refresh the MVP path. Each topic includes its ACTIVE knowledge points, ordered by `created_at`, then `id`; no band or answer key is returned. `hasPracticeSet` is true exactly when at least one package matches `POST /practice-sets/search` for that KP with `excludePackageIds=[]` and default `minQuestions=3`. KP5 has no eligible practice package, so it is false and cannot create a review, although the TFNG test still measures it.
 
 ```json
 [
   {
     "topicId": "10000000-0000-4000-8000-000000000001",
     "code": "DEMO_READING", "name": "Demo IELTS Reading", "sortOrder": 900, "requiredFeatureKey": null,
+    "skill": "READING", "hasTopicTest": true,
     "knowledgePoints": [
       {"id":"20000000-0000-4000-8000-000000000003","code":"DR_TOPIC_SENTENCE","name":"Câu chủ đề","learningType":"PROCEDURE","skill":"READING","description":null,"hasPracticeSet":true}
     ]
@@ -22,6 +23,7 @@ Returns an array of ACTIVE topics with at least one PUBLISHED lesson **and** one
   {
     "topicId": "20000000-0000-4000-8000-000000000002",
     "code": "TFNG_SKILLS", "name": "True / False / Not Given", "sortOrder": 910, "requiredFeatureKey": null,
+    "skill": "READING", "hasTopicTest": true,
     "knowledgePoints": [
       {"id":"20000000-0000-4000-8000-000000000005","code":"TFNG_FALSE_VS_NOT_GIVEN","name":"False hay Not Given","learningType":"PROCEDURE","skill":"READING","description":null,"hasPracticeSet":false}
     ]
@@ -29,7 +31,7 @@ Returns an array of ACTIVE topics with at least one PUBLISHED lesson **and** one
 ]
 ```
 
-The example shows representative KPs; the real response includes **all** ACTIVE KPs of each returned topic (KP1–KP4 for `DEMO_READING`, KP5 for `TFNG_SKILLS`). `hasPracticeSet` uses the same eligible-package predicate as search, including the no-overlap rule below. It is computed in a batched query, not by one query per KP. The topic object is `{topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints}`; `skill` belongs only to each KP. `requiredFeatureKey` (added 2026-10-02) is the Access feature needed to learn the topic, `null` when free; the seed marks `PREMIUM_MATCHING_INFO` and `PREMIUM_SENTENCE_COMPLETION` (sort 930, 940) with `PREMIUM_CONTENT`.
+The example shows representative KPs; the real response includes **all** ACTIVE KPs of each returned topic (KP1–KP4 for `DEMO_READING`, KP5 for `TFNG_SKILLS`). `hasPracticeSet` uses the same eligible-package predicate as search, including the no-overlap rule below. It is computed in a batched query, not by one query per KP. The topic object is `{topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest}`; `skill` and `hasTopicTest` were added 2026-10-03 and existing readers that ignore unknown fields keep working. Content V15 moved the Writing knowledge points `DEMO_READING_W1_CHART` and `DEMO_READING_W2_OPINION`, with their essay blocks (same block ids), from Reading lessons L3/L4 to `DEMO_WRITING` lessons W1/W2 (sort 950, no final test). Every lesson question has its topic's skill. `requiredFeatureKey` (added 2026-10-02) is the Access feature needed to learn the topic, `null` when free; the seed marks `PREMIUM_MATCHING_INFO` and `PREMIUM_SENTENCE_COMPLETION` (sort 930, 940) with `PREMIUM_CONTENT`.
 
 ## `GET /topics/{id}/lessons`
 

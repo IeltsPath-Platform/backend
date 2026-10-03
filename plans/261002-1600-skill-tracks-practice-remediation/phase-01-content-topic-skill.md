@@ -99,4 +99,25 @@ Cập nhật `TopicSequenceResult`, `TopicSequenceResponse`. Field mới là **t
 
 ## Verification
 
-(Codex điền.)
+Status: completed 2026-10-03 (nhánh `feat/skill-tracks-practice`).
+
+- `mvn -pl services/content-service -am test`: 150 test, 0 fail, 0 skip (Testcontainers chạy V1–V15 thật).
+- `mvn -pl services/learning-service -am test`: 198 test xanh (learning chưa đổi; field mới bị bỏ qua khi đọc).
+- Code review (subagent): không có lỗi chặn; đã sửa: bỏ query thừa khi skill không đổi, test `ALL` kiểm đúng command,
+  hai dòng tài liệu cũ (`answer-spec-v1.md`, `fe-main-flow-guide.md`). `graphify update .` đã chạy.
+- ID V15 đối chiếu V9/V10/V11: KP6 `22000000-…-020000000006`, KP7 `21000000-…-020000000007`, block TEXT/essay
+  `22000000-…-040000000001/2` → W1, `21000000-…-040000000001/2` → W2; L3, L4 còn 3 block Reading mỗi bài.
+- Thứ tự `topic-sequence` mới: DEMO_LISTENING, DEMO_READING, TFNG_SKILLS, PREMIUM_MATCHING_INFO,
+  PREMIUM_SENTENCE_COMPLETION, DEMO_WRITING (`hasTopicTest=false`).
+- `PUT /api/content/topics/{id}`: `skill` null giữ nguyên (khác `band`: null là xoá); đổi skill khi topic có lesson
+  PUBLISHED ⇒ 409 `TOPIC_SKILL_LOCKED`.
+
+Cần chủ dự án duyệt (nội dung học viên thấy): V15 viết lại text 2 block TEXT vì text cũ nhắc bài đọc Reading:
+- W1 (`22000000-…-040000000001`): "Writing Task 1 mở bằng câu tổng quan nêu đặc điểm nổi bật nhất của biểu đồ, rồi mới
+  đưa số liệu để chứng minh và so sánh."
+- W2 (`21000000-…-040000000001`): "Bài luận nêu quan điểm: mở bài nói rõ bạn đồng ý đến mức nào; mỗi đoạn thân bài mở
+  bằng một câu chủ đề rồi chứng minh bằng lý do và ví dụ."
+
+Trạng thái tạm (không merge/deploy riêng phase 1): learning hiện tại vẫn xếp một chuỗi theo `sort_order`, nên
+`DEMO_WRITING` (950) đứng cuối, sau cả topic premium, và không có topic test ⇒ bài luận chưa tới được cho tới khi P3
+xong. Merge cùng P3 trong một PR.

@@ -185,8 +185,9 @@ Khi `testStatus = AVAILABLE`:
 
 ### Bước 7. Lặp lại
 
-Quay về Bước 2 với topic mới. Thứ tự demo: `DEMO_READING` (4 bài, có Writing ở L3, L4) → `TFNG_SKILLS` (1 bài) →
-`DEMO_LISTENING` (2 bài có audio) → hai topic `PREMIUM` (chỉ hiển thị).
+Quay về Bước 2 với topic mới. Thứ tự demo: `DEMO_READING` (4 bài) → `TFNG_SKILLS` (1 bài) →
+`DEMO_LISTENING` (2 bài có audio) → hai topic `PREMIUM` (chỉ hiển thị) → `DEMO_WRITING` (W1, W2, bài luận; không có thi
+cuối). Content V15 chuyển bài luận khỏi L3, L4; tới khi Learning có lộ trình theo kỹ năng, `DEMO_WRITING` đứng cuối chuỗi.
 
 ## 5. Mã lỗi FE cần xử lý
 

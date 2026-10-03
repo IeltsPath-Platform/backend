@@ -14,6 +14,7 @@ import com.group01.content.domain.vo.BlockType;
 import com.group01.content.domain.vo.LessonBlockKind;
 import com.group01.content.domain.vo.MediaReferencePolicy;
 import com.group01.content.domain.vo.PackageType;
+import com.group01.content.domain.vo.Skill;
 import com.group01.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
@@ -39,6 +40,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** Lesson schema, demo seed and the learning-content queries against a real PostgreSQL migrated to the latest. */
@@ -169,27 +171,90 @@ class LessonPipelineSeedTest {
     // ---- reads ----
 
     @Test
-    void topicSequenceListsTopicsWithLessonsAndTestsAndTheirActiveKnowledgePoints() {
+    void topicSequenceListsEachSkillsTopicsWithLessonsAndTheirActiveKnowledgePoints() {
         List<TopicSequenceResult> sequence = reader.topicSequence(3);
 
         assertThat(sequence).extracting(TopicSequenceResult::code)
-                .containsExactly("DEMO_READING", "TFNG_SKILLS", "DEMO_LISTENING",
-                        "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION");
-        // Paid topics come after every free one, so a free learner never has to pass one to continue.
+                .containsExactly("DEMO_LISTENING", "DEMO_READING", "TFNG_SKILLS",
+                        "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION", "DEMO_WRITING");
+        assertThat(sequence).extracting(TopicSequenceResult::skill)
+                .containsExactly(Skill.LISTENING, Skill.READING, Skill.READING, Skill.READING, Skill.READING,
+                        Skill.WRITING);
+        // The Writing topic has no final test; a learner passes it by completing its lessons.
+        assertThat(sequence).extracting(TopicSequenceResult::hasTopicTest)
+                .containsExactly(true, true, true, true, true, false);
+        // Within the Reading track, paid topics come after every free one.
         assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
-                .containsExactly(null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT");
-        assertThat(sequence.get(0).knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::code)
+                .containsExactly(null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT", null);
+        TopicSequenceResult reading = topic(sequence, "DEMO_READING");
+        assertThat(reading.knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::code)
                 .containsExactly("DEMO_READING_MAIN_IDEA", "DR_IDEA_OR_DETAIL", "DR_TOPIC_SENTENCE",
-                        "DR_MATCHING_HEADINGS", "DEMO_READING_W2_OPINION",
-                        "DEMO_READING_W1_CHART");
-        // Reading KPs have practice sets; the Writing KPs added with the essay blocks have none.
-        assertThat(sequence.get(0).knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::hasPracticeSet)
-                .containsExactly(true, true, true, true, false, false);
-        assertThat(sequence.get(1).knowledgePoints()).singleElement()
+                        "DR_MATCHING_HEADINGS");
+        assertThat(reading.knowledgePoints()).allMatch(TopicSequenceResult.KnowledgePointEntry::hasPracticeSet);
+        // The Writing knowledge points moved with their essays and have no practice set.
+        assertThat(topic(sequence, "DEMO_WRITING").knowledgePoints())
+                .extracting(TopicSequenceResult.KnowledgePointEntry::code, TopicSequenceResult.KnowledgePointEntry::hasPracticeSet)
+                .containsExactly(tuple("DEMO_READING_W2_OPINION", false), tuple("DEMO_READING_W1_CHART", false));
+        assertThat(topic(sequence, "TFNG_SKILLS").knowledgePoints()).singleElement()
                 .satisfies(kp -> {
                     assertThat(kp.code()).isEqualTo("TFNG_FALSE_VS_NOT_GIVEN");
                     assertThat(kp.hasPracticeSet()).isFalse();
                 });
+    }
+
+    @Test
+    void writingEssaysMovedToTheirOwnTopicKeepingTheirBlockIds() {
+        UUID w1 = lessonId("W1");
+        UUID w2 = lessonId("W2");
+        assertThat(blockIds(w1)).containsExactly(UUID.fromString("22000000-0000-4000-8000-040000000001"),
+                UUID.fromString("22000000-0000-4000-8000-040000000002"));
+        assertThat(blockIds(w2)).containsExactly(UUID.fromString("21000000-0000-4000-8000-040000000001"),
+                UUID.fromString("21000000-0000-4000-8000-040000000002"));
+        assertThat(reader.publishedLesson(w1).orElseThrow().knowledgePointIds())
+                .containsExactly(kpId("DEMO_READING_W1_CHART"));
+        assertThat(reader.publishedLesson(w2).orElseThrow().knowledgePointIds())
+                .containsExactly(kpId("DEMO_READING_W2_OPINION"));
+
+        // The Reading lessons L3 and L4 keep only Reading blocks and knowledge points.
+        for (String code : List.of("L3", "L4")) {
+            UUID lessonId = lessonId(code);
+            assertThat(blockIds(lessonId)).as(code).hasSize(3);
+            assertThat(reader.publishedLesson(lessonId).orElseThrow().knowledgePointIds()).as(code)
+                    .doesNotContain(kpId("DEMO_READING_W1_CHART"), kpId("DEMO_READING_W2_OPINION"));
+        }
+        assertThat(jdbc.queryForList("SELECT code FROM topics WHERE skill IS NULL AND id IN "
+                + "(SELECT topic_id FROM lessons WHERE status = 'PUBLISHED')", Map.of(), String.class)).isEmpty();
+    }
+
+    @Test
+    void everyLessonTeachesOnlyItsTopicsSkill() {
+        List<String> mismatchedQuestions = jdbc.queryForList("""
+                SELECT l.code || ' / ' || q.skill
+                FROM lessons l
+                JOIN topics t ON t.id = l.topic_id
+                JOIN lesson_blocks b ON b.lesson_id = l.id
+                JOIN lesson_block_questions bq ON bq.block_id = b.id
+                JOIN question_versions qv ON qv.id = bq.question_version_id
+                JOIN questions q ON q.id = qv.question_id
+                WHERE l.status = 'PUBLISHED' AND q.skill IS DISTINCT FROM t.skill
+                """, Map.of(), String.class);
+        List<String> mismatchedKnowledgePoints = jdbc.queryForList("""
+                SELECT l.code || ' / ' || kp.code
+                FROM lessons l
+                JOIN topics t ON t.id = l.topic_id
+                JOIN lesson_knowledge_points lkp ON lkp.lesson_id = l.id
+                JOIN knowledge_points kp ON kp.id = lkp.knowledge_point_id
+                WHERE l.status = 'PUBLISHED' AND kp.skill IS NOT NULL AND kp.skill <> t.skill
+                """, Map.of(), String.class);
+
+        assertThat(mismatchedQuestions).isEmpty();
+        assertThat(mismatchedKnowledgePoints).isEmpty();
+    }
+
+    @Test
+    void topicSkillAcceptsOnlyOneOfTheFourSkills() {
+        assertThrows(SQLException.class, () -> execute(
+                "UPDATE topics SET skill = 'ALL' WHERE id = '" + DEMO_READING + "'"));
     }
 
     @Test
@@ -217,7 +282,7 @@ class LessonPipelineSeedTest {
                     VALUES ('90000000-0000-4000-8000-000000000003', '90000000-0000-4000-8000-000000000005', 1);
                     """);
             JdbcLearningContentReader sameTransaction = readerOn(connection);
-            return sameTransaction.topicSequence(3).get(1).knowledgePoints().get(0).hasPracticeSet()
+            return topic(sameTransaction.topicSequence(3), "TFNG_SKILLS").knowledgePoints().get(0).hasPracticeSet()
                     || !sameTransaction.searchPracticeSets(kpId("TFNG_FALSE_VS_NOT_GIVEN"), List.of(), 3, 10).isEmpty();
         });
         assertThat(hasPracticeSet).isFalse();
@@ -244,8 +309,7 @@ class LessonPipelineSeedTest {
         assertThat(lessons).extracting(LessonSummaryResult::code).containsExactly("L1", "L2", "L3", "L4");
         assertThat(lessons.get(0).exerciseBlockIds()).hasSize(2);
         assertThat(lessons.get(3).knowledgePointIds())
-                .containsExactly(kpId("DEMO_READING_MAIN_IDEA"), kpId("DR_MATCHING_HEADINGS"),
-                        kpId("DEMO_READING_W2_OPINION"));
+                .containsExactly(kpId("DEMO_READING_MAIN_IDEA"), kpId("DR_MATCHING_HEADINGS"));
     }
 
     @Test
@@ -269,7 +333,7 @@ class LessonPipelineSeedTest {
     }
 
     @Test
-    void everySeededExerciseBlockFollowsTheBlockRuleAndL3AndL4EndWithEssays() {
+    void everySeededExerciseBlockFollowsTheBlockRuleAndTheWritingLessonsEndWithEssays() {
         GetLessonContentUseCase lessons = new GetLessonContentUseCase(reader, MEDIA);
         List<UUID> lessonIds = jdbc.queryForList("SELECT id FROM lessons", Map.of(), UUID.class);
         List<LessonBlockKind> kinds = new ArrayList<>();
@@ -280,8 +344,7 @@ class LessonPipelineSeedTest {
         }
         assertThat(kinds).doesNotContainNull().filteredOn(LessonBlockKind.ESSAY::equals).hasSize(2);
 
-        UUID l4 = jdbc.queryForObject("SELECT id FROM lessons WHERE code = 'L4'", Map.of(), UUID.class);
-        LessonContentResult.Block essay = lessons.execute(l4).blocks().get(4);
+        LessonContentResult.Block essay = lessons.execute(lessonId("W2")).blocks().get(1);
         assertThat(essay.blockKind()).isEqualTo(LessonBlockKind.ESSAY);
         assertThat(essay.questions()).singleElement().satisfies(q -> {
             assertThat(q.answerSpecJson()).contains("\"task\": \"TASK_2\"");
@@ -292,8 +355,8 @@ class LessonPipelineSeedTest {
 
     @Test
     void task1EssayCarriesItsChartImageWhoseFiguresMatchTheChartFacts() throws Exception {
-        UUID l3 = jdbc.queryForObject("SELECT id FROM lessons WHERE code = 'L3'", Map.of(), UUID.class);
-        LessonContentResult.Block essay = new GetLessonContentUseCase(reader, MEDIA).execute(l3).blocks().get(4);
+        LessonContentResult.Block essay = new GetLessonContentUseCase(reader, MEDIA).execute(lessonId("W1")).blocks()
+                .get(1);
 
         assertThat(essay.blockKind()).isEqualTo(LessonBlockKind.ESSAY);
         LessonContentResult.Question question = essay.questions().get(0);
@@ -319,7 +382,7 @@ class LessonPipelineSeedTest {
     }
     @Test
     void listeningTopicHasAudioLessonsOnePracticeSetPerKnowledgePointAndTwoAudioTests() throws Exception {
-        TopicSequenceResult listening = reader.topicSequence(3).get(2);
+        TopicSequenceResult listening = topic(reader.topicSequence(3), "DEMO_LISTENING");
         assertThat(listening.knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::code)
                 .containsExactly("LS_NUM", "LS_SPELL", "LS_PARA", "LS_TRAP");
         assertThat(listening.knowledgePoints()).allMatch(TopicSequenceResult.KnowledgePointEntry::hasPracticeSet);
@@ -457,6 +520,19 @@ class LessonPipelineSeedTest {
     }
 
     // ---- helpers ----
+
+    private static TopicSequenceResult topic(List<TopicSequenceResult> sequence, String code) {
+        return sequence.stream().filter(topic -> topic.code().equals(code)).findFirst().orElseThrow();
+    }
+
+    private static UUID lessonId(String code) {
+        return jdbc.queryForObject("SELECT id FROM lessons WHERE code = :code", Map.of("code", code), UUID.class);
+    }
+
+    private static List<UUID> blockIds(UUID lessonId) {
+        return jdbc.queryForList("SELECT id FROM lesson_blocks WHERE lesson_id = :id ORDER BY sort_order",
+                Map.of("id", lessonId), UUID.class);
+    }
 
     /** Answer spec v1 grading of one response, for checking the seed. */
     private static boolean grade(JsonNode spec, String response) {

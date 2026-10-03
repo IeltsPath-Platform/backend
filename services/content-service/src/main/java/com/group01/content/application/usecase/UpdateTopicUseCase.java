@@ -29,6 +29,9 @@ public class UpdateTopicUseCase {
 
         topic.update(command.parentTopicId(), command.name(), command.sortOrder(), command.status(),
                 command.band());
+        if (command.skill() != null && command.skill() != topic.getSkill()) {
+            topic.changeSkill(command.skill(), topicRepository.hasPublishedLessons(topic.getId()));
+        }
         Topic saved = topicRepository.save(topic);
 
         return new TopicResult(
@@ -40,7 +43,8 @@ public class UpdateTopicUseCase {
                 saved.getStatus(),
                 saved.getCreatedAt(),
                 saved.getUpdatedAt(),
-                saved.getBand()
+                saved.getBand(),
+                saved.getSkill()
         );
     }
 }

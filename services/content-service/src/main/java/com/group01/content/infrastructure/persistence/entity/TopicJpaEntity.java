@@ -1,6 +1,7 @@
 package com.group01.content.infrastructure.persistence.entity;
 
 import com.group01.content.domain.vo.ContentStatus;
+import com.group01.content.domain.vo.Skill;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -44,6 +45,10 @@ public class TopicJpaEntity {
 
     @Column(name = "band_max", precision = 2, scale = 1)
     private BigDecimal bandMax;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "skill", length = 20)
+    private Skill skill;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

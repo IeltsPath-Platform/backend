@@ -19,6 +19,9 @@ import com.group01.content.application.usecase.GetTopicUseCase;
 import com.group01.content.application.usecase.UpdateTopicUseCase;
 import com.group01.content.domain.exception.DuplicateCodeException;
 import com.group01.content.domain.vo.ContentStatus;
+import com.group01.content.domain.vo.Skill;
+import com.group01.content.application.command.UpdateTopicCommand;
+import com.group01.content.domain.exception.TopicSkillLockedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +41,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -74,7 +78,7 @@ class TopicControllerTest {
         UUID topicId = UUID.randomUUID();
         TopicTreeResult treeNode = new TopicTreeResult(
                 topicId, null, "IELTS_READING", "Reading", 1, ContentStatus.ACTIVE,
-                Instant.now(), Instant.now(), BandRange.of(new BigDecimal("5.0"), new BigDecimal("6.5")), List.of()
+                Instant.now(), Instant.now(), BandRange.of(new BigDecimal("5.0"), new BigDecimal("6.5")), Skill.READING, List.of()
         );
         when(getTopicTreeUseCase.execute()).thenReturn(List.of(treeNode));
 
@@ -84,7 +88,8 @@ class TopicControllerTest {
                 .andExpect(jsonPath("$[0].code").value("IELTS_READING"))
                 .andExpect(jsonPath("$[0].name").value("Reading"))
                 .andExpect(jsonPath("$[0].bandMin").value(5.0))
-                .andExpect(jsonPath("$[0].bandMax").value(6.5));
+                .andExpect(jsonPath("$[0].bandMax").value(6.5))
+                .andExpect(jsonPath("$[0].skill").value("READING"));
     }
 
     @Test
@@ -92,7 +97,7 @@ class TopicControllerTest {
         UUID id = UUID.randomUUID();
         when(getTopicUseCase.execute(id)).thenReturn(new TopicResult(
                 id, null, "READING", "Reading", 1, ContentStatus.ACTIVE,
-                Instant.now(), Instant.now(), BandRange.UNBOUNDED));
+                Instant.now(), Instant.now(), BandRange.UNBOUNDED, null));
 
         mockMvc.perform(get("/api/content/topics/{id}", id))
                 .andExpect(status().isOk())
@@ -104,10 +109,10 @@ class TopicControllerTest {
     void shouldCreateTopicSuccessfully() throws Exception {
         UUID topicId = UUID.randomUUID();
         CreateTopicRequest request = new CreateTopicRequest(null, "IELTS_WRITING", "Writing", 2,
-                new BigDecimal("6.0"), null);
+                new BigDecimal("6.0"), null, Skill.WRITING);
         TopicResult result = new TopicResult(
                 topicId, null, "IELTS_WRITING", "Writing", 2, ContentStatus.ACTIVE,
-                Instant.now(), Instant.now(), BandRange.of(new BigDecimal("6.0"), null)
+                Instant.now(), Instant.now(), BandRange.of(new BigDecimal("6.0"), null), Skill.WRITING
         );
 
         when(createTopicUseCase.execute(any(CreateTopicCommand.class))).thenReturn(result);
@@ -120,11 +125,13 @@ class TopicControllerTest {
                 .andExpect(jsonPath("$.code").value("IELTS_WRITING"))
                 .andExpect(jsonPath("$.name").value("Writing"))
                 .andExpect(jsonPath("$.bandMin").value(6.0))
-                .andExpect(jsonPath("$.bandMax").doesNotExist());
+                .andExpect(jsonPath("$.bandMax").doesNotExist())
+                .andExpect(jsonPath("$.skill").value("WRITING"));
 
         ArgumentCaptor<CreateTopicCommand> command = ArgumentCaptor.forClass(CreateTopicCommand.class);
         verify(createTopicUseCase).execute(command.capture());
         assertThat(command.getValue().band()).isEqualTo(BandRange.of(new BigDecimal("6.0"), null));
+        assertThat(command.getValue().skill()).isEqualTo(Skill.WRITING);
     }
 
     @Test
@@ -141,9 +148,41 @@ class TopicControllerTest {
     }
 
     @Test
+    void passesTheRequestedSkillToTheUseCaseAndMapsItsRejectionTo400() throws Exception {
+        // The aggregate rejects ALL (see TopicTest); here the request reaches it unchanged and the refusal becomes 400.
+        when(createTopicUseCase.execute(any(CreateTopicCommand.class)))
+                .thenThrow(new IllegalArgumentException("A topic teaches one skill; ALL is not allowed"));
+        mockMvc.perform(post("/api/content/topics")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"MIX\",\"name\":\"Mix\",\"sortOrder\":0,\"skill\":\"ALL\"}"))
+                .andExpect(status().isBadRequest());
+
+        ArgumentCaptor<CreateTopicCommand> command = ArgumentCaptor.forClass(CreateTopicCommand.class);
+        verify(createTopicUseCase).execute(command.capture());
+        assertThat(command.getValue().skill()).isEqualTo(Skill.ALL);
+    }
+
+    @Test
+    void changingTheSkillOfATopicWithPublishedLessonsReturns409() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(updateTopicUseCase.execute(any(UpdateTopicCommand.class)))
+                .thenThrow(new TopicSkillLockedException("DEMO_READING"));
+
+        mockMvc.perform(put("/api/content/topics/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Reading\",\"sortOrder\":900,\"skill\":\"LISTENING\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.code").value("TOPIC_SKILL_LOCKED"));
+
+        ArgumentCaptor<UpdateTopicCommand> command = ArgumentCaptor.forClass(UpdateTopicCommand.class);
+        verify(updateTopicUseCase).execute(command.capture());
+        assertThat(command.getValue().skill()).isEqualTo(Skill.LISTENING);
+    }
+
+    @Test
     @DisplayName("POST /api/content/topics with duplicate code should return 400 Bad Request")
     void shouldReturn400OnDuplicateCode() throws Exception {
-        CreateTopicRequest request = new CreateTopicRequest(null, "DUPLICATE", "Duplicate Topic", 1, null, null);
+        CreateTopicRequest request = new CreateTopicRequest(null, "DUPLICATE", "Duplicate Topic", 1, null, null, null);
         when(createTopicUseCase.execute(any(CreateTopicCommand.class)))
                 .thenThrow(new DuplicateCodeException("Topic", "DUPLICATE"));
 

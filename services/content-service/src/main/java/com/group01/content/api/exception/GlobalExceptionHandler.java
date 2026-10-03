@@ -47,6 +47,13 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
     }
 
+    @ExceptionHandler(TopicSkillLockedException.class)
+    public ResponseEntity<ErrorResponse> handleTopicSkillLocked(TopicSkillLockedException ex, HttpServletRequest request) {
+        log.warn("Topic skill change refused: {}", ex.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "TOPIC_SKILL_LOCKED"));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, String> details = new HashMap<>();

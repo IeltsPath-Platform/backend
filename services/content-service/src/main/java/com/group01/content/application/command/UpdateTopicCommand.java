@@ -2,6 +2,7 @@ package com.group01.content.application.command;
 
 import com.group01.content.domain.vo.BandRange;
 import com.group01.content.domain.vo.ContentStatus;
+import com.group01.content.domain.vo.Skill;
 
 import java.util.UUID;
 
@@ -11,6 +12,7 @@ public record UpdateTopicCommand(
         String name,
         int sortOrder,
         ContentStatus status,
-        BandRange band
+        BandRange band,
+        Skill skill
 ) {}
 

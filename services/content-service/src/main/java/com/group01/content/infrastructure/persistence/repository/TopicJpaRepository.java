@@ -2,6 +2,8 @@ package com.group01.content.infrastructure.persistence.repository;
 
 import com.group01.content.infrastructure.persistence.entity.TopicJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,5 +16,9 @@ public interface TopicJpaRepository extends JpaRepository<TopicJpaEntity, UUID> 
     List<TopicJpaEntity> findByParentTopicIdIsNullOrderBySortOrderAsc();
     List<TopicJpaEntity> findByParentTopicIdOrderBySortOrderAsc(UUID parentTopicId);
     boolean existsByCode(String code);
+
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM lessons WHERE topic_id = :topicId AND status = 'PUBLISHED')",
+            nativeQuery = true)
+    boolean hasPublishedLessons(@Param("topicId") UUID topicId);
 }
 

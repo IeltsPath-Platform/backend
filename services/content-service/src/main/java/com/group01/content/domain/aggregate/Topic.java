@@ -1,7 +1,9 @@
 package com.group01.content.domain.aggregate;
 
+import com.group01.content.domain.exception.TopicSkillLockedException;
 import com.group01.content.domain.vo.BandRange;
 import com.group01.content.domain.vo.ContentStatus;
+import com.group01.content.domain.vo.Skill;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -15,11 +17,12 @@ public class Topic {
     private int sortOrder;
     private ContentStatus status;
     private BandRange band;
+    private Skill skill;
     private final Instant createdAt;
     private Instant updatedAt;
 
     public Topic(UUID id, UUID parentTopicId, String code, String name, int sortOrder,
-                 ContentStatus status, BandRange band, Instant createdAt, Instant updatedAt) {
+                 ContentStatus status, BandRange band, Skill skill, Instant createdAt, Instant updatedAt) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.parentTopicId = parentTopicId;
         if (code == null || code.isBlank()) {
@@ -33,20 +36,23 @@ public class Topic {
         this.sortOrder = sortOrder;
         this.status = status != null ? status : ContentStatus.ACTIVE;
         this.band = band != null ? band : BandRange.UNBOUNDED;
+        this.skill = requireSingleSkill(skill);
         this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.updatedAt = updatedAt != null ? updatedAt : this.createdAt;
     }
 
     public static Topic create(UUID parentTopicId, String code, String name, int sortOrder) {
-        return create(parentTopicId, code, name, sortOrder, BandRange.UNBOUNDED);
+        return create(parentTopicId, code, name, sortOrder, BandRange.UNBOUNDED, null);
     }
 
-    public static Topic create(UUID parentTopicId, String code, String name, int sortOrder, BandRange band) {
+    public static Topic create(UUID parentTopicId, String code, String name, int sortOrder, BandRange band,
+                               Skill skill) {
         Instant now = Instant.now();
-        return new Topic(UUID.randomUUID(), parentTopicId, code, name, sortOrder, ContentStatus.ACTIVE, band, now, now);
+        return new Topic(UUID.randomUUID(), parentTopicId, code, name, sortOrder, ContentStatus.ACTIVE, band, skill,
+                now, now);
     }
 
-    /** Replaces every editable field, band included: a null band clears it. */
+    /** Replaces every editable field, band included: a null band clears it. The skill is changed separately. */
     public void update(UUID parentTopicId, String name, int sortOrder, ContentStatus status, BandRange band) {
         this.parentTopicId = parentTopicId;
         this.name = Objects.requireNonNull(name, "name must not be null");
@@ -58,6 +64,29 @@ public class Topic {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * Sets the skill the topic's lessons teach. Once a lesson is published, learners' tracks depend on it, so it can
+     * no longer change.
+     */
+    public void changeSkill(Skill newSkill, boolean hasPublishedLessons) {
+        Skill checked = requireSingleSkill(newSkill);
+        if (checked == skill) {
+            return;
+        }
+        if (hasPublishedLessons) {
+            throw new TopicSkillLockedException(code);
+        }
+        this.skill = checked;
+        this.updatedAt = Instant.now();
+    }
+
+    private static Skill requireSingleSkill(Skill skill) {
+        if (skill == Skill.ALL) {
+            throw new IllegalArgumentException("A topic teaches one skill; ALL is not allowed");
+        }
+        return skill;
+    }
+
     public UUID getId() { return id; }
     public UUID getParentTopicId() { return parentTopicId; }
     public String getCode() { return code; }
@@ -65,6 +94,7 @@ public class Topic {
     public int getSortOrder() { return sortOrder; }
     public ContentStatus getStatus() { return status; }
     public BandRange getBand() { return band; }
+    public Skill getSkill() { return skill; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

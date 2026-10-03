@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.DecimalMax;
 import com.group01.content.domain.vo.ContentStatus;
+import com.group01.content.domain.vo.Skill;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -23,6 +24,8 @@ public record UpdateTopicRequest(
         BigDecimal bandMin,
         @DecimalMin(value = "0.0", message = "bandMax must be at least 0.0")
         @DecimalMax(value = "9.0", message = "bandMax must be at most 9.0")
-        BigDecimal bandMax
+        BigDecimal bandMax,
+        // Null keeps the current skill; a change is refused once the topic has published lessons.
+        Skill skill
 ) {}
 

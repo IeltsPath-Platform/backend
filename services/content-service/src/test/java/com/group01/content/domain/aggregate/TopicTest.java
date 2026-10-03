@@ -4,6 +4,8 @@ import com.group01.content.domain.vo.BandRange;
 import java.math.BigDecimal;
 
 import com.group01.content.domain.vo.ContentStatus;
+import com.group01.content.domain.vo.Skill;
+import com.group01.content.domain.exception.TopicSkillLockedException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -55,6 +57,31 @@ class TopicTest {
         topic.update(parentId, "New Name", 2, null, null);
 
         assertThat(topic.getBand()).isEqualTo(BandRange.UNBOUNDED);
+    }
+
+    @Test
+    void aTopicTeachesOneSkillNeverAll() {
+        assertThat(Topic.create(null, "W", "Writing", 1, BandRange.UNBOUNDED, Skill.WRITING).getSkill())
+                .isEqualTo(Skill.WRITING);
+        assertThat(Topic.create(null, "NONE", "No skill yet", 1).getSkill()).isNull();
+        assertThatThrownBy(() -> Topic.create(null, "MIX", "Mixed", 1, BandRange.UNBOUNDED, Skill.ALL))
+                .isInstanceOf(IllegalArgumentException.class);
+        Topic topic = Topic.create(null, "R", "Reading", 1, BandRange.UNBOUNDED, Skill.READING);
+        assertThatThrownBy(() -> topic.changeSkill(Skill.ALL, false)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void theSkillIsLockedOncePublishedLessonsDependOnIt() {
+        Topic topic = Topic.create(null, "R", "Reading", 1, BandRange.UNBOUNDED, Skill.READING);
+
+        topic.changeSkill(Skill.READING, true);
+        assertThat(topic.getSkill()).isEqualTo(Skill.READING);
+        assertThatThrownBy(() -> topic.changeSkill(Skill.LISTENING, true))
+                .isInstanceOf(TopicSkillLockedException.class);
+        assertThat(topic.getSkill()).isEqualTo(Skill.READING);
+
+        topic.changeSkill(Skill.LISTENING, false);
+        assertThat(topic.getSkill()).isEqualTo(Skill.LISTENING);
     }
 }
 

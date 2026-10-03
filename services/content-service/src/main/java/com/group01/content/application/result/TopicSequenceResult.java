@@ -8,7 +8,8 @@ import java.util.UUID;
 
 /**
  * A topic in the learning order, with the active knowledge points it measures. {@code requiredFeatureKey} is the
- * Access feature needed to learn it; null means free.
+ * Access feature needed to learn it; null means free. {@code skill} is the one skill its lessons teach;
+ * {@code hasTopicTest} is false when the topic has no published final test and is passed by completing its lessons.
  */
 public record TopicSequenceResult(
         UUID topicId,
@@ -16,7 +17,9 @@ public record TopicSequenceResult(
         String name,
         int sortOrder,
         String requiredFeatureKey,
-        List<KnowledgePointEntry> knowledgePoints
+        List<KnowledgePointEntry> knowledgePoints,
+        Skill skill,
+        boolean hasTopicTest
 ) {
     /** {@code hasPracticeSet}: at least one practice set is eligible for review of this knowledge point. */
     public record KnowledgePointEntry(

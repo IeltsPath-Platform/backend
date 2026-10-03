@@ -3,6 +3,7 @@ package com.group01.content.api.controller;
 import com.group01.content.api.exception.GlobalExceptionHandler;
 import com.group01.content.application.result.LessonContentResult;
 import com.group01.content.application.result.PackageVersionContentResult;
+import com.group01.content.application.result.TopicSequenceResult;
 import com.group01.content.application.usecase.GetLessonContentUseCase;
 import com.group01.content.application.usecase.GetPackageVersionContentUseCase;
 import com.group01.content.application.usecase.GetTopicLessonsUseCase;
@@ -51,6 +52,21 @@ class InternalLearningContentControllerTest {
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
+    }
+
+    @Test
+    void topicSequenceCarriesEachTopicsSkillAndWhetherItHasAFinalTest() throws Exception {
+        UUID writing = UUID.randomUUID();
+        when(topicSequence.execute()).thenReturn(List.of(new TopicSequenceResult(writing, "DEMO_WRITING",
+                "Writing cơ bản", 950, null, List.of(), Skill.WRITING, false)));
+
+        mockMvc.perform(get("/internal/learning-content/topic-sequence"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].topicId").value(writing.toString()))
+                .andExpect(jsonPath("$[0].code").value("DEMO_WRITING"))
+                .andExpect(jsonPath("$[0].skill").value("WRITING"))
+                .andExpect(jsonPath("$[0].hasTopicTest").value(false))
+                .andExpect(jsonPath("$[0].knowledgePoints").isEmpty());
     }
 
     @Test

@@ -1,6 +1,6 @@
 # Lộ trình theo kỹ năng, Practice gắn Lesson và thang ôn tập (remediation ladder)
 
-Status: pending
+Status: in progress (P1 xong 2026-10-03, nhánh `feat/skill-tracks-practice`)
 Người implement: Codex. Người viết plan: Claude. Base: `main` @ `c00993d` (đã validate 2026-10-03).
 
 ## 1. Mục tiêu nghiệp vụ (đã chốt với chủ dự án)
@@ -114,7 +114,7 @@ là lần 2, set ôn sau lý thuyết trượt là lần 3 ⇒ `MAX_FAILED_REVIE
 
 | Phase | Service | Nội dung | File |
 | --- | --- | --- | --- |
-| P1 | content | `topics.skill`, topic `DEMO_WRITING`, tách essay khỏi Reading, `topic-sequence` mới | [phase-01](phase-01-content-topic-skill.md) |
+| P1 ✓ | content | `topics.skill`, topic `DEMO_WRITING`, tách essay khỏi Reading, `topic-sequence` mới | [phase-01](phase-01-content-topic-skill.md) |
 | P2 | content | `lesson_block_knowledge_points`, `content_packages.lesson_id`, API practice theo lesson | [phase-02](phase-02-content-block-kp-practice-link.md) |
 | P3 | learning | Lộ trình theo skill, gate review theo skill, topic không có test | [phase-03](phase-03-learning-skill-tracks.md) |
 | P4 | learning | Catalog Practice + practice attempts | [phase-04](phase-04-learning-practice-attempts.md) |

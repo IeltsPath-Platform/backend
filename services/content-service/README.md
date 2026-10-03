@@ -18,9 +18,17 @@ multiple test codes. `LESSON` remains a valid package type for existing reading 
 lesson pipeline. These are implemented migrations; their presence does not confirm they ran on a shared database.
 
 Learning reads the six `/internal/learning-content/**` routes in the
-[internal contract](../../docs/contracts/learning-content-internal-v1.md). `topic-sequence` returns ordered active
-topics with published lessons and topic tests, including active KPs and `hasPracticeSet`. Learning owns learner
-progress, gates and mastery; Assessment reads package snapshots when it creates an attempt.
+[internal contract](../../docs/contracts/learning-content-internal-v1.md). `topic-sequence` returns active topics
+that have a skill and published lessons, ordered by skill then `sort_order`, with `hasTopicTest`, active KPs and
+`hasPracticeSet`. Learning owns learner progress, gates and mastery; Assessment reads package snapshots when it
+creates an attempt.
+
+Each topic that teaches lessons has one `skill` (`LISTENING`, `READING`, `WRITING`, `SPEAKING`; V15, never `ALL`),
+and its lessons inherit it. Topic create/update accept an optional `skill`; update keeps the current skill when it is
+omitted and returns `409` (`details.code = TOPIC_SKILL_LOCKED`) when a topic with published lessons would change
+skill. There is no lesson authoring API, so seed migrations must keep every lesson question and lesson KP on its
+topic's skill: `LessonPipelineSeedTest.everyLessonTeachesOnlyItsTopicsSkill` enforces it. V15 moved the demo Writing
+essays from Reading lessons L3/L4 into topic `DEMO_WRITING` (lessons W1, W2; no final test), keeping their block ids.
 
 Topics retain optional `bandMin`/`bandMax` metadata (0–9, half-band steps). V8 removes KP band columns and the KP
 API no longer accepts or returns own/effective band ranges. The current learning sequence uses topic `sort_order`,

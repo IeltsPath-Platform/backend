@@ -81,18 +81,23 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
     @Override
     public List<TopicSequenceResult> topicSequence(int minPracticeQuestions) {
-        record TopicRow(UUID id, String code, String name, int sortOrder, String requiredFeatureKey) {}
+        record TopicRow(UUID id, String code, String name, int sortOrder, String requiredFeatureKey, Skill skill,
+                        boolean hasTopicTest) {}
+        // A topic joins its skill's track once it has a skill and a published lesson; without a final test it is
+        // passed by completing its lessons.
         List<TopicRow> topics = jdbc.query("""
-                SELECT t.id, t.code, t.name, t.sort_order, t.required_feature_key
+                SELECT t.id, t.code, t.name, t.sort_order, t.required_feature_key, t.skill,
+                       EXISTS (SELECT 1 FROM content_packages p
+                               WHERE p.topic_id = t.id AND p.package_type = 'TOPIC_TEST'
+                                 AND p.status = 'PUBLISHED' AND p.current_published_version_id IS NOT NULL)
+                           AS has_topic_test
                 FROM topics t
-                WHERE t.status = 'ACTIVE'
+                WHERE t.status = 'ACTIVE' AND t.skill IS NOT NULL
                   AND EXISTS (SELECT 1 FROM lessons l WHERE l.topic_id = t.id AND l.status = 'PUBLISHED')
-                  AND EXISTS (SELECT 1 FROM content_packages p
-                              WHERE p.topic_id = t.id AND p.package_type = 'TOPIC_TEST'
-                                AND p.status = 'PUBLISHED' AND p.current_published_version_id IS NOT NULL)
-                ORDER BY t.sort_order, t.id
+                ORDER BY t.skill, t.sort_order, t.id
                 """, Map.of(), (rs, i) -> new TopicRow(uuid(rs, "id"), rs.getString("code"), rs.getString("name"),
-                rs.getInt("sort_order"), rs.getString("required_feature_key")));
+                rs.getInt("sort_order"), rs.getString("required_feature_key"),
+                enumOrNull(Skill.class, rs.getString("skill")), rs.getBoolean("has_topic_test")));
         if (topics.isEmpty()) {
             return List.of();
         }
@@ -120,7 +125,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
         return topics.stream()
                 .map(t -> new TopicSequenceResult(t.id(), t.code(), t.name(), t.sortOrder(), t.requiredFeatureKey(),
-                        pointsByTopic.getOrDefault(t.id(), List.of())))
+                        pointsByTopic.getOrDefault(t.id(), List.of()), t.skill(), t.hasTopicTest()))
                 .toList();
     }
 
