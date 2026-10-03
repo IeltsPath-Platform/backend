@@ -64,12 +64,14 @@ Làm (chỉ khi các bản ghi seed tồn tại – bọc bằng `WHERE EXISTS`/
 
 ## 3. Validation lesson theo skill
 
-Ở use case publish lesson (và khi gắn question vào EXERCISE block nếu có use case authoring – tìm trong
-`application/usecase/*Lesson*`):
+Content **không có** API tạo/publish lesson (lesson chỉ đến từ migration seed; use case lesson hiện có chỉ đọc:
+`GetLessonContentUseCase`, `GetTopicLessonsUseCase`). Không tạo API authoring mới. Ràng buộc được giữ bằng:
 
-- topic chưa có skill ⇒ 409 `TOPIC_SKILL_REQUIRED`;
-- mọi question version trong lesson phải có `questions.skill = topics.skill` ⇒ ngược lại 422 `LESSON_SKILL_MISMATCH`;
-- `lesson_knowledge_points` của lesson chỉ chứa KP có `skill` = topic skill hoặc NULL.
+- kiểm tra cuối V15 (mục 1.4) và một test nhất quán chạy trên DB sau mọi migration:
+  - topic có lesson PUBLISHED phải có skill;
+  - mọi question version trong lesson PUBLISHED có `questions.skill = topics.skill`;
+  - `lesson_knowledge_points` của lesson chỉ chứa KP có `skill` = topic skill hoặc NULL;
+- seed tương lai phải qua được test này (ghi vào README content).
 
 ## 4. Internal `GET /internal/learning-content/topic-sequence`
 
