@@ -33,7 +33,8 @@ public class CreateTopicUseCase {
                 command.code(),
                 command.name(),
                 command.sortOrder(),
-                command.band()
+                command.band(),
+                command.skill()
         );
 
         Topic saved = topicRepository.save(topic);
@@ -46,7 +47,8 @@ public class CreateTopicUseCase {
                 saved.getStatus(),
                 saved.getCreatedAt(),
                 saved.getUpdatedAt(),
-                saved.getBand()
+                saved.getBand(),
+                saved.getSkill()
         );
     }
 }

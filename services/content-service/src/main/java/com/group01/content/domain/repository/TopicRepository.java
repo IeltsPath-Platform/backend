@@ -17,5 +17,6 @@ public interface TopicRepository {
     List<Topic> findRootTopics();
     List<Topic> findByParentTopicId(UUID parentTopicId);
     boolean existsByCode(String code);
+    boolean hasPublishedLessons(UUID topicId);
 }
 

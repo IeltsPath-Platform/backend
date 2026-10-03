@@ -9,6 +9,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.HashSet;
+import java.util.Set;
+import com.group01.learning.domain.vo.LearningSkill;
 
 public final class TopicStatusDeriver {
     public Map<UUID, TopicStatus> derive(List<TopicProgress> topics) {
@@ -18,14 +21,13 @@ public final class TopicStatusDeriver {
                         .thenComparing(topic -> topic.topicId().toString()))
                 .toList();
         Map<UUID, TopicStatus> statuses = new LinkedHashMap<>();
-        boolean currentTopicFound = false;
+        Set<LearningSkill> currentSkills = new HashSet<>();
         for (TopicProgress topic : ordered) {
             TopicStatus status;
             if (topic.passedAt() != null) {
                 status = TopicStatus.PASSED;
-            } else if (!currentTopicFound) {
+            } else if (currentSkills.add(topic.skill())) {
                 status = TopicStatus.IN_PROGRESS;
-                currentTopicFound = true;
             } else {
                 status = TopicStatus.LOCKED;
             }

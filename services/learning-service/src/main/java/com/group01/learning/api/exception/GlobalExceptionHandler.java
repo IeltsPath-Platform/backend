@@ -2,6 +2,7 @@ package com.group01.learning.api.exception;
 
 import com.group01.learning.application.exception.LearningRequestException;
 import com.group01.learning.domain.exception.LearningGateException;
+import com.group01.learning.domain.exception.PracticeAttemptAlreadySubmittedException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -21,11 +22,16 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(PracticeAttemptAlreadySubmittedException.class)
+    public ResponseEntity<LearningErrorResponse> submitted(PracticeAttemptAlreadySubmittedException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new LearningErrorResponse(exception.getMessage(), "ATTEMPT_ALREADY_SUBMITTED", null));
+    }
     @ExceptionHandler(LearningGateException.class)
     public ResponseEntity<LearningErrorResponse> gate(LearningGateException exception) {
         var reviews = "REVIEW_REQUIRED".equals(exception.getCode()) ? exception.getReviews().stream()
                 .map(review -> new LearningErrorResponse.Review(review.reviewId(), review.lessonId(),
-                        review.knowledgePointId())).toList() : null;
+                        review.knowledgePointId(), review.skill())).toList() : null;
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(new LearningErrorResponse(exception.getMessage(), exception.getCode(), reviews));
     }
@@ -34,7 +40,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<LearningErrorResponse> learningRequest(LearningRequestException exception) {
         return ResponseEntity.status(exception.getStatus())
                 .body(new LearningErrorResponse(exception.getMessage(), exception.getCode(), null,
-                        exception.getSubmissionId()));
+                        exception.getSubmissionId(), exception.getLessonIds()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

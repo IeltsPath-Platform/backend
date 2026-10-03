@@ -1,13 +1,21 @@
 package com.group01.content.api.controller;
 
 import com.group01.content.api.dto.internal.LessonContentResponse;
+import com.group01.content.api.dto.internal.LessonPracticeSetResponse;
+import com.group01.content.api.dto.internal.PracticeSetAvailabilityRequest;
+import com.group01.content.api.dto.internal.PracticeSetAvailabilityResponse;
+import com.group01.content.api.dto.internal.TopicPracticeSetsResponse;
 import com.group01.content.api.dto.internal.LessonSummaryResponse;
 import com.group01.content.api.dto.internal.PackageVersionContentResponse;
 import com.group01.content.api.dto.internal.PracticeSetResponse;
 import com.group01.content.api.dto.internal.PracticeSetSearchRequest;
 import com.group01.content.api.dto.internal.TopicSequenceResponse;
 import com.group01.content.api.dto.internal.TopicTestPackageResponse;
+import com.group01.content.application.command.CountPracticeSetsCommand;
 import com.group01.content.application.command.SearchPracticeSetsCommand;
+import com.group01.content.application.usecase.CountAvailablePracticeSetsUseCase;
+import com.group01.content.application.usecase.GetLessonPracticeSetsUseCase;
+import com.group01.content.application.usecase.GetTopicPracticeSetsUseCase;
 import com.group01.content.application.usecase.GetLessonContentUseCase;
 import com.group01.content.application.usecase.GetPackageVersionContentUseCase;
 import com.group01.content.application.usecase.GetTopicLessonsUseCase;
@@ -40,6 +48,9 @@ public class InternalLearningContentController {
     private final GetTopicTestPackagesUseCase getTopicTestPackages;
     private final SearchPracticeSetsUseCase searchPracticeSets;
     private final GetPackageVersionContentUseCase getPackageVersionContent;
+    private final GetLessonPracticeSetsUseCase getLessonPracticeSets;
+    private final GetTopicPracticeSetsUseCase getTopicPracticeSets;
+    private final CountAvailablePracticeSetsUseCase countAvailablePracticeSets;
 
     @GetMapping("/topic-sequence")
     public List<TopicSequenceResponse> topicSequence() {
@@ -64,8 +75,26 @@ public class InternalLearningContentController {
     @PostMapping("/practice-sets/search")
     public List<PracticeSetResponse> searchPracticeSets(@Valid @RequestBody PracticeSetSearchRequest request) {
         return searchPracticeSets.execute(new SearchPracticeSetsCommand(request.knowledgePointId(),
-                        request.excludePackageIds(), request.minQuestions(), request.limit()))
+                        request.excludePackageIds(), request.minQuestions(), request.limit(),
+                        request.preferredLessonId()))
                 .stream().map(PracticeSetResponse::from).toList();
+    }
+
+    @GetMapping("/lessons/{id}/practice-sets")
+    public List<LessonPracticeSetResponse> lessonPracticeSets(@PathVariable("id") UUID lessonId) {
+        return getLessonPracticeSets.execute(lessonId).stream().map(LessonPracticeSetResponse::from).toList();
+    }
+
+    @GetMapping("/topics/{id}/practice-sets")
+    public TopicPracticeSetsResponse topicPracticeSets(@PathVariable("id") UUID topicId) {
+        return TopicPracticeSetsResponse.from(getTopicPracticeSets.execute(topicId));
+    }
+
+    @PostMapping("/practice-sets/availability")
+    public PracticeSetAvailabilityResponse practiceSetAvailability(
+            @Valid @RequestBody PracticeSetAvailabilityRequest request) {
+        return new PracticeSetAvailabilityResponse(countAvailablePracticeSets.execute(new CountPracticeSetsCommand(
+                request.knowledgePointIds(), request.excludePackageIds(), request.minQuestions())));
     }
 
     @GetMapping("/package-versions/{id}")

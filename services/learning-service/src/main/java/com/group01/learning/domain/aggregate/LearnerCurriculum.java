@@ -3,6 +3,7 @@ package com.group01.learning.domain.aggregate;
 import com.group01.learning.domain.entity.TopicProgress;
 import com.group01.learning.domain.service.TopicStatusDeriver;
 import com.group01.learning.domain.vo.TopicStatus;
+import com.group01.learning.domain.vo.LearningSkill;
 
 import java.time.Instant;
 import java.util.*;
@@ -31,12 +32,22 @@ public final class LearnerCurriculum {
     public List<TopicProgress> topics() { return List.copyOf(topics.values()); }
 
     /** Takes the Content order (1..n in list order). Topics Content no longer lists lose their order but keep a pass. */
-    public void reorder(List<UUID> orderedTopicIds) {
+    public void reorder(List<TopicPlacement> placements) {
         topics.values().forEach(topic -> topic.order(null));
-        for (int index = 0; index < orderedTopicIds.size(); index++) {
-            topics.computeIfAbsent(orderedTopicIds.get(index), id -> new TopicProgress(id, null, null)).order(index + 1);
+        for (int index = 0; index < placements.size(); index++) {
+            TopicPlacement placement = placements.get(index);
+            topics.computeIfAbsent(placement.topicId(), id -> new TopicProgress(id, null, null))
+                    .place(index + 1, placement.skill(), placement.hasTopicTest());
         }
     }
+
+    public void reorder(Collection<UUID> orderedTopicIds) {
+        reorder(orderedTopicIds.stream().map(id -> new TopicPlacement(id, null, true)).toList());
+    }
+
+    public record TopicPlacement(UUID topicId, LearningSkill skill, boolean hasTopicTest) {}
+
+    public Optional<TopicProgress> topic(UUID topicId) { return Optional.ofNullable(topics.get(topicId)); }
 
     /** True when this call passed the topic; a topic not in the curriculum yet is recorded without an order. */
     public boolean pass(UUID topicId, Instant now) {

@@ -13,6 +13,10 @@ import com.group01.learning.application.usecase.SubmitLessonExerciseUseCase;
 import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
 import com.group01.learning.application.usecase.GetReviewUseCase;
 import com.group01.learning.application.usecase.SubmitReviewUseCase;
+import com.group01.learning.application.usecase.SubmitTheoryCheckUseCase;
+import com.group01.learning.application.usecase.CompleteLessonUseCase;
+import com.group01.learning.domain.vo.LearningSkill;
+import com.group01.learning.domain.vo.TopicStatus;
 import com.group01.learning.domain.exception.LearningGateException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,22 +85,26 @@ class ReviewAndTestAssignmentIntegrationTest {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired GetReviewUseCase getReviewUseCase;
+    @Autowired SubmitTheoryCheckUseCase theoryCheck;
     @Autowired SubmitReviewUseCase submitReviewUseCase;
     @Autowired AssignTopicTestUseCase tests;
     @Autowired GetLessonUseCase getLessonUseCase;
     @Autowired SubmitLessonExerciseUseCase submitLessonExerciseUseCase;
     @Autowired RefreshLearningTopicsUseCase topics;
+    @Autowired CompleteLessonUseCase completeLessonUseCase;
     @MockitoBean LearningContentClient content;
 
     @BeforeEach
     void resetDataAndCurriculum() {
         jdbc.execute("""
-                TRUNCATE review_sets, review_items, lesson_exercise_submissions, kp_evidence,
+                TRUNCATE review_theory_checks, review_sets, review_items, practice_attempts, lesson_practice_passes,
+                lesson_exercise_submissions, kp_evidence,
                 lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments,
                 assessment_result_versions RESTART IDENTITY
                 """);
-        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "LISTEN", "Listening", 920,
-                List.of(new KnowledgePoint(KP, "LS_NUM", "Numbers", "PROCEDURE", "LISTENING", "d", true)))));
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "LISTEN", "Listening", 920, null,
+                List.of(new KnowledgePoint(KP, "LS_NUM", "Numbers", "PROCEDURE", "LISTENING", "d", true)),
+                LearningSkill.LISTENING, true)));
         when(content.getTopicLessons(TOPIC)).thenReturn(List.of(new LessonSummary(LESSON, TOPIC, "LS1", "Form", null,
                 1, List.of(KP), List.of(EXERCISE_BLOCK, ESSAY_BLOCK))));
         Asset audio = new Asset(UUID.randomUUID(), "AUDIO", "Caller: It is Thompson.", "listening/demo/ls1.mp3", 45,
@@ -150,11 +158,11 @@ class ReviewAndTestAssignmentIntegrationTest {
     // ---- reviews ----
 
     @Test
-    void reviewAssignsOneSetAtATimeMovesToUnusedPackagesAndSkipsAfterThreeFailedSets() {
+    void reviewAssignsUnusedPackagesAndSkipsWhenNoneRemain() {
         UUID review = pendingReview(USER);
-        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt())).thenAnswer(invocation -> {
+        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt(), eq(LESSON))).thenAnswer(invocation -> {
             List<UUID> excluded = invocation.getArgument(1);
-            return List.of(practice(PACKAGE_A), practice(PACKAGE_B)).stream()
+            return List.of(practice(PACKAGE_A)).stream()
                     .filter(set -> !excluded.contains(set.packageId())).toList();
         });
 
@@ -166,23 +174,26 @@ class ReviewAndTestAssignmentIntegrationTest {
         assertTrue(first.set().questions().stream().allMatch(question -> question.hint() == null));
         assertEquals(first.set().reviewSetId(), getReviewUseCase.execute(USER, review).set().reviewSetId());
 
+        // A failed set shows its solutions and transcript, then sends the review to the theory.
         ReviewSubmissionResult failed = submit(review, first.set().reviewSetId(), "B");
         assertEquals("PENDING", failed.reviewStatus());
-        assertNull(failed.results().getFirst().correctAnswer());
+        assertEquals("THEORY", failed.stage());
+        assertNotNull(failed.results().getFirst().correctAnswer());
         assertTrue(failed.results().stream().allMatch(answer -> answer.hint() == null));
-        assertNull(failed.transcript());
+        assertNotNull(failed.transcript());
 
-        ReviewResult second = getReviewUseCase.execute(USER, review);
-        assertEquals(PACKAGE_B, second.set().packageId());
-        assertEquals("PENDING", submit(review, second.set().reviewSetId(), "B").reviewStatus());
+        ReviewResult theory = getReviewUseCase.execute(USER, review);
+        assertNull(theory.set());
+        theoryCheck.execute(USER, review, new SubmitExerciseCommand(UUID.randomUUID(), theory.quickCheck().stream()
+                .map(question -> new SubmitExerciseCommand.Answer(question.questionVersionId(), "A")).toList()));
 
-        // Every package was used: the one given longest ago comes back.
+        // The only package has been revealed, so no further set is assigned.
         ReviewResult third = getReviewUseCase.execute(USER, review);
-        assertEquals(PACKAGE_A, third.set().packageId());
-        assertEquals("SKIPPED", submit(review, third.set().reviewSetId(), "B").reviewStatus());
+        assertEquals("SKIPPED", third.reviewStatus());
+        assertNull(third.set());
         assertEquals("SKIPPED", getReviewUseCase.execute(USER, review).reviewStatus());
         assertNull(getReviewUseCase.execute(USER, review).set());
-        assertEquals(9, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'review_set'",
+        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'review_set'",
                 Integer.class));
         // A skipped review no longer gates lessons.
         assertDoesNotThrow(() -> getLessonUseCase.execute(USER, LESSON));
@@ -191,7 +202,7 @@ class ReviewAndTestAssignmentIntegrationTest {
     @Test
     void passedSetFinishesTheReviewWithSolutionsAndTranscriptAndReplaysByRequestId() {
         UUID review = pendingReview(USER);
-        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt())).thenReturn(List.of(practice(PACKAGE_A)));
+        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt(), eq(LESSON))).thenReturn(List.of(practice(PACKAGE_A)));
         UUID set = getReviewUseCase.execute(USER, review).set().reviewSetId();
         UUID requestId = UUID.randomUUID();
 
@@ -213,7 +224,7 @@ class ReviewAndTestAssignmentIntegrationTest {
         var notFound = assertThrows(LearningRequestException.class, () -> getReviewUseCase.execute(OTHER_USER, review));
         assertEquals(404, notFound.getStatus());
 
-        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt())).thenReturn(List.of());
+        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt(), eq(LESSON))).thenReturn(List.of());
         ReviewResult skipped = getReviewUseCase.execute(USER, review);
         assertEquals("SKIPPED", skipped.reviewStatus());
         assertNull(skipped.set());
@@ -250,6 +261,63 @@ class ReviewAndTestAssignmentIntegrationTest {
         when(content.getTopicTestPackages(TOPIC)).thenReturn(List.of());
         var unavailable = assertThrows(LearningRequestException.class, () -> tests.execute(USER, TOPIC));
         assertEquals("TEST_UNAVAILABLE", unavailable.getCode());
+    }
+
+    @Test
+    void skillTracksKeepReviewsLocalAndPassWritingWithoutATest() {
+        UUID readingFirst = UUID.randomUUID();
+        UUID readingNext = UUID.randomUUID();
+        UUID writing = UUID.randomUUID();
+        UUID firstLesson = UUID.randomUUID();
+        UUID nextLesson = UUID.randomUUID();
+        UUID writingFirst = UUID.randomUUID();
+        UUID writingLast = UUID.randomUUID();
+        when(content.getTopicSequence()).thenReturn(List.of(
+                new Topic(readingFirst, "READ1", "Reading one", 1, null, List.of(), LearningSkill.READING, false),
+                new Topic(readingNext, "READ2", "Reading two", 2, null, List.of(), LearningSkill.READING, true),
+                new Topic(TOPIC, "LISTEN", "Listening", 3, null,
+                        List.of(new KnowledgePoint(KP, "LS_NUM", "Numbers", "PROCEDURE", "LISTENING", "d", true)),
+                        LearningSkill.LISTENING, true),
+                new Topic(writing, "WRITE", "Writing", 4, null, List.of(), LearningSkill.WRITING, false)));
+        when(content.getTopicLessons(readingFirst)).thenReturn(List.of(new LessonSummary(firstLesson, readingFirst,
+                "R1", "First", null, 1, List.of(), List.of())));
+        when(content.getTopicLessons(readingNext)).thenReturn(List.of(new LessonSummary(nextLesson, readingNext,
+                "R2", "Next", null, 1, List.of(), List.of())));
+        when(content.getTopicLessons(writing)).thenReturn(List.of(
+                new LessonSummary(writingFirst, writing, "W1", "Writing one", null, 1, List.of(), List.of()),
+                new LessonSummary(writingLast, writing, "W2", "Writing two", null, 2, List.of(), List.of())));
+        when(content.getLesson(firstLesson)).thenReturn(new Lesson(firstLesson, readingFirst, "R1", "First", null,
+                1, List.of(), List.of(), LearningSkill.READING));
+        when(content.getLesson(nextLesson)).thenReturn(new Lesson(nextLesson, readingNext, "R2", "Next", null,
+                1, List.of(), List.of(), LearningSkill.READING));
+        when(content.getLesson(writingFirst)).thenReturn(new Lesson(writingFirst, writing, "W1", "Writing one", null,
+                1, List.of(), List.of(), LearningSkill.WRITING));
+        when(content.getLesson(writingLast)).thenReturn(new Lesson(writingLast, writing, "W2", "Writing two", null,
+                2, List.of(), List.of(), LearningSkill.WRITING));
+
+        var initial = topics.execute(USER);
+        assertEquals(TopicStatus.IN_PROGRESS, initial.stream().filter(t -> t.topicId().equals(readingFirst))
+                .findFirst().orElseThrow().status());
+        assertEquals(TopicStatus.IN_PROGRESS, initial.stream().filter(t -> t.topicId().equals(TOPIC))
+                .findFirst().orElseThrow().status());
+        assertEquals(TopicStatus.IN_PROGRESS, initial.stream().filter(t -> t.topicId().equals(writing))
+                .findFirst().orElseThrow().status());
+        completeLessonUseCase.execute(USER, firstLesson);
+        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill) "
+                        + "VALUES (?, ?, ?, ?, 'PENDING', 'READING')",
+                UUID.randomUUID(), USER, UUID.randomUUID(), firstLesson);
+        var blocked = assertThrows(LearningGateException.class, () -> getLessonUseCase.execute(USER, nextLesson));
+        assertEquals("REVIEW_REQUIRED", blocked.getCode());
+        assertEquals("AVAILABLE", getLessonUseCase.execute(USER, LESSON).status());
+
+        completeLessonUseCase.execute(USER, writingFirst);
+        completeLessonUseCase.execute(USER, writingLast);
+        var after = topics.execute(USER);
+        assertEquals(TopicStatus.PASSED, after.stream().filter(t -> t.topicId().equals(writing))
+                .findFirst().orElseThrow().status());
+        var unavailable = assertThrows(LearningRequestException.class, () -> tests.execute(USER, writing));
+        assertEquals(409, unavailable.getStatus());
+        assertEquals("NO_TOPIC_TEST", unavailable.getCode());
     }
 
     // ---- helpers ----

@@ -12,7 +12,8 @@ import com.group01.learning.application.service.AnswerSheet;
 import com.group01.learning.application.service.LessonAccess;
 import com.group01.learning.application.service.LessonEvidenceReference;
 import com.group01.learning.application.service.LessonViewAssembler;
-import com.group01.learning.application.service.ReviewReevaluation;
+import com.group01.learning.application.service.PracticeProgress;
+import com.group01.learning.application.service.TopicCompletion;
 import com.group01.learning.domain.aggregate.LessonProgress;
 import com.group01.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.group01.learning.domain.repository.LessonProgressRepository;
@@ -31,7 +32,7 @@ import java.util.stream.Collectors;
 
 /**
  * Grades one exercise block. A {@code requestId} replays its saved response. Only the first submission of a block is
- * mastery evidence; a passed block reveals its solutions, and completing the lesson may insert reviews.
+ * mastery evidence; a passed block reveals its solutions.
  */
 @Service
 public class SubmitLessonExerciseUseCase {
@@ -42,21 +43,24 @@ public class SubmitLessonExerciseUseCase {
     private final ExerciseSubmissionLog submissions;
     private final KnowledgeEvidenceRepository evidence;
     private final LessonProgressRepository lessons;
-    private final ReviewReevaluation reviews;
+    private final PracticeProgress practice;
+    private final TopicCompletion topicCompletion;
     private final LessonViewAssembler view;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
     private final Clock clock = Clock.systemUTC();
 
     public SubmitLessonExerciseUseCase(LearnerLock lock, LessonAccess access, ExerciseSubmissionLog submissions,
                                        KnowledgeEvidenceRepository evidence, LessonProgressRepository lessons,
-                                       ReviewReevaluation reviews, LessonViewAssembler view) {
+                                       PracticeProgress practice, LessonViewAssembler view,
+                                       TopicCompletion topicCompletion) {
         this.lock = lock;
         this.access = access;
         this.submissions = submissions;
         this.evidence = evidence;
         this.lessons = lessons;
-        this.reviews = reviews;
+        this.practice = practice;
         this.view = view;
+        this.topicCompletion = topicCompletion;
     }
 
     @Transactional
@@ -130,7 +134,10 @@ public class SubmitLessonExerciseUseCase {
         if (!submissions.save(userId, lessonId, blockId, command, response)) throw requestConflict();
         boolean newlyCompleted = lessonCompleted && progress.complete(clock.instant());
         lessons.save(progress);
-        if (newlyCompleted) reevaluate(userId, lesson);
+        if (newlyCompleted) {
+            practice.refreshPassForLesson(userId, lesson.lessonId());
+            topicCompletion.onLessonCompleted(userId, lesson.topicId());
+        }
         return response;
     }
 
@@ -138,18 +145,6 @@ public class SubmitLessonExerciseUseCase {
         return lesson.blocks().stream().filter(Block::isExercise)
                 .flatMap(block -> block.questions().stream()).flatMap(question -> question.knowledgePointIds().stream())
                 .collect(Collectors.toSet());
-    }
-
-    /** Knowledge points answered wrong on the first try of any block are the ones a review may target. */
-    private void reevaluate(UUID userId, Lesson lesson) {
-        Map<UUID, List<UUID>> kpsByQuestion = lesson.blocks().stream()
-                .filter(Block::isExercise).flatMap(block -> block.questions().stream())
-                .collect(Collectors.toMap(Question::questionVersionId, Question::knowledgePointIds, (first, second) -> first));
-        Set<UUID> wrong = submissions.firstResponses(userId, lesson.lessonId()).stream()
-                .flatMap(submission -> submission.results().stream()).filter(result -> !result.correct())
-                .flatMap(result -> kpsByQuestion.getOrDefault(result.questionVersionId(), List.of()).stream())
-                .collect(Collectors.toSet());
-        reviews.execute(userId, new HashSet<>(lesson.knowledgePointIds()), wrong);
     }
 
     private static LearningRequestException requestConflict() {

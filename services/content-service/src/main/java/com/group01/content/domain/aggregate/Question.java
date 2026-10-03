@@ -3,6 +3,7 @@ package com.group01.content.domain.aggregate;
 import com.group01.content.domain.entity.QuestionVersion;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.domain.vo.QuestionType;
+import com.group01.content.domain.vo.QuestionPurpose;
 import com.group01.content.domain.vo.Skill;
 
 import java.time.Instant;
@@ -11,6 +12,7 @@ import java.util.*;
 public class Question {
 
     private final UUID id;
+    private final QuestionPurpose purpose;
     private QuestionType questionType;
     private Skill skill;
     private String requiredFeatureKey;
@@ -22,8 +24,9 @@ public class Question {
 
     public Question(UUID id, QuestionType questionType, Skill skill, String requiredFeatureKey,
             PublicationStatus status, UUID currentPublishedVersionId,
-            Instant createdAt, Instant updatedAt, List<QuestionVersion> versions) {
+            Instant createdAt, Instant updatedAt, List<QuestionVersion> versions, QuestionPurpose purpose) {
         this.id = Objects.requireNonNull(id, "id must not be null");
+        this.purpose = purpose != null ? purpose : QuestionPurpose.LEARNING;
         this.questionType = Objects.requireNonNull(questionType, "questionType must not be null");
         this.skill = skill;
         this.requiredFeatureKey = requiredFeatureKey;
@@ -35,9 +38,14 @@ public class Question {
     }
 
     public static Question create(QuestionType questionType, Skill skill, String requiredFeatureKey) {
+        return create(questionType, skill, requiredFeatureKey, QuestionPurpose.LEARNING);
+    }
+
+    public static Question create(QuestionType questionType, Skill skill, String requiredFeatureKey,
+                                  QuestionPurpose purpose) {
         Instant now = Instant.now();
         return new Question(UUID.randomUUID(), questionType, skill, requiredFeatureKey,
-                PublicationStatus.DRAFT, null, now, now, new ArrayList<>());
+                PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), purpose);
     }
 
     public void publishVersion(UUID versionId) {
@@ -63,6 +71,10 @@ public class Question {
 
     public UUID getId() {
         return id;
+    }
+
+    public QuestionPurpose getPurpose() {
+        return purpose;
     }
 
     public QuestionType getQuestionType() {

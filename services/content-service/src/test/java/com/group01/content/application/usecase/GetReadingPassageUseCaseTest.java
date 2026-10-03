@@ -52,7 +52,7 @@ class GetReadingPassageUseCaseTest {
         ContentPackageVersion version = new ContentPackageVersion(versionId, packageId, 1, PublicationStatus.PUBLISHED,
                 "{}", 1, Instant.now(), null, Instant.now(), Instant.now(), List.of(section));
         return new ContentPackage(packageId, "CODE", "Practice set", type, null, status, publishedVersionId,
-                Instant.now(), Instant.now(), List.of(version));
+                Instant.now(), Instant.now(), List.of(version), null);
     }
 
     private static ContentAsset asset(AssetType type, String text) {

@@ -34,7 +34,8 @@ public class ContentPackagePersistenceMapper {
                 entity.getCurrentPublishedVersionId(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
-                versions
+                versions,
+                entity.getLessonId()
         );
     }
 
@@ -54,6 +55,7 @@ public class ContentPackagePersistenceMapper {
                 .requiredFeatureKey(domain.getRequiredFeatureKey())
                 .status(domain.getStatus())
                 .currentPublishedVersionId(domain.getCurrentPublishedVersionId())
+                .lessonId(domain.getLessonId())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .versions(versionEntities)

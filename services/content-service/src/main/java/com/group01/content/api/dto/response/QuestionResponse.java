@@ -5,6 +5,7 @@ import com.group01.content.api.dto.AccessLevel;
 import com.group01.content.application.result.QuestionResult;
 import com.group01.content.domain.vo.PublicationStatus;
 import com.group01.content.domain.vo.QuestionType;
+import com.group01.content.domain.vo.QuestionPurpose;
 import com.group01.content.domain.vo.Skill;
 
 import java.time.Instant;
@@ -18,7 +19,8 @@ public record QuestionResponse(
         PublicationStatus status,
         UUID currentPublishedVersionId,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        QuestionPurpose purpose
 ) {
     public static QuestionResponse from(QuestionResult result) {
         return new QuestionResponse(
@@ -29,7 +31,8 @@ public record QuestionResponse(
                 result.status(),
                 result.currentPublishedVersionId(),
                 result.createdAt(),
-                result.updatedAt()
+                result.updatedAt(),
+                result.purpose()
         );
     }
 }

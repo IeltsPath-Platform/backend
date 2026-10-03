@@ -5,15 +5,14 @@ import com.group01.learning.application.port.LearnerLock;
 import com.group01.learning.application.port.LearningContentClient.Block;
 import com.group01.learning.application.port.LearningContentClient.Lesson;
 import com.group01.learning.application.service.LessonAccess;
-import com.group01.learning.application.service.ReviewReevaluation;
+import com.group01.learning.application.service.PracticeProgress;
+import com.group01.learning.application.service.TopicCompletion;
 import com.group01.learning.domain.aggregate.LessonProgress;
 import com.group01.learning.domain.repository.LessonProgressRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 
 /** Completes a lesson that has no exercise block; idempotent. */
@@ -22,15 +21,17 @@ public class CompleteLessonUseCase {
     private final LearnerLock lock;
     private final LessonAccess access;
     private final LessonProgressRepository lessons;
-    private final ReviewReevaluation reviews;
+    private final PracticeProgress practice;
+    private final TopicCompletion topicCompletion;
     private final Clock clock = Clock.systemUTC();
 
     public CompleteLessonUseCase(LearnerLock lock, LessonAccess access, LessonProgressRepository lessons,
-                                 ReviewReevaluation reviews) {
+                                 PracticeProgress practice, TopicCompletion topicCompletion) {
         this.lock = lock;
         this.access = access;
         this.lessons = lessons;
-        this.reviews = reviews;
+        this.practice = practice;
+        this.topicCompletion = topicCompletion;
     }
 
     @Transactional
@@ -44,7 +45,8 @@ public class CompleteLessonUseCase {
         LessonProgress progress = access.refresh(userId, lesson, context.progress());
         if (progress.complete(clock.instant())) {
             lessons.save(progress);
-            reviews.execute(userId, new HashSet<>(lesson.knowledgePointIds()), Set.of());
+            practice.refreshPassForLesson(userId, lesson.lessonId());
+            topicCompletion.onLessonCompleted(userId, lesson.topicId());
         }
         return lessonId;
     }

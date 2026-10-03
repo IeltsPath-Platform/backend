@@ -1,8 +1,8 @@
 ---
 type: service-architecture
 version: V3
-status: target-design
-updated: 2026-10-02
+status: current
+updated: 2026-10-03
 scope: IELTSPath MVP
 ---
 # Backend Service Architecture — IELTSPath V3
@@ -19,25 +19,18 @@ Tài liệu này chỉ mô tả:
 
 Chi tiết schema cột, index, constraint và thuật toán nghiệp vụ nằm trong tài liệu Database/Spec tương ứng, không mô tả sâu tại đây.
 
-V2 có hai thay đổi kiến trúc chính so với V1: `ai-assistant-service` bị loại bỏ và năng lực AI/adaptive được gom vào `ai-learning-service` chạy Python/FastAPI + DeepTutor; đồng thời learner-owned utility data (activity, streak, video progress, note, flashcard) từng được tách ra một service hỗ trợ học viên, đã gỡ khi triển khai V3. Nguyên tắc database-per-service vẫn giữ nguyên.
+Đối chiếu với code ngày 2026-10-03. Các thay đổi đã triển khai so với thiết kế V2:
 
-**V3 (thiết kế đích; phần chia service đã triển khai 2026-10-01)** có ba thay đổi so với V2:
+1. **Tách service (2026-10-01).** `library-service` nhận catalog từ vựng và video từ content, cùng thư viện học cá nhân
+   (flashcard, note, tiến độ video). Activity và streak chuyển sang `user-service`. Service hỗ trợ học viên cũ đã gỡ.
+2. **Learning Service Java (2026-10-01).** `learning-service` (`learning_db`) thay `ai-learning-service` Python; không có
+   tutor runtime. Chỉ công thức mastery được port.
+3. **Học theo topic → bài, theo skill (2026-10-03).** Content có bài học, topic mang một skill, đề Practice gắn bài;
+   Learning giữ lộ trình theo skill, tiến độ, Practice, thang ôn tập và giao mã đề cuối; Assessment tự chấm đề cuối.
+4. **Bỏ band ở knowledge point.** Listening (audio do team upload, Content ghép URL) và Writing trong bài đã chạy.
 
-1. **Tách service (đã triển khai).** `library-service` nhận catalog từ vựng và video từ content, cùng thư viện học cá nhân (flashcard, note, tiến độ video). Service hỗ trợ học viên cũ đã gỡ; activity và streak chuyển sang `user-service`.
-2. **Học theo topic → bài.** Content có bài học; ai-learning giữ thứ tự học, tiến độ, luyện thêm và ôn bằng gói câu mới, giao mã đề cuối; assessment tự chấm đề cuối topic.
-3. **Bỏ band ở knowledge point.**
-
-Phần chia service đã triển khai qua các commit `465f543`, `0da2eb2`, `d762660`, `fec5d14`, `ab613b1`.
-Các mục học theo topic và bỏ band vẫn là thiết kế đích của V3, không được suy là đã triển khai từ các commit này.
-
-Bổ sung 2026-09-30, đã triển khai: **Listening** đi trọn luồng học (bài nghe, gói luyện và đề cuối có audio), không thêm
-service, database hay bảng. Runtime học hiện tại là Learning Service Java, không phải Python/DeepTutor ở baseline bên dưới.
-Gói luyện chọn theo độ khó **hoãn ngoài MVP**. Audio mp3 do team upload lên bucket public-read;
-DB lưu key hoặc URL `https://`, Content là nơi duy nhất resolve thành URL.
-
-Nguồn: `plans/260929-1640-lesson-learning-pipeline-mvp/plan.md`, `plans/260930-0851-listening-topic-audio-lessons/plan.md`,
-`plans/260930-2057-mvp-reading-writing-listening-roadmap/plan.md` (plan tài liệu chia service cũ ở git history, commit `6506d5e`); **chia service thuộc MVP** (chốt 2026-10-01);
-schema ở `DATABASE_V5.md` V5.1, V5.2, V5.3. Vẫn 9 business service và 9 database.
+Nguồn: `plans/261002-1600-skill-tracks-practice-remediation/plan.md`, `plans/260929-1640-lesson-learning-pipeline-mvp/plan.md`,
+`plans/260930-0851-listening-topic-audio-lessons/plan.md`; schema ở `DATABASE_V5.md`.
 
 ---
 
@@ -59,7 +52,7 @@ backend/
     ├── access-service/           # Java + Spring Boot
     ├── content-service/          # Java + Spring Boot
     ├── assessment-service/       # Java + Spring Boot
-    ├── ai-learning-service/      # Python + FastAPI + DeepTutor
+    ├── learning-service/         # Java + Spring Boot; lộ trình, bài học, Practice, bài ôn
     ├── library-service/          # Java + Spring Boot; catalog và thư viện cá nhân
     ├── game-service/             # Java + Spring Boot
     ├── notification-service/     # Java + Spring Boot
@@ -78,8 +71,8 @@ Tổng cộng:
 Không còn:
 
 ```text
-ai-assistant-service
-ai_assistant_db
+ai-assistant-service, ai_assistant_db
+ai-learning-service (Python), ai_learning_db
 dịch vụ hỗ trợ học viên cũ (đã gỡ; dữ liệu mới thuộc user_db và library_db)
 ```
 
@@ -87,27 +80,21 @@ dịch vụ hỗ trợ học viên cũ (đã gỡ; dữ liệu mới thuộc use
 
 # 3. Service và database ownership
 
-| Service                  | Technology                   | Database            | Số business tables | Trách nhiệm chính                                                                                                                   |
-| :----------------------- | :--------------------------- | :------------------ | ------------------: | :------------------------------------------------------------------------------------------------------------------------------------- |
-| `user-service`         | Java + Spring Boot           | `user_db`         |                  11 | Identity, role, profile, learning goal, hồ sơ người chấm, activity, streak                                                        |
-| `access-service`       | Java + Spring Boot           | `access_db`       |                   8 | Plan, subscription, Premium, activation key, point                                                                                     |
-| `content-service`      | Java + Spring Boot           | `content_db`      |                  16 | Curriculum, knowledge point, question bank, gói đề, bài học                                                                       |
-| `assessment-service`   | Java + Spring Boot           | `assessment_db`   |                  13 | Formal assessment, đề cuối topic tự chấm, result, error analysis, Writing/Speaking grading                                        |
-| `ai-learning-service`  | Python + FastAPI + DeepTutor | `ai_learning_db`  |                  22 | DeepTutor mastery, tutor runtime, question-level review, luồng học bài (thứ tự học, tiến độ, luyện thêm/ôn, giao mã đề) |
-| `library-service`      | Java + Spring Boot           | `library_db`      |                  11 | Catalog từ vựng, video; flashcard, note, tiến độ video, đoạn video đã lưu                                                    |
-| `game-service`         | Java + Spring Boot           | `game_db`         |                  11 | Learning game, realtime room/match, quiz event, leaderboard                                                                            |
-| `notification-service` | Java + Spring Boot           | `notification_db` |                   5 | Notification, reminder, push delivery                                                                                                  |
-| `community-service`    | Java + Spring Boot           | `community_db`    |                   3 | Post, comment, reaction                                                                                                                |
+| Service | Technology | Database | Bảng nghiệp vụ | Trách nhiệm chính |
+| :--- | :--- | :--- | ---: | :--- |
+| `user-service` | Java + Spring Boot | `user_db` | 10 | Identity, role, profile, learning goal, activity, streak |
+| `access-service` | Java + Spring Boot | `access_db` | 8 | Plan, subscription, Premium, activation key, point |
+| `content-service` | Java + Spring Boot | `content_db` | 17 | Curriculum, topic theo skill, knowledge point, question bank, gói đề, bài học |
+| `assessment-service` | Java + Spring Boot | `assessment_db` | 15 | Formal assessment, đề cuối topic tự chấm, result, error analysis, grading |
+| `learning-service` | Java + Spring Boot | `learning_db` | 14 | Lộ trình theo skill, tiến độ bài, Practice, thang ôn tập, mastery, giao mã đề, chấm Writing trong bài |
+| `library-service` | Java + Spring Boot | `library_db` | 11 | Catalog từ vựng, video; flashcard, note, tiến độ video, đoạn video đã lưu |
+| `game-service` | Java + Spring Boot | `game_db` | 11 | Learning game, realtime room/match; quiz/leaderboard (bảng có, chưa có API) |
+| `notification-service` | Java + Spring Boot | `notification_db` | 0 | Chưa triển khai (khung package); thiết kế 5 bảng |
+| `community-service` | Java + Spring Boot | `community_db` | 3 | Post, comment, reaction |
 
-Tổng (toàn bộ thiết kế đích V3; phần chia service đã triển khai):
-
-```text
-100 business tables
-+ 7 outbox_events
-= 107 physical tables
-```
-
-Service có phát event giữ một `outbox_events` riêng. V3: `library_db` và `notification_db` không có outbox (chưa có consumer cho event của hai service này). Số bảng AI Learning tính theo `DATABASE_V5.md` §7.1–§7.13, §7.18–§7.26; các bảng snapshot và ingest kết quả thi (§7.15, §7.17) không tính vào con số này.
+Tổng theo migration: **89 bảng nghiệp vụ + 5 `outbox_events` = 94 bảng** (access, content, assessment, game, community
+có outbox; user, learning, library, notification không có). Learning nhận `AssessmentCompleted.v2` qua RabbitMQ, chưa
+phát event nào.
 
 ---
 
@@ -148,11 +135,12 @@ learner_profiles
 oauth_identities
 account_action_tokens
 learning_goals
-examiner_profiles        (V3)
+examiner_profiles        (thiết kế, chưa có migration)
 learning_activities      (V3, từ learning-support)
 streaks                  (V3, từ learning-support)
-outbox_events
 ```
+
+`user_db` chưa có `outbox_events`.
 
 `user-service` không sở hữu subscription, point hoặc Premium entitlement. Learning goal từ V3 chỉ để hiển thị và nhắc học; không dùng để tạo path. Route công khai `/api/learning-support/{activities,streak}/**` giữ nguyên, Gateway trỏ về `user-service`.
 
@@ -205,10 +193,11 @@ Các service khác chỉ giữ logical reference đến subscription/ledger khi 
 IELTS curriculum
 Topic
 Knowledge Point
-Lesson / lesson block                    (V3)
+Topic có một skill (LISTENING/READING/WRITING/SPEAKING)
+Lesson / lesson block, KP mà khối TEXT dạy
 Content package / version
-Topic test (TOPIC_TEST, nhiều mã đề)     (V3)
-Practice set làm ngân hàng câu ôn        (V3)
+Topic test (TOPIC_TEST, nhiều mã đề)
+Practice set gắn một bài (cũng là kho set ôn)
 Question Bank
 Question ↔ Knowledge Point mapping
 Media asset (audio Listening: key file trên object storage + transcript)
@@ -225,8 +214,7 @@ topics / knowledge_points
 = curriculum taxonomy + canonical KP metadata
 
 knowledge_points.learning_type
-= MEMORY | CONCEPT | PROCEDURE | DESIGN
-= map 1:1 sang DeepTutor KnowledgeType
+= MEMORY | CONCEPT | PROCEDURE | DESIGN (metadata, không điều khiển mastery)
 ACTIVE Knowledge Point bắt buộc có learning_type; `kind` là phân loại content riêng
 
 required_feature_key
@@ -243,13 +231,23 @@ knowledge_points (V3)
 content_packages.topic_id (V3)
 = mã đề TOPIC_TEST gắn topic; một topic nhiều mã đề
 
-lessons / lesson_blocks (V3)
-= nội dung bài học; bài biết câu hỏi qua lesson_block_questions,
-  dạy KP qua lesson_knowledge_points
-= content không giữ tiến độ học viên; khóa/mở bài do ai-learning quyết định
+topics.skill (Content V15)
+= một skill mỗi topic, bài thừa hưởng; khóa đổi khi đã có bài PUBLISHED (409 TOPIC_SKILL_LOCKED)
 
-/internal/learning-content/* (V3)
-= endpoint nội bộ cho ai-learning và assessment, trả cả answer_spec;
+lessons / lesson_blocks
+= nội dung bài học; bài biết câu hỏi qua lesson_block_questions,
+  dạy KP qua lesson_knowledge_points; khối TEXT dạy KP qua lesson_block_knowledge_points (V16)
+= content không giữ tiến độ học viên; khóa/mở bài do learning-service quyết định
+
+content_packages.lesson_id (V16)
+= PRACTICE_SET thuộc Practice của một bài
+
+questions.purpose (V17) + một câu một chủ
+= LEARNING (bài, Practice, đề cuối topic) hoặc EXAM (thi thử, xếp lớp);
+  publish chặn câu đã thuộc nơi khác (422 QUESTION_ALREADY_USED) hoặc sai purpose (422 QUESTION_PURPOSE_MISMATCH)
+
+/internal/learning-content/*
+= endpoint nội bộ cho learning-service và assessment, trả cả answer_spec;
   Gateway chặn /internal/**
 
 content_assets AUDIO (V3, bổ sung 2026-09-30)
@@ -298,6 +296,7 @@ lesson_blocks                  (V3)
 lesson_block_vocabulary        (V3)
 lesson_block_questions         (V3)
 lesson_knowledge_points        (V3)
+lesson_block_knowledge_points  (V16)
 
 outbox_events
 ```
@@ -307,9 +306,9 @@ V3 chuyển sang `library-service`: `vocabulary_items`, `vocabulary_senses`, `le
 Listening đã triển khai, không thêm bảng: dùng `content_assets` (AUDIO), khối `ASSET` của `lesson_blocks` và section
 `skill = LISTENING` có sẵn. Content trả `mediaUrl` từ key + `CONTENT_MEDIA_BASE_URL` hoặc giữ nguyên URL `https://`;
 transcript nằm ở `text_content`, chỉ đi qua API nội bộ hoặc API asset dành cho `ADMIN`/`CONTENT_AUTHOR`.
-Seed có một gói luyện mỗi KP; chọn gói theo độ khó (`DATABASE_V5.md` §5.18) hoãn ngoài MVP.
+Seed có một gói luyện mỗi KP Listening (chưa có mp3 mới); Reading có ít nhất hai đề Practice mỗi bài (V18). Chọn gói theo độ khó (`DATABASE_V5.md` §5.18) hoãn ngoài MVP.
 
-`ai-learning-service` có thể đọc curriculum/content qua API/tool adapter nhưng không sở hữu bản canonical của các bảng này.
+`learning-service` đọc curriculum/content qua `/internal/learning-content/*` nhưng không sở hữu bản canonical của các bảng này.
 
 ---
 
@@ -364,11 +363,11 @@ outbox_events
 
 Point vẫn thuộc `access-service`; grading chỉ giữ logical reference tới point ledger/subscription khi cần.
 
-Kết quả assessment được publish qua integration event cho `ai-learning-service`; Assessment không ghi trực tiếp vào `ai_learning_db`.
+Kết quả assessment được publish qua `AssessmentCompleted.v2` cho `learning-service`; Assessment không ghi trực tiếp vào `learning_db`.
 
 V3 (không đổi bảng):
 
-- **Tạo attempt:** app chỉ gửi `packageVersionId`. Assessment lấy đề và đáp án từ content (`/internal/learning-content/package-versions/{id}`) và tự suy `attempt_type` từ loại gói. `PRACTICE_SET` bị từ chối, vì gói ôn chấm ở ai-learning.
+- **Tạo attempt:** app chỉ gửi `packageVersionId`. Assessment lấy đề và đáp án từ content (`/internal/learning-content/package-versions/{id}`) và tự suy `attempt_type` từ loại gói. `PRACTICE_SET` bị từ chối, vì Practice và set ôn chấm ở learning-service.
 - **Đáp án:** nằm trong `attempt_items.answer_snapshot`, không bao giờ trả cho học viên.
 - **Nộp bài:** câu khách quan được tự chấm; kết quả `COMPLETED` và outbox cùng transaction. Lời giải chỉ trả khi ≥ 70%.
 - **Không gọi user-service:** `AssessmentCompleted.v2` có `package_version_id`, `learning_goal_id` null.
@@ -380,142 +379,58 @@ V3 (không đổi bảng):
 
 ---
 
-# 8. `ai-learning-service`
+# 8. `learning-service`
 
 ## 8.1 Technology
 
 ```text
-Python
-FastAPI
-DeepTutor
-PostgreSQL
+Java 21 + Spring Boot 3.5, JDBC (NamedParameterJdbcTemplate), Flyway, Spring AMQP (consumer)
 ```
 
 ## 8.2 Trách nhiệm
 
-`ai-learning-service` chỉ sở hữu **Adaptive Learning / AI Tutor core**. Service này không quản lý note, flashcard, streak hay video progress.
-
 ```text
-DeepTutor Mastery Path
-Learner adaptive state
-Mastery / evidence / retention state
-Next learning objective
-Tutor session runtime
-Tutor interaction / deterministic grading
-Question Notebook history used by Tutor
-Question-level mistake/review practice
-RAG / tutor memory integration ở runtime
-Formal assessment evidence ingestion
-
-Luồng học bài (V3):
-Thứ tự học theo topic (topic có bài và có đề, theo sort_order)
-Cổng mở bài (khóa tuần tự, bài ôn đang chờ)
-Chấm bài tập theo answer_spec, giấu đáp án tới khi đạt
-Luyện thêm / ôn bắt buộc bằng gói PRACTICE_SET câu mới
-Chọn gói luyện: gói chưa giao có câu đo KP, hết thì gói giao lâu nhất; KP không có gói thì không chèn bài ôn
-  (chọn theo dạng câu và độ khó hoãn ngoài MVP)
-Giao mã đề cuối (mỗi lần giao dùng một lần), nhận kết quả đề qua event
-Listening (đã triển khai ở Learning Service Java): chuyển mediaUrl đã resolve; transcript chỉ hiện khi bài hoàn thành hoặc review set đạt ≥70%
+Lộ trình topic theo skill (mỗi skill một topic IN_PROGRESS)
+Cổng bài học, nộp bài tập, gợi ý câu sai
+Practice theo bài: catalog, attempt, lời giải sau khi nộp
+Bài qua Practice (điều kiện thi cuối)
+Thang ôn tập: set có hint → lý thuyết của KP + quick-check → set mới chưa lộ → SKIPPED
+Mastery theo KP (công thức port từ DeepTutor v1.6.9, tính khi đọc)
+Giao mã đề cuối topic; topic không có đề cuối đạt khi xong bài
+Chấm Writing trong bài bằng LLM (hạn mức ngày, trừ point qua access)
+Consumer AssessmentCompleted.v2 (không gọi HTTP)
 ```
 
-DeepTutor là adaptive learning authority duy nhất; không tồn tại Java Adaptive Engine hoặc planner thứ hai chạy song song. V3: con số mastery do DeepTutor core tính. Luật luồng học (khóa bài, chèn luyện thêm/ôn khi KP dưới ngưỡng và có câu sai) là code riêng của IELTSPath, đặt ngoài `app/mastery`. Path một mỗi học viên, tạo theo `sort_order`, không goal, không LLM.
+Không có tutor runtime, RAG, learner memory hay planner. Mọi lượt ghi của học viên mở đầu bằng `pg_advisory_xact_lock`.
 
-## 8.3 Internal boundary
+## 8.3 Database
 
 ```text
-ai-learning-service/
-├── mastery/
-├── tutor-runtime/
-├── practice/
-├── integrations/
-│   ├── content/
-│   ├── assessment/
-│   └── user/
-├── rag/
-└── memory/
+learning_db
 ```
 
-## 8.4 Database
+## 8.4 Bảng sở hữu
 
 ```text
-ai_learning_db
-```
-
-## 8.5 Bảng sở hữu
-
-### DeepTutor Mastery Core
-
-```text
-mastery_paths
-mastery_path_sessions
-mastery_interactions
-mastery_events
-mastery_learning_evidence
-mastery_path_leases
-```
-
-### Tutor/session runtime
-
-```text
-sessions
-messages
-turns
-turn_events
-```
-
-### Question-level mistake/review practice
-
-```text
-notebook_entries
-practice_review_state
-practice_review_events
-```
-
-### Tutor memory / material / hạn mức LLM
-
-```text
-learner_memory
-session_materials
-llm_daily_usage
-```
-
-### Luồng học bài (V5.1, sửa V5.2)
-
-```text
+knowledge_point_catalog
 topic_progress
 lesson_progress
 lesson_exercise_submissions
-path_review_items
-path_review_sets          (V5.2)
-topic_test_assignments    (V5.2)
+review_items
+review_sets
+topic_test_assignments
+kp_evidence
+assessment_result_versions
+lesson_writing_submissions     (V2)
+llm_daily_usage                (V2)
+practice_attempts              (V4)
+lesson_practice_passes         (V4)
+review_theory_checks           (V5)
 ```
 
-### Integration outbox
-
-```text
-outbox_events
-```
-
-Không còn các bảng Adaptive Engine V1:
-
-```text
-mastery_records
-review_events
-topic_gate_attempts
-daily_plans
-daily_tasks
-mistake_notebook_entries
-```
-
-`topic_progress` quay lại từ V5.1 nhưng chỉ lưu học viên đã học tới topic nào; mastery vẫn do DeepTutor core giữ. V5.2 xóa `mastery_path_knowledge_point_bands`.
-
-Không còn:
-
-```text
-ai_conversations
-ai_messages
-ai_assistant_db
-```
+V3 thêm `skill` cho `topic_progress`, `knowledge_point_catalog`, `review_items` và `has_topic_test`; V4 thêm
+`trigger_kind`, `source_attempt_id` và source evidence `practice_set`; V5 thêm stage của bài ôn. Chi tiết ở
+`DATABASE_V5.md` §7 và `.sdd/database/mvp-database.md`. Không có `outbox_events`.
 
 ---
 
@@ -544,7 +459,7 @@ Flashcards
 Deck membership
 ```
 
-`library-service` không tính mastery, không chọn `next_objective()` và không chạy scheduler/policy của DeepTutor. Catalog chỉ `ADMIN`, `CONTENT_AUTHOR` ghi; thư viện cá nhân do chủ sở hữu ghi.
+`library-service` không tính mastery và không quyết định thứ tự học hay bài ôn. Catalog chỉ `ADMIN`, `CONTENT_AUTHOR` ghi; thư viện cá nhân do chủ sở hữu ghi.
 
 ## 9.3 Database
 
@@ -603,7 +518,7 @@ Quiz participation
 Leaderboard period / entry
 ```
 
-Game không trực tiếp thay đổi DeepTutor mastery state. Nếu sau này game result được dùng làm learning evidence thì phải đi qua integration contract với `ai-learning-service`.
+Game không ghi bằng chứng mastery. Nếu sau này kết quả game được dùng làm bằng chứng học thì phải đi qua integration contract với `learning-service`.
 
 V3:
 
@@ -751,7 +666,7 @@ Spring Security conventions
 Shared authorization utilities
 ```
 
-`ai-learning-service` là Python nên không import Java library này. Python service tuân theo cùng JWT/JWKS/security contract bằng implementation riêng.
+Mọi business service hiện là Java và dùng chung thư viện này.
 
 ## 14.2 `event-contracts`
 
@@ -772,7 +687,7 @@ LearningProgressUpdated.v1
 NotificationRequested.v1
 ```
 
-Java và Python cùng serialize/validate theo contract; không chia sẻ Java DTO trực tiếp.
+Producer và consumer cùng serialize/validate theo contract; không chia sẻ Java DTO trực tiếp.
 
 ---
 
@@ -806,7 +721,7 @@ assessment_db.grading_jobs.user_id
 hoặc:
 
 ```text
-ai_learning_db.mastery_learning_evidence.knowledge_point_id
+learning_db.kp_evidence.kp_id
 → logical reference tới content_db.knowledge_points.id
 → KHÔNG physical FK
 ```
@@ -822,10 +737,13 @@ Dùng khi caller cần kết quả ngay.
 Ví dụ:
 
 ```text
-ai-learning-service → content-service
-get topic / KP / reading material (API công khai)
+learning-service → content-service
 /internal/learning-content/*: topic-sequence, topics/{id}/lessons, lessons/{id},
-topics/{id}/test-packages, practice-sets/search, package-versions/{id}      (V3)
+lessons/{id}/practice-sets, topics/{id}/practice-sets, topics/{id}/test-packages,
+practice-sets/search, practice-sets/availability, package-versions/{id}
+
+learning-service → access-service
+số dư point, trừ point sau khi chấm Writing
 
 assessment-service → content-service
 /internal/learning-content/package-versions/{id}: đề + đáp án khi tạo attempt   (V3)
@@ -840,7 +758,7 @@ assessment-service → access-service
 validate/debit point hoặc validate Premium khi workflow yêu cầu
 ```
 
-V3 bỏ theo thiết kế: `ai-learning-service → user-service` (path không còn dùng goal), `assessment-service → user-service` (không tra goal). Service hỗ trợ học viên cũ đã gỡ nên không còn gọi Content. `ai-learning-service → access-service` (kiểm premium theo topic) hoãn khỏi MVP. Gọi nội bộ forward bearer của request; Gateway chặn `/internal/**`.
+Không có `learning-service → user-service` (lộ trình không dùng goal) hay `assessment-service → user-service`. Kiểm premium theo topic khi học hoãn khỏi MVP. Gọi nội bộ forward bearer của request; Gateway chặn `/internal/**`.
 
 ## 16.2 Asynchronous event
 
@@ -851,19 +769,19 @@ Ví dụ:
 ```text
 assessment-service
 → AssessmentCompleted.v2 (V3: có package_version_id, learning_goal_id null)
-→ ai-learning-service
+→ learning-service
    (topic lấy từ topic_test_assignments; không gọi HTTP khi xử lý event)
 
-ai-learning-service
-→ LearningActivityRecorded / TutorSessionCompleted
-→ user-service (V3; service hỗ trợ học viên cũ đã gỡ)
+learning-service
+→ LearningActivityRecorded (dự kiến)
+→ user-service
 
 access-service
 → SubscriptionChanged
 → interested consumers
 
-ai-learning-service
-→ LearningProgressUpdated
+learning-service
+→ LearningProgressUpdated (dự kiến)
 → notification-service
 
 user-service
@@ -892,8 +810,8 @@ content-service
 assessment-service
 └── assessment_db
 
-ai-learning-service
-└── ai_learning_db
+learning-service
+└── learning_db
 
 library-service
 └── library_db
@@ -913,35 +831,33 @@ Không có shared business database.
 Không có (DB hỗ trợ học viên cũ đã gỡ):
 
 ```text
-ai_assistant_db
+ai_assistant_db, ai_learning_db
 ```
 
 ---
 
-# 18. Baseline V3 (thiết kế đích)
+# 18. Kiểm kê hiện tại
 
 ```text
-Business services:     9
-Business databases:    9
-Business tables:     100
-Outbox tables:         7
-Physical tables:     107
+Business services:     9 (notification chỉ là khung)
+Business databases:    8 có migration (notification chưa có)
+Business tables:      89
+Outbox tables:         5
+Physical tables:      94
 ```
-
-V2 (baseline 2026-09-22): 9 service, 85 business table, 9 outbox, 94 bảng vật lý. Phần chênh lệch đến từ bảng bài học (V5.1/V5.2), hồ sơ người chấm, bảng tutor memory/hạn mức, và việc bỏ outbox của library/notification.
 
 Source of truth theo domain:
 
 ```text
-user_db        → identity/profile/learning goal/examiner profile/activity/streak
+user_db        → identity/profile/learning goal/activity/streak
 access_db      → entitlement/subscription/point
 content_db     → canonical IELTS content, bài học, đề cuối topic, gói luyện tập
 assessment_db  → formal assessment/grading
-ai_learning_db → DeepTutor mastery / tutor state / tiến độ học bài
+learning_db    → lộ trình theo skill, tiến độ bài, Practice, bài ôn, bằng chứng mastery, giao mã đề
 library_db     → catalog từ vựng, video / thư viện học cá nhân
 game_db        → game/quiz/leaderboard
 notification_db→ notification/reminder
 community_db   → community content
 ```
 
-Đây là boundary chính của Backend Service Architecture V3. Chi tiết cấu trúc từng bảng nằm trong `DATABASE_V5.md`.
+Đây là boundary chính của backend. Chi tiết cấu trúc từng bảng nằm trong `DATABASE_V5.md`.

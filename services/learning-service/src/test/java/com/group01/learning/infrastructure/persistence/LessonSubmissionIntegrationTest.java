@@ -16,6 +16,7 @@ import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.repository.KnowledgePointCatalogRepository;
 import com.group01.learning.domain.repository.LearnerCurriculumRepository;
 import com.group01.learning.domain.vo.KnowledgePointCatalogEntry;
+import com.group01.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -106,15 +107,16 @@ class LessonSubmissionIntegrationTest {
     @BeforeEach
     void resetDataAndCurriculum() {
         jdbc.execute("""
-                TRUNCATE review_sets, review_items, lesson_exercise_submissions, kp_evidence,
+                TRUNCATE review_theory_checks, review_sets, review_items, practice_attempts, lesson_practice_passes,
+                lesson_exercise_submissions, kp_evidence,
                 lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments,
                 assessment_result_versions RESTART IDENTITY
                 """);
         when(content.getTopicSequence()).thenReturn(List.of(
-                new LearningContentClient.Topic(TOPIC, "FIRST", "First topic", 900,
-                        List.of(knowledgePoint(KP, true))),
-                new LearningContentClient.Topic(OTHER_TOPIC, "SECOND", "Second topic", 910,
-                        List.of(knowledgePoint(OTHER_KP, false)))));
+                new LearningContentClient.Topic(TOPIC, "FIRST", "First topic", 900, null,
+                        List.of(knowledgePoint(KP, true)), LearningSkill.READING, true),
+                new LearningContentClient.Topic(OTHER_TOPIC, "SECOND", "Second topic", 910, null,
+                        List.of(knowledgePoint(OTHER_KP, false)), LearningSkill.READING, true)));
         when(content.getTopicLessons(TOPIC)).thenReturn(List.of(
                 new LearningContentClient.LessonSummary(LESSON, TOPIC, "L1", "First lesson", null,
                         1, List.of(KP), List.of(BLOCK))));
@@ -287,7 +289,7 @@ class LessonSubmissionIntegrationTest {
     }
 
     @Test
-    void failedFirstAttemptThenCorrectRetryCompletesLessonAndReplaysAfterReviewGate() {
+    void failedFirstAttemptThenCorrectRetryCompletesLessonAndReplays() {
         topics.execute(USER);
         UUID firstRequest = UUID.randomUUID();
         SubmissionResult failed = submitLessonExerciseUseCase.execute(USER, LESSON, BLOCK, command(firstRequest, "B"));
@@ -311,9 +313,8 @@ class LessonSubmissionIntegrationTest {
         assertEquals("lesson_exercise", jdbc.queryForObject("SELECT source FROM kp_evidence", String.class));
         assertNotNull(jdbc.queryForObject("SELECT completed_at FROM lesson_progress WHERE user_id = ?",
                 Timestamp.class, USER));
-        assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM review_items", String.class));
-        assertEquals(KP, jdbc.queryForObject("SELECT knowledge_point_id FROM review_items", UUID.class));
-        assertEquals(LESSON, jdbc.queryForObject("SELECT lesson_id FROM review_items", UUID.class));
+        assertEquals(0, count("review_items"));
+        assertEquals("NO_PRACTICE", jdbc.queryForObject("SELECT reason FROM lesson_practice_passes", String.class));
 
         clearInvocations(content);
         assertEquals(failed, submitLessonExerciseUseCase.execute(USER, LESSON, BLOCK, command(firstRequest, "A")));
@@ -321,12 +322,7 @@ class LessonSubmissionIntegrationTest {
         verifyNoInteractions(content);
         assertEquals(1, count("kp_evidence"));
         assertEquals(2, count("lesson_exercise_submissions"));
-        assertEquals(1, count("review_items"));
-
-        LearningGateException gate = assertThrows(LearningGateException.class,
-                () -> submitLessonExerciseUseCase.execute(USER, LESSON, BLOCK, command(UUID.randomUUID(), "A")));
-        assertEquals("REVIEW_REQUIRED", gate.getCode());
-        assertEquals(KP, gate.getReviews().getFirst().knowledgePointId());
+        assertEquals(0, count("review_items"));
         MasteryResult result = mastery.execute(USER).stream()
                 .filter(item -> item.knowledgePointId().equals(KP)).findFirst().orElseThrow();
         assertEquals(0.0, result.mastery());
@@ -464,24 +460,24 @@ class LessonSubmissionIntegrationTest {
     }
 
     @Test
-    void reviewInsertFailureRollsBackPassingRetryAndCompletion() {
+    void practicePassInsertFailureRollsBackPassingRetryAndCompletion() {
         topics.execute(USER);
         submitLessonExerciseUseCase.execute(USER, LESSON, BLOCK, command(UUID.randomUUID(), "B"));
         UUID retry = UUID.randomUUID();
-        jdbc.execute("ALTER TABLE review_items ADD CONSTRAINT reject_pending_review CHECK (status <> 'PENDING')");
+        jdbc.execute("ALTER TABLE lesson_practice_passes ADD CONSTRAINT reject_practice_pass CHECK (reason <> 'NO_PRACTICE')");
         try {
             assertThrows(DataIntegrityViolationException.class,
                     () -> submitLessonExerciseUseCase.execute(USER, LESSON, BLOCK, command(retry, "A")));
             assertEquals(1, count("lesson_exercise_submissions"));
             assertEquals(1, count("kp_evidence"));
-            assertEquals(0, count("review_items"));
+            assertEquals(0, count("lesson_practice_passes"));
             assertEquals(0, jdbc.queryForObject("SELECT cardinality(passed_block_ids) FROM lesson_progress", Integer.class));
             assertNull(jdbc.queryForObject("SELECT completed_at FROM lesson_progress", Timestamp.class));
         } finally {
-            jdbc.execute("ALTER TABLE review_items DROP CONSTRAINT reject_pending_review");
+            jdbc.execute("ALTER TABLE lesson_practice_passes DROP CONSTRAINT reject_practice_pass");
         }
         assertTrue(submitLessonExerciseUseCase.execute(USER, LESSON, BLOCK, command(retry, "A")).lessonCompleted());
-        assertEquals(1, count("review_items"));
+        assertEquals(1, count("lesson_practice_passes"));
         assertEquals(2, count("lesson_exercise_submissions"));
         assertEquals(1, count("kp_evidence"));
     }

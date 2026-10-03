@@ -158,12 +158,16 @@ src/main/java/com/group01/<service>
   không chứa luật. Khóa, replay theo `requestId`, hạn mức LLM là port ở `application/port`.
 - Không còn path DeepTutor: bằng chứng học lưu theo user ở `kp_evidence`; mastery của KP tính khi đọc bằng
   `MasteryCalculator` (port `compute_mastery` của DeepTutor v1.6.9, Apache-2.0; giữ comment ghi nguồn và giá trị test gốc).
-- Thứ tự topic theo user từ Content `topic-sequence`, không LLM, không goal/band. `LessonAccessGate` và use case trong
-  `services/learning-service/src/main/java/com/group01/learning/` quyết định cổng bài; trạng thái topic suy ra khi đọc.
+- Thứ tự topic theo user từ Content `topic-sequence`, không LLM, không goal/band; mỗi skill là một chuỗi riêng (mỗi
+  skill một topic `IN_PROGRESS`) và bài ôn chỉ chặn bài, Practice, thi cuối của cùng skill. `LessonAccessGate` và use
+  case trong `services/learning-service/src/main/java/com/group01/learning/` quyết định cổng bài; trạng thái topic suy
+  ra khi đọc.
 - Mọi lượt ghi của một học viên chạy trong một `@Transactional` mở đầu bằng `pg_advisory_xact_lock` theo user.
 - Bằng chứng bài học chỉ ghi ở lần nộp đầu của mỗi khối; bài ôn ghi mỗi set (nộp một lần); kết quả thi ghi theo
   `(attempt_id, result_version)`, chấm lại thì thay bằng chứng của version cũ.
-- Học viên không bao giờ nhận `answerSpec`, `explanation` trước khi đạt, `chartFacts`, hay transcript trước khi đạt.
+- Học viên không bao giờ nhận `answerSpec` hay `chartFacts`. `explanation` và transcript chỉ có sau khi đạt, **trừ**
+  practice attempt, set ôn và quick-check của bài ôn: có ngay sau khi nộp. Package đã nộp ở Practice hoặc đã giao trong
+  bài ôn không bao giờ được giao lại làm set ôn cho chính học viên đó (hết package thì bài ôn `SKIPPED`).
 - Consumer không gọi HTTP; ACK sau khi transaction commit; vi phạm contract hoặc hết lượt thử → DLQ.
 - Tác vụ LLM mới cho học viên (chấm Writing) phải có hạn mức theo ngày (plan 0737).
 ## 4. Quy tắc đặt tên file và cấu trúc dự án

@@ -2,6 +2,7 @@ package com.group01.content.api.dto.request;
 
 import com.group01.content.api.dto.AccessLevel;
 import com.group01.content.domain.vo.QuestionType;
+import com.group01.content.domain.vo.QuestionPurpose;
 import com.group01.content.domain.vo.Skill;
 import jakarta.validation.constraints.NotNull;
 
@@ -10,5 +11,14 @@ public record CreateQuestionRequest(
         QuestionType questionType,
 
         Skill skill,
-        AccessLevel accessLevel
-) {}
+        AccessLevel accessLevel,
+        QuestionPurpose purpose
+) {
+    public CreateQuestionRequest {
+        purpose = purpose != null ? purpose : QuestionPurpose.LEARNING;
+    }
+
+    public CreateQuestionRequest(QuestionType questionType, Skill skill, AccessLevel accessLevel) {
+        this(questionType, skill, accessLevel, QuestionPurpose.LEARNING);
+    }
+}

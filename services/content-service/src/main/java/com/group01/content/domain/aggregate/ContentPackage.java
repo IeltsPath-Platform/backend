@@ -1,6 +1,7 @@
 package com.group01.content.domain.aggregate;
 
 import com.group01.content.domain.entity.ContentPackageVersion;
+import com.group01.content.domain.exception.InvalidPackageLessonException;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.PublicationStatus;
 
@@ -18,11 +19,13 @@ public class ContentPackage {
     private final Instant createdAt;
     private Instant updatedAt;
     private final List<ContentPackageVersion> versions;
+    private final UUID lessonId;
 
+    /** {@code lessonId} makes a practice set part of that lesson's Practice; other package types have none. */
     public ContentPackage(UUID id, String code, String title, PackageType packageType,
                           String requiredFeatureKey, PublicationStatus status,
                           UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
-                          List<ContentPackageVersion> versions) {
+                          List<ContentPackageVersion> versions, UUID lessonId) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.code = Objects.requireNonNull(code, "code must not be null");
         this.title = Objects.requireNonNull(title, "title must not be null");
@@ -33,12 +36,21 @@ public class ContentPackage {
         this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.updatedAt = updatedAt != null ? updatedAt : this.createdAt;
         this.versions = versions != null ? new ArrayList<>(versions) : new ArrayList<>();
+        if (lessonId != null && packageType != PackageType.PRACTICE_SET) {
+            throw new InvalidPackageLessonException("Only a PRACTICE_SET package can belong to a lesson");
+        }
+        this.lessonId = lessonId;
     }
 
     public static ContentPackage create(String code, String title, PackageType packageType, String requiredFeatureKey) {
+        return create(code, title, packageType, requiredFeatureKey, null);
+    }
+
+    public static ContentPackage create(String code, String title, PackageType packageType, String requiredFeatureKey,
+                                        UUID lessonId) {
         Instant now = Instant.now();
         return new ContentPackage(UUID.randomUUID(), code, title, packageType, requiredFeatureKey,
-                PublicationStatus.DRAFT, null, now, now, new ArrayList<>());
+                PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), lessonId);
     }
 
     public void publishVersion(UUID versionId) {
@@ -58,6 +70,7 @@ public class ContentPackage {
     }
 
     public UUID getId() { return id; }
+    public UUID getLessonId() { return lessonId; }
     public String getCode() { return code; }
     public String getTitle() { return title; }
     public PackageType getPackageType() { return packageType; }

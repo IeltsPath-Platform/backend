@@ -63,6 +63,7 @@ public class GetTopicTreeUseCase {
                 current.getCreatedAt(),
                 current.getUpdatedAt(),
                 current.getBand(),
+                current.getSkill(),
                 childNodes
         );
     }

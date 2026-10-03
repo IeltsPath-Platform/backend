@@ -9,12 +9,14 @@ Một `ReviewItem` cho một KP có `stage ∈ {PRACTICE, THEORY}` khi `status =
 
 ### 1.1 Stage ban đầu khi tạo review (`ReviewRule.initialStage`)
 
+Review chỉ được tạo từ Practice (P4 luật 8) hoặc assessment (luật mastery cũ); hoàn thành lesson không tạo review.
+Xét theo thứ tự, dòng đầu khớp thì dùng:
+
 | Nguồn tạo review (`ReviewTrigger`) | Stage ban đầu | `theory_reason` |
 | --- | --- | --- |
-| `LESSON` (hoàn thành lesson, KP sai ở bài tập lesson) | PRACTICE | – (learner vừa đọc lý thuyết; lần sai trong lesson là "lần trượt 1") |
-| `PRACTICE(percent)` với `percent < 0.40` | THEORY | `LOW_SCORE` |
-| `PRACTICE` hoặc `ASSESSMENT`, và KP **đã sai** trong first-submission bài tập của lesson dạy KP (`review.lessonId`, dùng `ExerciseSubmissionLog.firstResponses`) | THEORY | `WRONG_IN_LESSON` |
-| `PRACTICE` / `ASSESSMENT` còn lại | PRACTICE | – |
+| `PRACTICE(kpPercent)` với tỉ lệ đúng **của KP trong attempt** < 0.40 | THEORY | `LOW_SCORE` |
+| `PRACTICE` hoặc `ASSESSMENT`, và KP **đã sai** trong first-submission bài tập của lesson `review.lessonId` (`ExerciseSubmissionLog.firstResponses`, đọc một lần cho cả tập KP) | THEORY | `WRONG_IN_LESSON` |
+| còn lại | PRACTICE | – |
 
 ### 1.2 Khi nộp set ôn (`ReviewItem.recordSetResult(setId, requestId, correct, total)`)
 
@@ -34,16 +36,20 @@ sau lý thuyết = 3 (⇒ SKIPPED). Review bắt đầu ở THEORY (fast-track /
 
 ### 1.4 Ở stage PRACTICE
 
-- `GET /reviews/{id}` giao set như hiện tại, nhưng chọn package theo thứ tự: (1) gắn `preferredLessonId =
-  review.lessonId`, (2) chưa từng dùng trong review **và** practice attempt của learner, (3) LRU (`PackageRotation`).
-  Không có package ⇒ `SKIPPED` như hiện tại.
-- Item trả kèm `hint`. Sau khi nộp (đạt hay trượt) luôn trả `correctAnswer`, `explanation`, transcript (D9).
+- `GET /reviews/{id}` giao set như hiện tại, nhưng chọn package (D11):
+  - `exclude` = mọi package **đã lộ** với learner = package của review set đã giao (`reviews.assignedPackageIds`,
+    giao mà chưa nộp vẫn tính vì đã thấy đề) ∪ `PracticeAttemptRepository.revealedPackageIds(userId)` (P4: practice
+    đã nộp ∪ review set đã nộp);
+  - gọi `searchPracticeSets(kp, exclude, MIN_SET_QUESTIONS, preferredLessonId = review.lessonId)`, lấy phần tử đầu;
+  - **bỏ** nhánh fallback `PackageRotation.leastRecentlyUsed` (không dùng lại package). Không còn package ⇒
+    `SKIPPED` như hiện tại. Nếu `PackageRotation` không còn caller nào thì xoá class và test của nó.
+- Item trả kèm `hint`. Sau khi nộp (đạt hay trượt) luôn trả `correctAnswer`, `explanation`, transcript (D9, D11).
 - `POST /reviews/{id}/theory-check` ⇒ 409 `THEORY_NOT_REQUIRED`.
 
 ### 1.5 Không đổi
 
-Ngưỡng tạo review (mastery < 0.6, có practice set, KP sai, chưa có review chờ), unique pending per (user, KP), cách
-chọn `lessonId` (lesson hoàn thành sớm nhất dạy KP), review khoá theo skill (P3). Nhiều KP sai ⇒ nhiều review; danh
+Luật tạo review từ assessment (mastery < 0.6, có practice set, KP sai, chưa có review chờ) và cách chọn `lessonId` cho
+review assessment (lesson hoàn thành sớm nhất dạy KP); review Practice dùng lesson của attempt (P4). Unique pending per (user, KP), review khoá theo skill (P3). Nhiều KP sai ⇒ nhiều review; danh
 sách `GET /reviews?status=PENDING` sắp cũ nhất trước để learner ôn lần lượt.
 
 ## 2. Migration `V5__review_ladder.sql`
@@ -54,8 +60,6 @@ ALTER TABLE review_items ADD COLUMN stage VARCHAR(10) NOT NULL DEFAULT 'PRACTICE
 ALTER TABLE review_items ADD COLUMN theory_reason VARCHAR(30)
     CHECK (theory_reason IN ('SECOND_FAIL', 'LOW_SCORE', 'WRONG_IN_LESSON'));
 ALTER TABLE review_items ADD COLUMN theory_completed_count INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE review_items ADD COLUMN trigger_kind VARCHAR(20)
-    CHECK (trigger_kind IN ('LESSON', 'PRACTICE', 'ASSESSMENT'));
 
 ALTER TABLE review_sets ADD COLUMN correct_count INTEGER;
 ALTER TABLE review_sets ADD COLUMN total_count INTEGER;
@@ -75,7 +79,7 @@ CREATE TABLE review_theory_checks (
 CREATE INDEX idx_review_theory_checks_item ON review_theory_checks (review_item_id, submitted_at);
 ```
 
-Dữ liệu cũ (`trigger_kind` để NULL):
+Dữ liệu cũ (`trigger_kind` để NULL – cột thêm ở V4):
 - review PENDING có set mở ⇒ giữ `PRACTICE`;
 - review PENDING không có set mở và đã có ≥ 1 set trượt ⇒ `stage = 'THEORY', theory_reason = 'SECOND_FAIL'`
   (kể cả khi đã trượt 2 set theo luật cũ: learner được ôn lý thuyết một lần, set kế tiếp trượt sẽ SKIPPED).
@@ -84,9 +88,10 @@ Dữ liệu cũ (`trigger_kind` để NULL):
 
 Service mới `application/service/TheoryFocus` (logic chọn block thuần nên đặt ở `domain/service/TheoryBlockSelector`):
 
-- **Theory blocks**: từ `content.lesson(review.lessonId)`, lấy block `TEXT`/`ASSET`/`VOCABULARY` có
-  `knowledgePointIds` chứa KP, giữ `sortOrder`. Rỗng ⇒ fallback mọi block TEXT/ASSET (hành vi cũ), `theoryScope =
-  LESSON_FALLBACK`; ngược lại `theoryScope = KNOWLEDGE_POINT`.
+- **Theory blocks**: từ `content.getLesson(review.lessonId)`, lấy block `TEXT` có `textContent` và
+  `knowledgePointIds` chứa KP, giữ `sortOrder`. Rỗng ⇒ fallback mọi block TEXT (đúng hành vi cũ ở
+  `GetReviewUseCase`), `theoryScope = LESSON_FALLBACK`; ngược lại `theoryScope = KNOWLEDGE_POINT`. Không bao giờ đưa
+  ASSET vào (transcript Listening).
 - **Quick-check**: tối đa **3** câu hỏi từ block EXERCISE không phải ESSAY của lesson đó, câu có `knowledgePointIds`
   chứa KP, theo thứ tự block rồi câu. Danh sách là **xác định** (cùng input ⇒ cùng câu) để `theory-check` chấm lại
   được mà không cần lưu trước. Không có câu ⇒ `quickCheck = []`, theory-check nhận `answers = {}` như "đã đọc xong".
@@ -96,41 +101,46 @@ Service mới `application/service/TheoryFocus` (logic chọn block thuần nên
 
 | Lớp | Việc |
 | --- | --- |
-| `domain/vo/ReviewStage`, `domain/vo/TheoryReason`, `domain/vo/ReviewTrigger` | enum / record (`ReviewTrigger` có `kind` + `percent` nullable). |
+| `domain/vo/ReviewStage`, `domain/vo/TheoryReason`, `domain/vo/ReviewTrigger` | enum / record (`ReviewTrigger` có `kind` PRACTICE|ASSESSMENT + `kpPercent` nullable; `ReviewTrigger` tạo ở P4). |
 | `domain/service/ReviewRule` | `MAX_FAILED_REVIEW_SETS = 2`; `initialStage(trigger, wrongInLesson)`; `reevaluate` trả stage/reason cho mỗi review mới. |
 | `domain/aggregate/ReviewItem` | field `stage`, `theoryReason`, `theoryCompletedCount`, `triggerKind`; `assignSet` chỉ khi PRACTICE (`IllegalStateException` ngược lại); `recordSetResult(setId, requestId, correct, total)` theo 1.2; `completeTheory()` theo 1.3. Javadoc cập nhật. |
 | `domain/entity/ReviewSet` | thêm `correct`, `total`. |
 | `JdbcReviewItemRepository` | đọc/ghi cột mới; lưu `review_theory_checks`. |
-| `application/service/ReviewReevaluation` | nhận `ReviewTrigger`; với PRACTICE/ASSESSMENT tính `wrongInLesson` qua `ExerciseSubmissionLog.firstResponses(userId, lessonId)`. Cập nhật mọi caller: `CompleteLessonUseCase`, `SubmitLessonExerciseUseCase` (LESSON), `SubmitPracticeAttemptUseCase` (PRACTICE + percent), `ApplyAssessmentResultUseCase` (ASSESSMENT), `SubmitLessonEssayUseCase` nếu có gọi. |
-| `GetReviewUseCase` | rẽ nhánh theo stage (1.3 / 1.4); rotation mới (dùng `PracticeAttemptRepository.packageIdsUsed`). |
-| `SubmitReviewUseCase` | 409 `THEORY_REQUIRED` khi THEORY; luôn reveal; lưu correct/total; response thêm `stage`, `status`, `failedSets`. |
+| `application/service/ReviewReevaluation` | nhận `ReviewTrigger`; với PRACTICE/ASSESSMENT tính `wrongInLesson` qua `ExerciseSubmissionLog.firstResponses(userId, lessonId)`. Caller còn lại: `ApplyAssessmentResultUseCase` (ASSESSMENT). Review từ Practice tính stage qua cùng `ReviewRule.initialStage` trong `SubmitPracticeAttemptUseCase` (kpPercent của từng KP). |
+| `GetReviewUseCase` | rẽ nhánh theo stage (1.3 / 1.4); chọn package theo 1.4 (dùng `PracticeAttemptRepository.revealedPackageIds`). |
+| `SubmitReviewUseCase` | 409 `THEORY_REQUIRED` khi THEORY; luôn reveal; lưu correct/total; response thêm `stage`, `failedSets`. |
 | `SubmitTheoryCheckUseCase` (mới) | `@Transactional`, `LearnerLock`, idempotent theo `requestId`; dùng `ItemGrading`; không ghi evidence. |
 | `ReviewController` + DTO | route mới; `ReviewResponse` thêm field mục 5. |
 
 ## 5. API public
 
-`GET /api/learning/reviews/{reviewId}`:
+`GET /api/learning/reviews/{reviewId}` – DTO hiện tại là
+`ReviewResponse(reviewId, reviewStatus, lessonId, theory: List<String>, set{reviewSetId, packageId, packageVersionId,
+passage, audio, questions})`. **Giữ nguyên mọi field và kiểu**, chỉ thêm:
 
 ```json
 {
-  "reviewId": "…", "knowledgePointId": "…", "knowledgePointName": "…", "skill": "READING",
-  "lessonId": "…", "status": "PENDING", "stage": "THEORY", "theoryReason": "SECOND_FAIL",
+  "reviewId": "…", "reviewStatus": "PENDING", "lessonId": "…",
+  "theory": ["đoạn lý thuyết của KP …"],
+  "set": null,
+  "knowledgePointId": "…", "skill": "READING",
+  "stage": "THEORY", "theoryReason": "SECOND_FAIL", "theoryScope": "KNOWLEDGE_POINT",
   "failedSets": 1, "maxFailedSets": 2,
-  "theory": { "scope": "KNOWLEDGE_POINT", "blocks": [ {"blockId": "…", "blockType": "TEXT", "sortOrder": 1, "textContent": "…", "asset": null} ] },
-  "quickCheck": [ {"questionVersionId": "…", "stem": "…", "options": [], "hint": "…"} ],
-  "set": null
+  "quickCheck": [ {"questionVersionId": "…", "sortOrder": 1, "stem": "…", "options": [], "hint": "…"} ]
 }
 ```
 
-Ở PRACTICE: `theory = null`, `quickCheck = []`, `set = {setId, packageId, packageVersionId, sections/items có hint}`.
-Field cũ của response giữ nguyên tên; nếu response cũ đã có `theory` dạng khác, giữ tên cũ và thêm `theoryScope`
-thay vì đổi shape – Codex đối chiếu `ReviewResponse` hiện tại và ghi quyết định vào Verification.
+- `theory` vẫn là mảng chuỗi, luôn có ở cả hai stage (giờ chỉ gồm TEXT của KP, hoặc fallback cả lesson).
+- Ở PRACTICE: `quickCheck = []`, `set` như cũ, câu hỏi trong `set.questions` có `hint`.
+- Ở THEORY: `set = null`.
 
-`POST /api/learning/reviews/{reviewId}/theory-check` body `{requestId, answers: {questionVersionId: answer}}` ⇒
-`{reviewId, correct, total, items:[{questionVersionId, correct, correctAnswer, explanation}], stage: "PRACTICE"}`.
+`POST /api/learning/reviews/{reviewId}/theory-check` body `{requestId, answers}` (`answers` cùng shape mảng như lesson
+submission, đủ mọi câu quick-check; không có câu ⇒ `[]`) ⇒
+`{reviewId, correct, total, results:[{questionVersionId, correct, correctAnswer, explanation, hint:null}], stage:"PRACTICE"}`.
 
-`POST /api/learning/reviews/{reviewId}/submissions` response thêm `stage`, `status`, `failedSets`; `items[*]`
-luôn có `correctAnswer`, `explanation`.
+`POST /api/learning/reviews/{reviewId}/submissions` – DTO hiện tại
+`ReviewSubmissionResponse(reviewStatus, results, transcript)`. Giữ nguyên, thêm `stage`, `failedSets`. `results[*]`
+luôn là dạng `SolvedAnswer` (có `correctAnswer`, `explanation`) kể cả khi trượt; `transcript` luôn có với set Listening.
 
 ## 6. Test
 
@@ -143,25 +153,49 @@ Unit (`ReviewItemTest`, `ReviewRuleTest`, `TheoryBlockSelectorTest`):
 
 Integration `RemediationLadderIntegrationTest` (stub Content có lesson 2 KP với block→KP, 3 practice set cho KP A):
 
-1. **Fail 1 → set có hint**: practice attempt 50% sai KP A (mastery < 0.6) ⇒ review PRACTICE; GET review có set, item
+1. **Fail 1 → set có hint**: practice attempt lần đầu 50%, KP A đúng 50% (mastery vẫn ≥ 0.6, KP A không sai trong lesson) ⇒ review PRACTICE; GET review có set, item
    có `hint`; lesson cùng skill bị REVIEW_REQUIRED; lesson skill khác vào được.
 2. **Fail 2 → lý thuyết đúng KP**: nộp set 50% ⇒ THEORY/SECOND_FAIL; GET review chỉ trả block gắn KP A (không có block
    KP B); có ≤ 3 câu quick-check KP A; submissions ⇒ 409 THEORY_REQUIRED.
 3. theory-check sai hết ⇒ vẫn về PRACTICE, có `explanation`, không thêm `kp_evidence`; idempotent theo requestId.
 4. **Fail 3 → SKIPPED**: set tiếp theo trượt ⇒ SKIPPED; lesson cùng skill mở lại.
-5. **< 40%**: practice attempt 20% ⇒ review tạo ở THEORY/LOW_SCORE.
+5. **< 40%**: practice attempt có KP A đúng 1/4 ⇒ review KP A tạo ở THEORY/LOW_SCORE; KP B đúng 3/4 cùng attempt ⇒ không tạo review cho B.
 6. **Fast-track**: KP A sai ở first-submission bài tập lesson, sau đó practice 60% ⇒ review THEORY/WRONG_IN_LESSON.
 7. **Đạt**: set ≥ 70% ⇒ DONE, response có lời giải.
 8. **Nhiều KP**: practice sai cả A và B ⇒ 2 review; `GET /reviews?status=PENDING` cũ nhất trước.
-9. Rotation: set ôn ưu tiên package gắn lesson và chưa từng làm trong practice.
+9. Không dùng lại package: set ôn ưu tiên package gắn lesson; **không bao giờ** giao package đã nộp ở practice hoặc
+   đã giao ở review trước; hết package ⇒ review SKIPPED (thay test LRU cũ).
+10. Không lộ trước khi nộp: `GET /reviews/{id}`, `GET /practice-attempts/{id}` (chưa nộp), quick-check không chứa
+    `correctAnswer`, `explanation`, `answerSpec`, transcript.
 
 Cập nhật test cũ đang kỳ vọng `MAX_FAILED_REVIEW_SETS = 3` hoặc "trượt chưa thấy lời giải" – đây là thay đổi chủ
 đích (D8, D9); ghi danh sách test đã sửa vào Verification.
 
 ## Acceptance
 
-`mvn -q -pl services/learning-service -am test` xanh; 9 kịch bản trên có test.
+`mvn -q -pl services/learning-service -am test` xanh; 10 kịch bản trên được phủ bởi unit hoặc integration (được gộp
+nhiều kịch bản vào một test method).
 
 ## Verification
 
-(Codex điền.)
+- Code: V5 migration; `ReviewStage`, `TheoryReason`; `ReviewRule` (`MAX_FAILED_REVIEW_SETS = 2`, `initialStage`);
+  `ReviewItem` (stage, `recordSetResult(correct, total)`, `completeTheory`, `startWithTheory`); `ReviewSet`
+  correct/total; `TheoryBlockSelector` (domain) + `TheoryFocus`, `FirstAttemptMistakes` (application);
+  `SubmitTheoryCheckUseCase`, `ReviewTheoryCheckLog` + JDBC; `GetReviewUseCase`, `SubmitReviewUseCase`,
+  `SubmitPracticeAttemptUseCase` (stage when created), `GET /reviews` real `stage`; route
+  `POST /reviews/{id}/theory-check`; content client `Block.knowledgePointIds`.
+- Lệch spec (có chủ đích): `ReviewTrigger` không tạo vì P4 đã có `trigger_kind`; review từ assessment xét
+  `WRONG_IN_LESSON` lúc học viên mở review lần đầu (khi review còn "fresh"), vì consumer RabbitMQ không được gọi
+  HTTP (AGENTS §3.8). Review từ Practice xét khi tạo. `PackageRotation` giữ lại vì giao mã đề cuối vẫn dùng;
+  bỏ `ReviewItemRepository.lastAssignedAt` (không còn caller).
+- Test mới: `ReviewRuleTest` (bảng 1.1), `ReviewItemTest` (bảng 1.2 + guard stage), `TheoryBlockSelectorTest` (2),
+  `RemediationLadderIntegrationTest` (2 method: thang đầy đủ PRACTICE → THEORY → quick-check → set mới chưa lộ →
+  SKIPPED; stage ban đầu LOW_SCORE / WRONG_IN_LESSON khi tạo từ Practice và khi mở review assessment).
+- Test cũ sửa (thay đổi chủ đích D8, D9, D11): `ReviewItemTest` (chữ ký `recordSetResult`, giới hạn 2),
+  `ReviewRuleTest` (giới hạn 2), `LessonLearningWebMvcTest` (review set có hint, set trượt có lời giải; stage thật
+  trong `GET /reviews`; mock use case mới), `ReviewAndTestAssignmentIntegrationTest.reviewAssignsUnusedPackagesAndSkipsWhenNoneRemain`
+  (trượt ⇒ THEORY, có lời giải và transcript, quick-check rồi hết đề ⇒ SKIPPED), `LearningServiceApplicationTests`
+  (Flyway 5, 14 bảng), bốn test integration thêm `review_theory_checks` vào TRUNCATE.
+- Chạy: unit + MVC 4 class xanh; `RemediationLadderIntegrationTest` 2/2; toàn bộ learning-service 216 test, lần
+  chạy đầy đủ có 2 fail (hai test cũ nêu trên), sửa xong chạy lại hai class đó 8/8 xanh. Docker/Testcontainers chạy,
+  không skip.

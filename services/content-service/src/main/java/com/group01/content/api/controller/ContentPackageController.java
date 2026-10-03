@@ -67,7 +67,8 @@ public class ContentPackageController {
                 request.code(),
                 request.title(),
                 request.packageType(),
-                AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT")
+                AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT"),
+                request.lessonId()
         ));
         return ContentPackageResponse.from(result);
     }

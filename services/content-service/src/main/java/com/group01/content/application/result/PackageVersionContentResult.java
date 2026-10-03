@@ -54,6 +54,7 @@ public record PackageVersionContentResult(
             String optionsJson,
             String answerSpecJson,
             String explanation,
+            String hint,
             double maxScore,
             List<KnowledgePointMapping> knowledgePointMappings
     ) {}

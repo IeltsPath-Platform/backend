@@ -3,6 +3,7 @@ package com.group01.learning.domain.service;
 import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.vo.PendingReview;
 import com.group01.learning.domain.vo.TopicStatus;
+import com.group01.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -72,5 +73,21 @@ class LessonAccessGateTest {
         assertThat(assertThrows(LearningGateException.class,
                 () -> gate.authorize(List.of(review), review.reviewId(), TopicStatus.IN_PROGRESS, false)).getCode())
                 .isEqualTo("LESSON_LOCKED");
+    }
+
+    @Test
+    void reviewsBlockOnlyTheirSkillWhileUnspecifiedReviewsBlockEverySkill() {
+        var reading = new PendingReview(new UUID(0, 10), new UUID(0, 11), new UUID(0, 12),
+                LearningSkill.READING);
+        assertThatCode(() -> gate.authorize(List.of(reading), null, LearningSkill.LISTENING,
+                TopicStatus.IN_PROGRESS, true)).doesNotThrowAnyException();
+        var error = assertThrows(LearningGateException.class, () -> gate.authorize(List.of(reading), null,
+                LearningSkill.READING, TopicStatus.IN_PROGRESS, true));
+        assertThat(error.getReviews()).containsExactly(reading);
+        assertThat(assertThrows(LearningGateException.class, () -> gate.authorize(List.of(review), null,
+                LearningSkill.LISTENING, TopicStatus.IN_PROGRESS, true)).getCode())
+                .isEqualTo("REVIEW_REQUIRED");
+        assertThatCode(() -> gate.authorize(List.of(reading), reading.reviewId(), LearningSkill.READING,
+                TopicStatus.IN_PROGRESS, true)).doesNotThrowAnyException();
     }
 }

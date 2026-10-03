@@ -12,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -47,6 +48,37 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
     }
 
+    @ExceptionHandler(InvalidPackageLessonException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPackageLesson(InvalidPackageLessonException ex,
+                                                                    HttpServletRequest request) {
+        log.warn("Package lesson refused: {}", ex.getMessage());
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "INVALID_PACKAGE_LESSON"));
+    }
+
+    @ExceptionHandler(QuestionAlreadyUsedException.class)
+    public ResponseEntity<ErrorResponse> handleQuestionAlreadyUsed(QuestionAlreadyUsedException ex,
+                                                                  HttpServletRequest request) {
+        log.warn("Package question usage refused: {}", ex.getMessage());
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "QUESTION_ALREADY_USED"));
+    }
+
+    @ExceptionHandler(QuestionPurposeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleQuestionPurposeMismatch(QuestionPurposeMismatchException ex,
+                                                                      HttpServletRequest request) {
+        log.warn("Package question purpose refused: {}", ex.getMessage());
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "QUESTION_PURPOSE_MISMATCH"));
+    }
+
+    @ExceptionHandler(TopicSkillLockedException.class)
+    public ResponseEntity<ErrorResponse> handleTopicSkillLocked(TopicSkillLockedException ex, HttpServletRequest request) {
+        log.warn("Topic skill change refused: {}", ex.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "TOPIC_SKILL_LOCKED"));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, String> details = new HashMap<>();
@@ -61,6 +93,13 @@ public class GlobalExceptionHandler {
                                                                    HttpServletRequest request) {
         log.warn("Malformed request body: {}", ex.getMessage());
         return buildResponse(HttpStatus.BAD_REQUEST, "Malformed request body", request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidParameter(MethodArgumentTypeMismatchException ex,
+                                                               HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, "Invalid value for request parameter " + ex.getName(),
+                request.getRequestURI(), null);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

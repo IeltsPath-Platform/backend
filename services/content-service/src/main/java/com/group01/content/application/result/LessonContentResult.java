@@ -3,6 +3,7 @@ package com.group01.content.application.result;
 import com.group01.content.domain.vo.AssetType;
 import com.group01.content.domain.vo.BlockType;
 import com.group01.content.domain.vo.LessonBlockKind;
+import com.group01.content.domain.vo.Skill;
 
 import java.util.List;
 import java.util.UUID;
@@ -10,7 +11,7 @@ import java.util.UUID;
 /**
  * A published lesson with its blocks in order. Exercise questions carry the answer spec and explanation, so this is
  * for services only and must never reach a learner unchanged. JSON values ({@code optionsJson},
- * {@code answerSpecJson}) are kept as stored.
+ * {@code answerSpecJson}) are kept as stored. {@code skill} is the skill of the lesson's topic.
  */
 public record LessonContentResult(
         UUID lessonId,
@@ -20,15 +21,18 @@ public record LessonContentResult(
         String summary,
         int sortOrder,
         List<UUID> knowledgePointIds,
-        List<Block> blocks
+        List<Block> blocks,
+        Skill skill
 ) {
     public LessonContentResult withBlocks(List<Block> newBlocks) {
-        return new LessonContentResult(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, newBlocks);
+        return new LessonContentResult(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, newBlocks,
+                skill);
     }
 
     /**
      * Only the field matching {@code blockType} is set; the others are null. {@code blockKind} is set for
-     * {@code EXERCISE} blocks once the use case has classified them.
+     * {@code EXERCISE} blocks once the use case has classified them. {@code knowledgePointIds} are the knowledge
+     * points a TEXT block teaches, or those its questions measure for an EXERCISE block; empty otherwise.
      */
     public record Block(
             UUID blockId,
@@ -38,20 +42,22 @@ public record LessonContentResult(
             String textContent,
             Asset asset,
             List<UUID> vocabularySenseIds,
-            List<Question> questions
+            List<Question> questions,
+            List<UUID> knowledgePointIds
     ) {
         public Block withBlockKind(LessonBlockKind kind) {
-            return new Block(blockId, blockType, kind, sortOrder, textContent, asset, vocabularySenseIds, questions);
+            return new Block(blockId, blockType, kind, sortOrder, textContent, asset, vocabularySenseIds, questions,
+                    knowledgePointIds);
         }
 
         public Block withAsset(Asset newAsset) {
             return new Block(blockId, blockType, blockKind, sortOrder, textContent, newAsset, vocabularySenseIds,
-                    questions);
+                    questions, knowledgePointIds);
         }
 
         public Block withQuestions(List<Question> newQuestions) {
             return new Block(blockId, blockType, blockKind, sortOrder, textContent, asset, vocabularySenseIds,
-                    newQuestions);
+                    newQuestions, knowledgePointIds);
         }
     }
 

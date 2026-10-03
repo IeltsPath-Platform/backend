@@ -16,15 +16,14 @@ Tất cả **nullable** – được điền ở lần refresh curriculum đầu
 
 ### Dữ liệu Writing bị chuyển lesson (P1 mục 1.3)
 
-Learning đang lưu `lesson_id` = L3/L4 cho các essay đã nộp và `passed_block_ids`/`knowledge_point_ids` của L3/L4 có
-chứa block/KP Writing. Trong cùng V3, **chỉ với đúng các ID seed** (ghi rõ trong comment SQL):
+Đã kiểm trên main: essay block **không bao giờ** vào `passed_block_ids` (chỉ `SubmitLessonExerciseUseCase` gọi
+`passBlock`), và `lesson_progress.knowledge_point_ids` được ghi lại từ Content mỗi lần truy cập
+(`LessonAccess.refresh` → `LessonProgress.place`). Vì vậy V3 chỉ cần, **với đúng các ID seed** (ghi rõ trong comment
+SQL):
 
 1. `UPDATE lesson_writing_submissions SET lesson_id = W1/W2` theo `block_id` essay đã chuyển.
-2. `lesson_progress` của L3/L4: bỏ 2 block ID đã chuyển khỏi `passed_block_ids`, bỏ KP6/KP7 khỏi `knowledge_point_ids`.
-3. Nếu learner đã pass essay block: chèn `lesson_progress` cho W1/W2 (`topic_id = DEMO_WRITING`, `passed_block_ids`
-   = block đã pass, `completed_at` = NULL – learner hoàn thành lại qua `/complete` vì lesson chỉ còn TEXT + essay).
-4. `kp_evidence`, `review_items` giữ nguyên (KP ID không đổi; `review_items.lesson_id` L3/L4 cho KP6/KP7 cập nhật
-   sang W1/W2).
+2. `UPDATE review_items SET lesson_id = W1/W2` cho review của KP6/KP7 đang trỏ L3/L4.
+3. Không đụng `lesson_progress`, `kp_evidence` (KP ID không đổi). W1/W2 tự tạo `lesson_progress` khi learner mở.
 
 Ghi chú vào README: đây là di chuyển dữ liệu demo, không phải pattern chung.
 
@@ -47,8 +46,8 @@ Unit test bắt buộc cho `TopicStatusDeriver` (2 skill độc lập, mỗi ski
 - `RefreshLearningTopicsUseCase`:
   - lưu `skill`, `hasTopicTest` cho từng topic;
   - lưu `knowledge_point_catalog.skill`;
-  - sau đó backfill `review_items.skill` còn NULL của user: join `review_items.lesson_id → lesson_progress.topic_id →
-    topic_progress.skill`;
+  - sau đó backfill `review_items.skill` còn NULL của user theo `knowledge_point_id → knowledge_point_catalog.skill`
+    (không join qua `lesson_progress`: review KP6/KP7 trỏ W1/W2 mà learner chưa mở);
   - `TopicResult` thêm `skill`, `hasTopicTest`. Thứ tự trả về: theo skill (LISTENING, READING, WRITING, SPEAKING) rồi
     `sequence_order`.
 - `LessonAccess.authorize`:
@@ -76,14 +75,17 @@ Unit test bắt buộc cho `TopicStatusDeriver` (2 skill độc lập, mỗi ski
 | `GET /api/learning/topics/{id}/lessons` | `skill`, `hasTopicTest`; `testStatus` có thể là `NONE` |
 | `GET /api/learning/lessons/{id}` | `skill` |
 | Lỗi `REVIEW_REQUIRED` | mỗi review trong danh sách có `skill`; chỉ liệt kê review cùng skill |
-| Mới: `GET /api/learning/reviews?status=PENDING&skill=` | danh sách review chờ của learner, cũ nhất trước: `{reviewId, knowledgePointId, knowledgePointName, lessonId, skill, stage, createdAt}` (`stage` thêm ở P5; P3 trả `PRACTICE`) |
+| Mới: `GET /api/learning/reviews?status=PENDING&skill=&limit=` | danh sách review của learner, cũ nhất trước, `limit` mặc định 20, tối đa 100 (vượt ⇒ 400); `status` mặc định `PENDING`. Item `{reviewId, knowledgePointId, lessonId, skill, stage, createdAt}` (`stage` thêm ở P5; P3 trả `PRACTICE`). Không trả tên KP (catalog không lưu tên; client đã có tên từ `GET /mastery`), chỉ đọc `learning_db`. |
+| `GET /api/learning/topics` | thứ tự premium: topic `accessLevel=PREMIUM` vẫn xếp sau topic free **trong cùng skill**. |
 
 ## 5. Test
 
 - Integration (Testcontainers, `LearningFlowIntegrationTest` hoặc file mới `SkillTrackIntegrationTest`), dùng
   `LearningContentClient` stub có 2 topic READING + 1 LISTENING + 1 WRITING (`hasTopicTest=false`):
   1. Ban đầu READING#1, LISTENING#1, WRITING#1 đều IN_PROGRESS.
-  2. Tạo review Reading (sai KP khi hoàn thành lesson) ⇒ lesson Reading tiếp theo 409 REVIEW_REQUIRED; lesson Listening 200.
+  2. Có review Reading PENDING (tạo qua `AssessmentResult` TOPIC_GATE sai KP hoặc insert thẳng `review_items` trong
+     test – P4 mới bỏ review khi hoàn thành lesson, nhưng test này không được dựa vào luồng đó) ⇒ lesson Reading tiếp
+     theo 403 REVIEW_REQUIRED (status hiện có của contract); lesson Listening 200.
   3. Hoàn thành mọi lesson Writing ⇒ topic Writing PASSED, không cần test.
   4. `POST /topics/{writing}/test-assignments` ⇒ 409 NO_TOPIC_TEST.
   5. Review cũ `skill NULL` chặn mọi skill cho tới khi refresh backfill.
@@ -97,4 +99,7 @@ Unit test bắt buộc cho `TopicStatusDeriver` (2 skill độc lập, mỗi ski
 
 ## Verification
 
-(Codex điền.)
+- Changed learning-service migration, domain, use cases, JDBC adapters, API DTO/controller, four requested test classes, and the migration-version assertion; updated the learning README and learner contract.
+- Focused four-class run: 50 tests passed, 0 failed, 0 skipped. The one full learning-service run: 202 tests, 201 passed, 1 failed because its Flyway version assertion still expected V2; after updating that assertion for V3, its one-class rerun passed (1/1). Docker/Testcontainers ran; no tests were skipped.
+- `SubmitLessonEssayUseCase` records/grading submissions but does not call `LessonProgress.complete`, so it cannot complete a lesson and does not need a topic-completion hook.
+- The existing `REVIEW_REQUIRED` HTTP status remains 403 per the public contract; the new Reading review flow verifies the code, while `NO_TOPIC_TEST` returns 409.

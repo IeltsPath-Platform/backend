@@ -1,6 +1,7 @@
 package com.group01.content.api.dto.request;
 
 import java.math.BigDecimal;
+import com.group01.content.domain.vo.Skill;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.NotBlank;
@@ -25,6 +26,8 @@ public record CreateTopicRequest(
         BigDecimal bandMin,
         @DecimalMin(value = "0.0", message = "bandMax must be at least 0.0")
         @DecimalMax(value = "9.0", message = "bandMax must be at most 9.0")
-        BigDecimal bandMax
+        BigDecimal bandMax,
+        // The skill the topic's lessons teach; optional, never ALL.
+        Skill skill
 ) {}
 

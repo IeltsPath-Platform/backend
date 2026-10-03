@@ -34,7 +34,8 @@ public class ArchiveQuestionUseCase {
                 saved.getStatus(),
                 saved.getCurrentPublishedVersionId(),
                 saved.getCreatedAt(),
-                saved.getUpdatedAt()
+                saved.getUpdatedAt(),
+                saved.getPurpose()
         );
     }
 }

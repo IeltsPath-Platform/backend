@@ -4,6 +4,8 @@ import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.service.ReviewRule.CompletedLesson;
 import com.group01.learning.domain.service.ReviewRule.ReviewCandidate;
 import com.group01.learning.domain.vo.PendingReview;
+import com.group01.learning.domain.vo.ReviewStage;
+import com.group01.learning.domain.vo.TheoryReason;
 import com.group01.learning.domain.entity.TopicProgress;
 import com.group01.learning.domain.vo.TopicStatus;
 import org.junit.jupiter.api.Test;
@@ -122,6 +124,18 @@ class ReviewRuleTest {
             assertThatThrownBy(() -> new ReviewRule(invalid)).isInstanceOf(IllegalArgumentException.class);
         }
         assertThatCode(() -> new ReviewRule(1.0)).doesNotThrowAnyException();
-        assertThat(ReviewRule.MAX_FAILED_REVIEW_SETS).isEqualTo(3);
+        assertThat(ReviewRule.MAX_FAILED_REVIEW_SETS).isEqualTo(2);
+    }
+
+    @Test
+    void newReviewsStartWithTheoryWhenTheScoreIsLowOrTheLessonWasAlreadyWrong() {
+        assertThat(ReviewRule.initialStage(0.25, false))
+                .isEqualTo(new ReviewRule.Start(ReviewStage.THEORY, TheoryReason.LOW_SCORE));
+        assertThat(ReviewRule.initialStage(0.25, true).theoryReason()).isEqualTo(TheoryReason.LOW_SCORE);
+        assertThat(ReviewRule.initialStage(0.5, true))
+                .isEqualTo(new ReviewRule.Start(ReviewStage.THEORY, TheoryReason.WRONG_IN_LESSON));
+        assertThat(ReviewRule.initialStage(null, true).theoryReason()).isEqualTo(TheoryReason.WRONG_IN_LESSON);
+        assertThat(ReviewRule.initialStage(0.5, false)).isEqualTo(new ReviewRule.Start(ReviewStage.PRACTICE, null));
+        assertThat(ReviewRule.initialStage(null, false).stage()).isEqualTo(ReviewStage.PRACTICE);
     }
 }

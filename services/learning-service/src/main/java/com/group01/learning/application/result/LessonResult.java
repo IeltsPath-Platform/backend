@@ -3,9 +3,14 @@ package com.group01.learning.application.result;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import com.group01.learning.domain.vo.LearningSkill;
 
 public record LessonResult(UUID lessonId, UUID topicId, String code, String title, String summary,
-                           int sortOrder, String status, List<Block> blocks) {
+                           int sortOrder, String status, List<Block> blocks, LearningSkill skill) {
+    public LessonResult(UUID lessonId, UUID topicId, String code, String title, String summary,
+                        int sortOrder, String status, List<Block> blocks) {
+        this(lessonId, topicId, code, title, summary, sortOrder, status, blocks, null);
+    }
     /**
      * {@code blockKind} is set on exercise blocks; an essay block carries {@code essay} instead of questions, the
      * learner's {@code latestSubmission} (null when none) and {@code sampleAnswer} once the block has been passed.

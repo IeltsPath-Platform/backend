@@ -65,5 +65,10 @@ public class TopicRepositoryAdapter implements TopicRepository {
     public boolean existsByCode(String code) {
         return topicJpaRepository.existsByCode(code);
     }
+
+    @Override
+    public boolean hasPublishedLessons(UUID topicId) {
+        return topicJpaRepository.hasPublishedLessons(topicId);
+    }
 }
 

@@ -18,9 +18,27 @@ multiple test codes. `LESSON` remains a valid package type for existing reading 
 lesson pipeline. These are implemented migrations; their presence does not confirm they ran on a shared database.
 
 Learning reads the six `/internal/learning-content/**` routes in the
-[internal contract](../../docs/contracts/learning-content-internal-v1.md). `topic-sequence` returns ordered active
-topics with published lessons and topic tests, including active KPs and `hasPracticeSet`. Learning owns learner
-progress, gates and mastery; Assessment reads package snapshots when it creates an attempt.
+[internal contract](../../docs/contracts/learning-content-internal-v1.md). `topic-sequence` returns active topics
+that have a skill and published lessons, ordered by skill then `sort_order`, with `hasTopicTest`, active KPs and
+`hasPracticeSet`. Learning owns learner progress, gates and mastery; Assessment reads package snapshots when it
+creates an attempt.
+
+Each topic that teaches lessons has one `skill` (`LISTENING`, `READING`, `WRITING`, `SPEAKING`; V15, never `ALL`),
+and its lessons inherit it. Topic create/update accept an optional `skill`; update keeps the current skill when it is
+omitted and returns `409` (`details.code = TOPIC_SKILL_LOCKED`) when a topic with published lessons would change
+skill. There is no lesson authoring API, so seed migrations must keep every lesson question and lesson KP on its
+topic's skill: `LessonPipelineSeedTest.everyLessonTeachesOnlyItsTopicsSkill` enforces it. V15 moved the demo Writing
+essays from Reading lessons L3/L4 into topic `DEMO_WRITING` (lessons W1, W2; no final test), keeping their block ids.
+
+V16 adds `lesson_block_knowledge_points` (the KPs each TEXT block teaches) and `content_packages.lesson_id`, which makes a `PRACTICE_SET` part of a lesson's Practice. Package creation accepts an optional `lessonId` (practice sets only, the lesson must exist, else `422` with `details.code = INVALID_PACKAGE_LESSON`); publishing such a package fails the same way when a question's skill differs from the lesson's topic. V16 seeds `PS-KP1-C`, `PS-KP1-D` and one set for each of TF1, PM1, PM2, PS1 and PS2, and refuses a published lesson of a topic with a final test that has no Practice.
+
+V18 thêm 11 đề Practice Reading (mỗi bài Reading của topic có thi cuối có ít nhất hai đề; mỗi KP đủ đề cho một lần Practice và hai set ôn) và đề thi cuối thứ hai X8, X9, X10 cho `TFNG_SKILLS`, `PREMIUM_MATCHING_INFO`, `PREMIUM_SENTENCE_COMPLETION`, để thi lại gặp đề khác. Toàn văn câu hỏi để duyệt: `plans/261002-1600-skill-tracks-practice-remediation/reports/v18-new-questions.md`.
+
+Còn thiếu: mỗi KP Listening (`LS_NUM`, `LS_SPELL`, `LS_PARA`, `LS_TRAP`) chỉ có một đề Practice, vì chưa có file mp3 mới. Practice Listening trượt nên không tạo được bài ôn (hết đề chưa lộ lời giải). Cần thêm audio để thang ôn tập của Listening đủ bước.
+
+Each question (`question_id`, across all its versions) has at most one owner: any lesson, or one `PRACTICE_SET`, `TOPIC_TEST`, `MOCK_TEST` or `PLACEMENT_TEST` package. Publishing checks every lesson and PUBLISHED versions of other covered packages; drafts do not reserve questions, and versions of the same package may share them. A conflict returns `422` with `details.code = QUESTION_ALREADY_USED`, listing at most 10 conflicts, without saving or publishing. `QUIZ` and legacy `LESSON` packages are outside this rule.
+
+V17 adds immutable `questions.purpose`: `LEARNING` for lessons, practice and topic tests; `EXAM` for mock and placement tests. Existing questions default to `LEARNING`; those already attached to any mock or placement test are backfilled to `EXAM`. Question creation accepts optional `purpose` (default `LEARNING`), question responses include it, and the catalog accepts `?purpose=LEARNING|EXAM` with optional `skill`, filtering in the database. Adding a version preserves purpose. Publishing locks question rows in id order until commit before checking ownership and purpose; the wrong purpose returns `422` with `details.code = QUESTION_PURPOSE_MISMATCH` without saving. Invalid purpose input returns `400`.
 
 Topics retain optional `bandMin`/`bandMax` metadata (0–9, half-band steps). V8 removes KP band columns and the KP
 API no longer accepts or returns own/effective band ranges. The current learning sequence uses topic `sort_order`,

@@ -175,7 +175,7 @@ class ContentAuthorizationWebMvcTest {
         when(createQuestion.execute(any())).thenReturn(new QuestionResult(id, QuestionType.MULTIPLE_CHOICE,
                 Skill.READING, null, PublicationStatus.DRAFT, null, Instant.now(), Instant.now()));
         when(createPackage.execute(any())).thenReturn(new ContentPackageResult(id, "PS-KP1-A", "Practice",
-                PackageType.PRACTICE_SET, null, PublicationStatus.DRAFT, null, Instant.now(), Instant.now()));
+                PackageType.PRACTICE_SET, null, PublicationStatus.DRAFT, null, Instant.now(), Instant.now(), null));
         when(createKnowledgePoint.execute(any())).thenReturn(new KnowledgePointResult(id, id, "KP1", "KP1",
                 KnowledgePointKind.GRAMMAR, LearningType.CONCEPT, null, null, ContentStatus.ACTIVE,
                 Instant.now(), Instant.now()));

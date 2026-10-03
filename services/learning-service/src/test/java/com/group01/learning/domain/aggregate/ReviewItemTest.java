@@ -1,7 +1,8 @@
 package com.group01.learning.domain.aggregate;
 
-import com.group01.learning.domain.service.ReviewRule;
+import com.group01.learning.domain.vo.ReviewStage;
 import com.group01.learning.domain.vo.ReviewStatus;
+import com.group01.learning.domain.vo.TheoryReason;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -15,39 +16,58 @@ class ReviewItemTest {
                 ReviewStatus.PENDING, null, failedSets);
     }
 
-    @Test
-    void passedSetFinishesTheReview() {
-        ReviewItem review = pending(0);
-        UUID setId = review.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()).id();
-
-        assertThat(review.recordSetResult(setId, UUID.randomUUID(), true)).isEqualTo(ReviewStatus.DONE);
-        assertThat(review.openSet()).isEmpty();
-        assertThat(review.answeredSet()).get().satisfies(set -> assertThat(set.passed()).isTrue());
+    private static UUID assign(ReviewItem review) {
+        return review.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()).id();
     }
 
     @Test
-    void failedSetKeepsTheReviewPendingUntilTheLastAllowedFailure() {
-        ReviewItem review = pending(ReviewRule.MAX_FAILED_REVIEW_SETS - 2);
-        UUID first = review.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()).id();
-        assertThat(review.recordSetResult(first, UUID.randomUUID(), false)).isEqualTo(ReviewStatus.PENDING);
+    void setResultsFollowTheLadder() {
+        ReviewItem passed = pending(0);
+        assertThat(passed.recordSetResult(assign(passed), UUID.randomUUID(), 3, 4)).isEqualTo(ReviewStatus.DONE);
+        assertThat(passed.answeredSet()).get().satisfies(set -> {
+            assertThat(set.passed()).isTrue();
+            assertThat(set.correct()).isEqualTo(3);
+        });
 
-        ReviewItem reloaded = pending(ReviewRule.MAX_FAILED_REVIEW_SETS - 1);
-        UUID last = reloaded.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()).id();
-        assertThat(reloaded.recordSetResult(last, UUID.randomUUID(), false)).isEqualTo(ReviewStatus.SKIPPED);
+        ReviewItem failed = pending(0);
+        assertThat(failed.recordSetResult(assign(failed), UUID.randomUUID(), 2, 4)).isEqualTo(ReviewStatus.PENDING);
+        assertThat(failed.stage()).isEqualTo(ReviewStage.THEORY);
+        assertThat(failed.theoryReason()).isEqualTo(TheoryReason.SECOND_FAIL);
+
+        ReviewItem low = pending(0);
+        low.recordSetResult(assign(low), UUID.randomUUID(), 1, 4);
+        assertThat(low.theoryReason()).isEqualTo(TheoryReason.LOW_SCORE);
+
+        low.completeTheory();
+        assertThat(low.stage()).isEqualTo(ReviewStage.PRACTICE);
+        assertThat(low.theoryCompletedCount()).isEqualTo(1);
+        assertThat(low.recordSetResult(assign(low), UUID.randomUUID(), 2, 4)).isEqualTo(ReviewStatus.SKIPPED);
+    }
+
+    @Test
+    void stagesGuardSetsAndTheory() {
+        ReviewItem practice = pending(0);
+        assertThatThrownBy(practice::completeTheory).isInstanceOf(IllegalStateException.class);
+
+        ReviewItem theory = pending(0);
+        theory.startWithTheory(TheoryReason.WRONG_IN_LESSON);
+        assertThat(theory.isFresh()).isFalse();
+        assertThatThrownBy(() -> assign(theory)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> theory.startWithTheory(TheoryReason.WRONG_IN_LESSON))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
     void onlyTheOpenSetOfAPendingReviewAcceptsAnswers() {
         ReviewItem review = pending(0);
-        UUID setId = review.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()).id();
+        UUID setId = assign(review);
 
         assertThat(review.acceptsAnswersFor(UUID.randomUUID())).isFalse();
-        assertThatThrownBy(() -> review.recordSetResult(UUID.randomUUID(), UUID.randomUUID(), true))
+        assertThatThrownBy(() -> review.recordSetResult(UUID.randomUUID(), UUID.randomUUID(), 3, 3))
                 .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> review.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()))
-                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> assign(review)).isInstanceOf(IllegalStateException.class);
 
-        review.recordSetResult(setId, UUID.randomUUID(), true);
+        review.recordSetResult(setId, UUID.randomUUID(), 3, 3);
         assertThat(review.acceptsAnswersFor(setId)).isFalse();
     }
 
@@ -57,7 +77,6 @@ class ReviewItemTest {
         review.skip();
         assertThat(review.status()).isEqualTo(ReviewStatus.SKIPPED);
         assertThatThrownBy(review::skip).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> review.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()))
-                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> assign(review)).isInstanceOf(IllegalStateException.class);
     }
 }

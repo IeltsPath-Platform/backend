@@ -1,6 +1,7 @@
 package com.group01.learning.infrastructure.persistence;
 
 import com.group01.learning.application.exception.AccessUnavailableException;
+import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.application.exception.InsufficientPointsException;
 import com.group01.learning.application.exception.LearningRequestException;
 import com.group01.learning.application.exception.LlmUnavailableException;
@@ -95,13 +96,13 @@ class LessonWritingIntegrationTest {
     @BeforeEach
     void seed() {
         jdbc.execute("""
-                TRUNCATE review_sets, review_items, lesson_exercise_submissions, kp_evidence, lesson_progress,
+                TRUNCATE review_theory_checks, review_sets, review_items, lesson_exercise_submissions, kp_evidence, lesson_progress,
                 topic_progress, knowledge_point_catalog, topic_test_assignments, assessment_result_versions,
                 lesson_writing_submissions, llm_daily_usage RESTART IDENTITY
                 """);
         reset(content, access, llm);
         when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
-                "Writing", 900, List.of(kp(KP), kp(ESSAY_KP)))));
+                "Writing", 900, null, List.of(kp(KP), kp(ESSAY_KP)), LearningSkill.WRITING, true)));
         when(content.getTopicLessons(TOPIC)).thenReturn(List.of(new LearningContentClient.LessonSummary(LESSON, TOPIC,
                 "L4", "Essay lesson", null, 1, List.of(KP, ESSAY_KP), List.of(EXERCISE_BLOCK))));
         var exercise = new LearningContentClient.Block(EXERCISE_BLOCK, "EXERCISE", 1, null, null, null,

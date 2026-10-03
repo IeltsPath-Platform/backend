@@ -1,6 +1,6 @@
 # Kiến trúc hệ thống IELTSPath (backend)
 
-- Cập nhật lần cuối: 2026-10-01; dữ kiện đã kiểm với code sau khi learning-service có consumer kết quả thi
+- Cập nhật lần cuối: 2026-10-03; dữ kiện đã kiểm với code sau khi learning-service có lộ trình theo skill, Practice và thang ôn tập
 - Đọc khi cần hiểu toàn hệ thống. Quy tắc bắt buộc nằm ở [`AGENTS.md`](../AGENTS.md); hướng dẫn chạy chi tiết ở
   [`README.md`](../README.md). Code là nguồn đúng khi tài liệu này lệch.
 
@@ -45,7 +45,7 @@ library --HTTP--> content                 learning --HTTP--> content (/internal/
 | `game-service` | Phòng game, trận, phiên chơi, WebSocket realtime | `game_db` (compose 5435) | `/api/games/**`, `/ws/games/**` |
 | `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (compose 5434; default code là local 5432, đổi bằng `COMMUNITY_DB_URL`) | `/api/community/**` |
 | `notification-service` | Chưa triển khai (chỉ khung package) | `notification_db` (local 5432) | `/api/notifications/**` |
-| `learning-service` | Thứ tự topic theo user, bài học và nộp khối bài tập, cổng mở bài, mastery theo KP, bài ôn bằng gói luyện, giao mã đề cuối; nhận kết quả thi chính thức | `learning_db` (compose 5436) | `/api/learning/**` |
+| `learning-service` | Thứ tự topic theo user (mỗi skill một chuỗi), bài học và nộp khối bài tập, cổng mở bài, Practice theo bài, mastery theo KP, thang ôn tập (set → lý thuyết → set), giao mã đề cuối; nhận kết quả thi chính thức | `learning_db` (compose 5436) | `/api/learning/**` |
 
 Chi tiết schema: [`.sdd/database/DATABASE_V5.md`](../.sdd/database/DATABASE_V5.md). Service Java tự chạy Flyway khi khởi
 động (`src/main/resources/db/migration`).
@@ -62,7 +62,7 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | library | content | `GET /api/content/topics/{id}` khi ghi video | `CONTENT_SERVICE_URL` (mặc định `http://localhost:8082`) |
 | game (`VOCABULARY`) | library | `POST /internal/game-content/snapshots` | `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) |
 | game (`GRAMMAR`) | content | `POST /internal/game-content/snapshots` | `CONTENT_SERVICE_URL` |
-| learning | content | `/internal/learning-content/{topic-sequence,topics/{id}/lessons,lessons/{id},topics/{id}/test-packages,practice-sets/search,package-versions/{id}}` | `CONTENT_SERVICE_URL` (mặc định `http://localhost:8082`) |
+| learning | content | `/internal/learning-content/{topic-sequence,topics/{id}/lessons,lessons/{id},lessons/{id}/practice-sets,topics/{id}/practice-sets,topics/{id}/test-packages,practice-sets/search,practice-sets/availability,package-versions/{id}}` | `CONTENT_SERVICE_URL` (mặc định `http://localhost:8082`) |
 | learning | access | `GET /api/access/me/points` (số dư), `POST /internal/access/points/debit` (trừ 3 point sau khi chấm bài luận), bearer của học viên | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
 | learning | LLM (ngoài hệ thống) | `POST {base}/chat/completions` (OpenAI-compatible) khi chấm bài luận, ngoài mọi transaction | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` |
 
@@ -73,8 +73,9 @@ contract [`learning-content-internal-v1`](contracts/learning-content-internal-v1
 
 Listening dùng mp3 do team tự upload lên bucket cloud public-read. Content resolve key với `CONTENT_MEDIA_BASE_URL`
 (prefix `https://`) thành `mediaUrl`; URL `https://` đầy đủ được giữ nguyên, không cần base. Learning và Assessment
-chuyển tiếp URL đã resolve, không ghép lại. Transcript nằm trong `content_assets.text_content`: Learning chỉ trả khi
-bài hoàn thành hoặc review set đạt ≥ 70%; Assessment giữ trong snapshot server và trả `sectionSolutions` khi kết quả ≥ 70%.
+chuyển tiếp URL đã resolve, không ghép lại. Transcript nằm trong `content_assets.text_content`: Learning trả khi bài
+hoàn thành, hoặc sau khi nộp practice attempt hay set ôn; Assessment giữ trong snapshot server và trả `sectionSolutions`
+khi kết quả ≥ 70%.
 
 ### Bất đồng bộ (RabbitMQ)
 
@@ -88,6 +89,7 @@ learning: AssessmentCompletedListener (ack thủ công)
   -> queue learning.assessment-completed.v2 (retry qua ...v2.retry có TTL, vi phạm contract/hết lượt -> ...v2.dlq)
   -> AssessmentCompletedParser -> ApplyAssessmentResultUseCase (một transaction, khóa theo user):
      version theo (attempt, result_version) -> kp_evidence -> TOPIC_GATE dùng lần giao mã đề -> chèn bài ôn
+     (mastery < 0.6; stage ban đầu xét lúc học viên mở bài ôn, vì consumer không gọi Content)
 ```
 
 Contract: [`docs/contracts/assessment-completed-v2.md`](contracts/assessment-completed-v2.md). Bằng chứng gắn với user nên áp
@@ -144,13 +146,21 @@ Client -> Gateway (public /auth/login) -> user-service LoginUseCase -> UserRepos
 ### Học topic và bài (Learning Service)
 
 ```text
-GET /api/learning/topics -> một lần gọi Content topic-sequence -> knowledge_point_catalog + topic_progress.sequence_order
-  -> trạng thái suy ra khi đọc: PASSED (passed_at) / IN_PROGRESS (topic đầu chưa đạt) / LOCKED
-POST /api/learning/lessons/{id}/exercises/{blockId}/submissions -> khóa theo user -> cổng (REVIEW_REQUIRED, TOPIC_LOCKED,
-  LESSON_LOCKED) -> chấm answer-spec-v1 -> bằng chứng lần nộp đầu -> bài xong thì ReviewRule chèn bài ôn khi KP yếu
-GET /api/learning/reviews/{id} -> lý thuyết + một gói PRACTICE_SET (không còn gói -> SKIPPED)
-POST /api/learning/reviews/{id}/submissions -> mỗi set một lần; >=70% -> DONE; trượt 3 set -> SKIPPED
-POST /api/learning/topics/{id}/test-assignments -> một mã đề dùng một lần, xoay vòng theo package
+GET /api/learning/topics -> một lần gọi Content topic-sequence -> knowledge_point_catalog + topic_progress (skill,
+  has_topic_test, sequence_order) -> trạng thái suy ra khi đọc, theo từng skill: PASSED / IN_PROGRESS (topic đầu chưa
+  đạt của skill) / LOCKED
+POST /api/learning/lessons/{id}/exercises/{blockId}/submissions -> khóa theo user -> cổng (REVIEW_REQUIRED cùng skill,
+  TOPIC_LOCKED, LESSON_LOCKED) -> chấm answer-spec-v1 -> bằng chứng lần nộp đầu; xong bài không tạo bài ôn;
+  topic không có thi cuối thì PASSED khi xong mọi bài
+POST /api/learning/lessons/{id}/practice-attempts -> nộp -> lời giải; lần nộp đầu của package chưa lộ ghi bằng chứng
+  practice_set; < 70% tạo bài ôn cho KP < 70% (còn package chưa lộ); lưu lesson_practice_passes khi bài qua Practice
+GET /api/learning/reviews/{id} -> lý thuyết của KP; PRACTICE: một set chưa giao/chưa lộ, có hint (hết -> SKIPPED);
+  THEORY: quick-check <= 3 câu của bài
+POST /api/learning/reviews/{id}/submissions -> mỗi set một lần, luôn có lời giải; >=70% -> DONE; trượt -> THEORY;
+  trượt set thứ hai -> SKIPPED
+POST /api/learning/reviews/{id}/theory-check -> không ghi bằng chứng -> PRACTICE
+POST /api/learning/topics/{id}/test-assignments -> REVIEW_REQUIRED, PRACTICE_REQUIRED (mọi bài phải qua Practice),
+  TEST_LOCKED -> một mã đề dùng một lần, xoay vòng theo package
 ```
 
 Gợi ý Reading (`question_versions.hint`, Content V13) do Content lưu và trả qua

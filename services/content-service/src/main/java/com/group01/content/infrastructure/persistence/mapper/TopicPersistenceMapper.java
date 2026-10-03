@@ -18,6 +18,7 @@ public class TopicPersistenceMapper {
                 entity.getSortOrder(),
                 entity.getStatus(),
                 BandRange.of(entity.getBandMin(), entity.getBandMax()),
+                entity.getSkill(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -34,6 +35,7 @@ public class TopicPersistenceMapper {
                 .status(domain.getStatus())
                 .bandMin(domain.getBand().min())
                 .bandMax(domain.getBand().max())
+                .skill(domain.getSkill())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .build();

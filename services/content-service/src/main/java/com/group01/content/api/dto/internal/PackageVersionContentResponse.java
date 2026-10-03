@@ -31,6 +31,7 @@ public record PackageVersionContentResponse(
             @JsonRawValue String options,
             @JsonRawValue String answerSpec,
             String explanation,
+            String hint,
             double maxScore,
             List<KnowledgePointMapping> knowledgePointMappings
     ) {}
@@ -47,7 +48,7 @@ public record PackageVersionContentResponse(
                                         s.audio().durationSeconds(), s.audio().transcript()),
                                 s.items().stream()
                                 .map(i -> new Item(i.questionVersionId(), i.sortOrder(), i.stem(), i.optionsJson(),
-                                        i.answerSpecJson(), i.explanation(), i.maxScore(),
+                                        i.answerSpecJson(), i.explanation(), i.hint(), i.maxScore(),
                                         i.knowledgePointMappings().stream()
                                                 .map(m -> new KnowledgePointMapping(m.knowledgePointId(), m.weight()))
                                                 .toList()))

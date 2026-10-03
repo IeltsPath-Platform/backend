@@ -13,6 +13,7 @@ import com.group01.learning.domain.repository.ReviewItemRepository;
 import com.group01.learning.domain.service.LessonAccessGate;
 import com.group01.learning.domain.vo.MasteryHistory;
 import com.group01.learning.domain.vo.TopicStatus;
+import com.group01.learning.domain.entity.TopicProgress;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -56,15 +57,28 @@ public class LessonAccess {
             if (summary.lessonId().equals(lesson.lessonId())) { found = true; break; }
             previousComplete &= completed(progress.get(summary.lessonId()));
         }
-        gate.authorize(reviews.findPending(userId), null, status(userId, lesson.topicId()), previousComplete);
+        var topic = topic(userId, lesson.topicId());
+        gate.authorize(reviews.findPending(userId), null, topic.skill(),
+                status(userId, lesson.topicId()), previousComplete);
         if (!found) throw new LearningRequestException(404, "NOT_FOUND", "Lesson was not found");
         return new Context(lesson, progress.get(lesson.lessonId()), previousComplete);
     }
 
     /** Checks the gate again after a curriculum refresh may have changed the learner's current topic. */
     public void reauthorize(UUID userId, Context context) {
-        gate.authorize(reviews.findPending(userId), null, status(userId, context.lesson().topicId()),
+        var topic = topic(userId, context.lesson().topicId());
+        gate.authorize(reviews.findPending(userId), null, topic.skill(),
+                status(userId, context.lesson().topicId()),
                 context.previousLessonsComplete());
+    }
+
+    public TopicProgress topic(UUID userId, UUID topicId) {
+        var found = curricula.find(userId).topic(topicId);
+        if (found.isEmpty() || found.get().skill() == null) {
+            refreshTopics.execute(userId);
+            found = curricula.find(userId).topic(topicId);
+        }
+        return found.orElse(new TopicProgress(topicId, null, null));
     }
 
     public TopicStatus status(UUID userId, UUID topicId) {

@@ -8,6 +8,7 @@ import com.group01.learning.domain.repository.ReviewItemRepository;
 import com.group01.learning.domain.service.MasteryCalculator;
 import com.group01.learning.domain.service.ReviewRule;
 import com.group01.learning.domain.vo.PendingReview;
+import com.group01.learning.domain.vo.LearningSkill;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -42,11 +43,15 @@ public class ReviewReevaluation {
             if (history.hasPracticeSet()) practiceKps.add(history.knowledgePointId());
         }
         Map<UUID, Integer> topicOrder = new HashMap<>();
-        for (TopicProgress topic : curricula.find(userId).topics()) topicOrder.put(topic.topicId(), topic.sequenceOrder());
+        Map<UUID, LearningSkill> topicSkills = new HashMap<>();
+        for (TopicProgress topic : curricula.find(userId).topics()) {
+            topicOrder.put(topic.topicId(), topic.sequenceOrder());
+            topicSkills.put(topic.topicId(), topic.skill());
+        }
         Map<UUID, List<ReviewRule.CompletedLesson>> lessonsByKp = new HashMap<>();
         for (var lesson : lessons.findCompleted(userId)) {
             var completed = new ReviewRule.CompletedLesson(lesson.lessonId(),
-                    topicOrder.get(lesson.topicId()), lesson.sortOrder());
+                    topicOrder.get(lesson.topicId()), lesson.sortOrder(), topicSkills.get(lesson.topicId()));
             for (UUID kpId : lesson.knowledgePointIds()) {
                 lessonsByKp.computeIfAbsent(kpId, ignored -> new ArrayList<>()).add(completed);
             }

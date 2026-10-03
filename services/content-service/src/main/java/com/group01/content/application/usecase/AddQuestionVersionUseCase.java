@@ -58,7 +58,8 @@ public class AddQuestionVersionUseCase {
                 saved.getStatus(),
                 saved.getCurrentPublishedVersionId(),
                 saved.getCreatedAt(),
-                saved.getUpdatedAt()
+                saved.getUpdatedAt(),
+                saved.getPurpose()
         );
     }
 }

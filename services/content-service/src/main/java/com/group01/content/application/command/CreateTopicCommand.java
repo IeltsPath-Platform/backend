@@ -1,6 +1,7 @@
 package com.group01.content.application.command;
 
 import com.group01.content.domain.vo.BandRange;
+import com.group01.content.domain.vo.Skill;
 import java.util.UUID;
 
 public record CreateTopicCommand(
@@ -8,6 +9,7 @@ public record CreateTopicCommand(
         String code,
         String name,
         int sortOrder,
-        BandRange band
+        BandRange band,
+        Skill skill
 ) {}
 

@@ -10,16 +10,19 @@ import com.group01.learning.domain.aggregate.TopicTestAssignment;
 import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.repository.LearnerCurriculumRepository;
 import com.group01.learning.domain.repository.LessonProgressRepository;
-import com.group01.learning.domain.repository.ReviewItemRepository;
 import com.group01.learning.domain.repository.TopicTestAssignmentRepository;
 import com.group01.learning.domain.service.PackageRotation;
 import com.group01.learning.domain.vo.TopicStatus;
+import com.group01.learning.domain.vo.PracticeStatus;
+import com.group01.learning.application.service.PracticeProgress;
+import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.HashMap;
 
 /**
  * Gives the learner one final-test code for the current topic. A code is used once: after its attempt is consumed
@@ -31,27 +34,59 @@ public class AssignTopicTestUseCase {
     private final LearnerLock lock;
     private final LearnerCurriculumRepository curricula;
     private final LessonProgressRepository lessons;
-    private final ReviewItemRepository reviews;
     private final TopicTestAssignmentRepository assignments;
+    private final RefreshLearningTopicsUseCase refreshTopics;
+    private final PracticeProgress practice;
 
     public AssignTopicTestUseCase(LearningContentClient content, LearnerLock lock,
                                   LearnerCurriculumRepository curricula, LessonProgressRepository lessons,
-                                  ReviewItemRepository reviews, TopicTestAssignmentRepository assignments) {
+                                  TopicTestAssignmentRepository assignments,
+                                  RefreshLearningTopicsUseCase refreshTopics, PracticeProgress practice) {
         this.content = content;
         this.lock = lock;
         this.curricula = curricula;
         this.lessons = lessons;
-        this.reviews = reviews;
         this.assignments = assignments;
+        this.refreshTopics = refreshTopics;
+        this.practice = practice;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = LearningRequestException.class)
     public TestAssignmentResult execute(UUID userId, UUID topicId) {
         lock.lock(userId);
-        var pending = reviews.findPending(userId);
+        var curriculum = curricula.find(userId);
+        var topic = curriculum.topic(topicId);
+        if (topic.isEmpty() || topic.get().skill() == null) {
+            refreshTopics.execute(userId);
+            curriculum = curricula.find(userId);
+            topic = curriculum.topic(topicId);
+        }
+        if (topic.isPresent() && !topic.get().hasTopicTest()) {
+            throw new LearningRequestException(409, "NO_TOPIC_TEST", "This topic has no final test");
+        }
+        var skill = topic.map(com.group01.learning.domain.entity.TopicProgress::skill).orElse(null);
+        var topicLessons = content.getTopicLessons(topicId);
+        Map<UUID, LessonProgress> done = lessons.findByTopic(userId, topicId);
+        Map<UUID, Boolean> completed = new HashMap<>();
+        for (var lesson : topicLessons) {
+            LessonProgress progress = done.get(lesson.lessonId());
+            completed.put(lesson.lessonId(), progress != null && progress.isCompleted());
+        }
+        var topicPractice = practice.forTopic(userId, topicId, completed);
+        var pending = topicPractice.pendingReviews().stream()
+                .filter(review -> review.skill() == null || review.skill() == skill).toList();
         if (!pending.isEmpty()) throw new LearningGateException("REVIEW_REQUIRED", pending);
-        TopicStatus status = curricula.find(userId).status(topicId);
-        if (status != TopicStatus.IN_PROGRESS || !allLessonsCompleted(userId, topicId)) {
+        var practiceStates = topicPractice.clearances();
+        practice.persistPassed(userId, practiceStates);
+        List<UUID> missing = topicLessons.stream().map(LearningContentClient.LessonSummary::lessonId)
+                .filter(id -> practiceStates.get(id).status() == PracticeStatus.REQUIRED).toList();
+        if (!missing.isEmpty()) {
+            throw new LearningRequestException(409, "PRACTICE_REQUIRED", "Complete practice for these lessons",
+                    null, missing);
+        }
+        TopicStatus status = curriculum.status(topicId);
+        if (status != TopicStatus.IN_PROGRESS || topicLessons.isEmpty()
+                || completed.values().stream().anyMatch(value -> !value)) {
             throw new LearningRequestException(403, "TEST_LOCKED", "Complete the topic lessons first");
         }
         var open = assignments.findOpen(userId, topicId);
@@ -67,15 +102,6 @@ public class AssignTopicTestUseCase {
                 chosen.packageId(), chosen.packageVersionId());
         assignments.save(assignment);
         return result(assignment);
-    }
-
-    private boolean allLessonsCompleted(UUID userId, UUID topicId) {
-        var topicLessons = content.getTopicLessons(topicId);
-        Map<UUID, LessonProgress> done = lessons.findByTopic(userId, topicId);
-        return !topicLessons.isEmpty() && topicLessons.stream().allMatch(lesson -> {
-            LessonProgress progress = done.get(lesson.lessonId());
-            return progress != null && progress.isCompleted();
-        });
     }
 
     private static TestAssignmentResult result(TopicTestAssignment assignment) {

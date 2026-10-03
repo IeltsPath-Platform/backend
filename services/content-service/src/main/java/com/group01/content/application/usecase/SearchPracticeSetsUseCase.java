@@ -36,7 +36,8 @@ public class SearchPracticeSetsUseCase {
         if (limit < 1 || limit > MAX_LIMIT) {
             throw new IllegalArgumentException("limit must be between 1 and " + MAX_LIMIT);
         }
-        List<UUID> exclude =command.excludePackageIds() == null ? List.of() : command.excludePackageIds();
-        return reader.searchPracticeSets(command.knowledgePointId(), exclude, minQuestions, limit);
+        List<UUID> exclude = command.excludePackageIds() == null ? List.of() : command.excludePackageIds();
+        return reader.searchPracticeSets(command.knowledgePointId(), exclude, minQuestions, limit,
+                command.preferredLessonId());
     }
 }

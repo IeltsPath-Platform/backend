@@ -1,5 +1,7 @@
 package com.group01.learning.application.port;
 
+import com.group01.learning.domain.vo.LearningSkill;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -14,14 +16,30 @@ public interface LearningContentClient {
 
     List<TestPackage> getTopicTestPackages(UUID topicId);
 
+    List<LessonPracticeSet> lessonPracticeSets(UUID lessonId);
+
+    TopicPracticeSets topicPracticeSets(UUID topicId);
+
+    Map<UUID, Integer> practiceSetAvailability(List<UUID> knowledgePointIds, List<UUID> excludePackageIds,
+                                                int minQuestions);
+
     List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
                                        int minQuestions, int limit);
+
+    default List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
+                                                 int minQuestions, int limit, UUID preferredLessonId) {
+        return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit);
+    }
 
     PackageVersion getPackageVersion(UUID versionId);
 
     /** {@code requiredFeatureKey} is the Access feature needed to learn the topic; null means free. */
     record Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
-                 List<KnowledgePoint> knowledgePoints) {
+                 List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest) {
+        public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                     List<KnowledgePoint> knowledgePoints) {
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, null, true);
+        }
         public Topic(UUID topicId, String code, String name, int sortOrder, List<KnowledgePoint> knowledgePoints) {
             this(topicId, code, name, sortOrder, null, knowledgePoints);
         }
@@ -36,12 +54,23 @@ public interface LearningContentClient {
     }
 
     record Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
-                  int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks) {
+                  int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks, LearningSkill skill) {
+        public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
+                      int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks) {
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, null);
+        }
     }
 
     /** {@code blockKind} is {@code EXERCISE} or {@code ESSAY} on exercise blocks; absent means {@code EXERCISE}. */
+    /** {@code knowledgePointIds}: the KPs a TEXT block teaches, or the KPs of an exercise block's questions. */
     record Block(UUID blockId, String blockType, int sortOrder, String textContent, Asset asset,
-                 List<UUID> vocabularySenseIds, List<Question> questions, String blockKind) {
+                 List<UUID> vocabularySenseIds, List<Question> questions, String blockKind,
+                 List<UUID> knowledgePointIds) {
+        public Block(UUID blockId, String blockType, int sortOrder, String textContent, Asset asset,
+                     List<UUID> vocabularySenseIds, List<Question> questions, String blockKind) {
+            this(blockId, blockType, sortOrder, textContent, asset, vocabularySenseIds, questions, blockKind, null);
+        }
+
         public Block(UUID blockId, String blockType, int sortOrder, String textContent, Asset asset,
                      List<UUID> vocabularySenseIds, List<Question> questions) {
             this(blockId, blockType, sortOrder, textContent, asset, vocabularySenseIds, questions, null);
@@ -93,6 +122,13 @@ public interface LearningContentClient {
                        int matchedQuestionCount) {
     }
 
+    record LessonPracticeSet(UUID packageId, UUID packageVersionId, String code, String title,
+                             int questionCount, List<UUID> knowledgePointIds, String requiredFeatureKey) {}
+
+    record TopicPracticeSets(List<LessonSets> lessons) {
+        public record LessonSets(UUID lessonId, List<LessonPracticeSet> practiceSets) {}
+    }
+
     record PackageVersion(UUID packageVersionId, UUID packageId, String packageType, UUID topicId,
                           Map<String, Object> rules, List<Section> sections) {
     }
@@ -105,13 +141,19 @@ public interface LearningContentClient {
         }
     }
 
-    /** The transcript is an answer: learners see it only after passing. */
+    /** The transcript is an answer: learner responses expose it only after the permitted submission. */
     record SectionAudio(UUID assetId, String mediaUrl, Integer durationSeconds, String transcript) {
     }
 
     record Item(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
-                Map<String, Object> answerSpec, String explanation, BigDecimal maxScore,
+                Map<String, Object> answerSpec, String explanation, String hint, BigDecimal maxScore,
                 List<KnowledgePointMapping> knowledgePointMappings) {
+        public Item(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
+                    Map<String, Object> answerSpec, String explanation, BigDecimal maxScore,
+                    List<KnowledgePointMapping> knowledgePointMappings) {
+            this(questionVersionId, sortOrder, stem, options, answerSpec, explanation, null, maxScore,
+                    knowledgePointMappings);
+        }
     }
 
     record KnowledgePointMapping(UUID knowledgePointId, BigDecimal weight) {

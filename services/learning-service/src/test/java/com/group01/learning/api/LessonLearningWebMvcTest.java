@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.group01.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import com.group01.learning.api.controller.LessonLearningController;
+import com.group01.learning.api.controller.ReviewController;
+import com.group01.learning.api.controller.PracticeController;
 import com.group01.learning.api.dto.response.ReviewResponse;
 import com.group01.learning.api.dto.response.ReviewSubmissionResponse;
 import com.group01.learning.application.command.SubmitExerciseCommand;
@@ -16,6 +18,20 @@ import com.group01.learning.application.usecase.GetLessonUseCase;
 import com.group01.learning.application.usecase.SubmitLessonExerciseUseCase;
 import com.group01.learning.application.usecase.CompleteLessonUseCase;
 import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
+import com.group01.learning.application.usecase.ListReviewsUseCase;
+import com.group01.learning.application.usecase.SubmitTheoryCheckUseCase;
+import com.group01.learning.application.usecase.GetReviewUseCase;
+import com.group01.learning.application.usecase.SubmitReviewUseCase;
+import com.group01.learning.application.usecase.AssignTopicTestUseCase;
+import com.group01.learning.application.usecase.GetLessonPracticeSetsUseCase;
+import com.group01.learning.application.usecase.StartPracticeAttemptUseCase;
+import com.group01.learning.application.usecase.GetPracticeAttemptUseCase;
+import com.group01.learning.application.usecase.SubmitPracticeAttemptUseCase;
+import com.group01.learning.domain.vo.ReviewListEntry;
+import com.group01.learning.domain.vo.ReviewStatus;
+import com.group01.learning.domain.vo.LearningSkill;
+import com.group01.learning.domain.vo.ReviewStage;
+import java.time.Instant;
 import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.vo.PendingReview;
 import com.group01.learning.domain.vo.TopicStatus;
@@ -54,7 +70,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = LessonLearningController.class, properties = {
+@WebMvcTest(controllers = {LessonLearningController.class, ReviewController.class, PracticeController.class}, properties = {
         "spring.config.import=",
         "spring.cloud.config.enabled=false",
         "eureka.client.enabled=false",
@@ -92,10 +108,52 @@ class LessonLearningWebMvcTest {
     @MockitoBean CompleteLessonUseCase completeLessonUseCase;
     @MockitoBean RefreshLearningTopicsUseCase topics;
     @MockitoBean GetMasteryUseCase mastery;
+    @MockitoBean ListReviewsUseCase listReviews;
+    @MockitoBean SubmitTheoryCheckUseCase submitTheoryCheck;
+    @MockitoBean GetReviewUseCase getReviewUseCase;
+    @MockitoBean SubmitReviewUseCase submitReviewUseCase;
+    @MockitoBean AssignTopicTestUseCase assignTopicTestUseCase;
+    @MockitoBean GetLessonPracticeSetsUseCase practiceCatalog;
+    @MockitoBean StartPracticeAttemptUseCase startPractice;
+    @MockitoBean GetPracticeAttemptUseCase getPractice;
+    @MockitoBean SubmitPracticeAttemptUseCase submitPractice;
 
     @BeforeEach
     void verifiedIdentity() {
         when(currentUser.requireUserId()).thenReturn(USER);
+    }
+
+    @Test
+    void practiceStartAndReadHideAnswersBeforeSubmission() throws Exception {
+        UUID attemptId = UUID.randomUUID();
+        UUID packageId = UUID.randomUUID();
+        var view = new PracticeAttemptView(attemptId, packageId, UUID.randomUUID(), "Passage", null,
+                List.of(new LessonResult.Question(QUESTION, 1, "Question", null, "Hint")));
+        when(startPractice.execute(USER, LESSON, packageId)).thenReturn(view);
+        when(getPractice.execute(USER, attemptId)).thenReturn(new GetPracticeAttemptUseCase.Result(view, null));
+        var started = body(mvc.perform(authenticated(post("/api/learning/lessons/{id}/practice-attempts", LESSON)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"packageId\":\"" + packageId + "\"}")))
+                .andExpect(status().isCreated()).andReturn());
+        var fetched = body(mvc.perform(authenticated(get("/api/learning/practice-attempts/{id}", attemptId)))
+                .andExpect(status().isOk()).andReturn());
+        assertEquals("Hint", started.path("questions").get(0).path("hint").asText());
+        assertFalse(started.toString().contains("answerSpec"));
+        assertFalse(started.toString().contains("explanation"));
+        assertFalse(fetched.toString().contains("answerSpec"));
+        assertFalse(fetched.toString().contains("explanation"));
+    }
+
+    @Test
+    void listsOwnedReviewsWithSkillAndRejectsExcessiveLimit() throws Exception {
+        when(listReviews.execute(USER, ReviewStatus.PENDING, LearningSkill.READING, 20))
+                .thenReturn(List.of(new ReviewListEntry(REVIEW, KP, LESSON, LearningSkill.READING,
+                        ReviewStage.THEORY, Instant.parse("2026-10-01T00:00:00Z"))));
+        mvc.perform(authenticated(get("/api/learning/reviews").param("skill", "READING")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].skill").value("READING"))
+                .andExpect(jsonPath("$[0].stage").value("THEORY"));
+        mvc.perform(authenticated(get("/api/learning/reviews").param("limit", "101")))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -176,23 +234,23 @@ class LessonLearningWebMvcTest {
     }
 
     @Test
-    void sharedReviewDtosKeepHintsNullEvenIfAnInternalResultContainsOne() {
-        var question = new LessonResult.Question(QUESTION, 1, "Choose one", null, "Must remain private to lessons.");
+    void reviewSetsCarryHintsAndEveryAnsweredSetShowsItsSolutions() {
+        var question = new LessonResult.Question(QUESTION, 1, "Choose one", null, "Look at the first sentence.");
         var review = new ReviewResult(REVIEW, "PENDING", LESSON, List.of(), new ReviewResult.ReviewSet(
-                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Passage", null, List.of(question)));
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Passage", null, List.of(question)),
+                KP, LearningSkill.READING, "PRACTICE", null, "KNOWLEDGE_POINT", 0, 2, List.of());
         JsonNode reviewQuestion = json.valueToTree(ReviewResponse.from(review)).path("set").path("questions").get(0);
-        assertQuestionAllowlist(reviewQuestion);
+        assertEquals(Set.of("questionVersionId", "sortOrder", "stem", "options", "hint"), keys(reviewQuestion));
+        assertEquals("Look at the first sentence.", reviewQuestion.path("hint").asText());
         for (boolean passed : List.of(false, true)) {
             var result = new ReviewSubmissionResult(passed ? "DONE" : "PENDING", passed,
-                    List.of(new SubmissionResult.AnswerResult(QUESTION, false, "A", "Explanation", "Hidden hint")), null);
+                    List.of(new SubmissionResult.AnswerResult(QUESTION, false, "A", "Explanation", "Hidden hint")),
+                    null, passed ? "PRACTICE" : "THEORY", 1);
             JsonNode answer = json.valueToTree(ReviewSubmissionResponse.from(result)).path("results").get(0);
-            assertTrue(answer.has("hint"));
             assertTrue(answer.path("hint").isNull());
             assertFalse(answer.has("answerSpec"));
-            if (!passed) {
-                assertFalse(answer.has("correctAnswer"));
-                assertFalse(answer.has("explanation"));
-            }
+            assertEquals("A", answer.path("correctAnswer").asText());
+            assertEquals("Explanation", answer.path("explanation").asText());
         }
     }
 

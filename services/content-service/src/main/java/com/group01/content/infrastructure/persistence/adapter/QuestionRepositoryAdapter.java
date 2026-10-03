@@ -3,6 +3,7 @@ package com.group01.content.infrastructure.persistence.adapter;
 import com.group01.content.domain.aggregate.Question;
 import com.group01.content.domain.repository.QuestionRepository;
 import com.group01.content.domain.vo.Skill;
+import com.group01.content.domain.vo.QuestionPurpose;
 import com.group01.content.infrastructure.persistence.mapper.QuestionPersistenceMapper;
 import com.group01.content.infrastructure.persistence.repository.QuestionJpaRepository;
 import org.springframework.stereotype.Component;
@@ -48,6 +49,11 @@ public class QuestionRepositoryAdapter implements QuestionRepository {
     @Override
     public List<Question> findAll() {
         return questionJpaRepository.findAll().stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<Question> findByPurpose(QuestionPurpose purpose, Skill skill) {
+        return questionJpaRepository.findByPurpose(purpose, skill).stream().map(mapper::toDomainSummary).toList();
     }
 }
 

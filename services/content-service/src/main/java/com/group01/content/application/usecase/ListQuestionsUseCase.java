@@ -4,6 +4,7 @@ import com.group01.content.application.result.QuestionResult;
 import com.group01.content.domain.aggregate.Question;
 import com.group01.content.domain.repository.QuestionRepository;
 import com.group01.content.domain.vo.Skill;
+import com.group01.content.domain.vo.QuestionPurpose;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,8 +21,14 @@ public class ListQuestionsUseCase {
     }
 
     public List<QuestionResult> execute(Skill skill) {
+        return execute(skill, null);
+    }
+
+    public List<QuestionResult> execute(Skill skill, QuestionPurpose purpose) {
         List<Question> questions;
-        if (skill != null) {
+        if (purpose != null) {
+            questions = questionRepository.findByPurpose(purpose, skill);
+        } else if (skill != null) {
             questions = questionRepository.findBySkill(skill);
         } else {
             questions = questionRepository.findAll();
@@ -36,7 +43,8 @@ public class ListQuestionsUseCase {
                         q.getStatus(),
                         q.getCurrentPublishedVersionId(),
                         q.getCreatedAt(),
-                        q.getUpdatedAt()
+                        q.getUpdatedAt(),
+                        q.getPurpose()
                 ))
                 .toList();
     }
