@@ -481,7 +481,7 @@ class LessonPipelineSeedTest {
             return sameTransaction.searchPracticeSets(kpId("TFNG_FALSE_VS_NOT_GIVEN"), List.of(), 3, 10, null).stream()
                     .map(PracticeSetResult::code).toList();
         });
-        assertThat(found).containsExactly("PS-TF-A");
+        assertThat(found).containsExactly("PS-TF-A", "PS-TF-B", "PS-TF-C");
     }
 
     @Test
@@ -490,7 +490,12 @@ class LessonPipelineSeedTest {
         PracticeSetResult first = reader.searchPracticeSets(kp2, List.of(), 3, 1, null).get(0);
         PracticeSetResult second = reader.searchPracticeSets(kp2, List.of(first.packageId()), 3, 1, null).get(0);
         assertThat(Set.of(first.code(), second.code())).containsExactlyInAnyOrder("PS-KP2-A", "PS-KP2-B");
-        assertThat(reader.searchPracticeSets(kp2, List.of(first.packageId(), second.packageId()), 3, 1, null)).isEmpty();
+        // The four-question sets come before the three-question V18 set.
+        PracticeSetResult third = reader.searchPracticeSets(kp2, List.of(first.packageId(), second.packageId()), 3, 1,
+                null).get(0);
+        assertThat(third.code()).isEqualTo("PS-KP2-C");
+        assertThat(reader.searchPracticeSets(kp2, List.of(first.packageId(), second.packageId(), third.packageId()), 3,
+                1, null)).isEmpty();
         assertThat(first.questionCount()).isEqualTo(4);
         assertThat(first.matchedQuestionCount()).isEqualTo(4);
 
@@ -526,7 +531,11 @@ class LessonPipelineSeedTest {
                 Map.entry("PS-KP3-A", "L1"), Map.entry("PS-KP4-A", "L4"), Map.entry("PS-NUM", "LS1"),
                 Map.entry("PS-SPELL", "LS1"), Map.entry("PS-PARA", "LS2"), Map.entry("PS-TRAP", "LS2"),
                 Map.entry("PS-TF-A", "TF1"), Map.entry("PS-PM1-A", "PM1"), Map.entry("PS-PM2-A", "PM2"),
-                Map.entry("PS-PS1-A", "PS1"), Map.entry("PS-PS2-A", "PS2"))));
+                Map.entry("PS-PS1-A", "PS1"), Map.entry("PS-PS2-A", "PS2"),
+                Map.entry("PS-KP3-B", "L1"), Map.entry("PS-KP3-C", "L1"), Map.entry("PS-KP2-C", "L3"),
+                Map.entry("PS-KP4-B", "L4"), Map.entry("PS-KP4-C", "L4"), Map.entry("PS-TF-B", "TF1"),
+                Map.entry("PS-TF-C", "TF1"), Map.entry("PS-PM1-B", "PM1"), Map.entry("PS-PM2-B", "PM2"),
+                Map.entry("PS-PS1-B", "PS1"), Map.entry("PS-PS2-B", "PS2"))));
         // The one-question V4 demo package is too small to be anyone's Practice.
         assertThat(jdbc.queryForObject("SELECT lesson_id FROM content_packages WHERE code = 'DEMO_MAIN_FLOW_READING'",
                 Map.of(), UUID.class)).isNull();
@@ -600,7 +609,7 @@ class LessonPipelineSeedTest {
         UUID setA = jdbc.queryForObject("SELECT id FROM content_packages WHERE code = 'PS-KP1-A'", Map.of(), UUID.class);
 
         assertThat(reader.countEligiblePracticeSets(List.of(kp1, kp5, unknown), List.of(setA), 3))
-                .containsExactlyInAnyOrderEntriesOf(Map.of(kp1, 3, kp5, 1, unknown, 0));
+                .containsExactlyInAnyOrderEntriesOf(Map.of(kp1, 3, kp5, 3, unknown, 0));
     }
 
     @Test
@@ -847,8 +856,9 @@ class LessonPipelineSeedTest {
         List<UUID> all = jdbc.queryForList("SELECT id FROM question_versions", Map.of(), UUID.class);
         Set<UUID> reserved = reader.questionVersionsReservedForLearning(all);
         // 43 reading questions, the Task 1 and Task 2 essays, 27 listening questions, the V4 practice-set question
-        // the 10 questions of the paid topics and the 21 practice questions of V16.
-        assertThat(reserved).hasSize(104);
+        // the 10 questions of the paid topics, the 21 practice questions of V16 and the 43 practice and final-test
+        // questions of V18.
+        assertThat(reserved).hasSize(147);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }
 
