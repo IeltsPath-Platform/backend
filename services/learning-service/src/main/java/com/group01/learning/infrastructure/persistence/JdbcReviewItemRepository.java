@@ -73,12 +73,12 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
 
     @Override
     public void backfillMissingSkill(UUID userId) {
+        // Keyed by KP, not lesson: a review can point at a lesson the learner has never opened (moved demo essays).
         jdbc.update("""
-                UPDATE review_items r SET skill = t.skill
-                FROM lesson_progress l JOIN topic_progress t
-                  ON t.user_id = l.user_id AND t.topic_id = l.topic_id
-                WHERE r.user_id = :userId AND r.skill IS NULL AND l.user_id = r.user_id
-                  AND l.lesson_id = r.lesson_id AND t.skill IS NOT NULL
+                UPDATE review_items r SET skill = c.skill
+                FROM knowledge_point_catalog c
+                WHERE r.user_id = :userId AND r.skill IS NULL
+                  AND c.kp_id = r.knowledge_point_id AND c.skill IS NOT NULL
                 """, Map.of("userId", userId));
     }
 

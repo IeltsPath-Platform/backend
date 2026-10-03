@@ -16,6 +16,7 @@ import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.repository.KnowledgePointCatalogRepository;
 import com.group01.learning.domain.repository.LearnerCurriculumRepository;
 import com.group01.learning.domain.vo.KnowledgePointCatalogEntry;
+import com.group01.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -111,10 +112,10 @@ class LessonSubmissionIntegrationTest {
                 assessment_result_versions RESTART IDENTITY
                 """);
         when(content.getTopicSequence()).thenReturn(List.of(
-                new LearningContentClient.Topic(TOPIC, "FIRST", "First topic", 900,
-                        List.of(knowledgePoint(KP, true))),
-                new LearningContentClient.Topic(OTHER_TOPIC, "SECOND", "Second topic", 910,
-                        List.of(knowledgePoint(OTHER_KP, false)))));
+                new LearningContentClient.Topic(TOPIC, "FIRST", "First topic", 900, null,
+                        List.of(knowledgePoint(KP, true)), LearningSkill.READING, true),
+                new LearningContentClient.Topic(OTHER_TOPIC, "SECOND", "Second topic", 910, null,
+                        List.of(knowledgePoint(OTHER_KP, false)), LearningSkill.READING, true)));
         when(content.getTopicLessons(TOPIC)).thenReturn(List.of(
                 new LearningContentClient.LessonSummary(LESSON, TOPIC, "L1", "First lesson", null,
                         1, List.of(KP), List.of(BLOCK))));

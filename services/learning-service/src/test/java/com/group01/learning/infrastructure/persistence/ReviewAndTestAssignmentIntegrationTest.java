@@ -99,8 +99,9 @@ class ReviewAndTestAssignmentIntegrationTest {
                 lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments,
                 assessment_result_versions RESTART IDENTITY
                 """);
-        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "LISTEN", "Listening", 920,
-                List.of(new KnowledgePoint(KP, "LS_NUM", "Numbers", "PROCEDURE", "LISTENING", "d", true)))));
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "LISTEN", "Listening", 920, null,
+                List.of(new KnowledgePoint(KP, "LS_NUM", "Numbers", "PROCEDURE", "LISTENING", "d", true)),
+                LearningSkill.LISTENING, true)));
         when(content.getTopicLessons(TOPIC)).thenReturn(List.of(new LessonSummary(LESSON, TOPIC, "LS1", "Form", null,
                 1, List.of(KP), List.of(EXERCISE_BLOCK, ESSAY_BLOCK))));
         Asset audio = new Asset(UUID.randomUUID(), "AUDIO", "Caller: It is Thompson.", "listening/demo/ls1.mp3", 45,

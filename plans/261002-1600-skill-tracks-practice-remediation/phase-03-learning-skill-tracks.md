@@ -46,8 +46,8 @@ Unit test bắt buộc cho `TopicStatusDeriver` (2 skill độc lập, mỗi ski
 - `RefreshLearningTopicsUseCase`:
   - lưu `skill`, `hasTopicTest` cho từng topic;
   - lưu `knowledge_point_catalog.skill`;
-  - sau đó backfill `review_items.skill` còn NULL của user: join `review_items.lesson_id → lesson_progress.topic_id →
-    topic_progress.skill`;
+  - sau đó backfill `review_items.skill` còn NULL của user theo `knowledge_point_id → knowledge_point_catalog.skill`
+    (không join qua `lesson_progress`: review KP6/KP7 trỏ W1/W2 mà learner chưa mở);
   - `TopicResult` thêm `skill`, `hasTopicTest`. Thứ tự trả về: theo skill (LISTENING, READING, WRITING, SPEAKING) rồi
     `sequence_order`.
 - `LessonAccess.authorize`:
@@ -85,7 +85,7 @@ Unit test bắt buộc cho `TopicStatusDeriver` (2 skill độc lập, mỗi ski
   1. Ban đầu READING#1, LISTENING#1, WRITING#1 đều IN_PROGRESS.
   2. Có review Reading PENDING (tạo qua `AssessmentResult` TOPIC_GATE sai KP hoặc insert thẳng `review_items` trong
      test – P4 mới bỏ review khi hoàn thành lesson, nhưng test này không được dựa vào luồng đó) ⇒ lesson Reading tiếp
-     theo 409 REVIEW_REQUIRED; lesson Listening 200.
+     theo 403 REVIEW_REQUIRED (status hiện có của contract); lesson Listening 200.
   3. Hoàn thành mọi lesson Writing ⇒ topic Writing PASSED, không cần test.
   4. `POST /topics/{writing}/test-assignments` ⇒ 409 NO_TOPIC_TEST.
   5. Review cũ `skill NULL` chặn mọi skill cho tới khi refresh backfill.
