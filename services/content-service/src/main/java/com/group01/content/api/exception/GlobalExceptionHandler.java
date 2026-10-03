@@ -47,6 +47,14 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
     }
 
+    @ExceptionHandler(InvalidPackageLessonException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPackageLesson(InvalidPackageLessonException ex,
+                                                                    HttpServletRequest request) {
+        log.warn("Package lesson refused: {}", ex.getMessage());
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "INVALID_PACKAGE_LESSON"));
+    }
+
     @ExceptionHandler(TopicSkillLockedException.class)
     public ResponseEntity<ErrorResponse> handleTopicSkillLocked(TopicSkillLockedException ex, HttpServletRequest request) {
         log.warn("Topic skill change refused: {}", ex.getMessage());

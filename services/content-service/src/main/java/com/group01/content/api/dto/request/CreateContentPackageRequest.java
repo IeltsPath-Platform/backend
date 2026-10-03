@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.util.UUID;
+
 public record CreateContentPackageRequest(
         @NotBlank(message = "code is required")
         @Size(max = 100, message = "code must not exceed 100 characters")
@@ -18,5 +20,7 @@ public record CreateContentPackageRequest(
         @NotNull(message = "packageType is required")
         PackageType packageType,
 
-        AccessLevel accessLevel
+        AccessLevel accessLevel,
+        // Only for PRACTICE_SET: the lesson whose Practice the set belongs to.
+        UUID lessonId
 ) {}

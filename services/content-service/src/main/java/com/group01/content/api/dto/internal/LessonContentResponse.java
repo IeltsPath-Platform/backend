@@ -6,6 +6,7 @@ import com.group01.content.application.result.LessonContentResult;
 import com.group01.content.domain.vo.AssetType;
 import com.group01.content.domain.vo.BlockType;
 import com.group01.content.domain.vo.LessonBlockKind;
+import com.group01.content.domain.vo.Skill;
 
 import java.util.List;
 import java.util.UUID;
@@ -19,9 +20,13 @@ public record LessonContentResponse(
         String summary,
         int sortOrder,
         List<UUID> knowledgePointIds,
-        List<Block> blocks
+        List<Block> blocks,
+        Skill skill
 ) {
-    /** A block shows only the field of its type; {@code blockKind} appears on EXERCISE blocks. */
+    /**
+     * A block shows only the field of its type; {@code blockKind} appears on EXERCISE blocks.
+     * {@code knowledgePointIds} are those a TEXT block teaches or an EXERCISE block's questions measure.
+     */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Block(
             UUID blockId,
@@ -31,7 +36,8 @@ public record LessonContentResponse(
             String textContent,
             Asset asset,
             List<UUID> vocabularySenseIds,
-            List<Question> questions
+            List<Question> questions,
+            List<UUID> knowledgePointIds
     ) {}
 
     /** For AUDIO, {@code textContent} is the transcript and {@code mediaUrl} the playable URL. */
@@ -59,7 +65,7 @@ public record LessonContentResponse(
     public static LessonContentResponse from(LessonContentResult result) {
         return new LessonContentResponse(result.lessonId(), result.topicId(), result.code(), result.title(),
                 result.summary(), result.sortOrder(), result.knowledgePointIds(),
-                result.blocks().stream().map(LessonContentResponse::block).toList());
+                result.blocks().stream().map(LessonContentResponse::block).toList(), result.skill());
     }
 
     private static Block block(LessonContentResult.Block block) {
@@ -75,6 +81,7 @@ public record LessonContentResponse(
                                         .map(a -> new QuestionAsset(a.assetId(), a.assetType(), a.mediaUrl(),
                                                 a.altText(), a.sortOrder()))
                                         .toList()))
-                        .toList());
+                        .toList(),
+                block.knowledgePointIds());
     }
 }

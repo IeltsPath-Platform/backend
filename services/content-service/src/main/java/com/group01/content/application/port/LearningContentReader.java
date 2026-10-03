@@ -1,6 +1,8 @@
 package com.group01.content.application.port;
 
 import com.group01.content.application.result.LessonContentResult;
+import com.group01.content.application.result.LessonPracticeSetResult;
+import com.group01.content.application.result.LessonPracticeSetsResult;
 import com.group01.content.application.result.LessonSummaryResult;
 import com.group01.content.application.result.PackageVersionContentResult;
 import com.group01.content.application.result.PracticeSetResult;
@@ -9,6 +11,7 @@ import com.group01.content.application.result.TopicTestPackageResult;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -24,7 +27,7 @@ import java.util.UUID;
  */
 public interface LearningContentReader {
 
-    /** Active topics with a published lesson and a published final test, in learning order. */
+    /** Active topics that have a skill and a published lesson, by skill and then in learning order. */
     List<TopicSequenceResult> topicSequence(int minPracticeQuestions);
 
     boolean activeTopicExists(UUID topicId);
@@ -33,11 +36,34 @@ public interface LearningContentReader {
 
     Optional<LessonContentResult> publishedLesson(UUID lessonId);
 
+    boolean publishedLessonExists(UUID lessonId);
+
+    boolean lessonExists(UUID lessonId);
+
+    /** Published practice sets of the lesson, by code. */
+    List<LessonPracticeSetResult> lessonPracticeSets(UUID lessonId);
+
+    /** Every published lesson of the topic in order, each with its published practice sets by code. */
+    List<LessonPracticeSetsResult> topicPracticeSets(UUID topicId);
+
+    /**
+     * For each knowledge point, how many eligible practice sets are not in {@code excludePackageIds}. Unknown
+     * knowledge points count zero.
+     */
+    Map<UUID, Integer> countEligiblePracticeSets(Collection<UUID> knowledgePointIds,
+                                                 Collection<UUID> excludePackageIds, int minQuestions);
+
+    /** Whether a question of the package version has a skill other than that of the lesson's topic. */
+    boolean packageVersionLeavesLessonSkill(UUID packageVersionId, UUID lessonId);
+
     List<TopicTestPackageResult> publishedTestPackages(UUID topicId);
 
-    /** Eligible practice sets, most matching questions first, then by package id. */
+    /**
+     * Eligible practice sets: those of {@code preferredLessonId} first when it is given, then most matching
+     * questions, then by package id.
+     */
     List<PracticeSetResult> searchPracticeSets(UUID knowledgePointId, Collection<UUID> excludePackageIds,
-                                               int minQuestions, int limit);
+                                               int minQuestions, int limit, UUID preferredLessonId);
 
     Optional<PackageVersionContentResult> publishedPackageVersion(UUID packageVersionId);
 

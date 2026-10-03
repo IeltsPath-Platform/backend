@@ -30,6 +30,10 @@ skill. There is no lesson authoring API, so seed migrations must keep every less
 topic's skill: `LessonPipelineSeedTest.everyLessonTeachesOnlyItsTopicsSkill` enforces it. V15 moved the demo Writing
 essays from Reading lessons L3/L4 into topic `DEMO_WRITING` (lessons W1, W2; no final test), keeping their block ids.
 
+V16 adds `lesson_block_knowledge_points` (the KPs each TEXT block teaches) and `content_packages.lesson_id`, which makes a `PRACTICE_SET` part of a lesson's Practice. Package creation accepts an optional `lessonId` (practice sets only, the lesson must exist, else `422` with `details.code = INVALID_PACKAGE_LESSON`); publishing such a package fails the same way when a question's skill differs from the lesson's topic. V16 seeds `PS-KP1-C`, `PS-KP1-D` and one set for each of TF1, PM1, PM2, PS1 and PS2, and refuses a published lesson of a topic with a final test that has no Practice.
+
+Còn thiếu: mỗi KP Listening (`LS_NUM`, `LS_SPELL`, `LS_PARA`, `LS_TRAP`) chỉ có một đề Practice, vì chưa có file mp3 mới. Practice Listening trượt nên không tạo được bài ôn (hết đề chưa lộ lời giải). Cần thêm audio để thang ôn tập của Listening đủ bước.
+
 Topics retain optional `bandMin`/`bandMax` metadata (0–9, half-band steps). V8 removes KP band columns and the KP
 API no longer accepts or returns own/effective band ranges. The current learning sequence uses topic `sort_order`,
 without goal-band filtering or placement test-out. Topic create/update still validate bands; omitting them on update

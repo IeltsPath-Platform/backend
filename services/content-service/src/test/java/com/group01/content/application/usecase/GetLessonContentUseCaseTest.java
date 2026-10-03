@@ -34,9 +34,10 @@ class GetLessonContentUseCaseTest {
 
     private LessonContentResult lessonWith(LessonContentResult.Question... questions) {
         return new LessonContentResult(lessonId, UUID.randomUUID(), "L3", "Title", null, 3, List.of(), List.of(
-                new LessonContentResult.Block(UUID.randomUUID(), BlockType.TEXT, null, 1, "Text", null, null, null),
+                new LessonContentResult.Block(UUID.randomUUID(), BlockType.TEXT, null, 1, "Text", null, null, null,
+                        List.of()),
                 new LessonContentResult.Block(UUID.randomUUID(), BlockType.EXERCISE, null, 2, null, null, null,
-                        List.of(questions))));
+                        List.of(questions), List.of())), null);
     }
 
     private static LessonContentResult.QuestionAsset image(String reference) {

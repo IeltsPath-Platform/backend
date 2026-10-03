@@ -22,17 +22,7 @@ public class ListContentPackagesUseCase {
     public List<ContentPackageResult> execute(Boolean featureRequired, PublicationStatus status) {
         List<ContentPackage> packages = contentPackageRepository.findAll(featureRequired, status);
         return packages.stream()
-                .map(pkg -> new ContentPackageResult(
-                        pkg.getId(),
-                        pkg.getCode(),
-                        pkg.getTitle(),
-                        pkg.getPackageType(),
-                        pkg.getRequiredFeatureKey(),
-                        pkg.getStatus(),
-                        pkg.getCurrentPublishedVersionId(),
-                        pkg.getCreatedAt(),
-                        pkg.getUpdatedAt()
-                ))
+                .map(ContentPackageResult::of)
                 .toList();
     }
 }

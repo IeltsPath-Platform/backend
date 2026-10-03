@@ -1,11 +1,13 @@
 package com.group01.content.application.usecase;
 
 import com.group01.content.application.command.PublishContentPackageCommand;
+import com.group01.content.application.port.LearningContentReader;
 import com.group01.content.application.result.ContentPackageResult;
 import com.group01.content.domain.aggregate.ContentPackage;
 import com.group01.content.domain.entity.ContentPackageVersion;
 import com.group01.content.domain.exception.ContentPackageNotFoundException;
 import com.group01.content.domain.exception.InvalidContentStateException;
+import com.group01.content.domain.exception.InvalidPackageLessonException;
 import com.group01.content.domain.repository.ContentPackageRepository;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.PublicationStatus;
@@ -23,6 +25,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +34,9 @@ class PublishContentPackageUseCaseTest {
 
     @Mock
     private ContentPackageRepository contentPackageRepository;
+
+    @Mock
+    private LearningContentReader lessons;
 
     @InjectMocks
     private PublishContentPackageUseCase publishContentPackageUseCase;
@@ -87,5 +93,21 @@ class PublishContentPackageUseCaseTest {
 
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(command))
                 .isInstanceOf(InvalidContentStateException.class);
+    }
+
+    @Test
+    void aLessonsPracticeSetCannotPublishQuestionsOfAnotherSkill() {
+        UUID lessonId = UUID.randomUUID();
+        ContentPackage practice = ContentPackage.create("PS-NEW", "Practice", PackageType.PRACTICE_SET, null, lessonId);
+        ContentPackageVersion practiceVersion = ContentPackageVersion.create(practice.getId(), 1, "{}");
+        practice.addVersion(practiceVersion);
+        when(contentPackageRepository.findById(practice.getId())).thenReturn(Optional.of(practice));
+        when(lessons.packageVersionLeavesLessonSkill(practiceVersion.getId(), lessonId)).thenReturn(true);
+
+        assertThatThrownBy(() -> publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(practice.getId(), practiceVersion.getId(), userId)))
+                .isInstanceOf(InvalidPackageLessonException.class);
+        verify(contentPackageRepository, never()).save(any());
+        assertThat(practice.getStatus()).isEqualTo(PublicationStatus.DRAFT);
     }
 }

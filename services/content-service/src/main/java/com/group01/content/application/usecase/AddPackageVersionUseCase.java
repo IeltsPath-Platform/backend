@@ -32,16 +32,6 @@ public class AddPackageVersionUseCase {
         pkg.addVersion(version);
         ContentPackage saved = contentPackageRepository.save(pkg);
 
-        return new ContentPackageResult(
-                saved.getId(),
-                saved.getCode(),
-                saved.getTitle(),
-                saved.getPackageType(),
-                saved.getRequiredFeatureKey(),
-                saved.getStatus(),
-                saved.getCurrentPublishedVersionId(),
-                saved.getCreatedAt(),
-                saved.getUpdatedAt()
-        );
+        return ContentPackageResult.of(saved);
     }
 }

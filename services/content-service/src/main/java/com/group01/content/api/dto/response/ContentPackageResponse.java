@@ -18,7 +18,8 @@ public record ContentPackageResponse(
         PublicationStatus status,
         UUID currentPublishedVersionId,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        UUID lessonId
 ) {
     public static ContentPackageResponse from(ContentPackageResult result) {
         return new ContentPackageResponse(
@@ -30,7 +31,8 @@ public record ContentPackageResponse(
                 result.status(),
                 result.currentPublishedVersionId(),
                 result.createdAt(),
-                result.updatedAt()
+                result.updatedAt(),
+                result.lessonId()
         );
     }
 }

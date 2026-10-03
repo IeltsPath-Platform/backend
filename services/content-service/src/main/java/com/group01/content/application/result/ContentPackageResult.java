@@ -1,5 +1,6 @@
 package com.group01.content.application.result;
 
+import com.group01.content.domain.aggregate.ContentPackage;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.PublicationStatus;
 
@@ -15,5 +16,12 @@ public record ContentPackageResult(
         PublicationStatus status,
         UUID currentPublishedVersionId,
         Instant createdAt,
-        Instant updatedAt
-) {}
+        Instant updatedAt,
+        UUID lessonId
+) {
+    public static ContentPackageResult of(ContentPackage pkg) {
+        return new ContentPackageResult(pkg.getId(), pkg.getCode(), pkg.getTitle(), pkg.getPackageType(),
+                pkg.getRequiredFeatureKey(), pkg.getStatus(), pkg.getCurrentPublishedVersionId(), pkg.getCreatedAt(),
+                pkg.getUpdatedAt(), pkg.getLessonId());
+    }
+}
