@@ -99,4 +99,7 @@ Unit test bắt buộc cho `TopicStatusDeriver` (2 skill độc lập, mỗi ski
 
 ## Verification
 
-(Codex điền.)
+- Changed learning-service migration, domain, use cases, JDBC adapters, API DTO/controller, four requested test classes, and the migration-version assertion; updated the learning README and learner contract.
+- Focused four-class run: 50 tests passed, 0 failed, 0 skipped. The one full learning-service run: 202 tests, 201 passed, 1 failed because its Flyway version assertion still expected V2; after updating that assertion for V3, its one-class rerun passed (1/1). Docker/Testcontainers ran; no tests were skipped.
+- `SubmitLessonEssayUseCase` records/grading submissions but does not call `LessonProgress.complete`, so it cannot complete a lesson and does not need a topic-completion hook.
+- The existing `REVIEW_REQUIRED` HTTP status remains 403 per the public contract; the new Reading review flow verifies the code, while `NO_TOPIC_TEST` returns 409.

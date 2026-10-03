@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.group01.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import com.group01.learning.api.controller.LessonLearningController;
+import com.group01.learning.api.controller.ReviewController;
 import com.group01.learning.api.dto.response.ReviewResponse;
 import com.group01.learning.api.dto.response.ReviewSubmissionResponse;
 import com.group01.learning.application.command.SubmitExerciseCommand;
@@ -16,6 +17,14 @@ import com.group01.learning.application.usecase.GetLessonUseCase;
 import com.group01.learning.application.usecase.SubmitLessonExerciseUseCase;
 import com.group01.learning.application.usecase.CompleteLessonUseCase;
 import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
+import com.group01.learning.application.usecase.ListReviewsUseCase;
+import com.group01.learning.application.usecase.GetReviewUseCase;
+import com.group01.learning.application.usecase.SubmitReviewUseCase;
+import com.group01.learning.application.usecase.AssignTopicTestUseCase;
+import com.group01.learning.domain.vo.ReviewListEntry;
+import com.group01.learning.domain.vo.ReviewStatus;
+import com.group01.learning.domain.vo.LearningSkill;
+import java.time.Instant;
 import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.vo.PendingReview;
 import com.group01.learning.domain.vo.TopicStatus;
@@ -54,7 +63,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = LessonLearningController.class, properties = {
+@WebMvcTest(controllers = {LessonLearningController.class, ReviewController.class}, properties = {
         "spring.config.import=",
         "spring.cloud.config.enabled=false",
         "eureka.client.enabled=false",
@@ -92,10 +101,27 @@ class LessonLearningWebMvcTest {
     @MockitoBean CompleteLessonUseCase completeLessonUseCase;
     @MockitoBean RefreshLearningTopicsUseCase topics;
     @MockitoBean GetMasteryUseCase mastery;
+    @MockitoBean ListReviewsUseCase listReviews;
+    @MockitoBean GetReviewUseCase getReviewUseCase;
+    @MockitoBean SubmitReviewUseCase submitReviewUseCase;
+    @MockitoBean AssignTopicTestUseCase assignTopicTestUseCase;
 
     @BeforeEach
     void verifiedIdentity() {
         when(currentUser.requireUserId()).thenReturn(USER);
+    }
+
+    @Test
+    void listsOwnedReviewsWithSkillAndRejectsExcessiveLimit() throws Exception {
+        when(listReviews.execute(USER, ReviewStatus.PENDING, LearningSkill.READING, 20))
+                .thenReturn(List.of(new ReviewListEntry(REVIEW, KP, LESSON, LearningSkill.READING,
+                        Instant.parse("2026-10-01T00:00:00Z"))));
+        mvc.perform(authenticated(get("/api/learning/reviews").param("skill", "READING")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].skill").value("READING"))
+                .andExpect(jsonPath("$[0].stage").value("PRACTICE"));
+        mvc.perform(authenticated(get("/api/learning/reviews").param("limit", "101")))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

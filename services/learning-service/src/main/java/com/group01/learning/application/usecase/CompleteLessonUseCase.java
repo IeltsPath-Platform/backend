@@ -6,6 +6,7 @@ import com.group01.learning.application.port.LearningContentClient.Block;
 import com.group01.learning.application.port.LearningContentClient.Lesson;
 import com.group01.learning.application.service.LessonAccess;
 import com.group01.learning.application.service.ReviewReevaluation;
+import com.group01.learning.application.service.TopicCompletion;
 import com.group01.learning.domain.aggregate.LessonProgress;
 import com.group01.learning.domain.repository.LessonProgressRepository;
 import org.springframework.stereotype.Service;
@@ -23,14 +24,16 @@ public class CompleteLessonUseCase {
     private final LessonAccess access;
     private final LessonProgressRepository lessons;
     private final ReviewReevaluation reviews;
+    private final TopicCompletion topicCompletion;
     private final Clock clock = Clock.systemUTC();
 
     public CompleteLessonUseCase(LearnerLock lock, LessonAccess access, LessonProgressRepository lessons,
-                                 ReviewReevaluation reviews) {
+                                 ReviewReevaluation reviews, TopicCompletion topicCompletion) {
         this.lock = lock;
         this.access = access;
         this.lessons = lessons;
         this.reviews = reviews;
+        this.topicCompletion = topicCompletion;
     }
 
     @Transactional
@@ -45,6 +48,7 @@ public class CompleteLessonUseCase {
         if (progress.complete(clock.instant())) {
             lessons.save(progress);
             reviews.execute(userId, new HashSet<>(lesson.knowledgePointIds()), Set.of());
+            topicCompletion.onLessonCompleted(userId, lesson.topicId());
         }
         return lessonId;
     }

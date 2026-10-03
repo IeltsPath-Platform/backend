@@ -13,6 +13,7 @@ import com.group01.learning.application.service.LessonAccess;
 import com.group01.learning.application.service.LessonEvidenceReference;
 import com.group01.learning.application.service.LessonViewAssembler;
 import com.group01.learning.application.service.ReviewReevaluation;
+import com.group01.learning.application.service.TopicCompletion;
 import com.group01.learning.domain.aggregate.LessonProgress;
 import com.group01.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.group01.learning.domain.repository.LessonProgressRepository;
@@ -43,13 +44,15 @@ public class SubmitLessonExerciseUseCase {
     private final KnowledgeEvidenceRepository evidence;
     private final LessonProgressRepository lessons;
     private final ReviewReevaluation reviews;
+    private final TopicCompletion topicCompletion;
     private final LessonViewAssembler view;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
     private final Clock clock = Clock.systemUTC();
 
     public SubmitLessonExerciseUseCase(LearnerLock lock, LessonAccess access, ExerciseSubmissionLog submissions,
                                        KnowledgeEvidenceRepository evidence, LessonProgressRepository lessons,
-                                       ReviewReevaluation reviews, LessonViewAssembler view) {
+                                       ReviewReevaluation reviews, LessonViewAssembler view,
+                                       TopicCompletion topicCompletion) {
         this.lock = lock;
         this.access = access;
         this.submissions = submissions;
@@ -57,6 +60,7 @@ public class SubmitLessonExerciseUseCase {
         this.lessons = lessons;
         this.reviews = reviews;
         this.view = view;
+        this.topicCompletion = topicCompletion;
     }
 
     @Transactional
@@ -130,7 +134,10 @@ public class SubmitLessonExerciseUseCase {
         if (!submissions.save(userId, lessonId, blockId, command, response)) throw requestConflict();
         boolean newlyCompleted = lessonCompleted && progress.complete(clock.instant());
         lessons.save(progress);
-        if (newlyCompleted) reevaluate(userId, lesson);
+        if (newlyCompleted) {
+            reevaluate(userId, lesson);
+            topicCompletion.onLessonCompleted(userId, lesson.topicId());
+        }
         return response;
     }
 

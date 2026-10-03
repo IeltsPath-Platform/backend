@@ -20,6 +20,6 @@ public class GetMasteryUseCase {
     public List<MasteryResult> execute(UUID userId) {
         return evidence.findMasteryHistories(userId).stream().map(history -> new MasteryResult(
                 history.knowledgePointId(), history.topicId(), calculator.compute(history.correctness()),
-                history.evidenceCount())).toList();
+                history.evidenceCount(), history.skill())).toList();
     }
 }

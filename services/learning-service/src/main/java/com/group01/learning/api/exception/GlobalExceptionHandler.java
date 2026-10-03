@@ -25,7 +25,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<LearningErrorResponse> gate(LearningGateException exception) {
         var reviews = "REVIEW_REQUIRED".equals(exception.getCode()) ? exception.getReviews().stream()
                 .map(review -> new LearningErrorResponse.Review(review.reviewId(), review.lessonId(),
-                        review.knowledgePointId())).toList() : null;
+                        review.knowledgePointId(), review.skill())).toList() : null;
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(new LearningErrorResponse(exception.getMessage(), exception.getCode(), reviews));
     }

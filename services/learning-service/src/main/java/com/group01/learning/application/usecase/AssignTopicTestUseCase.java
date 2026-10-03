@@ -14,6 +14,7 @@ import com.group01.learning.domain.repository.ReviewItemRepository;
 import com.group01.learning.domain.repository.TopicTestAssignmentRepository;
 import com.group01.learning.domain.service.PackageRotation;
 import com.group01.learning.domain.vo.TopicStatus;
+import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,24 +34,39 @@ public class AssignTopicTestUseCase {
     private final LessonProgressRepository lessons;
     private final ReviewItemRepository reviews;
     private final TopicTestAssignmentRepository assignments;
+    private final RefreshLearningTopicsUseCase refreshTopics;
 
     public AssignTopicTestUseCase(LearningContentClient content, LearnerLock lock,
                                   LearnerCurriculumRepository curricula, LessonProgressRepository lessons,
-                                  ReviewItemRepository reviews, TopicTestAssignmentRepository assignments) {
+                                  ReviewItemRepository reviews, TopicTestAssignmentRepository assignments,
+                                  RefreshLearningTopicsUseCase refreshTopics) {
         this.content = content;
         this.lock = lock;
         this.curricula = curricula;
         this.lessons = lessons;
         this.reviews = reviews;
         this.assignments = assignments;
+        this.refreshTopics = refreshTopics;
     }
 
     @Transactional
     public TestAssignmentResult execute(UUID userId, UUID topicId) {
         lock.lock(userId);
-        var pending = reviews.findPending(userId);
+        var curriculum = curricula.find(userId);
+        var topic = curriculum.topic(topicId);
+        if (topic.isEmpty() || topic.get().skill() == null) {
+            refreshTopics.execute(userId);
+            curriculum = curricula.find(userId);
+            topic = curriculum.topic(topicId);
+        }
+        if (topic.isPresent() && !topic.get().hasTopicTest()) {
+            throw new LearningRequestException(409, "NO_TOPIC_TEST", "This topic has no final test");
+        }
+        var skill = topic.map(com.group01.learning.domain.entity.TopicProgress::skill).orElse(null);
+        var pending = reviews.findPending(userId).stream()
+                .filter(review -> review.skill() == null || review.skill() == skill).toList();
         if (!pending.isEmpty()) throw new LearningGateException("REVIEW_REQUIRED", pending);
-        TopicStatus status = curricula.find(userId).status(topicId);
+        TopicStatus status = curriculum.status(topicId);
         if (status != TopicStatus.IN_PROGRESS || !allLessonsCompleted(userId, topicId)) {
             throw new LearningRequestException(403, "TEST_LOCKED", "Complete the topic lessons first");
         }

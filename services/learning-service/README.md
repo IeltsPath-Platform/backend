@@ -41,26 +41,33 @@ to refresh the user's curriculum order before opening lessons. See the
 
 | Method | Path | Behavior |
 | --- | --- | --- |
-| GET | `/topics` | One Content `topic-sequence` read refreshes the shared KP catalog and the user's topic order; returns statuses and completed lesson counts. |
-| GET | `/topics/{id}/lessons` | Lists lessons and `testStatus` for an `IN_PROGRESS` or `PASSED` topic. |
+| GET | `/topics` | One Content `topic-sequence` read refreshes the shared KP catalog and the user's topic order; returns `skill`, `hasTopicTest`, statuses and completed lesson counts. |
+| GET | `/topics/{id}/lessons` | Lists lessons, `skill`, `hasTopicTest`, and `testStatus` for an `IN_PROGRESS` or `PASSED` topic. |
 | GET | `/lessons/{id}` | Applies the lesson gate and returns ordered blocks; a passed exercise block includes its solutions. |
 | POST | `/lessons/{id}/exercises/{blockId}/submissions` | Grades every question in the block, saves an idempotent response and completes the lesson when all exercise blocks have passed. |
 | POST | `/lessons/{id}/essays/{blockId}/submissions` | `{requestId, essayText}`: grades the essay within the request (see below) and returns the band, four criteria, corrections and summary once points are charged. |
 | GET | `/writing-submissions/{id}` | Owner only; the grade appears only when `GRADED` (`PAYMENT_PENDING` shows `code`, `GRADING`/`FAILED` show `failureCode`). |
 | POST | `/lessons/{id}/complete` | Idempotently completes a lesson with no exercise blocks; lessons with exercises return `409 LESSON_HAS_EXERCISES`. |
 | GET | `/reviews/{id}` | Owned review only (else 404): theory of the teaching lesson and one open practice set (unused package first, otherwise the one given longest ago). No package left: `SKIPPED`. |
+| GET | `/reviews` | Lists owned reviews oldest first; `status` defaults to `PENDING`, optional `skill` filters by skill (and includes legacy unassigned reviews), `limit` defaults to 20 and is capped at 100 (`400` above that). |
 | POST | `/reviews/{id}/submissions` | Submits the open set once (`REVIEW_SET_CLOSED` otherwise); writes `review_set` evidence; 70% → `DONE` with solutions (and the audio transcript), third failed set → `SKIPPED`. |
 | POST | `/topics/{id}/test-assignments` | `REVIEW_REQUIRED` / `TEST_LOCKED` gates, then returns the open assignment or assigns an unused test code (the least recently used one when all were used); none → `409 TEST_UNAVAILABLE`. |
-| GET | `/mastery` | Returns `{knowledgePointId, topicId, mastery, evidenceCount}` for catalog KPs using only the current user's evidence; makes no Content request. |
+| GET | `/mastery` | Returns `{knowledgePointId, topicId, skill, mastery, evidenceCount}` for catalog KPs using only the current user's evidence; makes no Content request. |
 
-Topics derive `PASSED` from `passed_at`; the first unpassed topic is `IN_PROGRESS`
-and later topics are `LOCKED`. Removed topics lose their sequence order and leave
+Topics derive `PASSED` from `passed_at`; the first unpassed topic in each skill is `IN_PROGRESS`
+and later topics of that skill are `LOCKED`. Topics without a skill share a separate order.
+Free topics precede premium topics within each skill. A topic without a final test has
+`testStatus: NONE` and passes when all published lessons are completed; requesting its
+test assignment returns `409 NO_TOPIC_TEST`. Pending reviews gate only their own skill;
+legacy reviews with no skill gate every skill. Removed topics lose their sequence order and leave
 the topic list. Lessons become available in order after earlier lessons complete.
 Lesson GET, submission and completion apply errors in this order:
 `REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`. Exercise blocks carry `blockKind`: essay blocks show only the prompt, task,
 minimum words, pass band and images, never count toward completion and reject exercise
 submissions with `409 ESSAY_BLOCK`. Media assets expose `mediaUrl`; an audio transcript
 appears only once the lesson is completed.
+
+The Writing demo data move in `V3__skill_tracks.sql` reassigns only the known W1/W2 essay submissions and KP6/KP7 reviews using their seed IDs; it is not a general-purpose migration pattern.
 
 Question objects contain only `questionVersionId`, `sortOrder`, `stem`, `options`, `hint`.
 `options: null` represents a fill answer. `answerSpec` and KP mappings are never
@@ -103,7 +110,8 @@ Lesson completion reevaluates reviews from the first submission of each block. A
 requires all four: mastery below `learning.review-mastery-threshold` (default `0.6`),
 a wrong answer for that KP, a completed teaching lesson, and an eligible practice set
 in the catalog. Existing pending reviews are not duplicated. A pending review blocks
-further lesson access until it is `DONE` or `SKIPPED`.
+further lesson access in its skill until it is `DONE` or `SKIPPED`; a legacy review
+without a skill blocks every skill until curriculum refresh can backfill it.
 
 ## Writing essays
 
@@ -151,7 +159,7 @@ DLQ with header `x-learning-failure`. Settings: `LEARNING_RETRY_DELAY_MS` (30 s)
 (5), `LEARNING_CONSUMER_ENABLED` (true).
 
 Learning errors use `{detail, code}`; `REVIEW_REQUIRED` additionally includes
-`reviews` with `reviewId`, `lessonId`, `knowledgePointId`. Malformed requests return
+`reviews` with `reviewId`, `lessonId`, `knowledgePointId`, and `skill` when known. Malformed requests return
 422. Content reads forward the authenticated internal bearer and `X-Correlation-Id`;
 missing content maps to `404 NOT_FOUND`, transport/unavailability errors to
 `503 CONTENT_UNAVAILABLE`, and other Content failures to `502 CONTENT_FAILURE`.

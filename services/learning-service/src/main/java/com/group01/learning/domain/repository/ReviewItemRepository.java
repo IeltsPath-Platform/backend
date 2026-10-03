@@ -3,6 +3,9 @@ package com.group01.learning.domain.repository;
 import com.group01.learning.domain.aggregate.ReviewItem;
 import com.group01.learning.domain.service.ReviewRule.ReviewCandidate;
 import com.group01.learning.domain.vo.PendingReview;
+import com.group01.learning.domain.vo.LearningSkill;
+import com.group01.learning.domain.vo.ReviewListEntry;
+import com.group01.learning.domain.vo.ReviewStatus;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -16,6 +19,10 @@ public interface ReviewItemRepository {
     Optional<ReviewItem> findOwned(UUID userId, UUID reviewId);
 
     List<PendingReview> findPending(UUID userId);
+
+    List<ReviewListEntry> list(UUID userId, ReviewStatus status, LearningSkill skill, int limit);
+
+    void backfillMissingSkill(UUID userId);
 
     /** Adds PENDING reviews; a knowledge point that already has one keeps it. */
     void insertPending(UUID userId, List<ReviewCandidate> candidates);

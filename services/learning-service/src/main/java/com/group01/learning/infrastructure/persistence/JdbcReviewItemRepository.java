@@ -6,6 +6,8 @@ import com.group01.learning.domain.repository.ReviewItemRepository;
 import com.group01.learning.domain.service.ReviewRule.ReviewCandidate;
 import com.group01.learning.domain.vo.PendingReview;
 import com.group01.learning.domain.vo.ReviewStatus;
+import com.group01.learning.domain.vo.LearningSkill;
+import com.group01.learning.domain.vo.ReviewListEntry;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -24,7 +26,7 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
     @Override
     public Optional<ReviewItem> findOwned(UUID userId, UUID reviewId) {
         return jdbc.query("""
-                SELECT r.id, r.knowledge_point_id, r.lesson_id, r.status,
+                SELECT r.id, r.knowledge_point_id, r.lesson_id, r.status, r.skill,
                 s.id AS set_id, s.package_id, s.package_version_id,
                 (SELECT count(*) FROM review_sets f WHERE f.review_item_id = r.id AND f.passed = FALSE) AS failed_sets
                 FROM review_items r
@@ -36,31 +38,63 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
                     row.getObject("package_version_id", UUID.class));
             return ReviewItem.restore(row.getObject("id", UUID.class), userId,
                     row.getObject("knowledge_point_id", UUID.class), row.getObject("lesson_id", UUID.class),
-                    ReviewStatus.valueOf(row.getString("status")), open, row.getInt("failed_sets"));
+                    ReviewStatus.valueOf(row.getString("status")), open, row.getInt("failed_sets"),
+                    row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")));
         }).stream().findFirst();
     }
 
     @Override
     public List<PendingReview> findPending(UUID userId) {
         return jdbc.query("""
-                SELECT id, lesson_id, knowledge_point_id FROM review_items
+                SELECT id, lesson_id, knowledge_point_id, skill FROM review_items
                 WHERE user_id = :userId AND status = 'PENDING' ORDER BY created_at, id
                 """, Map.of("userId", userId), (row, index) -> new PendingReview(row.getObject("id", UUID.class),
-                row.getObject("lesson_id", UUID.class), row.getObject("knowledge_point_id", UUID.class)));
+                row.getObject("lesson_id", UUID.class), row.getObject("knowledge_point_id", UUID.class),
+                row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill"))));
+    }
+
+    @Override
+    public List<ReviewListEntry> list(UUID userId, ReviewStatus status, LearningSkill skill, int limit) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("userId", userId);
+        params.put("status", status.name());
+        params.put("skill", skill == null ? null : skill.name());
+        params.put("limit", limit);
+        return jdbc.query("""
+                SELECT id, knowledge_point_id, lesson_id, skill, created_at FROM review_items
+                WHERE user_id = :userId AND status = :status
+                  AND (CAST(:skill AS varchar) IS NULL OR skill = :skill OR skill IS NULL)
+                ORDER BY created_at, id LIMIT :limit
+                """, params, (row, index) -> new ReviewListEntry(row.getObject("id", UUID.class),
+                row.getObject("knowledge_point_id", UUID.class), row.getObject("lesson_id", UUID.class),
+                row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")),
+                row.getTimestamp("created_at").toInstant()));
+    }
+
+    @Override
+    public void backfillMissingSkill(UUID userId) {
+        jdbc.update("""
+                UPDATE review_items r SET skill = t.skill
+                FROM lesson_progress l JOIN topic_progress t
+                  ON t.user_id = l.user_id AND t.topic_id = l.topic_id
+                WHERE r.user_id = :userId AND r.skill IS NULL AND l.user_id = r.user_id
+                  AND l.lesson_id = r.lesson_id AND t.skill IS NOT NULL
+                """, Map.of("userId", userId));
     }
 
     @Override
     public void insertPending(UUID userId, List<ReviewCandidate> candidates) {
         if (candidates.isEmpty()) return;
         jdbc.getJdbcOperations().batchUpdate("""
-                INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status)
-                VALUES (?, ?, ?, ?, 'PENDING')
+                INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill)
+                VALUES (?, ?, ?, ?, 'PENDING', ?)
                 ON CONFLICT (user_id, knowledge_point_id) WHERE status = 'PENDING' DO NOTHING
                 """, candidates, candidates.size(), (statement, review) -> {
             statement.setObject(1, UUID.randomUUID());
             statement.setObject(2, userId);
             statement.setObject(3, review.knowledgePointId());
             statement.setObject(4, review.lessonId());
+            statement.setString(5, review.skill() == null ? null : review.skill().name());
         });
     }
 

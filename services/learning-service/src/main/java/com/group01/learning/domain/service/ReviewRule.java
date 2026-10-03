@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import com.group01.learning.domain.vo.LearningSkill;
 
 public final class ReviewRule {
     public static final int MAX_FAILED_REVIEW_SETS = 3;
@@ -37,19 +38,25 @@ public final class ReviewRule {
                 continue;
             }
             lessonsByKp.getOrDefault(kp, List.of()).stream().min(LESSON_ORDER)
-                    .ifPresent(lesson -> candidates.add(new ReviewCandidate(kp, lesson.lessonId())));
+                    .ifPresent(lesson -> candidates.add(new ReviewCandidate(kp, lesson.lessonId(), lesson.skill())));
         }
         return List.copyOf(candidates);
     }
 
     /** Each entry represents a lesson whose completed timestamp has already been recorded. */
-    public record CompletedLesson(UUID lessonId, Integer sequenceOrder, int lessonSortOrder) {
+    public record CompletedLesson(UUID lessonId, Integer sequenceOrder, int lessonSortOrder, LearningSkill skill) {
+        public CompletedLesson(UUID lessonId, Integer sequenceOrder, int lessonSortOrder) {
+            this(lessonId, sequenceOrder, lessonSortOrder, null);
+        }
         public CompletedLesson {
             Objects.requireNonNull(lessonId, "lessonId");
         }
     }
 
-    public record ReviewCandidate(UUID knowledgePointId, UUID lessonId) {
+    public record ReviewCandidate(UUID knowledgePointId, UUID lessonId, LearningSkill skill) {
+        public ReviewCandidate(UUID knowledgePointId, UUID lessonId) {
+            this(knowledgePointId, lessonId, null);
+        }
         public ReviewCandidate {
             Objects.requireNonNull(knowledgePointId, "knowledgePointId");
             Objects.requireNonNull(lessonId, "lessonId");

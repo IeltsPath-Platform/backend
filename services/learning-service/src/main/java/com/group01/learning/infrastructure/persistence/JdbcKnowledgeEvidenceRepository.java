@@ -3,6 +3,7 @@ package com.group01.learning.infrastructure.persistence;
 import com.group01.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.group01.learning.domain.vo.KnowledgeEvidence;
 import com.group01.learning.domain.vo.MasteryHistory;
+import com.group01.learning.domain.vo.LearningSkill;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.stereotype.Repository;
@@ -50,7 +51,7 @@ public class JdbcKnowledgeEvidenceRepository implements KnowledgeEvidenceReposit
                     row_number() OVER (PARTITION BY kp_id ORDER BY ordinal DESC) AS recency
                     FROM kp_evidence WHERE user_id = ?
                 )
-                SELECT catalog.kp_id, catalog.topic_id, catalog.has_practice_set,
+                SELECT catalog.kp_id, catalog.topic_id, catalog.has_practice_set, catalog.skill,
                 history.correct, history.ordinal, COALESCE(history.evidence_count, 0) AS evidence_count
                 FROM knowledge_point_catalog catalog LEFT JOIN history
                 ON history.kp_id = catalog.kp_id AND history.recency <= 5
@@ -62,15 +63,17 @@ public class JdbcKnowledgeEvidenceRepository implements KnowledgeEvidenceReposit
                 Row history = histories.get(kpId);
                 if (history == null) {
                     history = new Row(kpId, rows.getObject("topic_id", UUID.class), rows.getBoolean("has_practice_set"),
+                            rows.getString("skill") == null ? null : LearningSkill.valueOf(rows.getString("skill")),
                             new ArrayList<>(), rows.getLong("evidence_count"));
                     histories.put(kpId, history);
                 }
                 if (rows.getObject("ordinal") != null) history.correctness().add(rows.getBoolean("correct"));
             }
             return histories.values().stream().map(row -> new MasteryHistory(row.kpId(), row.topicId(),
-                    row.hasPracticeSet(), row.correctness(), row.evidenceCount())).toList();
+                    row.hasPracticeSet(), row.correctness(), row.evidenceCount(), row.skill())).toList();
         }, userId);
     }
 
-    private record Row(UUID kpId, UUID topicId, boolean hasPracticeSet, List<Boolean> correctness, long evidenceCount) {}
+    private record Row(UUID kpId, UUID topicId, boolean hasPracticeSet, LearningSkill skill,
+                       List<Boolean> correctness, long evidenceCount) {}
 }

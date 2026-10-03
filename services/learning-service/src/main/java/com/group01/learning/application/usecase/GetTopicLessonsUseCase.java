@@ -30,8 +30,9 @@ public class GetTopicLessonsUseCase {
         this.reviews = reviews;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public TopicLessonsResult execute(UUID userId, UUID topicId) {
+        var topic = access.topic(userId, topicId);
         TopicStatus topicStatus = access.status(userId, topicId);
         if (topicStatus == TopicStatus.LOCKED) throw new LearningGateException("TOPIC_LOCKED", List.of());
         var ordered = LessonAccess.orderedLessons(content.getTopicLessons(topicId));
@@ -44,9 +45,11 @@ public class GetTopicLessonsUseCase {
                     lesson.sortOrder(), completed ? "COMPLETED" : previousComplete ? "AVAILABLE" : "LOCKED"));
             previousComplete &= completed;
         }
-        boolean hasPendingReview = !reviews.findPending(userId).isEmpty();
-        String testStatus = topicStatus == TopicStatus.PASSED ? "PASSED"
+        boolean hasPendingReview = reviews.findPending(userId).stream()
+                .anyMatch(review -> review.skill() == null || review.skill() == topic.skill());
+        String testStatus = !topic.hasTopicTest() ? "NONE" : topicStatus == TopicStatus.PASSED ? "PASSED"
                 : previousComplete && !hasPendingReview ? "AVAILABLE" : "LOCKED";
-        return new TopicLessonsResult(topicId, List.copyOf(summaries), testStatus);
+        return new TopicLessonsResult(topicId, List.copyOf(summaries), testStatus,
+                topic.skill(), topic.hasTopicTest());
     }
 }

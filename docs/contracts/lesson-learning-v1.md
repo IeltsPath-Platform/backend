@@ -6,7 +6,7 @@
 
 **Reading hints (2026-10-02):** lesson exercise questions and submission results add an always-present nullable `hint` field, with the policy below. Review DTOs share this field but always return `null`; final assessments are unchanged.
 
-The MVP app displays topic and lesson status. The Java Learning Service owns progress, mastery evidence, reviews and test assignments. Tutor, practice notebook, learner memory, learning goals and LLM ordering are removed. Reviews use new `PRACTICE_SET` questions, solutions stay hidden until the relevant block or set is passed, and a final test assignment uses a package code once before selecting another package. Topic order is stored in `topic_progress.sequence_order`; only `passed_at` is persisted. No `topics.test_package_id`, assessment schema migration, premium gate, or unpublished content authoring API is introduced here.
+The MVP app displays topic and lesson status. The Java Learning Service owns progress, mastery evidence, reviews and test assignments. Tutor, practice notebook, learner memory, learning goals and LLM ordering are removed. Reviews use new `PRACTICE_SET` questions, solutions stay hidden until the relevant block or set is passed, and a final test assignment uses a package code once before selecting another package. Topic order and skill are stored in `topic_progress`; `passed_at` remains one-way. No `topics.test_package_id`, assessment schema migration, premium gate, or unpublished content authoring API is introduced here.
 
 ## Learner routes
 
@@ -14,33 +14,33 @@ All routes in this section have prefix `/api/learning`, require the learner bear
 
 ### `GET /topics`
 
-Refreshes the shared `knowledge_point_catalog` and the user's `topic_progress.sequence_order` from one Content `topic-sequence` read. Returns `[{topicId, code, name, sequenceOrder, status, completedLessonCount, accessLevel}]`. `accessLevel` (added 2026-10-02) is `FREE`, or `PREMIUM` when Content requires a paid feature for the topic (`requiredFeatureKey`); clients show a `PREMIUM` topic as paid and disabled. It does not change `status`, and Learning does not check the learner's plan yet. Paid demo topics come after every free topic. A topic is `PASSED` when `passed_at` exists; otherwise the first unpassed topic in current `sequenceOrder` is `IN_PROGRESS` and the others are `LOCKED`. Removed topics have no sequence order and are omitted. A newly inserted topic can become the first unpassed one without leaving another topic stuck as `LOCKED`.
+Refreshes the shared `knowledge_point_catalog` and the user's topic order from one Content `topic-sequence` read. Returns `[{topicId, code, name, sequenceOrder, status, completedLessonCount, accessLevel, skill, hasTopicTest}]`. `accessLevel` is `FREE`, or `PREMIUM` when Content requires a paid feature for the topic (`requiredFeatureKey`); Learning does not check the learner's plan yet. Topics are ordered by skill (`LISTENING`, `READING`, `WRITING`, `SPEAKING`), with free topics before premium topics within each skill. A topic is `PASSED` when `passed_at` exists; otherwise the first unpassed topic of each skill is `IN_PROGRESS` and later topics of that skill are `LOCKED`. Null-skill topics form their own group. Removed topics have no sequence order and are omitted.
 
 ```json
 [
-  {"topicId":"10000000-0000-4000-8000-000000000001","code":"DEMO_READING","name":"Demo IELTS Reading","sequenceOrder":1,"status":"IN_PROGRESS","completedLessonCount":0,"accessLevel":"FREE"},
-  {"topicId":"20000000-0000-4000-8000-000000000002","code":"TFNG_SKILLS","name":"True / False / Not Given","sequenceOrder":2,"status":"LOCKED","completedLessonCount":0,"accessLevel":"FREE"},
-  {"topicId":"24000000-0000-4000-8000-010000000001","code":"PREMIUM_MATCHING_INFO","name":"Matching Information","sequenceOrder":4,"status":"LOCKED","completedLessonCount":0,"accessLevel":"PREMIUM"}
+  {"topicId":"10000000-0000-4000-8000-000000000001","code":"DEMO_READING","name":"Demo IELTS Reading","sequenceOrder":1,"status":"IN_PROGRESS","completedLessonCount":0,"accessLevel":"FREE","skill":"READING","hasTopicTest":true},
+  {"topicId":"20000000-0000-4000-8000-000000000002","code":"TFNG_SKILLS","name":"True / False / Not Given","sequenceOrder":2,"status":"LOCKED","completedLessonCount":0,"accessLevel":"FREE","skill":"READING","hasTopicTest":true},
+  {"topicId":"24000000-0000-4000-8000-010000000001","code":"PREMIUM_MATCHING_INFO","name":"Matching Information","sequenceOrder":4,"status":"LOCKED","completedLessonCount":0,"accessLevel":"PREMIUM","skill":"READING","hasTopicTest":true}
 ]
 ```
 
 ### `GET /mastery`
 
-Returns `[{knowledgePointId, topicId, mastery, evidenceCount}]` for KPs in `knowledge_point_catalog`, using only the verified user's `kp_evidence`. `mastery` is a number from 0 to 1; `evidenceCount` counts the user's stored evidence for that KP. No learning goal or aggregate learning state is required.
+Returns `[{knowledgePointId, topicId, skill, mastery, evidenceCount}]` for KPs in `knowledge_point_catalog`, using only the verified user's `kp_evidence`. `mastery` is a number from 0 to 1; `evidenceCount` counts the user's stored evidence for that KP. No learning goal or aggregate learning state is required.
 
 Example after Lan completes L1:
 
 ```json
-[{"knowledgePointId":"20000000-0000-4000-8000-020000000003","topicId":"10000000-0000-4000-8000-000000000001","mastery":0.729,"evidenceCount":4}]
+[{"knowledgePointId":"20000000-0000-4000-8000-020000000003","topicId":"10000000-0000-4000-8000-000000000001","skill":"READING","mastery":0.729,"evidenceCount":4}]
 ```
 
 ### `GET /topics/{id}/lessons`
 
-The topic must be `IN_PROGRESS` or `PASSED`; otherwise `403 TOPIC_LOCKED`. Returns `{topicId, lessons, testStatus}`. Lesson statuses are `LOCKED`, `AVAILABLE`, or `COMPLETED`; `testStatus` is `LOCKED`, `AVAILABLE`, or `PASSED`. The test is available only for the current topic after all its lessons are completed and no review is pending.
+The topic must be `IN_PROGRESS` or `PASSED`; otherwise `403 TOPIC_LOCKED`. Returns `{topicId, skill, hasTopicTest, lessons, testStatus}`. Lesson statuses are `LOCKED`, `AVAILABLE`, or `COMPLETED`; `testStatus` is `LOCKED`, `AVAILABLE`, `PASSED`, or `NONE` when `hasTopicTest=false`. A test is available only after all topic lessons are completed and no review of the same skill (or unassigned skill) is pending. Completing every published lesson passes a topic without a test.
 
 ```json
 {
-  "topicId":"10000000-0000-4000-8000-000000000001","testStatus":"LOCKED",
+  "topicId":"10000000-0000-4000-8000-000000000001","skill":"READING","hasTopicTest":true,"testStatus":"LOCKED",
   "lessons":[
     {"lessonId":"20000000-0000-4000-8000-000000000101","code":"L1","title":"Câu chủ đề nằm ở đâu","sortOrder":1,"status":"AVAILABLE"},
     {"lessonId":"20000000-0000-4000-8000-000000000102","code":"L2","title":"Ý chính của cả bài","sortOrder":2,"status":"LOCKED"},
@@ -52,6 +52,8 @@ The topic must be `IN_PROGRESS` or `PASSED`; otherwise `403 TOPIC_LOCKED`. Retur
 
 ### `GET /lessons/{id}`
 
+Lesson metadata adds `skill` from Content. A pending review blocks only lessons of the same skill; a legacy review with `skill: null` blocks every skill. The existing gate error precedence and HTTP 403 remain unchanged.
+
 The same lesson gate applies to this GET, submissions, and completion. Error precedence: pending review (`REVIEW_REQUIRED`), topic not current (`TOPIC_LOCKED`), then earlier lesson incomplete (`LESSON_LOCKED`). Returns metadata and ordered `blocks`. A question object has **only** `questionVersionId`, `sortOrder`, `stem`, `options`, `hint`; an asset can provide passage text alongside it. Exercise blocks carry `blockKind`: `EXERCISE` for auto-graded questions, `ESSAY` for a Writing essay block shaped as in [`lesson-writing-v1`](lesson-writing-v1.md) (an essay block never counts toward lesson completion, and exercise submissions to it return `409 ESSAY_BLOCK`). An `ASSET` block gives `{id, assetType, textContent?, mediaUrl?, durationSeconds?, transcript?}`: a `PASSAGE` has `textContent`; media has `mediaUrl` (never the stored reference); an `AUDIO` asset gains `transcript` only once the lesson is completed, and before that the key is absent because the transcript gives the answers away. Do not pass through Content's `answerSpec`, `explanation`, KP mappings, or solution fields. `options=null` means a fill response; a non-null array means choose an `optionKey`, including the three TFNG keys. A passed exercise block gains a separate `solutions` array of `{questionVersionId, correctAnswer, explanation}`; an unpassed block omits the `solutions` key entirely.
 
 `hint` is always present, including when `null`, so the key does not disclose which questions have author-written hints. Learning Service reveals Content's hint only for a gradable `FILL`, or a gradable `CHOICE` with at least three options (including TFNG). Empty/absent CHOICE options are treated as the fixed three-choice TFNG fallback; one or two options and unsupported/ungradable specs are ineligible. Legacy gradable specs without `type` follow the grader's CHOICE default. A question must have been answered incorrectly in **any** saved submission for the same verified user, lesson and block, and the block must not have passed. Once opened, its hint remains even after a later correct answer while the block still fails. Before the first wrong answer, without a Content hint, or after the block has passed, `hint=null`. The runtime rule does not filter by skill; current Content seed supplies Reading hints and leaves Listening hints null. Essay prompts do not use this field.
@@ -60,7 +62,7 @@ The following is the L1-B5 portion of L1. The full response also contains L1's t
 
 ```json
 {
-  "lessonId":"20000000-0000-4000-8000-000000000101","topicId":"10000000-0000-4000-8000-000000000001","code":"L1","title":"Câu chủ đề nằm ở đâu","sortOrder":1,"status":"AVAILABLE",
+  "lessonId":"20000000-0000-4000-8000-000000000101","topicId":"10000000-0000-4000-8000-000000000001","code":"L1","title":"Câu chủ đề nằm ở đâu","sortOrder":1,"status":"AVAILABLE","skill":"READING",
   "blocks":[
     {"blockId":"20000000-0000-4000-8000-000000000205","blockType":"EXERCISE","sortOrder":5,"passed":false,"questions":[
       {"questionVersionId":"20000000-0000-4000-8000-000000000001","sortOrder":1,"stem":"Which sentence is the topic sentence of paragraph C?","options":[{"optionKey":"A","content":"Green roofs also manage rainwater.","sortOrder":1},{"optionKey":"B","content":"The soil soaks up much of a heavy shower and releases it slowly…","sortOrder":2},{"optionKey":"C","content":"In Copenhagen, new flat roofs must now be planted for this reason.","sortOrder":3}],"hint":null},
@@ -101,6 +103,10 @@ Only a lesson with **no** `EXERCISE` block can be completed this way; a lesson w
 {"detail":"L1 contains exercise blocks","code":"LESSON_HAS_EXERCISES"}
 ```
 
+### `GET /reviews`
+
+Lists the verified learner's reviews oldest first, without a Content request. Query parameters: `status` defaults to `PENDING`; `skill` optionally selects that skill and legacy null-skill reviews; `limit` defaults to 20, accepts 1–100, and returns HTTP 400 above 100. Each item is `{reviewId, knowledgePointId, lessonId, skill, stage, createdAt}`. `stage` is `PRACTICE` in this version. Review skill is filled from the teaching lesson's topic on curriculum refresh when possible.
+
 ### `GET /reviews/{reviewId}`
 
 `reviewId` is a UUID. An unknown review or another learner's review returns `404 NOT_FOUND`. Returns the teaching lesson's theory and the one open review set, assigning an eligible `PRACTICE_SET` if necessary. Repeated GETs return the same open set. If all packages were removed before the first set could be assigned, mark the review `SKIPPED` and return no set. A review set contains questions with the same learner allowlist as a lesson; its solutions are omitted until the set is passed. A Listening set adds `audio: {mediaUrl, durationSeconds}` next to `passage` (no transcript).
@@ -133,7 +139,9 @@ Request: `{reviewSetId, requestId, answers}` with the same answer array shape as
 
 ### `POST /topics/{id}/test-assignments`
 
-Requires the topic to be `IN_PROGRESS`, all lessons completed, and no pending review; otherwise `403 TEST_LOCKED` or `403 REVIEW_REQUIRED`. Empty body. Repeated POSTs return the same unconsumed assignment. After consumption, choose a `packageId` not yet used by this learner/topic; when exhausted, reuse the least recently consumed package with its currently PUBLISHED version. With no available code, return `409 TEST_UNAVAILABLE`. Assignment alone does not submit an assessment or pass the topic.
+Only pending reviews of the topic's skill or a legacy null skill block assignment. A topic with `hasTopicTest=false` returns `409 NO_TOPIC_TEST` and passes when all its published lessons are completed.
+
+Requires the topic to be `IN_PROGRESS`, all lessons completed, and no pending review of its skill or a legacy null skill; otherwise `403 TEST_LOCKED` or `403 REVIEW_REQUIRED`. Empty body. Repeated POSTs return the same unconsumed assignment. After consumption, choose a `packageId` not yet used by this learner/topic; when exhausted, reuse the least recently consumed package with its currently PUBLISHED version. With no available code, return `409 TEST_UNAVAILABLE`. Assignment alone does not submit an assessment or pass the topic.
 
 For `DEMO_READING` the first assignment can be seed code `X1`:
 
@@ -145,7 +153,7 @@ For `DEMO_READING` the first assignment can be seed code `X1`:
 
 ## Error body and review rule
 
-New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: array }`. `reviews` is present only for `REVIEW_REQUIRED`, with each entry `{reviewId, lessonId, knowledgePointId}`. Do not return an answer, prompt, or token in an error. Ordinary malformed requests use HTTP 422; dependency errors retain HTTP 502/503. Examples for each new code:
+New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: array }`. `reviews` is present only for `REVIEW_REQUIRED`, with each entry `{reviewId, lessonId, knowledgePointId, skill?}`; a legacy null skill is omitted. Do not return an answer, prompt, or token in an error. Ordinary malformed requests use HTTP 422; dependency errors retain HTTP 502/503. Examples for each new code:
 
 | HTTP | Code | JSON example |
 | --- | --- | --- |
@@ -154,6 +162,7 @@ New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: ar
 | 403 | `LESSON_LOCKED` | `{"detail":"Complete L1 before L2","code":"LESSON_LOCKED"}` |
 | 403 | `TEST_LOCKED` | `{"detail":"Complete the topic lessons first","code":"TEST_LOCKED"}` |
 | 409 | `TEST_UNAVAILABLE` | `{"detail":"No published test code is available","code":"TEST_UNAVAILABLE"}` |
+| 409 | `NO_TOPIC_TEST` | `{"detail":"This topic has no final test","code":"NO_TOPIC_TEST"}` |
 | 409 | `REQUEST_CONFLICT` | `{"detail":"requestId belongs to another submission","code":"REQUEST_CONFLICT"}` |
 | 409 | `LESSON_HAS_EXERCISES` | `{"detail":"L1 contains exercise blocks","code":"LESSON_HAS_EXERCISES"}` |
 | 409 | `REVIEW_SET_CLOSED` | `{"detail":"Review set is closed","code":"REVIEW_SET_CLOSED"}` |

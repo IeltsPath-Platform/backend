@@ -3,6 +3,7 @@ package com.group01.learning.domain.service;
 import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.vo.PendingReview;
 import com.group01.learning.domain.vo.TopicStatus;
+import com.group01.learning.domain.vo.LearningSkill;
 
 import java.util.List;
 import java.util.UUID;
@@ -10,8 +11,14 @@ import java.util.UUID;
 public final class LessonAccessGate {
     public void authorize(List<PendingReview> pendingReviews, UUID currentReviewId,
                           TopicStatus topicStatus, boolean previousLessonsComplete) {
+        authorize(pendingReviews, currentReviewId, null, topicStatus, previousLessonsComplete);
+    }
+
+    public void authorize(List<PendingReview> pendingReviews, UUID currentReviewId, LearningSkill lessonSkill,
+                          TopicStatus topicStatus, boolean previousLessonsComplete) {
         List<PendingReview> blockingReviews = pendingReviews.stream()
                 .filter(review -> !review.reviewId().equals(currentReviewId))
+                .filter(review -> review.skill() == null || review.skill() == lessonSkill)
                 .toList();
         if (!blockingReviews.isEmpty()) {
             throw new LearningGateException("REVIEW_REQUIRED", blockingReviews);

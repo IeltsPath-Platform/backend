@@ -1,5 +1,7 @@
 package com.group01.learning.application.port;
 
+import com.group01.learning.domain.vo.LearningSkill;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +23,11 @@ public interface LearningContentClient {
 
     /** {@code requiredFeatureKey} is the Access feature needed to learn the topic; null means free. */
     record Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
-                 List<KnowledgePoint> knowledgePoints) {
+                 List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest) {
+        public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                     List<KnowledgePoint> knowledgePoints) {
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, null, true);
+        }
         public Topic(UUID topicId, String code, String name, int sortOrder, List<KnowledgePoint> knowledgePoints) {
             this(topicId, code, name, sortOrder, null, knowledgePoints);
         }
@@ -36,7 +42,11 @@ public interface LearningContentClient {
     }
 
     record Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
-                  int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks) {
+                  int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks, LearningSkill skill) {
+        public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
+                      int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks) {
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, null);
+        }
     }
 
     /** {@code blockKind} is {@code EXERCISE} or {@code ESSAY} on exercise blocks; absent means {@code EXERCISE}. */

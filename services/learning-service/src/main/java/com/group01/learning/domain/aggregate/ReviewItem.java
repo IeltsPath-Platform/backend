@@ -3,6 +3,7 @@ package com.group01.learning.domain.aggregate;
 import com.group01.learning.domain.entity.ReviewSet;
 import com.group01.learning.domain.service.ReviewRule;
 import com.group01.learning.domain.vo.ReviewStatus;
+import com.group01.learning.domain.vo.LearningSkill;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -18,6 +19,7 @@ public final class ReviewItem {
     private final UUID userId;
     private final UUID knowledgePointId;
     private final UUID lessonId;
+    private final LearningSkill skill;
     private ReviewStatus status;
     private ReviewSet openSet;
     private int failedSets;
@@ -25,11 +27,12 @@ public final class ReviewItem {
     private ReviewSet answeredSet;
 
     private ReviewItem(UUID id, UUID userId, UUID knowledgePointId, UUID lessonId, ReviewStatus status,
-                       ReviewSet openSet, int failedSets) {
+                       ReviewSet openSet, int failedSets, LearningSkill skill) {
         this.id = Objects.requireNonNull(id, "id");
         this.userId = Objects.requireNonNull(userId, "userId");
         this.knowledgePointId = Objects.requireNonNull(knowledgePointId, "knowledgePointId");
         this.lessonId = Objects.requireNonNull(lessonId, "lessonId");
+        this.skill = skill;
         this.status = Objects.requireNonNull(status, "status");
         this.openSet = openSet;
         this.failedSets = failedSets;
@@ -37,7 +40,12 @@ public final class ReviewItem {
 
     public static ReviewItem restore(UUID id, UUID userId, UUID knowledgePointId, UUID lessonId, ReviewStatus status,
                                      ReviewSet openSet, int failedSets) {
-        return new ReviewItem(id, userId, knowledgePointId, lessonId, status, openSet, failedSets);
+        return restore(id, userId, knowledgePointId, lessonId, status, openSet, failedSets, null);
+    }
+
+    public static ReviewItem restore(UUID id, UUID userId, UUID knowledgePointId, UUID lessonId, ReviewStatus status,
+                                     ReviewSet openSet, int failedSets, LearningSkill skill) {
+        return new ReviewItem(id, userId, knowledgePointId, lessonId, status, openSet, failedSets, skill);
     }
 
     /** Gives the learner a new practice set; only a PENDING review without an open set takes one. */
@@ -82,6 +90,7 @@ public final class ReviewItem {
     public UUID userId() { return userId; }
     public UUID knowledgePointId() { return knowledgePointId; }
     public UUID lessonId() { return lessonId; }
+    public LearningSkill skill() { return skill; }
     public ReviewStatus status() { return status; }
     public Optional<ReviewSet> openSet() { return Optional.ofNullable(openSet); }
 

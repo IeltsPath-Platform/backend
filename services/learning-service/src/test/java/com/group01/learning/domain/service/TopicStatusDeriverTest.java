@@ -2,6 +2,7 @@ package com.group01.learning.domain.service;
 
 import com.group01.learning.domain.entity.TopicProgress;
 import com.group01.learning.domain.vo.TopicStatus;
+import com.group01.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -61,5 +62,23 @@ class TopicStatusDeriverTest {
         assertThat(deriver.derive(List.of(new TopicProgress(second, 1, null),
                 new TopicProgress(first, 1, null))))
                 .containsEntry(first, TopicStatus.IN_PROGRESS).containsEntry(second, TopicStatus.LOCKED);
+    }
+
+    @Test
+    void opensAnIndependentTopicForEachSkillIncludingUnspecified() {
+        UUID fourth = new UUID(0, 4);
+        UUID fifth = new UUID(0, 5);
+        var result = deriver.derive(List.of(
+                new TopicProgress(first, 1, null, LearningSkill.READING, true),
+                new TopicProgress(second, 2, null, LearningSkill.LISTENING, true),
+                new TopicProgress(third, 3, null, null, true),
+                new TopicProgress(fourth, 4, null, LearningSkill.READING, true),
+                new TopicProgress(fifth, 5, null, LearningSkill.LISTENING, true)));
+
+        assertThat(result).containsEntry(first, TopicStatus.IN_PROGRESS)
+                .containsEntry(second, TopicStatus.IN_PROGRESS)
+                .containsEntry(third, TopicStatus.IN_PROGRESS)
+                .containsEntry(fourth, TopicStatus.LOCKED)
+                .containsEntry(fifth, TopicStatus.LOCKED);
     }
 }
