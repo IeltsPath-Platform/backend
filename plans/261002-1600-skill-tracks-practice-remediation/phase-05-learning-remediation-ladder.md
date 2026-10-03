@@ -38,7 +38,8 @@ sau lý thuyết = 3 (⇒ SKIPPED). Review bắt đầu ở THEORY (fast-track /
 
 - `GET /reviews/{id}` giao set như hiện tại, nhưng chọn package (D11):
   - `exclude` = mọi package **đã lộ** với learner = package của review set đã giao (`reviews.assignedPackageIds`,
-    giao mà chưa nộp vẫn tính vì đã thấy đề) ∪ `PracticeAttemptRepository.submittedPackageIds(userId)`;
+    giao mà chưa nộp vẫn tính vì đã thấy đề) ∪ `PracticeAttemptRepository.revealedPackageIds(userId)` (P4: practice
+    đã nộp ∪ review set đã nộp);
   - gọi `searchPracticeSets(kp, exclude, MIN_SET_QUESTIONS, preferredLessonId = review.lessonId)`, lấy phần tử đầu;
   - **bỏ** nhánh fallback `PackageRotation.leastRecentlyUsed` (không dùng lại package). Không còn package ⇒
     `SKIPPED` như hiện tại. Nếu `PackageRotation` không còn caller nào thì xoá class và test của nó.
@@ -106,7 +107,7 @@ Service mới `application/service/TheoryFocus` (logic chọn block thuần nên
 | `domain/entity/ReviewSet` | thêm `correct`, `total`. |
 | `JdbcReviewItemRepository` | đọc/ghi cột mới; lưu `review_theory_checks`. |
 | `application/service/ReviewReevaluation` | nhận `ReviewTrigger`; với PRACTICE/ASSESSMENT tính `wrongInLesson` qua `ExerciseSubmissionLog.firstResponses(userId, lessonId)`. Caller còn lại: `ApplyAssessmentResultUseCase` (ASSESSMENT). Review từ Practice tính stage qua cùng `ReviewRule.initialStage` trong `SubmitPracticeAttemptUseCase` (kpPercent của từng KP). |
-| `GetReviewUseCase` | rẽ nhánh theo stage (1.3 / 1.4); chọn package theo 1.4 (dùng `PracticeAttemptRepository.submittedPackageIds`). |
+| `GetReviewUseCase` | rẽ nhánh theo stage (1.3 / 1.4); chọn package theo 1.4 (dùng `PracticeAttemptRepository.revealedPackageIds`). |
 | `SubmitReviewUseCase` | 409 `THEORY_REQUIRED` khi THEORY; luôn reveal; lưu correct/total; response thêm `stage`, `failedSets`. |
 | `SubmitTheoryCheckUseCase` (mới) | `@Transactional`, `LearnerLock`, idempotent theo `requestId`; dùng `ItemGrading`; không ghi evidence. |
 | `ReviewController` + DTO | route mới; `ReviewResponse` thêm field mục 5. |
@@ -172,7 +173,8 @@ Cập nhật test cũ đang kỳ vọng `MAX_FAILED_REVIEW_SETS = 3` hoặc "tr�
 
 ## Acceptance
 
-`mvn -q -pl services/learning-service -am test` xanh; 10 kịch bản trên có test.
+`mvn -q -pl services/learning-service -am test` xanh; 10 kịch bản trên được phủ bởi unit hoặc integration (được gộp
+nhiều kịch bản vào một test method).
 
 ## Verification
 
