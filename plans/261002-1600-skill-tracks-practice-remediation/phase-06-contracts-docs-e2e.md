@@ -47,16 +47,17 @@ Compose như các plan trước, learner mới, qua Gateway.
 1. `GET /api/learning/topics` ⇒ có READING, LISTENING, WRITING, mỗi skill một IN_PROGRESS.
 2. `GET /lessons/{L1}/practice-sets` khi chưa xong L1 ⇒ mọi item `LOCKED`; start ⇒ 409 `PRACTICE_LOCKED`.
 3. Học L1 cố ý sai **một** câu (block vẫn đạt) ⇒ hoàn thành ⇒ **không** có review; practice-sets `AVAILABLE`.
-4. Practice `PS-KP1-A` đúng 2/4 (40–69%, KP1 không thuộc câu sai ở bước 3 – nếu thuộc thì ghi lại là fast-track) ⇒
-   `reviewsCreated` có review `stage=PRACTICE`; response có `explanation`.
-5. Lesson Reading kế tiếp ⇒ 409 `REVIEW_REQUIRED`; mở LS1 (Listening) ⇒ 200.
+4. L1 chỉ có một đề (`PS-KP3-A`): làm 2/4 ⇒ `reviewsCreated=[]` (không còn đề chưa lộ, D12), response có
+   `explanation`; L1 `practiceStatus=PASSED/ALL_SETS_ATTEMPTED`. Xong L2, làm `PS-KP1-A` (KP Main idea có 4 đề) 2/4 ⇒
+   `reviewsCreated` có review `stage=PRACTICE`. Các bước 5–8 chạy thang ôn trên L2.
+5. Lesson Reading kế tiếp (L3) ⇒ 403 `REVIEW_REQUIRED`; mở LS1 (Listening) ⇒ 200.
 6. `GET /reviews/{id}` ⇒ set là package **khác** `PS-KP1-A`, câu có `hint`; nộp sai ≥ 40% ⇒ `stage=THEORY`,
    `theoryReason=SECOND_FAIL`, `results` có `explanation`, `failedSets=1`.
 7. `GET /reviews/{id}` ⇒ `theory` chỉ gồm TEXT của KP1, có `quickCheck`, `set=null`; nộp set ⇒ 409
    `THEORY_REQUIRED`; `theory-check` ⇒ `stage=PRACTICE`.
 8. `GET /reviews/{id}` ⇒ package thứ ba, chưa lộ; nộp sai ⇒ `reviewStatus=SKIPPED`; lesson Reading kế tiếp mở lại;
    L1 giờ "qua Practice" (review PRACTICE của L1 đã kết thúc).
-9. Xong L2–L4 nhưng chưa qua Practice ⇒ `POST /topics/{DEMO_READING}/test-assignments` ⇒ 409 `PRACTICE_REQUIRED`;
+9. Xong L3–L4 nhưng chưa qua Practice ⇒ `POST /topics/{DEMO_READING}/test-assignments` ⇒ 409 `PRACTICE_REQUIRED`;
    làm đạt practice lần đầu của từng lesson ⇒ giao đề được.
 10. W1, W2 ⇒ `/complete` ⇒ topic `DEMO_WRITING` PASSED; `POST /topics/{DEMO_WRITING}/test-assignments` ⇒ 409
     `NO_TOPIC_TEST`.
@@ -71,3 +72,15 @@ Báo cáo che token, mật khẩu, email.
 - `mvn -q -pl services/content-service,services/learning-service -am test` xanh.
 - `graphify update .`.
 - `plan.md`: Status → completed, điền Verification từng phase.
+
+## Verification
+
+- Tài liệu: `AGENTS.md` §3.8 (ngoại lệ lời giải D11, chuỗi topic theo skill), `docs/system-architecture.md` (Learning,
+  route nội bộ, transcript, flow), `docs/fe-main-flow-guide.md` (Practice, stage bài ôn, mã lỗi mới),
+  `docs/contracts/lesson-learning-v1.md` (sơ đồ trạng thái review; phần còn lại cập nhật ở P3–P5). Contract nội bộ
+  Content và README hai service đã cập nhật ở P1–P5. `CLAUDE.md` không có câu sai, không sửa.
+- E2E: [reports/e2e.md](reports/e2e.md), 47/47 PASS qua Gateway của `docker-compose.mvp.yml` sau khi build lại
+  content và learning, learner mới. Runbook bước 4 đã sửa theo dữ liệu seed thật (L1 chỉ có một đề Practice).
+- `graphify update .` đã chạy.
+- Test: content-service 185/185 (lần chạy ở P2b, không đổi code content sau đó); learning-service 216 test ở P5 (xem
+  phase-05). Không chạy lại gộp hai service sau phần tài liệu vì P6 không đổi code.
