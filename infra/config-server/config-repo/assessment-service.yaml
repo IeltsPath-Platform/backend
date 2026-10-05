@@ -51,7 +51,7 @@ springdoc:
   api-docs:
     enabled: ${API_DOCS_ENABLED:true}
   paths-to-match:
-    - /api/assessments/attempts/**
+    - /api/assessments/**
 
 management:
   endpoints:

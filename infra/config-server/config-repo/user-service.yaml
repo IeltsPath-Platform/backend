@@ -53,8 +53,9 @@ springdoc:
     enabled: ${API_DOCS_ENABLED:true}
   paths-to-match:
     - /auth/**
-    - /api/users/register
-    - /api/users/me
+    - /api/users/**
+    - /api/learning-support/activities/**
+    - /api/learning-support/streak/**
 
 management:
   endpoints:

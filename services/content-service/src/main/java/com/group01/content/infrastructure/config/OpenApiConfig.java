@@ -1,4 +1,4 @@
-package com.group01.access.infrastructure.config;
+package com.group01.content.infrastructure.config;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
@@ -14,8 +14,8 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 @OpenAPIDefinition(
-        info = @Info(title = "Access Service", version = "v1",
-                description = "Plans, subscriptions, activation keys and the point wallet."),
+        info = @Info(title = "Content Service", version = "v1",
+                description = "Topics, knowledge points, questions, content packages, assets and reading passages."),
         servers = @Server(url = "/", description = "API Gateway"),
         security = @SecurityRequirement(name = "bearer"))
 @SecurityScheme(name = "bearer", type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT")

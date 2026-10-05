@@ -20,10 +20,26 @@ app:
         patterns:
           - /actuator/health
           - /actuator/info
+          - /v3/api-docs
+          - /v3/api-docs/**
 
 library:
   content:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
+
+springdoc:
+  # OpenAPI for the Gateway Swagger UI; set API_DOCS_ENABLED=false outside local development.
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:true}
+  paths-to-match:
+    - /api/content/videos/**
+    - /api/content/vocabulary/**
+    - /api/content/admin/vocabulary/**
+    - /api/learning-support/flashcards/**
+    - /api/learning-support/decks/**
+    - /api/learning-support/notes/**
+    - /api/learning-support/video-progress/**
+    - /api/learning-support/saved-segments/**
 
 management:
   endpoints:

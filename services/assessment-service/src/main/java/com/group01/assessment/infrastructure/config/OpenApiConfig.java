@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @OpenAPIDefinition(
         info = @Info(title = "Assessment Service", version = "v1",
-                description = "Final test attempts: start, structure, answers, submit, result. Contract: docs/contracts/lesson-learning-v1.md."),
+                description = "Test attempts and answers, results, examiner and AI grading, learner submissions and video practice. Contract: docs/contracts/lesson-learning-v1.md."),
         servers = @Server(url = "/", description = "API Gateway"),
         security = @SecurityRequirement(name = "bearer"))
 @SecurityScheme(name = "bearer", type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT")

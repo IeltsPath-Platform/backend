@@ -20,6 +20,8 @@ app:
         patterns:
           - /actuator/health
           - /actuator/info
+          - /v3/api-docs
+          - /v3/api-docs/**
           - /ws/games
 
 game:
@@ -29,6 +31,13 @@ game:
     base-url: ${LIBRARY_SERVICE_URL:http://localhost:8081}
   websocket:
     allowed-origins: ${GAME_WEBSOCKET_ALLOWED_ORIGINS:http://localhost:5173}
+
+springdoc:
+  # OpenAPI for the Gateway Swagger UI; set API_DOCS_ENABLED=false outside local development.
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:true}
+  paths-to-match:
+    - /api/games/**
 
 management:
   endpoints:
