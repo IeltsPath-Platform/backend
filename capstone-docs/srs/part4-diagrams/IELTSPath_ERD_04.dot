@@ -1,0 +1,17 @@
+digraph G {
+graph [rankdir=TB, bgcolor="white", pad=0.18, nodesep=0.45, ranksep=0.8, splines=polyline, outputorder=edgesfirst];
+node [shape=plain, fontname="Arial", fontsize=14];
+edge [fontname="Arial", fontsize=10, color="#405369", penwidth=1.2, arrowsize=0.8, dir=both];
+"content.topics" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Topic</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  parent_topic_id</FONT></TD></TR></TABLE>>];
+"content.knowledge_points" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Knowledge Point</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  topic_id</FONT></TD></TR></TABLE>>];
+"content.lessons" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Lesson</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  topic_id</FONT></TD></TR></TABLE>>];
+"content.lesson_blocks" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Lesson Block</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  lesson_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  asset_id</FONT></TD></TR></TABLE>>];
+"content.content_assets" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Content Asset</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR></TABLE>>];
+"content.topics" -> "content.topics" [id="0", arrowtail="teeodot", arrowhead="crowodot", style="solid"];
+"content.topics" -> "content.knowledge_points" [id="1", arrowtail="teetee", arrowhead="crowodot", style="solid"];
+"content.topics" -> "content.lessons" [id="2", arrowtail="teetee", arrowhead="crowodot", style="solid"];
+"content.lessons" -> "content.lesson_blocks" [id="3", arrowtail="teetee", arrowhead="crowodot", style="solid"];
+"content.content_assets" -> "content.lesson_blocks" [id="4", arrowtail="teeodot", arrowhead="crowodot", style="solid"];
+"content.lessons" -> "content.knowledge_points" [id="5", arrowtail="crowodot", arrowhead="crowodot", style="solid", label="lesson knowledge points\n(association)"];
+"content.lesson_blocks" -> "content.knowledge_points" [id="6", arrowtail="crowodot", arrowhead="crowodot", style="solid", label="lesson block knowledge points\n(association)"];
+}

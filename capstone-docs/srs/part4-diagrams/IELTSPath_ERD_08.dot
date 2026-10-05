@@ -1,0 +1,24 @@
+digraph G {
+graph [rankdir=LR, bgcolor="white", pad=0.18, nodesep=0.45, ranksep=0.8, splines=polyline, outputorder=edgesfirst];
+node [shape=plain, fontname="Arial", fontsize=14];
+edge [fontname="Arial", fontsize=10, color="#405369", penwidth=1.2, arrowsize=0.8, dir=both];
+"learning.topic_progress" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Topic Progress</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  user_id, topic_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  user_id</FONT></TD></TR></TABLE>>];
+"learning.lesson_progress" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Lesson Progress</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  user_id, lesson_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  lesson_id</FONT></TD></TR></TABLE>>];
+"learning.lesson_exercise_submissions" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Exercise Submission</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  lesson_id</FONT></TD></TR></TABLE>>];
+"learning.lesson_writing_submissions" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Writing Submission</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  lesson_id</FONT></TD></TR></TABLE>>];
+"learning.practice_attempts" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Practice Attempt</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  lesson_id</FONT></TD></TR></TABLE>>];
+"learning.lesson_practice_passes" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Practice Pass</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  user_id, lesson_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  lesson_id</FONT></TD></TR></TABLE>>];
+"user.users" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#F1F3F5"><TR><TD BGCOLOR="#E3E7EC"><B>User [user]</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR></TABLE>>];
+"content.lessons" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#F1F3F5"><TR><TD BGCOLOR="#E3E7EC"><B>Lesson [content]</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR></TABLE>>];
+"user.users" -> "learning.topic_progress" [id="0", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+"user.users" -> "learning.lesson_progress" [id="1", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+"content.lessons" -> "learning.lesson_progress" [id="2", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+"user.users" -> "learning.lesson_exercise_submissions" [id="3", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+"content.lessons" -> "learning.lesson_exercise_submissions" [id="4", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+"user.users" -> "learning.lesson_writing_submissions" [id="5", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+"content.lessons" -> "learning.lesson_writing_submissions" [id="6", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+"user.users" -> "learning.practice_attempts" [id="7", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+"content.lessons" -> "learning.practice_attempts" [id="8", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+"user.users" -> "learning.lesson_practice_passes" [id="9", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+"content.lessons" -> "learning.lesson_practice_passes" [id="10", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+}

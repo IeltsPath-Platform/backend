@@ -1,0 +1,14 @@
+digraph G {
+graph [rankdir=TB, bgcolor="white", pad=0.18, nodesep=0.45, ranksep=0.8, splines=polyline, outputorder=edgesfirst];
+node [shape=plain, fontname="Arial", fontsize=14];
+edge [fontname="Arial", fontsize=10, color="#405369", penwidth=1.2, arrowsize=0.8, dir=both];
+"library.vocabulary_items" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Vocabulary Item</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR></TABLE>>];
+"library.vocabulary_senses" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Vocabulary Sense</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  vocabulary_item_id</FONT></TD></TR></TABLE>>];
+"library.learning_videos" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Learning Video</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR></TABLE>>];
+"library.video_segments" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Video Segment</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  video_id</FONT></TD></TR></TABLE>>];
+"library.video_segment_lexical_entries" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Segment Lexical Entry</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  segment_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  vocabulary_sense_id</FONT></TD></TR></TABLE>>];
+"library.vocabulary_items" -> "library.vocabulary_senses" [id="0", arrowtail="teetee", arrowhead="crowodot", style="solid"];
+"library.learning_videos" -> "library.video_segments" [id="1", arrowtail="teetee", arrowhead="crowodot", style="solid"];
+"library.video_segments" -> "library.video_segment_lexical_entries" [id="2", arrowtail="teetee", arrowhead="crowodot", style="solid"];
+"library.vocabulary_senses" -> "library.video_segment_lexical_entries" [id="3", arrowtail="teeodot", arrowhead="crowodot", style="solid"];
+}

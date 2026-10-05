@@ -1,0 +1,16 @@
+digraph G {
+graph [rankdir=TB, bgcolor="white", pad=0.18, nodesep=0.45, ranksep=0.8, splines=polyline, outputorder=edgesfirst];
+node [shape=plain, fontname="Arial", fontsize=14];
+edge [fontname="Arial", fontsize=10, color="#405369", penwidth=1.2, arrowsize=0.8, dir=both];
+"content.content_packages" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Content Package</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  current_published_version_id</FONT></TD></TR></TABLE>>];
+"content.content_package_versions" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Package Version</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  package_id</FONT></TD></TR></TABLE>>];
+"content.content_sections" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Content Section</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  package_version_id</FONT></TD></TR></TABLE>>];
+"content.questions" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Question</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  current_published_version_id</FONT></TD></TR></TABLE>>];
+"content.question_versions" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Question Version</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  question_id</FONT></TD></TR></TABLE>>];
+"content.content_package_versions" -> "content.content_packages" [id="0", arrowtail="teeodot", arrowhead="crowodot", style="solid"];
+"content.content_packages" -> "content.content_package_versions" [id="1", arrowtail="teetee", arrowhead="crowodot", style="solid"];
+"content.content_package_versions" -> "content.content_sections" [id="2", arrowtail="teetee", arrowhead="crowodot", style="solid"];
+"content.question_versions" -> "content.questions" [id="3", arrowtail="teeodot", arrowhead="crowodot", style="solid"];
+"content.questions" -> "content.question_versions" [id="4", arrowtail="teetee", arrowhead="crowodot", style="solid"];
+"content.content_sections" -> "content.question_versions" [id="5", arrowtail="crowodot", arrowhead="crowodot", style="solid", label="section questions\n(association)"];
+}

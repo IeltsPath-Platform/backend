@@ -1,0 +1,5465 @@
+{
+  "nodes": {
+    "user.users": {
+      "name": "users",
+      "service": "user",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "email": {
+          "nullable": false
+        },
+        "full_name": {
+          "nullable": false
+        },
+        "phone_number": {
+          "nullable": true
+        },
+        "password_hash": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "email"
+        ],
+        [
+          "phone_number"
+        ]
+      ],
+      "fks": [],
+      "source": "services/user-service/src/main/resources/db/migration/V1__create_user_tables.sql",
+      "label": "User",
+      "purpose": "Represents an account that owns learning records or performs staff actions.",
+      "key": "user.users"
+    },
+    "user.roles": {
+      "name": "roles",
+      "service": "user",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "name": {
+          "nullable": false
+        },
+        "description": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "name"
+        ]
+      ],
+      "fks": [],
+      "source": "services/user-service/src/main/resources/db/migration/V1__create_user_tables.sql",
+      "label": "Role",
+      "purpose": "Defines a system access role assigned to users.",
+      "key": "user.roles"
+    },
+    "user.learner_profiles": {
+      "name": "learner_profiles",
+      "service": "user",
+      "cols": {
+        "user_id": {
+          "nullable": false
+        },
+        "display_name": {
+          "nullable": false
+        },
+        "avatar_reference": {
+          "nullable": true
+        },
+        "bio": {
+          "nullable": true
+        },
+        "self_reported_band": {
+          "nullable": true
+        },
+        "timezone": {
+          "nullable": false
+        },
+        "profile_visibility": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "user_id"
+      ],
+      "unique": [],
+      "fks": [
+        {
+          "cols": [
+            "user_id"
+          ],
+          "target": "users",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/user-service/src/main/resources/db/migration/V2__create_identity_tables.sql",
+      "label": "Learner Profile",
+      "purpose": "Stores the learning profile and visibility preferences of one user.",
+      "key": "user.learner_profiles"
+    },
+    "user.learning_goals": {
+      "name": "learning_goals",
+      "service": "user",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "target_band": {
+          "nullable": false
+        },
+        "exam_date": {
+          "nullable": true
+        },
+        "available_minutes_per_day": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "started_at": {
+          "nullable": false
+        },
+        "ended_at": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [
+        {
+          "cols": [
+            "user_id"
+          ],
+          "target": "users",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/user-service/src/main/resources/db/migration/V2__create_identity_tables.sql",
+      "label": "Learning Goal",
+      "purpose": "Records a user's target band, study availability and goal lifecycle.",
+      "key": "user.learning_goals"
+    },
+    "user.learning_activities": {
+      "name": "learning_activities",
+      "service": "user",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "activity_type": {
+          "nullable": false
+        },
+        "source_type": {
+          "nullable": false
+        },
+        "source_id": {
+          "nullable": false
+        },
+        "occurred_at": {
+          "nullable": false
+        },
+        "duration_seconds": {
+          "nullable": true
+        },
+        "verified_at": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/user-service/src/main/resources/db/migration/V5__create_learning_activity_and_streak_tables.sql",
+      "label": "Learning Activity",
+      "purpose": "Records a user's learning activity and its source reference.",
+      "key": "user.learning_activities"
+    },
+    "user.streaks": {
+      "name": "streaks",
+      "service": "user",
+      "cols": {
+        "user_id": {
+          "nullable": false
+        },
+        "current_days": {
+          "nullable": false
+        },
+        "longest_days": {
+          "nullable": false
+        },
+        "last_qualified_date": {
+          "nullable": true
+        },
+        "timezone": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "user_id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/user-service/src/main/resources/db/migration/V5__create_learning_activity_and_streak_tables.sql",
+      "label": "Streak",
+      "purpose": "Stores a user's current and longest qualified-day streak.",
+      "key": "user.streaks"
+    },
+    "access.plans": {
+      "name": "plans",
+      "service": "access",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "code": {
+          "nullable": false
+        },
+        "name": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "code"
+        ]
+      ],
+      "fks": [],
+      "source": "services/access-service/src/main/resources/db/migration/V1__create_access_tables.sql",
+      "label": "Plan",
+      "purpose": "Defines an access offering available through subscriptions.",
+      "key": "access.plans"
+    },
+    "access.plan_features": {
+      "name": "plan_features",
+      "service": "access",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "plan_id": {
+          "nullable": false
+        },
+        "feature_key": {
+          "nullable": false
+        },
+        "is_enabled": {
+          "nullable": false
+        },
+        "limit_value": {
+          "nullable": true
+        },
+        "config": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "plan_id",
+          "feature_key"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "plan_id"
+          ],
+          "target": "plans",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/access-service/src/main/resources/db/migration/V1__create_access_tables.sql",
+      "label": "Plan Feature",
+      "purpose": "Defines a feature entitlement and optional limit within a plan.",
+      "key": "access.plan_features"
+    },
+    "access.subscriptions": {
+      "name": "subscriptions",
+      "service": "access",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "plan_id": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "starts_at": {
+          "nullable": false
+        },
+        "ends_at": {
+          "nullable": true
+        },
+        "source_type": {
+          "nullable": false
+        },
+        "source_reference_id": {
+          "nullable": true
+        },
+        "human_grading_credits_total": {
+          "nullable": false
+        },
+        "human_grading_credits_used": {
+          "nullable": false
+        },
+        "cancelled_at": {
+          "nullable": true
+        },
+        "row_version": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [
+        {
+          "cols": [
+            "plan_id"
+          ],
+          "target": "plans",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/access-service/src/main/resources/db/migration/V1__create_access_tables.sql",
+      "label": "Subscription",
+      "purpose": "Records a user's access to a plan for a period.",
+      "key": "access.subscriptions"
+    },
+    "access.key_products": {
+      "name": "key_products",
+      "service": "access",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "code": {
+          "nullable": false
+        },
+        "name": {
+          "nullable": false
+        },
+        "key_type": {
+          "nullable": false
+        },
+        "points_amount": {
+          "nullable": true
+        },
+        "plan_id": {
+          "nullable": true
+        },
+        "premium_days": {
+          "nullable": true
+        },
+        "human_grading_credits": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "code"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "plan_id"
+          ],
+          "target": "plans",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/access-service/src/main/resources/db/migration/V1__create_access_tables.sql",
+      "label": "Key Product",
+      "purpose": "Defines the points or plan benefits granted by an activation key.",
+      "key": "access.key_products"
+    },
+    "access.activation_keys": {
+      "name": "activation_keys",
+      "service": "access",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "product_id": {
+          "nullable": false
+        },
+        "code_hash": {
+          "nullable": false
+        },
+        "code_hint": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "expires_at": {
+          "nullable": true
+        },
+        "created_by": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "redeemed_at": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "code_hash"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "product_id"
+          ],
+          "target": "key_products",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/access-service/src/main/resources/db/migration/V1__create_access_tables.sql",
+      "label": "Activation Key",
+      "purpose": "Represents a redeemable code issued for a key product.",
+      "key": "access.activation_keys"
+    },
+    "access.key_activations": {
+      "name": "key_activations",
+      "service": "access",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "key_id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "product_type": {
+          "nullable": false
+        },
+        "points_granted": {
+          "nullable": false
+        },
+        "premium_days_granted": {
+          "nullable": false
+        },
+        "human_grading_credits_granted": {
+          "nullable": false
+        },
+        "activated_at": {
+          "nullable": false
+        },
+        "idempotency_key": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "key_id"
+        ],
+        [
+          "idempotency_key"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "key_id"
+          ],
+          "target": "activation_keys",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/access-service/src/main/resources/db/migration/V1__create_access_tables.sql",
+      "label": "Key Activation",
+      "purpose": "Records the user and benefits of a key redemption.",
+      "key": "access.key_activations"
+    },
+    "access.point_wallets": {
+      "name": "point_wallets",
+      "service": "access",
+      "cols": {
+        "user_id": {
+          "nullable": false
+        },
+        "balance": {
+          "nullable": false
+        },
+        "total_credited": {
+          "nullable": false
+        },
+        "total_debited": {
+          "nullable": false
+        },
+        "row_version": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "user_id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/access-service/src/main/resources/db/migration/V1__create_access_tables.sql",
+      "label": "Point Wallet",
+      "purpose": "Stores a user's point balance and credited/debited totals.",
+      "key": "access.point_wallets"
+    },
+    "access.point_ledger_entries": {
+      "name": "point_ledger_entries",
+      "service": "access",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "delta": {
+          "nullable": false
+        },
+        "balance_after": {
+          "nullable": false
+        },
+        "transaction_type": {
+          "nullable": false
+        },
+        "reference_type": {
+          "nullable": false
+        },
+        "reference_id": {
+          "nullable": false
+        },
+        "idempotency_key": {
+          "nullable": false
+        },
+        "description": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "idempotency_key"
+        ]
+      ],
+      "fks": [],
+      "source": "services/access-service/src/main/resources/db/migration/V1__create_access_tables.sql",
+      "label": "Point Ledger Entry",
+      "purpose": "Records an individual point balance change and its source.",
+      "key": "access.point_ledger_entries"
+    },
+    "content.topics": {
+      "name": "topics",
+      "service": "content",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "parent_topic_id": {
+          "nullable": true
+        },
+        "code": {
+          "nullable": false
+        },
+        "name": {
+          "nullable": false
+        },
+        "sort_order": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        },
+        "band_min": {
+          "nullable": true
+        },
+        "band_max": {
+          "nullable": true
+        },
+        "required_feature_key": {
+          "nullable": true
+        },
+        "skill": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "code"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "parent_topic_id"
+          ],
+          "target": "topics",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/content-service/src/main/resources/db/migration/V1__create_content_tables.sql",
+      "label": "Topic",
+      "purpose": "Organizes curriculum content and ordered lessons, with an optional parent topic.",
+      "key": "content.topics"
+    },
+    "content.knowledge_points": {
+      "name": "knowledge_points",
+      "service": "content",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "topic_id": {
+          "nullable": false
+        },
+        "code": {
+          "nullable": false
+        },
+        "name": {
+          "nullable": false
+        },
+        "kind": {
+          "nullable": false
+        },
+        "skill": {
+          "nullable": true
+        },
+        "description": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        },
+        "learning_type": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "code"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "topic_id"
+          ],
+          "target": "topics",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/content-service/src/main/resources/db/migration/V1__create_content_tables.sql",
+      "label": "Knowledge Point",
+      "purpose": "Defines a unit of knowledge associated with a topic.",
+      "key": "content.knowledge_points"
+    },
+    "content.lessons": {
+      "name": "lessons",
+      "service": "content",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "topic_id": {
+          "nullable": false
+        },
+        "code": {
+          "nullable": false
+        },
+        "title": {
+          "nullable": false
+        },
+        "summary": {
+          "nullable": true
+        },
+        "sort_order": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "code"
+        ],
+        [
+          "topic_id",
+          "sort_order"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "topic_id"
+          ],
+          "target": "topics",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/content-service/src/main/resources/db/migration/V8__lessons_and_topic_tests.sql",
+      "label": "Lesson",
+      "purpose": "Defines an ordered learning unit inside a topic.",
+      "key": "content.lessons"
+    },
+    "content.lesson_blocks": {
+      "name": "lesson_blocks",
+      "service": "content",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "lesson_id": {
+          "nullable": false
+        },
+        "sort_order": {
+          "nullable": false
+        },
+        "block_type": {
+          "nullable": false
+        },
+        "text_content": {
+          "nullable": true
+        },
+        "asset_id": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "lesson_id",
+          "sort_order"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "lesson_id"
+          ],
+          "target": "lessons",
+          "target_cols": [
+            "id"
+          ]
+        },
+        {
+          "cols": [
+            "asset_id"
+          ],
+          "target": "content_assets",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/content-service/src/main/resources/db/migration/V8__lessons_and_topic_tests.sql",
+      "label": "Lesson Block",
+      "purpose": "Defines an ordered text, asset, vocabulary or exercise block of a lesson.",
+      "key": "content.lesson_blocks"
+    },
+    "content.content_assets": {
+      "name": "content_assets",
+      "service": "content",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "asset_type": {
+          "nullable": false
+        },
+        "text_content": {
+          "nullable": true
+        },
+        "media_reference": {
+          "nullable": true
+        },
+        "duration_seconds": {
+          "nullable": true
+        },
+        "checksum": {
+          "nullable": true
+        },
+        "validation_status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/content-service/src/main/resources/db/migration/V1__create_content_tables.sql",
+      "label": "Content Asset",
+      "purpose": "Stores text or a media reference used by learning content.",
+      "key": "content.content_assets"
+    },
+    "content.content_packages": {
+      "name": "content_packages",
+      "service": "content",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "code": {
+          "nullable": false
+        },
+        "title": {
+          "nullable": false
+        },
+        "package_type": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "current_published_version_id": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        },
+        "required_feature_key": {
+          "nullable": true
+        },
+        "topic_id": {
+          "nullable": true
+        },
+        "lesson_id": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "code"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "current_published_version_id"
+          ],
+          "target": "content_package_versions",
+          "target_cols": [
+            "id"
+          ]
+        },
+        {
+          "cols": [
+            "topic_id"
+          ],
+          "target": "topics",
+          "target_cols": [
+            "id"
+          ]
+        },
+        {
+          "cols": [
+            "lesson_id"
+          ],
+          "target": "lessons",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/content-service/src/main/resources/db/migration/V1__create_content_tables.sql",
+      "label": "Content Package",
+      "purpose": "Groups versioned content for practice, tests, quizzes or legacy lesson packages.",
+      "key": "content.content_packages"
+    },
+    "content.content_package_versions": {
+      "name": "content_package_versions",
+      "service": "content",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "package_id": {
+          "nullable": false
+        },
+        "version_number": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "rules": {
+          "nullable": false
+        },
+        "schema_version": {
+          "nullable": false
+        },
+        "published_at": {
+          "nullable": true
+        },
+        "published_by": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "package_id",
+          "version_number"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "package_id"
+          ],
+          "target": "content_packages",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/content-service/src/main/resources/db/migration/V1__create_content_tables.sql",
+      "label": "Package Version",
+      "purpose": "Preserves one numbered version of a content package.",
+      "key": "content.content_package_versions"
+    },
+    "content.content_sections": {
+      "name": "content_sections",
+      "service": "content",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "package_version_id": {
+          "nullable": false
+        },
+        "title": {
+          "nullable": false
+        },
+        "skill": {
+          "nullable": true
+        },
+        "sort_order": {
+          "nullable": false
+        },
+        "time_limit_seconds": {
+          "nullable": true
+        },
+        "instructions": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "package_version_id",
+          "sort_order"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "package_version_id"
+          ],
+          "target": "content_package_versions",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/content-service/src/main/resources/db/migration/V1__create_content_tables.sql",
+      "label": "Content Section",
+      "purpose": "Groups ordered questions within a package version.",
+      "key": "content.content_sections"
+    },
+    "content.questions": {
+      "name": "questions",
+      "service": "content",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "question_type": {
+          "nullable": false
+        },
+        "skill": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "current_published_version_id": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        },
+        "required_feature_key": {
+          "nullable": true
+        },
+        "purpose": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [
+        {
+          "cols": [
+            "current_published_version_id"
+          ],
+          "target": "question_versions",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/content-service/src/main/resources/db/migration/V1__create_content_tables.sql",
+      "label": "Question",
+      "purpose": "Identifies a reusable question independently of its versions.",
+      "key": "content.questions"
+    },
+    "content.question_versions": {
+      "name": "question_versions",
+      "service": "content",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "question_id": {
+          "nullable": false
+        },
+        "version_number": {
+          "nullable": false
+        },
+        "stem": {
+          "nullable": false
+        },
+        "options": {
+          "nullable": true
+        },
+        "answer_spec": {
+          "nullable": false
+        },
+        "schema_version": {
+          "nullable": false
+        },
+        "explanation": {
+          "nullable": true
+        },
+        "difficulty": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        },
+        "hint": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "question_id",
+          "version_number"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "question_id"
+          ],
+          "target": "questions",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/content-service/src/main/resources/db/migration/V1__create_content_tables.sql",
+      "label": "Question Version",
+      "purpose": "Preserves the prompt, answer specification and explanation of a question version.",
+      "key": "content.question_versions"
+    },
+    "library.vocabulary_items": {
+      "name": "vocabulary_items",
+      "service": "library",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "lemma": {
+          "nullable": false
+        },
+        "normalized_lemma": {
+          "nullable": false
+        },
+        "ipa": {
+          "nullable": true
+        },
+        "pronunciation_audio_reference": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/library-service/src/main/resources/db/migration/V1__create_library_catalog.sql",
+      "label": "Vocabulary Item",
+      "purpose": "Defines a vocabulary headword and its pronunciation information.",
+      "key": "library.vocabulary_items"
+    },
+    "library.vocabulary_senses": {
+      "name": "vocabulary_senses",
+      "service": "library",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "vocabulary_item_id": {
+          "nullable": false
+        },
+        "part_of_speech": {
+          "nullable": false
+        },
+        "english_definition": {
+          "nullable": true
+        },
+        "vietnamese_meaning": {
+          "nullable": false
+        },
+        "example_sentence": {
+          "nullable": false
+        },
+        "image_url": {
+          "nullable": true
+        },
+        "sort_order": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [
+        {
+          "cols": [
+            "vocabulary_item_id"
+          ],
+          "target": "vocabulary_items",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/library-service/src/main/resources/db/migration/V1__create_library_catalog.sql",
+      "label": "Vocabulary Sense",
+      "purpose": "Defines a meaning and example for a vocabulary item.",
+      "key": "library.vocabulary_senses"
+    },
+    "library.learning_videos": {
+      "name": "learning_videos",
+      "service": "library",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "youtube_video_id": {
+          "nullable": false
+        },
+        "youtube_url": {
+          "nullable": false
+        },
+        "title": {
+          "nullable": false
+        },
+        "description": {
+          "nullable": true
+        },
+        "thumbnail_url": {
+          "nullable": true
+        },
+        "duration_seconds": {
+          "nullable": true
+        },
+        "topic_id": {
+          "nullable": true
+        },
+        "level": {
+          "nullable": true
+        },
+        "required_feature_key": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_by": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "youtube_video_id"
+        ]
+      ],
+      "fks": [],
+      "source": "services/library-service/src/main/resources/db/migration/V1__create_library_catalog.sql",
+      "label": "Learning Video",
+      "purpose": "Describes a catalog video and its optional topic reference.",
+      "key": "library.learning_videos"
+    },
+    "library.video_segments": {
+      "name": "video_segments",
+      "service": "library",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "video_id": {
+          "nullable": false
+        },
+        "sequence_no": {
+          "nullable": false
+        },
+        "start_ms": {
+          "nullable": false
+        },
+        "end_ms": {
+          "nullable": false
+        },
+        "transcript": {
+          "nullable": false
+        },
+        "translation_vi": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "video_id",
+          "sequence_no"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "video_id"
+          ],
+          "target": "learning_videos",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/library-service/src/main/resources/db/migration/V1__create_library_catalog.sql",
+      "label": "Video Segment",
+      "purpose": "Defines a timed transcript segment of a learning video.",
+      "key": "library.video_segments"
+    },
+    "library.video_segment_lexical_entries": {
+      "name": "video_segment_lexical_entries",
+      "service": "library",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "segment_id": {
+          "nullable": false
+        },
+        "vocabulary_sense_id": {
+          "nullable": true
+        },
+        "surface_text": {
+          "nullable": false
+        },
+        "start_char": {
+          "nullable": false
+        },
+        "end_char": {
+          "nullable": false
+        },
+        "sort_order": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "segment_id",
+          "start_char",
+          "end_char"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "segment_id"
+          ],
+          "target": "video_segments",
+          "target_cols": [
+            "id"
+          ]
+        },
+        {
+          "cols": [
+            "vocabulary_sense_id"
+          ],
+          "target": "vocabulary_senses",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/library-service/src/main/resources/db/migration/V1__create_library_catalog.sql",
+      "label": "Segment Lexical Entry",
+      "purpose": "Marks a text span in a segment and its optional vocabulary sense.",
+      "key": "library.video_segment_lexical_entries"
+    },
+    "library.video_learning_progress": {
+      "name": "video_learning_progress",
+      "service": "library",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "video_id": {
+          "nullable": false
+        },
+        "last_position_ms": {
+          "nullable": false
+        },
+        "watched_duration_seconds": {
+          "nullable": false
+        },
+        "progress_percent": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "started_at": {
+          "nullable": true
+        },
+        "last_watched_at": {
+          "nullable": true
+        },
+        "completed_at": {
+          "nullable": true
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "user_id",
+          "video_id"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "video_id"
+          ],
+          "target": "learning_videos",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/library-service/src/main/resources/db/migration/V2__create_personal_library.sql",
+      "label": "Video Progress",
+      "purpose": "Records one user's viewing progress for one video.",
+      "key": "library.video_learning_progress"
+    },
+    "library.saved_video_segments": {
+      "name": "saved_video_segments",
+      "service": "library",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "video_id": {
+          "nullable": false
+        },
+        "segment_id": {
+          "nullable": false
+        },
+        "transcript_snapshot": {
+          "nullable": false
+        },
+        "note": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "user_id",
+          "segment_id"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "video_id"
+          ],
+          "target": "learning_videos",
+          "target_cols": [
+            "id"
+          ]
+        },
+        {
+          "cols": [
+            "segment_id"
+          ],
+          "target": "video_segments",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/library-service/src/main/resources/db/migration/V2__create_personal_library.sql",
+      "label": "Saved Segment",
+      "purpose": "Records a user's saved video segment and transcript snapshot.",
+      "key": "library.saved_video_segments"
+    },
+    "library.notes": {
+      "name": "notes",
+      "service": "library",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "title": {
+          "nullable": false
+        },
+        "body": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        },
+        "source_type": {
+          "nullable": true
+        },
+        "source_reference_id": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/library-service/src/main/resources/db/migration/V2__create_personal_library.sql",
+      "label": "Note",
+      "purpose": "Stores a user's personal note with an optional source reference.",
+      "key": "library.notes"
+    },
+    "library.flashcard_decks": {
+      "name": "flashcard_decks",
+      "service": "library",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "name": {
+          "nullable": false
+        },
+        "description": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/library-service/src/main/resources/db/migration/V2__create_personal_library.sql",
+      "label": "Flashcard Deck",
+      "purpose": "Groups a user's flashcards into a named deck.",
+      "key": "library.flashcard_decks"
+    },
+    "library.flashcards": {
+      "name": "flashcards",
+      "service": "library",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "source_type": {
+          "nullable": false
+        },
+        "vocabulary_sense_id": {
+          "nullable": true
+        },
+        "source_reference_id": {
+          "nullable": true
+        },
+        "highlighted_text": {
+          "nullable": true
+        },
+        "front": {
+          "nullable": false
+        },
+        "back": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [
+        {
+          "cols": [
+            "vocabulary_sense_id"
+          ],
+          "target": "vocabulary_senses",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/library-service/src/main/resources/db/migration/V2__create_personal_library.sql",
+      "label": "Flashcard",
+      "purpose": "Stores a user's study card and optional vocabulary or source reference.",
+      "key": "library.flashcards"
+    },
+    "learning.topic_progress": {
+      "name": "topic_progress",
+      "service": "learning",
+      "cols": {
+        "user_id": {
+          "nullable": false
+        },
+        "topic_id": {
+          "nullable": false
+        },
+        "sequence_order": {
+          "nullable": true
+        },
+        "passed_at": {
+          "nullable": true
+        },
+        "updated_at": {
+          "nullable": false
+        },
+        "skill": {
+          "nullable": true
+        },
+        "has_topic_test": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "user_id",
+        "topic_id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/learning-service/src/main/resources/db/migration/V1__learning_schema.sql",
+      "label": "Topic Progress",
+      "purpose": "Records one user's sequence position and completion for a topic.",
+      "key": "learning.topic_progress"
+    },
+    "learning.lesson_progress": {
+      "name": "lesson_progress",
+      "service": "learning",
+      "cols": {
+        "user_id": {
+          "nullable": false
+        },
+        "lesson_id": {
+          "nullable": false
+        },
+        "topic_id": {
+          "nullable": false
+        },
+        "lesson_sort_order": {
+          "nullable": false
+        },
+        "knowledge_point_ids": {
+          "nullable": false
+        },
+        "passed_block_ids": {
+          "nullable": false
+        },
+        "completed_at": {
+          "nullable": true
+        },
+        "updated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "user_id",
+        "lesson_id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/learning-service/src/main/resources/db/migration/V1__learning_schema.sql",
+      "label": "Lesson Progress",
+      "purpose": "Records one user's passed blocks and completion for a lesson.",
+      "key": "learning.lesson_progress"
+    },
+    "learning.lesson_exercise_submissions": {
+      "name": "lesson_exercise_submissions",
+      "service": "learning",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "lesson_id": {
+          "nullable": false
+        },
+        "block_id": {
+          "nullable": false
+        },
+        "request_id": {
+          "nullable": false
+        },
+        "answers": {
+          "nullable": false
+        },
+        "block_passed": {
+          "nullable": false
+        },
+        "response": {
+          "nullable": false
+        },
+        "submitted_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "request_id"
+        ]
+      ],
+      "fks": [],
+      "source": "services/learning-service/src/main/resources/db/migration/V1__learning_schema.sql",
+      "label": "Exercise Submission",
+      "purpose": "Records a user's answers and result for a lesson block submission.",
+      "key": "learning.lesson_exercise_submissions"
+    },
+    "learning.lesson_writing_submissions": {
+      "name": "lesson_writing_submissions",
+      "service": "learning",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "lesson_id": {
+          "nullable": false
+        },
+        "block_id": {
+          "nullable": false
+        },
+        "question_version_id": {
+          "nullable": false
+        },
+        "knowledge_point_ids": {
+          "nullable": false
+        },
+        "request_id": {
+          "nullable": false
+        },
+        "essay_text": {
+          "nullable": false
+        },
+        "word_count": {
+          "nullable": false
+        },
+        "prompt_snapshot": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "point_cost": {
+          "nullable": false
+        },
+        "debit_ledger_entry_id": {
+          "nullable": true
+        },
+        "failure_code": {
+          "nullable": true
+        },
+        "result": {
+          "nullable": true
+        },
+        "overall_band": {
+          "nullable": true
+        },
+        "passed": {
+          "nullable": true
+        },
+        "grading_started_at": {
+          "nullable": false
+        },
+        "submitted_at": {
+          "nullable": false
+        },
+        "graded_at": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "request_id"
+        ]
+      ],
+      "fks": [],
+      "source": "services/learning-service/src/main/resources/db/migration/V2__lesson_writing.sql",
+      "label": "Writing Submission",
+      "purpose": "Records an essay, its grading outcome and point-debit reference.",
+      "key": "learning.lesson_writing_submissions"
+    },
+    "learning.practice_attempts": {
+      "name": "practice_attempts",
+      "service": "learning",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "lesson_id": {
+          "nullable": false
+        },
+        "skill": {
+          "nullable": false
+        },
+        "package_id": {
+          "nullable": false
+        },
+        "package_version_id": {
+          "nullable": false
+        },
+        "started_at": {
+          "nullable": false
+        },
+        "submitted_at": {
+          "nullable": true
+        },
+        "request_id": {
+          "nullable": true
+        },
+        "correct_count": {
+          "nullable": true
+        },
+        "total_count": {
+          "nullable": true
+        },
+        "passed": {
+          "nullable": true
+        },
+        "counted_as_evidence": {
+          "nullable": false
+        },
+        "response": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "request_id"
+        ]
+      ],
+      "fks": [],
+      "source": "services/learning-service/src/main/resources/db/migration/V4__practice_attempts.sql",
+      "label": "Practice Attempt",
+      "purpose": "Records a user's attempt at a lesson practice package.",
+      "key": "learning.practice_attempts"
+    },
+    "learning.lesson_practice_passes": {
+      "name": "lesson_practice_passes",
+      "service": "learning",
+      "cols": {
+        "user_id": {
+          "nullable": false
+        },
+        "lesson_id": {
+          "nullable": false
+        },
+        "reason": {
+          "nullable": false
+        },
+        "passed_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "user_id",
+        "lesson_id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/learning-service/src/main/resources/db/migration/V4__practice_attempts.sql",
+      "label": "Practice Pass",
+      "purpose": "Records that one user has satisfied a lesson's practice gate.",
+      "key": "learning.lesson_practice_passes"
+    },
+    "learning.review_items": {
+      "name": "review_items",
+      "service": "learning",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "knowledge_point_id": {
+          "nullable": false
+        },
+        "lesson_id": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "done_at": {
+          "nullable": true
+        },
+        "skill": {
+          "nullable": true
+        },
+        "trigger_kind": {
+          "nullable": true
+        },
+        "source_attempt_id": {
+          "nullable": true
+        },
+        "stage": {
+          "nullable": false
+        },
+        "theory_reason": {
+          "nullable": true
+        },
+        "theory_completed_count": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [
+        {
+          "cols": [
+            "source_attempt_id"
+          ],
+          "target": "practice_attempts",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/learning-service/src/main/resources/db/migration/V1__learning_schema.sql",
+      "label": "Review Item",
+      "purpose": "Tracks a user's remediation for a knowledge point and lesson.",
+      "key": "learning.review_items"
+    },
+    "learning.review_sets": {
+      "name": "review_sets",
+      "service": "learning",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "review_item_id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "package_id": {
+          "nullable": false
+        },
+        "package_version_id": {
+          "nullable": false
+        },
+        "assigned_at": {
+          "nullable": false
+        },
+        "submitted_at": {
+          "nullable": true
+        },
+        "passed": {
+          "nullable": true
+        },
+        "request_id": {
+          "nullable": true
+        },
+        "response": {
+          "nullable": true
+        },
+        "correct_count": {
+          "nullable": true
+        },
+        "total_count": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "request_id"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "review_item_id"
+          ],
+          "target": "review_items",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/learning-service/src/main/resources/db/migration/V1__learning_schema.sql",
+      "label": "Review Set",
+      "purpose": "Records a package version assigned as a set within a review item.",
+      "key": "learning.review_sets"
+    },
+    "learning.review_theory_checks": {
+      "name": "review_theory_checks",
+      "service": "learning",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "review_item_id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "request_id": {
+          "nullable": false
+        },
+        "question_version_ids": {
+          "nullable": false
+        },
+        "answers": {
+          "nullable": false
+        },
+        "correct_count": {
+          "nullable": false
+        },
+        "total_count": {
+          "nullable": false
+        },
+        "response": {
+          "nullable": false
+        },
+        "submitted_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "request_id"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "review_item_id"
+          ],
+          "target": "review_items",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/learning-service/src/main/resources/db/migration/V5__review_ladder.sql",
+      "label": "Review Theory Check",
+      "purpose": "Records the answers and result of a review theory quick-check.",
+      "key": "learning.review_theory_checks"
+    },
+    "learning.topic_test_assignments": {
+      "name": "topic_test_assignments",
+      "service": "learning",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "topic_id": {
+          "nullable": false
+        },
+        "package_id": {
+          "nullable": false
+        },
+        "package_version_id": {
+          "nullable": false
+        },
+        "assigned_at": {
+          "nullable": false
+        },
+        "consumed_attempt_id": {
+          "nullable": true
+        },
+        "consumed_at": {
+          "nullable": true
+        },
+        "percent": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/learning-service/src/main/resources/db/migration/V1__learning_schema.sql",
+      "label": "Topic Test Assignment",
+      "purpose": "Records a topic test package version assigned to a user and its consumed attempt.",
+      "key": "learning.topic_test_assignments"
+    },
+    "learning.kp_evidence": {
+      "name": "kp_evidence",
+      "service": "learning",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "ordinal": {
+          "nullable": true
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "kp_id": {
+          "nullable": false
+        },
+        "correct": {
+          "nullable": false
+        },
+        "source": {
+          "nullable": false
+        },
+        "source_reference_id": {
+          "nullable": false
+        },
+        "attempt_id": {
+          "nullable": true
+        },
+        "result_version": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "user_id",
+          "source",
+          "source_reference_id"
+        ]
+      ],
+      "fks": [],
+      "source": "services/learning-service/src/main/resources/db/migration/V1__learning_schema.sql",
+      "label": "KP Evidence",
+      "purpose": "Records a user's knowledge-point outcome with its learning or assessment source.",
+      "key": "learning.kp_evidence"
+    },
+    "assessment.assessment_attempts": {
+      "name": "assessment_attempts",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "package_version_id": {
+          "nullable": false
+        },
+        "attempt_type": {
+          "nullable": false
+        },
+        "mode": {
+          "nullable": false
+        },
+        "channel": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "started_at": {
+          "nullable": true
+        },
+        "submitted_at": {
+          "nullable": true
+        },
+        "expires_at": {
+          "nullable": true
+        },
+        "row_version": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        },
+        "learning_goal_id": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Assessment Attempt",
+      "purpose": "Records one user's sitting of a content package version.",
+      "key": "assessment.assessment_attempts"
+    },
+    "assessment.attempt_sections": {
+      "name": "attempt_sections",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "attempt_id": {
+          "nullable": false
+        },
+        "content_section_id": {
+          "nullable": false
+        },
+        "sort_order": {
+          "nullable": false
+        },
+        "section_snapshot": {
+          "nullable": false
+        },
+        "started_at": {
+          "nullable": true
+        },
+        "completed_at": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "attempt_id",
+          "sort_order"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "attempt_id"
+          ],
+          "target": "assessment_attempts",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Attempt Section",
+      "purpose": "Preserves a content section snapshot within an assessment attempt.",
+      "key": "assessment.attempt_sections"
+    },
+    "assessment.attempt_items": {
+      "name": "attempt_items",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "attempt_section_id": {
+          "nullable": false
+        },
+        "question_version_id": {
+          "nullable": false
+        },
+        "sort_order": {
+          "nullable": false
+        },
+        "question_snapshot": {
+          "nullable": false
+        },
+        "answer_snapshot": {
+          "nullable": true
+        },
+        "knowledge_snapshot": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "attempt_section_id",
+          "sort_order"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "attempt_section_id"
+          ],
+          "target": "attempt_sections",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Attempt Item",
+      "purpose": "Preserves a question version snapshot within an attempt section.",
+      "key": "assessment.attempt_items"
+    },
+    "assessment.attempt_responses": {
+      "name": "attempt_responses",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "attempt_item_id": {
+          "nullable": false
+        },
+        "response_payload": {
+          "nullable": false
+        },
+        "schema_version": {
+          "nullable": false
+        },
+        "revision": {
+          "nullable": false
+        },
+        "saved_at": {
+          "nullable": false
+        },
+        "submitted_at": {
+          "nullable": true
+        },
+        "lock_version": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "attempt_item_id"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "attempt_item_id"
+          ],
+          "target": "attempt_items",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Attempt Response",
+      "purpose": "Stores the current response for an attempt item.",
+      "key": "assessment.attempt_responses"
+    },
+    "assessment.assessment_results": {
+      "name": "assessment_results",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "attempt_id": {
+          "nullable": false
+        },
+        "result_version": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "overall_band": {
+          "nullable": true
+        },
+        "completed_at": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "attempt_id",
+          "result_version"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "attempt_id"
+          ],
+          "target": "assessment_attempts",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Assessment Result",
+      "purpose": "Represents a numbered result version for an assessment attempt.",
+      "key": "assessment.assessment_results"
+    },
+    "assessment.skill_scores": {
+      "name": "skill_scores",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "result_id": {
+          "nullable": false
+        },
+        "skill": {
+          "nullable": false
+        },
+        "raw_score": {
+          "nullable": true
+        },
+        "band": {
+          "nullable": true
+        },
+        "grading_source": {
+          "nullable": false
+        },
+        "feedback_revision_id": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "result_id",
+          "skill"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "result_id"
+          ],
+          "target": "assessment_results",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Skill Score",
+      "purpose": "Records a skill score and grading source within an assessment result.",
+      "key": "assessment.skill_scores"
+    },
+    "assessment.item_results": {
+      "name": "item_results",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "result_id": {
+          "nullable": false
+        },
+        "attempt_item_id": {
+          "nullable": false
+        },
+        "score": {
+          "nullable": false
+        },
+        "is_correct": {
+          "nullable": true
+        },
+        "duration_milliseconds": {
+          "nullable": true
+        },
+        "feedback_snapshot": {
+          "nullable": false
+        },
+        "max_score": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "result_id",
+          "attempt_item_id"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "result_id"
+          ],
+          "target": "assessment_results",
+          "target_cols": [
+            "id"
+          ]
+        },
+        {
+          "cols": [
+            "attempt_item_id"
+          ],
+          "target": "attempt_items",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Item Result",
+      "purpose": "Records the score and feedback for an attempt item in a result version.",
+      "key": "assessment.item_results"
+    },
+    "assessment.error_analysis_items": {
+      "name": "error_analysis_items",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "item_result_id": {
+          "nullable": false
+        },
+        "knowledge_point_id": {
+          "nullable": true
+        },
+        "error_type": {
+          "nullable": false
+        },
+        "explanation": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [
+        {
+          "cols": [
+            "item_result_id"
+          ],
+          "target": "item_results",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Error Analysis Item",
+      "purpose": "Describes an error in an item result and its optional knowledge point.",
+      "key": "assessment.error_analysis_items"
+    },
+    "assessment.learner_submissions": {
+      "name": "learner_submissions",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "attempt_item_id": {
+          "nullable": true
+        },
+        "prompt_snapshot": {
+          "nullable": false
+        },
+        "skill": {
+          "nullable": false
+        },
+        "text_payload": {
+          "nullable": true
+        },
+        "audio_reference": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "submission_key": {
+          "nullable": false
+        },
+        "submitted_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "user_id",
+          "submission_key"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "attempt_item_id"
+          ],
+          "target": "attempt_items",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Learner Submission",
+      "purpose": "Stores submitted text or an audio reference, optionally linked to an attempt item.",
+      "key": "assessment.learner_submissions"
+    },
+    "assessment.grading_jobs": {
+      "name": "grading_jobs",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "submission_id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "skill": {
+          "nullable": false
+        },
+        "grading_mode": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "point_cost_snapshot": {
+          "nullable": true
+        },
+        "point_ledger_entry_id": {
+          "nullable": true
+        },
+        "premium_subscription_id": {
+          "nullable": true
+        },
+        "idempotency_key": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "completed_at": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "idempotency_key"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "submission_id"
+          ],
+          "target": "learner_submissions",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Grading Job",
+      "purpose": "Tracks grading requested for a learner submission and its charging references.",
+      "key": "assessment.grading_jobs"
+    },
+    "assessment.human_reviews": {
+      "name": "human_reviews",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "grading_job_id": {
+          "nullable": false
+        },
+        "grader_user_id": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "assigned_at": {
+          "nullable": true
+        },
+        "started_at": {
+          "nullable": true
+        },
+        "completed_at": {
+          "nullable": true
+        },
+        "reviewer_note": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "grading_job_id"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "grading_job_id"
+          ],
+          "target": "grading_jobs",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Human Review",
+      "purpose": "Tracks examiner assignment and review for a grading job.",
+      "key": "assessment.human_reviews"
+    },
+    "assessment.grading_point_costs": {
+      "name": "grading_point_costs",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "skill": {
+          "nullable": false
+        },
+        "grading_mode": {
+          "nullable": false
+        },
+        "point_cost": {
+          "nullable": false
+        },
+        "effective_from": {
+          "nullable": false
+        },
+        "effective_to": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Grading Point Cost",
+      "purpose": "Defines a time-bounded point cost for a skill and grading mode.",
+      "key": "assessment.grading_point_costs"
+    },
+    "assessment.video_practice_attempts": {
+      "name": "video_practice_attempts",
+      "service": "assessment",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "video_id": {
+          "nullable": false
+        },
+        "segment_id": {
+          "nullable": false
+        },
+        "practice_type": {
+          "nullable": false
+        },
+        "reference_text_snapshot": {
+          "nullable": false
+        },
+        "response_text": {
+          "nullable": true
+        },
+        "audio_reference": {
+          "nullable": true
+        },
+        "score": {
+          "nullable": true
+        },
+        "result_payload": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "started_at": {
+          "nullable": false
+        },
+        "completed_at": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "label": "Video Practice Attempt",
+      "purpose": "Records a user's dictation or shadowing attempt for a video segment.",
+      "key": "assessment.video_practice_attempts"
+    },
+    "game.game_rooms": {
+      "name": "game_rooms",
+      "service": "game",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "room_code": {
+          "nullable": false
+        },
+        "host_user_id": {
+          "nullable": false
+        },
+        "game_type": {
+          "nullable": false
+        },
+        "learning_domain": {
+          "nullable": false
+        },
+        "mode": {
+          "nullable": false
+        },
+        "max_players": {
+          "nullable": false
+        },
+        "config_snapshot": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        },
+        "expires_at": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "room_code"
+        ]
+      ],
+      "fks": [],
+      "source": "services/game-service/src/main/resources/db/migration/V1__create_game_tables.sql",
+      "label": "Game Room",
+      "purpose": "Represents a hosted multiplayer room and its configuration.",
+      "key": "game.game_rooms"
+    },
+    "game.game_room_members": {
+      "name": "game_room_members",
+      "service": "game",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "room_id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "member_role": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "joined_at": {
+          "nullable": false
+        },
+        "ready_at": {
+          "nullable": true
+        },
+        "left_at": {
+          "nullable": true
+        },
+        "last_seen_at": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "room_id",
+          "user_id"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "room_id"
+          ],
+          "target": "game_rooms",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/game-service/src/main/resources/db/migration/V1__create_game_tables.sql",
+      "label": "Room Member",
+      "purpose": "Records a user's membership and readiness in a game room.",
+      "key": "game.game_room_members"
+    },
+    "game.game_matches": {
+      "name": "game_matches",
+      "service": "game",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "room_id": {
+          "nullable": true
+        },
+        "game_type": {
+          "nullable": false
+        },
+        "learning_domain": {
+          "nullable": false
+        },
+        "config_snapshot": {
+          "nullable": false
+        },
+        "content_snapshot": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "started_at": {
+          "nullable": true
+        },
+        "ended_at": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [
+        {
+          "cols": [
+            "room_id"
+          ],
+          "target": "game_rooms",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/game-service/src/main/resources/db/migration/V1__create_game_tables.sql",
+      "label": "Game Match",
+      "purpose": "Represents a multiplayer match with its content snapshot.",
+      "key": "game.game_matches"
+    },
+    "game.game_match_players": {
+      "name": "game_match_players",
+      "service": "game",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "match_id": {
+          "nullable": false
+        },
+        "room_member_id": {
+          "nullable": true
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "score": {
+          "nullable": false
+        },
+        "rank": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "joined_at": {
+          "nullable": false
+        },
+        "finished_at": {
+          "nullable": true
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "match_id",
+          "user_id"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "match_id"
+          ],
+          "target": "game_matches",
+          "target_cols": [
+            "id"
+          ]
+        },
+        {
+          "cols": [
+            "room_member_id"
+          ],
+          "target": "game_room_members",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/game-service/src/main/resources/db/migration/V1__create_game_tables.sql",
+      "label": "Match Player",
+      "purpose": "Records one user's participation, score and rank in a match.",
+      "key": "game.game_match_players"
+    },
+    "game.game_sessions": {
+      "name": "game_sessions",
+      "service": "game",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "match_player_id": {
+          "nullable": true
+        },
+        "game_type": {
+          "nullable": false
+        },
+        "learning_domain": {
+          "nullable": false
+        },
+        "mode": {
+          "nullable": false
+        },
+        "topic_id": {
+          "nullable": true
+        },
+        "source_snapshot": {
+          "nullable": false
+        },
+        "started_at": {
+          "nullable": false
+        },
+        "ended_at": {
+          "nullable": true
+        },
+        "score": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "verification_status": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "match_player_id"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "match_player_id"
+          ],
+          "target": "game_match_players",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/game-service/src/main/resources/db/migration/V1__create_game_tables.sql",
+      "label": "Game Session",
+      "purpose": "Records a user's game play and optional multiplayer participant link.",
+      "key": "game.game_sessions"
+    },
+    "game.game_answers": {
+      "name": "game_answers",
+      "service": "game",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "session_id": {
+          "nullable": false
+        },
+        "item_sequence": {
+          "nullable": false
+        },
+        "vocabulary_sense_id": {
+          "nullable": true
+        },
+        "question_version_id": {
+          "nullable": true
+        },
+        "item_snapshot": {
+          "nullable": false
+        },
+        "response_payload": {
+          "nullable": false
+        },
+        "is_correct": {
+          "nullable": false
+        },
+        "duration_milliseconds": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "session_id",
+          "item_sequence"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "session_id"
+          ],
+          "target": "game_sessions",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/game-service/src/main/resources/db/migration/V1__create_game_tables.sql",
+      "label": "Game Answer",
+      "purpose": "Records an answer to a snapshot item within a game session.",
+      "key": "game.game_answers"
+    },
+    "game.game_events": {
+      "name": "game_events",
+      "service": "game",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "match_id": {
+          "nullable": false
+        },
+        "match_player_id": {
+          "nullable": true
+        },
+        "sequence_no": {
+          "nullable": false
+        },
+        "event_type": {
+          "nullable": false
+        },
+        "payload": {
+          "nullable": false
+        },
+        "occurred_at": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "match_id",
+          "sequence_no"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "match_id"
+          ],
+          "target": "game_matches",
+          "target_cols": [
+            "id"
+          ]
+        },
+        {
+          "cols": [
+            "match_player_id"
+          ],
+          "target": "game_match_players",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/game-service/src/main/resources/db/migration/V1__create_game_tables.sql",
+      "label": "Game Event",
+      "purpose": "Records a sequenced match event with an optional player reference.",
+      "key": "game.game_events"
+    },
+    "game.quiz_events": {
+      "name": "quiz_events",
+      "service": "game",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "package_version_id": {
+          "nullable": false
+        },
+        "topic_id": {
+          "nullable": false
+        },
+        "opens_at": {
+          "nullable": false
+        },
+        "closes_at": {
+          "nullable": true
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/game-service/src/main/resources/db/migration/V1__create_game_tables.sql",
+      "label": "Quiz Event",
+      "purpose": "Defines a scheduled quiz using a topic and content package version.",
+      "key": "game.quiz_events"
+    },
+    "game.quiz_participations": {
+      "name": "quiz_participations",
+      "service": "game",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "quiz_event_id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "attempt_id": {
+          "nullable": false
+        },
+        "attempt_number": {
+          "nullable": false
+        },
+        "score": {
+          "nullable": true
+        },
+        "duration_milliseconds": {
+          "nullable": true
+        },
+        "verification_status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "attempt_id"
+        ],
+        [
+          "quiz_event_id",
+          "user_id",
+          "attempt_number"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "quiz_event_id"
+          ],
+          "target": "quiz_events",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/game-service/src/main/resources/db/migration/V1__create_game_tables.sql",
+      "label": "Quiz Participation",
+      "purpose": "Records a user's assessment attempt in a quiz event.",
+      "key": "game.quiz_participations"
+    },
+    "game.leaderboard_periods": {
+      "name": "leaderboard_periods",
+      "service": "game",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "topic_id": {
+          "nullable": true
+        },
+        "activity_type": {
+          "nullable": false
+        },
+        "period_type": {
+          "nullable": false
+        },
+        "starts_at": {
+          "nullable": false
+        },
+        "ends_at": {
+          "nullable": true
+        },
+        "timezone": {
+          "nullable": false
+        },
+        "rules_version": {
+          "nullable": true
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/game-service/src/main/resources/db/migration/V1__create_game_tables.sql",
+      "label": "Leaderboard Period",
+      "purpose": "Defines the activity and time window of a leaderboard.",
+      "key": "game.leaderboard_periods"
+    },
+    "game.leaderboard_entries": {
+      "name": "leaderboard_entries",
+      "service": "game",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "period_id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "score": {
+          "nullable": false
+        },
+        "tie_break_duration_milliseconds": {
+          "nullable": true
+        },
+        "rank": {
+          "nullable": true
+        },
+        "calculated_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "period_id",
+          "user_id"
+        ]
+      ],
+      "fks": [
+        {
+          "cols": [
+            "period_id"
+          ],
+          "target": "leaderboard_periods",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/game-service/src/main/resources/db/migration/V1__create_game_tables.sql",
+      "label": "Leaderboard Entry",
+      "purpose": "Records a user's score and rank for a leaderboard period.",
+      "key": "game.leaderboard_entries"
+    },
+    "community.posts": {
+      "name": "posts",
+      "service": "community",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "author_id": {
+          "nullable": false
+        },
+        "category": {
+          "nullable": false
+        },
+        "title": {
+          "nullable": true
+        },
+        "body": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        },
+        "version": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [],
+      "source": "services/community-service/src/main/resources/db/migration/V1__create_community_tables.sql",
+      "label": "Post",
+      "purpose": "Stores a user-authored community post and its moderation status.",
+      "key": "community.posts"
+    },
+    "community.comments": {
+      "name": "comments",
+      "service": "community",
+      "cols": {
+        "id": {
+          "nullable": false
+        },
+        "post_id": {
+          "nullable": false
+        },
+        "author_id": {
+          "nullable": false
+        },
+        "parent_comment_id": {
+          "nullable": true
+        },
+        "body": {
+          "nullable": false
+        },
+        "status": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        },
+        "updated_at": {
+          "nullable": false
+        },
+        "version": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "fks": [
+        {
+          "cols": [
+            "post_id"
+          ],
+          "target": "posts",
+          "target_cols": [
+            "id"
+          ]
+        },
+        {
+          "cols": [
+            "parent_comment_id"
+          ],
+          "target": "comments",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/community-service/src/main/resources/db/migration/V1__create_community_tables.sql",
+      "label": "Comment",
+      "purpose": "Stores a reply to a post, optionally nested below another comment.",
+      "key": "community.comments"
+    },
+    "community.post_reactions": {
+      "name": "post_reactions",
+      "service": "community",
+      "cols": {
+        "post_id": {
+          "nullable": false
+        },
+        "user_id": {
+          "nullable": false
+        },
+        "reaction_type": {
+          "nullable": false
+        },
+        "created_at": {
+          "nullable": false
+        }
+      },
+      "pk": [
+        "post_id",
+        "user_id",
+        "reaction_type"
+      ],
+      "unique": [],
+      "fks": [
+        {
+          "cols": [
+            "post_id"
+          ],
+          "target": "posts",
+          "target_cols": [
+            "id"
+          ]
+        }
+      ],
+      "source": "services/community-service/src/main/resources/db/migration/V1__create_community_tables.sql",
+      "label": "Post Reaction",
+      "purpose": "Records a user's reaction type on a post.",
+      "key": "community.post_reactions"
+    }
+  },
+  "edges": [
+    {
+      "parent": "user.users",
+      "child": "user.learner_profiles",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": true
+    },
+    {
+      "parent": "user.users",
+      "child": "user.learning_goals",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "user.learning_activities",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "user.streaks",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": true
+    },
+    {
+      "parent": "access.plans",
+      "child": "access.plan_features",
+      "cols": [
+        "plan_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "access.plans",
+      "child": "access.subscriptions",
+      "cols": [
+        "plan_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "access.subscriptions",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "access.plans",
+      "child": "access.key_products",
+      "cols": [
+        "plan_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "access.key_products",
+      "child": "access.activation_keys",
+      "cols": [
+        "product_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "access.activation_keys",
+      "child": "access.key_activations",
+      "cols": [
+        "key_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": true
+    },
+    {
+      "parent": "user.users",
+      "child": "access.key_activations",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "access.point_wallets",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": true
+    },
+    {
+      "parent": "user.users",
+      "child": "access.point_ledger_entries",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.topics",
+      "child": "content.topics",
+      "cols": [
+        "parent_topic_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "content.topics",
+      "child": "content.knowledge_points",
+      "cols": [
+        "topic_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.topics",
+      "child": "content.lessons",
+      "cols": [
+        "topic_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.lessons",
+      "child": "content.lesson_blocks",
+      "cols": [
+        "lesson_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.content_assets",
+      "child": "content.lesson_blocks",
+      "cols": [
+        "asset_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "content.content_package_versions",
+      "child": "content.content_packages",
+      "cols": [
+        "current_published_version_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "content.topics",
+      "child": "content.content_packages",
+      "cols": [
+        "topic_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "content.lessons",
+      "child": "content.content_packages",
+      "cols": [
+        "lesson_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "content.content_packages",
+      "child": "content.content_package_versions",
+      "cols": [
+        "package_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.content_package_versions",
+      "child": "content.content_sections",
+      "cols": [
+        "package_version_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.question_versions",
+      "child": "content.questions",
+      "cols": [
+        "current_published_version_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "content.questions",
+      "child": "content.question_versions",
+      "cols": [
+        "question_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "library.vocabulary_items",
+      "child": "library.vocabulary_senses",
+      "cols": [
+        "vocabulary_item_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.topics",
+      "child": "library.learning_videos",
+      "cols": [
+        "topic_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "library.learning_videos",
+      "child": "library.video_segments",
+      "cols": [
+        "video_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "library.video_segments",
+      "child": "library.video_segment_lexical_entries",
+      "cols": [
+        "segment_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "library.vocabulary_senses",
+      "child": "library.video_segment_lexical_entries",
+      "cols": [
+        "vocabulary_sense_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "library.learning_videos",
+      "child": "library.video_learning_progress",
+      "cols": [
+        "video_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "library.video_learning_progress",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "library.learning_videos",
+      "child": "library.saved_video_segments",
+      "cols": [
+        "video_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "library.video_segments",
+      "child": "library.saved_video_segments",
+      "cols": [
+        "segment_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "library.saved_video_segments",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "library.notes",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "library.flashcard_decks",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "library.vocabulary_senses",
+      "child": "library.flashcards",
+      "cols": [
+        "vocabulary_sense_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "library.flashcards",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "learning.topic_progress",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.topics",
+      "child": "learning.topic_progress",
+      "cols": [
+        "topic_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "learning.lesson_progress",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.topics",
+      "child": "learning.lesson_progress",
+      "cols": [
+        "topic_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.lessons",
+      "child": "learning.lesson_progress",
+      "cols": [
+        "lesson_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "learning.lesson_exercise_submissions",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.lessons",
+      "child": "learning.lesson_exercise_submissions",
+      "cols": [
+        "lesson_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.lesson_blocks",
+      "child": "learning.lesson_exercise_submissions",
+      "cols": [
+        "block_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "learning.lesson_writing_submissions",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.lessons",
+      "child": "learning.lesson_writing_submissions",
+      "cols": [
+        "lesson_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.lesson_blocks",
+      "child": "learning.lesson_writing_submissions",
+      "cols": [
+        "block_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.question_versions",
+      "child": "learning.lesson_writing_submissions",
+      "cols": [
+        "question_version_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "access.point_ledger_entries",
+      "child": "learning.lesson_writing_submissions",
+      "cols": [
+        "debit_ledger_entry_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "learning.practice_attempts",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.lessons",
+      "child": "learning.practice_attempts",
+      "cols": [
+        "lesson_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.content_packages",
+      "child": "learning.practice_attempts",
+      "cols": [
+        "package_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.content_package_versions",
+      "child": "learning.practice_attempts",
+      "cols": [
+        "package_version_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "learning.lesson_practice_passes",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.lessons",
+      "child": "learning.lesson_practice_passes",
+      "cols": [
+        "lesson_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "learning.practice_attempts",
+      "child": "learning.review_items",
+      "cols": [
+        "source_attempt_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "learning.review_items",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.lessons",
+      "child": "learning.review_items",
+      "cols": [
+        "lesson_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.knowledge_points",
+      "child": "learning.review_items",
+      "cols": [
+        "knowledge_point_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "learning.review_items",
+      "child": "learning.review_sets",
+      "cols": [
+        "review_item_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "learning.review_sets",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.content_packages",
+      "child": "learning.review_sets",
+      "cols": [
+        "package_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.content_package_versions",
+      "child": "learning.review_sets",
+      "cols": [
+        "package_version_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "learning.review_items",
+      "child": "learning.review_theory_checks",
+      "cols": [
+        "review_item_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "learning.review_theory_checks",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "learning.topic_test_assignments",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.topics",
+      "child": "learning.topic_test_assignments",
+      "cols": [
+        "topic_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.content_packages",
+      "child": "learning.topic_test_assignments",
+      "cols": [
+        "package_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.content_package_versions",
+      "child": "learning.topic_test_assignments",
+      "cols": [
+        "package_version_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "assessment.assessment_attempts",
+      "child": "learning.topic_test_assignments",
+      "cols": [
+        "consumed_attempt_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "learning.kp_evidence",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.knowledge_points",
+      "child": "learning.kp_evidence",
+      "cols": [
+        "kp_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "assessment.assessment_attempts",
+      "child": "learning.kp_evidence",
+      "cols": [
+        "attempt_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "assessment.assessment_attempts",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.content_package_versions",
+      "child": "assessment.assessment_attempts",
+      "cols": [
+        "package_version_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.learning_goals",
+      "child": "assessment.assessment_attempts",
+      "cols": [
+        "learning_goal_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "assessment.assessment_attempts",
+      "child": "assessment.attempt_sections",
+      "cols": [
+        "attempt_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.content_sections",
+      "child": "assessment.attempt_sections",
+      "cols": [
+        "content_section_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "assessment.attempt_sections",
+      "child": "assessment.attempt_items",
+      "cols": [
+        "attempt_section_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.question_versions",
+      "child": "assessment.attempt_items",
+      "cols": [
+        "question_version_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "assessment.attempt_items",
+      "child": "assessment.attempt_responses",
+      "cols": [
+        "attempt_item_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": true
+    },
+    {
+      "parent": "assessment.assessment_attempts",
+      "child": "assessment.assessment_results",
+      "cols": [
+        "attempt_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "assessment.assessment_results",
+      "child": "assessment.skill_scores",
+      "cols": [
+        "result_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "assessment.assessment_results",
+      "child": "assessment.item_results",
+      "cols": [
+        "result_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "assessment.attempt_items",
+      "child": "assessment.item_results",
+      "cols": [
+        "attempt_item_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "assessment.item_results",
+      "child": "assessment.error_analysis_items",
+      "cols": [
+        "item_result_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.knowledge_points",
+      "child": "assessment.error_analysis_items",
+      "cols": [
+        "knowledge_point_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "assessment.attempt_items",
+      "child": "assessment.learner_submissions",
+      "cols": [
+        "attempt_item_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "assessment.learner_submissions",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "assessment.learner_submissions",
+      "child": "assessment.grading_jobs",
+      "cols": [
+        "submission_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "assessment.grading_jobs",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "access.point_ledger_entries",
+      "child": "assessment.grading_jobs",
+      "cols": [
+        "point_ledger_entry_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "access.subscriptions",
+      "child": "assessment.grading_jobs",
+      "cols": [
+        "premium_subscription_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "assessment.grading_jobs",
+      "child": "assessment.human_reviews",
+      "cols": [
+        "grading_job_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": true
+    },
+    {
+      "parent": "user.users",
+      "child": "assessment.human_reviews",
+      "cols": [
+        "grader_user_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "assessment.video_practice_attempts",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "library.learning_videos",
+      "child": "assessment.video_practice_attempts",
+      "cols": [
+        "video_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "library.video_segments",
+      "child": "assessment.video_practice_attempts",
+      "cols": [
+        "segment_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "game.game_rooms",
+      "cols": [
+        "host_user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "game.game_rooms",
+      "child": "game.game_room_members",
+      "cols": [
+        "room_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "game.game_room_members",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "game.game_rooms",
+      "child": "game.game_matches",
+      "cols": [
+        "room_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "game.game_matches",
+      "child": "game.game_match_players",
+      "cols": [
+        "match_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "game.game_room_members",
+      "child": "game.game_match_players",
+      "cols": [
+        "room_member_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "game.game_match_players",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "game.game_match_players",
+      "child": "game.game_sessions",
+      "cols": [
+        "match_player_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": true
+    },
+    {
+      "parent": "user.users",
+      "child": "game.game_sessions",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.topics",
+      "child": "game.game_sessions",
+      "cols": [
+        "topic_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "game.game_sessions",
+      "child": "game.game_answers",
+      "cols": [
+        "session_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.question_versions",
+      "child": "game.game_answers",
+      "cols": [
+        "question_version_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "library.vocabulary_senses",
+      "child": "game.game_answers",
+      "cols": [
+        "vocabulary_sense_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "game.game_matches",
+      "child": "game.game_events",
+      "cols": [
+        "match_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "game.game_match_players",
+      "child": "game.game_events",
+      "cols": [
+        "match_player_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "content.topics",
+      "child": "game.quiz_events",
+      "cols": [
+        "topic_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "content.content_package_versions",
+      "child": "game.quiz_events",
+      "cols": [
+        "package_version_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "game.quiz_events",
+      "child": "game.quiz_participations",
+      "cols": [
+        "quiz_event_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "game.quiz_participations",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "assessment.assessment_attempts",
+      "child": "game.quiz_participations",
+      "cols": [
+        "attempt_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": true
+    },
+    {
+      "parent": "content.topics",
+      "child": "game.leaderboard_periods",
+      "cols": [
+        "topic_id"
+      ],
+      "kind": "Ref",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "game.leaderboard_periods",
+      "child": "game.leaderboard_entries",
+      "cols": [
+        "period_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "game.leaderboard_entries",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "community.posts",
+      "cols": [
+        "author_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "community.posts",
+      "child": "community.comments",
+      "cols": [
+        "post_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "community.comments",
+      "child": "community.comments",
+      "cols": [
+        "parent_comment_id"
+      ],
+      "kind": "FK",
+      "optional": true,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "community.comments",
+      "cols": [
+        "author_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "community.posts",
+      "child": "community.post_reactions",
+      "cols": [
+        "post_id"
+      ],
+      "kind": "FK",
+      "optional": false,
+      "unique": false
+    },
+    {
+      "parent": "user.users",
+      "child": "community.post_reactions",
+      "cols": [
+        "user_id"
+      ],
+      "kind": "Ref",
+      "optional": false,
+      "unique": false
+    }
+  ],
+  "bridges": [
+    {
+      "parent": "user.users",
+      "child": "user.roles",
+      "cols": [
+        "user_id",
+        "role_id"
+      ],
+      "kind": "M:N",
+      "via": "user_roles"
+    },
+    {
+      "parent": "library.flashcard_decks",
+      "child": "library.flashcards",
+      "cols": [
+        "deck_id",
+        "flashcard_id"
+      ],
+      "kind": "M:N",
+      "via": "flashcard_deck_items"
+    },
+    {
+      "parent": "content.lessons",
+      "child": "content.knowledge_points",
+      "cols": [
+        "lesson_id",
+        "knowledge_point_id"
+      ],
+      "kind": "M:N",
+      "via": "lesson_knowledge_points"
+    },
+    {
+      "parent": "content.lesson_blocks",
+      "child": "content.question_versions",
+      "cols": [
+        "block_id",
+        "question_version_id"
+      ],
+      "kind": "M:N",
+      "via": "lesson_block_questions"
+    },
+    {
+      "parent": "content.lesson_blocks",
+      "child": "content.knowledge_points",
+      "cols": [
+        "block_id",
+        "knowledge_point_id"
+      ],
+      "kind": "M:N",
+      "via": "lesson_block_knowledge_points"
+    },
+    {
+      "parent": "content.question_versions",
+      "child": "content.knowledge_points",
+      "cols": [
+        "question_version_id",
+        "knowledge_point_id"
+      ],
+      "kind": "M:N",
+      "via": "question_knowledge_points"
+    },
+    {
+      "parent": "content.content_sections",
+      "child": "content.question_versions",
+      "cols": [
+        "section_id",
+        "question_version_id"
+      ],
+      "kind": "M:N",
+      "via": "section_questions"
+    },
+    {
+      "parent": "content.lesson_blocks",
+      "child": "library.vocabulary_senses",
+      "cols": [
+        "block_id",
+        "vocabulary_sense_id"
+      ],
+      "kind": "M:N Ref",
+      "via": "lesson_block_vocabulary"
+    },
+    {
+      "parent": "content.content_sections",
+      "child": "content.content_assets",
+      "cols": [
+        "section_id",
+        "asset_id"
+      ],
+      "kind": "M:N",
+      "via": "content_asset_links"
+    },
+    {
+      "parent": "content.question_versions",
+      "child": "content.content_assets",
+      "cols": [
+        "question_version_id",
+        "asset_id"
+      ],
+      "kind": "M:N",
+      "via": "content_asset_links"
+    }
+  ],
+  "groups": [
+    [
+      "user",
+      "Accounts and learning profile",
+      "users roles learner_profiles learning_goals learning_activities streaks"
+    ],
+    [
+      "access",
+      "Plans and activation",
+      "plans plan_features subscriptions key_products activation_keys key_activations"
+    ],
+    [
+      "access",
+      "Points",
+      "point_wallets point_ledger_entries"
+    ],
+    [
+      "content",
+      "Curriculum",
+      "topics knowledge_points lessons lesson_blocks content_assets"
+    ],
+    [
+      "content",
+      "Packages and questions",
+      "content_packages content_package_versions content_sections questions question_versions"
+    ],
+    [
+      "library",
+      "Vocabulary and video catalog",
+      "vocabulary_items vocabulary_senses learning_videos video_segments video_segment_lexical_entries"
+    ],
+    [
+      "library",
+      "Personal library",
+      "video_learning_progress saved_video_segments notes flashcard_decks flashcards"
+    ],
+    [
+      "learning",
+      "Lesson progress and practice",
+      "topic_progress lesson_progress lesson_exercise_submissions lesson_writing_submissions practice_attempts lesson_practice_passes"
+    ],
+    [
+      "learning",
+      "Review and evidence",
+      "review_items review_sets review_theory_checks topic_test_assignments kp_evidence"
+    ],
+    [
+      "assessment",
+      "Attempts and results",
+      "assessment_attempts attempt_sections attempt_items attempt_responses assessment_results skill_scores item_results error_analysis_items"
+    ],
+    [
+      "assessment",
+      "Submissions and grading",
+      "learner_submissions grading_jobs human_reviews grading_point_costs video_practice_attempts"
+    ],
+    [
+      "game",
+      "Game play",
+      "game_rooms game_room_members game_matches game_match_players game_sessions game_answers game_events"
+    ],
+    [
+      "game",
+      "Quizzes and leaderboards",
+      "quiz_events quiz_participations leaderboard_periods leaderboard_entries"
+    ],
+    [
+      "community",
+      "Community",
+      "posts comments post_reactions"
+    ]
+  ],
+  "sources": [
+    {
+      "path": "services/access-service/src/main/resources/db/migration/V1__create_access_tables.sql",
+      "sha256": "cc80abea5a1ca572c13fb87529052cab71c2389a7bd855e3bdd1db6aa057af35"
+    },
+    {
+      "path": "services/access-service/src/main/resources/db/migration/V2__add_video_learning_premium_feature.sql",
+      "sha256": "7f4cbaa11f9bae6ee7f6282f4616ae4acab3149f8466029ac4dc1242b25aeadb"
+    },
+    {
+      "path": "services/assessment-service/src/main/resources/db/migration/V1__create_assessment_tables.sql",
+      "sha256": "084fd6cbd2b8ec558645279e9da5c2e7aa5d6cd44b2932f105725b6aac483262"
+    },
+    {
+      "path": "services/assessment-service/src/main/resources/db/migration/V2__seed_grading_point_costs.sql",
+      "sha256": "c1f223108e8be3e9f9fa2bf924eab6a06a0b04916e2429c2557f2a4b549ac7ef"
+    },
+    {
+      "path": "services/assessment-service/src/main/resources/db/migration/V3__add_attempt_response_lock_version.sql",
+      "sha256": "3f4c0d94f8c00113b707e2f4efa4e4c9286a9aa637f283504a59d24a803fa067"
+    },
+    {
+      "path": "services/assessment-service/src/main/resources/db/migration/V4__add_assessment_completed_event_support.sql",
+      "sha256": "9a7eab0c8df574e46aa9c64e4bde2a0a87b0362ae1fd2a4455eb5c02811e688e"
+    },
+    {
+      "path": "services/community-service/src/main/resources/db/migration/V1__create_community_tables.sql",
+      "sha256": "26dd560297c9c53f6422070d9b162ca0790c462bc41f6321b6e20bda0e26db2e"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V1__create_content_tables.sql",
+      "sha256": "41a760d9d3a9c3f1f43e1598513aa166612833ebd4f4d0bfa1ce48e087d8cd34"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V2__align_content_entitlements.sql",
+      "sha256": "7a08a7b6e85135b01bd6b615c2221c91cd391cfab09ce761c0e7aa2ed11d777a"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V3__add_knowledge_point_learning_type.sql",
+      "sha256": "b940d0fb92bef2397c5cf7ea9c33cb25e0fd6e8f53d76331b534b8e481ba5f97"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V4__seed_main_flow_content.sql",
+      "sha256": "74fab0e7cfade72d76ac7393d5775deb89b392e98b85bc7703c9c59051db1634"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V5__add_band_ranges.sql",
+      "sha256": "773f19374bade9c03a4f0d5d2e5094c00dc4db2c3f745fbc9ce1a7c9b464d83e"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V6__seed_demo_reading_passage.sql",
+      "sha256": "c37a99760e4303606b997ee571bd31e7e9350d98a09deb7ddb56514fa9c83366"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V7__drop_vocabulary_and_video_tables.sql",
+      "sha256": "852b47a2f9a6d4b8131f3a7c9aee1fe86a8461102b71b5f3d4ecdddf217696ec"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V8__lessons_and_topic_tests.sql",
+      "sha256": "ee839d2b6c1be6518ce9623304e6fe56fd45104ecc2f30693c82a3a079df9c43"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V9__seed_lesson_pipeline_demo.sql",
+      "sha256": "9a000fb7bb55d8d75256fe5f7a5f1a3e71941f2fc7f1824ca9f298e10a0bf7cb"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V10__seed_writing_task2_demo.sql",
+      "sha256": "5fa95004e4a1aa6a6f2d4134e921f00cc0acf032bfd8d3d17101c300fc21ac40"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V11__seed_writing_task1_demo.sql",
+      "sha256": "b3fa2f47719c2ae3e76afbec958bbb97805ffc84a0f29e179bd78501426626d4"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V12__seed_listening_demo.sql",
+      "sha256": "b826db4f6990c7cf6a10ffc64157029cf397b6124ca58692b7627519e86e5e10"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V13__question_version_hint.sql",
+      "sha256": "aba2fde463d6e9614b0ff1810d0d8f40da56d951196ce8b5cd1a5889aa2f0af2"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V14__premium_topics.sql",
+      "sha256": "f82f15e985eb3cc156df6cfc31cc2c41d729b7a0237493a4233ffcad8e9ae662"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V15__topic_skill_and_writing_topic.sql",
+      "sha256": "a4ea21b7399835cd2032396c0fc56a5db378b97e9fd7660803e3908d6b86fc16"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V16__lesson_block_kps_and_practice_lesson.sql",
+      "sha256": "e829d16c6f70b07fb2f4d3c6e1c74e8a9987dbf2d9c87649bbe3c9534d82b3b0"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V17__question_purpose.sql",
+      "sha256": "73a1cf62ecbd90f19af4dcfe59af2054338d1431a21fb42854c554903c637612"
+    },
+    {
+      "path": "services/content-service/src/main/resources/db/migration/V18__more_reading_practice_and_final_tests.sql",
+      "sha256": "1dbd1e1d61acbd84600e05600a2b2b9995f81178ee9d4398dff794dde997fcbb"
+    },
+    {
+      "path": "services/game-service/src/main/resources/db/migration/V1__create_game_tables.sql",
+      "sha256": "fba9a9595085ed0a629b362cee946d7413f73dfbbf00e75d43276b38bfc86222"
+    },
+    {
+      "path": "services/learning-service/src/main/resources/db/migration/V1__learning_schema.sql",
+      "sha256": "09fd2ea6876b59b1367968b3e442c20bd7190108cbc13762aedfe18a0efaa1fb"
+    },
+    {
+      "path": "services/learning-service/src/main/resources/db/migration/V2__lesson_writing.sql",
+      "sha256": "ed2485b796438aafe3522919592a45d839d87a2e56a5d3cd8e7f8f9e8167f9d3"
+    },
+    {
+      "path": "services/learning-service/src/main/resources/db/migration/V3__skill_tracks.sql",
+      "sha256": "47efbe46f420fac80ccacd66cc3ee64f16bd3d09e3ba23fcb68b1613409860e7"
+    },
+    {
+      "path": "services/learning-service/src/main/resources/db/migration/V4__practice_attempts.sql",
+      "sha256": "46541cc09d2377103364e3b40c64d80de2200e616e2ed08fe8ee4b6e66fc5205"
+    },
+    {
+      "path": "services/learning-service/src/main/resources/db/migration/V5__review_ladder.sql",
+      "sha256": "570f6672c2947034e04da687a12d43ab883610a95fcda66e887a79347eb3fed9"
+    },
+    {
+      "path": "services/library-service/src/main/resources/db/migration/V1__create_library_catalog.sql",
+      "sha256": "a3a4dbab0c4962dd01782313614443eacd088c66b48086ad3a19e11426d3bb76"
+    },
+    {
+      "path": "services/library-service/src/main/resources/db/migration/V2__create_personal_library.sql",
+      "sha256": "a2fc61a2e7518ce6ae86a8bfef46f493b92ad622b692adc83dfd0394f8d8c7f3"
+    },
+    {
+      "path": "services/user-service/src/main/resources/db/migration/V1__create_user_tables.sql",
+      "sha256": "e09d8253398c2b30122f5d6ff5de1b75026aa5a3e6cbf868c4f94262c0a89c84"
+    },
+    {
+      "path": "services/user-service/src/main/resources/db/migration/V2__create_identity_tables.sql",
+      "sha256": "141d7464409029e0dc86e0480fc74951df10624f64e8e04607a7e1a078ee9e9a"
+    },
+    {
+      "path": "services/user-service/src/main/resources/db/migration/V3__rename_learner_add_roles.sql",
+      "sha256": "ab3292e6a58f04b6ea7170fcbe89f0375a63bc54a281360ca246e835f9d25db6"
+    },
+    {
+      "path": "services/user-service/src/main/resources/db/migration/V4__enforce_one_active_learning_goal_per_user.sql",
+      "sha256": "534e2cfcfdf64e750957e8f55200febb559b7ff6fc87cd05f5f8df8b00cf544b"
+    },
+    {
+      "path": "services/user-service/src/main/resources/db/migration/V5__create_learning_activity_and_streak_tables.sql",
+      "sha256": "9cac11d62b3e26ad2cefbe616041bcaad3b8801b9a23789734a7710aac424a5d"
+    }
+  ]
+}

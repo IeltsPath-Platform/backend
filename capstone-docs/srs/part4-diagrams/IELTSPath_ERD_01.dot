@@ -1,0 +1,16 @@
+digraph G {
+graph [rankdir=TB, bgcolor="white", pad=0.18, nodesep=0.45, ranksep=0.8, splines=polyline, outputorder=edgesfirst];
+node [shape=plain, fontname="Arial", fontsize=14];
+edge [fontname="Arial", fontsize=10, color="#405369", penwidth=1.2, arrowsize=0.8, dir=both];
+"user.users" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>User</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR></TABLE>>];
+"user.roles" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Role</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR></TABLE>>];
+"user.learner_profiles" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Learner Profile</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  user_id</FONT></TD></TR></TABLE>>];
+"user.learning_goals" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Learning Goal</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  user_id</FONT></TD></TR></TABLE>>];
+"user.learning_activities" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Learning Activity</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  user_id</FONT></TD></TR></TABLE>>];
+"user.streaks" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Streak</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  user_id</FONT></TD></TR></TABLE>>];
+"user.users" -> "user.learner_profiles" [id="0", arrowtail="teetee", arrowhead="teeodot", style="solid"];
+"user.users" -> "user.learning_goals" [id="1", arrowtail="teetee", arrowhead="crowodot", style="solid"];
+"user.users" -> "user.learning_activities" [id="2", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+"user.users" -> "user.streaks" [id="3", arrowtail="teetee", arrowhead="teeodot", style="dashed"];
+"user.users" -> "user.roles" [id="4", arrowtail="crowodot", arrowhead="crowodot", style="solid", label="user roles\n(association)"];
+}

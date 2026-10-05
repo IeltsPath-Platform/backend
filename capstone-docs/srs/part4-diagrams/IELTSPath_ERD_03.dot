@@ -1,0 +1,10 @@
+digraph G {
+graph [rankdir=TB, bgcolor="white", pad=0.18, nodesep=0.45, ranksep=0.8, splines=polyline, outputorder=edgesfirst];
+node [shape=plain, fontname="Arial", fontsize=14];
+edge [fontname="Arial", fontsize=10, color="#405369", penwidth=1.2, arrowsize=0.8, dir=both];
+"access.point_wallets" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Point Wallet</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  user_id</FONT></TD></TR></TABLE>>];
+"access.point_ledger_entries" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Point Ledger Entry</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  user_id</FONT></TD></TR></TABLE>>];
+"user.users" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#F1F3F5"><TR><TD BGCOLOR="#E3E7EC"><B>User [user]</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR></TABLE>>];
+"user.users" -> "access.point_wallets" [id="0", arrowtail="teetee", arrowhead="teeodot", style="dashed"];
+"user.users" -> "access.point_ledger_entries" [id="1", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+}

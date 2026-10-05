@@ -1,0 +1,16 @@
+digraph G {
+graph [rankdir=TB, bgcolor="white", pad=0.18, nodesep=0.45, ranksep=0.8, splines=polyline, outputorder=edgesfirst];
+node [shape=plain, fontname="Arial", fontsize=14];
+edge [fontname="Arial", fontsize=10, color="#405369", penwidth=1.2, arrowsize=0.8, dir=both];
+"game.quiz_events" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Quiz Event</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR></TABLE>>];
+"game.quiz_participations" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Quiz Participation</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  quiz_event_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  user_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  attempt_id</FONT></TD></TR></TABLE>>];
+"game.leaderboard_periods" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Leaderboard Period</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR></TABLE>>];
+"game.leaderboard_entries" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#FFFFFF"><TR><TD BGCOLOR="#DBE7F3"><B>Leaderboard Entry</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">FK  period_id</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">Ref  user_id</FONT></TD></TR></TABLE>>];
+"user.users" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#F1F3F5"><TR><TD BGCOLOR="#E3E7EC"><B>User [user]</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR></TABLE>>];
+"assessment.assessment_attempts" [label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="7" COLOR="#52667A" BGCOLOR="#F1F3F5"><TR><TD BGCOLOR="#E3E7EC"><B>Assessment Attempt [assessment]</B></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">PK  id</FONT></TD></TR></TABLE>>];
+"game.quiz_events" -> "game.quiz_participations" [id="0", arrowtail="teetee", arrowhead="crowodot", style="solid"];
+"user.users" -> "game.quiz_participations" [id="1", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+"assessment.assessment_attempts" -> "game.quiz_participations" [id="2", arrowtail="teetee", arrowhead="teeodot", style="dashed"];
+"game.leaderboard_periods" -> "game.leaderboard_entries" [id="3", arrowtail="teetee", arrowhead="crowodot", style="solid"];
+"user.users" -> "game.leaderboard_entries" [id="4", arrowtail="teetee", arrowhead="crowodot", style="dashed"];
+}
