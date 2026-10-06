@@ -16,6 +16,8 @@ public interface LearningContentClient {
 
     List<TestPackage> getTopicTestPackages(UUID topicId);
 
+    List<TestPackage> getCourseTestPackages(UUID courseId);
+
     List<LessonPracticeSet> lessonPracticeSets(UUID lessonId);
 
     TopicPracticeSets topicPracticeSets(UUID topicId);
@@ -35,15 +37,21 @@ public interface LearningContentClient {
 
     /** {@code requiredFeatureKey} is the Access feature needed to learn the topic; null means free. */
     record Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
-                 List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest) {
+                 List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course) {
+        public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                     List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest) {
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, null);
+        }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints) {
-            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, null, true);
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, null, true, null);
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, List<KnowledgePoint> knowledgePoints) {
             this(topicId, code, name, sortOrder, null, knowledgePoints);
         }
     }
+
+    record Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {}
 
     record KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
                           String description, boolean hasPracticeSet) {

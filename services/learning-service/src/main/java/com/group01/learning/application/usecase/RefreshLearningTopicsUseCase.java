@@ -45,8 +45,9 @@ public class RefreshLearningTopicsUseCase {
         lock.lock(userId);
         var topics = content.getTopicSequence()
                 .stream()
-                .sorted(Comparator.comparingInt((LearningContentClient.Topic topic) ->
-                        topic.skill() == null ? Integer.MAX_VALUE : topic.skill().ordinal())
+                .sorted(Comparator.comparing((LearningContentClient.Topic topic) ->
+                                topic.course() == null ? null : topic.course().bandLevel(),
+                                Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(topic -> topic.requiredFeatureKey() == null ? 0 : 1)
                         .thenComparingInt(LearningContentClient.Topic::sortOrder)
                         .thenComparing(topic -> topic.topicId().toString()))
@@ -60,7 +61,8 @@ public class RefreshLearningTopicsUseCase {
         }
         LearnerCurriculum curriculum = curricula.find(userId);
         curriculum.reorder(topics.stream().map(topic -> new TopicPlacement(
-                topic.topicId(), topic.skill(), topic.hasTopicTest())).toList());
+                topic.topicId(), topic.course() == null ? null : topic.course().courseId(),
+                topic.skill(), topic.hasTopicTest())).toList());
         curricula.save(curriculum);
         catalog.upsert(entries);
         reviews.backfillMissingSkill(userId);
@@ -71,7 +73,10 @@ public class RefreshLearningTopicsUseCase {
             var topic = topics.get(index);
             results.add(new TopicResult(topic.topicId(), topic.code(), topic.name(), index + 1,
                     statuses.get(topic.topicId()), counts.getOrDefault(topic.topicId(), 0),
-                    topic.requiredFeatureKey(), topic.skill(), topic.hasTopicTest()));
+                    topic.requiredFeatureKey(), topic.skill(), topic.hasTopicTest(), topic.course() == null ? null
+                            : new TopicResult.Course(topic.course().courseId(), topic.course().code(),
+                            topic.course().name(), topic.course().bandLevel()),
+                    topic.course() != null && topic.course().hasCourseTest()));
         }
         return List.copyOf(results);
     }

@@ -96,7 +96,7 @@ Vẫn phải dừng và ghi `BLOCKED` khi: test đỏ vì hành vi nghiệp vụ
 | 3 | [Content seed courses](./phase-03-content-seed-courses.md) | Completed |
 | 4 | [Assessment course gate](./phase-04-assessment-course-gate.md) | Pending |
 | 5 | [Learning placement recommendation](./phase-05-learning-learner-level.md) | Completed |
-| 6 | [Learning course path and course test](./phase-06-learning-course-path-and-course-test.md) | Pending |
+| 6 | [Learning course path and course test](./phase-06-learning-course-path-and-course-test.md) | Completed |
 | 7 | [Docs and verification](./phase-07-docs-and-verification.md) | Pending |
 
 Thứ tự commit: 1 → 2 → 3 → 5 → 6 → 4 → 7.
@@ -476,3 +476,12 @@ INSERT INTO section_questions (id, section_id, question_version_id, sort_order, 
 - Phases 1, 2, 3 and 5 are complete. Phases 6, 4 and 7 remain pending in the requested commit order. Overall plan status remains `in-progress`.
 - Confirmed commit order on `feat/course-band-levels`: `d867758`, `5926d93`, `6935369`, followed by phase 5. Phase 6 is next; phase 4 must follow phase 6.
 - The authorized phase-3 seed expectation changes and phase-5 migration-count update pass against PostgreSQL/Testcontainers. The phase-5 health check is unchanged.
+
+### Phase 6 Verification — 2026-10-07
+
+- Status: `DONE`; phase 6 is verified and committed after the full Docker-backed learning suite passed.
+- TDD red: the focused compile failed before implementation because the new course-domain and result types did not exist; 0 tests executed, 0 skipped. The first Docker-backed focused run then exposed fixture cleanup and recommendation-index mistakes in the new integration test; both were corrected. The specifically allowlisted `ReviewAndTestAssignmentIntegrationTest.skillTracksKeepReviewsLocalAndPassWritingWithoutATest` stub was updated with distinct course metadata so the old assertions continued to verify skill-local reviews.
+- Full command: `mvn -q -pl services/learning-service -am test` exited 0. Learning Service: 238 executed, 238 passed, 0 failures, 0 errors, 0 skipped. Shared `common-security`: 8 executed, 8 passed, 0 failures, 0 errors, 0 skipped. Docker/Testcontainers executed PostgreSQL integration cases, including `CoursePathIntegrationTest`, `ReviewAndTestAssignmentIntegrationTest`, and `LearningServiceApplicationTests`.
+- Final focused recheck after the course metadata aggregation cleanup: `CoursePathIntegrationTest` ran 3 tests, 3 passed, 0 failures, 0 errors, 0 skipped.
+- Authorized `LearningServiceApplicationTests.contextStartsWithMigratedSchemaAndPublicHealth` change: Flyway version `6 -> 7`; table count `15 -> 17`; public health assertion unchanged. SQL count: baseline `14` + V6 `learner_placements` (1 table) + V7 `course_progress` and `course_test_assignments` (2 tables) = `17`.
+- No other old expectation changed. `git diff --check` passed. No real LLM calls. Commit subject: `feat(learning): add course learning paths and tests`.

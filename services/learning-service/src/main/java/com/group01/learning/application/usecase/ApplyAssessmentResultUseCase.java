@@ -10,10 +10,14 @@ import com.group01.learning.application.service.ReviewReevaluation;
 import com.group01.learning.domain.aggregate.LearnerCurriculum;
 import com.group01.learning.domain.aggregate.TopicTestAssignment;
 import com.group01.learning.domain.aggregate.LearnerPlacement;
+import com.group01.learning.domain.aggregate.CourseTestAssignment;
+import com.group01.learning.domain.aggregate.CourseProgress;
 import com.group01.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.group01.learning.domain.repository.LearnerCurriculumRepository;
 import com.group01.learning.domain.repository.TopicTestAssignmentRepository;
 import com.group01.learning.domain.repository.LearnerPlacementRepository;
+import com.group01.learning.domain.repository.CourseProgressRepository;
+import com.group01.learning.domain.repository.CourseTestAssignmentRepository;
 import com.group01.learning.domain.vo.BandLevel;
 import com.group01.learning.domain.vo.KnowledgeEvidence;
 import org.slf4j.Logger;
@@ -39,7 +43,8 @@ import java.util.UUID;
 @Service
 public class ApplyAssessmentResultUseCase {
     private static final Logger log = LoggerFactory.getLogger(ApplyAssessmentResultUseCase.class);
-    private static final Set<String> REVIEWED_TYPES = Set.of("TOPIC_GATE", "MOCK", "OFFICIAL_PRACTICE", "QUIZ");
+    private static final Set<String> REVIEWED_TYPES = Set.of("TOPIC_GATE", "COURSE_GATE", "MOCK",
+            "OFFICIAL_PRACTICE", "QUIZ");
 
     private final LearnerLock lock;
     private final KnowledgeEvidenceRepository evidence;
@@ -48,12 +53,15 @@ public class ApplyAssessmentResultUseCase {
     private final TopicTestAssignmentRepository assignments;
     private final ReviewReevaluation reviews;
     private final LearnerPlacementRepository placements;
+    private final CourseProgressRepository courseProgress;
+    private final CourseTestAssignmentRepository courseAssignments;
     private final Clock clock = Clock.systemUTC();
 
     public ApplyAssessmentResultUseCase(LearnerLock lock, KnowledgeEvidenceRepository evidence,
                                         LearnerCurriculumRepository curricula, AssessmentResultLog results,
                                         TopicTestAssignmentRepository assignments, ReviewReevaluation reviews,
-                                        LearnerPlacementRepository placements) {
+                                        LearnerPlacementRepository placements, CourseProgressRepository courseProgress,
+                                        CourseTestAssignmentRepository courseAssignments) {
         this.lock = lock;
         this.evidence = evidence;
         this.curricula = curricula;
@@ -61,6 +69,8 @@ public class ApplyAssessmentResultUseCase {
         this.assignments = assignments;
         this.reviews = reviews;
         this.placements = placements;
+        this.courseProgress = courseProgress;
+        this.courseAssignments = courseAssignments;
     }
 
     @Transactional
@@ -96,6 +106,7 @@ public class ApplyAssessmentResultUseCase {
         }
         evidence.append(userId, judged);
         if ("TOPIC_GATE".equals(result.assessmentType())) applyTopicGate(result);
+        if ("COURSE_GATE".equals(result.assessmentType())) applyCourseGate(result);
         if (REVIEWED_TYPES.contains(result.assessmentType())) reviews.execute(userId, considered, wrong);
     }
 
@@ -131,6 +142,32 @@ public class ApplyAssessmentResultUseCase {
         if (passed) {
             LearnerCurriculum curriculum = curricula.find(result.userId());
             if (curriculum.pass(assignment.topicId(), clock.instant())) curricula.save(curriculum);
+        }
+    }
+
+    private void applyCourseGate(AssessmentResult result) {
+        if (result.packageVersionId() == null) {
+            log.info("Course gate result without package version: eventId={}", result.eventId());
+            return;
+        }
+        var open = courseAssignments.findOpenForAttempt(result.userId(), result.packageVersionId(), result.completedAt());
+        if (open.isEmpty()) {
+            log.info("Course gate result without an open assignment: eventId={}", result.eventId());
+            return;
+        }
+        BigDecimal score = result.items().stream().map(ItemResult::score).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal max = result.items().stream().map(ItemResult::maxScore).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal percent = max.signum() == 0 ? BigDecimal.ZERO
+                : score.multiply(BigDecimal.valueOf(100)).divide(max, 4, RoundingMode.HALF_UP);
+        CourseTestAssignment assignment = open.get();
+        boolean passed = assignment.consume(result.attemptId(), percent);
+        courseAssignments.save(assignment);
+        if (passed) {
+            CourseProgress progress = courseProgress.findAll(result.userId()).get(assignment.courseId());
+            if (progress == null) {
+                progress = CourseProgress.restore(result.userId(), assignment.courseId(), null);
+            }
+            if (progress.pass(clock.instant())) courseProgress.save(progress);
         }
     }
 }

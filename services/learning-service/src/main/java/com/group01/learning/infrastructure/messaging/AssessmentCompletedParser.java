@@ -24,7 +24,8 @@ import java.util.UUID;
 @Component
 public class AssessmentCompletedParser {
     static final String EVENT_TYPE = "AssessmentCompleted.v2";
-    private static final Set<String> TYPES = Set.of("PLACEMENT", "OFFICIAL_PRACTICE", "MOCK", "TOPIC_GATE", "QUIZ");
+    private static final Set<String> TYPES = Set.of("PLACEMENT", "OFFICIAL_PRACTICE", "MOCK", "TOPIC_GATE",
+            "COURSE_GATE", "QUIZ");
     private static final Set<String> JUDGMENTS = Set.of("PASS", "FAIL", "NOT_ASSESSED");
 
     private final ObjectMapper json;

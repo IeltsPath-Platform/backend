@@ -27,8 +27,10 @@ class ApplyPlacementResultUseCaseTest {
     private final TopicTestAssignmentRepository assignments = mock(TopicTestAssignmentRepository.class);
     private final ReviewReevaluation reviews = mock(ReviewReevaluation.class);
     private final LearnerPlacementRepository placements = mock(LearnerPlacementRepository.class);
+    private final CourseProgressRepository courseProgress = mock(CourseProgressRepository.class);
+    private final CourseTestAssignmentRepository courseAssignments = mock(CourseTestAssignmentRepository.class);
     private final ApplyAssessmentResultUseCase useCase = new ApplyAssessmentResultUseCase(
-            lock, evidence, curricula, results, assignments, reviews, placements);
+            lock, evidence, curricula, results, assignments, reviews, placements, courseProgress, courseAssignments);
     private final UUID user = UUID.randomUUID();
     private final Instant completed = Instant.parse("2026-10-06T10:00:00Z");
 
@@ -45,7 +47,7 @@ class ApplyPlacementResultUseCaseTest {
         var saved = org.mockito.ArgumentCaptor.forClass(LearnerPlacement.class);
         verify(placements).save(saved.capture());
         assertThat(saved.getValue().band().value()).isEqualTo(new BigDecimal("6.0"));
-        verifyNoInteractions(evidence, curricula, assignments, reviews);
+        verifyNoInteractions(evidence, curricula, assignments, reviews, courseProgress, courseAssignments);
     }
 
     @Test
@@ -61,7 +63,7 @@ class ApplyPlacementResultUseCaseTest {
         assertThat(placement.band().value()).isEqualTo(new BigDecimal("7.0"));
         verify(placements).save(placement);
         verify(evidence, never()).append(any(), any());
-        verifyNoInteractions(curricula, assignments, reviews);
+        verifyNoInteractions(curricula, assignments, reviews, courseProgress, courseAssignments);
     }
 
     @Test
@@ -70,7 +72,7 @@ class ApplyPlacementResultUseCaseTest {
         AssessmentResult replay = event(UUID.randomUUID(), 2, "6.0", completed);
         when(results.appliedVersion(user, replay.attemptId())).thenReturn(Optional.of(2));
         useCase.execute(replay);
-        verifyNoInteractions(placements, evidence, curricula, assignments, reviews);
+        verifyNoInteractions(placements, evidence, curricula, assignments, reviews, courseProgress, courseAssignments);
         verify(results, never()).recordVersion(user, replay.attemptId(), 2);
     }
 

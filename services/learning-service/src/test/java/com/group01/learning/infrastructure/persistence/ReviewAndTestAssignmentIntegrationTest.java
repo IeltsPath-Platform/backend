@@ -272,13 +272,19 @@ class ReviewAndTestAssignmentIntegrationTest {
         UUID nextLesson = UUID.randomUUID();
         UUID writingFirst = UUID.randomUUID();
         UUID writingLast = UUID.randomUUID();
+        Course readingCourse = new Course(UUID.randomUUID(), "READING", "Reading", new BigDecimal("5.5"), false);
+        Course listeningCourse = new Course(UUID.randomUUID(), "LISTENING", "Listening", new BigDecimal("5.5"), false);
+        Course writingCourse = new Course(UUID.randomUUID(), "WRITING", "Writing", new BigDecimal("5.5"), false);
         when(content.getTopicSequence()).thenReturn(List.of(
-                new Topic(readingFirst, "READ1", "Reading one", 1, null, List.of(), LearningSkill.READING, false),
-                new Topic(readingNext, "READ2", "Reading two", 2, null, List.of(), LearningSkill.READING, true),
+                new Topic(readingFirst, "READ1", "Reading one", 1, null, List.of(), LearningSkill.READING, false,
+                        readingCourse),
+                new Topic(readingNext, "READ2", "Reading two", 2, null, List.of(), LearningSkill.READING, true,
+                        readingCourse),
                 new Topic(TOPIC, "LISTEN", "Listening", 3, null,
                         List.of(new KnowledgePoint(KP, "LS_NUM", "Numbers", "PROCEDURE", "LISTENING", "d", true)),
-                        LearningSkill.LISTENING, true),
-                new Topic(writing, "WRITE", "Writing", 4, null, List.of(), LearningSkill.WRITING, false)));
+                        LearningSkill.LISTENING, true, listeningCourse),
+                new Topic(writing, "WRITE", "Writing", 4, null, List.of(), LearningSkill.WRITING, false,
+                        writingCourse)));
         when(content.getTopicLessons(readingFirst)).thenReturn(List.of(new LessonSummary(firstLesson, readingFirst,
                 "R1", "First", null, 1, List.of(), List.of())));
         when(content.getTopicLessons(readingNext)).thenReturn(List.of(new LessonSummary(nextLesson, readingNext,

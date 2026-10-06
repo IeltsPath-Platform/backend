@@ -69,6 +69,14 @@ class AssessmentCompletedParserTest {
     }
 
     @Test
+    void acceptsCourseGateAssessmentType() throws Exception {
+        String courseGate = mutate(event(""), root ->
+                ((ObjectNode) root.get("data")).put("assessment_type", "COURSE_GATE"));
+
+        assertEquals("COURSE_GATE", parse(courseGate).assessmentType());
+    }
+
+    @Test
     void contractViolationsAreRejected() throws Exception {
         String valid = event("");
         assertViolation("not json");

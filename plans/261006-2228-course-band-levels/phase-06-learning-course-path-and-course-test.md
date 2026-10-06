@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Learning course path and course test"
-status: pending
+status: completed
 priority: P1
 dependencies: [2, 5]
 ---
@@ -106,6 +106,15 @@ unique rõ và không đụng flow thi topic đang chạy ổn.
       `TopicStatusDeriverTest`).
 - [ ] Không thêm giá trị `TopicStatus`; response topic chỉ thêm field `course`.
 - [ ] Không có lời gọi content trong vòng lặp.
+
+## Verification
+
+- TDD red: the focused compile failed before implementation because the new course-domain and result types did not exist; 0 tests executed, 0 skipped. The first Docker-backed focused run then exposed test-fixture cleanup and recommendation-index mistakes in the new integration test; these were corrected. The existing allowlisted `skillTracksKeepReviewsLocalAndPassWritingWithoutATest` failure was resolved by assigning distinct course groups in its topic-sequence stub, preserving its skill-local review assertions.
+- Full suite: `mvn -q -pl services/learning-service -am test` exited 0. Learning Service: 238 executed, 238 passed, 0 failures, 0 errors, 0 skipped. Shared `common-security`: 8 executed, 8 passed, 0 failures, 0 errors, 0 skipped. Docker/Testcontainers ran the PostgreSQL cases, including `CoursePathIntegrationTest`, `ReviewAndTestAssignmentIntegrationTest`, and `LearningServiceApplicationTests`.
+- Final focused recheck after linearizing course metadata aggregation: `CoursePathIntegrationTest` executed 3 tests, 3 passed, 0 failures, 0 errors, 0 skipped.
+- Authorized `LearningServiceApplicationTests.contextStartsWithMigratedSchemaAndPublicHealth` update: Flyway version `6 -> 7`; table count `15 -> 17`; health assertion unchanged. SQL count: `14` baseline tables + `1` table from V6 (`learner_placements`) + `2` tables from V7 (`course_progress`, `course_test_assignments`) = `17`.
+- The only change to the allowlisted legacy skill-track method was adding distinct course metadata to the topic fixtures; its assertions and review-by-skill intent remain unchanged. `git diff --check` passed. No real LLM calls.
+- Commit subject: `feat(learning): add course learning paths and tests`.
 
 ## Risk Assessment
 - Mở mọi course nghĩa là học viên band thấp vào thẳng 6.5: đây là quyết định chủ ý (D4), gợi ý từ placement bù lại.
