@@ -101,7 +101,7 @@ spring:
               uri: lb://learning-service
               predicates:
                 - Path=/api/learning/**
-            # OpenAPI documents of the main learner flow, proxied for the Gateway Swagger UI.
+            # OpenAPI documents of every business service with an API, proxied for the Gateway Swagger UI.
             - id: api-docs-user-service
               uri: lb://USER-SERVICE
               predicates:
@@ -126,6 +126,30 @@ spring:
                 - Path=/api-docs/learning-service
               filters:
                 - RewritePath=/api-docs/learning-service, /v3/api-docs
+            - id: api-docs-content-service
+              uri: lb://CONTENT-SERVICE
+              predicates:
+                - Path=/api-docs/content-service
+              filters:
+                - RewritePath=/api-docs/content-service, /v3/api-docs
+            - id: api-docs-library-service
+              uri: lb://LIBRARY-SERVICE
+              predicates:
+                - Path=/api-docs/library-service
+              filters:
+                - RewritePath=/api-docs/library-service, /v3/api-docs
+            - id: api-docs-game-service
+              uri: lb://GAME-SERVICE
+              predicates:
+                - Path=/api-docs/game-service
+              filters:
+                - RewritePath=/api-docs/game-service, /v3/api-docs
+            - id: api-docs-community-service
+              uri: lb://COMMUNITY-SERVICE
+              predicates:
+                - Path=/api-docs/community-service
+              filters:
+                - RewritePath=/api-docs/community-service, /v3/api-docs
 
 app:
   auth:
@@ -167,7 +191,7 @@ gateway:
       - /webjars/**
 
 springdoc:
-  # Swagger UI for the main learner flow; set API_DOCS_ENABLED=false outside local development.
+  # Swagger UI for every business service; set API_DOCS_ENABLED=false outside local development.
   api-docs:
     enabled: ${API_DOCS_ENABLED:true}
   swagger-ui:
@@ -181,6 +205,14 @@ springdoc:
         url: /api-docs/assessment-service
       - name: learning-service
         url: /api-docs/learning-service
+      - name: content-service
+        url: /api-docs/content-service
+      - name: library-service
+        url: /api-docs/library-service
+      - name: game-service
+        url: /api-docs/game-service
+      - name: community-service
+        url: /api-docs/community-service
 
 management:
   endpoints:

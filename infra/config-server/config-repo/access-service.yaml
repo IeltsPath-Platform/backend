@@ -33,8 +33,7 @@ springdoc:
   api-docs:
     enabled: ${API_DOCS_ENABLED:true}
   paths-to-match:
-    - /api/access/me/**
-    - /api/access/admin/points/**
+    - /api/access/**
 
 management:
   endpoints:
