@@ -48,6 +48,31 @@ Returns PUBLISHED lessons of the ACTIVE topic in `sortOrder` order, with IDs nee
 
 The example includes two representative entries; the actual seed has L1–L4.
 
+V21 seed example for the independent 6.5 Reading sequence (KPs abbreviated to show the course and per-KP practice flag):
+
+```json
+{
+  "topicId":"28000000-0000-4000-8000-010000000001",
+  "code":"READING_6_5_INFERENCE",
+  "name":"Reading 6.5: Inference and paraphrase",
+  "sortOrder":960,
+  "requiredFeatureKey":null,
+  "skill":"READING",
+  "hasTopicTest":true,
+  "course":{"courseId":"30000000-0000-4000-8000-000000000002","code":"IELTS_6_5","name":"IELTS 6.5","bandLevel":6.5,"hasCourseTest":true},
+  "knowledgePoints":[
+    {"id":"28000000-0000-4000-8000-020000000001","code":"R65_EVIDENCE_INFERENCE","name":"Supported inference","learningType":"PROCEDURE","skill":"READING","description":null,"hasPracticeSet":true},
+    {"id":"28000000-0000-4000-8000-020000000002","code":"R65_PARAPHRASE","name":"Paraphrase across sentences","learningType":"PROCEDURE","skill":"READING","description":null,"hasPracticeSet":true}
+  ]
+}
+```
+
+The seed also creates one `COURSE_TEST` for each seeded course. For example, the 6.5 course package route returns:
+
+```json
+[{"packageId":"28000000-0000-4000-8000-080000000005","packageVersionId":"28000000-0000-4000-8000-090000000005","code":"COURSE-6_5-READING"}]
+```
+
 ## `GET /lessons/{id}`
 
 Returns `{lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, skill}` for a PUBLISHED lesson; `skill` (added 2026-10-03) is the skill of the lesson's topic. Blocks are ordered by `sortOrder` and share `{blockId, blockType, sortOrder, knowledgePointIds}`. Block `knowledgePointIds` (added 2026-10-03, never null) are the KPs a `TEXT` block teaches (table `lesson_block_knowledge_points`, possibly empty), the distinct KPs of an `EXERCISE` block's questions, and `[]` for `ASSET` and `VOCABULARY` blocks. A review uses the `TEXT` blocks of its KP as theory; an `ASSET` block (passage, audio) is never theory.

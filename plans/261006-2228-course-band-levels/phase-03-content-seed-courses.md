@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Content seed courses"
-status: pending
+status: completed
 priority: P1
 dependencies: [2]
 ---
@@ -49,8 +49,16 @@ demo được "hai học viên có band khác nhau học khác nhau".
 3. Chạy test seed + toàn bộ test content (seed test cũ `LessonPipelineSeedTest`, `DemoReadingPassageSeedTest` phải xanh).
 
 ## Success Criteria
-- [ ] `CourseSeedTest` xanh; test seed cũ xanh.
-- [ ] Không câu nào xuất hiện ở hai package (rule `questionsUsedElsewhere` không vi phạm).
+- [x] `CourseSeedTest` xanh; test seed cũ xanh.
+- [x] Không câu nào xuất hiện ở hai package (rule `questionsUsedElsewhere` không vi phạm).
+
+## Verification
+
+- `docker ps` succeeded; Testcontainers PostgreSQL cases executed.
+- `mvn -q -pl services/content-service -am test` exited 0: Content Service 224 passed, 0 failures, 0 errors, 0 skipped; shared `common-security` 8 passed, 0 failures, 0 errors, 0 skipped. Included CourseSeedTest (4), CourseMigrationTest (2), CourseSequenceIntegrationTest (6), LessonPipelineSeedTest (32), and CourseSeedResourceTest (3), all executed.
+- Authorized old-test changes were limited to the two exact changes recorded in the plan's allowlist and the phase-3 sequence method. No other old test expectations changed.
+- `git diff --check` passed. Full seed content and review evidence are recorded in the plan's Phase 3 Verification and [review report](./reports/phase-03-review.md).
+- Commit subject: `feat(content): seed courses and higher-band reading`.
 
 ## Risk Assessment
 - Viết nội dung là việc tốn nhất của plan: giới hạn ở 1 topic 6.5, 2 KP, 1 lesson. Nhóm BA/author có thể thay nội
