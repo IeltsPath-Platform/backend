@@ -25,9 +25,9 @@ public class CreateContentPackageUseCase {
     }
 
     public ContentPackageResult execute(CreateContentPackageCommand command) {
-        if (command.packageType() == PackageType.TOPIC_TEST) {
-            // A final test must belong to a topic; only the curriculum seed creates them.
-            throw new IllegalArgumentException("TOPIC_TEST packages cannot be created through this API");
+        if (command.packageType() == PackageType.TOPIC_TEST || command.packageType() == PackageType.COURSE_TEST) {
+            // Final tests belong to the seeded curriculum.
+            throw new IllegalArgumentException(command.packageType() + " packages cannot be created through this API");
         }
         if (contentPackageRepository.existsByCode(command.code())) {
             throw new DuplicateCodeException("ContentPackage", command.code());

@@ -8,6 +8,7 @@ import com.group01.content.application.result.PackageVersionContentResult;
 import com.group01.content.application.result.PracticeSetResult;
 import com.group01.content.application.result.TopicSequenceResult;
 import com.group01.content.application.result.TopicTestPackageResult;
+import com.group01.content.application.result.PackageQuestionSpec;
 import com.group01.content.domain.vo.QuestionUsageConflict;
 import com.group01.content.domain.vo.QuestionPurpose;
 
@@ -24,13 +25,13 @@ import java.util.UUID;
  *
  * <p>A practice set is <em>eligible</em> for a knowledge point when it is a published {@code PRACTICE_SET} whose
  * current version has at least {@code minQuestions} questions, at least one of them measuring the knowledge point,
- * and none of them used by a lesson or by any {@code TOPIC_TEST}, {@code MOCK_TEST} or {@code PLACEMENT_TEST}
+ * and none of them used by a lesson or by any {@code TOPIC_TEST}, {@code COURSE_TEST}, {@code MOCK_TEST} or {@code PLACEMENT_TEST}
  * package. {@link #topicSequence} and
  * {@link #searchPracticeSets} share this rule.
  */
 public interface LearningContentReader {
 
-    /** Active topics that have a skill and a published lesson, by skill and then in learning order. */
+    /** Active topics in active courses, with a skill and published lesson, by skill, course band, topic order and id. */
     List<TopicSequenceResult> topicSequence(int minPracticeQuestions);
 
     boolean activeTopicExists(UUID topicId);
@@ -61,7 +62,7 @@ public interface LearningContentReader {
 
     /**
      * Questions of this version used by any lesson or a published version of another {@code PRACTICE_SET},
-     * {@code TOPIC_TEST}, {@code MOCK_TEST} or {@code PLACEMENT_TEST} package, compared by question id across all
+     * {@code TOPIC_TEST}, {@code COURSE_TEST}, {@code MOCK_TEST} or {@code PLACEMENT_TEST} package, compared by question id across all
      * question versions. Versions of the same package are not conflicts. Loaded in one query.
      */
     List<QuestionUsageConflict> questionsUsedElsewhere(UUID packageVersionId);
@@ -73,6 +74,12 @@ public interface LearningContentReader {
     List<UUID> questionsWithWrongPurpose(UUID packageVersionId, QuestionPurpose requiredPurpose);
 
     List<TopicTestPackageResult> publishedTestPackages(UUID topicId);
+
+    /** Published course final tests with their current published version, ordered by package id. */
+    List<TopicTestPackageResult> courseTestPackages(UUID courseId);
+
+    /** All question versions of a package version, including drafts, loaded in one query for publish validation. */
+    List<PackageQuestionSpec> packageQuestionSpecs(UUID packageVersionId);
 
     /**
      * Eligible practice sets: those of {@code preferredLessonId} first when it is given, then most matching

@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Content sequence and course test packages"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 ---
@@ -61,9 +61,9 @@ dependencies: [1]
 6. `mvn -q -pl services/content-service -am test`.
 
 ## Success Criteria
-- [ ] Mọi test mới đỏ trước, xanh sau; test content cũ xanh **sau khi phase 3 backfill** (seed topic cũ chưa có course
+- [x] Mọi test mới đỏ trước, xanh sau khi code; các test có Docker bị skip và chưa được kiểm chứng PostgreSQL. Test content cũ xanh **sau khi phase 3 backfill** (seed topic cũ chưa có course
       sẽ biến mất khỏi sequence giữa phase 2 và 3; nên gộp 2+3 vào một PR).
-- [ ] Không N+1: course đến từ JOIN, không lặp query.
+- [x] Không N+1: course đến từ JOIN, không lặp query.
 
 ## Risk Assessment
 - Giữa phase 2 và 3 lộ trình trống vì seed chưa có course → làm 2 và 3 cùng nhánh, cùng PR.

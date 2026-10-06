@@ -5,6 +5,7 @@ import com.group01.content.domain.vo.Skill;
 
 import java.util.List;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 /**
  * A topic in the learning order, with the active knowledge points it measures. {@code requiredFeatureKey} is the
@@ -19,8 +20,16 @@ public record TopicSequenceResult(
         String requiredFeatureKey,
         List<KnowledgePointEntry> knowledgePoints,
         Skill skill,
-        boolean hasTopicTest
+        boolean hasTopicTest,
+        CourseEntry course
 ) {
+    public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                               List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest) {
+        this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, null);
+    }
+
+    public record CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {}
+
     /** {@code hasPracticeSet}: at least one practice set is eligible for review of this knowledge point. */
     public record KnowledgePointEntry(
             UUID id,

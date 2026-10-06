@@ -76,7 +76,7 @@ Người implement: Codex. Người viết plan: Claude. Base: `main` @ `6351f3a
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | [Content course model](./phase-01-content-course-model.md) | Completed |
-| 2 | [Content sequence and course test packages](./phase-02-content-sequence-and-course-test-packages.md) | Pending |
+| 2 | [Content sequence and course test packages](./phase-02-content-sequence-and-course-test-packages.md) | Completed |
 | 3 | [Content seed courses](./phase-03-content-seed-courses.md) | Pending |
 | 4 | [Assessment course gate](./phase-04-assessment-course-gate.md) | Pending |
 | 5 | [Learning placement recommendation](./phase-05-learning-learner-level.md) | Pending |
@@ -176,7 +176,7 @@ mọi `BLOCKED`.)
 ### Phase 1 Verification — 2026-10-07
 
 - Status: `DONE_WITH_CONCERNS` — implementation and available tests complete; PostgreSQL checks skipped because the Docker daemon is unavailable. No `BLOCKED` condition.
-- Commit subject: `feat(content): add band-level courses and topic membership` (hash recorded in next verification entry).
+- Commit: `d86775862fa1664a0a162688d6e382885121fe69` — `feat(content): add band-level courses and topic membership`.
 - Scope: additive `V19__courses.sql` (no seeds); framework-free `Course`, repository, MapStruct/JPA adapter, course author/list APIs, scoped 409 course conflicts, and nullable `courseId` through topic domain, persistence, commands/results, request DTOs, and detail/tree responses. Existing topic duplicate-code 400 behavior and band metadata preserved. Update null retains course membership; create without a course remains valid. Content README updated for these APIs.
 - TDD red: wrote all initial phase tests before production code. The sandbox attempt could not resolve Maven dependencies due to cache/network permissions and is not counted as the red proof. Elevated runs of the following command exited 1 at `testCompile` because `Course`, `CourseRepository`, course use cases/controller, and persistence types did not yet exist:
 
@@ -198,3 +198,24 @@ mọi `BLOCKED`.)
 - Review: [phase review](./reports/phase-01-review.md); adapter tests cover named unique-constraint error translation while preserving other failures. `git diff --check` passed; source check confirmed no Spring/JPA/Hibernate imports in `Course`.
 - Graph: `graphify update .` exited 0, 7864 nodes / 26885 edges; SQL extraction warning reports missing `tree_sitter_sql`. No dependency installed; generated graph artifacts remain uncommitted.
 - Seed text: none added in this phase. Old expectations changed: none.
+
+### Phase 2 Verification — 2026-10-07
+
+- Status: `DONE_WITH_CONCERNS` — implementation and available tests complete; Docker-dependent PostgreSQL cases skipped. No `BLOCKED` condition. The approved gap before course seed/backfill remains: old seeded topics have no course and are excluded from the sequence until phase 3; the approved old sequence test expectation is deferred to that phase.
+- Commit subject: `feat(content): expose course sequences and final test packages` (hash recorded in next verification entry).
+- Scope: new `V20__course_test_packages.sql`, `COURSE_TEST` enum with required course membership in aggregate/database, package course ID persistence, seeded-only API creation rejection, course metadata joined into topic sequence, internal course test-packages endpoint, and course-test inclusion in all three question exclusion/ownership/reservation type lists. Course tests use the existing ordered question locks, ownership and LEARNING-purpose checks, then require nonempty Reading objective CHOICE/FILL specifications before publication. Published version reader already accepts every package type; no existing package payload shape changed.
+- TDD red: new tests were written before production edits. Elevated command below exited 1 at `testCompile` because `GetCourseTestPackagesUseCase` and `PackageQuestionSpec` did not yet exist:
+
+  ```powershell
+  mvn -q -pl services/content-service -am test '-Dtest=CoursePackagesUseCaseTest,ContentPackageCourseMappingTest,CourseSequenceIntegrationTest,InternalLearningContentControllerTest,ContentPackageControllerTest' '-Dsurefire.failIfNoSpecifiedTests=false'
+  ```
+
+- Initial implementation recheck exposed a new-test route mistake: `ContentPackageControllerTest.creatingACourseTestThroughTheAuthorApiReturns400` targeted nonexistent `/api/content/admin/packages`. Corrected only this new test to the existing author-protected `/api/content/packages` route; the same focused command then exited 0 (27 discovered, 21 passed, 6 skipped). No old expectation or route changed.
+- Review identified FILL Unicode-whitespace divergence from Assessment. Added `CoursePackagesUseCaseTest.fillAlternativesUseTheGradersUnicodeWhitespaceRule` before the fix; elevated `mvn -q -pl services/content-service -am test '-Dtest=CoursePackagesUseCaseTest' '-Dsurefire.failIfNoSpecifiedTests=false'` exited 1 (7 tests, one failure): an NBSP-only accepted answer incorrectly published. FILL now uses the grader's Unicode whitespace replacement followed by trim; CHOICE keeps the grader's existing nonblank-string rule. Regression covers both NBSP-only rejection and valid text surrounded by NBSP. Empty course tests are also rejected.
+- Final focused green: first command above exited 0 — 29 discovered, 23 passed, 6 skipped, zero failures/errors.
+- Full regression: elevated `mvn -q -pl services/content-service -am test` exited 0 — content 217 discovered, 170 passed, 47 skipped, zero failures/errors; common-security 8 passed. Available old tests remained green. No old test expectations changed; `LessonPipelineSeedTest.topicSequenceListsEachSkillsTopicsWithLessonsAndTheirActiveKnowledgePoints` remains untouched for the phase-3 backfill.
+- New skipped PostgreSQL tests (Docker daemon unavailable): `CourseSequenceIntegrationTest.sequenceExcludesUnassignedInactiveAndLessonlessTopicsAndUsesCourseBandOrder`, `.courseTestFlagAndPackageQueryRequirePublishedPackagesAndCurrentVersions`, `.courseQuestionsCannotBeExposedAsPracticeAndAreReservedAcrossQuestionVersions`, `.questionSpecProjectionIncludesEssayAndMalformedObjectiveShapesForPublishValidation`, `.courseTestsRequireAnExistingCourseAndCannotOmitCourseMembership`, `.courseTestForeignKeyRejectsUnknownCourses`. Fixtures pin Flyway target 20 and rollback each test; future V21 seeds cannot conflict. Actual migration, SQL filtering/order, FK guards, package eligibility and cross-version ownership queries were not exercised.
+- Existing skips: `BandRangeMigrationTest` (4), `CatalogRemovalMigrationTest` (1), `CourseMigrationTest` (2), `DemoReadingPassageSeedTest` (1), `KnowledgePointLearningTypeMigrationTest` (1), `LessonPipelineSeedTest` (32); see phase 1 and [baseline skip evidence](./reports/baseline-skipped-tests.json).
+- Contract: [internal learning content API](../../docs/contracts/learning-content-internal-v1.md) dated 2026-10-07, ten routes, additive `course` metadata, active-course filtering/order, endpoint shape/errors, Reading objective publishing and practice/reservation exclusions. Application parses JSON; domain has no JSON/framework dependency. Fixed number of reader queries, with course metadata from the topic JOIN and no per-topic/per-question repository queries.
+- Review: [phase review](./reports/phase-02-review.md); concrete FILL mismatch resolved and regression proved red/green. `git diff --check` passed. `graphify update .` exited 0 — 7920 nodes / 27077 edges; SQL parser still unavailable, no dependency installed, graph artifacts not staged.
+- Seed text added: none. Existing migration files rewritten: none. Unrelated user document edits preserved.

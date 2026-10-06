@@ -41,9 +41,9 @@ Worker corrected the query to `WHERE code IN ('LOW','HIGH')` and added the exhau
 
 Worker added focused cases covering both named course constraints becoming `DuplicateCourseException` and an unrelated integrity constraint preserving the original exception. Reviewed source and fresh `CoursePersistenceTest` XML show all five cases pass. Production handling is present and correct by source inspection; no production failure was observed.
 
-### Forward verification consideration: course migration fixtures vs later seeds
+### Resolved: course migration fixtures vs later seeds
 
-`CourseMigrationTest` applies every available migration and inserts bands 5.5/6.5. The later approved course seeds use these same unique bands. The controller has requested pinning this schema test to Flyway target 19 or equivalent fixture isolation before the seed phase. `CoursePersistenceTest` has no seed conflict because its courses are mapper objects and its repository is mocked.
+The later approved course seeds use the same unique bands 5.5/6.5 as the schema test fixtures. Worker pinned `CourseMigrationTest` to Flyway target 19; re-reading line 23 confirms future seeds cannot conflict with this test. `CoursePersistenceTest` has no seed conflict because its courses are mapper objects and its repository is mocked.
 
 ## Quality checks
 
@@ -57,4 +57,4 @@ Worker added focused cases covering both named course constraints becoming `Dupl
 
 ## Verification limitations and next steps
 
-Controller should retain the worker's red/green command evidence, full content suite result and subsequent adapter result in Verification. All Testcontainers skips must remain explicit; no migration or database-runtime claim is justified until Docker tests run. Resolve the forward seed-fixture consideration before adding course seeds. No source, test or plan files were edited by this reviewer.
+Controller should retain the worker's red/green command evidence, full content suite result and subsequent adapter result in Verification. All Testcontainers skips must remain explicit; no migration or database-runtime claim is justified until Docker tests run. No source, test or plan files were edited by this reviewer.
