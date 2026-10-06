@@ -182,6 +182,20 @@ class AutoGradingIntegrationTest {
     }
 
     @Test
+    void courseTestPersistsAsCourseGateAndEmitsTheCourseGateType() throws Exception {
+        UUID attemptId = startAttempt(UUID.randomUUID(), "COURSE_TEST", List.of(Q1));
+        UUID itemId = itemIds(attemptId).getFirst();
+        assertEquals("COURSE_GATE", jdbc.queryForObject(
+                "SELECT attempt_type FROM assessment_attempts WHERE id = ?", String.class, attemptId));
+
+        answer(attemptId, itemId, "{\"answer\":\"B\"}");
+        submit.execute(new SubmitAssessmentAttemptCommand(userId, attemptId));
+
+        JsonNode event = json.readTree(events(attemptId).getFirst());
+        assertEquals("COURSE_GATE", event.path("data").path("assessment_type").asText());
+    }
+
+    @Test
     void omittedAndInvalidAnswersScoreZeroAndAFailHidesSolutions() {
         UUID attemptId = startAttempt(UUID.randomUUID(), "MOCK_TEST", List.of(Q1, Q2, Q3, Q4_LEGACY));
         List<UUID> items = itemIds(attemptId);

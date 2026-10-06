@@ -94,7 +94,7 @@ Vẫn phải dừng và ghi `BLOCKED` khi: test đỏ vì hành vi nghiệp vụ
 | 1 | [Content course model](./phase-01-content-course-model.md) | Completed |
 | 2 | [Content sequence and course test packages](./phase-02-content-sequence-and-course-test-packages.md) | Completed |
 | 3 | [Content seed courses](./phase-03-content-seed-courses.md) | Completed |
-| 4 | [Assessment course gate](./phase-04-assessment-course-gate.md) | Pending |
+| 4 | [Assessment course gate](./phase-04-assessment-course-gate.md) | Completed |
 | 5 | [Learning placement recommendation](./phase-05-learning-learner-level.md) | Completed |
 | 6 | [Learning course path and course test](./phase-06-learning-course-path-and-course-test.md) | Completed |
 | 7 | [Docs and verification](./phase-07-docs-and-verification.md) | Pending |
@@ -485,3 +485,11 @@ INSERT INTO section_questions (id, section_id, question_version_id, sort_order, 
 - Final focused recheck after the course metadata aggregation cleanup: `CoursePathIntegrationTest` ran 3 tests, 3 passed, 0 failures, 0 errors, 0 skipped.
 - Authorized `LearningServiceApplicationTests.contextStartsWithMigratedSchemaAndPublicHealth` change: Flyway version `6 -> 7`; table count `15 -> 17`; public health assertion unchanged. SQL count: baseline `14` + V6 `learner_placements` (1 table) + V7 `course_progress` and `course_test_assignments` (2 tables) = `17`.
 - No other old expectation changed. `git diff --check` passed. No real LLM calls. Commit subject: `feat(learning): add course learning paths and tests`.
+
+### Phase 4 Verification — 2026-10-07
+
+- Status: `DONE`; phase 4 is verified and committed after the full Docker-backed assessment suite passed.
+- TDD red: the initial compile failed because `AttemptType.COURSE_GATE` did not exist; 0 tests executed, 0 skipped. After adding the enum mapping but before V5, PostgreSQL rejected `COURSE_GATE` under the original generated CHECK constraint as expected (10 selected tests, 9 passed, 1 expected error, 0 skipped).
+- Focused green: `mvn -q -pl services/assessment-service -am test '-Dtest=AssessmentAttemptTest,AutoGradingIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false'` exited 0: 10 tests executed and passed, 0 failures, 0 errors, 0 skipped. Testcontainers exercised the new migration and persisted attempt; the test asserted `assessment_type=COURSE_GATE` in the emitted event JSON.
+- Full command: `mvn -q -pl services/assessment-service -am test` exited 0. Assessment Service: 118 executed, 118 passed, 0 failures, 0 errors, 0 skipped. Shared `common-security`: 8 executed, 8 passed, 0 failures, 0 errors, 0 skipped. PostgreSQL/Testcontainers schema and outbox tests executed.
+- Updated `docs/contracts/assessment-completed-v2.md` and the Assessment README to define the new event type and deploy order. No existing test expectation changed. `git diff --check` passed. Commit subject: `feat(assessment): support course gate attempts`.

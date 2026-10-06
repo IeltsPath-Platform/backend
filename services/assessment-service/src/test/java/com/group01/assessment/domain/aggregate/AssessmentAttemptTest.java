@@ -23,5 +23,6 @@ class AssessmentAttemptTest {
         assertEquals(AttemptType.MOCK,AttemptType.forContentPackageType("MOCK_TEST"));
         assertEquals(AttemptType.PLACEMENT,AttemptType.forContentPackageType("PLACEMENT_TEST"));
         assertEquals(AttemptType.QUIZ,AttemptType.forContentPackageType("QUIZ"));
+        assertEquals(AttemptType.COURSE_GATE, AttemptType.forContentPackageType("COURSE_TEST"));
     }
 }

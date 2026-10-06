@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Assessment course gate"
-status: pending
+status: completed
 priority: P2
 dependencies: [2, 6]
 ---
@@ -42,6 +42,14 @@ PR** (D12). Mọi service chạy cùng commit nên learning luôn nhận đượ
 ## Success Criteria
 - [ ] Test mới xanh, test assessment cũ xanh.
 - [ ] Contract doc nêu thứ tự deploy.
+
+## Verification
+
+- TDD red: the first focused run failed compilation because `AttemptType.COURSE_GATE` did not exist; 0 tests executed, 0 skipped. After adding the enum mapping but before V5, PostgreSQL rejected the new type under the existing `assessment_attempts_attempt_type_check` constraint as expected (10 selected tests, 9 passed, 1 expected error, 0 skipped).
+- Focused green: `mvn -q -pl services/assessment-service -am test '-Dtest=AssessmentAttemptTest,AutoGradingIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false'` exited 0: 10 executed, 10 passed, 0 failures, 0 errors, 0 skipped. Docker/Testcontainers applied V5; the integration case persisted `COURSE_GATE` and asserted the emitted `AssessmentCompleted.v2` JSON type.
+- Full suite: `mvn -q -pl services/assessment-service -am test` exited 0. Assessment Service: 118 executed, 118 passed, 0 failures, 0 errors, 0 skipped. Shared `common-security`: 8 executed, 8 passed, 0 failures, 0 errors, 0 skipped. PostgreSQL/Testcontainers schema and outbox cases executed.
+- Updated the event contract and Assessment README with the new type and deploy order: Learning accepts `COURSE_GATE` before Assessment emits it. `git diff --check` passed. No existing test expectation changed.
+- Commit subject: `feat(assessment): support course gate attempts`.
 
 ## Risk Assessment
 - Chạy assessment mới với learning cũ (ví dụ chỉ restart assessment khi dev local) thì event `COURSE_GATE` vào DLQ
