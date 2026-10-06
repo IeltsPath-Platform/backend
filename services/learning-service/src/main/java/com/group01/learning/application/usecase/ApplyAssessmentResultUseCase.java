@@ -9,9 +9,12 @@ import com.group01.learning.application.service.LessonEvidenceReference;
 import com.group01.learning.application.service.ReviewReevaluation;
 import com.group01.learning.domain.aggregate.LearnerCurriculum;
 import com.group01.learning.domain.aggregate.TopicTestAssignment;
+import com.group01.learning.domain.aggregate.LearnerPlacement;
 import com.group01.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.group01.learning.domain.repository.LearnerCurriculumRepository;
 import com.group01.learning.domain.repository.TopicTestAssignmentRepository;
+import com.group01.learning.domain.repository.LearnerPlacementRepository;
+import com.group01.learning.domain.vo.BandLevel;
 import com.group01.learning.domain.vo.KnowledgeEvidence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,17 +47,20 @@ public class ApplyAssessmentResultUseCase {
     private final AssessmentResultLog results;
     private final TopicTestAssignmentRepository assignments;
     private final ReviewReevaluation reviews;
+    private final LearnerPlacementRepository placements;
     private final Clock clock = Clock.systemUTC();
 
     public ApplyAssessmentResultUseCase(LearnerLock lock, KnowledgeEvidenceRepository evidence,
                                         LearnerCurriculumRepository curricula, AssessmentResultLog results,
-                                        TopicTestAssignmentRepository assignments, ReviewReevaluation reviews) {
+                                        TopicTestAssignmentRepository assignments, ReviewReevaluation reviews,
+                                        LearnerPlacementRepository placements) {
         this.lock = lock;
         this.evidence = evidence;
         this.curricula = curricula;
         this.results = results;
         this.assignments = assignments;
         this.reviews = reviews;
+        this.placements = placements;
     }
 
     @Transactional
@@ -69,7 +75,10 @@ public class ApplyAssessmentResultUseCase {
         }
         if (applied.isPresent()) evidence.removeAssessmentEvidence(userId, result.attemptId());
         results.recordVersion(userId, result.attemptId(), result.resultVersion());
-        if ("PLACEMENT".equals(result.assessmentType())) return;
+        if ("PLACEMENT".equals(result.assessmentType())) {
+            applyPlacement(result);
+            return;
+        }
         List<KnowledgeEvidence> judged = new ArrayList<>();
         Set<UUID> considered = new LinkedHashSet<>();
         Set<UUID> wrong = new HashSet<>();
@@ -88,6 +97,17 @@ public class ApplyAssessmentResultUseCase {
         evidence.append(userId, judged);
         if ("TOPIC_GATE".equals(result.assessmentType())) applyTopicGate(result);
         if (REVIEWED_TYPES.contains(result.assessmentType())) reviews.execute(userId, considered, wrong);
+    }
+
+    private void applyPlacement(AssessmentResult result) {
+        if (result.overallBand() == null) return;
+        BandLevel band = new BandLevel(result.overallBand());
+        var existing = placements.find(result.userId());
+        if (existing.isEmpty()) {
+            placements.save(LearnerPlacement.create(result.userId(), band, result.attemptId(), result.completedAt()));
+        } else if (existing.get().record(band, result.attemptId(), result.completedAt())) {
+            placements.save(existing.get());
+        }
     }
 
     /** Only the first completed attempt after an assignment consumes it; 70% or more passes the topic. */

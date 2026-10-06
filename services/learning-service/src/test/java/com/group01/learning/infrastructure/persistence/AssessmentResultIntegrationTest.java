@@ -75,6 +75,7 @@ class AssessmentResultIntegrationTest {
 
     @BeforeEach
     void seed() {
+        jdbc.execute("TRUNCATE learner_placements");
         jdbc.execute("""
                 TRUNCATE review_theory_checks, review_sets, review_items, lesson_exercise_submissions, kp_evidence,
                 lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments,
@@ -93,6 +94,50 @@ class AssessmentResultIntegrationTest {
                 INSERT INTO topic_test_assignments (id, user_id, topic_id, package_id, package_version_id, assigned_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """, assignment, USER, TOPIC, UUID.randomUUID(), VERSION, Timestamp.from(COMPLETED.minusSeconds(600)));
+    }
+
+    @Test
+    void placementEstimateIsStoredOnceWithoutEvidenceAndRegradeReplacesItsBand() {
+        UUID attempt = UUID.randomUUID();
+        AssessmentResult initial = placement(attempt, 1, "6.0", COMPLETED);
+        apply.execute(initial);
+        assertEquals(new BigDecimal("6.0"), jdbc.queryForObject(
+                "SELECT band FROM learner_placements WHERE user_id = ?", BigDecimal.class, USER));
+        assertEquals(attempt, jdbc.queryForObject(
+                "SELECT attempt_id FROM learner_placements WHERE user_id = ?", UUID.class, USER));
+        Timestamp updated = jdbc.queryForObject(
+                "SELECT updated_at FROM learner_placements WHERE user_id = ?", Timestamp.class, USER);
+        apply.execute(initial);
+        assertEquals(updated, jdbc.queryForObject(
+                "SELECT updated_at FROM learner_placements WHERE user_id = ?", Timestamp.class, USER));
+        apply.execute(placement(attempt, 2, "6.5", COMPLETED));
+        assertEquals(new BigDecimal("6.5"), jdbc.queryForObject(
+                "SELECT band FROM learner_placements WHERE user_id = ?", BigDecimal.class, USER));
+        assertEquals(0, assessmentEvidence());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items", Integer.class));
+        assertNull(jdbc.queryForObject("SELECT passed_at FROM topic_progress WHERE user_id = ? AND topic_id = ?",
+                Timestamp.class, USER, TOPIC));
+    }
+
+    @Test
+    void placementWithoutBandDoesNotCreateAnEstimateAndOlderAttemptsDoNotReplaceIt() {
+        apply.execute(placement(UUID.randomUUID(), 1, null, COMPLETED));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM learner_placements", Integer.class));
+        UUID latest = UUID.randomUUID();
+        apply.execute(placement(latest, 1, "6.5", COMPLETED.plusSeconds(60)));
+        apply.execute(placement(UUID.randomUUID(), 1, "5.5", COMPLETED));
+        assertEquals(latest, jdbc.queryForObject("SELECT attempt_id FROM learner_placements WHERE user_id = ?",
+                UUID.class, USER));
+        assertEquals(new BigDecimal("6.5"), jdbc.queryForObject(
+                "SELECT band FROM learner_placements WHERE user_id = ?", BigDecimal.class, USER));
+        assertEquals(0, assessmentEvidence());
+    }
+
+    private static AssessmentResult placement(UUID attempt, int version, String band, Instant completedAt) {
+        var original = result("PLACEMENT", attempt, version, 3, VERSION);
+        return new AssessmentResult(original.eventId(), original.userId(), original.packageVersionId(),
+                original.attemptId(), original.resultId(), original.resultVersion(), original.assessmentType(),
+                completedAt, original.items(), band == null ? null : new BigDecimal(band));
     }
 
     /** {@code rightItems} correct items on KP_RIGHT plus one wrong item on KP_WRONG. */

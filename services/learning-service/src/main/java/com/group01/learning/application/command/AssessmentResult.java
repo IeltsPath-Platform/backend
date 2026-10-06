@@ -8,7 +8,12 @@ import java.util.UUID;
 /** A completed result version from {@code AssessmentCompleted.v2}, already checked against the contract. */
 public record AssessmentResult(UUID eventId, UUID userId, UUID packageVersionId, UUID attemptId, UUID resultId,
                                int resultVersion, String assessmentType, Instant completedAt,
-                               List<ItemResult> items) {
+                               List<ItemResult> items, BigDecimal overallBand) {
+    public AssessmentResult(UUID eventId, UUID userId, UUID packageVersionId, UUID attemptId, UUID resultId,
+                            int resultVersion, String assessmentType, Instant completedAt, List<ItemResult> items) {
+        this(eventId, userId, packageVersionId, attemptId, resultId, resultVersion, assessmentType, completedAt,
+                items, null);
+    }
     public AssessmentResult {
         items = List.copyOf(items);
     }

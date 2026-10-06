@@ -55,6 +55,20 @@ Người implement: Codex. Người viết plan: Claude. Base: `main` @ `6351f3a
 | learning `infrastructure/client/RestLearningContentClientTest` | Field `course` mới | Thêm case; case cũ (không có `course`) phải vẫn xanh |
 | content `LessonPipelineSeedTest.lessonPracticeAndTestQuestionsAreReservedForLearning` (~dòng 858) | V21 thêm 24 question version LEARNING có owner (lesson, practice, topic test, course test) | **Chỉ** đổi `hasSize(147)` thành `hasSize(171)`; không đổi query hay assertion khác. *(Thêm 2026-10-07, chủ dự án duyệt sau khi Codex báo BLOCKED)* |
 | content `LessonPipelineSeedTest.practiceSetsBelongToTheEarliestLessonTeachingTheirKnowledgePoint` (~dòng 523) | V21 thêm 2 practice set gắn lesson | **Chỉ** thêm 2 entry `R65-PS-INFERENCE → R65-I1`, `R65-PS-PARAPHRASE → R65-I1`; giữ nguyên 28 entry cũ. *(Thêm 2026-10-07, chủ dự án duyệt sau khi Codex báo BLOCKED)* |
+| learning `LearningServiceApplicationTests.contextStartsWithMigratedSchemaAndPublicHealth` (~dòng 60–61) | Mỗi migration learning mới đổi phiên bản Flyway hiện tại và số bảng | **Chỉ** cập nhật hai số: version = migration learning cao nhất sau phase đó, số bảng = 14 + số bảng mới tạo bởi các migration của plan (đếm từ file SQL, ghi phép đếm vào Verification); giữ nguyên kiểm tra health. *(Thêm 2026-10-07, chủ dự án duyệt sau khi Codex báo BLOCKED)* |
+
+### Quyền tự quyết khi chạy không có người giám sát (chủ dự án duyệt 2026-10-07)
+
+Áp dụng cho các phase còn lại (5, 6, 4, 7). Codex **được tự sửa kỳ vọng của test cũ** mà không cần hỏi, nếu thỏa **cả ba**:
+1. Test đỏ chỉ vì dữ liệu hoặc số đếm do chính plan này thêm (migration, seed, bảng, field mới), **hoặc** vì luật D5
+   (chuỗi theo course thay cho chuỗi theo skill) đúng như phase 6 mô tả.
+2. Chỉ sửa con số, danh sách hoặc kỳ vọng trạng thái cho khớp luật mới; không xóa test, không nới assertion, không đổi
+   ý định của test (ví dụ: review vẫn chỉ khóa cùng skill).
+3. Ghi vào Verification: tên test, kỳ vọng cũ → mới, lý do gắn với D-nào.
+
+Vẫn phải dừng và ghi `BLOCKED` khi: test đỏ vì hành vi nghiệp vụ khác plan, phải đổi contract hoặc route ngoài plan, phải
+đổi bảng quyết định, migration xung đột, đụng `common-security`/Gateway/JWT, hoặc Docker không chạy được (khi đó không
+được commit phase có migration). Không push, không tạo PR, không merge.
 
 ## Quyết định đã chốt (implementer không được tự đổi)
 
@@ -81,7 +95,7 @@ Người implement: Codex. Người viết plan: Claude. Base: `main` @ `6351f3a
 | 2 | [Content sequence and course test packages](./phase-02-content-sequence-and-course-test-packages.md) | Completed |
 | 3 | [Content seed courses](./phase-03-content-seed-courses.md) | Completed |
 | 4 | [Assessment course gate](./phase-04-assessment-course-gate.md) | Pending |
-| 5 | [Learning placement recommendation](./phase-05-learning-learner-level.md) | Blocked (partial, unverified) |
+| 5 | [Learning placement recommendation](./phase-05-learning-learner-level.md) | Completed |
 | 6 | [Learning course path and course test](./phase-06-learning-course-path-and-course-test.md) | Pending |
 | 7 | [Docs and verification](./phase-07-docs-and-verification.md) | Pending |
 
@@ -447,8 +461,18 @@ INSERT INTO section_questions (id, section_id, question_version_id, sort_order, 
 - Old expectations changed: none. Seed content: none in learning. No real LLM calls.
 - Detailed evidence and file inventory: [placement verification draft](./reports/phase-05-verification-draft.md).
 
+### Phase 5 Verification — 2026-10-07
+
+- Status: `DONE`; phase 5 is committed after the full Docker-backed suite passed.
+- Commit subject: `feat(learning): record placement band recommendations`.
+- TDD red before production implementation: the focused compile failed because `BandLevel` did not exist yet; 0 tests executed, 0 skipped. This is expected red evidence.
+- Focused green: `mvn -q -pl services/learning-service -am test '-Dtest=BandLevelTest,LearnerPlacementTest,ApplyPlacementResultUseCaseTest,AssessmentCompletedParserTest,AssessmentResultIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false'` — exit 0; 19 selected Learning tests passed, 0 failures, 0 errors, 0 skipped. PostgreSQL/Testcontainers executed `AssessmentResultIntegrationTest` and applied Flyway V1–V6.
+- Full command: `mvn -q -pl services/learning-service -am test` — exit 0. Learning Service: 228 tests, 228 passed, 0 failures, 0 errors, 0 skipped. Shared `common-security`: 8 tests, 8 passed, 0 failures, 0 errors, 0 skipped. Docker/Testcontainers ran; the application context test executed successfully.
+- Authorized legacy expectation change in `LearningServiceApplicationTests.contextStartsWithMigratedSchemaAndPublicHealth`: Flyway version `5 → 6`; table count `14 → 15`; health check unchanged. SQL count: `14` baseline tables + `1` table created by this plan's learning migration V6 (`learner_placements`) = `15` tables.
+- No other expectation was changed. No real LLM calls. Test contexts logged RabbitMQ connection retries because no broker was running; no test was skipped for that reason.
+
 ### Plan status reconciliation — 2026-10-07
 
-- Reviewed all seven phase files: phases 1 and 2 completed with recorded Docker limitations; phase 3 blocked; phase 5 partial and blocked; phases 4, 6 and 7 pending. Overall status is `in-progress`, not completed.
-- Confirmed commit order so far: `d867758` then `5926d93`, on `feat/course-band-levels`. No phase-3 commit was made and no later phase was committed ahead of it.
-- Resume requires explicit authorization to extend the old-test allowlist to the two named content tests. The decision table, migrations already committed, and those tests' current expectations remain unchanged.
+- Phases 1, 2, 3 and 5 are complete. Phases 6, 4 and 7 remain pending in the requested commit order. Overall plan status remains `in-progress`.
+- Confirmed commit order on `feat/course-band-levels`: `d867758`, `5926d93`, `6935369`, followed by phase 5. Phase 6 is next; phase 4 must follow phase 6.
+- The authorized phase-3 seed expectation changes and phase-5 migration-count update pass against PostgreSQL/Testcontainers. The phase-5 health check is unchanged.

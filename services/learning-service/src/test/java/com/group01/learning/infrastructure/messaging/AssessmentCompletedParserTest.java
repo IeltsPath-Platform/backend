@@ -15,6 +15,24 @@ class AssessmentCompletedParserTest {
     private final ObjectMapper json = new ObjectMapper();
     private final AssessmentCompletedParser parser = new AssessmentCompletedParser(json);
 
+    @Test
+    void overallBandIsOptionalAndNormalizesNumericHalfBands() {
+        assertNull(parse(event("")).overallBand());
+        assertNull(parse(event(",\"overall_band\":null")).overallBand());
+        for (String band : new String[]{"0.0", "6.00", "9.0"}) {
+            assertEquals(new java.math.BigDecimal(band).setScale(1),
+                    parse(event(",\"overall_band\":" + band)).overallBand());
+        }
+    }
+
+    @Test
+    void invalidOverallBandsAreContractViolations() {
+        for (String value : new String[]{"9.5", "6.25", "-0.5", "6.000000000000000000001",
+                "\"6.0\"", "true", "{}"}) {
+            assertViolation(event(",\"overall_band\":" + value));
+        }
+    }
+
     static String event(String extraData) {
         return """
                 {"event_id":"%s","event_type":"AssessmentCompleted.v2","occurred_at":"2026-10-01T09:10:00Z",
