@@ -47,6 +47,34 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @ExtendWith(MockitoExtension.class)
 class TopicControllerTest {
+    @Test
+    void courseMembershipPassesThroughCreateUpdateAndReadResponses() throws Exception {
+        UUID id = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+        TopicResult result = new TopicResult(id, null, "TOPIC", "Topic", 1, ContentStatus.ACTIVE,
+                Instant.now(), Instant.now(), BandRange.UNBOUNDED, null, courseId);
+        when(createTopicUseCase.execute(any())).thenReturn(result);
+        when(updateTopicUseCase.execute(any())).thenReturn(result);
+        when(getTopicUseCase.execute(id)).thenReturn(result);
+        when(getTopicTreeUseCase.execute()).thenReturn(List.of(new TopicTreeResult(id, null, "TOPIC", "Topic", 1,
+                ContentStatus.ACTIVE, Instant.now(), Instant.now(), BandRange.UNBOUNDED, null, List.of(), courseId)));
+        String body = "{\"code\":\"TOPIC\",\"name\":\"Topic\",\"sortOrder\":1,\"courseId\":\"" + courseId + "\"}";
+        mockMvc.perform(post("/api/content/admin/topics").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.courseId").value(courseId.toString()));
+        mockMvc.perform(put("/api/content/admin/topics/{id}", id).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.courseId").value(courseId.toString()));
+        mockMvc.perform(get("/api/content/topics/{id}", id))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.courseId").value(courseId.toString()));
+        mockMvc.perform(get("/api/content/topics"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].courseId").value(courseId.toString()));
+        ArgumentCaptor<CreateTopicCommand> create = ArgumentCaptor.forClass(CreateTopicCommand.class);
+        verify(createTopicUseCase).execute(create.capture());
+        assertThat(create.getValue().courseId()).isEqualTo(courseId);
+        ArgumentCaptor<UpdateTopicCommand> update = ArgumentCaptor.forClass(UpdateTopicCommand.class);
+        verify(updateTopicUseCase).execute(update.capture());
+        assertThat(update.getValue().courseId()).isEqualTo(courseId);
+    }
+
 
     @Mock
     private GetTopicTreeUseCase getTopicTreeUseCase;

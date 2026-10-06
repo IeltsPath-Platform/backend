@@ -22,6 +22,6 @@ public class GetTopicUseCase {
         Topic topic = topicRepository.findById(id).orElseThrow(() -> new TopicNotFoundException(id));
         return new TopicResult(topic.getId(), topic.getParentTopicId(), topic.getCode(), topic.getName(),
                 topic.getSortOrder(), topic.getStatus(), topic.getCreatedAt(), topic.getUpdatedAt(), topic.getBand(),
-                topic.getSkill());
+                topic.getSkill(), topic.getCourseId());
     }
 }

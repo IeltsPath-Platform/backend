@@ -10,6 +10,22 @@ migration only in Testcontainers until its use on a shared `content_db` is appro
 through `GET /api/content/topics/{id}`. Content implements `POST /internal/game-content/snapshots` only for `GRAMMAR`;
 Library implements the same [snapshot contract](../../docs/contracts/game-content-snapshot-v1.md) for `VOCABULARY`.
 
+## Courses
+
+Courses group topics by an IELTS band level shared across skills. `bandLevel` is unique and must be between 0 and 9
+in half-band steps. `code` is unique and remains unchanged on update. Courses have `ACTIVE` or `INACTIVE` status.
+
+- `GET /api/content/courses`: `ADMIN`, `CONTENT_AUTHOR`, `CUSTOMER`, and `EXAMINER`; returns all courses ordered by
+  `bandLevel` in the database.
+- `POST /api/content/admin/courses`: `ADMIN` and `CONTENT_AUTHOR`; accepts `code`, `name`, and `bandLevel` and creates
+  an active course.
+- `PUT /api/content/admin/courses/{id}`: the same author roles; accepts `name`, `bandLevel`, and optional `status`.
+  Duplicate course codes or band levels return 409; invalid bands return 400; unknown course IDs return 404.
+
+Topic create/update requests and topic detail/tree responses include nullable `courseId`. A supplied ID must reference
+an existing course. An omitted or null course ID on update preserves membership; creating a topic without a course
+remains valid. Topic `bandMin`/`bandMax` metadata remains available. V19 adds the course table and nullable topic foreign key.
+
 ## Lessons and curriculum order
 
 V8 implements `lessons`, `lesson_blocks`, `lesson_block_vocabulary`, `lesson_block_questions` and

@@ -6,6 +6,8 @@ import com.group01.content.domain.aggregate.Topic;
 import com.group01.content.domain.exception.DuplicateCodeException;
 import com.group01.content.domain.exception.TopicNotFoundException;
 import com.group01.content.domain.repository.TopicRepository;
+import com.group01.content.domain.repository.CourseRepository;
+import com.group01.content.domain.exception.CourseNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,9 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class CreateTopicUseCase {
 
     private final TopicRepository topicRepository;
+    private final CourseRepository courseRepository;
 
-    public CreateTopicUseCase(TopicRepository topicRepository) {
+    public CreateTopicUseCase(TopicRepository topicRepository, CourseRepository courseRepository) {
         this.topicRepository = topicRepository;
+        this.courseRepository = courseRepository;
     }
 
     public TopicResult execute(CreateTopicCommand command) {
@@ -28,6 +32,11 @@ public class CreateTopicUseCase {
                     .orElseThrow(() -> new TopicNotFoundException(command.parentTopicId()));
         }
 
+        if (command.courseId() != null) {
+            courseRepository.findById(command.courseId())
+                    .orElseThrow(() -> new CourseNotFoundException(command.courseId()));
+        }
+
         Topic topic = Topic.create(
                 command.parentTopicId(),
                 command.code(),
@@ -36,6 +45,7 @@ public class CreateTopicUseCase {
                 command.band(),
                 command.skill()
         );
+        if (command.courseId() != null) topic.assignCourse(command.courseId());
 
         Topic saved = topicRepository.save(topic);
         return new TopicResult(
@@ -48,7 +58,8 @@ public class CreateTopicUseCase {
                 saved.getCreatedAt(),
                 saved.getUpdatedAt(),
                 saved.getBand(),
-                saved.getSkill()
+                saved.getSkill(),
+                saved.getCourseId()
         );
     }
 }

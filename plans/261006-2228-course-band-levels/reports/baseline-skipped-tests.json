@@ -1,0 +1,524 @@
+﻿[
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.BandRangeMigrationTest",
+        "Test":  "seededContentKeepsAnOpenBand",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.BandRangeMigrationTest",
+        "Test":  "knowledgePointsNoLongerHaveABandButTopicsDo",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.BandRangeMigrationTest",
+        "Test":  "invalidBandRangesAreRejected",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.BandRangeMigrationTest",
+        "Test":  "validTopicBandRangesAreStored",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.CatalogRemovalMigrationTest",
+        "Test":  "contentOwnsNoCatalogTables",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.DemoReadingPassageSeedTest",
+        "Test":  "demoReadingSectionOfAPublishedPracticeSetHasOnePassage",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.KnowledgePointLearningTypeMigrationTest",
+        "Test":  "activeKnowledgePointRequiresOneOfTheFourLearningTypes",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "practiceSetSearchHonoursExclusionsAndSkipsTheOneQuestionDemoPackage",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "seedMatchesTheMvpSeedContent",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "textBlocksTeachTheirLessonsKnowledgePointsAndExerciseBlocksTheirQuestions",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "aPackageVersionLeavesTheLessonSkillWhenAQuestionHasAnotherSkill",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "topicPracticeSetsListEveryLessonInOrderInOneRead",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "practiceSetsBelongToTheEarliestLessonTeachingTheirKnowledgePoint",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "lessonContentHasBlocksInOrderWithFullQuestions",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "aPreferredLessonsPracticeSetsComeFirstAndTheRestKeepTheirOrder",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "readingLessonHintsExistOnlyForEligibleQuestionsAndNeverGiveTheAnswer",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "practiceSetItemsCarryTheirHints",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "everyLessonTeachesOnlyItsTopicsSkill",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "writingEssaysMovedToTheirOwnTopicKeepingTheirBlockIds",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "aPracticeSetBelowTheMinimumIsNeverFound",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "everySeedAnswerSpecIsAValidV1Spec",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "task1EssayCarriesItsChartImageWhoseFiguresMatchTheChartFacts",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "topicLessonsAreInOrderWithTheirKnowledgePointsAndExerciseBlocks",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "topicSequenceListsEachSkillsTopicsWithLessonsAndTheirActiveKnowledgePoints",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "topicTestPackagesMustBelongToATopic",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "availabilityCountsEligibleSetsPerKnowledgePointLeavingOutExcludedOnes",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "topicTestPackagesAndTheirVersionContent",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "lessonPracticeAndTestQuestionsAreReservedForLearning",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "everyLessonOfATopicWithAFinalTestOffersPractice",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "newPracticeQuestionsAreEligibleAndCarryExplanationsAndHints",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "listeningTopicHasAudioLessonsOnePracticeSetPerKnowledgePointAndTwoAudioTests",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "questionPurposeMigrationBackfillsExistingExamQuestionsAndDefaultsNewQuestions",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "practiceSetQuestionsAreNeverLessonOrTestQuestions",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "premiumTopicSeedAnswerSpecsAreValidV1Specs",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "everySeededExerciseBlockFollowsTheBlockRuleAndTheWritingLessonsEndWithEssays",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "seededQuestionsHaveOneOwnerAndMockTestsDetectLessonQuestions",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "topicSkillAcceptsOnlyOneOfTheFourSkills",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "seedQuestionsMatchTheirOwnersPurposeAndPublishingLocksHoldUntilRollback",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/content-service",
+        "Class":  "com.group01.content.infrastructure.persistence.LessonPipelineSeedTest",
+        "Test":  "lessonOrderIsUniqueWithinATopic",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/assessment-service",
+        "Class":  "com.group01.assessment.application.usecase.AutoGradingIntegrationTest",
+        "Test":  "omittedAndInvalidAnswersScoreZeroAndAFailHidesSolutions",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/assessment-service",
+        "Class":  "com.group01.assessment.application.usecase.AutoGradingIntegrationTest",
+        "Test":  "passingSubmitCompletesVersionOneWithOneEventAndShowsSolutions",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/assessment-service",
+        "Class":  "com.group01.assessment.application.usecase.AutoGradingIntegrationTest",
+        "Test":  "lateSubmitPersistsTheExpiry",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/assessment-service",
+        "Class":  "com.group01.assessment.application.usecase.AutoGradingIntegrationTest",
+        "Test":  "anUngradableItemLeavesTheAttemptForAHumanGrader",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/assessment-service",
+        "Class":  "com.group01.assessment.application.usecase.AutoGradingIntegrationTest",
+        "Test":  "listeningSubmitKeepsTranscriptPrivateUntilSeventyPercent(int)",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/assessment-service",
+        "Class":  "com.group01.assessment.infrastructure.messaging.AssessmentOutboxIntegrationTest",
+        "Test":  "relayPublishesOnlyCommittedOutboxRows",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/assessment-service",
+        "Class":  "com.group01.assessment.infrastructure.messaging.AssessmentOutboxIntegrationTest",
+        "Test":  "rolledBackFinalizationLeavesNeitherCompletedResultNorEvent",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/assessment-service",
+        "Class":  "com.group01.assessment.infrastructure.messaging.AssessmentOutboxIntegrationTest",
+        "Test":  "finalizedResultAndItsOutboxEventCommitTogether",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/assessment-service",
+        "Class":  "com.group01.assessment.infrastructure.messaging.AssessmentOutboxIntegrationTest",
+        "Test":  "graderLifecycleFinalizesWithTheGradersBandAndPublishesOneEvent",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/assessment-service",
+        "Class":  "com.group01.assessment.infrastructure.persistence.AssessmentSchemaValidationTest",
+        "Test":  "flywaySchemaMatchesEntitiesAndStoresV5AssessmentRows",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.AssessmentResultIntegrationTest",
+        "Test":  "passingTopicGatePassesTopicConsumesAssignmentAndInsertsReviewForTheMissedKp",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.AssessmentResultIntegrationTest",
+        "Test":  "failingTopicGateConsumesTheAssignmentButKeepsTheTopicOpen",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.AssessmentResultIntegrationTest",
+        "Test":  "mockResultWithoutPackageVersionStillAddsEvidenceAndReviews",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.AssessmentResultIntegrationTest",
+        "Test":  "placementRecordsOnlyTheVersionAndAnAttemptBeforeTheAssignmentDoesNotOpenTheTopic",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.AssessmentResultIntegrationTest",
+        "Test":  "regradeReplacesTheAttemptEvidenceAndNeverRevokesThePass",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonSubmissionIntegrationTest",
+        "Test":  "requestIdCannotBeReusedInAnotherScope(ChangedScope)",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonSubmissionIntegrationTest",
+        "Test":  "hintEligibilityAndMissingContentAreAppliedToSubmissionAndLessonRead",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonSubmissionIntegrationTest",
+        "Test":  "wrongQuestionHistoryIsScopedByUserLessonAndBlock",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonSubmissionIntegrationTest",
+        "Test":  "hintsDoNotChangeFirstAttemptEvidenceOrMastery",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonSubmissionIntegrationTest",
+        "Test":  "hintsOpenOnWrongAnswersPersistAcrossAllAttemptsAndDisappearAfterPassing",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonSubmissionIntegrationTest",
+        "Test":  "submissionRefreshesLessonMetadataWithoutAPriorLessonRead",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonSubmissionIntegrationTest",
+        "Test":  "missingDuplicateOrForeignAnswersDoNotWriteProgress(List)",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonSubmissionIntegrationTest",
+        "Test":  "failedFirstAttemptThenCorrectRetryCompletesLessonAndReplays",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonSubmissionIntegrationTest",
+        "Test":  "masteryUsesLatestFiveOrdinalsCountsAllEvidenceAndIsolatesUsers",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonSubmissionIntegrationTest",
+        "Test":  "practicePassInsertFailureRollsBackPassingRetryAndCompletion",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonSubmissionIntegrationTest",
+        "Test":  "concurrentDuplicateRequestsProduceOneSubmissionAndOneEvidenceItem",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonSubmissionIntegrationTest",
+        "Test":  "concurrentUsersCanRefreshSharedCatalogInOppositeContentOrders",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonWritingIntegrationTest",
+        "Test":  "gradedEssayChargesOnceRecordsEvidenceAndAResendReplaysIt",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonWritingIntegrationTest",
+        "Test":  "aStaleGradingNoLongerBlocksTheBlockButAFreshOneDoes",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonWritingIntegrationTest",
+        "Test":  "whileOneEssayIsGradingAnotherOfTheSameBlockIsRefused",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonWritingIntegrationTest",
+        "Test":  "lessonGatesWrongBlocksAndForeignRequestsAreRejected",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonWritingIntegrationTest",
+        "Test":  "dailyLimitStopsGradingBeforeTheLlm",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonWritingIntegrationTest",
+        "Test":  "llmFailureChargesNothingAndAResendGradesTheSameSubmission",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonWritingIntegrationTest",
+        "Test":  "aRefusedDebitWithholdsTheGradeUntilAResendPays",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonWritingIntegrationTest",
+        "Test":  "evidenceIsRecordedForEveryEssayUntilTheBlockIsFirstPassed",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonWritingIntegrationTest",
+        "Test":  "theEssayBlockNeverBlocksLessonCompletion",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.LessonWritingIntegrationTest",
+        "Test":  "essayValidationAndBalanceRunBeforeAnyRowOrLlmCall",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.PracticeIntegrationTest",
+        "Test":  "practiceEvidenceReviewAndTopicClearanceFollowPackageHistory",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.RemediationLadderIntegrationTest",
+        "Test":  "newReviewsStartWithTheoryForLowScoresAndMistakesMadeInTheLesson",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.RemediationLadderIntegrationTest",
+        "Test":  "failedReviewSetLeadsToTheoryThenANewUnrevealedSetThenSkip",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.ReviewAndTestAssignmentIntegrationTest",
+        "Test":  "passedSetFinishesTheReviewWithSolutionsAndTranscriptAndReplaysByRequestId",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.ReviewAndTestAssignmentIntegrationTest",
+        "Test":  "reviewAssignsUnusedPackagesAndSkipsWhenNoneRemain",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.ReviewAndTestAssignmentIntegrationTest",
+        "Test":  "testAssignmentIsGatedIdempotentAndRotatesThroughPackages",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.ReviewAndTestAssignmentIntegrationTest",
+        "Test":  "topicWithoutTestPackagesIsUnavailable",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.ReviewAndTestAssignmentIntegrationTest",
+        "Test":  "skillTracksKeepReviewsLocalAndPassWritingWithoutATest",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.ReviewAndTestAssignmentIntegrationTest",
+        "Test":  "essayBlockNeitherBlocksCompletionNorAcceptsExerciseAnswersAndTranscriptWaitsForCompletion",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.infrastructure.persistence.ReviewAndTestAssignmentIntegrationTest",
+        "Test":  "reviewOfAnotherLearnerIsNotFoundAndNoPackageSkipsTheReview",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    },
+    {
+        "Module":  "services/learning-service",
+        "Class":  "com.group01.learning.LearningServiceApplicationTests",
+        "Test":  "contextStartsWithMigratedSchemaAndPublicHealth",
+        "Reason":  "disabledWithoutDocker is true and Docker is not available"
+    }
+]

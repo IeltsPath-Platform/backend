@@ -19,7 +19,8 @@ public record TopicResponse(
         Instant updatedAt,
         BigDecimal bandMin,
         BigDecimal bandMax,
-        Skill skill
+        Skill skill,
+        UUID courseId
 ) {
     public static TopicResponse from(TopicResult result) {
         return new TopicResponse(
@@ -33,7 +34,8 @@ public record TopicResponse(
                 result.updatedAt(),
                 result.band().min(),
                 result.band().max(),
-                result.skill()
+                result.skill(),
+                result.courseId()
         );
     }
 }

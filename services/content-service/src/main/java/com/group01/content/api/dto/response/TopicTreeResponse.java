@@ -21,7 +21,8 @@ public record TopicTreeResponse(
         BigDecimal bandMin,
         BigDecimal bandMax,
         Skill skill,
-        List<TopicTreeResponse> children
+        List<TopicTreeResponse> children,
+        UUID courseId
 ) {
     public static TopicTreeResponse from(TopicTreeResult result) {
         List<TopicTreeResponse> childResponses = result.children() != null
@@ -39,7 +40,8 @@ public record TopicTreeResponse(
                 result.band().min(),
                 result.band().max(),
                 result.skill(),
-                childResponses
+                childResponses,
+                result.courseId()
         );
     }
 }
