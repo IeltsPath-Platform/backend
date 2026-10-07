@@ -21,6 +21,16 @@ spring:
       mandatory: true
 
 assessment:
+  llm-grading:
+    enabled: true
+    base-url: ${ASSESSMENT_LLM_BASE_URL:}
+    api-key: ${ASSESSMENT_LLM_API_KEY:}
+    model: ${ASSESSMENT_LLM_MODEL:}
+    poll-interval: PT5S
+    batch-size: 10
+    daily-limit: ${ASSESSMENT_LLM_DAILY_LIMIT:20}
+    stuck-after: PT10M
+    quota-timezone: Asia/Ho_Chi_Minh
   content:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
   messaging:

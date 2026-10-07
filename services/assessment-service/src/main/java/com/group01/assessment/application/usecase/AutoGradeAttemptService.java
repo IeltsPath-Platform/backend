@@ -54,6 +54,16 @@ public class AutoGradeAttemptService {
     /** @return true when the attempt was graded and its result completed. */
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean gradeIfObjective(AssessmentAttempt attempt) {
+        return grade(attempt, Map.of());
+    }
+
+    /**
+     * Grades the objective items and takes each essay's outcome from {@code essayPassed} (keyed by attempt item): a
+     * passed essay earns its full score, any other none. Writes nothing and returns false when an item is neither
+     * objective nor an essay with an outcome.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean grade(AssessmentAttempt attempt, Map<UUID, Boolean> essayPassed) {
         List<AttemptItem> items = attemptItems.findByAttemptId(attempt.getId());
         if (items.isEmpty()) {
             return false;
@@ -61,7 +71,8 @@ public class AutoGradeAttemptService {
         List<AnswerSnapshot> answers = new ArrayList<>(items.size());
         for (AttemptItem item : items) {
             Optional<AnswerSnapshot> answer = AnswerSnapshot.parse(json, item.answerSnapshot());
-            if (answer.isEmpty() || !answer.get().autoGradable(grader)) {
+            boolean essay = answer.isPresent() && essayPassed.containsKey(item.id()) && answer.get().gradableEssay();
+            if (answer.isEmpty() || !essay && !answer.get().autoGradable(grader)) {
                 return false;
             }
             answers.add(answer.get());
@@ -76,7 +87,8 @@ public class AutoGradeAttemptService {
         for (int i = 0; i < items.size(); i++) {
             AttemptItem item = items.get(i);
             AnswerSnapshot answer = answers.get(i);
-            boolean correct = isCorrect(answer, responseByItem.get(item.id()));
+            boolean correct = essayPassed.containsKey(item.id()) ? Boolean.TRUE.equals(essayPassed.get(item.id()))
+                    : isCorrect(answer, responseByItem.get(item.id()));
             graded.add(new ItemResult(UUID.randomUUID(), draft.id(), item.id(), correct ? answer.maxScore() : 0.0,
                     answer.maxScore(), correct, null, NO_FEEDBACK));
         }

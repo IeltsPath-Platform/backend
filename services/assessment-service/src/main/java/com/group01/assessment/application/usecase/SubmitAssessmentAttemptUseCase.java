@@ -18,11 +18,12 @@ import java.time.Instant;
 @Service
 public class SubmitAssessmentAttemptUseCase {
     private final AssessmentAttemptRepository repository;
-    private final AutoGradeAttemptService autoGrader;
+    private final EnqueueGateEssayGradingService gateEssayGrading;
 
-    public SubmitAssessmentAttemptUseCase(AssessmentAttemptRepository repository, AutoGradeAttemptService autoGrader) {
+    public SubmitAssessmentAttemptUseCase(AssessmentAttemptRepository repository,
+                                          EnqueueGateEssayGradingService gateEssayGrading) {
         this.repository = repository;
-        this.autoGrader = autoGrader;
+        this.gateEssayGrading = gateEssayGrading;
     }
 
     @Transactional(noRollbackFor = AttemptExpiredException.class)
@@ -39,7 +40,7 @@ public class SubmitAssessmentAttemptUseCase {
             throw expired;
         }
         var saved = repository.save(attempt);
-        autoGrader.gradeIfObjective(saved);
+        gateEssayGrading.enqueueOrGrade(saved);
         return AssessmentAttemptResult.from(saved);
     }
 }

@@ -237,6 +237,8 @@ Java chạy trên host (IDE hoặc `java -jar`); Compose chỉ chạy DB và Rab
 | `CONTENT_MEDIA_BASE_URL` | Prefix https của bucket chứa mp3 Listening; thiếu thì bài Listening trả 500 `INVALID_MEDIA_REFERENCE` |
 | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` | Endpoint OpenAI-compatible để Learning Service chấm bài luận Writing; thiếu thì nộp bài luận trả 503 `GRADING_UNAVAILABLE`. API key là secret. Gemini: base URL `https://generativelanguage.googleapis.com/v1beta/openai`, model `gemini-3.8-flash` (đã thử 2026-10-02; `gemini-2.5-flash` không còn cấp cho key mới) |
 | `LEARNING_LLM_REASONING_EFFORT` | Mức suy luận gửi cho model. Với `gemini-3.8-flash` đặt `low`: mặc định của client cho `gemini-3*` là `minimal`, model này trả 400 |
+| `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL` | Endpoint OpenAI-compatible để Assessment Service chấm essay trong thi topic/course. Thiếu cấu hình, lỗi LLM hoặc hết hạn mức ngày thì chuyển bài sang EXAMINER; bài thi MOCK vẫn do EXAMINER chấm. API key là secret. |
+| `ASSESSMENT_LLM_DAILY_LIMIT` | Số essay tối đa mỗi học viên mỗi ngày mà Assessment Service gửi chấm AI (mặc định `20`; tính theo ngày `Asia/Ho_Chi_Minh`) |
 
 Nếu mật khẩu có ký tự đặc biệt, hãy percent-encode hoặc chọn giá trị an toàn cho URL, vì nó nằm trong URL DB/AMQP.
 

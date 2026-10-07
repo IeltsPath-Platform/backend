@@ -7,7 +7,7 @@ Assessment Service owns assessment attempts and their local assessment history. 
 The service currently supports:
 
 - creating attempts from a published Content package version, reading, submitting, expiring, and saving responses;
-- grading objective (`CHOICE`/`FILL`) attempts automatically at submit;
+- grading objective (`CHOICE`/`FILL`) attempts automatically at submit, and essays in `TOPIC_GATE`/`COURSE_GATE` with the configured LLM;
 - the learner result view and the human grading flow for everything else;
 - creating learner submissions and local grading job state;
 - creating video practice attempts.
@@ -40,11 +40,15 @@ Both keys are absent below 70; a passing result without section transcripts has 
 
 ### Grading
 
-- **Automatic:** when every item's answer spec is gradable (answer spec v1, `docs/contracts/answer-spec-v1.md`), submit
+- **Objective automatic:** when every item's answer spec is gradable (answer spec v1, `docs/contracts/answer-spec-v1.md`), submit
   writes result version 1 `COMPLETED`, one `item_results` row per item (correct = `maxScore`, wrong or omitted = 0) and
   the outbox row, all in the submit transaction. A repeated submit changes nothing.
-- **Human:** if any item is ungradable (for example an essay), submit only records `SUBMITTED` and graders use the
-  endpoints below.
+- **Topic/course gate essays:** a submitted essay is queued for free background AI grading after the attempt is
+  submitted. Essay answers use the `passBand` captured in the answer snapshot; an omitted essay scores zero. The result
+  and `AssessmentCompleted.v2` outbox row are written after all submitted essays finish grading. Missing LLM settings,
+  provider errors, invalid replies, or a reached daily quota create a queued human-review job. `MOCK` essays stay on the
+  existing human grading path.
+- **Human:** other ungradable items are left for graders to complete through the endpoints below.
 - Submitting at or after `expiresAt` commits `EXPIRED` and returns `409 ATTEMPT_EXPIRED`.
 
 Both paths complete the result through `AssessmentResultCompleter`, which moves it to COMPLETED and writes
@@ -105,6 +109,8 @@ The service owns the `assessment_db` PostgreSQL database. Flyway migrations are 
 - `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`
 - `CONTENT_SERVICE_URL`
 - `ASSESSMENT_OUTBOX_RELAY_ENABLED` (default `true`)
+- `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL` (optional; blank settings send gate essays to human review)
+- `ASSESSMENT_LLM_DAILY_LIMIT` (per learner/day, default `20`)
 
 The service imports configuration from Config Server and registers with Eureka using the shared project runtime configuration. Do not put credentials or JWT secret values in source or documentation.
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.group01.assessment.domain.service.AnswerSpecGrader;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
 
@@ -36,5 +37,16 @@ record AnswerSnapshot(Map<String, Object> answerSpec, String explanation, Double
 
     boolean autoGradable(AnswerSpecGrader grader) {
         return maxScore != null && maxScore > 0 && grader.grade(answerSpec, null).gradable();
+    }
+
+    /** A Writing essay with a numeric pass band, graded by band rather than by answer matching. */
+    boolean gradableEssay() {
+        return answerSpec != null && "ESSAY".equals(answerSpec.get("type")) && passBand() != null
+                && maxScore != null && maxScore > 0;
+    }
+
+    BigDecimal passBand() {
+        Object band = answerSpec == null ? null : answerSpec.get("passBand");
+        return band instanceof Number number ? new BigDecimal(number.toString()) : null;
     }
 }
