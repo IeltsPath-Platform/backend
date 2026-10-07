@@ -489,9 +489,11 @@ NAV_FLOW_PNG = HERE / "part1-diagrams" / "IELTSPath_ScreenNavigationFlow.png"
 JOB_FLOW_PNG = HERE / "part1-diagrams" / "IELTSPath_JobSchedule.png"
 NAV_FLOW_CAPTION = ("Figure 1.1 — Screen Navigation Flow, read top to bottom: ① public screens → sign-in → top bar "
                     "→ ② learning loop, ③ prototypes, ④ self-study & account, ⑤ staff by role. Colours and line "
-                    "styles follow the legend. Source: part1-diagrams/IELTSPath_ScreenNavigationFlow.dot")
-JOB_FLOW_CAPTION = ("Figure 1.2 — Job Schedule & Dependencies: triggers, queues and external systems of JOB-01 "
-                    "to JOB-07. Dashed nodes are Draft. Source: part1-diagrams/IELTSPath_JobSchedule.dot")
+                    "styles follow the legend. Source: part1-diagrams/IELTSPath_ScreenNavigationFlow.drawio")
+JOB_FLOW_CAPTION = ("Figure 1.2 — Job Schedule & Dependencies: the running pipeline grade → outbox → JOB-01 → "
+                    "RabbitMQ → JOB-02 with its retry and dead-letter queues, and the Draft jobs JOB-03 to JOB-07 "
+                    "with their triggers and external systems. Colours follow the legend. "
+                    "Source: part1-diagrams/IELTSPath_JobSchedule.drawio")
 
 NAV_FLOW_TEXT = [
     "The web client is the IELTS Space frontend (" + FRONTEND_REF + "), a React single-page app in front of the API "
