@@ -25,10 +25,12 @@ từ KP (M12). Lesson nhiều skill hoàn thành khi mọi block khách quan (R,
   - `LessonAccess`, `PracticeAccess`, `AssignTopicTestUseCase`, `GetTopicLessonsUseCase`: dùng `skills` của lesson,
     hoặc của topic với thi topic (thi topic bị chặn nếu review chờ có skill thuộc topic).
   - Skill của review:
-    - `PracticeReviewCandidate`, `ReviewReevaluation`: lấy skill từ `KnowledgePointCatalogEntry.skill` của KP, không lấy
-      `attempt.skill()` hay `topic.skill()`;
+    - `PracticeReviewCandidate`, `ReviewReevaluation`, `domain/service/ReviewRule` (dòng tạo `ReviewCandidate` đang lấy
+      `lesson.skill()`): lấy skill từ `KnowledgePointCatalogEntry.skill` của KP, không lấy `attempt.skill()`,
+      `lesson.skill()` hay `topic.skill()`;
     - `reviews.backfillMissingSkill` vẫn chạy cho dữ liệu cũ.
   - `RefreshLearningTopicsUseCase`: đọc `skills` vào `TopicPlacement`; catalog KP giữ skill riêng của KP như hiện tại.
+  - Lesson response của `GetLessonUseCase` (đang trả `lesson.skill()`) thêm `skills`, `skill` theo cùng luật.
   - Topic response (`TopicResult`/`TopicResponse`) thêm `skills`; `skill` cũ trả theo luật của content (một phần tử thì
     có, ngược lại null).
 - Non-functional: transaction và `LearnerLock` như hiện tại; không thêm lời gọi content trong vòng lặp.
@@ -38,8 +40,8 @@ từ KP (M12). Lesson nhiều skill hoàn thành khi mọi block khách quan (R,
 - Modify (gốc `services/learning-service/src/main/java/com/group01/learning/`):
   - `application/port/LearningContentClient.java`, `infrastructure/client/RestLearningContentClient.java`;
   - `domain/entity/TopicProgress.java`, `domain/aggregate/LearnerCurriculum.java`, `domain/service/LessonAccessGate.java`;
-  - `application/service/{LessonAccess,PracticeAccess,ReviewReevaluation}.java`;
-  - `application/usecase/{RefreshLearningTopicsUseCase,AssignTopicTestUseCase,GetTopicLessonsUseCase,SubmitPracticeAttemptUseCase}.java`;
+  - `application/service/{LessonAccess,PracticeAccess,ReviewReevaluation}.java`, `domain/service/ReviewRule.java`;
+  - `application/usecase/{RefreshLearningTopicsUseCase,AssignTopicTestUseCase,GetTopicLessonsUseCase,GetLessonUseCase,SubmitPracticeAttemptUseCase}.java`;
   - `application/result/TopicResult.java`, `api/dto/response/TopicResponse.java`;
   - `infrastructure/persistence/JdbcLearnerCurriculumRepository.java`.
 - Tests: `domain/service/LessonAccessGateTest`, `infrastructure/client/RestLearningContentClientTest`,

@@ -21,7 +21,9 @@ không trừ điểm, có hạn mức (M8). Lỗi thì chuyển EXAMINER (M9). `
       `grading_mode=AI`, `point_cost_snapshot=0`, `status=QUEUED`; item essay chưa có submission → 0 điểm, không tạo
       job (M14). Mọi essay đều thiếu → chấm xong ngay trong transaction như tự chấm;
 <!-- Updated: Validation Session 1 - nguồn essay từ learner_submissions; thiếu thì 0 điểm -->
-    - `idempotency_key = attemptItemId` để nộp lại không tạo job trùng.
+    - `grading_jobs.idempotency_key` là UNIQUE toàn bảng: job AI dùng `gate-essay:{attemptItemId}:ai`, job HUMAN tạo khi
+      AI thất bại dùng `gate-essay:{attemptItemId}:human`; nộp lại không tạo job trùng. Job HUMAN có
+      `point_cost_snapshot = NULL` (CHECK của bảng).
   - `GateEssayGradingScheduler` (`@Scheduled`, cấu hình `assessment.llm-grading.poll-interval`):
     - lấy job AI `QUEUED` của attempt `TOPIC_GATE`/`COURSE_GATE` (giới hạn batch, `FOR UPDATE SKIP LOCKED`), chuyển
       `PROCESSING` và commit;

@@ -131,6 +131,7 @@ class CoursePathIntegrationTest {
 
         UUID attempt = UUID.randomUUID();
         AssessmentResult passed = courseGate(attempt, VERSION_A, 4);
+        assignBeforeCompletion();
         applyResult.execute(passed);
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM course_test_assignments "
                 + "WHERE consumed_attempt_id = ? AND consumed_at IS NOT NULL", Integer.class, attempt));
@@ -152,6 +153,7 @@ class CoursePathIntegrationTest {
         jdbc.update("UPDATE topic_progress SET passed_at = ? WHERE user_id = ? AND course_id = ?",
                 java.sql.Timestamp.from(COMPLETED), USER, LOWER);
         var first = assignCourseTest.execute(USER, LOWER);
+        assignBeforeCompletion();
         applyResult.execute(courseGate(UUID.randomUUID(), first.packageVersionId(), 3));
 
         var next = assignCourseTest.execute(USER, LOWER);
@@ -166,6 +168,12 @@ class CoursePathIntegrationTest {
                 index < correctCount ? BigDecimal.ONE : BigDecimal.ZERO, BigDecimal.ONE, List.of())).toList();
         return new AssessmentResult(UUID.randomUUID(), USER, packageVersionId, attemptId, UUID.randomUUID(), 1,
                 "COURSE_GATE", COMPLETED, items);
+    }
+
+    /** Assignments take the database clock; pin them before {@link #COMPLETED} so the gate always matches them. */
+    private void assignBeforeCompletion() {
+        jdbc.update("UPDATE course_test_assignments SET assigned_at = ? WHERE user_id = ?",
+                java.sql.Timestamp.from(COMPLETED.minusSeconds(60)), USER);
     }
 
     private static LearningContentClient.Topic topic(UUID id, String code, int order, LearningSkill skill,

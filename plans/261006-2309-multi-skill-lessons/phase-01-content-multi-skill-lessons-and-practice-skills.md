@@ -34,8 +34,9 @@ lesson, Practice set. Luật publish đổi theo (M5, M7, M10).
       thuộc `skills` của lesson;
     - essay trong `PRACTICE_SET`, `TOPIC_TEST`, `COURSE_TEST` phải có `answer_spec.passBand` (0–9, bước 0.5), không có
       thì từ chối;
-    - **sửa luật của plan Course:** `COURSE_TEST` cũng được có essay (đổi luật "chỉ câu tự chấm" thành "essay phải có
-      `passBand`").
+    - **sửa luật của plan Course (M15):** `PublishContentPackageUseCase` hiện bắt `COURSE_TEST` chỉ gồm câu Reading tự
+      chấm. Đổi thành: câu Reading hoặc Listening có spec CHOICE/FILL chấm được, hoặc essay Writing có `passBand`;
+      Speaking và spec không chấm được vẫn bị từ chối. Sửa 2 test của `CoursePackagesUseCaseTest` theo bảng test cũ.
   - `UpdateTopicUseCase`: bỏ luật "không đổi skill khi có lesson PUBLISHED" (topic skill không còn ý nghĩa với lộ
     trình); vẫn validate giá trị enum nếu gửi lên.
 - Non-functional: tính `skills` bằng query gom theo tập (`array_agg(DISTINCT ...)`), không query theo từng lesson/set.

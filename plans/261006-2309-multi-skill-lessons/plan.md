@@ -25,7 +25,8 @@ tách skill). Số migration bên dưới giả định plan Course đã dùng c
 
 ## Giao cho người implement (Codex)
 
-Người implement: Codex. Người viết plan: Claude. Base: `main` @ `6351f3a`.
+Người implement: Codex. Người viết plan: Claude. Base: `main` sau khi merge PR seed demo course (content V22); ghi hash
+commit base vào Verification.
 
 1. Đọc theo thứ tự: `AGENTS.md`, `CLAUDE.md`, `plan.md` này (đặc biệt bảng quyết định và Validation Log), rồi từng
    phase trước khi làm phase đó. Bảng quyết định là chốt của chủ dự án: **không tự đổi**.
@@ -46,7 +47,7 @@ Người implement: Codex. Người viết plan: Claude. Base: `main` @ `6351f3a
 ### Trước khi bắt đầu
 
 Plan `261006-2228-course-band-levels` phải đã merge vào `main`. Base của plan này là commit merge đó (ghi vào
-Verification). Kiểm lại trước khi viết code: số migration kế tiếp (giả định content V22, learning V8–V10, assessment
+Verification). Kiểm lại trước khi viết code: số migration kế tiếp (giả định content V23 — V22 đã dùng cho seed demo course, learning V8–V10, assessment
 V6), tên file nêu trong các phase, và các field plan Course đã thêm. Lệch thì sửa theo code thật và ghi vào
 Verification; lệch về luật thì `BLOCKED`.
 
@@ -59,7 +60,9 @@ Verification; lệch về luật thì `BLOCKED`.
 | content `application/usecase/PublishContentPackageUseCaseTest.aLessonsPracticeSetCannotPublishQuestionsOfAnotherSkill` (~dòng 125) | Cùng lý do | Câu có skill **ngoài** tập skill của lesson thì bị từ chối |
 | content `application/usecase/UpdateTopicUseCaseTest.changingTheSkillOfATopicWithPublishedLessonsIsRefusedAndNothingIsSaved` (~dòng 42) | Bỏ luật khóa skill của topic (phase 1) | Đổi thành: đổi skill được |
 | content `domain/aggregate/TopicTest.theSkillIsLockedOncePublishedLessonsDependOnIt` (~dòng 74) | Cùng lý do | Xóa hoặc đảo kỳ vọng, ghi lý do |
-| learning `LearningServiceApplicationTests.contextStartsWithMigratedSchemaAndPublicHealth` (~dòng 60–61) | Mỗi migration learning mới đổi phiên bản Flyway hiện tại và số bảng | **Chỉ** cập nhật hai số: version = migration learning cao nhất sau phase đó, số bảng = 14 + số bảng mới tạo bởi các migration của plan (đếm từ file SQL, ghi phép đếm vào Verification); giữ nguyên kiểm tra health. *(Thêm 2026-10-07, chủ dự án duyệt sau khi Codex báo BLOCKED)* |
+| learning `LearningServiceApplicationTests.contextStartsWithMigratedSchemaAndPublicHealth` (~dòng 60–61) | Mỗi migration learning mới đổi phiên bản Flyway hiện tại và số bảng | **Chỉ** cập nhật hai số: version = migration learning cao nhất sau phase đó, số bảng = 17 (sau plan Course: V6–V7) + số bảng mới tạo bởi các migration của plan (đếm từ file SQL, ghi phép đếm vào Verification); giữ nguyên kiểm tra health. *(Thêm 2026-10-07, chủ dự án duyệt sau khi Codex báo BLOCKED)* |
+| content `LessonPipelineSeedTest.topicSequenceListsEachSkillsTopicsWithLessonsAndTheirActiveKnowledgePoints`, `practiceSetsBelongToTheEarliestLessonTeachingTheirKnowledgePoint`, `everySeededExerciseBlockFollowsTheBlockRuleAndTheWritingLessonsEndWithEssays`, `lessonPracticeAndTestQuestionsAreReservedForLearning` | Các test này đếm chính xác toàn bộ seed; V23 thêm topic, Practice, essay, câu hỏi | **Chỉ thêm** dữ liệu của V23 (topic `TREES_MULTI_SKILL` với `skill=null`, các bộ Practice, số essay, số câu); không đổi kỳ vọng của seed cũ. *(Thêm 2026-10-07)* |
+| content `application/usecase/CoursePackagesUseCaseTest.ungradableCourseQuestionsAreRejectedBeforePublication`, `validChoiceFillAndLegacyChoiceSpecsPublishButEssayOrNonReadingDoNot` | Luật `COURSE_TEST` đổi theo M15 | Câu Reading/Listening tự chấm và essay Writing có `passBand` được publish; essay thiếu `passBand`, Speaking, spec không chấm được vẫn bị từ chối. *(Thêm 2026-10-07)* |
 
 Giữ nguyên (không được đổi): `TopicTest.aTopicTeachesOneSkillNeverAll`, `LessonPipelineSeedTest.topicSkillAcceptsOnlyOneOfTheFourSkills`,
 `LessonAccessGateTest.reviewsBlockOnlyTheirSkillWhileUnspecifiedReviewsBlockEverySkill` (overload một skill vẫn đúng),
@@ -83,6 +86,7 @@ mọi test của `LessonWritingIntegrationTest` (refactor phase 5 không đổi 
 | M12 | Skill của review lấy theo **skill của KP** (không còn lấy skill của attempt hay lesson). |
 | M13 | Một nhánh, một PR, mỗi phase một commit. |
 | M14 | Writing được kiểm bắt buộc **chỉ ở thi topic** (LLM, miễn phí). Essay trong đề thi nộp qua API sẵn có `POST /api/assessments/submissions`; khi nộp attempt, essay có submission thì tạo job AI, essay chưa nộp được 0 điểm (không tạo job). |
+| M15 | `COURSE_TEST` được chứa Reading, Listening (tự chấm) và Writing (essay có `passBand`, LLM chấm trong assessment như `TOPIC_GATE`). Không Speaking. Thay luật "chỉ Reading tự chấm" của plan Course. *(Chốt 2026-10-07)* |
 
 ## Phases
 
@@ -155,6 +159,14 @@ lesson (lesson vẫn chỉ seed) · UI.
 - Decision deltas checked: 2
 - Reconciled stale references: xem các dòng `<!-- Updated: Validation Session 1 -->`
 - Unresolved contradictions: 0
+
+### Session 2 — 2026-10-07 (kiểm lại sau khi plan Course merge)
+
+- Migration kế tiếp khớp code: content V23 (V22 đã dùng cho seed demo course), learning V8–V10, assessment V6.
+- Lệch đã sửa: base commit; gốc số bảng learning 14 → 17; thêm `ReviewRule`, `GetLessonUseCase` vào phase 3; khóa
+  idempotency job AI/HUMAN ở phase 6 (`grading_jobs.idempotency_key` UNIQUE toàn bảng).
+- Quyết định mới: M15 (`COURSE_TEST` R+L+W). Cho phép sửa kỳ vọng `LessonPipelineSeedTest` (4 test đếm seed) và
+  `CoursePackagesUseCaseTest` (2 test luật course test), giới hạn như bảng trên.
 
 ## Verification
 

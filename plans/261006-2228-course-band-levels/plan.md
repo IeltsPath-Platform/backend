@@ -1,7 +1,7 @@
 ---
 title: "Course theo band, gợi ý course từ placement và thi cuối course"
 description: "Thêm Course (bậc band) nhóm topic; mọi course mở, mỗi course là một chuỗi riêng; placement chỉ gợi ý course; thi cuối course là mốc không chặn."
-status: in-progress
+status: completed
 priority: P2
 branch: "feat/course-band-levels"
 tags: [content, learning, assessment, tdd]
@@ -97,7 +97,7 @@ Vẫn phải dừng và ghi `BLOCKED` khi: test đỏ vì hành vi nghiệp vụ
 | 4 | [Assessment course gate](./phase-04-assessment-course-gate.md) | Completed |
 | 5 | [Learning placement recommendation](./phase-05-learning-learner-level.md) | Completed |
 | 6 | [Learning course path and course test](./phase-06-learning-course-path-and-course-test.md) | Completed |
-| 7 | [Docs and verification](./phase-07-docs-and-verification.md) | Pending |
+| 7 | [Docs and verification](./phase-07-docs-and-verification.md) | Completed |
 
 Thứ tự commit: 1 → 2 → 3 → 5 → 6 → 4 → 7.
 
@@ -125,12 +125,13 @@ Dữ liệu ví dụ: course 5.5 có R1 → R2 → L1 (theo `sortOrder`; R là R
 Assessment tự quy điểm placement ra band · seed bài placement · course theo skill · ép học tăng dần theo band · course
 "đang học" · API admin tạo package `COURSE_TEST` · UI.
 
-## Câu hỏi mở (không chặn implement)
+## Câu hỏi mở — đã chốt 2026-10-07
 
-1. Hai course cùng band (Academic/General) có cần không? D1 đang ép `band_level` unique.
-2. Nội dung thật cho course 6.5 và COURSE_TEST do ai viết? Seed phase 3 chỉ là demo tối thiểu.
-3. Khi trình bày cho hội đồng: mentor muốn học "tăng dần", còn D4 mở mọi course. Cần một câu giải thích (gợi ý course
-   từ placement thay cho việc ép thứ tự).
+1. **Chỉ làm Academic.** Không có course General; giữ `band_level` unique (D1).
+2. **Tạm dùng mock data** cho demo: content `V22__seed_course_demo_content.sql` cho mỗi course đủ Reading, Listening,
+   Writing và hai đề thi cuối course (để demo xoay đề). Nội dung thật để sau.
+3. **Không bắt buộc học tăng dần.** Giữ D4 (mọi course mở, placement chỉ gợi ý). Câu giải thích cho hội đồng: người
+   đã đạt 6.0 không nên bị buộc học lại 5.5; placement gợi ý đúng course, còn trong mỗi course topic vẫn học lần lượt.
 
 ## Dependencies
 
@@ -473,7 +474,7 @@ INSERT INTO section_questions (id, section_id, question_version_id, sort_order, 
 
 ### Plan status reconciliation — 2026-10-07
 
-- Phases 1, 2, 3 and 5 are complete. Phases 6, 4 and 7 remain pending in the requested commit order. Overall plan status remains `in-progress`.
+- (Superseded by the phase 6, 4 and 7 entries below.) Phases 1, 2, 3 and 5 were complete at this point; 6, 4 and 7 followed in order.
 - Confirmed commit order on `feat/course-band-levels`: `d867758`, `5926d93`, `6935369`, followed by phase 5. Phase 6 is next; phase 4 must follow phase 6.
 - The authorized phase-3 seed expectation changes and phase-5 migration-count update pass against PostgreSQL/Testcontainers. The phase-5 health check is unchanged.
 
@@ -493,3 +494,12 @@ INSERT INTO section_questions (id, section_id, question_version_id, sort_order, 
 - Focused green: `mvn -q -pl services/assessment-service -am test '-Dtest=AssessmentAttemptTest,AutoGradingIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false'` exited 0: 10 tests executed and passed, 0 failures, 0 errors, 0 skipped. Testcontainers exercised the new migration and persisted attempt; the test asserted `assessment_type=COURSE_GATE` in the emitted event JSON.
 - Full command: `mvn -q -pl services/assessment-service -am test` exited 0. Assessment Service: 118 executed, 118 passed, 0 failures, 0 errors, 0 skipped. Shared `common-security`: 8 executed, 8 passed, 0 failures, 0 errors, 0 skipped. PostgreSQL/Testcontainers schema and outbox tests executed.
 - Updated `docs/contracts/assessment-completed-v2.md` and the Assessment README to define the new event type and deploy order. No existing test expectation changed. `git diff --check` passed. Commit subject: `feat(assessment): support course gate attempts`.
+
+### Phase 7 Verification — 2026-10-07
+
+- Status: `DONE_WITH_CONCERNS`; plan merged to `main` via PR #45 (`df6c57f`). Plan status set to `completed`.
+- Docs: phase 7 doc changes landed in `36b1092` (bundled with report files, non-conventional subject). Rechecked against code: `CourseResponse` fields, the five course error codes and HTTP statuses (`COURSE_NOT_FOUND` 404, `NO_COURSE_TEST` 409, `COURSE_TEST_LOCKED` 403, `COURSE_ALREADY_PASSED` 409, `TEST_UNAVAILABLE` 409), `@PreAuthorize("hasRole('CUSTOMER')")` on both course routes, `COURSE_GATE` in `assessment-completed-v2.md`, AGENTS §3.8 and the CLAUDE §5 deploy pitfall all match.
+- First full run on `main` failed: `CoursePathIntegrationTest` (2 tests). Cause: the test sent `completedAt = 2026-10-07T00:00:00Z` while assignments take the database `clock_timestamp()`; `findOpenForAttempt` requires `assigned_at <= completedAt`, so the test passed only before that instant. Using `Instant.now()` still failed once because the Docker VM clock and the host clock differ by milliseconds. Fix (test only, production code unchanged): pin `assigned_at` to `COMPLETED - 60s` before applying the result, same pattern as `AssessmentResultIntegrationTest`.
+- `mvn -q -pl services/content-service,services/assessment-service,services/learning-service -am test`: content 224/224, assessment 117/117, common-security 8/8, all with Docker/Testcontainers, 0 skipped. Learning after the fix: `mvn -q -pl services/learning-service -am test` exited 0, 238/238, 0 skipped.
+- `mvn -q compile -DskipTests` (whole reactor) exited 0. `graphify update .` done. `git diff --check` passed. No plan/phase IDs in code, tests, migrations or commit messages.
+- Concerns: manual stack smoke (`GET /api/learning/topics` → course test via Assessment → `GET /courses` PASSED) not run. The test fix is uncommitted on `main`.

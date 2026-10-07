@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "Docs and verification"
-status: pending
+status: completed
 priority: P2
 dependencies: [1, 2, 3, 4, 5, 6]
 ---
@@ -50,9 +50,9 @@ Cập nhật tài liệu dự án theo hành vi mới và chạy kiểm chứng 
 3. Sweep: grep `TopicStatus`, `package_type IN`, `"TOPIC_GATE"` để chắc không bỏ sót chỗ cần thêm course.
 
 ## Success Criteria
-- [ ] Ba module test xanh; reactor compile xanh.
-- [ ] Contract và architecture doc khớp code (field, mã lỗi, ví dụ).
-- [ ] Không có mã plan/phase trong code, test, migration, commit.
+- [x] Ba module test xanh; reactor compile xanh.
+- [x] Contract và architecture doc khớp code (field, mã lỗi, ví dụ).
+- [x] Không có mã plan/phase trong code, test, migration, commit.
 
 ## Risk Assessment
 - Tài liệu lệch code là lỗi hay gặp nhất ở repo này: viết doc sau cùng, đối chiếu từng field.
