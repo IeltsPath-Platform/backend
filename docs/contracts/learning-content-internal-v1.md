@@ -67,10 +67,12 @@ V21 seed example for the independent 6.5 Reading sequence (KPs abbreviated to sh
 }
 ```
 
-The seed also creates one `COURSE_TEST` for each seeded course. For example, the 6.5 course package route returns:
+The seed also creates `COURSE_TEST` packages for each seeded course: one in V21 and a second in V22, so assignments
+can rotate. For example, the 6.5 course package route returns:
 
 ```json
-[{"packageId":"28000000-0000-4000-8000-080000000005","packageVersionId":"28000000-0000-4000-8000-090000000005","code":"COURSE-6_5-READING"}]
+[{"packageId":"28000000-0000-4000-8000-080000000005","packageVersionId":"28000000-0000-4000-8000-090000000005","code":"COURSE-6_5-READING"},
+ {"packageId":"29000000-0000-4000-8000-080000000005","packageVersionId":"29000000-0000-4000-8000-090000000005","code":"COURSE-6_5-READING-B"}]
 ```
 
 ## `GET /lessons/{id}`

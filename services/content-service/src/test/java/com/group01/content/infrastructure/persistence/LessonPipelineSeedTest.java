@@ -370,17 +370,18 @@ class LessonPipelineSeedTest {
         List<TopicSequenceResult> sequence = reader.topicSequence(3);
 
         assertThat(sequence).extracting(TopicSequenceResult::code)
-                .containsExactly("DEMO_LISTENING", "DEMO_READING", "TFNG_SKILLS",
-                        "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION", "READING_6_5_INFERENCE", "DEMO_WRITING");
+                .containsExactly("DEMO_LISTENING", "LISTENING_6_5_DETAIL", "DEMO_READING", "TFNG_SKILLS",
+                        "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION", "READING_6_5_INFERENCE", "DEMO_WRITING",
+                        "WRITING_6_5_DISCUSSION");
         assertThat(sequence).extracting(TopicSequenceResult::skill)
-                .containsExactly(Skill.LISTENING, Skill.READING, Skill.READING, Skill.READING, Skill.READING,
-                        Skill.READING, Skill.WRITING);
-        // The Writing topic has no final test; a learner passes it by completing its lessons.
+                .containsExactly(Skill.LISTENING, Skill.LISTENING, Skill.READING, Skill.READING, Skill.READING, Skill.READING,
+                        Skill.READING, Skill.WRITING, Skill.WRITING);
+        // Writing topics have no final test; a learner passes them by completing their lessons.
         assertThat(sequence).extracting(TopicSequenceResult::hasTopicTest)
-                .containsExactly(true, true, true, true, true, true, false);
+                .containsExactly(true, true, true, true, true, true, true, false, false);
         // The lower-band Reading course keeps its paid topics after its free topics.
         assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
-                .containsExactly(null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT", null, null);
+                .containsExactly(null, null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT", null, null, null);
         assertThat(sequence).allMatch(entry -> entry.course().hasCourseTest());
         assertThat(topic(sequence, "READING_6_5_INFERENCE").course().bandLevel()).isEqualByComparingTo("6.5");
         assertThat(topic(sequence, "DEMO_READING").course().bandLevel()).isEqualByComparingTo("5.5");
@@ -539,7 +540,8 @@ class LessonPipelineSeedTest {
                 Map.entry("PS-KP4-B", "L4"), Map.entry("PS-KP4-C", "L4"), Map.entry("PS-TF-B", "TF1"),
                 Map.entry("PS-TF-C", "TF1"), Map.entry("PS-PM1-B", "PM1"), Map.entry("PS-PM2-B", "PM2"),
                 Map.entry("PS-PS1-B", "PS1"), Map.entry("PS-PS2-B", "PS2"),
-                Map.entry("R65-PS-INFERENCE", "R65-I1"), Map.entry("R65-PS-PARAPHRASE", "R65-I1"))));
+                Map.entry("R65-PS-INFERENCE", "R65-I1"), Map.entry("R65-PS-PARAPHRASE", "R65-I1"),
+                Map.entry("L65-PS-CORRECTION", "L65-1"), Map.entry("L65-PS-PURPOSE", "L65-1"))));
         // The one-question V4 demo package is too small to be anyone's Practice.
         assertThat(jdbc.queryForObject("SELECT lesson_id FROM content_packages WHERE code = 'DEMO_MAIN_FLOW_READING'",
                 Map.of(), UUID.class)).isNull();
@@ -688,7 +690,7 @@ class LessonPipelineSeedTest {
                     .filter(block -> block.blockType() == BlockType.EXERCISE)
                     .forEach(block -> kinds.add(block.blockKind()));
         }
-        assertThat(kinds).doesNotContainNull().filteredOn(LessonBlockKind.ESSAY::equals).hasSize(2);
+        assertThat(kinds).doesNotContainNull().filteredOn(LessonBlockKind.ESSAY::equals).hasSize(3);
 
         LessonContentResult.Block essay = lessons.execute(lessonId("W2")).blocks().get(1);
         assertThat(essay.blockKind()).isEqualTo(LessonBlockKind.ESSAY);
@@ -759,6 +761,8 @@ class LessonPipelineSeedTest {
                 JOIN question_knowledge_points qkp ON qkp.question_version_id = sq.question_version_id
                 JOIN content_asset_links al ON al.section_id = s.id
                 JOIN content_assets a ON a.id = al.asset_id AND a.asset_type = 'AUDIO'
+                JOIN knowledge_points kp ON kp.id = qkp.knowledge_point_id
+                JOIN topics t ON t.id = kp.topic_id AND t.code = 'DEMO_LISTENING'
                 WHERE s.skill = 'LISTENING'
                 GROUP BY p.code, p.package_type ORDER BY p.code
                 """, Map.of());
@@ -861,8 +865,8 @@ class LessonPipelineSeedTest {
         Set<UUID> reserved = reader.questionVersionsReservedForLearning(all);
         // 43 reading questions, the Task 1 and Task 2 essays, 27 listening questions, the V4 practice-set question
         // the 10 questions of the paid topics, the 21 practice questions of V16 and the 43 practice and final-test
-        // questions of V18.
-        assertThat(reserved).hasSize(171);
+        // questions of V18, the 24 course questions of V21 and the 25 lesson, practice and final-test questions of V22.
+        assertThat(reserved).hasSize(196);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }
 

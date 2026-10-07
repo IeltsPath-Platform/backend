@@ -33,6 +33,12 @@ six-question Reading `COURSE_TEST`; these packages are seed-managed and exposed 
 `hasCourseTest` flag and `GET /internal/learning-content/courses/{id}/test-packages`. The seed and representative
 6.5 sequence response are covered in the [internal learning content contract](../../docs/contracts/learning-content-internal-v1.md).
 
+V22 is mock demo content so each Academic course covers Reading, Listening and Writing and can rotate final tests.
+IELTS 6.5 gains `LISTENING_6_5_DETAIL` (two knowledge points, one lesson, a practice set per knowledge point and a
+topic test) and `WRITING_6_5_DISCUSSION` (one Task 2 essay lesson with `passBand` 6.5, no topic test). The Listening
+packages reuse the V12 audio (`ls2.mp3`, `trapM.mp3`, `museum.mp3`, `hotel.mp3`), so no new media upload is needed.
+Each course gains a second six-question Reading `COURSE_TEST` (`COURSE-5_5-READING-B`, `COURSE-6_5-READING-B`).
+
 ## Lessons and curriculum order
 
 V8 implements `lessons`, `lesson_blocks`, `lesson_block_vocabulary`, `lesson_block_questions` and
