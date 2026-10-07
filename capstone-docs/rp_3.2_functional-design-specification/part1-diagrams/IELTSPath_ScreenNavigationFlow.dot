@@ -1,0 +1,148 @@
+// FDS Figure 1.1 — Screen Navigation Flow, aligned with the frontend (commit ac25901).
+// Read top to bottom: public screens → sign-in → the areas a signed-in user reaches from the top bar.
+// Blue = built with the real API · orange = built on mock data · grey dashed = not built (design target).
+digraph ScreenNavigation {
+  graph [rankdir=TB, fontname="Arial", fontsize=13, nodesep=0.35, ranksep=0.55, compound=true, newrank=true,
+         pad=0.3, bgcolor="white", labelloc=t, labeljust=c,
+         label=<<b>IELTSPath — Screen Navigation Flow</b><br/><font point-size="11" color="#595959">FDS Figure 1.1 · numbers are FDS sections (2.x)</font><br/> >];
+  node  [shape=box, style="rounded,filled", fontname="Arial", fontsize=11, margin="0.16,0.07", penwidth=1.3,
+         fillcolor="#DEEBF7", color="#2E75B6", fontcolor="#1F1F1F"];
+  edge  [fontname="Arial", fontsize=9, color="#4A6E96", fontcolor="#33475B", arrowsize=0.7, penwidth=1.1];
+
+  // ---------------------------------------------------------------- 1. Public
+  subgraph cluster_public {
+    label=<<b>① PUBLIC — no sign-in</b>>; fontsize=12; fontcolor="#404040";
+    style="rounded,filled"; fillcolor="#F5F5F5"; color="#BFBFBF"; margin=14;
+    Home     [label=<<b>2.1 Home</b><br/><font point-size="9" color="#595959">/home · landing, plans</font>>];
+    Vocab    [label=<<b>2.28 Vocabulary</b><br/><font point-size="9" color="#595959">/vocabulary</font>>,
+              fillcolor="#FBE5D6", color="#C55A11"];
+    Login    [label=<<b>2.2 Login</b><br/><font point-size="9" color="#595959">/login</font>>, penwidth=2.2];
+    Register [label=<<b>2.3 Register</b><br/><font point-size="9" color="#595959">/register</font>>];
+    Forgot   [label=<<b>2.4 Forgot Password</b><br/><font point-size="9" color="#595959">/forgot-password</font>>];
+    Reset    [label=<<b>2.5 Reset Password</b><br/><font point-size="9" color="#595959">/reset-password</font>>];
+    OAuth    [label=<<b>2.6 OAuth Callback</b><br/><font point-size="9" color="#595959">/auth/oauth/callback</font>>,
+              style="rounded,dashed", fillcolor="white", color="#8C8C8C", fontcolor="#595959"];
+  }
+
+  // ---------------------------------------------------------------- 2. Sign-in hub and top bar
+  SignedIn [label=<<b>Signed in</b><br/><font point-size="9">back to the page the user wanted, else /learn</font>>,
+            shape=box, style="rounded,filled", fillcolor="#1F3864", color="#1F3864", fontcolor="white"];
+  TopBar   [label=<<b>Top bar (SiteNavbar)</b><br/><font point-size="9">Tổng quát · Lớp học · Lộ trình · Luyện đề · Học liệu · Đăng xuất</font>>,
+            shape=box, style="filled", fillcolor="#404040", color="#404040", fontcolor="white"];
+
+  // ---------------------------------------------------------------- 3. Learning loop
+  subgraph cluster_learning {
+    label=<<b>② LEARNING LOOP — /learn</b> · real API>; fontsize=12; fontcolor="#1F4E79";
+    style="rounded,filled"; fillcolor="#F3F8FD"; color="#9DC3E6"; margin=14;
+    Path     [label=<<b>2.8 Learning Path</b><br/><font point-size="9" color="#595959">/learn</font>>, penwidth=2.2];
+    Topic    [label=<<b>2.9 Topic Detail</b><br/><font point-size="9" color="#595959">/learn/topics/:id</font>>];
+    Lesson   [label=<<b>2.10 Lesson Player</b><br/><font point-size="9" color="#595959">/learn/lessons/:id</font><br/><font point-size="9" color="#595959">+ 2.11 Writing Feedback (inline)</font>>];
+    Practice [label=<<b>2.12 Practice Set</b><br/><font point-size="9" color="#595959">/learn/lessons/:id/practice</font>>];
+    Review   [label=<<b>2.14 Review Session</b><br/><font point-size="9" color="#595959">/learn/reviews/:id</font>>];
+    Attempt  [label=<<b>2.16 Test Attempt</b><br/><font point-size="9" color="#595959">/learn/tests/:attemptId</font>>];
+    Result   [label=<<b>2.17 Test Result</b><br/><font point-size="9" color="#595959">/learn/tests/:attemptId/result</font>>];
+    node [style="rounded,dashed", fillcolor="white", color="#8C8C8C", fontcolor="#595959"];
+    Reviews  [label=<<b>2.13 Review List</b>>];
+    Mastery  [label=<<b>2.15 Mastery</b>>];
+    Mock     [label=<<b>2.18 Mock &amp; Placement Tests</b>>];
+  }
+
+  // ---------------------------------------------------------------- 4. Prototypes on mock data
+  subgraph cluster_proto {
+    label=<<b>③ PROTOTYPES</b> · mock data>; fontsize=12; fontcolor="#843C0C";
+    style="rounded,filled"; fillcolor="#FEF6F0"; color="#F4B183"; margin=14;
+    node [fillcolor="#FBE5D6", color="#C55A11"];
+    Overview    [label=<<b>2.7 Overview</b><br/><font point-size="9" color="#595959">/overview · home when signed in</font>>, penwidth=2.2];
+    Catalog     [label=<<b>2.19 Practice Test Catalog</b><br/><font point-size="9" color="#595959">/practice-tests</font>>];
+    Workspace   [label=<<b>2.20 Practice Workspaces</b><br/><font point-size="9" color="#595959">Reading · Listening · Writing · Speaking</font>>];
+    Classroom   [label=<<b>2.21 Classroom</b><br/><font point-size="9" color="#595959">/classroom</font>>];
+    ClassLesson [label=<<b>2.22 Classroom Lesson</b><br/><font point-size="9" color="#595959">/lessons/:lessonId</font>>];
+  }
+
+  // ---------------------------------------------------------------- 5. Learner screens not built yet
+  subgraph cluster_self {
+    label=<<b>④ SELF-STUDY &amp; ACCOUNT</b> · not built>; fontsize=12; fontcolor="#595959";
+    style="rounded,dashed"; color="#8C8C8C"; margin=14;
+    node [style="rounded,dashed", fillcolor="white", color="#8C8C8C", fontcolor="#404040"];
+    Account   [label=<<b>2.23–2.27 Account</b><br/><font point-size="9">Profile · Goals · Subscription &amp; Points</font><br/><font point-size="9">Activity · Notifications</font>>];
+    Library   [label=<<b>2.29–2.32 Library</b><br/><font point-size="9">Videos · Video Player · Notes · Flashcards</font>>];
+    Games     [label=<<b>2.33–2.35 Games</b><br/><font point-size="9">Lobby · Single-player · Game Room</font>>];
+    Community [label=<<b>2.36–2.37 Community</b><br/><font point-size="9">Feed · Post Detail</font>>];
+  }
+
+  // ---------------------------------------------------------------- 6. Staff screens not built yet
+  subgraph cluster_staff {
+    label=<<b>⑤ STAFF</b> · not built · opened by role (GAP-02)>; fontsize=12; fontcolor="#595959";
+    style="rounded,dashed"; color="#8C8C8C"; margin=14;
+    node [style="rounded,dashed", fillcolor="white", color="#8C8C8C", fontcolor="#404040"];
+    Admin    [label=<<b>ADMIN · SALES_STAFF</b><br/><font point-size="9">2.38–2.42 Users · Plans · Keys · Points</font>>];
+    Author   [label=<<b>CONTENT_AUTHOR</b><br/><font point-size="9">2.43–2.49 Topics · Questions · Packages</font><br/><font point-size="9">Assets · Lessons · Vocabulary · Videos</font>>];
+    Examiner [label=<<b>EXAMINER</b><br/><font point-size="9">2.50 Grading Workspace</font>>];
+  }
+
+  // ---------------------------------------------------------------- Legend (one compact table node)
+  Legend [shape=plain, style="", label=<
+    <table border="1" cellborder="0" cellspacing="3" cellpadding="5" color="#BFBFBF" bgcolor="white">
+      <tr>
+        <td><b>Legend</b></td>
+        <td bgcolor="#DEEBF7" border="1" color="#2E75B6" width="26"> </td><td align="left"><font point-size="10">Built — real API</font></td>
+        <td bgcolor="#FBE5D6" border="1" color="#C55A11" width="26"> </td><td align="left"><font point-size="10">Built — mock data</font></td>
+        <td border="1" color="#8C8C8C" style="dashed" width="26"> </td><td align="left"><font point-size="10">Not built — design target</font></td>
+        <td bgcolor="#1F3864" width="26"> </td><td align="left"><font point-size="10">Shared step</font></td>
+        <td><font color="#4A6E96">──▶</font></td><td align="left"><font point-size="10">User action</font></td>
+        <td><font color="#8C8C8C">- - ▶</font></td><td align="left"><font point-size="10">Planned link</font></td>
+      </tr>
+    </table>>];
+
+  // ---------------------------------------------------------------- Public flow
+  Home -> Login    [label=" Đăng nhập"];
+  Home -> Register [label=" Đăng ký"];
+  Home -> Vocab    [label=" Từ điển"];
+  Login -> Register [dir=both, label=" Đăng ký ngay /\n Đăng nhập"];
+  Login -> Forgot  [label=" Quên mật khẩu?"];
+  Forgot -> Reset  [label=" Tôi đã có mã"];
+  Reset -> Login   [label=" reset ok", constraint=false];
+  Login -> OAuth   [style=dashed, color="#8C8C8C", label=" Google (off)"];
+
+  // ---------------------------------------------------------------- Sign-in
+  Login -> SignedIn    [penwidth=2, color="#1F3864"];
+  Register -> SignedIn [penwidth=2, color="#1F3864", label=" auto sign-in"];
+  OAuth -> SignedIn    [style=dashed, color="#8C8C8C"];
+  SignedIn -> TopBar   [penwidth=2, color="#1F3864"];
+
+  // ---------------------------------------------------------------- Top bar → areas (one arrow per area)
+  TopBar -> Path      [lhead=cluster_learning, penwidth=1.8, color="#2E75B6", fontcolor="#1F4E79", label=" Lộ trình"];
+  TopBar -> Overview  [lhead=cluster_proto, penwidth=1.8, color="#C55A11", fontcolor="#843C0C", label=" Tổng quát · Lớp học\n Luyện đề"];
+  TopBar -> Account   [lhead=cluster_self, style=dashed, color="#8C8C8C", fontcolor="#595959", label=" planned menu"];
+  SignedIn -> Admin   [lhead=cluster_staff, style=dashed, color="#8C8C8C", fontcolor="#595959", label=" staff role → role home"];
+
+  // ---------------------------------------------------------------- Learning loop
+  Path -> Topic        [label=" chọn topic"];
+  Topic -> Lesson      [label=" học bài"];
+  Lesson -> Practice   [label=" Luyện thêm"];
+  Practice -> Review   [label=" < 70% → bài ôn"];
+  Review -> Lesson     [label=" Học tiếp", constraint=false];
+  Topic -> Attempt     [label=" Làm bài kiểm tra"];
+  Attempt -> Result    [label=" Nộp bài"];
+  Result -> Path       [label=" Xem lộ trình", constraint=false];
+  Path -> Review       [style=dotted, label=" review banner", constraint=false];
+  Path -> Reviews      [style=dashed, color="#8C8C8C"];
+  Path -> Mastery      [style=dashed, color="#8C8C8C"];
+  Mock -> Attempt      [style=dashed, color="#8C8C8C"];
+
+  // ---------------------------------------------------------------- Prototypes
+  Overview -> Catalog     [style=invis];
+  Catalog -> Workspace    [label=" Luyện tập / Thi thử"];
+  Classroom -> ClassLesson;
+  Overview -> Classroom   [style=invis];
+
+  // Self-study column order
+  Account -> Library -> Games -> Community [style=invis];
+  Admin -> Author -> Examiner [style=invis];
+
+  // Keep the public screens on two short rows and the four areas side by side.
+  { rank=same; Home; Vocab; }
+  { rank=same; Forgot; Reset; }
+  { rank=same; Review; Legend; }
+  { rank=same; Path; Overview; Account; Admin; }
+}

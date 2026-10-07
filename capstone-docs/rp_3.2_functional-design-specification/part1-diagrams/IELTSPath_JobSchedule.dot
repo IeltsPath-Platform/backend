@@ -1,0 +1,66 @@
+// FDS Figure 1.2 — Job Schedule & Dependencies. Dashed = Draft. Render: render-diagrams.cjs
+digraph JobSchedule {
+  graph [rankdir=TB, fontname="Helvetica", fontsize=16, nodesep=0.35, ranksep=0.6, newrank=true,
+         label="IELTSPath — Job Schedule & Dependencies (FDS 1.2)", labelloc=t];
+  node  [fontname="Helvetica", fontsize=10, style="rounded,filled", fillcolor="#FFFFFF", color="#2E75B6", shape=box];
+  edge  [fontname="Helvetica", fontsize=8, color="#5B7FA6", arrowsize=0.6];
+
+  // triggers
+  T2s   [label="every 2 s\n(fixed delay)", shape=ellipse, fillcolor="#FFF2CC", color="#BF9000"];
+  Tq    [label="grading job\ncreated", shape=ellipse, fillcolor="#FFF2CC", color="#BF9000", style="filled,dashed"];
+  Tcron [label="every [TBC] min", shape=ellipse, fillcolor="#FFF2CC", color="#BF9000", style="filled,dashed"];
+  Tret  [label="every [TBC] s", shape=ellipse, fillcolor="#FFF2CC", color="#BF9000", style="filled,dashed"];
+  Tmm   [label="every [TBC] s", shape=ellipse, fillcolor="#FFF2CC", color="#BF9000", style="filled,dashed"];
+
+  subgraph cluster_assessment {
+    label="assessment-service"; style="rounded,filled"; fillcolor="#EAF3FB"; color="#9DC3E6";
+    Grade [label="Auto-grade at submit /\nexaminer finalize\n(FT-31, FT-32)", fillcolor="#F2F2F2", color="#7F7F7F"];
+    Outbox [label="outbox_events\n(same transaction)", shape=cylinder, fillcolor="#F2F2F2", color="#7F7F7F"];
+    J1 [label="JOB-01\nAssessment outbox relay\nbatch 50 · max 20 attempts", fillcolor="#DEEAF1", penwidth=2];
+    J3 [label="JOB-03\nAI grading worker", style="rounded,dashed"];
+  }
+
+  subgraph cluster_broker {
+    label="RabbitMQ"; style="rounded,filled"; fillcolor="#F4F9F1"; color="#A9D18E";
+    Ex [label="exchange assessment.events\nkey assessment.completed.v2", shape=hexagon];
+    Q  [label="learning.assessment-completed.v2", shape=cds];
+    QR [label="…v2.retry (TTL 30 s)", shape=cds];
+    DLQ [label="…v2.dlq", shape=cds, fillcolor="#FCE4D6", color="#C00000"];
+    QN [label="notification queue [TBC]", shape=cds, style="filled,dashed"];
+  }
+
+  subgraph cluster_learning {
+    label="learning-service"; style="rounded,filled"; fillcolor="#EAF3FB"; color="#9DC3E6";
+    J2 [label="JOB-02\nAssessmentCompleted.v2 consumer\nevidence · topic pass · reviews", fillcolor="#DEEAF1", penwidth=2];
+  }
+
+  subgraph cluster_notification {
+    label="notification-service (Draft)"; style="rounded,dashed"; color="#7F7F7F";
+    J4 [label="JOB-04\nGrading-done alert dispatcher", style="rounded,dashed"];
+    J5 [label="JOB-05\nStudy reminder scheduler", style="rounded,dashed"];
+    J6 [label="JOB-06\nNotification delivery retry", style="rounded,dashed"];
+  }
+
+  subgraph cluster_game {
+    label="game-service (Draft)"; style="rounded,dashed"; color="#7F7F7F";
+    J7 [label="JOB-07\nMatchmaking queue sweeper", style="rounded,dashed"];
+  }
+
+  LLM [label="LLM Provider /\nSpeech Assessment Provider", shape=component, fillcolor="#F2F2F2", color="#7F7F7F"];
+  Access [label="access-service\n/internal/access/points/debit", shape=component, fillcolor="#F2F2F2", color="#7F7F7F"];
+  FCM [label="Firebase Cloud Messaging /\nEmail Service", shape=component, fillcolor="#F2F2F2", color="#7F7F7F"];
+
+  Grade -> Outbox [label="write"];
+  T2s -> J1; Outbox -> J1 [label="claim SKIP LOCKED"];
+  J1 -> Ex [label="publish + confirm"];
+  Ex -> Q; Q -> J2 [label="consume (manual ack)"];
+  J2 -> QR [label="nack (attempt < 5)"]; QR -> Q [label="after 30 s"];
+  J2 -> DLQ [label="contract violation /\n5th failure"];
+  Ex -> QN [style=dashed]; QN -> J4 [style=dashed];
+  Tq -> J3 [style=dashed]; J3 -> LLM [style=dashed]; J3 -> Access [style=dashed, label="debit once"];
+  J3 -> Grade [style=dashed, label="finalize result"];
+  Tcron -> J5 [style=dashed];
+  J4 -> J6 [style=dashed, label="deliveries"]; J5 -> J6 [style=dashed]; Tret -> J6 [style=dashed];
+  J6 -> FCM [style=dashed];
+  Tmm -> J7 [style=dashed];
+}
