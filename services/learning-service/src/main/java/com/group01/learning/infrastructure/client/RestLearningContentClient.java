@@ -3,6 +3,7 @@ package com.group01.learning.infrastructure.client;
 import com.group01.commonsecurity.header.SecurityHeaders;
 import com.group01.learning.application.exception.LearningRequestException;
 import com.group01.learning.application.port.LearningContentClient;
+import com.group01.learning.domain.vo.LearningSkill;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -16,8 +17,9 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.UUID;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 @Component
@@ -66,6 +68,13 @@ public class RestLearningContentClient implements LearningContentClient {
     @Override
     public List<LessonPracticeSet> lessonPracticeSets(UUID lessonId) {
         return get("/lessons/{id}/practice-sets", new ParameterizedTypeReference<>() { }, lessonId);
+    }
+
+    @Override
+    public List<LessonPracticeSet> lessonPracticeSets(UUID lessonId, Optional<LearningSkill> skill) {
+        if (skill.isEmpty()) return lessonPracticeSets(lessonId);
+        return get("/lessons/{id}/practice-sets?skill={skill}", new ParameterizedTypeReference<>() { }, lessonId,
+                skill.get().name());
     }
 
     @Override

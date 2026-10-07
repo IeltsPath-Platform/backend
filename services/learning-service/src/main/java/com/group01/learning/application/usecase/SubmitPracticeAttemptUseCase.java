@@ -25,7 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.util.*;
+import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 
 @Service
 public class SubmitPracticeAttemptUseCase {
@@ -73,12 +77,16 @@ public class SubmitPracticeAttemptUseCase {
         List<KnowledgeEvidence> firstAnswers = new ArrayList<>();
         List<PracticeReviewRule.ItemOutcome> outcomes = new ArrayList<>();
         List<PracticeSubmission.Answer> results = new ArrayList<>();
+        Map<LearningSkill, List<PracticeReviewRule.ItemOutcome>> outcomesBySkill = new EnumMap<>(LearningSkill.class);
         for (int index = 0; index < graded.items().size(); index++) {
             var item = graded.items().get(index);
             var grade = graded.grades().get(index);
             Set<UUID> kps = new LinkedHashSet<>();
             for (var mapping : item.knowledgePointMappings()) kps.add(mapping.knowledgePointId());
-            outcomes.add(new PracticeReviewRule.ItemOutcome(kps, grade.correct()));
+            var outcome = new PracticeReviewRule.ItemOutcome(kps, grade.correct());
+            outcomes.add(outcome);
+            LearningSkill itemSkill = graded.itemSkills().get(index);
+            if (itemSkill != null) outcomesBySkill.computeIfAbsent(itemSkill, ignored -> new ArrayList<>()).add(outcome);
             if (counted) for (UUID kp : kps) firstAnswers.add(KnowledgeEvidence.of(kp, grade.correct(),
                     EvidenceSource.PRACTICE_SET,
                     LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), kp)));
@@ -96,7 +104,7 @@ public class SubmitPracticeAttemptUseCase {
                     excluded.stream().sorted(Comparator.comparing(UUID::toString)).toList(), MIN_SET_QUESTIONS);
             Set<UUID> pending = new HashSet<>();
             reviews.findPending(userId).forEach(review -> pending.add(review.knowledgePointId()));
-            var needs = reviewRule.derive(graded.percent(), true, outcomes, pending, availability);
+            var needs = reviewNeeds(graded, outcomes, outcomesBySkill, pending, availability);
             Set<UUID> wrongInLesson = needs.isEmpty() ? Set.of() : mistakes.of(userId, lesson);
             Map<UUID, LearningSkill> kpSkills = new HashMap<>();
             if (!needs.isEmpty()) evidence.findMasteryHistories(userId).stream().filter(history -> history.skill() != null)
@@ -114,12 +122,37 @@ public class SubmitPracticeAttemptUseCase {
                 .map(candidate -> new PracticeSubmission.ReviewCreated(candidate.reviewId(),
                         candidate.knowledgePointId(), candidate.stage().name())).toList();
         PracticeSubmission response = new PracticeSubmission(attemptId, graded.correct(), graded.total(),
-                graded.percent(), graded.passed(), counted, List.copyOf(results), transcript, created);
+                graded.percent(), graded.passed(), counted, List.copyOf(results), transcript, created,
+                graded.skillScores());
         attempt.recordResult(command.requestId(), response, clock.instant());
         attempts.saveResult(attempt);
         evidence.append(userId, firstAnswers);
         reviews.insertPracticePending(userId, candidates);
         progress.refreshPassForLesson(userId, attempt.lessonId());
         return response;
+    }
+
+    /**
+     * Each objective skill below the pass mark is judged on its own items, so a weak Listening part of a mixed set
+     * does not send its Reading knowledge points to review. Writing never creates reviews. A set whose sections name
+     * no skill is judged as a whole.
+     */
+    private List<PracticeReviewRule.Need> reviewNeeds(ItemGrading.Graded graded,
+                                                      List<PracticeReviewRule.ItemOutcome> outcomes,
+                                                      Map<LearningSkill, List<PracticeReviewRule.ItemOutcome>> bySkill,
+                                                      Set<UUID> pending, Map<UUID, Integer> availability) {
+        if (graded.skillScores().isEmpty()) {
+            return reviewRule.derive(graded.percent(), true, outcomes, pending, availability);
+        }
+        List<PracticeReviewRule.Need> needs = new ArrayList<>();
+        Set<UUID> claimed = new HashSet<>(pending);
+        for (var score : graded.skillScores()) {
+            if (score.passed() || score.skill() == LearningSkill.WRITING) continue;
+            var skillNeeds = reviewRule.derive(score.percent(), true, bySkill.get(score.skill()), claimed,
+                    availability);
+            skillNeeds.forEach(need -> claimed.add(need.knowledgePointId()));
+            needs.addAll(skillNeeds);
+        }
+        return needs;
     }
 }

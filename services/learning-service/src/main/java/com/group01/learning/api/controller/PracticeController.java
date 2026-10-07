@@ -4,18 +4,22 @@ import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import com.group01.learning.api.dto.request.StartPracticeAttemptRequest;
 import com.group01.learning.api.dto.request.SubmitExerciseRequest;
 import com.group01.learning.api.dto.response.PracticeSubmissionResponse;
+import com.group01.learning.application.exception.LearningRequestException;
 import com.group01.learning.application.result.LessonPracticeSetsResult;
 import com.group01.learning.application.result.PracticeAttemptView;
 import com.group01.learning.application.usecase.GetLessonPracticeSetsUseCase;
 import com.group01.learning.application.usecase.GetPracticeAttemptUseCase;
 import com.group01.learning.application.usecase.StartPracticeAttemptUseCase;
 import com.group01.learning.application.usecase.SubmitPracticeAttemptUseCase;
+import com.group01.learning.domain.vo.LearningSkill;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -29,8 +33,19 @@ public class PracticeController {
     private final SubmitPracticeAttemptUseCase submit;
 
     @GetMapping("/lessons/{id}/practice-sets")
-    public LessonPracticeSetsResult catalog(@PathVariable("id") UUID lessonId) {
-        return catalog.execute(currentUser.requireUserId(), lessonId);
+    public LessonPracticeSetsResult catalog(@PathVariable("id") UUID lessonId,
+                                            @RequestParam(value = "skill", required = false) String skill) {
+        return catalog.execute(currentUser.requireUserId(), lessonId, skill(skill));
+    }
+
+    private static Optional<LearningSkill> skill(String value) {
+        if (value == null) return Optional.empty();
+        try {
+            return Optional.of(LearningSkill.valueOf(value));
+        } catch (IllegalArgumentException unknown) {
+            throw new LearningRequestException(400, "INVALID_SKILL",
+                    "skill must be LISTENING, READING, WRITING or SPEAKING");
+        }
     }
 
     @PostMapping("/lessons/{id}/practice-attempts")

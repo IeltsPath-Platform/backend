@@ -1,18 +1,19 @@
 package com.group01.learning.application.service;
 
-import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.application.port.LearningContentClient.LessonPracticeSet;
+import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.domain.aggregate.PracticeAttempt;
 import com.group01.learning.domain.repository.LessonPracticePassRepository;
 import com.group01.learning.domain.repository.LessonProgressRepository;
 import com.group01.learning.domain.repository.PracticeAttemptRepository;
 import com.group01.learning.domain.repository.ReviewItemRepository;
-import com.group01.learning.domain.service.PracticeClearance;
 import com.group01.learning.domain.service.PracticeClearance.Clearance;
-import com.group01.learning.domain.vo.PracticePassReason;
-import com.group01.learning.domain.vo.PracticeStatus;
-import com.group01.learning.domain.vo.PracticeReviewState;
+import com.group01.learning.domain.service.PracticeClearance;
+import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.domain.vo.PendingReview;
+import com.group01.learning.domain.vo.PracticePassReason;
+import com.group01.learning.domain.vo.PracticeReviewState;
+import com.group01.learning.domain.vo.PracticeStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -86,18 +87,18 @@ public class PracticeProgress {
         Map<UUID, List<PracticeClearance.AttemptFact>> attemptFacts = new HashMap<>();
         for (var pass : firstPasses) {
             attemptFacts.computeIfAbsent(pass.lessonId(), ignored -> new ArrayList<>())
-                    .add(new PracticeClearance.AttemptFact(pass.packageId(), true, true));
+                    .add(new PracticeClearance.AttemptFact(pass.packageId(), pass.passed(), true, pass.passedSkills()));
         }
         Map<UUID, List<PracticeClearance.ReviewFact>> reviewFacts = new HashMap<>();
         for (PracticeReviewState review : allReviews) {
             reviewFacts.computeIfAbsent(review.lessonId(), ignored -> new ArrayList<>())
-                    .add(new PracticeClearance.ReviewFact(review.status()));
+                    .add(new PracticeClearance.ReviewFact(review.status(), review.skill()));
         }
         Map<UUID, Clearance> result = new HashMap<>();
         for (var entry : sets.entrySet()) {
             UUID lessonId = entry.getKey();
-            Set<UUID> packages = entry.getValue().stream().map(LessonPracticeSet::packageId)
-                    .collect(Collectors.toSet());
+            Map<UUID, Set<LearningSkill>> packages = new HashMap<>();
+            entry.getValue().forEach(set -> packages.put(set.packageId(), set.skills()));
             result.put(lessonId, rule.derive(completed.getOrDefault(lessonId, false), packages,
                     attemptFacts.getOrDefault(lessonId, List.of()), revealed,
                     reviewFacts.getOrDefault(lessonId, List.of()), stored.get(lessonId)));

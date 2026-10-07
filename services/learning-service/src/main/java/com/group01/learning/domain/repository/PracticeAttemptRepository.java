@@ -1,6 +1,7 @@
 package com.group01.learning.domain.repository;
 
 import com.group01.learning.domain.aggregate.PracticeAttempt;
+import com.group01.learning.domain.vo.LearningSkill;
 
 import java.util.Collection;
 import java.util.List;
@@ -20,7 +21,12 @@ public interface PracticeAttemptRepository {
     void insert(PracticeAttempt attempt);
     void saveResult(PracticeAttempt attempt);
 
-    record FirstPass(UUID lessonId, UUID packageId) {}
+    /** A counted first submission that passed the set or at least one of its skills. */
+    record FirstPass(UUID lessonId, UUID packageId, boolean passed, Set<LearningSkill> passedSkills) {
+        public FirstPass(UUID lessonId, UUID packageId) {
+            this(lessonId, packageId, true, Set.of());
+        }
+    }
     record TopicAttempts(List<FirstPass> firstPasses, Set<UUID> revealedPackageIds) {}
     record PackageSummary(UUID packageId, UUID lastAttemptId, boolean open, boolean passed,
                           boolean attempted, Double bestPercent) {}

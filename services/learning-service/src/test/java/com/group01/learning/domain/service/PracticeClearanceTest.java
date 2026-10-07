@@ -1,11 +1,13 @@
 package com.group01.learning.domain.service;
 
+import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.domain.vo.PracticePassReason;
 import com.group01.learning.domain.vo.PracticeStatus;
 import com.group01.learning.domain.vo.ReviewStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -14,6 +16,61 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class PracticeClearanceTest {
     private final PracticeClearance rule = new PracticeClearance();
     private final UUID set = UUID.randomUUID();
+
+    private static final Set<LearningSkill> R = Set.of(LearningSkill.READING);
+    private static final Set<LearningSkill> L = Set.of(LearningSkill.LISTENING);
+    private static final Set<LearningSkill> W = Set.of(LearningSkill.WRITING);
+    private static final Set<LearningSkill> RL = Set.of(LearningSkill.READING, LearningSkill.LISTENING);
+    private final UUID readingSet = UUID.randomUUID();
+    private final UUID listeningSet = UUID.randomUUID();
+    private final UUID mixedSet = UUID.randomUUID();
+    private final UUID writingSet = UUID.randomUUID();
+
+    private PracticeClearance.Clearance mixed(List<PracticeClearance.AttemptFact> attempts, Set<UUID> revealed,
+                                              List<PracticeClearance.ReviewFact> reviews) {
+        return rule.derive(true, Map.of(readingSet, R, listeningSet, L, mixedSet, RL, writingSet, W), attempts,
+                revealed, reviews, null);
+    }
+
+    private PracticeClearance.AttemptFact passed(UUID set, Set<LearningSkill> skills) {
+        return new PracticeClearance.AttemptFact(set, false, true, skills);
+    }
+
+    @Test
+    void aMixedSetPassingBothSkillsClearsThePractice() {
+        var result = mixed(List.of(passed(mixedSet, RL)), Set.of(mixedSet), List.of());
+        assertEquals(PracticeStatus.PASSED, result.status());
+        assertEquals(PracticePassReason.FIRST_SUBMISSION, result.reason());
+    }
+
+    @Test
+    void readingAloneLeavesListeningRequiredUntilAListeningPartPasses() {
+        assertEquals(PracticeStatus.REQUIRED, mixed(List.of(passed(readingSet, R)), Set.of(readingSet), List.of()).status());
+        assertEquals(PracticeStatus.REQUIRED,
+                mixed(List.of(passed(mixedSet, R)), Set.of(mixedSet), List.of()).status());
+        assertEquals(PracticeStatus.PASSED, mixed(List.of(passed(readingSet, R), passed(listeningSet, L)),
+                Set.of(readingSet, listeningSet), List.of()).status());
+    }
+
+    @Test
+    void writingSetsAreOptionalAndAWritingOnlyPracticeIsNoPractice() {
+        var readingAndWriting = rule.derive(true, Map.of(readingSet, R, writingSet, W),
+                List.of(passed(readingSet, R)), Set.of(readingSet), List.of(), null);
+        assertEquals(PracticeStatus.PASSED, readingAndWriting.status());
+        var writingOnly = rule.derive(true, Map.of(writingSet, W), List.of(), Set.of(), List.of(), null);
+        assertEquals(PracticePassReason.NO_PRACTICE, writingOnly.reason());
+    }
+
+    @Test
+    void aSkillClearedByAFinishedReviewKeepsTheWeakerReason() {
+        var result = mixed(List.of(passed(readingSet, R)), Set.of(readingSet),
+                List.of(new PracticeClearance.ReviewFact(ReviewStatus.SKIPPED, LearningSkill.LISTENING)));
+        assertEquals(PracticeStatus.PASSED, result.status());
+        assertEquals(PracticePassReason.REVIEW_FINISHED, result.reason());
+        var otherSkill = mixed(List.of(passed(readingSet, R)), Set.of(readingSet),
+                List.of(new PracticeClearance.ReviewFact(ReviewStatus.DONE, LearningSkill.READING)));
+        assertEquals(PracticeStatus.REQUIRED, otherSkill.status());
+    }
 
     @Test
     void firstCountedPassingSubmissionWins() {

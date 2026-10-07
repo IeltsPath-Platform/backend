@@ -95,7 +95,7 @@ mọi test của `LessonWritingIntegrationTest` (refactor phase 5 không đổi 
 | 1 | [Content multi-skill lessons and practice skills](./phase-01-content-multi-skill-lessons-and-practice-skills.md) | Completed |
 | 2 | [Content seed multi-skill topic](./phase-02-content-seed-multi-skill-topic.md) | Completed |
 | 3 | [Learning multi-skill gating](./phase-03-learning-multi-skill-gating.md) | Completed |
-| 4 | [Learning practice per-skill clearance](./phase-04-learning-practice-per-skill-clearance.md) | Pending |
+| 4 | [Learning practice per-skill clearance](./phase-04-learning-practice-per-skill-clearance.md) | Completed |
 | 5 | [Learning practice essays](./phase-05-learning-practice-essays.md) | Pending |
 | 6 | [Assessment LLM gate grading](./phase-06-assessment-llm-gate-grading.md) | Pending |
 | 7 | [Docs and verification](./phase-07-docs-and-verification.md) | Pending |
@@ -230,6 +230,25 @@ lesson (lesson vẫn chỉ seed) · UI.
 - A lesson that Content sends without `skills` uses its topic's skills, so older single-skill lessons gate as before.
 - Grep: no remaining `topic.skill()`/`lesson.skill()` decides a gate in `application`/`domain`; left uses are response
   compatibility fields, fallbacks when a KP has no skill, and `PracticeAttempt` (next phase).
+
+### Phase 4 Verification — 2026-10-07
+
+- Status: `DONE_WITH_CONCERNS` — tests written right after the code (not run red first); one schema deviation below.
+- Command: `mvn -q -pl services/learning-service -am test` exited 0 — learning 250/250, common-security 8/8, 0 skipped,
+  Docker/Testcontainers.
+- Migration `V9__practice_skills.sql`: `practice_attempts.skills` and `passed_skills` (`VARCHAR(20)[]`), backfilled from
+  `skill`/`passed`; `skill` becomes nullable (NULL for a mixed set). No new table: tables stay 17.
+- **Deviation:** the plan proposed a table `lesson_practice_skill_passes`. Per-skill FIRST_SUBMISSION facts come from
+  `practice_attempts.passed_skills` instead, and the lesson-level pass stays in `lesson_practice_passes` (written once,
+  never revoked), so a per-skill table would only duplicate attempt data. Owner to confirm in the PR.
+- Behaviour: `ItemGrading` scores each section skill; `passed` = every skill ≥ 70%; `PracticeSubmission.skillScores`
+  (response field). `PracticeClearance` clears each objective skill (R, L) by first passing submission, finished review
+  of that skill, or all its sets revealed; Writing sets are optional; Writing-only Practice is `NO_PRACTICE`; sets
+  without `skills` (older Content) are judged as before. Reviews are derived per failed objective skill.
+  `GET /lessons/{id}/practice-sets?skill=X` filters the list (`400 INVALID_SKILL`), clearance counts every set.
+- Allowlisted change: `LearningServiceApplicationTests` Flyway version `8 → 9`; tables 17.
+- New tests: `PracticeClearanceTest` (4), `MultiSkillLessonIntegrationTest` (2: mixed set scored per skill with a
+  LISTENING-only review and Practice still REQUIRED; passing both parts clears Practice without the Writing set).
 
 (Codex điền sau mỗi phase: commit, lệnh đã chạy và kết quả, test bị skip, test cũ đã sửa kỳ vọng, nội dung seed mới,
 mọi `BLOCKED`.)

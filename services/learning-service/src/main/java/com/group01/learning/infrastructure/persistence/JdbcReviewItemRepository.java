@@ -4,14 +4,14 @@ import com.group01.learning.domain.aggregate.ReviewItem;
 import com.group01.learning.domain.entity.ReviewSet;
 import com.group01.learning.domain.repository.ReviewItemRepository;
 import com.group01.learning.domain.service.ReviewRule.ReviewCandidate;
+import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.domain.vo.PendingReview;
+import com.group01.learning.domain.vo.PracticeReviewCandidate;
+import com.group01.learning.domain.vo.PracticeReviewState;
+import com.group01.learning.domain.vo.ReviewListEntry;
 import com.group01.learning.domain.vo.ReviewStage;
 import com.group01.learning.domain.vo.ReviewStatus;
 import com.group01.learning.domain.vo.TheoryReason;
-import com.group01.learning.domain.vo.LearningSkill;
-import com.group01.learning.domain.vo.ReviewListEntry;
-import com.group01.learning.domain.vo.PracticeReviewState;
-import com.group01.learning.domain.vo.PracticeReviewCandidate;
 import com.group01.learning.domain.vo.TopicReviewSnapshot;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -64,12 +64,12 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
     public List<PracticeReviewState> findPracticeByLessons(UUID userId, Collection<UUID> lessonIds) {
         if (lessonIds.isEmpty()) return List.of();
         return jdbc.query("""
-                SELECT lesson_id, knowledge_point_id, status FROM review_items
+                SELECT lesson_id, knowledge_point_id, status, skill FROM review_items
                 WHERE user_id = :userId AND lesson_id IN (:lessonIds) AND trigger_kind = 'PRACTICE'
                 """, Map.of("userId", userId, "lessonIds", lessonIds), (row, index) ->
                 new PracticeReviewState(row.getObject("lesson_id", UUID.class),
                         row.getObject("knowledge_point_id", UUID.class),
-                        ReviewStatus.valueOf(row.getString("status"))));
+                        ReviewStatus.valueOf(row.getString("status")), skill(row.getString("skill"))));
     }
 
     @Override
@@ -87,13 +87,18 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
             UUID lessonId = row.getObject("lesson_id", UUID.class);
             UUID kpId = row.getObject("knowledge_point_id", UUID.class);
             ReviewStatus status = ReviewStatus.valueOf(row.getString("status"));
+            LearningSkill skill = skill(row.getString("skill"));
             if (status == ReviewStatus.PENDING) pending.add(new PendingReview(row.getObject("id", UUID.class),
-                    lessonId, kpId, row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill"))));
+                    lessonId, kpId, skill));
             if ("PRACTICE".equals(row.getString("trigger_kind")) && lessonIds.contains(lessonId)) {
-                practice.add(new PracticeReviewState(lessonId, kpId, status));
+                practice.add(new PracticeReviewState(lessonId, kpId, status, skill));
             }
         });
         return new TopicReviewSnapshot(List.copyOf(pending), List.copyOf(practice));
+    }
+
+    private static LearningSkill skill(String value) {
+        return value == null ? null : LearningSkill.valueOf(value);
     }
 
     @Override

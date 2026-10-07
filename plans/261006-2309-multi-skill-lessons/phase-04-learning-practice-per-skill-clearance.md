@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Learning practice per-skill clearance"
-status: pending
+status: completed
 priority: P1
 dependencies: [3]
 ---
@@ -70,8 +70,8 @@ Practice có bộ riêng và bộ trộn. Mỗi lần nộp tính điểm theo t
 6. `mvn -q -pl services/learning-service -am test`.
 
 ## Success Criteria
-- [ ] Mọi test cũ của thang ôn tập xanh không đổi kỳ vọng (một skill là trường hợp riêng của nhiều skill).
-- [ ] Practice của lesson nhiều skill chỉ PASSED khi mọi skill pass.
+- [x] Mọi test cũ của thang ôn tập xanh không đổi kỳ vọng (một skill là trường hợp riêng của nhiều skill).
+- [x] Practice của lesson nhiều skill chỉ PASSED khi mọi skill pass.
 
 ## Risk Assessment
 - `PracticeClearance` và thang ôn tập là phần có nhiều test nhất của learning. Phải giữ đúng các lý do PASS cũ theo

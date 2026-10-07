@@ -10,15 +10,18 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 @Repository
 public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository {
-    private static final String COLUMNS = "id, user_id, lesson_id, skill, package_id, package_version_id, "
+    private static final String COLUMNS = "id, user_id, lesson_id, skills, package_id, package_version_id, "
             + "started_at, submitted_at, request_id, response";
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper json;
@@ -62,11 +65,11 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
         List<FirstPass> firstPasses = new ArrayList<>();
         Set<UUID> revealed = new HashSet<>();
         String sql = """
-                SELECT 'PASS' AS row_kind, lesson_id, MIN(package_id::text)::uuid AS package_id
+                SELECT 'PASS' AS row_kind, lesson_id, package_id, passed, passed_skills
                 FROM practice_attempts
                 WHERE user_id = :userId AND lesson_id IN (:lessonIds)
-                  AND submitted_at IS NOT NULL AND passed = TRUE AND counted_as_evidence = TRUE
-                GROUP BY lesson_id
+                  AND submitted_at IS NOT NULL AND counted_as_evidence = TRUE
+                  AND (passed = TRUE OR cardinality(passed_skills) > 0)
                 """;
         Map<String, Object> params = new HashMap<>();
         params.put("userId", userId);
@@ -75,7 +78,7 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
             params.put("packageIds", packageIds);
             sql += """
                     UNION ALL
-                    SELECT 'REVEALED', NULL::uuid, package_id FROM (
+                    SELECT 'REVEALED', NULL::uuid, package_id, NULL::boolean, NULL::varchar[] FROM (
                         SELECT package_id FROM practice_attempts
                         WHERE user_id = :userId AND package_id IN (:packageIds) AND submitted_at IS NOT NULL
                         UNION
@@ -87,7 +90,8 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
         jdbc.query(sql, params, row -> {
             if ("PASS".equals(row.getString("row_kind"))) {
                 firstPasses.add(new FirstPass(row.getObject("lesson_id", UUID.class),
-                        row.getObject("package_id", UUID.class)));
+                        row.getObject("package_id", UUID.class), row.getBoolean("passed"),
+                        skills(row.getArray("passed_skills"))));
             } else revealed.add(row.getObject("package_id", UUID.class));
         });
         return new TopicAttempts(List.copyOf(firstPasses), Set.copyOf(revealed));
@@ -137,8 +141,9 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
     @Override
     public void insert(PracticeAttempt attempt) {
         jdbc.update("""
-                INSERT INTO practice_attempts (id, user_id, lesson_id, skill, package_id, package_version_id, started_at)
-                VALUES (:id, :userId, :lessonId, :skill, :packageId, :versionId, :startedAt)
+                INSERT INTO practice_attempts (id, user_id, lesson_id, skill, skills, package_id, package_version_id,
+                started_at)
+                VALUES (:id, :userId, :lessonId, :skill, CAST(:skills AS varchar[]), :packageId, :versionId, :startedAt)
                 """, params(attempt));
     }
 
@@ -151,6 +156,7 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
         params.put("total", attempt.response().total());
         params.put("passed", attempt.response().passed());
         params.put("counted", attempt.response().countedAsEvidence());
+        params.put("passedSkills", array(attempt.passedSkills()));
         try {
             params.put("response", json.writeValueAsString(attempt.response()));
         } catch (JsonProcessingException exception) {
@@ -159,7 +165,8 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
         int updated = jdbc.update("""
                 UPDATE practice_attempts SET submitted_at = :submittedAt, request_id = :requestId,
                 correct_count = :correct, total_count = :total, passed = :passed,
-                counted_as_evidence = :counted, response = CAST(:response AS jsonb)
+                counted_as_evidence = :counted, passed_skills = CAST(:passedSkills AS varchar[]),
+                response = CAST(:response AS jsonb)
                 WHERE id = :id AND user_id = :userId AND submitted_at IS NULL
                 """, params);
         if (updated != 1) throw new IllegalStateException("Practice attempt changed while submitting");
@@ -170,11 +177,27 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
         params.put("id", attempt.id());
         params.put("userId", attempt.userId());
         params.put("lessonId", attempt.lessonId());
-        params.put("skill", attempt.skill().name());
+        params.put("skill", attempt.skill() == null ? null : attempt.skill().name());
+        params.put("skills", array(attempt.skills()));
         params.put("packageId", attempt.packageId());
         params.put("versionId", attempt.packageVersionId());
         params.put("startedAt", Timestamp.from(attempt.startedAt()));
         return params;
+    }
+
+    /** A PostgreSQL array literal of skill names, cast to {@code varchar[]} in SQL. */
+    private static String array(Set<LearningSkill> skills) {
+        return skills.stream().sorted().map(Enum::name).collect(Collectors.joining(",", "{", "}"));
+    }
+
+    private static Set<LearningSkill> skills(Array array) throws SQLException {
+        if (array == null) return Set.of();
+        try {
+            return Arrays.stream((Object[]) array.getArray()).map(value -> LearningSkill.valueOf((String) value))
+                    .collect(Collectors.toUnmodifiableSet());
+        } finally {
+            array.free();
+        }
     }
 
     private PracticeAttempt map(ResultSet row, int index) throws SQLException {
@@ -190,7 +213,7 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
         Instant submitted = row.getTimestamp("submitted_at") == null ? null
                 : row.getTimestamp("submitted_at").toInstant();
         return PracticeAttempt.restore(row.getObject("id", UUID.class), row.getObject("user_id", UUID.class),
-                row.getObject("lesson_id", UUID.class), LearningSkill.valueOf(row.getString("skill")),
+                row.getObject("lesson_id", UUID.class), skills(row.getArray("skills")),
                 row.getObject("package_id", UUID.class), row.getObject("package_version_id", UUID.class),
                 row.getTimestamp("started_at").toInstant(), submitted, row.getObject("request_id", UUID.class),
                 response);

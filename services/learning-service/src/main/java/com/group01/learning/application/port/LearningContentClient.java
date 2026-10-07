@@ -9,6 +9,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -24,6 +25,13 @@ public interface LearningContentClient {
     List<TestPackage> getCourseTestPackages(UUID courseId);
 
     List<LessonPracticeSet> lessonPracticeSets(UUID lessonId);
+
+    /** Only the sets whose questions are all of {@code skill}; every set when empty. */
+    default List<LessonPracticeSet> lessonPracticeSets(UUID lessonId, Optional<LearningSkill> skill) {
+        List<LessonPracticeSet> sets = lessonPracticeSets(lessonId);
+        return skill.isEmpty() || sets == null ? sets : sets.stream()
+                .filter(set -> set.skills().equals(Set.of(skill.get()))).toList();
+    }
 
     TopicPracticeSets topicPracticeSets(UUID topicId);
 
@@ -171,8 +179,18 @@ public interface LearningContentClient {
                        int matchedQuestionCount) {
     }
 
+    /** {@code skills} are the skills of the set's questions; empty from Content that does not send them. */
     record LessonPracticeSet(UUID packageId, UUID packageVersionId, String code, String title,
-                             int questionCount, List<UUID> knowledgePointIds, String requiredFeatureKey) {}
+                             int questionCount, List<UUID> knowledgePointIds, String requiredFeatureKey,
+                             Set<LearningSkill> skills) {
+        public LessonPracticeSet {
+            skills = skillsOrSingle(skills, null);
+        }
+        public LessonPracticeSet(UUID packageId, UUID packageVersionId, String code, String title,
+                                 int questionCount, List<UUID> knowledgePointIds, String requiredFeatureKey) {
+            this(packageId, packageVersionId, code, title, questionCount, knowledgePointIds, requiredFeatureKey, null);
+        }
+    }
 
     record TopicPracticeSets(List<LessonSets> lessons) {
         public record LessonSets(UUID lessonId, List<LessonPracticeSet> practiceSets) {}

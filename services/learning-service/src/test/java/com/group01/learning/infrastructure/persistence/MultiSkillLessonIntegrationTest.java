@@ -1,19 +1,26 @@
 package com.group01.learning.infrastructure.persistence;
 
-import com.group01.learning.application.command.AssessmentResult;
 import com.group01.learning.application.command.AssessmentResult.ItemResult;
 import com.group01.learning.application.command.AssessmentResult.KnowledgePointJudgment;
+import com.group01.learning.application.command.AssessmentResult;
 import com.group01.learning.application.command.SubmitExerciseCommand;
-import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.application.port.LearningContentClient.*;
+import com.group01.learning.application.port.LearningContentClient;
+import com.group01.learning.application.result.LessonPracticeSetsResult;
 import com.group01.learning.application.result.SubmissionResult;
 import com.group01.learning.application.usecase.ApplyAssessmentResultUseCase;
 import com.group01.learning.application.usecase.AssignTopicTestUseCase;
+import com.group01.learning.application.usecase.GetLessonPracticeSetsUseCase;
 import com.group01.learning.application.usecase.GetLessonUseCase;
 import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
+import com.group01.learning.application.usecase.StartPracticeAttemptUseCase;
 import com.group01.learning.application.usecase.SubmitLessonExerciseUseCase;
+import com.group01.learning.application.usecase.SubmitPracticeAttemptUseCase;
 import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.vo.LearningSkill;
+import com.group01.learning.domain.vo.PracticePassReason;
+import com.group01.learning.domain.vo.PracticeStatus;
+import com.group01.learning.domain.vo.PracticeSubmission;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,10 +39,13 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /** A topic whose first lesson teaches Reading, Listening and Writing, and whose second lesson teaches Listening only. */
@@ -82,6 +92,11 @@ class MultiSkillLessonIntegrationTest {
     private static final UUID SECOND_QUESTION = UUID.randomUUID();
     private static final Set<LearningSkill> THREE = Set.of(LearningSkill.LISTENING, LearningSkill.READING,
             LearningSkill.WRITING);
+    private static final UUID READING_SET = UUID.randomUUID();
+    private static final UUID LISTENING_SET = UUID.randomUUID();
+    private static final UUID MIXED_SET = UUID.randomUUID();
+    private static final UUID MIXED_VERSION = UUID.randomUUID();
+    private static final UUID WRITING_SET = UUID.randomUUID();
 
     @Autowired JdbcTemplate jdbc;
     @Autowired RefreshLearningTopicsUseCase topics;
@@ -89,6 +104,9 @@ class MultiSkillLessonIntegrationTest {
     @Autowired SubmitLessonExerciseUseCase submitExercise;
     @Autowired AssignTopicTestUseCase assignTopicTest;
     @Autowired ApplyAssessmentResultUseCase applyResult;
+    @Autowired GetLessonPracticeSetsUseCase practiceSets;
+    @Autowired StartPracticeAttemptUseCase startPractice;
+    @Autowired SubmitPracticeAttemptUseCase submitPractice;
     @MockitoBean LearningContentClient content;
 
     @BeforeEach
@@ -124,7 +142,55 @@ class MultiSkillLessonIntegrationTest {
                 Set.of(LearningSkill.LISTENING)));
         when(content.getTopicTestPackages(TOPIC)).thenReturn(List.of(
                 new TestPackage(UUID.randomUUID(), UUID.randomUUID(), "TR-TOPIC-TEST")));
+        List<LessonPracticeSet> sets = List.of(
+                practiceSet(READING_SET, UUID.randomUUID(), "TR-R", Set.of(LearningSkill.READING)),
+                practiceSet(LISTENING_SET, UUID.randomUUID(), "TR-L", Set.of(LearningSkill.LISTENING)),
+                practiceSet(MIXED_SET, MIXED_VERSION, "TR-RL", Set.of(LearningSkill.READING, LearningSkill.LISTENING)),
+                practiceSet(WRITING_SET, UUID.randomUUID(), "TR-W", Set.of(LearningSkill.WRITING)));
+        when(content.lessonPracticeSets(MIXED)).thenReturn(sets);
+        when(content.lessonPracticeSets(LISTENING_ONLY)).thenReturn(List.of());
+        when(content.topicPracticeSets(TOPIC)).thenReturn(new TopicPracticeSets(List.of(
+                new TopicPracticeSets.LessonSets(MIXED, sets), new TopicPracticeSets.LessonSets(LISTENING_ONLY, List.of()))));
+        when(content.getPackageVersion(MIXED_VERSION)).thenReturn(new PackageVersion(MIXED_VERSION, MIXED_SET,
+                "PRACTICE_SET", null, Map.of(), List.of(
+                new Section(UUID.randomUUID(), "Roots", "READING", null, 1, "Passage", items(KP_READING, 2)),
+                new Section(UUID.randomUUID(), "Gym", "LISTENING", null, 2, null, items(KP_LISTENING, 3)))));
+        when(content.practiceSetAvailability(anyList(), anyList(), eq(3)))
+                .thenReturn(Map.of(KP_READING, 1, KP_LISTENING, 1));
         topics.execute(USER);
+    }
+
+    @Test
+    void aMixedSetIsScoredPerSkillAndOnlyTheFailedSkillGoesToReview() {
+        completeMixedLesson("A");
+        assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(USER, MIXED).practiceStatus());
+        assertEquals(List.of("TR-R"), practiceSets.execute(USER, MIXED, Optional.of(LearningSkill.READING)).items()
+                .stream().map(LessonPracticeSetsResult.Item::code).toList());
+
+        var view = startPractice.execute(USER, MIXED, MIXED_SET);
+        var result = submitPractice.execute(USER, view.attemptId(), answers("A", "A", "A", "B", "B"));
+
+        assertFalse(result.passed());
+        assertEquals(List.of(LearningSkill.LISTENING, LearningSkill.READING),
+                result.skillScores().stream().map(PracticeSubmission.SkillScore::skill).toList());
+        assertFalse(result.skillScores().get(0).passed());
+        assertTrue(result.skillScores().get(1).passed());
+        assertEquals(List.of(KP_LISTENING), result.reviewsCreated().stream()
+                .map(PracticeSubmission.ReviewCreated::knowledgePointId).toList());
+        assertEquals("LISTENING", jdbc.queryForObject("SELECT skill FROM review_items WHERE user_id = ? "
+                + "AND knowledge_point_id = ?", String.class, USER, KP_LISTENING));
+        assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(USER, MIXED).practiceStatus());
+    }
+
+    @Test
+    void passingBothPartsOfTheMixedSetClearsThePracticeWithoutTheWritingSet() {
+        completeMixedLesson("A");
+        var view = startPractice.execute(USER, MIXED, MIXED_SET);
+        assertTrue(submitPractice.execute(USER, view.attemptId(), answers("A", "A", "A", "A", "A")).passed());
+
+        var catalog = practiceSets.execute(USER, MIXED);
+        assertEquals(PracticeStatus.PASSED, catalog.practiceStatus());
+        assertEquals(PracticePassReason.FIRST_SUBMISSION, catalog.practicePassReason());
     }
 
     @Test
@@ -169,6 +235,26 @@ class MultiSkillLessonIntegrationTest {
     private SubmissionResult answer(UUID lesson, UUID block, UUID question, String value) {
         return submitExercise.execute(USER, lesson, block, new SubmitExerciseCommand(UUID.randomUUID(),
                 List.of(new SubmitExerciseCommand.Answer(question, value))));
+    }
+
+    private static LessonPracticeSet practiceSet(UUID id, UUID version, String code, Set<LearningSkill> skills) {
+        return new LessonPracticeSet(id, version, code, code, 3, List.of(), null, skills);
+    }
+
+    /** Items of one section; the answers below follow section order, then item order. */
+    private static final List<UUID> ITEM_IDS = java.util.stream.Stream.generate(UUID::randomUUID).limit(5).toList();
+
+    private static List<Item> items(UUID kp, int count) {
+        int offset = kp.equals(KP_READING) ? 0 : 2;
+        return java.util.stream.IntStream.range(0, count).mapToObj(index -> new Item(ITEM_IDS.get(offset + index),
+                index + 1, "Pick", List.of(new Option("A", "Right", 1), new Option("B", "Wrong", 2)),
+                Map.of("type", "CHOICE", "correct", "A"), "Because", BigDecimal.ONE,
+                List.of(new KnowledgePointMapping(kp, BigDecimal.ONE)))).toList();
+    }
+
+    private static SubmitExerciseCommand answers(String... values) {
+        return new SubmitExerciseCommand(UUID.randomUUID(), java.util.stream.IntStream.range(0, values.length)
+                .mapToObj(index -> new SubmitExerciseCommand.Answer(ITEM_IDS.get(index), values[index])).toList());
     }
 
     private static Question choice(UUID id, UUID kp) {

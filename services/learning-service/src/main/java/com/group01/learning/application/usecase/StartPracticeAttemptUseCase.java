@@ -41,7 +41,8 @@ public class StartPracticeAttemptUseCase {
                 .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Practice set was not found"));
         PracticeAttempt attempt = attempts.findOpen(userId, packageId).orElse(null);
         if (attempt == null) {
-            attempt = PracticeAttempt.start(UUID.randomUUID(), userId, lessonId, lesson.skill(), packageId,
+            attempt = PracticeAttempt.start(UUID.randomUUID(), userId, lessonId,
+                    set.skills().isEmpty() ? lesson.skills() : set.skills(), packageId,
                     set.packageVersionId(), clock.instant());
             attempts.insert(attempt);
         }
