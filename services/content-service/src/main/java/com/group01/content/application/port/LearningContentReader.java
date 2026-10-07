@@ -11,6 +11,7 @@ import com.group01.content.application.result.TopicTestPackageResult;
 import com.group01.content.application.result.PackageQuestionSpec;
 import com.group01.content.domain.vo.QuestionUsageConflict;
 import com.group01.content.domain.vo.QuestionPurpose;
+import com.group01.content.domain.vo.Skill;
 
 import java.util.Collection;
 import java.util.List;
@@ -47,6 +48,8 @@ public interface LearningContentReader {
     /** Published practice sets of the lesson, by code. */
     List<LessonPracticeSetResult> lessonPracticeSets(UUID lessonId);
 
+    List<LessonPracticeSetResult> lessonPracticeSets(UUID lessonId, Optional<Skill> skill);
+
     /** Every published lesson of the topic in order, each with its published practice sets by code. */
     List<LessonPracticeSetsResult> topicPracticeSets(UUID topicId);
 
@@ -57,8 +60,8 @@ public interface LearningContentReader {
     Map<UUID, Integer> countEligiblePracticeSets(Collection<UUID> knowledgePointIds,
                                                  Collection<UUID> excludePackageIds, int minQuestions);
 
-    /** Whether a question of the package version has a skill other than that of the lesson's topic. */
-    boolean packageVersionLeavesLessonSkill(UUID packageVersionId, UUID lessonId);
+    /** Whether a question of the package version has a skill outside the lesson's taught skills. */
+    boolean packageVersionLeavesLessonSkills(UUID packageVersionId, UUID lessonId);
 
     /**
      * Questions of this version used by any lesson or a published version of another {@code PRACTICE_SET},

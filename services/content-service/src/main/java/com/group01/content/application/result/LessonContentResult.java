@@ -22,11 +22,23 @@ public record LessonContentResult(
         int sortOrder,
         List<UUID> knowledgePointIds,
         List<Block> blocks,
-        Skill skill
+        Skill skill,
+        List<Skill> skills
 ) {
+    public LessonContentResult {
+        skills = skills.stream().filter(s -> s != Skill.ALL).distinct().sorted().toList();
+        skill = skills.size() == 1 ? skills.getFirst() : null;
+    }
+
+    public LessonContentResult(UUID lessonId, UUID topicId, String code, String title, String summary, int sortOrder,
+                               List<UUID> knowledgePointIds, List<Block> blocks, Skill skill) {
+        this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, skill,
+                skill == null ? List.of() : List.of(skill));
+    }
+
     public LessonContentResult withBlocks(List<Block> newBlocks) {
         return new LessonContentResult(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, newBlocks,
-                skill);
+                skill, skills);
     }
 
     /**

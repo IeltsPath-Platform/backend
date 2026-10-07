@@ -106,7 +106,7 @@ class CoursePackagesUseCaseTest {
     }
 
     @Test
-    void validChoiceFillAndLegacyChoiceSpecsPublishButEssayOrNonReadingDoNot() {
+    void validObjectiveAndWritingQuestionsPublishButInvalidEssayAndSpeakingDoNot() {
         for (String spec : List.of("{\"type\":\"CHOICE\",\"correct\":\"A\"}",
                 "{\"correct\":\"A\"}", "{\"type\":\"FILL\",\"accepted\":[\"answer\"]}")) {
             ContentPackage pkg = draft();
@@ -117,7 +117,7 @@ class CoursePackagesUseCaseTest {
         }
         for (PackageQuestionSpec question : List.of(
                 new PackageQuestionSpec(UUID.randomUUID(), QuestionType.ESSAY, Skill.READING, "{\"correct\":\"A\"}"),
-                new PackageQuestionSpec(UUID.randomUUID(), QuestionType.MULTIPLE_CHOICE, Skill.LISTENING, "{\"correct\":\"A\"}"))) {
+                new PackageQuestionSpec(UUID.randomUUID(), QuestionType.MULTIPLE_CHOICE, Skill.SPEAKING, "{\"correct\":\"A\"}"))) {
             ContentPackage pkg = draft();
             when(reader.packageQuestionSpecs(pkg.getVersions().getFirst().getId())).thenReturn(List.of(question));
             assertThatThrownBy(() -> publish(pkg)).isInstanceOf(InvalidContentStateException.class);

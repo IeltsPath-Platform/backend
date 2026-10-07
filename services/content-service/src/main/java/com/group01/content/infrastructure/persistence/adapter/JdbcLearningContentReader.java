@@ -41,6 +41,26 @@ import java.util.UUID;
  */
 @Component
 public class JdbcLearningContentReader implements LearningContentReader {
+    private static final String LESSON_SKILLS = """
+            SELECT q.skill FROM lesson_blocks b
+            JOIN lesson_block_questions bq ON bq.block_id = b.id
+            JOIN question_versions qv ON qv.id = bq.question_version_id
+            JOIN questions q ON q.id = qv.question_id
+            WHERE b.lesson_id = l.id AND b.block_type = 'EXERCISE' AND q.skill <> 'ALL'
+            UNION
+            SELECT kp.skill FROM lesson_blocks b
+            JOIN lesson_block_knowledge_points bk ON bk.block_id = b.id
+            JOIN knowledge_points kp ON kp.id = bk.knowledge_point_id
+            WHERE b.lesson_id = l.id AND b.block_type = 'TEXT' AND kp.skill <> 'ALL'
+            """;
+
+    private static final String PRACTICE_SKILLS = """
+            SELECT DISTINCT q.skill FROM content_sections s
+            JOIN section_questions sq ON sq.section_id = s.id
+            JOIN question_versions qv ON qv.id = sq.question_version_id
+            JOIN questions q ON q.id = qv.question_id
+            WHERE s.package_version_id = p.current_published_version_id AND q.skill <> 'ALL'
+            """;
 
     /** Question versions used by a lesson, final test, mock test or placement test; review must not repeat them. */
     private static final String LESSON_OR_TEST_QUESTION_VERSIONS = """
@@ -88,10 +108,13 @@ public class JdbcLearningContentReader implements LearningContentReader {
     @Override
     public List<TopicSequenceResult> topicSequence(int minPracticeQuestions) {
         record TopicRow(UUID id, String code, String name, int sortOrder, String requiredFeatureKey, Skill skill,
-                        boolean hasTopicTest, TopicSequenceResult.CourseEntry course) {}
+                        boolean hasTopicTest, TopicSequenceResult.CourseEntry course, List<Skill> skills) {}
         // Course metadata is read with the topic; topics outside an active course do not join the curriculum.
         List<TopicRow> topics = jdbc.query("""
                 SELECT t.id, t.code, t.name, t.sort_order, t.required_feature_key, t.skill,
+                       ARRAY(SELECT DISTINCT ls.skill FROM lessons l
+                             CROSS JOIN LATERAL (%s) ls
+                             WHERE l.topic_id = t.id AND l.status = 'PUBLISHED') AS skills,
                        EXISTS (SELECT 1 FROM content_packages p
                                WHERE p.topic_id = t.id AND p.package_type = 'TOPIC_TEST'
                                  AND p.status = 'PUBLISHED' AND p.current_published_version_id IS NOT NULL)
@@ -103,14 +126,14 @@ public class JdbcLearningContentReader implements LearningContentReader {
                            AS has_course_test
                 FROM topics t
                 JOIN courses c ON c.id = t.course_id
-                WHERE t.status = 'ACTIVE' AND t.skill IS NOT NULL AND c.status = 'ACTIVE'
+                WHERE t.status = 'ACTIVE' AND c.status = 'ACTIVE'
                   AND EXISTS (SELECT 1 FROM lessons l WHERE l.topic_id = t.id AND l.status = 'PUBLISHED')
                 ORDER BY t.skill, c.band_level, t.sort_order, t.id
-                """, Map.of(), (rs, i) -> new TopicRow(uuid(rs, "id"), rs.getString("code"), rs.getString("name"),
+                """.formatted(LESSON_SKILLS), Map.of(), (rs, i) -> new TopicRow(uuid(rs, "id"), rs.getString("code"), rs.getString("name"),
                 rs.getInt("sort_order"), rs.getString("required_feature_key"),
                 enumOrNull(Skill.class, rs.getString("skill")), rs.getBoolean("has_topic_test"),
                 new TopicSequenceResult.CourseEntry(uuid(rs, "course_id"), rs.getString("course_code"),
-                        rs.getString("course_name"), rs.getBigDecimal("band_level"), rs.getBoolean("has_course_test"))));
+                        rs.getString("course_name"), rs.getBigDecimal("band_level"), rs.getBoolean("has_course_test")), skills(rs)));
         if (topics.isEmpty()) {
             return List.of();
         }
@@ -138,7 +161,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
         return topics.stream()
                 .map(t -> new TopicSequenceResult(t.id(), t.code(), t.name(), t.sortOrder(), t.requiredFeatureKey(),
-                        pointsByTopic.getOrDefault(t.id(), List.of()), t.skill(), t.hasTopicTest(), t.course()))
+                        pointsByTopic.getOrDefault(t.id(), List.of()), t.skill(), t.hasTopicTest(), t.course(), t.skills()))
                 .toList();
     }
 
@@ -152,14 +175,14 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
     @Override
     public List<LessonSummaryResult> publishedLessons(UUID topicId) {
-        record LessonRow(UUID id, String code, String title, String summary, int sortOrder) {}
+        record LessonRow(UUID id, String code, String title, String summary, int sortOrder, List<Skill> skills) {}
         List<LessonRow> lessons = jdbc.query("""
-                SELECT l.id, l.code, l.title, l.summary, l.sort_order
+                SELECT l.id, l.code, l.title, l.summary, l.sort_order, ARRAY(%s) AS skills
                 FROM lessons l
                 WHERE l.topic_id = :topicId AND l.status = 'PUBLISHED'
                 ORDER BY l.sort_order
-                """, Map.of("topicId", topicId), (rs, i) -> new LessonRow(uuid(rs, "id"), rs.getString("code"),
-                rs.getString("title"), rs.getString("summary"), rs.getInt("sort_order")));
+                """.formatted(LESSON_SKILLS), Map.of("topicId", topicId), (rs, i) -> new LessonRow(uuid(rs, "id"), rs.getString("code"),
+                rs.getString("title"), rs.getString("summary"), rs.getInt("sort_order"), skills(rs)));
         if (lessons.isEmpty()) {
             return List.of();
         }
@@ -178,20 +201,20 @@ public class JdbcLearningContentReader implements LearningContentReader {
         return lessons.stream()
                 .map(l -> new LessonSummaryResult(l.id(), topicId, l.code(), l.title(), l.summary(), l.sortOrder(),
                         knowledgePoints.getOrDefault(l.id(), List.of()),
-                        exerciseBlocks.getOrDefault(l.id(), List.of())))
+                        exerciseBlocks.getOrDefault(l.id(), List.of()), l.skills()))
                 .toList();
     }
 
     @Override
     public Optional<LessonContentResult> publishedLesson(UUID lessonId) {
-        record LessonRow(UUID topicId, String code, String title, String summary, int sortOrder, Skill skill) {}
+        record LessonRow(UUID topicId, String code, String title, String summary, int sortOrder, List<Skill> skills) {}
         List<LessonRow> found = jdbc.query("""
-                SELECT l.topic_id, l.code, l.title, l.summary, l.sort_order, t.skill FROM lessons l
+                SELECT l.topic_id, l.code, l.title, l.summary, l.sort_order, ARRAY(%s) AS skills FROM lessons l
                 JOIN topics t ON t.id = l.topic_id
                 WHERE l.id = :id AND l.status = 'PUBLISHED'
-                """, Map.of("id", lessonId), (rs, i) -> new LessonRow(uuid(rs, "topic_id"), rs.getString("code"),
+                """.formatted(LESSON_SKILLS), Map.of("id", lessonId), (rs, i) -> new LessonRow(uuid(rs, "topic_id"), rs.getString("code"),
                 rs.getString("title"), rs.getString("summary"), rs.getInt("sort_order"),
-                enumOrNull(Skill.class, rs.getString("skill"))));
+                skills(rs)));
         if (found.isEmpty()) {
             return Optional.empty();
         }
@@ -307,7 +330,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
         return Optional.of(new LessonContentResult(lessonId, lesson.topicId(), lesson.code(), lesson.title(),
                 lesson.summary(), lesson.sortOrder(),
-                lessonKnowledgePoints(List.of(lessonId)).getOrDefault(lessonId, List.of()), blocks, lesson.skill()));
+                lessonKnowledgePoints(List.of(lessonId)).getOrDefault(lessonId, List.of()), blocks, null, lesson.skills()));
     }
 
     @Override
@@ -325,7 +348,12 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
     @Override
     public List<LessonPracticeSetResult> lessonPracticeSets(UUID lessonId) {
-        return practiceSetsOf(List.of(lessonId)).getOrDefault(lessonId, List.of());
+        return lessonPracticeSets(lessonId, Optional.empty());
+    }
+
+    @Override
+    public List<LessonPracticeSetResult> lessonPracticeSets(UUID lessonId, Optional<Skill> skill) {
+        return practiceSetsOf(List.of(lessonId), skill).getOrDefault(lessonId, List.of());
     }
 
     @Override
@@ -336,27 +364,34 @@ public class JdbcLearningContentReader implements LearningContentReader {
         if (lessonIds.isEmpty()) {
             return List.of();
         }
-        Map<UUID, List<LessonPracticeSetResult>> sets = practiceSetsOf(lessonIds);
+        Map<UUID, List<LessonPracticeSetResult>> sets = practiceSetsOf(lessonIds, Optional.empty());
         return lessonIds.stream()
                 .map(id -> new LessonPracticeSetsResult(id, sets.getOrDefault(id, List.of())))
                 .toList();
     }
 
     /** Published practice sets of the lessons, by code, in two queries. */
-    private Map<UUID, List<LessonPracticeSetResult>> practiceSetsOf(List<UUID> lessonIds) {
+    private Map<UUID, List<LessonPracticeSetResult>> practiceSetsOf(List<UUID> lessonIds, Optional<Skill> skill) {
         record SetRow(UUID lessonId, UUID packageId, UUID versionId, String code, String title, int questionCount,
-                      String requiredFeatureKey) {}
+                      String requiredFeatureKey, List<Skill> skills) {}
+        var params = new MapSqlParameterSource("lessonIds", lessonIds);
+        String filter = skill.map(s -> {
+            params.addValue("skill", s.name());
+            return "AND ARRAY(" + PRACTICE_SKILLS + ")::text[] = ARRAY[:skill]::text[]";
+        }).orElse("");
         List<SetRow> rows = jdbc.query("""
                 SELECT p.lesson_id, p.id, p.current_published_version_id, p.code, p.title, p.required_feature_key,
+                       ARRAY(%s) AS skills,
                        (SELECT count(*) FROM content_sections s JOIN section_questions sq ON sq.section_id = s.id
                         WHERE s.package_version_id = p.current_published_version_id) AS question_count
                 FROM content_packages p
                 WHERE p.lesson_id IN (:lessonIds) AND p.package_type = 'PRACTICE_SET' AND p.status = 'PUBLISHED'
                   AND p.current_published_version_id IS NOT NULL
+                  %s
                 ORDER BY p.lesson_id, p.code
-                """, Map.of("lessonIds", lessonIds), (rs, i) -> new SetRow(uuid(rs, "lesson_id"), uuid(rs, "id"),
+                """.formatted(PRACTICE_SKILLS, filter), params, (rs, i) -> new SetRow(uuid(rs, "lesson_id"), uuid(rs, "id"),
                 uuid(rs, "current_published_version_id"), rs.getString("code"), rs.getString("title"),
-                rs.getInt("question_count"), rs.getString("required_feature_key")));
+                rs.getInt("question_count"), rs.getString("required_feature_key"), skills(rs)));
         if (rows.isEmpty()) {
             return Map.of();
         }
@@ -378,7 +413,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
             result.computeIfAbsent(row.lessonId(), ignored -> new ArrayList<>())
                     .add(new LessonPracticeSetResult(row.lessonId(), row.packageId(), row.versionId(), row.code(),
                             row.title(), row.questionCount(), pointsByVersion.getOrDefault(row.versionId(), List.of()),
-                            row.requiredFeatureKey()));
+                            row.requiredFeatureKey(), row.skills()));
         }
         return result;
     }
@@ -411,7 +446,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     @Override
-    public boolean packageVersionLeavesLessonSkill(UUID packageVersionId, UUID lessonId) {
+    public boolean packageVersionLeavesLessonSkills(UUID packageVersionId, UUID lessonId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (
                     SELECT 1 FROM content_sections s
@@ -419,9 +454,18 @@ public class JdbcLearningContentReader implements LearningContentReader {
                     JOIN question_versions qv ON qv.id = sq.question_version_id
                     JOIN questions q ON q.id = qv.question_id
                     JOIN lessons l ON l.id = :lessonId
-                    JOIN topics t ON t.id = l.topic_id
-                    WHERE s.package_version_id = :versionId AND q.skill IS DISTINCT FROM t.skill)
-                """, Map.of("versionId", packageVersionId, "lessonId", lessonId), Boolean.class));
+                    WHERE s.package_version_id = :versionId AND (q.skill IS NULL OR q.skill NOT IN (%s)))
+                """.formatted(LESSON_SKILLS), Map.of("versionId", packageVersionId, "lessonId", lessonId), Boolean.class));
+    }
+
+    private static List<Skill> skills(ResultSet rs) throws SQLException {
+        var array = rs.getArray("skills");
+        if (array == null) return List.of();
+        try {
+            return java.util.Arrays.stream((String[]) array.getArray()).map(Skill::valueOf).sorted().toList();
+        } finally {
+            array.free();
+        }
     }
 
     @Override

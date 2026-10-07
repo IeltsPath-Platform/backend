@@ -1,7 +1,7 @@
 ---
 title: "Lesson nhiều skill (Reading, Listening, Writing)"
 description: "Một lesson dạy R+L+W; Practice có bộ riêng từng skill và bộ trộn, đạt theo từng skill, essay chấm LLM; thi topic trộn skill, Writing chấm LLM trong assessment, lỗi thì EXAMINER."
-status: pending
+status: in-progress
 priority: P2
 branch: "feat/multi-skill-lessons"
 tags: [content, learning, assessment, llm, tdd]
@@ -92,7 +92,7 @@ mọi test của `LessonWritingIntegrationTest` (refactor phase 5 không đổi 
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Content multi-skill lessons and practice skills](./phase-01-content-multi-skill-lessons-and-practice-skills.md) | Pending |
+| 1 | [Content multi-skill lessons and practice skills](./phase-01-content-multi-skill-lessons-and-practice-skills.md) | Completed |
 | 2 | [Content seed multi-skill topic](./phase-02-content-seed-multi-skill-topic.md) | Pending |
 | 3 | [Learning multi-skill gating](./phase-03-learning-multi-skill-gating.md) | Pending |
 | 4 | [Learning practice per-skill clearance](./phase-04-learning-practice-per-skill-clearance.md) | Pending |
@@ -169,6 +169,31 @@ lesson (lesson vẫn chỉ seed) · UI.
   `CoursePackagesUseCaseTest` (2 test luật course test), giới hạn như bảng trên.
 
 ## Verification
+
+### Implementation baseline — 2026-10-07
+
+- Base commit: `668dca3` (`668dca36d210923c213d25389c0bc6372fb54138`). Existing branch: `feat/multi-skill-lessons`; initial working tree clean.
+- Migration numbers checked before implementation: Content latest V22, Learning latest V7, Assessment latest V5; Content V23, Learning V8–V10 and Assessment V6 are available.
+- Docker daemon available before tests; no Docker Desktop startup required.
+
+### Phase 1 Verification — 2026-10-07
+
+- Status: `DONE`. Codex wrote the red tests and most of the implementation, then stopped on its usage limit; Claude
+  finished the remaining items (contract doc, clean-up, the allowlisted seed test) and committed.
+- Red: `mvn -q -pl services/content-service -am test` exited 1 with 8 expected failures/errors (235 tests, 0 skipped);
+  names in [content red report](./reports/content-red.md). Baseline before work: 228/228 ([baseline](./reports/content-baseline.md)).
+- Green: `mvn -q -pl services/content-service -am test` exited 0 — content 242/242, common-security 8/8, 0 skipped,
+  Docker/Testcontainers.
+- Old tests changed (all allowlisted): `LessonPipelineSeedTest.everyLessonTeachesOnlyItsTopicsSkill` →
+  `everyLessonPracticeSetStaysWithinTheSkillsItsLessonTeaches`; `aPackageVersionLeavesTheLessonSkill…` calls
+  `packageVersionLeavesLessonSkills`; `PublishContentPackageUseCaseTest` renamed method call;
+  `UpdateTopicUseCaseTest.changingTheSkillOfATopicWithPublishedLessonsIsRefusedAndNothingIsSaved` →
+  `…IsAllowed`; `TopicTest.theSkillIsLockedOncePublishedLessonsDependOnIt` → `topicSkillMetadataCanChangeAfterLessonsArePublished`;
+  `CoursePackagesUseCaseTest.validChoiceFillAndLegacyChoiceSpecsPublishButEssayOrNonReadingDoNot` →
+  `validObjectiveAndWritingQuestionsPublishButInvalidEssayAndSpeakingDoNot` (Speaking replaces Listening as the rejected
+  skill). `TopicTest.aTopicTeachesOneSkillNeverAll` keeps its expectations; only the call `changeSkill(Skill.ALL, false)`
+  became `changeSkill(Skill.ALL)` because the two-argument overload was removed.
+- Course test rule changed (M15): Reading/Listening auto-gradable or Writing essay with `passBand`.
 
 (Codex điền sau mỗi phase: commit, lệnh đã chạy và kết quả, test bị skip, test cũ đã sửa kỳ vọng, nội dung seed mới,
 mọi `BLOCKED`.)

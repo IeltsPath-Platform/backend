@@ -21,8 +21,21 @@ public record TopicSequenceResult(
         List<KnowledgePointEntry> knowledgePoints,
         Skill skill,
         boolean hasTopicTest,
-        CourseEntry course
+        CourseEntry course,
+        List<Skill> skills
 ) {
+    public TopicSequenceResult {
+        skills = skills.stream().filter(s -> s != Skill.ALL).distinct().sorted().toList();
+        skill = skills.size() == 1 ? skills.getFirst() : null;
+    }
+
+    public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                               List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest,
+                               CourseEntry course) {
+        this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
+                skill == null ? List.of() : List.of(skill));
+    }
+
     public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                                List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest) {
         this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, null);

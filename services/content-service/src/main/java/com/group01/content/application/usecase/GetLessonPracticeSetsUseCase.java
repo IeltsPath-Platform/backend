@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.Optional;
+import com.group01.content.domain.vo.Skill;
 
 /** The practice sets that make up a published lesson's Practice. */
 @Service
@@ -20,9 +22,14 @@ public class GetLessonPracticeSetsUseCase {
     }
 
     public List<LessonPracticeSetResult> execute(UUID lessonId) {
+        return execute(lessonId, Optional.empty());
+    }
+
+    public List<LessonPracticeSetResult> execute(UUID lessonId, Optional<Skill> skill) {
         if (!reader.publishedLessonExists(lessonId)) {
             throw new LessonNotFoundException(lessonId);
         }
-        return reader.lessonPracticeSets(lessonId);
+        if (skill.orElse(null) == Skill.ALL) throw new IllegalArgumentException("skill must select one skill");
+        return skill.isEmpty() ? reader.lessonPracticeSets(lessonId) : reader.lessonPracticeSets(lessonId, skill);
     }
 }

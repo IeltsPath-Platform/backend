@@ -20,6 +20,8 @@ import com.group01.content.domain.vo.QuestionPurpose;
 import com.group01.content.domain.vo.PackageType;
 import com.group01.content.domain.vo.QuestionType;
 import com.group01.content.domain.vo.Skill;
+import com.group01.content.domain.vo.LessonBlockKind;
+import com.group01.content.application.result.PackageQuestionSpec;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,11 +60,11 @@ public class PublishContentPackageUseCase {
             throw new InvalidContentStateException("Version " + command.versionId() + " does not belong to package " + command.packageId());
         }
 
-        // A lesson's Practice teaches that lesson's skill only.
+        // A lesson's Practice measures only skills taught by that lesson.
         if (pkg.getLessonId() != null
-                && lessons.packageVersionLeavesLessonSkill(targetVersion.getId(), pkg.getLessonId())) {
-            throw new InvalidPackageLessonException("Every question of a lesson's practice set must have the skill "
-                    + "of the lesson's topic");
+                && lessons.packageVersionLeavesLessonSkills(targetVersion.getId(), pkg.getLessonId())) {
+            throw new InvalidPackageLessonException("Every question of a lesson's practice set must belong to the "
+                    + "lesson's taught skills");
         }
 
         switch (pkg.getPackageType()) {
@@ -84,12 +86,19 @@ public class PublishContentPackageUseCase {
             default -> { }
         }
 
-        if (pkg.getPackageType() == PackageType.COURSE_TEST) {
+        if (pkg.getPackageType() == PackageType.PRACTICE_SET || pkg.getPackageType() == PackageType.TOPIC_TEST
+                || pkg.getPackageType() == PackageType.COURSE_TEST) {
             var questions = lessons.packageQuestionSpecs(targetVersion.getId());
-            if (questions.isEmpty() || questions.stream().anyMatch(question -> question.skill() != Skill.READING
-                    || question.questionType() == QuestionType.ESSAY || question.questionType() == QuestionType.SPEAKING
-                    || !autoGradable(question.answerSpecJson()))) {
-                throw new InvalidContentStateException("COURSE_TEST requires Reading questions with gradable CHOICE or FILL answer specs");
+            for (var question : questions) {
+                JsonNode spec = parseSpec(question.answerSpecJson());
+                if ((question.questionType() == QuestionType.ESSAY
+                        || LessonBlockKind.ESSAY_SPEC_TYPE.equals(spec.path("type").asText())) && !validEssay(question, spec)) {
+                    throw new InvalidContentStateException("Writing essays require passBand from 0 to 9 in steps of 0.5");
+                }
+            }
+            if (pkg.getPackageType() == PackageType.COURSE_TEST
+                    && (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableCourseQuestion(question)))) {
+                throw new InvalidContentStateException("COURSE_TEST requires gradable Reading or Listening questions, or Writing essays with passBand");
             }
         }
 
@@ -97,6 +106,31 @@ public class PublishContentPackageUseCase {
         pkg.publishVersion(targetVersion.getId());
 
         return ContentPackageResult.of(contentPackageRepository.save(pkg));
+    }
+
+    private static JsonNode parseSpec(String raw) {
+        try {
+            JsonNode spec = raw == null ? null : JSON.readTree(raw);
+            return spec == null ? JSON.nullNode() : spec;
+        } catch (JsonProcessingException ex) {
+            return JSON.nullNode();
+        }
+    }
+
+    private static boolean validEssay(PackageQuestionSpec question, JsonNode spec) {
+        if (question.skill() != Skill.WRITING || question.questionType() != QuestionType.ESSAY
+                || !LessonBlockKind.ESSAY_SPEC_TYPE.equals(spec.path("type").asText())
+                || !spec.path("passBand").isNumber()) return false;
+        var band = spec.path("passBand").decimalValue();
+        return band.signum() >= 0 && band.compareTo(java.math.BigDecimal.valueOf(9)) <= 0
+                && band.remainder(new java.math.BigDecimal("0.5")).signum() == 0;
+    }
+
+    private static boolean gradableCourseQuestion(PackageQuestionSpec question) {
+        if (question.skill() == Skill.WRITING) return validEssay(question, parseSpec(question.answerSpecJson()));
+        return (question.skill() == Skill.READING || question.skill() == Skill.LISTENING)
+                && question.questionType() != QuestionType.ESSAY && question.questionType() != QuestionType.SPEAKING
+                && autoGradable(question.answerSpecJson());
     }
 
     private static boolean autoGradable(String answerSpecJson) {

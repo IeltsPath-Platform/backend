@@ -21,7 +21,8 @@ public record LessonContentResponse(
         int sortOrder,
         List<UUID> knowledgePointIds,
         List<Block> blocks,
-        Skill skill
+        Skill skill,
+        List<Skill> skills
 ) {
     /**
      * A block shows only the field of its type; {@code blockKind} appears on EXERCISE blocks.
@@ -65,7 +66,7 @@ public record LessonContentResponse(
     public static LessonContentResponse from(LessonContentResult result) {
         return new LessonContentResponse(result.lessonId(), result.topicId(), result.code(), result.title(),
                 result.summary(), result.sortOrder(), result.knowledgePointIds(),
-                result.blocks().stream().map(LessonContentResponse::block).toList(), result.skill());
+                result.blocks().stream().map(LessonContentResponse::block).toList(), result.skill(), result.skills());
     }
 
     private static Block block(LessonContentResult.Block block) {

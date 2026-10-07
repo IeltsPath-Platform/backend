@@ -1,6 +1,5 @@
 package com.group01.content.domain.aggregate;
 
-import com.group01.content.domain.exception.TopicSkillLockedException;
 import com.group01.content.domain.vo.BandRange;
 import com.group01.content.domain.vo.ContentStatus;
 import com.group01.content.domain.vo.Skill;
@@ -72,16 +71,13 @@ public class Topic {
     }
 
     /**
-     * Sets the skill the topic's lessons teach. Once a lesson is published, learners' tracks depend on it, so it can
-     * no longer change.
+     * Sets the topic's skill label. Learning paths read the skills of a topic's lessons, so the label may change at
+     * any time; it must still name exactly one skill.
      */
-    public void changeSkill(Skill newSkill, boolean hasPublishedLessons) {
+    public void changeSkill(Skill newSkill) {
         Skill checked = requireSingleSkill(newSkill);
         if (checked == skill) {
             return;
-        }
-        if (hasPublishedLessons) {
-            throw new TopicSkillLockedException(code);
         }
         this.skill = checked;
         this.updatedAt = Instant.now();

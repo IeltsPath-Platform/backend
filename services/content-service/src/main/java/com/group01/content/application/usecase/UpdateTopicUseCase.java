@@ -45,7 +45,7 @@ public class UpdateTopicUseCase {
         topic.update(command.parentTopicId(), command.name(), command.sortOrder(), command.status(),
                 command.band());
         if (command.skill() != null && command.skill() != topic.getSkill()) {
-            topic.changeSkill(command.skill(), topicRepository.hasPublishedLessons(topic.getId()));
+            topic.changeSkill(command.skill());
         }
         if (command.courseId() != null) topic.assignCourse(command.courseId());
         Topic saved = topicRepository.save(topic);

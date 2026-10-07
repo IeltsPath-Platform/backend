@@ -5,7 +5,6 @@ import java.math.BigDecimal;
 
 import com.group01.content.domain.vo.ContentStatus;
 import com.group01.content.domain.vo.Skill;
-import com.group01.content.domain.exception.TopicSkillLockedException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -67,20 +66,17 @@ class TopicTest {
         assertThatThrownBy(() -> Topic.create(null, "MIX", "Mixed", 1, BandRange.UNBOUNDED, Skill.ALL))
                 .isInstanceOf(IllegalArgumentException.class);
         Topic topic = Topic.create(null, "R", "Reading", 1, BandRange.UNBOUNDED, Skill.READING);
-        assertThatThrownBy(() -> topic.changeSkill(Skill.ALL, false)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> topic.changeSkill(Skill.ALL)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    void theSkillIsLockedOncePublishedLessonsDependOnIt() {
+    void topicSkillMetadataCanChangeAfterLessonsArePublished() {
         Topic topic = Topic.create(null, "R", "Reading", 1, BandRange.UNBOUNDED, Skill.READING);
 
-        topic.changeSkill(Skill.READING, true);
-        assertThat(topic.getSkill()).isEqualTo(Skill.READING);
-        assertThatThrownBy(() -> topic.changeSkill(Skill.LISTENING, true))
-                .isInstanceOf(TopicSkillLockedException.class);
-        assertThat(topic.getSkill()).isEqualTo(Skill.READING);
-
-        topic.changeSkill(Skill.LISTENING, false);
+        // Learning paths follow the skills of the published lessons, so the topic label is free to change.
+        topic.changeSkill(Skill.LISTENING);
+        assertThat(topic.getSkill()).isEqualTo(Skill.LISTENING);
+        topic.changeSkill(Skill.LISTENING);
         assertThat(topic.getSkill()).isEqualTo(Skill.LISTENING);
     }
 }

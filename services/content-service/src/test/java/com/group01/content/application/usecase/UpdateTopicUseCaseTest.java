@@ -2,7 +2,6 @@ package com.group01.content.application.usecase;
 
 import com.group01.content.application.command.UpdateTopicCommand;
 import com.group01.content.domain.aggregate.Topic;
-import com.group01.content.domain.exception.TopicSkillLockedException;
 import com.group01.content.domain.repository.TopicRepository;
 import com.group01.content.domain.vo.BandRange;
 import com.group01.content.domain.vo.ContentStatus;
@@ -80,12 +79,11 @@ class UpdateTopicUseCaseTest {
     }
 
     @Test
-    void changingTheSkillOfATopicWithPublishedLessonsIsRefusedAndNothingIsSaved() {
+    void changingTheSkillOfATopicWithPublishedLessonsIsAllowed() {
         givenReadingTopic(true);
 
-        assertThatThrownBy(() -> useCase.execute(command(Skill.LISTENING)))
-                .isInstanceOf(TopicSkillLockedException.class);
-        verify(repository, never()).save(any());
+        assertThat(useCase.execute(command(Skill.LISTENING)).skill()).isEqualTo(Skill.LISTENING);
+        verify(repository).save(any());
     }
 
     @Test

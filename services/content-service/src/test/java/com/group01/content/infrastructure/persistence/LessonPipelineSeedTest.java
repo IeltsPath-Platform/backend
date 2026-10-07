@@ -427,28 +427,18 @@ class LessonPipelineSeedTest {
     }
 
     @Test
-    void everyLessonTeachesOnlyItsTopicsSkill() {
-        List<String> mismatchedQuestions = jdbc.queryForList("""
-                SELECT l.code || ' / ' || q.skill
-                FROM lessons l
-                JOIN topics t ON t.id = l.topic_id
-                JOIN lesson_blocks b ON b.lesson_id = l.id
-                JOIN lesson_block_questions bq ON bq.block_id = b.id
-                JOIN question_versions qv ON qv.id = bq.question_version_id
-                JOIN questions q ON q.id = qv.question_id
-                WHERE l.status = 'PUBLISHED' AND q.skill IS DISTINCT FROM t.skill
-                """, Map.of(), String.class);
-        List<String> mismatchedKnowledgePoints = jdbc.queryForList("""
-                SELECT l.code || ' / ' || kp.code
-                FROM lessons l
-                JOIN topics t ON t.id = l.topic_id
-                JOIN lesson_knowledge_points lkp ON lkp.lesson_id = l.id
-                JOIN knowledge_points kp ON kp.id = lkp.knowledge_point_id
-                WHERE l.status = 'PUBLISHED' AND kp.skill IS NOT NULL AND kp.skill <> t.skill
-                """, Map.of(), String.class);
+    void everyLessonPracticeSetStaysWithinTheSkillsItsLessonTeaches() {
+        // A lesson may teach several skills; its Practice may only measure skills the lesson teaches.
+        List<Map<String, Object>> practiceSets = jdbc.queryForList("""
+                SELECT p.code, p.current_published_version_id AS version_id, p.lesson_id
+                FROM content_packages p
+                WHERE p.package_type = 'PRACTICE_SET' AND p.status = 'PUBLISHED' AND p.lesson_id IS NOT NULL
+                """, Map.of());
 
-        assertThat(mismatchedQuestions).isEmpty();
-        assertThat(mismatchedKnowledgePoints).isEmpty();
+        assertThat(practiceSets).isNotEmpty();
+        assertThat(practiceSets).filteredOn(row -> reader.packageVersionLeavesLessonSkills(
+                        (UUID) row.get("version_id"), (UUID) row.get("lesson_id")))
+                .extracting(row -> row.get("code")).isEmpty();
     }
 
     @Test
@@ -646,8 +636,8 @@ class LessonPipelineSeedTest {
                 Map.of(), UUID.class);
         UUID topicSentenceVersion = jdbc.queryForObject(
                 "SELECT current_published_version_id FROM content_packages WHERE code = 'PS-KP3-A'", Map.of(), UUID.class);
-        assertThat(reader.packageVersionLeavesLessonSkill(numVersion, lessonId("L1"))).isTrue();
-        assertThat(reader.packageVersionLeavesLessonSkill(topicSentenceVersion, lessonId("L1"))).isFalse();
+        assertThat(reader.packageVersionLeavesLessonSkills(numVersion, lessonId("L1"))).isTrue();
+        assertThat(reader.packageVersionLeavesLessonSkills(topicSentenceVersion, lessonId("L1"))).isFalse();
     }
 
     @Test

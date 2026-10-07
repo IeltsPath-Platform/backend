@@ -42,6 +42,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class InternalLearningContentControllerTest {
+    @Test
+    void practiceSkillFilterIsForwardedAndSetSkillsAreSerialized() throws Exception {
+        UUID lessonId = UUID.randomUUID();
+        var filter = java.util.Optional.of(Skill.READING);
+        var set = new LessonPracticeSetResult(lessonId, UUID.randomUUID(), UUID.randomUUID(), "PURE_R", "Reading",
+                3, List.of(), null, List.of(Skill.READING));
+        when(lessonPracticeSets.execute(lessonId, filter)).thenReturn(List.of(set));
+        mockMvc.perform(get("/internal/learning-content/lessons/{id}/practice-sets", lessonId).param("skill", "READING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].skills[0]").value("READING"));
+        verify(lessonPracticeSets).execute(lessonId, filter);
+    }
+
+    @Test
+    void invalidPracticeSkillFilterIsRejected() throws Exception {
+        mockMvc.perform(get("/internal/learning-content/lessons/{id}/practice-sets", UUID.randomUUID())
+                        .param("skill", "FOO"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/internal/learning-content/lessons/{id}/practice-sets", UUID.randomUUID())
+                        .param("skill", "ALL"))
+                .andExpect(status().isBadRequest());
+    }
+
     private final com.group01.content.application.usecase.GetCourseTestPackagesUseCase courseTests =
             mock(com.group01.content.application.usecase.GetCourseTestPackagesUseCase.class);
 

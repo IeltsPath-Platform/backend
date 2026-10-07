@@ -128,7 +128,7 @@ class PublishContentPackageUseCaseTest {
         ContentPackageVersion practiceVersion = ContentPackageVersion.create(practice.getId(), 1, "{}");
         practice.addVersion(practiceVersion);
         when(contentPackageRepository.findById(practice.getId())).thenReturn(Optional.of(practice));
-        when(lessons.packageVersionLeavesLessonSkill(practiceVersion.getId(), lessonId)).thenReturn(true);
+        when(lessons.packageVersionLeavesLessonSkills(practiceVersion.getId(), lessonId)).thenReturn(true);
 
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(
                 new PublishContentPackageCommand(practice.getId(), practiceVersion.getId(), userId)))

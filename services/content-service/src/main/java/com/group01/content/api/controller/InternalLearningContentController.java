@@ -1,6 +1,7 @@
 package com.group01.content.api.controller;
 
 import com.group01.content.api.dto.internal.LessonContentResponse;
+import com.group01.content.api.dto.internal.PracticeSetSkillFilter;
 import com.group01.content.api.dto.internal.LessonPracticeSetResponse;
 import com.group01.content.api.dto.internal.PracticeSetAvailabilityRequest;
 import com.group01.content.api.dto.internal.PracticeSetAvailabilityResponse;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -88,8 +90,12 @@ public class InternalLearningContentController {
     }
 
     @GetMapping("/lessons/{id}/practice-sets")
-    public List<LessonPracticeSetResponse> lessonPracticeSets(@PathVariable("id") UUID lessonId) {
-        return getLessonPracticeSets.execute(lessonId).stream().map(LessonPracticeSetResponse::from).toList();
+    public List<LessonPracticeSetResponse> lessonPracticeSets(@PathVariable("id") UUID lessonId,
+                                                            @RequestParam(value = "skill", required = false) String value) {
+        var skill = PracticeSetSkillFilter.parse(value);
+        var sets = skill.isEmpty() ? getLessonPracticeSets.execute(lessonId)
+                : getLessonPracticeSets.execute(lessonId, skill);
+        return sets.stream().map(LessonPracticeSetResponse::from).toList();
     }
 
     @GetMapping("/topics/{id}/practice-sets")

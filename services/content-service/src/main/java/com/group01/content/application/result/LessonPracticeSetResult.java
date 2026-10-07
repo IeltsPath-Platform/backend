@@ -2,6 +2,7 @@ package com.group01.content.application.result;
 
 import java.util.List;
 import java.util.UUID;
+import com.group01.content.domain.vo.Skill;
 
 /**
  * A published practice set that belongs to a lesson's Practice. {@code knowledgePointIds} are the knowledge points
@@ -15,5 +16,12 @@ public record LessonPracticeSetResult(
         String title,
         int questionCount,
         List<UUID> knowledgePointIds,
-        String requiredFeatureKey
-) {}
+        String requiredFeatureKey,
+        List<Skill> skills
+) {
+    public LessonPracticeSetResult(UUID lessonId, UUID packageId, UUID packageVersionId, String code, String title,
+                                   int questionCount, List<UUID> knowledgePointIds, String requiredFeatureKey) {
+        this(lessonId, packageId, packageVersionId, code, title, questionCount, knowledgePointIds,
+                requiredFeatureKey, List.of());
+    }
+}
