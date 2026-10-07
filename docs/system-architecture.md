@@ -1,6 +1,6 @@
 # Kiến trúc hệ thống IELTSPath (backend)
 
-- Cập nhật lần cuối: 2026-10-03; dữ kiện đã kiểm với code sau khi learning-service có lộ trình theo skill, Practice và thang ôn tập
+- Cập nhật lần cuối: 2026-10-07; dữ kiện đã kiểm với code sau khi có course theo band, placement recommendation và thi cuối course
 - Đọc khi cần hiểu toàn hệ thống. Quy tắc bắt buộc nằm ở [`AGENTS.md`](../AGENTS.md); hướng dẫn chạy chi tiết ở
   [`README.md`](../README.md). Code là nguồn đúng khi tài liệu này lệch.
 
@@ -38,14 +38,14 @@ library --HTTP--> content                 learning --HTTP--> content (/internal/
 | `infra/api-gateway` | Ingress WebFlux: xác thực external JWT, ký internal JWT, routing, CORS, correlation id | — | — |
 | `shared/common-security` | Thư viện: security servlet cho downstream, internal JWT, `CanonicalRoles`, `CurrentUserProvider` | — | — |
 | `user-service` | Tài khoản, role, đăng nhập/refresh/logout, hồ sơ học viên, learning goal, activity và streak | `user_db` (Postgres local 5432; V5 tạo `learning_activities`, `streaks`) | `/auth/**`, `/api/users/**`, `/api/learning-support/{activities,streak}/**` |
-| `content-service` | Chủ đề, knowledge point, câu hỏi (có version), gói nội dung/bài đọc, asset; kiểm topic cho library và snapshot grammar cho game | `content_db` (local 5432; V7 xóa năm bảng catalog) | `/api/content/**` trừ nhóm từ vựng/video |
+| `content-service` | Course theo band, topic, knowledge point, câu hỏi (có version), gói nội dung/bài đọc, asset; kiểm topic cho library và snapshot grammar cho game | `content_db` (local 5432; V7 xóa năm bảng catalog) | `/api/content/**` trừ nhóm từ vựng/video |
 | `library-service` | Catalog từ vựng/video (V1, năm bảng), flashcard/deck, note, tiến độ video và đoạn đã lưu (V2, sáu bảng) | `library_db` (compose host 5437) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
 | `assessment-service` | Lượt làm bài, chấm, kết quả (có version), bài nộp, video practice; phát `AssessmentCompleted.v2` | `assessment_db` (local 5432) | `/api/assessments/**` |
 | `access-service` | Gói, subscription, activation key, ví điểm và sổ điểm | `access_db` (local 5432) | `/api/access/**` |
 | `game-service` | Phòng game, trận, phiên chơi, WebSocket realtime | `game_db` (compose 5435) | `/api/games/**`, `/ws/games/**` |
 | `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (compose 5434; default code là local 5432, đổi bằng `COMMUNITY_DB_URL`) | `/api/community/**` |
 | `notification-service` | Chưa triển khai (chỉ khung package) | `notification_db` (local 5432) | `/api/notifications/**` |
-| `learning-service` | Thứ tự topic theo user (mỗi skill một chuỗi), bài học và nộp khối bài tập, cổng mở bài, Practice theo bài, mastery theo KP, thang ôn tập (set → lý thuyết → set), giao mã đề cuối; nhận kết quả thi chính thức | `learning_db` (compose 5436) | `/api/learning/**` |
+| `learning-service` | Placement recommendation; topic path theo course (một chuỗi cho mọi skill), bài học, Practice theo bài, mastery theo KP, thang ôn tập, course/topic progress và giao mã đề cuối; nhận kết quả thi chính thức | `learning_db` (compose 5436; `learner_placements`, `course_progress`, `course_test_assignments`) | `/api/learning/**` |
 
 Chi tiết schema: [`.sdd/database/DATABASE_V5.md`](../.sdd/database/DATABASE_V5.md). Service Java tự chạy Flyway khi khởi
 động (`src/main/resources/db/migration`).
@@ -146,9 +146,11 @@ Client -> Gateway (public /auth/login) -> user-service LoginUseCase -> UserRepos
 ### Học topic và bài (Learning Service)
 
 ```text
-GET /api/learning/topics -> một lần gọi Content topic-sequence -> knowledge_point_catalog + topic_progress (skill,
-  has_topic_test, sequence_order) -> trạng thái suy ra khi đọc, theo từng skill: PASSED / IN_PROGRESS (topic đầu chưa
-  đạt của skill) / LOCKED
+GET /api/learning/courses -> refresh từ Content topic-sequence + course_progress + learner_placements
+  -> danh sách course theo band, recommended lấy từ placement (chỉ gợi ý)
+GET /api/learning/topics -> một lần gọi Content topic-sequence -> knowledge_point_catalog + topic_progress (course_id,
+  skill, has_topic_test, sequence_order) -> trạng thái theo từng course: PASSED / IN_PROGRESS (topic đầu chưa đạt
+  trong course) / LOCKED; mọi course đều mở và chuỗi không tách skill
 POST /api/learning/lessons/{id}/exercises/{blockId}/submissions -> khóa theo user -> cổng (REVIEW_REQUIRED cùng skill,
   TOPIC_LOCKED, LESSON_LOCKED) -> chấm answer-spec-v1 -> bằng chứng lần nộp đầu; xong bài không tạo bài ôn;
   topic không có thi cuối thì PASSED khi xong mọi bài
@@ -161,6 +163,8 @@ POST /api/learning/reviews/{id}/submissions -> mỗi set một lần, luôn có 
 POST /api/learning/reviews/{id}/theory-check -> không ghi bằng chứng -> PRACTICE
 POST /api/learning/topics/{id}/test-assignments -> REVIEW_REQUIRED, PRACTICE_REQUIRED (mọi bài phải qua Practice),
   TEST_LOCKED -> một mã đề dùng một lần, xoay vòng theo package
+POST /api/learning/courses/{id}/test-assignments -> cần mọi topic trong course PASSED -> một COURSE_TEST assignment
+  -> Assessment attempt COURSE_GATE -> đạt >= 70% thì course_progress PASSED; không chặn topic khác
 ```
 
 Gợi ý Reading (`question_versions.hint`, Content V13) do Content lưu và trả qua
@@ -192,9 +196,11 @@ Học viên lấy mã đề từ learning (`POST /api/learning/topics/{id}/test-
 
 Assessment không gọi User lấy goal; attempt mới và event có `learning_goal_id` null. Consumer Learning không gọi
 HTTP và không cần path hoặc trạng thái học có sẵn. Trong một transaction khóa theo user, version bằng/cũ bị bỏ qua;
-version cao hơn thay evidence của attempt. `PLACEMENT` chỉ ghi version. `TOPIC_GATE` tìm assignment cùng user/package
-version, `consumed_at IS NULL` và `assigned_at <= completed_at`, lấy lần giao mới nhất thỏa điều kiện. Lần giao được
-consume cả khi trượt; đạt ≥70% ghi `passed_at` một chiều. ACK sau commit; topic kế mở theo trạng thái suy ra khi đọc.
+version cao hơn thay evidence của attempt. `PLACEMENT` lưu `overall_band` mới nhất, không ghi mastery hay đổi trạng thái topic;
+band chỉ dùng để đánh dấu course được gợi ý. `TOPIC_GATE` tìm assignment cùng user/package version, còn mở và đã giao
+trước khi attempt hoàn tất; lần giao được consume cả khi trượt; đạt ≥70% ghi `passed_at` một chiều. `COURSE_GATE` dùng
+quy tắc tương tự cho `course_test_assignments`; đạt ≥70% ghi `course_progress.passed_at`. ACK sau commit; topic kế trong
+cùng course mở theo trạng thái suy ra khi đọc. Course test không chặn topic hay course khác.
 
 ## 7. Chạy local (tóm tắt)
 

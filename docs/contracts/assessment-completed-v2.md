@@ -133,6 +133,10 @@ Consumer delivery rules:
   review evaluation. Topic `PASSED` is one-way; a regrade does not revoke it or
   consume another assignment.
 - `PLACEMENT` records only the processed result version. It writes no mastery evidence.
+- A non-null `overall_band` on the latest `PLACEMENT` result is stored by Learning for course recommendation only. It does not
+  change topic status, select a course for the learner, or gate a course.
+- `COURSE_GATE` consumes the matching open course-test assignment. A result at or above 70% records one-way
+  `course_progress.passed_at`; it does not change any topic status.
 
 ## Rollout and DLQ replay
 
