@@ -2,8 +2,8 @@ package com.group01.learning.domain.aggregate;
 
 import com.group01.learning.domain.entity.TopicProgress;
 import com.group01.learning.domain.service.TopicStatusDeriver;
-import com.group01.learning.domain.vo.TopicStatus;
 import com.group01.learning.domain.vo.LearningSkill;
+import com.group01.learning.domain.vo.TopicStatus;
 
 import java.time.Instant;
 import java.util.*;
@@ -37,15 +37,21 @@ public final class LearnerCurriculum {
         for (int index = 0; index < placements.size(); index++) {
             TopicPlacement placement = placements.get(index);
             topics.computeIfAbsent(placement.topicId(), id -> new TopicProgress(id, null, null))
-                    .place(index + 1, placement.courseId(), placement.skill(), placement.hasTopicTest());
+                    .place(index + 1, placement.courseId(), placement.skills(), placement.hasTopicTest());
         }
     }
 
     public void reorder(Collection<UUID> orderedTopicIds) {
-        reorder(orderedTopicIds.stream().map(id -> new TopicPlacement(id, null, null, true)).toList());
+        reorder(orderedTopicIds.stream().map(id -> new TopicPlacement(id, null, Set.<LearningSkill>of(), true)).toList());
     }
 
-    public record TopicPlacement(UUID topicId, UUID courseId, LearningSkill skill, boolean hasTopicTest) {
+    public record TopicPlacement(UUID topicId, UUID courseId, Set<LearningSkill> skills, boolean hasTopicTest) {
+        public TopicPlacement {
+            skills = skills == null ? Set.of() : Set.copyOf(skills);
+        }
+        public TopicPlacement(UUID topicId, UUID courseId, LearningSkill skill, boolean hasTopicTest) {
+            this(topicId, courseId, skill == null ? Set.<LearningSkill>of() : Set.of(skill), hasTopicTest);
+        }
         public TopicPlacement(UUID topicId, LearningSkill skill, boolean hasTopicTest) {
             this(topicId, null, skill, hasTopicTest);
         }

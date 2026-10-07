@@ -45,6 +45,6 @@ public class GetLessonUseCase {
                         .toList()),
                 submissions.wrongQuestions(userId, lessonId));
         return new LessonResult(lesson.lessonId(), lesson.topicId(), lesson.code(), lesson.title(), lesson.summary(),
-                lesson.sortOrder(), completed ? "COMPLETED" : "AVAILABLE", blocks, lesson.skill());
+                lesson.sortOrder(), completed ? "COMPLETED" : "AVAILABLE", blocks, lesson.skill(), lesson.skills());
     }
 }

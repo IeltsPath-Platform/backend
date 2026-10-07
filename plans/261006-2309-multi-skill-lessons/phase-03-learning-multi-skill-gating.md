@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Learning multi-skill gating"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 ---
@@ -63,8 +63,8 @@ từ KP (M12). Lesson nhiều skill hoàn thành khi mọi block khách quan (R,
 5. `mvn -q -pl services/learning-service -am test`.
 
 ## Success Criteria
-- [ ] Test cũ của gate, thang ôn tập, skill track xanh (overload một skill giữ hành vi).
-- [ ] Không còn chỗ nào trong `application`/`domain` gọi `topic.skill()` hay `lesson.skill()` để ra quyết định gác cổng
+- [x] Test cũ của gate, thang ôn tập, skill track xanh (overload một skill giữ hành vi).
+- [x] Không còn chỗ nào trong `application`/`domain` gọi `topic.skill()` hay `lesson.skill()` để ra quyết định gác cổng
       (grep xác nhận).
 
 ## Risk Assessment

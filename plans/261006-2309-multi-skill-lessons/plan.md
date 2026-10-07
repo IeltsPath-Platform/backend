@@ -94,7 +94,7 @@ mọi test của `LessonWritingIntegrationTest` (refactor phase 5 không đổi 
 |-------|------|--------|
 | 1 | [Content multi-skill lessons and practice skills](./phase-01-content-multi-skill-lessons-and-practice-skills.md) | Completed |
 | 2 | [Content seed multi-skill topic](./phase-02-content-seed-multi-skill-topic.md) | Completed |
-| 3 | [Learning multi-skill gating](./phase-03-learning-multi-skill-gating.md) | Pending |
+| 3 | [Learning multi-skill gating](./phase-03-learning-multi-skill-gating.md) | Completed |
 | 4 | [Learning practice per-skill clearance](./phase-04-learning-practice-per-skill-clearance.md) | Pending |
 | 5 | [Learning practice essays](./phase-05-learning-practice-essays.md) | Pending |
 | 6 | [Assessment LLM gate grading](./phase-06-assessment-llm-gate-grading.md) | Pending |
@@ -213,6 +213,23 @@ lesson (lesson vẫn chỉ seed) · UI.
   no topic with published lessons has a null `skill`. That is the old one-skill-per-topic rule which this phase's own
   spec (topic `skill` NULL) replaces. The last assertion now requires that a topic without a skill label teaches more
   than one skill and is exactly `TREES_MULTI_SKILL`; the rest of the test is unchanged. Owner to confirm in the PR.
+
+### Phase 3 Verification — 2026-10-07
+
+- Status: `DONE_WITH_CONCERNS` — tests were written right after the code in this phase, not run red first; they pin
+  the new behaviour (gate by lesson skill set, client `skills` fallback, KP skill on reviews).
+- Command: `mvn -q -pl services/learning-service -am test` exited 0 — learning 244/244, common-security 8/8, 0 skipped,
+  Docker/Testcontainers (first run without Docker skipped 46; rerun with Docker).
+- Migration `V8__topic_skills.sql`: `topic_progress.skills VARCHAR(20)[]`, backfilled from `skill`; `skill` kept (single
+  skill or NULL). No new table.
+- Allowlisted change: `LearningServiceApplicationTests.contextStartsWithMigratedSchemaAndPublicHealth` Flyway version
+  `7 → 8`; tables stay 17 (17 + 0 new tables). Health check unchanged.
+- New tests: `LessonAccessGateTest` (2), `RestLearningContentClientTest.mapsDerivedSkillsAndFallsBack…`,
+  `MultiSkillLessonIntegrationTest` (3: mixed lesson completes without the essay; a READING review blocks the mixed lesson
+  and the topic test but not a Listening-only lesson; a missed Reading KP in a topic test creates a READING review).
+- A lesson that Content sends without `skills` uses its topic's skills, so older single-skill lessons gate as before.
+- Grep: no remaining `topic.skill()`/`lesson.skill()` decides a gate in `application`/`domain`; left uses are response
+  compatibility fields, fallbacks when a KP has no skill, and `PracticeAttempt` (next phase).
 
 (Codex điền sau mỗi phase: commit, lệnh đã chạy và kết quả, test bị skip, test cũ đã sửa kỳ vọng, nội dung seed mới,
 mọi `BLOCKED`.)

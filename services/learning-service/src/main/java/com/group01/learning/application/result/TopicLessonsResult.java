@@ -1,13 +1,22 @@
 package com.group01.learning.application.result;
 
-import java.util.List;
-import java.util.UUID;
 import com.group01.learning.domain.vo.LearningSkill;
-import com.group01.learning.domain.vo.PracticeStatus;
 import com.group01.learning.domain.vo.PracticePassReason;
+import com.group01.learning.domain.vo.PracticeStatus;
+
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 public record TopicLessonsResult(UUID topicId, List<LessonSummary> lessons, String testStatus,
-                                 LearningSkill skill, boolean hasTopicTest) {
+                                 LearningSkill skill, boolean hasTopicTest, Set<LearningSkill> skills) {
+    public TopicLessonsResult {
+        skills = skills == null ? Set.of() : skills;
+    }
+    public TopicLessonsResult(UUID topicId, List<LessonSummary> lessons, String testStatus,
+                              LearningSkill skill, boolean hasTopicTest) {
+        this(topicId, lessons, testStatus, skill, hasTopicTest, skill == null ? Set.of() : Set.of(skill));
+    }
     public TopicLessonsResult(UUID topicId, List<LessonSummary> lessons, String testStatus) {
         this(topicId, lessons, testStatus, null, true);
     }

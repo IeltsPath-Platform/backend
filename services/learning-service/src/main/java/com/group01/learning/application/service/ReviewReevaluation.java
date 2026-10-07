@@ -7,8 +7,8 @@ import com.group01.learning.domain.repository.LessonProgressRepository;
 import com.group01.learning.domain.repository.ReviewItemRepository;
 import com.group01.learning.domain.service.MasteryCalculator;
 import com.group01.learning.domain.service.ReviewRule;
-import com.group01.learning.domain.vo.PendingReview;
 import com.group01.learning.domain.vo.LearningSkill;
+import com.group01.learning.domain.vo.PendingReview;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -38,9 +38,11 @@ public class ReviewReevaluation {
     public void execute(UUID userId, Set<UUID> consideredKps, Set<UUID> wrongKps) {
         Map<UUID, Double> mastery = new HashMap<>();
         Set<UUID> practiceKps = new HashSet<>();
+        Map<UUID, LearningSkill> kpSkills = new HashMap<>();
         for (var history : evidence.findMasteryHistories(userId)) {
             mastery.put(history.knowledgePointId(), masteryCalculator.compute(history.correctness()));
             if (history.hasPracticeSet()) practiceKps.add(history.knowledgePointId());
+            if (history.skill() != null) kpSkills.put(history.knowledgePointId(), history.skill());
         }
         Map<UUID, Integer> topicOrder = new HashMap<>();
         Map<UUID, LearningSkill> topicSkills = new HashMap<>();
@@ -59,6 +61,6 @@ public class ReviewReevaluation {
         Set<UUID> pending = reviews.findPending(userId).stream().map(PendingReview::knowledgePointId)
                 .collect(Collectors.toSet());
         reviews.insertPending(userId, rule.reevaluate(consideredKps, wrongKps, mastery, lessonsByKp, practiceKps,
-                pending));
+                pending, kpSkills));
     }
 }

@@ -1,12 +1,22 @@
 package com.group01.learning.application.result;
 
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.UUID;
 import com.group01.learning.domain.vo.LearningSkill;
 
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
 public record LessonResult(UUID lessonId, UUID topicId, String code, String title, String summary,
-                           int sortOrder, String status, List<Block> blocks, LearningSkill skill) {
+                           int sortOrder, String status, List<Block> blocks, LearningSkill skill,
+                           Set<LearningSkill> skills) {
+    public LessonResult {
+        skills = skills == null ? (skill == null ? Set.of() : Set.of(skill)) : skills;
+    }
+    public LessonResult(UUID lessonId, UUID topicId, String code, String title, String summary,
+                        int sortOrder, String status, List<Block> blocks, LearningSkill skill) {
+        this(lessonId, topicId, code, title, summary, sortOrder, status, blocks, skill, null);
+    }
     public LessonResult(UUID lessonId, UUID topicId, String code, String title, String summary,
                         int sortOrder, String status, List<Block> blocks) {
         this(lessonId, topicId, code, title, summary, sortOrder, status, blocks, null);

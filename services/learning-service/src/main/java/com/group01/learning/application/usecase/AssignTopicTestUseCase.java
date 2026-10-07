@@ -2,27 +2,31 @@ package com.group01.learning.application.usecase;
 
 import com.group01.learning.application.exception.LearningRequestException;
 import com.group01.learning.application.port.LearnerLock;
-import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.application.port.LearningContentClient.TestPackage;
+import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.application.result.TestAssignmentResult;
+import com.group01.learning.application.service.PracticeProgress;
+import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
 import com.group01.learning.domain.aggregate.LessonProgress;
 import com.group01.learning.domain.aggregate.TopicTestAssignment;
+import com.group01.learning.domain.entity.TopicProgress;
 import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.repository.LearnerCurriculumRepository;
 import com.group01.learning.domain.repository.LessonProgressRepository;
 import com.group01.learning.domain.repository.TopicTestAssignmentRepository;
+import com.group01.learning.domain.service.LessonAccessGate;
 import com.group01.learning.domain.service.PackageRotation;
-import com.group01.learning.domain.vo.TopicStatus;
+import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.domain.vo.PracticeStatus;
-import com.group01.learning.application.service.PracticeProgress;
-import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
+import com.group01.learning.domain.vo.TopicStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
-import java.util.HashMap;
 
 /**
  * Gives the learner one final-test code for the current topic. A code is used once: after its attempt is consumed
@@ -56,7 +60,7 @@ public class AssignTopicTestUseCase {
         lock.lock(userId);
         var curriculum = curricula.find(userId);
         var topic = curriculum.topic(topicId);
-        if (topic.isEmpty() || topic.get().skill() == null) {
+        if (topic.isEmpty() || topic.get().skills().isEmpty()) {
             refreshTopics.execute(userId);
             curriculum = curricula.find(userId);
             topic = curriculum.topic(topicId);
@@ -64,7 +68,7 @@ public class AssignTopicTestUseCase {
         if (topic.isPresent() && !topic.get().hasTopicTest()) {
             throw new LearningRequestException(409, "NO_TOPIC_TEST", "This topic has no final test");
         }
-        var skill = topic.map(com.group01.learning.domain.entity.TopicProgress::skill).orElse(null);
+        Set<LearningSkill> skills = topic.map(TopicProgress::skills).orElse(Set.of());
         var topicLessons = content.getTopicLessons(topicId);
         Map<UUID, LessonProgress> done = lessons.findByTopic(userId, topicId);
         Map<UUID, Boolean> completed = new HashMap<>();
@@ -73,8 +77,7 @@ public class AssignTopicTestUseCase {
             completed.put(lesson.lessonId(), progress != null && progress.isCompleted());
         }
         var topicPractice = practice.forTopic(userId, topicId, completed);
-        var pending = topicPractice.pendingReviews().stream()
-                .filter(review -> review.skill() == null || review.skill() == skill).toList();
+        var pending = LessonAccessGate.blocking(topicPractice.pendingReviews(), skills);
         if (!pending.isEmpty()) throw new LearningGateException("REVIEW_REQUIRED", pending);
         var practiceStates = topicPractice.clearances();
         practice.persistPassed(userId, practiceStates);

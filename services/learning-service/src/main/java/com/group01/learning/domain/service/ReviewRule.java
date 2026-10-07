@@ -1,5 +1,9 @@
 package com.group01.learning.domain.service;
 
+import com.group01.learning.domain.vo.LearningSkill;
+import com.group01.learning.domain.vo.ReviewStage;
+import com.group01.learning.domain.vo.TheoryReason;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -7,9 +11,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import com.group01.learning.domain.vo.LearningSkill;
-import com.group01.learning.domain.vo.ReviewStage;
-import com.group01.learning.domain.vo.TheoryReason;
 
 public final class ReviewRule {
     /** The failure that created the review is the first; the second sends to theory, the third skips the review. */
@@ -35,6 +36,18 @@ public final class ReviewRule {
                                            Map<UUID, Double> mastery,
                                            Map<UUID, List<CompletedLesson>> lessonsByKp,
                                            Set<UUID> kpsWithPracticeSet, Set<UUID> pendingKps) {
+        return reevaluate(consideredKps, wrongKps, mastery, lessonsByKp, kpsWithPracticeSet, pendingKps, Map.of());
+    }
+
+    /**
+     * {@code kpSkills} gives each review the skill of its knowledge point, so a review from a lesson teaching several
+     * skills blocks only that skill; a knowledge point without one takes the skill of its lesson.
+     */
+    public List<ReviewCandidate> reevaluate(Set<UUID> consideredKps, Set<UUID> wrongKps,
+                                           Map<UUID, Double> mastery,
+                                           Map<UUID, List<CompletedLesson>> lessonsByKp,
+                                           Set<UUID> kpsWithPracticeSet, Set<UUID> pendingKps,
+                                           Map<UUID, LearningSkill> kpSkills) {
         List<ReviewCandidate> candidates = new ArrayList<>();
         List<UUID> orderedKps = consideredKps.stream().sorted(Comparator.comparing(UUID::toString)).toList();
         for (UUID kp : orderedKps) {
@@ -43,7 +56,8 @@ public final class ReviewRule {
                 continue;
             }
             lessonsByKp.getOrDefault(kp, List.of()).stream().min(LESSON_ORDER)
-                    .ifPresent(lesson -> candidates.add(new ReviewCandidate(kp, lesson.lessonId(), lesson.skill())));
+                    .ifPresent(lesson -> candidates.add(new ReviewCandidate(kp, lesson.lessonId(),
+                            kpSkills.getOrDefault(kp, lesson.skill()))));
         }
         return List.copyOf(candidates);
     }

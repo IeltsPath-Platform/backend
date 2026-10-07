@@ -3,8 +3,13 @@ package com.group01.learning.application.port;
 import com.group01.learning.domain.vo.LearningSkill;
 
 import java.math.BigDecimal;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 public interface LearningContentClient {
@@ -35,9 +40,28 @@ public interface LearningContentClient {
 
     PackageVersion getPackageVersion(UUID versionId);
 
-    /** {@code requiredFeatureKey} is the Access feature needed to learn the topic; null means free. */
+    /** The given skills in enum order, or the single legacy skill when Content did not send any. */
+    static Set<LearningSkill> skillsOrSingle(Collection<LearningSkill> skills, LearningSkill single) {
+        EnumSet<LearningSkill> result = EnumSet.noneOf(LearningSkill.class);
+        if (skills != null) skills.stream().filter(Objects::nonNull).forEach(result::add);
+        else if (single != null) result.add(single);
+        return Collections.unmodifiableSet(result);
+    }
+
+    /**
+     * {@code requiredFeatureKey} is the Access feature needed to learn the topic; null means free. {@code skills} are
+     * the skills its lessons teach; a response without them falls back to {@code skill}.
+     */
     record Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
-                 List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course) {
+                 List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
+                 Set<LearningSkill> skills) {
+        public Topic {
+            skills = skillsOrSingle(skills, skill);
+        }
+        public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                     List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course) {
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, null);
+        }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest) {
             this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, null);
@@ -58,11 +82,28 @@ public interface LearningContentClient {
     }
 
     record LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
-                         int sortOrder, List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds) {
+                         int sortOrder, List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds,
+                         Set<LearningSkill> skills) {
+        public LessonSummary {
+            skills = skillsOrSingle(skills, null);
+        }
+        public LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
+                             int sortOrder, List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds) {
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, null);
+        }
     }
 
+    /** {@code skills} are the skills the lesson teaches; a response without them falls back to {@code skill}. */
     record Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
-                  int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks, LearningSkill skill) {
+                  int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks, LearningSkill skill,
+                  Set<LearningSkill> skills) {
+        public Lesson {
+            skills = skillsOrSingle(skills, skill);
+        }
+        public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
+                      int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks, LearningSkill skill) {
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, skill, null);
+        }
         public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
                       int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks) {
             this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, null);

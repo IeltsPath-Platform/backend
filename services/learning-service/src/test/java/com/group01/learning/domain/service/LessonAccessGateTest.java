@@ -1,12 +1,13 @@
 package com.group01.learning.domain.service;
 
 import com.group01.learning.domain.exception.LearningGateException;
+import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.domain.vo.PendingReview;
 import com.group01.learning.domain.vo.TopicStatus;
-import com.group01.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +28,26 @@ class LessonAccessGateTest {
         assertThat(error.getReviews()).containsExactly(review);
         assertThat(error.getMessage()).isEqualTo("Complete the pending reviews first.");
         assertThatThrownBy(() -> error.getReviews().clear()).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void aReviewBlocksOnlyLessonsThatTeachItsSkill() {
+        var reading = new PendingReview(new UUID(0, 4), new UUID(0, 5), new UUID(0, 6), LearningSkill.READING);
+
+        assertThat(assertThrows(LearningGateException.class, () -> gate.authorize(List.of(reading), null,
+                Set.of(LearningSkill.READING, LearningSkill.LISTENING), TopicStatus.IN_PROGRESS, true)).getCode())
+                .isEqualTo("REVIEW_REQUIRED");
+        assertThatCode(() -> gate.authorize(List.of(reading), null, Set.of(LearningSkill.LISTENING),
+                TopicStatus.IN_PROGRESS, true)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void aReviewWithoutASkillBlocksEveryLessonWhateverItTeaches() {
+        assertThat(assertThrows(LearningGateException.class, () -> gate.authorize(List.of(review), null,
+                Set.of(LearningSkill.LISTENING), TopicStatus.IN_PROGRESS, true)).getCode())
+                .isEqualTo("REVIEW_REQUIRED");
+        assertThat(assertThrows(LearningGateException.class, () -> gate.authorize(List.of(review), null,
+                Set.<LearningSkill>of(), TopicStatus.IN_PROGRESS, true)).getCode()).isEqualTo("REVIEW_REQUIRED");
     }
 
     @Test

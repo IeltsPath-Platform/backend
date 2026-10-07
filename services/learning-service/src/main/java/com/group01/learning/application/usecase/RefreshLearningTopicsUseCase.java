@@ -3,8 +3,8 @@ package com.group01.learning.application.usecase;
 import com.group01.learning.application.port.LearnerLock;
 import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.application.result.TopicResult;
-import com.group01.learning.domain.aggregate.LearnerCurriculum;
 import com.group01.learning.domain.aggregate.LearnerCurriculum.TopicPlacement;
+import com.group01.learning.domain.aggregate.LearnerCurriculum;
 import com.group01.learning.domain.repository.KnowledgePointCatalogRepository;
 import com.group01.learning.domain.repository.LearnerCurriculumRepository;
 import com.group01.learning.domain.repository.LessonProgressRepository;
@@ -62,7 +62,7 @@ public class RefreshLearningTopicsUseCase {
         LearnerCurriculum curriculum = curricula.find(userId);
         curriculum.reorder(topics.stream().map(topic -> new TopicPlacement(
                 topic.topicId(), topic.course() == null ? null : topic.course().courseId(),
-                topic.skill(), topic.hasTopicTest())).toList());
+                topic.skills(), topic.hasTopicTest())).toList());
         curricula.save(curriculum);
         catalog.upsert(entries);
         reviews.backfillMissingSkill(userId);
@@ -76,7 +76,7 @@ public class RefreshLearningTopicsUseCase {
                     topic.requiredFeatureKey(), topic.skill(), topic.hasTopicTest(), topic.course() == null ? null
                             : new TopicResult.Course(topic.course().courseId(), topic.course().code(),
                             topic.course().name(), topic.course().bandLevel()),
-                    topic.course() != null && topic.course().hasCourseTest()));
+                    topic.course() != null && topic.course().hasCourseTest(), topic.skills()));
         }
         return List.copyOf(results);
     }

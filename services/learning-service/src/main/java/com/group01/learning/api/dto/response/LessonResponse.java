@@ -2,15 +2,16 @@ package com.group01.learning.api.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.group01.learning.application.result.LessonResult;
+import com.group01.learning.domain.vo.LearningSkill;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import com.group01.learning.domain.vo.LearningSkill;
 
 public record LessonResponse(UUID lessonId, UUID topicId, String code, String title, String summary,
-                             int sortOrder, String status, List<Block> blocks, LearningSkill skill) {
+                             int sortOrder, String status, List<Block> blocks, LearningSkill skill,
+                             List<LearningSkill> skills) {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Block(UUID blockId, String blockType, String blockKind, int sortOrder, String textContent,
                         Asset asset, List<UUID> vocabularySenseIds, Boolean passed, List<Question> questions,
@@ -75,6 +76,7 @@ public record LessonResponse(UUID lessonId, UUID topicId, String code, String ti
 
     public static LessonResponse from(LessonResult result) {
         return new LessonResponse(result.lessonId(), result.topicId(), result.code(), result.title(), result.summary(),
-                result.sortOrder(), result.status(), result.blocks().stream().map(Block::from).toList(), result.skill());
+                result.sortOrder(), result.status(), result.blocks().stream().map(Block::from).toList(), result.skill(),
+                result.skills().stream().sorted().toList());
     }
 }

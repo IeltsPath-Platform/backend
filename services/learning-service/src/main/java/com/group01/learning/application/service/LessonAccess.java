@@ -1,22 +1,24 @@
 package com.group01.learning.application.service;
 
 import com.group01.learning.application.exception.LearningRequestException;
-import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.application.port.LearningContentClient.Lesson;
 import com.group01.learning.application.port.LearningContentClient.LessonSummary;
+import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.application.usecase.RefreshLearningTopicsUseCase;
 import com.group01.learning.domain.aggregate.LessonProgress;
+import com.group01.learning.domain.entity.TopicProgress;
 import com.group01.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.group01.learning.domain.repository.LearnerCurriculumRepository;
 import com.group01.learning.domain.repository.LessonProgressRepository;
 import com.group01.learning.domain.repository.ReviewItemRepository;
 import com.group01.learning.domain.service.LessonAccessGate;
+import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.domain.vo.MasteryHistory;
 import com.group01.learning.domain.vo.TopicStatus;
-import com.group01.learning.domain.entity.TopicProgress;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -58,7 +60,7 @@ public class LessonAccess {
             previousComplete &= completed(progress.get(summary.lessonId()));
         }
         var topic = topic(userId, lesson.topicId());
-        gate.authorize(reviews.findPending(userId), null, topic.skill(),
+        gate.authorize(reviews.findPending(userId), null, skillsOf(lesson, topic),
                 status(userId, lesson.topicId()), previousComplete);
         if (!found) throw new LearningRequestException(404, "NOT_FOUND", "Lesson was not found");
         return new Context(lesson, progress.get(lesson.lessonId()), previousComplete);
@@ -67,18 +69,23 @@ public class LessonAccess {
     /** Checks the gate again after a curriculum refresh may have changed the learner's current topic. */
     public void reauthorize(UUID userId, Context context) {
         var topic = topic(userId, context.lesson().topicId());
-        gate.authorize(reviews.findPending(userId), null, topic.skill(),
+        gate.authorize(reviews.findPending(userId), null, skillsOf(context.lesson(), topic),
                 status(userId, context.lesson().topicId()),
                 context.previousLessonsComplete());
     }
 
     public TopicProgress topic(UUID userId, UUID topicId) {
         var found = curricula.find(userId).topic(topicId);
-        if (found.isEmpty() || found.get().skill() == null) {
+        if (found.isEmpty() || found.get().skills().isEmpty()) {
             refreshTopics.execute(userId);
             found = curricula.find(userId).topic(topicId);
         }
         return found.orElse(new TopicProgress(topicId, null, null));
+    }
+
+    /** The skills the lesson teaches; a lesson Content sent without them takes its topic's skills. */
+    public static Set<LearningSkill> skillsOf(Lesson lesson, TopicProgress topic) {
+        return lesson.skills().isEmpty() ? topic.skills() : lesson.skills();
     }
 
     public TopicStatus status(UUID userId, UUID topicId) {

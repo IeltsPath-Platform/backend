@@ -2,6 +2,7 @@ package com.group01.learning.infrastructure.client;
 
 import com.group01.commonsecurity.header.SecurityHeaders;
 import com.group01.learning.application.exception.LearningRequestException;
+import com.group01.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -116,6 +118,43 @@ class RestLearningContentClientTest {
         assertEquals("IELTS 6.5", course.name());
         assertEquals(new BigDecimal("6.5"), course.bandLevel());
         assertTrue(course.hasCourseTest());
+    }
+
+    @Test
+    void mapsDerivedSkillsAndFallsBackToTheSingleSkillOfAnOlderResponse() {
+        server.expect(requestTo(INTERNAL_PATH + "/topic-sequence"))
+                .andRespond(withSuccess("""
+                        [{"topicId":"10000000-0000-4000-8000-000000000001","code":"MIX","name":"Mixed",
+                          "sortOrder":955,"requiredFeatureKey":null,"skill":null,"hasTopicTest":true,
+                          "skills":["READING","LISTENING","WRITING"],"knowledgePoints":[]},
+                         {"topicId":"10000000-0000-4000-8000-000000000002","code":"OLD","name":"Older",
+                          "sortOrder":900,"requiredFeatureKey":null,"skill":"READING","hasTopicTest":true,
+                          "knowledgePoints":[]}]
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID))
+                .andRespond(withSuccess("""
+                        {"lessonId":"20000000-0000-4000-8000-000000000101",
+                         "topicId":"10000000-0000-4000-8000-000000000001","code":"T1","title":"Trees",
+                         "summary":null,"sortOrder":1,"knowledgePointIds":[],"blocks":[],
+                         "skill":null,"skills":["LISTENING","READING"]}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(INTERNAL_PATH + "/topics/" + TOPIC_ID + "/lessons"))
+                .andRespond(withSuccess("""
+                        [{"lessonId":"20000000-0000-4000-8000-000000000101",
+                          "topicId":"10000000-0000-4000-8000-000000000001","code":"T1","title":"Trees",
+                          "summary":null,"sortOrder":1,"knowledgePointIds":[],"exerciseBlockIds":[],
+                          "skills":["WRITING","READING"]}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var topics = client.getTopicSequence();
+        var lesson = client.getLesson(LESSON_ID);
+        var summary = client.getTopicLessons(TOPIC_ID).getFirst();
+
+        assertEquals(List.of(LearningSkill.LISTENING, LearningSkill.READING, LearningSkill.WRITING),
+                List.copyOf(topics.getFirst().skills()));
+        assertEquals(Set.of(LearningSkill.READING), topics.get(1).skills());
+        assertEquals(Set.of(LearningSkill.LISTENING, LearningSkill.READING), lesson.skills());
+        assertEquals(Set.of(LearningSkill.READING, LearningSkill.WRITING), summary.skills());
     }
 
     @Test

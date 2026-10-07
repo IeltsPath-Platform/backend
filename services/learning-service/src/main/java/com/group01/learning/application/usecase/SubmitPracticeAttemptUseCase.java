@@ -17,6 +17,7 @@ import com.group01.learning.domain.service.PracticeReviewRule;
 import com.group01.learning.domain.service.ReviewRule;
 import com.group01.learning.domain.vo.EvidenceSource;
 import com.group01.learning.domain.vo.KnowledgeEvidence;
+import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.domain.vo.PracticeReviewCandidate;
 import com.group01.learning.domain.vo.PracticeSubmission;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.util.*;
+import java.util.HashMap;
 
 @Service
 public class SubmitPracticeAttemptUseCase {
@@ -96,10 +98,14 @@ public class SubmitPracticeAttemptUseCase {
             reviews.findPending(userId).forEach(review -> pending.add(review.knowledgePointId()));
             var needs = reviewRule.derive(graded.percent(), true, outcomes, pending, availability);
             Set<UUID> wrongInLesson = needs.isEmpty() ? Set.of() : mistakes.of(userId, lesson);
+            Map<UUID, LearningSkill> kpSkills = new HashMap<>();
+            if (!needs.isEmpty()) evidence.findMasteryHistories(userId).stream().filter(history -> history.skill() != null)
+                    .forEach(history -> kpSkills.put(history.knowledgePointId(), history.skill()));
             candidates = needs.stream().map(need -> {
                 var start = ReviewRule.initialStage(need.kpPercent(), wrongInLesson.contains(need.knowledgePointId()));
                 return new PracticeReviewCandidate(UUID.randomUUID(), attempt.lessonId(), need.knowledgePointId(),
-                        attempt.skill(), attempt.id(), need.kpPercent(), start.stage(), start.theoryReason());
+                        kpSkills.getOrDefault(need.knowledgePointId(), attempt.skill()), attempt.id(), need.kpPercent(),
+                        start.stage(), start.theoryReason());
             }).toList();
         }
         var first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);

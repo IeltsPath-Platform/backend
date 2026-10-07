@@ -5,7 +5,7 @@ import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.domain.exception.LearningGateException;
 import com.group01.learning.domain.repository.LessonProgressRepository;
 import com.group01.learning.domain.repository.ReviewItemRepository;
-import com.group01.learning.domain.vo.LearningSkill;
+import com.group01.learning.domain.service.LessonAccessGate;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -27,9 +27,7 @@ public class PracticeAccess {
         if (!completed(userId, lessonId)) {
             throw new LearningRequestException(409, "PRACTICE_LOCKED", "Complete the lesson before practice");
         }
-        LearningSkill skill = lesson.skill();
-        var pending = reviews.findPending(userId).stream()
-                .filter(review -> review.skill() == null || review.skill() == skill).toList();
+        var pending = LessonAccessGate.blocking(reviews.findPending(userId), lesson.skills());
         if (!pending.isEmpty()) throw new LearningGateException("REVIEW_REQUIRED", pending);
         return lesson;
     }
