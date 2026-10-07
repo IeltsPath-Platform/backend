@@ -1,6 +1,6 @@
 # Hướng dẫn FE: thứ tự gọi API luồng học chính (MVP)
 
-- Cập nhật: 2026-10-03. Đối tượng: dev FE ghép luồng học Reading → Writing → Listening (mỗi kỹ năng một lộ trình riêng).
+- Cập nhật: 2026-10-07. Đối tượng: dev FE ghép lộ trình theo course band, topic đa kỹ năng và thi cuối course.
 - Tài liệu chỉ nói **gọi API nào, khi nào, đọc trường nào**. Giao diện do FE tự thiết kế.
 - Chi tiết từng trường: [`contracts/lesson-learning-v1.md`](contracts/lesson-learning-v1.md),
   [`contracts/lesson-writing-v1.md`](contracts/lesson-writing-v1.md). Thử API trực tiếp: Swagger UI ở
@@ -26,32 +26,37 @@ Tài khoản demo (có sẵn khi bật `DEMO_DATA_ENABLED`): `learner@ielts.demo
 | --- | --- | --- |
 | Đăng ký / đăng nhập | — | `POST /api/users/register`, `POST /auth/login` |
 | Khởi động app (đã có token) | `GET /api/users/me`, `GET /api/access/me/points` | `POST /auth/refresh` khi gặp `401` |
+| Danh sách course | `GET /api/learning/courses` | Hiện band, `recommended`, tiến độ và trạng thái thi cuối course |
 | Lộ trình (danh sách topic) | `GET /api/learning/topics` | Chọn topic |
 | Topic (danh sách bài học) | `GET /api/learning/topics/{topicId}/lessons` | Chọn bài, bấm "Làm bài kiểm tra" |
 | Bài học | `GET /api/learning/lessons/{lessonId}` | Nộp bài tập, nộp bài luận |
 | Practice của bài | `GET /api/learning/lessons/{lessonId}/practice-sets` | Bắt đầu đề (`POST .../practice-attempts`), nộp đề |
 | Bài ôn | `GET /api/learning/reviews/{reviewId}` | Nộp set ôn, hoặc làm quick-check khi `stage=THEORY` |
 | Bài kiểm tra cuối topic | `POST .../test-assignments` → `POST /api/assessments/attempts` → `GET .../structure` | Lưu từng câu, nộp bài, xem kết quả |
+| Thi cuối course | `POST /api/learning/courses/{courseId}/test-assignments` → Assessment | Chỉ mở khi mọi topic trong course đã `PASSED`; theo dõi `testStatus` |
 | Tiến độ kỹ năng (tuỳ chọn) | `GET /api/learning/mastery` | — |
 
 ## 3. Sơ đồ luồng
 
 ```mermaid
 flowchart TD
-    A[Đăng nhập] --> B[GET /api/learning/topics]
-    B -->|chọn topic IN_PROGRESS hoặc PASSED| C[GET /topics/id/lessons]
-    C -->|chọn bài AVAILABLE/COMPLETED| D[GET /lessons/id]
-    D --> E[Nộp bài tập từng khối]
-    E -->|blockPassed=false| E
-    E -->|lessonCompleted=true| PR[GET /lessons/id/practice-sets → làm Practice]
-    PR -->|đạt hoặc qua Practice| C
+    A[Đăng nhập] --> B[GET /api/learning/courses]
+    B -->|chọn course; recommendation chỉ gợi ý| C[GET /api/learning/topics]
+    C -->|nhóm theo course; chọn topic IN_PROGRESS hoặc PASSED| D[GET /topics/id/lessons]
+    D -->|chọn bài AVAILABLE/COMPLETED| L[GET /lessons/id]
+    L --> X[Nộp bài tập từng khối]
+    X -->|blockPassed=false| X
+    X -->|lessonCompleted=true| PR[GET /lessons/id/practice-sets → làm Practice]
+    PR -->|đạt hoặc qua Practice| D
     PR -->|reviewsCreated| R
-    D -->|403 REVIEW_REQUIRED| R[GET /reviews/reviewId → set ôn hoặc lý thuyết + quick-check]
-    R --> C
-    C -->|testStatus=AVAILABLE| T[POST test-assignments → làm bài trên assessment]
+    L -->|403 REVIEW_REQUIRED| R[GET /reviews/reviewId → set ôn hoặc lý thuyết + quick-check]
+    R --> D
+    D -->|testStatus=AVAILABLE| T[POST topic test-assignments → Assessment]
     T -->|percent ≥ 70| P[Poll GET /topics tới khi topic PASSED]
     T -->|percent < 70| T
-    P --> B
+    P --> C
+    B -->|course testStatus=AVAILABLE| CT[POST course test-assignments → Assessment]
+    CT -->|COURSE_GATE percent ≥ 70| CP[Poll GET /courses tới khi course PASSED]
 ```
 
 ## 4. Kịch bản luồng chính (theo tài khoản demo)
@@ -74,24 +79,29 @@ Người dùng mới: `POST /api/users/register` body `{email, password (6–72 
 
 ### Bước 2. Màn lộ trình
 
-`GET /api/learning/topics` → mảng đã sắp theo `sequenceOrder`:
+Course screen calls `GET /api/learning/courses` (CUSTOMER role) and displays `bandLevel`, `recommended`, `topicCount`,
+`passedTopicCount` and `testStatus`. A recommendation is guidance from placement; every course stays open. Select a course
+to group its topics from `GET /api/learning/topics` by `course.courseId`.
+
+`GET /api/learning/topics` → mảng đã sắp theo `sequenceOrder`; each topic includes course metadata:
 
 ```json
 [
-  {"topicId":"…","code":"DEMO_READING","name":"Demo IELTS Reading","sequenceOrder":1,"status":"IN_PROGRESS","completedLessonCount":0,"accessLevel":"FREE"},
-  {"topicId":"…","code":"TFNG_SKILLS","name":"True / False / Not Given","sequenceOrder":2,"status":"LOCKED","completedLessonCount":0,"accessLevel":"FREE"},
-  {"topicId":"…","code":"PREMIUM_MATCHING_INFO","name":"Matching Information","sequenceOrder":4,"status":"LOCKED","completedLessonCount":0,"accessLevel":"PREMIUM"}
+  {"topicId":"…","code":"DEMO_READING","name":"Demo IELTS Reading","sequenceOrder":1,"status":"IN_PROGRESS","completedLessonCount":0,"accessLevel":"FREE","skill":"READING","course":{"courseId":"…","code":"IELTS_5_5","name":"IELTS 5.5","bandLevel":5.5}},
+  {"topicId":"…","code":"TFNG_SKILLS","name":"True / False / Not Given","sequenceOrder":2,"status":"LOCKED","completedLessonCount":0,"accessLevel":"FREE","skill":"READING","course":{"courseId":"…","code":"IELTS_5_5","name":"IELTS 5.5","bandLevel":5.5}},
+  {"topicId":"…","code":"PREMIUM_MATCHING_INFO","name":"Matching Information","sequenceOrder":4,"status":"LOCKED","completedLessonCount":0,"accessLevel":"PREMIUM","skill":"READING","course":{"courseId":"…","code":"IELTS_5_5","name":"IELTS 5.5","bandLevel":5.5}}
 ]
 ```
 
 | Trường | FE hiển thị |
 | --- | --- |
 | `status = PASSED` | Đã xong, vẫn mở để xem lại. |
-| `status = IN_PROGRESS` | Topic đang học (luôn chỉ có **một**). |
+| `status = IN_PROGRESS` | Topic đang học; mỗi course có topic `IN_PROGRESS` riêng. |
 | `status = LOCKED` | Chưa tới lượt, disable. |
 | `accessLevel = PREMIUM` | Nội dung trả phí: hiện nhãn trả phí và disable, kể cả khi `status` khác `LOCKED`. |
 
-Chỉ cho bấm vào topic `IN_PROGRESS` hoặc `PASSED` (topic `LOCKED` gọi tiếp sẽ nhận `403 TOPIC_LOCKED`).
+Chỉ cho bấm vào topic `IN_PROGRESS` hoặc `PASSED` (topic `LOCKED` gọi tiếp sẽ nhận `403 TOPIC_LOCKED`). Thứ tự một course
+chạy chung qua mọi skill: `course.bandLevel` → free/premium → `sortOrder` → `topicId`.
 
 ### Bước 3. Màn topic
 
@@ -206,9 +216,18 @@ Khi `testStatus = AVAILABLE`:
 
 ### Bước 7. Lặp lại
 
-Quay về Bước 2 với topic mới. Thứ tự demo: `DEMO_READING` (4 bài) → `TFNG_SKILLS` (1 bài) →
-`DEMO_LISTENING` (2 bài có audio) → hai topic `PREMIUM` (chỉ hiển thị) → `DEMO_WRITING` (W1, W2, bài luận; không có thi
-cuối). Content V15 chuyển bài luận khỏi L3, L4; tới khi Learning có lộ trình theo kỹ năng, `DEMO_WRITING` đứng cuối chuỗi.
+Quay về màn course để xem tiến độ rồi chọn topic `IN_PROGRESS` tiếp theo trong course. Placement recommendation không
+khóa lựa chọn. Topic Reading, Listening, Writing và Speaking trong cùng course dùng chung một thứ tự.
+
+### Bước 8. Thi cuối course
+
+Khi `GET /api/learning/courses` trả `testStatus = AVAILABLE`, mọi topic của course đã `PASSED`:
+
+1. Gọi `POST /api/learning/courses/{courseId}/test-assignments` (body rỗng) với role `CUSTOMER` →
+   `{assignmentId, packageId, packageVersionId}`. Gọi lại khi assignment còn mở sẽ trả cùng package.
+2. Tạo attempt qua `POST /api/assessments/attempts` với `packageVersionId`, lưu câu trả lời và nộp như bài thi cuối topic.
+3. Assessment phát event `COURSE_GATE`. Từ 70% trở lên, poll `GET /api/learning/courses` đến khi course `testStatus = PASSED`.
+   Thi cuối course không khóa topic hoặc course khác. Dưới 70%, assignment đã dùng; POST kế tiếp sẽ chọn package ít dùng nhất.
 
 ## 5. Mã lỗi FE cần xử lý
 

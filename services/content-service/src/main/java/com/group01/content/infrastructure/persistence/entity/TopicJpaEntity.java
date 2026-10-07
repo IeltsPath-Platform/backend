@@ -27,6 +27,9 @@ public class TopicJpaEntity {
     @Column(name = "parent_topic_id")
     private UUID parentTopicId;
 
+    @Column(name = "course_id")
+    private UUID courseId;
+
     @Column(name = "code", nullable = false, unique = true, length = 100)
     private String code;
 

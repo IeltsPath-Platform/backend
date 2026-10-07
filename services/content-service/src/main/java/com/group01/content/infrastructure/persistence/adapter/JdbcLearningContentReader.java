@@ -9,6 +9,8 @@ import com.group01.content.application.result.PackageVersionContentResult;
 import com.group01.content.application.result.PracticeSetResult;
 import com.group01.content.application.result.TopicSequenceResult;
 import com.group01.content.application.result.TopicTestPackageResult;
+import com.group01.content.application.result.PackageQuestionSpec;
+import com.group01.content.domain.vo.QuestionType;
 import com.group01.content.domain.vo.AssetType;
 import com.group01.content.domain.vo.BlockType;
 import com.group01.content.domain.vo.LessonBlockKind;
@@ -49,7 +51,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
             JOIN content_sections ts ON ts.id = tsq.section_id
             JOIN content_package_versions tv ON tv.id = ts.package_version_id
             JOIN content_packages tp ON tp.id = tv.package_id
-            WHERE tp.package_type IN ('TOPIC_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
+            WHERE tp.package_type IN ('TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
             """;
 
     /**
@@ -86,22 +88,29 @@ public class JdbcLearningContentReader implements LearningContentReader {
     @Override
     public List<TopicSequenceResult> topicSequence(int minPracticeQuestions) {
         record TopicRow(UUID id, String code, String name, int sortOrder, String requiredFeatureKey, Skill skill,
-                        boolean hasTopicTest) {}
-        // A topic joins its skill's track once it has a skill and a published lesson; without a final test it is
-        // passed by completing its lessons.
+                        boolean hasTopicTest, TopicSequenceResult.CourseEntry course) {}
+        // Course metadata is read with the topic; topics outside an active course do not join the curriculum.
         List<TopicRow> topics = jdbc.query("""
                 SELECT t.id, t.code, t.name, t.sort_order, t.required_feature_key, t.skill,
                        EXISTS (SELECT 1 FROM content_packages p
                                WHERE p.topic_id = t.id AND p.package_type = 'TOPIC_TEST'
                                  AND p.status = 'PUBLISHED' AND p.current_published_version_id IS NOT NULL)
-                           AS has_topic_test
+                           AS has_topic_test,
+                       c.id AS course_id, c.code AS course_code, c.name AS course_name, c.band_level,
+                       EXISTS (SELECT 1 FROM content_packages p
+                               WHERE p.course_id = c.id AND p.package_type = 'COURSE_TEST'
+                                 AND p.status = 'PUBLISHED' AND p.current_published_version_id IS NOT NULL)
+                           AS has_course_test
                 FROM topics t
-                WHERE t.status = 'ACTIVE' AND t.skill IS NOT NULL
+                JOIN courses c ON c.id = t.course_id
+                WHERE t.status = 'ACTIVE' AND t.skill IS NOT NULL AND c.status = 'ACTIVE'
                   AND EXISTS (SELECT 1 FROM lessons l WHERE l.topic_id = t.id AND l.status = 'PUBLISHED')
-                ORDER BY t.skill, t.sort_order, t.id
+                ORDER BY t.skill, c.band_level, t.sort_order, t.id
                 """, Map.of(), (rs, i) -> new TopicRow(uuid(rs, "id"), rs.getString("code"), rs.getString("name"),
                 rs.getInt("sort_order"), rs.getString("required_feature_key"),
-                enumOrNull(Skill.class, rs.getString("skill")), rs.getBoolean("has_topic_test")));
+                enumOrNull(Skill.class, rs.getString("skill")), rs.getBoolean("has_topic_test"),
+                new TopicSequenceResult.CourseEntry(uuid(rs, "course_id"), rs.getString("course_code"),
+                        rs.getString("course_name"), rs.getBigDecimal("band_level"), rs.getBoolean("has_course_test"))));
         if (topics.isEmpty()) {
             return List.of();
         }
@@ -129,7 +138,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
         return topics.stream()
                 .map(t -> new TopicSequenceResult(t.id(), t.code(), t.name(), t.sortOrder(), t.requiredFeatureKey(),
-                        pointsByTopic.getOrDefault(t.id(), List.of()), t.skill(), t.hasTopicTest()))
+                        pointsByTopic.getOrDefault(t.id(), List.of()), t.skill(), t.hasTopicTest(), t.course()))
                 .toList();
     }
 
@@ -441,7 +450,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 JOIN content_package_versions v ON v.id = s.package_version_id
                 JOIN content_packages p ON p.id = v.package_id
                 WHERE p.id <> tq.package_id AND v.status = 'PUBLISHED'
-                  AND p.package_type IN ('PRACTICE_SET', 'TOPIC_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
+                  AND p.package_type IN ('PRACTICE_SET', 'TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
                 ORDER BY question_id, owner_type, owner_code
                 """, Map.of("versionId", packageVersionId), (rs, i) -> new QuestionUsageConflict(
                 uuid(rs, "question_id"), QuestionUsageConflict.OwnerType.valueOf(rs.getString("owner_type")),
@@ -484,6 +493,34 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 ORDER BY p.id
                 """, Map.of("topicId", topicId), (rs, i) -> new TopicTestPackageResult(uuid(rs, "id"),
                 uuid(rs, "current_published_version_id"), rs.getString("code")));
+    }
+
+    @Override
+    public List<TopicTestPackageResult> courseTestPackages(UUID courseId) {
+        return jdbc.query("""
+                SELECT p.id, p.current_published_version_id, p.code
+                FROM content_packages p
+                JOIN content_package_versions v ON v.id = p.current_published_version_id AND v.package_id = p.id
+                WHERE p.course_id = :courseId AND p.package_type = 'COURSE_TEST'
+                  AND p.status = 'PUBLISHED' AND v.status = 'PUBLISHED'
+                ORDER BY p.id
+                """, Map.of("courseId", courseId), (rs, i) -> new TopicTestPackageResult(uuid(rs, "id"),
+                uuid(rs, "current_published_version_id"), rs.getString("code")));
+    }
+
+    @Override
+    public List<PackageQuestionSpec> packageQuestionSpecs(UUID packageVersionId) {
+        return jdbc.query("""
+                SELECT DISTINCT qv.id, q.question_type, q.skill, qv.answer_spec::text AS answer_spec
+                FROM content_sections s
+                JOIN section_questions sq ON sq.section_id = s.id
+                JOIN question_versions qv ON qv.id = sq.question_version_id
+                JOIN questions q ON q.id = qv.question_id
+                WHERE s.package_version_id = :versionId
+                ORDER BY qv.id
+                """, Map.of("versionId", packageVersionId), (rs, i) -> new PackageQuestionSpec(uuid(rs, "id"),
+                QuestionType.valueOf(rs.getString("question_type")), enumOrNull(Skill.class, rs.getString("skill")),
+                rs.getString("answer_spec")));
     }
 
     @Override
@@ -613,7 +650,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 JOIN content_package_versions v ON v.id = s.package_version_id
                 JOIN content_packages p ON p.id = v.package_id
                 WHERE sq.question_version_id IN (:ids)
-                  AND p.package_type IN ('TOPIC_TEST', 'MOCK_TEST', 'PLACEMENT_TEST', 'PRACTICE_SET')
+                  AND p.package_type IN ('TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST', 'PRACTICE_SET')
                 """, Map.of("ids", questionVersionIds), (rs, i) -> uuid(rs, "id")));
     }
 

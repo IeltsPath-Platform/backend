@@ -20,12 +20,21 @@ public class ContentPackage {
     private Instant updatedAt;
     private final List<ContentPackageVersion> versions;
     private final UUID lessonId;
+    private final UUID courseId;
 
     /** {@code lessonId} makes a practice set part of that lesson's Practice; other package types have none. */
     public ContentPackage(UUID id, String code, String title, PackageType packageType,
                           String requiredFeatureKey, PublicationStatus status,
                           UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
                           List<ContentPackageVersion> versions, UUID lessonId) {
+        this(id, code, title, packageType, requiredFeatureKey, status, currentPublishedVersionId, createdAt, updatedAt,
+                versions, lessonId, null);
+    }
+
+    public ContentPackage(UUID id, String code, String title, PackageType packageType,
+                          String requiredFeatureKey, PublicationStatus status,
+                          UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
+                          List<ContentPackageVersion> versions, UUID lessonId, UUID courseId) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.code = Objects.requireNonNull(code, "code must not be null");
         this.title = Objects.requireNonNull(title, "title must not be null");
@@ -40,6 +49,10 @@ public class ContentPackage {
             throw new InvalidPackageLessonException("Only a PRACTICE_SET package can belong to a lesson");
         }
         this.lessonId = lessonId;
+        if (packageType == PackageType.COURSE_TEST && courseId == null) {
+            throw new IllegalArgumentException("A COURSE_TEST package must belong to a course");
+        }
+        this.courseId = courseId;
     }
 
     public static ContentPackage create(String code, String title, PackageType packageType, String requiredFeatureKey) {
@@ -71,6 +84,7 @@ public class ContentPackage {
 
     public UUID getId() { return id; }
     public UUID getLessonId() { return lessonId; }
+    public UUID getCourseId() { return courseId; }
     public String getCode() { return code; }
     public String getTitle() { return title; }
     public PackageType getPackageType() { return packageType; }

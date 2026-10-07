@@ -12,6 +12,7 @@ import java.util.UUID;
 public class Topic {
     private final UUID id;
     private UUID parentTopicId;
+    private UUID courseId;
     private String code;
     private String name;
     private int sortOrder;
@@ -23,8 +24,14 @@ public class Topic {
 
     public Topic(UUID id, UUID parentTopicId, String code, String name, int sortOrder,
                  ContentStatus status, BandRange band, Skill skill, Instant createdAt, Instant updatedAt) {
+        this(id, parentTopicId, code, name, sortOrder, status, band, skill, createdAt, updatedAt, null);
+    }
+
+    public Topic(UUID id, UUID parentTopicId, String code, String name, int sortOrder,
+                 ContentStatus status, BandRange band, Skill skill, Instant createdAt, Instant updatedAt, UUID courseId) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.parentTopicId = parentTopicId;
+        this.courseId = courseId;
         if (code == null || code.isBlank()) {
             throw new IllegalArgumentException("code must not be blank");
         }
@@ -89,6 +96,12 @@ public class Topic {
 
     public UUID getId() { return id; }
     public UUID getParentTopicId() { return parentTopicId; }
+    public UUID getCourseId() { return courseId; }
+
+    public void assignCourse(UUID courseId) {
+        this.courseId = Objects.requireNonNull(courseId, "courseId must not be null");
+        this.updatedAt = Instant.now();
+    }
     public String getCode() { return code; }
     public String getName() { return name; }
     public int getSortOrder() { return sortOrder; }

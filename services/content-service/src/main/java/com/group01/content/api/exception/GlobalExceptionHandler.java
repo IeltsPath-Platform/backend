@@ -25,6 +25,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             TopicNotFoundException.class,
+            CourseNotFoundException.class,
             KnowledgePointNotFoundException.class,
             ContentPackageNotFoundException.class,
             QuestionNotFoundException.class,
@@ -77,6 +78,12 @@ public class GlobalExceptionHandler {
         log.warn("Topic skill change refused: {}", ex.getMessage());
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
                 Map.of("code", "TOPIC_SKILL_LOCKED"));
+    }
+
+    @ExceptionHandler(DuplicateCourseException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateCourse(DuplicateCourseException ex, HttpServletRequest request) {
+        log.warn("Course conflict: {}", ex.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(), null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

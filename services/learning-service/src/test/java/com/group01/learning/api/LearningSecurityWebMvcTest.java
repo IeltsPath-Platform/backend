@@ -1,12 +1,17 @@
 package com.group01.learning.api;
 
 import com.group01.commonsecurity.config.CommonSecurityAutoConfiguration;
+import com.group01.commonsecurity.currentuser.CurrentUserProvider;
+import com.group01.learning.api.controller.CourseController;
+import com.group01.learning.application.usecase.AssignCourseTestUseCase;
+import com.group01.learning.application.usecase.ListCoursesUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -19,7 +24,7 @@ import java.util.Base64;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = LearningSecurityWebMvcTest.ProtectedController.class, properties = {
+@WebMvcTest(controllers = {LearningSecurityWebMvcTest.ProtectedController.class, CourseController.class}, properties = {
         "spring.config.import=",
         "spring.cloud.config.enabled=false",
         "eureka.client.enabled=false",
@@ -47,6 +52,9 @@ class LearningSecurityWebMvcTest {
     }
 
     @Autowired MockMvc mockMvc;
+    @MockitoBean CurrentUserProvider currentUser;
+    @MockitoBean ListCoursesUseCase listCourses;
+    @MockitoBean AssignCourseTestUseCase assignCourseTest;
 
     @Test
     void missingTokenIsUnauthorized() throws Exception {
@@ -57,5 +65,11 @@ class LearningSecurityWebMvcTest {
     @WithMockUser(roles = "CUSTOMER")
     void authenticatedCallerReachesTheTestRoute() throws Exception {
         mockMvc.perform(get("/api/learning/test-protected")).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "EXAMINER")
+    void examinerCannotReadLearningCourses() throws Exception {
+        mockMvc.perform(get("/api/learning/courses")).andExpect(status().isForbidden());
     }
 }

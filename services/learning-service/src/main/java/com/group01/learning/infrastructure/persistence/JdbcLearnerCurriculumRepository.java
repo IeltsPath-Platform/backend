@@ -22,10 +22,12 @@ public class JdbcLearnerCurriculumRepository implements LearnerCurriculumReposit
     @Override
     public LearnerCurriculum find(UUID userId) {
         List<TopicProgress> topics = jdbc.query(
-                "SELECT topic_id, sequence_order, passed_at, skill, has_topic_test FROM topic_progress WHERE user_id = ?",
+                "SELECT topic_id, course_id, sequence_order, passed_at, skill, has_topic_test "
+                        + "FROM topic_progress WHERE user_id = ?",
                 (row, index) -> {
                     Timestamp passed = row.getTimestamp("passed_at");
                     return new TopicProgress(row.getObject("topic_id", UUID.class),
+                            row.getObject("course_id", UUID.class),
                             row.getObject("sequence_order", Integer.class), passed == null ? null : passed.toInstant(),
                             row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")),
                             row.getBoolean("has_topic_test"));
@@ -39,18 +41,20 @@ public class JdbcLearnerCurriculumRepository implements LearnerCurriculumReposit
         List<TopicProgress> topics = curriculum.topics();
         if (topics.isEmpty()) return;
         jdbc.batchUpdate("""
-                INSERT INTO topic_progress (user_id, topic_id, sequence_order, passed_at, skill, has_topic_test)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO topic_progress (user_id, topic_id, course_id, sequence_order, passed_at, skill, has_topic_test)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (user_id, topic_id) DO UPDATE SET sequence_order = EXCLUDED.sequence_order,
                 passed_at = COALESCE(topic_progress.passed_at, EXCLUDED.passed_at),
-                skill = EXCLUDED.skill, has_topic_test = EXCLUDED.has_topic_test, updated_at = clock_timestamp()
+                course_id = EXCLUDED.course_id, skill = EXCLUDED.skill,
+                has_topic_test = EXCLUDED.has_topic_test, updated_at = clock_timestamp()
                 """, topics, topics.size(), (statement, topic) -> {
             statement.setObject(1, curriculum.userId());
             statement.setObject(2, topic.topicId());
-            statement.setObject(3, topic.sequenceOrder());
-            statement.setTimestamp(4, topic.passedAt() == null ? null : Timestamp.from(topic.passedAt()));
-            statement.setString(5, topic.skill() == null ? null : topic.skill().name());
-            statement.setBoolean(6, topic.hasTopicTest());
+            statement.setObject(3, topic.courseId());
+            statement.setObject(4, topic.sequenceOrder());
+            statement.setTimestamp(5, topic.passedAt() == null ? null : Timestamp.from(topic.passedAt()));
+            statement.setString(6, topic.skill() == null ? null : topic.skill().name());
+            statement.setBoolean(7, topic.hasTopicTest());
         });
     }
 }

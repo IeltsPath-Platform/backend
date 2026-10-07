@@ -44,6 +44,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @ExtendWith(MockitoExtension.class)
 class ContentPackageControllerTest {
+    @Test
+    void creatingACourseTestThroughTheAuthorApiReturns400() throws Exception {
+        when(createContentPackageUseCase.execute(any())).thenThrow(
+                new IllegalArgumentException("COURSE_TEST packages cannot be created through this API"));
+        mockMvc.perform(post("/api/content/packages").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"FINAL\",\"title\":\"Final\",\"packageType\":\"COURSE_TEST\"}"))
+                .andExpect(status().isBadRequest());
+        ArgumentCaptor<CreateContentPackageCommand> command = ArgumentCaptor.forClass(CreateContentPackageCommand.class);
+        verify(createContentPackageUseCase).execute(command.capture());
+        assertThat(command.getValue().packageType()).isEqualTo(PackageType.COURSE_TEST);
+    }
 
     @Mock
     private ListContentPackagesUseCase listContentPackagesUseCase;

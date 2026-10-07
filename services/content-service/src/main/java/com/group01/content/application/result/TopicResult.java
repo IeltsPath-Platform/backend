@@ -17,6 +17,12 @@ public record TopicResult(
         Instant createdAt,
         Instant updatedAt,
         BandRange band,
-        Skill skill
-) {}
+        Skill skill,
+        UUID courseId
+) {
+    public TopicResult(UUID id, UUID parentTopicId, String code, String name, int sortOrder, ContentStatus status,
+                       Instant createdAt, Instant updatedAt, BandRange band, Skill skill) {
+        this(id, parentTopicId, code, name, sortOrder, status, createdAt, updatedAt, band, skill, null);
+    }
+}
 

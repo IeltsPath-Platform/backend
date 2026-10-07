@@ -62,7 +62,8 @@ public class TopicController {
                 request.name(),
                 request.sortOrder(),
                 BandRange.of(request.bandMin(), request.bandMax()),
-                request.skill()
+                request.skill(),
+                request.courseId()
         ));
         return TopicResponse.from(result);
     }
@@ -80,7 +81,8 @@ public class TopicController {
                 request.sortOrder(),
                 request.status(),
                 BandRange.of(request.bandMin(), request.bandMax()),
-                request.skill()
+                request.skill(),
+                request.courseId()
         ));
         return TopicResponse.from(result);
     }

@@ -64,7 +64,8 @@ public class GetTopicTreeUseCase {
                 current.getUpdatedAt(),
                 current.getBand(),
                 current.getSkill(),
-                childNodes
+                childNodes,
+                current.getCourseId()
         );
     }
 }

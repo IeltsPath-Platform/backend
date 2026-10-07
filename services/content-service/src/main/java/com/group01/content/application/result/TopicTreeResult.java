@@ -19,6 +19,12 @@ public record TopicTreeResult(
         Instant updatedAt,
         BandRange band,
         Skill skill,
-        List<TopicTreeResult> children
-) {}
+        List<TopicTreeResult> children,
+        UUID courseId
+) {
+    public TopicTreeResult(UUID id, UUID parentTopicId, String code, String name, int sortOrder, ContentStatus status,
+                           Instant createdAt, Instant updatedAt, BandRange band, Skill skill, List<TopicTreeResult> children) {
+        this(id, parentTopicId, code, name, sortOrder, status, createdAt, updatedAt, band, skill, children, null);
+    }
+}
 

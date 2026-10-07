@@ -19,7 +19,8 @@ Service `GET /internal/learning-content/package-versions/{id}`, forwarding the c
 `X-Correlation-Id` (unknown version → `404`, Content failure → `503 CONTENT_UNAVAILABLE`). `AttemptCreator` then writes,
 in one transaction:
 
-- the attempt type derived from the package type (`TOPIC_TEST`→`TOPIC_GATE`, `MOCK_TEST`→`MOCK`,
+- the attempt type derived from the package type (`TOPIC_TEST`→`TOPIC_GATE`, `COURSE_TEST`→`COURSE_GATE`,
+  `MOCK_TEST`→`MOCK`,
   `PLACEMENT_TEST`→`PLACEMENT`, `QUIZ`→`QUIZ`; `PRACTICE_SET` and `LESSON` → `422 PACKAGE_NOT_ATTEMPTABLE`);
 - Reading `section_snapshot` `{title, skill, instructions, passage?}`; an audio section instead stores
   `{title, skill, instructions, audio:{url,durationSeconds}, solution:{transcript}}`, using Content's resolved `mediaUrl`;

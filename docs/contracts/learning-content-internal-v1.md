@@ -1,14 +1,14 @@
 # Internal learning content API v1
 
-**Status: approved 2026-10-01.**
+**Status: approved 2026-10-01. Updated 2026-10-07: course sequence metadata and course final-test packages.**
 
-Content Service owns these nine routes under `/internal/learning-content` (three practice routes added 2026-10-03). They require a verified internal JWT; callers forward the request bearer and `X-Correlation-Id`. Gateway must explicitly deny client access to `/internal/**`. Responses here can contain `answerSpec` and `explanation` and must never be proxied to a learner unchanged. This contract uses Content's camelCase JSON names. Vocabulary/video catalog data belongs to Library Service; Content V7 removed those tables. The `VOCABULARY` block contains logical sense IDs only, with no Content-owned vocabulary entity or cross-database lookup.
+Content Service owns these ten routes under `/internal/learning-content` (three practice routes added 2026-10-03; course test packages added 2026-10-07). They require a verified internal JWT; callers forward the request bearer and `X-Correlation-Id`. Gateway must explicitly deny client access to `/internal/**`. Responses here can contain `answerSpec` and `explanation` and must never be proxied to a learner unchanged. This contract uses Content's camelCase JSON names. Vocabulary/video catalog data belongs to Library Service; Content V7 removed those tables. The `VOCABULARY` block contains logical sense IDs only, with no Content-owned vocabulary entity or cross-database lookup.
 
 Examples use real codes, stems, answers, and passages from [`seed-content.md`](../../plans/260930-2057-mvp-reading-writing-listening-roadmap/seed-content.md). The existing V4 UUIDs for DEMO_READING and KP1 are real; other example UUIDs illustrate relationships rather than fixing V9 migration IDs. A `404` means the id is unknown or unpublished. Collections are sorted as described below.
 
 ## `GET /topic-sequence`
 
-Returns an array of ACTIVE topics that have a `skill` and at least one PUBLISHED lesson, ordered by `skill`, then `sortOrder`, then `topicId` (changed 2026-10-03: a PUBLISHED `TOPIC_TEST` is no longer required). `skill` is the one skill the topic's lessons teach (`LISTENING`, `READING`, `WRITING` or `SPEAKING`; never `ALL`). `hasTopicTest` is true when the topic has a PUBLISHED `TOPIC_TEST` package with a current version; a topic without one (the demo `DEMO_WRITING`) is passed by completing its lessons. This is the single curriculum read used to build and refresh the MVP path. Each topic includes its ACTIVE knowledge points, ordered by `created_at`, then `id`; no band or answer key is returned. `hasPracticeSet` is true exactly when at least one package matches `POST /practice-sets/search` for that KP with `excludePackageIds=[]` and default `minQuestions=3`. Since content V16 every KP of the free and premium Reading and Listening topics has one; the Writing KPs have none.
+Returns an array of ACTIVE topics that belong to an ACTIVE course, have a `skill` and at least one PUBLISHED lesson, ordered by `skill`, then `course.bandLevel`, then `sortOrder`, then `topicId` (course filtering/order added 2026-10-07; a PUBLISHED `TOPIC_TEST` has not been required since 2026-10-03). Topics without a course or in an inactive course are excluded. Each topic carries `course: {courseId, code, name, bandLevel, hasCourseTest}`; `hasCourseTest` is true when that course has a PUBLISHED `COURSE_TEST` package with a non-null current version. Course metadata is joined in the topic query. `skill` is the one skill the topic's lessons teach (`LISTENING`, `READING`, `WRITING` or `SPEAKING`; never `ALL`). `hasTopicTest` is true when the topic has a PUBLISHED `TOPIC_TEST` package with a current version; a topic without one (the demo `DEMO_WRITING`) is passed by completing its lessons. This is the single curriculum read used to build and refresh the MVP path. Each topic includes its ACTIVE knowledge points, ordered by `created_at`, then `id`; no topic band range or answer key is returned. `hasPracticeSet` is true exactly when at least one package matches `POST /practice-sets/search` for that KP with `excludePackageIds=[]` and default `minQuestions=3`. Since content V16 every KP of the free and premium Reading and Listening topics has one; the Writing KPs have none.
 
 ```json
 [
@@ -16,6 +16,7 @@ Returns an array of ACTIVE topics that have a `skill` and at least one PUBLISHED
     "topicId": "10000000-0000-4000-8000-000000000001",
     "code": "DEMO_READING", "name": "Demo IELTS Reading", "sortOrder": 900, "requiredFeatureKey": null,
     "skill": "READING", "hasTopicTest": true,
+    "course": {"courseId":"30000000-0000-4000-8000-000000000001","code":"IELTS_5_5","name":"IELTS 5.5","bandLevel":5.5,"hasCourseTest":true},
     "knowledgePoints": [
       {"id":"20000000-0000-4000-8000-000000000003","code":"DR_TOPIC_SENTENCE","name":"Câu chủ đề","learningType":"PROCEDURE","skill":"READING","description":null,"hasPracticeSet":true}
     ]
@@ -24,6 +25,7 @@ Returns an array of ACTIVE topics that have a `skill` and at least one PUBLISHED
     "topicId": "20000000-0000-4000-8000-000000000002",
     "code": "TFNG_SKILLS", "name": "True / False / Not Given", "sortOrder": 910, "requiredFeatureKey": null,
     "skill": "READING", "hasTopicTest": true,
+    "course": {"courseId":"30000000-0000-4000-8000-000000000001","code":"IELTS_5_5","name":"IELTS 5.5","bandLevel":5.5,"hasCourseTest":true},
     "knowledgePoints": [
       {"id":"20000000-0000-4000-8000-000000000005","code":"TFNG_FALSE_VS_NOT_GIVEN","name":"False hay Not Given","learningType":"PROCEDURE","skill":"READING","description":null,"hasPracticeSet":true}
     ]
@@ -31,7 +33,7 @@ Returns an array of ACTIVE topics that have a `skill` and at least one PUBLISHED
 ]
 ```
 
-The example shows representative KPs; the real response includes **all** ACTIVE KPs of each returned topic (KP1–KP4 for `DEMO_READING`, KP5 for `TFNG_SKILLS`). `hasPracticeSet` uses the same eligible-package predicate as search, including the no-overlap rule below. It is computed in a batched query, not by one query per KP. The topic object is `{topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest}`; `skill` and `hasTopicTest` were added 2026-10-03 and existing readers that ignore unknown fields keep working. Content V15 moved the Writing knowledge points `DEMO_READING_W1_CHART` and `DEMO_READING_W2_OPINION`, with their essay blocks (same block ids), from Reading lessons L3/L4 to `DEMO_WRITING` lessons W1/W2 (sort 950, no final test). Every lesson question has its topic's skill. `requiredFeatureKey` (added 2026-10-02) is the Access feature needed to learn the topic, `null` when free; the seed marks `PREMIUM_MATCHING_INFO` and `PREMIUM_SENTENCE_COMPLETION` (sort 930, 940) with `PREMIUM_CONTENT`.
+The example shows representative KPs; the real response includes **all** ACTIVE KPs of each returned topic (KP1–KP4 for `DEMO_READING`, KP5 for `TFNG_SKILLS`). `hasPracticeSet` uses the same eligible-package predicate as search, including the no-overlap rule below. It is computed in a batched query, not by one query per KP. The topic object is `{topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course}`; `skill` and `hasTopicTest` were added 2026-10-03 and `course` on 2026-10-07. Existing readers that ignore unknown fields keep working. Content V15 moved the Writing knowledge points `DEMO_READING_W1_CHART` and `DEMO_READING_W2_OPINION`, with their essay blocks (same block ids), from Reading lessons L3/L4 to `DEMO_WRITING` lessons W1/W2 (sort 950, no final test). Every lesson question has its topic's skill. `requiredFeatureKey` (added 2026-10-02) is the Access feature needed to learn the topic, `null` when free; the seed marks `PREMIUM_MATCHING_INFO` and `PREMIUM_SENTENCE_COMPLETION` (sort 930, 940) with `PREMIUM_CONTENT`.
 
 ## `GET /topics/{id}/lessons`
 
@@ -45,6 +47,31 @@ Returns PUBLISHED lessons of the ACTIVE topic in `sortOrder` order, with IDs nee
 ```
 
 The example includes two representative entries; the actual seed has L1–L4.
+
+V21 seed example for the independent 6.5 Reading sequence (KPs abbreviated to show the course and per-KP practice flag):
+
+```json
+{
+  "topicId":"28000000-0000-4000-8000-010000000001",
+  "code":"READING_6_5_INFERENCE",
+  "name":"Reading 6.5: Inference and paraphrase",
+  "sortOrder":960,
+  "requiredFeatureKey":null,
+  "skill":"READING",
+  "hasTopicTest":true,
+  "course":{"courseId":"30000000-0000-4000-8000-000000000002","code":"IELTS_6_5","name":"IELTS 6.5","bandLevel":6.5,"hasCourseTest":true},
+  "knowledgePoints":[
+    {"id":"28000000-0000-4000-8000-020000000001","code":"R65_EVIDENCE_INFERENCE","name":"Supported inference","learningType":"PROCEDURE","skill":"READING","description":null,"hasPracticeSet":true},
+    {"id":"28000000-0000-4000-8000-020000000002","code":"R65_PARAPHRASE","name":"Paraphrase across sentences","learningType":"PROCEDURE","skill":"READING","description":null,"hasPracticeSet":true}
+  ]
+}
+```
+
+The seed also creates one `COURSE_TEST` for each seeded course. For example, the 6.5 course package route returns:
+
+```json
+[{"packageId":"28000000-0000-4000-8000-080000000005","packageVersionId":"28000000-0000-4000-8000-090000000005","code":"COURSE-6_5-READING"}]
+```
 
 ## `GET /lessons/{id}`
 
@@ -91,6 +118,12 @@ Returns PUBLISHED `TOPIC_TEST` packages for the topic with their current PUBLISH
 ]
 ```
 
+## `GET /courses/{id}/test-packages`
+
+Added 2026-10-07. Returns PUBLISHED `COURSE_TEST` packages belonging to the ACTIVE course, with a current version that belongs to the same package and is PUBLISHED, sorted by `packageId`. Shape is identical to `GET /topics/{id}/test-packages`: `{packageId, packageVersionId, code}[]`. An unknown or inactive course returns `404`; a course without a published final test returns `[]`. Course tests are created by seed only. Learning owns eligibility for taking the course test and rotates the returned packages.
+
+`GET /package-versions/{id}` accepts published `COURSE_TEST` versions using the existing package payload, with `packageType="COURSE_TEST"` and nullable `topicId`.
+
 ## `POST /practice-sets/search`
 
 Request is `{knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId}`. Defaults are `[]`, `3`, `1` and none; `limit` must be 1–10. Return PUBLISHED `PRACTICE_SET` packages with at least `minQuestions` total questions and at least one question mapped to the requested KP. Exclude packages in `excludePackageIds` and packages containing any question version also used in a lesson or `TOPIC_TEST` of **any** topic. Sort the packages of `preferredLessonId` (added 2026-10-03, optional) first, then by matching-question count descending, then `packageId`; apply `limit` in the database. Learning passes every package already revealed to the learner in `excludePackageIds`. The `hasPracticeSet` predicate above is this eligibility rule before exclusion/limit.
@@ -103,7 +136,7 @@ Request is `{knowledgePointId, excludePackageIds, minQuestions, limit, preferred
 [{"packageId":"20000000-0000-4000-8000-000000000501","packageVersionId":"20000000-0000-4000-8000-000000000601","code":"PS-KP1-A","questionCount":4,"matchedQuestionCount":4}]
 ```
 
-Practice search eligibility also excludes question versions used by `MOCK_TEST` or `PLACEMENT_TEST` packages. The same exclusion applies to availability counts and `hasPracticeSet`.
+Practice search eligibility also excludes question versions used by `COURSE_TEST`, `MOCK_TEST` or `PLACEMENT_TEST` packages. The same exclusion applies to availability counts and `hasPracticeSet`. Reservation checks also include `COURSE_TEST` questions, so they cannot be reused as practice material.
 
 The request/response illustrates KP1 and its `PS-KP1-A` package. The V4 one-question package is ineligible with the default `minQuestions=3`.
 
@@ -145,4 +178,4 @@ X1 example (one representative item shown; the actual version contains Q2, Q14, 
 
 These are new internal DTOs. Existing public Content DTO names such as `answerSpecJson` and `rulesJson` are unchanged by this contract. Error responses follow Content Service's existing `ErrorResponse` shape; a missing/unpublished resource is `404` and invalid search input is `400`.
 
-Package publishing enforces one owner per `question_id` across its versions: any lesson or a published version of one `PRACTICE_SET`, `TOPIC_TEST`, `MOCK_TEST` or `PLACEMENT_TEST` package; versions of the same package may share questions and drafts do not reserve them. Conflicts return `422` with `details.code = QUESTION_ALREADY_USED`. The question bank's immutable `purpose` (V17) is `LEARNING` for lessons, practice and topic tests, and `EXAM` for mock/placement tests; publishing the wrong purpose returns `422` with `details.code = QUESTION_PURPOSE_MISMATCH`. Public question creation accepts optional `purpose` (default `LEARNING`), public question responses include it, and `GET /api/content/questions` accepts a purpose filter; the internal lesson/package payloads remain as defined above. `QUIZ` and legacy `LESSON` packages are outside these publishing checks.
+Package publishing enforces one owner per `question_id` across its versions: any lesson or a published version of one `PRACTICE_SET`, `TOPIC_TEST`, `COURSE_TEST`, `MOCK_TEST` or `PLACEMENT_TEST` package; versions of the same package may share questions and drafts do not reserve them. Conflicts return `422` with `details.code = QUESTION_ALREADY_USED`. The question bank's immutable `purpose` (V17) is `LEARNING` for lessons, practice, topic tests and course tests, and `EXAM` for mock/placement tests; publishing the wrong purpose returns `422` with `details.code = QUESTION_PURPOSE_MISMATCH`. Course tests use the same ordered question locks and ownership/purpose checks before publishing. They must contain Reading questions with auto-gradable CHOICE or FILL answer specs (including the legacy CHOICE shape): missing/unsupported specs, blank or non-text CHOICE answers, empty/invalid FILL alternatives, essays, and non-Reading questions return `400` without publishing. Public creation of `COURSE_TEST` returns `400`, like `TOPIC_TEST`; both are seeded only. Public question creation accepts optional `purpose` (default `LEARNING`), public question responses include it, and `GET /api/content/questions` accepts a purpose filter; the internal lesson/package payloads remain as defined above. `QUIZ` and legacy `LESSON` packages are outside these publishing checks.

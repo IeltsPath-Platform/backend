@@ -42,6 +42,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class InternalLearningContentControllerTest {
+    private final com.group01.content.application.usecase.GetCourseTestPackagesUseCase courseTests =
+            mock(com.group01.content.application.usecase.GetCourseTestPackagesUseCase.class);
+
+    @Test
+    void sequenceCarriesCourseMetadataAndCourseTestPackagesUseTheExistingShape() throws Exception {
+        UUID course = UUID.randomUUID();
+        UUID pkg = UUID.randomUUID();
+        UUID version = UUID.randomUUID();
+        when(topicSequence.execute()).thenReturn(List.of(new TopicSequenceResult(UUID.randomUUID(), "TOPIC", "Topic",
+                1, null, List.of(), Skill.READING, false,
+                new TopicSequenceResult.CourseEntry(course, "IELTS_5_5", "IELTS 5.5", new java.math.BigDecimal("5.5"), true))));
+        when(courseTests.execute(course)).thenReturn(List.of(
+                new com.group01.content.application.result.TopicTestPackageResult(pkg, version, "FINAL")));
+        mockMvc.perform(get("/internal/learning-content/topic-sequence"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].course.courseId").value(course.toString()))
+                .andExpect(jsonPath("$[0].course.bandLevel").value(5.5))
+                .andExpect(jsonPath("$[0].course.hasCourseTest").value(true));
+        mockMvc.perform(get("/internal/learning-content/courses/{id}/test-packages", course))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].packageId").value(pkg.toString()))
+                .andExpect(jsonPath("$[0].packageVersionId").value(version.toString()))
+                .andExpect(jsonPath("$[0].code").value("FINAL"));
+    }
     private final GetTopicSequenceUseCase topicSequence = mock(GetTopicSequenceUseCase.class);
     private final GetTopicLessonsUseCase topicLessons = mock(GetTopicLessonsUseCase.class);
     private final GetLessonContentUseCase lessonContent = mock(GetLessonContentUseCase.class);
@@ -59,7 +81,7 @@ class InternalLearningContentControllerTest {
         validator.afterPropertiesSet();
         mockMvc = MockMvcBuilders.standaloneSetup(new InternalLearningContentController(topicSequence, topicLessons,
                         lessonContent, testPackages, search, packageVersion, lessonPracticeSets, topicPracticeSets,
-                        availability))
+                        availability, courseTests))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();

@@ -10,6 +10,29 @@ migration only in Testcontainers until its use on a shared `content_db` is appro
 through `GET /api/content/topics/{id}`. Content implements `POST /internal/game-content/snapshots` only for `GRAMMAR`;
 Library implements the same [snapshot contract](../../docs/contracts/game-content-snapshot-v1.md) for `VOCABULARY`.
 
+## Courses
+
+Courses group topics by an IELTS band level shared across skills. `bandLevel` is unique and must be between 0 and 9
+in half-band steps. `code` is unique and remains unchanged on update. Courses have `ACTIVE` or `INACTIVE` status.
+
+- `GET /api/content/courses`: `ADMIN`, `CONTENT_AUTHOR`, `CUSTOMER`, and `EXAMINER`; returns all courses ordered by
+  `bandLevel` in the database.
+- `POST /api/content/admin/courses`: `ADMIN` and `CONTENT_AUTHOR`; accepts `code`, `name`, and `bandLevel` and creates
+  an active course.
+- `PUT /api/content/admin/courses/{id}`: the same author roles; accepts `name`, `bandLevel`, and optional `status`.
+  Duplicate course codes or band levels return 409; invalid bands return 400; unknown course IDs return 404.
+
+Topic create/update requests and topic detail/tree responses include nullable `courseId`. A supplied ID must reference
+an existing course. An omitted or null course ID on update preserves membership; creating a topic without a course
+remains valid. Topic `bandMin`/`bandMax` metadata remains available. V19 adds the course table and nullable topic foreign key.
+
+V21 seeds active `IELTS_5_5` (band 5.5) and `IELTS_6_5` (band 6.5) courses. Every existing topic with a skill is
+assigned to IELTS 5.5. IELTS 6.5 includes the Reading topic `READING_6_5_INFERENCE`, with inference and paraphrase
+knowledge points, a lesson, a passage, practice for each knowledge point, and a topic test. Each course has a
+six-question Reading `COURSE_TEST`; these packages are seed-managed and exposed through the course sequence's
+`hasCourseTest` flag and `GET /internal/learning-content/courses/{id}/test-packages`. The seed and representative
+6.5 sequence response are covered in the [internal learning content contract](../../docs/contracts/learning-content-internal-v1.md).
+
 ## Lessons and curriculum order
 
 V8 implements `lessons`, `lesson_blocks`, `lesson_block_vocabulary`, `lesson_block_questions` and
@@ -17,11 +40,11 @@ V8 implements `lessons`, `lesson_blocks`, `lesson_block_vocabulary`, `lesson_blo
 multiple test codes. `LESSON` remains a valid package type for existing reading packages. V9 seeds the Reading
 lesson pipeline. These are implemented migrations; their presence does not confirm they ran on a shared database.
 
-Learning reads the six `/internal/learning-content/**` routes in the
+Learning reads the `/internal/learning-content/**` routes in the
 [internal contract](../../docs/contracts/learning-content-internal-v1.md). `topic-sequence` returns active topics
-that have a skill and published lessons, ordered by skill then `sort_order`, with `hasTopicTest`, active KPs and
-`hasPracticeSet`. Learning owns learner progress, gates and mastery; Assessment reads package snapshots when it
-creates an attempt.
+that have a skill and published lessons and an active course, ordered by skill, course band and topic order, with
+course metadata, `hasTopicTest`, active KPs and `hasPracticeSet`. Learning owns learner progress, gates and mastery;
+Assessment reads package snapshots when it creates an attempt.
 
 Each topic that teaches lessons has one `skill` (`LISTENING`, `READING`, `WRITING`, `SPEAKING`; V15, never `ALL`),
 and its lessons inherit it. Topic create/update accept an optional `skill`; update keeps the current skill when it is

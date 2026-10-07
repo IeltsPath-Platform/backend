@@ -50,7 +50,7 @@ OutboxRelay                                                     committed row ->
 | `attempt_id` | UUID | Regrade lineage: every version of one attempt's result shares it. |
 | `result_id` | UUID | The versioned result row (a new id for each version). |
 | `result_version` | integer >= 1 | Monotonic per attempt. |
-| `assessment_type` | string | `PLACEMENT`, `OFFICIAL_PRACTICE`, `MOCK`, `TOPIC_GATE`, `QUIZ` |
+| `assessment_type` | string | `PLACEMENT`, `OFFICIAL_PRACTICE`, `MOCK`, `TOPIC_GATE`, `QUIZ`, `COURSE_GATE` |
 | `status` | string | Always `COMPLETED`. |
 | `completed_at` | ISO-8601 instant | |
 | `overall_band` | number or null | The grader's band for this version (0.0–9.0, half-band steps); `null` when none was recorded. Optional on older events. Placement no longer writes mastery or tests out KPs; the field remains for compatibility. |
@@ -133,12 +133,18 @@ Consumer delivery rules:
   review evaluation. Topic `PASSED` is one-way; a regrade does not revoke it or
   consume another assignment.
 - `PLACEMENT` records only the processed result version. It writes no mastery evidence.
+- A non-null `overall_band` on the latest `PLACEMENT` result is stored by Learning for course recommendation only. It does not
+  change topic status, select a course for the learner, or gate a course.
+- `COURSE_GATE` consumes the matching open course-test assignment. A result at or above 70% records one-way
+  `course_progress.passed_at`; it does not change any topic status.
 
 ## Rollout and DLQ replay
 
-1. Deploy Learning Service's consumer accepting `learning_goal_id` as null or missing
-   and `package_version_id` as optional before Assessment's new producer. The consumer
-   declares the main, retry and dead-letter topology above.
+1. Deploy Learning Service's consumer accepting `learning_goal_id` as null or missing,
+   `package_version_id` as optional, and `COURSE_GATE` before Assessment emits the new
+   type. The consumer declares the main, retry and dead-letter topology above. The
+   course-test flow uses `COURSE_GATE` for `COURSE_TEST` packages; restart Learning
+   before Assessment, then replay any messages already sent to the DLQ.
 2. While only the service skeleton exists, no new Learning Service queue is declared.
    The development rollout accepts this gap until the consumer is implemented.
 3. Pause the Assessment outbox relay or producer during recovery. Inspect queue counts

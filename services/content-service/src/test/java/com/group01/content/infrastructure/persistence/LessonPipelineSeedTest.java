@@ -371,16 +371,19 @@ class LessonPipelineSeedTest {
 
         assertThat(sequence).extracting(TopicSequenceResult::code)
                 .containsExactly("DEMO_LISTENING", "DEMO_READING", "TFNG_SKILLS",
-                        "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION", "DEMO_WRITING");
+                        "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION", "READING_6_5_INFERENCE", "DEMO_WRITING");
         assertThat(sequence).extracting(TopicSequenceResult::skill)
                 .containsExactly(Skill.LISTENING, Skill.READING, Skill.READING, Skill.READING, Skill.READING,
-                        Skill.WRITING);
+                        Skill.READING, Skill.WRITING);
         // The Writing topic has no final test; a learner passes it by completing its lessons.
         assertThat(sequence).extracting(TopicSequenceResult::hasTopicTest)
-                .containsExactly(true, true, true, true, true, false);
-        // Within the Reading track, paid topics come after every free one.
+                .containsExactly(true, true, true, true, true, true, false);
+        // The lower-band Reading course keeps its paid topics after its free topics.
         assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
-                .containsExactly(null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT", null);
+                .containsExactly(null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT", null, null);
+        assertThat(sequence).allMatch(entry -> entry.course().hasCourseTest());
+        assertThat(topic(sequence, "READING_6_5_INFERENCE").course().bandLevel()).isEqualByComparingTo("6.5");
+        assertThat(topic(sequence, "DEMO_READING").course().bandLevel()).isEqualByComparingTo("5.5");
         TopicSequenceResult reading = topic(sequence, "DEMO_READING");
         assertThat(reading.knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::code)
                 .containsExactly("DEMO_READING_MAIN_IDEA", "DR_IDEA_OR_DETAIL", "DR_TOPIC_SENTENCE",
@@ -535,7 +538,8 @@ class LessonPipelineSeedTest {
                 Map.entry("PS-KP3-B", "L1"), Map.entry("PS-KP3-C", "L1"), Map.entry("PS-KP2-C", "L3"),
                 Map.entry("PS-KP4-B", "L4"), Map.entry("PS-KP4-C", "L4"), Map.entry("PS-TF-B", "TF1"),
                 Map.entry("PS-TF-C", "TF1"), Map.entry("PS-PM1-B", "PM1"), Map.entry("PS-PM2-B", "PM2"),
-                Map.entry("PS-PS1-B", "PS1"), Map.entry("PS-PS2-B", "PS2"))));
+                Map.entry("PS-PS1-B", "PS1"), Map.entry("PS-PS2-B", "PS2"),
+                Map.entry("R65-PS-INFERENCE", "R65-I1"), Map.entry("R65-PS-PARAPHRASE", "R65-I1"))));
         // The one-question V4 demo package is too small to be anyone's Practice.
         assertThat(jdbc.queryForObject("SELECT lesson_id FROM content_packages WHERE code = 'DEMO_MAIN_FLOW_READING'",
                 Map.of(), UUID.class)).isNull();
@@ -858,7 +862,7 @@ class LessonPipelineSeedTest {
         // 43 reading questions, the Task 1 and Task 2 essays, 27 listening questions, the V4 practice-set question
         // the 10 questions of the paid topics, the 21 practice questions of V16 and the 43 practice and final-test
         // questions of V18.
-        assertThat(reserved).hasSize(147);
+        assertThat(reserved).hasSize(171);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }
 

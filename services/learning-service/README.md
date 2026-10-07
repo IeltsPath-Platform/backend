@@ -3,7 +3,8 @@
 Spring Boot service on port 8086, registered in Eureka as `learning-service`.
 Gateway forwards `/api/learning/**` and supplies the internal JWT validated by
 `common-security`. The verified JWT subject scopes all learner progress and mastery.
-The module implements topic ordering, lessons (exercise and essay blocks, audio),
+The module implements placement-based course recommendations, independent topic paths per course, course final-test
+assignments and the `COURSE_GATE` result path, lessons (exercise and essay blocks, audio),
 exercise submissions, Writing essay grading (Task 1 and Task 2, LLM), mastery reads,
 review sets, final-test assignment and the `AssessmentCompleted.v2` consumer.
 
@@ -35,13 +36,16 @@ Tests supply their own configuration and do not import local environment files.
 ## Implemented learner routes
 
 Call through Gateway with the learner bearer token. All paths below have prefix
-`/api/learning`; request and response JSON use camelCase. Start with `GET /topics`
-to refresh the user's curriculum order before opening lessons. See the
+`/api/learning`; request and response JSON use camelCase. Start with `GET /courses` to
+show available bands and the optional placement recommendation, then group topics from
+`GET /topics` by each topic's `course.courseId`. See the
 [approved learner contract](../../docs/contracts/lesson-learning-v1.md) for payloads.
 
 | Method | Path | Behavior |
 | --- | --- | --- |
-| GET | `/topics` | One Content `topic-sequence` read refreshes the shared KP catalog and the user's topic order; returns `skill`, `hasTopicTest`, statuses and completed lesson counts. |
+| GET | `/courses` | CUSTOMER only; returns courses by band with placement-based `recommended`, topic counts and course-test `testStatus`. Every course is open. |
+| GET | `/topics` | One Content `topic-sequence` read refreshes the shared KP catalog and the user's topic order; returns `skill`, `course`, `hasTopicTest`, statuses and completed lesson counts. Topic status sequences are independent per course and span skills. |
+| POST | `/courses/{id}/test-assignments` | CUSTOMER only; assigns/returns a course final-test package after every topic in that course passes. `COURSE_GATE` at 70% passes the course without blocking another course. |
 | GET | `/topics/{id}/lessons` | Lists lessons with `practiceStatus` and `practicePassReason`, plus topic `skill`, `hasTopicTest`, and `testStatus`. |
 | GET | `/lessons/{id}` | Applies the lesson gate and returns ordered blocks; a passed exercise block includes its solutions. |
 | POST | `/lessons/{id}/exercises/{blockId}/submissions` | Grades every question in the block, saves an idempotent response and completes the lesson when all exercise blocks have passed. |

@@ -88,12 +88,52 @@ class RestLearningContentClientTest {
         assertEquals("DEMO_READING", topic.code());
         assertEquals(900, topic.sortOrder());
         assertEquals("PREMIUM_CONTENT", topic.requiredFeatureKey());
+        assertNull(topic.course());
         var knowledgePoint = topic.knowledgePoints().getFirst();
         assertEquals(KP_ID, knowledgePoint.id());
         assertEquals("PROCEDURE", knowledgePoint.learningType());
         assertEquals("READING", knowledgePoint.skill());
         assertNull(knowledgePoint.description());
         assertTrue(knowledgePoint.hasPracticeSet());
+    }
+
+    @Test
+    void mapsTopicCourseMetadataInSequence() {
+        server.expect(requestTo(INTERNAL_PATH + "/topic-sequence"))
+                .andRespond(withSuccess("""
+                        [{"topicId":"10000000-0000-4000-8000-000000000001","code":"R65",
+                          "name":"Reading 6.5","sortOrder":960,"requiredFeatureKey":null,
+                          "skill":"READING","hasTopicTest":true,
+                          "course":{"courseId":"30000000-0000-4000-8000-000000000002",
+                            "code":"IELTS_6_5","name":"IELTS 6.5","bandLevel":6.5,"hasCourseTest":true},
+                          "knowledgePoints":[]}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var course = client.getTopicSequence().getFirst().course();
+
+        assertEquals(UUID.fromString("30000000-0000-4000-8000-000000000002"), course.courseId());
+        assertEquals("IELTS_6_5", course.code());
+        assertEquals("IELTS 6.5", course.name());
+        assertEquals(new BigDecimal("6.5"), course.bandLevel());
+        assertTrue(course.hasCourseTest());
+    }
+
+    @Test
+    void mapsCourseTestPackages() {
+        UUID courseId = UUID.fromString("30000000-0000-4000-8000-000000000002");
+        server.expect(requestTo(INTERNAL_PATH + "/courses/" + courseId + "/test-packages"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        [{"packageId":"28000000-0000-4000-8000-080000000005",
+                          "packageVersionId":"28000000-0000-4000-8000-090000000005",
+                          "code":"COURSE-6_5-READING"}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var testPackage = client.getCourseTestPackages(courseId).getFirst();
+
+        assertEquals(UUID.fromString("28000000-0000-4000-8000-080000000005"), testPackage.packageId());
+        assertEquals(UUID.fromString("28000000-0000-4000-8000-090000000005"), testPackage.packageVersionId());
+        assertEquals("COURSE-6_5-READING", testPackage.code());
     }
 
     @Test

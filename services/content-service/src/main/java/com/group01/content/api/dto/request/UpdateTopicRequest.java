@@ -26,6 +26,12 @@ public record UpdateTopicRequest(
         @DecimalMax(value = "9.0", message = "bandMax must be at most 9.0")
         BigDecimal bandMax,
         // Null keeps the current skill; a change is refused once the topic has published lessons.
-        Skill skill
-) {}
+        Skill skill,
+        UUID courseId
+) {
+    public UpdateTopicRequest(UUID parentTopicId, String name, int sortOrder, ContentStatus status,
+                              BigDecimal bandMin, BigDecimal bandMax, Skill skill) {
+        this(parentTopicId, name, sortOrder, status, bandMin, bandMax, skill, null);
+    }
+}
 

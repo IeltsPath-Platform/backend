@@ -20,7 +20,8 @@ public class TopicPersistenceMapper {
                 BandRange.of(entity.getBandMin(), entity.getBandMax()),
                 entity.getSkill(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getCourseId()
         );
     }
 
@@ -29,6 +30,7 @@ public class TopicPersistenceMapper {
         return TopicJpaEntity.builder()
                 .id(domain.getId())
                 .parentTopicId(domain.getParentTopicId())
+                .courseId(domain.getCourseId())
                 .code(domain.getCode())
                 .name(domain.getName())
                 .sortOrder(domain.getSortOrder())

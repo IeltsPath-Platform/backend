@@ -68,17 +68,20 @@ class TopicStatusDeriverTest {
     void opensAnIndependentTopicForEachSkillIncludingUnspecified() {
         UUID fourth = new UUID(0, 4);
         UUID fifth = new UUID(0, 5);
+        UUID readingCourse = new UUID(1, 1);
+        UUID higherCourse = new UUID(1, 2);
+        UUID unassignedCourse = new UUID(1, 3);
         var result = deriver.derive(List.of(
-                new TopicProgress(first, 1, null, LearningSkill.READING, true),
-                new TopicProgress(second, 2, null, LearningSkill.LISTENING, true),
-                new TopicProgress(third, 3, null, null, true),
-                new TopicProgress(fourth, 4, null, LearningSkill.READING, true),
-                new TopicProgress(fifth, 5, null, LearningSkill.LISTENING, true)));
+                new TopicProgress(first, readingCourse, 1, null, LearningSkill.READING, true),
+                new TopicProgress(second, readingCourse, 2, null, LearningSkill.LISTENING, true),
+                new TopicProgress(third, unassignedCourse, 3, null, null, true),
+                new TopicProgress(fourth, higherCourse, 4, null, LearningSkill.READING, true),
+                new TopicProgress(fifth, higherCourse, 5, null, LearningSkill.LISTENING, true)));
 
         assertThat(result).containsEntry(first, TopicStatus.IN_PROGRESS)
-                .containsEntry(second, TopicStatus.IN_PROGRESS)
+                .containsEntry(second, TopicStatus.LOCKED)
                 .containsEntry(third, TopicStatus.IN_PROGRESS)
-                .containsEntry(fourth, TopicStatus.LOCKED)
+                .containsEntry(fourth, TopicStatus.IN_PROGRESS)
                 .containsEntry(fifth, TopicStatus.LOCKED);
     }
 }

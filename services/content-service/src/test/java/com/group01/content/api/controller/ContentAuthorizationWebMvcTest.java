@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = {
         QuestionController.class, ContentPackageController.class, ContentAssetController.class,
-        KnowledgePointController.class, TopicController.class, ReadingController.class
+        KnowledgePointController.class, TopicController.class, ReadingController.class, CourseController.class
 }, properties = {
         "spring.cloud.config.enabled=false",
         "app.auth.internal-jwt-issuer=urn:code-base:api-gateway"
@@ -57,6 +57,47 @@ class ContentAuthorizationWebMvcTest {
     }
 
     @Autowired MockMvc mockMvc;
+    @MockitoBean ListCoursesUseCase listCourses;
+    @MockitoBean CreateCourseUseCase createCourse;
+    @MockitoBean UpdateCourseUseCase updateCourse;
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void learnerCanReadCoursesButCannotCreateOrUpdateThem() throws Exception {
+        when(listCourses.execute()).thenReturn(List.of());
+        mockMvc.perform(get("/api/content/courses")).andExpect(status().isOk());
+        mockMvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"code\":\"IELTS\",\"name\":\"IELTS\",\"bandLevel\":5.5}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/content/admin/courses/{id}", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"IELTS\",\"bandLevel\":5.5}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(createCourse, updateCourse);
+    }
+
+    @Test
+    @WithMockUser(roles = "SALES_STAFF")
+    void salesStaffCannotReadCourses() throws Exception {
+        mockMvc.perform(get("/api/content/courses")).andExpect(status().isForbidden());
+        verifyNoInteractions(listCourses);
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void authorCanCreateAndUpdateCourses() throws Exception {
+        var course = com.group01.content.application.result.CourseResult.from(
+                com.group01.content.domain.aggregate.Course.create("IELTS", "IELTS", new java.math.BigDecimal("5.5")));
+        when(createCourse.execute(any())).thenReturn(course);
+        when(updateCourse.execute(any())).thenReturn(course);
+        mockMvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"IELTS\",\"name\":\"IELTS\",\"bandLevel\":5.5}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/content/admin/courses/{id}", UUID.randomUUID()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"IELTS\",\"bandLevel\":5.5}"))
+                .andExpect(status().isOk());
+    }
     @MockitoBean ListQuestionsUseCase listQuestions;
     @MockitoBean GetQuestionDetailUseCase getQuestionDetail;
     @MockitoBean CreateQuestionUseCase createQuestion;

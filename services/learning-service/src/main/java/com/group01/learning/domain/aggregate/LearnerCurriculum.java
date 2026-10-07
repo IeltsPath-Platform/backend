@@ -37,15 +37,19 @@ public final class LearnerCurriculum {
         for (int index = 0; index < placements.size(); index++) {
             TopicPlacement placement = placements.get(index);
             topics.computeIfAbsent(placement.topicId(), id -> new TopicProgress(id, null, null))
-                    .place(index + 1, placement.skill(), placement.hasTopicTest());
+                    .place(index + 1, placement.courseId(), placement.skill(), placement.hasTopicTest());
         }
     }
 
     public void reorder(Collection<UUID> orderedTopicIds) {
-        reorder(orderedTopicIds.stream().map(id -> new TopicPlacement(id, null, true)).toList());
+        reorder(orderedTopicIds.stream().map(id -> new TopicPlacement(id, null, null, true)).toList());
     }
 
-    public record TopicPlacement(UUID topicId, LearningSkill skill, boolean hasTopicTest) {}
+    public record TopicPlacement(UUID topicId, UUID courseId, LearningSkill skill, boolean hasTopicTest) {
+        public TopicPlacement(UUID topicId, LearningSkill skill, boolean hasTopicTest) {
+            this(topicId, null, skill, hasTopicTest);
+        }
+    }
 
     public Optional<TopicProgress> topic(UUID topicId) { return Optional.ofNullable(topics.get(topicId)); }
 

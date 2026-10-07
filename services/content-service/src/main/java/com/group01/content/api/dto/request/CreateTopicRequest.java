@@ -28,6 +28,12 @@ public record CreateTopicRequest(
         @DecimalMax(value = "9.0", message = "bandMax must be at most 9.0")
         BigDecimal bandMax,
         // The skill the topic's lessons teach; optional, never ALL.
-        Skill skill
-) {}
+        Skill skill,
+        UUID courseId
+) {
+    public CreateTopicRequest(UUID parentTopicId, String code, String name, int sortOrder,
+                              BigDecimal bandMin, BigDecimal bandMax, Skill skill) {
+        this(parentTopicId, code, name, sortOrder, bandMin, bandMax, skill, null);
+    }
+}
 

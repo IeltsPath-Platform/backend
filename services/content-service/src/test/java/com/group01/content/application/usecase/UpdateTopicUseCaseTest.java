@@ -22,6 +22,47 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class UpdateTopicUseCaseTest {
+    @Test
+    void assigningACourseValidatesItAndReturnsItsId() {
+        var courses = mock(com.group01.content.domain.repository.CourseRepository.class);
+        var topic = Topic.create(null, "TOPIC", "Topic", 1);
+        UUID courseId = UUID.randomUUID();
+        when(repository.findById(topic.getId())).thenReturn(Optional.of(topic));
+        when(courses.findById(courseId)).thenReturn(Optional.of(new com.group01.content.domain.aggregate.Course(
+                courseId, "IELTS", "IELTS", new java.math.BigDecimal("5.5"), ContentStatus.ACTIVE, null, null)));
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        var result = new UpdateTopicUseCase(repository, courses).execute(new UpdateTopicCommand(
+                topic.getId(), null, "Topic", 1, null, BandRange.UNBOUNDED, null, courseId));
+        assertThat(result.courseId()).isEqualTo(courseId);
+        assertThat(topic.getCourseId()).isEqualTo(courseId);
+    }
+
+    @Test
+    void missingCourseIsRefusedBeforeTheTopicIsChangedOrSaved() {
+        var courses = mock(com.group01.content.domain.repository.CourseRepository.class);
+        var topic = Topic.create(null, "TOPIC", "Original", 1);
+        when(repository.findById(topic.getId())).thenReturn(Optional.of(topic));
+        assertThatThrownBy(() -> new UpdateTopicUseCase(repository, courses).execute(new UpdateTopicCommand(
+                topic.getId(), null, "Changed", 1, null, BandRange.UNBOUNDED, null, UUID.randomUUID())))
+                .isInstanceOf(com.group01.content.domain.exception.CourseNotFoundException.class);
+        assertThat(topic.getName()).isEqualTo("Original");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void nullCourseKeepsExistingMembershipWithoutReadingCourses() {
+        var courses = mock(com.group01.content.domain.repository.CourseRepository.class);
+        var topic = Topic.create(null, "TOPIC", "Topic", 1);
+        UUID courseId = UUID.randomUUID();
+        topic.assignCourse(courseId);
+        when(repository.findById(topic.getId())).thenReturn(Optional.of(topic));
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        var result = new UpdateTopicUseCase(repository, courses).execute(new UpdateTopicCommand(
+                topic.getId(), null, "Topic", 1, null, BandRange.UNBOUNDED, null, null));
+        assertThat(result.courseId()).isEqualTo(courseId);
+        org.mockito.Mockito.verifyNoInteractions(courses);
+    }
+
     private final TopicRepository repository = mock(TopicRepository.class);
     private final UpdateTopicUseCase useCase = new UpdateTopicUseCase(repository);
     private final UUID id = UUID.randomUUID();

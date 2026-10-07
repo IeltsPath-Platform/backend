@@ -1,6 +1,6 @@
 # CLAUDE.md — IELTSPath backend
 
-- Cập nhật lần cuối: 2026-10-02; dữ kiện đã kiểm với code tại commit `2226a25`. Về dữ kiện, code là nguồn đúng khi tài
+- Cập nhật lần cuối: 2026-10-07; dữ kiện đã kiểm với code sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
 - Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
@@ -93,6 +93,8 @@ Test service học: `mvn -q -pl services/learning-service -am test` (Testcontain
 - assessment dùng RabbitMQ với `RABBITMQ_USERNAME`/`RABBITMQ_PASSWORD` từ `.env`; mặc định `guest` sẽ bị broker từ chối.
 - `GATEWAY_INTERNAL_JWT_SECRET` phải giống nhau ở Gateway, mọi service Java, lệch là 401. Config-repo có giá
   trị fallback cho secret (thiếu biến env thì chạy bằng secret công khai trong repo): không dựa vào, không tự sửa, báo người dùng.
+- Assessment phát `COURSE_GATE` cho bài thi `COURSE_TEST`; Learning phải được cập nhật để nhận type này trước khi Assessment
+  phát event. Nếu event đến Learning bản cũ, nó vào DLQ; restart Learning rồi replay theo quy trình trong contract.
 - Outbox của access/content/game chỉ ghi, chưa có relay: event của các service này không tới consumer.
 - notification-service chỉ là khung package.
 - Role chuẩn là `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF` (`LEARNER` cũ đã đổi thành `CUSTOMER`).

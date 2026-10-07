@@ -1,8 +1,10 @@
 package com.group01.learning.infrastructure.messaging;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.group01.learning.application.command.AssessmentResult;
+import com.group01.learning.domain.vo.BandLevel;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -22,7 +24,8 @@ import java.util.UUID;
 @Component
 public class AssessmentCompletedParser {
     static final String EVENT_TYPE = "AssessmentCompleted.v2";
-    private static final Set<String> TYPES = Set.of("PLACEMENT", "OFFICIAL_PRACTICE", "MOCK", "TOPIC_GATE", "QUIZ");
+    private static final Set<String> TYPES = Set.of("PLACEMENT", "OFFICIAL_PRACTICE", "MOCK", "TOPIC_GATE",
+            "COURSE_GATE", "QUIZ");
     private static final Set<String> JUDGMENTS = Set.of("PASS", "FAIL", "NOT_ASSESSED");
 
     private final ObjectMapper json;
@@ -34,7 +37,7 @@ public class AssessmentCompletedParser {
     public AssessmentResult parse(byte[] body) {
         JsonNode root;
         try {
-            root = json.readTree(body);
+            root = json.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readTree(body);
         } catch (IOException exception) {
             throw new ContractViolationException("body is not JSON");
         }
@@ -55,7 +58,7 @@ public class AssessmentCompletedParser {
         optionalUuid(data, "learning_goal_id");
         return new AssessmentResult(uuid(root, "event_id"), uuid(data, "user_id"),
                 optionalUuid(data, "package_version_id"), uuid(data, "attempt_id"), uuid(data, "result_id"),
-                version.intValue(), type, instant(data, "completed_at"), parsed);
+                version.intValue(), type, instant(data, "completed_at"), parsed, optionalBand(data));
     }
 
     private AssessmentResult.ItemResult item(JsonNode item) {
@@ -123,6 +126,17 @@ public class AssessmentCompletedParser {
         JsonNode value = node.get(field);
         if (value == null || !value.isNumber()) throw new ContractViolationException(field + " must be a number");
         return value.decimalValue();
+    }
+
+    private static BigDecimal optionalBand(JsonNode data) {
+        JsonNode value = data.get("overall_band");
+        if (value == null || value.isNull()) return null;
+        if (!value.isNumber()) throw new ContractViolationException("overall_band must be a number or null");
+        try {
+            return new BandLevel(value.decimalValue()).value();
+        } catch (IllegalArgumentException exception) {
+            throw new ContractViolationException("overall_band must be between 0 and 9 in half-band steps");
+        }
     }
 
     private static Instant instant(JsonNode node, String field) {
