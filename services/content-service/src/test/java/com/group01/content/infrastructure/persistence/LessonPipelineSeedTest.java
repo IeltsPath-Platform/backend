@@ -372,16 +372,17 @@ class LessonPipelineSeedTest {
         assertThat(sequence).extracting(TopicSequenceResult::code)
                 .containsExactly("DEMO_LISTENING", "LISTENING_6_5_DETAIL", "DEMO_READING", "TFNG_SKILLS",
                         "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION", "READING_6_5_INFERENCE", "DEMO_WRITING",
-                        "WRITING_6_5_DISCUSSION");
+                        "WRITING_6_5_DISCUSSION", "TREES_MULTI_SKILL");
         assertThat(sequence).extracting(TopicSequenceResult::skill)
                 .containsExactly(Skill.LISTENING, Skill.LISTENING, Skill.READING, Skill.READING, Skill.READING, Skill.READING,
-                        Skill.READING, Skill.WRITING, Skill.WRITING);
-        // Writing topics have no final test; a learner passes them by completing their lessons.
+                        Skill.READING, Skill.WRITING, Skill.WRITING, null);
+        // Writing topics have no final test; a learner passes them by completing their lessons. The multi-skill topic
+        // has no single skill and comes last.
         assertThat(sequence).extracting(TopicSequenceResult::hasTopicTest)
-                .containsExactly(true, true, true, true, true, true, true, false, false);
+                .containsExactly(true, true, true, true, true, true, true, false, false, true);
         // The lower-band Reading course keeps its paid topics after its free topics.
         assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
-                .containsExactly(null, null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT", null, null, null);
+                .containsExactly(null, null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT", null, null, null, null);
         assertThat(sequence).allMatch(entry -> entry.course().hasCourseTest());
         assertThat(topic(sequence, "READING_6_5_INFERENCE").course().bandLevel()).isEqualByComparingTo("6.5");
         assertThat(topic(sequence, "DEMO_READING").course().bandLevel()).isEqualByComparingTo("5.5");
@@ -422,8 +423,12 @@ class LessonPipelineSeedTest {
             assertThat(reader.publishedLesson(lessonId).orElseThrow().knowledgePointIds()).as(code)
                     .doesNotContain(kpId("DEMO_READING_W1_CHART"), kpId("DEMO_READING_W2_OPINION"));
         }
+        // A topic with published lessons and no skill label must be one whose lessons teach several skills.
+        assertThat(reader.topicSequence(3)).filteredOn(topic -> topic.skill() == null)
+                .allSatisfy(topic -> assertThat(topic.skills()).as(topic.code()).hasSizeGreaterThan(1));
         assertThat(jdbc.queryForList("SELECT code FROM topics WHERE skill IS NULL AND id IN "
-                + "(SELECT topic_id FROM lessons WHERE status = 'PUBLISHED')", Map.of(), String.class)).isEmpty();
+                + "(SELECT topic_id FROM lessons WHERE status = 'PUBLISHED')", Map.of(), String.class))
+                .containsExactly("TREES_MULTI_SKILL");
     }
 
     @Test
@@ -531,7 +536,9 @@ class LessonPipelineSeedTest {
                 Map.entry("PS-TF-C", "TF1"), Map.entry("PS-PM1-B", "PM1"), Map.entry("PS-PM2-B", "PM2"),
                 Map.entry("PS-PS1-B", "PS1"), Map.entry("PS-PS2-B", "PS2"),
                 Map.entry("R65-PS-INFERENCE", "R65-I1"), Map.entry("R65-PS-PARAPHRASE", "R65-I1"),
-                Map.entry("L65-PS-CORRECTION", "L65-1"), Map.entry("L65-PS-PURPOSE", "L65-1"))));
+                Map.entry("L65-PS-CORRECTION", "L65-1"), Map.entry("L65-PS-PURPOSE", "L65-1"),
+                Map.entry("TR-PS-READING", "T1"), Map.entry("TR-PS-LISTENING", "T1"), Map.entry("TR-PS-WRITING", "T1"),
+                Map.entry("TR-PS-MIXED", "T1"), Map.entry("TR-PS-T2-READING", "T2"))));
         // The one-question V4 demo package is too small to be anyone's Practice.
         assertThat(jdbc.queryForObject("SELECT lesson_id FROM content_packages WHERE code = 'DEMO_MAIN_FLOW_READING'",
                 Map.of(), UUID.class)).isNull();
@@ -680,7 +687,7 @@ class LessonPipelineSeedTest {
                     .filter(block -> block.blockType() == BlockType.EXERCISE)
                     .forEach(block -> kinds.add(block.blockKind()));
         }
-        assertThat(kinds).doesNotContainNull().filteredOn(LessonBlockKind.ESSAY::equals).hasSize(3);
+        assertThat(kinds).doesNotContainNull().filteredOn(LessonBlockKind.ESSAY::equals).hasSize(5);
 
         LessonContentResult.Block essay = lessons.execute(lessonId("W2")).blocks().get(1);
         assertThat(essay.blockKind()).isEqualTo(LessonBlockKind.ESSAY);
@@ -856,7 +863,8 @@ class LessonPipelineSeedTest {
         // 43 reading questions, the Task 1 and Task 2 essays, 27 listening questions, the V4 practice-set question
         // the 10 questions of the paid topics, the 21 practice questions of V16 and the 43 practice and final-test
         // questions of V18, the 24 course questions of V21 and the 25 lesson, practice and final-test questions of V22.
-        assertThat(reserved).hasSize(196);
+        // V23 adds 33 lesson, practice and topic-test questions of the multi-skill topic.
+        assertThat(reserved).hasSize(229);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }
 

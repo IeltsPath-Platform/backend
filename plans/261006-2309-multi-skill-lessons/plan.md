@@ -93,7 +93,7 @@ mọi test của `LessonWritingIntegrationTest` (refactor phase 5 không đổi 
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | [Content multi-skill lessons and practice skills](./phase-01-content-multi-skill-lessons-and-practice-skills.md) | Completed |
-| 2 | [Content seed multi-skill topic](./phase-02-content-seed-multi-skill-topic.md) | Pending |
+| 2 | [Content seed multi-skill topic](./phase-02-content-seed-multi-skill-topic.md) | Completed |
 | 3 | [Learning multi-skill gating](./phase-03-learning-multi-skill-gating.md) | Pending |
 | 4 | [Learning practice per-skill clearance](./phase-04-learning-practice-per-skill-clearance.md) | Pending |
 | 5 | [Learning practice essays](./phase-05-learning-practice-essays.md) | Pending |
@@ -194,6 +194,25 @@ lesson (lesson vẫn chỉ seed) · UI.
   skill). `TopicTest.aTopicTeachesOneSkillNeverAll` keeps its expectations; only the call `changeSkill(Skill.ALL, false)`
   became `changeSkill(Skill.ALL)` because the two-argument overload was removed.
 - Course test rule changed (M15): Reading/Listening auto-gradable or Writing essay with `passBand`.
+
+### Phase 2 Verification — 2026-10-07
+
+- Status: `DONE_WITH_CONCERNS` (one old test changed outside the allowlist, see below).
+- Red: `mvn -q -pl services/content-service -am test -Dtest=MultiSkillSeedTest` failed — Flyway target 23 did not exist.
+- Green: `mvn -q -pl services/content-service -am test` exited 0 — content 247/247, common-security 8/8, 0 skipped,
+  Docker/Testcontainers.
+- Seed `V23__seed_multi_skill_topic.sql` (UUID prefix `2a000000-`): topic `TREES_MULTI_SKILL` (course 5.5, sort 955,
+  `skill` NULL), 4 KPs (2 R, 1 L, 1 W), lessons T1/T2 each with R + L + W blocks and a Task 2 essay (`passBand` 5.5);
+  T1 Practice: R, L, W (1 essay), R+L (3 + 3); T2 Practice: one R set (added so every lesson of a topic with a final test
+  keeps a Practice, as `everyLessonOfATopicWithAFinalTestOffersPractice` requires); topic test R + L + 1 essay. 33 new
+  questions. Listening reuses V12 audio. Full text for review: [v23-seed-content](./reports/v23-seed-content.md).
+- Old tests changed (allowlisted, only V23 data added): `LessonPipelineSeedTest.topicSequenceListsEachSkills…`,
+  `practiceSetsBelongToTheEarliestLesson…`, `everySeededExerciseBlock…` (essays 3 → 5),
+  `lessonPracticeAndTestQuestionsAreReservedForLearning` (196 → 229).
+- **Outside the allowlist:** `LessonPipelineSeedTest.writingEssaysMovedToTheirOwnTopicKeepingTheirBlockIds` asserted that
+  no topic with published lessons has a null `skill`. That is the old one-skill-per-topic rule which this phase's own
+  spec (topic `skill` NULL) replaces. The last assertion now requires that a topic without a skill label teaches more
+  than one skill and is exactly `TREES_MULTI_SKILL`; the rest of the test is unchanged. Owner to confirm in the PR.
 
 (Codex điền sau mỗi phase: commit, lệnh đã chạy và kết quả, test bị skip, test cũ đã sửa kỳ vọng, nội dung seed mới,
 mọi `BLOCKED`.)
