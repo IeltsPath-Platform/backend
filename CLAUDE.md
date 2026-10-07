@@ -43,7 +43,9 @@ Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/c
 - `.env` ở root (gitignored) chứa mật khẩu và secret: compose nội suy nó; Gateway và mọi service Java nghiệp vụ import nó
   (`optional:file:../../.env[.properties]`; config-server, eureka-server thì không). Chỉ ghi tên biến, không ghi giá trị. Learning Service
   cần `LEARNING_DB_PASSWORD`, `RABBITMQ_PASSWORD`; chấm bài luận cần thêm `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`,
-  `LEARNING_LLM_MODEL` (thiếu thì nộp bài luận trả 503, phần khác vẫn chạy) và access-service đang chạy
+  `LEARNING_LLM_MODEL` (thiếu thì nộp bài luận trả 503, phần khác vẫn chạy); essay trong thi topic/course của Assessment
+  dùng `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL`, `ASSESSMENT_LLM_DAILY_LIMIT`
+  (mặc định 20; thiếu cấu hình thì gate essay chuyển EXAMINER) và access-service đang chạy
   (`ACCESS_SERVICE_URL`, mặc định `http://localhost:8084`); content cần `CONTENT_MEDIA_BASE_URL` (https của bucket mp3) cho bài Listening.
 - Compose yêu cầu mọi biến `${VAR:?}` trong `.env` dù chỉ bật một phần stack (danh sách ở `AGENTS.md` §3.6; hay thiếu
   `LIBRARY_DB_PASSWORD`, `LEARNING_DB_PASSWORD` trên `.env` tạo trước khi chia service). Chỉ chạy các container cần dùng:
@@ -95,6 +97,9 @@ Test service học: `mvn -q -pl services/learning-service -am test` (Testcontain
   trị fallback cho secret (thiếu biến env thì chạy bằng secret công khai trong repo): không dựa vào, không tự sửa, báo người dùng.
 - Assessment phát `COURSE_GATE` cho bài thi `COURSE_TEST`; Learning phải được cập nhật để nhận type này trước khi Assessment
   phát event. Nếu event đến Learning bản cũ, nó vào DLQ; restart Learning rồi replay theo quy trình trong contract.
+- Essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE` được chấm LLM miễn phí; thiếu cấu hình, LLM lỗi hoặc hết quota ngày thì
+  chuyển sang hàng chờ EXAMINER. Essay không được nộp qua `/api/assessments/submissions` sẽ nhận 0 điểm và không tạo job.
+  `MOCK` vẫn do EXAMINER chấm.
 - Outbox của access/content/game chỉ ghi, chưa có relay: event của các service này không tới consumer.
 - notification-service chỉ là khung package.
 - Role chuẩn là `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF` (`LEARNER` cũ đã đổi thành `CUSTOMER`).

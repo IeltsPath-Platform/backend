@@ -117,6 +117,9 @@ chạy chung qua mọi skill: `course.bandLevel` → free/premium → `sortOrder
 `GET /api/learning/lessons/{lessonId}` → `{lessonId, topicId, code, title, summary, sortOrder, status, blocks[]}`.
 Render `blocks` theo thứ tự:
 
+Lesson có thể chứa câu hỏi thuộc nhiều skill; trường `skills` phản ánh các skill suy ra từ câu hỏi. Hoàn tất các khối
+bài học theo response; Practice và quyền làm thi cuối topic được kiểm riêng cho từng skill mà topic yêu cầu.
+
 | Khối | Nhận biết | Render |
 | --- | --- | --- |
 | Lý thuyết | `blockType = "TEXT"` | `textContent` |
@@ -148,6 +151,9 @@ POST /api/learning/lessons/{lessonId}/essays/{blockId}/submissions
 - Trả `{submissionId, status:"GRADED", task, wordCount, overallBand, passed, criteria[{code, band, strengths[], improvements[]}], corrections[{excerpt, suggestion, category}], summary, pointsCharged, sampleAnswer?}`.
   Sau đó gọi lại `GET /api/access/me/points` để cập nhật điểm.
 - Xem lại một lần chấm: `GET /api/learning/writing-submissions/{submissionId}`.
+- Essay của bài học dùng API Learning ở trên. Essay trong đề `TOPIC_GATE`/`COURSE_GATE` dùng Assessment API
+  `POST /api/assessments/submissions` trước khi nộp attempt; chấm LLM miễn phí và bất đồng bộ. Essay không được nộp
+  nhận 0 điểm, không tạo job; lỗi LLM, thiếu cấu hình hoặc hết quota ngày thì chuyển cho EXAMINER.
 - Band là ước lượng của AI, nên ghi rõ "không phải điểm IELTS chính thức".
 
 ### Bước 4b. Practice của bài

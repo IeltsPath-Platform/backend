@@ -22,7 +22,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity và streak tại `/api/learning-support/{activities,streak}`. |
 | `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset; kiểm topic cho library. |
 | `services/library-service` | Cổng 8081, `library_db` (Compose host 5437): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
-| `services/assessment-service` | Làm bài, chấm, kết quả; phát `AssessmentCompleted.v2`. |
+| `services/assessment-service` | Làm bài, chấm objective/LLM cho essay gate và EXAMINER, kết quả; phát `AssessmentCompleted.v2`. |
 | `services/access-service` | Gói, subscription, activation key, điểm. |
 | `services/game-service` | Phòng game, trận, phiên chơi, WebSocket. |
 | `services/community-service` | Bài viết, bình luận, reaction, kiểm duyệt. |
@@ -135,6 +135,9 @@ src/main/java/com/group01/<service>
   `${VAR:?}` (`LIBRARY_DB_PASSWORD`, `LEARNING_DB_PASSWORD`, `GAME_DB_PASSWORD`, `POSTGRES_PASSWORD`, `RABBITMQ_USERNAME`,
   `RABBITMQ_PASSWORD`, `GATEWAY_INTERNAL_JWT_SECRET`) phải có trong `.env` kể cả khi chỉ bật một phần stack;
   community-service mặc định DB local 5432, dùng DB compose (5434) thì đặt `COMMUNITY_DB_URL`.
+- Assessment gate essay dùng OpenAI-compatible LLM qua `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`,
+  `ASSESSMENT_LLM_MODEL`; quota theo ngày cấu hình bằng `ASSESSMENT_LLM_DAILY_LIMIT` (mặc định 20). Thiếu cấu hình,
+  lỗi chấm hoặc hết quota thì essay được chuyển sang hàng chờ EXAMINER; không ghi essay/prompt vào log.
 - Chạy local: service Java trên host (Config Server → Eureka → Gateway → business service); compose chạy DB của
   library/community/game/learning và RabbitMQ. Library dùng `library_db` qua host 5437.
   Game chọn snapshot `VOCABULARY` từ library và `GRAMMAR` từ content; `LIBRARY_SERVICE_URL` mặc định
@@ -158,6 +161,8 @@ src/main/java/com/group01/<service>
   không chứa luật. Khóa, replay theo `requestId`, hạn mức LLM là port ở `application/port`.
 - Không còn path DeepTutor: bằng chứng học lưu theo user ở `kp_evidence`; mastery của KP tính khi đọc bằng
   `MasteryCalculator` (port `compute_mastery` của DeepTutor v1.6.9, Apache-2.0; giữ comment ghi nguồn và giá trị test gốc).
+- Skill của lesson suy ra từ câu hỏi trong các block; lesson có thể chứa nhiều skill. Khóa lesson, review và Practice
+  được áp theo từng skill; bài học hoàn thành theo các block bắt buộc, Practice phải đạt riêng cho từng skill có yêu cầu.
 - Thứ tự topic theo user từ Content `topic-sequence`, không LLM/goal; mỗi course là một chuỗi chung mọi skill. Mọi course
   đều mở; band từ placement chỉ gợi ý course và không đổi trạng thái topic. Bài ôn vẫn chặn bài, Practice và thi topic
   của cùng skill. Thi cuối course không chặn tiến độ topic hay course khác. `LessonAccessGate` và use case trong

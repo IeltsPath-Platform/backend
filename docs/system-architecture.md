@@ -40,7 +40,7 @@ library --HTTP--> content                 learning --HTTP--> content (/internal/
 | `user-service` | Tài khoản, role, đăng nhập/refresh/logout, hồ sơ học viên, learning goal, activity và streak | `user_db` (Postgres local 5432; V5 tạo `learning_activities`, `streaks`) | `/auth/**`, `/api/users/**`, `/api/learning-support/{activities,streak}/**` |
 | `content-service` | Course theo band, topic, knowledge point, câu hỏi (có version), gói nội dung/bài đọc, asset; kiểm topic cho library và snapshot grammar cho game | `content_db` (local 5432; V7 xóa năm bảng catalog) | `/api/content/**` trừ nhóm từ vựng/video |
 | `library-service` | Catalog từ vựng/video (V1, năm bảng), flashcard/deck, note, tiến độ video và đoạn đã lưu (V2, sáu bảng) | `library_db` (compose host 5437) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
-| `assessment-service` | Lượt làm bài, chấm, kết quả (có version), bài nộp, video practice; phát `AssessmentCompleted.v2` | `assessment_db` (local 5432) | `/api/assessments/**` |
+| `assessment-service` | Lượt làm bài, chấm tự động và LLM cho thi topic/course, chấm EXAMINER, kết quả (có version), bài nộp, video practice; phát `AssessmentCompleted.v2` | `assessment_db` (local 5432) | `/api/assessments/**` |
 | `access-service` | Gói, subscription, activation key, ví điểm và sổ điểm | `access_db` (local 5432) | `/api/access/**` |
 | `game-service` | Phòng game, trận, phiên chơi, WebSocket realtime | `game_db` (compose 5435) | `/api/games/**`, `/ws/games/**` |
 | `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (compose 5434; default code là local 5432, đổi bằng `COMMUNITY_DB_URL`) | `/api/community/**` |
@@ -65,6 +65,7 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | learning | content | `/internal/learning-content/{topic-sequence,topics/{id}/lessons,lessons/{id},lessons/{id}/practice-sets,topics/{id}/practice-sets,topics/{id}/test-packages,practice-sets/search,practice-sets/availability,package-versions/{id}}` | `CONTENT_SERVICE_URL` (mặc định `http://localhost:8082`) |
 | learning | access | `GET /api/access/me/points` (số dư), `POST /internal/access/points/debit` (trừ 3 point sau khi chấm bài luận), bearer của học viên | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
 | learning | LLM (ngoài hệ thống) | `POST {base}/chat/completions` (OpenAI-compatible) khi chấm bài luận, ngoài mọi transaction | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` |
+| assessment | LLM (ngoài hệ thống) | `POST {base}/chat/completions` cho essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE`, ngoài transaction | `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL`; quota ngày `ASSESSMENT_LLM_DAILY_LIMIT` |
 
 Assessment, library, game và learning gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`.
 Library dùng timeout kết nối 2 giây, đọc 5 giây; lỗi Content khi kiểm topic trả 503. Hai nơi cài snapshot game theo
@@ -166,6 +167,11 @@ POST /api/learning/topics/{id}/test-assignments -> REVIEW_REQUIRED, PRACTICE_REQ
 POST /api/learning/courses/{id}/test-assignments -> cần mọi topic trong course PASSED -> một COURSE_TEST assignment
   -> Assessment attempt COURSE_GATE -> đạt >= 70% thì course_progress PASSED; không chặn topic khác
 ```
+
+Khi nộp `TOPIC_GATE`/`COURSE_GATE`, essay đã gửi qua `/api/assessments/submissions` được xếp thành grading job miễn phí.
+Scheduler claim job trong transaction ngắn, gọi Assessment LLM ngoài transaction rồi ghi band và hoàn tất result/outbox
+trong transaction mới. Thiếu cấu hình, lỗi LLM hoặc hết quota ngày chuyển essay sang hàng chờ EXAMINER; essay không nộp
+được tính 0 và không tạo job. `MOCK` tiếp tục do EXAMINER chấm.
 
 Gợi ý Reading (`question_versions.hint`, Content V13) do Content lưu và trả qua
 `/internal/learning-content/lessons/{id}`; Learning Service Java quyết định hiển thị cho câu `FILL` hoặc `CHOICE`

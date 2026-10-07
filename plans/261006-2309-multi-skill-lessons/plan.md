@@ -1,7 +1,7 @@
 ---
 title: "Lesson nhiều skill (Reading, Listening, Writing)"
 description: "Một lesson dạy R+L+W; Practice có bộ riêng từng skill và bộ trộn, đạt theo từng skill, essay chấm LLM; thi topic trộn skill, Writing chấm LLM trong assessment, lỗi thì EXAMINER."
-status: in-progress
+status: completed
 priority: P2
 branch: "feat/multi-skill-lessons"
 tags: [content, learning, assessment, llm, tdd]
@@ -97,8 +97,8 @@ mọi test của `LessonWritingIntegrationTest` (refactor phase 5 không đổi 
 | 3 | [Learning multi-skill gating](./phase-03-learning-multi-skill-gating.md) | Completed |
 | 4 | [Learning practice per-skill clearance](./phase-04-learning-practice-per-skill-clearance.md) | Completed |
 | 5 | [Learning practice essays](./phase-05-learning-practice-essays.md) | Completed |
-| 6 | [Assessment LLM gate grading](./phase-06-assessment-llm-gate-grading.md) | Pending |
-| 7 | [Docs and verification](./phase-07-docs-and-verification.md) | Pending |
+| 6 | [Assessment LLM gate grading](./phase-06-assessment-llm-gate-grading.md) | Completed |
+| 7 | [Docs and verification](./phase-07-docs-and-verification.md) | Completed |
 
 Thứ tự commit: 1 → 2 → 3 → 4 → 5 → 6 → 7. Phase 6 độc lập với 3–5 và có thể làm song song nếu có người thứ hai.
 
@@ -274,3 +274,32 @@ lesson (lesson vẫn chỉ seed) · UI.
 
 (Codex điền sau mỗi phase: commit, lệnh đã chạy và kết quả, test bị skip, test cũ đã sửa kỳ vọng, nội dung seed mới,
 mọi `BLOCKED`.)
+
+### Phase 6 Verification — 2026-10-07
+
+- Status: `DONE`. Assessment gate essays now use free asynchronous AI grading after submission through
+  `/api/assessments/submissions`; omitted essays score zero without a job, while `MOCK` and non-gate essays preserve the
+  existing EXAMINER/objective paths. LLM/config/quota failures enqueue a HUMAN job.
+- Migration `V6__gate_llm_grading.sql`: adds `grading_jobs.llm_band`, the `(status, grading_mode)` claim index, and
+  `llm_usage_daily`; Testcontainers applied all six assessment migrations and validated the JPA schema.
+- LLM and quota checks run outside a transaction. Job completion and result/outbox assembly share one short transaction;
+  this was tightened after review found a crash window between the two writes. A transaction-boundary test covers it.
+- Review: one result durability issue was fixed; no other concrete findings in quota, idempotency, HUMAN handoff,
+  privacy, or preserved MOCK/objective behavior.
+- Full assessment tests, including Testcontainers integration coverage and the transaction-boundary test, are included in
+  the phase 7 aggregate run below.
+
+### Phase 7 Verification — 2026-10-07
+
+- Status: `DONE`. `mvn -q -pl services/content-service,services/learning-service,services/assessment-service -am test`
+  exited 0: content 247/247, learning 253/253, assessment 137/137, common-security 8/8; 0 failures, errors, or skipped
+  tests. Docker/Testcontainers were available and ran.
+- `mvn -q compile -DskipTests` exited 0 for the full reactor. `git diff --check` passed.
+- `graphify update .` exited 0; graph refreshed to 9,583 nodes and 34,528 edges.
+- Docs checked/updated: service/environment descriptions in `AGENTS.md` and `CLAUDE.md`, LLM fallback and unchanged event
+  contract in `docs/contracts/assessment-completed-v2.md`, multi-skill lesson and gate-essay flow in
+  `docs/fe-main-flow-guide.md` and `docs/system-architecture.md`; learning/content contracts were already aligned.
+- Grep of `\.skill\(\)` in learning application/domain found only response compatibility, KP/review-skill logic, and
+  fallback reads for legacy untagged data; no lesson access or Practice gate uses one lesson skill as its rule.
+- Manual multi-service runtime smoke was not run; verification used the three services' Testcontainers/integration
+  suites. No tests were skipped.

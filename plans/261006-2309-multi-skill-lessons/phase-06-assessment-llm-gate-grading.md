@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Assessment LLM gate grading"
-status: pending
+status: completed
 priority: P1
 dependencies: [1]
 ---
@@ -91,8 +91,8 @@ CompleteJob: all jobs COMPLETED → GateResultAssembler → AssessmentResultComp
 5. `mvn -q -pl services/assessment-service -am test`.
 
 ## Success Criteria
-- [ ] Không gọi LLM trong transaction nào (review code + test bằng port chậm giả).
-- [ ] Luồng EXAMINER cũ và tự chấm khách quan không đổi (test cũ xanh).
+- [x] Không gọi LLM trong transaction nào (review code + test bằng port chậm giả).
+- [x] Luồng EXAMINER cũ và tự chấm khách quan không đổi (test cũ xanh).
 
 ## Risk Assessment
 - Luồng nộp bài essay hiện tại (`learner_submissions`, `grading_jobs`) phải đọc kỹ trước khi sửa: bước đầu của phase là
