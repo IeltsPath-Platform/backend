@@ -110,4 +110,4 @@ user/package version, `consumed_at IS NULL` và `assigned_at <= completed_at`; c
 - Learning migration [V1](../../services/learning-service/src/main/resources/db/migration/V1__learning_schema.sql)–[V5](../../services/learning-service/src/main/resources/db/migration/V5__review_ladder.sql).
 - Content migration V8–V18 trong `services/content-service/src/main/resources/db/migration/`.
 - Use case Learning: `GetReviewUseCase`, `SubmitReviewUseCase`, `SubmitTheoryCheckUseCase`, `SubmitPracticeAttemptUseCase`,
-  `AssignTopicTestUseCase`, `ApplyAssessmentResultUseCase` trong `services/learning-service/src/main/java/com/group01/learning/application/usecase/`.
+  `AssignTopicTestUseCase`, `ApplyAssessmentResultUseCase` trong `services/learning-service/src/main/java/com/ieltspath/learning/application/usecase/`.

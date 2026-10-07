@@ -36,7 +36,7 @@ Dưới đây là cấu trúc thư mục chính của Gateway và ý nghĩa củ
 src
 ├── main
 │   ├── java
-│   │   └── com.group01.apigateway
+│   │   └── com.ieltspath.apigateway
 │   │       ├── ApiGatewayApplication.java       # Class khởi động chính (entry point) của Spring Boot.
 │   │       ├── error
 │   │       │   ├── GatewayErrorAttributes.java  # Tùy chỉnh các thuộc tính (attributes) lỗi trả về cho client ở dạng JSON.
@@ -55,7 +55,7 @@ src
 │       └── application.yml                      # Config bootstrap: khai báo tên service và URL của Config Server.
 └── test
     └── java
-        └── com.group01.apigateway
+        └── com.ieltspath.apigateway
             ├── ApiGatewayApplicationTests.java          # Smoke test: kiểm tra Spring context load thành công.
             └── security
                 └── InternalJwtServiceTest.java          # Unit test: kiểm tra logic tạo và ký internal JWT.

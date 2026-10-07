@@ -67,7 +67,7 @@ Registration public mặc định tạo user với role `CUSTOMER`. Các API qu�
 ## Các package chính
 
 ```text
-com.group01.user
+com.ieltspath.user
 ├── api
 │   ├── controller
 │   ├── dto

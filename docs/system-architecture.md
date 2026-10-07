@@ -37,15 +37,15 @@ library --HTTP--> content                 learning --HTTP--> content (/internal/
 | `infra/eureka-server` | Service registry | — | — |
 | `infra/api-gateway` | Ingress WebFlux: xác thực external JWT, ký internal JWT, routing, CORS, correlation id | — | — |
 | `shared/common-security` | Thư viện: security servlet cho downstream, internal JWT, `CanonicalRoles`, `CurrentUserProvider` | — | — |
-| `user-service` | Tài khoản, role, đăng nhập/refresh/logout, hồ sơ học viên, learning goal, activity và streak | `user_db` (Postgres local 5432; V5 tạo `learning_activities`, `streaks`) | `/auth/**`, `/api/users/**`, `/api/learning-support/{activities,streak}/**` |
-| `content-service` | Course theo band, topic, knowledge point, câu hỏi (có version), gói nội dung/bài đọc, asset; kiểm topic cho library và snapshot grammar cho game | `content_db` (local 5432; V7 xóa năm bảng catalog) | `/api/content/**` trừ nhóm từ vựng/video |
-| `library-service` | Catalog từ vựng/video (V1, năm bảng), flashcard/deck, note, tiến độ video và đoạn đã lưu (V2, sáu bảng) | `library_db` (compose host 5437) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
-| `assessment-service` | Lượt làm bài, chấm tự động và LLM cho thi topic/course, chấm EXAMINER, kết quả (có version), bài nộp, video practice; phát `AssessmentCompleted.v2` | `assessment_db` (local 5432) | `/api/assessments/**` |
-| `access-service` | Gói, subscription, activation key, ví điểm và sổ điểm | `access_db` (local 5432) | `/api/access/**` |
-| `game-service` | Phòng game, trận, phiên chơi, WebSocket realtime | `game_db` (compose 5435) | `/api/games/**`, `/ws/games/**` |
-| `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (compose 5434; default code là local 5432, đổi bằng `COMMUNITY_DB_URL`) | `/api/community/**` |
-| `notification-service` | Chưa triển khai (chỉ khung package) | `notification_db` (local 5432) | `/api/notifications/**` |
-| `learning-service` | Placement recommendation; topic path theo course (một chuỗi cho mọi skill), bài học, Practice theo bài, mastery theo KP, thang ôn tập, course/topic progress và giao mã đề cuối; nhận kết quả thi chính thức | `learning_db` (compose 5436; `learner_placements`, `course_progress`, `course_test_assignments`) | `/api/learning/**` |
+| `user-service` | Tài khoản, role, đăng nhập/refresh/logout, hồ sơ học viên, learning goal, activity và streak | `user_db` (Compose PostgreSQL host 5440; V5 tạo `learning_activities`, `streaks`) | `/auth/**`, `/api/users/**`, `/api/learning-support/{activities,streak}/**` |
+| `content-service` | Course theo band, topic, knowledge point, câu hỏi (có version), gói nội dung/bài đọc, asset; kiểm topic cho library và snapshot grammar cho game | `content_db` (Compose PostgreSQL host 5440; V7 xóa năm bảng catalog) | `/api/content/**` trừ nhóm từ vựng/video |
+| `library-service` | Catalog từ vựng/video (V1, năm bảng), flashcard/deck, note, tiến độ video và đoạn đã lưu (V2, sáu bảng) | `library_db` (Compose PostgreSQL host 5440) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
+| `assessment-service` | Lượt làm bài, chấm tự động và LLM cho thi topic/course, chấm EXAMINER, kết quả (có version), bài nộp, video practice; phát `AssessmentCompleted.v2` | `assessment_db` (Compose PostgreSQL host 5440) | `/api/assessments/**` |
+| `access-service` | Gói, subscription, activation key, ví điểm và sổ điểm | `access_db` (Compose PostgreSQL host 5440) | `/api/access/**` |
+| `game-service` | Phòng game, trận, phiên chơi, WebSocket realtime | `game_db` (Compose PostgreSQL host 5440) | `/api/games/**`, `/ws/games/**` |
+| `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (Compose PostgreSQL host 5440) | `/api/community/**` |
+| `notification-service` | Chưa triển khai (chỉ khung package) | Chưa có database runtime | Chưa có route hoạt động |
+| `learning-service` | Placement recommendation; topic path theo course (một chuỗi cho mọi skill), bài học, Practice theo bài, mastery theo KP, thang ôn tập, course/topic progress và giao mã đề cuối; nhận kết quả thi chính thức | `learning_db` (Compose PostgreSQL host 5440; `learner_placements`, `course_progress`, `course_test_assignments`) | `/api/learning/**` |
 
 Chi tiết schema: [`.sdd/database/DATABASE_V5.md`](../.sdd/database/DATABASE_V5.md). Service Java tự chạy Flyway khi khởi
 động (`src/main/resources/db/migration`).
@@ -210,14 +210,14 @@ cùng course mở theo trạng thái suy ra khi đọc. Course test không chặ
 
 ## 7. Chạy local (tóm tắt)
 
-- Compose (`docker-compose.yml`): `library-db` (host 5437), `community-db`, `game-db`, `learning-db` (host 5436), `rabbitmq`,
-  `game-service` (không dùng được, xem §11). Chỉ bật các service cần, không `docker compose up` toàn bộ.
-- Trên host (IDE hoặc `java -jar`): config-server → eureka → api-gateway → các business service Java. Postgres local
-  5432 cần `user_db`, `content_db`, `assessment_db`, `access_db`, `notification_db`.
-- `.env` ở root (gitignored) được compose nội suy; Gateway và mọi service Java nghiệp vụ import nó
-  (`optional:file:../../.env[.properties]`), config-server và eureka-server thì không. Compose yêu cầu `LIBRARY_DB_PASSWORD`
-  dù không bật `library-db`. Bài Listening cần `CONTENT_MEDIA_BASE_URL`. Game trên host cần đặt `CONTENT_SERVICE_URL=http://localhost:8082`;
-  `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
+- Root `docker-compose.yml` khởi chạy PostgreSQL, RabbitMQ, Config Server, Eureka, Gateway và tất cả service đã triển khai.
+  PostgreSQL ở host port 5440, với database riêng mỗi bounded context; `infra/postgres/init-databases.sql` tạo database,
+  sau đó Flyway của từng service tạo schema và seed. User/Access nạp tài khoản/điểm demo mặc định; đặt
+  `DEMO_DATA_ENABLED=false` để tắt.
+- Dùng `docker compose up -d --build` cho toàn stack. Khi chạy Java trên host, dùng `docker compose up -d postgres rabbitmq`
+  rồi trỏ `*_DB_URL` tới `localhost:5440/<service>_db`. `.env` ở root được Compose và các service Java nghiệp vụ nạp;
+  Config Server và Eureka không nạp file này. Bài Listening cần `CONTENT_MEDIA_BASE_URL`. Game chạy trên host cần đặt
+  `CONTENT_SERVICE_URL=http://localhost:8082`; `LIBRARY_SERVICE_URL` mặc định `http://localhost:8081`.
 
 ## 8. Quyết định kiến trúc đã quan sát
 
@@ -268,10 +268,7 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | Content V7 xóa vĩnh viễn năm bảng catalog | Chỉ chạy trên Testcontainers cho tới khi duyệt chạy trên `content_db` dùng chung |
 | Outbox của access/content/game không có relay | Event chưa được phát |
 | notification-service chỉ là khung | Route Gateway đã có |
-| Compose `game-service` trỏ `http://config-server:8888` | Compose không có config-server |
 | Secret có giá trị fallback trong config-repo được track | Thiếu biến env thì service dùng secret công khai trong repo |
-| README root chỉ liệt kê 3 DB local | access, notification cần `access_db`, `notification_db` |
-| community-service mặc định `localhost:5432/community_db`, DB compose ở 5434 | Đặt `COMMUNITY_DB_URL` khi dùng DB compose |
 | `.sdd/global/system-architecture.md`, `.sdd/constraints/global.md` (baseline 2026-09-18) ghi không có broker/outbox/learning service | Lỗi thời; `.sdd/global/constitution.md` vẫn là invariant cao nhất. Dữ kiện: code, `AGENTS.md`, tài liệu này |
 | Gateway CORS chỉ expose `Authorization`, `Content-Type` | Browser không đọc được header khác (ví dụ `Retry-After`) |
 | community có bảng `outbox_events` (V1) nhưng không dùng | Library không tạo bảng này; outbox của access/content/game chưa có relay |
@@ -280,7 +277,7 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | Bài Writing lưu ở hai nơi | Bài luận trong bài học ở `learning_db.lesson_writing_submissions`; Writing trong đề (sau MVP) ở `assessment_db.learner_submissions` |
 | Ảnh biểu đồ Task 1 mới dùng tham chiếu media | Content nhận URL `https://` hoặc data URI ảnh Base64 và trả `mediaUrl`; chưa có luồng upload hay tích hợp object storage cho ảnh. Seed dùng SVG data URI; grader đọc `chartFacts`, không đọc ảnh |
 | Media Listening dùng bucket public-read | Team tự upload 8 mp3 của seed; backend chưa có upload API, signed URL hay giới hạn lượt nghe. Thiếu `CONTENT_MEDIA_BASE_URL` thì các reference dạng key không resolve được (`INVALID_MEDIA_REFERENCE`); URL `https://` đầy đủ không cần base |
-| Writing trong đề cuối chưa thuộc MVP | Bài luận Task 1/Task 2 chỉ ở bài học; đưa Writing vào đề cuối chờ chốt chính sách phí để tránh tạo tường phí tại cổng topic |
+| Writing trong Practice và gate dùng chính sách phí khác nhau | Practice trừ điểm; essay trong `TOPIC_GATE`/`COURSE_GATE` chấm miễn phí và có quota riêng ở Assessment |
 | Một số ghi Writing chưa theo quy tắc khóa mọi lượt ghi theo user | Bắt đầu/kết thúc chấm có transaction và advisory lock; quota, lưu grade và lỗi trung gian dùng SQL nguyên tử có điều kiện ngoài các transaction này. Dữ kiện hiện tại, không thay quy tắc AGENTS.md §3.8 |
 | Cổng bài học là authority cho luồng học | `LessonAccessGate` kiểm review/topic/bài trước; runtime Java MVP không có tutor hay `next_objective` |
 | Sơ đồ §1 còn cạnh assessment → user từ baseline cũ | Tạo attempt hiện chỉ đọc Content; không gọi User để lấy goal (xem §3 và §6) |

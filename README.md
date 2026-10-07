@@ -41,10 +41,12 @@ IELTSPath/
 │   ├── library-service/        # Catalog từ vựng/video và thư viện học cá nhân
 │   ├── game-service/           # Phòng game, phiên chơi và WebSocket
 │   └── community-service/      # Bài viết, bình luận, reaction và moderation
-├── docker-compose.yml          # File Docker Compose khởi chạy hạ tầng (Postgres, Infrastructure)
+├── docker-compose.yml          # Một file Compose cho database, broker và các service đã triển khai
 ├── pom.xml                     # Root POM quản lý phiên bản và danh sách module
 └── README.md                   # Tài liệu hướng dẫn dự án
 ```
+
+Namespace Java thống nhất của các module là `com.ieltspath.<module>`; Maven `groupId` dùng `com.ieltspath`.
 
 ---
 
@@ -195,19 +197,19 @@ mvn clean compile -DskipTests
 
 *(Nếu hiển thị `BUILD SUCCESS` là toàn bộ cấu trúc dự án và các module con đã hợp lệ).*
 
-### 4. Khởi Chạy Hạ Tầng Với Docker
+### 4. Khởi Chạy Backend Với Docker
 
-Compose cung cấp các DB `library-db` (host 5437), `community-db` (5434), `game-db` (5435), `learning-db` (5436)
-và RabbitMQ. Các service Java, Config Server, Eureka và Gateway chạy trên host; Compose không có ba container hạ tầng
-này. Đặt đủ biến môi trường của §6 trong `.env` ở root, kiểm cấu hình rồi chỉ bật container cần dùng:
+Compose khởi chạy PostgreSQL (mỗi service vẫn có database riêng), RabbitMQ, Config Server, Eureka, Gateway và các
+service đã triển khai. Các database schema và dữ liệu demo được nạp bởi Flyway; tài khoản và điểm demo bật mặc định
+trong môi trường local. Đặt biến môi trường của §6 trong `.env` ở root, kiểm cấu hình rồi khởi chạy:
 
 ```powershell
 docker compose config --quiet
-docker compose up -d library-db
+docker compose up -d --build
 ```
 
-`LIBRARY_DB_PASSWORD` bắt buộc ngay cả khi chỉ chạy một container khác vì Compose nội suy toàn bộ file. Hướng dẫn
-khởi động luồng chính và các cổng còn lại ở §6.
+PostgreSQL được publish ở host port `5440` và chứa database riêng cho user, content, assessment, access, learning,
+library, game và community. `docker compose down` giữ dữ liệu; thêm `-v` để xóa database và khởi tạo lại toàn bộ seed.
 
 ### 5. Quản Lý Schema Bằng Flyway
 
@@ -229,8 +231,7 @@ Java chạy trên host (IDE hoặc `java -jar`); Compose chỉ chạy DB và Rab
 
 | Biến | Dùng cho |
 | --- | --- |
-| `LIBRARY_DB_PASSWORD`, `POSTGRES_PASSWORD`, `GAME_DB_PASSWORD` | Compose nội suy toàn bộ file, nên phải có dù không chạy các DB đó; library dùng DB ở host 5437 |
-| `LEARNING_DB_PASSWORD` | `learning-db` (host 5436) và Learning Service |
+| `POSTGRES_PASSWORD` | Mật khẩu PostgreSQL dùng bởi các database riêng của từng service; host port mặc định `5440` |
 | `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | Broker trong compose; assessment và Learning Service trên host phải dùng đúng cặp này (mặc định `guest` sẽ fail) |
 | `GATEWAY_INTERNAL_JWT_SECRET` | Gateway và toàn bộ downstream service phải dùng cùng giá trị, lệch sẽ trả 401 |
 | `EXTERNAL_JWT_SECRET` | User Service ký token, Gateway xác thực |
@@ -244,15 +245,12 @@ Nếu mật khẩu có ký tự đặc biệt, hãy percent-encode hoặc chọn
 
 **Thứ tự khởi động:**
 
-1. PostgreSQL local (`localhost:5432`) có sẵn `user_db`, `content_db`, `assessment_db`. Flyway của từng service tự áp khi khởi động.
-2. DB trong Compose và RabbitMQ:
-   ```bash
-   docker compose up -d library-db learning-db rabbitmq
-   ```
-3. Service Java trên host: config-server → eureka → api-gateway → user → content → library → assessment →
-   learning → game (khi cần). Learning Service tự khai báo queue `learning.assessment-completed.v2`, retry queue và DLQ.
-   Các Spring module tự nạp `.env` ở root repository (khi working directory là root hoặc thư mục module), nên không cần
-   khai báo secret khác nhau ở từng Run Configuration.
+1. Chạy toàn stack trong container: `docker compose up -d --build`. Init script tạo database riêng cho từng service;
+   Flyway áp schema/seed. User và Access ghi tài khoản/điểm demo khi `DEMO_DATA_ENABLED=true` (mặc định local bật).
+2. Hoặc chạy Java từ IDE: `docker compose up -d postgres rabbitmq`, đặt từng `*_DB_URL` về
+   `jdbc:postgresql://localhost:5440/<service>_db` và password bằng `POSTGRES_PASSWORD`; sau đó chạy Config Server →
+   Eureka → Gateway → các business service. Các Spring module tự nạp `.env` ở root repository.
+3. Mở Swagger tại Gateway `http://localhost:8080/swagger-ui.html`.
 
 Gateway giữ path công khai: `/api/content/videos/**`, `/api/content/vocabulary/**` và
 `/api/content/admin/vocabulary/**` tới library; `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**`
@@ -262,8 +260,8 @@ tới library; `/api/learning-support/{activities,streak}/**` tới user; `/api/
 mặc định địa chỉ `http://content-service:8082`. Library kiểm topic video qua Content. Content V7 xóa năm bảng catalog;
 chỉ cho Flyway chạy migration phá hủy này trên Testcontainers cho tới khi có duyệt riêng đối với `content_db` dùng chung.
 
-Nội dung demo Reading, Writing và Listening nằm trong migration content V9–V12. V13 thêm gợi ý Reading ở Content;
-Learning Service trả `hint` cho câu từng sai trong cùng user/bài/khối chưa đạt (câu điền hoặc chọn ≥3 phương án,
+Nội dung demo Reading, Writing, Listening và lesson nhiều skill nằm trong các migration Content V9–V23. V13 thêm gợi ý
+Reading ở Content; Learning Service trả `hint` cho câu từng sai trong cùng user/bài/khối chưa đạt (câu điền hoặc chọn ≥3 phương án,
 TFNG hỗ trợ options thiếu/rỗng), giữ tới khi khối đạt. Contract: [lesson-learning-v1](docs/contracts/lesson-learning-v1.md).
 Listening cần 8 file mp3 upload
 đúng key dưới `CONTENT_MEDIA_BASE_URL` (danh sách trong `services/content-service/README.md`). Thư mục
@@ -271,7 +269,7 @@ Listening cần 8 file mp3 upload
 service nào build hay import thư mục này.
 **Tài khoản demo cho frontend (chỉ dev/demo, mật khẩu công khai):** bật `DEMO_DATA_ENABLED=true` thì user-service và
 access-service tự ghi tài khoản demo sau mỗi lần Flyway chạy (callback `db/callback/afterMigrate__demo_data.sql`). Mặc
-định là `false`; `docker-compose.mvp.yml` bật sẵn (đặt `DEMO_DATA_ENABLED=false` để có DB trống); chạy service từ IDE thì
+định là `false`; Compose local bật sẵn (đặt `DEMO_DATA_ENABLED=false` để không ghi tài khoản/điểm demo); chạy service từ IDE thì
 thêm `DEMO_DATA_ENABLED=true` vào `.env`. Ghi một lần, khởi động lại không ghi trùng và không nạp lại point đã dùng.
 
 | Tài khoản | userId | Mật khẩu | Ghi chú |
@@ -279,8 +277,9 @@ thêm `DEMO_DATA_ENABLED=true` vào `.env`. Ghi một lần, khởi động lạ
 | `learner@ielts.demo` | `00000000-0000-0000-0000-000000000001` | `Demo@123` | CUSTOMER, ví 30 point (10 lần chấm Writing) |
 | `admin@ielts.demo` | `00000000-0000-0000-0000-000000000002` | `Demo@123` | ADMIN, nạp point qua `POST /api/access/admin/points/adjust` |
 
-Content đã có sẵn bài demo (V9–V13), Learning tự tạo lộ trình khi học viên gọi `GET /api/learning/topics` lần đầu, nên
-không cần seed thêm. Không bật cờ này trên database dùng chung hoặc production.
+Content seed các bài Reading, Listening, Writing và topic nhiều skill qua các Flyway migration (V9–V23). Learning tự
+tạo lộ trình khi học viên gọi `GET /api/learning/topics` lần đầu, nên không cần seed thêm. Không bật cờ demo trên
+database dùng chung hoặc production.
 
 **Tài khoản có quyền (chỉ dev, chỉ trên DB local):**
 
@@ -299,19 +298,20 @@ Grader (`EXAMINER`/`ADMIN`) chấm qua `/api/assessments/grading/**`, xem `servi
 Bằng chứng E2E của lần kiểm chứng gần nhất:
 `plans/260930-2057-mvp-reading-writing-listening-roadmap/reports/e2e-261002-mvp-reading-writing-listening.md`.
 
-**Chạy cả luồng chính bằng Docker** (không cần IDE, không cần Postgres local): `docker-compose.mvp.yml` dựng
-config-server, eureka, Gateway, user, content, access, assessment, learning, một Postgres (5 database, script
-`infra/postgres/mvp-init-databases.sql`) và RabbitMQ; không gồm library, game, community, notification.
+**Chạy backend bằng Docker** (không cần IDE, không cần Postgres local): file `docker-compose.yml` dựng config-server,
+Eureka, Gateway, user, content, library, access, assessment, learning, game, community, một PostgreSQL có database riêng
+cho từng service, và RabbitMQ. `notification-service` chưa triển khai nên không nằm trong stack.
 
 ```bash
-docker compose -f docker-compose.mvp.yml up -d --build   # lần đầu build lâu; sau đó bỏ --build
-docker compose -f docker-compose.mvp.yml down            # thêm -v để xóa dữ liệu (bắt buộc khi đổi mật khẩu)
+docker compose up -d --build  # lần đầu build lâu; sau đó bỏ --build
+docker compose down           # thêm -v để xóa dữ liệu và nạp lại seed
 ```
 
 Cần trong `.env`: `POSTGRES_PASSWORD`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `EXTERNAL_JWT_SECRET`,
-`GATEWAY_INTERNAL_JWT_SECRET`; tùy chọn `LEARNING_LLM_*` (chấm Writing) và `CONTENT_MEDIA_BASE_URL` (mặc định là URL
-giữ chỗ, audio chưa phát được). Cổng host: Gateway 8080, Eureka 8761, Postgres 5440, RabbitMQ UI 15673; nếu đang chạy
-service từ IDE thì đổi bằng `MVP_GATEWAY_PORT`, `MVP_EUREKA_PORT`, `MVP_POSTGRES_PORT`, `MVP_RABBITMQ_UI_PORT`.
+`GATEWAY_INTERNAL_JWT_SECRET`; tùy chọn `LEARNING_LLM_*`, `ASSESSMENT_LLM_*` (chấm Writing) và
+`CONTENT_MEDIA_BASE_URL` (mặc định là URL giữ chỗ, audio chưa phát được). Cổng host: Gateway 8080, Eureka 8761,
+Postgres 5440, RabbitMQ 5672/UI 15673; đổi bằng `MVP_GATEWAY_PORT`, `MVP_EUREKA_PORT`, `MVP_POSTGRES_PORT`,
+`RABBITMQ_HOST_PORT`, `MVP_RABBITMQ_UI_PORT` nếu cổng đã được dùng.
 Config-repo được mount chỉ đọc, sửa YAML xong chỉ cần restart service.
 
 **Ghép FE:** thứ tự gọi API và kịch bản luồng học chính ở [`docs/fe-main-flow-guide.md`](docs/fe-main-flow-guide.md).

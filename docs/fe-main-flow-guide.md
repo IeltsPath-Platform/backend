@@ -10,7 +10,7 @@
 
 | Mục | Quy ước |
 | --- | --- |
-| Base URL | Mọi request đi qua Gateway: `http://localhost:8080` (đổi được bằng `MVP_GATEWAY_PORT` khi chạy `docker-compose.mvp.yml`). Không gọi thẳng cổng service. |
+| Base URL | Mọi request đi qua Gateway: `http://localhost:8080` (đổi được bằng `MVP_GATEWAY_PORT` trong root `docker-compose.yml`). Không gọi thẳng cổng service. |
 | CORS | Gateway cho phép mọi origin `http://localhost:*` và `http://127.0.0.1:*`, cùng `FRONTEND_ORIGIN` (mặc định `http://localhost:5173`). |
 | Xác thực | Header `Authorization: Bearer <accessToken>` cho mọi API trừ đăng ký, đăng nhập, refresh. Thiếu/hết hạn token → `401`. |
 | `requestId` | Các API nộp bài (bài tập, bài ôn, bài luận) bắt buộc `requestId` dạng UUID do FE sinh (`crypto.randomUUID()`). Gửi lại **cùng** `requestId` (mạng lỗi, timeout) thì nhận lại đúng kết quả cũ, không bị tính hai lần. Lần làm lại mới thì sinh `requestId` mới. |

@@ -2,7 +2,7 @@
 
 - Phiên bản: 2.2
 - Cập nhật lần cuối: 2026-10-07; dữ kiện đã kiểm với code sau course path, placement recommendation và course gate
-- Dự án: `IELTSPath` (Maven coordinates: `com.group01:code-base:1.0-SNAPSHOT`)
+- Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
 **Thứ tự ưu tiên:** `.sdd/global/constitution.md` (invariant cấp dự án, LOCKED) → file này (quy tắc vận hành cho agent;
@@ -21,13 +21,13 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-security` | Thư viện security servlet dùng chung (internal JWT, `CanonicalRoles`, `CurrentUserProvider`); không deploy độc lập. |
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity và streak tại `/api/learning-support/{activities,streak}`. |
 | `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset; kiểm topic cho library. |
-| `services/library-service` | Cổng 8081, `library_db` (Compose host 5437): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
+| `services/library-service` | Cổng 8081, `library_db` (Compose PostgreSQL host 5440): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
 | `services/assessment-service` | Làm bài, chấm objective/LLM cho essay gate và EXAMINER, kết quả; phát `AssessmentCompleted.v2`. |
 | `services/access-service` | Gói, subscription, activation key, điểm. |
 | `services/game-service` | Phòng game, trận, phiên chơi, WebSocket. |
 | `services/community-service` | Bài viết, bình luận, reaction, kiểm duyệt. |
 | `services/notification-service` | Chưa triển khai (khung package). |
-| `services/learning-service` | Cổng 8086, `learning_db` (Compose host 5436): thứ tự topic, bài học, nộp bài, cổng mở bài, mastery theo KP, bài ôn, giao mã đề cuối, consumer `AssessmentCompleted.v2`. Route `/api/learning/**`. |
+| `services/learning-service` | Cổng 8086, `learning_db` (Compose PostgreSQL host 5440): thứ tự topic, bài học, nộp bài, cổng mở bài, mastery theo KP, bài ôn, giao mã đề cuối, consumer `AssessmentCompleted.v2`. Route `/api/learning/**`. |
 | `third_party/deeptutor` | Bản clone chỉ để đọc (nguồn của công thức mastery đã port). **Không phải dependency.** |
 
 Mỗi business service sở hữu một database PostgreSQL riêng. Gateway chuyển hai nhóm activity/streak tới user-service;
@@ -81,7 +81,7 @@ config -> framework wiring
 ### 3.1.1 Template bắt buộc cho business service Java mới
 
 ```text
-src/main/java/com/group01/<service>
+src/main/java/com/ieltspath/<service>
 |-- domain         aggregate, entity, vo, event, exception, repository
 |-- application    command, query, result, usecase, port, exception
 |-- api            controller, dto
@@ -131,17 +131,20 @@ src/main/java/com/group01/<service>
 - Bootstrap setting ở `src/main/resources/application.y(a)ml` của module; runtime setting ở
   `infra/config-server/config-repo/<service>.yaml` (+ `application.yaml` dùng chung). Không lặp setting Eureka client toàn cục.
 - Gateway và mọi service Java nghiệp vụ import `.env` ở root (`optional:file:../../.env[.properties]`; config-server và
-  eureka-server thì không); compose cũng nội suy file này. `.env` không commit. Compose nội suy cả file nên mọi biến
-  `${VAR:?}` (`LIBRARY_DB_PASSWORD`, `LEARNING_DB_PASSWORD`, `GAME_DB_PASSWORD`, `POSTGRES_PASSWORD`, `RABBITMQ_USERNAME`,
-  `RABBITMQ_PASSWORD`, `GATEWAY_INTERNAL_JWT_SECRET`) phải có trong `.env` kể cả khi chỉ bật một phần stack;
-  community-service mặc định DB local 5432, dùng DB compose (5434) thì đặt `COMMUNITY_DB_URL`.
+  eureka-server thì không); Compose cũng nội suy file này. `.env` không commit. Root chỉ có một
+  `docker-compose.yml`: PostgreSQL chạy ở host port 5440 với database riêng cho mỗi service, RabbitMQ, hạ tầng Spring,
+  và các service đã triển khai. Các biến bắt buộc là `POSTGRES_PASSWORD`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`,
+  `EXTERNAL_JWT_SECRET`, `GATEWAY_INTERNAL_JWT_SECRET`; có thể override cổng bằng `MVP_POSTGRES_PORT`,
+  `RABBITMQ_HOST_PORT`, `MVP_RABBITMQ_UI_PORT`, `MVP_GATEWAY_PORT`, `MVP_EUREKA_PORT`.
 - Assessment gate essay dùng OpenAI-compatible LLM qua `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`,
   `ASSESSMENT_LLM_MODEL`; quota theo ngày cấu hình bằng `ASSESSMENT_LLM_DAILY_LIMIT` (mặc định 20). Thiếu cấu hình,
   lỗi chấm hoặc hết quota thì essay được chuyển sang hàng chờ EXAMINER; không ghi essay/prompt vào log.
-- Chạy local: service Java trên host (Config Server → Eureka → Gateway → business service); compose chạy DB của
-  library/community/game/learning và RabbitMQ. Library dùng `library_db` qua host 5437.
-  Game chọn snapshot `VOCABULARY` từ library và `GRAMMAR` từ content; `LIBRARY_SERVICE_URL` mặc định
-  `http://localhost:8081` trong config-repo. Chi tiết: `README.md` §6, `docs/system-architecture.md` §7.
+- Chạy local bằng container: `docker compose up -d --build` khởi chạy PostgreSQL, RabbitMQ, Config Server, Eureka,
+  Gateway và các service đã triển khai; Flyway của từng service tạo schema/seed trong database riêng. Để chạy Java từ
+  IDE, dùng `docker compose up -d postgres rabbitmq` rồi trỏ các `*_DB_URL` tới `localhost:${MVP_POSTGRES_PORT:-5440}/<service>_db`; thứ tự service trên host là Config Server → Eureka → Gateway → business service.
+  Tài khoản/điểm demo của user/access chỉ được ghi khi `DEMO_DATA_ENABLED=true` (Compose local mặc định bật).
+  Game chọn snapshot `VOCABULARY` từ library và `GRAMMAR` từ content; trong Compose các base URL trỏ theo tên service.
+  Chi tiết: `README.md` §6, `docs/system-architecture.md` §7.
 - `Dockerfile.spring-service` build module Maven theo `MODULE_PATH`; Config Server có Dockerfile riêng.
 
 ### 3.7 Hiệu năng persistence, N+1 và độ phức tạp
@@ -166,7 +169,7 @@ src/main/java/com/group01/<service>
 - Thứ tự topic theo user từ Content `topic-sequence`, không LLM/goal; mỗi course là một chuỗi chung mọi skill. Mọi course
   đều mở; band từ placement chỉ gợi ý course và không đổi trạng thái topic. Bài ôn vẫn chặn bài, Practice và thi topic
   của cùng skill. Thi cuối course không chặn tiến độ topic hay course khác. `LessonAccessGate` và use case trong
-  `services/learning-service/src/main/java/com/group01/learning/` quyết định cổng bài; trạng thái topic suy ra khi đọc.
+  `services/learning-service/src/main/java/com/ieltspath/learning/` quyết định cổng bài; trạng thái topic suy ra khi đọc.
 - Mọi lượt ghi của một học viên chạy trong một `@Transactional` mở đầu bằng `pg_advisory_xact_lock` theo user.
 - Bằng chứng bài học chỉ ghi ở lần nộp đầu của mỗi khối; bài ôn ghi mỗi set (nộp một lần); kết quả thi ghi theo
   `(attempt_id, result_version)`, chấm lại thì thay bằng chứng của version cũ.
@@ -181,18 +184,18 @@ src/main/java/com/group01/<service>
 shared/common-security/                 thư viện security dùng chung
 infra/{api-gateway,config-server,eureka-server}/
 infra/config-server/config-repo/        YAML runtime tập trung
-services/<name>-service/                service Java: src/main/java/com/group01/<package>/{api,application,domain,infrastructure}
+services/<name>-service/                service Java: src/main/java/com/ieltspath/<package>/{api,application,domain,infrastructure}
                                         (package bỏ gạch nối, ví dụ library; user-service có thêm config/)
                                         + src/main/resources/db/migration/
 docs/contracts/                         contract HTTP/SSE/event
-docker-compose.yml                      stack local (một phần)
+docker-compose.yml                      stack local (database, broker và service đã triển khai)
 ```
 
 Khi không có convention cụ thể, theo code lân cận trong cùng module.
 
 | Thành phần | Convention |
 | --- | --- |
-| Java package / type | `com.group01.<module>` viết thường; type PascalCase, một public type mỗi file. |
+| Java package / type | `com.ieltspath.<module>` viết thường; type PascalCase, một public type mỗi file. |
 | Aggregate, VO | `domain/aggregate/<Name>.java`, `domain/vo/<Name>.java` (record hoặc enum). |
 | Use case | `application/usecase/<Verb><Noun>UseCase.java`, `application/command/...Command.java`, `application/result/...Result.java`. |
 | Repository | `domain/repository/<Name>Repository.java`; adapter `<Name>RepositoryAdapter` ở `infrastructure/adapter` hoặc `infrastructure/persistence` theo service. |

@@ -1,0 +1,27 @@
+package com.ieltspath.assessment.api.controller;
+
+import com.ieltspath.assessment.api.dto.response.LearnerAssessmentResultResponse;
+import com.ieltspath.assessment.application.usecase.GetAssessmentResultUseCase;
+import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/assessments/attempts/{attemptId}/result")
+@RequiredArgsConstructor
+public class AssessmentResultController {
+
+    private final CurrentUserProvider currentUser;
+    private final GetAssessmentResultUseCase getAssessmentResultUseCase;
+
+    @GetMapping
+    public LearnerAssessmentResultResponse get(@PathVariable("attemptId") UUID attemptId) {
+        return LearnerAssessmentResultResponse.from(
+                getAssessmentResultUseCase.execute(currentUser.requireUserId(), attemptId));
+    }
+}

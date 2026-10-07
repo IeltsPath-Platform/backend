@@ -68,15 +68,16 @@ mvn -pl infra/eureka-server spring-boot:run
 mvn -pl infra/api-gateway spring-boot:run
 ```
 
-Hoặc chạy toàn bộ bằng Docker Compose từ thư mục gốc:
+Chạy PostgreSQL, RabbitMQ, infrastructure và các business service đã triển khai bằng một Compose file tại root:
 
 ```powershell
-docker compose up -d
+docker compose up -d --build
 ```
 
-Compose uses the root `Dockerfile.spring-service` for regular Spring Boot
-services. `config-server` keeps its own Dockerfile because it includes
-`config-repo`.
+Compose dùng `Dockerfile.spring-service` cho tất cả Spring Boot service và mount `config-repo` chỉ đọc vào Config Server.
+`infra/config-server/Dockerfile` vẫn dùng được khi build độc lập. PostgreSQL có một database riêng cho từng service;
+init script tạo database, sau đó Flyway
+chạy migration và seed của service. User/Access demo data chỉ được ghi khi `DEMO_DATA_ENABLED=true`.
 
 ## Tài liệu chi tiết
 

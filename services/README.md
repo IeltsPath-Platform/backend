@@ -30,7 +30,7 @@ Gateway giữ các path `/api/learning-support/**`: `activities` và `streak` t�
 Ví dụ lấy user hiện tại trong controller:
 
 ```java
-import com.group01.commonsecurity.currentuser.CurrentUserProvider;
+import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 
 private final CurrentUserProvider currentUserProvider;
 

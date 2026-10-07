@@ -12,16 +12,19 @@ review sets, final-test assignment and the `AssessmentCompleted.v2` consumer.
 
 Runtime configuration is in
 [`learning-service.yaml`](../../infra/config-server/config-repo/learning-service.yaml).
-PostgreSQL runs as Compose `learning-db` on `127.0.0.1:5436`, database `learning_db`.
-Set `LEARNING_DB_PASSWORD`, `GATEWAY_INTERNAL_JWT_SECRET` and RabbitMQ credentials
-in the local environment. The database password has no fallback.
+The root Compose stack runs PostgreSQL at host port `5440`; Learning owns the separate `learning_db` database.
+For container execution, run `docker compose up -d --build`. To run Learning from the host, start the dependencies with
+`docker compose up -d postgres rabbitmq`, set `LEARNING_DB_URL=jdbc:postgresql://localhost:5440/learning_db`,
+`LEARNING_DB_PASSWORD` to the same local value as `POSTGRES_PASSWORD`, and provide `GATEWAY_INTERNAL_JWT_SECRET` plus
+RabbitMQ credentials.
 Content defaults to `http://localhost:8082`; override it with `CONTENT_SERVICE_URL`.
 Access (points) defaults to `http://localhost:8084`; override it with `ACCESS_SERVICE_URL`.
 Essay grading needs an OpenAI-compatible endpoint: `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`
 (secret, `.env` only), `LEARNING_LLM_MODEL`, optional `LEARNING_LLM_REASONING_EFFORT`. Without them essay
 submissions return `503 GRADING_UNAVAILABLE`; everything else works. `LEARNING_WRITING_POINT_COST` (3) and
 `LEARNING_WRITING_DAILY_GRADING_LIMIT` (10) tune the price and the daily limit.
-Start Config Server, Eureka, Gateway, User and Content (and Access for essays) before using the learner APIs.
+When running from the host, start Config Server, Eureka, Gateway, User and Content (and Access for essays) before using
+the learner APIs. The full Compose stack includes these services.
 
 From the repository root:
 

@@ -1,0 +1,27 @@
+package com.ieltspath.content.application.command;
+
+import com.ieltspath.content.domain.vo.QuestionDifficulty;
+import com.ieltspath.content.domain.vo.QuestionOptionPayload;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+
+public record AddQuestionVersionCommand(
+        UUID questionId,
+        int versionNumber,
+        String stem,
+        List<QuestionOptionPayload> options,
+        String answerSpecJson,
+        String explanation,
+        String hint,
+        QuestionDifficulty difficulty,
+        List<KnowledgePointInput> knowledgePoints
+) {
+    public record KnowledgePointInput(
+            UUID questionVersionId,
+            UUID knowledgePointId,
+            BigDecimal weight
+    ) {
+    }
+}

@@ -1,0 +1,6 @@
+package com.ieltspath.community.application.command;
+
+import java.util.UUID;
+
+public record EditCommentCommand(UUID commentId, String body) {
+}

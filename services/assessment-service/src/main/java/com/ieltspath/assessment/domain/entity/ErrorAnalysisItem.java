@@ -1,0 +1,7 @@
+package com.ieltspath.assessment.domain.entity;
+
+import java.util.UUID;
+
+public record ErrorAnalysisItem(UUID id, UUID itemResultId, UUID knowledgePointId,
+                                String errorType, String explanation) {
+}
