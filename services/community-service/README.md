@@ -42,4 +42,6 @@ the API boundary; they do not read security context or raw identity headers them
 
 ## Local runtime
 
-Set the same required variables as the root Compose stack (`POSTGRES_PASSWORD`, `EXTERNAL_JWT_SECRET`, `GATEWAY_INTERNAL_JWT_SECRET`), then run `docker compose up -d --build`. Docker starts `community-db` from `postgres:15-alpine`; Flyway initializes the schema when Community Service starts.
+Set the required root Compose variables (`POSTGRES_PASSWORD`, `EXTERNAL_JWT_SECRET`, `GATEWAY_INTERNAL_JWT_SECRET`),
+then run `docker compose up -d --build community-service`. The shared PostgreSQL container has a separate `community_db`;
+Flyway initializes its schema when Community Service starts.

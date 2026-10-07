@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "Docs and verification"
-status: pending
+status: completed
 priority: P2
 dependencies: [1, 2, 3, 4, 5, 6]
 ---
@@ -46,8 +46,8 @@ Cập nhật tài liệu theo hành vi lesson nhiều skill và chạy kiểm ch
 3. Grep `\.skill()` trong `application`/`domain` của learning để chắc không còn quyết định dựa trên một skill.
 
 ## Success Criteria
-- [ ] Ba module xanh; reactor compile xanh.
-- [ ] Tài liệu khớp code; không có mã plan/phase trong code, test, migration, commit.
+- [x] Ba module xanh; reactor compile xanh.
+- [x] Tài liệu khớp code; không có mã plan/phase trong code, test, migration, commit.
 
 ## Risk Assessment
 - AGENTS §3.8 là quy tắc chính cho agent: viết sai thì agent sau làm sai. Đối chiếu từng câu với code.

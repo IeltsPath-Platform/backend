@@ -66,6 +66,13 @@ Each `item_results[]` entry:
 | `score`, `max_score` | number | `0 <= score <= max_score`, `max_score > 0`. |
 | `knowledge_point_mappings[]` | array | The Content snapshot taken at attempt start. |
 
+`TOPIC_GATE` and `COURSE_GATE` attempts may contain essay items. The learner submits an essay through
+`POST /api/assessments/submissions` before submitting the attempt. A submitted essay is graded asynchronously by the
+Assessment LLM at no point cost; the result and this event are created after all AI essay jobs for the attempt finish.
+An essay without a submitted response scores zero and creates no grading job. If the LLM is unavailable, returns an
+invalid grade, or the learner has reached the daily limit, Assessment queues the essay for EXAMINER review; the event is
+then emitted when the examiner completes the result. The `AssessmentCompleted.v2` payload shape does not change.
+
 Each `knowledge_point_mappings[]` entry:
 
 | Field | Type | Notes |

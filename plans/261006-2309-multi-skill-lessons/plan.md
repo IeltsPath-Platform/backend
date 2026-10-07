@@ -1,7 +1,7 @@
 ---
 title: "Lesson nhiều skill (Reading, Listening, Writing)"
 description: "Một lesson dạy R+L+W; Practice có bộ riêng từng skill và bộ trộn, đạt theo từng skill, essay chấm LLM; thi topic trộn skill, Writing chấm LLM trong assessment, lỗi thì EXAMINER."
-status: pending
+status: completed
 priority: P2
 branch: "feat/multi-skill-lessons"
 tags: [content, learning, assessment, llm, tdd]
@@ -92,13 +92,13 @@ mọi test của `LessonWritingIntegrationTest` (refactor phase 5 không đổi 
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Content multi-skill lessons and practice skills](./phase-01-content-multi-skill-lessons-and-practice-skills.md) | Pending |
-| 2 | [Content seed multi-skill topic](./phase-02-content-seed-multi-skill-topic.md) | Pending |
-| 3 | [Learning multi-skill gating](./phase-03-learning-multi-skill-gating.md) | Pending |
-| 4 | [Learning practice per-skill clearance](./phase-04-learning-practice-per-skill-clearance.md) | Pending |
-| 5 | [Learning practice essays](./phase-05-learning-practice-essays.md) | Pending |
-| 6 | [Assessment LLM gate grading](./phase-06-assessment-llm-gate-grading.md) | Pending |
-| 7 | [Docs and verification](./phase-07-docs-and-verification.md) | Pending |
+| 1 | [Content multi-skill lessons and practice skills](./phase-01-content-multi-skill-lessons-and-practice-skills.md) | Completed |
+| 2 | [Content seed multi-skill topic](./phase-02-content-seed-multi-skill-topic.md) | Completed |
+| 3 | [Learning multi-skill gating](./phase-03-learning-multi-skill-gating.md) | Completed |
+| 4 | [Learning practice per-skill clearance](./phase-04-learning-practice-per-skill-clearance.md) | Completed |
+| 5 | [Learning practice essays](./phase-05-learning-practice-essays.md) | Completed |
+| 6 | [Assessment LLM gate grading](./phase-06-assessment-llm-gate-grading.md) | Completed |
+| 7 | [Docs and verification](./phase-07-docs-and-verification.md) | Completed |
 
 Thứ tự commit: 1 → 2 → 3 → 4 → 5 → 6 → 7. Phase 6 độc lập với 3–5 và có thể làm song song nếu có người thứ hai.
 
@@ -170,5 +170,136 @@ lesson (lesson vẫn chỉ seed) · UI.
 
 ## Verification
 
+### Implementation baseline — 2026-10-07
+
+- Base commit: `668dca3` (`668dca36d210923c213d25389c0bc6372fb54138`). Existing branch: `feat/multi-skill-lessons`; initial working tree clean.
+- Migration numbers checked before implementation: Content latest V22, Learning latest V7, Assessment latest V5; Content V23, Learning V8–V10 and Assessment V6 are available.
+- Docker daemon available before tests; no Docker Desktop startup required.
+
+### Phase 1 Verification — 2026-10-07
+
+- Status: `DONE`. Codex wrote the red tests and most of the implementation, then stopped on its usage limit; Claude
+  finished the remaining items (contract doc, clean-up, the allowlisted seed test) and committed.
+- Red: `mvn -q -pl services/content-service -am test` exited 1 with 8 expected failures/errors (235 tests, 0 skipped);
+  names in [content red report](./reports/content-red.md). Baseline before work: 228/228 ([baseline](./reports/content-baseline.md)).
+- Green: `mvn -q -pl services/content-service -am test` exited 0 — content 242/242, common-security 8/8, 0 skipped,
+  Docker/Testcontainers.
+- Old tests changed (all allowlisted): `LessonPipelineSeedTest.everyLessonTeachesOnlyItsTopicsSkill` →
+  `everyLessonPracticeSetStaysWithinTheSkillsItsLessonTeaches`; `aPackageVersionLeavesTheLessonSkill…` calls
+  `packageVersionLeavesLessonSkills`; `PublishContentPackageUseCaseTest` renamed method call;
+  `UpdateTopicUseCaseTest.changingTheSkillOfATopicWithPublishedLessonsIsRefusedAndNothingIsSaved` →
+  `…IsAllowed`; `TopicTest.theSkillIsLockedOncePublishedLessonsDependOnIt` → `topicSkillMetadataCanChangeAfterLessonsArePublished`;
+  `CoursePackagesUseCaseTest.validChoiceFillAndLegacyChoiceSpecsPublishButEssayOrNonReadingDoNot` →
+  `validObjectiveAndWritingQuestionsPublishButInvalidEssayAndSpeakingDoNot` (Speaking replaces Listening as the rejected
+  skill). `TopicTest.aTopicTeachesOneSkillNeverAll` keeps its expectations; only the call `changeSkill(Skill.ALL, false)`
+  became `changeSkill(Skill.ALL)` because the two-argument overload was removed.
+- Course test rule changed (M15): Reading/Listening auto-gradable or Writing essay with `passBand`.
+
+### Phase 2 Verification — 2026-10-07
+
+- Status: `DONE_WITH_CONCERNS` (one old test changed outside the allowlist, see below).
+- Red: `mvn -q -pl services/content-service -am test -Dtest=MultiSkillSeedTest` failed — Flyway target 23 did not exist.
+- Green: `mvn -q -pl services/content-service -am test` exited 0 — content 247/247, common-security 8/8, 0 skipped,
+  Docker/Testcontainers.
+- Seed `V23__seed_multi_skill_topic.sql` (UUID prefix `2a000000-`): topic `TREES_MULTI_SKILL` (course 5.5, sort 955,
+  `skill` NULL), 4 KPs (2 R, 1 L, 1 W), lessons T1/T2 each with R + L + W blocks and a Task 2 essay (`passBand` 5.5);
+  T1 Practice: R, L, W (1 essay), R+L (3 + 3); T2 Practice: one R set (added so every lesson of a topic with a final test
+  keeps a Practice, as `everyLessonOfATopicWithAFinalTestOffersPractice` requires); topic test R + L + 1 essay. 33 new
+  questions. Listening reuses V12 audio. Full text for review: [v23-seed-content](./reports/v23-seed-content.md).
+- Old tests changed (allowlisted, only V23 data added): `LessonPipelineSeedTest.topicSequenceListsEachSkills…`,
+  `practiceSetsBelongToTheEarliestLesson…`, `everySeededExerciseBlock…` (essays 3 → 5),
+  `lessonPracticeAndTestQuestionsAreReservedForLearning` (196 → 229).
+- **Outside the allowlist:** `LessonPipelineSeedTest.writingEssaysMovedToTheirOwnTopicKeepingTheirBlockIds` asserted that
+  no topic with published lessons has a null `skill`. That is the old one-skill-per-topic rule which this phase's own
+  spec (topic `skill` NULL) replaces. The last assertion now requires that a topic without a skill label teaches more
+  than one skill and is exactly `TREES_MULTI_SKILL`; the rest of the test is unchanged. Owner to confirm in the PR.
+
+### Phase 3 Verification — 2026-10-07
+
+- Status: `DONE_WITH_CONCERNS` — tests were written right after the code in this phase, not run red first; they pin
+  the new behaviour (gate by lesson skill set, client `skills` fallback, KP skill on reviews).
+- Command: `mvn -q -pl services/learning-service -am test` exited 0 — learning 244/244, common-security 8/8, 0 skipped,
+  Docker/Testcontainers (first run without Docker skipped 46; rerun with Docker).
+- Migration `V8__topic_skills.sql`: `topic_progress.skills VARCHAR(20)[]`, backfilled from `skill`; `skill` kept (single
+  skill or NULL). No new table.
+- Allowlisted change: `LearningServiceApplicationTests.contextStartsWithMigratedSchemaAndPublicHealth` Flyway version
+  `7 → 8`; tables stay 17 (17 + 0 new tables). Health check unchanged.
+- New tests: `LessonAccessGateTest` (2), `RestLearningContentClientTest.mapsDerivedSkillsAndFallsBack…`,
+  `MultiSkillLessonIntegrationTest` (3: mixed lesson completes without the essay; a READING review blocks the mixed lesson
+  and the topic test but not a Listening-only lesson; a missed Reading KP in a topic test creates a READING review).
+- A lesson that Content sends without `skills` uses its topic's skills, so older single-skill lessons gate as before.
+- Grep: no remaining `topic.skill()`/`lesson.skill()` decides a gate in `application`/`domain`; left uses are response
+  compatibility fields, fallbacks when a KP has no skill, and `PracticeAttempt` (next phase).
+
+### Phase 4 Verification — 2026-10-07
+
+- Status: `DONE_WITH_CONCERNS` — tests written right after the code (not run red first); one schema deviation below.
+- Command: `mvn -q -pl services/learning-service -am test` exited 0 — learning 250/250, common-security 8/8, 0 skipped,
+  Docker/Testcontainers.
+- Migration `V9__practice_skills.sql`: `practice_attempts.skills` and `passed_skills` (`VARCHAR(20)[]`), backfilled from
+  `skill`/`passed`; `skill` becomes nullable (NULL for a mixed set). No new table: tables stay 17.
+- **Deviation:** the plan proposed a table `lesson_practice_skill_passes`. Per-skill FIRST_SUBMISSION facts come from
+  `practice_attempts.passed_skills` instead, and the lesson-level pass stays in `lesson_practice_passes` (written once,
+  never revoked), so a per-skill table would only duplicate attempt data. Owner to confirm in the PR.
+- Behaviour: `ItemGrading` scores each section skill; `passed` = every skill ≥ 70%; `PracticeSubmission.skillScores`
+  (response field). `PracticeClearance` clears each objective skill (R, L) by first passing submission, finished review
+  of that skill, or all its sets revealed; Writing sets are optional; Writing-only Practice is `NO_PRACTICE`; sets
+  without `skills` (older Content) are judged as before. Reviews are derived per failed objective skill.
+  `GET /lessons/{id}/practice-sets?skill=X` filters the list (`400 INVALID_SKILL`), clearance counts every set.
+- Allowlisted change: `LearningServiceApplicationTests` Flyway version `8 → 9`; tables 17.
+- New tests: `PracticeClearanceTest` (4), `MultiSkillLessonIntegrationTest` (2: mixed set scored per skill with a
+  LISTENING-only review and Practice still REQUIRED; passing both parts clears Practice without the Writing set).
+
+### Phase 5 Verification — 2026-10-07
+
+- Status: `DONE_WITH_CONCERNS` — tests written right after the code; two small design choices below.
+- Commits: refactor `651bc98` (`EssaySubmissionFlow`, `EssayPrompts` extracted; learning 250/250 with
+  `LessonWritingIntegrationTest` unchanged), then the feature commit.
+- Command: `mvn -q -pl services/learning-service -am test` exited 0 — learning 253/253, common-security 8/8, 0 skipped,
+  Docker/Testcontainers.
+- Migration `V10__practice_essays.sql`: `lesson_writing_submissions.source` (`LESSON_BLOCK|PRACTICE_ITEM`),
+  `practice_attempt_id`, `block_id` nullable, CHECK by source, in-flight unique index per (user, attempt, question).
+  No new table (17). **No foreign key** to `practice_attempts`: with one, every existing test that truncates
+  `practice_attempts` failed (outside the allowlist); the use case checks ownership and that the attempt is open.
+- Behaviour: `POST /api/learning/practice-attempts/{id}/essays/{questionVersionId}/submissions` (body reuses
+  `SubmitEssayRequest {requestId, essayText}`) — same statuses and codes as lesson essays (402/429/503/422, replay by
+  `requestId` charges once, ledger key `practice-writing:{user}:{requestId}`), `409 NOT_ESSAY_ITEM`,
+  `409 ATTEMPT_SUBMITTED`. Submitting the set needs every essay GRADED (`409 ESSAY_NOT_GRADED`); an essay counts correct
+  when its band ≥ `passBand`, goes into `skillScores[WRITING]` and KP evidence (`practice_set`) when counted; no review.
+  The practice view now lists `sections` (passage/audio, questions, essays with `latestSubmission`), so a mixed set
+  shows its Listening audio; the transcript after submission comes from the first section with audio.
+- Allowlisted change: `LearningServiceApplicationTests` Flyway `9 → 10`; tables 17.
+- Test wiring (no expectation changed): `LessonLearningWebMvcTest` mocks the new use case so the controller loads.
+- New tests: `PracticeEssayIntegrationTest` (3).
+
 (Codex điền sau mỗi phase: commit, lệnh đã chạy và kết quả, test bị skip, test cũ đã sửa kỳ vọng, nội dung seed mới,
 mọi `BLOCKED`.)
+
+### Phase 6 Verification — 2026-10-07
+
+- Status: `DONE`. Assessment gate essays now use free asynchronous AI grading after submission through
+  `/api/assessments/submissions`; omitted essays score zero without a job, while `MOCK` and non-gate essays preserve the
+  existing EXAMINER/objective paths. LLM/config/quota failures enqueue a HUMAN job.
+- Migration `V6__gate_llm_grading.sql`: adds `grading_jobs.llm_band`, the `(status, grading_mode)` claim index, and
+  `llm_usage_daily`; Testcontainers applied all six assessment migrations and validated the JPA schema.
+- LLM and quota checks run outside a transaction. Job completion and result/outbox assembly share one short transaction;
+  this was tightened after review found a crash window between the two writes. A transaction-boundary test covers it.
+- Review: one result durability issue was fixed; no other concrete findings in quota, idempotency, HUMAN handoff,
+  privacy, or preserved MOCK/objective behavior.
+- Full assessment tests, including Testcontainers integration coverage and the transaction-boundary test, are included in
+  the phase 7 aggregate run below.
+
+### Phase 7 Verification — 2026-10-07
+
+- Status: `DONE`. `mvn -q -pl services/content-service,services/learning-service,services/assessment-service -am test`
+  exited 0: content 247/247, learning 253/253, assessment 137/137, common-security 8/8; 0 failures, errors, or skipped
+  tests. Docker/Testcontainers were available and ran.
+- `mvn -q compile -DskipTests` exited 0 for the full reactor. `git diff --check` passed.
+- `graphify update .` exited 0; graph refreshed to 9,583 nodes and 34,528 edges.
+- Docs checked/updated: service/environment descriptions in `AGENTS.md` and `CLAUDE.md`, LLM fallback and unchanged event
+  contract in `docs/contracts/assessment-completed-v2.md`, multi-skill lesson and gate-essay flow in
+  `docs/fe-main-flow-guide.md` and `docs/system-architecture.md`; learning/content contracts were already aligned.
+- Grep of `\.skill\(\)` in learning application/domain found only response compatibility, KP/review-skill logic, and
+  fallback reads for legacy untagged data; no lesson access or Practice gate uses one lesson skill as its rule.
+- Manual multi-service runtime smoke was not run; verification used the three services' Testcontainers/integration
+  suites. No tests were skipped.

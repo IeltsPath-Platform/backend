@@ -1,7 +1,7 @@
 # Library Service
 
-`library-service` (Spring Boot, Eureka name `LIBRARY-SERVICE`) runs on port `8081` and owns `library_db`. For local
-development, Compose provides `library-db` on host port `5437`; the Java service runs on the host.
+`library-service` (Spring Boot, Eureka name `LIBRARY-SERVICE`) runs on port `8081` and owns `library_db`. The root
+Compose stack runs Library with the other deployed services; PostgreSQL publishes at host port `5440`.
 
 ## Data and routes
 
@@ -23,13 +23,14 @@ timeout; Content failures return 503. `POST /internal/game-content/snapshots` se
 
 ## Local setup
 
-Set `LIBRARY_DB_PASSWORD` in the root `.env`: Docker Compose requires it even when starting other containers.
-Start the database with `docker compose up -d library-db`, then run Config Server, Eureka and Library Service on
-the host. Runtime config is in `infra/config-server/config-repo/library-service.yaml`:
+For the full container stack, run `docker compose up -d --build`. To run Library from the host, start PostgreSQL with
+`docker compose up -d postgres` and set `LIBRARY_DB_URL=jdbc:postgresql://localhost:5440/library_db` and
+`LIBRARY_DB_PASSWORD` to the same local value as `POSTGRES_PASSWORD`. Runtime config is in
+`infra/config-server/config-repo/library-service.yaml`:
 
 | Variable | Default or purpose |
 | --- | --- |
-| `LIBRARY_DB_URL` | `jdbc:postgresql://localhost:5437/library_db` |
+| `LIBRARY_DB_URL` | `jdbc:postgresql://localhost:5440/library_db` |
 | `LIBRARY_DB_USERNAME` | `postgres` |
 | `LIBRARY_DB_PASSWORD` | Required database password; no fallback in service config |
 | `CONTENT_SERVICE_URL` | `http://localhost:8082` for topic lookup |

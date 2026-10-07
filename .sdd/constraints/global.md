@@ -58,7 +58,7 @@ Không có frontend, JavaScript/Node package manager, message broker, cache, obj
 
 **Constraint:** Module SHOULD kế thừa root parent POM. Spring Boot và Spring Cloud version MUST tiếp tục lấy từ BOM/import ở root POM; không pin lại version của managed dependency trong module nếu chưa có lý do được review.
 
-**Bằng chứng:** Tất cả module POM hiện có đều kế thừa `com.group01:code-base`; root POM import Spring Boot và Spring Cloud dependency BOM.
+**Bằng chứng:** Tất cả module POM hiện có đều kế thừa `com.ieltspath:code-base`; root POM import Spring Boot và Spring Cloud dependency BOM.
 
 **Lưu ý:** Maven Compiler Plugin 3.14.0 và Surefire 3.5.3 chỉ được cấu hình tường minh ở `common-security`, `api-gateway` và `user-service`; chưa có bằng chứng rằng các plugin này được áp dụng đồng nhất cho mọi module.
 
@@ -91,7 +91,7 @@ Các module hiện có là `infra/api-gateway`, `infra/config-server`, `infra/eu
 | Đối tượng | Convention đã xác minh | Bằng chứng / phạm vi |
 | --- | --- | --- |
 | Maven module, deployable service, artifact | kebab-case | `api-gateway`, `config-server`, `eureka-server`, `user-service`, `common-security` |
-| Java package | lowercase dưới `com.group01.<module>` | Source tree và `AGENTS.md` |
+| Java package | lowercase dưới `com.ieltspath.<module>` | Source tree và `AGENTS.md` |
 | Java public type | PascalCase, một public type mỗi file cùng tên | `AGENTS.md`; source tree |
 | Use case | `<Verb><Noun>UseCase` | `application/usecase/*UseCase.java` |
 | Command/result | `<Verb><Noun>Command`, `<Name>Result` | `application/command`, `application/result` |
@@ -246,7 +246,7 @@ Chạy Docker command chỉ khi Docker daemon khả dụng. Không có install, 
 
 ## 20. CẦN TEAM LÀM RÕ
 
-- Có đổi Maven coordinates/artifact `code-base` sang thương hiệu IELTSPath hay chỉ đổi tên hiển thị/tài liệu?
+- Maven `groupId` hiện là `com.ieltspath`; `artifactId` `code-base` được giữ nguyên.
 - API versioning, pagination/filter/sort contract, API response standard và OpenAPI/contract-test strategy.
 - CI/CD, release process, formatter/linter và coverage policy.
 - Production deployment target, secret manager, observability platform và operational policy.

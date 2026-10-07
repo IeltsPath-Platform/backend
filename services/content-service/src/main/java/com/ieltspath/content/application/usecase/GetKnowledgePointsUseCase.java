@@ -1,0 +1,28 @@
+package com.ieltspath.content.application.usecase;
+
+import com.ieltspath.content.application.result.KnowledgePointResult;
+import com.ieltspath.content.domain.aggregate.KnowledgePoint;
+import com.ieltspath.content.domain.repository.KnowledgePointRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@Transactional(readOnly = true)
+public class GetKnowledgePointsUseCase {
+
+    private final KnowledgePointRepository knowledgePointRepository;
+
+    public GetKnowledgePointsUseCase(KnowledgePointRepository knowledgePointRepository) {
+        this.knowledgePointRepository = knowledgePointRepository;
+    }
+
+    public List<KnowledgePointResult> execute(UUID topicId) {
+        List<KnowledgePoint> points = topicId != null
+                ? knowledgePointRepository.findByTopicId(topicId)
+                : knowledgePointRepository.findAll();
+        return points.stream().map(KnowledgePointResult::from).toList();
+    }
+}

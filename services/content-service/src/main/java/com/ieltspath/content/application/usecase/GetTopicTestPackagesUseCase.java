@@ -1,0 +1,27 @@
+package com.ieltspath.content.application.usecase;
+
+import com.ieltspath.content.application.port.LearningContentReader;
+import com.ieltspath.content.application.result.TopicTestPackageResult;
+import com.ieltspath.content.domain.exception.TopicNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@Transactional(readOnly = true)
+public class GetTopicTestPackagesUseCase {
+    private final LearningContentReader reader;
+
+    public GetTopicTestPackagesUseCase(LearningContentReader reader) {
+        this.reader = reader;
+    }
+
+    public List<TopicTestPackageResult> execute(UUID topicId) {
+        if (!reader.activeTopicExists(topicId)) {
+            throw new TopicNotFoundException(topicId);
+        }
+        return reader.publishedTestPackages(topicId);
+    }
+}

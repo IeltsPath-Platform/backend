@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Content seed multi-skill topic"
-status: pending
+status: completed
 priority: P2
 dependencies: [1]
 ---
@@ -43,7 +43,7 @@ Seed một topic nhiều skill để demo và làm dữ liệu cho test integrat
 3. Chạy test content toàn bộ.
 
 ## Success Criteria
-- [ ] `MultiSkillSeedTest` và test seed cũ xanh.
+- [x] `MultiSkillSeedTest` và test seed cũ xanh.
 
 ## Risk Assessment
 - Soạn nội dung là phần tốn công nhất; giữ ở mức tối thiểu đủ cho acceptance criteria của plan.

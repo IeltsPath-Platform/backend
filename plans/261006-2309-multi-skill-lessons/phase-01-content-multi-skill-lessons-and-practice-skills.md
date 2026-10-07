@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Content multi-skill lessons and practice skills"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 ---
@@ -71,8 +71,8 @@ Thêm `PracticeSetSkillFilter` (parse `skill` ở controller → `Optional<Skill
 5. `mvn -q -pl services/content-service -am test`.
 
 ## Success Criteria
-- [ ] Test mới đỏ trước, xanh sau; test seed cũ xanh (topic một skill vẫn có `skill`).
-- [ ] Reader cũ (learning chưa sửa) vẫn đọc được response, vì chỉ thêm field.
+- [x] Test mới đỏ trước, xanh sau; test seed cũ xanh (topic một skill vẫn có `skill`).
+- [x] Reader cũ (learning chưa sửa) vẫn đọc được response, vì chỉ thêm field.
 
 ## Risk Assessment
 - Ngay sau phase này, topic nhiều skill có `skill=null`. Learning cũ dựa vào `skill` sẽ coi là null, nên phải xong

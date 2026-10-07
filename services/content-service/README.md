@@ -39,6 +39,12 @@ topic test) and `WRITING_6_5_DISCUSSION` (one Task 2 essay lesson with `passBand
 packages reuse the V12 audio (`ls2.mp3`, `trapM.mp3`, `museum.mp3`, `hotel.mp3`), so no new media upload is needed.
 Each course gains a second six-question Reading `COURSE_TEST` (`COURSE-5_5-READING-B`, `COURSE-6_5-READING-B`).
 
+V23 seeds `TREES_MULTI_SKILL` ("Cây cối", IELTS 5.5, sort 955, no topic `skill`): lessons T1 and T2 each teach Reading,
+Listening and Writing (theory, passage + Reading exercise, audio + Listening exercise, Task 2 essay with `passBand`
+5.5). T1 has a Reading set, a Listening set, a one-essay Writing set and a mixed Reading + Listening set; T2 has a
+Reading set. The topic test `TR-TOPIC-TEST` has a Reading, a Listening and a Writing (essay) section. Listening reuses
+the V12 audio (`tour.mp3`, `ls1.mp3`, `numM.mp3`, `spellM.mp3`, `ls2.mp3`); no new media upload is needed.
+
 ## Lessons and curriculum order
 
 V8 implements `lessons`, `lesson_blocks`, `lesson_block_vocabulary`, `lesson_block_questions` and

@@ -1,72 +1,64 @@
-services:
-  library-db:
-    image: postgres:15-alpine
-    container_name: library-db
-    environment:
-      POSTGRES_DB: library_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "${LIBRARY_DB_PASSWORD:?Set LIBRARY_DB_PASSWORD}"
-    ports:
-      - "127.0.0.1:5437:5432"
-    networks:
-      - codebase-network
-    volumes:
-      - library-db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d library_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+# One local stack for IELTSPath. Flyway migrations seed content; DEMO_DATA_ENABLED seeds demo auth and points.
+# Gateway: http://localhost:8080 | Eureka: http://localhost:8761 | PostgreSQL: localhost:5440 | RabbitMQ UI: localhost:15673
+# Set POSTGRES_PASSWORD, RABBITMQ_USERNAME/PASSWORD, EXTERNAL_JWT_SECRET and GATEWAY_INTERNAL_JWT_SECRET in root .env.
+# Demo accounts are dev-only. Set DEMO_DATA_ENABLED=false to disable user/access demo callbacks.
+name: ieltspath
 
-  community-db:
+x-spring-service: &spring-service
+  restart: unless-stopped
+  networks:
+    - codebase-network
+  healthcheck:
+    test: ["CMD-SHELL", "wget -qO- http://localhost:$${SERVER_PORT}/actuator/health | grep -q UP"]
+    interval: 10s
+    timeout: 5s
+    retries: 18
+    start_period: 30s
+
+x-spring-env: &spring-env
+  SPRING_CLOUD_CONFIG_URI: http://config-server:8888
+  EUREKA_URL: http://eureka-server:8761/eureka/
+  GATEWAY_INTERNAL_JWT_SECRET: "${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}"
+  API_DOCS_ENABLED: "${API_DOCS_ENABLED:-true}"
+  JAVA_TOOL_OPTIONS: "-Xms64m -Xmx512m"
+
+x-after-infra: &after-infra
+  postgres:
+    condition: service_healthy
+  config-server:
+    condition: service_healthy
+  eureka-server:
+    condition: service_healthy
+
+services:
+  # One PostgreSQL server, separate database per bounded context. Each service applies its own Flyway migrations.
+  postgres:
     image: postgres:15-alpine
-    container_name: community-db
     environment:
-      POSTGRES_DB: community_db
+      POSTGRES_DB: user_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}"
     ports:
-      - "127.0.0.1:5434:5432"
+      - "127.0.0.1:${MVP_POSTGRES_PORT:-5440}:5432"
     networks:
       - codebase-network
     volumes:
-      - community-db-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init-databases.sql:/docker-entrypoint-initdb.d/01-databases.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d community_db"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d user_db"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  game-db:
-    image: postgres:15-alpine
-    container_name: game-db
-    environment:
-      POSTGRES_DB: game_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "${GAME_DB_PASSWORD:?Set GAME_DB_PASSWORD}"
-    ports:
-      - "127.0.0.1:5435:5432"
-    networks:
-      - codebase-network
-    volumes:
-      - game-db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d game_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # Integration event broker. Assessment publishes AssessmentCompleted.v2 to the "assessment.events" topic
-  # exchange; Learning Service declares and consumes its own durable queue, retry queue and DLQ.
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
-    container_name: rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: "${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME}"
       RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}"
     ports:
-      - "127.0.0.1:5672:5672"
-      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:${RABBITMQ_HOST_PORT:-5672}:5672"
+      - "127.0.0.1:${MVP_RABBITMQ_UI_PORT:-15673}:15672"
     networks:
       - codebase-network
     volumes:
@@ -75,58 +67,219 @@ services:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 6
+      retries: 10
 
-  learning-db:
-    image: postgres:15-alpine
-    container_name: learning-db
+  config-server:
+    <<: *spring-service
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: infra/config-server
     environment:
-      POSTGRES_DB: learning_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "${LEARNING_DB_PASSWORD:?Set LEARNING_DB_PASSWORD}"
-    ports:
-      - "127.0.0.1:5436:5432"
-    networks:
-      - codebase-network
+      SERVER_PORT: 8888
+      CONFIG_NATIVE_REPO_URI: file:/config-repo
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
     volumes:
-      - learning-db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d learning_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - ./infra/config-server/config-repo:/config-repo:ro
+
+  eureka-server:
+    <<: *spring-service
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: infra/eureka-server
+    environment:
+      <<: *spring-env
+      SERVER_PORT: 8761
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
+    ports:
+      - "127.0.0.1:${MVP_EUREKA_PORT:-8761}:8761"
+    depends_on:
+      config-server:
+        condition: service_healthy
+
+  api-gateway:
+    <<: *spring-service
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: infra/api-gateway
+    environment:
+      <<: *spring-env
+      SERVER_PORT: 8080
+      EXTERNAL_JWT_SECRET: "${EXTERNAL_JWT_SECRET:?Set EXTERNAL_JWT_SECRET}"
+      FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:5173}"
+    ports:
+      - "127.0.0.1:${MVP_GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+
+  user-service:
+    <<: *spring-service
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: services/user-service
+    environment:
+      <<: *spring-env
+      SERVER_PORT: 8085
+      EXTERNAL_JWT_SECRET: "${EXTERNAL_JWT_SECRET:?Set EXTERNAL_JWT_SECRET}"
+      USER_DB_URL: jdbc:postgresql://postgres:5432/user_db
+      USER_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      DEMO_DATA_ENABLED: "${DEMO_DATA_ENABLED:-true}"
+    depends_on: *after-infra
+
+  content-service:
+    <<: *spring-service
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: services/content-service
+    environment:
+      <<: *spring-env
+      SERVER_PORT: 8082
+      CONTENT_DB_URL: jdbc:postgresql://postgres:5432/content_db
+      CONTENT_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      CONTENT_MEDIA_BASE_URL: "${CONTENT_MEDIA_BASE_URL:-https://media.example.invalid/}"
+    depends_on: *after-infra
+
+  library-service:
+    <<: *spring-service
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: services/library-service
+    environment:
+      <<: *spring-env
+      SERVER_PORT: 8081
+      LIBRARY_DB_URL: jdbc:postgresql://postgres:5432/library_db
+      LIBRARY_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      CONTENT_SERVICE_URL: http://content-service:8082
+    depends_on:
+      <<: *after-infra
+      content-service:
+        condition: service_healthy
+
+  access-service:
+    <<: *spring-service
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: services/access-service
+    environment:
+      <<: *spring-env
+      SERVER_PORT: 8084
+      ACCESS_DB_URL: jdbc:postgresql://postgres:5432/access_db
+      ACCESS_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      DEMO_DATA_ENABLED: "${DEMO_DATA_ENABLED:-true}"
+    depends_on: *after-infra
+
+  assessment-service:
+    <<: *spring-service
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: services/assessment-service
+    environment:
+      <<: *spring-env
+      SERVER_PORT: 8083
+      ASSESSMENT_DB_URL: jdbc:postgresql://postgres:5432/assessment_db
+      ASSESSMENT_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
+      CONTENT_SERVICE_URL: http://content-service:8082
+      ASSESSMENT_LLM_BASE_URL: "${ASSESSMENT_LLM_BASE_URL:-}"
+      ASSESSMENT_LLM_API_KEY: "${ASSESSMENT_LLM_API_KEY:-}"
+      ASSESSMENT_LLM_MODEL: "${ASSESSMENT_LLM_MODEL:-}"
+      ASSESSMENT_LLM_DAILY_LIMIT: "${ASSESSMENT_LLM_DAILY_LIMIT:-20}"
+    depends_on:
+      <<: *after-infra
+      rabbitmq:
+        condition: service_healthy
+      content-service:
+        condition: service_healthy
+
+  learning-service:
+    <<: *spring-service
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: services/learning-service
+    environment:
+      <<: *spring-env
+      SERVER_PORT: 8086
+      LEARNING_DB_URL: jdbc:postgresql://postgres:5432/learning_db
+      LEARNING_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
+      CONTENT_SERVICE_URL: http://content-service:8082
+      ACCESS_SERVICE_URL: http://access-service:8084
+      LEARNING_LLM_BASE_URL: "${LEARNING_LLM_BASE_URL:-}"
+      LEARNING_LLM_API_KEY: "${LEARNING_LLM_API_KEY:-}"
+      LEARNING_LLM_MODEL: "${LEARNING_LLM_MODEL:-}"
+      LEARNING_LLM_REASONING_EFFORT: "${LEARNING_LLM_REASONING_EFFORT:-}"
+    depends_on:
+      <<: *after-infra
+      rabbitmq:
+        condition: service_healthy
+      content-service:
+        condition: service_healthy
+      access-service:
+        condition: service_healthy
 
   game-service:
+    <<: *spring-service
     build:
       context: .
       dockerfile: Dockerfile.spring-service
       args:
         MODULE_PATH: services/game-service
-    container_name: game-service
     environment:
+      <<: *spring-env
       SERVER_PORT: 8087
-      SPRING_CLOUD_CONFIG_URI: http://config-server:8888
-      GAME_DB_URL: jdbc:postgresql://game-db:5432/game_db
-      GAME_DB_USERNAME: postgres
-      GAME_DB_PASSWORD: "${GAME_DB_PASSWORD:?Set GAME_DB_PASSWORD}"
-      GATEWAY_INTERNAL_JWT_SECRET: "${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}"
-      CONTENT_SERVICE_URL: ${CONTENT_SERVICE_URL:-http://content-service:8082}
-      LIBRARY_SERVICE_URL: ${LIBRARY_SERVICE_URL:-http://library-service:8081}
-    ports:
-      - "127.0.0.1:8087:8087"
-    networks:
-      - codebase-network
+      GAME_DB_URL: jdbc:postgresql://postgres:5432/game_db
+      GAME_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      CONTENT_SERVICE_URL: http://content-service:8082
+      LIBRARY_SERVICE_URL: http://library-service:8081
     depends_on:
-      game-db:
+      <<: *after-infra
+      content-service:
         condition: service_healthy
+      library-service:
+        condition: service_healthy
+
+  community-service:
+    <<: *spring-service
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: services/community-service
+    environment:
+      <<: *spring-env
+      SERVER_PORT: 8089
+      COMMUNITY_DB_URL: jdbc:postgresql://postgres:5432/community_db
+      COMMUNITY_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+    depends_on: *after-infra
 
 networks:
   codebase-network:
     driver: bridge
 
 volumes:
-  library-db-data:
-  community-db-data:
-  game-db-data:
+  postgres-data:
   rabbitmq-data:
-  learning-db-data:
