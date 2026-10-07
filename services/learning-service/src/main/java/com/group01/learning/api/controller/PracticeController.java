@@ -2,8 +2,10 @@ package com.group01.learning.api.controller;
 
 import com.group01.commonsecurity.currentuser.CurrentUserProvider;
 import com.group01.learning.api.dto.request.StartPracticeAttemptRequest;
+import com.group01.learning.api.dto.request.SubmitEssayRequest;
 import com.group01.learning.api.dto.request.SubmitExerciseRequest;
 import com.group01.learning.api.dto.response.PracticeSubmissionResponse;
+import com.group01.learning.api.dto.response.WritingSubmissionResponse;
 import com.group01.learning.application.exception.LearningRequestException;
 import com.group01.learning.application.result.LessonPracticeSetsResult;
 import com.group01.learning.application.result.PracticeAttemptView;
@@ -11,6 +13,7 @@ import com.group01.learning.application.usecase.GetLessonPracticeSetsUseCase;
 import com.group01.learning.application.usecase.GetPracticeAttemptUseCase;
 import com.group01.learning.application.usecase.StartPracticeAttemptUseCase;
 import com.group01.learning.application.usecase.SubmitPracticeAttemptUseCase;
+import com.group01.learning.application.usecase.SubmitPracticeEssayUseCase;
 import com.group01.learning.domain.vo.LearningSkill;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +34,7 @@ public class PracticeController {
     private final StartPracticeAttemptUseCase start;
     private final GetPracticeAttemptUseCase get;
     private final SubmitPracticeAttemptUseCase submit;
+    private final SubmitPracticeEssayUseCase submitEssay;
 
     @GetMapping("/lessons/{id}/practice-sets")
     public LessonPracticeSetsResult catalog(@PathVariable("id") UUID lessonId,
@@ -59,6 +63,14 @@ public class PracticeController {
     public Object get(@PathVariable("id") UUID attemptId) {
         var result = get.execute(currentUser.requireUserId(), attemptId);
         return result.submission() == null ? result.view() : PracticeSubmissionResponse.from(result.submission());
+    }
+
+    @PostMapping("/practice-attempts/{id}/essays/{questionVersionId}/submissions")
+    public WritingSubmissionResponse submitEssay(@PathVariable("id") UUID attemptId,
+                                                 @PathVariable("questionVersionId") UUID questionVersionId,
+                                                 @Valid @RequestBody SubmitEssayRequest request) {
+        return WritingSubmissionResponse.from(submitEssay.execute(currentUser.requireUserId(), attemptId,
+                questionVersionId, request.requestId(), request.essayText()));
     }
 
     @PostMapping("/practice-attempts/{id}/submissions")

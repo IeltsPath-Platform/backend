@@ -3,6 +3,7 @@ package com.group01.learning.application.usecase;
 import com.group01.learning.application.command.SubmitExerciseCommand;
 import com.group01.learning.application.exception.LearningRequestException;
 import com.group01.learning.application.port.LearnerLock;
+import com.group01.learning.application.port.LearningContentClient.PackageVersion;
 import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.application.service.FirstAttemptMistakes;
 import com.group01.learning.application.service.ItemGrading;
@@ -13,6 +14,7 @@ import com.group01.learning.domain.aggregate.PracticeAttempt;
 import com.group01.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.group01.learning.domain.repository.PracticeAttemptRepository;
 import com.group01.learning.domain.repository.ReviewItemRepository;
+import com.group01.learning.domain.repository.WritingSubmissionRepository;
 import com.group01.learning.domain.service.PracticeReviewRule;
 import com.group01.learning.domain.service.ReviewRule;
 import com.group01.learning.domain.vo.EvidenceSource;
@@ -20,6 +22,7 @@ import com.group01.learning.domain.vo.KnowledgeEvidence;
 import com.group01.learning.domain.vo.LearningSkill;
 import com.group01.learning.domain.vo.PracticeReviewCandidate;
 import com.group01.learning.domain.vo.PracticeSubmission;
+import com.group01.learning.domain.vo.WritingSubmissionStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +43,7 @@ public class SubmitPracticeAttemptUseCase {
     private final PracticeAttemptRepository attempts;
     private final ReviewItemRepository reviews;
     private final KnowledgeEvidenceRepository evidence;
+    private final WritingSubmissionRepository essays;
     private final PracticeProgress progress;
     private final FirstAttemptMistakes mistakes;
     private final ItemGrading grading = new ItemGrading();
@@ -49,7 +53,7 @@ public class SubmitPracticeAttemptUseCase {
     public SubmitPracticeAttemptUseCase(LearnerLock lock, PracticeAccess access, LearningContentClient content,
                                         PracticeAttemptRepository attempts, ReviewItemRepository reviews,
                                         KnowledgeEvidenceRepository evidence, PracticeProgress progress,
-                                        FirstAttemptMistakes mistakes) {
+                                        FirstAttemptMistakes mistakes, WritingSubmissionRepository essays) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -58,6 +62,7 @@ public class SubmitPracticeAttemptUseCase {
         this.evidence = evidence;
         this.progress = progress;
         this.mistakes = mistakes;
+        this.essays = essays;
     }
 
     @Transactional
@@ -71,7 +76,7 @@ public class SubmitPracticeAttemptUseCase {
         }
         var lesson = access.require(userId, attempt.lessonId());
         var version = content.getPackageVersion(attempt.packageVersionId());
-        var graded = grading.grade(version, command.answers());
+        var graded = grading.grade(version, command.answers(), "Practice set", gradedEssays(userId, attempt, version));
         Set<UUID> revealed = attempts.revealedPackageIds(userId);
         boolean counted = !revealed.contains(attempt.packageId());
         List<KnowledgeEvidence> firstAnswers = new ArrayList<>();
@@ -116,8 +121,8 @@ public class SubmitPracticeAttemptUseCase {
                         start.stage(), start.theoryReason());
             }).toList();
         }
-        var first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);
-        String transcript = first == null || first.audio() == null ? null : first.audio().transcript();
+        String transcript = ItemGrading.orderedSections(version).stream().filter(section -> section.audio() != null)
+                .map(section -> section.audio().transcript()).findFirst().orElse(null);
         List<PracticeSubmission.ReviewCreated> created = candidates.stream()
                 .map(candidate -> new PracticeSubmission.ReviewCreated(candidate.reviewId(),
                         candidate.knowledgePointId(), candidate.stage().name())).toList();
@@ -130,6 +135,25 @@ public class SubmitPracticeAttemptUseCase {
         reviews.insertPracticePending(userId, candidates);
         progress.refreshPassForLesson(userId, attempt.lessonId());
         return response;
+    }
+
+    /**
+     * Whether each essay of the set passed, from the newest submission of each; every essay must be GRADED first.
+     */
+    private Map<UUID, Boolean> gradedEssays(UUID userId, PracticeAttempt attempt, PackageVersion version) {
+        var essayItems = ItemGrading.orderedItems(version).stream().filter(ItemGrading::isEssay).toList();
+        if (essayItems.isEmpty()) return Map.of();
+        var latest = essays.latestForPractice(userId, attempt.id());
+        Map<UUID, Boolean> passed = new HashMap<>();
+        for (var item : essayItems) {
+            var submission = latest.get(item.questionVersionId());
+            if (submission == null || submission.status() != WritingSubmissionStatus.GRADED) {
+                throw new LearningRequestException(409, "ESSAY_NOT_GRADED",
+                        "Submit every essay of the set and wait for its grade first");
+            }
+            passed.put(item.questionVersionId(), Boolean.TRUE.equals(submission.passed()));
+        }
+        return passed;
     }
 
     /**

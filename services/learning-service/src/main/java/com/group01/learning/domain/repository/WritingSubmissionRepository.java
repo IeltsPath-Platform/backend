@@ -21,6 +21,12 @@ public interface WritingSubmissionRepository {
     /** The learner's GRADING submissions for the block. */
     List<WritingSubmission> findGrading(UUID userId, UUID blockId);
 
+    /** The learner's GRADING submissions for one essay question of a practice attempt. */
+    List<WritingSubmission> findGradingForPractice(UUID userId, UUID practiceAttemptId, UUID questionVersionId);
+
+    /** The newest submission of each essay question of the attempt, keyed by question version. */
+    Map<UUID, WritingSubmission> latestForPractice(UUID userId, UUID practiceAttemptId);
+
     /**
      * Inserts a new submission, or writes a loaded one only if it is still in {@link WritingSubmission#persistedStatus()};
      * false when another request changed it first. Moves out of GRADING happen without the learner's lock, so this

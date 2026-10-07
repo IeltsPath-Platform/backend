@@ -24,6 +24,7 @@ public final class WritingSubmission {
     private final UUID userId;
     private final UUID lessonId;
     private final UUID blockId;
+    private final UUID practiceAttemptId;
     private final UUID requestId;
     private final String essayText;
     private final int wordCount;
@@ -37,14 +38,19 @@ public final class WritingSubmission {
     private UUID ledgerEntryId;
     private Instant gradingStartedAt;
 
-    private WritingSubmission(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID requestId, String essayText,
+    private WritingSubmission(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID practiceAttemptId,
+                              UUID requestId, String essayText,
                               int wordCount, EssayPrompt prompt, int pointCost, WritingSubmissionStatus status,
                               WritingSubmissionStatus persistedStatus, String failureCode, WritingGrade grade,
                               Boolean passed, UUID ledgerEntryId, Instant gradingStartedAt) {
         this.id = Objects.requireNonNull(id, "id");
         this.userId = Objects.requireNonNull(userId, "userId");
         this.lessonId = Objects.requireNonNull(lessonId, "lessonId");
-        this.blockId = Objects.requireNonNull(blockId, "blockId");
+        if ((blockId == null) == (practiceAttemptId == null)) {
+            throw new IllegalArgumentException("An essay belongs to a lesson block or to a practice attempt");
+        }
+        this.blockId = blockId;
+        this.practiceAttemptId = practiceAttemptId;
         this.requestId = Objects.requireNonNull(requestId, "requestId");
         this.essayText = Objects.requireNonNull(essayText, "essayText");
         this.wordCount = wordCount;
@@ -63,16 +69,35 @@ public final class WritingSubmission {
     public static WritingSubmission start(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID requestId,
                                          String essayText, int wordCount, EssayPrompt prompt, int pointCost,
                                          Instant now) {
-        return new WritingSubmission(id, userId, lessonId, blockId, requestId, essayText, wordCount, prompt,
-                pointCost, GRADING, null, null, null, null, null, Objects.requireNonNull(now, "now"));
+        return new WritingSubmission(id, userId, lessonId, Objects.requireNonNull(blockId, "blockId"), null,
+                requestId, essayText, wordCount, prompt, pointCost, GRADING, null, null, null, null, null,
+                Objects.requireNonNull(now, "now"));
+    }
+
+    /** A new essay for a question of a practice attempt, GRADING from {@code now}; not stored yet. */
+    public static WritingSubmission startPractice(UUID id, UUID userId, UUID lessonId, UUID practiceAttemptId,
+                                                 UUID requestId, String essayText, int wordCount, EssayPrompt prompt,
+                                                 int pointCost, Instant now) {
+        return new WritingSubmission(id, userId, lessonId, null, Objects.requireNonNull(practiceAttemptId,
+                "practiceAttemptId"), requestId, essayText, wordCount, prompt, pointCost, GRADING, null, null, null,
+                null, null, Objects.requireNonNull(now, "now"));
     }
 
     public static WritingSubmission restore(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID requestId,
                                            String essayText, int wordCount, EssayPrompt prompt, int pointCost,
                                            WritingSubmissionStatus status, String failureCode, WritingGrade grade,
                                            Boolean passed, UUID ledgerEntryId, Instant gradingStartedAt) {
-        return new WritingSubmission(id, userId, lessonId, blockId, requestId, essayText, wordCount, prompt,
-                pointCost, status, status, failureCode, grade, passed, ledgerEntryId, gradingStartedAt);
+        return restore(id, userId, lessonId, blockId, null, requestId, essayText, wordCount, prompt, pointCost, status,
+                failureCode, grade, passed, ledgerEntryId, gradingStartedAt);
+    }
+
+    public static WritingSubmission restore(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID practiceAttemptId,
+                                           UUID requestId, String essayText, int wordCount, EssayPrompt prompt,
+                                           int pointCost, WritingSubmissionStatus status, String failureCode,
+                                           WritingGrade grade, Boolean passed, UUID ledgerEntryId,
+                                           Instant gradingStartedAt) {
+        return new WritingSubmission(id, userId, lessonId, blockId, practiceAttemptId, requestId, essayText, wordCount,
+                prompt, pointCost, status, status, failureCode, grade, passed, ledgerEntryId, gradingStartedAt);
     }
 
     /** A grading that started before {@code staleBefore} outlived its request (for example a crash). */
@@ -137,7 +162,10 @@ public final class WritingSubmission {
     public UUID id() { return id; }
     public UUID userId() { return userId; }
     public UUID lessonId() { return lessonId; }
+    /** The lesson essay block; null for a practice essay. */
     public UUID blockId() { return blockId; }
+    /** The practice attempt the essay answers; null for a lesson essay. */
+    public UUID practiceAttemptId() { return practiceAttemptId; }
     public UUID requestId() { return requestId; }
     public String essayText() { return essayText; }
     public int wordCount() { return wordCount; }

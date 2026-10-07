@@ -96,7 +96,7 @@ mọi test của `LessonWritingIntegrationTest` (refactor phase 5 không đổi 
 | 2 | [Content seed multi-skill topic](./phase-02-content-seed-multi-skill-topic.md) | Completed |
 | 3 | [Learning multi-skill gating](./phase-03-learning-multi-skill-gating.md) | Completed |
 | 4 | [Learning practice per-skill clearance](./phase-04-learning-practice-per-skill-clearance.md) | Completed |
-| 5 | [Learning practice essays](./phase-05-learning-practice-essays.md) | Pending |
+| 5 | [Learning practice essays](./phase-05-learning-practice-essays.md) | Completed |
 | 6 | [Assessment LLM gate grading](./phase-06-assessment-llm-gate-grading.md) | Pending |
 | 7 | [Docs and verification](./phase-07-docs-and-verification.md) | Pending |
 
@@ -249,6 +249,28 @@ lesson (lesson vẫn chỉ seed) · UI.
 - Allowlisted change: `LearningServiceApplicationTests` Flyway version `8 → 9`; tables 17.
 - New tests: `PracticeClearanceTest` (4), `MultiSkillLessonIntegrationTest` (2: mixed set scored per skill with a
   LISTENING-only review and Practice still REQUIRED; passing both parts clears Practice without the Writing set).
+
+### Phase 5 Verification — 2026-10-07
+
+- Status: `DONE_WITH_CONCERNS` — tests written right after the code; two small design choices below.
+- Commits: refactor `651bc98` (`EssaySubmissionFlow`, `EssayPrompts` extracted; learning 250/250 with
+  `LessonWritingIntegrationTest` unchanged), then the feature commit.
+- Command: `mvn -q -pl services/learning-service -am test` exited 0 — learning 253/253, common-security 8/8, 0 skipped,
+  Docker/Testcontainers.
+- Migration `V10__practice_essays.sql`: `lesson_writing_submissions.source` (`LESSON_BLOCK|PRACTICE_ITEM`),
+  `practice_attempt_id`, `block_id` nullable, CHECK by source, in-flight unique index per (user, attempt, question).
+  No new table (17). **No foreign key** to `practice_attempts`: with one, every existing test that truncates
+  `practice_attempts` failed (outside the allowlist); the use case checks ownership and that the attempt is open.
+- Behaviour: `POST /api/learning/practice-attempts/{id}/essays/{questionVersionId}/submissions` (body reuses
+  `SubmitEssayRequest {requestId, essayText}`) — same statuses and codes as lesson essays (402/429/503/422, replay by
+  `requestId` charges once, ledger key `practice-writing:{user}:{requestId}`), `409 NOT_ESSAY_ITEM`,
+  `409 ATTEMPT_SUBMITTED`. Submitting the set needs every essay GRADED (`409 ESSAY_NOT_GRADED`); an essay counts correct
+  when its band ≥ `passBand`, goes into `skillScores[WRITING]` and KP evidence (`practice_set`) when counted; no review.
+  The practice view now lists `sections` (passage/audio, questions, essays with `latestSubmission`), so a mixed set
+  shows its Listening audio; the transcript after submission comes from the first section with audio.
+- Allowlisted change: `LearningServiceApplicationTests` Flyway `9 → 10`; tables 17.
+- Test wiring (no expectation changed): `LessonLearningWebMvcTest` mocks the new use case so the controller loads.
+- New tests: `PracticeEssayIntegrationTest` (3).
 
 (Codex điền sau mỗi phase: commit, lệnh đã chạy và kết quả, test bị skip, test cũ đã sửa kỳ vọng, nội dung seed mới,
 mọi `BLOCKED`.)

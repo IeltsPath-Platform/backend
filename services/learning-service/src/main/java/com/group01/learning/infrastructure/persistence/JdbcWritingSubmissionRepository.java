@@ -8,17 +8,20 @@ import com.group01.learning.domain.vo.EssayPrompt;
 import com.group01.learning.domain.vo.WritingGrade;
 import com.group01.learning.domain.vo.WritingSubmissionStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.HashMap;
 
 @Repository
 public class JdbcWritingSubmissionRepository implements WritingSubmissionRepository {
     private static final String COLUMNS = """
-            id, user_id, lesson_id, block_id, request_id, essay_text, word_count, prompt_snapshot::text AS prompt,
+            id, user_id, lesson_id, block_id, practice_attempt_id, request_id, essay_text, word_count,
+            prompt_snapshot::text AS prompt,
             status, point_cost, debit_ledger_entry_id, failure_code, result::text AS result, overall_band, passed,
             grading_started_at""";
 
@@ -55,6 +58,24 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
     }
 
     @Override
+    public List<WritingSubmission> findGradingForPractice(UUID userId, UUID practiceAttemptId, UUID questionVersionId) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM lesson_writing_submissions WHERE user_id = ? "
+                        + "AND practice_attempt_id = ? AND question_version_id = ? AND status = 'GRADING'",
+                this::submission, userId, practiceAttemptId, questionVersionId);
+    }
+
+    @Override
+    public Map<UUID, WritingSubmission> latestForPractice(UUID userId, UUID practiceAttemptId) {
+        Map<UUID, WritingSubmission> latest = new HashMap<>();
+        jdbc.query("SELECT DISTINCT ON (question_version_id) question_version_id AS question, " + COLUMNS
+                        + " FROM lesson_writing_submissions WHERE user_id = ? AND practice_attempt_id = ? "
+                        + "ORDER BY question_version_id, submitted_at DESC, id",
+                (RowCallbackHandler) row -> latest.put(row.getObject("question", UUID.class), submission(row, 0)),
+                userId, practiceAttemptId);
+        return latest;
+    }
+
+    @Override
     public boolean save(WritingSubmission submission) {
         boolean written = submission.isNew() ? insert(submission) : update(submission);
         if (written) submission.persisted();
@@ -66,8 +87,8 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
             var statement = connection.prepareStatement("""
                     INSERT INTO lesson_writing_submissions (id, user_id, lesson_id, block_id, question_version_id,
                     knowledge_point_ids, request_id, essay_text, word_count, prompt_snapshot, status, point_cost,
-                    grading_started_at, submitted_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?, ?)
+                    grading_started_at, submitted_at, source, practice_attempt_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?, ?, ?, ?)
                     """);
             Timestamp started = Timestamp.from(submission.gradingStartedAt());
             statement.setObject(1, submission.id());
@@ -84,6 +105,8 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
             statement.setInt(12, submission.pointCost());
             statement.setTimestamp(13, started);
             statement.setTimestamp(14, started);
+            statement.setString(15, submission.practiceAttemptId() == null ? "LESSON_BLOCK" : "PRACTICE_ITEM");
+            statement.setObject(16, submission.practiceAttemptId());
             return statement;
         }) == 1;
     }
@@ -140,7 +163,7 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
         var band = row.getBigDecimal("overall_band");
         return WritingSubmission.restore(row.getObject("id", UUID.class), row.getObject("user_id", UUID.class),
                 row.getObject("lesson_id", UUID.class), row.getObject("block_id", UUID.class),
-                row.getObject("request_id", UUID.class), row.getString("essay_text"), row.getInt("word_count"),
+                row.getObject("practice_attempt_id", UUID.class), row.getObject("request_id", UUID.class), row.getString("essay_text"), row.getInt("word_count"),
                 read(row.getString("prompt"), EssayPrompt.class), row.getInt("point_cost"),
                 WritingSubmissionStatus.valueOf(row.getString("status")), row.getString("failure_code"),
                 stored == null ? null : new WritingGrade(stored.criteria(), stored.corrections(), stored.summary(), band),

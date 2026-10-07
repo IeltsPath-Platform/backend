@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Learning practice essays"
-status: pending
+status: completed
 priority: P2
 dependencies: [4]
 ---
@@ -64,8 +64,8 @@ PASSED (M6).
 5. `mvn -q -pl services/learning-service -am test`.
 
 ## Success Criteria
-- [ ] `LessonWritingIntegrationTest` xanh không đổi kỳ vọng sau refactor.
-- [ ] Đạt hay trượt bộ W không đổi trạng thái Practice của lesson (nối với phase 4).
+- [x] `LessonWritingIntegrationTest` xanh không đổi kỳ vọng sau refactor.
+- [x] Đạt hay trượt bộ W không đổi trạng thái Practice của lesson (nối với phase 4).
 
 ## Risk Assessment
 - Refactor luồng bài luận lesson (có trừ điểm, idempotent) rủi ro cao: làm bước 2 riêng một commit, chạy test trước khi

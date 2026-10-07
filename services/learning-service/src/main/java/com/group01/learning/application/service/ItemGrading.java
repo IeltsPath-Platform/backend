@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public final class ItemGrading {
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
@@ -23,11 +24,28 @@ public final class ItemGrading {
     }
 
     public Graded grade(PackageVersion version, List<SubmitExerciseCommand.Answer> submitted, String subject) {
+        return grade(version, submitted, subject, Map.of());
+    }
+
+    /**
+     * {@code essays} gives whether each essay item passed; the learner answers only the other items. An essay item
+     * without an entry cannot be graded here.
+     */
+    public Graded grade(PackageVersion version, List<SubmitExerciseCommand.Answer> submitted, String subject,
+                        Map<UUID, Boolean> essays) {
         List<Item> items = orderedItems(version);
-        Map<java.util.UUID, Object> answers = AnswerSheet.require(items.stream().map(Item::questionVersionId).toList(),
-                submitted);
-        List<AnswerSpecGrader.Grade> grades = items.stream()
-                .map(item -> grader.grade(item.answerSpec(), answers.get(item.questionVersionId()))).toList();
+        List<UUID> objective = items.stream().filter(item -> !isEssay(item)).map(Item::questionVersionId).toList();
+        Map<UUID, Object> answers;
+        if (!objective.isEmpty() || submitted == null || !submitted.isEmpty()) {
+            answers = AnswerSheet.require(objective, submitted == null ? List.of() : submitted);
+        } else {
+            answers = Map.of();
+        }
+        List<AnswerSpecGrader.Grade> grades = items.stream().map(item -> !isEssay(item)
+                ? grader.grade(item.answerSpec(), answers.get(item.questionVersionId()))
+                : essays.containsKey(item.questionVersionId())
+                ? new AnswerSpecGrader.Grade(true, essays.get(item.questionVersionId()), null)
+                : new AnswerSpecGrader.Grade(false, false, null)).toList();
         if (grades.stream().anyMatch(grade -> !grade.gradable())) {
             throw new LearningRequestException(422, "UNGRADABLE_EXERCISE", subject + " contains unsupported questions");
         }
@@ -64,6 +82,10 @@ public final class ItemGrading {
         } catch (IllegalArgumentException unknown) {
             return null;
         }
+    }
+
+    public static boolean isEssay(Item item) {
+        return item.answerSpec() != null && "ESSAY".equals(item.answerSpec().get("type"));
     }
 
     public static List<Section> orderedSections(PackageVersion version) {

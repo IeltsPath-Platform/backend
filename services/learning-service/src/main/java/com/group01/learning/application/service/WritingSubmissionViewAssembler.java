@@ -19,7 +19,8 @@ public class WritingSubmissionViewAssembler {
         String task = submission.prompt().task();
         String status = submission.status().name();
         if (submission.status() == WritingSubmissionStatus.GRADED) {
-            boolean showSample = Boolean.TRUE.equals(submission.passed())
+            // Practice answers are shown once submitted; a lesson essay waits until its block is passed.
+            boolean showSample = submission.practiceAttemptId() != null || Boolean.TRUE.equals(submission.passed())
                     || essays.blockPassed(submission.userId(), submission.blockId(), submission.id());
             return new WritingSubmissionResult(submission.id(), status, task, submission.wordCount(),
                     submission.overallBand(), submission.passed(), submission.grade(), submission.pointCost(),
