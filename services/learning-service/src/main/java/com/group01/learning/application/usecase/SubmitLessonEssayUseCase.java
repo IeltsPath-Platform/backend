@@ -1,29 +1,21 @@
 package com.group01.learning.application.usecase;
 
-import com.group01.learning.application.exception.AccessUnavailableException;
-import com.group01.learning.application.exception.InsufficientPointsException;
 import com.group01.learning.application.exception.LearningRequestException;
-import com.group01.learning.application.exception.WritingGradingException;
-import com.group01.learning.application.port.AccessClient;
 import com.group01.learning.application.port.LearnerLock;
 import com.group01.learning.application.port.LearningContentClient;
 import com.group01.learning.application.port.LearningContentClient.Block;
 import com.group01.learning.application.port.LearningContentClient.Lesson;
-import com.group01.learning.application.port.LlmUsageQuota;
 import com.group01.learning.application.result.WritingSubmissionResult;
-import com.group01.learning.application.service.EssayGrader;
+import com.group01.learning.application.service.EssayPrompts;
+import com.group01.learning.application.service.EssaySubmissionFlow;
 import com.group01.learning.application.service.LessonAccess;
 import com.group01.learning.application.service.LessonEvidenceReference;
-import com.group01.learning.application.service.WritingSettings;
 import com.group01.learning.application.service.WritingSubmissionViewAssembler;
 import com.group01.learning.domain.aggregate.WritingSubmission;
 import com.group01.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.group01.learning.domain.repository.WritingSubmissionRepository;
-import com.group01.learning.domain.service.WritingScore;
-import com.group01.learning.domain.vo.EssayPrompt;
 import com.group01.learning.domain.vo.EvidenceSource;
 import com.group01.learning.domain.vo.KnowledgeEvidence;
-import com.group01.learning.domain.vo.WritingGrade;
 import com.group01.learning.domain.vo.WritingSubmissionStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,12 +23,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Grades a lesson essay within the request. Order: validate → look up {@code requestId} → load the lesson → check the
@@ -47,7 +41,6 @@ import java.util.*;
  */
 @Service
 public class SubmitLessonEssayUseCase {
-    static final String USAGE_KIND = "writing_grading";
     private static final Logger log = LoggerFactory.getLogger(SubmitLessonEssayUseCase.class);
 
     private final LearningContentClient content;
@@ -55,43 +48,37 @@ public class SubmitLessonEssayUseCase {
     private final LearnerLock lock;
     private final KnowledgeEvidenceRepository evidence;
     private final WritingSubmissionRepository essays;
-    private final LlmUsageQuota quota;
-    private final EssayGrader grader;
-    private final AccessClient points;
-    private final WritingSettings settings;
+    private final EssaySubmissionFlow flow;
     private final TransactionTemplate transaction;
     private final WritingSubmissionViewAssembler view;
     private final Clock clock = Clock.systemUTC();
 
     public SubmitLessonEssayUseCase(LearningContentClient content, LessonAccess access, LearnerLock lock,
-                                  KnowledgeEvidenceRepository evidence, WritingSubmissionRepository essays,
-                                  LlmUsageQuota quota, EssayGrader grader, AccessClient points, WritingSettings settings,
-                                  PlatformTransactionManager transactionManager, WritingSubmissionViewAssembler view) {
+                                    KnowledgeEvidenceRepository evidence, WritingSubmissionRepository essays,
+                                    EssaySubmissionFlow flow, PlatformTransactionManager transactionManager,
+                                    WritingSubmissionViewAssembler view) {
         this.content = content;
         this.access = access;
         this.lock = lock;
         this.evidence = evidence;
         this.essays = essays;
-        this.quota = quota;
-        this.grader = grader;
-        this.points = points;
-        this.settings = settings;
+        this.flow = flow;
         this.transaction = new TransactionTemplate(transactionManager);
         this.view = view;
     }
 
     public WritingSubmissionResult execute(UUID userId, UUID lessonId, UUID blockId, UUID requestId, String essayText) {
-        int words = validate(essayText);
+        int words = flow.validate(essayText);
 
         Optional<WritingSubmission> existing = essays.findByRequestId(requestId);
         if (existing.isPresent()) {
             WritingSubmission submission = existing.get();
-            if (!submission.userId().equals(userId) || !submission.lessonId().equals(lessonId)
-                    || !submission.blockId().equals(blockId)) throw requestConflict();
+            if (!submission.userId().equals(userId) || !lessonId.equals(submission.lessonId())
+                    || !blockId.equals(submission.blockId())) throw EssaySubmissionFlow.requestConflict();
             if (submission.status() == WritingSubmissionStatus.GRADED) return view.assemble(submission);
             if (submission.status() == WritingSubmissionStatus.PAYMENT_PENDING) return charge(submission);
         }
-        if (!grader.available()) throw gradingUnavailable(null);
+        flow.requireGraderAvailable();
 
         Lesson lesson = content.getLesson(lessonId);
         Block block = lesson.blocks().stream()
@@ -101,50 +88,18 @@ public class SubmitLessonEssayUseCase {
         if (!block.isEssay()) {
             throw new LearningRequestException(409, "NOT_ESSAY_BLOCK", "This block is not an essay");
         }
-        requireBalance();
+        flow.requireBalance();
 
         WritingSubmission grading = transaction.execute(status -> startGrading(userId, lesson, block, requestId,
                 essayText, words));
-        if (!quota.tryConsume(userId, LocalDate.now(clock.withZone(ZoneId.of(settings.quotaTimezone()))),
-                USAGE_KIND, settings.dailyGradingLimit())) {
-            grading.fail("DAILY_LIMIT_REACHED");
-            essays.save(grading);
-            throw new LearningRequestException(429, "DAILY_LIMIT_REACHED", "Daily grading limit reached");
-        }
-
-        WritingGrade grade;
-        try {
-            grade = grader.grade(grading.prompt(), grading.essayText());
-        } catch (WritingGradingException exception) {
-            grading.fail(exception.getCode());
-            essays.save(grading);
-            log.warn("Essay grading failed: submissionId={}, code={}", grading.id(), exception.getCode());
-            throw gradingUnavailable(grading.id());
-        }
-        grading.recordGrade(grade);
-        // False when the grading was abandoned and taken over by another request meanwhile.
-        if (!essays.save(grading)) throw gradingInProgress();
+        flow.grade(grading);
         return charge(grading);
     }
 
-    /** Debit, then record GRADED and mastery evidence; resending PAYMENT_PENDING starts here. */
     private WritingSubmissionResult charge(WritingSubmission submission) {
-        UUID ledgerEntryId;
-        try {
-            ledgerEntryId = points.debit(submission.userId(), submission.pointCost(), submission.id(),
-                    "lesson-writing:" + submission.userId() + ":" + submission.requestId(), "Lesson essay grading");
-        } catch (InsufficientPointsException exception) {
-            submission.recordPaymentFailure("INSUFFICIENT_POINTS");
-            essays.save(submission);
-            throw new LearningRequestException(402, "INSUFFICIENT_POINTS", "Not enough points to release the grade",
-                    submission.id());
-        } catch (AccessUnavailableException exception) {
-            submission.recordPaymentFailure("PAYMENT_UNAVAILABLE");
-            essays.save(submission);
-            throw new LearningRequestException(503, "PAYMENT_UNAVAILABLE", "Payment is unavailable; resend later",
-                    submission.id());
-        }
-        return transaction.execute(status -> finish(submission, ledgerEntryId));
+        return flow.charge(submission, "lesson-writing:" + submission.userId() + ":" + submission.requestId(),
+                "Lesson essay grading", (charged, ledgerEntryId) -> transaction.execute(
+                        status -> finish(charged, ledgerEntryId)));
     }
 
     private WritingSubmission startGrading(UUID userId, Lesson lesson, Block block, UUID requestId, String essayText,
@@ -156,26 +111,27 @@ public class SubmitLessonEssayUseCase {
         boolean gradingInProgress = false;
         for (WritingSubmission grading : essays.findGrading(userId, block.blockId())) {
             // A grading that outlived its request (for example a crash) no longer blocks the block.
-            if (grading.isStale(now.minusSeconds(settings.staleGradingSeconds()))) {
+            if (grading.isStale(now.minusSeconds(flow.staleGradingSeconds()))) {
                 grading.abandon();
                 if (!essays.save(grading)) gradingInProgress = true;
             } else {
                 gradingInProgress = true;
             }
         }
-        if (gradingInProgress) throw gradingInProgress();
+        if (gradingInProgress) throw EssaySubmissionFlow.gradingInProgress();
         Optional<WritingSubmission> existing = essays.findByRequestId(requestId);
         if (existing.isEmpty()) {
             WritingSubmission submission = WritingSubmission.start(UUID.randomUUID(), userId, lesson.lessonId(),
-                    block.blockId(), requestId, essayText, words, prompt(block), settings.pointCost(), now);
+                    block.blockId(), requestId, essayText, words, EssayPrompts.of(block.questions().getFirst()),
+                    flow.pointCost(), now);
             essays.save(submission);
             return submission;
         }
         // Only a FAILED submission is graded again (on the essay it was first sent with); anything else raced ahead.
         WritingSubmission submission = existing.get();
-        if (submission.status() != WritingSubmissionStatus.FAILED) throw gradingInProgress();
+        if (submission.status() != WritingSubmissionStatus.FAILED) throw EssaySubmissionFlow.gradingInProgress();
         submission.restart(now);
-        if (!essays.save(submission)) throw gradingInProgress();
+        if (!essays.save(submission)) throw EssaySubmissionFlow.gradingInProgress();
         return submission;
     }
 
@@ -203,65 +159,5 @@ public class SubmitLessonEssayUseCase {
         submission.markGraded(ledgerEntryId);
         essays.save(submission);
         return view.assemble(submission);
-    }
-
-    private int validate(String essayText) {
-        if (essayText == null || essayText.isBlank()) {
-            throw new LearningRequestException(422, "ESSAY_EMPTY", "The essay is empty");
-        }
-        if (essayText.length() > settings.maxChars()) throw essayTooLong();
-        int words = WritingScore.countWords(essayText);
-        if (words < settings.minWords()) {
-            throw new LearningRequestException(422, "ESSAY_TOO_SHORT",
-                    "The essay needs at least " + settings.minWords() + " words");
-        }
-        if (words > settings.maxWords()) throw essayTooLong();
-        return words;
-    }
-
-    private void requireBalance() {
-        long balance;
-        try {
-            balance = points.balance();
-        } catch (AccessUnavailableException exception) {
-            throw new LearningRequestException(503, "PAYMENT_UNAVAILABLE", "Payment is unavailable");
-        }
-        if (balance < settings.pointCost()) {
-            throw new LearningRequestException(402, "INSUFFICIENT_POINTS",
-                    "Grading costs " + settings.pointCost() + " points");
-        }
-    }
-
-    /** Task 2 and Task 1 alike; chart facts and the sample answer stay server-side in the snapshot. */
-    private static EssayPrompt prompt(Block block) {
-        var question = block.questions().getFirst();
-        Map<String, Object> spec = question.answerSpec() == null ? Map.of() : question.answerSpec();
-        List<EssayPrompt.Image> images = question.assets() == null ? List.of() : question.assets().stream()
-                .filter(asset -> "IMAGE".equals(asset.assetType()))
-                .sorted(Comparator.comparingInt(LearningContentClient.QuestionAsset::sortOrder))
-                .map(asset -> new EssayPrompt.Image(asset.mediaUrl(), asset.altText())).toList();
-        return new EssayPrompt(question.questionVersionId(), question.stem(),
-                spec.get("task") instanceof String task ? task : null,
-                spec.get("minWords") instanceof Number words ? words.intValue() : null,
-                spec.get("passBand") instanceof Number band ? new BigDecimal(band.toString()) : null,
-                spec.get("chartFacts") instanceof String facts ? facts : null,
-                question.explanation(), images, List.copyOf(question.knowledgePointIds()));
-    }
-
-    private LearningRequestException essayTooLong() {
-        return new LearningRequestException(422, "ESSAY_TOO_LONG", "The essay is too long");
-    }
-
-    private static LearningRequestException gradingUnavailable(UUID submissionId) {
-        return new LearningRequestException(503, "GRADING_UNAVAILABLE", "Grading is unavailable; nothing was charged",
-                submissionId);
-    }
-
-    private static LearningRequestException gradingInProgress() {
-        return new LearningRequestException(409, "GRADING_IN_PROGRESS", "This essay block is already being graded");
-    }
-
-    private static LearningRequestException requestConflict() {
-        return new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
     }
 }
