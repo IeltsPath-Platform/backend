@@ -40,8 +40,8 @@ PR** (D12). Mọi service chạy cùng commit nên learning luôn nhận đượ
 4. `mvn -q -pl services/assessment-service -am test`.
 
 ## Success Criteria
-- [ ] Test mới xanh, test assessment cũ xanh.
-- [ ] Contract doc nêu thứ tự deploy.
+- [x] Test mới xanh, test assessment cũ xanh.
+- [x] Contract doc nêu thứ tự deploy.
 
 ## Verification
 

@@ -12,7 +12,7 @@ dependencies: [1]
 Seed một topic nhiều skill để demo và làm dữ liệu cho test integration của learning/assessment.
 
 ## Requirements
-- Migration `V22__seed_multi_skill_topic.sql`, UUID cố định, theo pattern V9/V12/V18/V21:
+- Migration `V23__seed_multi_skill_topic.sql`, UUID cố định, theo pattern V9/V12/V18/V21:
   - Topic `TREES_MULTI_SKILL` ("Cây cối"), course `IELTS_5_5`, `skill` NULL, `sort_order` sau các topic 5.5 hiện có.
   - KP: 2 Reading, 1 Listening, 1 Writing.
   - Lesson T1, T2 PUBLISHED, mỗi lesson:
@@ -28,7 +28,7 @@ Seed một topic nhiều skill để demo và làm dữ liệu cho test integrat
   không hợp thì ghi key mới vào bảng README.
 
 ## Related Code Files
-- Create: `services/content-service/src/main/resources/db/migration/V22__seed_multi_skill_topic.sql`,
+- Create: `services/content-service/src/main/resources/db/migration/V23__seed_multi_skill_topic.sql`,
   `services/content-service/src/test/java/com/group01/content/infrastructure/persistence/MultiSkillSeedTest.java`
 - Docs: `services/content-service/README.md` (bảng seed + media)
 
@@ -39,7 +39,7 @@ Seed một topic nhiều skill để demo và làm dữ liệu cho test integrat
    - `?skill=WRITING` trả đúng bộ W;
    - mọi essay có `passBand`;
    - không câu nào nằm ở hai package.
-2. Viết V22.
+2. Viết V23.
 3. Chạy test content toàn bộ.
 
 ## Success Criteria

@@ -102,10 +102,10 @@ unique rõ và không đụng flow thi topic đang chạy ổn.
 6. `mvn -q -pl services/learning-service -am test`.
 
 ## Success Criteria
-- [ ] Mọi test learning cũ xanh (đặc biệt `RemediationLadderIntegrationTest`, `ReviewAndTestAssignmentIntegrationTest`,
+- [x] Mọi test learning cũ xanh (đặc biệt `RemediationLadderIntegrationTest`, `ReviewAndTestAssignmentIntegrationTest`,
       `TopicStatusDeriverTest`).
-- [ ] Không thêm giá trị `TopicStatus`; response topic chỉ thêm field `course`.
-- [ ] Không có lời gọi content trong vòng lặp.
+- [x] Không thêm giá trị `TopicStatus`; response topic chỉ thêm field `course`.
+- [x] Không có lời gọi content trong vòng lặp.
 
 ## Verification
 
