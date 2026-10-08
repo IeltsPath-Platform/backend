@@ -26,6 +26,7 @@ class GradeGateEssayJobUseCaseTest {
     private final EssayGradingPort grader = mock(EssayGradingPort.class);
     private final AssessmentLlmQuota quota = mock(AssessmentLlmQuota.class);
     private final GateResultAssembler assembler = mock(GateResultAssembler.class);
+    private final PlacementGradingService placement = mock(PlacementGradingService.class);
     private final RecordingTransactionManager tx = new RecordingTransactionManager();
     private final UUID userId = UUID.randomUUID();
     private final UUID attemptId = UUID.randomUUID();
@@ -51,7 +52,7 @@ class GradeGateEssayJobUseCaseTest {
         when(grader.grade(any(), eq("submitted essay"))).thenAnswer(invocation -> {
             assertFalse(TransactionSynchronizationManager.isActualTransactionActive(),
                     "the remote LLM call must not run in a database transaction");
-            return new BigDecimal("6.0");
+            return new EssayGradingPort.EssayGrade(new BigDecimal("6.0"), "{\"summary\":\"ok\"}");
         });
         doAnswer(invocation -> {
             assertTrue(TransactionSynchronizationManager.isActualTransactionActive(),
@@ -61,7 +62,7 @@ class GradeGateEssayJobUseCaseTest {
 
         assertEquals(1, useCase().gradeBatch());
 
-        verify(jobs).complete(jobId, new BigDecimal("6.0"), now);
+        verify(jobs).complete(jobId, new BigDecimal("6.0"), "{\"summary\":\"ok\"}", now);
         verify(assembler).completeIfGraded(attemptId);
         verify(jobs).claim(5, now);
         verify(jobs).requeueStuck(now.minus(Duration.ofMinutes(10)));
@@ -108,6 +109,36 @@ class GradeGateEssayJobUseCaseTest {
     }
 
     @Test
+    void placementEssayCompletesThePlacementAttemptNotTheGateAssembler() {
+        stubClaim();
+        when(placement.handles(attemptId)).thenReturn(true);
+        when(grader.available()).thenReturn(true);
+        when(quota.tryConsume(eq(userId), any(LocalDate.class), eq(4))).thenReturn(true);
+        when(grader.grade(any(), eq("submitted essay"))).thenReturn(new EssayGradingPort.EssayGrade(new BigDecimal("6.5"), null));
+
+        useCase().gradeBatch();
+
+        verify(jobs).complete(jobId, new BigDecimal("6.5"), null, now);
+        verify(placement).completeIfGraded(attemptId);
+        verifyNoInteractions(assembler);
+    }
+
+    @Test
+    void placementEssayTheLlmCannotGradeTakesTheDefaultBandInsteadOfAnExaminer() {
+        stubClaim();
+        when(placement.handles(attemptId)).thenReturn(true);
+        when(placement.defaultWritingBand()).thenReturn(new BigDecimal("5.5"));
+        when(grader.available()).thenReturn(false);
+
+        useCase().gradeBatch();
+
+        verify(jobs).complete(jobId, new BigDecimal("5.5"), null, now);
+        verify(placement).completeIfGraded(attemptId);
+        verify(jobs, never()).fail(any(), any());
+        verify(jobs, never()).enqueueHuman(any(), any(), any());
+    }
+
+    @Test
     void processingJobsOlderThanTheRecoveryWindowAreRequeued() {
         when(jobs.claim(5, now)).thenReturn(List.of());
 
@@ -124,7 +155,7 @@ class GradeGateEssayJobUseCaseTest {
     }
 
     private GradeGateEssayJobUseCase useCase() {
-        return new GradeGateEssayJobUseCase(jobs, grader, quota, assembler, tx, new ObjectMapper(),
+        return new GradeGateEssayJobUseCase(jobs, grader, quota, assembler, placement, tx, new ObjectMapper(),
                 5, 4, Duration.ofMinutes(10), ZoneId.of("UTC"), java.time.Clock.fixed(now, ZoneId.of("UTC")));
     }
 

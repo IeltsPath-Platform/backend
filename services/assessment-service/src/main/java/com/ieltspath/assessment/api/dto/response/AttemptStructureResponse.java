@@ -6,11 +6,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.application.result.AttemptStructureResult;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 public record AttemptStructureResponse(List<Section> sections) {
-    public record Section(UUID id, UUID contentSectionId, int sortOrder, Snapshot snapshot, List<Item> items) {}
+    /** {@code startedAt} is null until the learner first opens the section, {@code completedAt} until they finish it. */
+    public record Section(UUID id, UUID contentSectionId, int sortOrder, Snapshot snapshot, List<Item> items,
+                          Instant startedAt, Instant completedAt) {}
 
     public record Snapshot(String title, String skill, String instructions,
                            @JsonInclude(JsonInclude.Include.NON_NULL) String passage,
@@ -60,7 +63,9 @@ public record AttemptStructureResponse(List<Section> sections) {
                                         item.sortOrder(),
                                         item.questionSnapshot(),
                                         item.knowledgeSnapshot()))
-                                .toList()))
+                                .toList(),
+                        section.startedAt(),
+                        section.completedAt()))
                 .toList());
     }
 }

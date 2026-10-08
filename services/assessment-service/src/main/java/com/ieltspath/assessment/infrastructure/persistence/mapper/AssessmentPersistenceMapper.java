@@ -23,9 +23,9 @@ public class AssessmentPersistenceMapper {
         e.setLearningGoalId(d.getLearningGoalId());
         return e;
     }
-    public AttemptSection toDomain(AttemptSectionJpaEntity e) { return new AttemptSection(e.getId(), e.getAttemptId(), e.getContentSectionId(), e.getSortOrder(), e.getSnapshot()); }
+    public AttemptSection toDomain(AttemptSectionJpaEntity e) { return new AttemptSection(e.getId(), e.getAttemptId(), e.getContentSectionId(), e.getSortOrder(), e.getSnapshot(), e.getStartedAt(), e.getCompletedAt()); }
     public AttemptSectionJpaEntity toEntity(AttemptSection d) {
-        var e = new AttemptSectionJpaEntity(); e.setId(d.id()); e.setAttemptId(d.attemptId()); e.setContentSectionId(d.contentSectionId()); e.setSortOrder(d.sortOrder()); e.setSnapshot(d.snapshot()); return e;
+        var e = new AttemptSectionJpaEntity(); e.setId(d.id()); e.setAttemptId(d.attemptId()); e.setContentSectionId(d.contentSectionId()); e.setSortOrder(d.sortOrder()); e.setSnapshot(d.snapshot()); e.setStartedAt(d.startedAt()); e.setCompletedAt(d.completedAt()); return e;
     }
     public AttemptItem toDomain(AttemptItemJpaEntity e) { return new AttemptItem(e.getId(), e.getAttemptSectionId(), e.getQuestionVersionId(), e.getSortOrder(), e.getQuestionSnapshot(), e.getAnswerSnapshot(), e.getKnowledgeSnapshot()); }
     public AttemptItemJpaEntity toEntity(AttemptItem d) {

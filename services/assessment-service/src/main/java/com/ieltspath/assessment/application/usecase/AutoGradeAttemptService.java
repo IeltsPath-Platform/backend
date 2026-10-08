@@ -101,7 +101,7 @@ public class AutoGradeAttemptService {
      * A missing response, {@code {}} or {@code {"answer":null}} is an omitted answer. A payload whose {@code answer}
      * is not a string is invalid input; it scores zero rather than being coerced into a match.
      */
-    private boolean isCorrect(AnswerSnapshot answer, AttemptResponse response) {
+    boolean isCorrect(AnswerSnapshot answer, AttemptResponse response) {
         Object payload = null;
         if (response != null) {
             try {

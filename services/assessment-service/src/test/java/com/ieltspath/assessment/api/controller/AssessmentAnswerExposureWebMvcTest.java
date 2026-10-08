@@ -66,6 +66,10 @@ class AssessmentAnswerExposureWebMvcTest {
     @MockitoBean ExpireAssessmentAttemptUseCase expireAttempt;
     @MockitoBean SaveAttemptResponseUseCase saveResponse;
     @MockitoBean GetAssessmentResultUseCase getResult;
+    @MockitoBean GetCurrentPlacementAttemptUseCase currentPlacement;
+    @MockitoBean ListAttemptResponsesUseCase listResponses;
+    @MockitoBean CompleteAttemptSectionUseCase completeSection;
+    @MockitoBean StartAttemptSectionUseCase startSection;
 
     private final UUID userId = UUID.randomUUID();
     private final UUID attemptId = UUID.randomUUID();
@@ -90,6 +94,28 @@ class AssessmentAnswerExposureWebMvcTest {
                 .andExpect(jsonPath("$.sections[0].items[0].questionSnapshot").value("{\"stem\":\"Question\"}"))
                 .andExpect(jsonPath("$.sections[0].items[0].knowledgeSnapshot").value("{\"kp\":\"KP1\"}"))
                 .andExpect(jsonPath("$.sections[0].items[0].answerSnapshot").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void aLearnerWithoutPlacementGetsNoContentRatherThanAnError() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(userId);
+        when(currentPlacement.execute(userId)).thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(get("/api/assessments/attempts/placement/current"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void completingASectionAnswersNoContent() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(userId);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/assessments/attempts/{id}/sections/{sectionId}/complete", attemptId, sectionId)
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()))
+                .andExpect(status().isNoContent());
+        org.mockito.Mockito.verify(completeSection).execute(userId, attemptId, sectionId);
     }
 
     @Test

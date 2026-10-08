@@ -35,8 +35,39 @@ class OpenAiCompatibleEssayGraderTest {
 
         EssayGradingPort grader = new OpenAiCompatibleEssayGrader(builder.build(), properties(), new ObjectMapper());
 
-        assertEquals(new BigDecimal("6.0"), grader.grade(
-                new EssayGradingPort.Prompt("Discuss the topic", "TASK_2", 250, null), "candidate essay"));
+        EssayGradingPort.EssayGrade grade = grader.grade(
+                new EssayGradingPort.Prompt("Discuss the topic", "TASK_2", 250, null), "candidate essay");
+        assertEquals(new BigDecimal("6.0"), grade.band());
+        assertNull(grade.feedback(), "a reply with bands only carries no comments");
+        server.verify();
+    }
+
+    @Test
+    void keepsTheExaminerCommentsBesideTheBand() throws Exception {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        String reply = new ObjectMapper().writeValueAsString(Map.of(
+                "criteria", List.of(
+                        Map.of("code", "TR", "band", 5.0, "comment", "  Lạc đề: \"social networks\" → bám sát đề.  "),
+                        Map.of("code", "CC", "band", 6.0, "comment", "Bố cục rõ."),
+                        Map.of("code", "LR", "band", 6.0),
+                        Map.of("code", "GRA", "band", 5.5, "comment", "")),
+                "summary", "Bài viết cần bám đề hơn.",
+                "focus", List.of("PEEL Structure: triển khai ý", 7)));
+        server.expect(requestTo("https://llm.example/v1/chat/completions"))
+                .andRespond(withSuccess(new ObjectMapper().writeValueAsString(Map.of("choices", List.of(Map.of(
+                        "message", Map.of("content", reply))))), MediaType.APPLICATION_JSON));
+
+        EssayGradingPort.EssayGrade grade = new OpenAiCompatibleEssayGrader(builder.build(), properties(), new ObjectMapper())
+                .grade(new EssayGradingPort.Prompt("Discuss the topic", "TASK_2", 250, null), "candidate essay");
+
+        assertEquals(new BigDecimal("5.5"), grade.band());
+        var feedback = new ObjectMapper().readTree(grade.feedback());
+        assertEquals("Bài viết cần bám đề hơn.", feedback.path("summary").asText());
+        assertEquals("Lạc đề: \"social networks\" → bám sát đề.", feedback.path("criteria").path(0).path("comment").asText());
+        assertTrue(feedback.path("criteria").path(2).path("comment").isNull(), "a missing comment stays empty");
+        assertTrue(feedback.path("criteria").path(3).path("comment").isNull(), "a blank comment stays empty");
+        assertEquals(1, feedback.path("focus").size(), "non-text focus items are dropped");
         server.verify();
     }
 

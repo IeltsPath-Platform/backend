@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public interface AttemptSectionRepository {
     List<AttemptSection> saveAll(List<AttemptSection> sections);
+    AttemptSection save(AttemptSection section);
     Optional<AttemptSection> findById(UUID id);
     List<AttemptSection> findByAttemptId(UUID attemptId);
 }

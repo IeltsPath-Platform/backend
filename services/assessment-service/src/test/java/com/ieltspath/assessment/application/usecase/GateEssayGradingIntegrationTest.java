@@ -95,11 +95,14 @@ class GateEssayGradingIntegrationTest {
                 """, attemptId));
 
         when(essayGrader.available()).thenReturn(true);
-        when(essayGrader.grade(any(), anyString())).thenReturn(new BigDecimal("6.0"));
+        when(essayGrader.grade(any(), anyString())).thenReturn(new EssayGradingPort.EssayGrade(new BigDecimal("6.0"),
+                "{\"summary\":\"Bài viết rõ ý.\",\"criteria\":[],\"focus\":[]}"));
         assertEquals(1, gradeJobs.gradeBatch());
 
         assertEquals("COMPLETED", jdbc.queryForObject("SELECT status FROM grading_jobs WHERE submission_id IN " +
                 "(SELECT id FROM learner_submissions WHERE attempt_item_id = ?)", String.class, itemId));
+        assertEquals("Bài viết rõ ý.", jdbc.queryForObject("SELECT llm_feedback->>'summary' FROM grading_jobs " +
+                "WHERE submission_id IN (SELECT id FROM learner_submissions WHERE attempt_item_id = ?)", String.class, itemId));
         assertEquals(1, count("SELECT count(*) FROM assessment_results WHERE attempt_id = ? AND status = 'COMPLETED'",
                 attemptId));
         assertEquals(1, count("SELECT count(*) FROM outbox_events WHERE event_type = 'AssessmentCompleted.v2' AND aggregate_id IN " +

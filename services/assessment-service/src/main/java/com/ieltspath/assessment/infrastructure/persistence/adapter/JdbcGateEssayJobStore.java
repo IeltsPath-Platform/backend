@@ -111,7 +111,7 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
                     JOIN attempt_sections ase ON ase.id = ai.attempt_section_id
                     JOIN assessment_attempts aa ON aa.id = ase.attempt_id
                     WHERE gj.grading_mode = 'AI' AND gj.status = 'QUEUED'
-                      AND aa.attempt_type IN ('TOPIC_GATE', 'COURSE_GATE')
+                      AND aa.attempt_type IN ('TOPIC_GATE', 'COURSE_GATE', 'PLACEMENT')
                     ORDER BY gj.created_at, gj.id
                     LIMIT :limit
                     FOR UPDATE OF gj SKIP LOCKED
@@ -141,13 +141,13 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public void complete(UUID jobId, BigDecimal band, Instant now) {
+    public void complete(UUID jobId, BigDecimal band, String feedback, Instant now) {
         jdbc.update("""
-                UPDATE grading_jobs SET status = 'COMPLETED', llm_band = :band,
+                UPDATE grading_jobs SET status = 'COMPLETED', llm_band = :band, llm_feedback = CAST(:feedback AS JSONB),
                     completed_at = :now, processing_started_at = NULL
                 WHERE id = :id AND grading_mode = 'AI' AND status = 'PROCESSING'
                 """, new MapSqlParameterSource().addValue("id", jobId).addValue("band", band)
-                .addValue("now", Timestamp.from(now)));
+                .addValue("feedback", feedback).addValue("now", Timestamp.from(now)));
     }
 
     @Override
@@ -162,7 +162,7 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
     @Override
     public List<JobState> aiJobs(UUID attemptId) {
         return jdbc.query("""
-                SELECT ai.id AS attempt_item_id, gj.status, gj.llm_band
+                SELECT ai.id AS attempt_item_id, gj.status, gj.llm_band, gj.llm_feedback::text AS llm_feedback
                 FROM grading_jobs gj
                 JOIN learner_submissions ls ON ls.id = gj.submission_id
                 JOIN attempt_items ai ON ai.id = ls.attempt_item_id
@@ -170,6 +170,7 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
                 WHERE ase.attempt_id = :attemptId AND gj.grading_mode = 'AI'
                 ORDER BY ai.id
                 """, Map.of("attemptId", attemptId), (rs, rowNum) -> new JobState(
-                rs.getObject("attempt_item_id", UUID.class), rs.getString("status"), rs.getBigDecimal("llm_band")));
+                rs.getObject("attempt_item_id", UUID.class), rs.getString("status"), rs.getBigDecimal("llm_band"),
+                rs.getString("llm_feedback")));
     }
 }

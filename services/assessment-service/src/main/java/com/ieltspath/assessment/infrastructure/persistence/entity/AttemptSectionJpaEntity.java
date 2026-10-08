@@ -7,6 +7,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -27,4 +28,8 @@ public class AttemptSectionJpaEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "section_snapshot", columnDefinition = "JSONB", nullable = false)
     private String snapshot;
+    @Column(name = "started_at")
+    private Instant startedAt;
+    @Column(name = "completed_at")
+    private Instant completedAt;
 }

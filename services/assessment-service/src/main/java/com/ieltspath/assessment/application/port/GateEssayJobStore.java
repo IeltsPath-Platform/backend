@@ -27,7 +27,8 @@ public interface GateEssayJobStore {
     /** Moves up to {@code limit} queued AI jobs to PROCESSING, skipping rows other workers hold, and returns them. */
     List<ClaimedJob> claim(int limit, Instant now);
 
-    void complete(UUID jobId, BigDecimal band, Instant now);
+    /** {@code feedback} is the grader's JSON comments, or null when it gave a band only. */
+    void complete(UUID jobId, BigDecimal band, String feedback, Instant now);
 
     void fail(UUID jobId, Instant now);
 
@@ -38,6 +39,10 @@ public interface GateEssayJobStore {
     record ClaimedJob(UUID jobId, UUID userId, UUID attemptId, UUID attemptItemId, UUID submissionId, String essay,
                       String questionSnapshot, String answerSnapshot) {}
 
-    /** {@code status} is a grading job status; {@code band} is set once COMPLETED. */
-    record JobState(UUID attemptItemId, String status, BigDecimal band) {}
+    /** {@code status} is a grading job status; {@code band} and possibly {@code feedback} are set once COMPLETED. */
+    record JobState(UUID attemptItemId, String status, BigDecimal band, String feedback) {
+        public JobState(UUID attemptItemId, String status, BigDecimal band) {
+            this(attemptItemId, status, band, null);
+        }
+    }
 }

@@ -51,7 +51,9 @@ public class GetAttemptStructureUseCase {
                                         item.sortOrder(),
                                         item.questionSnapshot(),
                                         item.knowledgeSnapshot()))
-                                .toList()))
+                                .toList(),
+                        section.startedAt(),
+                        section.completedAt()))
                 .toList();
         return new AttemptStructureResult(values);
     }

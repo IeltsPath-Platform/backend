@@ -8,13 +8,19 @@ public interface EssayGradingPort {
     boolean available();
 
     /**
-     * The overall IELTS band of {@code essay}.
+     * The overall IELTS band of {@code essay} and the examiner's comments on it.
      *
      * @throws com.ieltspath.assessment.application.exception.EssayGradingException when the LLM is unavailable or its
      *                                                                          reply cannot be used
      */
-    BigDecimal grade(Prompt prompt, String essay);
+    EssayGrade grade(Prompt prompt, String essay);
 
     /** {@code task} is {@code TASK_1} or {@code TASK_2}; {@code chartFacts} is required for Task 1. */
     record Prompt(String stem, String task, Integer minWords, String chartFacts) {}
+
+    /**
+     * {@code feedback} is JSON {@code {summary, criteria: [{code, band, comment}], focus: [..]}}, or null when the
+     * reply carried bands without usable comments; the band alone is still a valid grade.
+     */
+    record EssayGrade(BigDecimal band, String feedback) {}
 }

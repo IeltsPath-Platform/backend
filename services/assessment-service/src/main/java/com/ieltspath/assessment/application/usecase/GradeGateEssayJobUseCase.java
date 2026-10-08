@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -23,9 +22,10 @@ import java.time.ZoneId;
 import java.util.List;
 
 /**
- * Grades queued essay jobs of topic and course tests. Claiming and recording run in short transactions; the quota and
- * the LLM call run outside any transaction. A job that cannot be graded by the LLM (not configured, daily limit,
- * failure or unusable reply) fails and is replaced by a job for a human examiner.
+ * Grades queued essay jobs of topic, course and placement tests. Claiming and recording run in short transactions; the
+ * quota and the LLM call run outside any transaction. A job that cannot be graded by the LLM (not configured, daily
+ * limit, failure or unusable reply) fails and is replaced by a job for a human examiner; a placement essay instead
+ * takes the default Writing band so the learner is never left waiting.
  */
 @Service
 public class GradeGateEssayJobUseCase {
@@ -35,6 +35,7 @@ public class GradeGateEssayJobUseCase {
     private final EssayGradingPort grader;
     private final AssessmentLlmQuota quota;
     private final GateResultAssembler assembler;
+    private final PlacementGradingService placement;
     private final TransactionTemplate transaction;
     private final ObjectMapper json;
     private final int batchSize;
@@ -45,24 +46,26 @@ public class GradeGateEssayJobUseCase {
 
     @Autowired
     public GradeGateEssayJobUseCase(GateEssayJobStore jobs, EssayGradingPort grader, AssessmentLlmQuota quota,
-                                    GateResultAssembler assembler, PlatformTransactionManager transactionManager,
-                                    ObjectMapper json,
+                                    GateResultAssembler assembler, PlacementGradingService placement,
+                                    PlatformTransactionManager transactionManager, ObjectMapper json,
                                     @Value("${assessment.llm-grading.batch-size:10}") int batchSize,
                                     @Value("${assessment.llm-grading.daily-limit:20}") int dailyLimit,
                                     @Value("${assessment.llm-grading.stuck-after:PT10M}") Duration stuckAfter,
                                     @Value("${assessment.llm-grading.quota-timezone:Asia/Ho_Chi_Minh}") String quotaZone) {
-        this(jobs, grader, quota, assembler, transactionManager, json, batchSize, dailyLimit, stuckAfter,
+        this(jobs, grader, quota, assembler, placement, transactionManager, json, batchSize, dailyLimit, stuckAfter,
                 ZoneId.of(quotaZone), Clock.systemUTC());
     }
 
     GradeGateEssayJobUseCase(GateEssayJobStore jobs, EssayGradingPort grader, AssessmentLlmQuota quota,
-                             GateResultAssembler assembler, PlatformTransactionManager transactionManager,
+                             GateResultAssembler assembler, PlacementGradingService placement,
+                             PlatformTransactionManager transactionManager,
                              ObjectMapper json, int batchSize, int dailyLimit, Duration stuckAfter, ZoneId quotaZone,
                              Clock clock) {
         this.jobs = jobs;
         this.grader = grader;
         this.quota = quota;
         this.assembler = assembler;
+        this.placement = placement;
         this.transaction = new TransactionTemplate(transactionManager);
         this.json = json;
         this.batchSize = batchSize;
@@ -85,13 +88,13 @@ public class GradeGateEssayJobUseCase {
     }
 
     private void gradeOne(GateEssayJobStore.ClaimedJob job) {
-        BigDecimal band;
+        EssayGradingPort.EssayGrade grade;
         try {
             if (!grader.available()) throw new EssayGradingException("LLM_UNAVAILABLE");
             if (!quota.tryConsume(job.userId(), LocalDate.now(clock.withZone(quotaZone)), dailyLimit)) {
                 throw new EssayGradingException("DAILY_LIMIT_REACHED");
             }
-            band = grader.grade(prompt(job), job.essay());
+            grade = grader.grade(prompt(job), job.essay());
         } catch (EssayGradingException exception) {
             handOver(job, exception.getCode());
             return;
@@ -100,12 +103,28 @@ public class GradeGateEssayJobUseCase {
             return;
         }
         transaction.executeWithoutResult(status -> {
-            jobs.complete(job.jobId(), band, clock.instant());
-            assembler.completeIfGraded(job.attemptId());
+            jobs.complete(job.jobId(), grade.band(), grade.feedback(), clock.instant());
+            completeAttempt(job);
         });
     }
 
+    private void completeAttempt(GateEssayJobStore.ClaimedJob job) {
+        if (placement.handles(job.attemptId())) {
+            placement.completeIfGraded(job.attemptId());
+        } else {
+            assembler.completeIfGraded(job.attemptId());
+        }
+    }
+
     private void handOver(GateEssayJobStore.ClaimedJob job, String code) {
+        if (placement.handles(job.attemptId())) {
+            log.warn("Placement essay graded with the default band: jobId={}, code={}", job.jobId(), code);
+            transaction.executeWithoutResult(status -> {
+                jobs.complete(job.jobId(), placement.defaultWritingBand(), null, clock.instant());
+                placement.completeIfGraded(job.attemptId());
+            });
+            return;
+        }
         log.warn("Gate essay grading moved to an examiner: jobId={}, code={}", job.jobId(), code);
         transaction.executeWithoutResult(status -> {
             jobs.fail(job.jobId(), clock.instant());

@@ -12,6 +12,20 @@ The service currently supports:
 - creating learner submissions and local grading job state;
 - creating video practice attempts.
 
+### Grading a placement attempt
+
+A `PLACEMENT` attempt is graded by `PlacementGradingService` when it is submitted, never by an examiner. Listening and
+Reading items are graded by answer spec and each skill's percent correct becomes a band
+(below 30% → 4.0, 30–44 → 4.5, 45–59 → 5.0, 60–69 → 5.5, 70–79 → 6.0, 80–89 → 6.5, 90 and above → 7.0). A Writing
+essay the learner sent through `POST /api/assessments/submissions` goes to the LLM job queue and its band is the Writing
+band; an essay never sent counts as 0, and an essay the LLM cannot grade (not configured, daily limit, failure) takes
+`assessment.placement.default-writing-band` (default 5.5). Speaking takes the fixed
+`assessment.placement.speaking-band` (default 5.5) because recordings are only stored. The overall band is the mean of
+the four skill bands rounded to the nearest half band and is written to `assessment_results.overall_band`, so the
+`AssessmentCompleted.v2` event carries it for Learning. The skill bands are not stored: `GET
+/api/assessments/attempts/{id}/placement-result` recomputes them from the stored item results and essay jobs the same
+way, and is `404` until the placement result is COMPLETED.
+
 ### Starting an attempt
 
 The client sends only `{packageVersionId, mode, channel}`. Before opening a transaction, the service reads Content
@@ -65,12 +79,17 @@ All assessment routes require an authenticated internal JWT. The authenticated s
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/api/assessments/attempts` | Create an attempt from a Content package version |
+| `GET` | `/api/assessments/attempts/placement/current` | Caller's newest `PLACEMENT` attempt in any status; `204` (no body) when they never started one |
 | `GET` | `/api/assessments/attempts/{id}` | Read an owned attempt |
 | `GET` | `/api/assessments/attempts/{id}/structure` | Read the owned attempt structure |
+| `POST` | `/api/assessments/attempts/{id}/sections/{sectionId}/start` | Record when the learner first opens a section (`204`); repeating it is harmless |
+| `POST` | `/api/assessments/attempts/{id}/sections/{sectionId}/complete` | Finish a section (`204`); its items then reject new responses. Repeating it is harmless |
+| `GET` | `/api/assessments/attempts/{id}/responses` | Saved responses of an owned attempt with their `revision`, so a client can resume |
 | `PUT` | `/api/assessments/attempts/{id}/items/{itemId}/response` | Save a response with an expected revision |
 | `POST` | `/api/assessments/attempts/{id}/submit` | Submit an attempt; auto-grades objective attempts |
 | `POST` | `/api/assessments/attempts/{id}/expire` | Expire an attempt |
 | `GET` | `/api/assessments/attempts/{id}/result` | Learner view of the latest COMPLETED version: `score`, `maxScore`, `percent`, per-item `correct`; `solutions[]` only when `percent ≥ 70` |
+| `GET` | `/api/assessments/attempts/{id}/placement-result` | Owned completed `PLACEMENT` attempt: `overallBand`, `completedAt`, `skills[]` of `{skill, band}` and the report `sections[]` in test order: `{skill, title, questions[], essays[]}`. Listening/Reading questions carry `{number, prompt, learnerAnswer, correctAnswer, correct, explanation}`; Writing essays `{task, band, submitted, feedback}` where `feedback` is the LLM's `{summary, criteria[{code, band, comment}], focus[]}` or null |
 | `POST` | `/api/assessments/submissions` | Create a Writing or Speaking submission |
 | `POST` | `/api/assessments/grading-jobs` | Create local grading job state |
 | `GET` | `/api/assessments/grading-jobs/{id}` | Read an owned grading job |

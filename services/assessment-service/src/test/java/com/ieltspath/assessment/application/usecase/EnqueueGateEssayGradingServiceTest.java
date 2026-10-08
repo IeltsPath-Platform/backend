@@ -31,6 +31,7 @@ class EnqueueGateEssayGradingServiceTest {
     @Mock AttemptItemRepository items;
     @Mock GateEssayJobStore jobs;
     @Mock AutoGradeAttemptService autoGrader;
+    @Mock PlacementGradingService placementGrading;
 
     private final ObjectMapper json = new ObjectMapper();
     private final UUID userId = UUID.randomUUID();
@@ -90,7 +91,17 @@ class EnqueueGateEssayGradingServiceTest {
     }
 
     private EnqueueGateEssayGradingService service() {
-        return new EnqueueGateEssayGradingService(items, jobs, autoGrader, json);
+        return new EnqueueGateEssayGradingService(items, jobs, autoGrader, placementGrading, json);
+    }
+
+    @Test
+    void placementAttemptIsGradedByThePlacementServiceOnly() {
+        AssessmentAttempt attempt = attempt(AttemptType.PLACEMENT);
+
+        service().enqueueOrGrade(attempt);
+
+        verify(placementGrading).onSubmit(attempt);
+        verifyNoInteractions(items, jobs, autoGrader);
     }
 
     private AttemptItem item(UUID id, String answer) {

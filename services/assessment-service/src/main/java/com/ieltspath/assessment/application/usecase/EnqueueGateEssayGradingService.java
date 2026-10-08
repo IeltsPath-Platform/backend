@@ -20,7 +20,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * On submit of a topic or course test that has essays: each essay the learner sent through
+ * A placement test is graded by {@link PlacementGradingService}. On submit of a topic or course test that has
+ * essays: each essay the learner sent through
  * {@code POST /api/assessments/submissions} gets a free AI grading job; an essay never sent scores zero. When no essay
  * was sent the attempt is graded at once. Mock tests and other types keep the human path.
  */
@@ -31,14 +32,17 @@ public class EnqueueGateEssayGradingService {
     private final AttemptItemRepository attemptItems;
     private final GateEssayJobStore jobs;
     private final AutoGradeAttemptService autoGrader;
+    private final PlacementGradingService placementGrading;
     private final ObjectMapper json;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
 
     public EnqueueGateEssayGradingService(AttemptItemRepository attemptItems, GateEssayJobStore jobs,
-                                          AutoGradeAttemptService autoGrader, ObjectMapper json) {
+                                          AutoGradeAttemptService autoGrader,
+                                          PlacementGradingService placementGrading, ObjectMapper json) {
         this.attemptItems = attemptItems;
         this.jobs = jobs;
         this.autoGrader = autoGrader;
+        this.placementGrading = placementGrading;
         this.json = json;
     }
 
@@ -52,6 +56,10 @@ public class EnqueueGateEssayGradingService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void enqueueOrGrade(AssessmentAttempt attempt) {
+        if (attempt.getAttemptType() == AttemptType.PLACEMENT) {
+            placementGrading.onSubmit(attempt);
+            return;
+        }
         if (!GATES.contains(attempt.getAttemptType())) {
             autoGrader.gradeIfObjective(attempt);
             return;
