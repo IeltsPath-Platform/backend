@@ -75,6 +75,9 @@ docker compose ps
 
 Test service học: `mvn -q -pl services/learning-service -am test` (Testcontainers cần Docker).
 
+CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `docker compose config --quiet` cho mọi PR vào
+`main`. Test Testcontainers tự bỏ qua khi máy không có Docker, nên xanh ở local chưa chắc xanh trên CI.
+
 ## 5. Cạm bẫy đã biết
 
 - `CONTENT_SERVICE_URL` của game-service trong config-repo mặc định `http://content-service:8082` (tên trong Docker) và ghi
