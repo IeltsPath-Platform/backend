@@ -80,10 +80,10 @@ Người dùng mới: `POST /api/users/register` body `{email, password (6–72 
 `{"refreshToken":"..."}` để lấy cặp token mới; refresh cũng lỗi thì về màn đăng nhập. Đăng xuất:
 `POST /auth/logout` body `{"refreshToken":"..."}`.
 
-### Bước 1b. Placement test (bắt buộc trước khi vào lộ trình)
+### Bước 1b. Placement test (không bắt buộc)
 
-Học viên chưa có placement gọi bất kỳ `/api/learning/**` nào (trừ `placement-test`) đều nhận `403 PLACEMENT_REQUIRED`:
-FE chuyển sang màn làm placement.
+Học viên có thể vào lộ trình và học mọi course mà không cần làm placement; làm placement chỉ để hệ thống gợi ý
+course phù hợp. FE đưa lối vào placement ở menu "Khóa học".
 
 1. `GET /api/learning/placement-test` → `{packageId, packageVersionId}`. Đã làm rồi thì `409 PLACEMENT_ALREADY_DONE`
    (FE vào thẳng màn course); chưa có đề thì `404 NO_PLACEMENT_TEST`.
@@ -94,8 +94,8 @@ FE chuyển sang màn làm placement.
    `skill: "SPEAKING"` và `audioReference` thay cho `textPayload`.
 4. `POST /api/assessments/attempts/{attemptId}/submit`. Assessment tự chấm; Writing do LLM chấm (không đủ điều kiện thì
    dùng band mặc định), Speaking dùng band cố định của MVP.
-5. Poll `GET /api/learning/courses` mỗi 2 giây (tối đa ~1 phút) tới khi hết `403 PLACEMENT_REQUIRED`; course có
-   `recommended = true` là course phù hợp với band của học viên.
+5. Poll `GET /api/assessments/attempts/{attemptId}/placement-result` mỗi 2 giây (tối đa ~1 phút) tới khi hết `404`;
+   sau đó course có `recommended = true` trong `GET /api/learning/courses` là course phù hợp với band của học viên.
 
 ### Bước 2. Màn lộ trình
 
@@ -260,7 +260,6 @@ Khi `GET /api/learning/courses` trả `testStatus = AVAILABLE`, mọi topic củ
 | HTTP | `code` | Khi nào | FE xử lý |
 | --- | --- | --- | --- |
 | 401 | — | Thiếu hoặc hết hạn token | `POST /auth/refresh`, lỗi tiếp thì về đăng nhập |
-| 403 | `PLACEMENT_REQUIRED` | Chưa làm placement test | Chuyển sang màn placement (Bước 1b) |
 | 409 | `PLACEMENT_ALREADY_DONE` | Gọi `placement-test` khi đã có placement | Vào thẳng màn course |
 | 403 | `TOPIC_LOCKED` | Mở topic/bài chưa tới lượt | Quay về lộ trình |
 | 403 | `LESSON_LOCKED` | Mở bài khi bài trước chưa xong | Quay về màn topic |

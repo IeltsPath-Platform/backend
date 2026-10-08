@@ -74,7 +74,6 @@ class WritingWebMvcTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @MockitoBean CurrentUserProvider currentUser;
-    @MockitoBean com.ieltspath.learning.application.usecase.RequirePlacementUseCase requirePlacement;
     @MockitoBean GetWritingSubmissionUseCase getWritingSubmissionUseCase;
     @MockitoBean SubmitLessonEssayUseCase submitLessonEssayUseCase;
     @MockitoBean GetTopicLessonsUseCase getTopicLessonsUseCase;

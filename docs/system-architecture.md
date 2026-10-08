@@ -149,9 +149,9 @@ Client -> Gateway (public /auth/login) -> user-service LoginUseCase -> UserRepos
 ```text
 GET /api/learning/placement-test -> Content internal placement-packages -> {packageId, packageVersionId};
   409 PLACEMENT_ALREADY_DONE khi learner_placements đã có dòng của user
-(mọi /api/learning/** khác, vai CUSTOMER: 403 PLACEMENT_REQUIRED tới khi có learner_placements)
+(placement không bắt buộc: không route học nào đòi learner_placements)
 GET /api/learning/courses -> refresh từ Content topic-sequence + course_progress + learner_placements
-  -> danh sách course theo band, recommended lấy từ placement (chỉ gợi ý; sau placement mọi course đều mở)
+  -> danh sách course theo band, recommended lấy từ placement (chỉ gợi ý; mọi course luôn mở)
 GET /api/learning/topics -> một lần gọi Content topic-sequence -> knowledge_point_catalog + topic_progress (course_id,
   skill, has_topic_test, sequence_order) -> trạng thái theo từng course: PASSED / IN_PROGRESS (topic đầu chưa đạt
   trong course) / LOCKED; mọi course đều mở và chuỗi không tách skill

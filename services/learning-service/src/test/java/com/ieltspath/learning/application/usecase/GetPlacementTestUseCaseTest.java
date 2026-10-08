@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-class PlacementGateUseCasesTest {
+class GetPlacementTestUseCaseTest {
     private final LearnerPlacementRepository placements = mock(LearnerPlacementRepository.class);
     private final LearningContentClient content = mock(LearningContentClient.class);
     private final UUID userId = UUID.randomUUID();
@@ -58,24 +58,6 @@ class PlacementGateUseCasesTest {
                     assertThat(error.getStatus()).isEqualTo(404);
                     assertThat(error.getCode()).isEqualTo("NO_PLACEMENT_TEST");
                 });
-    }
-
-    @Test
-    void learnerWithoutPlacementIsRefused() {
-        when(placements.find(userId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> new RequirePlacementUseCase(placements).execute(userId))
-                .isInstanceOfSatisfying(LearningRequestException.class, error -> {
-                    assertThat(error.getStatus()).isEqualTo(403);
-                    assertThat(error.getCode()).isEqualTo("PLACEMENT_REQUIRED");
-                });
-    }
-
-    @Test
-    void learnerWithPlacementPasses() {
-        when(placements.find(userId)).thenReturn(Optional.of(existingPlacement()));
-
-        new RequirePlacementUseCase(placements).execute(userId);
     }
 
     private LearnerPlacement existingPlacement() {
