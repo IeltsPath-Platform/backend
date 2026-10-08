@@ -147,8 +147,11 @@ Client -> Gateway (public /auth/login) -> user-service LoginUseCase -> UserRepos
 ### Học topic và bài (Learning Service)
 
 ```text
+GET /api/learning/placement-test -> Content internal placement-packages -> {packageId, packageVersionId};
+  409 PLACEMENT_ALREADY_DONE khi learner_placements đã có dòng của user
+(mọi /api/learning/** khác, vai CUSTOMER: 403 PLACEMENT_REQUIRED tới khi có learner_placements)
 GET /api/learning/courses -> refresh từ Content topic-sequence + course_progress + learner_placements
-  -> danh sách course theo band, recommended lấy từ placement (chỉ gợi ý)
+  -> danh sách course theo band, recommended lấy từ placement (chỉ gợi ý; sau placement mọi course đều mở)
 GET /api/learning/topics -> một lần gọi Content topic-sequence -> knowledge_point_catalog + topic_progress (course_id,
   skill, has_topic_test, sequence_order) -> trạng thái theo từng course: PASSED / IN_PROGRESS (topic đầu chưa đạt
   trong course) / LOCKED; mọi course đều mở và chuỗi không tách skill
@@ -202,7 +205,9 @@ Học viên lấy mã đề từ learning (`POST /api/learning/topics/{id}/test-
 
 Assessment không gọi User lấy goal; attempt mới và event có `learning_goal_id` null. Consumer Learning không gọi
 HTTP và không cần path hoặc trạng thái học có sẵn. Trong một transaction khóa theo user, version bằng/cũ bị bỏ qua;
-version cao hơn thay evidence của attempt. `PLACEMENT` lưu `overall_band` mới nhất, không ghi mastery hay đổi trạng thái topic;
+version cao hơn thay evidence của attempt. `PLACEMENT` lưu `overall_band` mới nhất (Assessment tự chấm đề placement 4 kỹ năng và tính band: Listening/Reading theo
+% đúng, Writing theo band LLM hoặc band mặc định khi LLM không chấm được, Speaking theo band cố định cấu hình; band tổng là
+trung bình làm tròn 0.5), không ghi mastery hay đổi trạng thái topic;
 band chỉ dùng để đánh dấu course được gợi ý. `TOPIC_GATE` tìm assignment cùng user/package version, còn mở và đã giao
 trước khi attempt hoàn tất; lần giao được consume cả khi trượt; đạt ≥70% ghi `passed_at` một chiều. `COURSE_GATE` dùng
 quy tắc tương tự cho `course_test_assignments`; đạt ≥70% ghi `course_progress.passed_at`. ACK sau commit; topic kế trong

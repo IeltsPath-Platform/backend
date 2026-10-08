@@ -138,7 +138,7 @@ class PublishContentPackageUseCaseTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"PRACTICE_SET,LEARNING", "TOPIC_TEST,LEARNING", "MOCK_TEST,EXAM", "PLACEMENT_TEST,EXAM"})
+    @CsvSource({"PRACTICE_SET,LEARNING", "TOPIC_TEST,LEARNING", "MOCK_TEST,EXAM", "PLACEMENT_TEST,PLACEMENT"})
     void questionsMustMatchThePackagesPurposeBeforePublishing(PackageType type, QuestionPurpose requiredPurpose) {
         ContentPackage pkg = ContentPackage.create("PURPOSE-CHECK", "Purpose", type, null);
         ContentPackageVersion draft = ContentPackageVersion.create(pkg.getId(), 1, "{}");

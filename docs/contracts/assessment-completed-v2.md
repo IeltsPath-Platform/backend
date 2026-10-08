@@ -141,7 +141,9 @@ Consumer delivery rules:
   consume another assignment.
 - `PLACEMENT` records only the processed result version. It writes no mastery evidence.
 - A non-null `overall_band` on the latest `PLACEMENT` result is stored by Learning for course recommendation only. It does not
-  change topic status, select a course for the learner, or gate a course.
+  change topic status, select a course for the learner, or gate a course. Assessment computes it for placement attempts
+  (mean of the four skill bands, rounded to 0.5). Learning treats the first stored placement as the learner's gate
+  to the learning routes.
 - `COURSE_GATE` consumes the matching open course-test assignment. A result at or above 70% records one-way
   `course_progress.passed_at`; it does not change any topic status.
 

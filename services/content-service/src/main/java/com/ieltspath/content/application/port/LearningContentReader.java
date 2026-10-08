@@ -81,6 +81,9 @@ public interface LearningContentReader {
     /** Published course final tests with their current published version, ordered by package id. */
     List<TopicTestPackageResult> courseTestPackages(UUID courseId);
 
+    /** Published placement tests with their current published version, ordered by package id. */
+    List<TopicTestPackageResult> placementTestPackages();
+
     /** All question versions of a package version, including drafts, loaded in one query for publish validation. */
     List<PackageQuestionSpec> packageQuestionSpecs(UUID packageVersionId);
 

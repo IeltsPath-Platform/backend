@@ -24,6 +24,9 @@ public interface LearningContentClient {
 
     List<TestPackage> getCourseTestPackages(UUID courseId);
 
+    /** Published placement tests, ordered by package id. */
+    List<TestPackage> getPlacementTestPackages();
+
     List<LessonPracticeSet> lessonPracticeSets(UUID lessonId);
 
     /** Only the sets whose questions are all of {@code skill}; every set when empty. */

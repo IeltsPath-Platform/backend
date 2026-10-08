@@ -75,7 +75,8 @@ public class PublishContentPackageUseCase {
                     throw new QuestionAlreadyUsedException(conflicts);
                 }
                 QuestionPurpose requiredPurpose = switch (pkg.getPackageType()) {
-                    case MOCK_TEST, PLACEMENT_TEST -> QuestionPurpose.EXAM;
+                    case MOCK_TEST -> QuestionPurpose.EXAM;
+                    case PLACEMENT_TEST -> QuestionPurpose.PLACEMENT;
                     default -> QuestionPurpose.LEARNING;
                 };
                 List<UUID> wrongPurpose = lessons.questionsWithWrongPurpose(targetVersion.getId(), requiredPurpose);

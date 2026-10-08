@@ -6,7 +6,7 @@
 
 **Reading hints (2026-10-02):** lesson exercise questions and submission results add an always-present nullable `hint` field, with the policy below. Review set and quick-check questions carry the question's `hint` (2026-10-03); review results keep `hint: null`; final assessments are unchanged.
 
-The MVP app displays course, topic and lesson status. The Java Learning Service owns learner placements, course/topic progress, mastery evidence, reviews and test assignments. Every course is open; placement recommends a course but does not change topic state. Topics form one sequence per course, shared across skills. Reviews still gate work by skill. A course-final-test assignment uses a package code once before rotating; passing at 70% marks the course complete without blocking any topic. Topic order, course id and skill are stored in `topic_progress`; topic and course pass timestamps are one-way. Tutor, practice notebook, learner memory, learning goals and LLM ordering are removed.
+The MVP app displays course, topic and lesson status. The Java Learning Service owns learner placements, course/topic progress, mastery evidence, reviews and test assignments. A learner must complete the placement test first; afterwards every course is open, and placement only recommends a course without changing topic state. Topics form one sequence per course, shared across skills. Reviews still gate work by skill. A course-final-test assignment uses a package code once before rotating; passing at 70% marks the course complete without blocking any topic. Topic order, course id and skill are stored in `topic_progress`; topic and course pass timestamps are one-way. Tutor, practice notebook, learner memory, learning goals and LLM ordering are removed.
 
 ## Learner routes
 
@@ -27,6 +27,12 @@ Refreshes the shared `knowledge_point_catalog` and the user's topic order from o
 ### `GET /courses`
 
 Available only to role `CUSTOMER`. Returns courses ordered by `bandLevel` as `[{courseId, code, name, bandLevel, topicCount, passedTopicCount, recommended, testStatus, passedAt}]`. A recommendation uses the learner's latest non-null `overall_band` from a `PLACEMENT` result: the lowest course band at or above it, or the highest course if no band is high enough. Without a placement, no course is recommended. Placement never changes topic status. `testStatus` is `NONE` when the course has no published final test, `LOCKED` while a course topic remains unpassed, `AVAILABLE` once all topics pass, and `PASSED` after the course test reaches 70%.
+
+### `GET /placement-test`
+
+Available only to role `CUSTOMER`. Returns `{packageId, packageVersionId}` of the published `PLACEMENT_TEST` package. The learner then starts an Assessment attempt with that `packageVersionId` (`POST /api/assessments/attempts`, type `PLACEMENT`), sends the Writing essay and the Speaking recording through `POST /api/assessments/submissions`, and submits the attempt. A learner can sit the test once: when a placement exists the call returns `409 PLACEMENT_ALREADY_DONE`; without a published package it returns `404 NO_PLACEMENT_TEST`. This route is the only `/api/learning/**` route open to a `CUSTOMER` without a placement.
+
+Until a placement exists, every other `/api/learning/**` route called by a `CUSTOMER` returns `403 PLACEMENT_REQUIRED`. The placement is stored when Assessment completes the attempt, so poll `GET /courses` until it stops returning that error.
 
 ### `POST /courses/{id}/test-assignments`
 
@@ -201,6 +207,9 @@ New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: ar
 | HTTP | Code | JSON example |
 | --- | --- | --- |
 | 403 | `REVIEW_REQUIRED` | `{"detail":"Complete the pending review first","code":"REVIEW_REQUIRED","reviews":[{"reviewId":"20000000-0000-4000-8000-000000000901","lessonId":"20000000-0000-4000-8000-000000000102","knowledgePointId":"10000000-0000-4000-8000-000000000002"}]}` |
+| 403 | `PLACEMENT_REQUIRED` | `{"detail":"Take the placement test first","code":"PLACEMENT_REQUIRED"}` |
+| 409 | `PLACEMENT_ALREADY_DONE` | `{"detail":"The placement test was already taken","code":"PLACEMENT_ALREADY_DONE"}` |
+| 404 | `NO_PLACEMENT_TEST` | `{"detail":"No placement test is published","code":"NO_PLACEMENT_TEST"}` |
 | 403 | `TOPIC_LOCKED` | `{"detail":"Topic is locked","code":"TOPIC_LOCKED"}` |
 | 403 | `LESSON_LOCKED` | `{"detail":"Complete L1 before L2","code":"LESSON_LOCKED"}` |
 | 403 | `TEST_LOCKED` | `{"detail":"Complete the topic lessons first","code":"TEST_LOCKED"}` |

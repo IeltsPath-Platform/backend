@@ -66,6 +66,11 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public List<TestPackage> getPlacementTestPackages() {
+        return get("/placement-packages", new ParameterizedTypeReference<>() { });
+    }
+
+    @Override
     public List<LessonPracticeSet> lessonPracticeSets(UUID lessonId) {
         return get("/lessons/{id}/practice-sets", new ParameterizedTypeReference<>() { }, lessonId);
     }

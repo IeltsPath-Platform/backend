@@ -87,6 +87,18 @@ class InternalLearningContentControllerTest {
                 .andExpect(jsonPath("$[0].packageVersionId").value(version.toString()))
                 .andExpect(jsonPath("$[0].code").value("FINAL"));
     }
+    @Test
+    void placementPackagesUseTheExistingPackageShape() throws Exception {
+        UUID pkg = UUID.randomUUID();
+        UUID version = UUID.randomUUID();
+        when(placementTests.execute()).thenReturn(List.of(
+                new com.ieltspath.content.application.result.TopicTestPackageResult(pkg, version, "PLACEMENT")));
+        mockMvc.perform(get("/internal/learning-content/placement-packages"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].packageId").value(pkg.toString()))
+                .andExpect(jsonPath("$[0].packageVersionId").value(version.toString()))
+                .andExpect(jsonPath("$[0].code").value("PLACEMENT"));
+    }
+
     private final GetTopicSequenceUseCase topicSequence = mock(GetTopicSequenceUseCase.class);
     private final GetTopicLessonsUseCase topicLessons = mock(GetTopicLessonsUseCase.class);
     private final GetLessonContentUseCase lessonContent = mock(GetLessonContentUseCase.class);
@@ -96,6 +108,8 @@ class InternalLearningContentControllerTest {
     private final GetLessonPracticeSetsUseCase lessonPracticeSets = mock(GetLessonPracticeSetsUseCase.class);
     private final GetTopicPracticeSetsUseCase topicPracticeSets = mock(GetTopicPracticeSetsUseCase.class);
     private final CountAvailablePracticeSetsUseCase availability = mock(CountAvailablePracticeSetsUseCase.class);
+    private final com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase placementTests =
+            mock(com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase.class);
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -104,7 +118,7 @@ class InternalLearningContentControllerTest {
         validator.afterPropertiesSet();
         mockMvc = MockMvcBuilders.standaloneSetup(new InternalLearningContentController(topicSequence, topicLessons,
                         lessonContent, testPackages, search, packageVersion, lessonPracticeSets, topicPracticeSets,
-                        availability, courseTests))
+                        availability, courseTests, placementTests))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();

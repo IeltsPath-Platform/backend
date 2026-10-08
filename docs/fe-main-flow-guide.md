@@ -26,6 +26,7 @@ Tài khoản demo (có sẵn khi bật `DEMO_DATA_ENABLED`): `learner@ielts.demo
 | --- | --- | --- |
 | Đăng ký / đăng nhập | — | `POST /api/users/register`, `POST /auth/login` |
 | Khởi động app (đã có token) | `GET /api/users/me`, `GET /api/access/me/points` | `POST /auth/refresh` khi gặp `401` |
+| Placement test (bắt buộc, làm một lần) | `GET /api/learning/placement-test` → `POST /api/assessments/attempts` → `GET .../structure` | Lưu câu, gửi bài luận và bản thu âm qua `POST /api/assessments/submissions`, nộp bài, chờ band |
 | Danh sách course | `GET /api/learning/courses` | Hiện band, `recommended`, tiến độ và trạng thái thi cuối course |
 | Lộ trình (danh sách topic) | `GET /api/learning/topics` | Chọn topic |
 | Topic (danh sách bài học) | `GET /api/learning/topics/{topicId}/lessons` | Chọn bài, bấm "Làm bài kiểm tra" |
@@ -40,7 +41,9 @@ Tài khoản demo (có sẵn khi bật `DEMO_DATA_ENABLED`): `learner@ielts.demo
 
 ```mermaid
 flowchart TD
-    A[Đăng nhập] --> B[GET /api/learning/courses]
+    A[Đăng nhập] --> PT[GET /api/learning/placement-test]
+    PT -->|làm bài, nộp, poll GET /courses tới khi 200| B[GET /api/learning/courses]
+    A -->|đã có placement| B
     B -->|chọn course; recommendation chỉ gợi ý| C[GET /api/learning/topics]
     C -->|nhóm theo course; chọn topic IN_PROGRESS hoặc PASSED| D[GET /topics/id/lessons]
     D -->|chọn bài AVAILABLE/COMPLETED| L[GET /lessons/id]
@@ -77,10 +80,27 @@ Người dùng mới: `POST /api/users/register` body `{email, password (6–72 
 `{"refreshToken":"..."}` để lấy cặp token mới; refresh cũng lỗi thì về màn đăng nhập. Đăng xuất:
 `POST /auth/logout` body `{"refreshToken":"..."}`.
 
+### Bước 1b. Placement test (bắt buộc trước khi vào lộ trình)
+
+Học viên chưa có placement gọi bất kỳ `/api/learning/**` nào (trừ `placement-test`) đều nhận `403 PLACEMENT_REQUIRED`:
+FE chuyển sang màn làm placement.
+
+1. `GET /api/learning/placement-test` → `{packageId, packageVersionId}`. Đã làm rồi thì `409 PLACEMENT_ALREADY_DONE`
+   (FE vào thẳng màn course); chưa có đề thì `404 NO_PLACEMENT_TEST`.
+2. Làm bài như thi cuối topic (Bước 6): `POST /api/assessments/attempts` với `packageVersionId`, `GET .../structure`,
+   `PUT .../items/{itemId}/response` cho câu Listening và Reading.
+3. Câu Writing: `POST /api/assessments/submissions` với `attemptItemId`, `skill: "WRITING"`, `textPayload`,
+   `promptSnapshot` (chuỗi JSON, ví dụ `{"stem":"..."}`) và `submissionKey` duy nhất. Câu Speaking: cùng endpoint với
+   `skill: "SPEAKING"` và `audioReference` thay cho `textPayload`.
+4. `POST /api/assessments/attempts/{attemptId}/submit`. Assessment tự chấm; Writing do LLM chấm (không đủ điều kiện thì
+   dùng band mặc định), Speaking dùng band cố định của MVP.
+5. Poll `GET /api/learning/courses` mỗi 2 giây (tối đa ~1 phút) tới khi hết `403 PLACEMENT_REQUIRED`; course có
+   `recommended = true` là course phù hợp với band của học viên.
+
 ### Bước 2. Màn lộ trình
 
 Course screen calls `GET /api/learning/courses` (CUSTOMER role) and displays `bandLevel`, `recommended`, `topicCount`,
-`passedTopicCount` and `testStatus`. A recommendation is guidance from placement; every course stays open. Select a course
+`passedTopicCount` and `testStatus`. A recommendation is guidance from placement; once the placement test is done every course stays open. Select a course
 to group its topics from `GET /api/learning/topics` by `course.courseId`.
 
 `GET /api/learning/topics` → mảng đã sắp theo `sequenceOrder`; each topic includes course metadata:
@@ -240,6 +260,8 @@ Khi `GET /api/learning/courses` trả `testStatus = AVAILABLE`, mọi topic củ
 | HTTP | `code` | Khi nào | FE xử lý |
 | --- | --- | --- | --- |
 | 401 | — | Thiếu hoặc hết hạn token | `POST /auth/refresh`, lỗi tiếp thì về đăng nhập |
+| 403 | `PLACEMENT_REQUIRED` | Chưa làm placement test | Chuyển sang màn placement (Bước 1b) |
+| 409 | `PLACEMENT_ALREADY_DONE` | Gọi `placement-test` khi đã có placement | Vào thẳng màn course |
 | 403 | `TOPIC_LOCKED` | Mở topic/bài chưa tới lượt | Quay về lộ trình |
 | 403 | `LESSON_LOCKED` | Mở bài khi bài trước chưa xong | Quay về màn topic |
 | 403 | `REVIEW_REQUIRED` | Còn bài ôn chưa làm | Mở bài ôn theo `reviews[]` (Bước 5) |

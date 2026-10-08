@@ -166,8 +166,10 @@ src/main/java/com/ieltspath/<service>
   `MasteryCalculator` (port `compute_mastery` của DeepTutor v1.6.9, Apache-2.0; giữ comment ghi nguồn và giá trị test gốc).
 - Skill của lesson suy ra từ câu hỏi trong các block; lesson có thể chứa nhiều skill. Khóa lesson, review và Practice
   được áp theo từng skill; bài học hoàn thành theo các block bắt buộc, Practice phải đạt riêng cho từng skill có yêu cầu.
-- Thứ tự topic theo user từ Content `topic-sequence`, không LLM/goal; mỗi course là một chuỗi chung mọi skill. Mọi course
-  đều mở; band từ placement chỉ gợi ý course và không đổi trạng thái topic. Bài ôn vẫn chặn bài, Practice và thi topic
+- Thứ tự topic theo user từ Content `topic-sequence`, không LLM/goal; mỗi course là một chuỗi chung mọi skill. Học viên phải
+  có placement trước: thiếu thì mọi `/api/learning/**` (trừ `GET /placement-test`) trả `403 PLACEMENT_REQUIRED`, và
+  placement chỉ làm được một lần (`409 PLACEMENT_ALREADY_DONE`). Có placement rồi thì mọi course đều mở; band chỉ gợi ý
+  course và không đổi trạng thái topic. Bài ôn vẫn chặn bài, Practice và thi topic
   của cùng skill. Thi cuối course không chặn tiến độ topic hay course khác. `LessonAccessGate` và use case trong
   `services/learning-service/src/main/java/com/ieltspath/learning/` quyết định cổng bài; trạng thái topic suy ra khi đọc.
 - Mọi lượt ghi của một học viên chạy trong một `@Transactional` mở đầu bằng `pg_advisory_xact_lock` theo user.

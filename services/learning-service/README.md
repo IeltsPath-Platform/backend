@@ -46,7 +46,8 @@ show available bands and the optional placement recommendation, then group topic
 
 | Method | Path | Behavior |
 | --- | --- | --- |
-| GET | `/courses` | CUSTOMER only; returns courses by band with placement-based `recommended`, topic counts and course-test `testStatus`. Every course is open. |
+| GET | `/placement-test` | CUSTOMER only; returns `{packageId, packageVersionId}` of the published placement test, `409 PLACEMENT_ALREADY_DONE` once a placement exists, `404 NO_PLACEMENT_TEST` without a package. The only route open before a placement. |
+| GET | `/courses` | CUSTOMER only; returns courses by band with placement-based `recommended`, topic counts and course-test `testStatus`. Every course is open once a placement exists; before that, every route except `/placement-test` answers `403 PLACEMENT_REQUIRED`. |
 | GET | `/topics` | One Content `topic-sequence` read refreshes the shared KP catalog and the user's topic order; returns `skill`, `course`, `hasTopicTest`, statuses and completed lesson counts. Topic status sequences are independent per course and span skills. |
 | POST | `/courses/{id}/test-assignments` | CUSTOMER only; assigns/returns a course final-test package after every topic in that course passes. `COURSE_GATE` at 70% passes the course without blocking another course. |
 | GET | `/topics/{id}/lessons` | Lists lessons with `practiceStatus` and `practicePassReason`, plus topic `skill`, `hasTopicTest`, and `testStatus`. |

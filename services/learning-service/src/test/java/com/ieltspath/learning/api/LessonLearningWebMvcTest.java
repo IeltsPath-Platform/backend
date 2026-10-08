@@ -103,6 +103,7 @@ class LessonLearningWebMvcTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @MockitoBean CurrentUserProvider currentUser;
+    @MockitoBean com.ieltspath.learning.application.usecase.RequirePlacementUseCase requirePlacement;
     @MockitoBean GetTopicLessonsUseCase getTopicLessonsUseCase;
     @MockitoBean GetLessonUseCase getLessonUseCase;
     @MockitoBean SubmitLessonExerciseUseCase submitLessonExerciseUseCase;

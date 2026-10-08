@@ -553,6 +553,19 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     @Override
+    public List<TopicTestPackageResult> placementTestPackages() {
+        return jdbc.query("""
+                SELECT p.id, p.current_published_version_id, p.code
+                FROM content_packages p
+                JOIN content_package_versions v ON v.id = p.current_published_version_id AND v.package_id = p.id
+                WHERE p.package_type = 'PLACEMENT_TEST'
+                  AND p.status = 'PUBLISHED' AND v.status = 'PUBLISHED'
+                ORDER BY p.id
+                """, (rs, i) -> new TopicTestPackageResult(uuid(rs, "id"),
+                uuid(rs, "current_published_version_id"), rs.getString("code")));
+    }
+
+    @Override
     public List<PackageQuestionSpec> packageQuestionSpecs(UUID packageVersionId) {
         return jdbc.query("""
                 SELECT DISTINCT qv.id, q.question_type, q.skill, qv.answer_spec::text AS answer_spec

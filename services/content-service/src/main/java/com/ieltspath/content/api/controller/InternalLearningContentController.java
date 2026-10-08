@@ -23,6 +23,7 @@ import com.ieltspath.content.application.usecase.GetTopicLessonsUseCase;
 import com.ieltspath.content.application.usecase.GetTopicSequenceUseCase;
 import com.ieltspath.content.application.usecase.GetTopicTestPackagesUseCase;
 import com.ieltspath.content.application.usecase.GetCourseTestPackagesUseCase;
+import com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase;
 import com.ieltspath.content.application.usecase.SearchPracticeSetsUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +56,12 @@ public class InternalLearningContentController {
     private final GetTopicPracticeSetsUseCase getTopicPracticeSets;
     private final CountAvailablePracticeSetsUseCase countAvailablePracticeSets;
     private final GetCourseTestPackagesUseCase getCourseTestPackages;
+    private final GetPlacementTestPackagesUseCase getPlacementTestPackages;
+
+    @GetMapping("/placement-packages")
+    public List<TopicTestPackageResponse> placementPackages() {
+        return getPlacementTestPackages.execute().stream().map(TopicTestPackageResponse::from).toList();
+    }
 
     @GetMapping("/courses/{id}/test-packages")
     public List<TopicTestPackageResponse> courseTestPackages(@PathVariable("id") UUID courseId) {

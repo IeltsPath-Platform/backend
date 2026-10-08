@@ -284,8 +284,9 @@ class LessonPipelineSeedTest {
                 JOIN content_packages p ON p.id = v.package_id
                 WHERE v.status = 'PUBLISHED'
                   AND p.package_type IN ('PRACTICE_SET', 'TOPIC_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
-                  AND q.purpose <> CASE WHEN p.package_type IN ('MOCK_TEST', 'PLACEMENT_TEST')
-                                       THEN 'EXAM' ELSE 'LEARNING' END
+                  AND q.purpose <> CASE p.package_type WHEN 'MOCK_TEST' THEN 'EXAM'
+                                                       WHEN 'PLACEMENT_TEST' THEN 'PLACEMENT'
+                                                       ELSE 'LEARNING' END
                 """, Map.of(), UUID.class);
         assertThat(wrongPurpose).as("Seed questions with incorrect purpose").isEmpty();
         UUID versionId = reader.publishedTestPackages(DEMO_READING).get(0).packageVersionId();
@@ -863,8 +864,9 @@ class LessonPipelineSeedTest {
         // 43 reading questions, the Task 1 and Task 2 essays, 27 listening questions, the V4 practice-set question
         // the 10 questions of the paid topics, the 21 practice questions of V16 and the 43 practice and final-test
         // questions of V18, the 24 course questions of V21 and the 25 lesson, practice and final-test questions of V22.
-        // V23 adds 33 lesson, practice and topic-test questions of the multi-skill topic.
-        assertThat(reserved).hasSize(229);
+        // V23 adds 33 lesson, practice and topic-test questions of the multi-skill topic and V25 the 12 placement
+        // questions, which no lesson or review may reuse either.
+        assertThat(reserved).hasSize(241);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }
 
