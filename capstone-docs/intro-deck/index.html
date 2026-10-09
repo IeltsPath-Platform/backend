@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IELTSPath Intro Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Lora:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0c1b4d;
+    --navy-2: #13296b;
+    --blue: #2b59d9;
+    --gold: #e0a13a;
+    --gold-ink: #8a5a10;
+    --red: #c9432f;
+    --cream: #f4f3ef;
+    --lav: #e8ecf8;
+    --card: #fbfaf7;
+    --line: #e1e2ea;
+    --ink: #1a2440;
+    --muted: #5d6680;
+  }
+  @page { size: 1280px 720px; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #888; }
+  body { font-family: "Be Vietnam Pro", sans-serif; color: var(--ink); font-size: 16px; line-height: 1.5; }
+  .slide {
+    width: 1280px; height: 720px; position: relative; overflow: hidden;
+    padding: 76px 84px 0; background: var(--cream);
+    page-break-after: always; break-after: page; margin: 0 auto;
+  }
+  .slide.lav { background: var(--lav); }
+  .slide.dark { background: var(--navy); color: #f4f1e8; }
+  .logo { position: absolute; top: 24px; right: 84px; height: 54px; }
+  .kicker { font-size: 13px; font-weight: 700; letter-spacing: .14em; color: var(--blue); text-transform: uppercase; margin-bottom: 8px; }
+  h1 { font-family: "Lora", serif; font-weight: 600; font-size: 42px; line-height: 1.18; color: var(--navy); margin-bottom: 26px; letter-spacing: -.01em; }
+  .lead { font-size: 18px; color: #2c3656; max-width: 920px; margin-bottom: 26px; }
+  .foot { position: absolute; left: 84px; right: 84px; bottom: 34px; display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+  .grid { display: grid; gap: 18px; }
+  .g2 { grid-template-columns: 1fr 1fr; }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; }
+  .card.navy { background: var(--navy); border-color: var(--navy); color: #dfe4f3; }
+  .card.navy h3 { color: #fff; }
+  .card h3 { font-size: 19px; font-weight: 700; color: var(--navy); margin: 10px 0 8px; line-height: 1.3; }
+  .card p, .card li { font-size: 14.5px; color: #3a4462; }
+  .card.navy p, .card.navy li { color: #d5dbee; }
+  .card ul { padding-left: 18px; }
+  .card li { margin-bottom: 5px; }
+  .ico { width: 24px; height: 24px; stroke: var(--blue); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .navy .ico { stroke: var(--gold); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { background: var(--navy); color: #fff; text-align: left; font-weight: 600; padding: 10px 12px; }
+  td { padding: 9px 12px; border: 1px solid var(--line); vertical-align: top; color: #2c3656; }
+  tr:nth-child(odd) td { background: #eef0f6; }
+  tr:nth-child(even) td { background: var(--card); }
+  td.b { font-weight: 700; color: var(--navy); }
+  .note { font-size: 14px; color: var(--muted); }
+  .arrow { color: var(--blue); align-self: center; font-size: 18px; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: #e1e8fb; color: var(--blue); }
+  .tag.gold { background: #fbecd2; color: var(--gold-ink); }
+  .step { width: 24px; height: 24px; border-radius: 50%; color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; flex: none; }
+  .card ul.sm li { font-size: 12.5px; margin-bottom: 4px; }
+  .node { background: var(--navy); color: #fff; padding: 6px 12px; border-radius: 8px; font-weight: 600; }
+  .flowrow { display: flex; align-items: center; gap: 10px; }
+  .flowlabel { width: 110px; font-weight: 700; font-size: 14px; flex: none; }
+  .chip { background: #e8eefc; color: var(--navy); border: 1px solid #b9c9f2; padding: 9px 16px; border-radius: 10px; font-weight: 600; font-size: 15px; }
+  .chip.gray { background: #f0efea; border-color: #dcdbd4; color: #5d6680; }
+  .chip.bad { background: #fdeee9; border-color: #e9a898; color: var(--red); }
+  .chip.good { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .qnum { width: 30px; height: 30px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; font-weight: 700; }
+  .colhead { color: #fff; font-weight: 700; padding: 11px 20px; font-size: 16px; }
+  .pair { padding: 13px 20px; border-top: 1px solid var(--line); }
+  .pair:first-of-type { border-top: 0; }
+  .pair b { display: block; color: var(--navy); font-size: 14.5px; margin-bottom: 3px; }
+  .pair span { display: block; font-size: 13.5px; color: #3a4462; }
+  .pair span::before { content: "→ "; color: var(--blue); font-weight: 700; }
+  .steps5 { display: grid; grid-template-columns: repeat(4, 1fr 26px) 1fr; align-items: stretch; }
+  .st { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 38px 12px 26px; text-align: center; }
+  .stn { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); width: 30px; height: 30px; border-radius: 50%; color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 15px; }
+  .pic { width: 176px; height: 154px; display: block; margin: 0 auto 18px; }
+  .stt { font-weight: 700; font-size: 16.5px; line-height: 1.3; white-space: nowrap; }
+  .stc { font-size: 14px; color: var(--muted); margin-top: 6px; }
+  .sta { align-self: center; text-align: center; color: var(--blue); font-size: 22px; }
+  .treeline { display: flex; align-items: center; gap: 10px; margin-top: 44px; font-size: 13px; }
+  .tl-label { font-weight: 700; color: var(--navy); }
+  .tl-note { margin-left: auto; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- 1 · Cover -->
+<section class="slide dark" style="padding:0">
+  <div style="position:absolute;right:0;top:0;width:470px;height:410px;background:var(--navy-2);border-bottom-left-radius:90px"></div>
+  <img src="logo-light.png" alt="IELTS Space" style="position:absolute;left:86px;top:84px;height:94px">
+  <div style="position:absolute;left:86px;top:276px;right:200px">
+    <div class="kicker" style="color:var(--gold)">Báo cáo 1 · Vision &amp; Scope</div>
+    <div style="font-family:Lora,serif;font-weight:600;font-size:76px;line-height:1.1;color:#f6f1e4;margin:10px 0 18px">IELTSPath</div>
+    <div style="font-size:25px;line-height:1.5;color:#c9d2ef;max-width:900px">Hệ thống ôn luyện IELTS cho học viên IELTS Space, bổ trợ bên cạnh giờ học trên lớp và trong thời gian chờ lớp band mới</div>
+  </div>
+  <div style="position:absolute;left:86px;bottom:80px;font-size:16px;color:#aeb8da">Nhóm thực hiện: SEP490_G112 · Phiên bản v1.2.0 · 08/10/2026</div>
+</section>
+
+<!-- 2 · Bối cảnh -->
+<section class="slide">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">01 · Bối cảnh</div>
+  <h1>Học viên cần chỗ ôn luyện<br>ngoài giờ lên lớp</h1>
+  <p class="lead">IELTS Space là trung tâm luyện thi IELTS tại Hà Nội, dạy theo lớp chia band. Việc học chính diễn ra trên lớp; ngoài giờ lớp, học viên tự ôn luyện mà không có công cụ nào khớp với nội dung trung tâm dạy.</p>
+  <div class="grid g3">
+    <div class="card">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <h3>Học viên đang học</h3>
+      <p>Giữa các buổi học tự luyện bằng tài liệu giáo viên phát hoặc web miễn phí. Bài làm không được chấm ngay, không biết sai vì thiếu kiến thức gì.</p>
+    </div>
+    <div class="card">
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <h3>Học viên chờ lớp band mới</h3>
+      <p>Học xong một band và chờ lớp band tiếp theo khai giảng. Trong thời gian chờ gần như không có nội dung để luyện, dễ ngừng học.</p>
+    </div>
+    <div class="card navy">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
+      <h3>Cùng mục tiêu, khác xuất phát</h3>
+      <p>Hai học viên cùng nhắm 7.0: người đang ở 5.0 cần củng cố nền tảng, người ở 6.5 cần luyện phần nâng cao. Học viên cần biết mình đang yếu ở đâu để ôn đúng chỗ.</p>
+    </div>
+  </div>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>02</span></div>
+</section>
+
+<!-- 3 · Người học điển hình -->
+<section class="slide lav">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">02 · Người học điển hình</div>
+  <h1>Linh luyện không định hướng,<br>Minh ngừng luyện khi chờ lớp</h1>
+  <div class="grid g2">
+    <div class="card" style="padding:26px 28px">
+      <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
+        <div style="width:50px;height:50px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-weight:700;font-size:20px">L</div>
+        <div><div style="font-weight:700;font-size:20px;color:var(--navy)">Linh</div><div class="note">Sinh viên năm hai · đang học lớp band 5.5 · mục tiêu 6.5</div></div>
+      </div>
+      <ul>
+        <li>Giữa các buổi học làm tài liệu trung tâm phát và vài đề online</li>
+        <li>Thấy điểm số, nhưng không biết kỹ năng Reading nào liên tục làm mất điểm</li>
+        <li>Không biết nên ôn lại phần nào trước buổi học sau</li>
+        <li>Đề online không khớp với band và nội dung lớp đang học</li>
+      </ul>
+    </div>
+    <div class="card" style="padding:26px 28px">
+      <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
+        <div style="width:50px;height:50px;border-radius:50%;background:var(--gold);color:var(--navy);display:grid;place-items:center;font-weight:700;font-size:20px">M</div>
+        <div><div style="font-weight:700;font-size:20px;color:var(--navy)">Minh</div><div class="note">Nhân viên văn phòng · xong lớp 5.5 · chờ lớp 6.0</div></div>
+      </div>
+      <ul>
+        <li>Trong lúc chờ lớp mới, không có bài nào để luyện tiếp</li>
+        <li>Muốn làm quen trước nội dung band 6.0 nhưng không có tài liệu</li>
+        <li>Mất nhịp luyện, vào lớp mới phải khởi động lại</li>
+        <li>Chỉ rảnh buổi tối, cần bài ngắn làm được trên điện thoại</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>03</span></div>
+</section>
+
+<!-- 4 · Vì sao cần làm ngay -->
+<section class="slide">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">03 · Vì sao cần làm ngay</div>
+  <h1>Học viên đã luyện online, câu hỏi là luyện ở đâu</h1>
+  <div class="grid g3">
+    <div class="card">
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>
+      <h3>Học viên đang mất</h3>
+      <ul>
+        <li>Thời gian luyện không nhắm vào điểm yếu thật</li>
+        <li>Không biết sai vì thiếu kiến thức gì, ôn gì tiếp</li>
+        <li>Thời gian chờ lớp dễ ngừng luyện, mất nhịp</li>
+      </ul>
+    </div>
+    <div class="card">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
+      <h3>Công cụ hiện có chưa đủ</h3>
+      <ul>
+        <li>Tài liệu phát tay: không chấm ngay, không giải thích</li>
+        <li>Web miễn phí: không khớp band và nội dung lớp</li>
+        <li>Không có nội dung để luyện trong thời gian chờ lớp</li>
+      </ul>
+    </div>
+    <div class="card navy">
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M17 6l3 3M14 9l2 2"/></svg>
+      <h3>Hướng giải quyết và ràng buộc</h3>
+      <p style="margin-bottom:10px">Học viên vẫn tự luyện online, nhưng trên web chung, không khớp với nội dung lớp đang học. Trung tâm cần kênh riêng, bám đúng nội dung mình dạy.</p>
+      <p>Hệ thống chỉ phục vụ học viên của trung tâm. Quyền dùng nội dung premium cấp bằng thẻ kích hoạt qua đội sales, không thêm thanh toán hay kế toán.</p>
+    </div>
+  </div>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>04</span></div>
+</section>
+
+<!-- 5 · Giải pháp hiện có -->
+<section class="slide">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">04 · Giải pháp hiện có</div>
+  <h1>Ba cách luyện tập hiện có, chưa cách nào đủ</h1>
+  <table>
+    <tr><th style="width:12%">Tiêu chí</th><th style="width:29%">STUDY4</th><th style="width:29%">ELSA Speak</th><th>Tự luyện hiện nay tại IELTS Space</th></tr>
+    <tr><td class="b">Đối tượng</td><td>Người Việt ôn thi IELTS, từ xây nền tảng đến nhắm band cao</td><td>Người muốn cải thiện kỹ năng nói; có khóa IELTS Speaking</td><td>Học viên đang học và học viên chờ lớp band mới</td></tr>
+    <tr><td class="b">Tính năng</td><td>Khóa học 4 kỹ năng; đề luyện từng kỹ năng kèm tài liệu</td><td>Phản hồi phát âm, độ trôi chảy qua nhận diện giọng nói; hội thoại với AI; lộ trình cá nhân hóa; game</td><td>Giáo viên phát tài liệu luyện giữa các buổi học</td></tr>
+    <tr><td class="b">Điểm mạnh</td><td>Luyện nhiều đề, quen dạng câu hỏi và format thi</td><td>Nhiều cơ hội nói, phản hồi nhanh</td><td>Tài liệu do giáo viên trung tâm soạn, khớp nội dung trên lớp</td></tr>
+    <tr><td class="b">Hạn chế</td><td>Chỉ hiện điểm và số câu đúng, không giải thích vì sao sai hay học gì tiếp; thiên về luyện đề hơn xây kiến thức</td><td>Tập trung kỹ năng nói; chưa có lộ trình IELTS kết hợp Reading, Listening, Writing với đề luyện</td><td>Không chấm và phản hồi ngay; học viên không biết mình yếu kiến thức nào; thời gian chờ lớp không có nội dung để luyện</td></tr>
+  </table>
+  <div class="foot"><span>Nguồn: study4.com · vn.elsaspeak.com · quy trình hiện tại của IELTS Space</span><span>05</span></div>
+</section>
+
+<!-- 6 · Khoảng trống -->
+<section class="slide lav">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">05 · Khoảng trống</div>
+  <h1>Ba giải pháp hiện tại để lại bảy khoảng trống</h1>
+  <div class="grid g2" style="gap:12px 18px">
+    <div class="card" style="border-left:4px solid var(--blue);padding:13px 20px"><div style="font-size:13px"><b style="color:var(--blue)">GAP-01 · Không biết vì sao mình sai</b> <span class="note">· STUDY4</span></div><p style="margin-top:4px">Kết quả chỉ có điểm số, không chỉ ra sai vì thiếu kiến thức gì và cần ôn gì tiếp.</p></div>
+    <div class="card" style="border-left:4px solid var(--blue);padding:13px 20px"><div style="font-size:13px"><b style="color:var(--blue)">GAP-02 · Luyện đề khi chưa học kiến thức</b> <span class="note">· STUDY4</span></div><p style="margin-top:4px">Học viên lao vào làm đề khi chưa nắm kiến thức mà dạng câu hỏi đó đòi hỏi.</p></div>
+    <div class="card" style="border-left:4px solid var(--blue);padding:13px 20px"><div style="font-size:13px"><b style="color:var(--blue)">GAP-03 · Chỉ luyện được kỹ năng nói</b> <span class="note">· ELSA</span></div><p style="margin-top:4px">ELSA chỉ phản hồi phần nói. Chưa có nơi luyện đủ 4 kỹ năng.</p></div>
+    <div class="card" style="border-left:4px solid var(--gold);padding:13px 20px"><div style="font-size:13px"><b style="color:var(--blue)">GAP-04 · Không biết mình yếu ở đâu</b> <span class="note">· Tự luyện tại trung tâm</span></div><p style="margin-top:4px">Tự luyện không cho học viên biết topic nào đã vững, điểm kiến thức nào còn yếu.</p></div>
+    <div class="card" style="border-left:4px solid var(--gold);padding:13px 20px"><div style="font-size:13px"><b style="color:var(--blue)">GAP-05 · Không có nội dung luyện ngoài giờ lớp</b> <span class="note">· Tự luyện tại trung tâm</span></div><p style="margin-top:4px">Giữa các buổi học và lúc chờ lớp mới, học viên không có nội dung online đúng band của trung tâm.</p></div>
+    <div class="card" style="border-left:4px solid var(--gold);padding:13px 20px"><div style="font-size:13px"><b style="color:var(--blue)">GAP-06 · Thiếu động lực luyện tập</b> <span class="note">· Tự luyện tại trung tâm</span></div><p style="margin-top:4px">Luyện một mình dễ nản; không có cộng đồng hay hoạt động kéo học viên quay lại.</p></div>
+    <div class="card" style="border-left:4px solid var(--gold);padding:13px 20px"><div style="font-size:13px"><b style="color:var(--blue)">GAP-07 · Học từ vựng thiếu ngữ cảnh</b> <span class="note">· Tự luyện tại trung tâm</span></div><p style="margin-top:4px">Học từ theo danh sách, thiếu ngữ cảnh sử dụng và không được ôn lại đều đặn.</p></div>
+  </div>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>06</span></div>
+</section>
+
+<!-- 7 · Bài toán chính: học một bài -->
+<section class="slide">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">06 · Bài toán chính</div>
+  <h1 style="margin-bottom:14px">Học một bài: làm đạt mới được đi tiếp</h1>
+  <svg viewBox="0 0 1112 440" width="1112" height="440" style="display:block;overflow:visible" font-family="Be Vietnam Pro,sans-serif">
+<defs>
+<marker id="mb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" fill="#2b59d9"/></marker>
+<marker id="mr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" fill="#c9432f"/></marker>
+</defs><circle cx="75" cy="102" r="10" fill="#0c1b4d"/><path d="M75 112 V139" stroke="#2b59d9" stroke-width="2.2" fill="none" marker-end="url(#mb)"/><rect x="0" y="142" width="150" height="96" rx="12" fill="#e8eefc" stroke="#2b59d9" stroke-width="1.4"/><circle cx="75" cy="166" r="12" fill="#e8eefc" stroke="#2b59d9" stroke-width="1.6"/><path d="M71 160 L81 166 L71 172Z" fill="#2b59d9"/><text x="75" y="202" text-anchor="middle" font-size="14.5" font-weight="700" fill="#0c1b4d">Mở bài tiếp theo</text><text x="75" y="219" text-anchor="middle" font-size="12" fill="#2b59d9">trong topic đang học</text><path d="M150 190 H193" stroke="#2b59d9" stroke-width="2.2" fill="none" marker-end="url(#mb)"/><path d="M267 138 L339 190 L267 242 L195 190Z" fill="#fdf0d6" stroke="#e0a13a" stroke-width="1.8"/><text x="267" y="187" text-anchor="middle" font-size="13.5" font-weight="700" fill="#8a5a10">Có bài ôn</text><text x="267" y="205" text-anchor="middle" font-size="13.5" font-weight="700" fill="#8a5a10">đang chờ?</text><path d="M339 190 H381" stroke="#2b59d9" stroke-width="2.2" fill="none" marker-end="url(#mb)"/><text x="361.5" y="182" text-anchor="middle" font-size="12" font-weight="700" fill="#2b59d9">Không</text><rect x="384" y="142" width="150" height="96" rx="12" fill="#fbfaf7" stroke="#d4d8e6" stroke-width="1.4"/><path d="M439 158 Q449 153 459 158 V178 Q449 173 439 178Z M459 158 Q469 153 479 158 V178 Q469 173 459 178Z" fill="#e8eefc" stroke="#2b59d9" stroke-width="1.6"/><text x="459" y="202" text-anchor="middle" font-size="14.5" font-weight="700" fill="#0c1b4d">Xem bài học</text><text x="459" y="219" text-anchor="middle" font-size="12" fill="#5d6680">lý thuyết, bài đọc/nghe,</text><text x="459" y="233" text-anchor="middle" font-size="12" fill="#5d6680">bài tập chưa có đáp án</text><path d="M534 190 H573" stroke="#2b59d9" stroke-width="2.2" fill="none" marker-end="url(#mb)"/><rect x="576" y="142" width="150" height="96" rx="12" fill="#e8eefc" stroke="#2b59d9" stroke-width="1.4"/><rect x="638" y="154" width="22" height="26" rx="3" fill="#fff" stroke="#2b59d9" stroke-width="1.6"/><path d="M643 162 h12 M643 168 h12 M643 174 h7" stroke="#9fb5ee" stroke-width="2" stroke-linecap="round"/><path d="M653 180 L666 160" stroke="#e0a13a" stroke-width="4.5" stroke-linecap="round"/><text x="651" y="202" text-anchor="middle" font-size="14.5" font-weight="700" fill="#0c1b4d">Làm bài</text><text x="651" y="219" text-anchor="middle" font-size="12" fill="#2b59d9">rồi nộp</text><path d="M726 190 H765" stroke="#2b59d9" stroke-width="2.2" fill="none" marker-end="url(#mb)"/><rect x="768" y="142" width="150" height="96" rx="12" fill="#fbfaf7" stroke="#d4d8e6" stroke-width="1.4"/><rect x="829" y="154" width="28" height="26" rx="4" fill="#fff" stroke="#2b59d9" stroke-width="1.6"/><path d="M834 161 l2.5 2.5 4-5 M834 169 l2.5 2.5 4-5" stroke="#2f9e55" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M834 173 l5 5 m0-5 l-5 5" stroke="#c9432f" stroke-width="1.8" stroke-linecap="round"/><path d="M844 161 h8 M844 169 h8 M844 176 h8" stroke="#c7d2ee" stroke-width="2" stroke-linecap="round"/><text x="843" y="202" text-anchor="middle" font-size="14.5" font-weight="700" fill="#0c1b4d">Chấm điểm</text><text x="843" y="219" text-anchor="middle" font-size="12" fill="#5d6680">ghi kết quả lần nộp đầu</text><path d="M918 190 H961" stroke="#2b59d9" stroke-width="2.2" fill="none" marker-end="url(#mb)"/><path d="M1035 138 L1107 190 L1035 242 L963 190Z" fill="#fdf0d6" stroke="#e0a13a" stroke-width="1.8"/><text x="1035" y="187" text-anchor="middle" font-size="13.5" font-weight="700" fill="#8a5a10">Đúng ≥ 70%?</text><path d="M267 138 V88" stroke="#c9432f" stroke-width="2.2" fill="none" marker-end="url(#mr)"/><text x="281" y="118" text-anchor="middle" font-size="12" font-weight="700" fill="#c9432f">Có</text><rect x="177" y="28" width="180" height="58" rx="10" fill="#fdeee9" stroke="#e9a898"/><text x="267" y="62" text-anchor="middle" font-size="13.5" font-weight="700" fill="#c9432f">Làm bài ôn trước</text><path d="M175 57 H139" stroke="#c9432f" stroke-width="2.2" fill="none" marker-end="url(#mr)"/><circle cx="125" cy="57" r="12" fill="#fff" stroke="#c9432f" stroke-width="2"/><path d="M118 50 l14 14 m0 -14 l-14 14" stroke="#c9432f" stroke-width="2"/><path d="M1035 138 V88" stroke="#c9432f" stroke-width="2.2" fill="none" marker-end="url(#mr)"/><text x="1055" y="118" text-anchor="middle" font-size="12" font-weight="700" fill="#c9432f">Chưa</text><rect x="886" y="28" width="226" height="58" rx="10" fill="#fdeee9" stroke="#e9a898"/><text x="999" y="53" text-anchor="middle" font-size="13.5" font-weight="700" fill="#c9432f">Đánh dấu câu sai, hiện gợi ý</text><text x="999" y="71" text-anchor="middle" font-size="12" fill="#9a4a3c">chưa hiện lời giải</text><path d="M884 57 H651 V139" stroke="#c9432f" stroke-width="2.2" fill="none" marker-end="url(#mr)"/><text x="760" y="49" text-anchor="middle" font-size="12" font-weight="700" fill="#c9432f">Làm lại</text><path d="M1035 242 V321" stroke="#2b59d9" stroke-width="2.2" fill="none" marker-end="url(#mb)"/><text x="1051" y="290" text-anchor="middle" font-size="12" font-weight="700" fill="#2b59d9">Đạt</text><rect x="960" y="324" width="150" height="96" rx="12" fill="#fbfaf7" stroke="#d4d8e6" stroke-width="1.4"/><circle cx="1035" cy="346" r="10" fill="#fdf0d6" stroke="#e0a13a" stroke-width="1.6"/><rect x="1030" y="356" width="10" height="6" rx="2" fill="#e0a13a"/><text x="1035" y="384" text-anchor="middle" font-size="14.5" font-weight="700" fill="#0c1b4d">Xem đáp án</text><text x="1035" y="401" text-anchor="middle" font-size="12" fill="#5d6680">và lời giải</text><path d="M960 372 H918" stroke="#2b59d9" stroke-width="2.2" fill="none" marker-end="url(#mb)"/><path d="M843 320 L915 372 L843 424 L771 372Z" fill="#fdf0d6" stroke="#e0a13a" stroke-width="1.8"/><text x="843" y="369" text-anchor="middle" font-size="13.5" font-weight="700" fill="#8a5a10">Tất cả bài tập</text><text x="843" y="387" text-anchor="middle" font-size="13.5" font-weight="700" fill="#8a5a10">đều đạt?</text><path d="M843 320 V282 H691 V241" stroke="#2b59d9" stroke-width="2.2" fill="none" marker-end="url(#mb)"/><text x="783" y="274" text-anchor="middle" font-size="12" font-weight="700" fill="#2b59d9">Chưa: làm tiếp</text><path d="M771 372 H729" stroke="#2b59d9" stroke-width="2.2" fill="none" marker-end="url(#mb)"/><text x="748.5" y="364" text-anchor="middle" font-size="12" font-weight="700" fill="#2b59d9">Rồi</text><rect x="576" y="324" width="150" height="96" rx="12" fill="#0c1b4d" stroke="#0c1b4d" stroke-width="1.4"/><path d="M641 336 V362" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M641 336 H665 L658 343 L665 350 H641Z" fill="#e0a13a"/><text x="651" y="384" text-anchor="middle" font-size="14.5" font-weight="700" fill="#ffffff">Hoàn thành bài</text><text x="651" y="401" text-anchor="middle" font-size="12" fill="#c9d2ef">mở bài tiếp</text><text x="651" y="415" text-anchor="middle" font-size="12" fill="#c9d2ef">và bộ luyện tập</text><path d="M576 372 H537" stroke="#2b59d9" stroke-width="2.2" fill="none" marker-end="url(#mb)"/><rect x="384" y="324" width="150" height="96" rx="12" fill="#eaf5ec" stroke="#9fd0a9" stroke-width="1.4"/><rect x="445" y="350" width="7" height="12" rx="1.5" fill="#9fd0a9"/><rect x="455" y="344" width="7" height="18" rx="1.5" fill="#5fb874"/><rect x="465" y="336" width="7" height="26" rx="1.5" fill="#2f9e55"/><text x="459" y="384" text-anchor="middle" font-size="14.5" font-weight="700" fill="#2f7a3d">Cập nhật nắm vững</text><text x="459" y="401" text-anchor="middle" font-size="12" fill="#3f7a4c">tính ngày học liên tục</text><path d="M384 372 H285" stroke="#2b59d9" stroke-width="2.2" fill="none" marker-end="url(#mb)"/><circle cx="267" cy="372" r="14" fill="none" stroke="#0c1b4d" stroke-width="2.5"/><circle cx="267" cy="372" r="8" fill="#0c1b4d"/></svg>
+  <div style="display:flex;gap:22px;justify-content:flex-end;margin-top:6px;font-size:13px;color:var(--muted)"><span><span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:#e8eefc;border:1.5px solid #2b59d9;vertical-align:-2px;margin-right:6px"></span>Học viên làm</span><span><span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:#fbfaf7;border:1.5px solid #d4d8e6;vertical-align:-2px;margin-right:6px"></span>Hệ thống làm</span></div>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>07</span></div>
+</section>
+
+<!-- 10 · Giải pháp đề xuất -->
+<section class="slide">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">07 · Giải pháp đề xuất</div>
+  <h1>IELTSPath: học kiến thức trước,<br>ôn theo lỗi sai của từng học viên</h1>
+  <div style="display:grid;grid-template-columns:1fr 16px 1fr 16px 1fr 16px 1fr 16px 1fr;gap:6px">
+    <div class="card"><div style="color:var(--blue);font-weight:700">01</div><h3 style="margin-top:4px">Kiểm tra đầu vào</h3><p>Bài placement ngắn ước lượng band và gợi ý khóa phù hợp.</p></div><span class="arrow">→</span>
+    <div class="card"><div style="color:var(--blue);font-weight:700">02</div><h3 style="margin-top:4px">Học kiến thức trước</h3><p>Mỗi khóa thuộc một band, gồm topic và bài học dạy kiến thức cho từng dạng câu hỏi trước khi luyện.</p></div><span class="arrow">→</span>
+    <div class="card"><div style="color:var(--blue);font-weight:700">03</div><h3 style="margin-top:4px">Luyện tập</h3><p>Câu trả lời sai được ghi nhận theo điểm kiến thức bị hổng.</p></div><span class="arrow">→</span>
+    <div class="card"><div style="color:var(--blue);font-weight:700">04</div><h3 style="margin-top:4px">Ôn tập trúng đích</h3><p>Điểm kiến thức yếu kích hoạt bài ôn riêng, nên bước tiếp theo luôn cụ thể.</p></div><span class="arrow">→</span>
+    <div class="card navy"><div style="color:var(--gold);font-weight:700">05</div><h3 style="margin-top:4px">Phản hồi và thi thử</h3><p>Writing, Speaking được nhận xét theo tiêu chí IELTS; thi thử 4 kỹ năng cho biết mức sẵn sàng.</p></div>
+  </div>
+  <p class="lead" style="margin-top:30px">IELTSPath là kênh ôn luyện trực tuyến của IELTS Space trên <b>web và điện thoại</b>, dành cho học viên đang học tại trung tâm và học viên đang chờ lớp band mới. Hệ thống bổ trợ, không thay giờ học trên lớp.</p>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>08</span></div>
+</section>
+
+<!-- 11 · Ai dùng -->
+<section class="slide lav">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">07 · Giải pháp đề xuất</div>
+  <h1>Một kênh ôn luyện cho hai lúc<br>học viên cần nhất</h1>
+  <div class="grid" style="grid-template-columns:1fr 1fr 0.9fr">
+    <div class="card">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      <h3>Học viên đang học</h3>
+      <ul>
+        <li>Ôn lại kiến thức trên lớp bằng bài học và Practice theo band</li>
+        <li>Nhận bài ôn đúng điểm kiến thức còn yếu</li>
+        <li>Nhận phản hồi Writing, Speaking theo tiêu chí IELTS</li>
+      </ul>
+    </div>
+    <div class="card">
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <h3>Học viên chờ lớp band mới</h3>
+      <ul>
+        <li>Giữ nhịp luyện qua game, thi đấu và cộng đồng người học</li>
+        <li>Học từ vựng trong ngữ cảnh video, ôn bằng flashcard</li>
+      </ul>
+    </div>
+    <div class="card navy">
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M17 6l3 3M14 9l2 2"/></svg>
+      <h3>Đội sales của trung tâm</h3>
+      <p>Cấp thẻ kích hoạt cho học viên đã đăng ký để mở nội dung premium. Hệ thống chỉ ghi lại thẻ nào được kích hoạt, bởi tài khoản nào, khi nào.</p>
+    </div>
+  </div>
+  <div class="card" style="margin-top:18px;padding:14px 22px;border-left:4px solid var(--gold)">
+    <p><b style="color:var(--navy)">Không theo dõi học viên.</b> Hệ thống không có báo cáo hay dashboard cho giáo viên, trung tâm về việc học viên luyện gì. Tiến độ và điểm yếu chỉ dùng để chọn bài ôn và để chính học viên tự xem.</p>
+  </div>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>09</span></div>
+</section>
+
+<!-- 12 · Thẻ kích hoạt -->
+<section class="slide">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">07 · Giải pháp đề xuất</div>
+  <h1>Premium bằng thẻ kích hoạt:<br>hệ thống chỉ cấp thẻ và ghi log</h1>
+  <div style="display:grid;grid-template-columns:1fr 16px 1fr 16px 1fr 16px 1fr;gap:6px">
+    <div class="card"><span class="tag">Hệ thống</span><h3>Tạo lô thẻ</h3><p>Admin tạo mã thẻ theo từng gói premium, ví dụ một lô 500 thẻ.</p></div><span class="arrow">→</span>
+    <div class="card" style="background:#fdf4e4;border-color:#efd5a3"><span class="tag gold">Sales và trung tâm</span><h3>Giao thẻ cho học viên</h3><p>Học viên đăng ký khóa tại trung tâm được sales giao thẻ; giá và thu tiền là việc của trung tâm.</p></div><span class="arrow">→</span>
+    <div class="card"><span class="tag">Hệ thống</span><h3>Học viên nhập mã</h3><p>Mã hợp lệ thì tài khoản được mở nội dung premium; mỗi thẻ chỉ dùng một lần.</p></div><span class="arrow">→</span>
+    <div class="card"><span class="tag">Hệ thống</span><h3>Ghi log kích hoạt</h3><p>Lưu thẻ nào, tài khoản nào, kích hoạt lúc nào. Có thắc mắc thì sales tra log là xong.</p></div>
+  </div>
+  <div class="grid g2" style="margin-top:20px">
+    <div class="card"><h3 style="margin-top:0">Hệ thống làm</h3><p>Tạo mã thẻ, kích hoạt, mở premium, ghi log kích hoạt. Một số topic mở sẵn cho mọi tài khoản.</p></div>
+    <div class="card navy"><h3 style="margin-top:0">Hệ thống không làm</h3><p>Cổng thanh toán online, hóa đơn, kế toán, thống kê doanh thu. Các việc này do sales và trung tâm đảm nhận.</p></div>
+  </div>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>10</span></div>
+</section>
+
+<!-- 13 · Tính năng 1/2 -->
+<section class="slide">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">08 · Tính năng chính (1/2)</div>
+  <h1>Lộ trình theo band, luyện tập và đánh giá</h1>
+  <table>
+    <tr><th style="width:9%">Mã</th><th style="width:30%">Tính năng</th><th>Mô tả</th></tr>
+    <tr><td class="b">FE-01</td><td class="b">Kiểm tra đầu vào và gợi ý khóa học</td><td>Bài placement ước lượng band và gợi ý khóa theo band</td></tr>
+    <tr><td class="b">FE-02</td><td class="b">Khóa học theo band, bài học đa kỹ năng</td><td>Khóa theo band gồm topic và bài học có lý thuyết, bài tập cho Reading, Listening, Writing, Speaking</td></tr>
+    <tr><td class="b">FE-03</td><td class="b">Luyện tập thích ứng và ôn tập</td><td>Kết quả luyện tập cập nhật mức thành thạo từng điểm kiến thức; điểm yếu kích hoạt set ôn và ôn lại lý thuyết</td></tr>
+    <tr><td class="b">FE-04</td><td class="b">Phản hồi Writing bằng AI</td><td>AI chấm bài luận theo tiêu chí IELTS Writing, nêu điểm mạnh và điểm cần cải thiện cho từng tiêu chí</td></tr>
+    <tr><td class="b">FE-05</td><td class="b">Bài thi topic, khóa học và tiến độ cá nhân</td><td>Bài thi cuối khép lại mỗi topic và khóa học; học viên tự xem mức thành thạo và tiến độ của mình</td></tr>
+    <tr><td class="b">FE-11</td><td class="b">Luyện Speaking và phản hồi bằng AI</td><td>Ghi âm câu trả lời IELTS Speaking; AI chấm theo tiêu chí Speaking về độ trôi chảy, từ vựng, ngữ pháp, phát âm</td></tr>
+    <tr><td class="b">FE-12</td><td class="b">Thi thử IELTS đầy đủ</td><td>Thi thử tính giờ đủ 4 kỹ năng; Reading, Listening chấm tự động, Writing, Speaking do giám khảo chấm</td></tr>
+  </table>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>11</span></div>
+</section>
+
+<!-- 14 · Tính năng 2/2 -->
+<section class="slide">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">08 · Tính năng chính (2/2)</div>
+  <h1>Giữ nhịp luyện tập ngoài giờ lên lớp</h1>
+  <table>
+    <tr><th style="width:9%">Mã</th><th style="width:30%">Tính năng</th><th>Mô tả</th></tr>
+    <tr><td class="b">FE-06</td><td class="b">Trò chơi học tập và thi đấu</td><td>Game từ vựng, ngữ pháp thời gian thực trong phòng chơi, học viên thi đấu với nhau</td></tr>
+    <tr><td class="b">FE-07</td><td class="b">Từ vựng qua video và flashcard</td><td>Học từ trong ngữ cảnh video, lưu đoạn video, ôn bằng bộ flashcard và ghi chú</td></tr>
+    <tr><td class="b">FE-08</td><td class="b">Cộng đồng người học</td><td>Đăng câu hỏi, mẹo học, bình luận và bày tỏ cảm xúc; bài viết được kiểm duyệt</td></tr>
+    <tr><td class="b">FE-09</td><td class="b">Ứng dụng học trên điện thoại</td><td>Tiếp tục bài học, luyện tập và ôn từ vựng trên điện thoại</td></tr>
+    <tr><td class="b">FE-10</td><td class="b">Thẻ kích hoạt nội dung premium</td><td>Sales cấp thẻ kích hoạt cho học viên đã đăng ký để mở nội dung premium; hệ thống ghi lại ai kích hoạt thẻ và khi nào</td></tr>
+  </table>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>12</span></div>
+</section>
+
+<!-- 15 · Kiến trúc -->
+<section class="slide lav">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">09 · Kiến trúc</div>
+  <h1>Vì sao IELTSPath chọn microservice</h1>
+  <div class="grid g2">
+    <div class="card" style="display:flex;gap:22px"><div style="font-family:Lora,serif;font-size:34px;color:var(--blue);line-height:1">1</div><div><h3 style="margin-top:0">Các phần có kiểu tải rất khác nhau</h3><p>Game thi đấu realtime, AI chấm bài viết phản hồi chậm, còn việc học cần nhanh. Tách riêng để phần nặng không làm chậm việc học.</p></div></div>
+    <div class="card" style="display:flex;gap:22px"><div style="font-family:Lora,serif;font-size:34px;color:var(--blue);line-height:1">2</div><div><h3 style="margin-top:0">Phần cá nhân hóa thay đổi nhiều nhất</h3><p>Cách tính điểm yếu và chọn bài ôn cần thử nghiệm, nâng cấp liên tục. Tách riêng để thay đổi mà không ảnh hưởng thi cử, nội dung hay tài khoản.</p></div></div>
+    <div class="card" style="display:flex;gap:22px"><div style="font-family:Lora,serif;font-size:34px;color:var(--blue);line-height:1">3</div><div><h3 style="margin-top:0">Mỗi phần quản lý dữ liệu của mình</h3><p>Nội dung, kết quả thi, tiến độ học, thẻ kích hoạt do những người khác nhau thay đổi. Mỗi phần giữ dữ liệu riêng, ranh giới rõ ràng.</p></div></div>
+    <div class="card" style="display:flex;gap:22px"><div style="font-family:Lora,serif;font-size:34px;color:var(--blue);line-height:1">4</div><div><h3 style="margin-top:0">Một phần lỗi không kéo sập cả hệ thống</h3><p>Game hay cộng đồng gặp sự cố thì học viên vẫn học được; kết quả thi được lưu và xử lý lại, không bị mất.</p></div></div>
+  </div>
+  <p class="note" style="margin-top:18px">Ngoài ra, các thành viên làm song song trên từng phần riêng, kiểm thử và triển khai độc lập.</p>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>13</span></div>
+</section>
+
+<!-- 16 · Giới hạn phạm vi -->
+<section class="slide">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">10 · Giới hạn phạm vi</div>
+  <h1>Những gì không nằm trong phạm vi dự án</h1>
+  <table style="font-size:13px">
+    <tr><th style="width:8%">Mã</th><th style="width:40%">Không bao gồm</th><th>Lý do</th></tr>
+    <tr><td class="b">LI-01</td><td class="b">Theo dõi, giám sát học viên: dashboard giáo viên, báo cáo luyện tập cho trung tâm</td><td>Hệ thống là công cụ tự ôn của học viên; dữ liệu học chỉ dùng để chọn bài ôn và để học viên tự xem</td></tr>
+    <tr><td class="b">LI-02</td><td class="b">Học thử cho khách chưa đăng ký, kênh tuyển sinh</td><td>Hệ thống chỉ phục vụ học viên của trung tâm; tư vấn, tuyển sinh vẫn do trung tâm đảm nhận</td></tr>
+    <tr><td class="b">LI-03</td><td class="b">Cổng thanh toán online, hóa đơn, kế toán, thống kê doanh thu</td><td>Thu tiền là việc của sales và trung tâm; hệ thống chỉ tạo mã thẻ, kích hoạt và ghi log</td></tr>
+    <tr><td class="b">LI-04</td><td class="b">Vận hành lớp trực tiếp: thời khóa biểu, xếp lớp, điểm danh, học phí</td><td>IELTS Space đã vận hành bằng nhân sự và công cụ riêng</td></tr>
+    <tr><td class="b">LI-05</td><td class="b">Lớp học trực tuyến, video bài giảng với giáo viên</td><td>Hệ thống là kênh tự ôn; bài giảng có giáo viên vẫn ở trên lớp</td></tr>
+    <tr><td class="b">LI-06</td><td class="b">Chứng chỉ IELTS chính thức hoặc cam kết band điểm</td><td>Kết quả thi thử là ước lượng để luyện tập, không thay kỳ thi IELTS chính thức</td></tr>
+    <tr><td class="b">LI-07</td><td class="b">Trợ lý chatbot IELTS dựa trên RAG</td><td>Cần kho kiến thức IELTS được tuyển chọn và kiểm thử để câu trả lời đáng tin cậy</td></tr>
+    <tr><td class="b">LI-08</td><td class="b">Dùng cho trung tâm khác (đa trung tâm, nhượng quyền)</td><td>Chỉ xây cho IELTS Space; nhiều trung tâm cần dữ liệu, thương hiệu, quản trị riêng</td></tr>
+  </table>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>14</span></div>
+</section>
+
+<!-- 17 · Giá trị kỳ vọng -->
+<section class="slide lav">
+  <img class="logo" src="logo-dark.png" alt="">
+  <div class="kicker">11 · Giá trị kỳ vọng</div>
+  <h1>Học viên ôn đúng chỗ yếu,<br>trung tâm có thêm giờ luyện ngoài lớp</h1>
+  <div class="grid" style="grid-template-columns:1fr 1fr;gap:20px">
+    <div class="card navy" style="padding:26px 30px">
+      <h3 style="margin-top:0;font-size:21px">Với học viên</h3>
+      <ul style="margin-top:8px">
+        <li>Có bài ôn khớp band và nội dung đang học trên lớp</li>
+        <li>Biết điểm yếu và việc cần ôn tiếp, bớt phỏng đoán</li>
+        <li>Không ngừng luyện trong thời gian chờ lớp band mới</li>
+        <li>Bài học và set luyện ngắn, làm được trên web hoặc điện thoại</li>
+        <li>Phản hồi Writing, Speaking ngay, không phải chờ buổi học sau</li>
+      </ul>
+    </div>
+    <div class="card" style="padding:26px 30px">
+      <h3 style="margin-top:0;font-size:21px">Với IELTS Space</h3>
+      <ul style="margin-top:8px">
+        <li>Mở rộng việc học ra ngoài giờ lớp bằng nội dung của chính trung tâm</li>
+        <li>Học viên vào lớp band mới với kiến thức đã được ôn trước</li>
+        <li>Bài tự ôn được chấm tự động, không thêm việc chấm cho giáo viên</li>
+        <li>Sales trả lời thắc mắc về thẻ ngay từ nhật ký kích hoạt</li>
+      </ul>
+      <p class="note" style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">Mức hài lòng đo bằng khảo sát tự nguyện cuối khóa, không dựa trên theo dõi học viên.</p>
+    </div>
+  </div>
+  <div class="foot"><span>IELTSPath · Báo cáo 1 · Vision &amp; Scope</span><span>15</span></div>
+</section>
+
+<!-- 19 · Cảm ơn -->
+<section class="slide dark" style="padding:0">
+  <div style="position:absolute;left:0;bottom:0;width:370px;height:360px;background:var(--navy-2);border-top-right-radius:120px"></div>
+  <img src="logo-light.png" alt="" style="position:absolute;top:24px;right:84px;height:54px">
+  <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+    <img src="logo-light.png" alt="IELTS Space" style="height:116px;margin-bottom:34px">
+    <div style="font-family:Lora,serif;font-weight:600;font-size:58px;color:#f6f1e4">Cảm ơn đã lắng nghe</div>
+    <div style="font-size:22px;color:#c9d2ef;margin-top:12px">Hỏi &amp; đáp</div>
+  </div>
+</section>
+
+</body>
+</html>
