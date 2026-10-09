@@ -232,11 +232,12 @@ SCREENS = [
     ),
     # ------------------------------------------------------------------ Topics & Knowledge Points
     screen(
-        key="AuthorTopics", name="Topics & Knowledge Points", route="/author/topics · CONTENT_AUTHOR home",
-        roles="ADMIN, CONTENT_AUTHOR", ft="FT-15", uc="UC: Manage topics, knowledge points, questions, packages, "
-                                                    "vocabulary and videos",
+        key="AuthorTopics", name="Courses & Topics", route="/author/topics · CONTENT_AUTHOR home",
+        roles="ADMIN, CONTENT_AUTHOR", ft="FT-15",
+        uc="UC: Manage courses; Manage topics, knowledge points, questions, packages, vocabulary and videos",
         status="Specified",
-        purpose="Lets an author maintain the topic tree of each skill and the knowledge points each topic teaches.",
+        purpose="Lets an author maintain the band-level courses, the topics of each course and the knowledge points "
+                "each topic teaches.",
         nav_from=[("Login", "CONTENT_AUTHOR signs in (home)"), ("Main menu", "User clicks \"Topics\"")],
         nav_to=[("Question Bank", "User clicks \"Questions\" on a knowledge point"),
                 ("Packages", "User clicks \"Packages\" on a topic"),
@@ -244,11 +245,16 @@ SCREENS = [
         pre=[AUTH, AUTHOR],
         entry=[("Home", "Login", "—"), ("Main menu", "Any author screen", "Query: `?skill=`")],
         exits=[("Save topic / KP", "API 2xx", "Stay", "MSG-01"), ex_menu("GLB-07 if unsaved"), EX_SESSION],
-        comps=[("TBL", "Topic tree", "Tree", "Grouped by skill; ordered by sortOrder", "Code, name, band range, status"),
+        comps=[("TBL", "Courses", "Table", "Ordered by band level", "Code, name, band level, status"),
+               ("BTN", "New course", "Button (Secondary)", "Code ≤ 100 (fixed after create), name ≤ 255, band level "
+                "0.0–9.0", "Update changes name, band level and status"),
+               ("TBL", "Topic tree", "Tree", "Grouped by course, then by sortOrder", "Code, name, skill, band range, "
+                "status"),
                ("TXT", "Code", "Text Input", "Required; ≤ 100 chars; read-only after create", "—"),
                ("TXT", "Name", "Text Input", "Required; ≤ 255 chars", "—"),
                ("SEL", "Skill", "Select", "LISTENING, READING, WRITING, SPEAKING", "Disabled once the topic has "
                 "published lessons (MSG-03)"),
+               ("SEL", "Course", "Select", "ACTIVE courses", "Places the topic in a course path (BR-35)"),
                ("SEL", "Parent topic", "Select", "Optional", "—"),
                ("NUM", "Band min / max", "Number (0.5)", "0.0–9.0; min ≤ max; MSG-04", "—"),
                ("NUM", "Sort order", "Number", "Integer", "—"),
@@ -257,12 +263,18 @@ SCREENS = [
                ("TBL", "Knowledge points", "Table", "Filtered by topic", "Code, name, kind, skill"),
                ("BTN", "New knowledge point", "Button (Secondary)", "Code ≤ 100, name ≤ 255", "Fields: code, name, kind, "
                 "learning type, skill, description")],
-        apis=[("Page load", "content.topics", "—", "Render tree · loading: skeleton", "403 → GLB-02"),
+        apis=[("Page load", "content.courses", "—", "Render courses", "403 → GLB-02"),
+              ("Save new course", "content.createCourse", "`{code, name, bandLevel}`", "Toast MSG-01; reload courses",
+               "400 → MSG-04; 409 → MSG-02"),
+              ("Save existing course", "content.updateCourse", "Path: `id`; `{name, bandLevel, status}`", "Toast MSG-01",
+               "400 → MSG-04"),
+              ("Page load (parallel)", "content.topics", "—", "Render tree · loading: skeleton", "403 → GLB-02"),
               ("User selects a topic", "content.topic", "Path: `id`", "Fill form", "404 → GLB-03"),
-              ("Save new topic", "content.createTopic", "`{parentTopicId, code, name, sortOrder, bandMin, bandMax, skill}`",
+              ("Save new topic", "content.createTopic", "`{courseId, parentTopicId, code, name, sortOrder, bandMin, "
+               "bandMax, skill}`",
                "Toast MSG-01; reload tree", "400 → MSG-04; 409 → MSG-02"),
-              ("Save existing topic", "content.updateTopic", "`{parentTopicId, name, sortOrder, status, bandMin, bandMax, "
-               "skill}` (skill omitted when unchanged)", "Toast MSG-01", "409 TOPIC_SKILL_LOCKED → MSG-03"),
+              ("Save existing topic", "content.updateTopic", "`{courseId, parentTopicId, name, sortOrder, status, bandMin, "
+               "bandMax, skill}` (skill omitted when unchanged)", "Toast MSG-01", "409 TOPIC_SKILL_LOCKED → MSG-03"),
               ("Topic selected", "content.kps", "Query: `topicId`", "Render KPs", "—"),
               ("Save KP", "content.createKp", "`{topicId, code, name, kind, learningType, skill, description}`",
                "Toast MSG-01", "400 → GLB-06")],
@@ -273,7 +285,10 @@ SCREENS = [
               ("Inline Error", "409 TOPIC_SKILL_LOCKED", "\"The skill cannot change because this topic has published "
                "lessons.\"", "Below field"),
               ("Inline Error", "Band outside 0–9 or min > max", "\"Use a band range between 0.0 and 9.0.\"", "Below field")],
-        rules=[("BR-12", "One skill per topic; locked after lessons are published", "MSG-03"), AUTHOR_RULE],
+        rules=[("BR-12", "A topic declares at most one skill, locked once lessons are published", "MSG-03"),
+               ("BR-35", "Courses are band levels shared by all skills; one course per band level; only ACTIVE "
+                "courses are in the learning path", "Course form; inactive courses vanish from Course List"),
+               AUTHOR_RULE],
     ),
     # ------------------------------------------------------------------ Question Bank
     screen(
@@ -282,18 +297,18 @@ SCREENS = [
         status="Specified",
         purpose="Lets an author create versioned questions with answer, explanation, hint, purpose and knowledge "
                 "points, and filter the bank by purpose and skill.",
-        nav_from=[("Topics & Knowledge Points", "User clicks \"Questions\""), ("Main menu", "User clicks \"Questions\"")],
+        nav_from=[("Courses & Topics", "User clicks \"Questions\""), ("Main menu", "User clicks \"Questions\"")],
         nav_to=[("Packages", "User adds selected questions to a package")],
         pre=[AUTH, AUTHOR],
         entry=[("Main menu", "Any author screen", "Query: `?purpose=&skill=`")],
         exits=[("Save", "API 2xx", "Stay", "MSG-01"), ex_menu("GLB-07 if the editor has unsaved changes"), EX_SESSION],
-        comps=[("SEL", "Purpose filter", "Select", "All, LEARNING, EXAM", "Sent to the API (database filter)"),
+        comps=[("SEL", "Purpose filter", "Select", "All, LEARNING, EXAM, PLACEMENT", "Sent to the API (database filter)"),
                ("SEL", "Skill filter", "Select", "All + four skills", "Sent to the API"),
                ("TBL", "Questions", "Table", "—", "Type, stem excerpt, purpose, skill, current version, status"),
                ("BTN", "New question", "Button (Primary)", "—", "Type, skill, access level, purpose (default LEARNING)"),
                ("SEL", "Question type", "Select", "MULTIPLE_CHOICE, FILL_IN_BLANK, MATCHING, TRUE_FALSE_NOT_GIVEN, "
                 "SHORT_ANSWER, ESSAY, SPEAKING", "Fixed after create"),
-               ("RAD", "Purpose", "Radio group", "LEARNING / EXAM; fixed after create", "—"),
+               ("RAD", "Purpose", "Radio group", "LEARNING / EXAM / PLACEMENT; fixed after create", "—"),
                ("TXA", "Stem", "Rich text", "Required", "Version editor"),
                ("TBL", "Options", "Editable list", "Choice types only", "Key, content, order"),
                ("TXA", "Answer specification", "JSON / form", "Required", "Hidden from learners"),
@@ -318,17 +333,17 @@ SCREENS = [
               ("Inline Error", "Hint too long", "\"Keep the hint under 500 characters.\"", "Below field"),
               ("Confirm Modal", "Archive", "Title: \"Archive this question?\" · Body: \"It stays in published packages but "
                "cannot be added to new ones.\"", "Buttons: \"Archive\" (Danger) + \"Cancel\"")],
-        rules=[("BR-14", "Purpose fixed: LEARNING or EXAM", "Read-only after create"), AUTHOR_RULE,
+        rules=[("BR-14", "Purpose fixed: LEARNING, EXAM or PLACEMENT", "Read-only after create"), AUTHOR_RULE,
                ("FT-16 BV-01", "Hint ≤ 500 chars", "MSG-03")],
     ),
     # ------------------------------------------------------------------ Packages
     screen(
         key="Packages", name="Packages", route="/author/packages", roles="ADMIN, CONTENT_AUTHOR",
         ft="FT-17, FT-34, FT-35", uc="UC: Manage topics, knowledge points, questions, packages, vocabulary and videos",
-        status="Specified (TOPIC_TEST creation: Draft)",
+        status="Specified (TOPIC_TEST and COURSE_TEST are created by seed only)",
         purpose="Lets an author group questions into versioned packages — practice sets, tests and quizzes — and "
                 "publish them after the system checks question ownership and purpose.",
-        nav_from=[("Topics & Knowledge Points", "User clicks \"Packages\""), ("Question Bank", "Add to package")],
+        nav_from=[("Courses & Topics", "User clicks \"Packages\""), ("Question Bank", "Add to package")],
         nav_to=[("Question Bank", "User clicks \"Add questions\"")],
         pre=[AUTH, AUTHOR],
         entry=[("Main menu", "Any author screen", "Query: `?status=&accessLevel=`")],
@@ -337,8 +352,8 @@ SCREENS = [
         comps=[("SEL", "Filters", "Select", "Access level, status", "Sent to the API"),
                ("TBL", "Packages", "Table", "—", "Code, title, type, access, published version"),
                ("BTN", "New package", "Button (Primary)", "—", "Code ≤ 100, title ≤ 255, type, access level"),
-               ("SEL", "Package type", "Select", "PRACTICE_SET, MOCK_TEST, PLACEMENT_TEST, QUIZ, LESSON (TOPIC_TEST: "
-                "Draft)", "—"),
+               ("SEL", "Package type", "Select", "PRACTICE_SET, MOCK_TEST, PLACEMENT_TEST, QUIZ, LESSON (TOPIC_TEST and "
+                "COURSE_TEST: seed only)", "—"),
                ("SEL", "Linked lesson", "Select", "PRACTICE_SET only", "Lesson of the same skill"),
                ("BTN", "New version", "Button (Secondary)", "Version number ≥ 1", "Starts DRAFT"),
                ("PNL", "Sections", "Editable list", "Title, skill, order, time limit, instructions", "Questions per section"),
@@ -359,8 +374,9 @@ SCREENS = [
         msgs=[("Success Toast", "Published", "\"Version {n} is published.\"", "Auto-dismiss 3s"),
               ("Alert Banner", "422 QUESTION_ALREADY_USED", "\"Some questions already belong to another lesson or package: "
                "{list}. Remove them or create new questions.\"", "Persistent"),
-              ("Alert Banner", "422 QUESTION_PURPOSE_MISMATCH", "\"Mock and placement tests need EXAM questions; lessons, "
-               "practice sets and topic tests need LEARNING questions.\"", "Persistent"),
+              ("Alert Banner", "422 QUESTION_PURPOSE_MISMATCH", "\"Mock tests need EXAM questions and the placement test "
+               "needs PLACEMENT questions; lessons, practice sets, topic tests and course tests need LEARNING "
+               "questions.\"", "Persistent"),
               ("Alert Banner", "422 INVALID_PACKAGE_LESSON", "\"The linked lesson does not exist or teaches another skill.\"",
                "Persistent"),
               ("Confirm Modal", "Publish", "Title: \"Publish version {n}?\" · Body: \"Learners will see it. Learners who "
@@ -412,10 +428,10 @@ SCREENS = [
               "validated when read. API rows are [TBC] (OQ-13).",
         purpose="Lets an author build a topic's ordered lessons from theory, assets, exercise blocks and essay blocks, "
                 "and publish them to the learning path.",
-        nav_from=[("Topics & Knowledge Points", "User clicks a lesson or \"New lesson\"")],
-        nav_to=[("Topics & Knowledge Points", "User clicks \"Back\""), ("Media Assets", "User adds an asset")],
+        nav_from=[("Courses & Topics", "User clicks a lesson or \"New lesson\"")],
+        nav_to=[("Courses & Topics", "User clicks \"Back\""), ("Media Assets", "User adds an asset")],
         pre=[AUTH, AUTHOR],
-        entry=[("Lesson link", "Topics & Knowledge Points", "`lessonId` or Query: `?topicId=` (new)")],
+        entry=[("Lesson link", "Courses & Topics", "`lessonId` or Query: `?topicId=` (new)")],
         exits=[("Publish", "Valid", "Stay", "MSG-01"), ("Publish rejected", "INVALID_LESSON_BLOCK", "Stay", "MSG-02"),
                ex_menu("GLB-07 if unsaved"), EX_SESSION],
         comps=[("TXT", "Title / code / summary", "Text Inputs", "Required", "Skill inherited from the topic (read-only)"),
@@ -514,7 +530,7 @@ SCREENS = [
     # ------------------------------------------------------------------ Grading Workspace
     screen(
         key="Grading", name="Grading Workspace", route="/examiner/grading · EXAMINER home", roles="ADMIN, EXAMINER",
-        ft="FT-32, FT-52", uc="UC: Grade attempt manually and finalize result",
+        ft="FT-31, FT-32, FT-52", uc="UC: Grade attempt manually and finalize result",
         status="Specified (work queue and response view: Draft)",
         purpose="Lets an Examiner open a submitted attempt, enter item scores, errors and knowledge-point judgments, and "
                 "finalize the result so it reaches the learner's progress.",
@@ -542,7 +558,12 @@ SCREENS = [
                "toast MSG-01", "Finalizing again returns the same result (no second event)"),
               ("Page load [Draft]", "as.queue", "—", "Render waiting attempts", "Draft")],
         interactions=[("Re-grade", ["Opening a version for a COMPLETED attempt creates the next version; once finalized, "
-                                    "the learner's evidence is replaced by the new version (BR-25)."])],
+                                    "the learner's evidence is replaced by the new version (BR-25)."]),
+                      ("Where the work comes from", ["Writing and Speaking of mock tests.",
+                                                     "Essays of topic and course tests that JOB-03 could not grade (LLM not "
+                                                     "configured, failed, or daily limit reached): a HUMAN grading job and a "
+                                                     "human_reviews row are created and the result waits for this screen "
+                                                     "(BR-39). Placement essays never come here (BR-41)."])],
         msgs=[("Success Toast", "Finalized", "\"Result finalized. The learner will be notified.\"", "Auto-dismiss 3s"),
               ("Error Toast", "Cannot open a version", "\"This attempt is not ready for grading, or another grading is "
                "still open.\"", "Auto-dismiss 5s"),
@@ -555,6 +576,7 @@ SCREENS = [
         rules=[("BR-26", "Only EXAMINER and ADMIN grade; finalizing twice has no effect", "Route guarded; repeat finalize "
                 "is harmless"),
                ("BR-25", "Newer version replaces older evidence", "Re-grade note"),
-               ("FT-32 BV-01…03", "Band 0–9; score ≤ max; error type ≤ 50", "Inline errors")],
+               ("FT-32 BV-01…03", "Band 0–9; score ≤ max; error type ≤ 50", "Inline errors"),
+               ("BR-39", "Test essays the LLM cannot grade go to an Examiner", "They appear in the waiting list [Draft]")],
     ),
 ]

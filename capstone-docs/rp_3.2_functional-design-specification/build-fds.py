@@ -284,8 +284,21 @@ def build_conventions():
     add([para("h4", "Global Guard Redirects"), table("pre", C.GLOBAL_GUARDS), spacer()])
 
 
-def _mockup_text(num, s):
-    shots = s.get("shots", [])
+MISSING_SHOTS = []
+
+
+def _shots(s):
+    """Screenshots of a screen whose files exist; a missing file is reported and left out of the document."""
+    found = []
+    for file, text in s.get("shots", []):
+        if (C.SCREENSHOT_DIR / file).exists():
+            found.append((file, text))
+        else:
+            MISSING_SHOTS.append(file)
+    return found
+
+
+def _mockup_text(num, s, shots):
     if shots:
         figures = ", ".join(f"Figure {num}-{i}" for i in range(1, len(shots) + 1))
         return f"{figures} below — screenshot of the frontend (IELTS Space web app)"
@@ -299,6 +312,7 @@ def build_screen(n, s):
     if s.get("draft"):
         add([para("note", s["draft"], normalise=False)])
     add([para("h3", f"{num}.1  General Information")])
+    shots = _shots(s)
     info = [
         ("Screen Name", s["name"]),
         ("Purpose", s["purpose"]),
@@ -307,15 +321,15 @@ def build_screen(n, s):
         ("Related FT / UC", f"{s['ft']}\n{C.uc_label(s['uc'])}"),
         ("Status", s["status"]),
         ("Frontend", s.get("frontend", C.FE_NOT_BUILT)),
-        ("Mockup / Wireframe", _mockup_text(num, s)),
+        ("Mockup / Wireframe", _mockup_text(num, s, shots)),
     ]
     if C.open_questions_for(s["name"]):
         info.append(("Open Questions", C.open_questions_for(s["name"]) + " (Appendix B)"))
     add([kv_table("kv", info), spacer()])
-    for i, (file, text) in enumerate(s.get("shots", []), 1):
+    for i, (file, text) in enumerate(shots, 1):
         add([picture(C.SCREENSHOT_DIR / file, width_cm=15.5),
              caption(f"Figure {num}-{i} — {text}. Source: screenshots/{file}")])
-    if s.get("shots"):
+    if shots:
         add([spacer()])
     add([para("h4", "Navigation Context"),
          table("nav", s["nav_from"]), spacer(),
@@ -434,7 +448,8 @@ def _traceability_rows():
     unknown = sorted(set(br_users) - set(C.BUSINESS_RULES))
     if unknown:
         raise SystemExit(f"Business rules {unknown} are not in the RTW Business Rules sheet (fds_content.BUSINESS_RULES)")
-    uc_rows = [(uc, name, ft, status, "\n".join(uc_screens[uc]) or "No screen — gap")
+    uc_rows = [(uc + (" *" if uc in C.PROPOSED_UC_IDS else ""), name, ft, status,
+                "\n".join(uc_screens[uc]) or "No screen — gap")
                for uc, (name, ft, status) in C.USE_CASES.items()]
     br_rows = [(br, title, status, owner, ", ".join(dict.fromkeys(br_users[br])) or "Not referenced — gap")
                for br, (title, status, owner) in C.BUSINESS_RULES.items()]
@@ -446,14 +461,15 @@ def build_traceability():
     add([para("h1", "APPENDIX D – TRACEABILITY TO THE RTW")])
     add([para("text", "Links every use case (RTW Sheet 2) and business rule (RTW Sheet 6) of " + C.RTW_REF + " to "
                       "the screens of Part 2 and the jobs of Part 3 that realise it. The tables are generated from the "
-                      "screen and job sections, so they always match the body of this document. Status is the RTW "
-                      "status: Specified / Approved = in effect in the current release; Draft = required but not built "
-                      "yet. \"gap\" marks an RTW item that no screen or job covers.")])
+                      "screen and job sections, so they always match the body of this document. Status is the status "
+                      "in SRS v0.9.24: Specified / Approved = in effect in the current release; Draft = required but "
+                      "not built yet. Use cases marked * and BR-35 to BR-41 come from the SRS and are not in RTW v1.0 "
+                      "yet; their UC ids are proposed (OQ-21). \"gap\" marks an item that no screen or job covers.")])
     add([para("h4", "D.1  Use Case → Screens"),
-         table("exit", uc_rows, header=("UC ID", "Use case", "FT (RTW)", "RTW status", "Screen(s)"),
+         table("exit", uc_rows, header=("UC ID", "Use case", "FT", "Status", "Screen(s)"),
                widths=[800, 2700, 1700, 1100, 2726]), spacer()])
     add([para("h4", "D.2  Business Rule → Screens and Jobs"),
-         table("exit", br_rows, header=("BR ID", "Rule (short)", "RTW status", "Owner", "Used in"),
+         table("exit", br_rows, header=("BR ID", "Rule (short)", "Status", "Owner", "Used in"),
                widths=[800, 3000, 1100, 1900, 2226]), spacer()])
     gaps = [r[0] for r in uc_rows if r[4].endswith("gap")] + [r[0] for r in br_rows if r[4].endswith("gap")]
     print("Traceability gaps:", ", ".join(gaps) or "none")
@@ -509,3 +525,5 @@ doc.core_properties.title = "IELTSPath — Functional Design Specification"
 doc.core_properties.author = C.AUTHOR
 doc.save(str(OUTPUT))
 print(f"Wrote {OUTPUT.name}: {len(C.SCREENS)} screens, {len(C.JOBS)} jobs")
+if MISSING_SHOTS:
+    print("Screenshots not found (left out):", ", ".join(MISSING_SHOTS))
