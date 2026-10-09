@@ -62,3 +62,6 @@ claude/
 .agents/
 agents/
 
+
+# Microsoft Office lock files
+~$*
