@@ -2,15 +2,15 @@
 
 Screens live in fds_screens_learner.py and fds_screens_staff.py. API ids are assigned in catalog order, so
 screens refer to an endpoint by its key (for example "auth.login") and never hard-code an API number.
-Facts were checked against the code at commit ecd2266 (no API change up to 6351f3a) and against SRS v0.9.15.
+Facts were checked against the backend at commit bf7db56, the frontend at commit bdac878 (branch feat/ui-learning) and SRS v0.9.24.
 """
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-VERSION = "v0.4"
+VERSION = "v0.5"
 AUTHOR = "SonLH"
 SCREENSHOT_DIR = HERE / "screenshots"
-FRONTEND_REF = "IeltsPath Platform Frontend (React 19 + Vite 8), branch feat/ui-main-flow, commit ac25901"
+FRONTEND_REF = "IeltsPath Platform Frontend (React 19 + Vite 8), branch feat/ui-learning, commit bdac878"
 TDS_REF = "IELTSPath_TDS v0.9.16 (Draft) — Report 4_TDS_IELTSPath_IeltsPath_v1.docx"
 RTW_REF = "IELTSPath_RTW v1.0 (05/10/2026) — Report 3.1_RTW_IELTSPath_v1.xlsx"
 # Endpoints that TDS Part 2.4 specifies in full (request body, status codes, response body).
@@ -26,11 +26,12 @@ DOC_INFO = [
     ("Document Title", "English Learning and IELTS Preparation Support System Based on Personalized Learning "
                        "Pathways for IELTS Space (IELTSPath)"),
     ("Version", VERSION),
-    ("Date", "07/10/2026"),
+    ("Date", "09/10/2026"),
     ("Status", "Draft"),
     ("Author(s)", AUTHOR),
     ("Reviewer(s)", "[Name / Role]"),
-    ("SRS Reference", "IELTSPath_SRS v0.9.15 (05/10/2026) — Report 3.0_SRS_IELTSPath_IeltsPath_v1.docx"),
+    ("SRS Reference", "IELTSPath_SRS v0.9.24 (09/10/2026) — Report 3.0_SRS_IELTSPath_IeltsPath_v1.docx"),
+    ("Backend Reference", "IELTSPath backend, branch main, commit bf7db56 (package com.ieltspath)"),
     ("Frontend Reference", FRONTEND_REF),
     ("TDS Reference", TDS_REF),
     ("RTW Reference", RTW_REF + " — Sheet 2 Use Case List (UC ids), Sheet 4 Permission Matrix (role policy), "
@@ -69,6 +70,15 @@ VERSION_HISTORY = [
      "and Reset Password cite the 72-byte password limit (NFR-SEC04); Lesson Player cites the 45-second grading "
      "limit (NFR-P03); Test Result and JOB-01 cite the 5-second result delivery (NFR-P05) and new frontend gap "
      "GAP-14; Section 2.0 and Appendix A cite NFR-P04, NFR-U01 and NFR-U02."),
+    ("v0.5", "09/10/2026", AUTHOR,
+     "Aligned with SRS v0.9.24, the backend at bf7db56 and the frontend at bdac878 (feat/ui-learning): new screens "
+     "Course List, Placement Test and Placement Report; Learning Path becomes Course Path (/learn/courses/:courseId) "
+     "with the course final test; Topic Detail, Lesson Player, Practice Set, Review Session, Test Attempt, Test "
+     "Result, Overview and Mock Tests follow the new frontend; staff screens add courses, PLACEMENT questions, "
+     "COURSE_TEST packages and essays handed to examiners; twelve new endpoints in Appendix A; use cases UC-43 to "
+     "UC-45 and rules BR-35 to BR-41 from the SRS; JOB-03 is now the running test essay grading worker and JOB-02 "
+     "handles COURSE_GATE and PLACEMENT; resolved open questions marked, OQ-21 and OQ-22 added; new frontend gaps "
+     "GAP-15 to GAP-19; Part 1 figures redrawn in draw.io; screenshots retaken from the running application."),
 ]
 
 # ------------------------------------------------------------------ API catalog
@@ -149,6 +159,9 @@ API_CATALOG = [
     ("access.consumeCredit", "POST", "/api/access/users/{userId}/consume-human-grading", "access",
      _INTERNAL, "FT-14", "Specified (no caller yet, TDS 2.5; learner flow: Draft)"),
     # content-service
+    ("content.courses", "GET", "/api/content/courses", "content", _READERS, "FT-15", "Specified"),
+    ("content.createCourse", "POST", "/api/content/admin/courses", "content", _AUTHOR, "FT-15", "Specified"),
+    ("content.updateCourse", "PUT", "/api/content/admin/courses/{id}", "content", _AUTHOR, "FT-15", "Specified"),
     ("content.topics", "GET", "/api/content/topics", "content", _READERS, "FT-15", "Specified"),
     ("content.topic", "GET", "/api/content/topics/{id}", "content", _READERS, "FT-15", "Specified"),
     ("content.createTopic", "POST", "/api/content/topics", "content", _AUTHOR, "FT-15", "Specified"),
@@ -219,6 +232,10 @@ API_CATALOG = [
     ("deck.removeItem", "DELETE", "/api/learning-support/decks/{deckId}/items/{flashcardId}", "library", _ANY,
      "FT-43", "Specified"),
     # learning-service
+    ("learn.courses", "GET", "/api/learning/courses", "learning", _L, "FT-20, FT-35, FT-55", "Specified"),
+    ("learn.placementTest", "GET", "/api/learning/placement-test", "learning", _L, "FT-35", "Specified"),
+    ("learn.assignCourseTest", "POST", "/api/learning/courses/{id}/test-assignments", "learning", _L, "FT-55",
+     "Specified"),
     ("learn.topics", "GET", "/api/learning/topics", "learning", _L, "FT-13, FT-20", "Specified"),
     ("learn.topicLessons", "GET", "/api/learning/topics/{id}/lessons", "learning", _L, "FT-20", "Specified"),
     ("learn.lesson", "GET", "/api/learning/lessons/{id}", "learning", _L, "FT-21, FT-23, FT-24", "Specified"),
@@ -233,6 +250,9 @@ API_CATALOG = [
     ("learn.practice", "GET", "/api/learning/practice-attempts/{id}", "learning", _L, "FT-27", "Specified"),
     ("learn.submitPractice", "POST", "/api/learning/practice-attempts/{id}/submissions", "learning", _L,
      "FT-27", "Specified"),
+    ("learn.submitPracticeEssay", "POST",
+     "/api/learning/practice-attempts/{id}/essays/{questionVersionId}/submissions", "learning", _L,
+     "FT-25, FT-27", "Specified"),
     ("learn.reviews", "GET", "/api/learning/reviews", "learning", _L, "FT-28", "Specified"),
     ("learn.review", "GET", "/api/learning/reviews/{reviewId}", "learning", _L, "FT-28", "Specified"),
     ("learn.submitReview", "POST", "/api/learning/reviews/{reviewId}/submissions", "learning", _L, "FT-28",
@@ -245,8 +265,17 @@ API_CATALOG = [
      _L, "FT-25", "Specified"),
     ("learn.essay", "GET", "/api/learning/writing-submissions/{id}", "learning", _L, "FT-25", "Specified"),
     # assessment-service
-    ("as.start", "POST", "/api/assessments/attempts", "assessment", _L, "FT-30, FT-34, FT-35", "Specified"),
+    ("as.start", "POST", "/api/assessments/attempts", "assessment", _L, "FT-30, FT-34, FT-35, FT-55",
+     "Specified"),
     ("as.attempt", "GET", "/api/assessments/attempts/{id}", "assessment", "Attempt owner", "FT-30", "Specified"),
+    ("as.placementCurrent", "GET", "/api/assessments/attempts/placement/current", "assessment", _L, "FT-35",
+     "Specified"),
+    ("as.responses", "GET", "/api/assessments/attempts/{id}/responses", "assessment", "Attempt owner",
+     "FT-30, FT-35", "Specified"),
+    ("as.sectionStart", "POST", "/api/assessments/attempts/{id}/sections/{sectionId}/start", "assessment",
+     "Attempt owner", "FT-35", "Specified"),
+    ("as.sectionComplete", "POST", "/api/assessments/attempts/{id}/sections/{sectionId}/complete", "assessment",
+     "Attempt owner", "FT-35", "Specified"),
     ("as.structure", "GET", "/api/assessments/attempts/{id}/structure", "assessment", "Attempt owner",
      "FT-24, FT-30", "Specified"),
     ("as.save", "PUT", "/api/assessments/attempts/{id}/items/{itemId}/response", "assessment", "Attempt owner",
@@ -257,7 +286,9 @@ API_CATALOG = [
      "FT-30, FT-31", "Specified"),
     ("as.result", "GET", "/api/assessments/attempts/{attemptId}/result", "assessment", "Attempt owner",
      "FT-24, FT-31", "Specified"),
-    ("as.mockList", "GET", "/api/assessments/catalog?type=MOCK|PLACEMENT", "assessment", _L, "FT-34, FT-35",
+    ("as.placementResult", "GET", "/api/assessments/attempts/{attemptId}/placement-result", "assessment",
+     "Attempt owner", "FT-35", "Specified"),
+    ("as.mockList", "GET", "/api/assessments/catalog?type=MOCK", "assessment", _L, "FT-34",
      _TBC),
     ("as.queue", "GET", "/api/assessments/grading/queue", "assessment", "ADMIN, EXAMINER", "FT-32", _TBC),
     ("as.openVersion", "POST", "/api/assessments/grading/attempts/{attemptId}/results", "assessment",
@@ -356,8 +387,9 @@ def api_catalog_rows():
 
 
 # ------------------------------------------------------------------ RTW traceability
-# Copied from the RTW (Sheet 2 Use Case List: id → name, FT, status; Sheet 6 Business Rules: id → short title,
-# status, owner). Screens name use cases as "UC: <name>; <name>"; the build turns each name into its RTW id and
+# Copied from the RTW (Sheet 2 Use Case List: id → name, FT; Sheet 6 Business Rules: id → short title, owner) and
+# brought up to SRS v0.9.24: status is the current one (Specified = built), UC-43 to UC-45 and BR-35 to BR-41 come
+# from the SRS because RTW v1.0 does not have them yet; their UC ids are proposed here (OQ-21). Screens name use cases as "UC: <name>; <name>"; the build turns each name into its RTW id and
 # stops when a name is not in this list, so the FDS and the RTW cannot drift apart silently.
 USE_CASES = {
     "UC-01": ("Register", "FT-01", "Specified"),
@@ -382,7 +414,7 @@ USE_CASES = {
     "UC-20": ("Take test attempt", "FT-24, FT-29, FT-30, FT-31, FT-34, FT-35", "Specified"),
     "UC-21": ("Take mock test", "FT-34", "Draft"),
     "UC-22": ("View result", "FT-31, FT-34, FT-35", "Specified"),
-    "UC-23": ("Take placement test", "FT-35", "Draft"),
+    "UC-23": ("Take placement test", "FT-35", "Specified"),
     "UC-24": ("Grade attempt manually and finalize result", "FT-32", "Specified"),
     "UC-25": ("Request examiner grading", "FT-14", "Draft"),
     "UC-26": ("Activate key", "FT-10, FT-11, FT-14", "Specified"),
@@ -403,7 +435,11 @@ USE_CASES = {
               "FT-15, FT-16, FT-17, FT-18, FT-36, FT-37", "Specified"),
     "UC-41": ("Upload media", "FT-18", "Draft"),
     "UC-42": ("Author lessons", "FT-19", "Draft"),
+    "UC-43": ("View and choose courses", "FT-20, FT-35", "Specified"),
+    "UC-44": ("Take course test", "FT-55", "Specified"),
+    "UC-45": ("Manage courses", "FT-15", "Specified"),
 }
+PROPOSED_UC_IDS = {"UC-43", "UC-44", "UC-45"}
 _UC_BY_NAME = {name: uc_id for uc_id, (name, _, _) in USE_CASES.items()}
 
 BUSINESS_RULES = {
@@ -419,17 +455,22 @@ BUSINESS_RULES = {
     "BR-10": ("AI Writing grading costs 3 points, charged after success", "Approved",
               "learning-service, access-service"),
     "BR-11": ("At most 10 AI Writing gradings per day", "Approved", "learning-service"),
-    "BR-12": ("One skill per topic; locked once lessons are published", "Approved", "content-service"),
-    "BR-13": ("One owner per question", "Approved", "content-service"),
-    "BR-14": ("Question purpose LEARNING or EXAM fits the package", "Approved", "content-service"),
-    "BR-15": ("Pass mark 70%", "Approved", "learning-service, assessment-service"),
-    "BR-16": ("Topic order per skill; one IN_PROGRESS topic", "Approved", "learning-service"),
-    "BR-17": ("Lesson gates; pending review blocks its own skill", "Approved", "learning-service"),
+    "BR-12": ("A topic declares at most one skill; a lesson teaches the skills of its questions", "Approved",
+              "content-service"),
+    "BR-13": ("One owner per question (lesson, practice set, topic, course, mock or placement test)",
+              "Approved", "content-service"),
+    "BR-14": ("Question purpose LEARNING, EXAM or PLACEMENT fits the package", "Approved", "content-service"),
+    "BR-15": ("Pass mark 70% (blocks, review sets, topic and course tests, each practice skill)", "Approved",
+              "learning-service, assessment-service"),
+    "BR-16": ("One topic sequence per course; first unpassed topic IN_PROGRESS", "Approved", "learning-service"),
+    "BR-17": ("Lessons in order; a pending review blocks lessons that teach its skill", "Approved",
+              "learning-service"),
     "BR-18": ("Evidence only from first submissions", "Approved", "learning-service"),
     "BR-19": ("Answers, hints and transcripts hidden until earned", "Approved", "learning-service, content-service"),
     "BR-20": ("Revealed practice set never reused as review set", "Approved", "learning-service"),
     "BR-21": ("Review ladder: set → theory → set", "Approved", "learning-service"),
-    "BR-22": ("Final test prerequisites; single-use test code", "Approved", "learning-service"),
+    "BR-22": ("Topic test prerequisites; topic and course test codes single-use", "Approved",
+              "learning-service"),
     "BR-23": ("Mastery from latest 5 outcomes; review below 0.6", "Approved", "learning-service"),
     "BR-24": ("Test solutions only at ≥ 70%", "Approved", "assessment-service"),
     "BR-25": ("Each result version applied once; newer replaces older", "Approved",
@@ -444,6 +485,17 @@ BUSINESS_RULES = {
     "BR-32": ("Notification preferences and reminder limits", "Draft", "notification-service"),
     "BR-33": ("Mock test band conversion", "Draft", "assessment-service"),
     "BR-34": ("Premium content needs an entitlement", "Draft", "learning-service, access-service"),
+    "BR-35": ("Courses are band levels shared by all skills", "Approved", "content-service, learning-service"),
+    "BR-36": ("Optional placement taken once; result only recommends a course", "Approved",
+              "learning-service, assessment-service"),
+    "BR-37": ("Course final test opens when every topic is PASSED; 70% passes the course", "Approved",
+              "learning-service"),
+    "BR-38": ("Lesson done by objective blocks; practice cleared skill by skill; essays never block", "Approved",
+              "learning-service"),
+    "BR-39": ("Test essays graded by the LLM for free within a daily limit, else by an examiner", "Approved",
+              "assessment-service"),
+    "BR-40": ("One current course; study opens only in it", "Draft", "learning-service"),
+    "BR-41": ("Placement graded per skill; overall band = mean rounded to 0.5", "Approved", "assessment-service"),
 }
 
 
@@ -487,12 +539,13 @@ APPENDIX_INTRO = [
 # ------------------------------------------------------------------ Part 1
 NAV_FLOW_PNG = HERE / "part1-diagrams" / "IELTSPath_ScreenNavigationFlow.png"
 JOB_FLOW_PNG = HERE / "part1-diagrams" / "IELTSPath_JobSchedule.png"
-NAV_FLOW_CAPTION = ("Figure 1.1 — Screen Navigation Flow, read top to bottom: ① public screens → sign-in → top bar "
-                    "→ ② learning loop, ③ prototypes, ④ self-study & account, ⑤ staff by role. Colours and line "
-                    "styles follow the legend. Source: part1-diagrams/IELTSPath_ScreenNavigationFlow.drawio")
-JOB_FLOW_CAPTION = ("Figure 1.2 — Job Schedule & Dependencies: the running pipeline grade → outbox → JOB-01 → "
-                    "RabbitMQ → JOB-02 with its retry and dead-letter queues, and the Draft jobs JOB-03 to JOB-07 "
-                    "with their triggers and external systems. Colours follow the legend. "
+NAV_FLOW_CAPTION = ("Figure 1.1 — Screen Navigation Flow, read top to bottom: public screens → top menu → courses, "
+                    "dashboard & practice, account & self-study, and staff screens by role. "
+                    "Source: part1-diagrams/IELTSPath_ScreenNavigationFlow.drawio")
+JOB_FLOW_CAPTION = ("Figure 1.2 — Job Schedule & Dependencies: the triggers, services, queues and external systems "
+                    "of JOB-01 (outbox relay), JOB-02 (applies test results, with retry and dead-letter queues), "
+                    "JOB-03 (test essay grading with the LLM, hand-over to the examiner queue) and JOB-04 to JOB-07 "
+                    "(notifications and matchmaking). "
                     "Source: part1-diagrams/IELTSPath_JobSchedule.drawio")
 
 NAV_FLOW_TEXT = [
@@ -500,27 +553,33 @@ NAV_FLOW_TEXT = [
     "Gateway (VITE_API_BASE_URL, default http://localhost:8080). Its UI language is Vietnamese. \"/\" opens /overview "
     "for a signed-in user and /home otherwise. Public routes are /home, /vocabulary, /login, /register, "
     "/forgot-password, /reset-password and /auth/oauth/callback; every other route is wrapped in RequireAuth.",
-    "The top bar (SiteNavbar) shows Trang chủ (/home) and Từ điển (/vocabulary) to guests, and adds Tổng quát "
-    "(/overview), Lớp học (/classroom), Lộ trình (/learn), Thực hành (/practice), Luyện đề (/practice-tests) and "
-    "Học liệu (/materials) after sign-in, plus the user dropdown with the point balance and Đăng xuất. After sign-in "
-    "the app returns to the route the user came from, otherwise to /learn; it does not route by role yet.",
-    "Learners move along the learning loop /learn → /learn/topics/:topicId → /learn/lessons/:lessonId → "
-    "/learn/lessons/:lessonId/practice → /learn/reviews/:reviewId → /learn/tests/:attemptId → "
-    "/learn/tests/:attemptId/result. These screens call the real backend. Overview, Classroom, Luyện đề (practice "
-    "tests) and Từ điển are built on mock data. /practice, /materials, /classes/:classCode/join, /mentors/:mentorSlug, "
-    "/terms, /privacy and /copyright show a placeholder page (RouteStatusPage); unknown routes show NotFoundPage.",
+    "The top bar (SiteNavbar) has two rows: the brand logo and account area, then the menu. Guests see Trang chủ, "
+    "Khóa học (sub-menu Test đầu vào 4 kỹ năng FREE · Khóa học), Luyện tập 4 kỹ năng (Listening · Reading · Writing · "
+    "Speaking, each /practice-tests?skill=…), Bài mẫu Writing 8.0+ and Kết quả học viên. Signed in, Trang chủ opens a "
+    "sub-menu Dashboard (/overview) · Lịch sử nộp bài · Khóa học của tôi (/learn), Sổ từ vựng (Flashcard của tôi · "
+    "Kho từ vựng · Bài mẫu 8đ) is added, and the user dropdown shows the point balance and Đăng xuất. After sign-in "
+    "the app returns to the route the user came from, otherwise to /learn; it does not route by role yet (GAP-02).",
+    "Learners move along the course loop /learn (course list) → /learn/courses/:courseId (the topic path of one "
+    "course, ending with the course final test) → /learn/topics/:topicId → /learn/lessons/:lessonId → "
+    "/learn/lessons/:lessonId/practice → /learn/reviews/:reviewId → /learn/tests/:attemptId (topic or course final "
+    "test) → /learn/tests/:attemptId/result. The optional placement test at /learn/placement runs a survey, a "
+    "four-skill test and a report that recommends a course. These screens call the real backend. Overview, "
+    "Classroom (no longer in the menu), Luyện đề and Từ điển are built on mock data. /practice, /submission-history, "
+    "/flashcards, /writing-samples, /student-results, /classes/:classCode/join, /mentors/:mentorSlug, /terms, "
+    "/privacy and /copyright show a placeholder page (RouteStatusPage); unknown routes show NotFoundPage.",
     "Screens marked \"FE: not built\" in the index — the account, library, games, community, notification and every "
-    "staff screen — are specified here as the design target. Figure 1.1 shows the navigation in five areas: blue "
-    "screens call the real API, orange screens run on mock data and grey dashed screens are not built yet. One arrow "
-    "from the top bar leads into each signed-in area, and staff areas open by role once GAP-02 is closed. Placeholder "
-    "routes are not drawn.",
+    "staff screen — are specified here as the design target. Figure 1.1 shows the navigation in five areas: the "
+    "public screens, then the top menu with one arrow into each signed-in area — courses, dashboard & practice, "
+    "account & self-study — and the staff screens opened by role. It draws only the main paths; the build status of "
+    "each screen is in the Screen Index, and placeholder routes are not drawn.",
 ]
 
 JOB_FLOW_TEXT = [
-    "Two jobs run in the current release: JOB-01 relays assessment outbox rows to RabbitMQ every 2 seconds and "
-    "JOB-02 consumes AssessmentCompleted.v2 in the learning service, with a 30-second retry queue and a dead-letter "
-    "queue. JOB-03 to JOB-07 are required by Draft features (AI grading, notifications, matchmaking) and are "
-    "specified here so the TDS can design them; their schedules and limits marked [TBC] need a team decision.",
+    "Three jobs run in the current release: JOB-01 relays assessment outbox rows to RabbitMQ every 2 seconds, JOB-02 "
+    "consumes AssessmentCompleted.v2 in the learning service, with a 30-second retry queue and a dead-letter queue, "
+    "and JOB-03 grades the essays of topic, course and placement tests with the LLM every 5 seconds. JOB-04 to "
+    "JOB-07 are required by Draft features (notifications, matchmaking) and are specified here so the TDS can "
+    "design them; AI grading that a learner requests for other attempts (FT-33) still has no worker.",
     "No other service runs a scheduler. access-service (PointCredited, PointDebited, SubscriptionGranted, "
     "SubscriptionChanged) and game-service (GameRoomCreated, GameMatchCompleted) write outbox rows but have no "
     "relay, so those events reach no consumer (TDS 2.5); this is a known gap, not a job.",
@@ -530,14 +589,14 @@ JOB_SCHEDULE_ASCII = [
     "┌──────────────────────────────────────────────────────────────────────────┐",
     "│  JOB-01  Assessment outbox relay       ←── every 2 s (fixed delay)       │",
     "│  JOB-02  AssessmentCompleted consumer  ←── RabbitMQ event (retry 30 s)   │",
-    "│  JOB-03  AI grading worker             ←── grading job created  [Draft]  │",
+    "│  JOB-03  Test essay grading worker     ←── every 5 s (fixed delay)       │",
     "│  JOB-04  Grading-done alert dispatcher ←── RabbitMQ event        [Draft]  │",
     "│  JOB-05  Study reminder scheduler      ←── every [TBC] min       [Draft]  │",
     "│  JOB-06  Notification delivery retry   ←── every [TBC] s         [Draft]  │",
     "│  JOB-07  Matchmaking queue sweeper     ←── every [TBC] s         [Draft]  │",
     "└──────────────────────────────────────────────────────────────────────────┘",
-    "Dependencies: JOB-01 → (assessment.events / assessment.completed.v2) → JOB-02, JOB-04;",
-    "              JOB-03 → finalize result → outbox → JOB-01;  JOB-04, JOB-05 → JOB-06 → FCM / Email.",
+    "Dependencies: JOB-03 → result complete → outbox → JOB-01 → (assessment.events / assessment.completed.v2)",
+    "              → JOB-02, JOB-04;  JOB-04, JOB-05 → JOB-06 → FCM / Email.",
 ]
 
 
@@ -632,8 +691,8 @@ GLOBAL_GUARDS = [
 ]
 # ------------------------------------------------------------------ Part 3
 PART3_INTRO = [
-    "One section per background job. JOB-01 and JOB-02 describe the current release (values from code and "
-    "config-repo). JOB-03 to JOB-07 are Draft: they specify required behaviour for Draft features, and every "
+    "One section per background job. JOB-01 to JOB-03 describe the current release (values from code and "
+    "config-repo). JOB-04 to JOB-07 are Draft: they specify required behaviour for Draft features, and every "
     "value marked [TBC] is an open decision listed in Appendix B. The platform has no metrics stack yet; alert "
     "rules name the condition to monitor once one is chosen.",
 ]
@@ -643,7 +702,7 @@ _STD_LOG_FORMAT = "[TIMESTAMP] [LEVEL] [service] [logger] message k=v … (corre
 JOBS = [
     dict(
         code="JOB-01", name="Assessment outbox relay",
-        bean="com.group01.assessment.infrastructure.messaging.OutboxRelayScheduler → OutboxRelay "
+        bean="com.ieltspath.assessment.infrastructure.messaging.OutboxRelayScheduler → OutboxRelay "
              "(assessment-service)",
         purpose="Publishes the AssessmentCompleted.v2 events that grading writes to the outbox table, so a "
                 "result reaches the learning service only after its database transaction has committed.",
@@ -744,13 +803,14 @@ JOBS = [
     ),
     dict(
         code="JOB-02", name="AssessmentCompleted.v2 consumer",
-        bean="com.group01.learning.infrastructure.messaging.AssessmentCompletedListener → "
+        bean="com.ieltspath.learning.infrastructure.messaging.AssessmentCompletedListener → "
              "ApplyAssessmentResultUseCase (learning-service)",
         purpose="Applies each final assessment result to the learner's progress: knowledge-point evidence, topic "
-                "test assignment, topic pass and reviews for weak knowledge points.",
+                "and course test assignments, topic and course pass, reviews for weak knowledge points and the "
+                "placement band used to recommend a course.",
         trigger="@RabbitListener on queue learning.assessment-completed.v2 (manual ack); "
                 "learning.messaging.consumer-enabled (default true)",
-        refs="FT-26, FT-29, FT-34, FT-35 · BR-22, BR-23, BR-25",
+        refs="FT-26, FT-29, FT-34, FT-35, FT-55 · BR-22, BR-23, BR-25, BR-36, BR-37",
         status="Specified (implemented)",
         sla_short="< 1 s per message under normal load; alert on any message in the DLQ.",
         context="The topic final test is graded in the assessment module, but topic progress lives in the learning "
@@ -769,11 +829,14 @@ JOBS = [
             "  2b: applied version ≥ resultVersion for this attempt → log INFO, commit, ack (no change)",
             "  2c: an older version was applied → delete its assessment evidence (BR-25)",
             "  2d: record (userId, attemptId, resultVersion) as applied",
-            "  2e: PLACEMENT → stop here (version only)",
+            "  2e: PLACEMENT → store overall_band in learner_placements (first one gates nothing,",
+            "      it only marks the recommended course, BR-36) and stop: no evidence, no topic change",
             "  2f: append one evidence row per judged knowledge point of every item",
             "  2g: TOPIC_GATE → find the latest unused assignment for the package version issued",
-            "      before completedAt; consume it; percent ≥ 70 → topic PASSED, next topic opens",
-            "  2h: TOPIC_GATE / MOCK → re-evaluate reviews: open one for each KP with mastery < 0.6",
+            "      before completedAt; consume it; percent ≥ 70 → topic PASSED, next topic of the course opens",
+            "  2h: COURSE_GATE → same rule on course_test_assignments; percent ≥ 70 →",
+            "      course_progress.passed_at (BR-37); no topic is locked or reopened",
+            "  2i: TOPIC_GATE / COURSE_GATE / MOCK → re-evaluate reviews: one for each KP with mastery < 0.6",
             "",
             "STEP 3: Acknowledge",
             "  - Commit succeeded → basicAck.",
@@ -796,8 +859,12 @@ JOBS = [
             ("DB Update", "Table `topic_test_assignments`", "`consumed_attempt_id, score`", "TOPIC_GATE with an open "
              "assignment"),
             ("DB Update", "Table `topic_progress`", "topic PASSED; next topic IN_PROGRESS", "TOPIC_GATE and percent ≥ 70"),
-            ("DB Insert", "Table `review_items`", "status PENDING per weak knowledge point", "TOPIC_GATE or MOCK, "
-             "mastery < 0.6"),
+            ("DB Update", "Tables `course_test_assignments`, `course_progress`", "assignment consumed; `passed_at`",
+             "COURSE_GATE (passed_at only at percent ≥ 70)"),
+            ("DB Upsert", "Table `learner_placements`", "`overall_band, attempt_id, completed_at`",
+             "PLACEMENT with a non-null overall band"),
+            ("DB Insert", "Table `review_items`", "status PENDING per weak knowledge point", "TOPIC_GATE, "
+             "COURSE_GATE or MOCK, mastery < 0.6"),
             ("Event Publish", "Exchange `learning.assessment-completed.dlx` → `…v2.dlq`", "original message + "
              "`x-learning-failure`", "Contract violation or 5th failure"),
         ],
@@ -814,7 +881,10 @@ JOBS = [
             ("BR-22", "Test code single-use, consumed even on failure", "Step 2g", "No open assignment → log INFO, "
              "evidence still recorded"),
             ("BR-15", "Topic pass mark 70%", "Step 2g", "Below 70% → topic stays IN_PROGRESS"),
-            ("BR-23", "Reviews open for mastery < 0.6", "Step 2h", "Mastery ≥ 0.6 → no review"),
+            ("BR-37", "Course passes at 70%; never locks a topic or another course", "Step 2h",
+             "Below 70% → course stays open, assignment consumed"),
+            ("BR-36", "Placement band only recommends a course", "Step 2e", "No topic or course status changes"),
+            ("BR-23", "Reviews open for mastery < 0.6", "Step 2i", "Mastery ≥ 0.6 → no review"),
             ("BR-25", "Result version applied once; newer replaces older", "Step 2b–2d", "Equal/older ignored"),
         ],
         errors=[
@@ -852,73 +922,109 @@ JOBS = [
         ],
     ),
     dict(
-        code="JOB-03", name="AI grading worker",
-        draft="Status Draft (FT-33, FT-39): grading jobs and submissions are stored today, but no worker grades "
-              "them and no points are charged. Lesson essays (FT-25) are graded synchronously and do not use "
-              "this job.",
-        bean="[TBC] com.group01.assessment.infrastructure.scheduler.GradingWorker (assessment-service)",
-        purpose="Grades a learner's Writing or Speaking response that was sent for AI grading inside a test "
-                "attempt, and finalizes the result so it feeds learning progress.",
-        trigger="Polls grading_jobs with status QUEUED every [TBC] s (or consumes an internal queue [TBC])",
-        refs="FT-33, FT-34, FT-39 · BR-09, BR-30",
-        status="Draft",
-        sla_short="Grade within [TBC] s of job creation; alert when a job stays QUEUED > [TBC] min.",
-        context="AI grading of a test response takes 20–45 seconds and must not hold the learner's request open. "
-                "The learner creates a grading job (FT-33) and the worker grades it later. Without the worker, "
-                "Writing and Speaking sections of mock tests never get a score and the mock result never reaches "
-                "learning.",
+        code="JOB-03", name="Test essay grading worker",
+        bean="com.ieltspath.assessment.infrastructure.scheduler.GateEssayGradingScheduler → "
+             "GradeGateEssayJobUseCase (assessment-service)",
+        purpose="Grades with the LLM, at no point cost, every essay a learner sent in a topic final test, a course "
+                "final test or the placement test, and completes the result once all of its essays are graded.",
+        trigger="@Scheduled fixed delay 5 s (assessment.llm-grading.poll-interval = PT5S); enabled by "
+                "assessment.llm-grading.enabled (default true)",
+        refs="FT-31, FT-32, FT-33, FT-35, FT-55 · BR-25, BR-39, BR-41",
+        status="Specified (implemented for TOPIC_GATE, COURSE_GATE and PLACEMENT; learner-requested AI grading of "
+               "other attempts, FT-33, is Draft)",
+        sla_short="One LLM call per essay (read timeout 45 s); a job stuck in PROCESSING is requeued after 10 min.",
+        context="When a learner submits a topic, course or placement test, every essay sent through "
+                "POST /api/assessments/submissions becomes one AI grading job (status QUEUED, no charge) and the "
+                "result waits until all of them are graded. An essay never sent scores 0 and gets no job (BR-39). "
+                "Without this job those results are never completed, no AssessmentCompleted.v2 event is written and "
+                "the learner's topic, course or placement never moves on. Lesson and practice essays (FT-25) are "
+                "graded synchronously by learning-service and do not use it.",
         flow=[
-            "STEP 1: Claim jobs  -- SELECT … FROM grading_jobs WHERE status = 'QUEUED'",
-            "        ORDER BY created_at LIMIT [TBC] FOR UPDATE SKIP LOCKED; set status RUNNING",
+            "STEP 1: Claim a batch (short transaction)",
+            "  - Requeue AI jobs left in PROCESSING for more than 10 min (stuck-after)",
+            "  - UPDATE grading_jobs SET status = 'PROCESSING' for up to 10 QUEUED AI jobs of",
+            "    TOPIC_GATE / COURSE_GATE / PLACEMENT attempts, FOR UPDATE OF gj SKIP LOCKED",
             "",
-            "STEP 2: FOR EACH job:",
-            "  2a: guard — job already GRADED or FAILED → skip",
-            "  2b: call LLM provider (Writing) or Speech Assessment Provider (Speaking),",
-            "      outside any DB transaction, timeout [TBC] s",
-            "  2c: valid grade → open result version, save details, finalize (outbox row, JOB-01)",
-            "  2d: debit points via /internal/access/points/debit with idempotencyKey = job id",
-            "      (BR-30); 402 → job FAILED_PAYMENT [TBC]",
-            "  2e: provider failure / invalid grade → status FAILED, nothing charged",
+            "STEP 2: FOR EACH claimed job (outside any transaction)",
+            "  2a: LLM not configured → LLM_UNAVAILABLE",
+            "  2b: consume the learner's daily quota (Vietnam date, limit 20) → else DAILY_LIMIT_REACHED",
+            "  2c: build the prompt from the question snapshot (stem, task, minWords, chartFacts)",
+            "      → unreadable snapshot: INVALID_PROMPT",
+            "  2d: call the OpenAI-compatible LLM (connect 3 s, read 45 s) → band + feedback",
+            "      → no reply / unusable reply: LLM_REQUEST_FAILED / INVALID_GRADE",
             "",
-            "STEP 3: Log processed / failed / durationMs",
+            "STEP 3: Success (new transaction)",
+            "  - grading_jobs: COMPLETED with llm_band and llm_feedback (only from PROCESSING)",
+            "  - PLACEMENT → complete the placement result when every skill is graded (BR-41)",
+            "  - otherwise → assemble the gate result once every AI job of the attempt is done:",
+            "    full marks when the band reaches the question's pass band, else 0 (BR-39);",
+            "    result + outbox row → JOB-01",
+            "",
+            "STEP 4: Any error of step 2 (new transaction)",
+            "  - PLACEMENT → job COMPLETED with the default Writing band 5.5; complete the placement",
+            "  - otherwise → job FAILED and a HUMAN grading job + human_reviews row (examiner queue,",
+            "    FT-32); the result is completed by the examiner",
+            "",
+            "STEP 5: An exception outside one job is caught by the scheduler, logged at WARN, retried next tick",
         ],
-        inputs=[("Table `grading_jobs`", "`id, submission_id, skill, grading_mode, point_cost_snapshot`",
-                 "`status = 'QUEUED'`", "Batch [TBC]"),
-                ("Table `learner_submissions`", "`text_payload, audio_reference, prompt_snapshot`", "`id = job.submission_id`",
-                 "Essay text never logged")],
-        outputs=[("DB Update", "Table `grading_jobs`", "`status GRADED / FAILED, point_ledger_entry_id`", "Each job"),
-                 ("DB Insert", "Tables `assessment_results`, `item_results`", "finalized result version", "Grade valid"),
-                 ("Event Publish", "Outbox → JOB-01", "`AssessmentCompleted.v2`", "Result finalized")],
-        idempotency=["Pattern B (status guard) + idempotency key:",
-                     "  - Only QUEUED jobs are claimed; GRADED and FAILED are final.",
-                     "  - The point debit uses the job id as idempotencyKey, so a retry never charges twice."],
-        verification="Run the worker twice on the same job with a stub provider: one result version, one ledger "
-                     "entry · L2 ref: [TBC].",
-        rules=[("BR-09", "Balance never below 0; ledger entry per change", "Step 2d", "402 → job failed, no grade shown"),
-               ("BR-30", "Same idempotency key never charges twice", "Step 2d", "Replay returns first ledger entry")],
-        errors=[("Transient", "Provider timeout, 5xx, network error", "Log WARN jobId errorType; back to QUEUED", "Yes",
-                 "[TBC]"),
-                ("Permanent", "Invalid grade after one retry, unsupported audio", "Status FAILED; learner can resend",
-                 "No", "—"),
-                ("Critical", "Unhandled exception", "Log ERROR (no essay text); status FAILED; alert", "No", "—")],
-        retry="Max [TBC] attempts · backoff [TBC]",
-        dlq="Not event-driven [TBC]; FAILED jobs are visible to the learner (FT-33)",
-        sla=[("Runtime per job (normal)", "< 45 s", "> 60 s", "Log timing"),
-             ("Runtime per job (peak)", "[TBC]", "[TBC]", "Load test"),
-             ("Records per execution", "≤ [TBC]", "—", "Log output"),
-             ("Queue wait", "< [TBC] min", "> [TBC] min", "now() − created_at of QUEUED jobs")],
-        index="grading_jobs(status, created_at)",
-        batch="[TBC] jobs per run · SKIP LOCKED claim",
-        logs=[("Job graded", "INFO", "`jobId skill durationMs`"), ("Job failed", "WARN", "`jobId errorType attempt`"),
-              ("Provider unavailable", "ERROR", "`provider errorType`")],
-        log_format=_STD_LOG_FORMAT + "; essays, prompts, transcripts and LLM output are never logged",
-        alerts=[("`GradingWorkerBacklog`", "QUEUED jobs older than [TBC] min", "Warning"),
-                ("`GradingWorkerFailures`", "FAILED/processed > [TBC]% in 15 min", "Critical")],
+        inputs=[("Table `grading_jobs`", "`id, submission_id, user_id, skill, grading_mode`",
+                 "`grading_mode = 'AI' AND status = 'QUEUED'`, attempt type TOPIC_GATE / COURSE_GATE / PLACEMENT",
+                 "Batch 10; FOR UPDATE SKIP LOCKED"),
+                ("Tables `learner_submissions`, `attempt_items`", "essay text, question and answer snapshots",
+                 "`id = job.submission_id`", "Essay text and prompt never logged"),
+                ("LLM quota store", "count per learner and day", "`user_id, date (Asia/Ho_Chi_Minh)`",
+                 "Limit ASSESSMENT_LLM_DAILY_LIMIT (default 20)")],
+        outputs=[("DB Update", "Table `grading_jobs`", "`status COMPLETED / FAILED, llm_band, llm_feedback`", "Each job"),
+                 ("DB Insert", "Tables `grading_jobs` (HUMAN), `human_reviews`", "examiner job, status QUEUED",
+                  "Gate essay the LLM could not grade"),
+                 ("DB Insert", "Tables `assessment_results`, `item_results`, `outbox_events`",
+                  "completed result version + AssessmentCompleted.v2 row", "All essays of the attempt graded"),
+                 ("External call", "OpenAI-compatible LLM `POST {base}/chat/completions`", "essay + task prompt",
+                  "Configured and within quota")],
+        idempotency=["Pattern B (status guard):",
+                     "  - Jobs move QUEUED → PROCESSING → COMPLETED / FAILED; complete and fail update only rows",
+                     "    still in PROCESSING, so a second worker or a requeued job cannot grade twice.",
+                     "  - The result is assembled only when no AI job of the attempt is left, and once per",
+                     "    attempt; a duplicate event is ignored by JOB-02 (BR-25).",
+                     "  - Gate grading is free, so no point debit can repeat."],
+        verification="Run two schedulers against one queued essay with a stub LLM: one COMPLETED job, one result "
+                     "version, one outbox row · L2 ref: [test-id TBC].",
+        rules=[("BR-39", "Test essays graded by the LLM for free, 20 per learner per day; full marks at the pass band",
+                "Steps 2b, 3", "Limit reached or LLM fails → examiner grades it"),
+               ("BR-41", "Placement Writing takes the default band 5.5 when the LLM cannot grade", "Step 4",
+                "Learner is never left waiting for an examiner"),
+               ("BR-25", "Each result version applied once", "Step 3", "Duplicate event ignored by JOB-02")],
+        errors=[("Transient", "LLM timeout, 5xx, network error (LLM_REQUEST_FAILED)",
+                 "Log WARN jobId, code; examiner job (gate) or default band (placement)", "No", "1 call"),
+                ("Permanent", "LLM not configured, daily limit reached, INVALID_GRADE, INVALID_PROMPT",
+                 "Same hand-over as above", "No", "—"),
+                ("Critical", "Database unavailable during claim or record",
+                 "Batch logged at WARN and retried next tick; PROCESSING jobs requeued after 10 min", "Yes",
+                 "Unbounded")],
+        retry="No LLM retry; a failed gate essay goes to an examiner, a failed placement essay takes band 5.5 · stuck "
+              "PROCESSING jobs are requeued after 10 min",
+        dlq="Not event-driven; essays the LLM could not grade wait in the examiner queue (human_reviews, Grading "
+            "Workspace)",
+        sla=[("Runtime per job (normal)", "< 45 s (LLM read timeout)", "> 45 s", "Log timing [TBC]"),
+             ("Records per execution", "≤ 10 jobs", "—", "Claimed count"),
+             ("Queue wait", "< 1 min after submit (FT-35 grading page)", "> 10 min", "now() − created_at of QUEUED AI "
+              "jobs"),
+             ("Daily LLM use per learner", "≤ 20 essays", "limit reached", "Quota store")],
+        index="grading_jobs(grading_mode, status, created_at) and the claim query of JdbcGateEssayJobStore "
+              "(assessment migrations V6, V7)",
+        batch="10 jobs per run · claimed with SKIP LOCKED, oldest first",
+        logs=[("Gate essay moved to an examiner", "WARN", "`jobId code`"),
+              ("Placement essay graded with the default band", "WARN", "`jobId code`"),
+              ("Batch failed", "WARN", "`exception class`")],
+        log_format=_STD_LOG_FORMAT + "; essays, prompts and LLM output are never logged",
+        alerts=[("`GateEssayBacklog`", "QUEUED AI jobs older than 10 min", "Warning"),
+                ("`GateEssayHandOverRate`", "jobs moved to an examiner > 20% in 1 h", "Warning"),
+                ("`GateEssayNotRunning`", "no batch within 2 × poll interval while jobs are queued", "Critical")],
     ),
     dict(
         code="JOB-04", name="Grading-done alert dispatcher",
         draft="Status Draft (FT-52): notification-service is a skeleton; no alert is sent in the current release.",
-        bean="[TBC] com.group01.notification.infrastructure.messaging.GradingDoneListener (notification-service)",
+        bean="[TBC] com.ieltspath.notification.infrastructure.messaging.GradingDoneListener (notification-service)",
         purpose="Creates one grading-done notification when an examiner finalizes a result and hands it to the "
                 "delivery channels the learner enabled.",
         trigger="RabbitMQ: own queue bound to assessment.events / assessment.completed.v2 [TBC: queue name]",
@@ -962,7 +1068,7 @@ JOBS = [
         code="JOB-05", name="Study reminder scheduler",
         draft="Status Draft (FT-53): no reminder is scheduled or sent in the current release; learning activity is "
               "reported by the client (FT-44).",
-        bean="[TBC] com.group01.notification.infrastructure.scheduler.StudyReminderScheduler (notification-service)",
+        bean="[TBC] com.ieltspath.notification.infrastructure.scheduler.StudyReminderScheduler (notification-service)",
         purpose="Creates at most one study reminder per learner per day, at the learner's preferred local time, on "
                 "days without a qualifying study activity.",
         trigger="@Scheduled every [TBC] minutes; ShedLock or SKIP LOCKED to run on one instance [TBC]",
@@ -1007,7 +1113,7 @@ JOBS = [
     dict(
         code="JOB-06", name="Notification delivery retry",
         draft="Status Draft (FT-54): no delivery record exists in the current release.",
-        bean="[TBC] com.group01.notification.infrastructure.scheduler.DeliveryDispatcher (notification-service)",
+        bean="[TBC] com.ieltspath.notification.infrastructure.scheduler.DeliveryDispatcher (notification-service)",
         purpose="Sends pending notification deliveries to Firebase Cloud Messaging or the Email Service and retries "
                 "failed ones without creating a second notification.",
         trigger="@Scheduled every [TBC] s",
@@ -1054,7 +1160,7 @@ JOBS = [
     dict(
         code="JOB-07", name="Matchmaking queue sweeper",
         draft="Status Draft (FT-48): matchmaking is not built; rooms are joined by id or code only.",
-        bean="[TBC] com.group01.game.infrastructure.scheduler.MatchmakingSweeper (game-service)",
+        bean="[TBC] com.ieltspath.game.infrastructure.scheduler.MatchmakingSweeper (game-service)",
         purpose="Groups waiting learners of the same game type into a room and starts the match, and removes "
                 "learners who waited too long.",
         trigger="@Scheduled every [TBC] s",
@@ -1095,26 +1201,32 @@ JOBS = [
 OPEN_QUESTIONS = [
     ("OQ-01", "Route names and copy of screens not built yet are proposals; the frontend team decides the final "
               "ones.", "Screens marked FE: not built"),
-    ("OQ-02", "OAuth providers, first-sign-in behaviour (create vs link by email) and the authorize endpoint the "
-              "frontend already calls.", "Login, OAuth Callback, FT-05"),
+    ("OQ-02", "Resolved (SRS v0.9.20): the first OAuth sign-in links by verified email or creates a CUSTOMER "
+              "account. Still open: providers and the authorize endpoint the frontend already calls.",
+     "Login, OAuth Callback, FT-05"),
     ("OQ-03", "Email Service integration: today the reset token is read from backend logs and pasted by hand.",
      "Forgot Password, Reset Password, JOB-06"),
     ("OQ-04", "Premium enforcement and the learner entitlement read; the frontend disables PREMIUM practice sets.",
-     "Learning Path, Practice Set, FT-13"),
-    ("OQ-05", "Mock test band conversion table; who grades Writing/Speaking sections of mock tests.",
-     "Mock & Placement Tests, JOB-03"),
-    ("OQ-06", "Placement test: one per learner? How the result sets the starting band/topic.",
-     "Mock & Placement Tests, FT-35"),
-    ("OQ-07", "AI grading price for test responses; grading worker schedule, timeouts and retries.",
-     "Test Result, JOB-03"),
-    ("OQ-08", "Recording upload size/duration/format and speech provider timeout.",
-     "Video Player, Practice Workspaces, FT-39, FT-40"),
-    ("OQ-09", "Dictation scoring rule (percentage of reference words).", "Video Player, FT-41"),
-    ("OQ-10", "Notification channels, alert delay, reminder schedule and retry limits.",
-     "Notification Centre, JOB-04 – JOB-06"),
-    ("OQ-11", "Matchmaking group size, waiting limit and sweep interval.", "Game Lobby, JOB-07"),
+     "Course Path, Practice Set, FT-13"),
+    ("OQ-05", "Resolved (SRS v0.9.20): Writing and Speaking of mock tests are graded by an Examiner and bands "
+              "come from the official IELTS Academic tables (BR-33).", "Mock Tests, FT-34"),
+    ("OQ-06", "Resolved (SRS v0.9.22, built): the placement test is optional, taken once (an Administrator can "
+              "allow a second attempt) and only recommends a course.", "Placement Test, FT-35"),
+    ("OQ-07", "Resolved (SRS v0.9.20): learner-requested AI grading costs 3 points for Writing and 5 for "
+              "Speaking; test essays are free (BR-39). Still open: the worker for learner-requested jobs.",
+     "Test Result, FT-33"),
+    ("OQ-08", "Resolved (SRS v0.9.20): recordings of 10 to 120 seconds, scored within 30 seconds; audio "
+              "upload up to 20 MB. Still open: the recording upload endpoint (placement keeps a local reference).",
+     "Video Player, Placement Test, FT-39, FT-40"),
+    ("OQ-09", "Resolved (SRS v0.9.20): dictation score = percentage of words typed correctly.",
+     "Video Player, FT-41"),
+    ("OQ-10", "Resolved (SRS v0.9.20): channels PUSH, EMAIL and IN_APP; alerts within 5 minutes; up to 3 delivery "
+              "retries. Still open: reminder schedule.", "Notification Centre, JOB-04 – JOB-06"),
+    ("OQ-11", "Resolved (SRS v0.9.20): matches of 2 learners after at most 60 seconds of waiting. Still open: "
+              "sweep interval.", "Game Lobby, JOB-07"),
     ("OQ-12", "Examiner work queue and an API for examiners to read learner responses.", "Grading Workspace, FT-32"),
-    ("OQ-13", "Lesson authoring API and media upload limits.", "Media Assets, Lesson Builder, FT-18, FT-19"),
+    ("OQ-13", "Lesson authoring API (open). Resolved (SRS v0.9.20): upload limits audio 20 MB, image 5 MB.",
+     "Media Assets, Lesson Builder, FT-18, FT-19"),
     ("OQ-14", "Activation key list for staff and SALES_STAFF access.", "Activation Keys, FT-11"),
     ("OQ-15", "Outbox relay replay procedure and DLQ retention; metrics/alerting stack.", "JOB-01, JOB-02"),
     ("OQ-16", "User list paging and search (GET /api/users returns all users today).", "User Management, FT-08"),
@@ -1129,6 +1241,12 @@ OPEN_QUESTIONS = [
     ("OQ-20", "Date-times: user-service returns local date-times without an offset, other services UTC (TDS 2.4, "
               "target UTC everywhere [TBC]). Until then screens that show user-service times may be off by the "
               "server's time zone.", "Profile & Account, User Management, User Detail"),
+    ("OQ-21", "Use cases View and choose courses, Take course test and Manage courses and rules BR-35 to BR-41 are in "
+              "SRS v0.9.24 but not in RTW v1.0; this FDS proposes the ids UC-43 to UC-45 until the RTW adds them.",
+     "Appendix D, Course List, Course Path, Test Attempt, Courses & Topics"),
+    ("OQ-22", "Current course (BR-40, SRS v0.9.21): neither the backend nor the frontend has a current course yet; "
+              "every course is open. Decide whether BR-40 stays or is dropped like the placement gate.",
+     "Course List, Course Path, Topic Detail, Lesson Player"),
 ]
 
 
@@ -1136,7 +1254,9 @@ def open_questions_for(name):
     """Ids of the open questions whose Affects column names this screen or job ("Practice Workspaces" also
     matches "Practice Workspaces (Reading, …)"); questions about all screens stay in Appendix B only."""
     ids = []
-    for oq_id, _, affects in OPEN_QUESTIONS:
+    for oq_id, question, affects in OPEN_QUESTIONS:
+        if question.startswith("Resolved") and "Still open" not in question:
+            continue
         parts = [p.strip() for p in affects.replace(";", ",").split(",")]
         if any(p == name or name.startswith(p + " (") for p in parts):
             ids.append(oq_id)
@@ -1144,8 +1264,9 @@ def open_questions_for(name):
 
 # Frontend vs SRS / FDS differences found when reading the frontend code (Appendix C).
 FE_GAPS = [
-    ("GAP-01", "The learning path is one list sorted by sequenceOrder under the heading \"Lộ trình Reading\"; it is "
-               "not grouped by skill.", "Learning Path", "FT-20, BR-16", "Add skill tabs and group topics by skill"),
+    ("GAP-01", "Resolved: the course path (/learn/courses/:courseId) lists the topics of one course in sequence "
+               "order with skill filter buttons (Tất cả · Listening · Reading · Writing · Speaking).", "Course Path",
+     "FT-20, BR-16", "—"),
     ("GAP-02", "No role-based home and no staff screens; GuestOnly and sign-in always lead to /learn.",
      "Login, all staff screens", "FT-07, FT-08", "Read roles from user.me and add the staff area"),
     ("GAP-03", "/home renders HomePage without an access client, so the key dialog always shows \"Phiên đăng nhập "
@@ -1157,14 +1278,15 @@ FE_GAPS = [
      "Practice Set", "FT-13, BR-34", "Use the entitlement once FT-13 is enforced"),
     ("GAP-06", "Reset password uses a code typed by hand (from backend logs); there is no email link yet.",
      "Forgot Password, Reset Password", "FT-04", "Keep ?token= support; add email delivery"),
-    ("GAP-07", "No review list, mastery, mock/placement, account, library, games, community or notification "
-               "screens; pending reviews appear only in the review banner.", "Several",
-     "FT-06, FT-09, FT-26, FT-28, FT-34 – FT-54", "Build from the specifications in Part 2"),
+    ("GAP-07", "No review list, mastery, mock test, account, library, games, community or notification screens; "
+               "pending reviews appear only in the review banner and lesson rail.", "Several",
+     "FT-06, FT-09, FT-26, FT-28, FT-34, FT-36 – FT-54", "Build from the specifications in Part 2"),
     ("GAP-08", "Writing feedback is shown inline in the essay block; writing-submissions/{id} is never called, so "
                "a FAILED or still-grading essay is not shown again after leaving the page.",
      "Lesson Player, Writing Feedback", "FT-25", "Read the latest submission on load"),
-    ("GAP-09", "The topic test saves a choice answer when it is picked but a text answer only at submit; there is "
-               "no timer or expiry handling.", "Test Attempt", "FT-30", "Save text answers on blur"),
+    ("GAP-09", "The topic and course test runner saves a choice answer when it is picked and a text answer when "
+               "the field loses focus, but has no timer or expiry handling.", "Test Attempt", "FT-30",
+     "Show remaining time when a test gets a time limit"),
     ("GAP-10", "Vocabulary, flashcards and notes of the practice area live in the browser (localStorage / page "
                "state), not in library-service.", "Vocabulary, Practice Workspaces", "FT-36, FT-42, FT-43",
      "Call the library APIs"),
@@ -1181,6 +1303,25 @@ FE_GAPS = [
                "relay polls every 2 s and NFR-P05 allows up to 5 s, so the page often shows no next topic although "
                "it opens a moment later.", "Test Result", "FT-29, NFR-P05",
      "Re-read for up to 6 s, or show \"Đang cập nhật lộ trình…\" with a reload button"),
+    ("GAP-15", "The placement card on the course list links to /placement, which has no route, so it opens "
+               "NotFoundPage; the top bar uses the right route /learn/placement.", "Course List", "FT-35",
+     "Link the card to /learn/placement"),
+    ("GAP-16", "The course final test maps only TEST_LOCKED and TEST_UNAVAILABLE; the backend returns "
+               "403 COURSE_TEST_LOCKED, 409 NO_COURSE_TEST, 409 COURSE_ALREADY_PASSED and 404 COURSE_NOT_FOUND, "
+               "which fall back to the raw server message.", "Course Path", "FT-55, BR-37",
+     "Map the four course codes to their own messages"),
+    ("GAP-17", "After the placement test is submitted the grading step polls GET /learning/courses and waits for "
+               "PLACEMENT_REQUIRED to stop, a code the backend removed when the test became optional. The report "
+               "opens at once and GET placement-result answers 404 until grading ends, so the learner sees an "
+               "error panel with Thử lại.", "Placement Test", "FT-35, BR-36",
+     "Poll GET /assessments/attempts/{id}/placement-result until it stops returning 404 (lesson-learning-v1)"),
+    ("GAP-18", "Practice sets with a Writing question cannot be answered: the backend accepts the essay at "
+               "POST /practice-attempts/{id}/essays/{questionVersionId}/submissions, but the practice page has no "
+               "essay block.", "Practice Set", "FT-25, FT-27, BR-38",
+     "Reuse the lesson essay block in the practice page"),
+    ("GAP-19", "Speaking recordings of the placement test stay in the browser; the submission only carries the "
+               "reference local-recording:{attemptId}:{itemId}, so Speaking takes the interim band 5.5 (BR-41).",
+     "Placement Test", "FT-35, FT-39", "Upload recordings once the recording endpoint exists (OQ-08)"),
 ]
 
 from fds_screens import SCREENS  # noqa: E402  (screens import helpers above)

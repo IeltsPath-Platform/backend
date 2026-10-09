@@ -10,7 +10,8 @@ REQUIRE_AUTH = ("Session exists (RequireAuth, GG-01)", "Continue rendering",
                 "Redirect → /login (state.from kept); GLB-01")
 GUEST_ONLY = ("No signed-in session (GuestOnly, GG-03)", "Render the form", "Redirect → /learn")
 EX_TOPBAR = ("User picks an item in the top bar (SiteNavbar)", "Any", "Selected route", "No unsaved-change prompt")
-REVIEW_GATE_RULE = ("BR-17", "A pending review blocks lessons, practice and the final test of its own skill",
+REVIEW_GATE_RULE = ("BR-17", "A pending review blocks the lessons that teach its skill, their practice and the "
+                    "final test of a topic that teaches it",
                     "403 REVIEW_REQUIRED → review panel / banner GLB-10 with \"Làm bài ôn\"")
 FE_AUTH = "Built — features/auth/pages/{page} (route {route}); calls the real backend."
 FE_LEARN = "Built — features/learning-path/pages/{page} inside LearnLayout (route {route}); calls the real backend."
@@ -96,7 +97,7 @@ SCREENS = [
         nav_from=[("Any protected route", "No session (RequireAuth); the original location is kept"),
                   ("Register", "User clicks \"Đăng nhập\""), ("Reset Password", "Reset succeeded (redirect after 0.9 s)"),
                   ("User menu", "User clicks \"Đăng xuất\"")],
-        nav_to=[("Original route, else Learning Path (/learn)", "Sign-in succeeds"),
+        nav_to=[("Original route, else Course List (/learn)", "Sign-in succeeds"),
                 ("Register", "User clicks \"Đăng ký ngay\""), ("Forgot Password", "User clicks \"Quên mật khẩu?\"")],
         pre=[GUEST_ONLY],
         entry=[("Protected route without session", "Any", "Router state `from`"), ("Top bar \"Đăng nhập\"", "Home, "
@@ -146,7 +147,7 @@ SCREENS = [
         shots=[("Register.png", "Register (/register)")],
         purpose="Lets a guest create a learner account and signs the guest in straight away, so learning can start.",
         nav_from=[("Login", "User clicks \"Đăng ký ngay\""), ("Top bar", "Guest clicks \"Đăng ký\"")],
-        nav_to=[("Learning Path (/learn)", "Registration and the automatic sign-in succeed"),
+        nav_to=[("Course List (/learn)", "Registration and the automatic sign-in succeed"),
                 ("Login", "User clicks \"Đăng nhập\"")],
         pre=[GUEST_ONLY],
         entry=[("Đăng ký ngay", "Login", "—"), ("Top bar", "Home, Vocabulary", "—")],
@@ -255,7 +256,7 @@ SCREENS = [
                  "endpoint exists (authApi.handleOAuthCallback throws).",
         purpose="Finishes a sign-in with the OAuth identity provider and opens the learning path.",
         nav_from=[("OAuth Identity Provider", "Provider redirects back with code/state")],
-        nav_to=[("Learning Path (/learn)", "Tokens received and user.me succeeds"), ("Login", "User clicks \"Quay lại đăng "
+        nav_to=[("Course List (/learn)", "Tokens received and user.me succeeds"), ("Login", "User clicks \"Quay lại đăng "
                 "nhập\"")],
         pre=[GUEST_ONLY],
         entry=[("Provider redirect", "OAuth Identity Provider", "Query: `code, state` [TBC]")],
@@ -276,133 +277,375 @@ SCREENS = [
         key="Overview", name="Overview", route="/overview · RequireAuth (default route when signed in)",
         roles="Any signed-in user", ft="FT-26, FT-44, FT-45 (intended)", uc="UC: View activity and streak; View mastery",
         fe="mock", status="Draft (UI on mock data, OQ-17)",
+        shots=[("Overview.png", "Overview (/overview) — dashboard on mock data")],
         frontend="Built on mock data — features/overview/pages/OverviewPage.tsx with mocks/overviewData.ts; no API "
                  "call.",
         purpose="Gives the learner a dashboard of study time, four-skill progress, words to review, mentor feedback, "
                 "courses and the study streak.",
-        nav_from=[("Browser", "Signed-in user opens \"/\""), ("Top bar", "User clicks \"Tổng quát\"")],
+        nav_from=[("Browser", "Signed-in user opens \"/\""), ("Top bar", "User opens \"Trang chủ\" → \"Dashboard\"")],
         nav_to=[("Selected route", "User follows a card link or the top bar")],
         pre=[REQUIRE_AUTH],
         entry=[("Default route", "Browser", "—"), ("Top bar", "Any page", "—")],
         exits=[EX_TOPBAR, EX_SESSION],
-        comps=[("PNL", "Hero banner", "Banner", "—", "\"Xin chào, {username} 👋\" · \"Band hiện tại: {band}\""),
-               ("PNL", "Sidebar", "Tab list", "—", "Overview sections"),
+        comps=[("PNL", "Hero banner", "Banner", "—", "\"Xin chào, {username} 👋\" · \"Band hiện tại: {band}\" · \"Mục tiêu: "
+                "{target} IELTS\""),
+               ("PNL", "Sidebar", "Section menu (sticky; a row on small screens)", "—", "Overview sections"),
                ("CRD", "Dữ Liệu Học Tổng Quan", "Stat cards", "—", "Tổng thời gian học, Số ngày học, Số đề đã luyện, Tỷ lệ "
                 "chính xác, Streak học"),
+               ("PNL", "Biểu đồ “chăm chỉ” của bạn", "Month calendar", "Month switch; pick a day or a week", "\"đã học\" / "
+                "\"chưa học\" / \"sắp tới\"; \"Dữ liệu mẫu · Hoạt động minh họa trong tuần hiện tại.\""),
                ("PNL", "Biểu đồ thời gian học", "Chart", "—", "Thực tế vs Kế hoạch per week"),
                ("PNL", "Tiến Độ 4 Kỹ Năng", "Panel", "—", "\"AI đánh giá so với kế hoạch lộ trình\""),
-               ("PNL", "Từ Vựng Cần Ôn", "Panel", "—", "Đã học / Chưa học; Từ mới, Ôn lần 1–3, Đã thuộc"),
+               ("PNL", "Study Plan · SPACE Autonomy · My Learning Orbit", "Panels", "—", "\"Kế hoạch AI cá nhân hoá\", "
+                "\"Bài học tiếp theo:\""),
                ("PNL", "Gợi Ý Ôn Luyện Từ AI", "Panel", "—", "\"Bắt đầu ngay\""),
-               ("PNL", "Phản Hồi Từ Mentor · Các Khoá Học Của Tôi", "Panels", "—", "—")],
+               ("PNL", "Phản Hồi Từ Mentor · Khoá Đang Học · Các Khoá Học Của Tôi", "Panels", "—", "—")],
         apis=[("Page load", None, "mocks/overviewData.ts", "Render cards", "—")],
         interactions=[("Data source", ["All numbers are mock data. When wired, study time and streak come from user-service "
                                        "(activity.list, streak.get) and skill progress from learn.mastery (OQ-17)."])],
         msgs=[("Empty State", "Design target: no activity", "\"Chưa có dữ liệu học tập.\"", "—")],
         rules=[("BR-27", "Personal data visible only to its owner", "Design target when the APIs are wired")],
     ),
-    # ------------------------------------------------------------------ Learning Path
+    # ------------------------------------------------------------------ Course List
     screen(
-        key="LearningPath", name="Learning Path", route="/learn · RequireAuth", roles="Signed-in learner",
-        ft="FT-13, FT-20, FT-28", uc="UC: View learning path", fe="api",
-        status="Specified (skill grouping: GAP-01; Premium lock: Draft)",
-        frontend=FE_LEARN.format(page="TopicListPage.tsx", route="/learn"),
-        shots=[("LearningPath.png", "Learning Path (/learn) — stations of the trail")],
-        purpose="Shows the learner's topics as an ordered trail with each topic's status, so the learner knows which "
-                "topic to study next.",
-        nav_from=[("Login / Register", "Sign-in without a stored route"), ("Top bar", "User clicks \"Lộ trình\""),
-                  ("Topic Detail, Test Result, Review Session", "User goes back to the trail")],
-        nav_to=[("Topic Detail", "User clicks a PASSED or IN_PROGRESS station"),
-                ("Review Session", "User clicks \"Làm bài ôn\" in the review banner")],
+        key="CourseList", name="Course List", route="/learn · RequireAuth (index of the learning area)",
+        roles="Signed-in learner", ft="FT-20, FT-35, FT-55", uc="UC: View and choose courses; View learning path",
+        fe="api", status="Specified (current course of BR-40: Draft, OQ-22; placement card link: GAP-15)",
+        frontend=FE_LEARN.format(page="CourseListPage.tsx", route="/learn"),
+        shots=[("CourseList.png", "Course List (/learn) — spotlight course and course cards")],
+        purpose="Shows every band-level course with the learner's progress, puts forward the course to continue or "
+                "the one the placement recommends, and leads to a course's topic path or to the placement test.",
+        nav_from=[("Login / Register", "Sign-in without a stored route"),
+                  ("Top bar", "User clicks \"Khóa học\" or \"Khóa học của tôi\""),
+                  ("Course Path, Test Result", "User clicks \"Tất cả khóa học\" / \"Xem danh sách khóa\""),
+                  ("Placement Test", "Placement already taken (PLACEMENT_ALREADY_DONE)")],
+        nav_to=[("Course Path", "User clicks the spotlight button or a course card"),
+                ("Placement Test", "User clicks the card \"Chưa biết nên chọn band nào?\" (wrong link today: GAP-15)")],
         pre=[REQUIRE_AUTH],
-        entry=[("Sign-in", "Login", "—"), ("Top bar", "Any page", "—"), ("Lock redirect", "Topic/Lesson pages",
-               "Router state `notice` (GLB-09)")],
+        entry=[("Sign-in", "Login", "—"), ("Top bar", "Any page", "—"),
+               ("Lock redirect", "Learning pages", "Router state `notice` (GLB-09)")],
+        exits=[("User clicks a course", "Any course (all are open)", "Course Path", "`/learn/courses/{courseId}`"),
+               ("User clicks the placement card", "Filter Tất cả", "NotFoundPage today; design target Placement Test",
+                "GAP-15"), EX_TOPBAR, EX_SESSION],
+        comps=[("PNL", "Page header", "Header", "—", "Eyebrow \"Khóa học\" · \"Lộ trình IELTS theo band mục tiêu\" · \"Mỗi khóa "
+                "gồm các chặng topic ngắn. Học xong các bài trong chặng và đạt bài kiểm tra chặng để mở chặng kế tiếp.\""),
+               ("CRD", "Spotlight", "Card", "Course in progress, else the recommended course, else the lowest band",
+                "Band ticket; label \"Đang học dở\" / \"Gợi ý cho bạn\" / \"Gợi ý bắt đầu\"; \"{n} chặng topic · đầu vào khuyến "
+                "nghị ~{band} · kết thúc bằng bài thi cuối khóa\"; progress \"{passed}/{n} chặng\""),
+               ("BTN", "Spotlight action", "Button (Accent)", "—", "\"Bắt đầu học\" / \"Học tiếp\" / \"Làm bài thi cuối khóa\" / "
+                "\"Xem lại lộ trình\" by course state"),
+               ("TAB", "Lọc khóa học", "Segmented buttons", "Filters with no course are hidden", "\"Tất cả\", \"Gợi ý cho bạn\", "
+                "\"Đang học\", \"Đã hoàn thành\", each with a count"),
+               ("CRD", "Course card", "Card grid", "Sorted by band level", "\"Band {x.x}\", title, \"{n} chặng topic · đầu vào "
+                "~{band}\", progress or \"Chưa bắt đầu\", chip \"Đã hoàn thành\" / \"Sẵn sàng thi cuối\" / \"Đang học\" / \"Gợi ý "
+                "cho bạn\", action label"),
+               ("CRD", "Placement card", "Card", "Shown with the Tất cả filter", "\"Chưa biết nên chọn band nào?\" · \"Làm bài "
+                "test đầu vào 4 kỹ năng miễn phí trong 15–20 phút để được gợi ý khóa phù hợp.\" · \"Làm test đầu vào\""),
+               ("PNL", "Notice banner", "Banner", "—", "Redirect notice (GLB-09)")],
+        apis=[("Page load", "learn.courses", "—", "Render spotlight and cards · loading: course skeleton",
+               "GLB-04 / GLB-05 panel with \"Thử lại\"")],
+        interactions=[("Course state", [
+            "In progress  = passedTopicCount > 0 AND testStatus ≠ PASSED",
+            "Action label = PASSED → \"Xem lại lộ trình\"; AVAILABLE → \"Làm bài thi cuối khóa\";",
+            "               in progress → \"Học tiếp\"; else \"Bắt đầu học\"",
+            "Entry band   = max(bandLevel − 1, 3.5)"]),
+            ("Recommendation", ["recommended comes from the latest placement band (BR-36): the lowest course at or above it,",
+                                "else the highest course. Without a placement nothing is recommended; every course stays open."])],
+        msgs=[("Empty State", "A filter has no course", "Title \"Không tìm thấy khóa học\" · \"Không có khóa học nào trong nhóm "
+               "này.\"", "Button \"Xem tất cả khóa học\""),
+              ("Loading", "Page load", "Skeleton \"Đang tải danh sách khóa học…\"", "—")],
+        rules=[("BR-35", "Courses are band levels shared by all skills, ordered by band", "Cards sorted by band level"),
+               ("BR-36", "Placement only recommends a course", "Chip \"Gợi ý cho bạn\"; no course is locked"),
+               ("BR-40", "One current course [Draft]", "Not built: every course opens (OQ-22)")],
+    ),
+    # ------------------------------------------------------------------ Placement Test
+    screen(
+        key="PlacementTest", name="Placement Test", route="/learn/placement · RequireAuth (survey, test and grading "
+        "steps)", roles="Signed-in learner", ft="FT-09, FT-35, FT-39",
+        uc="UC: Take placement test; Manage profile and learning goal", fe="api",
+        status="Specified (grading wait: GAP-17; Speaking recordings not uploaded: GAP-19)",
+        frontend=FE_LEARN.format(page="PlacementPage.tsx with placement/ (PlacementSurvey, PlacementDashboard, "
+                                      "ObjectiveSectionRunner, WritingSectionRunner, SpeakingSectionRunner)",
+                                 route="/learn/placement"),
+        shots=[("PlacementDashboard.png", "Placement Test — test step: the five sections of an attempt in progress")],
+        purpose="Lets a learner take the optional four-skill placement test once: three survey questions that save a "
+                "learning goal, then the Listening, Reading, Writing and Speaking sections handed in one by one, then "
+                "the wait while the essays are graded.",
+        nav_from=[("Top bar", "User clicks \"Test đầu vào 4 kỹ năng FREE\""),
+                  ("Course List", "Placement card (wrong link today: GAP-15)")],
+        nav_to=[("Placement Report", "Grading finished"),
+                ("Course List", "Placement already taken and no attempt of the learner's own (PLACEMENT_ALREADY_DONE)")],
+        pre=[REQUIRE_AUTH,
+             ("The learner has not finished a placement", "Survey, or the open attempt", "409 PLACEMENT_ALREADY_DONE → "
+              "redirect /learn"),
+             ("A PLACEMENT_TEST package is published", "Continue", "404 NO_PLACEMENT_TEST → MSG-01")],
+        entry=[("Top bar", "Any page", "—"),
+               ("Resume", "Learner comes back later", "Open attempt from as.placementCurrent: IN_PROGRESS → test step; "
+                "submitted → grading step")],
+        exits=[("User clicks Tiếp tục in the survey dialog", "Attempt created or resumed", "Test step (same route)", "—"),
+               ("Last section handed in", "Attempt submitted automatically", "Grading step", "—"),
+               ("Grading finished", "Result available", "Placement Report (same route)", "—"),
+               ("User clicks Lưu và quay lại", "Inside a section", "Section list", "Answers already saved"),
+               EX_TOPBAR, EX_SESSION],
+        comps=[("PRG", "Stepper", "Steps", "—", "\"Khảo sát\" · \"Bài test\" · \"Kết quả\" with the progress of the current step"),
+               ("PNL", "Survey question", "Chat bubble with mascot", "One question at a time", "\"Bạn dự định thi IELTS khi "
+                "nào?\" · \"Bạn có thể dành bao nhiêu thời gian học mỗi ngày?\" · \"Mục tiêu điểm IELTS của bạn là?\"; "
+                "\"Câu trước\""),
+               ("BTN", "Exam month", "Chips", "Next six months, \"Thời gian khác\" (month input), \"Chưa có kế hoạch\"",
+                "Exam date = last day of the month; \"Chưa có kế hoạch\" sends no date"),
+               ("BTN", "Study time", "Option list", "\"Dưới 1 tiếng\" 45, \"Khoảng 1 – 2 tiếng\" 90, \"Khoảng 2 – 3 tiếng\" 150, "
+                "\"Trên 3 tiếng\" 210 minutes a day", "—"),
+               ("BTN", "Target band", "Option list", "\"Dưới IELTS 5.5\" (5.5) … \"IELTS 8.0 trở lên\" (8.0)", "Saves the goal"),
+               ("MDL", "Bạn đã hoàn thành khảo sát!", "Dialog", "—", "Exam month, \"~{h}h/tuần\", band chart, button "
+                "\"Tiếp tục\" (\"Đang mở bài test…\")"),
+               ("PNL", "Bài kiểm tra đầu vào", "Dashboard", "—", "\"Bạn đã bắt đầu được {h} giờ {m} phút {s} giây\"; \"Không "
+                "giới hạn thời gian. Câu trả lời được lưu trên hệ thống nên có thể thoát và quay lại làm tiếp; phần nào đã "
+                "nộp thì không mở lại được.\""),
+               ("TBL", "Phần thi của bạn", "Section list", "Section order of the package (Reading, Listening, Writing "
+                "Task 1, Writing Task 2, Speaking in the seed)", "\"{done}/{n} đã hoàn thành\"; per section \"{n} câu\", time "
+                "\"{m} phút\" or \"Đã hoàn thành\" once handed in, button \"Làm bài\" / \"Làm tiếp\"; \"Làm lần lượt từng "
+                "phần. Bài được nộp tự động khi bạn hoàn thành phần cuối cùng.\""),
+               ("BTN", "Làm lại khảo sát", "Button (Outline)", "Test step", "Back to the survey; the attempt is kept"),
+               ("PNL", "Listening / Reading section", "Split view (passage or audio + questions)", "—",
+                "\"Chuyển nhanh tới câu hỏi\", flag, \"Câu trước\" / \"Câu tiếp theo\", \"Nộp phần này\", \"Lưu và quay lại\""),
+               ("TXA", "Bài viết", "Text Area per Writing task", "Saved as the learner types", "Placeholder \"Nhập phần viết của "
+                "bạn ở đây\"; panel \"Tra từ vựng\" (opens a dictionary in a new tab, ≤ 50 characters)"),
+               ("PNL", "Speaking", "Recorder", "Needs microphone permission", "\"Hướng dẫn chung\", \"Kiểm tra micro\", recording "
+                "starts after each question, \"Dừng & sang câu tiếp\" / \"Dừng & hoàn thành\""),
+               ("MDL", "Hand in a section", "Confirm dialog", "—", "\"Sau khi nộp, phần này không mở lại được.\" (+ unanswered "
+                "count, or \"Bài viết đang để trống nên sẽ tính 0 điểm.\")"),
+               ("PNL", "Grading", "Status panel (aria-live)", "—", "MSG-07 / MSG-08 / \"Chưa lấy được kết quả\" + \"Kiểm tra lại\"")],
+        apis=[("Page load", "as.placementCurrent", "— (204 when none)", "Choose the step", "GLB-04 panel"),
+              ("Page load", "learn.placementTest", "—", "Keep packageVersionId", "409 PLACEMENT_ALREADY_DONE → /learn; "
+               "404 NO_PLACEMENT_TEST → MSG-01"),
+              ("User picks a target band", "goal.create", "`{targetBand, examDate | null, availableMinutesPerDay}`",
+               "Summary dialog", "MSG-02 (the test can still start)"),
+              ("User clicks Tiếp tục (no attempt yet)", "as.start", "`{packageVersionId, mode: STANDARD, channel: WEB}`",
+               "Test step (attempt type PLACEMENT)", "MSG-03"),
+              ("Test step load", "as.structure", "Path: `attemptId`", "Sections and items", "GLB-04 panel"),
+              ("Test step load (parallel)", "as.responses", "Path: `attemptId`", "Restore saved answers", "GLB-04 panel"),
+              ("User opens a section the first time", "as.sectionStart", "Path: `attemptId, sectionId`",
+               "Section clock starts", "Ignored (the clock is only shown)"),
+              ("Answer picked, essay typed, recording stopped", "as.save", "`{payload, schemaVersion, expectedRevision}`",
+               "Save state", "MSG-04"),
+              ("Writing or Speaking section handed in", "as.submission", "`{attemptItemId, skill, textPayload | "
+               "audioReference, promptSnapshot, submissionKey}`", "Essay queued for JOB-03", "MSG-05"),
+              ("User hands in a section", "as.sectionComplete", "Path: `attemptId, sectionId`", "Section closed", "MSG-05"),
+              ("Last section handed in", "as.submit", "Path: `attemptId`", "Grading step", "MSG-06"),
+              ("Grading step, every 2 s, up to 45 times", "learn.courses", "—", "Treats success as graded (GAP-17)",
+               "Error → \"Chưa lấy được kết quả\"")],
+        interactions=[
+            ("Step on load", ["No attempt, or attempt EXPIRED / CANCELLED → survey",
+                              "Attempt IN_PROGRESS → test step",
+                              "Attempt submitted → grading step",
+                              "No attempt of the learner's own AND PLACEMENT_ALREADY_DONE → redirect /learn"]),
+            ("Sections", ["Each section is handed in on its own and is not reopened.",
+                          "When the last section is handed in, the attempt is submitted automatically.",
+                          "Speaking saves the recording length; the audio stays in the browser and only",
+                          "local-recording:{attemptId}:{itemId} is sent (GAP-19)."]),
+            ("Design target for the grading wait", ["Poll as.placementResult every 2 s until it stops returning 404, "
+                                                    "then open the report (GAP-17)."])],
+        msgs=[("Empty State", "404 NO_PLACEMENT_TEST", "\"Chưa có bài kiểm tra đầu vào nào được mở. Hãy quay lại sau.\"", "—"),
+              ("Info Text", "Goal not saved", "\"Chưa lưu được mục tiêu lên hệ thống ({message}). Bạn vẫn có thể làm bài.\"",
+               "In the survey dialog"),
+              ("Inline Error", "Attempt not started", "Server message + \" Hãy thử lại.\"", "In the survey dialog"),
+              ("Inline Error", "Answer, essay or recording not saved", "\"Chưa lưu được một số câu trả lời. Kiểm tra kết nối rồi "
+               "nộp lại.\" / \"Chưa lưu được bài viết. Kiểm tra kết nối rồi nộp lại.\" / \"Chưa lưu được bản ghi. Kiểm tra kết "
+               "nối rồi ghi lại câu này.\"", "In the section"),
+              ("Inline Error", "Section not handed in", "Server message + \" Hãy nộp lại.\"", "In the section"),
+              ("Inline Error", "Submit failed", "Server message + \" Hãy thử nộp lại.\" · \"Bạn đã hoàn thành tất cả các phần nhưng "
+               "bài chưa được nộp.\"", "Buttons \"Thử nộp lại\" / \"Nộp bài\""),
+              ("Info Panel", "Grading", "\"Đang chấm bài của bạn…\" · \"Bài luận được chấm tự động nên có thể mất tới một phút. "
+               "Đừng đóng trang này.\"", "Until graded"),
+              ("Info Panel", "Grading slow (after 45 checks)", "\"Kết quả đang được chấm\" · \"Việc chấm đang lâu hơn bình thường. "
+               "Bài của bạn đã được nộp, hãy kiểm tra lại sau ít phút.\"", "Button \"Kiểm tra lại\"")],
+        rules=[("BR-36", "Optional, taken once; only recommends a course", "Redirect when already taken; nothing locks"),
+               ("BR-41", "Per-skill bands; Writing by the LLM or 5.5; Speaking 5.5 for now; overall rounded to 0.5",
+                "Shown on the Placement Report"),
+               ("BR-39", "Essays graded by the LLM (JOB-03)", "Grading step (MSG-07)"),
+               ("BR-05", "At most one ACTIVE learning goal", "A refused goal only shows MSG-02"),
+               ("BR-14", "Placement questions have purpose PLACEMENT", "Authoring rule; no UI effect")],
+    ),
+    # ------------------------------------------------------------------ Placement Report
+    screen(
+        key="PlacementReport", name="Placement Report", route="/learn/placement · result step",
+        roles="Signed-in learner", ft="FT-20, FT-35", uc="UC: Take placement test; View and choose courses", fe="api",
+        status="Specified",
+        frontend=FE_LEARN.format(page="placement/PlacementResultView.tsx with ReportSkillPanels",
+                                 route="/learn/placement"),
+        purpose="Reports the placement result — overall and skill bands against the learner's target band, how "
+                "reachable the target is and the detail of every skill with the Writing feedback — and recommends a "
+                "course.",
+        nav_from=[("Placement Test", "Grading finished, or the learner comes back after grading")],
+        nav_to=[("Course Path", "User clicks \"Bắt đầu học\" (recommended course) or \"Xem khóa học\"")],
+        pre=[REQUIRE_AUTH, owner_only("placement attempt")],
+        entry=[("Grading finished", "Placement Test", "`attemptId`")],
+        exits=[("User clicks a course", "Any", "Course Path", "—"), EX_TOPBAR, EX_SESSION],
+        comps=[("PNL", "Report header", "Header", "—", "\"IELTS Academic · {date}\" · \"Báo cáo kết quả bài test\" · learner name · "
+                "\"Dưới đây là phân tích trình độ dựa trên bài test đầu vào…\""),
+               ("CRD", "Estimated overall band score", "Card", "—", "Overall band and one band per skill"),
+               ("CRD", "Target band", "Card", "Needs a learning goal", "Target band, \"Số ngày còn lại\" (or \"Chưa chọn\"), "
+                "\"Thời gian học {h} giờ/tuần\""),
+               ("PNL", "Đánh giá khả thi", "Band steps + advice", "—", "Tags \"Bạn ở đây\" and \"Band mục tiêu\"; advice text and "
+                "\"Gợi ý:\" tip"),
+               ("PNL", "Phân tích chi tiết", "Skill panels", "One per section", "Reading / Listening: right and wrong "
+                "questions; Writing Task 1 / Task 2: band and LLM feedback; Speaking: interim band"),
+               ("CRD", "Lộ trình khóa học", "Course cards", "Sorted by band", "\"Đề xuất cho bạn\" / \"Ôn nền tảng\" / \"Nâng "
+                "cao\", \"Band {x}\", \"{n} topic · đã qua {p}/{n}\", \"Bắt đầu học\" / \"Xem khóa học\"")],
+        apis=[("Report load", "as.placementResult", "Path: `attemptId`", "Bands, sections and essays · loading: \"Đang tải "
+               "báo cáo…\"", "404 while grading → error panel with \"Thử lại\" (GAP-17)"),
+              ("Report load (parallel)", "learn.courses", "—", "Recommended course and course cards", "Error panel"),
+              ("Report load (parallel)", "goal.active", "—", "Target side of the report", "404 → report without a target")],
+        interactions=[("Feasibility", ["The advice compares the overall band with the target band, the days left to the "
+                                       "exam month and the weekly study hours of the goal; without a goal only the bands "
+                                       "are shown."]),
+                      ("Course badge", ["Recommended → \"Đề xuất cho bạn\"; lower band → \"Ôn nền tảng\"; higher band → \"Nâng "
+                                        "cao\"; no recommendation → \"Khóa học\"."])],
+        msgs=[("Info Text", "No section detail", "\"Chưa có dữ liệu chi tiết cho bài làm này.\"", "—"),
+              ("Loading", "Report load", "\"Đang tải báo cáo…\"", "—")],
+        rules=[("BR-36", "The placement band only recommends a course", "Badge \"Đề xuất cho bạn\"; every course stays open"),
+               ("BR-41", "Overall band = mean of the skill bands rounded to 0.5", "Overall card")],
+    ),
+    # ------------------------------------------------------------------ Course Path
+    screen(
+        key="CoursePath", name="Course Path", route="/learn/courses/:courseId · RequireAuth", roles="Signed-in learner",
+        ft="FT-13, FT-20, FT-28, FT-55", uc="UC: View learning path; Take course test", fe="api",
+        status="Specified (course test error codes: GAP-16; Premium lock: Draft)",
+        frontend=FE_LEARN.format(page="TopicListPage.tsx", route="/learn/courses/:courseId"),
+        shots=[("CoursePath.png", "Course Path — the topic stations of one course")],
+        purpose="Shows the topics of one course as an ordered route with each topic's status and lesson progress, "
+                "ending with the course final test, so the learner knows which topic to study next.",
+        nav_from=[("Course List", "User clicks a course"), ("Topic Detail", "User clicks the course back link"),
+                  ("Test Result", "Course test: user clicks \"Về khóa học\" / \"Về khóa để làm lại\"")],
+        nav_to=[("Topic Detail", "User clicks a PASSED or IN_PROGRESS station, or \"Bắt đầu chặng\" / \"Học tiếp\""),
+                ("Test Attempt", "User clicks \"Làm bài thi cuối khóa\" and the attempt is created"),
+                ("Course List", "User clicks \"Tất cả khóa học\"")],
+        pre=[REQUIRE_AUTH],
+        entry=[("Course card", "Course List", "`courseId`"), ("Back link", "Topic Detail", "`courseId`")],
         exits=[("User clicks a station", "Not LOCKED", "Topic Detail", "—"),
-               ("LOCKED station", "—", "Not clickable", "Lock reason shown under the card"), EX_TOPBAR, EX_SESSION],
-        comps=[("PNL", "Hero", "Header", "—", "\"Lộ trình Reading\" · \"Đi từng chặng, mở khóa từng kỹ năng\" · \"{passed}/{n} "
-                "chặng đã qua\""),
-               ("TBL", "Trail", "Ordered list", "Sorted by sequenceOrder (all skills in one list, GAP-01)", "One station per "
-                "topic: \"Chặng {n}\", code, title, \"{done}/{total} bài đã xong\""),
-               ("BDG", "Topic status", "Badge", "PASSED \"Đã qua\" (green), IN_PROGRESS \"Đang học\" (blue), LOCKED \"Chưa mở\" "
-                "(grey)", "—"),
-               ("BDG", "Premium", "Badge", "Shown when the lock reason mentions Premium", "—"),
-               ("PNL", "Notice banner", "Banner", "—", "Shows a redirect notice (GLB-09)"),
-               ("PNL", "Review banner", "Alert banner", "—", "GLB-10 when pending reviews are known")],
-        apis=[("Page load", "learn.topics", "—", "Render the trail · loading: \"Đang tải lộ trình…\"", "GLB-04 / GLB-05 panel "
-               "with \"Thử lại\"")],
-        interactions=[("Station state", ["IF status = LOCKED THEN render a disabled card with the lock reason",
-                                         "ELSE render a link to /learn/topics/{id}", "END IF"]),
-                      ("Review banner source", ["In HTTP mode the banner shows reviews already known from Topic Detail, "
-                                                "Lesson or Practice responses; /learn itself does not call learn.reviews."])],
-        msgs=[("Empty State", "No topic", "\"Chưa có topic nào được giao cho bạn.\"", "—"),
-              ("Loading", "Page load", "\"Đang tải lộ trình…\"", "—")],
-        rules=[("BR-16", "One IN_PROGRESS topic per skill; later ones LOCKED", "Badges; LOCKED cards disabled. Not grouped "
-                "by skill yet (GAP-01)"),
-               ("BR-34", "Premium content needs an entitlement", "Only a Premium badge (OQ-04)")],
+               ("LOCKED station", "—", "Not clickable", "Lock reason under the card"),
+               ("User clicks Làm bài thi cuối khóa", "testStatus AVAILABLE; APIs 3–4 succeed", "Test Attempt",
+                "`/learn/tests/{attemptId}?course={courseId}`"),
+               ("Course test refused", "403 / 409", "Stay", "MSG-03…MSG-05"), EX_TOPBAR, EX_SESSION],
+        comps=[("LNK", "Tất cả khóa học", "Back link", "—", "To /learn"),
+               ("PNL", "Course header", "Header", "—", "\"Band {x.x} · Lộ trình khóa học\", course title, \"Học lần lượt từng "
+                "chặng. Hoàn thành các bài học và đạt bài kiểm tra chặng (từ 70%) để mở chặng tiếp theo.\""),
+               ("PRG", "Course progress", "Meter", "—", "\"{passed}/{total} chặng đã qua\" and percent"),
+               ("BTN", "Next topic", "Button (Accent)", "When a topic is IN_PROGRESS", "\"Tiếp theo · Chặng {n}: {title}\" + "
+                "\"Bắt đầu chặng\" / \"Học tiếp\""),
+               ("TAB", "Lọc theo kỹ năng", "Segmented buttons", "When the course has topics of more than one skill",
+                "\"Tất cả\" + Listening, Reading, Writing, Speaking, and \"Khác\" for topics without a skill"),
+               ("TBL", "Các chặng", "Ordered route", "Sorted by sequenceOrder", "\"Chặng {nn} · {skill}\", title, description, "
+                "\"{done}/{total} bài\" or \"Đã qua · {n} bài\", action \"Vào chặng\" / \"Học tiếp\" / \"Xem lại\""),
+               ("BDG", "Premium", "Chip", "Topic accessLevel PREMIUM", "\"Premium\""),
+               ("PNL", "Lock reason", "Inline text", "LOCKED stations", "Server lockedReason, else \"Hoàn thành chặng trước để "
+                "mở\"; a reason repeated on the next station is hidden"),
+               ("CRD", "Bài thi cuối khóa", "Final station", "Hidden when the course has no final test (testStatus NONE)",
+                "\"Về đích\" and a status text (see Interactions)"),
+               ("BTN", "Làm bài thi cuối khóa", "Button (Accent)", "Only when testStatus = AVAILABLE", "\"Đang giao đề…\" "
+                "while pending; chip \"Đã đạt\" when PASSED")],
+        apis=[("Page load", "learn.topics", "—", "Keep the topics of this course · loading: topic skeleton",
+               "GLB-04 / GLB-05 panel with \"Thử lại\""),
+              ("Page load (parallel)", "learn.courses", "—", "Course title, band, testStatus and counts", "Same panel"),
+              ("User clicks Làm bài thi cuối khóa", "learn.assignCourseTest", "Path: `courseId`", "Then API 4",
+               "MSG-03…MSG-05"),
+              ("Assignment received", "as.start", "`{packageVersionId, mode: STANDARD, channel: WEB}` (COURSE_GATE)",
+               "Navigate Test Attempt with `?course=`", "Server message + \" Hãy thử lại.\"")],
+        interactions=[("Final station text", ["PASSED    → \"Bạn đã đạt bài thi cuối khóa.\"",
+                                              "AVAILABLE → \"Bạn đã qua mọi chặng. Đề tổng hợp theo band mục tiêu, cần đạt từ 70%.\"",
+                                              "LOCKED    → \"Mở khi qua đủ {n} chặng (hiện {passed}/{n}). Cần đạt từ 70%.\""]),
+                      ("Station state", ["IF status = LOCKED THEN a disabled card with the lock reason",
+                                         "ELSE a link to /learn/topics/{id}; the next IN_PROGRESS topic is marked as the "
+                                         "current step"])],
+        msgs=[("Empty State", "Course has no topic", "\"Khóa này chưa có chặng nào.\"", "—"),
+              ("Success Text", "All topics passed", "\"Bạn đã qua tất cả các chặng.\"", "Header panel"),
+              ("Inline Error", "403 TEST_LOCKED (the backend sends COURSE_TEST_LOCKED, which falls back to MSG-05: "
+               "GAP-16)", "\"Bài thi cuối khóa chưa mở. Hoàn thành mọi chặng trong khóa trước.\"",
+               "On the final station; page reloads"),
+              ("Inline Error", "409 TEST_UNAVAILABLE", "\"Chưa có đề thi cuối cho khóa này. Hãy quay lại sau.\"",
+               "On the final station"),
+              ("Inline Error", "Other error (incl. NO_COURSE_TEST, COURSE_ALREADY_PASSED, COURSE_NOT_FOUND)",
+               "Server message + \" Hãy thử lại.\"", "On the final station")],
+        rules=[("BR-16", "One topic sequence per course; first unpassed topic IN_PROGRESS, later ones LOCKED",
+                "Badges; LOCKED stations disabled"),
+               ("BR-37", "Course test opens when every topic is PASSED; 70% passes the course", "Final station by testStatus"),
+               ("BR-22", "Course test code single-use", "A new assignment for each try"),
+               ("BR-34", "Premium content needs an entitlement", "Only a Premium chip (OQ-04)")],
     ),
     # ------------------------------------------------------------------ Topic Detail
     screen(
         key="TopicDetail", name="Topic Detail", route="/learn/topics/:topicId · RequireAuth", roles="Signed-in learner",
         ft="FT-20, FT-21, FT-27, FT-29", uc="UC: View learning path; Take test attempt", fe="api", status="Specified",
         frontend=FE_LEARN.format(page="TopicDetailPage.tsx", route="/learn/topics/:topicId"),
-        shots=[("TopicDetail.png", "Topic Detail — lesson list with lesson status")],
-        purpose="Lists the ordered lessons of a topic and the final test card, so the learner can open the next lesson, "
-                "go to practice or start the final test.",
-        nav_from=[("Learning Path", "User clicks a station"), ("Lesson Player, Practice Set, Test Result", "User goes back "
-                  "to the topic")],
-        nav_to=[("Lesson Player", "User clicks an AVAILABLE or COMPLETED lesson"),
-                ("Practice Set", "User clicks \"Mở luyện thêm\" (lesson COMPLETED, practice REQUIRED)"),
-                ("Review Session", "User follows an unlock hint for a pending review"),
-                ("Test Attempt", "User clicks \"Làm bài kiểm tra\" and the attempt is created")],
-        pre=[REQUIRE_AUTH, ("Topic exists and is not LOCKED", "Continue", "TOPIC_LOCKED → /learn with notice (GLB-09); 404 → "
-             "GLB-03")],
-        entry=[("Station click", "Learning Path", "`topicId`"), ("Back link", "Lesson Player", "`topicId`")],
+        shots=[("TopicDetail.png", "Topic Detail — lessons of a topic and its final test")],
+        purpose="Lists the ordered lessons of a topic, points to the next step — a pending review, the next lesson, the "
+                "practice a lesson still needs or the final test — and starts the topic final test.",
+        nav_from=[("Course Path", "User clicks a station"),
+                  ("Lesson Player, Practice Set, Test Result", "User goes back to the topic")],
+        nav_to=[("Lesson Player", "User clicks an AVAILABLE or COMPLETED lesson, or the next-step button"),
+                ("Practice Set", "User clicks \"Luyện ngay\" or the next-step button \"Luyện thêm\""),
+                ("Review Session", "User clicks \"Làm bài ôn\" in the header or the unlock checklist"),
+                ("Test Attempt", "User clicks \"Làm bài kiểm tra\" and the attempt is created"),
+                ("Course Path", "User clicks the course back link")],
+        pre=[REQUIRE_AUTH, ("Topic exists and is not LOCKED", "Continue", "TOPIC_LOCKED → /learn with notice (GLB-09); "
+             "404 → GLB-03")],
+        entry=[("Station click", "Course Path", "`topicId`"), ("Back link", "Lesson Player", "`topicId`")],
         exits=[("User clicks a lesson", "Not LOCKED", "Lesson Player", "—"),
                ("User clicks Làm bài kiểm tra", "testStatus AVAILABLE; APIs 4–5 succeed", "Test Attempt",
                 "`/learn/tests/{attemptId}?topic={topicId}`"),
-               ("Final test refused", "403 / 409", "Stay", "MSG-02…MSG-05"),
-               ("User clicks Lộ trình", "Any", "Learning Path", "—"), EX_SESSION],
-        comps=[("LNK", "Lộ trình", "Back link", "—", "To /learn"),
-               ("PNL", "Topic header", "Header", "—", "\"Chặng {n} · {code}\", title, status badge, \"{done}/{total} bài đã "
-                "xong\" + progress bar"),
-               ("TBL", "Lessons", "Ordered list", "Sorted by sortOrder", "\"Bài {n}: {title}\", \"{min} phút\", lock reason"),
-               ("BDG", "Lesson status", "Badge", "COMPLETED \"Đã xong\", AVAILABLE \"Đang mở\", LOCKED \"Đang khóa\"", "—"),
-               ("LNK", "Mở luyện thêm", "Link", "Visible when COMPLETED and practice REQUIRED", "Note \"Cần luyện thêm trước "
-                "khi mở đề cuối\""),
-               ("CRD", "Bài kiểm tra cuối", "Card", "—", "\"{n} câu · cần đạt từ 70% · không giới hạn thời gian\" (+ \"lần gần "
-                "nhất {p}%\")"),
-               ("BDG", "Test status", "Badge", "PASSED \"Đã đạt\", AVAILABLE \"Sẵn sàng\", LOCKED \"Đang khóa\", NONE \"Không có "
-                "đề\"", "—"),
-               ("PNL", "Unlock hints", "List of links", "Visible when testStatus = LOCKED", "\"Chưa mở đề — cần hoàn tất:\""),
-               ("BTN", "Làm bài kiểm tra", "Button (Primary)", "Visible only when AVAILABLE", "\"Đang giao đề…\" while pending")],
-        apis=[("Page load", "learn.topicLessons", "Path: `topicId`", "Render lessons and test card · loading: \"Đang tải "
-               "topic…\"", "GLB-03/04/09/10"),
-              ("Page load (parallel)", "learn.topics", "— (cached)", "Topic title, code, description", "Fallback title "
-               "\"Topic\""),
-              ("Page load (parallel)", "learn.reviews", "Query: `status=PENDING&limit=50`", "Sync the review banner and hints",
+               ("Final test refused", "403 / 409", "Stay", "MSG-02…MSG-06"),
+               ("User clicks the course link", "Any", "Course Path", "—"), EX_SESSION],
+        comps=[("LNK", "{course title}", "Back link", "—", "To /learn/courses/{courseId}; \"Lộ trình khóa học\" → /learn when "
+                "the topic has no course"),
+               ("PNL", "Topic header", "Header", "—", "\"Chặng {nn} · {skill}\", title, description"),
+               ("PRG", "Topic progress", "Meter", "—", "\"{done}/{total} bài đã xong\" and percent"),
+               ("BTN", "Next step", "Button (Accent)", "First match: pending review → next lesson → lesson needing practice",
+                "\"Cần làm trước · Bài ôn: {KP}\" + \"Làm bài ôn\"; \"Bắt đầu với\" / \"Tiếp theo · Bài {n}: {title}\" + "
+                "\"Bắt đầu học\" / \"Học tiếp\"; \"Cần luyện thêm\" + \"Luyện thêm\"; else \"Đã học xong các bài. Làm bài "
+                "kiểm tra chặng\" (jump) or \"Bạn đã qua chặng này · {p}%\""),
+               ("TBL", "Bài học trong chặng", "Ordered route", "Sorted by sortOrder", "\"{n} bài · khoảng {m} phút\"; lesson "
+                "title, \"{min} phút\", lock reason, action \"Học tiếp\" / \"Xem lại\" / \"Mở bài\""),
+               ("LNK", "Luyện ngay", "Link", "Lesson COMPLETED and practice REQUIRED", "\"Cần luyện thêm trước khi mở bài kiểm "
+                "tra chặng\""),
+               ("CRD", "Kiểm tra cuối chặng", "Final station", "—", "Test title and \"{n} câu hỏi · cần đạt từ 70% · không "
+                "giới hạn thời gian · lần gần nhất {p}%\"; \"Chặng này không có bài kiểm tra cuối.\" when NONE"),
+               ("PNL", "Để mở bài kiểm tra", "Checklist", "Visible when testStatus = LOCKED", "Items with links (see "
+                "Interactions)"),
+               ("BTN", "Làm bài kiểm tra", "Button (Accent)", "Only when AVAILABLE", "\"Đang giao đề…\" while pending; chip "
+                "\"Đã đạt\" when PASSED")],
+        apis=[("Page load", "learn.topicLessons", "Path: `topicId`", "Render lessons and the final station · loading: "
+               "\"Đang tải chặng học…\"", "GLB-03/04/09/10"),
+              ("Page load (parallel)", "learn.topics", "— (cached)", "Topic title, skill, description and course",
+               "Fallback title"),
+              ("Page load (parallel)", "learn.reviews", "Query: `status=PENDING&limit=50`", "Next step and review banner",
                "Error → empty list"),
-              ("User clicks Làm bài kiểm tra", "learn.assignTest", "Path: `topicId`", "Then API 5", "MSG-02…MSG-05"),
-              ("Assignment received", "as.start", "`{packageVersionId, mode: STANDARD, channel: WEB}`",
+              ("User clicks Làm bài kiểm tra", "learn.assignTest", "Path: `topicId`", "Then API 5", "MSG-02…MSG-06"),
+              ("Assignment received", "as.start", "`{packageVersionId, mode: STANDARD, channel: WEB}` (TOPIC_GATE)",
                "Navigate Test Attempt", "Server message + \" Hãy thử lại.\"")],
-        interactions=[("Unlock hints (testStatus = LOCKED)", [
-            "IF lessons not completed → \"Hoàn thành {n} bài học còn lại (vd. Bài {k}: {title}).\" → first such lesson",
-            "IF lessons need practice → \"Luyện thêm {n} bài đã học (practice REQUIRED) — vào trang luyện thêm của bài.\"",
-            "IF pending reviews → \"Hoàn thành {n} bài ôn bắt buộc (review) trước khi mở đề.\" → first review",
-            "IF none of these → \"Hoàn thành mọi bài học, luyện thêm (nếu có) và bài ôn còn treo để mở đề cuối.\""]),
+        interactions=[("Unlock checklist (testStatus = LOCKED)", [
+            "\"Hoàn thành {n} bài học còn lại\" (done: \"Hoàn thành tất cả bài học\") → first unfinished lesson",
+            "IF lessons need practice → \"Hoàn thành phần luyện thêm của {n} bài\" → its practice",
+            "IF pending reviews → \"Làm {n} bài ôn bắt buộc\" → first review",
+            "IF every item is done → \"Hoàn tất phần luyện thêm và bài ôn còn treo (nếu có)\""]),
             ("Final test start", ["An in-flight guard stops a second click. learn.assignTest returns the open assignment "
                                   "when one exists, so a retry reuses the same test version (FT-29/AC-01)."])],
-        msgs=[("Empty State", "Topic has no lesson", "\"Topic này chưa có bài học.\"", "—"),
-              ("Inline Error", "409 TEST_UNAVAILABLE / NO_TOPIC_TEST", "\"Chưa có đề cho topic này. Hãy quay lại sau.\"",
-               "On the test card"),
-              ("Inline Error", "409 PRACTICE_REQUIRED / PRACTICE_LOCKED", "\"Cần luyện thêm trước khi mở đề: Bài {n}, … Mở bài "
-               "học tương ứng và hoàn thành phần luyện thêm.\"", "On the card; page reloads"),
-              ("Inline Error", "403 REVIEW_REQUIRED", "\"Cần làm bài ôn “{KP}” trước khi làm bài kiểm tra.\"", "On the card; "
-               "page reloads"),
-              ("Inline Error", "403 TEST_LOCKED", "\"Bài kiểm tra chưa mở. Hoàn thành bài học, luyện thêm và bài ôn (nếu có).\"",
-               "On the card; page reloads"),
-              ("Info Text", "testStatus NONE", "\"Topic này không có đề cuối (NO_TOPIC_TEST).\"", "On the card")],
-        rules=[("BR-17", "Lessons open in order", "LOCKED rows are not links; lock reason shown"), REVIEW_GATE_RULE,
-               ("BR-22", "Final test needs every lesson completed and practice-cleared; codes rotate",
-                "Button only when AVAILABLE; unlock hints; MSG-02…MSG-05")],
+        msgs=[("Empty State", "Topic has no lesson", "\"Chặng này chưa có bài học.\"", "—"),
+              ("Inline Error", "409 TEST_UNAVAILABLE / NO_TOPIC_TEST", "\"Chưa có đề cho chặng này. Hãy quay lại sau.\"",
+               "On the final station"),
+              ("Inline Error", "409 PRACTICE_REQUIRED", "\"Cần luyện thêm trước khi mở đề: Bài {n}, … Mở bài học tương ứng và "
+               "hoàn thành phần luyện thêm.\"", "On the station; page reloads"),
+              ("Inline Error", "403 REVIEW_REQUIRED", "\"Cần làm bài ôn “{KP}” trước khi làm bài kiểm tra.\"",
+               "On the station; page reloads"),
+              ("Inline Error", "403 TEST_LOCKED", "\"Bài kiểm tra chưa mở. Hoàn thành bài học, luyện thêm và bài ôn (nếu "
+               "có).\"", "On the station; page reloads"),
+              ("Inline Error", "Other error", "Server message + \" Hãy thử lại.\"", "On the station")],
+        rules=[("BR-17", "Lessons open in order", "LOCKED lessons are not links; the lock reason is shown"),
+               REVIEW_GATE_RULE,
+               ("BR-22", "Topic test needs every lesson completed and practice-cleared; codes rotate",
+                "Checklist; the open assignment is reused"),
+               ("BR-38", "Practice is cleared skill by skill; essays never block", "\"Luyện ngay\" only while practice "
+                "is REQUIRED"),
+               ("BR-15", "Topic pass mark 70%", "\"cần đạt từ 70%\"")],
     ),
     # ------------------------------------------------------------------ Lesson Player
     screen(
@@ -410,15 +653,17 @@ SCREENS = [
         ft="FT-21, FT-22, FT-23, FT-24, FT-25", uc="UC: Study lesson; Submit Writing task; Grade essay", fe="api", status="Specified",
         frontend=FE_LEARN.format(page="LessonPage.tsx with components/blocks (BlockList, TextBlock, PassageBlock, "
                                       "AudioBlock, ExerciseBlock, EssayBlock)", route="/learn/lessons/:lessonId"),
-        shots=[("LessonPlayer-1.png", "Lesson Player — passage and an exercise block after a wrong answer, with the hint"),
-               ("LessonPlayer-2.png", "Lesson Player — a passed block shows the answer and explanation")],
+        shots=[("LessonPlayer.png", "Lesson Player — lesson content with the progress rail")],
         purpose="Presents a lesson's blocks in order — text, passage, audio, exercises and essays — grades each exercise "
                 "block, so the learner can pass the lesson and move on.",
-        nav_from=[("Topic Detail", "User clicks a lesson"), ("Lesson Player", "User clicks \"Bài tiếp theo\""),
+        nav_from=[("Topic Detail", "User clicks a lesson or the next-step button"),
+                  ("Lesson Player", "User clicks \"Bài tiếp theo\""),
                   ("Review Session", "User clicks \"Học tiếp\" after the review")],
-        nav_to=[("Practice Set", "Lesson completed; user clicks \"Luyện thêm\""),
-                ("Review Session", "A review was created; user clicks \"Làm bài ôn\""),
-                ("Lesson Player (next)", "User clicks \"Bài tiếp theo\""), ("Topic Detail", "User clicks the topic link")],
+        nav_to=[("Practice Set", "User clicks \"Luyện thêm bài này\""),
+                ("Review Session", "A review is pending; user clicks \"Làm bài ôn\""),
+                ("Lesson Player (next)", "User clicks \"Bài tiếp theo\""),
+                ("Topic Detail", "User clicks the topic link, \"Danh sách bài của chặng\", \"Về danh sách bài\" or "
+                 "\"Về chặng làm bài kiểm tra\"")],
         pre=[REQUIRE_AUTH,
              ("No pending review in the lesson's skill", "Continue", "403 REVIEW_REQUIRED → review panel (GLB-10)"),
              ("Topic not LOCKED and earlier lessons completed", "Continue", "TOPIC_LOCKED → /learn; LESSON_LOCKED → topic "
@@ -443,12 +688,19 @@ SCREENS = [
                 "\"Viết bài luận tại đây…\"; live \"{n} từ\""),
                ("BTN", "Nộp bài · 3 điểm", "Button (Primary)", "Disabled outside the word limits or when passed",
                 "\"Đang chấm (có thể 10–45 giây)…\" while grading"),
-               ("BTN", "Hoàn thành bài", "Button (Primary)", "Only for a lesson without exercise blocks", "—"),
-               ("PNL", "Completion panel", "Panel (role=status)", "—", "Buttons \"Luyện thêm\" or \"Làm bài ôn\", \"Bài tiếp "
-                "theo\" or \"Về topic / đề cuối\", \"Về topic\"")],
-        apis=[("Page load", "learn.lesson", "Path: `lessonId`", "Render blocks · loading: \"Đang tải bài học…\"",
+               ("PNL", "Lesson header", "Header", "—", "\"Bài {n} · Lý thuyết và bài tập\" or \"Bài {n} · Lý thuyết\", title"),
+               ("PNL", "Tiến độ bài học", "Side rail (bottom bar on mobile)", "—", "\"Bài {n} · {topic}\", state with a hint "
+                "(see Interactions), primary action, link \"Danh sách bài của chặng\""),
+               ("BTN", "Primary action", "Button (Accent)", "By lesson state", "\"Làm bài ôn\" / \"Luyện thêm bài này\" / "
+                "\"Bài tiếp theo\" or \"Về chặng làm bài kiểm tra\" / \"Hoàn thành bài\" (\"Đang ghi nhận…\") / \"Đến phần "
+                "bài tập\""),
+               ("PNL", "Completion panel", "Panel (role=status)", "Lesson COMPLETED", "\"Bạn đã hoàn thành bài này\" / \"Bài "
+                "này đã hoàn thành\", message, links \"Luyện thêm bài này\" and \"Về danh sách bài\"")],
+        apis=[("Page load", "learn.lesson", "Path: `lessonId`", "Render blocks · loading: \"Đang tải nội dung bài học…\"",
                "GLB-03/04/09/10"),
-              ("Page load (parallel)", "learn.topics", "— (cached)", "Topic title for the back link", "—"),
+              ("Page load (after the lesson)", "learn.topics", "— (cached)", "Topic title for the back link", "—"),
+              ("Page load (after the lesson)", "learn.topicLessons", "Path: `topicId`", "Next lesson and practice status "
+               "for the rail; reloaded after completion", "Rail without the next lesson"),
               ("User clicks Nộp", "learn.submitBlock", "`{requestId, answers:[{questionVersionId, answer}]}`",
                "Mark answers, hints, solutions on pass; completion panel when lessonCompleted", "Server message + \" Hãy thử "
                "nộp lại.\""),
@@ -466,17 +718,24 @@ SCREENS = [
                 "Each try sends a new requestId (no reuse after a network error)."]),
             ("Essay pre-check", ["IF balance < 3 THEN \"Không đủ điểm. Cần 3 điểm để chấm bài (hiện có {n}).\" and no request",
                                  "The balance comes from the session (access.myPoints)."]),
+            ("Rail state", ["Review pending      → \"Cần làm bài ôn\": \"Hoàn thành bài ôn “{KP}” để học tiếp.\"",
+                            "Done, practice due  → \"Cần luyện thêm\": \"Luyện thêm bài này để mở bài kiểm tra chặng.\"",
+                            "Done                → \"Đã hoàn thành\": \"Sẵn sàng sang bài tiếp theo.\" or, for the last",
+                            "                      lesson, \"Đây là bài cuối của chặng. Tiếp theo là bài kiểm tra chặng.\"",
+                            "Has exercises       → \"Đang học\": \"Làm và nộp bài tập trong bài để hoàn thành.\"",
+                            "Reading only        → \"Đang học\": \"Đọc hết nội dung rồi bấm hoàn thành để ghi nhận tiến độ.\""]),
         ],
         msgs=[("Inline Result", "Block passed", "\"Đạt {c}/{t} câu ({p}%). Đáp án và giải thích hiện dưới từng câu.\"",
                "Persistent"),
               ("Inline Result", "Block not passed", "\"Đúng {c}/{t} câu ({p}%). Cần từ 70% để đạt. Sửa các câu sai rồi nộp "
                "lại.\"", "Persistent"),
-              ("Info Text", "Lesson without exercises", "\"Bài này không có bài tập. Đọc xong thì đánh dấu hoàn thành.\"",
-               "Above the button"),
-              ("Completion Panel", "Lesson completed", "\"Bạn đã hoàn thành bài này\" · \"Tiếp theo: làm luyện thêm (practice) nếu "
-               "còn REQUIRED — đề cuối chỉ mở khi mọi bài đã practice PASSED và không còn review.\"", "Persistent"),
-              ("Completion Panel", "Review created", "\"Trước khi sang bài kế, cần ôn lại \"{KP}\". Bài ôn gồm phần lý thuyết "
-               "và một bộ câu hỏi ngắn.\"", "Button \"Làm bài ôn\""),
+              ("Info Text", "Lesson without exercises", "\"Hết nội dung bài học. Bấm Hoàn thành bài để ghi nhận tiến độ.\"",
+               "Under the content"),
+              ("Completion Panel", "Lesson completed", "\"Bạn đã hoàn thành bài này\" · \"Kiến thức của bài đã được ghi nhận. Bạn "
+               "có thể sang bài tiếp theo.\" (last lesson: \"Bạn đã học xong bài cuối của chặng. Quay về chặng để làm bài kiểm "
+               "tra.\"; practice due: \"Bài này yêu cầu luyện thêm trước khi mở bài kiểm tra chặng.\")", "Persistent"),
+              ("Completion Panel", "Review pending", "\"Bạn cần củng cố lại “{KP}” trước khi học tiếp. Bài ôn gồm tóm tắt lý "
+               "thuyết và vài câu hỏi ngắn.\"", "Rail button \"Làm bài ôn\""),
               ("Inline Error", "Balance below 3 (client) / 402 INSUFFICIENT_POINTS", "\"Không đủ điểm. Cần 3 điểm để chấm bài (hiện có {n}).\" / "
                "\"Không đủ điểm để chấm bài luận.\"", "Below the editor"),
               ("Inline Error", "503 GRADING_UNAVAILABLE", "\"Hệ thống chấm bài tạm thời không khả dụng. Thử lại sau.\"",
@@ -493,7 +752,9 @@ SCREENS = [
                 "Solutions rendered only for a passed block"),
                REVIEW_GATE_RULE, ("BR-10, BR-11", "3 points per essay; 10 gradings per day", "MSG-06 / MSG-08"),
                ("NFR-P03", "Grade or 503 GRADING_UNAVAILABLE within 45 s; each LLM call stops after 20 s",
-                "Client timeout 60 s (Section 2.0) covers it; MSG-07")],
+                "Client timeout 60 s (Section 2.0) covers it; MSG-07"),
+               ("BR-38", "A lesson is completed by its objective blocks; Writing essays never block it",
+                "Completion panel after the last objective block")],
     ),
     # ------------------------------------------------------------------ Writing Feedback
     screen(
@@ -534,7 +795,7 @@ SCREENS = [
     screen(
         key="PracticeSet", name="Practice Set", route="/learn/lessons/:lessonId/practice · RequireAuth",
         roles="Signed-in learner", ft="FT-23, FT-24, FT-26, FT-27", uc="UC: Do lesson practice", fe="api",
-        status="Specified (Premium sets disabled: GAP-05)",
+        status="Specified (Premium sets disabled: GAP-05; Writing questions not answerable: GAP-18)",
         frontend=FE_LEARN.format(page="PracticePage.tsx (list and attempt on the same route)",
                                  route="/learn/lessons/:lessonId/practice"),
         purpose="Lists the practice sets of a completed lesson and lets the learner answer one set, see every solution and "
@@ -542,20 +803,21 @@ SCREENS = [
         nav_from=[("Lesson Player", "User clicks \"Luyện thêm\""), ("Topic Detail", "User clicks \"Mở luyện thêm\" or an "
                   "unlock hint")],
         nav_to=[("Review Session", "A review was created; user clicks \"Làm bài ôn\""),
-                ("Learning Path", "Practice PASSED; user clicks \"Về lộ trình\""), ("Lesson Player", "User clicks \"Về bài học\"")],
+                ("Course List", "Practice PASSED; user clicks \"Về lộ trình\""), ("Lesson Player", "User clicks \"Về bài học\"")],
         pre=[REQUIRE_AUTH, ("No pending review in the skill", "Continue", "403 REVIEW_REQUIRED → review panel (GLB-10)")],
         entry=[("Luyện thêm", "Lesson Player", "`lessonId`"), ("Mở luyện thêm", "Topic Detail", "`lessonId`")],
         exits=[("User clicks Làm bộ này / Làm lại", "Set not LOCKED or PREMIUM", "Same route, attempt view", "—"),
                ("Submission done", "API 200", "Same route, result view", "MSG-02…MSG-05"),
                ("User clicks Danh sách luyện thêm / Về danh sách", "Any", "Same route, list view", "List reloads"), EX_SESSION],
-        comps=[("PNL", "Header", "Header", "—", "\"Luyện thêm\" · \"Củng cố trước khi mở đề cuối\" · \"Trạng thái practice: "
-                "{status} · {reason}\""),
-               ("CRD", "Practice set card", "Card list", "—", "Code, title, \"{n} câu · best {p}%\", \"Đã lộ đáp án — không tính "
-                "evidence.\" when revealed"),
+        comps=[("PNL", "Header", "Header", "—", "\"Luyện thêm\" · \"Củng cố trước khi mở bài kiểm tra chặng\" · REQUIRED "
+                "\"Bắt buộc: đạt ít nhất một bộ để mở bài kiểm tra chặng\", PASSED \"Đã đạt phần luyện thêm\", LOCKED \"Chưa "
+                "mở\" (+ \" · Hoàn thành bài học trước khi luyện.\")"),
+               ("CRD", "Practice set card", "Card list", "—", "Title, \"{n} câu · điểm cao nhất {p}%\", \"Đã lộ đáp án nên không "
+                "được tính.\" when revealed"),
                ("BDG", "Set status", "Badge", "AVAILABLE \"Sẵn sàng\", IN_PROGRESS \"Đang làm\", PASSED \"Đã đạt\", ATTEMPTED "
-                "\"Đã thử\", LOCKED \"Khóa\"", "—"),
-               ("BTN", "Làm bộ này / Làm lại", "Button (Primary)", "Disabled when LOCKED or PREMIUM", "\"Đang mở…\" while "
-                "starting; label \"Premium\" for Premium sets"),
+                "\"Đã thử\", LOCKED \"Chưa mở\"", "—"),
+               ("BTN", "Làm bộ này / Làm tiếp / Làm lại", "Button", "Hidden on LOCKED sets; disabled on PREMIUM sets",
+                "The set in progress (else the first open set) is the accent button; \"Đang mở…\" while starting"),
                ("PNL", "Passage / audio", "Split view", "—", "Left side of the attempt view"),
                ("PNL", "Questions", "ExerciseBlock (no resubmit)", "One answer per question", "Instructions \"Trả lời hết câu. "
                 "Đạt mới được tính evidence cho practice của bài.\""),
@@ -570,32 +832,34 @@ SCREENS = [
             "IF passed → \"Đã đạt bộ luyện thêm ({p}%).\" + \"Tiếp tục luyện / về topic\"",
             "ELSE → \"Chưa đạt ({p}%). Có thể chọn bộ khác hoặc làm bài ôn nếu được tạo.\" + \"Về danh sách\"",
             "IF reviewsCreated not empty → \"Đã tạo bài ôn bắt buộc sau lần luyện này.\" + \"Làm bài ôn\""])],
-        msgs=[("Empty State", "No practice set", "\"Bài này không có bộ luyện thêm (hoặc đã được coi là PASSED).\"", "—"),
+        msgs=[("Empty State", "No practice set", "\"Bài này không có bộ luyện thêm.\"", "—"),
               ("Success Panel", "Set passed", "\"Đã đạt bộ luyện thêm ({p}%).\"", "Button \"Tiếp tục luyện / về topic\""),
               ("Inline Result", "Set not passed", "\"Chưa đạt ({p}%). Có thể chọn bộ khác hoặc làm bài ôn nếu được tạo.\"",
                "Button \"Về danh sách\""),
               ("Review Panel", "Review created", "\"Đã tạo bài ôn bắt buộc sau lần luyện này.\"", "Button \"Làm bài ôn\""),
-              ("Info Text", "Set already revealed", "\"Bộ này đã lộ đáp án trước đó — lần nộp này không tính evidence.\"",
+              ("Info Text", "Set already revealed", "\"Bộ này đã lộ đáp án trước đó nên lần nộp này không được tính.\"",
                "Attempt header"),
-              ("Success Panel", "Practice PASSED for the lesson", "\"Practice đã PASSED. Có thể quay lại topic để mở đề cuối (nếu "
-               "không còn review).\"", "Button \"Về lộ trình\""),
-              ("Info Text", "Premium set", "\"Premium — chưa mở trong giai đoạn này.\"", "On the card")],
+              ("Success Panel", "Practice PASSED for the lesson", "\"Bạn đã đạt phần luyện thêm. Quay lại chặng để làm bài kiểm "
+               "tra (nếu không còn bài ôn).\"", "Button \"Về lộ trình\""),
+              ("Info Text", "Premium set", "\"Bộ Premium, chưa mở trong giai đoạn này.\"", "On the card")],
         rules=[("BR-15", "Pass mark 70%", "MSG-02 / MSG-03"),
                ("BR-18", "Only the first submission of an unrevealed set records evidence", "MSG-05"),
                ("BR-20", "A revealed set is never reused as a review set", "\"Đã lộ đáp án\" note"),
                ("BR-21", "Reviews open for knowledge points below 70%", "MSG-04"), REVIEW_GATE_RULE,
-               ("BR-34", "Premium sets need an entitlement", "Always disabled today (GAP-05)")],
+               ("BR-34", "Premium sets need an entitlement", "Always disabled today (GAP-05)"),
+               ("BR-38", "Practice is cleared skill by skill for Reading and Listening; essays never block",
+                "Writing questions of a set have no essay box yet (GAP-18)")],
     ),
     # ------------------------------------------------------------------ Review List (not built)
     screen(
         key="ReviewList", name="Review List", route="/learn/reviews (proposed)", roles="CUSTOMER",
         ft="FT-28", uc="UC: Complete review", status="Specified (backend); screen not built (GAP-07)",
         purpose="Lists the learner's reviews, oldest first, so the learner can finish the ones that block a skill.",
-        nav_from=[("Learning Path / Topic Detail / Lesson Player", "User clicks the pending-review banner or link"),
+        nav_from=[("Course Path / Topic Detail / Lesson Player", "User clicks the pending-review banner or link"),
                   ("Main menu", "User clicks \"Reviews\"")],
         nav_to=[("Review Session", "User clicks a review")],
         pre=[AUTH, LEARNER],
-        entry=[("Pending-review banner", "Learning Path, Topic Detail, Lesson Player", "Query: `?skill=`"),
+        entry=[("Pending-review banner", "Course Path, Topic Detail, Lesson Player", "Query: `?skill=`"),
                ("Main menu", "Any learner screen", "—")],
         exits=[("User clicks a review", "Any", "Review Session", "—"), ex_menu(), EX_SESSION],
         comps=[("SEL", "Status filter", "Select", "PENDING (default), DONE, SKIPPED", "—"),
@@ -632,14 +896,16 @@ SCREENS = [
                ("Second failure / no set left", "reviewStatus SKIPPED", "Stay; skipped panel", "MSG-02"),
                ("User clicks Học tiếp", "DONE or SKIPPED", "resumeLessonId lesson, else the topic, else /learn", "—"),
                EX_SESSION],
-        comps=[("PNL", "Header", "Header", "—", "Stage and \"fail {n}/{max}\""),
+        comps=[("LNK", "Về lộ trình học", "Back link", "—", "To the lesson to resume, else the topic, else /learn"),
+               ("PNL", "Header", "Header", "—", "\"Bài ôn bắt buộc · Bước đọc lý thuyết\" or \"· Bước luyện tập\"; \"Số bộ chưa "
+                "đạt: {n}/{max}.\" after a failed set"),
                ("PNL", "Lý thuyết cần nhớ", "Rich text", "—", "Theory blocks of the knowledge point"),
-               ("PNL", "Quick-check lý thuyết", "Questions", "THEORY stage", "\"Đọc lại lý thuyết rồi trả lời quick-check để mở bộ "
-                "luyện ôn.\""),
-               ("BTN", "Confirm read", "Button", "Only when there is no quick-check", "\"Không có câu quick-check. Xác nhận đã đọc lý "
-                "thuyết để sang PRACTICE.\" (GAP-12)"),
-               ("PNL", "Bộ câu hỏi ôn", "Questions + passage / \"Audio ôn\"", "PRACTICE stage", "\"Bộ {k}/{max} · {code}\"; "
-                "\"Làm bộ câu hỏi ôn. Đạt để hoàn thành; chưa đạt có thể sang THEORY hoặc bộ khác.\""),
+               ("PNL", "Kiểm tra nhanh lý thuyết", "Questions", "THEORY stage", "\"Đọc lại lý thuyết rồi trả lời vài câu kiểm tra "
+                "nhanh để mở bộ luyện ôn.\""),
+               ("BTN", "Confirm read", "Button", "Only when there is no quick-check", "\"Không có câu kiểm tra nhanh. Xác nhận đã "
+                "đọc lý thuyết để sang bước luyện tập.\" (GAP-12)"),
+               ("PNL", "Bộ câu hỏi ôn", "Questions + passage / \"Audio ôn\"", "PRACTICE stage", "\"Làm bộ câu hỏi ôn. Đạt là hoàn "
+                "thành; chưa đạt thì đọc lại lý thuyết hoặc làm bộ khác.\""),
                ("BTN", "Làm bộ tiếp theo", "Button (Secondary)", "After a failed set", "Reloads the review"),
                ("BTN", "Học tiếp", "Button (Primary)", "DONE or SKIPPED", "—")],
         apis=[("Page load", "learn.review", "Path: `reviewId`", "Render the stage · loading: \"Đang tải bài ôn…\"",
@@ -652,14 +918,14 @@ SCREENS = [
                "set", "422 INVALID_ANSWERS when there is no quick-check (GAP-12)")],
         interactions=[("Ladder", ["THEORY: quick check (no evidence) → PRACTICE with a new set",
                                   "PRACTICE: set ≥ 70% → DONE (MSG-03)",
-                                  "PRACTICE: set < 70% → \"Chưa đạt (failedSets {n}/{max}). Tải bộ tiếp theo.\"",
+                                  "PRACTICE: set < 70% → \"Chưa đạt ({n}/{max} bộ). Thử bộ tiếp theo.\"",
                                   "Second failed set or no unseen set → SKIPPED (MSG-02)"])],
-        msgs=[("Inline Result", "Set below 70%", "\"Chưa đạt (failedSets {n}/{max}). Tải bộ tiếp theo.\"", "Button \"Làm bộ tiếp "
+        msgs=[("Inline Result", "Set below 70%", "\"Chưa đạt ({n}/{max} bộ). Thử bộ tiếp theo.\"", "Button \"Làm bộ tiếp "
                "theo\""),
               ("Info Panel", "Review SKIPPED", "\"Đã bỏ qua bài ôn\" · \"Bạn chưa đạt sau {max} bộ. Bài ôn được bỏ qua để bạn tiếp "
                "tục học.\"", "Button \"Học tiếp\""),
-              ("Success Panel", "Review DONE", "\"Đã hoàn thành bài ôn\" · \"Lộ trình đã mở lại. Bạn có thể học tiếp hoặc quay lại "
-               "luyện thêm / đề cuối.\"", "Button \"Học tiếp\"")],
+              ("Success Panel", "Review DONE", "\"Đã hoàn thành bài ôn\" · \"Lộ trình đã mở lại. Bạn có thể học tiếp.\"",
+               "Button \"Học tiếp\"")],
         rules=[("BR-21", "Set → theory (≤ 3 quick checks, no evidence) → set; 70% DONE; second fail SKIPPED", "Stage header and "
                 "panels"),
                ("BR-20", "Revealed packages are never reused", "SKIPPED panel when no set remains"),
@@ -671,10 +937,10 @@ SCREENS = [
         ft="FT-26", uc="UC: View mastery", status="Specified (backend); screen not built (GAP-07)",
         purpose="Shows the learner's mastery from 0 to 1 for every knowledge point, grouped by skill and topic, so the "
                 "learner can see strong and weak points.",
-        nav_from=[("Learning Path", "User clicks \"View mastery\""), ("Main menu", "User clicks \"Mastery\"")],
+        nav_from=[("Course Path", "User clicks \"View mastery\""), ("Main menu", "User clicks \"Mastery\"")],
         nav_to=[("Topic Detail", "User clicks a topic group header")],
         pre=[AUTH, LEARNER],
-        entry=[("View mastery link", "Learning Path", "—"), ("Main menu", "Any learner screen", "Query: `?skill=`")],
+        entry=[("View mastery link", "Course Path", "—"), ("Main menu", "Any learner screen", "Query: `?skill=`")],
         exits=[("User clicks a topic", "Topic not LOCKED", "Topic Detail", "—"), ex_menu(), EX_SESSION],
         comps=[("TAB", "Skill tabs", "Tab bar", "LISTENING, READING, WRITING, SPEAKING", "—"),
                ("TBL", "Knowledge points", "Table grouped by topic", "Sortable: mastery, evidence count", "Name, mastery "
@@ -693,21 +959,25 @@ SCREENS = [
     ),
     # ------------------------------------------------------------------ Test Attempt
     screen(
-        key="TestAttempt", name="Test Attempt", route="/learn/tests/:attemptId?topic=… · RequireAuth",
-        roles="Signed-in learner", ft="FT-24, FT-30, FT-31", uc="UC: Take test attempt", fe="api",
-        status="Specified (text answers saved at submit; no timer: GAP-09)",
+        key="TestAttempt", name="Test Attempt", route="/learn/tests/:attemptId?topic=… | ?course=… · RequireAuth",
+        roles="Signed-in learner", ft="FT-24, FT-30, FT-31, FT-55", uc="UC: Take test attempt; Take course test",
+        fe="api", status="Specified (no timer: GAP-09)",
         frontend=FE_LEARN.format(page="TopicTestPage.tsx", route="/learn/tests/:attemptId"),
-        purpose="Lets the learner sit the topic final test section by section, with answers saved as they go, and submit "
-                "it for grading.",
-        nav_from=[("Topic Detail", "Final test assigned and attempt created")],
-        nav_to=[("Test Result", "Submit succeeds"), ("Topic Detail", "User clicks \"Về topic\"")],
+        purpose="Lets the learner sit a topic final test or a course final test section by section, with answers saved "
+                "as they go, and submit it for grading.",
+        nav_from=[("Topic Detail", "Topic final test assigned and attempt created"),
+                  ("Course Path", "Course final test assigned and attempt created")],
+        nav_to=[("Test Result", "Submit succeeds"), ("Topic Detail", "User clicks \"Về topic\""),
+                ("Course Path", "User clicks \"Về khóa học\"")],
         pre=[REQUIRE_AUTH, ("Attempt belongs to the user", "Continue", "403 → error panel")],
-        entry=[("Làm bài kiểm tra", "Topic Detail", "`attemptId`, Query `topic`")],
+        entry=[("Làm bài kiểm tra", "Topic Detail", "`attemptId`, Query `topic`"),
+               ("Làm bài thi cuối khóa", "Course Path", "`attemptId`, Query `course`")],
         exits=[("User clicks Nộp bài (all saved)", "API 200", "Test Result", "`/learn/tests/{id}/result?topic=…`, replace"),
                ("Save failed for some answer", "—", "Stay", "MSG-02"), ("User clicks Về topic", "Any", "Topic Detail",
                "Saved answers stay on the server"), EX_SESSION],
-        comps=[("PNL", "Header", "Header", "—", "\"Bài kiểm tra cuối\" · \"Làm từng phần, câu trả lời được lưu ngay\" · \"Không "
-                "giới hạn thời gian\""),
+        comps=[("LNK", "Về topic / Về khóa học", "Back link", "—", "To the topic or the course"),
+               ("PNL", "Header", "Header", "—", "\"Bài kiểm tra cuối\" (course: \"Thi cuối khóa\") · \"Làm từng phần, câu trả "
+                "lời được lưu ngay\" · \"Không giới hạn thời gian\""),
                ("TAB", "Các phần của đề", "Section list", "—", "\"Phần {n}\" with \"{done}/{total} câu\""),
                ("PNL", "Section content", "Passage / audio", "—", "No transcript during the test"),
                ("RAD", "Answer", "Radio (choices) / Text Input", "—", "Choice answers save on change"),
@@ -716,7 +986,7 @@ SCREENS = [
                ("BTN", "Nộp bài / Vẫn nộp", "Button (Primary)", "Second click needed when answers are missing",
                 "\"Đang nộp…\" while pending")],
         apis=[("Page load", "as.structure", "Path: `attemptId`", "Render sections · loading: \"Đang tải đề…\"", "GLB-03/04"),
-              ("Choice picked; and every answer at submit", "as.save", "`{payload: {answer}, schemaVersion: 1, "
+              ("Choice picked, text field left, and every answer at submit", "as.save", "`{payload: {answer}, schemaVersion: 1, "
                "expectedRevision}`", "Badge \"Đã lưu\"; keep the new revision", "Badge \"Chưa lưu được, sẽ thử lại khi nộp\""),
               ("User confirms Nộp bài", "as.submit", "Path: `attemptId`", "Navigate Test Result", "409 ATTEMPT_ALREADY_SUBMITTED / "
                "ATTEMPT_EXPIRED → server message + \" Hãy thử nộp lại.\"")],
@@ -737,33 +1007,41 @@ SCREENS = [
               ("Inline Error", "409 ATTEMPT_EXPIRED on submit", "Today: server message + \" Hãy thử nộp lại.\" Design "
                "target: same text as MSG-04", "Persistent")],
         rules=[("FT-30", "Frozen snapshot; no answers, hints or transcripts in the structure", "Nothing to hide client-side"),
-               ("FT-30 BV-01", "Save needs the current revision", "Revision kept per item")],
+               ("FT-30 BV-01", "Save needs the current revision", "Revision kept per item"),
+               ("BR-39", "Essays of topic and course tests are graded by the LLM after submit (JOB-03)",
+                "No essay box in the test runner yet; an essay never sent scores 0")],
     ),
     # ------------------------------------------------------------------ Test Result
     screen(
-        key="TestResult", name="Test Result", route="/learn/tests/:attemptId/result?topic=… · RequireAuth",
-        roles="Signed-in learner", ft="FT-14, FT-24, FT-29, FT-31, FT-33", uc="UC: View result; Request AI grading; Request examiner grading", fe="api",
+        key="TestResult", name="Test Result", route="/learn/tests/:attemptId/result?topic=… | ?course=… · RequireAuth",
+        roles="Signed-in learner", ft="FT-14, FT-24, FT-29, FT-31, FT-33, FT-55",
+        uc="UC: View result; Take course test; Request AI grading; Request examiner grading", fe="api",
         status="Specified (examiner and AI grading requests: Draft)",
         frontend=FE_LEARN.format(page="TopicTestResultPage.tsx", route="/learn/tests/:attemptId/result"),
-        shots=[("TestResult.png", "Test Result — a failed topic test (25%)")],
-        purpose="Shows the score of the submitted topic test, per-question correctness and — at 70% or more — the correct "
-                "answers, and tells the learner whether the topic is passed.",
+        shots=[("TestResult.png", "Test Result — a topic final test result")],
+        purpose="Shows the score of the submitted topic or course test, per-question correctness and — at 70% or more — "
+                "the correct answers, and tells the learner whether the topic or the course is passed.",
         nav_from=[("Test Attempt", "Submit succeeded")],
-        nav_to=[("Topic Detail (next topic)", "Passed; user clicks \"Sang chặng tiếp theo\""),
-                ("Learning Path", "User clicks \"Xem lộ trình\""), ("Topic Detail", "Failed; user clicks \"Về topic để làm "
-                "lại\"")],
+        nav_to=[("Topic Detail (next topic)", "Topic passed; user clicks \"Sang chặng tiếp theo\""),
+                ("Course Path", "Course passed: \"Về khóa học\"; failed: \"Về khóa để làm lại\""),
+                ("Course List", "User clicks \"Xem danh sách khóa\""),
+                ("Topic Detail", "Topic failed; user clicks \"Về topic để làm lại\"")],
         pre=[REQUIRE_AUTH, ("Attempt belongs to the user", "Continue", "403 → error panel")],
-        entry=[("Submit", "Test Attempt", "`attemptId`, Query `topic`")],
-        exits=[("User clicks a navigation button", "Any", "Topic / Learning Path", "—"), EX_SESSION],
+        entry=[("Submit", "Test Attempt", "`attemptId`, Query `topic` or `course`")],
+        exits=[("User clicks a navigation button", "Any", "Topic Detail, Course Path or Course List", "—"), EX_SESSION],
         comps=[("PRG", "Score dial", "Ring", "—", "Percent"),
-               ("PNL", "Outcome", "Header", "—", "\"Kết quả · mã đề {code}\" · \"Đạt bài kiểm tra cuối\" / \"Chưa đạt lần này\""),
+               ("PNL", "Outcome", "Header", "—", "\"Kết quả · mã đề {code}\" · \"Đạt bài kiểm tra cuối\" (course: \"Đạt thi "
+                "cuối khóa\") / \"Chưa đạt lần này\""),
                ("PNL", "Score line", "Text", "—", "\"{score}/{max} câu đúng · {p}% · cần từ 70%\""),
                ("TBL", "Từng câu", "List", "—", "\"Câu {n}\" ✓/✗; \"Đáp án: {answer}\" only when passed"),
-               ("BTN", "Sang chặng tiếp theo / Xem lộ trình / Về topic để làm lại", "Buttons", "—", "By outcome")],
+               ("BTN", "Sang chặng tiếp theo / Về khóa học / Xem danh sách khóa / Về topic (khóa) để làm lại", "Buttons",
+                "—", "By outcome and test kind")],
         apis=[("Page load", "as.result", "Path: `attemptId`", "Render score and items · loading: \"Đang chấm bài…\"",
                "404 / 403 → error panel"),
-              ("Passed: re-read the trail up to 4 times, 400 ms apart", "learn.topics", "—", "Find PASSED topic and the next "
-               "IN_PROGRESS topic", "Error → panel"),
+              ("Topic passed: re-read the topics up to 4 times, 400 ms apart", "learn.topics", "—", "Find the PASSED "
+               "topic and the next IN_PROGRESS topic", "Error → panel"),
+              ("Course passed: re-read the courses up to 4 times, 400 ms apart", "learn.courses", "—", "Find the course "
+               "with testStatus PASSED", "Error → panel"),
               ("Design target: user clicks \"Chấm bằng AI\" on a Writing/Speaking item [Draft]", "as.submission",
                "`{attemptItemId, skill, textPayload | audioReference, submissionKey}`", "Then API 4", "400 → GLB-06"),
               ("Design target: submission created [Draft]", "as.createJob", "`{submissionId, skill, gradingMode, "
@@ -774,7 +1052,11 @@ SCREENS = [
         interactions=[("Outcome text", [
             "IF passed AND a next topic is IN_PROGRESS → \"Topic đã qua. Chặng tiếp theo đã mở (làm mới từ GET /topics).\"",
             "ELSE IF passed → \"Topic đã qua. Bạn đã hoàn thành toàn bộ lộ trình hiện có.\"",
-            "ELSE → \"Đáp án được ẩn khi chưa đạt. Ôn lại các bài trong topic rồi làm lại; lần sau bạn sẽ nhận mã đề khác.\""]),
+            "ELSE → \"Đáp án được ẩn khi chưa đạt. Ôn lại các bài trong topic rồi làm lại; lần sau bạn sẽ nhận mã đề khác.\"",
+            "Course test: passed and course PASSED → \"Khóa đã đánh dấu PASSED (poll GET /courses). Bạn có thể chọn khóa",
+            "             khác hoặc xem lại lộ trình.\"; passed, not yet PASSED → \"Đã đạt điểm. Hệ thống đang cập nhật trạng",
+            "             thái khóa — làm mới danh sách khóa nếu chưa thấy PASSED.\"; failed → \"Đáp án được ẩn khi chưa đạt.",
+            "             Ôn lại các topic rồi làm lại; lần sau bạn sẽ nhận mã đề khác.\""]),
             ("Why it re-reads topics", ["The topic is passed asynchronously by JOB-02 after JOB-01 relays the event "
                                         "(relay every 2 s; NFR-P05 allows up to 5 s), so the page re-reads /topics "
                                         "before showing the next topic.",
@@ -786,45 +1068,45 @@ SCREENS = [
                "nhận mã đề khác.\"", "Persistent")],
         rules=[("BR-24", "Answers and transcripts only at ≥ 70%", "\"Đáp án\" lines only when passed"),
                ("BR-22", "Test code consumed even on failure; the next code rotates", "MSG-03"),
-               ("BR-15", "Topic pass mark 70%", "\"cần từ 70%\" in the score line"),
+               ("BR-15", "Topic and course pass mark 70%", "\"cần từ 70%\" in the score line"),
+               ("BR-37", "A course passes permanently at 70%; topics never relock", "Course outcome text"),
                ("NFR-P05", "A result reaches Learning Service within 5 s (95%)", "Re-read /topics long enough to see the "
                 "next topic (GAP-14)"),
                ("BR-31", "Examiner grading consumes one credit of an ACTIVE subscription [Draft]",
                 "402 → \"Bạn đã hết lượt chấm giáo viên.\"; nothing is consumed")],
     ),
-    # ------------------------------------------------------------------ Mock & Placement Tests (not built)
+    # ------------------------------------------------------------------ Mock Tests (not built)
     screen(
-        key="MockTests", name="Mock & Placement Tests", route="/tests (proposed)", roles="CUSTOMER",
-        ft="FT-34, FT-35", uc="UC: Take mock test; Take placement test", status="Draft",
-        draft="Draft: no mock or placement content exists and learners cannot list these tests in the current "
-              "release; attempts of type MOCK and PLACEMENT can already be started by package version id. The "
-              "frontend's Luyện đề area is a separate mock-data prototype (Practice Test Catalog).",
-        purpose="Lists the published mock tests and the one-time placement test, so the learner can estimate a "
-                "starting level or practise under exam conditions.",
-        nav_from=[("Main menu", "User clicks \"Tests\""), ("Learning Goals", "User clicks \"Take the placement test\"")],
+        key="MockTests", name="Mock Tests", route="/tests (proposed)", roles="CUSTOMER",
+        ft="FT-34", uc="UC: Take mock test", status="Draft",
+        draft="Draft: no mock test content exists and learners cannot list mock tests in the current release; an "
+              "attempt of type MOCK can already be started by package version id. The placement test is built "
+              "separately (Placement Test). The frontend's Luyện tập 4 kỹ năng area is a separate prototype "
+              "(Practice Test Catalog).",
+        purpose="Lists the published mock tests so the learner can practise under exam conditions and get an "
+                "estimated band per skill.",
+        nav_from=[("Main menu", "User clicks \"Tests\"")],
         nav_to=[("Test Attempt", "User starts a test"), ("Test Result", "User opens a past attempt")],
         pre=[AUTH, LEARNER],
-        entry=[("Main menu", "Any learner screen", "—"), ("Placement prompt", "Learning Goals", "Query: `?type=PLACEMENT`")],
+        entry=[("Main menu", "Any learner screen", "—")],
         exits=[("User clicks Start", "Test available", "Test Attempt", "Confirm modal MSG-02"),
                ("User clicks a past attempt", "Any", "Test Result", "—"), ex_menu(), EX_SESSION],
-        comps=[("TAB", "Type tabs", "Tab bar", "MOCK, PLACEMENT", "—"),
-               ("CRD", "Test card", "Card list", "—", "Title, skills covered, estimated duration [TBC]"),
-               ("BTN", "Start", "Button (Primary)", "Placement: disabled after one completed attempt [TBC]", "Triggers API 2"),
+        comps=[("CRD", "Test card", "Card list", "—", "Title, skills covered, estimated duration [TBC]"),
+               ("BTN", "Start", "Button (Primary)", "—", "Triggers API 2"),
                ("TBL", "Past attempts", "Table", "Newest first", "Date, overall band (mock), status")],
         apis=[("Page load (mount)", "as.mockList", "Query: `type`", "Render cards · loading: skeleton", "Error → GLB-04"),
               ("User confirms Start", "as.start", "`{packageVersionId, mode: STANDARD, channel: WEB}`",
                "Navigate Test Attempt", "422 PACKAGE_NOT_ATTEMPTABLE / 404 → MSG-03; 503 → GLB-05")],
-        interactions=[("Placement once", ["IF a PLACEMENT attempt is COMPLETED [TBC, OQ-06]",
-                                          "THEN   hide Start and show the placement result",
-                                          "END IF"])],
+        interactions=[("Grading", ["Objective sections are graded at submit; Writing and Speaking of a mock test are "
+                                   "graded by an Examiner (SRS v0.9.20) and the bands use the official IELTS Academic "
+                                   "tables (BR-33)."])],
         msgs=[("Empty State", "No published test", "Title: \"No tests yet\" · Description: \"Mock tests will appear here "
                "when they are published.\"", "—"),
               ("Confirm Modal", "User clicks Start", "Title: \"Start {test}?\" · Body: \"Find a quiet place. Your answers "
                "are saved as you go.\"", "Buttons: \"Start\" + \"Cancel\""),
               ("Error Toast", "Start fails", "\"This test cannot be started right now. Please try again later.\"",
                "Auto-dismiss 5s")],
-        rules=[("BR-14", "Mock/placement tests contain EXAM questions only", "Authoring rule; no UI effect"),
-               ("BR-33", "Mock bands 0–9 in 0.5 steps; overall = mean rounded to 0.5", "Shown on Test Result [TBC]"),
-               ("FT-35 BV-01", "One placement test per learner [TBC]", "Start hidden after completion")],
+        rules=[("BR-14", "Mock tests contain EXAM questions only", "Authoring rule; no UI effect"),
+               ("BR-33", "Mock bands from the official tables; overall = mean rounded to 0.5", "Shown on Test Result")],
     ),
 ]

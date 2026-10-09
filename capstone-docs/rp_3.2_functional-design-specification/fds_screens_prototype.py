@@ -9,13 +9,13 @@ MOCK_RULE = ("OQ-17", "Prototype on mock data", "No business rule is enforced; d
 SCREENS = [
     # ------------------------------------------------------------------ Practice Test Catalog
     screen(
-        key="PracticeCatalog", name="Practice Test Catalog", route="/practice-tests · RequireAuth",
+        key="PracticeCatalog", name="Practice Test Catalog", route="/practice-tests?skill=listening|reading|writing|speaking · RequireAuth",
         roles="Any signed-in user", ft="— (no SRS feature; closest FT-34 Mock test)", uc="—", fe="mock",
         status="Prototype (mock data, OQ-17)",
         frontend="Built on mock data — features/practice/pages/PracticeCatalogPage.tsx with mocks/practiceData.ts; no "
                  "API call.",
         purpose="Lets the learner browse practice tests by skill and open one in practice or exam mode.",
-        nav_from=[("Top bar", "User clicks \"Luyện đề\""), ("Practice Workspaces", "User clicks \"Thoát\"")],
+        nav_from=[("Top bar", "User clicks \"Luyện tập 4 kỹ năng\" or its sub-item Listening / Reading / Writing / Speaking, which opens the matching skill tab (?skill=…)"), ("Footer", "User clicks \"Khóa học\""), ("Practice Workspaces", "User clicks \"Thoát\"")],
         nav_to=[("Practice Workspaces", "User picks a test and a mode")],
         pre=[REQUIRE_AUTH],
         entry=[("Top bar", "Any page", "—")],
@@ -80,7 +80,7 @@ SCREENS = [
         frontend="Built on mock data — features/classroom/ClassroomPage.tsx with mocks/classroomData.ts; no API call.",
         purpose="Shows the learner's class, teacher and a calendar of class sessions with a link to join or open each "
                 "session.",
-        nav_from=[("Top bar", "User clicks \"Lớp học\"")],
+        nav_from=[("Direct link", "User opens /classroom (no longer in the top menu)")],
         nav_to=[("Classroom Lesson Workspace", "User opens a session's lesson"),
                 ("Placeholder /classes/:classCode/join", "User clicks \"Join class! Vào lớp ngay\"")],
         pre=[REQUIRE_AUTH],
