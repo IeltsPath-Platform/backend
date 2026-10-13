@@ -36,10 +36,12 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Grades a placement attempt and writes its overall band on the result. Listening and Reading are graded by percent
- * correct, Writing by the LLM band of the essay the learner sent (zero when none was sent) and Speaking by a fixed band
- * until recordings can be assessed. The skill bands are averaged into the result's {@code overallBand}; Learning only
- * stores it. An essay the LLM could not grade takes the default Writing band instead of waiting for an examiner.
+ * Grades a placement attempt and writes its overall band on the result. Listening and Reading are converted from the
+ * number of correct answers, Writing is the LLM band of each essay the learner sent (zero when none was sent; Task 2
+ * weighs twice Task 1) and Speaking is a configured band that defaults to 0 until recordings can be assessed. A skill
+ * may span several sections, such as the four Listening parts. The skill bands are averaged into the result's
+ * {@code overallBand}; Learning only stores it. An essay the LLM could not grade takes the default Writing band
+ * instead of waiting for an examiner.
  */
 @Service
 public class PlacementGradingService {
@@ -63,7 +65,7 @@ public class PlacementGradingService {
                                    AssessmentResultRepository results, ItemResultRepository itemResults,
                                    AssessmentResultCompleter completer, GateEssayJobStore jobs,
                                    AutoGradeAttemptService autoGrader, ObjectMapper json,
-                                   @Value("${assessment.placement.speaking-band:5.5}") double speakingBand,
+                                   @Value("${assessment.placement.speaking-band:0.0}") double speakingBand,
                                    @Value("${assessment.placement.default-writing-band:5.5}") double defaultWritingBand) {
         this.attempts = attempts;
         this.sections = sections;
@@ -129,7 +131,7 @@ public class PlacementGradingService {
 
         UUID resultId = UUID.randomUUID();
         Map<Skill, int[]> objective = new EnumMap<>(Skill.class);
-        Map<Skill, List<Double>> banded = new EnumMap<>(Skill.class);
+        Map<Skill, double[]> banded = new EnumMap<>(Skill.class);
         List<ItemResult> graded = new ArrayList<>(items.size());
         for (AttemptItem item : items) {
             AnswerSnapshot answer = AnswerSnapshot.parse(json, item.answerSnapshot())
@@ -139,10 +141,10 @@ public class PlacementGradingService {
             boolean correct;
             if (skill == Skill.WRITING) {
                 double band = essayBands.getOrDefault(item.id(), BigDecimal.ZERO).doubleValue();
-                banded.computeIfAbsent(skill, key -> new ArrayList<>()).add(band);
+                addBand(banded, skill, band, writingWeight(answer));
                 correct = answer.passBand() != null && band >= answer.passBand().doubleValue();
             } else if (skill == Skill.SPEAKING) {
-                banded.computeIfAbsent(skill, key -> new ArrayList<>()).add(speakingBand);
+                addBand(banded, skill, speakingBand, 1.0);
                 correct = true;
             } else {
                 correct = autoGrader.isCorrect(answer, responseByItem.get(item.id()));
@@ -176,14 +178,14 @@ public class PlacementGradingService {
                 state.band() != null ? state.band() : defaultWritingBand));
 
         Map<Skill, int[]> objective = new EnumMap<>(Skill.class);
-        Map<Skill, List<Double>> banded = new EnumMap<>(Skill.class);
+        Map<Skill, double[]> banded = new EnumMap<>(Skill.class);
         for (AttemptItem item : attemptItems.findByAttemptId(attemptId)) {
             Skill skill = skillBySection.get(item.attemptSectionId());
             if (skill == Skill.WRITING) {
-                banded.computeIfAbsent(skill, key -> new ArrayList<>())
-                        .add(essayBands.getOrDefault(item.id(), BigDecimal.ZERO).doubleValue());
+                double weight = AnswerSnapshot.parse(json, item.answerSnapshot()).map(this::writingWeight).orElse(1.0);
+                addBand(banded, skill, essayBands.getOrDefault(item.id(), BigDecimal.ZERO).doubleValue(), weight);
             } else if (skill == Skill.SPEAKING) {
-                banded.computeIfAbsent(skill, key -> new ArrayList<>()).add(speakingBand);
+                addBand(banded, skill, speakingBand, 1.0);
             } else {
                 ItemResult graded = gradedByItem.get(item.id());
                 int[] counts = objective.computeIfAbsent(skill, key -> new int[2]);
@@ -194,11 +196,21 @@ public class PlacementGradingService {
         return bandsBySkill(objective, banded);
     }
 
-    private static Map<Skill, Double> bandsBySkill(Map<Skill, int[]> objective, Map<Skill, List<Double>> banded) {
+    private double writingWeight(AnswerSnapshot answer) {
+        return PlacementBandCalculator.writingTaskWeight(answer.answerSpec() == null ? null : answer.answerSpec().get("task"));
+    }
+
+    /** Adds a weighted band to {@code [sum of band x weight, sum of weights]} of the skill. */
+    private static void addBand(Map<Skill, double[]> banded, Skill skill, double band, double weight) {
+        double[] totals = banded.computeIfAbsent(skill, key -> new double[2]);
+        totals[0] += band * weight;
+        totals[1] += weight;
+    }
+
+    private static Map<Skill, Double> bandsBySkill(Map<Skill, int[]> objective, Map<Skill, double[]> banded) {
         Map<Skill, Double> bands = new EnumMap<>(Skill.class);
-        objective.forEach((skill, c) -> bands.put(skill, PlacementBandCalculator.bandForPercent(100.0 * c[0] / c[1])));
-        banded.forEach((skill, list) -> bands.put(skill, list.stream().mapToDouble(Double::doubleValue)
-                .average().orElse(0.0)));
+        objective.forEach((skill, c) -> bands.put(skill, PlacementBandCalculator.bandForCorrect(skill, c[0], c[1])));
+        banded.forEach((skill, totals) -> bands.put(skill, totals[1] > 0 ? totals[0] / totals[1] : 0.0));
         return bands;
     }
 

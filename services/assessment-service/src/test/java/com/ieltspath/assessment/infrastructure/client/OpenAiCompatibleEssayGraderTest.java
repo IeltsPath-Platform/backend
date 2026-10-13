@@ -98,6 +98,30 @@ class OpenAiCompatibleEssayGraderTest {
         server.verify();
     }
 
+    @Test
+    void buildsTheChatCompletionsUrlFromDifferentBaseUrlShapes() throws Exception {
+        String reply = new ObjectMapper().writeValueAsString(Map.of("choices", List.of(Map.of("message", Map.of(
+                "content", "{\"criteria\":[{\"code\":\"TR\",\"band\":6.0},{\"code\":\"CC\",\"band\":6.0},"
+                        + "{\"code\":\"LR\",\"band\":6.0},{\"code\":\"GRA\",\"band\":6.0}]}")))));
+        Map<String, String> expectedUrlByBase = Map.of(
+                "https://llm.example", "https://llm.example/v1/chat/completions",
+                "https://llm.example/", "https://llm.example/v1/chat/completions",
+                "https://llm.example/v1", "https://llm.example/v1/chat/completions",
+                "https://generativelanguage.googleapis.com/v1beta/openai/",
+                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
+        for (var entry : expectedUrlByBase.entrySet()) {
+            RestClient.Builder builder = RestClient.builder();
+            MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+            server.expect(requestTo(entry.getValue())).andRespond(withSuccess(reply, MediaType.APPLICATION_JSON));
+            AssessmentLlmProperties properties = properties();
+            properties.setBaseUrl(entry.getKey());
+
+            new OpenAiCompatibleEssayGrader(builder.build(), properties, new ObjectMapper())
+                    .grade(new EssayGradingPort.Prompt("Discuss", "TASK_2", 250, null), "essay");
+            server.verify();
+        }
+    }
+
     private AssessmentLlmProperties properties() {
         AssessmentLlmProperties properties = new AssessmentLlmProperties();
         properties.setBaseUrl("https://llm.example");

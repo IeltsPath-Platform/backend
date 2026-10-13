@@ -110,6 +110,16 @@ clears the range.
   | `listening/demo/hotel.mp3` | 45 | final test X3 |
   | `listening/demo/tour.mp3` | 40 | final test X4 |
 
+- The V27 placement test (version 2 of `PLACEMENT-4SKILLS`: Listening Parts 1–4, Reading Passages 1–3, Writing Tasks
+  1–2, Speaking Parts 1–3) adds four more files; the seconds are estimates from the transcripts:
+
+  | Key | Seconds | Used by |
+  | --- | --- | --- |
+  | `listening/placement/part1.mp3` | 150 | placement Listening Part 1 |
+  | `listening/placement/part2.mp3` | 180 | placement Listening Part 2 |
+  | `listening/placement/part3.mp3` | 170 | placement Listening Part 3 |
+  | `listening/placement/part4.mp3` | 190 | placement Listening Part 4 |
+
 ## Verification
 
 ```powershell

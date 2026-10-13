@@ -105,7 +105,7 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 - Role chuẩn là `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF` (`LEARNER` cũ đã đổi thành `CUSTOMER`).
 - `graphify-out/` không được commit.
 - Bài Listening seed (content V12, reference dạng key) trả 500 `INVALID_MEDIA_REFERENCE` khi thiếu `CONTENT_MEDIA_BASE_URL`;
-  URL `https://` đầy đủ không cần base. 8 file mp3 phải upload đúng key (bảng trong `services/content-service/README.md`).
+  URL `https://` đầy đủ không cần base. 12 file mp3 (8 của V12, 4 của placement V27) phải upload đúng key (bảng trong `services/content-service/README.md`).
 
 ## 6. Tài liệu tra cứu
 

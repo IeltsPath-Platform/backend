@@ -280,8 +280,9 @@ thêm `DEMO_DATA_ENABLED=true` vào `.env`. Ghi một lần, khởi động lạ
 Content seed các bài Reading, Listening, Writing, topic nhiều skill và đề placement `PLACEMENT-4SKILLS` qua các Flyway
 migration (V9–V25). Placement test (`GET /api/learning/placement-test`) không bắt buộc: học viên học được mọi course khi chưa làm,
 placement chỉ dùng để gợi ý course và chỉ làm được một lần. Band placement lấy từ
-Listening/Reading theo % đúng, Writing do LLM chấm (band mặc định `assessment.placement.default-writing-band` khi LLM
-không chấm được) và Speaking cố định `assessment.placement.speaking-band` (cả hai mặc định 5.5). Learning tự
+Listening/Reading quy đổi theo số câu đúng trên 40 (bảng IELTS, không đúng câu nào là band 0), Writing do LLM chấm
+(Task 2 nặng gấp đôi Task 1; band mặc định `assessment.placement.default-writing-band` = 5.5 khi LLM không chấm được)
+và Speaking cố định `assessment.placement.speaking-band` (mặc định 0 cho tới khi chấm được ghi âm). Learning tự
 tạo lộ trình khi học viên gọi `GET /api/learning/topics` lần đầu, nên không cần seed thêm. Không bật cờ demo trên
 database dùng chung hoặc production.
 

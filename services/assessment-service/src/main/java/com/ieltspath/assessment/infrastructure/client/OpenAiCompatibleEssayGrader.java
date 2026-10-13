@@ -96,9 +96,12 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
         }
     }
 
+    /** A bare host gets the conventional {@code /v1}; a base URL that already has a path, such as {@code .../v1beta/openai}, is used as given. */
     private static String endpoint(String baseUrl) {
         String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        return base.endsWith("/v1") ? base + "/chat/completions" : base + "/v1/chat/completions";
+        String path = java.net.URI.create(base).getPath();
+        boolean hostOnly = path == null || path.isEmpty();
+        return hostOnly ? base + "/v1/chat/completions" : base + "/chat/completions";
     }
 
     private static String systemPrompt(String task) {
