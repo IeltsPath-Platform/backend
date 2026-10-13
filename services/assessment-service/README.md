@@ -15,12 +15,15 @@ The service currently supports:
 ### Grading a placement attempt
 
 A `PLACEMENT` attempt is graded by `PlacementGradingService` when it is submitted, never by an examiner. Listening and
-Reading items are graded by answer spec and each skill's percent correct becomes a band
-(below 30% → 4.0, 30–44 → 4.5, 45–59 → 5.0, 60–69 → 5.5, 70–79 → 6.0, 80–89 → 6.5, 90 and above → 7.0). A Writing
-essay the learner sent through `POST /api/assessments/submissions` goes to the LLM job queue and its band is the Writing
-band; an essay never sent counts as 0, and an essay the LLM cannot grade (not configured, daily limit, failure) takes
+Reading items are graded by answer spec and each of Listening and Reading is converted to a band from its number of
+correct answers scaled to 40 questions (Listening: 39–40 → 9.0, 37–38 → 8.5, 35–36 → 8.0, 32–34 → 7.5, 30–31 → 7.0,
+26–29 → 6.5, 23–25 → 6.0, 18–22 → 5.5, 16–17 → 5.0, 13–15 → 4.5, 10–12 → 4.0, 8–9 → 3.5, 6–7 → 3.0, 4–5 → 2.5, 3 → 2.0,
+2 → 1.5, 1 → 1.0, none → 0; Reading differs at 33–34 → 7.5, 30–32 → 7.0, 27–29 → 6.5, 23–26 → 6.0, 19–22 → 5.5,
+15–18 → 5.0, 13–14 → 4.5). A Writing essay the learner sent through `POST /api/assessments/submissions` goes to the LLM
+job queue and its band is the Writing band, Task 2 counting twice as much as Task 1; an essay never sent counts as 0,
+and an essay the LLM cannot grade (not configured, daily limit, failure) takes
 `assessment.placement.default-writing-band` (default 5.5). Speaking takes the fixed
-`assessment.placement.speaking-band` (default 5.5) because recordings are only stored. The overall band is the mean of
+`assessment.placement.speaking-band` (default 0) because recordings are only stored. The overall band is the mean of
 the four skill bands rounded to the nearest half band and is written to `assessment_results.overall_band`, so the
 `AssessmentCompleted.v2` event carries it for Learning. The skill bands are not stored: `GET
 /api/assessments/attempts/{id}/placement-result` recomputes them from the stored item results and essay jobs the same

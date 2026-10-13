@@ -44,11 +44,30 @@ class PlacementTestSeedTest {
         assertThat(payload.packageType()).isEqualTo(PackageType.PLACEMENT_TEST);
         Set<Skill> skills = payload.sections().stream().map(section -> section.skill()).collect(Collectors.toSet());
         assertThat(skills).containsExactlyInAnyOrder(Skill.LISTENING, Skill.READING, Skill.WRITING, Skill.SPEAKING);
-        // Same order as the computer-based test, with both Writing tasks.
+        // Same parts and order as the real test.
         assertThat(payload.sections()).extracting(section -> section.title()).containsExactly(
-                "Reading: a community tool library", "Listening: booking a study room",
-                "Writing Task 1: museum visitors", "Writing Task 2: trees or parking", "Speaking: a place you like");
-        assertThat(payload.sections().get(2).passage()).startsWith("Museum | 2019");
+                "Listening Part 1: joining a swimming course", "Listening Part 2: a visit to a nature reserve",
+                "Listening Part 3: a project on canteen food waste", "Listening Part 4: the early history of the bicycle",
+                "Reading Passage 1: bees in the city", "Reading Passage 2: the return of the night train",
+                "Reading Passage 3: the case for handwriting",
+                "Writing Task 1: museum visitors", "Writing Task 2: trees or parking",
+                "Speaking Part 1: introduction and interview", "Speaking Part 2: a place you like",
+                "Speaking Part 3: discussion");
+        assertThat(payload.sections().get(7).passage()).startsWith("Museum | 2019");
+    }
+
+    @Test
+    void listeningAndReadingHaveFortyQuestionsEachWithOneAudioOrPassagePerPart() {
+        var payload = reader.publishedPackageVersion(reader.placementTestPackages().getFirst().packageVersionId())
+                .orElseThrow();
+        Map<Skill, Integer> questions = payload.sections().stream().collect(Collectors.groupingBy(
+                section -> section.skill(), Collectors.summingInt(section -> section.items().size())));
+        assertThat(questions).containsEntry(Skill.LISTENING, 40).containsEntry(Skill.READING, 40)
+                .containsEntry(Skill.WRITING, 2).containsEntry(Skill.SPEAKING, 8);
+        payload.sections().stream().filter(section -> section.skill() == Skill.LISTENING)
+                .forEach(section -> assertThat(section.audio().mediaReference()).startsWith("listening/placement/part"));
+        payload.sections().stream().filter(section -> section.skill() == Skill.READING)
+                .forEach(section -> assertThat(section.passage()).isNotBlank());
     }
 
     @Test
@@ -57,7 +76,7 @@ class PlacementTestSeedTest {
         assertThat(reader.questionsWithWrongPurpose(version, QuestionPurpose.PLACEMENT)).isEmpty();
         assertThat(reader.questionsUsedElsewhere(version)).isEmpty();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM questions WHERE purpose = 'PLACEMENT'", Map.of(), Integer.class))
-                .isEqualTo(13);
+                .isEqualTo(101);
     }
 
     @Test

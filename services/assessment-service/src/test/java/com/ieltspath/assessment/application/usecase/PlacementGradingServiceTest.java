@@ -66,8 +66,8 @@ class PlacementGradingServiceTest {
 
         service().onSubmit(attempt);
 
-        // listening 100% -> 7.0, reading 0% -> 4.0, writing none -> 0.0, speaking fixed 5.5; mean 4.125 -> 4.0
-        assertThat(savedBand()).isEqualTo(4.0);
+        // listening all correct -> 9.0, reading none correct -> 0.0, writing none -> 0.0, speaking 0.0; mean 2.25 -> 2.5
+        assertThat(savedBand()).isEqualTo(2.5);
         assertThat(gradedItems()).extracting(ItemResult::correct).containsExactly(true, false, false, true);
         verify(jobs, never()).enqueueAi(any(), any());
         verify(completer).complete(eq(attempt), any(), eq(items), anyList());
@@ -95,8 +95,8 @@ class PlacementGradingServiceTest {
 
         assertThat(service().completeIfGraded(attempt.getId())).isTrue();
 
-        // (7.0 + 4.0 + 7.0 + 5.5) / 4 = 5.875 -> 6.0
-        assertThat(savedBand()).isEqualTo(6.0);
+        // (9.0 + 0.0 + 7.0 + 0.0) / 4 = 4.0
+        assertThat(savedBand()).isEqualTo(4.0);
         assertThat(gradedItems()).extracting(ItemResult::correct).containsExactly(true, false, true, true);
     }
 
@@ -125,8 +125,8 @@ class PlacementGradingServiceTest {
 
         service().completeIfGraded(attempt.getId());
 
-        // default writing 5.5: (7.0 + 4.0 + 5.5 + 5.5) / 4 = 5.5
-        assertThat(savedBand()).isEqualTo(5.5);
+        // default writing 5.5: (9.0 + 0.0 + 5.5 + 0.0) / 4 = 3.625 -> 3.5
+        assertThat(savedBand()).isEqualTo(3.5);
     }
 
     @Test
@@ -140,10 +140,10 @@ class PlacementGradingServiceTest {
         when(jobs.aiJobs(attempt.getId())).thenReturn(List.of(
                 new GateEssayJobStore.JobState(writing.id(), "COMPLETED", new BigDecimal("7.0"))));
 
-        // Same inputs as completedLlmBandFeedsTheWritingSkillBand, whose overall band is 6.0.
+        // Same inputs as completedLlmBandFeedsTheWritingSkillBand, whose overall band is 4.0.
         assertThat(service().skillBands(attempt.getId(), resultId)).containsExactly(
-                entry(Skill.LISTENING, 7.0), entry(Skill.READING, 4.0),
-                entry(Skill.WRITING, 7.0), entry(Skill.SPEAKING, 5.5));
+                entry(Skill.LISTENING, 9.0), entry(Skill.READING, 0.0),
+                entry(Skill.WRITING, 7.0), entry(Skill.SPEAKING, 0.0));
     }
 
     @Test
@@ -155,7 +155,25 @@ class PlacementGradingServiceTest {
         when(jobs.aiJobs(attempt.getId())).thenReturn(List.of());
 
         assertThat(service().skillBands(attempt.getId(), resultId)).containsEntry(Skill.WRITING, 0.0)
-                .containsEntry(Skill.LISTENING, 4.0);
+                .containsEntry(Skill.LISTENING, 0.0).containsEntry(Skill.SPEAKING, 0.0);
+    }
+
+    @Test
+    void writingTask2WeighsTwiceTask1() {
+        AttemptItem task1 = item("WRITING", "{\"answerSpec\":{\"type\":\"ESSAY\",\"task\":\"TASK_1\",\"passBand\":5.5},\"maxScore\":1.0}");
+        AttemptItem task2 = item("WRITING", "{\"answerSpec\":{\"type\":\"ESSAY\",\"task\":\"TASK_2\",\"passBand\":5.5},\"maxScore\":1.0}");
+        UUID resultId = UUID.randomUUID();
+        when(attemptItems.findByAttemptId(attempt.getId())).thenReturn(List.of(task1, task2));
+        when(sections.findByAttemptId(attempt.getId())).thenReturn(List.of(task1, task2).stream()
+                .map(item -> new AttemptSection(item.attemptSectionId(), attempt.getId(), UUID.randomUUID(), 0,
+                        "{\"skill\":\"WRITING\"}")).toList());
+        when(itemResults.findByResultId(resultId)).thenReturn(List.of());
+        when(jobs.aiJobs(attempt.getId())).thenReturn(List.of(
+                new GateEssayJobStore.JobState(task1.id(), "COMPLETED", new BigDecimal("5.0")),
+                new GateEssayJobStore.JobState(task2.id(), "COMPLETED", new BigDecimal("6.5"))));
+
+        // (5.0 x 1 + 6.5 x 2) / 3 = 6.0; a plain mean would give 5.75
+        assertThat(service().skillBands(attempt.getId(), resultId)).containsExactly(entry(Skill.WRITING, 6.0));
     }
 
     private List<AttemptSection> sectionRows() {
@@ -189,7 +207,7 @@ class PlacementGradingServiceTest {
 
     private PlacementGradingService service() {
         return new PlacementGradingService(attempts, sections, attemptItems, responses, results, itemResults,
-                completer, jobs, autoGrader, new ObjectMapper(), 5.5, 5.5);
+                completer, jobs, autoGrader, new ObjectMapper(), 0.0, 5.5);
     }
 
     private AttemptItem item(String skill, String answerSnapshot) {
