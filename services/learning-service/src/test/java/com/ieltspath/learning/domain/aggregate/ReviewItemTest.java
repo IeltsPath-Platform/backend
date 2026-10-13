@@ -49,12 +49,11 @@ class ReviewItemTest {
         ReviewItem practice = pending(0);
         assertThatThrownBy(practice::completeTheory).isInstanceOf(IllegalStateException.class);
 
+        // A failed set sends the review to the theory, where no further set can be given until it is read.
         ReviewItem theory = pending(0);
-        theory.startWithTheory(TheoryReason.WRONG_IN_LESSON);
-        assertThat(theory.isFresh()).isFalse();
+        theory.recordSetResult(assign(theory), UUID.randomUUID(), 2, 4);
+        assertThat(theory.stage()).isEqualTo(ReviewStage.THEORY);
         assertThatThrownBy(() -> assign(theory)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> theory.startWithTheory(TheoryReason.WRONG_IN_LESSON))
-                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test

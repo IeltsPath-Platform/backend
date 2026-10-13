@@ -56,6 +56,11 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public LessonResources getLessonResources(UUID lessonId) {
+        return get("/lessons/{id}/resources", new ParameterizedTypeReference<>() { }, lessonId);
+    }
+
+    @Override
     public List<TestPackage> getTopicTestPackages(UUID topicId) {
         return get("/topics/{id}/test-packages", new ParameterizedTypeReference<>() { }, topicId);
     }

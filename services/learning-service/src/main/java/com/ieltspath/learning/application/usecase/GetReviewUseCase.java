@@ -8,7 +8,6 @@ import com.ieltspath.learning.application.port.LearningContentClient.PracticeSet
 import com.ieltspath.learning.application.port.LearningContentClient.Section;
 import com.ieltspath.learning.application.result.LessonResult;
 import com.ieltspath.learning.application.result.ReviewResult;
-import com.ieltspath.learning.application.service.FirstAttemptMistakes;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.PracticeProgress;
 import com.ieltspath.learning.application.service.TheoryFocus;
@@ -43,18 +42,15 @@ public class GetReviewUseCase {
     private final ReviewItemRepository reviews;
     private final PracticeAttemptRepository attempts;
     private final PracticeProgress practice;
-    private final FirstAttemptMistakes mistakes;
     private final TheoryFocus theoryFocus = new TheoryFocus();
 
     public GetReviewUseCase(LearningContentClient content, LearnerLock lock, ReviewItemRepository reviews,
-                            PracticeAttemptRepository attempts, PracticeProgress practice,
-                            FirstAttemptMistakes mistakes) {
+                            PracticeAttemptRepository attempts, PracticeProgress practice) {
         this.content = content;
         this.lock = lock;
         this.reviews = reviews;
         this.attempts = attempts;
         this.practice = practice;
-        this.mistakes = mistakes;
     }
 
     @Transactional
@@ -62,19 +58,11 @@ public class GetReviewUseCase {
         lock.lock(userId);
         ReviewItem review = ownedReview(userId, reviewId);
         var lesson = content.getLesson(review.lessonId());
-        var focus = theoryFocus.of(lesson, review.knowledgePointId());
+        var focus = theoryFocus.of(lesson);
         if (review.status() != ReviewStatus.PENDING) return result(review, focus, null, List.of());
-        // Practice reviews choose their stage when created; reviews from assessment results are created by the
-        // event consumer, which cannot read lessons, so the lesson check happens on first open.
-        if (review.isFresh() && !"PRACTICE".equals(review.triggerKind())
-                && mistakes.of(userId, lesson).contains(review.knowledgePointId())) {
-            review.startWithTheory(TheoryReason.WRONG_IN_LESSON);
-            reviews.save(review);
-        }
         if (review.stage() == ReviewStage.THEORY) {
-            return result(review, focus, null, focus.quickCheck().stream()
-                    .map(question -> new LessonResult.Question(question.questionVersionId(), question.sortOrder(),
-                            question.stem(), options(question.options()), question.hint())).toList());
+            // The theory is the lesson summary; the learner reads it and confirms, there is no quick check.
+            return result(review, focus, null, List.of());
         }
         Set<UUID> revealed = attempts.revealedPackageIds(userId);
         if (review.openSet().isPresent() && revealed.contains(review.openSet().orElseThrow().packageId())) {

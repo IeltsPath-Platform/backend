@@ -1,7 +1,6 @@
 package com.ieltspath.content.infrastructure.persistence;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ieltspath.content.application.result.LessonContentResult;
 import com.ieltspath.content.application.result.LessonSummaryResult;
 import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.domain.vo.*;
@@ -47,15 +46,12 @@ class MultiSkillSeedTest {
     }
 
     @Test
-    void bothLessonsTeachEverySkillAndEachTheoryBlockNamesItsKnowledgePoints() {
+    void bothLessonsTeachEverySkillThroughTheirKnowledgePoints() {
         List<LessonSummaryResult> lessons = reader.publishedLessons(topic().topicId());
         assertThat(lessons).extracting(LessonSummaryResult::code).containsExactly("T1", "T2");
         for (LessonSummaryResult lesson : lessons) {
             assertThat(lesson.skills()).as(lesson.code()).containsExactlyElementsOf(ALL_THREE);
-            LessonContentResult content = reader.publishedLesson(lesson.lessonId()).orElseThrow();
-            assertThat(content.skills()).containsExactlyElementsOf(ALL_THREE);
-            assertThat(content.blocks()).filteredOn(block -> block.blockType() == BlockType.TEXT).hasSize(3)
-                    .allSatisfy(block -> assertThat(block.knowledgePointIds()).isNotEmpty());
+            assertThat(lesson.knowledgePointIds()).isNotEmpty();
         }
     }
 

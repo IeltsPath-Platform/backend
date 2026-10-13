@@ -20,6 +20,9 @@ public interface LearningContentClient {
 
     Lesson getLesson(UUID lessonId);
 
+    /** A published lesson's Markdown summary and its slide and document links. Callers apply the lesson gate. */
+    LessonResources getLessonResources(UUID lessonId);
+
     List<TestPackage> getTopicTestPackages(UUID topicId);
 
     List<TestPackage> getCourseTestPackages(UUID courseId);
@@ -93,86 +96,36 @@ public interface LearningContentClient {
     }
 
     record LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
-                         int sortOrder, List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds,
-                         Set<LearningSkill> skills) {
+                         int sortOrder, List<UUID> knowledgePointIds, Set<LearningSkill> skills) {
         public LessonSummary {
             skills = skillsOrSingle(skills, null);
         }
         public LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
-                             int sortOrder, List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds) {
-            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, null);
+                             int sortOrder, List<UUID> knowledgePointIds) {
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, null);
         }
     }
 
-    /** {@code skills} are the skills the lesson teaches; a response without them falls back to {@code skill}. */
-    record Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
-                  int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks, LearningSkill skill,
-                  Set<LearningSkill> skills) {
+    /**
+     * {@code summaryMarkdown} is the lesson's Markdown summary, {@code null} when it has none. {@code skills} are the
+     * skills the lesson teaches; a response without them falls back to {@code skill}.
+     */
+    record Lesson(UUID lessonId, UUID topicId, String code, String title, String summary, String summaryMarkdown,
+                  int sortOrder, List<UUID> knowledgePointIds, LearningSkill skill, Set<LearningSkill> skills) {
         public Lesson {
             skills = skillsOrSingle(skills, skill);
         }
-        public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
-                      int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks, LearningSkill skill) {
-            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, skill, null);
+        public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary, String summaryMarkdown,
+                      int sortOrder, List<UUID> knowledgePointIds, LearningSkill skill) {
+            this(lessonId, topicId, code, title, summary, summaryMarkdown, sortOrder, knowledgePointIds, skill, null);
         }
-        public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
-                      int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks) {
-            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, null);
+        public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary, String summaryMarkdown,
+                      int sortOrder, List<UUID> knowledgePointIds) {
+            this(lessonId, topicId, code, title, summary, summaryMarkdown, sortOrder, knowledgePointIds, null);
         }
-    }
-
-    /** {@code blockKind} is {@code EXERCISE} or {@code ESSAY} on exercise blocks; absent means {@code EXERCISE}. */
-    /** {@code knowledgePointIds}: the KPs a TEXT block teaches, or the KPs of an exercise block's questions. */
-    record Block(UUID blockId, String blockType, int sortOrder, String textContent, Asset asset,
-                 List<UUID> vocabularySenseIds, List<Question> questions, String blockKind,
-                 List<UUID> knowledgePointIds) {
-        public Block(UUID blockId, String blockType, int sortOrder, String textContent, Asset asset,
-                     List<UUID> vocabularySenseIds, List<Question> questions, String blockKind) {
-            this(blockId, blockType, sortOrder, textContent, asset, vocabularySenseIds, questions, blockKind, null);
-        }
-
-        public Block(UUID blockId, String blockType, int sortOrder, String textContent, Asset asset,
-                     List<UUID> vocabularySenseIds, List<Question> questions) {
-            this(blockId, blockType, sortOrder, textContent, asset, vocabularySenseIds, questions, null);
-        }
-
-        public boolean isExercise() {
-            return "EXERCISE".equals(blockType) && !isEssay();
-        }
-
-        public boolean isEssay() {
-            return "EXERCISE".equals(blockType) && "ESSAY".equals(blockKind);
-        }
-    }
-
-    /** {@code assets} are the images of an essay question; Content omits them elsewhere. */
-    record Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
-                    Map<String, Object> answerSpec, String explanation, List<UUID> knowledgePointIds,
-                    List<QuestionAsset> assets, String hint) {
-        public Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
-                        Map<String, Object> answerSpec, String explanation, List<UUID> knowledgePointIds,
-                        List<QuestionAsset> assets) {
-            this(questionVersionId, sortOrder, stem, options, answerSpec, explanation, knowledgePointIds, assets, null);
-        }
-
-        public Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
-                        Map<String, Object> answerSpec, String explanation, List<UUID> knowledgePointIds) {
-            this(questionVersionId, sortOrder, stem, options, answerSpec, explanation, knowledgePointIds, null);
-        }
-    }
-
-    record QuestionAsset(UUID assetId, String assetType, String mediaUrl, String altText, int sortOrder) {
     }
 
     record Option(String optionKey, String content, int sortOrder) {
-    }
-
-    /** For {@code AUDIO}, {@code textContent} is the transcript and {@code mediaUrl} the playable URL. */
-    record Asset(UUID id, String assetType, String textContent, String mediaReference,
-                 Integer durationSeconds, String mediaUrl) {
-        public Asset(UUID id, String assetType, String textContent, String mediaReference, Integer durationSeconds) {
-            this(id, assetType, textContent, mediaReference, durationSeconds, null);
-        }
     }
 
     record TestPackage(UUID packageId, UUID packageVersionId, String code) {
@@ -181,6 +134,17 @@ public interface LearningContentClient {
     record PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
                        int matchedQuestionCount) {
     }
+
+    /** {@code summaryMarkdown} is {@code null} when the lesson has none; links are in order. */
+    record LessonResources(UUID lessonId, String summaryMarkdown, List<ResourceLink> slides,
+                           List<ResourceLink> documents) {
+        public LessonResources {
+            slides = slides == null ? List.of() : List.copyOf(slides);
+            documents = documents == null ? List.of() : List.copyOf(documents);
+        }
+    }
+
+    record ResourceLink(UUID id, String title, String url, int sortOrder) {}
 
     /** {@code skills} are the skills of the set's questions; empty from Content that does not send them. */
     record LessonPracticeSet(UUID packageId, UUID packageVersionId, String code, String title,

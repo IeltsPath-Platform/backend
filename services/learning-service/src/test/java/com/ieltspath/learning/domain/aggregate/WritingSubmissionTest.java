@@ -19,8 +19,8 @@ class WritingSubmissionTest {
             new BigDecimal("6"), null, "Sample", List.of(), List.of(UUID.randomUUID()));
 
     private static WritingSubmission grading() {
-        return WritingSubmission.start(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                UUID.randomUUID(), "essay", 260, PROMPT, 3, NOW);
+        return WritingSubmission.startPractice(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), UUID.randomUUID(), "essay", 260, PROMPT, 3, NOW);
     }
 
     private static WritingGrade band(String overall) {

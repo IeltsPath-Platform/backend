@@ -52,12 +52,6 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
     }
 
     @Override
-    public List<WritingSubmission> findGrading(UUID userId, UUID blockId) {
-        return jdbc.query("SELECT " + COLUMNS + " FROM lesson_writing_submissions "
-                + "WHERE user_id = ? AND block_id = ? AND status = 'GRADING'", this::submission, userId, blockId);
-    }
-
-    @Override
     public List<WritingSubmission> findGradingForPractice(UUID userId, UUID practiceAttemptId, UUID questionVersionId) {
         return jdbc.query("SELECT " + COLUMNS + " FROM lesson_writing_submissions WHERE user_id = ? "
                         + "AND practice_attempt_id = ? AND question_version_id = ? AND status = 'GRADING'",
@@ -132,30 +126,6 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
                 SELECT EXISTS (SELECT 1 FROM lesson_writing_submissions WHERE user_id = ? AND block_id = ?
                 AND status = 'GRADED' AND passed AND id <> ?)
                 """, Boolean.class, userId, blockId, excludeId));
-    }
-
-    @Override
-    public Map<UUID, BlockSummary> summarizeBlocks(UUID userId, Collection<UUID> blockIds) {
-        if (blockIds.isEmpty()) return Map.of();
-        Map<UUID, BlockSummary> summaries = new HashMap<>();
-        jdbc.query(connection -> {
-            var statement = connection.prepareStatement("""
-                    SELECT DISTINCT ON (block_id) block_id, id, status, overall_band, passed,
-                    bool_or(status = 'GRADED' AND passed) OVER (PARTITION BY block_id) AS block_passed
-                    FROM lesson_writing_submissions WHERE user_id = ? AND block_id = ANY (?)
-                    ORDER BY block_id, submitted_at DESC, id
-                    """);
-            statement.setObject(1, userId);
-            statement.setArray(2, connection.createArrayOf("uuid", blockIds.toArray()));
-            return statement;
-        }, row -> {
-            WritingSubmissionStatus status = WritingSubmissionStatus.valueOf(row.getString("status"));
-            boolean graded = status == WritingSubmissionStatus.GRADED;
-            summaries.put(row.getObject("block_id", UUID.class), new BlockSummary(row.getObject("id", UUID.class),
-                    status, graded ? row.getBigDecimal("overall_band") : null,
-                    graded ? (Boolean) row.getObject("passed") : null, row.getBoolean("block_passed")));
-        });
-        return summaries;
     }
 
     private WritingSubmission submission(ResultSet row, int index) throws SQLException {

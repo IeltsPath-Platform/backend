@@ -16,14 +16,10 @@ class ProgressAggregatesTest {
     private static final Instant NOW = Instant.parse("2026-10-02T10:00:00Z");
 
     @Test
-    void lessonBlocksPassAndTheLessonCompletesOnce() {
+    void theLessonCompletesOnce() {
         LessonProgress progress = LessonProgress.start(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), 1,
                 List.of());
-        UUID block = UUID.randomUUID();
-
-        assertThat(progress.passBlock(block)).isTrue();
-        assertThat(progress.passBlock(block)).isFalse();
-        assertThat(progress.hasPassed(block)).isTrue();
+        assertThat(progress.isCompleted()).isFalse();
 
         assertThat(progress.complete(NOW)).isTrue();
         assertThat(progress.complete(NOW.plusSeconds(60))).isFalse();

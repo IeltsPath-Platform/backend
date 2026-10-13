@@ -46,8 +46,7 @@ class CourseSeedTest {
         assertThat(topic.knowledgePoints()).hasSize(2).allMatch(TopicSequenceResult.KnowledgePointEntry::hasPracticeSet);
         var lesson = reader.publishedLessons(topic.topicId()).getFirst();
         assertThat(lesson.knowledgePointIds()).hasSize(2);
-        var content = reader.publishedLesson(lesson.lessonId()).orElseThrow();
-        assertThat(content.blocks().stream().filter(block -> block.blockType() == BlockType.TEXT).findFirst().orElseThrow().knowledgePointIds()).hasSize(2);
+        assertThat(lesson.skills()).containsExactly(Skill.READING);
         assertThat(reader.lessonPracticeSets(lesson.lessonId())).hasSize(2).allMatch(set -> set.questionCount() >= 3);
         assertThat(reader.publishedTestPackages(topic.topicId())).hasSize(1);
     }

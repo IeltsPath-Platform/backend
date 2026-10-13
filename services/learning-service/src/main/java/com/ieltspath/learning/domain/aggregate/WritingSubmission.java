@@ -65,15 +65,6 @@ public final class WritingSubmission {
         this.gradingStartedAt = gradingStartedAt;
     }
 
-    /** A new submission, GRADING from {@code now}; not stored yet. */
-    public static WritingSubmission start(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID requestId,
-                                         String essayText, int wordCount, EssayPrompt prompt, int pointCost,
-                                         Instant now) {
-        return new WritingSubmission(id, userId, lessonId, Objects.requireNonNull(blockId, "blockId"), null,
-                requestId, essayText, wordCount, prompt, pointCost, GRADING, null, null, null, null, null,
-                Objects.requireNonNull(now, "now"));
-    }
-
     /** A new essay for a question of a practice attempt, GRADING from {@code now}; not stored yet. */
     public static WritingSubmission startPractice(UUID id, UUID userId, UUID lessonId, UUID practiceAttemptId,
                                                  UUID requestId, String essayText, int wordCount, EssayPrompt prompt,

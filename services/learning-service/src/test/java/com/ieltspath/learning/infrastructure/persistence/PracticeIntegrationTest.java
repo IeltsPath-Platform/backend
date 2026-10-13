@@ -83,12 +83,12 @@ class PracticeIntegrationTest {
                         new KnowledgePoint(secondKp, "KP2", "Second", "PROCEDURE", "READING", "", true)),
                 LearningSkill.READING, true)));
         when(content.getTopicLessons(topic)).thenReturn(List.of(
-                new LessonSummary(firstLesson, topic, "L1", "First", null, 1, List.of(firstKp), List.of()),
-                new LessonSummary(secondLesson, topic, "L2", "Second", null, 2, List.of(secondKp), List.of())));
+                new LessonSummary(firstLesson, topic, "L1", "First", null, 1, List.of(firstKp)),
+                new LessonSummary(secondLesson, topic, "L2", "Second", null, 2, List.of(secondKp))));
         when(content.getLesson(firstLesson)).thenReturn(new Lesson(firstLesson, topic, "L1", "First", null,
-                1, List.of(firstKp), List.of(), LearningSkill.READING));
+                null, 1, List.of(firstKp), LearningSkill.READING));
         when(content.getLesson(secondLesson)).thenReturn(new Lesson(secondLesson, topic, "L2", "Second", null,
-                2, List.of(secondKp), List.of(), LearningSkill.READING));
+                null, 2, List.of(secondKp), LearningSkill.READING));
         when(content.lessonPracticeSets(firstLesson)).thenReturn(firstSets);
         when(content.lessonPracticeSets(secondLesson)).thenReturn(secondSets);
         when(content.topicPracticeSets(topic)).thenReturn(new TopicPracticeSets(List.of(

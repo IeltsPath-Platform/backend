@@ -1,8 +1,6 @@
 package com.ieltspath.learning.application.usecase;
 
-import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearnerLock;
-import com.ieltspath.learning.application.port.LearningContentClient.Block;
 import com.ieltspath.learning.application.port.LearningContentClient.Lesson;
 import com.ieltspath.learning.application.service.LessonAccess;
 import com.ieltspath.learning.application.service.PracticeProgress;
@@ -15,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.util.UUID;
 
-/** Completes a lesson that has no exercise block; idempotent. */
+/** Completes a lesson when the learner confirms it; idempotent. */
 @Service
 public class CompleteLessonUseCase {
     private final LearnerLock lock;
@@ -39,9 +37,6 @@ public class CompleteLessonUseCase {
         lock.lock(userId);
         LessonAccess.Context context = access.authorize(userId, lessonId);
         Lesson lesson = context.lesson();
-        if (lesson.blocks().stream().anyMatch(Block::isExercise)) {
-            throw new LearningRequestException(409, "LESSON_HAS_EXERCISES", "Lesson contains exercise blocks");
-        }
         LessonProgress progress = access.refresh(userId, lesson, context.progress());
         if (progress.complete(clock.instant())) {
             lessons.save(progress);

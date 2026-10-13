@@ -50,7 +50,7 @@ class RemediationLadderIntegrationTest {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired RefreshLearningTopicsUseCase topics;
-    @Autowired SubmitLessonExerciseUseCase exercise;
+    @Autowired CompleteLessonUseCase complete;
     @Autowired StartPracticeAttemptUseCase start;
     @Autowired SubmitPracticeAttemptUseCase practice;
     @Autowired GetReviewUseCase getReview;
@@ -60,11 +60,8 @@ class RemediationLadderIntegrationTest {
 
     private final UUID topic = UUID.randomUUID();
     private final UUID lesson = UUID.randomUUID();
-    private final UUID block = UUID.randomUUID();
     private final UUID kpA = UUID.randomUUID();
     private final UUID kpB = UUID.randomUUID();
-    private final UUID lessonQuestionA = UUID.randomUUID();
-    private final UUID lessonQuestionB = UUID.randomUUID();
     private final Map<UUID, PackageVersion> versions = new LinkedHashMap<>();
 
     @BeforeEach
@@ -74,14 +71,9 @@ class RemediationLadderIntegrationTest {
                         new KnowledgePoint(kpB, "B", "B", "PROCEDURE", "READING", "", true)),
                 LearningSkill.READING, true)));
         when(content.getTopicLessons(topic)).thenReturn(List.of(new LessonSummary(lesson, topic, "L1", "Lesson",
-                null, 1, List.of(kpA, kpB), List.of(block))));
-        when(content.getLesson(lesson)).thenReturn(new Lesson(lesson, topic, "L1", "Lesson", null, 1,
-                List.of(kpA, kpB), List.of(
-                new Block(UUID.randomUUID(), "TEXT", 1, "Theory A", null, List.of(), List.of(), null, List.of(kpA)),
-                new Block(UUID.randomUUID(), "TEXT", 2, "Theory B", null, List.of(), List.of(), null, List.of(kpB)),
-                new Block(block, "EXERCISE", 3, null, null, List.of(), List.of(
-                        lessonQuestion(lessonQuestionA, 1, kpA), lessonQuestion(lessonQuestionB, 2, kpB)),
-                        "EXERCISE", List.of(kpA, kpB))), LearningSkill.READING));
+                null, 1, List.of(kpA, kpB))));
+        when(content.getLesson(lesson)).thenReturn(new Lesson(lesson, topic, "L1", "Lesson", null,
+                "Theory of the lesson", 1, List.of(kpA, kpB), LearningSkill.READING));
         when(content.lessonPracticeSets(lesson)).thenAnswer(invocation -> versions.values().stream()
                 .map(version -> new LessonPracticeSet(version.packageId(), version.packageVersionId(), "PS",
                         "Practice", 2, List.of(), null)).toList());
@@ -104,7 +96,7 @@ class RemediationLadderIntegrationTest {
         PackageVersion second = practiceSet(kpA, kpA);
         PackageVersion third = practiceSet(kpA, kpA);
         topics.execute(user);
-        exercise.execute(user, lesson, block, answers(List.of(lessonQuestionA, lessonQuestionB), "A", "A"));
+        complete.execute(user, lesson);
 
         var attempt = start.execute(user, lesson, first.packageId());
         var submitted = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "B"));
@@ -126,24 +118,26 @@ class RemediationLadderIntegrationTest {
 
         var theory = getReview.execute(user, reviewId);
         assertNull(theory.set());
-        assertEquals(List.of("Theory A"), theory.theory());
-        assertEquals("KNOWLEDGE_POINT", theory.theoryScope());
+        assertEquals(List.of("Theory of the lesson"), theory.theory());
+        assertEquals("LESSON", theory.theoryScope());
         assertEquals("SECOND_FAIL", theory.theoryReason());
-        assertEquals(List.of(lessonQuestionA), theory.quickCheck().stream()
-                .map(question -> question.questionVersionId()).toList());
-        assertEquals("Lesson hint", theory.quickCheck().getFirst().hint());
+        assertTrue(theory.quickCheck().isEmpty());
         var blocked = assertThrows(LearningRequestException.class, () -> submitReview.execute(user, reviewId,
                 new SubmitReviewCommand(withSet.set().reviewSetId(), UUID.randomUUID(),
                         answers(items(second), "A", "A").answers())));
         assertEquals("THEORY_REQUIRED", blocked.getCode());
 
         int evidenceBefore = count("kp_evidence");
-        var check = new SubmitExerciseCommand(UUID.randomUUID(),
-                List.of(new SubmitExerciseCommand.Answer(lessonQuestionA, "B")));
+        // The theory is the lesson summary: there is nothing to answer, so an answer is refused.
+        var refused = assertThrows(LearningRequestException.class, () -> theoryCheck.execute(user, reviewId,
+                new SubmitExerciseCommand(UUID.randomUUID(),
+                        List.of(new SubmitExerciseCommand.Answer(UUID.randomUUID(), "B")))));
+        assertEquals("INVALID_ANSWERS", refused.getCode());
+
+        var check = new SubmitExerciseCommand(UUID.randomUUID(), List.of());
         var checked = theoryCheck.execute(user, reviewId, check);
         assertEquals("PRACTICE", checked.stage());
-        assertEquals(0, checked.correct());
-        assertEquals("Because A", checked.results().getFirst().explanation());
+        assertTrue(checked.results().isEmpty());
         assertEquals(checked, theoryCheck.execute(user, reviewId, check));
         assertEquals(evidenceBefore, count("kp_evidence"));
 
@@ -157,33 +151,36 @@ class RemediationLadderIntegrationTest {
     }
 
     @Test
-    void newReviewsStartWithTheoryForLowScoresAndMistakesMadeInTheLesson() {
+    void newReviewsStartWithTheoryOnlyForLowScores() {
         UUID user = UUID.randomUUID();
         PackageVersion mixed = practiceSet(kpA, kpA, kpB, kpB);
         practiceSet(kpA, kpB);
         topics.execute(user);
-        exercise.execute(user, lesson, block, answers(List.of(lessonQuestionA, lessonQuestionB), "B", "A"));
-        exercise.execute(user, lesson, block, answers(List.of(lessonQuestionA, lessonQuestionB), "A", "A"));
+        complete.execute(user, lesson);
 
+        // kpA is half right, kpB is all wrong: only the low score starts a review at the theory.
         var attempt = start.execute(user, lesson, mixed.packageId());
         var submitted = practice.execute(user, attempt.attemptId(), answers(items(mixed), "A", "B", "B", "B"));
+        Map<UUID, String> stages = new HashMap<>();
         Map<UUID, String> reasons = new HashMap<>();
         for (var created : submitted.reviewsCreated()) {
-            assertEquals("THEORY", created.stage());
+            stages.put(created.knowledgePointId(), created.stage());
             reasons.put(created.knowledgePointId(), jdbc.queryForObject(
                     "SELECT theory_reason FROM review_items WHERE id = ?", String.class, created.reviewId()));
         }
-        assertEquals(Map.of(kpA, "WRONG_IN_LESSON", kpB, "LOW_SCORE"), reasons);
+        assertEquals(Map.of(kpA, "PRACTICE", kpB, "THEORY"), stages);
+        assertNull(reasons.get(kpA));
+        assertEquals("LOW_SCORE", reasons.get(kpB));
 
-        // A review from an assessment result is checked against the lesson when first opened.
+        // A review from an assessment result opens at the practice, with a set.
         jdbc.update("UPDATE review_items SET status = 'DONE' WHERE user_id = ?", user);
         UUID assessmentReview = UUID.randomUUID();
         jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind) "
                 + "VALUES (?, ?, ?, ?, 'PENDING', 'READING', 'ASSESSMENT')", assessmentReview, user, kpA, lesson);
         var opened = getReview.execute(user, assessmentReview);
-        assertEquals("THEORY", opened.stage());
-        assertEquals("WRONG_IN_LESSON", opened.theoryReason());
-        assertNull(opened.set());
+        assertEquals("PRACTICE", opened.stage());
+        assertNull(opened.theoryReason());
+        assertNotNull(opened.set());
     }
 
     private PackageVersion practiceSet(UUID... kps) {
@@ -199,11 +196,6 @@ class RemediationLadderIntegrationTest {
                 List.of(new Section(UUID.randomUUID(), "Practice", "READING", null, 1, "Passage", items)));
         versions.put(versionId, version);
         return version;
-    }
-
-    private static Question lessonQuestion(UUID id, int sortOrder, UUID kp) {
-        return new Question(id, sortOrder, "Choose", options(), Map.of("type", "CHOICE", "correct", "A"),
-                "Because A", List.of(kp), null, "Lesson hint");
     }
 
     private static List<Option> options() {

@@ -23,7 +23,6 @@ import com.ieltspath.learning.application.usecase.GetTopicLessonsUseCase;
 import com.ieltspath.learning.application.usecase.ListReviewsUseCase;
 import com.ieltspath.learning.application.usecase.RefreshLearningTopicsUseCase;
 import com.ieltspath.learning.application.usecase.StartPracticeAttemptUseCase;
-import com.ieltspath.learning.application.usecase.SubmitLessonExerciseUseCase;
 import com.ieltspath.learning.application.usecase.SubmitPracticeAttemptUseCase;
 import com.ieltspath.learning.application.usecase.SubmitPracticeEssayUseCase;
 import com.ieltspath.learning.application.usecase.SubmitReviewUseCase;
@@ -93,10 +92,7 @@ class LessonLearningWebMvcTest {
     private static final UUID USER = UUID.randomUUID();
     private static final UUID TOPIC = UUID.randomUUID();
     private static final UUID LESSON = UUID.randomUUID();
-    private static final UUID BLOCK = UUID.randomUUID();
     private static final UUID QUESTION = UUID.randomUUID();
-    private static final UUID FILL_QUESTION = UUID.randomUUID();
-    private static final UUID REQUEST = UUID.randomUUID();
     private static final UUID REVIEW = UUID.randomUUID();
     private static final UUID KP = UUID.randomUUID();
 
@@ -105,7 +101,6 @@ class LessonLearningWebMvcTest {
     @MockitoBean CurrentUserProvider currentUser;
     @MockitoBean GetTopicLessonsUseCase getTopicLessonsUseCase;
     @MockitoBean GetLessonUseCase getLessonUseCase;
-    @MockitoBean SubmitLessonExerciseUseCase submitLessonExerciseUseCase;
     @MockitoBean CompleteLessonUseCase completeLessonUseCase;
     @MockitoBean RefreshLearningTopicsUseCase topics;
     @MockitoBean GetMasteryUseCase mastery;
@@ -159,80 +154,17 @@ class LessonLearningWebMvcTest {
     }
 
     @Test
-    void unpassedQuestionsHaveExactAllowlistAndPreserveNullFillOptions() throws Exception {
-        when(getLessonUseCase.execute(USER, LESSON)).thenReturn(lesson(false));
+    void lessonShowsItsPlaceAndStatusWithoutBlocks() throws Exception {
+        when(getLessonUseCase.execute(USER, LESSON)).thenReturn(new LessonResult(LESSON, TOPIC, "L1", "First lesson",
+                null, 1, "AVAILABLE", LearningSkill.READING));
+
         JsonNode response = body(mvc.perform(authenticated(get("/api/learning/lessons/{id}", LESSON)))
                 .andExpect(status().isOk()).andReturn());
 
-        JsonNode passage = response.path("blocks").get(0).path("asset");
-        assertEquals("Passage text", passage.path("textContent").asText());
-        JsonNode block = response.path("blocks").get(1);
-        assertEquals(Set.of("blockId", "blockType", "blockKind", "sortOrder", "passed", "questions"), keys(block));
-        assertFalse(block.path("passed").asBoolean());
-        assertFalse(block.has("solutions"));
-        assertQuestionAllowlist(block.path("questions").get(0));
-        assertEquals(Set.of("optionKey", "content", "sortOrder"), keys(
-                block.path("questions").get(0).path("options").get(0)));
-        JsonNode fill = block.path("questions").get(1);
-        assertQuestionAllowlist(fill);
-        assertTrue(fill.has("options"));
-        assertTrue(fill.path("options").isNull());
-        assertFalse(response.toString().contains("answerSpec"));
-        assertFalse(response.toString().contains("explanation"));
-        assertFalse(response.toString().contains("knowledgePointIds"));
-        assertFalse(response.toString().contains("correctAnswer"));
-    }
-
-    @Test
-    void passedBlockRevealsSolutionsSeparatelyFromAllowlistedQuestions() throws Exception {
-        when(getLessonUseCase.execute(USER, LESSON)).thenReturn(lesson(true));
-        JsonNode response = body(mvc.perform(authenticated(get("/api/learning/lessons/{id}", LESSON)))
-                .andExpect(status().isOk()).andReturn());
-        JsonNode block = response.path("blocks").get(1);
-        assertTrue(block.path("passed").asBoolean());
-        assertQuestionAllowlist(block.path("questions").get(0));
-        assertQuestionAllowlist(block.path("questions").get(1));
-        JsonNode solution = block.path("solutions").get(0);
-        assertEquals(Set.of("questionVersionId", "correctAnswer", "explanation"), keys(solution));
-        assertEquals("A", solution.path("correctAnswer").asText());
-        assertEquals("The main idea", solution.path("explanation").asText());
-        assertFalse(block.has("answerSpec"));
-        assertFalse(block.has("knowledgePointIds"));
-    }
-
-    @Test
-    void failedSubmissionReturnsCorrectnessWithoutAnswerOrExplanation() throws Exception {
-        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenReturn(new SubmissionResult(
-                false, false, List.of(new SubmissionResult.AnswerResult(QUESTION, false,
-                "A", "The main idea"))));
-        JsonNode response = body(mvc.perform(authenticated(submission(validBody())))
-                .andExpect(status().isOk()).andReturn());
-        assertEquals(Set.of("blockPassed", "lessonCompleted", "results"), keys(response));
-        assertEquals(Set.of("questionVersionId", "correct", "hint"), keys(response.path("results").get(0)));
-        assertTrue(response.path("results").get(0).path("hint").isNull());
-        assertFalse(response.path("results").get(0).path("correct").asBoolean());
-        verify(submitLessonExerciseUseCase).execute(USER, LESSON, BLOCK,
-                new SubmitExerciseCommand(REQUEST, List.of(new SubmitExerciseCommand.Answer(QUESTION, "A"))));
-    }
-
-    @Test
-    void openedHintsAreReturnedInFailedSubmissionAndLessonQuestions() throws Exception {
-        String hint = "Compare the scope of the options.";
-        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenReturn(new SubmissionResult(
-                false, false, List.of(new SubmissionResult.AnswerResult(QUESTION, false, "A", "Explanation", hint))));
-        JsonNode answer = body(mvc.perform(authenticated(submission(validBody())))
-                .andExpect(status().isOk()).andReturn()).path("results").get(0);
-        assertEquals(Set.of("questionVersionId", "correct", "hint"), keys(answer));
-        assertEquals(hint, answer.path("hint").asText());
-
-        var exercise = new LessonResult.Block(BLOCK, "EXERCISE", "EXERCISE", 1, null, null, null,
-                false, List.of(new LessonResult.Question(QUESTION, 1, "Choose the main idea", null, hint)), null, null);
-        when(getLessonUseCase.execute(USER, LESSON)).thenReturn(new LessonResult(LESSON, TOPIC, "L1", "Lesson", null, 1,
-                "AVAILABLE", List.of(exercise)));
-        JsonNode question = body(mvc.perform(authenticated(get("/api/learning/lessons/{id}", LESSON)))
-                .andExpect(status().isOk()).andReturn()).path("blocks").get(0).path("questions").get(0);
-        assertEquals(Set.of("questionVersionId", "sortOrder", "stem", "options", "hint"), keys(question));
-        assertEquals(hint, question.path("hint").asText());
+        assertEquals(Set.of("lessonId", "topicId", "code", "title", "sortOrder", "status", "skill", "skills"),
+                keys(response));
+        assertEquals("AVAILABLE", response.path("status").asText());
+        assertEquals("READING", response.path("skills").get(0).asText());
     }
 
     @Test
@@ -256,27 +188,13 @@ class LessonLearningWebMvcTest {
         }
     }
 
-    @Test
-    void passedSubmissionIncludesAnswerAndExplanation() throws Exception {
-        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenReturn(new SubmissionResult(
-                true, true, List.of(new SubmissionResult.AnswerResult(QUESTION, true,
-                "A", "The main idea"))));
-        JsonNode response = body(mvc.perform(authenticated(submission(validBody())))
-                .andExpect(status().isOk()).andReturn());
-        JsonNode answer = response.path("results").get(0);
-        assertEquals(Set.of("questionVersionId", "correct", "correctAnswer", "explanation", "hint"), keys(answer));
-        assertTrue(answer.path("hint").isNull());
-        assertEquals("A", answer.path("correctAnswer").asText());
-    }
-
-    enum LessonAction { READ, SUBMIT, COMPLETE }
+    enum LessonAction { READ, COMPLETE }
 
     @ParameterizedTest
     @EnumSource(LessonAction.class)
     void reviewGateUsesExactErrorShapeForEveryLessonAction(LessonAction action) throws Exception {
         var gate = new LearningGateException("REVIEW_REQUIRED", List.of(new PendingReview(REVIEW, LESSON, KP)));
         when(getLessonUseCase.execute(USER, LESSON)).thenThrow(gate);
-        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenThrow(gate);
         when(completeLessonUseCase.execute(USER, LESSON)).thenThrow(gate);
 
         JsonNode response = body(mvc.perform(authenticated(lessonAction(action)))
@@ -299,55 +217,6 @@ class LessonLearningWebMvcTest {
                 .andExpect(status().isForbidden()).andReturn());
         assertEquals(Set.of("detail", "code"), keys(response));
         assertEquals(code, response.path("code").asText());
-    }
-
-    static Stream<String> invalidBodies() {
-        return Stream.of("{}", "{\"requestId\":\"" + REQUEST + "\"}",
-                "{\"requestId\":\"" + REQUEST + "\",\"answers\":null}",
-                "{\"requestId\":\"" + REQUEST + "\",\"answers\":[null]}",
-                "{\"requestId\":\"" + REQUEST + "\",\"answers\":[{\"answer\":\"A\"}]}",
-                "{\"requestId\":\"" + REQUEST + "\",\"answers\":[{\"questionVersionId\":\""
-                        + QUESTION + "\",\"answer\":1}]}", "{malformed");
-    }
-
-    @ParameterizedTest
-    @MethodSource("invalidBodies")
-    void malformedRequestsReturn422WithoutCallingUseCase(String request) throws Exception {
-        JsonNode response = body(mvc.perform(authenticated(submission(request)))
-                .andExpect(status().isUnprocessableEntity()).andReturn());
-        assertEquals(Set.of("detail"), keys(response));
-        assertEquals("Invalid request", response.path("detail").asText());
-        verifyNoInteractions(getTopicLessonsUseCase, getLessonUseCase, submitLessonExerciseUseCase, completeLessonUseCase);
-    }
-
-    static Stream<List<Map<String, Object>>> invalidAnswerSets() {
-        Map<String, Object> answer = Map.of("questionVersionId", QUESTION, "answer", "A");
-        return Stream.of(List.of(), List.of(answer, answer),
-                List.of(Map.of("questionVersionId", UUID.randomUUID(), "answer", "A")));
-    }
-
-    @ParameterizedTest
-    @MethodSource("invalidAnswerSets")
-    void missingDuplicateAndForeignAnswersMapUseCaseFailureTo422(List<Map<String, Object>> answers)
-            throws Exception {
-        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenThrow(new LearningRequestException(
-                422, "INVALID_ANSWERS", "Submit one answer for every exercise question"));
-        String request = json.writeValueAsString(Map.of("requestId", REQUEST, "answers", answers));
-        JsonNode response = body(mvc.perform(authenticated(submission(request)))
-                .andExpect(status().isUnprocessableEntity()).andReturn());
-        assertEquals(Set.of("detail", "code"), keys(response));
-        assertEquals("INVALID_ANSWERS", response.path("code").asText());
-        verify(submitLessonExerciseUseCase).execute(eq(USER), eq(LESSON), eq(BLOCK), any());
-    }
-
-    @Test
-    void requestConflictMapsTo409WithoutReviews() throws Exception {
-        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenThrow(new LearningRequestException(
-                409, "REQUEST_CONFLICT", "requestId belongs to another submission"));
-        JsonNode response = body(mvc.perform(authenticated(submission(validBody())))
-                .andExpect(status().isConflict()).andReturn());
-        assertEquals(Set.of("detail", "code"), keys(response));
-        assertEquals("REQUEST_CONFLICT", response.path("code").asText());
     }
 
     @Test
@@ -382,7 +251,7 @@ class LessonLearningWebMvcTest {
         verify(completeLessonUseCase).execute(USER, LESSON);
     }
 
-    enum ProtectedRoute { TOPICS, TOPIC_LESSONS, LESSON, SUBMISSION, COMPLETE, MASTERY }
+    enum ProtectedRoute { TOPICS, TOPIC_LESSONS, LESSON, COMPLETE, MASTERY }
 
     @ParameterizedTest
     @EnumSource(ProtectedRoute.class)
@@ -391,50 +260,23 @@ class LessonLearningWebMvcTest {
             case TOPICS -> get("/api/learning/topics");
             case TOPIC_LESSONS -> get("/api/learning/topics/{id}/lessons", TOPIC);
             case LESSON -> get("/api/learning/lessons/{id}", LESSON);
-            case SUBMISSION -> submission(validBody());
             case COMPLETE -> post("/api/learning/lessons/{id}/complete", LESSON);
             case MASTERY -> get("/api/learning/mastery");
         };
         mvc.perform(request).andExpect(status().isUnauthorized());
-        verifyNoInteractions(topics, getTopicLessonsUseCase, getLessonUseCase, submitLessonExerciseUseCase,
-                completeLessonUseCase, mastery, currentUser);
-    }
-
-    private LessonResult lesson(boolean passed) {
-        var choice = new LessonResult.Question(QUESTION, 1, "Choose the main idea",
-                List.of(new LessonResult.Option("A", "Main idea", 1)));
-        var fill = new LessonResult.Question(FILL_QUESTION, 2, "Complete one word", null);
-        var asset = new LessonResult.Asset(UUID.randomUUID(), "PASSAGE", "Passage text", null, null, null);
-        var passage = new LessonResult.Block(UUID.randomUUID(), "ASSET", null, 1, null, asset, null,
-                null, null, null, null);
-        var exercise = new LessonResult.Block(BLOCK, "EXERCISE", "EXERCISE", 2, null, null, null,
-                passed, List.of(choice, fill), passed ? List.of(
-                new LessonResult.Solution(QUESTION, "A", "The main idea"),
-                new LessonResult.Solution(FILL_QUESTION, "critics", "A word from the passage")) : null, null);
-        return new LessonResult(LESSON, TOPIC, "L1", "First lesson", null, 1, "AVAILABLE",
-                List.of(passage, exercise));
+        verifyNoInteractions(topics, getTopicLessonsUseCase, getLessonUseCase, completeLessonUseCase, mastery,
+                currentUser);
     }
 
     private MockHttpServletRequestBuilder lessonAction(LessonAction action) throws Exception {
         return switch (action) {
             case READ -> get("/api/learning/lessons/{id}", LESSON);
-            case SUBMIT -> submission(validBody());
             case COMPLETE -> post("/api/learning/lessons/{id}/complete", LESSON);
         };
     }
 
     private MockHttpServletRequestBuilder authenticated(MockHttpServletRequestBuilder request) {
         return request.with(jwt().jwt(token -> token.subject(USER.toString())));
-    }
-
-    private MockHttpServletRequestBuilder submission(String request) {
-        return post("/api/learning/lessons/{id}/exercises/{blockId}/submissions", LESSON, BLOCK)
-                .contentType(MediaType.APPLICATION_JSON).content(request);
-    }
-
-    private String validBody() throws Exception {
-        return json.writeValueAsString(Map.of("requestId", REQUEST, "answers",
-                List.of(Map.of("questionVersionId", QUESTION, "answer", "A"))));
     }
 
     private JsonNode body(MvcResult result) throws Exception {
@@ -447,8 +289,4 @@ class LessonLearningWebMvcTest {
         return fields;
     }
 
-    private void assertQuestionAllowlist(JsonNode question) {
-        assertEquals(Set.of("questionVersionId", "sortOrder", "stem", "options", "hint"), keys(question));
-        assertTrue(question.path("hint").isNull());
-    }
 }

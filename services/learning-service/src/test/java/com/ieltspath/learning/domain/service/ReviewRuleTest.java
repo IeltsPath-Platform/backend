@@ -128,14 +128,10 @@ class ReviewRuleTest {
     }
 
     @Test
-    void newReviewsStartWithTheoryWhenTheScoreIsLowOrTheLessonWasAlreadyWrong() {
-        assertThat(ReviewRule.initialStage(0.25, false))
+    void newReviewsStartWithTheoryOnlyWhenTheScoreIsLow() {
+        assertThat(ReviewRule.initialStage(0.25))
                 .isEqualTo(new ReviewRule.Start(ReviewStage.THEORY, TheoryReason.LOW_SCORE));
-        assertThat(ReviewRule.initialStage(0.25, true).theoryReason()).isEqualTo(TheoryReason.LOW_SCORE);
-        assertThat(ReviewRule.initialStage(0.5, true))
-                .isEqualTo(new ReviewRule.Start(ReviewStage.THEORY, TheoryReason.WRONG_IN_LESSON));
-        assertThat(ReviewRule.initialStage(null, true).theoryReason()).isEqualTo(TheoryReason.WRONG_IN_LESSON);
-        assertThat(ReviewRule.initialStage(0.5, false)).isEqualTo(new ReviewRule.Start(ReviewStage.PRACTICE, null));
-        assertThat(ReviewRule.initialStage(null, false).stage()).isEqualTo(ReviewStage.PRACTICE);
+        assertThat(ReviewRule.initialStage(0.5)).isEqualTo(new ReviewRule.Start(ReviewStage.PRACTICE, null));
+        assertThat(ReviewRule.initialStage(null).stage()).isEqualTo(ReviewStage.PRACTICE);
     }
 }

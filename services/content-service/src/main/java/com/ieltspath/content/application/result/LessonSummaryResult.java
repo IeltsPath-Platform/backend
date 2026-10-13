@@ -13,11 +13,5 @@ public record LessonSummaryResult(
         String summary,
         int sortOrder,
         List<UUID> knowledgePointIds,
-        List<UUID> exerciseBlockIds,
         List<Skill> skills
-) {
-    public LessonSummaryResult(UUID lessonId, UUID topicId, String code, String title, String summary, int sortOrder,
-                               List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds) {
-        this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, List.of());
-    }
-}
+) {}

@@ -11,7 +11,7 @@ import com.ieltspath.learning.application.usecase.GetLessonPracticeSetsUseCase;
 import com.ieltspath.learning.application.usecase.GetPracticeAttemptUseCase;
 import com.ieltspath.learning.application.usecase.RefreshLearningTopicsUseCase;
 import com.ieltspath.learning.application.usecase.StartPracticeAttemptUseCase;
-import com.ieltspath.learning.application.usecase.SubmitLessonExerciseUseCase;
+import com.ieltspath.learning.application.usecase.CompleteLessonUseCase;
 import com.ieltspath.learning.application.usecase.SubmitPracticeAttemptUseCase;
 import com.ieltspath.learning.application.usecase.SubmitPracticeEssayUseCase;
 import com.ieltspath.learning.domain.vo.LearningSkill;
@@ -89,7 +89,7 @@ class PracticeEssayIntegrationTest {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired RefreshLearningTopicsUseCase topics;
-    @Autowired SubmitLessonExerciseUseCase submitExercise;
+    @Autowired CompleteLessonUseCase completeLesson;
     @Autowired GetLessonPracticeSetsUseCase practiceSets;
     @Autowired StartPracticeAttemptUseCase startPractice;
     @Autowired GetPracticeAttemptUseCase getPractice;
@@ -102,7 +102,7 @@ class PracticeEssayIntegrationTest {
     @BeforeEach
     void setUp() {
         jdbc.execute("TRUNCATE lesson_writing_submissions, llm_daily_usage, review_theory_checks, review_sets, "
-                + "review_items, practice_attempts, lesson_practice_passes, lesson_exercise_submissions, kp_evidence, "
+                + "review_items, practice_attempts, lesson_practice_passes, kp_evidence, "
                 + "lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments, "
                 + "assessment_result_versions CASCADE");
         reset(content, access, llm);
@@ -112,12 +112,9 @@ class PracticeEssayIntegrationTest {
                 new KnowledgePoint(KP_WRITING, "TR_W", "Opinion", "PROCEDURE", "WRITING", "d", false)),
                 null, true, null, skills)));
         when(content.getTopicLessons(TOPIC)).thenReturn(List.of(new LessonSummary(LESSON, TOPIC, "T1", "Trees", null,
-                1, List.of(KP_READING, KP_WRITING), List.of(BLOCK), skills)));
-        when(content.getLesson(LESSON)).thenReturn(new Lesson(LESSON, TOPIC, "T1", "Trees", null, 1,
-                List.of(KP_READING, KP_WRITING), List.of(new Block(BLOCK, "EXERCISE", 1, null, null, null,
-                List.of(new Question(BLOCK_QUESTION, 1, "Pick", List.of(new Option("A", "a", 1), new Option("B", "b", 2)),
-                        Map.of("type", "CHOICE", "correct", "A"), "Because", List.of(KP_READING))), "EXERCISE")),
-                null, skills));
+                1, List.of(KP_READING, KP_WRITING), skills)));
+        when(content.getLesson(LESSON)).thenReturn(new Lesson(LESSON, TOPIC, "T1", "Trees", null, null, 1,
+                List.of(KP_READING, KP_WRITING), null, skills));
         when(content.lessonPracticeSets(LESSON)).thenReturn(List.of(
                 new LessonPracticeSet(READING_SET, READING_VERSION, "TR-R", "Reading", 3, List.of(KP_READING), null,
                         Set.of(LearningSkill.READING)),
@@ -139,8 +136,7 @@ class PracticeEssayIntegrationTest {
         when(access.balance()).thenReturn(30L);
         when(access.debit(any(), anyInt(), any(), anyString(), any())).thenAnswer(invocation -> UUID.randomUUID());
         topics.execute(USER);
-        submitExercise.execute(USER, LESSON, BLOCK, new SubmitExerciseCommand(UUID.randomUUID(),
-                List.of(new SubmitExerciseCommand.Answer(BLOCK_QUESTION, "A"))));
+        completeLesson.execute(USER, LESSON);
     }
 
     @Test

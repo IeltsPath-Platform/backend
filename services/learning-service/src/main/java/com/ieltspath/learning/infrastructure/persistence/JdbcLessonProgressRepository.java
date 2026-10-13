@@ -57,10 +57,10 @@ public class JdbcLessonProgressRepository implements LessonProgressRepository {
         jdbc.update(connection -> {
             var statement = connection.prepareStatement("""
                     INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, knowledge_point_ids,
-                    passed_block_ids, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    completed_at) VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT (user_id, lesson_id) DO UPDATE
                     SET topic_id = EXCLUDED.topic_id, lesson_sort_order = EXCLUDED.lesson_sort_order,
-                    knowledge_point_ids = EXCLUDED.knowledge_point_ids, passed_block_ids = EXCLUDED.passed_block_ids,
+                    knowledge_point_ids = EXCLUDED.knowledge_point_ids,
                     completed_at = COALESCE(lesson_progress.completed_at, EXCLUDED.completed_at),
                     updated_at = clock_timestamp()
                     """);
@@ -69,9 +69,7 @@ public class JdbcLessonProgressRepository implements LessonProgressRepository {
             statement.setObject(3, progress.topicId());
             statement.setInt(4, progress.sortOrder());
             statement.setArray(5, connection.createArrayOf("uuid", progress.knowledgePointIds().toArray()));
-            statement.setArray(6, connection.createArrayOf("text",
-                    progress.passedBlockIds().stream().map(UUID::toString).toArray()));
-            statement.setTimestamp(7, progress.completedAt() == null ? null : Timestamp.from(progress.completedAt()));
+            statement.setTimestamp(6, progress.completedAt() == null ? null : Timestamp.from(progress.completedAt()));
             return statement;
         });
     }
@@ -81,7 +79,6 @@ public class JdbcLessonProgressRepository implements LessonProgressRepository {
         return LessonProgress.restore(row.getObject("user_id", UUID.class), row.getObject("lesson_id", UUID.class),
                 row.getObject("topic_id", UUID.class), row.getInt("lesson_sort_order"),
                 SqlArrays.uuids(row.getArray("knowledge_point_ids")),
-                new LinkedHashSet<>(SqlArrays.uuids(row.getArray("passed_block_ids"))),
                 completed == null ? null : completed.toInstant());
     }
 }

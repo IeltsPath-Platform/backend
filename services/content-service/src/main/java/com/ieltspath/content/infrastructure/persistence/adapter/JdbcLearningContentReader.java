@@ -11,9 +11,6 @@ import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.application.result.TopicTestPackageResult;
 import com.ieltspath.content.application.result.PackageQuestionSpec;
 import com.ieltspath.content.domain.vo.QuestionType;
-import com.ieltspath.content.domain.vo.AssetType;
-import com.ieltspath.content.domain.vo.BlockType;
-import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.QuestionUsageConflict;
@@ -41,17 +38,11 @@ import java.util.UUID;
  */
 @Component
 public class JdbcLearningContentReader implements LearningContentReader {
+    /** A lesson teaches the skills of its knowledge points. */
     private static final String LESSON_SKILLS = """
-            SELECT q.skill FROM lesson_blocks b
-            JOIN lesson_block_questions bq ON bq.block_id = b.id
-            JOIN question_versions qv ON qv.id = bq.question_version_id
-            JOIN questions q ON q.id = qv.question_id
-            WHERE b.lesson_id = l.id AND b.block_type = 'EXERCISE' AND q.skill <> 'ALL'
-            UNION
-            SELECT kp.skill FROM lesson_blocks b
-            JOIN lesson_block_knowledge_points bk ON bk.block_id = b.id
-            JOIN knowledge_points kp ON kp.id = bk.knowledge_point_id
-            WHERE b.lesson_id = l.id AND b.block_type = 'TEXT' AND kp.skill <> 'ALL'
+            SELECT DISTINCT kp.skill FROM lesson_knowledge_points lkp
+            JOIN knowledge_points kp ON kp.id = lkp.knowledge_point_id
+            WHERE lkp.lesson_id = l.id AND kp.skill <> 'ALL'
             """;
 
     private static final String PRACTICE_SKILLS = """
@@ -62,10 +53,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
             WHERE s.package_version_id = p.current_published_version_id AND q.skill <> 'ALL'
             """;
 
-    /** Question versions used by a lesson, final test, mock test or placement test; review must not repeat them. */
-    private static final String LESSON_OR_TEST_QUESTION_VERSIONS = """
-            SELECT bq.question_version_id FROM lesson_block_questions bq
-            UNION
+    /** Question versions used by a final test, mock test or placement test; review must not repeat them. */
+    private static final String TEST_QUESTION_VERSIONS = """
             SELECT tsq.question_version_id
             FROM section_questions tsq
             JOIN content_sections ts ON ts.id = tsq.section_id
@@ -102,7 +91,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     private static String eligiblePracticeSet(String knowledgePointExpression) {
-        return ELIGIBLE_PRACTICE_SET.formatted(knowledgePointExpression, LESSON_OR_TEST_QUESTION_VERSIONS);
+        return ELIGIBLE_PRACTICE_SET.formatted(knowledgePointExpression, TEST_QUESTION_VERSIONS);
     }
 
     @Override
@@ -189,148 +178,24 @@ public class JdbcLearningContentReader implements LearningContentReader {
         List<UUID> lessonIds = lessons.stream().map(LessonRow::id).toList();
         Map<UUID, List<UUID>> knowledgePoints = lessonKnowledgePoints(lessonIds);
 
-        Map<UUID, List<UUID>> exerciseBlocks = new LinkedHashMap<>();
-        jdbc.query("""
-                SELECT b.lesson_id, b.id FROM lesson_blocks b
-                WHERE b.lesson_id IN (:lessonIds) AND b.block_type = 'EXERCISE'
-                ORDER BY b.lesson_id, b.sort_order
-                """, Map.of("lessonIds", lessonIds), rs -> {
-            exerciseBlocks.computeIfAbsent(uuid(rs, "lesson_id"), ignored -> new ArrayList<>()).add(uuid(rs, "id"));
-        });
-
         return lessons.stream()
                 .map(l -> new LessonSummaryResult(l.id(), topicId, l.code(), l.title(), l.summary(), l.sortOrder(),
-                        knowledgePoints.getOrDefault(l.id(), List.of()),
-                        exerciseBlocks.getOrDefault(l.id(), List.of()), l.skills()))
+                        knowledgePoints.getOrDefault(l.id(), List.of()), l.skills()))
                 .toList();
     }
 
     @Override
     public Optional<LessonContentResult> publishedLesson(UUID lessonId) {
-        record LessonRow(UUID topicId, String code, String title, String summary, int sortOrder, List<Skill> skills) {}
-        List<LessonRow> found = jdbc.query("""
-                SELECT l.topic_id, l.code, l.title, l.summary, l.sort_order, ARRAY(%s) AS skills FROM lessons l
-                JOIN topics t ON t.id = l.topic_id
+        List<LessonContentResult> found = jdbc.query("""
+                SELECT l.topic_id, l.code, l.title, l.summary, l.summary_markdown, l.sort_order,
+                       ARRAY(%s) AS skills
+                FROM lessons l
                 WHERE l.id = :id AND l.status = 'PUBLISHED'
-                """.formatted(LESSON_SKILLS), Map.of("id", lessonId), (rs, i) -> new LessonRow(uuid(rs, "topic_id"), rs.getString("code"),
-                rs.getString("title"), rs.getString("summary"), rs.getInt("sort_order"),
-                skills(rs)));
-        if (found.isEmpty()) {
-            return Optional.empty();
-        }
-        LessonRow lesson = found.get(0);
-        Map<String, Object> byLesson = Map.of("lessonId", lessonId);
-
-        Map<UUID, List<UUID>> questionPoints = new LinkedHashMap<>();
-        jdbc.query("""
-                SELECT DISTINCT qkp.question_version_id, qkp.knowledge_point_id
-                FROM question_knowledge_points qkp
-                JOIN lesson_block_questions bq ON bq.question_version_id = qkp.question_version_id
-                JOIN lesson_blocks b ON b.id = bq.block_id
-                WHERE b.lesson_id = :lessonId
-                ORDER BY qkp.question_version_id, qkp.knowledge_point_id
-                """, byLesson, rs -> {
-            questionPoints.computeIfAbsent(uuid(rs, "question_version_id"), ignored -> new ArrayList<>())
-                    .add(uuid(rs, "knowledge_point_id"));
-        });
-
-        Map<UUID, List<LessonContentResult.QuestionAsset>> questionAssets = new LinkedHashMap<>();
-        jdbc.query("""
-                SELECT l.question_version_id, a.id, a.asset_type, a.media_reference, a.text_content, l.sort_order
-                FROM content_asset_links l
-                JOIN content_assets a ON a.id = l.asset_id
-                JOIN lesson_block_questions bq ON bq.question_version_id = l.question_version_id
-                JOIN lesson_blocks b ON b.id = bq.block_id
-                WHERE b.lesson_id = :lessonId
-                ORDER BY l.question_version_id, l.sort_order, a.id
-                """, byLesson, rs -> {
-            questionAssets.computeIfAbsent(uuid(rs, "question_version_id"), ignored -> new ArrayList<>())
-                    .add(new LessonContentResult.QuestionAsset(uuid(rs, "id"),
-                            AssetType.valueOf(rs.getString("asset_type")), rs.getString("media_reference"), null,
-                            rs.getString("text_content"), rs.getInt("sort_order")));
-        });
-
-        Map<UUID, List<LessonContentResult.Question>> questionsByBlock = new LinkedHashMap<>();
-        jdbc.query("""
-                SELECT bq.block_id, bq.sort_order, qv.id, qv.stem, qv.options::text AS options,
-                       qv.answer_spec::text AS answer_spec, qv.explanation, qv.hint,
-                       qv.answer_spec->>'type' AS spec_type, qv.answer_spec->>'task' AS spec_task,
-                       qv.answer_spec->>'passBand' AS spec_pass_band, qv.answer_spec->>'chartFacts' AS spec_chart_facts
-                FROM lesson_block_questions bq
-                JOIN lesson_blocks b ON b.id = bq.block_id
-                JOIN question_versions qv ON qv.id = bq.question_version_id
-                WHERE b.lesson_id = :lessonId AND qv.status = 'PUBLISHED'
-                ORDER BY bq.block_id, bq.sort_order
-                """, byLesson, rs -> {
-            UUID versionId = uuid(rs, "id");
-            List<LessonContentResult.QuestionAsset> assets = questionAssets.getOrDefault(versionId, List.of());
-            questionsByBlock.computeIfAbsent(uuid(rs, "block_id"), ignored -> new ArrayList<>())
-                    .add(new LessonContentResult.Question(versionId, rs.getInt("sort_order"), rs.getString("stem"),
-                            rs.getString("options"), rs.getString("answer_spec"), rs.getString("explanation"),
-                            rs.getString("hint"), questionPoints.getOrDefault(versionId, List.of()),
-                            new LessonBlockKind.QuestionSpec(rs.getString("spec_type"), rs.getString("spec_task"),
-                                    rs.getString("spec_pass_band"), rs.getString("spec_chart_facts"),
-                                    assets.stream().map(LessonContentResult.QuestionAsset::assetType).toList()),
-                            assets));
-        });
-
-        Map<UUID, List<UUID>> sensesByBlock = new LinkedHashMap<>();
-        jdbc.query("""
-                SELECT v.block_id, v.vocabulary_sense_id FROM lesson_block_vocabulary v
-                JOIN lesson_blocks b ON b.id = v.block_id
-                WHERE b.lesson_id = :lessonId
-                ORDER BY v.block_id, v.sort_order
-                """, byLesson, rs -> {
-            sensesByBlock.computeIfAbsent(uuid(rs, "block_id"), ignored -> new ArrayList<>())
-                    .add(uuid(rs, "vocabulary_sense_id"));
-        });
-
-        Map<UUID, List<UUID>> pointsByTextBlock = new LinkedHashMap<>();
-        jdbc.query("""
-                SELECT bk.block_id, bk.knowledge_point_id
-                FROM lesson_block_knowledge_points bk
-                JOIN lesson_blocks b ON b.id = bk.block_id
-                JOIN knowledge_points kp ON kp.id = bk.knowledge_point_id
-                WHERE b.lesson_id = :lessonId
-                ORDER BY bk.block_id, kp.created_at, kp.id
-                """, byLesson, rs -> {
-            pointsByTextBlock.computeIfAbsent(uuid(rs, "block_id"), ignored -> new ArrayList<>())
-                    .add(uuid(rs, "knowledge_point_id"));
-        });
-
-        List<LessonContentResult.Block> blocks = jdbc.query("""
-                SELECT b.id, b.block_type, b.sort_order, b.text_content, a.id AS asset_id, a.asset_type,
-                       a.text_content AS asset_text, a.media_reference, a.duration_seconds
-                FROM lesson_blocks b
-                LEFT JOIN content_assets a ON a.id = b.asset_id
-                WHERE b.lesson_id = :lessonId
-                ORDER BY b.sort_order
-                """, byLesson, (rs, i) -> {
-            UUID blockId = uuid(rs, "id");
-            BlockType type = BlockType.valueOf(rs.getString("block_type"));
-            LessonContentResult.Asset asset = type == BlockType.ASSET
-                    ? new LessonContentResult.Asset(uuid(rs, "asset_id"),
-                    AssetType.valueOf(rs.getString("asset_type")), rs.getString("asset_text"),
-                    rs.getString("media_reference"), (Integer) rs.getObject("duration_seconds"), null)
-                    : null;
-            List<LessonContentResult.Question> questions =
-                    type == BlockType.EXERCISE ? questionsByBlock.getOrDefault(blockId, List.of()) : null;
-            List<UUID> blockPoints = switch (type) {
-                case TEXT -> pointsByTextBlock.getOrDefault(blockId, List.of());
-                case EXERCISE -> questions.stream()
-                        .flatMap(question -> question.knowledgePointIds().stream()).distinct().toList();
-                default -> List.of();
-            };
-            return new LessonContentResult.Block(blockId, type, null, rs.getInt("sort_order"),
-                    type == BlockType.TEXT ? rs.getString("text_content") : null,
-                    asset,
-                    type == BlockType.VOCABULARY ? sensesByBlock.getOrDefault(blockId, List.of()) : null,
-                    questions, blockPoints);
-        });
-
-        return Optional.of(new LessonContentResult(lessonId, lesson.topicId(), lesson.code(), lesson.title(),
-                lesson.summary(), lesson.sortOrder(),
-                lessonKnowledgePoints(List.of(lessonId)).getOrDefault(lessonId, List.of()), blocks, null, lesson.skills()));
+                """.formatted(LESSON_SKILLS), Map.of("id", lessonId), (rs, i) -> new LessonContentResult(lessonId,
+                uuid(rs, "topic_id"), rs.getString("code"), rs.getString("title"), rs.getString("summary"),
+                rs.getString("summary_markdown"), rs.getInt("sort_order"),
+                lessonKnowledgePoints(List.of(lessonId)).getOrDefault(lessonId, List.of()), null, skills(rs)));
+        return found.stream().findFirst();
     }
 
     @Override
@@ -479,13 +344,6 @@ public class JdbcLearningContentReader implements LearningContentReader {
                     JOIN question_versions qv ON qv.id = sq.question_version_id
                     WHERE v.id = :versionId
                 )
-                SELECT tq.question_id, 'LESSON' AS owner_type, l.code AS owner_code
-                FROM target_questions tq
-                JOIN question_versions qv ON qv.question_id = tq.question_id
-                JOIN lesson_block_questions bq ON bq.question_version_id = qv.id
-                JOIN lesson_blocks b ON b.id = bq.block_id
-                JOIN lessons l ON l.id = b.lesson_id
-                UNION
                 SELECT tq.question_id, 'PACKAGE' AS owner_type, p.code AS owner_code
                 FROM target_questions tq
                 JOIN question_versions qv ON qv.question_id = tq.question_id
@@ -699,10 +557,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
             return Set.of();
         }
         return new HashSet<>(jdbc.query("""
-                SELECT bq.question_version_id AS id FROM lesson_block_questions bq
-                WHERE bq.question_version_id IN (:ids)
-                UNION
-                SELECT sq.question_version_id FROM section_questions sq
+                SELECT sq.question_version_id AS id FROM section_questions sq
                 JOIN content_sections s ON s.id = sq.section_id
                 JOIN content_package_versions v ON v.id = s.package_version_id
                 JOIN content_packages p ON p.id = v.package_id

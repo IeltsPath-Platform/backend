@@ -109,12 +109,12 @@ class PublishContentPackageUseCaseTest {
         UUID questionId = UUID.randomUUID();
         when(contentPackageRepository.findById(contentPackage.getId())).thenReturn(Optional.of(contentPackage));
         when(lessons.questionsUsedElsewhere(versionId)).thenReturn(List.of(
-                new QuestionUsageConflict(questionId, QuestionUsageConflict.OwnerType.LESSON, "L1")));
+                new QuestionUsageConflict(questionId, QuestionUsageConflict.OwnerType.PACKAGE, "PS-KP1-A")));
 
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(
                 new PublishContentPackageCommand(contentPackage.getId(), versionId, userId)))
                 .isInstanceOf(QuestionAlreadyUsedException.class)
-                .hasMessageContaining(questionId.toString()).hasMessageContaining("LESSON L1");
+                .hasMessageContaining(questionId.toString()).hasMessageContaining("PACKAGE PS-KP1-A");
         verify(contentPackageRepository, never()).save(any());
         assertThat(contentPackage.getStatus()).isEqualTo(PublicationStatus.DRAFT);
         assertThat(version.getStatus()).isEqualTo(PublicationStatus.DRAFT);

@@ -5,7 +5,6 @@ import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageVersion;
 import com.ieltspath.learning.application.port.LearningContentClient;
-import com.ieltspath.learning.application.service.FirstAttemptMistakes;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.PracticeAccess;
@@ -45,7 +44,6 @@ public class SubmitPracticeAttemptUseCase {
     private final KnowledgeEvidenceRepository evidence;
     private final WritingSubmissionRepository essays;
     private final PracticeProgress progress;
-    private final FirstAttemptMistakes mistakes;
     private final ItemGrading grading = new ItemGrading();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final Clock clock = Clock.systemUTC();
@@ -53,7 +51,7 @@ public class SubmitPracticeAttemptUseCase {
     public SubmitPracticeAttemptUseCase(LearnerLock lock, PracticeAccess access, LearningContentClient content,
                                         PracticeAttemptRepository attempts, ReviewItemRepository reviews,
                                         KnowledgeEvidenceRepository evidence, PracticeProgress progress,
-                                        FirstAttemptMistakes mistakes, WritingSubmissionRepository essays) {
+                                        WritingSubmissionRepository essays) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -61,7 +59,6 @@ public class SubmitPracticeAttemptUseCase {
         this.reviews = reviews;
         this.evidence = evidence;
         this.progress = progress;
-        this.mistakes = mistakes;
         this.essays = essays;
     }
 
@@ -110,12 +107,11 @@ public class SubmitPracticeAttemptUseCase {
             Set<UUID> pending = new HashSet<>();
             reviews.findPending(userId).forEach(review -> pending.add(review.knowledgePointId()));
             var needs = reviewNeeds(graded, outcomes, outcomesBySkill, pending, availability);
-            Set<UUID> wrongInLesson = needs.isEmpty() ? Set.of() : mistakes.of(userId, lesson);
             Map<UUID, LearningSkill> kpSkills = new HashMap<>();
             if (!needs.isEmpty()) evidence.findMasteryHistories(userId).stream().filter(history -> history.skill() != null)
                     .forEach(history -> kpSkills.put(history.knowledgePointId(), history.skill()));
             candidates = needs.stream().map(need -> {
-                var start = ReviewRule.initialStage(need.kpPercent(), wrongInLesson.contains(need.knowledgePointId()));
+                var start = ReviewRule.initialStage(need.kpPercent());
                 return new PracticeReviewCandidate(UUID.randomUUID(), attempt.lessonId(), need.knowledgePointId(),
                         kpSkills.getOrDefault(need.knowledgePointId(), attempt.skill()), attempt.id(), need.kpPercent(),
                         start.stage(), start.theoryReason());

@@ -95,19 +95,6 @@ public final class ReviewItem {
         status = ReviewStatus.SKIPPED;
     }
 
-    /** True while the review has not given a set or theory yet, so its starting stage can still be decided. */
-    public boolean isFresh() {
-        return status == ReviewStatus.PENDING && stage == ReviewStage.PRACTICE && openSet == null && failedSets == 0
-                && theoryCompletedCount == 0;
-    }
-
-    /** Sends a fresh review to the theory before its first set (knowledge point already wrong in the lesson). */
-    public void startWithTheory(TheoryReason reason) {
-        if (!isFresh()) throw new IllegalStateException("Review has already started");
-        stage = ReviewStage.THEORY;
-        theoryReason = Objects.requireNonNull(reason, "reason");
-    }
-
     /** Whether {@code setId} is this review's open set, the only one that may be answered. */
     public boolean acceptsAnswersFor(UUID setId) {
         return status == ReviewStatus.PENDING && openSet != null && openSet.id().equals(setId);

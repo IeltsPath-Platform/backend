@@ -47,10 +47,12 @@ the V12 audio (`tour.mp3`, `ls1.mp3`, `numM.mp3`, `spellM.mp3`, `ls2.mp3`); no n
 
 ## Lessons and curriculum order
 
-V8 implements `lessons`, `lesson_blocks`, `lesson_block_vocabulary`, `lesson_block_questions` and
-`lesson_knowledge_points`. `content_packages.topic_id` links each `TOPIC_TEST` to its topic; a topic can have
-multiple test codes. `LESSON` remains a valid package type for existing reading packages. V9 seeds the Reading
-lesson pipeline. These are implemented migrations; their presence does not confirm they ran on a shared database.
+A lesson is its title, a Markdown summary, its slide and document links ([Lesson resources](#lesson-resources)) and
+the knowledge points it teaches (`lesson_knowledge_points`). V8 created `lessons` with ordered blocks; V30 removed
+the blocks (`lesson_blocks` and its child tables), moving their TEXT into `summary_markdown` and their knowledge points
+into `lesson_knowledge_points` first. `content_packages.topic_id` links each `TOPIC_TEST` to its topic; a topic can have
+multiple test codes. `LESSON` remains a valid package type for existing reading packages. These are implemented
+migrations; their presence does not confirm they ran on a shared database.
 
 Learning reads the `/internal/learning-content/**` routes in the
 [internal contract](../../docs/contracts/learning-content-internal-v1.md). `topic-sequence` returns active topics
@@ -59,27 +61,47 @@ course metadata, `hasTopicTest`, active KPs and `hasPracticeSet`. Learning owns 
 Assessment reads package snapshots when it creates an attempt.
 
 Each topic that teaches lessons has one `skill` (`LISTENING`, `READING`, `WRITING`, `SPEAKING`; V15, never `ALL`),
-and its lessons inherit it. Topic create/update accept an optional `skill`; update keeps the current skill when it is
-omitted and returns `409` (`details.code = TOPIC_SKILL_LOCKED`) when a topic with published lessons would change
-skill. There is no lesson authoring API, so seed migrations must keep every lesson question and lesson KP on its
-topic's skill: `LessonPipelineSeedTest.everyLessonTeachesOnlyItsTopicsSkill` enforces it. V15 moved the demo Writing
-essays from Reading lessons L3/L4 into topic `DEMO_WRITING` (lessons W1, W2; no final test), keeping their block ids.
+or none when its lessons teach several. Topic create/update accept an optional `skill`; update keeps the current skill
+when it is omitted and returns `409` (`details.code = TOPIC_SKILL_LOCKED`) when a topic with published lessons would
+change skill. A lesson teaches the distinct skills of its knowledge points (`skills`; `skill` is set when there is exactly
+one), so a lesson without knowledge points has no skill and falls back to its topic's. V15 moved the demo Writing
+lessons from Reading lessons L3/L4 into topic `DEMO_WRITING` (lessons W1, W2; no final test).
 
-V16 adds `lesson_block_knowledge_points` (the KPs each TEXT block teaches) and `content_packages.lesson_id`, which makes a `PRACTICE_SET` part of a lesson's Practice. Package creation accepts an optional `lessonId` (practice sets only, the lesson must exist, else `422` with `details.code = INVALID_PACKAGE_LESSON`); publishing such a package fails the same way when a question's skill differs from the lesson's topic. V16 seeds `PS-KP1-C`, `PS-KP1-D` and one set for each of TF1, PM1, PM2, PS1 and PS2, and refuses a published lesson of a topic with a final test that has no Practice.
+V16 added `content_packages.lesson_id`, which makes a `PRACTICE_SET` part of a lesson's Practice. Package creation accepts an optional `lessonId` (practice sets only, the lesson must exist, else `422` with `details.code = INVALID_PACKAGE_LESSON`); publishing such a package fails the same way when a question's skill differs from the lesson's topic. V16 seeds `PS-KP1-C`, `PS-KP1-D` and one set for each of TF1, PM1, PM2, PS1 and PS2, and refuses a published lesson of a topic with a final test that has no Practice.
 
 V18 thêm 11 đề Practice Reading (mỗi bài Reading của topic có thi cuối có ít nhất hai đề; mỗi KP đủ đề cho một lần Practice và hai set ôn) và đề thi cuối thứ hai X8, X9, X10 cho `TFNG_SKILLS`, `PREMIUM_MATCHING_INFO`, `PREMIUM_SENTENCE_COMPLETION`, để thi lại gặp đề khác. Toàn văn câu hỏi để duyệt: `plans/261002-1600-skill-tracks-practice-remediation/reports/v18-new-questions.md`.
 
 Còn thiếu: mỗi KP Listening (`LS_NUM`, `LS_SPELL`, `LS_PARA`, `LS_TRAP`) chỉ có một đề Practice, vì chưa có file mp3 mới. Practice Listening trượt nên không tạo được bài ôn (hết đề chưa lộ lời giải). Cần thêm audio để thang ôn tập của Listening đủ bước.
 
-Each question (`question_id`, across all its versions) has at most one owner: any lesson, or one `PRACTICE_SET`, `TOPIC_TEST`, `MOCK_TEST` or `PLACEMENT_TEST` package. Publishing checks every lesson and PUBLISHED versions of other covered packages; drafts do not reserve questions, and versions of the same package may share them. A conflict returns `422` with `details.code = QUESTION_ALREADY_USED`, listing at most 10 conflicts, without saving or publishing. `QUIZ` and legacy `LESSON` packages are outside this rule.
+Each question (`question_id`, across all its versions) has at most one owner: one `PRACTICE_SET`, `TOPIC_TEST`, `COURSE_TEST`, `MOCK_TEST` or `PLACEMENT_TEST` package (lessons own no questions since V30; the questions they held are unowned). Publishing checks PUBLISHED versions of other covered packages; drafts do not reserve questions, and versions of the same package may share them. A conflict returns `422` with `details.code = QUESTION_ALREADY_USED`, listing at most 10 conflicts, without saving or publishing. `QUIZ` and legacy `LESSON` packages are outside this rule.
 
 V24 adds purpose `PLACEMENT` and V25 seeds the published `PLACEMENT-4SKILLS` package (4 Listening, 6 Reading, 1 Writing and 1 Speaking question, all `PLACEMENT`); Learning reads it from `GET /internal/learning-content/placement-packages`. Placement tests accept only `PLACEMENT` questions and mock tests only `EXAM`.
-V17 adds immutable `questions.purpose`: `LEARNING` for lessons, practice and topic tests; `EXAM` for mock tests (placement tests moved to `PLACEMENT` in V24). Existing questions default to `LEARNING`; those already attached to any mock or placement test are backfilled to `EXAM`. Question creation accepts optional `purpose` (default `LEARNING`), question responses include it, and the catalog accepts `?purpose=LEARNING|EXAM` with optional `skill`, filtering in the database. Adding a version preserves purpose. Publishing locks question rows in id order until commit before checking ownership and purpose; the wrong purpose returns `422` with `details.code = QUESTION_PURPOSE_MISMATCH` without saving. Invalid purpose input returns `400`.
+V17 adds immutable `questions.purpose`: `LEARNING` for practice and topic tests; `EXAM` for mock tests (placement tests moved to `PLACEMENT` in V24). Existing questions default to `LEARNING`; those already attached to any mock or placement test are backfilled to `EXAM`. Question creation accepts optional `purpose` (default `LEARNING`), question responses include it, and the catalog accepts `?purpose=LEARNING|EXAM` with optional `skill`, filtering in the database. Adding a version preserves purpose. Publishing locks question rows in id order until commit before checking ownership and purpose; the wrong purpose returns `422` with `details.code = QUESTION_PURPOSE_MISMATCH` without saving. Invalid purpose input returns `400`.
 
 Topics retain optional `bandMin`/`bandMax` metadata (0–9, half-band steps). V8 removes KP band columns and the KP
 API no longer accepts or returns own/effective band ranges. The current learning sequence uses topic `sort_order`,
 without goal-band filtering or placement test-out. Topic create/update still validate bands; omitting them on update
 clears the range.
+
+## Lesson resources
+
+V28 adds `lessons.summary_markdown` (nullable) and `lesson_resources`: the `SLIDE` and `DOCUMENT` links of a lesson.
+Files stay outside the platform; only absolute `http(s)` links are stored (checked by the domain and by a database
+`CHECK`). Order is unique per lesson and type.
+
+Author routes (`ADMIN`, `CONTENT_AUTHOR`; any lesson status, unknown lesson → `404`):
+
+- `GET /api/content/admin/lessons/{lessonId}/resources`: `{lessonId, summaryMarkdown, slides[], documents[]}`, each
+  link `{id, title, url, sortOrder}` in order.
+- `PUT /api/content/admin/lessons/{lessonId}/summary`: `{markdown}` up to 20,000 characters; blank or missing removes
+  the summary. Returns `204`.
+- `POST /api/content/admin/lessons/{lessonId}/resources`: `{type: SLIDE|DOCUMENT, title, url, sortOrder}` → `201`.
+- `PUT /api/content/admin/lessons/{lessonId}/resources/{resourceId}`: `{title, url, sortOrder}`; the type is fixed.
+- `DELETE /api/content/admin/lessons/{lessonId}/resources/{resourceId}` → `204`.
+
+A taken `sortOrder` returns `409` with `details.code = DUPLICATE_RESOURCE_ORDER`; a resource of another lesson returns
+`404`. Learning reads `GET /internal/learning-content/lessons/{id}/resources` (published lessons only, same shape) and
+applies the lesson gate before a learner sees it.
 
 ## Media
 

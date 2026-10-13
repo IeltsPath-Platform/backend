@@ -19,8 +19,6 @@ import com.ieltspath.content.application.usecase.SearchPracticeSetsUseCase;
 import com.ieltspath.content.domain.exception.LessonNotFoundException;
 import com.ieltspath.content.domain.exception.TopicNotFoundException;
 import com.ieltspath.content.domain.vo.AssetType;
-import com.ieltspath.content.domain.vo.BlockType;
-import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.Skill;
 import org.junit.jupiter.api.BeforeEach;
@@ -194,43 +192,20 @@ class InternalLearningContentControllerTest {
     }
 
     @Test
-    void lessonBlocksCarryOnlyTheirOwnFieldsAndAnswerSpecsAsJson() throws Exception {
+    void lessonCarriesItsSummaryMarkdownKnowledgePointsAndSkills() throws Exception {
         UUID lessonId = UUID.randomUUID();
         UUID kp = UUID.randomUUID();
         when(lessonContent.execute(lessonId)).thenReturn(new LessonContentResult(lessonId, UUID.randomUUID(), "L1",
-                "Câu chủ đề nằm ở đâu", null, 1, List.of(), List.of(
-                new LessonContentResult.Block(UUID.randomUUID(), BlockType.TEXT, null, 1, "Mẹo", null, null, null,
-                        List.of(kp)),
-                new LessonContentResult.Block(UUID.randomUUID(), BlockType.ASSET, null, 2, null,
-                        new LessonContentResult.Asset(UUID.randomUUID(), AssetType.PASSAGE, "A. Text", null, null, null),
-                        null, null, List.of()),
-                new LessonContentResult.Block(UUID.randomUUID(), BlockType.EXERCISE, LessonBlockKind.EXERCISE, 3, null, null, null, List.of(
-                        new LessonContentResult.Question(UUID.randomUUID(), 1, "Complete ______.", null,
-                                "{\"type\":\"FILL\",\"accepted\":[\"critics\"]}", "Đoạn D.", "Đọc câu thứ hai của đoạn D.", List.of(),
-                                new LessonBlockKind.QuestionSpec("FILL", null, null, null, List.of()), null)), List.of(kp))),
-                Skill.READING));
+                "Câu chủ đề nằm ở đâu", null, "## Learning Outcomes", 1, List.of(kp), null, List.of(Skill.READING)));
 
         mockMvc.perform(get("/internal/learning-content/lessons/{id}", lessonId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summary").value((Object) null))
+                .andExpect(jsonPath("$.summaryMarkdown").value("## Learning Outcomes"))
+                .andExpect(jsonPath("$.knowledgePointIds[0]").value(kp.toString()))
                 .andExpect(jsonPath("$.skill").value("READING"))
-                .andExpect(jsonPath("$.blocks[0].textContent").value("Mẹo"))
-                .andExpect(jsonPath("$.blocks[0].knowledgePointIds[0]").value(kp.toString()))
-                .andExpect(jsonPath("$.blocks[1].knowledgePointIds").isEmpty())
-                .andExpect(jsonPath("$.blocks[2].knowledgePointIds[0]").value(kp.toString()))
-                .andExpect(jsonPath("$.blocks[0].asset").doesNotExist())
-                .andExpect(jsonPath("$.blocks[0].questions").doesNotExist())
-                .andExpect(jsonPath("$.blocks[0].blockKind").doesNotExist())
-                .andExpect(jsonPath("$.blocks[2].blockKind").value("EXERCISE"))
-                .andExpect(jsonPath("$.blocks[2].questions[0].spec").doesNotExist())
-                .andExpect(jsonPath("$.blocks[2].questions[0].assets").doesNotExist())
-                .andExpect(jsonPath("$.blocks[1].asset.assetType").value("PASSAGE"))
-                .andExpect(jsonPath("$.blocks[1].asset.mediaReference").value((Object) null))
-                .andExpect(jsonPath("$.blocks[2].textContent").doesNotExist())
-                .andExpect(jsonPath("$.blocks[2].questions[0].options").value((Object) null))
-                .andExpect(jsonPath("$.blocks[2].questions[0].answerSpec.type").value("FILL"))
-                .andExpect(jsonPath("$.blocks[2].questions[0].answerSpec.accepted[0]").value("critics"))
-                .andExpect(jsonPath("$.blocks[2].questions[0].hint").value("Đọc câu thứ hai của đoạn D."));
+                .andExpect(jsonPath("$.skills[0]").value("READING"))
+                .andExpect(jsonPath("$.blocks").doesNotExist());
     }
 
     @Test

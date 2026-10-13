@@ -20,7 +20,6 @@ import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.QuestionType;
 import com.ieltspath.content.domain.vo.Skill;
-import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.application.result.PackageQuestionSpec;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +35,9 @@ public class PublishContentPackageUseCase {
     private static final Pattern WHITESPACE = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
 
     private final ContentPackageRepository contentPackageRepository;
+    /** The answer-spec type of a Writing question graded as an essay. */
+    private static final String ESSAY_SPEC_TYPE = "ESSAY";
+
     private final LearningContentReader lessons;
 
     public PublishContentPackageUseCase(ContentPackageRepository contentPackageRepository,
@@ -93,7 +95,7 @@ public class PublishContentPackageUseCase {
             for (var question : questions) {
                 JsonNode spec = parseSpec(question.answerSpecJson());
                 if ((question.questionType() == QuestionType.ESSAY
-                        || LessonBlockKind.ESSAY_SPEC_TYPE.equals(spec.path("type").asText())) && !validEssay(question, spec)) {
+                        || ESSAY_SPEC_TYPE.equals(spec.path("type").asText())) && !validEssay(question, spec)) {
                     throw new InvalidContentStateException("Writing essays require passBand from 0 to 9 in steps of 0.5");
                 }
             }
@@ -120,7 +122,7 @@ public class PublishContentPackageUseCase {
 
     private static boolean validEssay(PackageQuestionSpec question, JsonNode spec) {
         if (question.skill() != Skill.WRITING || question.questionType() != QuestionType.ESSAY
-                || !LessonBlockKind.ESSAY_SPEC_TYPE.equals(spec.path("type").asText())
+                || !ESSAY_SPEC_TYPE.equals(spec.path("type").asText())
                 || !spec.path("passBand").isNumber()) return false;
         var band = spec.path("passBand").decimalValue();
         return band.signum() >= 0 && band.compareTo(java.math.BigDecimal.valueOf(9)) <= 0

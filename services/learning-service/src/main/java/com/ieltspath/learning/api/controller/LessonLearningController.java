@@ -1,17 +1,14 @@
 package com.ieltspath.learning.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
-import com.ieltspath.learning.api.dto.request.SubmitExerciseRequest;
 import com.ieltspath.learning.api.dto.response.CompletionResponse;
 import com.ieltspath.learning.api.dto.response.LessonResponse;
 import com.ieltspath.learning.api.dto.response.MasteryResponse;
-import com.ieltspath.learning.api.dto.response.SubmissionResponse;
 import com.ieltspath.learning.api.dto.response.TopicResponse;
 import com.ieltspath.learning.application.result.TopicLessonsResult;
 import com.ieltspath.learning.application.usecase.GetMasteryUseCase;
 import com.ieltspath.learning.application.usecase.GetTopicLessonsUseCase;
 import com.ieltspath.learning.application.usecase.GetLessonUseCase;
-import com.ieltspath.learning.application.usecase.SubmitLessonExerciseUseCase;
 import com.ieltspath.learning.application.usecase.CompleteLessonUseCase;
 import com.ieltspath.learning.application.usecase.RefreshLearningTopicsUseCase;
 import jakarta.validation.Valid;
@@ -34,7 +31,6 @@ public class LessonLearningController {
     private final RefreshLearningTopicsUseCase refreshLearningTopicsUseCase;
     private final GetTopicLessonsUseCase getTopicLessonsUseCase;
     private final GetLessonUseCase getLessonUseCase;
-    private final SubmitLessonExerciseUseCase submitLessonExerciseUseCase;
     private final CompleteLessonUseCase completeLessonUseCase;
     private final GetMasteryUseCase getMasteryUseCase;
 
@@ -53,13 +49,6 @@ public class LessonLearningController {
     @GetMapping("/lessons/{id}")
     public LessonResponse lesson(@PathVariable("id") UUID id) {
         return LessonResponse.from(getLessonUseCase.execute(currentUser.requireUserId(), id));
-    }
-
-    @PostMapping("/lessons/{id}/exercises/{blockId}/submissions")
-    public SubmissionResponse submit(@PathVariable("id") UUID id, @PathVariable("blockId") UUID blockId,
-                                     @Valid @RequestBody SubmitExerciseRequest request) {
-        return SubmissionResponse.from(submitLessonExerciseUseCase.execute(
-                currentUser.requireUserId(), id, blockId, request.toCommand()));
     }
 
     @PostMapping("/lessons/{id}/complete")

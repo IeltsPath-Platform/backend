@@ -135,14 +135,14 @@ class RestLearningContentClientTest {
                 .andRespond(withSuccess("""
                         {"lessonId":"20000000-0000-4000-8000-000000000101",
                          "topicId":"10000000-0000-4000-8000-000000000001","code":"T1","title":"Trees",
-                         "summary":null,"sortOrder":1,"knowledgePointIds":[],"blocks":[],
+                         "summary":null,"sortOrder":1,"knowledgePointIds":[],
                          "skill":null,"skills":["LISTENING","READING"]}
                         """, MediaType.APPLICATION_JSON));
         server.expect(requestTo(INTERNAL_PATH + "/topics/" + TOPIC_ID + "/lessons"))
                 .andRespond(withSuccess("""
                         [{"lessonId":"20000000-0000-4000-8000-000000000101",
                           "topicId":"10000000-0000-4000-8000-000000000001","code":"T1","title":"Trees",
-                          "summary":null,"sortOrder":1,"knowledgePointIds":[],"exerciseBlockIds":[],
+                          "summary":null,"sortOrder":1,"knowledgePointIds":[],
                           "skills":["WRITING","READING"]}]
                         """, MediaType.APPLICATION_JSON));
 
@@ -183,8 +183,7 @@ class RestLearningContentClientTest {
                         [{"lessonId":"20000000-0000-4000-8000-000000000101",
                           "topicId":"10000000-0000-4000-8000-000000000001","code":"L1",
                           "title":"Topic sentences","summary":null,"sortOrder":1,
-                          "knowledgePointIds":["20000000-0000-4000-8000-000000000003"],
-                          "exerciseBlockIds":["20000000-0000-4000-8000-000000000202"]}]
+                          "knowledgePointIds":["20000000-0000-4000-8000-000000000003"]}]
                         """, MediaType.APPLICATION_JSON));
 
         var lesson = client.getTopicLessons(TOPIC_ID).getFirst();
@@ -193,68 +192,27 @@ class RestLearningContentClientTest {
         assertEquals(TOPIC_ID, lesson.topicId());
         assertEquals("L1", lesson.code());
         assertEquals(List.of(KP_ID), lesson.knowledgePointIds());
-        assertEquals(List.of(UUID.fromString("20000000-0000-4000-8000-000000000202")),
-                lesson.exerciseBlockIds());
     }
 
     @Test
-    void mapsLessonBlocksAndChoiceAndFillAnswerSpecs() {
+    void mapsALessonWithItsMarkdownSummaryAndKnowledgePoints() {
         server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("""
                         {"lessonId":"20000000-0000-4000-8000-000000000101",
                          "topicId":"10000000-0000-4000-8000-000000000001","code":"L1",
-                         "title":"Topic sentences","summary":null,"sortOrder":1,
-                         "knowledgePointIds":["20000000-0000-4000-8000-000000000003"],
-                         "blocks":[
-                           {"blockId":"20000000-0000-4000-8000-000000000201","blockType":"TEXT",
-                            "sortOrder":1,"textContent":"Lesson prose"},
-                           {"blockId":"20000000-0000-4000-8000-000000000204","blockType":"ASSET",
-                            "sortOrder":2,"asset":{"id":"20000000-0000-4000-8000-000000000801",
-                              "assetType":"PASSAGE","textContent":"A reading passage.",
-                              "mediaReference":null,"durationSeconds":null}},
-                           {"blockId":"20000000-0000-4000-8000-000000000207","blockType":"VOCABULARY",
-                            "sortOrder":3,"vocabularySenseIds":["20000000-0000-4000-8000-000000000901"]},
-                           {"blockId":"20000000-0000-4000-8000-000000000202","blockType":"EXERCISE",
-                            "sortOrder":4,"questions":[
-                              {"questionVersionId":"20000000-0000-4000-8000-000000000013",
-                               "sortOrder":1,"stem":"Which sentence is the topic sentence?",
-                               "options":[{"optionKey":"A","content":"Main idea","sortOrder":1}],
-                               "answerSpec":{"type":"CHOICE","correct":"A"},
-                               "explanation":"A states the main idea.","hint":"Compare the scope of the options.",
-                               "knowledgePointIds":["20000000-0000-4000-8000-000000000003"]},
-                              {"questionVersionId":"20000000-0000-4000-8000-000000000012",
-                               "sortOrder":2,"stem":"People who doubt are called ____.","options":null,
-                               "answerSpec":{"type":"FILL","accepted":["critics"]},
-                               "explanation":"The passage says critics.","hint":"Find the noun near the contrast.",
-                               "knowledgePointIds":["20000000-0000-4000-8000-000000000003"]}]}]}
+                         "title":"Topic sentences","summary":null,"summaryMarkdown":"## Learning Outcomes",
+                         "sortOrder":1,"knowledgePointIds":["20000000-0000-4000-8000-000000000003"],
+                         "skill":"READING","skills":["READING"]}
                         """, MediaType.APPLICATION_JSON));
 
         var lesson = client.getLesson(LESSON_ID);
 
         assertEquals(LESSON_ID, lesson.lessonId());
-        assertEquals(4, lesson.blocks().size());
-        assertEquals("Lesson prose", lesson.blocks().get(0).textContent());
-        var passage = lesson.blocks().get(1).asset();
-        assertEquals(UUID.fromString("20000000-0000-4000-8000-000000000801"), passage.id());
-        assertEquals("PASSAGE", passage.assetType());
-        assertEquals("A reading passage.", passage.textContent());
-        assertNull(passage.mediaReference());
-        assertNull(passage.durationSeconds());
-        assertEquals(List.of(UUID.fromString("20000000-0000-4000-8000-000000000901")),
-                lesson.blocks().get(2).vocabularySenseIds());
-        var questions = lesson.blocks().get(3).questions();
-        assertEquals(2, questions.size());
-        assertEquals("A", questions.getFirst().options().getFirst().optionKey());
-        assertEquals("Main idea", questions.getFirst().options().getFirst().content());
-        assertEquals("A", questions.getFirst().answerSpec().get("correct"));
-        assertEquals("A states the main idea.", questions.getFirst().explanation());
-        assertEquals("Compare the scope of the options.", questions.getFirst().hint());
-        assertEquals("Find the noun near the contrast.", questions.get(1).hint());
-        assertEquals(List.of(KP_ID), questions.getFirst().knowledgePointIds());
-        assertNull(questions.get(1).options());
-        assertEquals("FILL", questions.get(1).answerSpec().get("type"));
-        assertEquals(List.of("critics"), questions.get(1).answerSpec().get("accepted"));
+        assertEquals("Topic sentences", lesson.title());
+        assertEquals("## Learning Outcomes", lesson.summaryMarkdown());
+        assertEquals(List.of(KP_ID), lesson.knowledgePointIds());
+        assertEquals(Set.of(LearningSkill.READING), lesson.skills());
     }
 
     @Test
@@ -365,6 +323,43 @@ class RestLearningContentClientTest {
                 .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
 
         assertTrue(client.getTopicSequence().isEmpty());
+    }
+
+    @Test
+    void mapsLessonResourcesAndDefaultsMissingListsToEmpty() {
+        server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID + "/resources"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-internal-token"))
+                .andRespond(withSuccess("""
+                        {"lessonId":"20000000-0000-4000-8000-000000000101","summaryMarkdown":"## Outcomes",
+                         "slides":[{"id":"20000000-0000-4000-8000-000000000501","title":"Slide",
+                                    "url":"https://docs.google.com/presentation/d/x","sortOrder":0}],
+                         "documents":[]}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID + "/resources"))
+                .andRespond(withSuccess("{\"lessonId\":\"20000000-0000-4000-8000-000000000101\"}",
+                        MediaType.APPLICATION_JSON));
+
+        var resources = client.getLessonResources(LESSON_ID);
+        var empty = client.getLessonResources(LESSON_ID);
+
+        assertEquals("## Outcomes", resources.summaryMarkdown());
+        assertEquals("https://docs.google.com/presentation/d/x", resources.slides().getFirst().url());
+        assertTrue(resources.documents().isEmpty());
+        assertNull(empty.summaryMarkdown());
+        assertTrue(empty.slides().isEmpty());
+        assertTrue(empty.documents().isEmpty());
+    }
+
+    @Test
+    void missingLessonResourcesBecomeNotFound() {
+        server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID + "/resources"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        var exception = assertThrows(LearningRequestException.class, () -> client.getLessonResources(LESSON_ID));
+
+        assertEquals(404, exception.getStatus());
+        assertEquals("NOT_FOUND", exception.getCode());
     }
 
     @ParameterizedTest

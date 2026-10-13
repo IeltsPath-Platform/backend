@@ -32,6 +32,7 @@ public class GlobalExceptionHandler {
             AssetNotFoundException.class,
             ReadingPassageNotFoundException.class,
             LessonNotFoundException.class,
+            LessonResourceNotFoundException.class,
             PackageVersionNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFoundException(ContentDomainException ex, HttpServletRequest request) {
@@ -86,6 +87,14 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(), null);
     }
 
+    @ExceptionHandler(DuplicateLessonResourceOrderException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateLessonResourceOrder(DuplicateLessonResourceOrderException ex,
+                                                                           HttpServletRequest request) {
+        log.warn("Lesson resource conflict: {}", ex.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "DUPLICATE_RESOURCE_ORDER"));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, String> details = new HashMap<>();
@@ -113,13 +122,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleAccessDeniedException(AccessDeniedException ex, HttpServletRequest request) {
         log.warn("Access denied: {}", ex.getMessage());
         return buildResponse(HttpStatus.FORBIDDEN, "Access denied", request.getRequestURI(), null);
-    }
-
-    @ExceptionHandler(InvalidLessonBlockException.class)
-    public ResponseEntity<ErrorResponse> handleInvalidLessonBlock(InvalidLessonBlockException ex, HttpServletRequest request) {
-        log.error("Lesson data breaks a block rule at {}: {}", request.getRequestURI(), ex.getMessage());
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), request.getRequestURI(),
-                Map.of("code", "INVALID_LESSON_BLOCK"));
     }
 
     @ExceptionHandler(InvalidMediaReferenceException.class)

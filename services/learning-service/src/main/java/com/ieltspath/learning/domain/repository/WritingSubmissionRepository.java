@@ -1,10 +1,7 @@
 package com.ieltspath.learning.domain.repository;
 
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
-import com.ieltspath.learning.domain.vo.WritingSubmissionStatus;
 
-import java.math.BigDecimal;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,9 +14,6 @@ public interface WritingSubmissionRepository {
     Optional<WritingSubmission> findForUpdate(UUID id);
 
     Optional<WritingSubmission> findOwned(UUID id, UUID userId);
-
-    /** The learner's GRADING submissions for the block. */
-    List<WritingSubmission> findGrading(UUID userId, UUID blockId);
 
     /** The learner's GRADING submissions for one essay question of a practice attempt. */
     List<WritingSubmission> findGradingForPractice(UUID userId, UUID practiceAttemptId, UUID questionVersionId);
@@ -37,10 +31,4 @@ public interface WritingSubmissionRepository {
     /** Whether the learner has a GRADED, passed submission for the block, other than {@code excludeId}. */
     boolean blockPassed(UUID userId, UUID blockId, UUID excludeId);
 
-    /** Newest submission and whether the block was ever passed, per essay block; one query. */
-    Map<UUID, BlockSummary> summarizeBlocks(UUID userId, Collection<UUID> blockIds);
-
-    /** The grade of the newest submission is set only when it is GRADED, so a withheld grade never leaks. */
-    record BlockSummary(UUID latestId, WritingSubmissionStatus latestStatus, BigDecimal latestOverallBand,
-                        Boolean latestPassed, boolean passed) {}
 }
