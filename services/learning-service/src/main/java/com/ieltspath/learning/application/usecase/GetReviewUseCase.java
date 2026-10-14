@@ -9,13 +9,12 @@ import com.ieltspath.learning.application.port.LearningContentClient.Section;
 import com.ieltspath.learning.application.result.LessonResult;
 import com.ieltspath.learning.application.result.ReviewResult;
 import com.ieltspath.learning.application.service.ItemGrading;
-import com.ieltspath.learning.application.service.PracticeProgress;
+import com.ieltspath.learning.application.service.LessonCompletion;
 import com.ieltspath.learning.application.service.TheoryFocus;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
-import com.ieltspath.learning.domain.service.ReviewRule;
 import com.ieltspath.learning.domain.vo.ReviewStage;
 import com.ieltspath.learning.domain.vo.ReviewStatus;
 import com.ieltspath.learning.domain.vo.TheoryReason;
@@ -41,16 +40,16 @@ public class GetReviewUseCase {
     private final LearnerLock lock;
     private final ReviewItemRepository reviews;
     private final PracticeAttemptRepository attempts;
-    private final PracticeProgress practice;
+    private final LessonCompletion lessonCompletion;
     private final TheoryFocus theoryFocus = new TheoryFocus();
 
     public GetReviewUseCase(LearningContentClient content, LearnerLock lock, ReviewItemRepository reviews,
-                            PracticeAttemptRepository attempts, PracticeProgress practice) {
+                            PracticeAttemptRepository attempts, LessonCompletion lessonCompletion) {
         this.content = content;
         this.lock = lock;
         this.reviews = reviews;
         this.attempts = attempts;
-        this.practice = practice;
+        this.lessonCompletion = lessonCompletion;
     }
 
     @Transactional
@@ -75,7 +74,7 @@ public class GetReviewUseCase {
                 // No unrevealed eligible package remains, so the learner can continue.
                 review.skip();
                 reviews.save(review);
-                practice.refreshPassForLesson(userId, review.lessonId());
+                lessonCompletion.afterPracticeChange(userId, review.lessonId());
                 return result(review, focus, null, List.of());
             }
             review.assignSet(UUID.randomUUID(), next.get().packageId(), next.get().packageVersionId());
@@ -99,7 +98,7 @@ public class GetReviewUseCase {
         return new ReviewResult(review.id(), review.status().name(), review.lessonId(), focus.theory(), set,
                 review.knowledgePointId(), review.skill(), review.stage().name(),
                 review.theoryReason() == null ? null : review.theoryReason().name(), focus.scope(),
-                review.failedSets(), ReviewRule.MAX_FAILED_REVIEW_SETS, quickCheck);
+                review.failedSets(), null, quickCheck);
     }
 
     private static List<LessonResult.Option> options(List<LearningContentClient.Option> options) {

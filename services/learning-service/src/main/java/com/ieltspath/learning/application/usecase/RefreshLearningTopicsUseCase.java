@@ -76,7 +76,7 @@ public class RefreshLearningTopicsUseCase {
                     topic.requiredFeatureKey(), topic.skill(), topic.hasTopicTest(), topic.course() == null ? null
                             : new TopicResult.Course(topic.course().courseId(), topic.course().code(),
                             topic.course().name(), topic.course().bandLevel()),
-                    topic.course() != null && topic.course().hasCourseTest(), topic.skills()));
+                    topic.course() != null && topic.course().hasCourseTest(), topic.skills(), topic.lessonCount()));
         }
         return List.copyOf(results);
     }

@@ -11,7 +11,6 @@ import com.ieltspath.learning.application.usecase.GetLessonPracticeSetsUseCase;
 import com.ieltspath.learning.application.usecase.GetPracticeAttemptUseCase;
 import com.ieltspath.learning.application.usecase.RefreshLearningTopicsUseCase;
 import com.ieltspath.learning.application.usecase.StartPracticeAttemptUseCase;
-import com.ieltspath.learning.application.usecase.CompleteLessonUseCase;
 import com.ieltspath.learning.application.usecase.SubmitPracticeAttemptUseCase;
 import com.ieltspath.learning.application.usecase.SubmitPracticeEssayUseCase;
 import com.ieltspath.learning.domain.vo.LearningSkill;
@@ -89,7 +88,6 @@ class PracticeEssayIntegrationTest {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired RefreshLearningTopicsUseCase topics;
-    @Autowired CompleteLessonUseCase completeLesson;
     @Autowired GetLessonPracticeSetsUseCase practiceSets;
     @Autowired StartPracticeAttemptUseCase startPractice;
     @Autowired GetPracticeAttemptUseCase getPractice;
@@ -136,7 +134,6 @@ class PracticeEssayIntegrationTest {
         when(access.balance()).thenReturn(30L);
         when(access.debit(any(), anyInt(), any(), anyString(), any())).thenAnswer(invocation -> UUID.randomUUID());
         topics.execute(USER);
-        completeLesson.execute(USER, LESSON);
     }
 
     @Test

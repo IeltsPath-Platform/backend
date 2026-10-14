@@ -129,14 +129,16 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         params.put("skill", skill == null ? null : skill.name());
         params.put("limit", limit);
         return jdbc.query("""
-                SELECT id, knowledge_point_id, lesson_id, skill, stage, created_at FROM review_items
-                WHERE user_id = :userId AND status = :status
-                  AND (CAST(:skill AS varchar) IS NULL OR skill = :skill OR skill IS NULL)
-                ORDER BY created_at, id LIMIT :limit
+                SELECT r.id, r.knowledge_point_id, r.lesson_id, r.skill, r.stage, r.created_at, a.package_id
+                FROM review_items r LEFT JOIN practice_attempts a ON a.id = r.source_attempt_id
+                WHERE r.user_id = :userId AND r.status = :status
+                  AND (CAST(:skill AS varchar) IS NULL OR r.skill = :skill OR r.skill IS NULL)
+                ORDER BY r.created_at, r.id LIMIT :limit
                 """, params, (row, index) -> new ReviewListEntry(row.getObject("id", UUID.class),
                 row.getObject("knowledge_point_id", UUID.class), row.getObject("lesson_id", UUID.class),
                 row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")),
-                ReviewStage.valueOf(row.getString("stage")), row.getTimestamp("created_at").toInstant()));
+                ReviewStage.valueOf(row.getString("stage")), row.getTimestamp("created_at").toInstant(),
+                row.getObject("package_id", UUID.class)));
     }
 
     @Override

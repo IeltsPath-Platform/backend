@@ -6,6 +6,7 @@ import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.*;
 import com.ieltspath.learning.application.usecase.*;
+import com.ieltspath.learning.domain.vo.PracticeStatus;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,10 +51,10 @@ class RemediationLadderIntegrationTest {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired RefreshLearningTopicsUseCase topics;
-    @Autowired CompleteLessonUseCase complete;
     @Autowired StartPracticeAttemptUseCase start;
     @Autowired SubmitPracticeAttemptUseCase practice;
     @Autowired GetReviewUseCase getReview;
+    @Autowired GetLessonPracticeSetsUseCase practiceSets;
     @Autowired SubmitReviewUseCase submitReview;
     @Autowired SubmitTheoryCheckUseCase theoryCheck;
     @MockitoBean LearningContentClient content;
@@ -90,13 +91,12 @@ class RemediationLadderIntegrationTest {
     }
 
     @Test
-    void failedReviewSetLeadsToTheoryThenANewUnrevealedSetThenSkip() {
+    void failedReviewSetsLeadToTheoryOnceThenNewSetsUntilNoneIsLeftToSkip() {
         UUID user = UUID.randomUUID();
         PackageVersion first = practiceSet(kpA, kpA);
         PackageVersion second = practiceSet(kpA, kpA);
         PackageVersion third = practiceSet(kpA, kpA);
         topics.execute(user);
-        complete.execute(user, lesson);
 
         var attempt = start.execute(user, lesson, first.packageId());
         var submitted = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "B"));
@@ -143,9 +143,23 @@ class RemediationLadderIntegrationTest {
 
         var next = getReview.execute(user, reviewId);
         assertEquals(third.packageId(), next.set().packageId());
-        var skipped = submitReview.execute(user, reviewId, new SubmitReviewCommand(next.set().reviewSetId(),
+        // A second failure does not skip the review or read the theory again: it goes straight to a new set.
+        var failedAgain = submitReview.execute(user, reviewId, new SubmitReviewCommand(next.set().reviewSetId(),
                 UUID.randomUUID(), answers(items(third), "B", "B").answers()));
-        assertEquals("SKIPPED", skipped.reviewStatus());
+        assertEquals("PENDING", failedAgain.reviewStatus());
+        assertEquals("PRACTICE", failedAgain.stage());
+        assertEquals(2, failedAgain.failedSets());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING'",
+                Integer.class, user));
+        assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(user, lesson).practiceStatus());
+
+        // Only when no unrevealed package is left does the review let the learner continue.
+        var last = getReview.execute(user, reviewId);
+        assertEquals("SKIPPED", last.reviewStatus());
+        // Finishing the last review passes the Practice, which completes the lesson.
+        assertEquals(PracticeStatus.PASSED, practiceSets.execute(user, lesson).practiceStatus());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM lesson_progress WHERE user_id = ? "
+                + "AND lesson_id = ? AND completed_at IS NOT NULL", Integer.class, user, lesson));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING'",
                 Integer.class, user));
     }
@@ -156,7 +170,6 @@ class RemediationLadderIntegrationTest {
         PackageVersion mixed = practiceSet(kpA, kpA, kpB, kpB);
         practiceSet(kpA, kpB);
         topics.execute(user);
-        complete.execute(user, lesson);
 
         // kpA is half right, kpB is all wrong: only the low score starts a review at the theory.
         var attempt = start.execute(user, lesson, mixed.packageId());

@@ -119,12 +119,11 @@ class ReviewRuleTest {
     }
 
     @Test
-    void validatesThresholdAndKeepsThreeFailedSetEscapeConstant() {
+    void validatesThreshold() {
         for (double invalid : new double[]{0.0, -0.1, 1.1, Double.NaN, Double.POSITIVE_INFINITY}) {
             assertThatThrownBy(() -> new ReviewRule(invalid)).isInstanceOf(IllegalArgumentException.class);
         }
         assertThatCode(() -> new ReviewRule(1.0)).doesNotThrowAnyException();
-        assertThat(ReviewRule.MAX_FAILED_REVIEW_SETS).isEqualTo(2);
     }
 
     @Test

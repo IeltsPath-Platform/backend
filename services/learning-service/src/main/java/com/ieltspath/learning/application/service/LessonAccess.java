@@ -14,6 +14,7 @@ import com.ieltspath.learning.domain.repository.ReviewItemRepository;
 import com.ieltspath.learning.domain.service.LessonAccessGate;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.MasteryHistory;
+import com.ieltspath.learning.domain.vo.PendingReview;
 import com.ieltspath.learning.domain.vo.TopicStatus;
 import org.springframework.stereotype.Component;
 
@@ -22,7 +23,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * The one lesson gate shared by reading a lesson, exercise and essay submissions, and completion: pending review,
+ * The one lesson gate shared by reading a lesson, its Practice, and completion: pending review,
  * then topic, then earlier lessons. Callers hold the learner's lock.
  */
 @Component
@@ -46,11 +47,21 @@ public class LessonAccess {
         this.refreshTopics = refreshTopics;
     }
 
+    /** Reading or completing a lesson: a review the lesson itself created does not hold the lesson back. */
     public Context authorize(UUID userId, UUID lessonId) {
         return authorize(userId, content.getLesson(lessonId));
     }
 
     public Context authorize(UUID userId, Lesson lesson) {
+        return authorize(userId, lesson, true);
+    }
+
+    /** Starting or answering the lesson's Practice: every pending review of the lesson's skills comes first. */
+    public Context authorizePractice(UUID userId, UUID lessonId) {
+        return authorize(userId, content.getLesson(lessonId), false);
+    }
+
+    private Context authorize(UUID userId, Lesson lesson, boolean ownReviewsAllowed) {
         var summaries = orderedLessons(content.getTopicLessons(lesson.topicId()));
         var progress = lessons.findByTopic(userId, lesson.topicId());
         boolean previousComplete = true;
@@ -60,7 +71,7 @@ public class LessonAccess {
             previousComplete &= completed(progress.get(summary.lessonId()));
         }
         var topic = topic(userId, lesson.topicId());
-        gate.authorize(reviews.findPending(userId), null, skillsOf(lesson, topic),
+        gate.authorize(pendingReviews(userId, lesson.lessonId(), ownReviewsAllowed), null, skillsOf(lesson, topic),
                 status(userId, lesson.topicId()), previousComplete);
         if (!found) throw new LearningRequestException(404, "NOT_FOUND", "Lesson was not found");
         return new Context(lesson, progress.get(lesson.lessonId()), previousComplete);
@@ -69,9 +80,30 @@ public class LessonAccess {
     /** Checks the gate again after a curriculum refresh may have changed the learner's current topic. */
     public void reauthorize(UUID userId, Context context) {
         var topic = topic(userId, context.lesson().topicId());
-        gate.authorize(reviews.findPending(userId), null, skillsOf(context.lesson(), topic),
-                status(userId, context.lesson().topicId()),
+        gate.authorize(pendingReviews(userId, context.lesson().lessonId(), true), null,
+                skillsOf(context.lesson(), topic), status(userId, context.lesson().topicId()),
                 context.previousLessonsComplete());
+    }
+
+    private List<PendingReview> pendingReviews(UUID userId, UUID lessonId, boolean ownReviewsAllowed) {
+        var pending = reviews.findPending(userId);
+        return ownReviewsAllowed ? pending.stream().filter(review -> !review.lessonId().equals(lessonId)).toList()
+                : pending;
+    }
+
+    /**
+     * Whether the lesson is open: its topic is open and every earlier lesson is completed. Reads only and never
+     * refreshes the curriculum, so read-only paths can call it without the learner's lock.
+     */
+    public boolean isOpen(UUID userId, UUID topicId, UUID lessonId) {
+        TopicStatus topicStatus = status(userId, topicId);
+        if (topicStatus != TopicStatus.IN_PROGRESS && topicStatus != TopicStatus.PASSED) return false;
+        var progress = lessons.findByTopic(userId, topicId);
+        for (var summary : orderedLessons(content.getTopicLessons(topicId))) {
+            if (summary.lessonId().equals(lessonId)) return true;
+            if (!completed(progress.get(summary.lessonId()))) return false;
+        }
+        return false;
     }
 
     public TopicProgress topic(UUID userId, UUID topicId) {

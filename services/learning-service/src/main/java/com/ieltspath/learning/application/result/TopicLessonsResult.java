@@ -20,10 +20,15 @@ public record TopicLessonsResult(UUID topicId, List<LessonSummary> lessons, Stri
     public TopicLessonsResult(UUID topicId, List<LessonSummary> lessons, String testStatus) {
         this(topicId, lessons, testStatus, null, true);
     }
+    /**
+     * {@code estimatedMinutes} is null when Content has no duration for the lesson. {@code blockingReviewId} is the
+     * oldest pending review that blocks a lesson the learner has not completed; such a lesson is {@code LOCKED}.
+     */
     public record LessonSummary(UUID lessonId, String code, String title, int sortOrder, String status,
-                                PracticeStatus practiceStatus, PracticePassReason practicePassReason) {
+                                PracticeStatus practiceStatus, PracticePassReason practicePassReason,
+                                Integer estimatedMinutes, UUID blockingReviewId) {
         public LessonSummary(UUID lessonId, String code, String title, int sortOrder, String status) {
-            this(lessonId, code, title, sortOrder, status, null, null);
+            this(lessonId, code, title, sortOrder, status, null, null, null, null);
         }
     }
 }

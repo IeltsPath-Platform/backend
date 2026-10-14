@@ -64,13 +64,20 @@ public interface LearningContentClient {
 
     /**
      * {@code requiredFeatureKey} is the Access feature needed to learn the topic; null means free. {@code skills} are
-     * the skills its lessons teach; a response without them falls back to {@code skill}.
+     * the skills its lessons teach; a response without them falls back to {@code skill}. {@code lessonCount} is the
+     * number of published lessons; 0 from Content that does not send it.
      */
     record Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                  List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
-                 Set<LearningSkill> skills) {
+                 Set<LearningSkill> skills, int lessonCount) {
         public Topic {
             skills = skillsOrSingle(skills, skill);
+        }
+        public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                     List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
+                     Set<LearningSkill> skills) {
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
+                    skills, 0);
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course) {
@@ -95,10 +102,16 @@ public interface LearningContentClient {
                           String description, boolean hasPracticeSet) {
     }
 
+    /** {@code estimatedMinutes} is null when the author has not set a duration. */
     record LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
-                         int sortOrder, List<UUID> knowledgePointIds, Set<LearningSkill> skills) {
+                         int sortOrder, List<UUID> knowledgePointIds, Set<LearningSkill> skills,
+                         Integer estimatedMinutes) {
         public LessonSummary {
             skills = skillsOrSingle(skills, null);
+        }
+        public LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
+                             int sortOrder, List<UUID> knowledgePointIds, Set<LearningSkill> skills) {
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, skills, null);
         }
         public LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
                              int sortOrder, List<UUID> knowledgePointIds) {

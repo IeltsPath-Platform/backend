@@ -12,7 +12,7 @@ import java.util.UUID;
  */
 public record ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, List<String> theory, ReviewSet set,
                            UUID knowledgePointId, LearningSkill skill, String stage, String theoryReason,
-                           String theoryScope, int failedSets, int maxFailedSets,
+                           String theoryScope, int failedSets, Integer maxFailedSets,
                            List<LessonResult.Question> quickCheck) {
     public record ReviewSet(UUID reviewSetId, UUID packageId, UUID packageVersionId, String passage, Audio audio,
                             List<LessonResult.Question> questions) {}

@@ -6,6 +6,7 @@ import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.*;
 import com.ieltspath.learning.application.usecase.*;
 import com.ieltspath.learning.domain.exception.LearningGateException;
+import com.ieltspath.learning.domain.vo.ReviewStatus;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +51,8 @@ class PracticeIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired RefreshLearningTopicsUseCase topics;
     @Autowired CompleteLessonUseCase complete;
+    @Autowired GetTopicLessonsUseCase topicLessons;
+    @Autowired ListReviewsUseCase listReviews;
     @Autowired GetLessonPracticeSetsUseCase catalog;
     @Autowired StartPracticeAttemptUseCase start;
     @Autowired SubmitPracticeAttemptUseCase submit;
@@ -107,17 +110,19 @@ class PracticeIntegrationTest {
                 UUID.randomUUID(), "TEST")));
 
         topics.execute(user);
-        assertEquals("LOCKED", catalog.execute(user, firstLesson).items().getFirst().status());
-        var locked = assertThrows(LearningRequestException.class,
-                () -> start.execute(user, firstLesson, firstPackage));
-        assertEquals(409, locked.getStatus());
-        assertEquals("PRACTICE_LOCKED", locked.getCode());
+        // The Practice opens with its lesson; the next lesson and its Practice stay closed until this one passes.
+        assertEquals("AVAILABLE", catalog.execute(user, firstLesson).items().getFirst().status());
+        assertEquals("LOCKED", catalog.execute(user, secondLesson).items().getFirst().status());
+        var closed = assertThrows(LearningGateException.class,
+                () -> start.execute(user, secondLesson, failedPackage));
+        assertEquals("LESSON_LOCKED", closed.getCode());
 
-        complete.execute(user, firstLesson);
-        complete.execute(user, secondLesson);
-        var required = assertThrows(LearningRequestException.class, () -> tests.execute(user, topic));
-        assertEquals("PRACTICE_REQUIRED", required.getCode());
-        assertEquals(Set.of(firstLesson, secondLesson), Set.copyOf(required.getLessonIds()));
+        // A lesson with required Practice cannot be confirmed by hand.
+        var refused = assertThrows(LearningRequestException.class, () -> complete.execute(user, firstLesson));
+        assertEquals("PRACTICE_REQUIRED", refused.getCode());
+        assertEquals(List.of(firstLesson), refused.getLessonIds());
+        assertEquals("TEST_LOCKED", assertThrows(LearningRequestException.class,
+                () -> tests.execute(user, topic)).getCode());
 
         var first = start.execute(user, firstLesson, firstPackage);
         var passed = submit.execute(user, first.attemptId(), answers(firstQuestion, secondQuestion, "A", "A"));
@@ -125,9 +130,13 @@ class PracticeIntegrationTest {
         assertTrue(passed.countedAsEvidence());
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source='practice_set'",
                 Integer.class));
-        assertEquals("PASSED", catalog.execute(user, firstLesson).practiceStatus().name());
-        assertEquals(List.of(secondLesson), assertThrows(LearningRequestException.class,
-                () -> tests.execute(user, topic)).getLessonIds());
+        // One passed set of the lesson's two does not finish the Practice: the lesson stays open and the next stays shut.
+        assertEquals("REQUIRED", catalog.execute(user, firstLesson).practiceStatus().name());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM lesson_progress WHERE user_id = ? "
+                + "AND lesson_id = ? AND completed_at IS NOT NULL", Integer.class, user, firstLesson));
+        assertEquals("LOCKED", catalog.execute(user, secondLesson).items().getFirst().status());
+        assertEquals("TEST_LOCKED", assertThrows(LearningRequestException.class,
+                () -> tests.execute(user, topic)).getCode());
 
         var second = start.execute(user, firstLesson, firstPackage);
         assertFalse(submit.execute(user, second.attemptId(), answers(firstQuestion, secondQuestion, "A", "A"))
@@ -147,6 +156,12 @@ class PracticeIntegrationTest {
                 revealedItems.second(), "A", "A")).countedAsEvidence());
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source='practice_set'",
                 Integer.class));
+        // Both sets of the first lesson were seen and its review is finished: the Practice passes, the lesson completes
+        // and the next lesson opens.
+        assertEquals("PASSED", catalog.execute(user, firstLesson).practiceStatus().name());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM lesson_progress WHERE user_id = ? "
+                + "AND lesson_id = ? AND completed_at IS NOT NULL", Integer.class, user, firstLesson));
+        assertEquals("AVAILABLE", catalog.execute(user, secondLesson).items().getFirst().status());
 
         var failed = start.execute(user, secondLesson, failedPackage);
         var failedResult = submit.execute(user, failed.attemptId(), answers(thirdQuestion, fourthQuestion, "A", "B"));
@@ -155,11 +170,31 @@ class PracticeIntegrationTest {
         assertEquals("PRACTICE", jdbc.queryForObject(
                 "SELECT trigger_kind FROM review_items WHERE id = ?", String.class,
                 failedResult.reviewsCreated().getFirst().reviewId()));
+        // The review list says which set created each review, so the lesson can show it under that set.
+        var pendingList = listReviews.execute(user, ReviewStatus.PENDING, null, 20);
+        assertEquals(1, pendingList.size());
+        assertEquals(failedPackage, pendingList.getFirst().sourcePackageId());
         var gate = assertThrows(LearningGateException.class,
                 () -> start.execute(user, secondLesson, sparePackage));
         assertEquals("REVIEW_REQUIRED", gate.getCode());
+        // The second lesson stays unfinished while its review is pending. It created the review, so the list keeps it
+        // open: the review holds back the lessons after it, not itself.
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM lesson_progress WHERE user_id = ? "
+                + "AND lesson_id = ? AND completed_at IS NOT NULL", Integer.class, user, secondLesson));
+        var blockedList = topicLessons.execute(user, topic).lessons();
+        assertEquals("COMPLETED", blockedList.get(0).status());
+        assertNull(blockedList.get(0).blockingReviewId());
+        assertEquals("AVAILABLE", blockedList.get(1).status());
+        assertNull(blockedList.get(1).blockingReviewId());
         jdbc.update("UPDATE review_items SET status='DONE' WHERE id=?",
                 failedResult.reviewsCreated().getFirst().reviewId());
+        var spare = start.execute(user, secondLesson, sparePackage);
+        var spareItems = ItemIds.of(content.getPackageVersion(spareVersion));
+        assertTrue(submit.execute(user, spare.attemptId(), answers(spareItems.first(), spareItems.second(),
+                "A", "A")).passed());
+        var openedList = topicLessons.execute(user, topic).lessons();
+        assertEquals("COMPLETED", openedList.get(1).status());
+        assertNull(openedList.get(1).blockingReviewId());
         assertNotNull(tests.execute(user, topic).assignmentId());
     }
 

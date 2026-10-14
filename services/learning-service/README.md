@@ -5,7 +5,8 @@ Gateway forwards `/api/learning/**` and supplies the internal JWT validated by
 `common-security`. The verified JWT subject scopes all learner progress and mastery.
 The module implements placement-based course recommendations, independent topic paths per course, course final-test
 assignments and the `COURSE_GATE` result path, lessons (a Markdown summary, slides and documents read
-from Content, completed by the learner's confirmation), practice sets, Writing essay grading in practice (Task 1 and
+from Content, completed when the lesson's Practice passes or, without required Practice, by the learner's
+confirmation), practice sets, Writing essay grading in practice (Task 1 and
 Task 2, LLM), mastery reads, review sets, final-test assignment and the `AssessmentCompleted.v2` consumer.
 
 ## Local runtime
@@ -54,14 +55,14 @@ show available bands and the optional placement recommendation, then group topic
 | GET | `/lessons/{id}` | Applies the lesson gate and returns the lesson: `{lessonId, topicId, code, title, summary, sortOrder, status, skill, skills}` with `status` `AVAILABLE` or `COMPLETED`. Its content is read from `/lessons/{id}/resources`. |
 | GET | `/lessons/{id}/resources` | Applies the same lesson gate and returns `{lessonId, summaryMarkdown, slides[], documents[]}` from Content; `summaryMarkdown` is `null` when the lesson has none, each link is `{id, title, url, sortOrder}`. Does not start or change lesson progress. |
 | GET | `/writing-submissions/{id}` | Owner only; the grade appears only when `GRADED` (`PAYMENT_PENDING` shows `code`, `GRADING`/`FAILED` show `failureCode`). Reads practice essays and essays graded while lessons still had essay blocks. |
-| POST | `/lessons/{id}/complete` | Idempotently completes the lesson once the learner confirms it, which opens the next lesson and the lesson's Practice. |
+| POST | `/lessons/{id}/complete` | Idempotently completes a lesson that has no required Practice (`NO_PRACTICE`), which opens the next lesson. A lesson with required Practice completes only when its Practice passes, so confirming it earlier returns `409 PRACTICE_REQUIRED` with `lessonIds: [lessonId]`. |
 | GET | `/lessons/{id}/practice-sets` | Lists lesson practice packages with access level, attempt and clearance status, and whether a package's answers were revealed. |
-| POST | `/lessons/{id}/practice-attempts` | Starts or returns the open attempt for a lesson package after lesson completion. |
-| GET | `/practice-attempts/{id}` | Returns an owned attempt's questions, or its saved result after submission. |
+| POST | `/lessons/{id}/practice-attempts` | Starts or returns the open attempt for a lesson package. The Practice opens with its lesson and follows the lesson gate. |
+| GET | `/practice-attempts/{id}` | Returns an owned attempt's questions, or its saved result after submission. Owner check only, so a learner can always read their own attempts. |
 | POST | `/practice-attempts/{id}/submissions` | Grades every question once per request id, reveals solutions, and may record evidence and a practice review. |
 | GET | `/reviews/{id}` | Owned review only (else 404): the theory of the review is the Markdown summary of its lesson (`theory`, scope `LESSON`), then by `stage`: `PRACTICE` gives one open set of a package never given or revealed (with hints), preferring the teaching lesson, none left → `SKIPPED`; `THEORY` gives no set and no quick check (`quickCheck` is always empty). |
-| GET | `/reviews` | Lists owned reviews oldest first; `status` defaults to `PENDING`, optional `skill` filters by skill (and includes legacy unassigned reviews), `limit` defaults to 20 and is capped at 100 (`400` above that). |
-| POST | `/reviews/{id}/submissions` | Submits the open set once (`REVIEW_SET_CLOSED` otherwise, `THEORY_REQUIRED` at the theory stage); writes `review_set` evidence; always returns solutions and the audio transcript; 70% → `DONE`, a failure → `THEORY`, the second failed set → `SKIPPED`. |
+| GET | `/reviews` | Lists owned reviews oldest first; `status` defaults to `PENDING`, optional `skill` filters by skill (and includes legacy unassigned reviews), `limit` defaults to 20 and is capped at 100 (`400` above that). Each review carries `sourcePackageId`, the Practice set whose attempt created it (`null` for reviews from assessments). |
+| POST | `/reviews/{id}/submissions` | Submits the open set once (`REVIEW_SET_CLOSED` otherwise, `THEORY_REQUIRED` at the theory stage); writes `review_set` evidence; always returns solutions and the audio transcript; 70% → `DONE`; the first failed set → `THEORY`, later failed sets go straight to a new set (`PRACTICE`), until one passes or no unrevealed package is left. |
 | POST | `/reviews/{id}/theory-check` | Confirms the theory was read: `answers` must be empty (`422 INVALID_ANSWERS` otherwise, `409 THEORY_NOT_REQUIRED` outside the theory stage). Writes no evidence and moves the review back to `PRACTICE`; a replayed `requestId` returns the stored result. |
 | POST | `/topics/{id}/test-assignments` | `REVIEW_REQUIRED`, `PRACTICE_REQUIRED`, and `TEST_LOCKED` gates, then returns the open assignment or assigns an unused test code (the least recently used one when all were used); none → `409 TEST_UNAVAILABLE`. |
 | GET | `/mastery` | Returns `{knowledgePointId, topicId, skill, mastery, evidenceCount}` for catalog KPs using only the current user's evidence; makes no Content request. |
@@ -72,8 +73,12 @@ Free topics precede premium topics within each skill. A topic without a final te
 `testStatus: NONE` and passes when all published lessons are completed; requesting its
 test assignment returns `409 NO_TOPIC_TEST`. Pending reviews gate only their own skill;
 legacy reviews with no skill gate every skill. Removed topics lose their sequence order and leave
-the topic list. Lessons become available in order after earlier lessons complete.
-Lesson GET, resources and completion apply errors in this order:
+the topic list. Lessons become available in order after earlier lessons complete. A lesson with required
+Practice (every published set of Reading or Listening, or without a skill; Writing sets and sets that need a paid
+feature are optional) completes when that Practice passes, so the next
+lesson opens only after the Practice of the lesson before it. A lesson without required Practice completes by
+confirmation.
+Lesson GET, resources, completion and Practice apply errors in this order:
 `REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`.
 
 Lessons no longer have exercise or essay blocks (Content V30). Tables written while they did stay as history and are
@@ -105,20 +110,31 @@ practice package writes `practice_set` evidence. A counted practice submission b
 no pending review and an unrevealed eligible set remains. A package is revealed after
 either a submitted practice attempt or a submitted review set; later practice of it
 still returns solutions but writes no evidence or review. Assessment results retain
-the mastery-based review rule. A pending review blocks lesson and practice access in
-its skill until `DONE` or `SKIPPED`; a legacy review without a skill blocks every skill.
+the mastery-based review rule. A pending review blocks the lessons of its skill and their Practice until
+`DONE` or `SKIPPED`; a legacy review without a skill blocks every skill. The lesson that created the review stays
+open to read (lesson GET, resources, completion), but its own Practice also waits for the review. In
+`GET /topics/{id}/lessons` such a lesson stays `AVAILABLE`, while the lessons held back by it are `LOCKED` with
+`blockingReviewId` set.
 
 A pending review is at stage `PRACTICE` (one set) or `THEORY` (read the Markdown summary of the lesson that teaches
 the KP, then confirm through `theory-check`). It starts at `THEORY` when the KP scored below 40% in the practice
-attempt that created it; reviews from assessment results start at `PRACTICE`. A failed set moves it to `THEORY`;
-the confirmation (no evidence) moves it back to `PRACTICE`; the second failed set skips it. A set never reuses a
-package the learner was given in a review or submitted in practice (`ReviewRule.MAX_FAILED_REVIEW_SETS`).
+attempt that created it; reviews from assessment results start at `PRACTICE`. The first failed set moves it to
+`THEORY`; the confirmation (no evidence) moves it back to `PRACTICE`; later failed sets take a new set without
+reading the theory again, with no limit on failures. A set never reuses a package the learner was given in a review
+or submitted in practice, so a review ends as `SKIPPED` only when no such package is left. `maxFailedSets` in a review
+response is `null`.
 Reviews created before Content V30 may carry the theory reason `WRONG_IN_LESSON`; it is no longer assigned.
 
 The final topic test needs every lesson completed and practice-cleared. Clearance is
 stored on write paths and never revoked by later package publication. Reasons, in
 priority order, are `FIRST_SUBMISSION`, `REVIEW_FINISHED`, `ALL_SETS_ATTEMPTED`, and
-`NO_PRACTICE`. Catalog and topic reads calculate status without writing pass rows.
+`NO_PRACTICE`. The Practice is cleared once **every required set has been submitted at least once** (a package a review
+used also counts as seen) and **no review of the lesson is pending**: `FIRST_SUBMISSION` when every required set passed
+at its first submission, `REVIEW_FINISHED` when reviews were needed and all are `DONE` or `SKIPPED`, else
+`ALL_SETS_ATTEMPTED`. Passing one set of several does not clear it. A lesson with no required set is `NO_PRACTICE` even
+before it opens; otherwise its Practice is `LOCKED` until the lesson opens, then `REQUIRED` until cleared. Clearing it
+completes the lesson. Catalog and topic reads calculate status
+without writing pass rows.
 
 ## Writing essays
 
@@ -159,8 +175,8 @@ DLQ with header `x-learning-failure`. Settings: `LEARNING_RETRY_DELAY_MS` (30 s)
 
 Learning errors use `{detail, code}`; `REVIEW_REQUIRED` additionally includes
 `reviews` with `reviewId`, `lessonId`, `knowledgePointId`, and `skill` when known. Malformed requests return
-422. `REVIEW_REQUIRED` remains HTTP 403; `PRACTICE_LOCKED`, `PRACTICE_REQUIRED`
-(with `lessonIds`), and `ATTEMPT_ALREADY_SUBMITTED` return HTTP 409. Content reads forward the authenticated internal bearer and `X-Correlation-Id`;
+422. `REVIEW_REQUIRED` remains HTTP 403; `PRACTICE_REQUIRED`
+(with `lessonIds`) and `ATTEMPT_ALREADY_SUBMITTED` return HTTP 409. Content reads forward the authenticated internal bearer and `X-Correlation-Id`;
 missing content maps to `404 NOT_FOUND`, transport/unavailability errors to
 `503 CONTENT_UNAVAILABLE`, and other Content failures to `502 CONTENT_FAILURE`.
 

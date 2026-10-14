@@ -13,7 +13,7 @@ import com.ieltspath.learning.application.result.SubmissionResult;
 import com.ieltspath.learning.application.service.AnswerSheet;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.ItemGrading;
-import com.ieltspath.learning.application.service.PracticeProgress;
+import com.ieltspath.learning.application.service.LessonCompletion;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
@@ -48,20 +48,20 @@ public class SubmitReviewUseCase {
     private final ReviewItemRepository reviews;
     private final PracticeAttemptRepository attempts;
     private final ReviewSubmissionLog submissions;
-    private final PracticeProgress practice;
+    private final LessonCompletion lessonCompletion;
     private final ItemGrading grading = new ItemGrading();
 
     public SubmitReviewUseCase(LearningContentClient content, LearnerLock lock, KnowledgeEvidenceRepository evidence,
                                ReviewItemRepository reviews, PracticeAttemptRepository attempts,
                                ReviewSubmissionLog submissions,
-                               PracticeProgress practice) {
+                               LessonCompletion lessonCompletion) {
         this.content = content;
         this.lock = lock;
         this.evidence = evidence;
         this.reviews = reviews;
         this.attempts = attempts;
         this.submissions = submissions;
-        this.practice = practice;
+        this.lessonCompletion = lessonCompletion;
     }
 
     @Transactional
@@ -116,7 +116,7 @@ public class SubmitReviewUseCase {
                 transcript, review.stage().name(), review.failedSets());
         reviews.save(review);
         submissions.save(set.id(), response);
-        if (status != ReviewStatus.PENDING) practice.refreshPassForLesson(userId, review.lessonId());
+        if (status != ReviewStatus.PENDING) lessonCompletion.afterPracticeChange(userId, review.lessonId());
         return response;
     }
 

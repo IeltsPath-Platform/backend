@@ -94,6 +94,7 @@ class LessonLearningWebMvcTest {
     private static final UUID LESSON = UUID.randomUUID();
     private static final UUID QUESTION = UUID.randomUUID();
     private static final UUID REVIEW = UUID.randomUUID();
+    private static final UUID SOURCE_PACKAGE = UUID.randomUUID();
     private static final UUID KP = UUID.randomUUID();
 
     @Autowired MockMvc mvc;
@@ -144,11 +145,12 @@ class LessonLearningWebMvcTest {
     void listsOwnedReviewsWithSkillAndRejectsExcessiveLimit() throws Exception {
         when(listReviews.execute(USER, ReviewStatus.PENDING, LearningSkill.READING, 20))
                 .thenReturn(List.of(new ReviewListEntry(REVIEW, KP, LESSON, LearningSkill.READING,
-                        ReviewStage.THEORY, Instant.parse("2026-10-01T00:00:00Z"))));
+                        ReviewStage.THEORY, Instant.parse("2026-10-01T00:00:00Z"), SOURCE_PACKAGE)));
         mvc.perform(authenticated(get("/api/learning/reviews").param("skill", "READING")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].skill").value("READING"))
-                .andExpect(jsonPath("$[0].stage").value("THEORY"));
+                .andExpect(jsonPath("$[0].stage").value("THEORY"))
+                .andExpect(jsonPath("$[0].sourcePackageId").value(SOURCE_PACKAGE.toString()));
         mvc.perform(authenticated(get("/api/learning/reviews").param("limit", "101")))
                 .andExpect(status().isBadRequest());
     }
@@ -222,11 +224,15 @@ class LessonLearningWebMvcTest {
     @Test
     void listMasteryAndCompletionRoutesUseVerifiedIdentity() throws Exception {
         when(topics.execute(USER)).thenReturn(List.of(
-                new TopicResult(TOPIC, "FIRST", "First topic", 1, TopicStatus.IN_PROGRESS, 2, null),
+                new TopicResult(TOPIC, "FIRST", "First topic", 1, TopicStatus.IN_PROGRESS, 2, null, null, true, null,
+                        false, null, 4),
                 new TopicResult(UUID.randomUUID(), "PAID", "Paid topic", 2, TopicStatus.LOCKED, 0,
                         "PREMIUM_CONTENT")));
         when(getTopicLessonsUseCase.execute(USER, TOPIC)).thenReturn(new TopicLessonsResult(TOPIC,
-                List.of(new TopicLessonsResult.LessonSummary(LESSON, "L1", "First lesson", 1, "COMPLETED")),
+                List.of(new TopicLessonsResult.LessonSummary(LESSON, "L1", "First lesson", 1, "COMPLETED", null, null,
+                                15, null),
+                        new TopicLessonsResult.LessonSummary(UUID.randomUUID(), "L2", "Second lesson", 2, "LOCKED",
+                                null, null, null, REVIEW)),
                 "AVAILABLE"));
         when(mastery.execute(USER)).thenReturn(List.of(new MasteryResult(KP, TOPIC, 0.729, 4)));
         when(completeLessonUseCase.execute(USER, LESSON)).thenReturn(LESSON);
@@ -234,11 +240,16 @@ class LessonLearningWebMvcTest {
         mvc.perform(authenticated(get("/api/learning/topics")).header("X-User-Id", UUID.randomUUID()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("IN_PROGRESS"))
                 .andExpect(jsonPath("$[0].completedLessonCount").value(2))
+                .andExpect(jsonPath("$[0].totalLessonCount").value(4))
                 .andExpect(jsonPath("$[0].accessLevel").value("FREE"))
                 .andExpect(jsonPath("$[1].accessLevel").value("PREMIUM"));
         mvc.perform(authenticated(get("/api/learning/topics/{id}/lessons", TOPIC)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.testStatus").value("AVAILABLE"))
-                .andExpect(jsonPath("$.lessons[0].status").value("COMPLETED"));
+                .andExpect(jsonPath("$.lessons[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.lessons[0].estimatedMinutes").value(15))
+                .andExpect(jsonPath("$.lessons[0].blockingReviewId").doesNotExist())
+                .andExpect(jsonPath("$.lessons[1].status").value("LOCKED"))
+                .andExpect(jsonPath("$.lessons[1].blockingReviewId").value(REVIEW.toString()));
         mvc.perform(authenticated(get("/api/learning/mastery")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].knowledgePointId").value(KP.toString()))
                 .andExpect(jsonPath("$[0].mastery").value(0.729)).andExpect(jsonPath("$[0].evidenceCount").value(4));

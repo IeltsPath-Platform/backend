@@ -8,7 +8,7 @@ import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.PracticeAccess;
-import com.ieltspath.learning.application.service.PracticeProgress;
+import com.ieltspath.learning.application.service.LessonCompletion;
 import com.ieltspath.learning.domain.aggregate.PracticeAttempt;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
@@ -43,14 +43,14 @@ public class SubmitPracticeAttemptUseCase {
     private final ReviewItemRepository reviews;
     private final KnowledgeEvidenceRepository evidence;
     private final WritingSubmissionRepository essays;
-    private final PracticeProgress progress;
+    private final LessonCompletion lessonCompletion;
     private final ItemGrading grading = new ItemGrading();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final Clock clock = Clock.systemUTC();
 
     public SubmitPracticeAttemptUseCase(LearnerLock lock, PracticeAccess access, LearningContentClient content,
                                         PracticeAttemptRepository attempts, ReviewItemRepository reviews,
-                                        KnowledgeEvidenceRepository evidence, PracticeProgress progress,
+                                        KnowledgeEvidenceRepository evidence, LessonCompletion lessonCompletion,
                                         WritingSubmissionRepository essays) {
         this.lock = lock;
         this.access = access;
@@ -58,7 +58,7 @@ public class SubmitPracticeAttemptUseCase {
         this.attempts = attempts;
         this.reviews = reviews;
         this.evidence = evidence;
-        this.progress = progress;
+        this.lessonCompletion = lessonCompletion;
         this.essays = essays;
     }
 
@@ -129,7 +129,7 @@ public class SubmitPracticeAttemptUseCase {
         attempts.saveResult(attempt);
         evidence.append(userId, firstAnswers);
         reviews.insertPracticePending(userId, candidates);
-        progress.refreshPassForLesson(userId, attempt.lessonId());
+        lessonCompletion.afterPracticeChange(userId, attempt.lessonId());
         return response;
     }
 

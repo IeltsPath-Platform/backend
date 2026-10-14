@@ -41,7 +41,24 @@ class ReviewItemTest {
         low.completeTheory();
         assertThat(low.stage()).isEqualTo(ReviewStage.PRACTICE);
         assertThat(low.theoryCompletedCount()).isEqualTo(1);
-        assertThat(low.recordSetResult(assign(low), UUID.randomUUID(), 2, 4)).isEqualTo(ReviewStatus.SKIPPED);
+        // Later failures skip the theory and go straight to a new set, until one passes.
+        assertThat(low.recordSetResult(assign(low), UUID.randomUUID(), 2, 4)).isEqualTo(ReviewStatus.PENDING);
+        assertThat(low.stage()).isEqualTo(ReviewStage.PRACTICE);
+        assertThat(low.failedSets()).isEqualTo(2);
+        assertThat(low.recordSetResult(assign(low), UUID.randomUUID(), 0, 4)).isEqualTo(ReviewStatus.PENDING);
+        assertThat(low.stage()).isEqualTo(ReviewStage.PRACTICE);
+        assertThat(low.recordSetResult(assign(low), UUID.randomUUID(), 4, 4)).isEqualTo(ReviewStatus.DONE);
+    }
+
+    @Test
+    void aReviewThatStartsWithTheoryReadsItAgainOnlyAfterItsFirstFailedSet() {
+        ReviewItem review = pending(0);
+        review.recordSetResult(assign(review), UUID.randomUUID(), 1, 4);
+        assertThat(review.stage()).isEqualTo(ReviewStage.THEORY);
+        review.completeTheory();
+        review.recordSetResult(assign(review), UUID.randomUUID(), 1, 4);
+        assertThat(review.stage()).isEqualTo(ReviewStage.PRACTICE);
+        assertThat(review.status()).isEqualTo(ReviewStatus.PENDING);
     }
 
     @Test

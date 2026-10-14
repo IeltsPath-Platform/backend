@@ -8,6 +8,7 @@ import com.ieltspath.learning.application.port.LearningContentClient.*;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.result.LessonPracticeSetsResult;
 import com.ieltspath.learning.application.result.SubmissionResult;
+import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.usecase.ApplyAssessmentResultUseCase;
 import com.ieltspath.learning.application.usecase.AssignTopicTestUseCase;
 import com.ieltspath.learning.application.usecase.GetLessonPracticeSetsUseCase;
@@ -16,6 +17,7 @@ import com.ieltspath.learning.application.usecase.RefreshLearningTopicsUseCase;
 import com.ieltspath.learning.application.usecase.StartPracticeAttemptUseCase;
 import com.ieltspath.learning.application.usecase.CompleteLessonUseCase;
 import com.ieltspath.learning.application.usecase.SubmitPracticeAttemptUseCase;
+import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.domain.exception.LearningGateException;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.PracticePassReason;
@@ -89,6 +91,8 @@ class MultiSkillLessonIntegrationTest {
     private static final UUID LISTENING_SET = UUID.randomUUID();
     private static final UUID MIXED_SET = UUID.randomUUID();
     private static final UUID MIXED_VERSION = UUID.randomUUID();
+    private static final UUID READING_VERSION = UUID.randomUUID();
+    private static final UUID LISTENING_VERSION = UUID.randomUUID();
     private static final UUID WRITING_SET = UUID.randomUUID();
 
     @Autowired JdbcTemplate jdbc;
@@ -125,8 +129,8 @@ class MultiSkillLessonIntegrationTest {
         when(content.getTopicTestPackages(TOPIC)).thenReturn(List.of(
                 new TestPackage(UUID.randomUUID(), UUID.randomUUID(), "TR-TOPIC-TEST")));
         List<LessonPracticeSet> sets = List.of(
-                practiceSet(READING_SET, UUID.randomUUID(), "TR-R", Set.of(LearningSkill.READING)),
-                practiceSet(LISTENING_SET, UUID.randomUUID(), "TR-L", Set.of(LearningSkill.LISTENING)),
+                practiceSet(READING_SET, READING_VERSION, "TR-R", Set.of(LearningSkill.READING)),
+                practiceSet(LISTENING_SET, LISTENING_VERSION, "TR-L", Set.of(LearningSkill.LISTENING)),
                 practiceSet(MIXED_SET, MIXED_VERSION, "TR-RL", Set.of(LearningSkill.READING, LearningSkill.LISTENING)),
                 practiceSet(WRITING_SET, UUID.randomUUID(), "TR-W", Set.of(LearningSkill.WRITING)));
         when(content.lessonPracticeSets(MIXED)).thenReturn(sets);
@@ -137,6 +141,12 @@ class MultiSkillLessonIntegrationTest {
                 "PRACTICE_SET", null, Map.of(), List.of(
                 new Section(UUID.randomUUID(), "Roots", "READING", null, 1, "Passage", items(KP_READING, 2)),
                 new Section(UUID.randomUUID(), "Gym", "LISTENING", null, 2, null, items(KP_LISTENING, 3)))));
+        when(content.getPackageVersion(READING_VERSION)).thenReturn(new PackageVersion(READING_VERSION, READING_SET,
+                "PRACTICE_SET", null, Map.of(), List.of(
+                new Section(UUID.randomUUID(), "Roots", "READING", null, 1, "Passage", items(KP_READING, 2)))));
+        when(content.getPackageVersion(LISTENING_VERSION)).thenReturn(new PackageVersion(LISTENING_VERSION,
+                LISTENING_SET, "PRACTICE_SET", null, Map.of(), List.of(
+                new Section(UUID.randomUUID(), "Gym", "LISTENING", null, 1, null, items(KP_LISTENING, 3)))));
         when(content.practiceSetAvailability(anyList(), anyList(), eq(3)))
                 .thenReturn(Map.of(KP_READING, 1, KP_LISTENING, 1));
         topics.execute(USER);
@@ -144,7 +154,6 @@ class MultiSkillLessonIntegrationTest {
 
     @Test
     void aMixedSetIsScoredPerSkillAndOnlyTheFailedSkillGoesToReview() {
-        completeMixedLesson();
         assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(USER, MIXED).practiceStatus());
         assertEquals(List.of("TR-R"), practiceSets.execute(USER, MIXED, Optional.of(LearningSkill.READING)).items()
                 .stream().map(LessonPracticeSetsResult.Item::code).toList());
@@ -165,43 +174,64 @@ class MultiSkillLessonIntegrationTest {
     }
 
     @Test
-    void passingBothPartsOfTheMixedSetClearsThePracticeWithoutTheWritingSet() {
-        completeMixedLesson();
+    void everyRequiredSetMustBeSubmittedAndTheWritingSetIsOptional() {
         var view = startPractice.execute(USER, MIXED, MIXED_SET);
         assertTrue(submitPractice.execute(USER, view.attemptId(), answers("A", "A", "A", "A", "A")).passed());
+        // One set of three is not enough, even when it passed both of its skills.
+        assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(USER, MIXED).practiceStatus());
+        assertEquals("AVAILABLE", getLesson.execute(USER, MIXED).status());
+
+        submitAllCorrect(READING_SET, READING_VERSION);
+        assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(USER, MIXED).practiceStatus());
+        submitAllCorrect(LISTENING_SET, LISTENING_VERSION);
 
         var catalog = practiceSets.execute(USER, MIXED);
         assertEquals(PracticeStatus.PASSED, catalog.practiceStatus());
         assertEquals(PracticePassReason.FIRST_SUBMISSION, catalog.practicePassReason());
+        assertEquals("COMPLETED", getLesson.execute(USER, MIXED).status());
     }
 
     @Test
-    void theMixedLessonShowsItsSkillsAndCompletesOnConfirmation() {
+    void theMixedLessonShowsItsSkillsAndCompletesWhenItsPracticePasses() {
         var before = getLesson.execute(USER, MIXED);
         assertEquals(THREE, before.skills());
         assertEquals("AVAILABLE", before.status());
 
-        completeLesson.execute(USER, MIXED);
+        var refused = assertThrows(LearningRequestException.class, () -> completeLesson.execute(USER, MIXED));
+        assertEquals("PRACTICE_REQUIRED", refused.getCode());
+        assertEquals(List.of(MIXED), refused.getLessonIds());
+        assertEquals("AVAILABLE", getLesson.execute(USER, MIXED).status());
+
+        passEveryRequiredSet();
 
         assertEquals("COMPLETED", getLesson.execute(USER, MIXED).status());
     }
 
     @Test
-    void aReadingReviewLocksLessonsAndTheTestThatTeachReadingButNotAListeningOnlyLesson() {
-        completeMixedLesson();
+    void aPendingReviewHoldsBackTheOtherLessonsOfItsSkillAndTheTestButNotTheLessonThatCreatedIt() {
+        passEveryRequiredSet();
         jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill) "
                 + "VALUES (?, ?, ?, ?, 'PENDING', 'READING')", UUID.randomUUID(), USER, KP_READING, MIXED);
 
+        // The lesson that created the review stays open to read, but its Practice waits for the review.
+        assertDoesNotThrow(() -> getLesson.execute(USER, MIXED));
         assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
-                () -> getLesson.execute(USER, MIXED)).getCode());
+                () -> startPractice.execute(USER, MIXED, READING_SET)).getCode());
+        // A Reading review does not hold back a lesson that only teaches Listening; the final test waits.
         assertDoesNotThrow(() -> getLesson.execute(USER, LISTENING_ONLY));
         assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
                 () -> assignTopicTest.execute(USER, TOPIC)).getCode());
+
+        // A Listening review of the first lesson holds back the next lesson, which teaches Listening.
+        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill) "
+                + "VALUES (?, ?, ?, ?, 'PENDING', 'LISTENING')", UUID.randomUUID(), USER, KP_LISTENING, MIXED);
+        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
+                () -> getLesson.execute(USER, LISTENING_ONLY)).getCode());
     }
 
     @Test
     void aMissedReadingKnowledgePointInATestCreatesAReadingReview() {
-        completeMixedLesson();
+        markMixedLessonCompleted();
         applyResult.execute(new AssessmentResult(UUID.randomUUID(), USER, UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), 1, "TOPIC_GATE", Instant.now(), List.of(new ItemResult(UUID.randomUUID(),
                 UUID.randomUUID(), false, BigDecimal.ZERO, BigDecimal.ONE,
@@ -211,8 +241,26 @@ class MultiSkillLessonIntegrationTest {
                 + "AND knowledge_point_id = ? AND status = 'PENDING'", String.class, USER, KP_READING));
     }
 
-    private void completeMixedLesson() {
-        completeLesson.execute(USER, MIXED);
+    /** A completed lesson with no Practice evidence, so a later test result can pull its mastery below the threshold. */
+    private void markMixedLessonCompleted() {
+        jdbc.update("INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, knowledge_point_ids, "
+                + "completed_at) VALUES (?, ?, ?, 1, ARRAY[?::uuid, ?::uuid], clock_timestamp())",
+                USER, MIXED, TOPIC, KP_READING, KP_LISTENING);
+    }
+
+    /** Passing every required set clears the Practice, which completes the lesson. */
+    private void passEveryRequiredSet() {
+        submitAllCorrect(READING_SET, READING_VERSION);
+        submitAllCorrect(LISTENING_SET, LISTENING_VERSION);
+        submitAllCorrect(MIXED_SET, MIXED_VERSION);
+    }
+
+    private void submitAllCorrect(UUID packageId, UUID versionId) {
+        var view = startPractice.execute(USER, MIXED, packageId);
+        var answers = ItemGrading.orderedItems(content.getPackageVersion(versionId)).stream()
+                .map(item -> new SubmitExerciseCommand.Answer(item.questionVersionId(), "A")).toList();
+        assertTrue(submitPractice.execute(USER, view.attemptId(),
+                new SubmitExerciseCommand(UUID.randomUUID(), answers)).passed());
     }
 
     private static LessonPracticeSet practiceSet(UUID id, UUID version, String code, Set<LearningSkill> skills) {
