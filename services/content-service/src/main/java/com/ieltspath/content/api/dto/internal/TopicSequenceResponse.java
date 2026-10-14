@@ -17,7 +17,8 @@ public record TopicSequenceResponse(
         Skill skill,
         boolean hasTopicTest,
         Course course,
-        List<Skill> skills
+        List<Skill> skills,
+        int lessonCount
 ) {
     public record Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel, boolean hasCourseTest) {
         static Course from(TopicSequenceResult.CourseEntry entry) {
@@ -34,6 +35,7 @@ public record TopicSequenceResponse(
                         .map(kp -> new KnowledgePoint(kp.id(), kp.code(), kp.name(), kp.learningType(), kp.skill(),
                                 kp.description(), kp.hasPracticeSet()))
                         .toList(),
-                result.skill(), result.hasTopicTest(), Course.from(result.course()), result.skills());
+                result.skill(), result.hasTopicTest(), Course.from(result.course()), result.skills(),
+                result.lessonCount());
     }
 }

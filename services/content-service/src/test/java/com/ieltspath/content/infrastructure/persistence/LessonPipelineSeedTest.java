@@ -356,6 +356,7 @@ class LessonPipelineSeedTest {
         assertThat(topic(sequence, "READING_6_5_INFERENCE").course().bandLevel()).isEqualByComparingTo("6.5");
         assertThat(topic(sequence, "DEMO_READING").course().bandLevel()).isEqualByComparingTo("5.5");
         TopicSequenceResult reading = topic(sequence, "DEMO_READING");
+        assertThat(reading.lessonCount()).isEqualTo(4);
         assertThat(reading.knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::code)
                 .containsExactly("DEMO_READING_MAIN_IDEA", "DR_IDEA_OR_DETAIL", "DR_TOPIC_SENTENCE",
                         "DR_MATCHING_HEADINGS");
@@ -610,6 +611,7 @@ class LessonPipelineSeedTest {
 
         assertThat(lessons).extracting(LessonSummaryResult::code).containsExactly("L1", "L2", "L3", "L4");
         assertThat(lessons.get(0).skills()).containsExactly(Skill.READING);
+        assertThat(lessons).extracting(LessonSummaryResult::estimatedMinutes).allMatch(minutes -> minutes > 0);
         assertThat(lessons.get(3).knowledgePointIds())
                 .containsExactly(kpId("DEMO_READING_MAIN_IDEA"), kpId("DR_MATCHING_HEADINGS"));
     }

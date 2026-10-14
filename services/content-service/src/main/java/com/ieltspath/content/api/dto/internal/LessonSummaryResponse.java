@@ -14,10 +14,12 @@ public record LessonSummaryResponse(
         String summary,
         int sortOrder,
         List<UUID> knowledgePointIds,
-        List<Skill> skills
+        List<Skill> skills,
+        Integer estimatedMinutes
 ) {
     public static LessonSummaryResponse from(LessonSummaryResult result) {
         return new LessonSummaryResponse(result.lessonId(), result.topicId(), result.code(), result.title(),
-                result.summary(), result.sortOrder(), result.knowledgePointIds(), result.skills());
+                result.summary(), result.sortOrder(), result.knowledgePointIds(), result.skills(),
+                result.estimatedMinutes());
     }
 }

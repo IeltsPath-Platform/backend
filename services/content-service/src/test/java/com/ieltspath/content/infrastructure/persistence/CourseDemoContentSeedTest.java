@@ -28,6 +28,8 @@ class CourseDemoContentSeedTest {
         source.setPassword(POSTGRES.getPassword());
         Flyway.configure().dataSource(source).locations("classpath:db/migration").target("22").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
+        // This test pins an older schema; the lesson query reads the column a later migration adds.
+        jdbc.getJdbcOperations().execute("ALTER TABLE lessons ADD COLUMN estimated_minutes INT");
         reader = new JdbcLearningContentReader(jdbc);
     }
 
