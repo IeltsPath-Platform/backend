@@ -10,6 +10,7 @@ branch: feat/lesson-resources (backend and frontend)
 - Practice (`/learn/lessons/:id/practice`) is embedded in the lesson page. Completion unchanged: button, then Practice opens.
 - Topic, courses, placement, Practice, topic tests unchanged. No Homework Hub, mentor, timetable.
 - Lives under `/learn/lessons/:lessonId`.
+- Later change (2026-10-14, plan 261014-2229-lesson-theory-only-practice-gated-unlock): the Practice tab was removed from the lesson page; Practice has its own page and a step on the trail, and a passed Practice completes the lesson.
 
 ## Design notes
 - Lesson skills come from `lesson_knowledge_points` -> `knowledge_points.skill` (was: block questions and TEXT block KPs). V30 first copies those block KPs into `lesson_knowledge_points`.

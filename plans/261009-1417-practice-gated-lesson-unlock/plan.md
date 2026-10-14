@@ -1,7 +1,7 @@
 ---
 title: "Practice-gated lesson unlock"
 description: "Lesson sau chỉ mở khi Practice của mọi lesson trước PASSED; bài ôn lặp đến khi đạt, hết bộ câu mới cho qua"
-status: pending
+status: cancelled
 priority: P1
 branch: "main"
 tags: [learning-service, lesson-gate, practice, review, tdd]
@@ -13,6 +13,8 @@ source: skill
 ---
 
 # Practice-gated lesson unlock
+
+> Superseded by 261014-2229-lesson-theory-only-practice-gated-unlock (2026-10-14). Not implemented as written.
 
 ## Overview
 
