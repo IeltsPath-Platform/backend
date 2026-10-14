@@ -1,6 +1,6 @@
 # Thiết kế thống kê dashboard cá nhân — BE và FE
 
-> Nghiên cứu 14/10/2026. Phạm vi: màn hình P-11 “Dữ liệu chi tiết”. Đây là thiết kế đề xuất, không mô tả tính năng đã triển khai. Hai quyết định đã chốt: **tiến độ = hoàn thành bài học; bỏ Mentor**.
+> Nghiên cứu 14/10/2026; phạm vi cập nhật cùng ngày: **bỏ ôn từ vựng và không sửa luồng chấm bài**. Phạm vi: màn hình P-11 “Dữ liệu chi tiết”. Đây là thiết kế đề xuất, không mô tả tính năng đã triển khai. Quyết định đã chốt: **tiến độ = hoàn thành bài học; bỏ Mentor; bỏ ôn từ vựng; không sửa luồng chấm**.
 
 ## Mục lục
 
@@ -15,14 +15,14 @@
 
 ## 1. Kết luận và hiện trạng
 
-Giải pháp phù hợp là **ghi đúng dữ liệu tại thời điểm học, tính tại service sở hữu, FE ghép 4 nhóm response thành 5 khu vực**. Không cần tạo service thống kê riêng. Không lấy dữ liệu mẫu làm công thức nghiệp vụ.
+Giải pháp phù hợp là **ghi đúng dữ liệu tại thời điểm học, tính tại service sở hữu, FE ghép 3 nhóm response thành 4 khu vực**. Không cần tạo service thống kê riêng. Không lấy dữ liệu mẫu làm công thức nghiệp vụ.
 
 | Khu vực | Đã có | Còn thiếu | Service chịu trách nhiệm |
 |---|---|---|---|
 | Thời gian thực tế/kế hoạch | Activity có duration do client gửi; goal có `availableMinutesPerDay`; profile có timezone | Đo active time, chống trùng/2 tab, lịch sử mục tiêu theo ngày, API bucket ngày | user |
 | Tiến độ 4 kỹ năng | Lesson completion, metadata multi-skill từ Content | Mẫu số lesson đúng scope và query tổng hợp, trạng thái thiếu skill | learning + metadata content |
-| Lịch sử band | AssessmentResult có version; SkillScore có band/source | API lịch sử theo user; score snapshot/provenance đầy đủ; tiêu chuẩn đủ điều kiện | assessment |
-| Từ vựng cần ôn | Catalog, flashcard, deck cá nhân | Trạng thái ghi nhớ, review event, due time, submit review và aggregate | library |
+| Lịch sử band | AssessmentResult có version; SkillScore có band và nguồn chấm AUTO/AI/HUMAN | API lịch sử đọc theo user; chưa có cờ phân biệt điểm đo thật với điểm dự phòng và plan này không thêm | assessment (chỉ đọc) |
+| Từ vựng cần ôn | — | **Ngoài phạm vi plan này**: cần luồng học/ôn có lưu trạng thái, làm ở plan riêng | — |
 | Khóa đang học | Course list, số topic passed, kết quả course test | Phân biệt catalog và course đã bắt đầu; đếm lesson; hoạt động gần nhất | learning + metadata content |
 | Mentor | Chỉ dữ liệu mẫu ở FE | **Loại khỏi phạm vi theo yêu cầu** | Không bổ sung |
 
@@ -32,7 +32,7 @@ Giải pháp phù hợp là **ghi đúng dữ liệu tại thời điểm học,
 - `completed_at - started_at` của attempt gồm cả thời gian nghỉ; duration của audio là độ dài tài nguyên, không phải số phút người học tập trung.
 - Mastery theo KP là bằng chứng đúng/sai; khác phần trăm lesson và khác IELTS band.
 - `GET /api/learning/courses` hiện liệt kê curriculum, không phải danh sách đã đăng ký. `passedTopicCount=0` vẫn có thể đang học lesson đầu tiên.
-- Placement Speaking hiện có band cấu hình mặc định 0; Writing có fallback 5.5 khi chấm không thành công. Chưa thể coi tất cả điểm này là tiến bộ đã đo.
+- Placement Speaking hiện có band cấu hình mặc định 0; Writing có fallback 5.5 khi chấm không thành công. Dữ liệu lưu không phân biệt hai trường hợp này với điểm thật, và plan này không sửa luồng chấm, nên chỉ gắn nhãn "ước lượng", không tuyên bố đã đo.
 - Con số 34% trong mock không khớp các số đếm kèm theo. Không giữ 34% như requirement.
 - Các nhãn “Từ mới / Ôn lần 1 / Ôn lần 2 / Ôn lần 3 / Đã thuộc” là mức ghi nhớ cá nhân, **không phải CEFR A1–C2**.
 
@@ -83,48 +83,22 @@ percent = 100 × count(completedLessons) / count(eligibleLessons)
 Nguồn là **kết quả bài thi có đủ thông tin chấm**, không chuyển phần trăm lesson hoặc mastery thành band.
 
 - Chỉ lấy result `COMPLETED`; chọn version COMPLETED mới nhất của mỗi attempt. Version mới đang chấm không xóa điểm hoàn tất trước đó, nhưng trả `regradePending=true`.
-- Mỗi điểm chứa attemptId/resultId/resultVersion, ngày nộp bài, ngày chấm, skill, band, loại đề, nguồn AUTO/AI/HUMAN, rubric/scoring version và chất lượng dữ liệu. `gradedAt` mới do chấm lại không trở thành một lần thi mới.
+- Mỗi điểm chứa attemptId/resultId/resultVersion, ngày nộp bài, ngày chấm, skill, band, loại đề (AttemptType), nguồn chấm AUTO/AI/HUMAN đã lưu. `gradedAt` mới do chấm lại không trở thành một lần thi mới.
 - Trục thời gian dùng thời điểm nộp bài; chấm lại thay điểm của chính attempt tại vị trí cũ. Sắp ổn định bằng timestamp + attemptId.
 - **Không nối tùy tiện** điểm QUIZ, topic gate, lesson Writing và full test vào một chuỗi band. API nhóm theo `seriesKind` và tiêu chuẩn đề; đề thiếu chuẩn scoring thì trả unavailable hoặc hiển thị điểm nội bộ bằng đơn vị riêng.
-- Đề xuất series mặc định: mock/full assessment có rubric được xác nhận. Placement có thể là điểm nền riêng, gắn nhãn “ước lượng placement”; không dùng band fallback hoặc Speaking chưa đo.
-- Overall chỉ xuất hiện khi 4 kỹ năng của **cùng một lần thi** có điểm đủ điều kiện. Không lấy Reading hôm nay, Writing tháng trước, Speaking mặc định để tính Overall. Công thức trung bình 4 kỹ năng và làm tròn nửa band theo IELTS chỉ là quy tắc tính, không biến điểm nội bộ thành chứng chỉ IELTS. [IELTS scoring](https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail)
+- Series mặc định: placement là điểm nền riêng, luôn gắn nhãn "ước lượng placement", không Overall, không vẽ Speaking. Mock/full assessment có rubric được xác nhận là series riêng khi có dữ liệu.
+- Overall chỉ xuất hiện khi 4 kỹ năng của **cùng một lần thi** đều có điểm do hệ thống chấm, và không dùng cho placement. Không lấy Reading hôm nay, Writing tháng trước, Speaking mặc định để tính Overall. Công thức trung bình 4 kỹ năng và làm tròn nửa band theo IELTS chỉ là quy tắc tính, không biến điểm nội bộ thành chứng chỉ IELTS. [IELTS scoring](https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail)
 - Thiếu Speaking: các tab Reading/Listening/Writing vẫn hiển thị nếu đủ điều kiện; Overall/Speaking báo thiếu dữ liệu, không thay bằng 0.
 - `latest`, `baseline`, `delta` dùng cùng skill, series và khoảng chọn. Chỉ một điểm thì delta null; điểm giảm thì hiển thị giảm, không luôn “+”. Chấm lại không làm tăng `attemptCount`.
 - Câu “đang tiến tới IELTS 6.5 đúng tốc độ” là dự báo chưa có cơ sở. Thay bằng thông tin xác định được: “Gần nhất 5.5 · Mục tiêu 6.5 · Chênh lệch 1.0”. Không gọi LLM khi tải trang.
 
-**Việc BE phải làm trước:** freeze skill score khi hoàn tất; bổ sung cờ `MEASURED / FALLBACK / NOT_ASSESSED / UNKNOWN_LEGACY` ở dữ liệu kết quả, giữ enum GradingSource hiện có cho nguồn chấm thật. Không suy ra provenance chỉ từ giá trị 0 hoặc 5.5; hai giá trị ấy cũng có thể là điểm thật. Result cũ chỉ backfill khi nguồn đã lưu đủ chứng minh, còn lại gắn UNKNOWN_LEGACY. Không thay thuật toán placement/gate trong task dashboard.
+**Giới hạn có chủ đích:** plan này không sửa luồng chấm, không thêm snapshot hay cờ provenance. Dữ liệu lưu chỉ phân biệt nguồn chấm AUTO/AI/HUMAN, không phân biệt điểm dự phòng (Writing 5.5 khi chấm lỗi, Speaking mặc định 0) với điểm thật; hai giá trị đó cũng có thể là điểm thật. Placement hiện còn tính lại band từ dữ liệu/config khi đọc, nên đổi config có thể làm điểm đã hiển thị đổi theo. Vì vậy: series placement luôn có nhãn "ước lượng placement", không vẽ Speaking, không tính Overall. Muốn điểm bất biến và có cờ MEASURED/FALLBACK thì phải mở plan riêng sửa luồng chấm, kèm test hồi quy gate và event.
 
-### 2.4. Từ vựng cần ôn
+### 2.4. Từ vựng cần ôn — ngoài phạm vi plan này
 
-Đây là phần cần xây **luồng học và ôn có lưu trạng thái**, không chỉ API đếm flashcard.
+Ôn từ vựng cần luồng học và ôn có lưu trạng thái (trạng thái ghi nhớ, lịch ôn, review event, màn ôn ở FE). Đó là tính năng riêng, làm ở plan riêng. Plan này không thêm bảng, API hay màn hình cho từ vựng.
 
-**Đề xuất đơn vị chuẩn:** một `vocabularySenseId` đã được learner đưa vào bộ học. Cùng nghĩa xuất hiện ở 3 deck vẫn đếm 1. Flashcard MANUAL/HIGHLIGHT chưa gắn nghĩa hoặc PRACTICE_QUESTION không tự tính là một từ; muốn bao gồm phải định nghĩa khóa học liệu riêng và đổi nhãn thành “mục ôn tập”. Không gom từ khác nghĩa chỉ vì giống spelling.
-
-```text
-total = new + level1 + level2 + level3 + retained
-retainedPercent = retained / total × 100
-dueCount = count(mục đã học, active, nextReviewAt <= serverNow)
-```
-
-Donut đề xuất ghi rõ **“Đã ghi nhớ”**; tiêu đề thẻ “Từ vựng cần ôn” hiển thị thêm dueCount. Đổi legend mock “Đã học/Chưa học” thành “Đã ghi nhớ/Đang học” cho cùng mẫu số. Khi total=0, phần trăm null và CTA “Thêm từ để học”. Mục mới chưa học tách khỏi dueCount; “Ôn ngay” mở queue đã đến hạn, không tự đánh dấu học xong.
-
-**Thang đơn giản để duyệt, không phải thuật toán hiện có:**
-
-| Trạng thái | Điều kiện vào | Lịch lần kế tiếp sau khi nhớ đúng |
-|---|---|---|
-| NEW | Learner thêm nghĩa vào bộ học | Chưa có lịch ôn |
-| LEVEL_1 | Recall đầu tiên thành công | Sau 1 ngày |
-| LEVEL_2 | Đạt lượt ôn tới hạn tiếp theo | Sau 3 ngày |
-| LEVEL_3 | Đạt lượt ôn tới hạn tiếp theo | Sau 7 ngày |
-| RETAINED | Đạt lượt ôn tới hạn tiếp theo | Sau 14 ngày; các lần sau giữ mức, hẹn lại |
-
-- Một lượt quên chuyển về LEVEL_1, hẹn học lại sau 10 phút. Đây là tham số sản phẩm cần thử nghiệm, không khẳng định tối ưu khoa học.
-- Click lật xem đáp án không phải nhớ đúng. Review có prompt → trả lời/recall → feedback → submit có `reviewId` và `requestId`; server giữ đáp án khi chấm objective. Nếu tự đánh giá thì ghi rõ `SELF_RATED`, không gọi là đánh giá khách quan.
-- Không thăng cấp nhiều lần bằng bấm lại trong một phiên: chỉ lượt đến hạn và đúng version mới thay đổi cấp; lượt luyện sớm lưu lịch sử nhưng không thăng cấp.
-- Retained vẫn có thể đến hạn; quên có thể hạ cấp. `dueCount` là tập con có thể giao với retained, không cộng vào total.
-- Archive/xóa khỏi bộ đang học loại khỏi mẫu số; lịch sử không bị rewrite. Tái thêm cùng nghĩa khôi phục state có quy tắc, không tạo mục trùng. Nội dung bị sửa ý nghĩa phải tăng version và reset/lập lịch lại theo rule được duyệt.
-
-**Ví dụ số mock:** 12 + 25 + 34 + 20 + 110 = 201; nếu 110 là retained thì tỷ lệ phải là 54.7%, không phải 34%. Không sửa số nguồn bằng tay để vừa biểu đồ.
+Thẻ "Từ vựng cần ôn" trong tab chi tiết hiển thị trạng thái chưa khả dụng, không dùng số mẫu. Số mẫu cũ không khớp nhau (12 + 25 + 34 + 20 + 110 = 201, nên 110 retained là 54.7%, không phải 34%) và không được giữ làm yêu cầu.
 
 ### 2.5. Các khóa học của tôi
 
@@ -149,10 +123,8 @@ Donut đề xuất ghi rõ **“Đã ghi nhớ”**; tiêu đề thẻ “Từ v
 | Lesson chuyển sang COMPLETED | Learning lưu completion một lần | % lesson và skill cập nhật |
 | Làm Practice/Review | Learning lưu attempt/review, thực thi gate | Thời gian tăng; không cộng lesson lần hai |
 | Nộp bài thi đang chờ chấm | Assessment lưu submit/processing | Chưa thêm điểm band chưa chấm |
-| Chấm xong | Assessment lưu result/skill snapshot cùng provenance | Thêm điểm đủ điều kiện; Learning nhận event hiện có cho gate |
+| Chấm xong | Assessment lưu result như hiện tại | Thêm điểm đã chấm vào lịch sử band; Learning nhận event hiện có cho gate |
 | Chấm lại | Assessment tạo version mới, finalize | Thay điểm attempt cũ, không cộng một bài thi mới |
-| Thêm từ vào bộ học | Library tạo personal vocabulary state NEW | Tăng mẫu số, không tăng retained |
-| Trả lời lượt ôn tới hạn | Library lưu review event + state mới trong một transaction | Đổi bucket, dueCount, retained% |
 | Quay về dashboard | FE refetch từng nhóm đã bị thay đổi | Hiển thị số đã commit, kèm generatedAt |
 
 ### 3.2. Đo thời gian đủ tin cậy, chi phí vừa phải
@@ -175,10 +147,9 @@ Donut đề xuất ghi rõ **“Đã ghi nhớ”**; tiêu đề thẻ “Từ v
 ```text
 Trang học FE ── heartbeat ──> User: session / interval / daily time / goal history
 Nộp lesson ───────────────> Learning: completion / practice / review / course activity
-Làm bài thi ──────────────> Assessment: versioned result / skill score / provenance
-Ôn từ vựng ───────────────> Library: personal vocabulary / recall event / due state
+Làm bài thi ──────────────> Assessment: result versioned hiện có (chỉ đọc cho dashboard)
 
-Dashboard FE ── song song qua Gateway ──> 4 API đọc tổng hợp của các owner
+Dashboard FE ── song song qua Gateway ──> 3 API đọc tổng hợp của các owner
 Learning ── một API metadata theo tập ──> Content (lesson/course/skill, không đáp án)
 ```
 
@@ -190,11 +161,11 @@ Không thêm event cho mỗi heartbeat. Không nhân bản toàn bộ kết qu�
 
 | Phương án | Lợi ích | Chi phí/rủi ro | Đề xuất |
 |---|---|---|---|
-| FE gọi 4 API aggregate theo owner | Dễ triển khai, dữ liệu đúng nguồn, lỗi từng thẻ độc lập | 4 request, thời điểm snapshot khác nhau | **Chọn cho giai đoạn này** |
+| FE gọi 3 API aggregate theo owner | Dễ triển khai, dữ liệu đúng nguồn, lỗi từng thẻ độc lập | 3 request, thời điểm snapshot khác nhau | **Chọn cho giai đoạn này** |
 | Một endpoint composer trong service hiện có | Một request FE | Service đó phụ thuộc cả 4 owner, thêm timeout và fan-out | Chỉ cân nhắc sau đo đạc |
 | Analytics service/read model riêng qua event | Tốt cho nhiều báo cáo/volume lớn | Contract, backfill, reconciliation, lag, vận hành mới | Chưa cần và chưa được duyệt |
 
-Mỗi widget có `generatedAt`, `availability` và `dataFrom`; không giả vờ 4 response là một snapshot transaction toàn hệ thống. Nếu endpoint cần Content không sẵn sàng, trả unavailable cho nhóm đó thay vì tỷ lệ 0.
+Mỗi widget có `generatedAt`, `availability` và `dataFrom`; không giả vờ 3 response là một snapshot transaction toàn hệ thống. Nếu endpoint cần Content không sẵn sàng, trả unavailable cho nhóm đó thay vì tỷ lệ 0.
 
 ### 4.2. Bảng dữ liệu đề xuất — migration mới
 
@@ -205,10 +176,6 @@ Mỗi widget có `generatedAt`, `availability` và `dataFrom`; không giả vờ
 | User | `study_daily_totals` | `(user_id, local_date, timezone, scope_key)` unique; active_ms; `scope_key=ALL` hoặc course cụ thể; ALL chỉ cộng một lần |
 | User | `study_goal_history` | user, effective local date/timezone, minutes, active/paused, goalId; bản ghi ngày không bị cập nhật ngược |
 | Learning | extension course activity riêng | user/course unique; startedAt/lastStudiedAt + provenance; không lạm dụng course test passedAt |
-| Assessment | extension snapshot skill/result | scoringVersion, eligibility/quality, frozen band; tận dụng `skill_scores` và `assessment_results`, không tạo kho điểm song song |
-| Library | `learner_vocabulary_progress` | `(user_id,vocabulary_sense_id)` unique; state, nextReviewAt, stateVersion, active, lastReviewedAt |
-| Library | `vocabulary_review_sessions/items` | reviewId/user; danh sách item được giao, stateVersion, thời hạn; sở hữu và độ lớn queue hữu hạn |
-| Library | `vocabulary_review_events` | requestId unique theo user, item/version/outcome/source/reviewedAt; append lịch sử và update state cùng transaction |
 
 Tên bảng là đề xuất, số version Flyway chọn lúc triển khai sau khi xem migration mới nhất. Không rewrite migration cũ. Receipt/interval retention, giới hạn payload và rate limit cần quyết định trước release; đề xuất interval 90 ngày, daily totals lâu hơn theo chính sách sản phẩm. Chỉ purge khi có quy tắc dữ liệu được duyệt, đồng thời giữ watermark chống replay và ghi rõ reconciliation chỉ đầy đủ trong cửa sổ raw data còn lưu.
 
@@ -224,17 +191,12 @@ Tên bảng là đề xuất, số version Flyway chọn lúc triển khai sau k
 | GET `/api/users/me/statistics/study-time` | User | `from,to,grain,courseId?`; bucket có actual/plan/status/timezone |
 | GET `/api/learning/statistics/progress` | Learning | Course scope, 4 skill counts/percent + preview 4 khóa; cursor khi xem tất cả |
 | GET `/api/assessments/me/statistics/bands` | Assessment | `from,to,seriesKind,skill?`; tối đa 100 điểm/lượt, cursor, latest/baseline/delta tính toàn khoảng |
-| GET `/api/learning-support/flashcards/statistics/vocabulary` | Library | Các bucket ghi nhớ, total/retained/due/asOf; chỉ vocabulary-sense scope |
-| POST `/api/learning-support/flashcards/vocabulary-review-sessions` | Library | Giao queue hữu hạn, mặc định 20, tối đa 50 |
-| POST `/api/learning-support/flashcards/vocabulary-review-sessions/{id}/answers` | Library | Recall outcome, requestId, item/stateVersion; update atomic |
 
-Library cần bổ sung thao tác “đưa nghĩa vào bộ học” trong use case lưu flashcard hoặc endpoint chuyên biệt nếu FE không tạo flashcard. Không thêm write ngầm trong GET statistics. Cách nhận self-rating/khách quan sẽ được chốt với luồng ôn trước implementation.
-
-Prefix mới nằm trong route hiện có `/api/users/**`, `/api/learning/**`, `/api/assessments/**`, `/api/learning-support/flashcards/**`. Kiểm tra matching tĩnh trước `/{id}` và security config từng service. Không sửa Gateway/shared security chỉ vì có dashboard nếu các prefix đã đáp ứng.
+Prefix mới nằm trong route hiện có `/api/users/**`, `/api/learning/**`, `/api/assessments/**`. Kiểm tra matching tĩnh trước `/{id}` và security config từng service. Không sửa Gateway/shared security chỉ vì có dashboard nếu các prefix đã đáp ứng.
 
 Internal metadata mới ở Content: trả tập course → lesson → skill và revision theo tối đa số course/lesson đã giới hạn trong contract; không trả `answerSpec`, transcript hoặc chartFacts. Extend `LearningContentClient` bằng batch method, không lặp `getTopicLessons()` trên từng topic. Nếu giới hạn sản phẩm bị vượt, báo rõ/cho phân trang; không tính % từ tập bị cắt mà coi là toàn bộ.
 
-Start session cần xác nhận ownership/context qua **application port → HTTP adapter** tới owner của source, tối đa một lần mỗi lần start; không gọi owner mỗi 30 giây. Không giữ transaction/row lock User trong lúc chờ HTTP. Learning/Assessment/Library chỉ xác nhận context thuộc mình, không quyết định luật time tracking. Resource bị xóa/revoke sau start xử lý bằng lease ngắn, kiểm lại khi resume; số phút không trao quyền truy cập nội dung.
+Start session cần xác nhận ownership/context qua **application port → HTTP adapter** tới owner của source, tối đa một lần mỗi lần start; không gọi owner mỗi 30 giây. Không giữ transaction/row lock User trong lúc chờ HTTP. Learning/Assessment chỉ xác nhận context thuộc mình, không quyết định luật time tracking. Resource bị xóa/revoke sau start xử lý bằng lease ngắn, kiểm lại khi resume; số phút không trao quyền truy cập nội dung.
 
 ### 4.4. Response mẫu tối thiểu
 
@@ -252,17 +214,16 @@ Start session cần xác nhận ownership/context qua **application port → HTT
 }
 ```
 
-Ví dụ chỉ minh họa contract, không seed dữ liệu thật. Skill response cần `skill,totalLessons,completedLessons,percent,status`; course response cần các count theo đúng đơn vị và resumeTarget. Band response phải có `eligibilityReason` khi không hiển thị được; vocab response có `countingUnit=VOCABULARY_SENSE`, `scheduleVersion`.
+Ví dụ chỉ minh họa contract, không seed dữ liệu thật. Skill response cần `skill,totalLessons,completedLessons,percent,status`; course response cần các count theo đúng đơn vị và resumeTarget. Band response phải có `seriesKind`, nhãn ước lượng và `availability`/lý do khi không hiển thị được.
 
 ### 4.5. Query và chi phí
 
 - User: range query daily totals bằng index user + date + scope; không tải toàn bộ activities về Java để group. Dùng truy vấn khoảng UTC/index trước khi xử lý timezone; PostgreSQL hỗ trợ date/time theo timezone. [PostgreSQL date/time](https://www.postgresql.org/docs/15/functions-datetime.html)
 - Learning: một batch Content metadata + query progress của user theo tập lesson/course; ghép bằng Map/Set O(n). Aggregate distinct lesson theo skill; không dùng denominator từ số row learner đã chạm tới.
-- Assessment: lọc owner và khoảng trước, chọn latest completed version/attempt bằng query set-based; index user/submittedAt ở attempt và attempt/resultVersion/status ở result. Không lấy latest toàn cục rồi mới kiểm tra ownership.
-- Library: GROUP BY state + count due bằng predicate; index `(user_id,active,next_review_at)` cho queue; cursor sort dueAt/id, không offset quét sâu.
+- Assessment: lọc owner và khoảng trước, chọn latest completed version/attempt bằng query set-based. Chỉ thêm index (migration additive, không đổi cột) nếu EXPLAIN cho thấy cần; không lấy latest toàn cục rồi mới kiểm tra ownership.
 - Unique key và transaction lock là nền tảng chống race. PostgreSQL advisory transaction lock tự giải phóng khi transaction kết thúc; giữ transaction ngắn, thứ tự khóa nhất quán. [PostgreSQL locking](https://www.postgresql.org/docs/15/explicit-locking.html)
 - 1.000 learner đang active với heartbeat 30s tạo khoảng 33 request/s; đây là phép tính tải, không phải benchmark. Không cần gửi event mỗi click/giây.
-- Giai đoạn đầu chỉ time dùng daily aggregate vì volume cao. Completion, band, vocab state query trực tiếp với index. Chỉ thêm cache/projection khác sau khi đo SQL và latency thực.
+- Giai đoạn đầu chỉ time dùng daily aggregate vì volume cao. Completion và band query trực tiếp với index. Chỉ thêm cache/projection khác sau khi đo SQL và latency thực.
 
 ## 5. Thiết kế FE
 
@@ -275,25 +236,24 @@ Ví dụ chỉ minh họa contract, không seed dữ liệu thật. Skill respon
 | Style/type | `src/features/overview/overview.css`, `src/types/overview.ts` | Layout sau bỏ Mentor, nullable/count/source status, chart accessible |
 | API mới | `src/features/overview/api/overviewApi.ts` | 4 endpoint aggregate qua httpClient |
 | Hook mới | `src/features/overview/hooks/useDetailedStatistics.ts` | Tải độc lập/abort/stale guard/refetch từng nhóm; cùng convention resource hiện có |
-| Đo thời gian mới | `src/features/study-activity/useStudySession.ts` và `studyActivityApi.ts` | Dùng chung lesson/practice/review/exam/vocab, xử lý visibility/media/lease/retry |
+| Đo thời gian mới | `src/features/study-activity/useStudySession.ts` và `studyActivityApi.ts` | Dùng chung lesson/practice/review/exam, xử lý visibility/media/lease/retry |
 | HTTP | `src/lib/httpClient.ts` | Nếu cần thêm tùy chọn keepalive cho flush, giữ refresh single-flight và memory-only token |
 | Trang học thật | `src/features/learning-path/pages/{LessonPage,PracticePage,ReviewPage,PlacementPage,TopicTestPage}.tsx` | Start sau API success, tín hiệu active, flush và invalidate sau mutation thành công |
 | Media | `src/features/learning-path/components/blocks/AudioBlock.tsx`, `placement/ExamAudioPlayer.tsx` | Phát tín hiệu playing/pause/waiting/ended; không gửi text/answer vào telemetry |
-| Vocabulary | `src/features/vocabulary/pages/VocabularyPage.tsx` và luồng ôn mới | Nối Library thật, thêm queue/submit recall để số liệu có nguồn |
 
 Các page dưới `features/practice` hoặc classroom còn có mock: chỉ bật tracking khi đã có hoạt động thật và source được BE xác nhận. Không đếm giờ thao tác trên màn hình demo như học thật.
 
 ### 5.2. Trạng thái và cách hiển thị
 
-- Mỗi card: loading, ready, empty, unavailable, error; lỗi Library không che time/skill.
+- Mỗi card: loading, ready, empty, unavailable, error; lỗi một service không che các card còn lại.
 - Khi filter đổi: hủy/ignore response cũ bằng key/request generation, không để tuần trước ghi đè tháng mới. Bỏ dữ liệu user cũ ngay logout/chuyển account.
 - FE không tự tính nghiệp vụ tiến độ/retained/band. FE có thể đổi seconds sang minutes, tính tọa độ SVG, format số và nhãn dựa trên counts/status BE.
 - SVG time chart có trục Y/đơn vị và số điểm đúng range; tooltip dùng số thật. Radar dùng cùng 4 counts với thanh progress; có bảng số đọc được bằng screen reader. Không tạo polygon giả cho skill null.
 - Khi quay lại dashboard hoặc mutation hoàn tất: refetch phần liên quan. Không polling toàn dashboard mỗi giây; chỉ polling chấm bài đang pending theo backoff có giới hạn, dừng khi hidden/unmount.
-- “Chi tiết”, “Ôn ngay”, “Xem tất cả” phải dẫn đến route có thật; khi luồng ôn chưa phát hành, show unavailable/disabled có lý do, không điều hướng sang mock để giả hoàn tất.
+- “Chi tiết”, “Xem tất cả” phải dẫn đến route có thật; không điều hướng sang mock để giả hoàn tất.
 - Deep link đề xuất `/overview?tab=detailed-stats&period=week&courseId=...`; parse/validate query, giữ back/forward. Không bắt buộc đổi toàn bộ navigation để triển khai số liệu.
 - Wireframe repo docs mới có menu dashboard thay sidebar, còn FE đang có sidebar. Ghi nhận lệch UI; chỉ làm navigation cần để vào chi tiết. Nếu đồng bộ toàn bộ shell thì tách scope riêng, không để chặn API thống kê.
-- Sau bỏ Mentor: thẻ vocab chiếm hàng riêng hoặc chia cùng course theo responsive; không tạo placeholder Mentor/AI Mentor.
+- Sau bỏ Mentor: không tạo placeholder Mentor/AI Mentor. Thẻ từ vựng nằm ngoài phạm vi: hiển thị "chưa khả dụng", không dữ liệu mẫu, không điều hướng.
 - Giữ React/TypeScript, httpClient, SVG và token hiện có; không thêm chart/query library mặc định. FE chưa có script test; nếu bổ sung Vitest/Playwright phải là quyết định dependency riêng, không tuyên bố đang có.
 
 ## 6. Tối ưu, kiểm thử và phát hành
@@ -301,16 +261,16 @@ Các page dưới `features/practice` hoặc classroom còn có mock: chỉ bậ
 ### 6.1. Lộ trình
 
 1. **Thu thời gian và lịch sử mục tiêu:** triển khai telemetry sớm để có dữ liệu tích lũy; API + hook và test concurrency/lifecycle.
-2. **Tổng hợp số liệu nghiệp vụ:** Content batch metadata/Learning completion; Assessment snapshot/band; Library recall state + luồng ôn tối thiểu. Ba nhánh này có thể làm độc lập khi đã khóa contract.
+2. **Tổng hợp số liệu nghiệp vụ:** Content batch metadata/Learning completion; Assessment API đọc lịch sử band (không đổi luồng chấm). Hai nhánh này làm độc lập khi đã khóa contract.
 3. **Ghép FE và nghiệm thu:** thay mock của tab chi tiết, bỏ Mentor, kiểm tra các widget và một buổi học từ đầu đến cuối.
 
-Có thể phát hành từng card với availability rõ ràng; điều đó là mốc trung gian. Hoàn thành đầy đủ màn hình cần Library review và band eligibility, không đánh dấu done chỉ vì đã vẽ được chart.
+Có thể phát hành từng card với availability rõ ràng; điều đó là mốc trung gian. Hoàn thành đầy đủ cần cả ba nhóm dữ liệu có thật, không đánh dấu done chỉ vì đã vẽ được chart.
 
 ### 6.2. Bộ tình huống nghiệm thu trọng yếu
 
 | Tình huống | Kỳ vọng |
 |---|---|
-| Learner mới | Time chưa đo; progress/vocab rỗng; band không có; không tự hiện 5.5 |
+| Learner mới | Time chưa đo; progress rỗng; band không có; không tự hiện 5.5; thẻ từ vựng chưa khả dụng |
 | Lesson nhiều skill | Complete một lần cập nhật từng skill tương ứng, course chỉ +1 lesson |
 | Retry submit/refresh | Counts không tăng đôi |
 | 2 tab/2 device | Một lease nhận thời gian, tổng không vượt thời gian thực |
@@ -319,18 +279,16 @@ Có thể phát hành từng card với availability rõ ràng; điều đó là
 | Qua 00:00/đổi timezone | Chia đúng ngày, không sửa lịch sử đã chốt |
 | Đổi goal | Target ngày cũ giữ nguyên; course filter không copy target toàn cục |
 | Regrade v2 pending/completed | Pending giữ v1 có nhãn; completed thay v1, attempt count không tăng |
-| Band fallback hoặc Speaking chưa đo | Không vẽ như measured; overall thiếu dữ liệu |
-| 2 lần ôn đồng thời cùng nghĩa | Một update hợp lệ theo stateVersion; không thăng 2 cấp |
-| Trùng nghĩa ở nhiều deck | Total tăng 1, không nhân số deck |
+| Placement hoặc Speaking chưa đo | Placement có nhãn ước lượng; Speaking không vẽ thành 0; không có Overall giả |
 | User khác truy cập session/review | Bị từ chối trước đọc/ghi; không lộ nội dung |
-| Content/Library lỗi | Card liên quan unavailable, các card còn lại hoạt động |
+| Content hoặc một service owner lỗi | Card liên quan unavailable, các card còn lại hoạt động |
 | Xóa/archive/publish thêm nội dung | Mẫu số và revision thay đổi theo policy, không lấy catalog cũ giả làm hiện tại |
 
 Unit test công thức/state machine; MVC test validation/ownership; Testcontainers test migration, unique/lock/replay, SQL aggregate và query plan. FE chạy lint/typecheck/build, kiểm thử lifecycle/browser thực và bàn phím; nếu chưa có framework tự động thì ghi nhận manual, không tạo báo cáo test giả.
 
 ### 6.3. SLO đề xuất và kiểm tra tải
 
-- Mục tiêu ban đầu để đo: 4 request aggregate, mỗi API p95 <500ms với dataset đại diện; dashboard usable <1.5s ở môi trường đã nêu rõ. Đây là acceptance target cần benchmark, không phải kết quả đã đạt.
+- Mục tiêu ban đầu để đo: 3 request aggregate, mỗi API p95 <500ms với dataset đại diện; dashboard usable <1.5s ở môi trường đã nêu rõ. Đây là acceptance target cần benchmark, không phải kết quả đã đạt.
 - Dashboard không thực hiện chuỗi HTTP theo số lesson; response/chart tối đa 366 bucket hoặc 100 điểm/lượt. Latest/baseline/delta phải được tính trên toàn range kể cả timeline phân trang.
 - Telemetry metrics: accepted/rejected/replayed/expired, lag, lastSuccessfulCapture; chỉ ID/code, không log đáp án, essay, transcript hay token.
 - Nếu dùng outbox cho tính năng khác về sau, consumer phải idempotent vì retry/redelivery có thể trùng; không mặc định exactly-once. [RabbitMQ reliability](https://www.rabbitmq.com/docs/reliability)
@@ -338,8 +296,7 @@ Unit test công thức/state machine; MVC test validation/ownership; Testcontain
 ### 6.4. Backfill và rollback
 
 - Có thể tính current lesson counts từ dữ liệu hiện có; không dựng lịch sử thời gian hoạt động từ completedAt.
-- Có thể truy xuất kết quả cũ với provenance đủ chứng minh; không tái chấm LLM hàng loạt hoặc lấy config hiện tại để giả snapshot quá khứ.
-- Flashcard cũ có vocabularySenseId chỉ vào NEW sau khi learner thực sự chọn học hoặc quy tắc import được duyệt; không mặc định “đã thuộc”.
+- Có thể truy xuất kết quả cũ đã chấm xong để vẽ lịch sử; không tái chấm LLM hàng loạt, không thêm cột hay migration ở assessment.
 - Migration additive; bật ghi trước, quan sát, bật đọc sau. Rollback FE/endpoint bằng khả năng cấu hình hiện có hoặc thay đổi được duyệt, giữ bảng/dữ liệu mới, không chạy destructive down migration.
 - Nếu phase chưa xong thì UI dùng empty/unavailable. Không fallback sang số mẫu trong production.
 
@@ -352,12 +309,8 @@ Hai quyết định đầu đã chốt với người dùng; các dòng còn l�
 | Tiến độ kỹ năng | **Đã chốt: tỷ lệ lesson hoàn thành** | Không tự đổi sang mastery |
 | Mentor | **Đã chốt: bỏ hoàn toàn** | Không tạo API/bảng/AI thay thế |
 | Scope radar | Course đã bắt đầu; chọn riêng course được | Nếu toàn catalog, mẫu số lớn và nhiều 0 không hữu ích |
-| Đơn vị vocab | Nghĩa từ canonical đã đưa vào học; dedupe cross-deck | Bao gồm card tự tạo cần định nghĩa item identity và đổi tên nhãn |
-| Donut | Retained/total; dueCount riêng | Nếu muốn due/total phải đổi label, không dùng cùng tên |
-| Lịch ôn | Thang 1/3/7/14 ngày, quên 10 phút; version hóa | Chưa có bằng chứng là tối ưu cho learner, cần thử nghiệm |
-| Recall | Chọn objective nếu có câu trả lời; self-rating ghi rõ nguồn | Tự đánh giá dễ làm nhưng độ tin cậy thấp hơn |
 | Active time | 30s heartbeat, 120s idle, hidden không tính; 1 lease/user | Người đọc lâu/background audio có thể bị thiếu thời gian |
-| Band đủ điều kiện | Series theo loại đề, không dùng fallback; Overall cùng 4 skill | Có thể ban đầu Overall trống vì chưa có Speaking thật |
+| Band đủ điều kiện | Series theo loại đề; placement luôn là "ước lượng placement", không Overall, không vẽ Speaking | Điểm placement hiện tính lại từ dữ liệu/config khi đọc và không đánh dấu điểm dự phòng; muốn bất biến và có cờ đo thật phải mở plan riêng sửa luồng chấm |
 | Retention | Đề xuất raw 90 ngày, totals lâu hơn | Cần thống nhất quyền xóa và khả năng đối soát trước release |
 
 ## 8. Nguồn nghiên cứu

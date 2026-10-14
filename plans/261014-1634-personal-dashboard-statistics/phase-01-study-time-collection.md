@@ -30,12 +30,12 @@ Tận dụng Clock, validation/ErrorResponse và CurrentUserProvider hiện có.
 
 - BE tạo `services/user-service/src/main/java/com/ieltspath/user/domain/aggregate/StudySession.java` và repository tương ứng.
 - BE tạo use cases `StartStudySessionUseCase`, `RecordStudyHeartbeatUseCase`, `CloseStudySessionUseCase`, `GetStudyTimeStatisticsUseCase` trong `services/user-service/src/main/java/com/ieltspath/user/application/usecase/`.
-- BE tạo `application/port/StudySourceVerifier.java`, adapter HTTP theo owner; endpoint context tối thiểu tại Learning/Assessment/Library nếu chưa có API trả dữ liệu cần xác nhận.
+- BE tạo `application/port/StudySourceVerifier.java`, adapter HTTP theo owner; endpoint context tối thiểu tại Learning/Assessment nếu chưa có API trả dữ liệu cần xác nhận.
 - BE tạo controller/DTO dưới `services/user-service/src/main/java/com/ieltspath/user/api/`; entity/repository/adapter cho session, interval, daily total, goal history theo convention user-service.
 - BE sửa `services/user-service/src/main/java/com/ieltspath/user/application/usecase/CreateLearningGoalUseCase.java` và `ChangeLearningGoalStatusUseCase.java` để ghi goal history cùng transaction; không sửa semantic các API goal hiện tại.
 - BE migration mới `services/user-service/src/main/resources/db/migration/V{next}__study_time_tracking.sql`.
 - FE tạo `src/features/study-activity/useStudySession.ts`, `studyActivityApi.ts`; sửa `src/lib/httpClient.ts` chỉ nếu cần keepalive option.
-- FE nối tại LessonPage/PracticePage/ReviewPage/PlacementPage/TopicTestPage và media đã liệt kê trong bản thiết kế; Library review nối khi phase 2 có source thật.
+- FE nối tại LessonPage/PracticePage/ReviewPage/PlacementPage/TopicTestPage và media đã liệt kê trong bản thiết kế.
 - Không xóa file hiện có; không đổi config/shared/security hoặc activity CRUD chỉ để dashboard chạy.
 
 ## Implementation Steps

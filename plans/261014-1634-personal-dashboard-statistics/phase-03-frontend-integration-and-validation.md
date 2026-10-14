@@ -14,7 +14,7 @@ Nguồn chuẩn: [thiết kế §5–6](./dashboard-statistics-design.md). Chỉ
 
 ## Requirements
 
-- Năm nhóm UI có dữ liệu thật/empty/unavailable rõ ràng; không fallback mock production.
+- Bốn nhóm UI có dữ liệu thật/empty/unavailable rõ ràng; thẻ từ vựng hiển thị chưa khả dụng; không fallback mock production.
 - Bỏ Mentor theo quyết định người dùng, không thay bằng tính năng mentor AI.
 - FE render/chart/filter, BE quyết định số liệu. Tái dùng HTTP auth và các dependency hiện có.
 
@@ -24,15 +24,14 @@ Base FE: `D:/Fall2026/New folder/FE/frontend`.
 
 - Sửa `src/features/overview/pages/OverviewPage.tsx`, `src/features/overview/components/OverviewDetailedStats.tsx`, `src/features/overview/overview.css`, `src/types/overview.ts`.
 - Tạo `src/features/overview/api/overviewApi.ts`, `src/features/overview/hooks/useDetailedStatistics.ts`.
-- Tách card `StudyTimeCard.tsx`, `SkillCompletionCard.tsx`, `BandHistoryCard.tsx`, `VocabularyReviewCard.tsx`, `ActiveCoursesCard.tsx` dưới components nếu phù hợp độ dài thực; không tạo abstraction chart framework.
-- Sửa/nối `src/features/vocabulary/pages/VocabularyPage.tsx` và tạo trang review/API Library tương ứng phase 2.
+- Tách card `StudyTimeCard.tsx`, `SkillCompletionCard.tsx`, `BandHistoryCard.tsx`, `ActiveCoursesCard.tsx` dưới components nếu phù hợp độ dài thực; không tạo abstraction chart framework.
 - Bổ sung invalidation sau mutation thật ở `src/features/learning-path/pages/`; tránh thay toán chấm/khóa bài.
 - Sửa README mục Dashboard khi behavior thực sự thay đổi; plan này không sửa README hôm nay.
 - `src/mocks/overviewData.ts` vẫn có thể được tab tổng quan sử dụng; chỉ bỏ import của tab chi tiết, không xóa cả file làm hỏng phần khác.
 
 ## Architecture
 
-Hook gửi 4 request độc lập, lưu state theo resource/query key. Dùng Promise.allSettled hoặc các resource riêng để partial failure không làm trống cả màn hình. Không kết hợp tổng dữ liệu của 2 user/range khi response về muộn. Không cần query library mới; tái sử dụng convention `useApiResource` nếu phù hợp và không làm hỏng các caller cũ.
+Hook gửi 3 request độc lập, lưu state theo resource/query key. Dùng Promise.allSettled hoặc các resource riêng để partial failure không làm trống cả màn hình. Không kết hợp tổng dữ liệu của 2 user/range khi response về muộn. Không cần query library mới; tái sử dụng convention `useApiResource` nếu phù hợp và không làm hỏng các caller cũ.
 
 ## Implementation Steps
 
@@ -40,8 +39,8 @@ Hook gửi 4 request độc lập, lưu state theo resource/query key. Dùng Pro
 2. Nối API/time filters/selected course/skill tabs; date range sử dụng quy ước ngày server. Course filter không đưa full daily target vào chart course.
 3. Thay SVG tọa độ cứng bằng dữ liệu, có trục/đơn vị/tooltip/table; nếu skill null, render marker chưa có nội dung hoặc bảng thay radar chứ không fake điểm 0.
 4. Xóa Mentor card/CSS riêng không còn dùng, chỉnh layout vocabulary; xóa AI nhận xét và dự báo tốc độ không có cơ sở ở tab chi tiết. Đổi caption skill thành “Bài học hoàn thành”.
-5. Course dùng đơn vị bài, counts thật, resumeTarget; bộ chọn và view-all có pagination. Band theo series với nguồn/quality, pending/empty hữu ích.
-6. Ôn ngay mở review queue thật, xử lý submit replay/version conflict rồi refetch summary; nếu Library chưa phát hành thì card unavailable, không coi bước này completed.
+5. Course dùng đơn vị bài, counts thật, resumeTarget; bộ chọn và view-all có pagination. Band theo series, placement có nhãn ước lượng, pending/empty hữu ích.
+6. Thẻ từ vựng: hiển thị chưa khả dụng, không dữ liệu mẫu, không điều hướng sang mock. Luồng ôn từ vựng làm ở plan riêng.
 7. Nối refetch sau mutation/return-to-dashboard, abort khi unmount/range change, xóa state logout. Hook time không bật trong mock-learning hoặc mock standalone practice.
 8. Deep link query cho tab/filter nếu áp dụng; kiểm back/forward, keyboard, reduced motion, screen reader. Đồng bộ menu shell đầy đủ là việc khác, không tự kéo vào scope.
 9. Chạy BE checks đúng module, FE lint/typecheck/build và kịch bản end-to-end ở §6.2; ghi rõ Docker skip hoặc môi trường không phù hợp.
@@ -53,9 +52,9 @@ Hook gửi 4 request độc lập, lưu state theo resource/query key. Dùng Pro
 - [ ] Radar và thanh skill cùng counts từ BE; không còn caption mastery/AI sai nghĩa.
 - [ ] Không còn Mentor hoặc AI Mentor trong tab chi tiết.
 - [ ] Band delta/nguồn/range đúng; target là mục tiêu, không lời hứa dự báo.
-- [ ] Vocab counts/percentage/CTA khớp trạng thái sau review thật.
+- [ ] Thẻ từ vựng không còn số mẫu, hiển thị chưa khả dụng.
 - [ ] Course đang học lesson đầu hiển thị dù chưa pass topic.
-- [ ] Một service lỗi chỉ lỗi card của service đó; retry không kéo theo 3 nhóm còn lại.
+- [ ] Một service lỗi chỉ lỗi card của service đó; retry không kéo theo 2 nhóm còn lại.
 - [ ] Session/logout/filter race không rò dữ liệu account/range trước.
 - [ ] Bàn phím, mobile, tooltip và bảng số accessible.
 
