@@ -220,6 +220,6 @@ class SaveAssessmentResultDetailsUseCaseTest {
 
     private SaveAssessmentResultDetailsUseCase useCase() {
         return new SaveAssessmentResultDetailsUseCase(attempts, results, attemptItems, skills, items, errors,
-                knowledgeSnapshot, judgments);
+                knowledgeSnapshot, judgments, org.mockito.Mockito.mock(com.ieltspath.assessment.application.port.BandStatisticsStore.class));
     }
 }

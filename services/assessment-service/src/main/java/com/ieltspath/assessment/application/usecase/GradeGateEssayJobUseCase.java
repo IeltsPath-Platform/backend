@@ -121,6 +121,7 @@ public class GradeGateEssayJobUseCase {
             log.warn("Placement essay graded with the default band: jobId={}, code={}", job.jobId(), code);
             transaction.executeWithoutResult(status -> {
                 jobs.complete(job.jobId(), placement.defaultWritingBand(), null, clock.instant());
+                jobs.markFallback(job.jobId());
                 placement.completeIfGraded(job.attemptId());
             });
             return;

@@ -144,10 +144,16 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
     public void complete(UUID jobId, BigDecimal band, String feedback, Instant now) {
         jdbc.update("""
                 UPDATE grading_jobs SET status = 'COMPLETED', llm_band = :band, llm_feedback = CAST(:feedback AS JSONB),
-                    completed_at = :now, processing_started_at = NULL
+                    completed_at = :now, processing_started_at = NULL, measurement_quality = 'MEASURED'
                 WHERE id = :id AND grading_mode = 'AI' AND status = 'PROCESSING'
                 """, new MapSqlParameterSource().addValue("id", jobId).addValue("band", band)
                 .addValue("feedback", feedback).addValue("now", Timestamp.from(now)));
+    }
+
+    @Override
+    public void markFallback(UUID jobId) {
+        jdbc.update("UPDATE grading_jobs SET measurement_quality='FALLBACK' WHERE id=:id AND status='COMPLETED'",
+                Map.of("id", jobId));
     }
 
     @Override
@@ -162,7 +168,7 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
     @Override
     public List<JobState> aiJobs(UUID attemptId) {
         return jdbc.query("""
-                SELECT ai.id AS attempt_item_id, gj.status, gj.llm_band, gj.llm_feedback::text AS llm_feedback
+                SELECT ai.id AS attempt_item_id, gj.status, gj.llm_band, gj.llm_feedback::text AS llm_feedback, gj.measurement_quality
                 FROM grading_jobs gj
                 JOIN learner_submissions ls ON ls.id = gj.submission_id
                 JOIN attempt_items ai ON ai.id = ls.attempt_item_id
@@ -171,6 +177,6 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
                 ORDER BY ai.id
                 """, Map.of("attemptId", attemptId), (rs, rowNum) -> new JobState(
                 rs.getObject("attempt_item_id", UUID.class), rs.getString("status"), rs.getBigDecimal("llm_band"),
-                rs.getString("llm_feedback")));
+                rs.getString("llm_feedback"), rs.getString("measurement_quality")));
     }
 }
