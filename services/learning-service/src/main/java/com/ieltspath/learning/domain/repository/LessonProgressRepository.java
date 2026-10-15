@@ -2,6 +2,7 @@ package com.ieltspath.learning.domain.repository;
 
 import com.ieltspath.learning.domain.aggregate.LessonProgress;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +17,12 @@ public interface LessonProgressRepository {
     List<LessonProgress> findCompleted(UUID userId);
 
     Map<UUID, Integer> completedCountsByTopic(UUID userId);
+
+    /**
+     * When the learner last studied each topic: the latest time they opened one of its lessons or submitted one of
+     * its practice sets. Topics they never opened are absent.
+     */
+    Map<UUID, Instant> lastStudiedByTopic(UUID userId);
 
     void save(LessonProgress progress);
 }

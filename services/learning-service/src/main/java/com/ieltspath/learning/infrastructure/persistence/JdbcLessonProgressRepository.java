@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.*;
 
 @Repository
@@ -49,6 +50,23 @@ public class JdbcLessonProgressRepository implements LessonProgressRepository {
                 (RowCallbackHandler) row -> counts.put(row.getObject("topic_id", UUID.class), row.getInt("total")),
                 userId);
         return counts;
+    }
+
+    @Override
+    public Map<UUID, Instant> lastStudiedByTopic(UUID userId) {
+        Map<UUID, Instant> latest = new HashMap<>();
+        // Opening a lesson saves its progress row; a practice set belongs to the topic of its lesson.
+        jdbc.query("""
+                SELECT topic_id, max(studied_at) AS studied_at FROM (
+                    SELECT topic_id, updated_at AS studied_at FROM lesson_progress WHERE user_id = ?
+                    UNION ALL
+                    SELECT lp.topic_id, pa.submitted_at FROM practice_attempts pa
+                    JOIN lesson_progress lp ON lp.user_id = pa.user_id AND lp.lesson_id = pa.lesson_id
+                    WHERE pa.user_id = ? AND pa.submitted_at IS NOT NULL
+                ) activity GROUP BY topic_id
+                """, (RowCallbackHandler) row -> latest.put(row.getObject("topic_id", UUID.class),
+                row.getTimestamp("studied_at").toInstant()), userId, userId);
+        return latest;
     }
 
     /** The aggregate holds the whole row; an earlier completion time is kept. */

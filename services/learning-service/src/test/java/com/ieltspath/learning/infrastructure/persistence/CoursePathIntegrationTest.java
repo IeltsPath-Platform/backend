@@ -117,6 +117,41 @@ class CoursePathIntegrationTest {
     }
 
     @Test
+    void aCourseCountsTheLessonsStudiedAndKnowsWhenTheLearnerLastStudiedIt() {
+        var lower = new LearningContentClient.Course(LOWER, "IELTS_5_5", "IELTS 5.5", new BigDecimal("5.5"), true);
+        var higher = new LearningContentClient.Course(HIGHER, "IELTS_6_5", "IELTS 6.5", new BigDecimal("6.5"), true);
+        when(content.getTopicSequence()).thenReturn(List.of(
+                new LearningContentClient.Topic(R1, "R1", "R1", 900, null, List.of(), LearningSkill.READING, true,
+                        lower, java.util.Set.of(LearningSkill.READING), 2),
+                topic(R3, "R3", 960, LearningSkill.READING, higher)));
+        jdbc.update("DELETE FROM practice_attempts WHERE user_id = ?", USER);
+        refresh.execute(USER);
+        // Nothing studied yet: no lesson done and no time to show.
+        CourseResult untouched = listCourses.execute(USER).getFirst();
+        assertEquals(0, untouched.completedLessonCount());
+        assertEquals(2, untouched.totalLessonCount());
+        assertNull(untouched.lastStudiedAt());
+
+        UUID lessonA = UUID.randomUUID();
+        Instant opened = Instant.parse("2026-10-14T08:00:00Z");
+        Instant submitted = Instant.parse("2026-10-15T09:30:00Z");
+        jdbc.update("INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, completed_at, updated_at) "
+                + "VALUES (?, ?, ?, 1, ?, ?)", USER, lessonA, R1, java.sql.Timestamp.from(opened),
+                java.sql.Timestamp.from(opened));
+        jdbc.update("INSERT INTO practice_attempts (id, user_id, lesson_id, skill, package_id, package_version_id, "
+                + "started_at, submitted_at, request_id) VALUES (?, ?, ?, 'READING', ?, ?, ?, ?, ?)",
+                UUID.randomUUID(), USER, lessonA, UUID.randomUUID(), UUID.randomUUID(),
+                java.sql.Timestamp.from(opened), java.sql.Timestamp.from(submitted), UUID.randomUUID());
+
+        List<CourseResult> courses = listCourses.execute(USER);
+        // The lesson's practice was submitted after it was opened, so that is when the course was last studied.
+        assertEquals(1, courses.getFirst().completedLessonCount());
+        assertEquals(submitted, courses.getFirst().lastStudiedAt());
+        assertEquals(0, courses.get(1).completedLessonCount());
+        assertNull(courses.get(1).lastStudiedAt());
+    }
+
+    @Test
     void locksCourseTestUntilEveryTopicPassesThenConsumesRotatesAndMarksCoursePassed() {
         var locked = assertThrows(com.ieltspath.learning.application.exception.LearningRequestException.class,
                 () -> assignCourseTest.execute(USER, LOWER));
