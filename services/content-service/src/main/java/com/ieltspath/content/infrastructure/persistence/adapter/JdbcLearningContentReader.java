@@ -106,6 +106,29 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     @Override
+    public com.ieltspath.content.application.result.ProgressMetadataResult progressMetadata(Collection<UUID> courseIds) {
+        if (courseIds.isEmpty()) return new com.ieltspath.content.application.result.ProgressMetadataResult("empty", true, List.of());
+        var rows = jdbc.query("""
+                SELECT c.id AS course_id, c.name AS course_name, c.band_level, t.id AS topic_id,
+                       l.id AS lesson_id, ARRAY(SELECT skill FROM (%s) ls ORDER BY skill) AS skills
+                FROM courses c JOIN topics t ON t.course_id = c.id
+                JOIN lessons l ON l.topic_id = t.id
+                WHERE c.id IN (:courseIds) AND c.status = 'ACTIVE' AND t.status = 'ACTIVE'
+                  AND l.status = 'PUBLISHED'
+                ORDER BY c.id, t.sort_order, t.id, l.sort_order, l.id
+                LIMIT 10001
+                """.formatted(LESSON_SKILLS), Map.of("courseIds", courseIds), (rs, i) ->
+                new com.ieltspath.content.application.result.ProgressMetadataResult.Lesson(
+                        uuid(rs, "course_id"), rs.getString("course_name"), rs.getBigDecimal("band_level"),
+                        uuid(rs, "topic_id"), uuid(rs, "lesson_id"), skills(rs)));
+        // Hash the denominator and skill membership, including removals; timestamps alone miss deletions.
+        String revision = UUID.nameUUIDFromBytes(rows.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+        boolean complete = rows.size() <= 10000;
+        return new com.ieltspath.content.application.result.ProgressMetadataResult(revision, complete,
+                complete ? rows : List.of());
+    }
+
+    @Override
     public List<TopicSequenceResult> topicSequence(int minPracticeQuestions) {
         record TopicRow(UUID id, String code, String name, int sortOrder, String requiredFeatureKey, Skill skill,
                         boolean hasTopicTest, TopicSequenceResult.CourseEntry course, List<Skill> skills) {}

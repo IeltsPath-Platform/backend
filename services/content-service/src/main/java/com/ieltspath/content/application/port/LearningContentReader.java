@@ -32,6 +32,8 @@ import java.util.UUID;
  */
 public interface LearningContentReader {
 
+    com.ieltspath.content.application.result.ProgressMetadataResult progressMetadata(Collection<UUID> courseIds);
+
     /** Active topics in active courses, with a skill and published lesson, by skill, course band, topic order and id. */
     List<TopicSequenceResult> topicSequence(int minPracticeQuestions);
 

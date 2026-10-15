@@ -135,6 +135,36 @@ class CourseSequenceIntegrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @Test
+    void progressMetadataUsesPublishedDenominatorAndRevisionChangesWithMembership() {
+        UUID course = course("STATS", "5.5", "ACTIVE");
+        UUID topic = topic("STATS_TOPIC", course, 1, true);
+        UUID lesson = sql.queryForObject("SELECT id FROM lessons WHERE topic_id=?", UUID.class, topic);
+        UUID block = UUID.randomUUID(), kp = UUID.randomUUID();
+        sql.update("INSERT INTO knowledge_points(id,topic_id,code,name,kind,learning_type,skill) VALUES (?,?,'STATS_KP','KP','STRATEGY','PROCEDURE','LISTENING')",kp,topic);
+        sql.update("INSERT INTO lesson_blocks(id,lesson_id,sort_order,block_type,text_content) VALUES (?,?,1,'TEXT','Theory')",block,lesson);
+        sql.update("INSERT INTO lesson_block_knowledge_points(block_id,knowledge_point_id) VALUES (?,?)",block,kp);
+        var first = reader.progressMetadata(List.of(course));
+        assertThat(first.complete()).isTrue();
+        assertThat(first.lessons()).hasSize(1);
+        assertThat(first.lessons().getFirst().skills()).containsExactly(com.ieltspath.content.domain.vo.Skill.LISTENING);
+        assertThat(first.revision()).isEqualTo(reader.progressMetadata(List.of(course)).revision());
+        sql.update("UPDATE lessons SET status='ARCHIVED' WHERE id=?",lesson);
+        var removed = reader.progressMetadata(List.of(course));
+        assertThat(removed.lessons()).isEmpty();
+        assertThat(removed.revision()).isNotEqualTo(first.revision());
+    }
+
+    @Test
+    void progressMetadataRejectsOversizedDenominatorWithoutReturningPartialRows() {
+        UUID course = course("STATS_LARGE", "5.5", "ACTIVE");
+        UUID topic = topic("STATS_LARGE_TOPIC", course, 1, false);
+        sql.update("INSERT INTO lessons(id,topic_id,code,title,sort_order,status) SELECT gen_random_uuid(),?, 'STATS_' || n,'Lesson',n,'PUBLISHED' FROM generate_series(1,10001) n",topic);
+        var result = reader.progressMetadata(List.of(course));
+        assertThat(result.complete()).isFalse();
+        assertThat(result.lessons()).isEmpty();
+    }
+
     private UUID course(String code, String band, String status) {
         UUID id = UUID.randomUUID();
         sql.update("INSERT INTO courses(id,code,name,band_level,status) VALUES (?,?,?,?::numeric,?)", id, code, code, band, status);
