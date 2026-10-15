@@ -123,7 +123,8 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 
 Graph ở `graphify-out/` chỉ chứa code first-party (đã loại `third_party/` và `*.md` trong `.graphifyignore`).
 
-- Khi `graphify-out/graph.json` tồn tại, câu hỏi về codebase: chạy `graphify query "<câu hỏi>"`, `graphify explain "<Symbol>"` hoặc
-  `graphify path "<A>" "<B>"` trước khi grep/đọc nhiều file. Tên trùng thì dùng `path::Symbol`.
+- BẮT BUỘC: khi `graphify-out/graph.json` tồn tại, mọi câu hỏi về codebase phải chạy `graphify query "<câu hỏi>"`,
+  `graphify explain "<Symbol>"` hoặc `graphify path "<A>" "<B>"` TRƯỚC khi grep/đọc file; chỉ mở file nguồn của node graph trả về.
+  Tên trùng thì dùng `path::Symbol`.
 - Chỉ đọc `graphify-out/GRAPH_REPORT.md` khi cần review kiến trúc rộng.
 - Sau khi sửa code: `graphify update .` (AST, không tốn API); thêm `--force` khi số node giảm có chủ đích.

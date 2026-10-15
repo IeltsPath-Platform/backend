@@ -253,8 +253,9 @@ Khi không có convention cụ thể, theo code lân cận trong cùng module.
 
 1. Đọc file này, `README.md` và README/config của module bị ảnh hưởng trước khi sửa code.
 2. Giữ thay đổi trong đúng bounded context. Chỉ sửa `common-security`, Gateway, Config Server hoặc Docker khi contract thật sự cần.
-3. Khi `graphify-out/graph.json` tồn tại, định hướng bằng Graphify trước khi đọc nhiều source (graph đã loại `third_party/`
-   và `*.md`). Tên trùng nhau thì dùng dạng `path::Symbol`.
+3. BẮT BUỘC định hướng bằng Graphify trước khi đọc source để tiết kiệm token. Khi `graphify-out/graph.json` tồn tại, TUYỆT ĐỐI
+   KHÔNG grep hoặc đọc nhiều file để "tìm hiểu codebase" khi chưa chạy `graphify query/explain/path/affected`; chỉ mở file
+   nguồn của node mà graph trả về (graph đã loại `third_party/` và `*.md`). Tên trùng nhau thì dùng dạng `path::Symbol`.
 
 ```powershell
 graphify query "<câu hỏi về codebase>"
