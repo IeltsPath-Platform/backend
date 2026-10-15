@@ -32,6 +32,11 @@ public class LearnerProfile {
         this.bio = bio;
         this.selfReportedBand = selfReportedBand;
         if (timezone != null && !timezone.isBlank()) {
+            try {
+                java.time.ZoneId.of(timezone.trim());
+            } catch (java.time.DateTimeException exception) {
+                throw new IllegalArgumentException("Timezone must be a valid IANA zone");
+            }
             this.timezone = timezone.trim();
         }
         touch();

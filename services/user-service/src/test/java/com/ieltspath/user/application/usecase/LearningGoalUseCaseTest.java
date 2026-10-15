@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 class LearningGoalUseCaseTest {
     @Mock private LearningGoalRepository learningGoalRepository;
     @Mock private UserRepository userRepository;
+    @Mock private ScheduleStudyGoalUseCase studyGoals;
 
     private GetActiveLearningGoalUseCase getActiveLearningGoalUseCase;
     private GetLearningGoalsByUserIdUseCase getLearningGoalsByUserIdUseCase;
@@ -45,8 +46,8 @@ class LearningGoalUseCaseTest {
     void setUp() {
         getActiveLearningGoalUseCase = new GetActiveLearningGoalUseCase(learningGoalRepository);
         getLearningGoalsByUserIdUseCase = new GetLearningGoalsByUserIdUseCase(learningGoalRepository);
-        createLearningGoalUseCase = new CreateLearningGoalUseCase(learningGoalRepository, userRepository);
-        changeLearningGoalStatusUseCase = new ChangeLearningGoalStatusUseCase(learningGoalRepository);
+        createLearningGoalUseCase = new CreateLearningGoalUseCase(learningGoalRepository, userRepository, studyGoals);
+        changeLearningGoalStatusUseCase = new ChangeLearningGoalStatusUseCase(learningGoalRepository, studyGoals);
     }
 
     @Test

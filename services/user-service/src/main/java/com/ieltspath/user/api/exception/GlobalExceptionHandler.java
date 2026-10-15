@@ -34,6 +34,16 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(com.ieltspath.user.domain.exception.StudyTrackingException.class)
+    ResponseEntity<ErrorResponse> handleStudyTracking(com.ieltspath.user.domain.exception.StudyTrackingException exception,
+                                                     HttpServletRequest request) {
+        HttpStatus status = switch(exception.getCode()) {
+            case "SESSION_NOT_FOUND", "SOURCE_NOT_AVAILABLE" -> HttpStatus.NOT_FOUND;
+            case "SOURCE_UNAVAILABLE" -> HttpStatus.SERVICE_UNAVAILABLE;
+            default -> HttpStatus.CONFLICT;
+        };
+        return error(status, exception.getCode(), request, Map.of("code", exception.getCode()));
+    }
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     void handleClientAbort(AsyncRequestNotUsableException exception, HttpServletRequest request) {
         log.debug("Client disconnected before response completed path={} reason={}",
@@ -87,7 +97,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({HttpMessageNotReadableException.class, MissingServletRequestParameterException.class,
             MethodArgumentTypeMismatchException.class})
     ResponseEntity<ErrorResponse> handleMalformedActivityRequest(Exception exception, HttpServletRequest request) {
-        return isLearningSupportPath(request)
+        return isLearningSupportPath(request) || request.getRequestURI().startsWith("/api/users/me/study-sessions")
+                || request.getRequestURI().startsWith("/api/users/me/statistics/")
                 ? error(HttpStatus.BAD_REQUEST, "Dữ liệu không hợp lệ", request, null)
                 : error(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi hệ thống không xác định", request, null);
     }

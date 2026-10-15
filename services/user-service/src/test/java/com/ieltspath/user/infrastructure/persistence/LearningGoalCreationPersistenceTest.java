@@ -52,7 +52,8 @@ class LearningGoalCreationPersistenceTest {
                 userId, userId + "@example.test");
         UserRepository users = mock(UserRepository.class);
         when(users.findById(userId)).thenReturn(Optional.of(User.builder().id(userId).build()));
-        CreateLearningGoalUseCase useCase = new CreateLearningGoalUseCase(goals, users);
+        CreateLearningGoalUseCase useCase = new CreateLearningGoalUseCase(goals, users,
+                mock(com.ieltspath.user.application.usecase.ScheduleStudyGoalUseCase.class));
 
         var first = useCase.execute(new CreateLearningGoalCommand(userId, new BigDecimal("6.5"), null, 30));
         var second = useCase.execute(new CreateLearningGoalCommand(userId, new BigDecimal("7.0"), null, 45));

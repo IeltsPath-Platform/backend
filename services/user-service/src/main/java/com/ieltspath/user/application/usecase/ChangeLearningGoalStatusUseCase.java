@@ -17,9 +17,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 @RequiredArgsConstructor
 public class ChangeLearningGoalStatusUseCase {
     private final LearningGoalRepository learningGoalRepository;
+    private final ScheduleStudyGoalUseCase studyGoals;
 
     @Transactional
     public LearningGoalResult execute(ChangeLearningGoalStatusCommand command) {
+        if (command.userId() != null) studyGoals.lock(command.userId());
+        else studyGoals.lockGoalOwner(command.goalId());
         LearningGoal goal = learningGoalRepository.findById(command.goalId())
                 .orElseThrow(() -> new LearningGoalNotFoundException("Không tìm thấy mục tiêu học tập với id: " + command.goalId()));
 
@@ -55,6 +58,7 @@ public class ChangeLearningGoalStatusUseCase {
             }
 
             LearningGoal saved = learningGoalRepository.save(goal);
+            studyGoals.execute(learningGoalRepository.findActiveByUserId(goal.getUserId()).orElse(saved));
             return toResult(saved);
         } catch (DataIntegrityViolationException exception) {
             throw new LearningGoalConflictException("An active learning goal already exists for this user");
