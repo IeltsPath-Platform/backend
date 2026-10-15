@@ -27,7 +27,11 @@ public interface PracticeAttemptRepository {
             this(lessonId, packageId, true, Set.of());
         }
     }
-    record TopicAttempts(List<FirstPass> firstPasses, Set<UUID> revealedPackageIds) {}
+    /**
+     * {@code submittedPackageIds} are the sets the learner submitted as Practice. A set a review served as material is
+     * revealed but not submitted, so it does not count towards the Practice of its lesson.
+     */
+    record TopicAttempts(List<FirstPass> firstPasses, Set<UUID> submittedPackageIds) {}
     record PackageSummary(UUID packageId, UUID lastAttemptId, boolean open, boolean passed,
                           boolean attempted, Double bestPercent) {}
 }

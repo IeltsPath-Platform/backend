@@ -48,14 +48,14 @@ public class PracticeProgress {
         var packageIds = sets.values().stream().flatMap(List::stream).map(LessonPracticeSet::packageId).toList();
         var topicAttempts = attempts.findForTopic(userId, sets.keySet(), packageIds);
         return new TopicState(derive(userId, open, sets, topicAttempts.firstPasses(),
-                topicAttempts.revealedPackageIds(), snapshot.practice()), snapshot.pending());
+                topicAttempts.submittedPackageIds(), snapshot.practice()), snapshot.pending());
     }
 
     public Clearance forLesson(UUID userId, UUID lessonId, boolean open, List<LessonPracticeSet> sets) {
         var facts = attempts.findForTopic(userId, List.of(lessonId),
                 sets.stream().map(LessonPracticeSet::packageId).toList());
         return derive(userId, Map.of(lessonId, open), Map.of(lessonId, sets),
-                facts.firstPasses(), facts.revealedPackageIds(),
+                facts.firstPasses(), facts.submittedPackageIds(),
                 reviews.findPracticeByLessons(userId, List.of(lessonId))).get(lessonId);
     }
 
@@ -78,7 +78,7 @@ public class PracticeProgress {
 
     private Map<UUID, Clearance> derive(UUID userId, Map<UUID, Boolean> open,
                                         Map<UUID, List<LessonPracticeSet>> sets,
-                                        List<PracticeAttemptRepository.FirstPass> firstPasses, Set<UUID> revealed,
+                                        List<PracticeAttemptRepository.FirstPass> firstPasses, Set<UUID> submitted,
                                         List<PracticeReviewState> allReviews) {
         Map<UUID, PracticePassReason> stored = passes.findByLessons(userId, sets.keySet());
         Map<UUID, List<PracticeClearance.AttemptFact>> attemptFacts = new HashMap<>();
@@ -99,7 +99,7 @@ public class PracticeProgress {
             entry.getValue().stream().filter(set -> set.requiredFeatureKey() == null)
                     .forEach(set -> packages.put(set.packageId(), set.skills()));
             result.put(lessonId, rule.derive(open.getOrDefault(lessonId, false), packages,
-                    attemptFacts.getOrDefault(lessonId, List.of()), revealed,
+                    attemptFacts.getOrDefault(lessonId, List.of()), submitted,
                     reviewFacts.getOrDefault(lessonId, List.of()), stored.get(lessonId)));
         }
         return result;

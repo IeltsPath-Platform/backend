@@ -63,7 +63,7 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
     public TopicAttempts findForTopic(UUID userId, Collection<UUID> lessonIds, Collection<UUID> packageIds) {
         if (lessonIds.isEmpty()) return new TopicAttempts(List.of(), Set.of());
         List<FirstPass> firstPasses = new ArrayList<>();
-        Set<UUID> revealed = new HashSet<>();
+        Set<UUID> submitted = new HashSet<>();
         String sql = """
                 SELECT 'PASS' AS row_kind, lesson_id, package_id, passed, passed_skills
                 FROM practice_attempts
@@ -78,13 +78,9 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
             params.put("packageIds", packageIds);
             sql += """
                     UNION ALL
-                    SELECT 'REVEALED', NULL::uuid, package_id, NULL::boolean, NULL::varchar[] FROM (
-                        SELECT package_id FROM practice_attempts
-                        WHERE user_id = :userId AND package_id IN (:packageIds) AND submitted_at IS NOT NULL
-                        UNION
-                        SELECT package_id FROM review_sets
-                        WHERE user_id = :userId AND package_id IN (:packageIds) AND submitted_at IS NOT NULL
-                    ) revealed_packages
+                    SELECT DISTINCT 'SUBMITTED', NULL::uuid, package_id, NULL::boolean, NULL::varchar[]
+                    FROM practice_attempts
+                    WHERE user_id = :userId AND package_id IN (:packageIds) AND submitted_at IS NOT NULL
                     """;
         }
         jdbc.query(sql, params, row -> {
@@ -92,9 +88,9 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
                 firstPasses.add(new FirstPass(row.getObject("lesson_id", UUID.class),
                         row.getObject("package_id", UUID.class), row.getBoolean("passed"),
                         skills(row.getArray("passed_skills"))));
-            } else revealed.add(row.getObject("package_id", UUID.class));
+            } else submitted.add(row.getObject("package_id", UUID.class));
         });
-        return new TopicAttempts(List.copyOf(firstPasses), Set.copyOf(revealed));
+        return new TopicAttempts(List.copyOf(firstPasses), Set.copyOf(submitted));
     }
 
     @Override

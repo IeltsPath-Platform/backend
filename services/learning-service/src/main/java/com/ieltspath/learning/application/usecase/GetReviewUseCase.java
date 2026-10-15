@@ -10,6 +10,7 @@ import com.ieltspath.learning.application.result.LessonResult;
 import com.ieltspath.learning.application.result.ReviewResult;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.LessonCompletion;
+import com.ieltspath.learning.application.service.ReviewMaterial;
 import com.ieltspath.learning.application.service.TheoryFocus;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
@@ -41,15 +42,18 @@ public class GetReviewUseCase {
     private final ReviewItemRepository reviews;
     private final PracticeAttemptRepository attempts;
     private final LessonCompletion lessonCompletion;
+    private final ReviewMaterial material;
     private final TheoryFocus theoryFocus = new TheoryFocus();
 
     public GetReviewUseCase(LearningContentClient content, LearnerLock lock, ReviewItemRepository reviews,
-                            PracticeAttemptRepository attempts, LessonCompletion lessonCompletion) {
+                            PracticeAttemptRepository attempts, LessonCompletion lessonCompletion,
+                            ReviewMaterial material) {
         this.content = content;
         this.lock = lock;
         this.reviews = reviews;
         this.attempts = attempts;
         this.lessonCompletion = lessonCompletion;
+        this.material = material;
     }
 
     @Transactional
@@ -116,7 +120,7 @@ public class GetReviewUseCase {
     private Optional<PracticeSet> nextPackage(UUID userId, UUID knowledgePointId, UUID lessonId, Set<UUID> revealed) {
         Set<UUID> excluded = new HashSet<>(revealed);
         excluded.addAll(reviews.assignedPackageIds(userId));
-        return content.searchPracticeSets(knowledgePointId, excluded.stream().toList(), MIN_SET_QUESTIONS, 1, lessonId)
-                .stream().findFirst();
+        return content.searchPracticeSets(knowledgePointId, material.excluding(lessonId, excluded), MIN_SET_QUESTIONS,
+                1, lessonId).stream().findFirst();
     }
 }

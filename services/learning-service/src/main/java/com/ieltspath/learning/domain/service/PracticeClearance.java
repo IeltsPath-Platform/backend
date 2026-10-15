@@ -14,8 +14,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Whether a learner has cleared a lesson's Practice: every required set has been submitted at least once and no
- * review it created is still pending. Required sets are those with an objective skill (Reading, Listening) or no
+ * Whether a learner has cleared a lesson's Practice: every required set has been submitted as Practice at least once
+ * and no review it created is still pending. A set a review served as material does not count as submitted. Required sets are those with an objective skill (Reading, Listening) or no
  * skill (older Content); Writing sets are optional. A lesson without required sets is {@code NO_PRACTICE} even before
  * it opens; otherwise its Practice is LOCKED until the lesson opens. A PASSED Practice is what completes a lesson that
  * has required sets.
@@ -24,10 +24,10 @@ public final class PracticeClearance {
     private static final Set<LearningSkill> OPTIONAL = EnumSet.of(LearningSkill.WRITING);
 
     public Clearance derive(boolean lessonOpen, Set<UUID> publishedPackages, List<AttemptFact> attempts,
-                            Set<UUID> revealedPackages, List<ReviewFact> reviews, PracticePassReason stored) {
+                            Set<UUID> submittedPackages, List<ReviewFact> reviews, PracticePassReason stored) {
         return derive(lessonOpen, publishedPackages.stream()
                         .collect(Collectors.toMap(id -> id, id -> Set.<LearningSkill>of())), attempts,
-                revealedPackages, reviews, stored);
+                submittedPackages, reviews, stored);
     }
 
     /**
@@ -36,7 +36,7 @@ public final class PracticeClearance {
      * {@code REVIEW_FINISHED} when reviews were needed and are all finished, else {@code ALL_SETS_ATTEMPTED}.
      */
     public Clearance derive(boolean lessonOpen, Map<UUID, Set<LearningSkill>> publishedSets,
-                            List<AttemptFact> attempts, Set<UUID> revealedPackages, List<ReviewFact> reviews,
+                            List<AttemptFact> attempts, Set<UUID> submittedPackages, List<ReviewFact> reviews,
                             PracticePassReason stored) {
         if (stored != null) return new Clearance(PracticeStatus.PASSED, stored);
         Map<UUID, Set<LearningSkill>> required = new HashMap<>();
@@ -48,7 +48,7 @@ public final class PracticeClearance {
         if (required.isEmpty()) return new Clearance(PracticeStatus.PASSED, PracticePassReason.NO_PRACTICE);
         if (!lessonOpen) return new Clearance(PracticeStatus.LOCKED, null);
         boolean pending = reviews.stream().anyMatch(review -> review.status() == ReviewStatus.PENDING);
-        if (pending || !revealedPackages.containsAll(required.keySet())) {
+        if (pending || !submittedPackages.containsAll(required.keySet())) {
             return new Clearance(PracticeStatus.REQUIRED, null);
         }
         if (!reviews.isEmpty()) return new Clearance(PracticeStatus.PASSED, PracticePassReason.REVIEW_FINISHED);

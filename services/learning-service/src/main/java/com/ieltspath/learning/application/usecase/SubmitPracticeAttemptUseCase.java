@@ -9,6 +9,7 @@ import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.PracticeAccess;
 import com.ieltspath.learning.application.service.LessonCompletion;
+import com.ieltspath.learning.application.service.ReviewMaterial;
 import com.ieltspath.learning.domain.aggregate.PracticeAttempt;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
@@ -44,6 +45,7 @@ public class SubmitPracticeAttemptUseCase {
     private final KnowledgeEvidenceRepository evidence;
     private final WritingSubmissionRepository essays;
     private final LessonCompletion lessonCompletion;
+    private final ReviewMaterial material;
     private final ItemGrading grading = new ItemGrading();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final Clock clock = Clock.systemUTC();
@@ -51,7 +53,7 @@ public class SubmitPracticeAttemptUseCase {
     public SubmitPracticeAttemptUseCase(LearnerLock lock, PracticeAccess access, LearningContentClient content,
                                         PracticeAttemptRepository attempts, ReviewItemRepository reviews,
                                         KnowledgeEvidenceRepository evidence, LessonCompletion lessonCompletion,
-                                        WritingSubmissionRepository essays) {
+                                        WritingSubmissionRepository essays, ReviewMaterial material) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -60,6 +62,7 @@ public class SubmitPracticeAttemptUseCase {
         this.evidence = evidence;
         this.lessonCompletion = lessonCompletion;
         this.essays = essays;
+        this.material = material;
     }
 
     @Transactional
@@ -101,9 +104,10 @@ public class SubmitPracticeAttemptUseCase {
             for (var item : outcomes) kps.addAll(item.knowledgePointIds());
             Set<UUID> excluded = new HashSet<>(revealed);
             excluded.add(attempt.packageId());
+            // A review never uses a set of the lesson, so only sets outside it count as material for a review.
             Map<UUID, Integer> availability = kps.isEmpty() ? Map.of() : content.practiceSetAvailability(
                     kps.stream().sorted(Comparator.comparing(UUID::toString)).toList(),
-                    excluded.stream().sorted(Comparator.comparing(UUID::toString)).toList(), MIN_SET_QUESTIONS);
+                    material.excluding(attempt.lessonId(), excluded), MIN_SET_QUESTIONS);
             Set<UUID> pending = new HashSet<>();
             reviews.findPending(userId).forEach(review -> pending.add(review.knowledgePointId()));
             var needs = reviewNeeds(graded, outcomes, outcomesBySkill, pending, availability);

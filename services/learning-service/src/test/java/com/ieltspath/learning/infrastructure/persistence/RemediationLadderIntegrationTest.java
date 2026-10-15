@@ -5,6 +5,7 @@ import com.ieltspath.learning.application.command.SubmitReviewCommand;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.*;
+import com.ieltspath.learning.application.result.LessonPracticeSetsResult;
 import com.ieltspath.learning.application.usecase.*;
 import com.ieltspath.learning.domain.vo.PracticeStatus;
 import com.ieltspath.learning.domain.vo.LearningSkill;
@@ -64,6 +65,8 @@ class RemediationLadderIntegrationTest {
     private final UUID kpA = UUID.randomUUID();
     private final UUID kpB = UUID.randomUUID();
     private final Map<UUID, PackageVersion> versions = new LinkedHashMap<>();
+    /** The sets bound to the lesson; the rest of {@link #versions} is review-only material. */
+    private final Set<UUID> lessonPackages = new HashSet<>();
 
     @BeforeEach
     void stubContent() {
@@ -76,15 +79,27 @@ class RemediationLadderIntegrationTest {
         when(content.getLesson(lesson)).thenReturn(new Lesson(lesson, topic, "L1", "Lesson", null,
                 "Theory of the lesson", 1, List.of(kpA, kpB), LearningSkill.READING));
         when(content.lessonPracticeSets(lesson)).thenAnswer(invocation -> versions.values().stream()
+                .filter(version -> lessonPackages.contains(version.packageId()))
                 .map(version -> new LessonPracticeSet(version.packageId(), version.packageVersionId(), "PS",
                         "Practice", 2, List.of(), null)).toList());
         when(content.topicPracticeSets(topic)).thenAnswer(invocation -> new TopicPracticeSets(List.of(
                 new TopicPracticeSets.LessonSets(lesson, content.lessonPracticeSets(lesson)))));
         when(content.getPackageVersion(any())).thenAnswer(invocation -> versions.get(invocation.<UUID>getArgument(0)));
-        when(content.practiceSetAvailability(anyList(), anyList(), eq(3))).thenReturn(Map.of(kpA, 2, kpB, 2));
-        when(content.searchPracticeSets(any(), anyList(), eq(3), eq(1), any())).thenAnswer(invocation -> {
+        when(content.practiceSetAvailability(anyList(), anyList(), eq(3))).thenAnswer(invocation -> {
+            List<UUID> kps = invocation.getArgument(0);
             List<UUID> excluded = invocation.getArgument(1);
-            return versions.values().stream().filter(version -> !excluded.contains(version.packageId())).limit(1)
+            Map<UUID, Integer> available = new HashMap<>();
+            for (UUID kp : kps) {
+                available.put(kp, (int) versions.values().stream()
+                        .filter(version -> !excluded.contains(version.packageId()) && covers(version, kp)).count());
+            }
+            return available;
+        });
+        when(content.searchPracticeSets(any(), anyList(), eq(3), eq(1), any())).thenAnswer(invocation -> {
+            UUID kp = invocation.getArgument(0);
+            List<UUID> excluded = invocation.getArgument(1);
+            return versions.values().stream()
+                    .filter(version -> !excluded.contains(version.packageId()) && covers(version, kp)).limit(1)
                     .map(version -> new PracticeSet(version.packageId(), version.packageVersionId(), "PS", 2, 2))
                     .toList();
         });
@@ -94,8 +109,9 @@ class RemediationLadderIntegrationTest {
     void failedReviewSetsLeadToTheoryOnceThenNewSetsUntilNoneIsLeftToSkip() {
         UUID user = UUID.randomUUID();
         PackageVersion first = practiceSet(kpA, kpA);
-        PackageVersion second = practiceSet(kpA, kpA);
-        PackageVersion third = practiceSet(kpA, kpA);
+        PackageVersion other = practiceSet(kpA, kpA);
+        PackageVersion second = reviewSet(kpA, kpA);
+        PackageVersion third = reviewSet(kpA, kpA);
         topics.execute(user);
 
         var attempt = start.execute(user, lesson, first.packageId());
@@ -156,19 +172,148 @@ class RemediationLadderIntegrationTest {
         // Only when no unrevealed package is left does the review let the learner continue.
         var last = getReview.execute(user, reviewId);
         assertEquals("SKIPPED", last.reviewStatus());
-        // Finishing the last review passes the Practice, which completes the lesson.
-        assertEquals(PracticeStatus.PASSED, practiceSets.execute(user, lesson).practiceStatus());
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM lesson_progress WHERE user_id = ? "
-                + "AND lesson_id = ? AND completed_at IS NOT NULL", Integer.class, user, lesson));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING'",
                 Integer.class, user));
+        // The review used only review-only sets; the lesson's other required set is still to practise.
+        assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(user, lesson).practiceStatus());
+        assertFalse(lessonCompleted(user));
+        var again = start.execute(user, lesson, other.packageId());
+        var otherResult = practice.execute(user, again.attemptId(), answers(items(other), "A", "A"));
+        assertTrue(otherResult.countedAsEvidence());
+        // Finishing the last required set passes the Practice, which completes the lesson.
+        assertEquals(PracticeStatus.PASSED, practiceSets.execute(user, lesson).practiceStatus());
+        assertTrue(lessonCompleted(user));
+    }
+
+    @Test
+    void aReviewNeverUsesASetOfItsLesson() {
+        UUID user = UUID.randomUUID();
+        PackageVersion first = practiceSet(kpA, kpA);
+        PackageVersion other = practiceSet(kpA, kpA);
+        PackageVersion spare = reviewSet(kpA, kpA);
+        topics.execute(user);
+
+        var attempt = start.execute(user, lesson, first.packageId());
+        var submitted = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "B"));
+        UUID reviewId = submitted.reviewsCreated().getFirst().reviewId();
+        var withSet = getReview.execute(user, reviewId);
+        assertEquals(spare.packageId(), withSet.set().packageId());
+        var passed = submitReview.execute(user, reviewId, new SubmitReviewCommand(withSet.set().reviewSetId(),
+                UUID.randomUUID(), answers(items(spare), "A", "A").answers()));
+        assertEquals("DONE", passed.reviewStatus());
+
+        // The learner has not practised the lesson's other set, and the review did not touch it.
+        assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(user, lesson).practiceStatus());
+        assertFalse(lessonCompleted(user));
+        var otherAttempt = start.execute(user, lesson, other.packageId());
+        var otherResult = practice.execute(user, otherAttempt.attemptId(), answers(items(other), "A", "A"));
+        assertTrue(otherResult.countedAsEvidence());
+        assertEquals(PracticeStatus.PASSED, practiceSets.execute(user, lesson).practiceStatus());
+        assertTrue(lessonCompleted(user));
+    }
+
+    @Test
+    void aFailedFirstSetIsNotPractisedAgainOnceItsReviewIsDone() {
+        UUID user = UUID.randomUUID();
+        PackageVersion first = practiceSet(kpA, kpA, kpA, kpA);
+        PackageVersion other = practiceSet(kpA, kpA);
+        PackageVersion spare = reviewSet(kpA, kpA);
+        topics.execute(user);
+
+        // Practice 1 is failed outright, so the review it creates opens at the theory.
+        var attempt = start.execute(user, lesson, first.packageId());
+        var failedFirst = practice.execute(user, attempt.attemptId(), answers(items(first), "B", "B", "B", "B"));
+        assertFalse(failedFirst.passed());
+        assertEquals(1, failedFirst.reviewsCreated().size());
+        assertEquals("THEORY", failedFirst.reviewsCreated().getFirst().stage());
+        UUID reviewId = failedFirst.reviewsCreated().getFirst().reviewId();
+        assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(user, lesson).practiceStatus());
+
+        theoryCheck.execute(user, reviewId, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
+        var withSet = getReview.execute(user, reviewId);
+        assertEquals(spare.packageId(), withSet.set().packageId());
+        var done = submitReview.execute(user, reviewId, new SubmitReviewCommand(withSet.set().reviewSetId(),
+                UUID.randomUUID(), answers(items(spare), "A", "A").answers()));
+        assertEquals("DONE", done.reviewStatus());
+
+        // Practice 1 stays as it was: attempted, never required again. Only the lesson's other set is left.
+        var afterReview = practiceSets.execute(user, lesson);
+        assertEquals(PracticeStatus.REQUIRED, afterReview.practiceStatus());
+        assertEquals("ATTEMPTED", status(afterReview, first));
+        assertEquals("AVAILABLE", status(afterReview, other));
+        assertFalse(lessonCompleted(user));
+
+        var otherAttempt = start.execute(user, lesson, other.packageId());
+        practice.execute(user, otherAttempt.attemptId(), answers(items(other), "A", "A"));
+        var finished = practiceSets.execute(user, lesson);
+        assertEquals(PracticeStatus.PASSED, finished.practiceStatus());
+        assertEquals("REVIEW_FINISHED", finished.practicePassReason().name());
+        assertTrue(lessonCompleted(user));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM practice_attempts WHERE user_id = ? AND package_id = ?",
+                Integer.class, user, first.packageId()));
+    }
+
+    private static String status(LessonPracticeSetsResult result, PackageVersion set) {
+        return result.items().stream().filter(item -> item.packageId().equals(set.packageId())).findFirst()
+                .orElseThrow().status();
+    }
+
+    @Test
+    void failingTheLessonsOtherSetAfterAReviewStillCountsAndStartsAReviewWhileMaterialRemains() {
+        UUID user = UUID.randomUUID();
+        PackageVersion first = practiceSet(kpA, kpA);
+        PackageVersion other = practiceSet(kpA, kpA);
+        PackageVersion spareOne = reviewSet(kpA, kpA);
+        reviewSet(kpA, kpA);
+        topics.execute(user);
+
+        var attempt = start.execute(user, lesson, first.packageId());
+        UUID reviewId = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "B"))
+                .reviewsCreated().getFirst().reviewId();
+        var withSet = getReview.execute(user, reviewId);
+        assertEquals(spareOne.packageId(), withSet.set().packageId());
+        submitReview.execute(user, reviewId, new SubmitReviewCommand(withSet.set().reviewSetId(), UUID.randomUUID(),
+                answers(items(spareOne), "A", "A").answers()));
+
+        // The lesson's other set was never shown by a review, so it counts, and a review-only set is left.
+        var otherAttempt = start.execute(user, lesson, other.packageId());
+        var failed = practice.execute(user, otherAttempt.attemptId(), answers(items(other), "A", "B"));
+        assertTrue(failed.countedAsEvidence());
+        assertEquals(1, failed.reviewsCreated().size());
+    }
+
+    @Test
+    void noReviewIsCreatedWhenEveryReviewOnlySetWasSeen() {
+        UUID user = UUID.randomUUID();
+        PackageVersion first = practiceSet(kpA, kpA);
+        PackageVersion other = practiceSet(kpA, kpA);
+        PackageVersion spare = reviewSet(kpA, kpA);
+        topics.execute(user);
+
+        var attempt = start.execute(user, lesson, first.packageId());
+        UUID reviewId = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "B"))
+                .reviewsCreated().getFirst().reviewId();
+        var withSet = getReview.execute(user, reviewId);
+        submitReview.execute(user, reviewId, new SubmitReviewCommand(withSet.set().reviewSetId(), UUID.randomUUID(),
+                answers(items(spare), "A", "A").answers()));
+
+        // The only review-only set was shown, so there is nothing left to review with: the failure still counts.
+        var otherAttempt = start.execute(user, lesson, other.packageId());
+        var failed = practice.execute(user, otherAttempt.attemptId(), answers(items(other), "A", "B"));
+        assertTrue(failed.countedAsEvidence());
+        assertTrue(failed.reviewsCreated().isEmpty());
+    }
+
+    private boolean lessonCompleted(UUID user) {
+        return jdbc.queryForObject("SELECT count(*) FROM lesson_progress WHERE user_id = ? AND lesson_id = ? "
+                + "AND completed_at IS NOT NULL", Integer.class, user, lesson) == 1;
     }
 
     @Test
     void newReviewsStartWithTheoryOnlyForLowScores() {
         UUID user = UUID.randomUUID();
         PackageVersion mixed = practiceSet(kpA, kpA, kpB, kpB);
-        practiceSet(kpA, kpB);
+        reviewSet(kpA, kpB);
         topics.execute(user);
 
         // kpA is half right, kpB is all wrong: only the low score starts a review at the theory.
@@ -196,7 +341,15 @@ class RemediationLadderIntegrationTest {
         assertNotNull(opened.set());
     }
 
+    /** A set bound to the lesson: practice the learner must do. */
     private PackageVersion practiceSet(UUID... kps) {
+        PackageVersion version = reviewSet(kps);
+        lessonPackages.add(version.packageId());
+        return version;
+    }
+
+    /** A set outside the lesson: material for reviews only. */
+    private PackageVersion reviewSet(UUID... kps) {
         UUID packageId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
         List<Item> items = new ArrayList<>();
@@ -209,6 +362,12 @@ class RemediationLadderIntegrationTest {
                 List.of(new Section(UUID.randomUUID(), "Practice", "READING", null, 1, "Passage", items)));
         versions.put(versionId, version);
         return version;
+    }
+
+    private static boolean covers(PackageVersion version, UUID kp) {
+        return version.sections().stream().flatMap(section -> section.items().stream())
+                .anyMatch(item -> item.knowledgePointMappings().stream()
+                        .anyMatch(mapping -> mapping.knowledgePointId().equals(kp)));
     }
 
     private static List<Option> options() {
