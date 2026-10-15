@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Domain statistics APIs"
-status: pending
+status: in_progress
 effort: ""
 dependencies: []
 ---
@@ -11,6 +11,8 @@ dependencies: []
 ## Overview
 
 Nguồn chuẩn: [thiết kế §2.2–2.5 và §4](./dashboard-statistics-design.md). Có thể triển khai song song phase 1 sau khi chốt quy ước scope/availability. Ba nhóm code dưới đây có owner riêng, không sửa cùng migration/config.
+
+Cập nhật 15/10/2026: API và luồng ghi đã triển khai; migration/query đã chạy PostgreSQL Testcontainers trong kiểm thử độc lập. Lượt kiểm chứng cuối sau sửa lỗi đang chạy. Band nhận `timezone` IANA tùy chọn (mặc định `Asia/Ho_Chi_Minh`), lọc từ đầu ngày `from` tới trước đầu ngày `to + 1` trong timezone đó; `dataFrom` dùng cùng timezone. FE gửi timezone trình duyệt.
 
 ## Requirements
 
@@ -67,13 +69,13 @@ Package path rút gọn trong một ô luôn nối với root Java service ở �
 
 ## Success Criteria
 
-- [ ] Completion retry không nhân đôi; multi-skill đúng; practice fail không giảm lesson completion.
+- [x] Completion retry không nhân đôi; multi-skill đúng; practice fail không giảm lesson completion.
 - [ ] Course chưa pass topic đầu nhưng đã học vẫn hiện; denominator lấy metadata đầy đủ và có revision.
-- [ ] Regrade không tăng attempts; fallback/unassessed không xuất hiện như measured.
-- [ ] Speaking thiếu không biến thành 0 và không tạo Overall đủ 4 kỹ năng giả.
+- [x] Regrade không tăng attempts; fallback/unassessed không xuất hiện như measured.
+- [x] Speaking thiếu không biến thành 0 và không tạo Overall đủ 4 kỹ năng giả.
 - [ ] Vocab 201 total/110 retained trả 54.7% theo precision policy; due là tập riêng.
-- [ ] Hai review đồng thời không vượt một level; replay trả đúng snapshot ban đầu.
-- [ ] User không đọc/ghi kết quả/session của user khác; static paths không bị bắt bởi `/{id}`.
+- [x] Hai review đồng thời không vượt một level; replay trả đúng snapshot ban đầu.
+- [x] User không đọc/ghi kết quả/session của user khác; static paths không bị bắt bởi `/{id}`.
 - [ ] Đủ producer và luồng ghi trước khi bật card; không seed mock để pass.
 
 ## Validation

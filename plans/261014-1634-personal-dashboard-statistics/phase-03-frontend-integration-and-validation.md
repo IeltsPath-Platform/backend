@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Frontend integration and validation"
-status: pending
+status: in_progress
 effort: ""
 dependencies: [1, 2]
 ---
@@ -11,6 +11,8 @@ dependencies: [1, 2]
 ## Overview
 
 Nguồn chuẩn: [thiết kế §5–6](./dashboard-statistics-design.md). Chỉ tab dữ liệu chi tiết và những luồng ghi cần thiết để có dữ liệu thật. Chưa đồng bộ toàn bộ dashboard tổng quan, shell navigation hoặc lớp học.
+
+Cập nhật 15/10/2026: FE đã tích hợp; lượt kiểm chứng cuối đã pass lint/typecheck/build, 4 test tính interval và 4 test reducer thống kê (0 fail/skip). Bộ test BE đầy đủ đang chạy. Browser/E2E, full-stack HTTP, nhiều tab, offline, logout, audio, keyboard và mobile chưa chạy; chưa nghiệm thu phase.
 
 ## Requirements
 
@@ -45,18 +47,18 @@ Hook gửi 4 request độc lập, lưu state theo resource/query key. Dùng Pro
 7. Nối refetch sau mutation/return-to-dashboard, abort khi unmount/range change, xóa state logout. Hook time không bật trong mock-learning hoặc mock standalone practice.
 8. Deep link query cho tab/filter nếu áp dụng; kiểm back/forward, keyboard, reduced motion, screen reader. Đồng bộ menu shell đầy đủ là việc khác, không tự kéo vào scope.
 9. Chạy BE checks đúng module, FE lint/typecheck/build và kịch bản end-to-end ở §6.2; ghi rõ Docker skip hoặc môi trường không phù hợp.
-10. Cập nhật contract/documentation tại vị trí team thống nhất; hiện BE docs/ thiếu nên phải chọn/khôi phục đường dẫn hợp lệ khi triển khai, không tạo link giả đến tài liệu không tồn tại.
+10. Cập nhật contract/documentation tại vị trí team thống nhất; tài liệu BE docs/ đã được khôi phục nguyên bản trước kiểm chứng cuối. Contract dashboard và giới hạn hiện tại được ghi trong bản thiết kế của plan; không sửa tài liệu vừa khôi phục như side effect.
 
 ## Success Criteria
 
 - [ ] Time week/month/course thực sự đổi dataset; 0/unknown/future khác nhau.
 - [ ] Radar và thanh skill cùng counts từ BE; không còn caption mastery/AI sai nghĩa.
-- [ ] Không còn Mentor hoặc AI Mentor trong tab chi tiết.
+- [x] Không còn Mentor hoặc AI Mentor trong tab chi tiết.
 - [ ] Band delta/nguồn/range đúng; target là mục tiêu, không lời hứa dự báo.
 - [ ] Vocab counts/percentage/CTA khớp trạng thái sau review thật.
 - [ ] Course đang học lesson đầu hiển thị dù chưa pass topic.
-- [ ] Một service lỗi chỉ lỗi card của service đó; retry không kéo theo 3 nhóm còn lại.
-- [ ] Session/logout/filter race không rò dữ liệu account/range trước.
+- [x] Một service lỗi chỉ lỗi card của service đó; retry không kéo theo 3 nhóm còn lại.
+- [x] Session/logout/filter race không rò dữ liệu account/range trước (đối chiếu key/guard trong code; browser logout chưa chạy).
 - [ ] Bàn phím, mobile, tooltip và bảng số accessible.
 
 ## Validation

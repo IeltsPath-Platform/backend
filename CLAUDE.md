@@ -1,6 +1,6 @@
 # CLAUDE.md — IELTSPath backend
 
-- Cập nhật lần cuối: 2026-10-07; dữ kiện đã kiểm với code sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
+- Cập nhật lần cuối: 2026-10-15 (bổ sung URL service khi user-service chạy trên host); dữ kiện kiến trúc đã kiểm ngày 2026-10-07 sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
 - Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
@@ -80,6 +80,7 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 
 ## 5. Cạm bẫy đã biết
 
+- Khi chạy user-service trên host, đặt `LEARNING_SERVICE_URL`, `ASSESSMENT_SERVICE_URL` và `LIBRARY_SERVICE_URL` trỏ tới localhost của service tương ứng; config-repo mặc định dùng tên service trong Docker.
 - `CONTENT_SERVICE_URL` của game-service trong config-repo mặc định `http://content-service:8082` (tên trong Docker) và ghi
   đè default local → khi chạy game trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082`.
 - Game gọi library qua `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) cho `VOCABULARY`, gọi content qua

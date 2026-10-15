@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Study time collection"
-status: pending
+status: in_progress
 effort: ""
 dependencies: []
 ---
@@ -11,6 +11,8 @@ dependencies: []
 ## Overview
 
 Nguồn chuẩn: [thiết kế §2.1, §3.2, §4](./dashboard-statistics-design.md). Triển khai dữ liệu mới tại User và hook FE trên trang học thật. Không cộng duration client CRUD hiện tại vào thống kê chính thức.
+
+Cập nhật 15/10/2026: đã triển khai và chạy Testcontainers thật cho persistence/replay; lượt kiểm chứng cuối đang chạy. Browser nhiều tab, sleep/resume, offline, logout và media chưa chạy nên phase chưa hoàn tất. Assessment chưa lưu liên kết course/topic trong attempt; `StudyContext.courseId` vẫn null và thời gian thi chưa được phân bổ vào course.
 
 ## Requirements
 
@@ -53,11 +55,11 @@ Tận dụng Clock, validation/ErrorResponse và CurrentUserProvider hiện có.
 ## Success Criteria
 
 - [ ] 60 giây active trong một tab không thành 120 giây khi tab thứ hai mở cùng bài.
-- [ ] Mất ACK và gửi lại cùng payload không đổi daily total.
-- [ ] Request source/user/epoch sai bị từ chối trước ghi.
+- [x] Mất ACK và gửi lại cùng payload không đổi daily total.
+- [x] Request source/user/epoch sai bị từ chối trước ghi.
 - [ ] Qua ngày, goal đổi, hidden/idle/media đều đúng policy và có test.
-- [ ] Không backfill active time bằng attempt elapsed/audio duration.
-- [ ] Query có index user/date/scope, khoảng tối đa 366 ngày; không đọc findAll unbounded.
+- [x] Không backfill active time bằng attempt elapsed/audio duration.
+- [x] Query có index user/date/scope, khoảng tối đa 366 ngày; không đọc findAll unbounded.
 - [ ] Telemetry offline không làm mất bài nộp hoặc thay đổi gate.
 
 ## Validation

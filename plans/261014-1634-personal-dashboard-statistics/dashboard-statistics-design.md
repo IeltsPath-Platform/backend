@@ -1,6 +1,6 @@
-# Thiết kế thống kê dashboard cá nhân — BE và FE
+ # Thiết kế thống kê dashboard cá nhân — BE và FE
 
-> Nghiên cứu 14/10/2026. Phạm vi: màn hình P-11 “Dữ liệu chi tiết”. Đây là thiết kế đề xuất, không mô tả tính năng đã triển khai. Hai quyết định đã chốt: **tiến độ = hoàn thành bài học; bỏ Mentor**.
+> Nghiên cứu 14/10/2026; cập nhật contract và giới hạn triển khai 15/10/2026. Phạm vi: màn hình P-11 “Dữ liệu chi tiết”. Các phần đề xuất giữ lại bối cảnh thiết kế; trạng thái triển khai/kiểm chứng nằm trong plan và phase. Hai quyết định đã chốt: **tiến độ = hoàn thành bài học; bỏ Mentor**.
 
 ## Mục lục
 
@@ -85,6 +85,7 @@ Nguồn là **kết quả bài thi có đủ thông tin chấm**, không chuyể
 - Chỉ lấy result `COMPLETED`; chọn version COMPLETED mới nhất của mỗi attempt. Version mới đang chấm không xóa điểm hoàn tất trước đó, nhưng trả `regradePending=true`.
 - Mỗi điểm chứa attemptId/resultId/resultVersion, ngày nộp bài, ngày chấm, skill, band, loại đề, nguồn AUTO/AI/HUMAN, rubric/scoring version và chất lượng dữ liệu. `gradedAt` mới do chấm lại không trở thành một lần thi mới.
 - Trục thời gian dùng thời điểm nộp bài; chấm lại thay điểm của chính attempt tại vị trí cũ. Sắp ổn định bằng timestamp + attemptId.
+- Contract ngày lọc: `timezone` là tham số IANA tùy chọn, mặc định `Asia/Ho_Chi_Minh`; timezone không hợp lệ trả 400. Chuyển `from` và `to` thành khoảng UTC nửa mở `[from.atStartOfDay(timezone), to.plusDays(1).atStartOfDay(timezone))`. Như vậy tính cả ngày `to` tại địa phương, kể cả ngày đổi DST; không giả định mọi ngày dài 24 giờ. `dataFrom` chuyển từ timestamp sang ngày trong cùng timezone. FE gửi timezone trình duyệt cùng khoảng ngày band.
 - **Không nối tùy tiện** điểm QUIZ, topic gate, lesson Writing và full test vào một chuỗi band. API nhóm theo `seriesKind` và tiêu chuẩn đề; đề thiếu chuẩn scoring thì trả unavailable hoặc hiển thị điểm nội bộ bằng đơn vị riêng.
 - Đề xuất series mặc định: mock/full assessment có rubric được xác nhận. Placement có thể là điểm nền riêng, gắn nhãn “ước lượng placement”; không dùng band fallback hoặc Speaking chưa đo.
 - Overall chỉ xuất hiện khi 4 kỹ năng của **cùng một lần thi** có điểm đủ điều kiện. Không lấy Reading hôm nay, Writing tháng trước, Speaking mặc định để tính Overall. Công thức trung bình 4 kỹ năng và làm tròn nửa band theo IELTS chỉ là quy tắc tính, không biến điểm nội bộ thành chứng chỉ IELTS. [IELTS scoring](https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail)
@@ -170,6 +171,8 @@ Donut đề xuất ghi rõ **“Đã ghi nhớ”**; tiêu đề thẻ “Từ v
 
 **Giới hạn tin cậy:** client có thể giả tương tác; server chỉ giảm lỗi đo/đếm trùng và chặn vượt thời gian thực. Không dùng chỉ số này cho tiền, điểm thưởng, chứng nhận hoặc kết luận chống gian lận. Telemetry lỗi không làm nộp bài thất bại.
 
+**Giới hạn course của Assessment đã xác nhận:** `AssessmentAttempt`, JPA schema, `ContentPackageProvider` và `AttemptCreator` lưu `packageVersionId`, loại đề, câu hỏi và knowledge-point IDs, nhưng không lưu liên kết topic/course đủ tin cậy. Vì vậy `StudyContext.courseId` vẫn là null, kể cả topic/course test: thời gian hợp lệ vào tổng ALL nhưng chưa vào scope course. Không suy đoán course từ knowledge-point IDs hoặc dữ liệu client; không đọc database service khác, thêm schema hay đổi `AssessmentCompleted.v2` trong lượt sửa này. Muốn phân bổ theo course cần contract liên kết do owner xác nhận ở phạm vi riêng.
+
 ### 3.3. Sơ đồ trách nhiệm
 
 ```text
@@ -223,7 +226,7 @@ Tên bảng là đề xuất, số version Flyway chọn lúc triển khai sau k
 | POST `/api/users/me/study-sessions/{id}/close` | User | Close idempotent, last flush; hết hạn không tự nhận gap |
 | GET `/api/users/me/statistics/study-time` | User | `from,to,grain,courseId?`; bucket có actual/plan/status/timezone |
 | GET `/api/learning/statistics/progress` | Learning | Course scope, 4 skill counts/percent + preview 4 khóa; cursor khi xem tất cả |
-| GET `/api/assessments/me/statistics/bands` | Assessment | `from,to,seriesKind,skill?`; tối đa 100 điểm/lượt, cursor, latest/baseline/delta tính toàn khoảng |
+| GET `/api/assessments/me/statistics/bands` | Assessment | `from,to,seriesKind,skill?,timezone?`; timezone IANA mặc định `Asia/Ho_Chi_Minh`, khoảng ngày địa phương nửa mở như §2.3; tối đa 100 điểm/lượt, cursor, latest/baseline/delta tính toàn khoảng; `dataFrom` cùng timezone |
 | GET `/api/learning-support/flashcards/statistics/vocabulary` | Library | Các bucket ghi nhớ, total/retained/due/asOf; chỉ vocabulary-sense scope |
 | POST `/api/learning-support/flashcards/vocabulary-review-sessions` | Library | Giao queue hữu hạn, mặc định 20, tối đa 50 |
 | POST `/api/learning-support/flashcards/vocabulary-review-sessions/{id}/answers` | Library | Recall outcome, requestId, item/stateVersion; update atomic |
@@ -288,6 +291,7 @@ Các page dưới `features/practice` hoặc classroom còn có mock: chỉ bậ
 - Mỗi card: loading, ready, empty, unavailable, error; lỗi Library không che time/skill.
 - Khi filter đổi: hủy/ignore response cũ bằng key/request generation, không để tuần trước ghi đè tháng mới. Bỏ dữ liệu user cũ ngay logout/chuyển account.
 - FE không tự tính nghiệp vụ tiến độ/retained/band. FE có thể đổi seconds sang minutes, tính tọa độ SVG, format số và nhãn dựa trên counts/status BE.
+- Với band, FE gửi timezone trình duyệt cùng ngày lọc và hiển thị band/delta một chữ số thập phân. Tuần/tháng thời gian học vẫn được FE chọn theo ngày trình duyệt trong khi BE ghi theo timezone hồ sơ; đây là giới hạn còn lại, không được coi bản sửa band đã đồng bộ hai quy ước này.
 - SVG time chart có trục Y/đơn vị và số điểm đúng range; tooltip dùng số thật. Radar dùng cùng 4 counts với thanh progress; có bảng số đọc được bằng screen reader. Không tạo polygon giả cho skill null.
 - Khi quay lại dashboard hoặc mutation hoàn tất: refetch phần liên quan. Không polling toàn dashboard mỗi giây; chỉ polling chấm bài đang pending theo backoff có giới hạn, dừng khi hidden/unmount.
 - “Chi tiết”, “Ôn ngay”, “Xem tất cả” phải dẫn đến route có thật; khi luồng ôn chưa phát hành, show unavailable/disabled có lý do, không điều hướng sang mock để giả hoàn tất.
