@@ -14,6 +14,7 @@ import com.ieltspath.learning.application.service.WritingSubmissionViewAssembler
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.MasteryProfileUpdater;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
 import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
@@ -55,13 +56,16 @@ public class SubmitLessonEssayUseCase {
     private final TransactionTemplate transaction;
     private final WritingSubmissionViewAssembler view;
     private final QuestionEventLog questionEvents;
+    private final MasteryProfileUpdater masteryProfiles;
     private final Clock clock = Clock.systemUTC();
 
     public SubmitLessonEssayUseCase(LearningContentClient content, LessonAccess access, LearnerLock lock,
                                     KnowledgeEvidenceRepository evidence, WritingSubmissionRepository essays,
                                     EssaySubmissionFlow flow, PlatformTransactionManager transactionManager,
-                                    WritingSubmissionViewAssembler view, QuestionEventLog questionEvents) {
+                                    WritingSubmissionViewAssembler view, QuestionEventLog questionEvents,
+                                    MasteryProfileUpdater masteryProfiles) {
         this.questionEvents = questionEvents;
+        this.masteryProfiles = masteryProfiles;
         this.content = content;
         this.access = access;
         this.lock = lock;
@@ -166,6 +170,7 @@ public class SubmitLessonEssayUseCase {
                 }
             }
             evidence.append(submission.userId(), essayEvidence);
+            masteryProfiles.recordEvidence(submission.userId(), essayEvidence);
         }
         submission.markGraded(ledgerEntryId);
         essays.save(submission);

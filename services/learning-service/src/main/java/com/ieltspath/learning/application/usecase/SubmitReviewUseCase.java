@@ -18,6 +18,7 @@ import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.MasteryProfileUpdater;
 import com.ieltspath.learning.application.service.AnswerDurations;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
 import com.ieltspath.learning.domain.vo.QuestionEventSource;
@@ -54,13 +55,16 @@ public class SubmitReviewUseCase {
     private final ReviewSubmissionLog submissions;
     private final PracticeProgress practice;
     private final QuestionEventLog questionEvents;
+    private final MasteryProfileUpdater masteryProfiles;
     private final ItemGrading grading = new ItemGrading();
 
     public SubmitReviewUseCase(LearningContentClient content, LearnerLock lock, KnowledgeEvidenceRepository evidence,
                                ReviewItemRepository reviews, PracticeAttemptRepository attempts,
                                ReviewSubmissionLog submissions,
-                               PracticeProgress practice, QuestionEventLog questionEvents) {
+                               PracticeProgress practice, QuestionEventLog questionEvents,
+                               MasteryProfileUpdater masteryProfiles) {
         this.questionEvents = questionEvents;
+        this.masteryProfiles = masteryProfiles;
         this.content = content;
         this.lock = lock;
         this.evidence = evidence;
@@ -122,6 +126,7 @@ public class SubmitReviewUseCase {
         }
         questionEvents.append(setEvents);
         evidence.append(userId, setAnswers);
+        masteryProfiles.recordEvidence(userId, setAnswers);
 
         ReviewStatus status = review.recordSetResult(set.id(), command.requestId(), graded.correct(), graded.total());
         Section first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);

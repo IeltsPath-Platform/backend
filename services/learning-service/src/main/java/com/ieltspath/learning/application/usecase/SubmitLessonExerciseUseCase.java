@@ -17,6 +17,7 @@ import com.ieltspath.learning.application.service.TopicCompletion;
 import com.ieltspath.learning.domain.aggregate.LessonProgress;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.MasteryProfileUpdater;
 import com.ieltspath.learning.application.service.AnswerDurations;
 import com.ieltspath.learning.domain.service.ErrorTagger;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
@@ -52,6 +53,7 @@ public class SubmitLessonExerciseUseCase {
     private final TopicCompletion topicCompletion;
     private final LessonViewAssembler view;
     private final QuestionEventLog questionEvents;
+    private final MasteryProfileUpdater masteryProfiles;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
     private final ErrorTagger errorTagger = new ErrorTagger();
     private final Clock clock = Clock.systemUTC();
@@ -59,7 +61,8 @@ public class SubmitLessonExerciseUseCase {
     public SubmitLessonExerciseUseCase(LearnerLock lock, LessonAccess access, ExerciseSubmissionLog submissions,
                                        KnowledgeEvidenceRepository evidence, LessonProgressRepository lessons,
                                        PracticeProgress practice, LessonViewAssembler view,
-                                       TopicCompletion topicCompletion, QuestionEventLog questionEvents) {
+                                       TopicCompletion topicCompletion, QuestionEventLog questionEvents,
+                                       MasteryProfileUpdater masteryProfiles) {
         this.lock = lock;
         this.access = access;
         this.submissions = submissions;
@@ -69,6 +72,7 @@ public class SubmitLessonExerciseUseCase {
         this.view = view;
         this.topicCompletion = topicCompletion;
         this.questionEvents = questionEvents;
+        this.masteryProfiles = masteryProfiles;
     }
 
     @Transactional
@@ -138,6 +142,7 @@ public class SubmitLessonExerciseUseCase {
                 }
             }
             evidence.append(userId, firstAnswers);
+            masteryProfiles.recordEvidence(userId, firstAnswers);
         }
         // Essay blocks never gate completion: a learner without points can still finish every lesson.
         boolean lessonCompleted = LessonAccess.completed(context.progress()) || lesson.blocks().stream()

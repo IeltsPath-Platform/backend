@@ -4,6 +4,7 @@ import com.ieltspath.learning.application.command.SubmitExerciseCommand;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.MasteryProfileUpdater;
 import com.ieltspath.learning.application.service.AnswerDurations;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
 import com.ieltspath.learning.domain.vo.QuestionEventSource;
@@ -51,6 +52,7 @@ public class SubmitPracticeAttemptUseCase {
     private final PracticeProgress progress;
     private final FirstAttemptMistakes mistakes;
     private final QuestionEventLog questionEvents;
+    private final MasteryProfileUpdater masteryProfiles;
     private final ItemGrading grading = new ItemGrading();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final Clock clock = Clock.systemUTC();
@@ -59,7 +61,7 @@ public class SubmitPracticeAttemptUseCase {
                                         PracticeAttemptRepository attempts, ReviewItemRepository reviews,
                                         KnowledgeEvidenceRepository evidence, PracticeProgress progress,
                                         FirstAttemptMistakes mistakes, WritingSubmissionRepository essays,
-                                        QuestionEventLog questionEvents) {
+                                        QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -70,6 +72,7 @@ public class SubmitPracticeAttemptUseCase {
         this.mistakes = mistakes;
         this.essays = essays;
         this.questionEvents = questionEvents;
+        this.masteryProfiles = masteryProfiles;
     }
 
     @Transactional
@@ -146,6 +149,7 @@ public class SubmitPracticeAttemptUseCase {
         attempts.saveResult(attempt);
         questionEvents.append(events);
         evidence.append(userId, firstAnswers);
+        masteryProfiles.recordEvidence(userId, firstAnswers);
         reviews.insertPracticePending(userId, candidates);
         progress.refreshPassForLesson(userId, attempt.lessonId());
         return response;

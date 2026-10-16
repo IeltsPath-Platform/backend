@@ -45,7 +45,18 @@ learning:
     daily-grading-limit: ${LEARNING_WRITING_DAILY_GRADING_LIMIT:10}
     quota-timezone: Asia/Ho_Chi_Minh
     grading-timeout-seconds: 20
+  # Older name of mastery.priority-below; it is the default for that key.
   review-mastery-threshold: 0.6
+  # Default mastery tiers and review schedule. Admin overrides win (PUT /api/learning/admin/rule-configs). The review
+  # schedule is a convention, not tuned against learner data.
+  mastery:
+    priority-below: ${learning.review-mastery-threshold}
+    maintain-from: 0.8
+    # A maintained point is reviewed after review-intervals-days[success streak] days, capped at the last entry.
+    review-intervals-days: 7,14,30,45,60
+    consolidate-days: 3
+    # Fill profiles for evidence that predates them after startup; idempotent.
+    backfill-on-startup: true
   messaging:
     # AssessmentCompleted.v2 consumer: delay before a failed event is retried, and attempts before the DLQ.
     retry-delay-ms: ${LEARNING_RETRY_DELAY_MS:30000}

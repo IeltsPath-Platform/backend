@@ -9,7 +9,6 @@ import com.ieltspath.learning.domain.service.MasteryCalculator;
 import com.ieltspath.learning.domain.service.ReviewRule;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.PendingReview;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -22,20 +21,22 @@ public class ReviewReevaluation {
     private final LearnerCurriculumRepository curricula;
     private final LessonProgressRepository lessons;
     private final ReviewItemRepository reviews;
-    private final ReviewRule rule;
+    private final MasteryRulesProvider rules;
     private final MasteryCalculator masteryCalculator = new MasteryCalculator();
 
     public ReviewReevaluation(KnowledgeEvidenceRepository evidence, LearnerCurriculumRepository curricula,
                               LessonProgressRepository lessons, ReviewItemRepository reviews,
-                              @Value("${learning.review-mastery-threshold:0.6}") double threshold) {
+                              MasteryRulesProvider rules) {
         this.evidence = evidence;
         this.curricula = curricula;
         this.lessons = lessons;
         this.reviews = reviews;
-        this.rule = new ReviewRule(threshold);
+        this.rules = rules;
     }
 
     public void execute(UUID userId, Set<UUID> consideredKps, Set<UUID> wrongKps) {
+        // A blocking review is created below the priority threshold, which Admin can change.
+        ReviewRule rule = new ReviewRule(rules.current().priorityBelow());
         Map<UUID, Double> mastery = new HashMap<>();
         Set<UUID> practiceKps = new HashSet<>();
         Map<UUID, LearningSkill> kpSkills = new HashMap<>();

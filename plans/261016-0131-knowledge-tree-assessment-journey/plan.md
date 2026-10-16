@@ -102,12 +102,12 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 | 3a | [Error taxonomy: bảng, CRUD, ErrorTagger, ghi error analysis](./phase-03-content-error-taxonomy.md) | content, learning, assessment | Completed (a140b8c) |
 | 3b | [Duyệt mã lỗi chính thức và gắn distractors cho câu](./phase-03-content-error-taxonomy.md) | content | Completed (V35, V36; quyết định Q1–Q4 đã chốt) |
 | 4 | [Event log từng câu và thời gian làm](./phase-04-question-event-log-and-duration.md) | learning, assessment | Completed |
-| 5 | [Mastery profile 3 mức, hạn ôn, API báo cáo](./phase-05-mastery-profile-and-report.md) | learning | Pending |
+| 5 | [Mastery profile 3 mức, hạn ôn, API báo cáo](./phase-05-mastery-profile-and-report.md) | learning | Completed |
 | 6 | [Giỏ ôn nhiều mức và recheck](./phase-06-review-tiers-and-recheck.md) | learning | Pending |
 | 7 | [Chẩn đoán dò ngược theo cây](./phase-07-diagnostic-backtracking.md) | learning | Pending |
 | 8 | [Practice test theo mốc course](./phase-08-practice-test-milestones.md) | content, assessment, learning | Completed (933 test của ba service xanh, không skip; xem báo cáo) |
 | 9 | [Điểm có trọng số và kết quả khóa](./phase-09-course-scoring-and-outcome.md) | learning | Pending |
-| 10 | [Hàng chờ giám khảo và chính sách AI](./phase-10-examiner-queue-and-ai-policy.md) | assessment | Pending |
+| 10 | [Hàng chờ giám khảo và chính sách AI](./phase-10-examiner-queue-and-ai-policy.md) | assessment | Completed (80123b5) |
 | 11 | [Rubric dạng dữ liệu và bộ test nghiệm thu AI](./phase-11-rubric-data-and-ai-evaluation.md) | content, assessment, learning | Pending |
 | 12 | [Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor](./phase-12-admin-area-backend.md) | learning, assessment, access | Pending |
 | 13 | [Contract, tài liệu và nghiệm thu](./phase-13-contracts-docs-and-verification.md) | docs | Pending |
@@ -118,14 +118,17 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 
 | Người | Phase | File chạm tới | Migration được dùng |
 |---|---|---|---|
-| Claude | 4 (event log) | learning: `SubmitExerciseCommand`, use case nộp bài, `QuestionEventLog` (mới), `AssessmentCompletedParser`; assessment: `SaveAttemptResponseRequest`, use case lưu câu trả lời, `AutoGradeAttemptService`, `AssessmentCompletedEventFactory`, `AssessmentCompletedV2` | learning V11, assessment V8 |
-| Codex | 8 (practice test theo mốc) | content: mốc, API admin, API nội bộ, `JdbcLearningContentReader`; learning: giao đề, `PracticeTestAssignment`, `ApplyAssessmentResultUseCase`, `LearningContentClient`; assessment: `AttemptType` | content **V38** (không dùng V32), learning **V12** (không dùng V15) |
+| Claude | 5 (mastery profile, báo cáo) | learning: `MasteryProfile*`, `MasteryRulesProvider`, `ReviewReevaluation`, các use case nộp bài và `ApplyAssessmentResultUseCase` (gọi cập nhật profile), `ReportController`, `RuleConfigController`, `QuestionEventLog` (thêm hàm đọc), `KnowledgeEvidenceRepository` | learning **V13** (plan cũ ghi V12, đã bị phase 8 dùng) |
+| Codex | 10 (hàng chờ giám khảo, chính sách AI) | assessment: `GateResultAssembler`, `GradeGateEssayJobUseCase`, `GateEssayJobStore`, `GradingJobController`, use case hàng chờ; `docs/ai-policy.md` | assessment **V9** |
+
+Đã xong: phase 4 (Claude, commit `85ad593`), phase 8 (Codex, commit `e710f11`), phase 10 (Codex, commit `80123b5`) và
+phase 5 (Claude).
 
 Quy tắc để không đè nhau trên cùng nhánh:
 1. Mỗi bên chỉ sửa file trong cột của mình. Nếu cần sửa file của bên kia, dừng và hỏi.
 2. Commit bằng đường dẫn cụ thể (`git add <file>`), không dùng `git add -A`.
 3. Chỉ một Maven build chạy tại một thời điểm, vì `target/` dùng chung. Codex chạy xong thì báo, Claude mới build.
-4. Phase 10 (hàng chờ giám khảo) và phase 6/7 chưa giao, sẽ bàn sau khi phase 4 và 8 xong.
+4. Phase 9 chờ phase 5 xong (cùng sửa `ApplyAssessmentResultUseCase`, `TopicStatusDeriver`). Phase 6/7 chờ plan 261009.
 
 ## Thứ tự và phụ thuộc
 

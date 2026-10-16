@@ -98,7 +98,7 @@ class LessonWritingIntegrationTest {
         jdbc.execute("""
                 TRUNCATE review_theory_checks, review_sets, review_items, lesson_exercise_submissions, kp_evidence, lesson_progress,
                 topic_progress, knowledge_point_catalog, topic_test_assignments, assessment_result_versions,
-                lesson_writing_submissions, llm_daily_usage RESTART IDENTITY
+                lesson_writing_submissions, llm_daily_usage, kp_mastery_profiles RESTART IDENTITY
                 """);
         reset(content, access, llm);
         when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
@@ -218,6 +218,8 @@ class LessonWritingIntegrationTest {
         assertEquals(ledger, jdbc.queryForObject("SELECT debit_ledger_entry_id FROM lesson_writing_submissions",
                 UUID.class));
         assertEquals(1, count("kp_evidence WHERE source = 'lesson_writing'"));
+        // The essay evidence also reached the knowledge point's mastery profile.
+        assertEquals(1, count("kp_mastery_profiles"));
     }
 
     @Test

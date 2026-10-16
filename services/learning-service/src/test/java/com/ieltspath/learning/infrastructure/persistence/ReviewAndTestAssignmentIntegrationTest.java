@@ -100,7 +100,7 @@ class ReviewAndTestAssignmentIntegrationTest {
                 TRUNCATE review_theory_checks, review_sets, review_items, practice_attempts, lesson_practice_passes,
                 lesson_exercise_submissions, kp_evidence,
                 lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments,
-                assessment_result_versions RESTART IDENTITY
+                assessment_result_versions, kp_mastery_profiles RESTART IDENTITY
                 """);
         when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "LISTEN", "Listening", 920, null,
                 List.of(new KnowledgePoint(KP, "LS_NUM", "Numbers", "PROCEDURE", "LISTENING", "d", true)),
@@ -195,6 +195,12 @@ class ReviewAndTestAssignmentIntegrationTest {
         assertNull(getReviewUseCase.execute(USER, review).set());
         assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'review_set'",
                 Integer.class));
+        // Every knowledge point that received evidence has a mastery profile.
+        int profiled = jdbc.queryForObject("SELECT count(*) FROM kp_mastery_profiles WHERE user_id = ?",
+                Integer.class, USER);
+        assertTrue(profiled > 0);
+        assertEquals(jdbc.queryForObject("SELECT count(DISTINCT kp_id) FROM kp_evidence WHERE user_id = ?",
+                Integer.class, USER), profiled);
         // A skipped review no longer gates lessons.
         assertDoesNotThrow(() -> getLessonUseCase.execute(USER, LESSON));
     }

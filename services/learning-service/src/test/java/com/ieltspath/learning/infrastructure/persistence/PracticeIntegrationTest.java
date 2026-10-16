@@ -125,6 +125,12 @@ class PracticeIntegrationTest {
         assertTrue(passed.countedAsEvidence());
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source='practice_set'",
                 Integer.class));
+        // Every knowledge point that received evidence has a mastery profile.
+        int profiled = jdbc.queryForObject("SELECT count(*) FROM kp_mastery_profiles WHERE user_id = ?",
+                Integer.class, user);
+        assertTrue(profiled > 0);
+        assertEquals(jdbc.queryForObject("SELECT count(DISTINCT kp_id) FROM kp_evidence WHERE user_id = ?",
+                Integer.class, user), profiled);
         assertEquals("PASSED", catalog.execute(user, firstLesson).practiceStatus().name());
         assertEquals(List.of(secondLesson), assertThrows(LearningRequestException.class,
                 () -> tests.execute(user, topic)).getLessonIds());

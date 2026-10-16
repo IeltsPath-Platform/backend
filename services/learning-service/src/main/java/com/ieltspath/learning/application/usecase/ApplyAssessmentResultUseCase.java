@@ -6,6 +6,7 @@ import com.ieltspath.learning.application.command.AssessmentResult.KnowledgePoin
 import com.ieltspath.learning.application.port.AssessmentResultLog;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.MasteryProfileUpdater;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
 import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
@@ -61,6 +62,7 @@ public class ApplyAssessmentResultUseCase {
     @org.springframework.beans.factory.annotation.Autowired
     private com.ieltspath.learning.domain.repository.PracticeTestAssignmentRepository practiceAssignments;
     private final QuestionEventLog questionEvents;
+    private final MasteryProfileUpdater masteryProfiles;
     private final Clock clock = Clock.systemUTC();
 
     public ApplyAssessmentResultUseCase(LearnerLock lock, KnowledgeEvidenceRepository evidence,
@@ -68,8 +70,9 @@ public class ApplyAssessmentResultUseCase {
                                         TopicTestAssignmentRepository assignments, ReviewReevaluation reviews,
                                         LearnerPlacementRepository placements, CourseProgressRepository courseProgress,
                                         CourseTestAssignmentRepository courseAssignments,
-                                        QuestionEventLog questionEvents) {
+                                        QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles) {
         this.questionEvents = questionEvents;
+        this.masteryProfiles = masteryProfiles;
         this.lock = lock;
         this.evidence = evidence;
         this.curricula = curricula;
@@ -91,8 +94,9 @@ public class ApplyAssessmentResultUseCase {
                     result.eventId(), result.attemptId(), result.resultVersion());
             return;
         }
+        Set<UUID> regradedKps = Set.of();
         if (applied.isPresent()) {
-            evidence.removeAssessmentEvidence(userId, result.attemptId());
+            regradedKps = evidence.removeAssessmentEvidence(userId, result.attemptId());
             questionEvents.removeAssessmentEvents(userId, result.attemptId());
         }
         results.recordVersion(userId, result.attemptId(), result.resultVersion());
@@ -125,6 +129,14 @@ public class ApplyAssessmentResultUseCase {
             }
         }
         evidence.append(userId, judged);
+        if (applied.isPresent()) {
+            // A regrade replaced earlier evidence, including points the new result no longer mentions.
+            Set<UUID> affected = new HashSet<>(regradedKps);
+            judged.forEach(item -> affected.add(item.knowledgePointId()));
+            masteryProfiles.rebuild(userId, affected);
+        } else {
+            masteryProfiles.recordEvidence(userId, judged);
+        }
         if ("OFFICIAL_PRACTICE".equals(result.assessmentType())) {
             if (applied.isEmpty()) applyPracticeTest(result);
             // Until review tiers exist, practice evidence must not create a blocking review.

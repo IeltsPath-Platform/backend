@@ -1,8 +1,12 @@
 package com.ieltspath.learning.application.port;
 
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
+import com.ieltspath.learning.domain.vo.QuestionEventSource;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -14,4 +18,25 @@ public interface QuestionEventLog {
 
     /** Removes the assessment events of one attempt, before a regraded result writes its own. */
     void removeAssessmentEvents(UUID userId, UUID attemptId);
+
+    /**
+     * Time and error statistics per knowledge point from the events since {@code since}. A point without events is
+     * absent. The median ignores events without a reported duration.
+     */
+    Map<UUID, EventStats> statsByKnowledgePoint(UUID userId, Collection<UUID> knowledgePointIds, Instant since);
+
+    /** The latest {@code perPoint} events of each point, newest first. */
+    Map<UUID, List<RecentEvent>> recentByKnowledgePoint(UUID userId, Collection<UUID> knowledgePointIds, int perPoint);
+
+    /** {@code errors} are the most frequent error codes first, at most three. */
+    record EventStats(Long medianDurationMs, List<ErrorCount> errors) {
+        public EventStats {
+            errors = List.copyOf(errors);
+        }
+    }
+
+    record ErrorCount(String code, int count) {}
+
+    record RecentEvent(UUID questionVersionId, Boolean correct, Long durationMs, QuestionEventSource source,
+                       String errorCode, Instant at) {}
 }

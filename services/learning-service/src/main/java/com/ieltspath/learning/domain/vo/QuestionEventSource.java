@@ -18,4 +18,11 @@ public enum QuestionEventSource {
     public String value() {
         return value;
     }
+
+    public static QuestionEventSource fromValue(String stored) {
+        for (QuestionEventSource source : values()) {
+            if (source.value.equals(stored)) return source;
+        }
+        throw new IllegalArgumentException("Unknown question event source: " + stored);
+    }
 }
