@@ -23,7 +23,7 @@ import java.util.UUID;
 
 /**
  * Grader lifecycle of a result version: open (or regrade) → save details → finalize. Finalizing emits
- * AssessmentCompleted.v2 through the outbox. Any EXAMINER can grade any result; there is no assignment model yet.
+ * AssessmentCompleted.v2 through the outbox. Queued essays require the assigned examiner.
  */
 @RestController
 @RequestMapping("/api/assessments/grading")

@@ -237,6 +237,6 @@ class SaveAssessmentResultDetailsUseCaseTest {
 
     private SaveAssessmentResultDetailsUseCase useCase() {
         return new SaveAssessmentResultDetailsUseCase(attempts, results, attemptItems, skills, items, errors,
-                knowledgeSnapshot, judgments, errorTypes);
+                knowledgeSnapshot, judgments, errorTypes, org.mockito.Mockito.mock(ExaminerGradingPolicy.class));
     }
 }

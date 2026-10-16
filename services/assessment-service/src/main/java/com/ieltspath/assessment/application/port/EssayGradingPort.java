@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 
 /** Grades one essay of a test with an LLM; implementations never log the essay, the prompt or credentials. */
 public interface EssayGradingPort {
+    String PROMPT_VERSION = "essay-rubric-v1";
     /** False when no LLM is configured; jobs then go straight to a human examiner. */
     boolean available();
 

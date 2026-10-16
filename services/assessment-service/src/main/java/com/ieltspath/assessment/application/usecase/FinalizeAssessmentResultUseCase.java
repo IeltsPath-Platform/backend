@@ -24,17 +24,19 @@ public class FinalizeAssessmentResultUseCase {
     private final AttemptItemRepository attemptItems;
     private final ItemResultRepository itemResults;
     private final AssessmentResultCompleter completer;
+    private final ExaminerGradingPolicy examinerPolicy;
 
     public FinalizeAssessmentResultUseCase(AssessmentResultRepository results,
                                            AssessmentAttemptRepository attempts,
                                            AttemptItemRepository attemptItems,
                                            ItemResultRepository itemResults,
-                                           AssessmentResultCompleter completer) {
+                                           AssessmentResultCompleter completer, ExaminerGradingPolicy examinerPolicy) {
         this.results = results;
         this.attempts = attempts;
         this.attemptItems = attemptItems;
         this.itemResults = itemResults;
         this.completer = completer;
+        this.examinerPolicy = examinerPolicy;
     }
 
     @Transactional
@@ -55,8 +57,10 @@ public class FinalizeAssessmentResultUseCase {
             throw new InvalidAssessmentStateException("Only a submitted attempt can have a final result");
         }
 
+        var gradedItems = itemResults.findByResultId(result.id());
+        examinerPolicy.complete(attempt.getId(), result.id(), gradedItems);
         AssessmentResult completed = completer.complete(attempt, result, attemptItems.findByAttemptId(attempt.getId()),
-                itemResults.findByResultId(result.id()));
+                gradedItems);
         return toResult(completed);
     }
 

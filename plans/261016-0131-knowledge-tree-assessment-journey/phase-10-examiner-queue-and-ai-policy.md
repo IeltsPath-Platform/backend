@@ -1,7 +1,7 @@
 ---
 phase: 10
 title: "Hàng chờ giám khảo và chính sách AI"
-status: pending
+status: completed
 priority: P1
 dependencies: [3]
 ---
@@ -92,9 +92,9 @@ chấm**, nên EXAMINER không biết có bài nào đang chờ. Phase này:
 
 ## Success Criteria
 
-- [ ] Essay course test không bao giờ được chốt bởi LLM.
-- [ ] EXAMINER thấy đủ việc chờ và không chấm trùng.
-- [ ] Mỗi essay course test đã chấm có một dòng so sánh đủ hai điểm.
+- [x] Essay course test không bao giờ được chốt bởi LLM.
+- [x] EXAMINER thấy đủ việc chờ và không chấm trùng.
+- [x] Mỗi essay course test đã chấm có một dòng so sánh; đủ hai điểm khi LLM chấm thành công. Khi LLM lỗi, phần LLM để null thay vì giả lập band.
 
 ## Risk Assessment
 
@@ -105,3 +105,16 @@ chấm**, nên EXAMINER không biết có bài nào đang chờ. Phase này:
 
 - Màn hàng chờ chấm: lọc, nhận việc, chấm theo tiêu chí, chọn mã lỗi.
 - Học viên thấy "Đang chờ giám khảo" và nhận xét tạm.
+
+
+## Kết quả triển khai — 2026-10-16
+
+- Migration V9 đã được kiểm tra trên PostgreSQL thật, cả database sạch lẫn nâng cấp từ V8 có job cũ trùng.
+- Hàng chờ phân trang, nhận việc, tranh nhận đồng thời, nhận lại sau hơn 24 giờ và API essay chấm mù đã hoàn tất.
+- Một giám khảo giữ các HUMAN job còn chờ của cùng attempt; mở phiên chấm lại sẽ đưa job đã hoàn tất về QUEUED chưa có người nhận.
+- COURSE_GATE dùng cùng ánh xạ submission đã chốt cho hai job. Essay bỏ trống được ghi rõ omitted:true và chỉ tạo job người chấm để không mất khỏi hàng chờ.
+- Lưu so sánh theo submission của assignment đã khóa; LLM đến trước/sau đều giữ phần điểm còn lại. Band giám khảo của từng essay lấy từ feedbackSnapshot.band (0–9, bước 0.5).
+- Nhận xét tạm chỉ chứa summary, comments, focus; không trả band. Rubric trả null cho tới tính năng rubric.
+- Topic, practice và placement giữ chính sách chấm hiện có. Schema AssessmentCompleted.v2 không đổi.
+- Kiểm chứng cuối: mvn -B -ntp -pl services/assessment-service -am test — assessment 268, common-security 8; 0 fail/error/skip. Rà soát độc lập đã không còn blocker.
+- Báo cáo: [from-codex-to-claude-phase-10-examiner-queue-report.md](plans/reports/from-codex-to-claude-phase-10-examiner-queue-report.md).

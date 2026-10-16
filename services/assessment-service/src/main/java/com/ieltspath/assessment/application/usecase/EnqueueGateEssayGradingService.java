@@ -20,10 +20,9 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * A placement test is graded by {@link PlacementGradingService}. On submit of a topic or course test that has
- * essays: each essay the learner sent through
- * {@code POST /api/assessments/submissions} gets a free AI grading job; an essay never sent scores zero. When no essay
- * was sent the attempt is graded at once. Mock tests and other types keep the human path.
+ * Placement uses its existing grader. Topic and practice essays get free asynchronous LLM jobs;
+ * course essays also enter the blind human queue, including explicit blank answers for omissions.
+ * Objective-only attempts retain deterministic grading.
  */
 @Service
 public class EnqueueGateEssayGradingService {
@@ -83,6 +82,11 @@ public class EnqueueGateEssayGradingService {
             return;
         }
         Map<UUID, UUID> submitted = jobs.submittedEssays(essays);
+        if (attempt.getAttemptType() == AttemptType.COURSE_GATE) {
+            jobs.enqueueAi(submitted, attempt.getUserId());
+            jobs.enqueueCourseHuman(essays, attempt.getUserId(), submitted);
+            return;
+        }
         if (submitted.isEmpty()) {
             Map<UUID, Boolean> none = new HashMap<>();
             essays.forEach(item -> none.put(item, false));

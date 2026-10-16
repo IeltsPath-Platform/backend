@@ -22,6 +22,18 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class GradeGateEssayJobUseCaseTest {
+    @Test
+    @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+    void providerFailureDoesNotLogEssayOrPrompt(org.springframework.boot.test.system.CapturedOutput output) {
+        stubClaim();
+        when(grader.available()).thenReturn(true);
+        when(quota.tryConsume(eq(userId),any(LocalDate.class),eq(4))).thenReturn(true);
+        when(grader.grade(any(),anyString())).thenThrow(new IllegalStateException("submitted essay SECRET_PROVIDER_PAYLOAD"));
+        useCase().gradeBatch();
+        assertFalse(output.getAll().contains("submitted essay"));
+        assertFalse(output.getAll().contains("SECRET_PROVIDER_PAYLOAD"));
+        assertTrue(output.getAll().contains("IllegalStateException"));
+    }
     private final GateEssayJobStore jobs = mock(GateEssayJobStore.class);
     private final EssayGradingPort grader = mock(EssayGradingPort.class);
     private final AssessmentLlmQuota quota = mock(AssessmentLlmQuota.class);
@@ -76,7 +88,7 @@ class GradeGateEssayJobUseCaseTest {
         assertEquals(1, useCase().gradeBatch());
 
         verify(jobs).fail(jobId, now);
-        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human");
+        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human", "LLM_NOT_CONFIGURED");
         verify(grader, never()).grade(any(), any());
         verifyNoInteractions(assembler);
     }
@@ -91,7 +103,7 @@ class GradeGateEssayJobUseCaseTest {
         useCase().gradeBatch();
 
         verify(jobs).fail(jobId, now);
-        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human");
+        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human", "LLM_FAILED");
         verify(assembler, never()).completeIfGraded(any());
     }
 
@@ -104,7 +116,7 @@ class GradeGateEssayJobUseCaseTest {
         useCase().gradeBatch();
 
         verify(jobs).fail(jobId, now);
-        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human");
+        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human", "LLM_QUOTA");
         verify(grader, never()).grade(any(), any());
     }
 

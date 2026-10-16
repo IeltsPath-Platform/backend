@@ -30,6 +30,21 @@ OutboxRelay                                                     committed row ->
 - `uq_outbox_assessment_completed_result` allows at most one `AssessmentCompleted.v2`
   row per result version.
 
+### Course essay grading policy
+
+COURSE_GATE attempts containing essays require a human examiner to finalize the
+result. Submitted essays queue both an LLM job (comparison and provisional text
+feedback only) and a HUMAN job with reason COURSE_GATE_POLICY. LLM completion never
+finalizes this result or emits this event. The assigned examiner saves item scores,
+judgments and band through the grading API, then finalizes; comparison data, human
+job completion, result completion and outbox insertion commit atomically. Missing
+LLM grades do not prevent human finalization. Objective-only course tests retain
+deterministic auto grading. Topic, practice and placement LLM policies are unchanged.
+
+The event schema and consumer behavior do not change. Provisional feedback and
+LLM/examiner comparison fields are not added to AssessmentCompleted.v2. See
+[assessment-grading-v1](assessment-grading-v1.md) and [AI policy](../ai-policy.md).
+
 ## Envelope
 
 | Field | Type | Notes |
@@ -68,12 +83,15 @@ Each `item_results[]` entry:
 | `error_code` | string or null | Optional. The error-taxonomy code (for example `PARAPHRASE_TRAP`) of a wrong objective answer, from the error analysis rows. Null for correct, ungraded and essay items. Distinct from the legacy `error_type` below. |
 | `knowledge_point_mappings[]` | array | The Content snapshot taken at attempt start. |
 
-`TOPIC_GATE` and `COURSE_GATE` attempts may contain essay items. The learner submits an essay through
-`POST /api/assessments/submissions` before submitting the attempt. A submitted essay is graded asynchronously by the
-Assessment LLM at no point cost; the result and this event are created after all AI essay jobs for the attempt finish.
-An essay without a submitted response scores zero and creates no grading job. If the LLM is unavailable, returns an
-invalid grade, or the learner has reached the daily limit, Assessment queues the essay for EXAMINER review; the event is
-then emitted when the examiner completes the result. The `AssessmentCompleted.v2` payload shape does not change.
+`TOPIC_GATE`, `OFFICIAL_PRACTICE` and `COURSE_GATE` attempts may contain essay items.
+The learner submits an essay through `POST /api/assessments/submissions` before
+submitting the attempt. Topic/practice essays retain asynchronous free LLM grading:
+all successful jobs complete the result/event, omissions score zero without jobs,
+and unavailable/invalid/quota-limited LLM grading falls back to an examiner.
+Course essays instead always queue HUMAN grading alongside the provisional LLM
+job; course omissions are stored as explicit blank responses and queued for HUMAN
+only. The course result/event requires examiner finalization in every essay case,
+including all-omitted attempts. The payload shape does not change.
 
 Each `knowledge_point_mappings[]` entry:
 

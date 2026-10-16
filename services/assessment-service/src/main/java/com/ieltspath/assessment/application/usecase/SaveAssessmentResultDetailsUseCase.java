@@ -35,6 +35,7 @@ public class SaveAssessmentResultDetailsUseCase {
     private final AttemptItemKnowledgePointRepository knowledgeSnapshot;
     private final ItemResultKnowledgeJudgmentRepository judgments;
     private final ErrorTypeCatalog errorTypes;
+    private final ExaminerGradingPolicy examinerPolicy;
 
     public SaveAssessmentResultDetailsUseCase(AssessmentAttemptRepository attempts,
                                               AssessmentResultRepository results,
@@ -44,7 +45,7 @@ public class SaveAssessmentResultDetailsUseCase {
                                               ErrorAnalysisItemRepository errors,
                                               AttemptItemKnowledgePointRepository knowledgeSnapshot,
                                               ItemResultKnowledgeJudgmentRepository judgments,
-                                              ErrorTypeCatalog errorTypes) {
+                                              ErrorTypeCatalog errorTypes, ExaminerGradingPolicy examinerPolicy) {
         this.attempts = attempts;
         this.results = results;
         this.attemptItems = attemptItems;
@@ -54,6 +55,7 @@ public class SaveAssessmentResultDetailsUseCase {
         this.knowledgeSnapshot = knowledgeSnapshot;
         this.judgments = judgments;
         this.errorTypes = errorTypes;
+        this.examinerPolicy = examinerPolicy;
     }
 
     /** Learner entry: the latest version of the caller's own attempt. The result's band is not changed. */
@@ -61,6 +63,9 @@ public class SaveAssessmentResultDetailsUseCase {
     public void execute(SaveAssessmentResultDetailsCommand command) {
         var attempt = attempts.findByIdAndUserId(command.attemptId(), command.userId())
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
+        if (attempt.getAttemptType() == com.ieltspath.assessment.domain.vo.AttemptType.COURSE_GATE) {
+            throw new com.ieltspath.assessment.domain.exception.AssessmentAccessDeniedException("Course results can only be edited by an examiner");
+        }
         var result = results.findLatestForUpdateByAttemptId(attempt.getId())
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
         requireGradable(result);
@@ -79,6 +84,7 @@ public class SaveAssessmentResultDetailsUseCase {
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
         requireGradable(result);
         var latest = results.findLatestByAttemptId(result.attemptId()).orElse(result);
+        examinerPolicy.requireAssignment(result.attemptId());
         if (latest.resultVersion() != result.resultVersion()) {
             throw new InvalidAssessmentStateException("Only the latest result version can be graded");
         }

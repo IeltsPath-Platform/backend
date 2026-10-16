@@ -16,6 +16,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.ieltspath.assessment.application.port.ExaminerQueueStore;
+import com.ieltspath.assessment.application.usecase.ListGradingQueueUseCase;
+import com.ieltspath.assessment.application.usecase.ClaimGradingJobUseCase;
+import com.ieltspath.assessment.application.usecase.GetJobEssayUseCase;
 
 import java.util.UUID;
 
@@ -27,6 +33,29 @@ public class GradingJobController {
     private final CurrentUserProvider currentUser;
     private final GetGradingJobUseCase getGradingJobUseCase;
     private final CreateGradingJobUseCase createGradingJobUseCase;
+    private final ListGradingQueueUseCase listQueue;
+    private final ClaimGradingJobUseCase claimJob;
+    private final GetJobEssayUseCase getEssay;
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('EXAMINER','ADMIN')")
+    public ExaminerQueueStore.QueuePage list(@RequestParam(name="mode",defaultValue="HUMAN") String mode,
+            @RequestParam(name="status",defaultValue="QUEUED") String status,@RequestParam(name="page",defaultValue="0") int page,
+            @RequestParam(name="size",defaultValue="20") int size) {
+        return listQueue.execute(mode,status,page,size);
+    }
+
+    @PostMapping("/{id}/claim")
+    @PreAuthorize("hasAnyRole('EXAMINER','ADMIN')")
+    public ExaminerQueueStore.QueueEntry claim(@PathVariable("id") UUID id) {
+        return claimJob.execute(currentUser.requireUserId(),id);
+    }
+
+    @GetMapping("/{id}/essay")
+    @PreAuthorize("hasAnyRole('EXAMINER','ADMIN')")
+    public ExaminerQueueStore.Essay essay(@PathVariable("id") UUID id) {
+        return getEssay.execute(currentUser.requireUserId(),id);
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

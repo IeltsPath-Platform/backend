@@ -19,12 +19,17 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(JobAlreadyClaimedException.class)
+    public ResponseEntity<ErrorResponse> claimed(JobAlreadyClaimedException e, HttpServletRequest r) {
+        return build(HttpStatus.CONFLICT, e.getMessage(), r.getRequestURI(), null, "JOB_ALREADY_CLAIMED");
+    }
     @ExceptionHandler(AssessmentNotFoundException.class)
     public ResponseEntity<ErrorResponse> notFound(AssessmentDomainException e, HttpServletRequest r) {
         return build(HttpStatus.NOT_FOUND, e.getMessage(), r.getRequestURI(), null);
     }
 
-    @ExceptionHandler({InvalidAssessmentStateException.class, IllegalArgumentException.class})
+    @ExceptionHandler({InvalidAssessmentStateException.class, IllegalArgumentException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
     public ResponseEntity<ErrorResponse> bad(Exception e, HttpServletRequest r) {
         return build(HttpStatus.BAD_REQUEST, e.getMessage(), r.getRequestURI(), null);
     }

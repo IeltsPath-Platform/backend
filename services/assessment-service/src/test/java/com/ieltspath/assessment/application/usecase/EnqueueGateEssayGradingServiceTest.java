@@ -54,7 +54,7 @@ class EnqueueGateEssayGradingServiceTest {
 
     @Test
     void gateWithOmittedEssayScoresItZeroAndCompletesWithoutCreatingJob() {
-        AssessmentAttempt attempt = attempt(AttemptType.COURSE_GATE);
+        AssessmentAttempt attempt = attempt(AttemptType.TOPIC_GATE);
         UUID essayId = UUID.randomUUID();
         UUID objectiveId = UUID.randomUUID();
         when(items.findByAttemptId(attempt.getId())).thenReturn(List.of(item(essayId, ESSAY), item(objectiveId, OBJECTIVE)));

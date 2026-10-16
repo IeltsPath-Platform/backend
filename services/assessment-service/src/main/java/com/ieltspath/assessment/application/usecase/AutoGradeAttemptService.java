@@ -83,6 +83,8 @@ public class AutoGradeAttemptService {
         List<AnswerSnapshot> answers = new ArrayList<>(items.size());
         for (AttemptItem item : items) {
             Optional<AnswerSnapshot> answer = AnswerSnapshot.parse(json, item.answerSnapshot());
+            if (attempt.getAttemptType() == com.ieltspath.assessment.domain.vo.AttemptType.COURSE_GATE
+                    && answer.isPresent() && answer.get().gradableEssay()) return false;
             boolean essay = answer.isPresent() && essayPassed.containsKey(item.id()) && answer.get().gradableEssay();
             if (answer.isEmpty() || !essay && !answer.get().autoGradable(grader)) {
                 return false;

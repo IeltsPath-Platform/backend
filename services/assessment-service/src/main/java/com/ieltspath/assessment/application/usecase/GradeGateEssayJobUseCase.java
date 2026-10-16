@@ -104,6 +104,7 @@ public class GradeGateEssayJobUseCase {
         }
         transaction.executeWithoutResult(status -> {
             jobs.complete(job.jobId(), grade.band(), grade.feedback(), clock.instant());
+            jobs.recordComparison(job.jobId());
             completeAttempt(job);
         });
     }
@@ -128,7 +129,13 @@ public class GradeGateEssayJobUseCase {
         log.warn("Gate essay grading moved to an examiner: jobId={}, code={}", job.jobId(), code);
         transaction.executeWithoutResult(status -> {
             jobs.fail(job.jobId(), clock.instant());
-            jobs.enqueueHuman(job.submissionId(), job.userId(), EnqueueGateEssayGradingService.humanKey(job.attemptItemId()));
+            String reason = switch (code) {
+                case "LLM_UNAVAILABLE" -> "LLM_NOT_CONFIGURED";
+                case "DAILY_LIMIT_REACHED" -> "LLM_QUOTA";
+                default -> "LLM_FAILED";
+            };
+            jobs.enqueueHuman(job.submissionId(), job.userId(),
+                    EnqueueGateEssayGradingService.humanKey(job.attemptItemId()), reason);
         });
     }
 
