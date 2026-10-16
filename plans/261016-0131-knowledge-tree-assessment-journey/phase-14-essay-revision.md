@@ -10,9 +10,14 @@ dependencies: [4, 5]
 
 ## Overview
 
-Board có nhánh: nhận feedback Writing theo rubric → **học viên sửa bài** → attempt mới → cập nhật Mastery Profile. Hiện
-essay lesson và Practice chấm một lần (`lesson_writing_submissions`), không có luồng sửa và nộp lại, nên không so sánh
-được bản trước với bản sau. Phase này thêm luồng sửa, nối các lần nộp thành một chuỗi, và cho học viên thấy tiến bộ.
+Board có nhánh: nhận feedback Writing theo rubric → **học viên sửa bài** → attempt mới → cập nhật Mastery Profile.
+
+**Hiện trạng (đã kiểm với code):** học viên đã nộp lại được essay của một block lesson. Mỗi lần nộp là một bản ghi riêng
+trong `lesson_writing_submissions` (khác `requestId`), và `SubmitLessonEssayUseCase` ghi bằng chứng `kp_evidence` cho mọi
+bản nộp **trước khi** học viên đạt block đó; sau khi đạt thì không ghi nữa. Thứ còn thiếu là: các bản **không nối với
+nhau**, không so sánh được bản trước với bản sau, không giới hạn số lần nộp, và Practice essay chưa có chuỗi tương tự.
+
+Phase này thêm chuỗi bản, so sánh và giới hạn lần sửa. **Không đổi luật bằng chứng hiện tại.**
 
 ## Requirements
 
@@ -33,11 +38,11 @@ essay lesson và Practice chấm một lần (`lesson_writing_submissions`), kh�
   - prompt chấm giữ nguyên đề và rubric; **không** gửi bản trước hay nhận xét trước cho LLM (tránh chấm lệch).
 - **So sánh:** `GET /api/learning/writing-submissions/{id}/history` trả chuỗi các bản: band từng tiêu chí, band tổng,
   số từ, mã lỗi (phase 3) của từng bản, và `delta` so với bản trước; mã lỗi đã hết và còn lại giữa hai bản gần nhất.
-- **Mastery (đã chốt với người dùng 2026-10-16):** bản sửa **không** ghi thêm `kp_evidence` cho KP của đề, để giữ luật "bằng chứng chỉ ghi ở lần
-  nộp đầu" (AGENTS.md §3.8, D7). Thay vào đó ghi `question_attempt_events` với `first_submission = false` và hiện tiến bộ
-  trong báo cáo (phase 5: khối `evidence` thêm `revisionDelta`). Lệch với nhánh "HV sửa bài → cập nhật mastery" trên board là có chủ ý;
-  khi trình bày cần nói rõ lý do (tránh mastery tăng giả do chép nhận xét rồi nộp lại).
-- **Cổng và bài ôn:** bản sửa không tạo bài ôn mới và không đổi trạng thái Practice đã đạt hoặc chưa đạt.
+- **Mastery (đã chốt với người dùng 2026-10-16): giữ luật hiện tại, không đổi.** Bản sửa vẫn theo đúng luật đang chạy:
+  mỗi bản nộp trước khi đạt block ghi bằng chứng, sau khi đạt thì không. Phase này không thêm và không bớt bằng chứng; chỉ
+  ghi thêm `question_attempt_events` (phase 4) cho mỗi bản kèm `revision_no`. Báo cáo (phase 5) thêm `revisionDelta` ở
+  khối `evidence`. Khớp nhánh "HV sửa bài → cập nhật mastery" trên board và không phải sửa AGENTS.md.
+- **Cổng và bài ôn:** không đổi so với hiện tại.
 
 ## Related Code Files
 
@@ -47,7 +52,7 @@ essay lesson và Practice chấm một lần (`lesson_writing_submissions`), kh�
   `L/infrastructure/persistence/JdbcWritingSubmissionRepository.java`, `L/api/controller/WritingController.java`
 - Tạo: `L/application/usecase/{SubmitEssayRevisionUseCase, GetEssayHistoryUseCase}.java`, DTO
 - Test: `WritingSubmissionTest` (giới hạn lần sửa, chỉ sửa bản mới nhất), `EssayRevisionIntegrationTest` (Testcontainers,
-  LLM giả: nộp, sửa, so sánh, không ghi thêm `kp_evidence`, trừ điểm đúng), `WritingControllerTest` (chỉ chủ bài)
+  LLM giả: nộp, sửa, so sánh, bằng chứng ghi đúng như luật hiện tại, trừ điểm đúng), `WritingControllerTest` (chỉ chủ bài)
 
 ## Implementation Steps
 
@@ -60,7 +65,7 @@ essay lesson và Practice chấm một lần (`lesson_writing_submissions`), kh�
 ## Success Criteria
 
 - [ ] Nộp lại tạo bản mới nối với bản trước; lịch sử trả delta đúng.
-- [ ] Không ghi `kp_evidence` thêm; không đổi trạng thái Practice.
+- [ ] Luật bằng chứng không đổi: test hiện có của `SubmitLessonEssayUseCase` vẫn xanh nguyên vẹn.
 - [ ] Vượt 3 lần sửa → 409; không rẽ nhánh từ bản cũ.
 
 ## Risk Assessment
