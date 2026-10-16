@@ -172,6 +172,24 @@ class LearnerProfileUseCaseTest {
     }
 
     @Test
+    void invalidTimezoneKeepsExistingZoneAndStillUpdatesProfile() {
+        UUID userId = UUID.randomUUID();
+        LearnerProfile existing = existingProfile(userId, "Asia/Ho_Chi_Minh");
+        when(learnerProfileRepository.findByUserId(userId)).thenReturn(Optional.of(existing));
+        when(learnerProfileRepository.save(existing)).thenAnswer(inv -> inv.getArgument(0));
+
+        var command = new UpdateLearnerProfileCommand(userId, "Updated learner", null, "Updated bio",
+                null, "Not/A_Timezone", null);
+        var result = updateLearnerProfileUseCase.execute(command);
+
+        assertEquals("Updated learner", result.displayName());
+        assertEquals("Asia/Ho_Chi_Minh", result.timezone());
+        verify(learnerProfileRepository).save(existing);
+        verifyNoInteractions(learningGoalRepository);
+        verify(studyGoals, never()).execute(any());
+    }
+
+    @Test
     void changedTimezoneWithoutActiveGoalDoesNotScheduleATarget() {
         UUID userId = UUID.randomUUID();
         LearnerProfile existing = existingProfile(userId, "UTC");
@@ -200,4 +218,3 @@ class LearnerProfileUseCaseTest {
         verify(learnerProfileRepository).deleteByUserId(userId);
     }
 }
-

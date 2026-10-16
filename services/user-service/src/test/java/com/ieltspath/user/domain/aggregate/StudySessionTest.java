@@ -72,4 +72,17 @@ class StudySessionTest {
         assertEquals(30_000,accepted.acceptedMs());
         assertEquals(databaseReadBack,accepted.session().startedAt());
     }
+
+    @Test void subMillisecondMidnightSplitKeepsPositivePersistableDuration() {
+        Instant anchor=Instant.parse("2026-10-14T16:59:59.999500Z");
+        var started=StudySession.start(UUID.randomUUID(),UUID.randomUUID(),"LESSON",UUID.randomUUID(),
+                null,"Asia/Ho_Chi_Minh",anchor);
+
+        var accepted=started.accept(1,1,List.of(interval(0,1)),anchor.plusMillis(1),false);
+
+        assertEquals(1,accepted.acceptedMs());
+        assertEquals(1,accepted.segments().stream().mapToLong(StudySession.Segment::milliseconds).sum());
+        assertTrue(accepted.segments().stream().allMatch(segment -> segment.milliseconds() > 0));
+        assertEquals(LocalDate.parse("2026-10-15"),accepted.segments().getFirst().date());
+    }
 }

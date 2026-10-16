@@ -16,8 +16,10 @@ public record StudySession(UUID id, UUID userId, UUID clientSessionId, String so
                 throw new IllegalArgumentException("Invalid active interval");
         }
     }
-    public record Segment(Instant start, Instant end, LocalDate date, String timezone) {
-        public long milliseconds() { return Duration.between(start, end).toMillis(); }
+    public record Segment(Instant start, Instant end, LocalDate date, String timezone, long milliseconds) {
+        public Segment {
+            if (milliseconds <= 0) throw new IllegalArgumentException("Segment milliseconds must be positive");
+        }
     }
     public record Acceptance(StudySession session, List<Segment> segments, long acceptedMs) {}
 
@@ -59,12 +61,17 @@ public record StudySession(UUID id, UUID userId, UUID clientSessionId, String so
             nextWatermark = Math.max(nextWatermark, to);
             if (to <= from) continue;
             accepted += to - from;
+            long allocated = 0;
             Instant cursor = startedAt.plusMillis(from), end = startedAt.plusMillis(to);
             while (cursor.isBefore(end)) {
                 LocalDate date = cursor.atZone(zone).toLocalDate();
                 Instant midnight = date.plusDays(1).atStartOfDay(zone).toInstant();
                 Instant segmentEnd = midnight.isBefore(end) ? midnight : end;
-                segments.add(new Segment(cursor, segmentEnd, date, timezone));
+                long segmentMs = segmentEnd.equals(end)
+                        ? to - from - allocated
+                        : Duration.between(cursor, segmentEnd).toMillis();
+                if (segmentMs > 0) segments.add(new Segment(cursor, segmentEnd, date, timezone, segmentMs));
+                allocated += segmentMs;
                 cursor = segmentEnd;
             }
         }

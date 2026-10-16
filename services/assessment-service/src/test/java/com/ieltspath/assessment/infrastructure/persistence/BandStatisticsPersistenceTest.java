@@ -55,9 +55,14 @@ class BandStatisticsPersistenceTest {
     }
 
     private UUID result(UUID attempt, int version, String status, Double band) {
+        return result(attempt, version, status, band, null);
+    }
+
+    private UUID result(UUID attempt, int version, String status, Double band, Double overallBand) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO assessment_results(id, attempt_id, result_version, status, completed_at) VALUES(?, ?, ?, ?, ?)",
-                id, attempt, version, status, "COMPLETED".equals(status) ? Timestamp.from(from.plusSeconds(9000)) : null);
+        jdbc.update("INSERT INTO assessment_results(id, attempt_id, result_version, status, overall_band, completed_at) VALUES(?, ?, ?, ?, ?, ?)",
+                id, attempt, version, status, overallBand,
+                "COMPLETED".equals(status) ? Timestamp.from(from.plusSeconds(9000)) : null);
         if (band != null) {
             score(id, "LISTENING", band, "AUTO");
         }
@@ -146,22 +151,22 @@ class BandStatisticsPersistenceTest {
     }
 
     @Test
-    void overallRequiresFourValidSkillsOnSameCompletedResultAndRoundsToHalfBand() {
-        UUID full = result(attempt(from.plusSeconds(3600)), 1, "COMPLETED", 6.0);
+    void overallRequiresFourValidSkillsOnSameCompletedResultAndUsesStoredBand() {
+        UUID full = result(attempt(from.plusSeconds(3600)), 1, "COMPLETED", 6.0, 6.5);
         score(full, "READING", 6.5, "AUTO");
         score(full, "WRITING", 7.0, "AI");
         score(full, "SPEAKING", 7.5, "HUMAN");
-        UUID partial = result(attempt(from.plusSeconds(7200)), 1, "COMPLETED", 9.0);
+        UUID partial = result(attempt(from.plusSeconds(7200)), 1, "COMPLETED", 9.0, 9.0);
         score(partial, "READING", 9.0, "AUTO");
         score(partial, "WRITING", 9.0, "HUMAN");
-        UUID invalid = result(attempt(from.plusSeconds(8000)), 1, "COMPLETED", 6.0);
+        UUID invalid = result(attempt(from.plusSeconds(8000)), 1, "COMPLETED", 6.0, 6.0);
         score(invalid, "READING", 6.0, "AUTO");
         score(invalid, "WRITING", 6.0, "HUMAN");
         score(invalid, "SPEAKING", 9.5, "HUMAN");
         var overall = store.history(user, from, until, "MOCK", "OVERALL", null, 100);
         assertEquals(1, overall.points().size());
         assertEquals(full, overall.points().getFirst().resultId());
-        assertEquals(7.0, overall.latest());
+        assertEquals(6.5, overall.latest());
         assertEquals("AI,AUTO,HUMAN", overall.points().getFirst().gradingSource());
         assertEquals("GRADED", overall.points().getFirst().measurementQuality());
         score(partial, "SPEAKING", 9.0, "HUMAN");

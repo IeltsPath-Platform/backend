@@ -22,7 +22,7 @@ public class JdbcBandStatisticsStore implements BandStatisticsStore {
     private static final String SERIES = """
         WITH newest AS (
           SELECT DISTINCT ON (a.id) a.id AS attempt_id, a.submitted_at, r.id AS result_id,
-                 r.result_version, r.completed_at AS graded_at,
+                 r.result_version, r.completed_at AS graded_at, r.overall_band,
                  EXISTS(SELECT 1 FROM assessment_results pending WHERE pending.attempt_id = a.id
                         AND pending.result_version > r.result_version
                         AND pending.status IN ('DRAFT', 'PROCESSING')) AS regrade_pending
@@ -35,7 +35,8 @@ public class JdbcBandStatisticsStore implements BandStatisticsStore {
           SELECT n.*, s.band, s.source
           FROM newest n
           JOIN LATERAL (
-            SELECT CASE WHEN :skill = 'OVERALL' THEN round(avg(ss.band) * 2) / 2
+            SELECT CASE WHEN :skill = 'OVERALL' THEN
+                            CASE WHEN n.overall_band BETWEEN 0 AND 9 THEN n.overall_band END
                         ELSE max(ss.band) END AS band,
                    string_agg(DISTINCT ss.grading_source, ',' ORDER BY ss.grading_source) AS source
             FROM skill_scores ss

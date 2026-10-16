@@ -44,6 +44,7 @@ CREATE TABLE study_goal_history (
 -- Seed only the current target at activation; no inferred historical targets or study time.
 INSERT INTO study_goal_history(user_id,effective_date,timezone,effective_at,goal_id,minutes)
 SELECT g.user_id, (CURRENT_TIMESTAMP AT TIME ZONE COALESCE(t.name,'Asia/Ho_Chi_Minh'))::date,
- COALESCE(t.name,'Asia/Ho_Chi_Minh'),CURRENT_TIMESTAMP,g.id,g.available_minutes_per_day
+ COALESCE(t.name,'Asia/Ho_Chi_Minh'),CURRENT_TIMESTAMP,g.id,
+ CASE WHEN g.available_minutes_per_day > 0 THEN g.available_minutes_per_day ELSE NULL END
 FROM learning_goals g LEFT JOIN learner_profiles p ON p.user_id=g.user_id
 LEFT JOIN pg_timezone_names t ON t.name=p.timezone WHERE g.status='ACTIVE';

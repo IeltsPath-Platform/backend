@@ -66,6 +66,27 @@ class StudyTimePersistenceTest {
         assertEquals(0,sessions.find(user,session.id()).orElseThrow().totalAcceptedMs());
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM study_daily_totals WHERE user_id=?",Integer.class,user));
     }
+
+    @Test void subMillisecondMidnightHeartbeatPersistsAndReplaysOnce() {
+        UUID user=user();
+        Instant anchor=Instant.parse("2026-10-14T16:59:59.999500Z");
+        var session=StudySession.start(user,UUID.randomUUID(),"LESSON",UUID.randomUUID(),null,"Asia/Ho_Chi_Minh",anchor);
+        tx.executeWithoutResult(status->sessions.save(session));
+        var heartbeat=new RecordStudyHeartbeatUseCase(sessions,Clock.fixed(anchor.plusMillis(1),ZoneOffset.UTC));
+        var interval=List.of(new StudySession.Interval(0,1));
+
+        var first=tx.execute(status->heartbeat.execute(user,session.id(),1,1,interval,false));
+        var replay=tx.execute(status->heartbeat.execute(user,session.id(),1,1,interval,false));
+
+        assertEquals(1,first.acceptedMs());
+        assertEquals(first,replay);
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM study_heartbeat_receipts WHERE session_id=?",
+                Integer.class,session.id()));
+        assertEquals(1L,jdbc.queryForObject("SELECT sum(active_ms) FROM study_activity_intervals WHERE session_id=?",
+                Long.class,session.id()));
+        assertEquals(1L,jdbc.queryForObject("SELECT sum(active_ms) FROM study_daily_totals WHERE user_id=?",
+                Long.class,user));
+    }
     @Test void migrationEnforcesSingleOpenLeaseAndBoundedQueriesReturnHistoricalGoal() {
         UUID user=user(); Instant now=Instant.now();
         var first=StudySession.start(user,UUID.randomUUID(),"LESSON",UUID.randomUUID(),null,"UTC",now);
