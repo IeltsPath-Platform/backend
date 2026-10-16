@@ -3,6 +3,7 @@ package com.ieltspath.content.domain.aggregate;
 import com.ieltspath.content.domain.exception.InvalidErrorTypeException;
 import com.ieltspath.content.domain.vo.ContentStatus;
 import com.ieltspath.content.domain.vo.ErrorCategory;
+import com.ieltspath.content.domain.vo.ErrorReviewStatus;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -25,11 +26,13 @@ public class ErrorType {
     private UUID knowledgePointId;
     private String fixHint;
     private ContentStatus status;
+    private ErrorReviewStatus reviewStatus;
     private final Instant createdAt;
     private Instant updatedAt;
 
     public ErrorType(UUID id, String code, String name, ErrorCategory category, int severity, UUID knowledgePointId,
-                     String fixHint, ContentStatus status, Instant createdAt, Instant updatedAt) {
+                     String fixHint, ContentStatus status, ErrorReviewStatus reviewStatus,
+                     Instant createdAt, Instant updatedAt) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.code = requireCode(code);
         this.name = requireName(name);
@@ -38,6 +41,7 @@ public class ErrorType {
         this.knowledgePointId = knowledgePointId;
         this.fixHint = requireFixHint(fixHint);
         this.status = status != null ? status : ContentStatus.ACTIVE;
+        this.reviewStatus = reviewStatus != null ? reviewStatus : ErrorReviewStatus.DRAFT;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.updatedAt = updatedAt != null ? updatedAt : this.createdAt;
     }
@@ -46,17 +50,19 @@ public class ErrorType {
                                    UUID knowledgePointId, String fixHint) {
         Instant now = Instant.now();
         return new ErrorType(UUID.randomUUID(), code, name, category, severity, knowledgePointId, fixHint,
-                ContentStatus.ACTIVE, now, now);
+                ContentStatus.ACTIVE, ErrorReviewStatus.DRAFT, now, now);
     }
 
+    /** A null {@code reviewStatus} leaves the current review state unchanged. */
     public void update(String name, ErrorCategory category, int severity, UUID knowledgePointId, String fixHint,
-                       ContentStatus status) {
+                       ContentStatus status, ErrorReviewStatus reviewStatus) {
         this.name = requireName(name);
         this.category = Objects.requireNonNull(category, "category must not be null");
         this.severity = requireSeverity(severity);
         this.knowledgePointId = knowledgePointId;
         this.fixHint = requireFixHint(fixHint);
         this.status = status != null ? status : this.status;
+        this.reviewStatus = reviewStatus != null ? reviewStatus : this.reviewStatus;
         this.updatedAt = Instant.now();
     }
 
@@ -96,6 +102,7 @@ public class ErrorType {
     public UUID getKnowledgePointId() { return knowledgePointId; }
     public String getFixHint() { return fixHint; }
     public ContentStatus getStatus() { return status; }
+    public ErrorReviewStatus getReviewStatus() { return reviewStatus; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

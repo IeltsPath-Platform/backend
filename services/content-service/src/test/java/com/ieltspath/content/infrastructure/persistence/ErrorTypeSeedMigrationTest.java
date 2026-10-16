@@ -35,6 +35,11 @@ class ErrorTypeSeedMigrationTest {
     }
 
     @Test
+    void everySeededErrorTypeIsStillADraftAwaitingReview() {
+        assertThat(count("SELECT count(*) FROM error_types WHERE review_status = 'DRAFT'")).isEqualTo(28);
+    }
+
+    @Test
     void everyCodeFollowsTheNamingRuleAndHasAHint() {
         assertThat(count("SELECT count(*) FROM error_types WHERE code !~ '^[A-Z][A-Z0-9_]*$' "
                 + "OR btrim(fix_hint) = ''")).isZero();

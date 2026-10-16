@@ -5,6 +5,7 @@ import com.ieltspath.content.domain.exception.ErrorTypeNotFoundException;
 import com.ieltspath.content.domain.repository.ErrorTypeRepository;
 import com.ieltspath.content.domain.vo.ContentStatus;
 import com.ieltspath.content.domain.vo.ErrorCategory;
+import com.ieltspath.content.domain.vo.ErrorReviewStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,9 +22,9 @@ public class UpdateErrorTypeUseCase {
     }
 
     public ErrorType execute(UUID id, String name, ErrorCategory category, int severity, UUID knowledgePointId,
-                             String fixHint, ContentStatus status) {
+                             String fixHint, ContentStatus status, ErrorReviewStatus reviewStatus) {
         ErrorType errorType = errorTypes.findById(id).orElseThrow(() -> new ErrorTypeNotFoundException(id));
-        errorType.update(name, category, severity, knowledgePointId, fixHint, status);
+        errorType.update(name, category, severity, knowledgePointId, fixHint, status, reviewStatus);
         return errorTypes.save(errorType);
     }
 }

@@ -2,7 +2,9 @@ package com.ieltspath.content.domain.aggregate;
 
 import com.ieltspath.content.domain.exception.InvalidErrorTypeException;
 import com.ieltspath.content.domain.vo.ContentStatus;
+import com.ieltspath.content.domain.vo.ErrorReviewStatus;
 import com.ieltspath.content.domain.vo.ErrorCategory;
+import com.ieltspath.content.domain.vo.ErrorReviewStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -50,12 +52,20 @@ class ErrorTypeTest {
         ErrorType errorType = ErrorType.create("TENSE", "Tense", ErrorCategory.GRAMMAR, 1, null, "hint");
         UUID knowledgePoint = UUID.randomUUID();
 
-        errorType.update("Verb tense", ErrorCategory.GRAMMAR, 2, knowledgePoint, "New hint", ContentStatus.INACTIVE);
+        errorType.update("Verb tense", ErrorCategory.GRAMMAR, 2, knowledgePoint, "New hint", ContentStatus.INACTIVE,
+                ErrorReviewStatus.APPROVED);
 
         assertThat(errorType.getCode()).isEqualTo("TENSE");
         assertThat(errorType.getName()).isEqualTo("Verb tense");
         assertThat(errorType.getSeverity()).isEqualTo(2);
         assertThat(errorType.getKnowledgePointId()).isEqualTo(knowledgePoint);
         assertThat(errorType.getStatus()).isEqualTo(ContentStatus.INACTIVE);
+        assertThat(errorType.getReviewStatus()).isEqualTo(ErrorReviewStatus.APPROVED);
+    }
+
+    @Test
+    void newErrorTypesAreDraftUntilReviewed() {
+        assertThat(ErrorType.create("TENSE", "Tense", ErrorCategory.GRAMMAR, 1, null, "hint").getReviewStatus())
+                .isEqualTo(ErrorReviewStatus.DRAFT);
     }
 }

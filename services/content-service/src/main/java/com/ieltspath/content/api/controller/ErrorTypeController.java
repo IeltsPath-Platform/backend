@@ -6,6 +6,7 @@ import com.ieltspath.content.application.usecase.UpdateErrorTypeUseCase;
 import com.ieltspath.content.domain.aggregate.ErrorType;
 import com.ieltspath.content.domain.vo.ContentStatus;
 import com.ieltspath.content.domain.vo.ErrorCategory;
+import com.ieltspath.content.domain.vo.ErrorReviewStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -45,7 +46,8 @@ public class ErrorTypeController {
     @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
     public ErrorTypeResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateErrorTypeRequest request) {
         return ErrorTypeResponse.from(updateErrorType.execute(id, request.name(), request.category(),
-                request.severity(), request.knowledgePointId(), request.fixHint(), request.status()));
+                request.severity(), request.knowledgePointId(), request.fixHint(), request.status(),
+                request.reviewStatus()));
     }
 
     public record CreateErrorTypeRequest(
@@ -63,14 +65,16 @@ public class ErrorTypeController {
             @Min(1) @Max(3) int severity,
             UUID knowledgePointId,
             @NotBlank String fixHint,
-            ContentStatus status) {}
+            ContentStatus status,
+            ErrorReviewStatus reviewStatus) {}
 
     public record ErrorTypeResponse(UUID id, String code, String name, ErrorCategory category, int severity,
-                                    UUID knowledgePointId, String fixHint, ContentStatus status) {
+                                    UUID knowledgePointId, String fixHint, ContentStatus status,
+                                    ErrorReviewStatus reviewStatus) {
         static ErrorTypeResponse from(ErrorType errorType) {
             return new ErrorTypeResponse(errorType.getId(), errorType.getCode(), errorType.getName(),
                     errorType.getCategory(), errorType.getSeverity(), errorType.getKnowledgePointId(),
-                    errorType.getFixHint(), errorType.getStatus());
+                    errorType.getFixHint(), errorType.getStatus(), errorType.getReviewStatus());
         }
     }
 }

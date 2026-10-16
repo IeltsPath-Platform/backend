@@ -36,6 +36,16 @@ dependencies: []
     trả `answerSpecJson` (`GameItemResponse` không có trường này). Đây là kiểm tra đọc code, chưa có test tự động riêng.
 - **Q4 (phạm vi): giữ 19 câu** (sau V36 là 20 câu, do thêm câu 20/003).
 
+### Điều kiện trước khi học viên thấy mã hoặc gợi ý sửa (quyết định B)
+
+- V37 thêm cột `error_types.review_status` (`DRAFT` | `APPROVED`). Tất cả 28 mã hiện là `DRAFT`. Cập nhật qua
+  `PUT /api/content/error-types/{id}` với `reviewStatus`.
+- Mã chỉ dùng nội bộ (ghi `error_analysis_items`, báo cáo cho mentor và R&D) khi còn `DRAFT`.
+- **Trước khi học viên thấy mã hoặc gợi ý sửa**, mã đó phải `APPROVED`, và một người hiểu IELTS đã duyệt các cặp câu–mã
+  liên quan. Áp dụng cho phase 4 (event log trả mã lỗi cho học viên) và phase 14 (so sánh mã lỗi giữa các bản nộp).
+- **Trước khi chẩn đoán dò ngược (phase 7) dựa vào mã**, các mã đó phải `APPROVED`. Phase 7 chưa làm.
+- Điều kiện này chưa có phần thực thi tự động. Người làm phase 4 và phase 7 phải kiểm `review_status` khi đọc mã.
+
 ### Ghi chú ngoài phạm vi phase 3 (cần xem riêng)
 
 - `game-service/JacksonGameAnswerEvaluator` không đọc khóa `correct` của spec CHOICE, nên theo đọc code thì mọi câu CHOICE
