@@ -68,14 +68,14 @@ public class PublishContentPackageUseCase {
         }
 
         switch (pkg.getPackageType()) {
-            case PRACTICE_SET, TOPIC_TEST, COURSE_TEST, MOCK_TEST, PLACEMENT_TEST -> {
+            case PRACTICE_SET, PRACTICE_TEST, TOPIC_TEST, COURSE_TEST, MOCK_TEST, PLACEMENT_TEST -> {
                 lessons.lockQuestionsForPublishing(targetVersion.getId());
                 List<QuestionUsageConflict> conflicts = lessons.questionsUsedElsewhere(targetVersion.getId());
                 if (!conflicts.isEmpty()) {
                     throw new QuestionAlreadyUsedException(conflicts);
                 }
                 QuestionPurpose requiredPurpose = switch (pkg.getPackageType()) {
-                    case MOCK_TEST -> QuestionPurpose.EXAM;
+                    case MOCK_TEST, PRACTICE_TEST -> QuestionPurpose.EXAM;
                     case PLACEMENT_TEST -> QuestionPurpose.PLACEMENT;
                     default -> QuestionPurpose.LEARNING;
                 };
@@ -88,7 +88,7 @@ public class PublishContentPackageUseCase {
         }
 
         if (pkg.getPackageType() == PackageType.PRACTICE_SET || pkg.getPackageType() == PackageType.TOPIC_TEST
-                || pkg.getPackageType() == PackageType.COURSE_TEST) {
+                || pkg.getPackageType() == PackageType.COURSE_TEST || pkg.getPackageType() == PackageType.PRACTICE_TEST) {
             var questions = lessons.packageQuestionSpecs(targetVersion.getId());
             for (var question : questions) {
                 JsonNode spec = parseSpec(question.answerSpecJson());
@@ -97,9 +97,9 @@ public class PublishContentPackageUseCase {
                     throw new InvalidContentStateException("Writing essays require passBand from 0 to 9 in steps of 0.5");
                 }
             }
-            if (pkg.getPackageType() == PackageType.COURSE_TEST
+            if ((pkg.getPackageType() == PackageType.COURSE_TEST || pkg.getPackageType() == PackageType.PRACTICE_TEST)
                     && (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableCourseQuestion(question)))) {
-                throw new InvalidContentStateException("COURSE_TEST requires gradable Reading or Listening questions, or Writing essays with passBand");
+                throw new InvalidContentStateException("Tests require gradable Reading or Listening questions, or Writing essays with passBand");
             }
         }
 

@@ -55,6 +55,8 @@ public class ApplyAssessmentResultUseCase {
     private final LearnerPlacementRepository placements;
     private final CourseProgressRepository courseProgress;
     private final CourseTestAssignmentRepository courseAssignments;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.ieltspath.learning.domain.repository.PracticeTestAssignmentRepository practiceAssignments;
     private final Clock clock = Clock.systemUTC();
 
     public ApplyAssessmentResultUseCase(LearnerLock lock, KnowledgeEvidenceRepository evidence,
@@ -105,9 +107,26 @@ public class ApplyAssessmentResultUseCase {
             }
         }
         evidence.append(userId, judged);
+        if ("OFFICIAL_PRACTICE".equals(result.assessmentType())) {
+            if (applied.isEmpty()) applyPracticeTest(result);
+            // Until review tiers exist, practice evidence must not create a blocking review.
+            return;
+        }
         if ("TOPIC_GATE".equals(result.assessmentType())) applyTopicGate(result);
         if ("COURSE_GATE".equals(result.assessmentType())) applyCourseGate(result);
         if (REVIEWED_TYPES.contains(result.assessmentType())) reviews.execute(userId, considered, wrong);
+    }
+
+    private void applyPracticeTest(AssessmentResult result) {
+        if (result.packageVersionId() == null) return;
+        var open = practiceAssignments.findOpenForAttempt(result.userId(), result.packageVersionId(), result.completedAt());
+        if (open.isEmpty()) return;
+        BigDecimal score = result.items().stream().map(ItemResult::score).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal max = result.items().stream().map(ItemResult::maxScore).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal percent = max.signum() == 0 ? BigDecimal.ZERO
+                : score.multiply(BigDecimal.valueOf(100)).divide(max, 4, RoundingMode.HALF_UP);
+        var assignment = open.get();
+        if (assignment.consume(result.attemptId(), result.completedAt(), percent)) practiceAssignments.save(assignment);
     }
 
     private void applyPlacement(AssessmentResult result) {

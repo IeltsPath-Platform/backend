@@ -15,6 +15,8 @@ import com.ieltspath.assessment.domain.vo.AttemptChannel;
 import com.ieltspath.assessment.domain.vo.AttemptMode;
 import com.ieltspath.assessment.domain.vo.Skill;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -72,9 +74,10 @@ class GateEssayGradingIntegrationTest {
 
     private final UUID userId = UUID.randomUUID();
 
-    @Test
-    void submittedGateEssayIsQueuedThenCompletesResultAndOutboxAfterSuccessfulAiGrade() {
-        UUID attemptId = startAttempt("TOPIC_TEST");
+    @ParameterizedTest
+    @ValueSource(strings = {"TOPIC_TEST", "PRACTICE_TEST"})
+    void submittedGateEssayIsQueuedThenCompletesResultAndOutboxAfterSuccessfulAiGrade(String packageType) {
+        UUID attemptId = startAttempt(packageType);
         UUID itemId = itemId(attemptId);
         createSubmission.execute(new CreateLearnerSubmissionCommand(userId, itemId, "{\"task\":\"TASK_2\"}",
                 Skill.WRITING, "A considered response to the question.", null, "gate-essay-submit-" + attemptId));
@@ -111,9 +114,10 @@ class GateEssayGradingIntegrationTest {
                 "WHERE r.attempt_id = ? AND ir.attempt_item_id = ? AND ir.is_correct = TRUE AND ir.score = 1", attemptId, itemId));
     }
 
-    @Test
-    void providerFailureCreatesHumanFallbackWithoutCompletingTheGate() {
-        UUID attemptId = startAttempt("COURSE_TEST");
+    @ParameterizedTest
+    @ValueSource(strings = {"COURSE_TEST", "PRACTICE_TEST"})
+    void providerFailureCreatesHumanFallbackWithoutCompletingTheGate(String packageType) {
+        UUID attemptId = startAttempt(packageType);
         UUID itemId = itemId(attemptId);
         createSubmission.execute(new CreateLearnerSubmissionCommand(userId, itemId, "{}", Skill.WRITING,
                 "Submitted essay", null, "gate-essay-failure-" + attemptId));

@@ -111,7 +111,7 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
                     JOIN attempt_sections ase ON ase.id = ai.attempt_section_id
                     JOIN assessment_attempts aa ON aa.id = ase.attempt_id
                     WHERE gj.grading_mode = 'AI' AND gj.status = 'QUEUED'
-                      AND aa.attempt_type IN ('TOPIC_GATE', 'COURSE_GATE', 'PLACEMENT')
+                      AND aa.attempt_type IN ('TOPIC_GATE', 'COURSE_GATE', 'PLACEMENT', 'OFFICIAL_PRACTICE')
                     ORDER BY gj.created_at, gj.id
                     LIMIT :limit
                     FOR UPDATE OF gj SKIP LOCKED

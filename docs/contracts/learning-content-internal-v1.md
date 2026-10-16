@@ -1,5 +1,32 @@
 # Internal learning content API v1
 
+## Course practice-test milestones
+
+`GET /internal/learning-content/courses/{id}/practice-test-milestones` returns up to 100 milestones for an ACTIVE
+course. Unknown or inactive courses return `404`. Only PUBLISHED `PRACTICE_TEST` packages whose current version is
+PUBLISHED and belongs to that package are included. Results are ordered by `afterTopicSequence`, `code`, and package id:
+
+```json
+[{"packageId":"6b2bf327-9455-4be7-942c-f24c5669f422","packageVersionId":"adff6074-cfd2-4320-b8d6-684dece01862","code":"CHECKPOINT-A","title":"Course checkpoint","afterTopicSequence":2}]
+```
+
+`afterTopicSequence` is a one-based position **inside the course**, using Learning's topic order (free topics first,
+then topic `sortOrder`, then id). Only ACTIVE topics with a PUBLISHED lesson count. The current package version is
+resolved on each read, so republishing does not require replacing the milestone.
+
+ADMIN and CONTENT_AUTHOR manage the same projection through `GET` and `PUT
+/api/content/admin/courses/{id}/practice-test-milestones`. PUT atomically replaces the course's milestones and takes
+`{"milestones":[{"packageId":"6b2bf327-9455-4be7-942c-f24c5669f422","afterTopicSequence":2}]}`. An empty array clears them.
+Unknown courses return `404`; duplicate packages, nonpositive or unreachable positions, more than 100 entries, unpublished
+versions, and packages of another type return `400`. A package can belong to only one course's milestones, matching
+Learning's single first-score assignment per learner/package. Reads for management also show configured packages that
+have since been archived; their `packageVersionId` may be null. Learners cannot call the management routes.
+
+The seed supplies one midpoint checkpoint per course 5.5 and 6.5. Both contain original short Reading/Writing material;
+they are not full-length IELTS mocks. Practice-test questions are reserved against reuse in lessons or review sets.
+Publishing a `PRACTICE_TEST` locks its question rows, checks ownership and `EXAM` purpose, and requires gradable
+Reading/Listening questions or Writing essays with a numeric `passBand`, as for course-test grading support.
+
 **Status: approved 2026-10-01. Updated 2026-10-16: active status on topic sequence entries and filtering in learner refresh. Earlier updates added course sequence metadata and course final-test packages, derived `skills`, and mixed-skill course tests.**
 
 Content Service owns these ten routes under `/internal/learning-content` (three practice routes added 2026-10-03; course test packages added 2026-10-07). They require a verified internal JWT; callers forward the request bearer and `X-Correlation-Id`. Gateway must explicitly deny client access to `/internal/**`. Responses here can contain `answerSpec` and `explanation` and must never be proxied to a learner unchanged. This contract uses Content's camelCase JSON names. Vocabulary/video catalog data belongs to Library Service; Content V7 removed those tables. The `VOCABULARY` block contains logical sense IDs only, with no Content-owned vocabulary entity or cross-database lookup.

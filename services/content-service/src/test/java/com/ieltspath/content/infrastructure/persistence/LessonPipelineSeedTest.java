@@ -868,7 +868,9 @@ class LessonPipelineSeedTest {
         // questions, V26 the placement Writing Task 1 and V27 the 88 new questions of the full-length placement,
         // which no lesson or review may reuse either. V33 adds the 23 questions of the 15 free practice sets for
         // Reading 6.5 and Writing.
-        assertThat(reserved).hasSize(353);
+        // Every seeded question belongs to learning or an assessment, including the new practice checkpoints.
+        assertThat(all).hasSizeGreaterThanOrEqualTo(353);
+        assertThat(reserved).containsExactlyInAnyOrderElementsOf(all);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }
 

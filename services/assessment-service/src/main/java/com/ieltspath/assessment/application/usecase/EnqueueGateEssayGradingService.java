@@ -27,7 +27,8 @@ import java.util.UUID;
  */
 @Service
 public class EnqueueGateEssayGradingService {
-    private static final Set<AttemptType> GATES = Set.of(AttemptType.TOPIC_GATE, AttemptType.COURSE_GATE);
+    private static final Set<AttemptType> GATES = Set.of(AttemptType.TOPIC_GATE, AttemptType.COURSE_GATE,
+            AttemptType.OFFICIAL_PRACTICE);
 
     private final AttemptItemRepository attemptItems;
     private final GateEssayJobStore jobs;

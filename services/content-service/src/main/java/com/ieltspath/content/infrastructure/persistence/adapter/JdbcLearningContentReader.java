@@ -75,7 +75,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
             JOIN content_sections ts ON ts.id = tsq.section_id
             JOIN content_package_versions tv ON tv.id = ts.package_version_id
             JOIN content_packages tp ON tp.id = tv.package_id
-            WHERE tp.package_type IN ('TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
+            WHERE tp.package_type IN ('TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST', 'PRACTICE_TEST')
             """;
 
     /**
@@ -498,7 +498,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 JOIN content_package_versions v ON v.id = s.package_version_id
                 JOIN content_packages p ON p.id = v.package_id
                 WHERE p.id <> tq.package_id AND v.status = 'PUBLISHED'
-                  AND p.package_type IN ('PRACTICE_SET', 'TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
+                  AND p.package_type IN ('PRACTICE_SET', 'TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST', 'PRACTICE_TEST')
                 ORDER BY question_id, owner_type, owner_code
                 """, Map.of("versionId", packageVersionId), (rs, i) -> new QuestionUsageConflict(
                 uuid(rs, "question_id"), QuestionUsageConflict.OwnerType.valueOf(rs.getString("owner_type")),
@@ -711,7 +711,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 JOIN content_package_versions v ON v.id = s.package_version_id
                 JOIN content_packages p ON p.id = v.package_id
                 WHERE sq.question_version_id IN (:ids)
-                  AND p.package_type IN ('TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST', 'PRACTICE_SET')
+                  AND p.package_type IN ('TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST', 'PRACTICE_SET', 'PRACTICE_TEST')
                 """, Map.of("ids", questionVersionIds), (rs, i) -> uuid(rs, "id")));
     }
 

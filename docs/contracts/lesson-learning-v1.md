@@ -10,6 +10,32 @@ The MVP app displays course, topic and lesson status. The Java Learning Service 
 
 ## Learner routes
 
+### Course practice tests
+
+`GET /api/learning/courses/{id}/practice-tests` requires CUSTOMER and uses the verified learner id. It refreshes the
+active curriculum and returns an ordered array of `{packageId, packageVersionId, code, title, afterTopicSequence,
+status, percent}`. An absent/inactive course returns `404 COURSE_NOT_FOUND`. A milestone is `LOCKED` until the topic
+at that one-based position **within its course** is PASSED; it is then `AVAILABLE`. Once its assignment has consumed
+a result, it is `DONE` with `percent` from 0 to 100. Before consumption `percent` is null. Passing topics in another
+course never unlocks this milestone. This gate does not change topic/course progression or the course-score formula.
+
+`POST /api/learning/courses/{id}/practice-tests/{packageId}/assignments` takes no body and returns
+`{assignmentId, packageId, packageVersionId}`. It returns `403 PRACTICE_TEST_LOCKED` for a locked milestone and
+`404 PRACTICE_TEST_NOT_FOUND` for a package outside this course's published milestones. Concurrent/repeated requests
+return the same open assignment. The learner starts an Assessment attempt using the returned version; Content type
+`PRACTICE_TEST` determines attempt type `OFFICIAL_PRACTICE`. Submitted essays enter the existing quota-controlled AI
+grading queue, with the existing EXAMINER fallback.
+
+An unconsumed assignment matches the learner, frozen package version, and a result completed at or after assignment.
+As with topic-test consumption, the first matching completed result applied by the consumer freezes its percentage;
+replays, regrades and later attempts cannot change it. Regrading an already-applied free attempt cannot consume a
+later assignment. After DONE the assignment route permits retakes using the currently published version without
+creating another scored assignment. Evidence and question events still follow normal result-version idempotency.
+
+Free `OFFICIAL_PRACTICE` results without a matching assignment write evidence/events without course marks or topic
+progression. `OFFICIAL_PRACTICE` does not invoke the blocking-review generator; nonblocking review generation is
+deferred until review tiers exist. Reviews that were already pending from other sources are unaffected.
+
 All routes in this section have prefix `/api/learning`, require the learner bearer token through Gateway, and are scoped to the verified user id. Response JSON uses camelCase. Content reads forward the bearer and `X-Correlation-Id`; a Content `404` becomes `404 NOT_FOUND`, and other dependency failures remain `502`/`503`. Lists are ordered by the Content `sortOrder` and stable ids. Learners cannot call Content's internal API or list packages/questions through public `/api/content` routes.
 
 ### `GET /topics`

@@ -24,6 +24,11 @@ public interface LearningContentClient {
 
     List<TestPackage> getCourseTestPackages(UUID courseId);
 
+    List<PracticeTestMilestone> getPracticeTestMilestones(UUID courseId);
+
+    record PracticeTestMilestone(UUID packageId, UUID packageVersionId, String code, String title,
+                                 int afterTopicSequence) {}
+
     /** Published placement tests, ordered by package id. */
     List<TestPackage> getPlacementTestPackages();
 

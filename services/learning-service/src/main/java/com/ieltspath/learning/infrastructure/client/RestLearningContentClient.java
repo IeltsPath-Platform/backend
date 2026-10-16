@@ -66,6 +66,11 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public List<PracticeTestMilestone> getPracticeTestMilestones(UUID courseId) {
+        return get("/courses/{id}/practice-test-milestones", new ParameterizedTypeReference<>() { }, courseId);
+    }
+
+    @Override
     public List<TestPackage> getPlacementTestPackages() {
         return get("/placement-packages", new ParameterizedTypeReference<>() { });
     }

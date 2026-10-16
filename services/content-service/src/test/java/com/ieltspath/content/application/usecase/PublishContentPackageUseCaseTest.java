@@ -138,7 +138,7 @@ class PublishContentPackageUseCaseTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"PRACTICE_SET,LEARNING", "TOPIC_TEST,LEARNING", "MOCK_TEST,EXAM", "PLACEMENT_TEST,PLACEMENT"})
+    @CsvSource({"PRACTICE_SET,LEARNING", "TOPIC_TEST,LEARNING", "MOCK_TEST,EXAM", "PLACEMENT_TEST,PLACEMENT", "PRACTICE_TEST,EXAM"})
     void questionsMustMatchThePackagesPurposeBeforePublishing(PackageType type, QuestionPurpose requiredPurpose) {
         ContentPackage pkg = ContentPackage.create("PURPOSE-CHECK", "Purpose", type, null);
         ContentPackageVersion draft = ContentPackageVersion.create(pkg.getId(), 1, "{}");
@@ -158,5 +158,35 @@ class PublishContentPackageUseCaseTest {
         checks.verify(lessons).lockQuestionsForPublishing(draft.getId());
         checks.verify(lessons).questionsUsedElsewhere(draft.getId());
         checks.verify(lessons).questionsWithWrongPurpose(draft.getId(), requiredPurpose);
+    }
+
+    @Test
+    void practiceTestCannotPublishAQuestionOwnedByAnotherPackage() {
+        var practice = ContentPackage.create("PRACTICE-OWNERSHIP", "Practice", PackageType.valueOf("PRACTICE_TEST"), null);
+        var draft = ContentPackageVersion.create(practice.getId(), 1, "{}");
+        practice.addVersion(draft);
+        when(contentPackageRepository.findById(practice.getId())).thenReturn(Optional.of(practice));
+        when(lessons.questionsUsedElsewhere(draft.getId())).thenReturn(List.of(
+                new QuestionUsageConflict(UUID.randomUUID(), QuestionUsageConflict.OwnerType.LESSON, "L1")));
+        assertThatThrownBy(() -> publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
+                .isInstanceOf(QuestionAlreadyUsedException.class);
+        verify(contentPackageRepository, never()).save(any());
+    }
+
+    @Test
+    void practiceTestEssayWithoutPassBandCannotPublish() {
+        var practice = ContentPackage.create("PRACTICE-ESSAY", "Practice", PackageType.valueOf("PRACTICE_TEST"), null);
+        var draft = ContentPackageVersion.create(practice.getId(), 1, "{}");
+        practice.addVersion(draft);
+        when(contentPackageRepository.findById(practice.getId())).thenReturn(Optional.of(practice));
+        when(lessons.packageQuestionSpecs(draft.getId())).thenReturn(List.of(
+                new com.ieltspath.content.application.result.PackageQuestionSpec(UUID.randomUUID(),
+                        com.ieltspath.content.domain.vo.QuestionType.ESSAY, com.ieltspath.content.domain.vo.Skill.WRITING,
+                        "{\"type\":\"ESSAY\",\"task\":\"TASK_2\"}")));
+        assertThatThrownBy(() -> publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
+                .isInstanceOf(InvalidContentStateException.class);
+        verify(contentPackageRepository, never()).save(any());
     }
 }

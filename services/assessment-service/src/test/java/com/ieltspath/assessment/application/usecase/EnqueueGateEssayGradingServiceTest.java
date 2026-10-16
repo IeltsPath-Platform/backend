@@ -95,6 +95,18 @@ class EnqueueGateEssayGradingServiceTest {
     }
 
     @Test
+    void officialPracticeEssayUsesTheExistingAiQueue() {
+        AssessmentAttempt attempt = attempt(AttemptType.OFFICIAL_PRACTICE);
+        UUID essayId = UUID.randomUUID();
+        UUID submissionId = UUID.randomUUID();
+        when(items.findByAttemptId(attempt.getId())).thenReturn(List.of(item(essayId, ESSAY)));
+        when(jobs.submittedEssays(List.of(essayId))).thenReturn(Map.of(essayId, submissionId));
+        service().enqueueOrGrade(attempt);
+        verify(jobs).enqueueAi(Map.of(essayId, submissionId), userId);
+        verifyNoInteractions(autoGrader, placementGrading);
+    }
+
+    @Test
     void placementAttemptIsGradedByThePlacementServiceOnly() {
         AssessmentAttempt attempt = attempt(AttemptType.PLACEMENT);
 
