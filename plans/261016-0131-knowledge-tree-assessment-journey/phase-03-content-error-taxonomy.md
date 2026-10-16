@@ -15,7 +15,9 @@ dependencies: []
   tự động và chặn mã lạ khi giám khảo nhập. Test: content 312, learning 280, assessment 243, đều xanh, không skip.
 - **3b (nội dung): nháp xong, chưa duyệt.** Mã, mức severity và gợi ý sửa ở V34 là nháp. V35 gắn `distractors` cho 19 câu
   trắc nghiệm Reading và Listening (mục đích `LEARNING`) với 25 phương án sai. Đây là phạm vi có bằng chứng trong giải thích
-  của chính câu hỏi. Còn 139 câu trắc nghiệm Reading/Listening chưa gắn. Phase 3 giữ `in_progress` cho đến khi người hiểu
+  của chính câu hỏi. Còn 139 câu trắc nghiệm Reading/Listening chưa gắn. Gói duyệt (bảng mã, 19 câu, 6 phương án chưa gắn, quyết định Q1 đến Q4):
+  [plans/reports/review-error-taxonomy-pack-261016-2141-report.md](../reports/review-error-taxonomy-pack-261016-2141-report.md).
+  Phase 3 giữ `in_progress` cho đến khi người hiểu
   IELTS duyệt.
 
 ### Phạm vi 3b và cách lấy dữ liệu
