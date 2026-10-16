@@ -1,5 +1,7 @@
 # Rà soát plan dashboard cá nhân
 
+> Báo cáo này viết trước khi bỏ ôn từ vựng và bỏ việc sửa luồng chấm bài. Các dòng nhắc vocab, provenance, snapshot bên dưới không còn áp dụng; chưa rà soát lại sau thay đổi.
+
 Ngày: 14/10/2026. Loại: tự rà soát nguồn và tính nhất quán của tài liệu; không phải kiểm thử ứng dụng hay review độc lập.
 
 ## Kết quả

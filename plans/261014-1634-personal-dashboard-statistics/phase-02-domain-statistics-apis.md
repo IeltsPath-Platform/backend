@@ -1,25 +1,25 @@
 ---
 phase: 2
 title: "Domain statistics APIs"
-status: in_progress
+status: pending
 effort: ""
 dependencies: []
 ---
 
-# Phase 2: API tiến độ, band và ôn từ vựng
+# Phase 2: API tiến độ và lịch sử band
 
 ## Overview
 
-Nguồn chuẩn: [thiết kế §2.2–2.5 và §4](./dashboard-statistics-design.md). Có thể triển khai song song phase 1 sau khi chốt quy ước scope/availability. Ba nhóm code dưới đây có owner riêng, không sửa cùng migration/config.
+Nguồn chuẩn: [thiết kế §2.2, §2.3, §2.5 và §4](./dashboard-statistics-design.md). Có thể triển khai song song phase 1 sau khi chốt quy ước scope/availability. Hai nhóm code dưới đây có owner riêng, không sửa cùng migration/config.
 
-Cập nhật 15/10/2026: API và luồng ghi đã triển khai; migration/query đã chạy PostgreSQL Testcontainers trong kiểm thử độc lập. Lượt kiểm chứng cuối sau sửa lỗi đang chạy. Band nhận `timezone` IANA tùy chọn (mặc định `Asia/Ho_Chi_Minh`), lọc từ đầu ngày `from` tới trước đầu ngày `to + 1` trong timezone đó; `dataFrom` dùng cùng timezone. FE gửi timezone trình duyệt.
+Ngoài phạm vi: ôn từ vựng (plan riêng) và sửa luồng chấm bài. Assessment chỉ thêm API đọc.
 
 ## Requirements
 
 - Tiến độ skill và course tính lesson completion; Practice/topic/course test là trạng thái riêng.
-- Band history chỉ dùng kết quả đủ provenance, version mới thay version cũ cùng attempt.
-- Vocab có write flow thật, due scheduling và counters nhất quán; không fake số liệu.
+- Band history chỉ đọc kết quả đã chấm xong, version mới thay version cũ cùng attempt; placement luôn có nhãn ước lượng.
 - Không triển khai Mentor, không gọi LLM mới để tạo dashboard.
+- Không sửa luồng finalize/chấm bài, không đổi band/gate/event hiện có.
 
 ## Related Code Files
 
@@ -29,17 +29,15 @@ Base BE: `D:/Fall2026/New folder/BE/backend`; các đường dẫn dưới đây
 |---|---|---|
 | Content | `services/content-service/src/main/java/com/ieltspath/content/api/controller/InternalLearningContentController.java`; `application/port/LearningContentReader.java`; `infrastructure/persistence/adapter/JdbcLearningContentReader.java` cùng package root | Batch metadata use case/result/DTO và query test |
 | Learning | `services/learning-service/src/main/java/com/ieltspath/learning/application/port/LearningContentClient.java`; `infrastructure/client/RestLearningContentClient.java`; `domain/aggregate/LessonProgress.java`; `infrastructure/persistence/JdbcLessonProgressRepository.java` cùng package root | `GetLearningProgressStatisticsUseCase`, read repository/result/DTO/controller, course activity aggregate/repository khi cần |
-| Assessment | `services/assessment-service/src/main/java/com/ieltspath/assessment/application/usecase/PlacementGradingService.java`, `AssessmentResultCompleter.java`, `FinalizeAssessmentResultUseCase.java`; `domain/entity/SkillScore.java`, `AssessmentResult.java` cùng package root | `GetBandHistoryUseCase`, query repository, provenance/snapshot fields, controller/DTO, migration additive |
-| Library | `services/library-service/src/main/java/com/ieltspath/library/domain/aggregate/Flashcard.java`; use cases `CreateFlashcardUseCase`, `UpdateFlashcardUseCase`, `DeleteFlashcardUseCase`; `api/controller/FlashcardController.java` cùng package root | Personal vocabulary progress + review session/event model/use cases/repositories/API/migration |
+| Assessment | Chỉ **đọc** `services/assessment-service/src/main/java/com/ieltspath/assessment/domain/entity/SkillScore.java`, `AssessmentResult.java` và repository hiện có; không sửa `PlacementGradingService`, `AssessmentResultCompleter`, `FinalizeAssessmentResultUseCase` | `GetBandHistoryUseCase`, query repository, controller/DTO; index additive nếu EXPLAIN cho thấy cần |
 
-Package path rút gọn trong một ô luôn nối với root Java service ở đầu ô. Migration mới tại `services/<owner>-service/src/main/resources/db/migration/`; chọn Vnext khi triển khai, không tự đoán version hôm nay.
+Package path rút gọn trong một ô luôn nối với root Java service ở đầu ô. Migration mới (course activity ở Learning; index nếu cần ở Assessment) tại `services/<owner>-service/src/main/resources/db/migration/`; chọn Vnext khi triển khai, không tự đoán version hôm nay.
 
 ## Architecture
 
 - Content sở hữu metadata, trả DTO theo batch. Learning sở hữu completion và tính phần trăm bằng tập metadata đó; không đọc DB Content.
 - Learning current counts là query, không phát event/tăng counter ở mọi endpoint rồi khó đối soát. Course activity ghi tại luồng bắt đầu học thành công, giữ lock per-user theo convention Learning.
-- Assessment freeze score/provenance lúc finalize trong transaction; một query lấy newest COMPLETED version mỗi attempt. Không đổi AssessmentCompleted.v2 chỉ để có dữ liệu dashboard.
-- Library aggregate bảo vệ state transition theo `stateVersion`, review request idempotent, history/event trong DB cùng transaction; không cần RabbitMQ cho việc đổi bucket nội bộ.
+- Assessment chỉ đọc: một query lấy newest COMPLETED version mỗi attempt. Không đổi AssessmentCompleted.v2, không thêm cột score/provenance.
 
 ## Implementation Steps
 
@@ -51,37 +49,27 @@ Package path rút gọn trong một ô luôn nối với root Java service ở �
 4. Ghi bắt đầu/course activity tại open lesson thành công; timestamp lịch sử chưa đủ chứng minh là null/provenance legacy, không dùng refresh timestamp. Không lấy telemetry client làm quyền enrollment.
 5. Trả preview/course cursor + resumeTarget theo gate; không đổi endpoint course list cũ hoặc đặt lại placement bắt buộc.
 
-### B. Assessment
+### B. Assessment (chỉ đọc)
 
-1. Audit mọi producer finalize thật sự đang dùng (placement, objective/gate, HUMAN/AI), xác định trường nào persisted, trường nào tính lại. Thêm snapshot/provenance ở đúng nơi hoàn tất, không chỉ patch GET result.
-2. Tách `gradingSource` và `measurementQuality`; điểm 0/5.5 không tự chứng minh fallback. Đảm bảo fallback default và unassessed Speaking được tag ngay lúc chấm.
-3. Eligibility theo loại đề/rubric/skill coverage; kết quả cũ thiếu chứng cứ là UNKNOWN_LEGACY. Không dùng điểm ngắn hoặc overall của gate để giả full IELTS band.
-4. Timeline newest COMPLETED/attempt, sort submittedAt/id; pending regrade giữ previous completed có nhãn; cursor page 100. Summary latest/baseline/delta lấy trên toàn range cùng series, không chỉ page đầu.
-5. Không regrade hàng loạt, không sửa band/gate cũ để “làm đẹp” dashboard. Thêm migration và contract mới, regression test đảm bảo response/gate/event cũ vẫn đúng.
-
-### C. Library
-
-1. Duyệt countingUnit=VOCABULARY_SENSE, lịch ôn, cách recall objective/self-rated. Enum/method domain cho NEW → L1 → L2 → L3 → RETAINED và quên → L1.
-2. Khóa duy nhất user+sense, quản lý add/archive/reactivate; nhiều deck không tạo duplicate. Lưu lịch sử khi archive, không hard delete state như side effect.
-3. Start review queue giới hạn, kiểm ownership, phiên hết hạn, item stateVersion. Prompt/feedback theo phase; không expose correct answer trước submit nếu objective.
-4. Submit requestId + expectedVersion trong transaction: replay trả kết quả cũ; mismatch trả conflict; thay state, dueAt, event atomic. Luyện trước hạn không thăng cấp.
-5. Summary GROUP BY states và due predicate; tổng bucket=total, retainedPercent cùng mẫu số. Kết nối “Ôn ngay” FE là công việc bắt buộc để card có dữ liệu thật, không hẹn vô thời hạn ngoài plan.
+1. Đọc code và schema để xác nhận: result nào COMPLETED, trường nào đã lưu, trường nào được tính lại khi đọc (band placement tính lại từ dữ liệu/config). Ghi giới hạn này vào contract.
+2. Query newest COMPLETED version mỗi attempt, lọc owner và khoảng trước. Nhóm theo `seriesKind` (loại đề). Placement là series riêng, luôn nhãn "ước lượng placement"; không vẽ Speaking; không tính Overall.
+3. Overall chỉ cho loại đề có đủ 4 kỹ năng cùng attempt, đều có điểm do hệ thống chấm. Đề thiếu tiêu chuẩn thì trả unavailable kèm lý do.
+4. Timeline sort submittedAt/id; pending regrade giữ điểm completed trước đó kèm `regradePending`; cursor page 100. Summary latest/baseline/delta tính trên toàn range cùng series, không chỉ page đầu.
+5. Không migration đổi cột, không regrade, không sửa band/gate cũ. Thêm index chỉ khi EXPLAIN cho thấy cần. Regression: response/gate/event cũ không đổi vì chỉ thêm đường đọc.
 
 ## Success Criteria
 
-- [x] Completion retry không nhân đôi; multi-skill đúng; practice fail không giảm lesson completion.
+- [ ] Completion retry không nhân đôi; multi-skill đúng; practice fail không giảm lesson completion.
 - [ ] Course chưa pass topic đầu nhưng đã học vẫn hiện; denominator lấy metadata đầy đủ và có revision.
-- [x] Regrade không tăng attempts; fallback/unassessed không xuất hiện như measured.
-- [x] Speaking thiếu không biến thành 0 và không tạo Overall đủ 4 kỹ năng giả.
-- [ ] Vocab 201 total/110 retained trả 54.7% theo precision policy; due là tập riêng.
-- [x] Hai review đồng thời không vượt một level; replay trả đúng snapshot ban đầu.
-- [x] User không đọc/ghi kết quả/session của user khác; static paths không bị bắt bởi `/{id}`.
-- [ ] Đủ producer và luồng ghi trước khi bật card; không seed mock để pass.
+- [ ] Regrade không tăng attempts; placement luôn có nhãn ước lượng.
+- [ ] Speaking thiếu không biến thành 0 và không tạo Overall giả.
+- [ ] User không đọc kết quả của user khác; static paths không bị bắt bởi `/{id}`.
+- [ ] Không file nào trong luồng finalize/chấm bài bị sửa.
 
 ## Validation
 
-Unit cho công thức/eligibility/state; MVC cho ownership/bounds; Testcontainers cho latest-result query, unique/locking, aggregate và migration. Chạy lần lượt module bị sửa: `mvn -q -pl services/content-service -am test`, `mvn -q -pl services/learning-service -am test`, `mvn -q -pl services/assessment-service -am test`, `mvn -q -pl services/library-service -am test`. LLM giả/stub, không gọi dịch vụ chấm thật trong test. Review SQL/EXPLAIN với dữ liệu fixture đại diện.
+Unit cho công thức; MVC cho ownership/bounds; Testcontainers cho latest-result query và migration. Chạy lần lượt module bị sửa: `mvn -q -pl services/content-service -am test`, `mvn -q -pl services/learning-service -am test`, `mvn -q -pl services/assessment-service -am test`. Review SQL/EXPLAIN với dữ liệu fixture đại diện.
 
 ## Risks and rollback
 
-Đề thi hiện tại có thể chưa đủ rubric/Speaking để Overall có điểm; hiển thị unavailable là đúng. Không coi enum MOCK tồn tại là toàn bộ mock-test flow đã có. Đổi nội dung làm mẫu số thay đổi phải báo revision. Rollback API/UI mới và giữ schema additive, không đổi scoring/gate cũ.
+Band placement hiện được tính lại khi đọc, nên đổi config có thể làm điểm hiển thị đổi theo; chấp nhận vì plan này không sửa luồng chấm, và nhãn ước lượng nói rõ điều đó. Điểm dự phòng (Writing 5.5) không phân biệt được với điểm thật trong dữ liệu; nếu cần phân biệt thì mở plan riêng. Đổi nội dung làm mẫu số thay đổi phải báo revision. Rollback API/UI mới và giữ schema additive.

@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Study time collection"
-status: in_progress
+status: pending
 effort: ""
 dependencies: []
 ---
@@ -11,8 +11,6 @@ dependencies: []
 ## Overview
 
 Nguồn chuẩn: [thiết kế §2.1, §3.2, §4](./dashboard-statistics-design.md). Triển khai dữ liệu mới tại User và hook FE trên trang học thật. Không cộng duration client CRUD hiện tại vào thống kê chính thức.
-
-Cập nhật 15/10/2026: đã triển khai và chạy Testcontainers thật cho persistence/replay; lượt kiểm chứng cuối đang chạy. Browser nhiều tab, sleep/resume, offline, logout và media chưa chạy nên phase chưa hoàn tất. Assessment chưa lưu liên kết course/topic trong attempt; `StudyContext.courseId` vẫn null và thời gian thi chưa được phân bổ vào course.
 
 ## Requirements
 
@@ -32,12 +30,12 @@ Tận dụng Clock, validation/ErrorResponse và CurrentUserProvider hiện có.
 
 - BE tạo `services/user-service/src/main/java/com/ieltspath/user/domain/aggregate/StudySession.java` và repository tương ứng.
 - BE tạo use cases `StartStudySessionUseCase`, `RecordStudyHeartbeatUseCase`, `CloseStudySessionUseCase`, `GetStudyTimeStatisticsUseCase` trong `services/user-service/src/main/java/com/ieltspath/user/application/usecase/`.
-- BE tạo `application/port/StudySourceVerifier.java`, adapter HTTP theo owner; endpoint context tối thiểu tại Learning/Assessment/Library nếu chưa có API trả dữ liệu cần xác nhận.
+- BE tạo `application/port/StudySourceVerifier.java`, adapter HTTP theo owner; endpoint context tối thiểu tại Learning/Assessment nếu chưa có API trả dữ liệu cần xác nhận.
 - BE tạo controller/DTO dưới `services/user-service/src/main/java/com/ieltspath/user/api/`; entity/repository/adapter cho session, interval, daily total, goal history theo convention user-service.
 - BE sửa `services/user-service/src/main/java/com/ieltspath/user/application/usecase/CreateLearningGoalUseCase.java` và `ChangeLearningGoalStatusUseCase.java` để ghi goal history cùng transaction; không sửa semantic các API goal hiện tại.
 - BE migration mới `services/user-service/src/main/resources/db/migration/V{next}__study_time_tracking.sql`.
 - FE tạo `src/features/study-activity/useStudySession.ts`, `studyActivityApi.ts`; sửa `src/lib/httpClient.ts` chỉ nếu cần keepalive option.
-- FE nối tại LessonPage/PracticePage/ReviewPage/PlacementPage/TopicTestPage và media đã liệt kê trong bản thiết kế; Library review nối khi phase 2 có source thật.
+- FE nối tại LessonPage/PracticePage/ReviewPage/PlacementPage/TopicTestPage và media đã liệt kê trong bản thiết kế.
 - Không xóa file hiện có; không đổi config/shared/security hoặc activity CRUD chỉ để dashboard chạy.
 
 ## Implementation Steps
@@ -55,11 +53,11 @@ Tận dụng Clock, validation/ErrorResponse và CurrentUserProvider hiện có.
 ## Success Criteria
 
 - [ ] 60 giây active trong một tab không thành 120 giây khi tab thứ hai mở cùng bài.
-- [x] Mất ACK và gửi lại cùng payload không đổi daily total.
-- [x] Request source/user/epoch sai bị từ chối trước ghi.
+- [ ] Mất ACK và gửi lại cùng payload không đổi daily total.
+- [ ] Request source/user/epoch sai bị từ chối trước ghi.
 - [ ] Qua ngày, goal đổi, hidden/idle/media đều đúng policy và có test.
-- [x] Không backfill active time bằng attempt elapsed/audio duration.
-- [x] Query có index user/date/scope, khoảng tối đa 366 ngày; không đọc findAll unbounded.
+- [ ] Không backfill active time bằng attempt elapsed/audio duration.
+- [ ] Query có index user/date/scope, khoảng tối đa 366 ngày; không đọc findAll unbounded.
 - [ ] Telemetry offline không làm mất bài nộp hoặc thay đổi gate.
 
 ## Validation
