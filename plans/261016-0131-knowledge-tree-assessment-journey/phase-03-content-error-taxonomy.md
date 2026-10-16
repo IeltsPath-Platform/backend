@@ -13,8 +13,23 @@ dependencies: []
 - **3a (kỹ thuật): xong, chưa commit.** Bảng `error_types` (V34) với 25 mã nháp, CRUD và endpoint nội bộ, kiểm `distractors`
   khi tạo phiên bản câu, `ErrorTagger` ở learning và assessment dùng chung bộ vector, assessment ghi `error_analysis_items`
   tự động và chặn mã lạ khi giám khảo nhập. Test: content 312, learning 280, assessment 243, đều xanh, không skip.
-- **3b (nội dung): chờ duyệt.** Danh sách mã chính thức, mức severity, gợi ý sửa, và gắn `distractors` cho câu trắc nghiệm
-  trong seed của các KP Reading và Listening. Cần người hiểu IELTS duyệt.
+- **3b (nội dung): nháp xong, chưa duyệt.** Mã, mức severity và gợi ý sửa ở V34 là nháp. V35 gắn `distractors` cho 19 câu
+  trắc nghiệm Reading và Listening (mục đích `LEARNING`) với 25 phương án sai. Đây là phạm vi có bằng chứng trong giải thích
+  của chính câu hỏi. Còn 139 câu trắc nghiệm Reading/Listening chưa gắn. Phase 3 giữ `in_progress` cho đến khi người hiểu
+  IELTS duyệt.
+
+### Phạm vi 3b và cách lấy dữ liệu
+
+- Chọn câu: giải thích phải nêu rõ vì sao một phương án sai là sai (ví dụ "Library là bẫy", "C không có căn cứ").
+  Không đoán phương án sai từ đáp án đúng.
+- Mỗi dòng trong V35 có khóa `correct` để chắc chắn không gắn nhầm vào đáp án đúng. Migration thêm khóa vào `answer_spec`
+  mà không đổi đáp án, nên không làm thay đổi kết quả chấm các lần làm đã có.
+- Một phương án sai không có mã nào khớp được để trống. Nhóm này đề xuất để người duyệt quyết định:
+  - `CONTRADICTED_BY_PASSAGE`: phương án nói ngược lại bài (4 phương án: 26/001 A, 33/001 A, 27/015 A, 33/002 B).
+  - `DETAIL_AS_MAIN_IDEA`: lấy một chi tiết làm ý chính (1 phương án: 20/003 B).
+  - `WRONG_TIME_FRAME`: gắn ý với một mốc thời gian mà bài không nói (1 phương án: 27/010 B).
+  Chưa thêm các mã này vào danh mục vì đó là quyết định về taxonomy.
+- Với các câu có giải thích không nêu bẫy, không gắn gì. Người duyệt có thể bổ sung sau bằng migration mới.
 
 ## Sai khác so với bản gốc (đã quyết định khi làm 3a)
 
