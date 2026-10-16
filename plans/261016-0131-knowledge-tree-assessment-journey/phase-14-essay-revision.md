@@ -33,10 +33,10 @@ essay lesson và Practice chấm một lần (`lesson_writing_submissions`), kh�
   - prompt chấm giữ nguyên đề và rubric; **không** gửi bản trước hay nhận xét trước cho LLM (tránh chấm lệch).
 - **So sánh:** `GET /api/learning/writing-submissions/{id}/history` trả chuỗi các bản: band từng tiêu chí, band tổng,
   số từ, mã lỗi (phase 3) của từng bản, và `delta` so với bản trước; mã lỗi đã hết và còn lại giữa hai bản gần nhất.
-- **Mastery (quyết định):** bản sửa **không** ghi thêm `kp_evidence` cho KP của đề, để giữ luật "bằng chứng chỉ ghi ở lần
+- **Mastery (đã chốt với người dùng 2026-10-16):** bản sửa **không** ghi thêm `kp_evidence` cho KP của đề, để giữ luật "bằng chứng chỉ ghi ở lần
   nộp đầu" (AGENTS.md §3.8, D7). Thay vào đó ghi `question_attempt_events` với `first_submission = false` và hiện tiến bộ
-  trong báo cáo (phase 5: khối `evidence` thêm `revisionDelta`). Muốn bản sửa cập nhật mastery thì phải đổi luật AGENTS.md;
-  đây là điểm bạn có thể quyết lại.
+  trong báo cáo (phase 5: khối `evidence` thêm `revisionDelta`). Lệch với nhánh "HV sửa bài → cập nhật mastery" trên board là có chủ ý;
+  khi trình bày cần nói rõ lý do (tránh mastery tăng giả do chép nhận xét rồi nộp lại).
 - **Cổng và bài ôn:** bản sửa không tạo bài ôn mới và không đổi trạng thái Practice đã đạt hoặc chưa đạt.
 
 ## Related Code Files
