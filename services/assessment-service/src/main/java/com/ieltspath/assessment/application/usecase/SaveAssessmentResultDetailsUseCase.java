@@ -6,6 +6,8 @@ import com.ieltspath.assessment.application.command.KnowledgeJudgmentInput;
 import com.ieltspath.assessment.application.command.SaveAssessmentResultDetailsCommand;
 import com.ieltspath.assessment.application.command.SaveGradingDetailsCommand;
 import com.ieltspath.assessment.application.command.SkillScoreInput;
+import com.ieltspath.assessment.application.exception.UnknownErrorCodeException;
+import com.ieltspath.assessment.application.port.ErrorTypeCatalog;
 import com.ieltspath.assessment.domain.entity.AssessmentResult;
 import com.ieltspath.assessment.domain.entity.ErrorAnalysisItem;
 import com.ieltspath.assessment.domain.entity.ItemResult;
@@ -32,6 +34,7 @@ public class SaveAssessmentResultDetailsUseCase {
     private final ErrorAnalysisItemRepository errors;
     private final AttemptItemKnowledgePointRepository knowledgeSnapshot;
     private final ItemResultKnowledgeJudgmentRepository judgments;
+    private final ErrorTypeCatalog errorTypes;
 
     public SaveAssessmentResultDetailsUseCase(AssessmentAttemptRepository attempts,
                                               AssessmentResultRepository results,
@@ -40,7 +43,8 @@ public class SaveAssessmentResultDetailsUseCase {
                                               ItemResultRepository items,
                                               ErrorAnalysisItemRepository errors,
                                               AttemptItemKnowledgePointRepository knowledgeSnapshot,
-                                              ItemResultKnowledgeJudgmentRepository judgments) {
+                                              ItemResultKnowledgeJudgmentRepository judgments,
+                                              ErrorTypeCatalog errorTypes) {
         this.attempts = attempts;
         this.results = results;
         this.attemptItems = attemptItems;
@@ -49,6 +53,7 @@ public class SaveAssessmentResultDetailsUseCase {
         this.errors = errors;
         this.knowledgeSnapshot = knowledgeSnapshot;
         this.judgments = judgments;
+        this.errorTypes = errorTypes;
     }
 
     /** Learner entry: the latest version of the caller's own attempt. The result's band is not changed. */
@@ -151,6 +156,12 @@ public class SaveAssessmentResultDetailsUseCase {
         }
 
         if (errorInputs != null && !errorInputs.isEmpty()) {
+            Set<String> activeCodes = errorTypes.activeCodes();
+            List<String> unknownCodes = errorInputs.stream().map(ErrorAnalysisInput::errorType)
+                    .filter(code -> !activeCodes.contains(code)).distinct().toList();
+            if (!unknownCodes.isEmpty()) {
+                throw new UnknownErrorCodeException(unknownCodes);
+            }
             Set<UUID> submittedErrorIds = new HashSet<>();
             for (ErrorAnalysisInput error : errorInputs) {
                 if (error.id() == null || !submittedErrorIds.add(error.id())) {

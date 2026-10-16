@@ -26,6 +26,7 @@ import com.ieltspath.content.application.usecase.GetTopicSequenceUseCase;
 import com.ieltspath.content.application.usecase.GetTopicTestPackagesUseCase;
 import com.ieltspath.content.application.usecase.GetCourseTestPackagesUseCase;
 import com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase;
+import com.ieltspath.content.application.usecase.ListErrorTypesUseCase;
 import com.ieltspath.content.application.usecase.SearchPracticeSetsUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +61,7 @@ public class InternalLearningContentController {
     private final CountAvailablePracticeSetsUseCase countAvailablePracticeSets;
     private final GetCourseTestPackagesUseCase getCourseTestPackages;
     private final GetPlacementTestPackagesUseCase getPlacementTestPackages;
+    private final ListErrorTypesUseCase listErrorTypes;
     private final GetActiveKnowledgePrerequisitesUseCase getActiveKnowledgePrerequisites;
 
     @PostMapping("/knowledge-points/prerequisites")
@@ -71,6 +73,19 @@ public class InternalLearningContentController {
     @GetMapping("/placement-packages")
     public List<TopicTestPackageResponse> placementPackages() {
         return getPlacementTestPackages.execute().stream().map(TopicTestPackageResponse::from).toList();
+    }
+
+    /** Active error types only; grading and error analysis record codes from this list. */
+    @GetMapping("/error-types")
+    public List<ActiveErrorTypeResponse> errorTypes() {
+        return listErrorTypes.execute(true).stream().map(ActiveErrorTypeResponse::from).toList();
+    }
+
+    public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint) {
+        static ActiveErrorTypeResponse from(com.ieltspath.content.domain.aggregate.ErrorType errorType) {
+            return new ActiveErrorTypeResponse(errorType.getCode(), errorType.getName(),
+                    errorType.getCategory().name(), errorType.getSeverity(), errorType.getFixHint());
+        }
     }
 
     @GetMapping("/courses/{id}/test-packages")

@@ -109,6 +109,8 @@ class InternalLearningContentControllerTest {
     private final GetLessonPracticeSetsUseCase lessonPracticeSets = mock(GetLessonPracticeSetsUseCase.class);
     private final GetTopicPracticeSetsUseCase topicPracticeSets = mock(GetTopicPracticeSetsUseCase.class);
     private final CountAvailablePracticeSetsUseCase availability = mock(CountAvailablePracticeSetsUseCase.class);
+    private final com.ieltspath.content.application.usecase.ListErrorTypesUseCase errorTypes =
+            mock(com.ieltspath.content.application.usecase.ListErrorTypesUseCase.class);
     private final GetActiveKnowledgePrerequisitesUseCase activeKnowledgePrerequisites =
             mock(GetActiveKnowledgePrerequisitesUseCase.class);
     private final com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase placementTests =
@@ -121,7 +123,7 @@ class InternalLearningContentControllerTest {
         validator.afterPropertiesSet();
         mockMvc = MockMvcBuilders.standaloneSetup(new InternalLearningContentController(topicSequence, topicLessons,
                         lessonContent, testPackages, search, packageVersion, lessonPracticeSets, topicPracticeSets,
-                        availability, courseTests, placementTests, activeKnowledgePrerequisites))
+                        availability, courseTests, placementTests, errorTypes, activeKnowledgePrerequisites))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();

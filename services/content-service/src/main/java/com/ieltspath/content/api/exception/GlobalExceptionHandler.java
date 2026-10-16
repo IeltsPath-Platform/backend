@@ -27,6 +27,7 @@ public class GlobalExceptionHandler {
             TopicNotFoundException.class,
             CourseNotFoundException.class,
             KnowledgePointNotFoundException.class,
+            ErrorTypeNotFoundException.class,
             ContentPackageNotFoundException.class,
             QuestionNotFoundException.class,
             AssetNotFoundException.class,
@@ -42,11 +43,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             DuplicateCodeException.class,
             InvalidContentStateException.class,
+            InvalidErrorTypeException.class,
             IllegalArgumentException.class
     })
     public ResponseEntity<ErrorResponse> handleBadRequestException(Exception ex, HttpServletRequest request) {
         log.warn("Bad request: {}", ex.getMessage());
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(UnknownErrorCodeException.class)
+    public ResponseEntity<ErrorResponse> handleUnknownErrorCode(UnknownErrorCodeException ex,
+                                                                HttpServletRequest request) {
+        log.warn("Unknown error code refused: {}", ex.getMessage());
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "UNKNOWN_ERROR_CODE"));
     }
 
     @ExceptionHandler(InvalidPackageLessonException.class)

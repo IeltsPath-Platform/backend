@@ -1,6 +1,7 @@
 package com.ieltspath.assessment.api.exception;
 
 import com.ieltspath.assessment.application.exception.ContentUnavailableException;
+import com.ieltspath.assessment.application.exception.UnknownErrorCodeException;
 import com.ieltspath.assessment.domain.exception.*;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,6 +38,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> notAttemptable(PackageNotAttemptableException e, HttpServletRequest r) {
         return build(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage(), r.getRequestURI(), null,
                 "PACKAGE_NOT_ATTEMPTABLE");
+    }
+
+    @ExceptionHandler(UnknownErrorCodeException.class)
+    public ResponseEntity<ErrorResponse> unknownErrorCode(UnknownErrorCodeException e, HttpServletRequest r) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage(), r.getRequestURI(), null, "UNKNOWN_ERROR_CODE");
     }
 
     @ExceptionHandler(ContentUnavailableException.class)

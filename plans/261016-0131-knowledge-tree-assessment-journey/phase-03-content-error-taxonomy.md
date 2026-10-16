@@ -1,12 +1,30 @@
 ---
 phase: 3
 title: "Error taxonomy và gắn mã lỗi cho đáp án"
-status: pending
+status: in_progress
 priority: P1
 dependencies: []
 ---
 
 # Phase 3: Error taxonomy và gắn mã lỗi cho đáp án
+
+## Trạng thái và tách phần
+
+- **3a (kỹ thuật): xong, chưa commit.** Bảng `error_types` (V34) với 25 mã nháp, CRUD và endpoint nội bộ, kiểm `distractors`
+  khi tạo phiên bản câu, `ErrorTagger` ở learning và assessment dùng chung bộ vector, assessment ghi `error_analysis_items`
+  tự động và chặn mã lạ khi giám khảo nhập. Test: content 312, learning 280, assessment 243, đều xanh, không skip.
+- **3b (nội dung): chờ duyệt.** Danh sách mã chính thức, mức severity, gợi ý sửa, và gắn `distractors` cho câu trắc nghiệm
+  trong seed của các KP Reading và Listening. Cần người hiểu IELTS duyệt.
+
+## Sai khác so với bản gốc (đã quyết định khi làm 3a)
+
+- Số migration là V34, không phải V31: V31 đến V33 đã dùng cho backfill độ khó và bộ câu luyện tập.
+- Bộ vector mới là `docs/contracts/answer-spec-error-tags-v1-vectors.json`, không thêm vào `answer-spec-v1-vectors.json`.
+  Lý do: giữ nguyên bộ vector grading đã duyệt, các test cũ không phải đổi.
+- Từ giới hạn số từ là khóa tùy chọn `maxWords` trên spec `FILL`, không đổi việc chấm đúng sai.
+- Không thêm migration cho assessment: bảng `error_analysis_items` đã có sẵn, chỉ thêm cách ghi.
+- Learning tính `errorCodes` trong `ItemGrading` nhưng chưa trả cho học viên. Phần đó thuộc phase 4 (event log).
+- `ErrorTagger` được viết riêng ở từng service như plan yêu cầu, không đưa vào `shared/`.
 
 ## Overview
 

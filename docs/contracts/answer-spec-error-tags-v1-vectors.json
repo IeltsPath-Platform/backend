@@ -1,0 +1,20 @@
+[
+  {"name":"choice distractor B maps to paraphrase trap","spec":{"type":"CHOICE","correct":"A","distractors":{"B":"PARAPHRASE_TRAP","C":"KEYWORD_MATCH_ONLY"}},"response":"B","correct":false,"expectedErrorCode":"PARAPHRASE_TRAP"},
+  {"name":"choice distractor C maps to keyword match","spec":{"type":"CHOICE","correct":"A","distractors":{"B":"PARAPHRASE_TRAP","C":"KEYWORD_MATCH_ONLY"}},"response":"C","correct":false,"expectedErrorCode":"KEYWORD_MATCH_ONLY"},
+  {"name":"choice correct has no tag","spec":{"type":"CHOICE","correct":"A","distractors":{"B":"PARAPHRASE_TRAP"}},"response":"A","correct":true,"expectedErrorCode":null},
+  {"name":"choice wrong without distractor has no tag","spec":{"type":"CHOICE","correct":"A","distractors":{"B":"PARAPHRASE_TRAP"}},"response":"D","correct":false,"expectedErrorCode":null},
+  {"name":"choice spec without distractors has no tag","spec":{"type":"CHOICE","correct":"A"},"response":"B","correct":false,"expectedErrorCode":null},
+  {"name":"choice omitted answer has no tag","spec":{"type":"CHOICE","correct":"A","distractors":{"B":"PARAPHRASE_TRAP"}},"response":null,"correct":false,"expectedErrorCode":null},
+  {"name":"fill plural singular","spec":{"type":"FILL","accepted":["critics"]},"response":"critic","correct":false,"expectedErrorCode":"PLURAL_FORM"},
+  {"name":"fill plural extra s","spec":{"type":"FILL","accepted":["critic"]},"response":"critics","correct":false,"expectedErrorCode":"PLURAL_FORM"},
+  {"name":"fill spelling two edits","spec":{"type":"FILL","accepted":["critics"]},"response":"critcis","correct":false,"expectedErrorCode":"SPELLING"},
+  {"name":"fill spelling one edit","spec":{"type":"FILL","accepted":["damage"]},"response":"damge","correct":false,"expectedErrorCode":"SPELLING"},
+  {"name":"fill unrelated word has no tag","spec":{"type":"FILL","accepted":["critics"]},"response":"banana","correct":false,"expectedErrorCode":null},
+  {"name":"fill wrong number is number format","spec":{"type":"FILL","accepted":["12","twelve"]},"response":"13","correct":false,"expectedErrorCode":"NUMBER_FORMAT"},
+  {"name":"fill same number other format","spec":{"type":"FILL","accepted":["9.30"]},"response":"9:30","correct":false,"expectedErrorCode":"NUMBER_FORMAT"},
+  {"name":"fill word limit exceeded","spec":{"type":"FILL","accepted":["damage"],"maxWords":1},"response":"physical damage","correct":false,"expectedErrorCode":"WORD_LIMIT_EXCEEDED"},
+  {"name":"fill within word limit is not a word limit error","spec":{"type":"FILL","accepted":["damage"],"maxWords":2},"response":"damge","correct":false,"expectedErrorCode":"SPELLING"},
+  {"name":"fill correct has no tag","spec":{"type":"FILL","accepted":["critics"]},"response":" Critics ","correct":true,"expectedErrorCode":null},
+  {"name":"fill empty answer has no tag","spec":{"type":"FILL","accepted":["critics"]},"response":"   ","correct":false,"expectedErrorCode":null},
+  {"name":"essay is never tagged here","spec":{"type":"ESSAY","task":"TASK_2","minWords":250,"passBand":6},"response":"text","correct":false,"expectedErrorCode":null}
+]
