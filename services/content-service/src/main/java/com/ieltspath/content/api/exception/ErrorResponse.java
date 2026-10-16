@@ -9,6 +9,6 @@ public record ErrorResponse(
         String error,
         String message,
         String path,
-        Map<String, String> details
+        Map<String, Object> details
 ) {}
 

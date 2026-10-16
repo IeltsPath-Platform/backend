@@ -11,7 +11,7 @@ import java.util.UUID;
 
 public class KnowledgePoint {
     private final UUID id;
-    private final UUID topicId;
+    private UUID topicId;
     private String code;
     private String name;
     private KnowledgePointKind kind;
@@ -50,19 +50,40 @@ public class KnowledgePoint {
                 ContentStatus.ACTIVE, now, now);
     }
 
-    public void update(String name, KnowledgePointKind kind, LearningType learningType,
-                       Skill skill, String description, ContentStatus status) {
-        this.name = Objects.requireNonNull(name, "name must not be null");
-        this.kind = Objects.requireNonNull(kind, "kind must not be null");
-        ContentStatus updatedStatus = status != null ? status : this.status;
-        if (updatedStatus == ContentStatus.ACTIVE && learningType == null) {
+    public void update(UUID topicId, String code, String name, KnowledgePointKind kind, LearningType learningType,
+                       Skill skill, String description) {
+        Objects.requireNonNull(topicId, "topicId must not be null");
+        Objects.requireNonNull(code, "code must not be null");
+        Objects.requireNonNull(name, "name must not be null");
+        Objects.requireNonNull(kind, "kind must not be null");
+        if (this.status == ContentStatus.ACTIVE && learningType == null) {
             throw new IllegalArgumentException("learningType is required for an active knowledge point");
         }
+        this.topicId = topicId;
+        this.code = code;
+        this.name = name;
+        this.kind = kind;
         this.learningType = learningType;
         this.skill = skill;
         this.description = description;
-        this.status = updatedStatus;
         this.updatedAt = Instant.now();
+    }
+
+    public void deactivate() {
+        if (this.status != ContentStatus.INACTIVE) {
+            this.status = ContentStatus.INACTIVE;
+            this.updatedAt = Instant.now();
+        }
+    }
+
+    public void activate() {
+        if (this.learningType == null) {
+            throw new IllegalArgumentException("learningType is required for an active knowledge point");
+        }
+        if (this.status != ContentStatus.ACTIVE) {
+            this.status = ContentStatus.ACTIVE;
+            this.updatedAt = Instant.now();
+        }
     }
 
     public UUID getId() { return id; }

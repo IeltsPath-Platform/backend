@@ -4,7 +4,9 @@ import com.ieltspath.content.application.command.AddQuestionVersionCommand;
 import com.ieltspath.content.domain.aggregate.Question;
 import com.ieltspath.content.domain.entity.QuestionKnowledgePoint;
 import com.ieltspath.content.domain.entity.QuestionVersion;
+import com.ieltspath.content.domain.exception.DifficultyRequiredException;
 import com.ieltspath.content.domain.repository.QuestionRepository;
+import com.ieltspath.content.domain.vo.QuestionDifficulty;
 import com.ieltspath.content.domain.vo.QuestionType;
 import com.ieltspath.content.domain.vo.Skill;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +22,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,7 +45,7 @@ class AddQuestionVersionUseCaseTest {
         UUID knowledgePointId = UUID.randomUUID();
 
         addQuestionVersionUseCase.execute(new AddQuestionVersionCommand(question.getId(), 1, "Stem", null, null,
-                null, null, null, List.of(new AddQuestionVersionCommand.KnowledgePointInput(
+                null, null, QuestionDifficulty.MEDIUM, List.of(new AddQuestionVersionCommand.KnowledgePointInput(
                         null, knowledgePointId, new BigDecimal("0.50")))));
 
         QuestionVersion version = question.getVersions().get(0);
@@ -60,7 +64,7 @@ class AddQuestionVersionUseCaseTest {
         when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
 
         addQuestionVersionUseCase.execute(new AddQuestionVersionCommand(question.getId(), 1, "Stem", null, null,
-                null, null, null, List.of(new AddQuestionVersionCommand.KnowledgePointInput(
+                null, null, QuestionDifficulty.MEDIUM, List.of(new AddQuestionVersionCommand.KnowledgePointInput(
                         UUID.randomUUID(), UUID.randomUUID(), null))));
 
         QuestionVersion version = question.getVersions().get(0);
@@ -76,11 +80,20 @@ class AddQuestionVersionUseCaseTest {
         when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
 
         addQuestionVersionUseCase.execute(new AddQuestionVersionCommand(question.getId(), 1, "Stem", null, null,
-                null, "  Read paragraph C again.  ", null, null));
+                null, "  Read paragraph C again.  ", QuestionDifficulty.MEDIUM, null));
         addQuestionVersionUseCase.execute(new AddQuestionVersionCommand(question.getId(), 2, "Stem", null, null,
-                null, "   ", null, null));
+                null, "   ", QuestionDifficulty.MEDIUM, null));
 
         assertThat(question.getVersions()).extracting(QuestionVersion::getHint)
                 .containsExactly("Read paragraph C again.", null);
+    }
+
+    @Test
+    @DisplayName("Question difficulty is required before a version can be created")
+    void requiresDifficulty() {
+        assertThatThrownBy(() -> addQuestionVersionUseCase.execute(new AddQuestionVersionCommand(
+                UUID.randomUUID(), 1, "Stem", null, null, null, null, null, null)))
+                .isInstanceOf(DifficultyRequiredException.class);
+        verifyNoInteractions(questionRepository);
     }
 }

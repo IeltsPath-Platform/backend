@@ -25,7 +25,7 @@ class CourseSeedTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("21").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("30").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
         reader = new JdbcLearningContentReader(jdbc);
     }
@@ -38,6 +38,26 @@ class CourseSeedTest {
         assertThat(reading.getLast().course().bandLevel()).isEqualByComparingTo("6.5");
         assertThat(reading.subList(0, reading.size() - 1)).allMatch(topic -> topic.course().bandLevel().doubleValue() == 5.5);
         assertThat(reader.topicSequence(3)).allMatch(topic -> topic.course().hasCourseTest());
+    }
+
+    @Test
+    void sixAndSevenBandCoursesAndTheirTopicsAreInactiveAndHiddenFromTheTopicSequence() {
+        var courses = jdbc.queryForList("SELECT id,code,status FROM courses "
+                + "WHERE code IN ('IELTS_6_0','IELTS_7_0') ORDER BY code", Map.of());
+        assertThat(courses).hasSize(2);
+        assertThat(courses).extracting(row -> row.get("code"))
+                .containsExactly("IELTS_6_0", "IELTS_7_0");
+        assertThat(courses).extracting(row -> row.get("status")).containsOnly("INACTIVE");
+
+        var topics = jdbc.queryForList("SELECT t.status,t.skill,c.code AS course_code "
+                + "FROM topics t JOIN courses c ON c.id=t.course_id "
+                + "WHERE c.code IN ('IELTS_6_0','IELTS_7_0') ORDER BY c.code,t.sort_order", Map.of());
+        assertThat(topics).hasSize(6);
+        assertThat(topics).extracting(row -> row.get("status")).containsOnly("INACTIVE");
+        assertThat(topics).extracting(row -> row.get("skill"))
+                .containsExactlyInAnyOrder("READING", "LISTENING", "WRITING", "READING", "LISTENING", "WRITING");
+        assertThat(reader.topicSequence(3)).noneMatch(topic -> topic.course() != null
+                && (topic.course().code().equals("IELTS_6_0") || topic.course().code().equals("IELTS_7_0")));
     }
 
     @Test
@@ -54,21 +74,22 @@ class CourseSeedTest {
 
     @Test
     void bothCourseTestsHaveNewObjectiveReadingQuestionsAndNoOtherOwner() {
-        var courses = jdbc.queryForList("SELECT id FROM courses ORDER BY band_level", Map.of(), UUID.class);
+        var courses = jdbc.queryForList("SELECT id FROM courses WHERE status='ACTIVE' ORDER BY band_level", Map.of(), UUID.class);
         assertThat(courses).hasSize(2);
         for (UUID course : courses) {
             var packages = reader.courseTestPackages(course);
-            assertThat(packages).hasSize(1);
-            var test = packages.getFirst();
-            var payload = reader.publishedPackageVersion(test.packageVersionId()).orElseThrow();
-            assertThat(payload.packageType()).isEqualTo(PackageType.COURSE_TEST);
-            assertThat(payload.sections()).singleElement().satisfies(section -> {
-                assertThat(section.skill()).isEqualTo(Skill.READING);
-                assertThat(section.items()).hasSizeBetween(6, 10);
-            });
-            assertThat(reader.questionsUsedElsewhere(test.packageVersionId())).isEmpty();
-            assertThat(reader.questionsWithWrongPurpose(test.packageVersionId(), QuestionPurpose.LEARNING)).isEmpty();
-            assertThat(reader.packageQuestionSpecs(test.packageVersionId())).allMatch(question -> question.skill() == Skill.READING && question.questionType() != QuestionType.ESSAY);
+            assertThat(packages).hasSize(2);
+            for (var test : packages) {
+                var payload = reader.publishedPackageVersion(test.packageVersionId()).orElseThrow();
+                assertThat(payload.packageType()).isEqualTo(PackageType.COURSE_TEST);
+                assertThat(payload.sections()).singleElement().satisfies(section -> {
+                    assertThat(section.skill()).isEqualTo(Skill.READING);
+                    assertThat(section.items()).hasSizeBetween(6, 10);
+                });
+                assertThat(reader.questionsUsedElsewhere(test.packageVersionId())).isEmpty();
+                assertThat(reader.questionsWithWrongPurpose(test.packageVersionId(), QuestionPurpose.LEARNING)).isEmpty();
+                assertThat(reader.packageQuestionSpecs(test.packageVersionId())).allMatch(question -> question.skill() == Skill.READING && question.questionType() != QuestionType.ESSAY);
+            }
         }
     }
 

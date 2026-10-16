@@ -8,6 +8,7 @@ import com.ieltspath.content.application.result.LessonPracticeSetResult;
 import com.ieltspath.content.application.result.LessonPracticeSetsResult;
 import com.ieltspath.content.application.command.CountPracticeSetsCommand;
 import com.ieltspath.content.application.usecase.CountAvailablePracticeSetsUseCase;
+import com.ieltspath.content.application.usecase.GetActiveKnowledgePrerequisitesUseCase;
 import com.ieltspath.content.application.usecase.GetLessonContentUseCase;
 import com.ieltspath.content.application.usecase.GetLessonPracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetTopicPracticeSetsUseCase;
@@ -108,6 +109,8 @@ class InternalLearningContentControllerTest {
     private final GetLessonPracticeSetsUseCase lessonPracticeSets = mock(GetLessonPracticeSetsUseCase.class);
     private final GetTopicPracticeSetsUseCase topicPracticeSets = mock(GetTopicPracticeSetsUseCase.class);
     private final CountAvailablePracticeSetsUseCase availability = mock(CountAvailablePracticeSetsUseCase.class);
+    private final GetActiveKnowledgePrerequisitesUseCase activeKnowledgePrerequisites =
+            mock(GetActiveKnowledgePrerequisitesUseCase.class);
     private final com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase placementTests =
             mock(com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase.class);
     private MockMvc mockMvc;
@@ -118,7 +121,7 @@ class InternalLearningContentControllerTest {
         validator.afterPropertiesSet();
         mockMvc = MockMvcBuilders.standaloneSetup(new InternalLearningContentController(topicSequence, topicLessons,
                         lessonContent, testPackages, search, packageVersion, lessonPracticeSets, topicPracticeSets,
-                        availability, courseTests, placementTests))
+                        availability, courseTests, placementTests, activeKnowledgePrerequisites))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -137,6 +140,47 @@ class InternalLearningContentControllerTest {
                 .andExpect(jsonPath("$[0].skill").value("WRITING"))
                 .andExpect(jsonPath("$[0].hasTopicTest").value(false))
                 .andExpect(jsonPath("$[0].knowledgePoints").isEmpty());
+    }
+
+    @Test
+    void activeKnowledgePointWithoutPrerequisitesIsReturnedWithAnEmptyList() throws Exception {
+        UUID activeId = UUID.randomUUID();
+        when(activeKnowledgePrerequisites.execute(List.of(activeId))).thenReturn(Map.of(activeId, List.of()));
+
+        mockMvc.perform(post("/internal/learning-content/knowledge-points/prerequisites")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"%s\"]}".formatted(activeId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['%s']".formatted(activeId)).isArray())
+                .andExpect(jsonPath("$['%s']".formatted(activeId)).isEmpty());
+    }
+
+    @Test
+    void missingAndInactiveKnowledgePointsAreOmittedFromPrerequisiteResponse() throws Exception {
+        UUID inactiveId = UUID.randomUUID();
+        UUID missingId = UUID.randomUUID();
+        when(activeKnowledgePrerequisites.execute(List.of(inactiveId, missingId))).thenReturn(Map.of());
+
+        mockMvc.perform(post("/internal/learning-content/knowledge-points/prerequisites")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"%s\",\"%s\"]}".formatted(inactiveId, missingId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isMap())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void prerequisiteResponseContainsOnlyActivePrerequisites() throws Exception {
+        UUID activeId = UUID.randomUUID();
+        UUID activePrerequisiteId = UUID.randomUUID();
+        when(activeKnowledgePrerequisites.execute(List.of(activeId))).thenReturn(
+                Map.of(activeId, List.of(activePrerequisiteId)));
+
+        mockMvc.perform(post("/internal/learning-content/knowledge-points/prerequisites")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"%s\"]}".formatted(activeId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['%s'][0]".formatted(activeId)).value(activePrerequisiteId.toString()));
     }
 
     @Test

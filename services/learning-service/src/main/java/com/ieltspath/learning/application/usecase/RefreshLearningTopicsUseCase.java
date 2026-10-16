@@ -45,6 +45,8 @@ public class RefreshLearningTopicsUseCase {
         lock.lock(userId);
         var topics = content.getTopicSequence()
                 .stream()
+                .filter(topic -> Boolean.TRUE.equals(topic.active()))
+                .filter(topic -> topic.course() == null || Boolean.TRUE.equals(topic.course().active()))
                 .sorted(Comparator.comparing((LearningContentClient.Topic topic) ->
                                 topic.course() == null ? null : topic.course().bandLevel(),
                                 Comparator.nullsLast(Comparator.naturalOrder()))

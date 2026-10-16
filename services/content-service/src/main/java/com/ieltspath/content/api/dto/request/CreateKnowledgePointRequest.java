@@ -5,6 +5,7 @@ import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.Skill;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
@@ -15,6 +16,8 @@ public record CreateKnowledgePointRequest(
 
         @NotBlank(message = "code is required")
         @Size(max = 100, message = "code must not exceed 100 characters")
+        @Pattern(regexp = "^[RLW](55|60|65|70)_[A-Z0-9_]{2,60}$",
+                message = "code must use the format R55_EXAMPLE, L60_EXAMPLE, or W70_EXAMPLE")
         String code,
 
         @NotBlank(message = "name is required")

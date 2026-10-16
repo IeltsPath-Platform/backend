@@ -114,6 +114,11 @@ class ContentAuthorizationWebMvcTest {
     @MockitoBean LinkAssetUseCase linkAsset;
     @MockitoBean GetKnowledgePointsUseCase getKnowledgePoints;
     @MockitoBean CreateKnowledgePointUseCase createKnowledgePoint;
+    @MockitoBean UpdateKnowledgePointUseCase updateKnowledgePoint;
+    @MockitoBean DeactivateKnowledgePointUseCase deactivateKnowledgePoint;
+    @MockitoBean ActivateKnowledgePointUseCase activateKnowledgePoint;
+    @MockitoBean GetKnowledgePointPrerequisitesUseCase getKnowledgePointPrerequisites;
+    @MockitoBean ReplaceKnowledgePointPrerequisitesUseCase replaceKnowledgePointPrerequisites;
     @MockitoBean GetTopicTreeUseCase getTopicTree;
     @MockitoBean GetTopicUseCase getTopic;
     @MockitoBean CreateTopicUseCase createTopic;
@@ -182,7 +187,7 @@ class ContentAuthorizationWebMvcTest {
                 .content("{\"assetType\":\"PASSAGE\",\"textContent\":\"Paragraph\"}"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/content/knowledge-points").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"topicId\":\"" + id + "\",\"code\":\"KP1\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\"}"))
+                .content("{\"topicId\":\"" + id + "\",\"code\":\"R55_EXAMPLE\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\"}"))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(createQuestion, createPackage, createAsset, linkAsset, createKnowledgePoint);
     }
@@ -217,7 +222,7 @@ class ContentAuthorizationWebMvcTest {
                 Skill.READING, null, PublicationStatus.DRAFT, null, Instant.now(), Instant.now()));
         when(createPackage.execute(any())).thenReturn(new ContentPackageResult(id, "PS-KP1-A", "Practice",
                 PackageType.PRACTICE_SET, null, PublicationStatus.DRAFT, null, Instant.now(), Instant.now(), null));
-        when(createKnowledgePoint.execute(any())).thenReturn(new KnowledgePointResult(id, id, "KP1", "KP1",
+        when(createKnowledgePoint.execute(any())).thenReturn(new KnowledgePointResult(id, id, "R55_EXAMPLE", "KP1",
                 KnowledgePointKind.GRAMMAR, LearningType.CONCEPT, null, null, ContentStatus.ACTIVE,
                 Instant.now(), Instant.now()));
         when(createAsset.execute(any())).thenReturn(new ContentAssetResult(
@@ -236,7 +241,7 @@ class ContentAuthorizationWebMvcTest {
                 .content("{\"assetType\":\"PASSAGE\",\"textContent\":\"Paragraph\"}"))
                 .andExpect(status().isCreated());
         mockMvc.perform(post("/api/content/knowledge-points").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"topicId\":\"" + id + "\",\"code\":\"KP1\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\"}"))
+                .content("{\"topicId\":\"" + id + "\",\"code\":\"R55_EXAMPLE\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\"}"))
                 .andExpect(status().isCreated());
     }
 

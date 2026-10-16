@@ -22,7 +22,8 @@ public record TopicSequenceResult(
         Skill skill,
         boolean hasTopicTest,
         CourseEntry course,
-        List<Skill> skills
+        List<Skill> skills,
+        boolean active
 ) {
     public TopicSequenceResult {
         skills = skills.stream().filter(s -> s != Skill.ALL).distinct().sorted().toList();
@@ -33,7 +34,14 @@ public record TopicSequenceResult(
                                List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest,
                                CourseEntry course) {
         this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
-                skill == null ? List.of() : List.of(skill));
+                skill == null ? List.of() : List.of(skill), true);
+    }
+
+    public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                               List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest,
+                               CourseEntry course, List<Skill> skills) {
+        this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, skills,
+                true);
     }
 
     public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
@@ -41,7 +49,12 @@ public record TopicSequenceResult(
         this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, null);
     }
 
-    public record CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {}
+    public record CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
+                              boolean active) {
+        public CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {
+            this(courseId, code, name, bandLevel, hasCourseTest, true);
+        }
+    }
 
     /** {@code hasPracticeSet}: at least one practice set is eligible for review of this knowledge point. */
     public record KnowledgePointEntry(

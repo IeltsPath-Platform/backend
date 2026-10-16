@@ -86,13 +86,49 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(), null);
     }
 
+    @ExceptionHandler(DifficultyRequiredException.class)
+    public ResponseEntity<ErrorResponse> handleDifficultyRequired(DifficultyRequiredException ex,
+                                                                    HttpServletRequest request) {
+        log.warn("Question version refused: {}", ex.getMessage());
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "DIFFICULTY_REQUIRED"));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex, HttpServletRequest request) {
-        Map<String, String> details = new HashMap<>();
+        Map<String, Object> details = new HashMap<>();
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             details.put(error.getField(), error.getDefaultMessage());
         }
         return buildResponse(HttpStatus.BAD_REQUEST, "Validation failed", request.getRequestURI(), details);
+    }
+
+    @ExceptionHandler(PrerequisiteCycleException.class)
+    public ResponseEntity<ErrorResponse> handlePrerequisiteCycle(PrerequisiteCycleException ex,
+                                                                 HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PREREQUISITE_CYCLE", "cycle", ex.getCycle()));
+    }
+
+    @ExceptionHandler(InvalidPrerequisiteException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPrerequisites(InvalidPrerequisiteException ex,
+                                                                     HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PREREQUISITE_INVALID", "invalidIds", ex.getInvalidIds()));
+    }
+
+    @ExceptionHandler(KnowledgePointInUseException.class)
+    public ResponseEntity<ErrorResponse> handleKnowledgePointInUse(KnowledgePointInUseException ex,
+                                                                    HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "KNOWLEDGE_POINT_IN_USE"));
+    }
+
+    @ExceptionHandler(InvalidKnowledgePointCodeException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidKnowledgePointCode(InvalidKnowledgePointCodeException ex,
+                                                                          HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "INVALID_KNOWLEDGE_POINT_CODE"));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -135,7 +171,8 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected internal error occurred", request.getRequestURI(), null);
     }
 
-    private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String message, String path, Map<String, String> details) {
+    private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String message, String path,
+                                                        Map<String, Object> details) {
         ErrorResponse response = new ErrorResponse(
                 LocalDateTime.now(),
                 status.value(),

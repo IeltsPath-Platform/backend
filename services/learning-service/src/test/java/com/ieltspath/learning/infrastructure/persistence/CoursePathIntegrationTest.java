@@ -62,6 +62,9 @@ class CoursePathIntegrationTest {
     private static final UUID USER = UUID.randomUUID();
     private static final UUID LOWER = UUID.fromString("30000000-0000-4000-8000-000000000001");
     private static final UUID HIGHER = UUID.fromString("30000000-0000-4000-8000-000000000002");
+    private static final UUID INACTIVE_COURSE = UUID.fromString("30000000-0000-4000-8000-000000000003");
+    private static final UUID INACTIVE_COURSE_TOPIC = UUID.randomUUID();
+    private static final UUID INACTIVE_TOPIC = UUID.randomUUID();
     private static final UUID R1 = UUID.randomUUID();
     private static final UUID R2 = UUID.randomUUID();
     private static final UUID L1 = UUID.randomUUID();
@@ -114,6 +117,25 @@ class CoursePathIntegrationTest {
         List<CourseResult> recommended = listCourses.execute(USER);
         assertFalse(recommended.get(0).recommended());
         assertTrue(recommended.get(1).recommended());
+    }
+
+    @Test
+    void doesNotListInactiveCoursesOrTopicsForTheLearner() {
+        var activeCourse = new LearningContentClient.Course(LOWER, "IELTS_5_5", "IELTS 5.5",
+                new BigDecimal("5.5"), true, true);
+        var inactiveCourse = new LearningContentClient.Course(INACTIVE_COURSE, "IELTS_6_0", "IELTS 6.0",
+                new BigDecimal("6.0"), false, false);
+        when(content.getTopicSequence()).thenReturn(List.of(
+                topic(R1, "ACTIVE_TOPIC", 900, LearningSkill.READING, activeCourse),
+                new LearningContentClient.Topic(INACTIVE_COURSE_TOPIC, "INACTIVE_COURSE_TOPIC", "Inactive course topic",
+                        910, null, List.of(), LearningSkill.READING, false, inactiveCourse, null, true),
+                new LearningContentClient.Topic(INACTIVE_TOPIC, "INACTIVE_TOPIC", "Inactive topic", 920,
+                        null, List.of(), LearningSkill.READING, false, activeCourse, null, false)));
+
+        List<CourseResult> courses = listCourses.execute(USER);
+        assertFalse(courses.stream().anyMatch(course -> course.code().equals("IELTS_6_0")));
+        assertTrue(refresh.execute(USER).stream().noneMatch(topic ->
+                topic.code().equals("INACTIVE_TOPIC") || topic.code().equals("INACTIVE_COURSE_TOPIC")));
     }
 
     @Test

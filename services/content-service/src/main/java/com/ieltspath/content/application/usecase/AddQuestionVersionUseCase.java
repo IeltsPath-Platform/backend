@@ -5,6 +5,7 @@ import com.ieltspath.content.application.result.QuestionResult;
 import com.ieltspath.content.domain.aggregate.Question;
 import com.ieltspath.content.domain.entity.QuestionKnowledgePoint;
 import com.ieltspath.content.domain.entity.QuestionVersion;
+import com.ieltspath.content.domain.exception.DifficultyRequiredException;
 import com.ieltspath.content.domain.exception.QuestionNotFoundException;
 import com.ieltspath.content.domain.repository.QuestionRepository;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,9 @@ public class AddQuestionVersionUseCase {
     }
 
     public QuestionResult execute(AddQuestionVersionCommand command) {
+        if (command.difficulty() == null) {
+            throw new DifficultyRequiredException();
+        }
         Question question = questionRepository.findById(command.questionId())
                 .orElseThrow(() -> new QuestionNotFoundException(command.questionId()));
 

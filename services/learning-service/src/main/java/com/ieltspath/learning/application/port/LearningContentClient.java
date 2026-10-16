@@ -65,13 +65,21 @@ public interface LearningContentClient {
      */
     record Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                  List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
-                 Set<LearningSkill> skills) {
+                 Set<LearningSkill> skills, Boolean active) {
         public Topic {
             skills = skillsOrSingle(skills, skill);
+            active = active == null || active;
+        }
+        public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                     List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
+                     Set<LearningSkill> skills) {
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
+                    skills, true);
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course) {
-            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, null);
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
+                    null, true);
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest) {
@@ -86,7 +94,15 @@ public interface LearningContentClient {
         }
     }
 
-    record Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {}
+    record Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest, Boolean active) {
+        public Course {
+            active = active == null || active;
+        }
+
+        public Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {
+            this(courseId, code, name, bandLevel, hasCourseTest, true);
+        }
+    }
 
     record KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
                           String description, boolean hasPracticeSet) {

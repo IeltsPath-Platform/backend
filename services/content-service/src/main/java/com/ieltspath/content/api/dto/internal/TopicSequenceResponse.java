@@ -17,11 +17,14 @@ public record TopicSequenceResponse(
         Skill skill,
         boolean hasTopicTest,
         Course course,
-        List<Skill> skills
+        List<Skill> skills,
+        boolean active
 ) {
-    public record Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel, boolean hasCourseTest) {
+    public record Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
+                         boolean hasCourseTest, boolean active) {
         static Course from(TopicSequenceResult.CourseEntry entry) {
-            return entry == null ? null : new Course(entry.courseId(), entry.code(), entry.name(), entry.bandLevel(), entry.hasCourseTest());
+            return entry == null ? null : new Course(entry.courseId(), entry.code(), entry.name(), entry.bandLevel(),
+                    entry.hasCourseTest(), entry.active());
         }
     }
     public record KnowledgePoint(UUID id, String code, String name, LearningType learningType, Skill skill,
@@ -34,6 +37,6 @@ public record TopicSequenceResponse(
                         .map(kp -> new KnowledgePoint(kp.id(), kp.code(), kp.name(), kp.learningType(), kp.skill(),
                                 kp.description(), kp.hasPracticeSet()))
                         .toList(),
-                result.skill(), result.hasTopicTest(), Course.from(result.course()), result.skills());
+                result.skill(), result.hasTopicTest(), Course.from(result.course()), result.skills(), result.active());
     }
 }

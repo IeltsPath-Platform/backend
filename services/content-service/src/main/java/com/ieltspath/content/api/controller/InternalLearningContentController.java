@@ -1,6 +1,7 @@
 package com.ieltspath.content.api.controller;
 
 import com.ieltspath.content.api.dto.internal.LessonContentResponse;
+import com.ieltspath.content.api.dto.internal.KnowledgePointPrerequisitesRequest;
 import com.ieltspath.content.api.dto.internal.PracticeSetSkillFilter;
 import com.ieltspath.content.api.dto.internal.LessonPracticeSetResponse;
 import com.ieltspath.content.api.dto.internal.PracticeSetAvailabilityRequest;
@@ -15,6 +16,7 @@ import com.ieltspath.content.api.dto.internal.TopicTestPackageResponse;
 import com.ieltspath.content.application.command.CountPracticeSetsCommand;
 import com.ieltspath.content.application.command.SearchPracticeSetsCommand;
 import com.ieltspath.content.application.usecase.CountAvailablePracticeSetsUseCase;
+import com.ieltspath.content.application.usecase.GetActiveKnowledgePrerequisitesUseCase;
 import com.ieltspath.content.application.usecase.GetLessonPracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetTopicPracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetLessonContentUseCase;
@@ -36,6 +38,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -57,6 +60,13 @@ public class InternalLearningContentController {
     private final CountAvailablePracticeSetsUseCase countAvailablePracticeSets;
     private final GetCourseTestPackagesUseCase getCourseTestPackages;
     private final GetPlacementTestPackagesUseCase getPlacementTestPackages;
+    private final GetActiveKnowledgePrerequisitesUseCase getActiveKnowledgePrerequisites;
+
+    @PostMapping("/knowledge-points/prerequisites")
+    public Map<UUID, List<UUID>> knowledgePointPrerequisites(
+            @Valid @RequestBody KnowledgePointPrerequisitesRequest request) {
+        return getActiveKnowledgePrerequisites.execute(request.ids());
+    }
 
     @GetMapping("/placement-packages")
     public List<TopicTestPackageResponse> placementPackages() {

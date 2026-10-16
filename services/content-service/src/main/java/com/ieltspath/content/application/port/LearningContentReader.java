@@ -9,6 +9,7 @@ import com.ieltspath.content.application.result.PracticeSetResult;
 import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.application.result.TopicTestPackageResult;
 import com.ieltspath.content.application.result.PackageQuestionSpec;
+import com.ieltspath.content.application.result.KnowledgeTreeNodeResult;
 import com.ieltspath.content.domain.vo.QuestionUsageConflict;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.domain.vo.Skill;
@@ -98,4 +99,9 @@ public interface LearningContentReader {
 
     /** The given question versions that a lesson, practice set, final test, mock test or placement test uses. */
     Set<UUID> questionVersionsReservedForLearning(Collection<UUID> questionVersionIds);
+
+    List<KnowledgeTreeNodeResult> knowledgeTreeNodes(UUID courseId, Skill skill, boolean includeInactive);
+
+    /** Active knowledge points mapped to their active, direct prerequisites; unknown and inactive ids are omitted. */
+    Map<UUID, List<UUID>> activeKnowledgePrerequisites(Collection<UUID> ids);
 }

@@ -1,7 +1,7 @@
 ---
 title: "Cây tri thức, chẩn đoán và hành trình đánh giá theo board mentor"
 description: "Dựng cây KP có cạnh tiên quyết, event log từng câu, mastery 3 mức, chẩn đoán dò ngược, điểm có trọng số 20/30/50, hàng chờ giám khảo, rubric và bộ test AI, khu quản trị"
-status: pending
+status: in_progress
 priority: P1
 branch: "feat/knowledge-tree-assessment-journey"
 tags: [content-service, learning-service, assessment-service, access-service, knowledge-tree, mastery, diagnostics, scoring, ai-policy]
@@ -96,8 +96,9 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 
 | Phase | Name | Service | Status |
 |-------|------|---------|--------|
-| 1 | [Cây tri thức: cạnh tiên quyết và API](./phase-01-content-knowledge-tree.md) | content | Pending |
-| 2 | [Seed cây band 5.5 → 7 và difficulty](./phase-02-content-seed-tree-and-difficulty.md) | content | Pending |
+| 1 | [Cây tri thức: cạnh tiên quyết và API](./phase-01-content-knowledge-tree.md) | content | Completed (chưa commit) |
+| 2a | [Course/topic 6.0, 7.0 INACTIVE, difficulty bắt buộc, lọc learning](./phase-02-content-seed-tree-and-difficulty.md) | content, learning | Completed (chưa commit) |
+| 2b | [Seed KP, cạnh, difficulty backfill, bộ câu (chờ duyệt nội dung)](./phase-02-content-seed-tree-and-difficulty.md) | content | Blocked (chờ duyệt) |
 | 3 | [Error taxonomy và gắn mã lỗi cho đáp án](./phase-03-content-error-taxonomy.md) | content, learning, assessment | Pending |
 | 4 | [Event log từng câu và thời gian làm](./phase-04-question-event-log-and-duration.md) | learning, assessment | Pending |
 | 5 | [Mastery profile 3 mức, hạn ôn, API báo cáo](./phase-05-mastery-profile-and-report.md) | learning | Pending |

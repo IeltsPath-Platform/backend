@@ -10,6 +10,7 @@ import com.ieltspath.content.application.result.PracticeSetResult;
 import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.application.result.TopicTestPackageResult;
 import com.ieltspath.content.application.result.PackageQuestionSpec;
+import com.ieltspath.content.application.result.KnowledgeTreeNodeResult;
 import com.ieltspath.content.domain.vo.QuestionType;
 import com.ieltspath.content.domain.vo.AssetType;
 import com.ieltspath.content.domain.vo.BlockType;
@@ -19,12 +20,15 @@ import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.QuestionUsageConflict;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.domain.vo.ContentStatus;
+import com.ieltspath.content.domain.vo.KnowledgePointKind;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Array;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -711,6 +715,69 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 """, Map.of("ids", questionVersionIds), (rs, i) -> uuid(rs, "id")));
     }
 
+    @Override
+    public List<KnowledgeTreeNodeResult> knowledgeTreeNodes(UUID courseId, Skill skill, boolean includeInactive) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
+        StringBuilder where = new StringBuilder(" WHERE 1 = 1 ");
+        if (!includeInactive) {
+            where.append(" AND kp.status = 'ACTIVE' ");
+        }
+        if (courseId != null) {
+            where.append(" AND t.course_id = :courseId ");
+            parameters.addValue("courseId", courseId);
+        }
+        if (skill != null) {
+            where.append(" AND kp.skill = :skill ");
+            parameters.addValue("skill", skill.name());
+        }
+        return jdbc.query("""
+                SELECT kp.id, kp.code, kp.name, kp.skill, kp.kind, kp.learning_type,
+                       c.band_level AS band, c.id AS course_id, kp.topic_id, kp.status,
+                       ARRAY(SELECT lkp.lesson_id FROM lesson_knowledge_points lkp
+                             WHERE lkp.knowledge_point_id = kp.id ORDER BY lkp.lesson_id) AS lesson_ids
+                FROM knowledge_points kp
+                LEFT JOIN topics t ON t.id = kp.topic_id
+                LEFT JOIN courses c ON c.id = t.course_id
+                """ + where + " ORDER BY c.band_level NULLS FIRST, t.course_id NULLS FIRST, kp.skill, kp.code, kp.id",
+                parameters, (rs, row) -> new KnowledgeTreeNodeResult(
+                        uuid(rs, "id"), rs.getString("code"), rs.getString("name"),
+                        enumOrNull(Skill.class, rs.getString("skill")),
+                        KnowledgePointKind.valueOf(rs.getString("kind")),
+                        enumOrNull(LearningType.class, rs.getString("learning_type")),
+                        rs.getBigDecimal("band"), nullableUuid(rs, "course_id"), uuid(rs, "topic_id"),
+                        uuids(rs.getArray("lesson_ids")), ContentStatus.valueOf(rs.getString("status"))));
+    }
+
+    @Override
+    public Map<UUID, List<UUID>> activeKnowledgePrerequisites(Collection<UUID> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> distinctIds = ids.stream().distinct().toList();
+        Map<UUID, List<UUID>> prerequisitesByKnowledgePoint = new LinkedHashMap<>();
+        jdbc.query("""
+                SELECT id FROM knowledge_points WHERE status = 'ACTIVE' AND id IN (:ids) ORDER BY id
+                """, Map.of("ids", distinctIds),
+                rs -> {
+                    prerequisitesByKnowledgePoint.put(uuid(rs, "id"), new ArrayList<>());
+                });
+        if (prerequisitesByKnowledgePoint.isEmpty()) {
+            return Map.of();
+        }
+        jdbc.query("""
+                SELECT kp.id AS knowledge_point_id, prereq.prerequisite_id
+                FROM knowledge_points kp
+                JOIN knowledge_point_prerequisites prereq ON prereq.knowledge_point_id = kp.id
+                JOIN knowledge_points prerequisite ON prerequisite.id = prereq.prerequisite_id
+                WHERE kp.status = 'ACTIVE' AND prerequisite.status = 'ACTIVE' AND kp.id IN (:ids)
+                ORDER BY kp.id, prereq.prerequisite_id
+                """, Map.of("ids", prerequisitesByKnowledgePoint.keySet()), rs -> {
+                    prerequisitesByKnowledgePoint.get(uuid(rs, "knowledge_point_id"))
+                            .add(uuid(rs, "prerequisite_id"));
+                });
+        return prerequisitesByKnowledgePoint;
+    }
+
     private Map<UUID, List<UUID>> lessonKnowledgePoints(List<UUID> lessonIds) {
         Map<UUID, List<UUID>> result = new LinkedHashMap<>();
         jdbc.query("""
@@ -728,6 +795,22 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
     private static UUID uuid(ResultSet rs, String column) throws SQLException {
         return rs.getObject(column, UUID.class);
+    }
+
+    private static UUID nullableUuid(ResultSet rs, String column) throws SQLException {
+        return rs.getObject(column, UUID.class);
+    }
+
+    private static List<UUID> uuids(Array array) throws SQLException {
+        if (array == null) {
+            return List.of();
+        }
+        Object[] values = (Object[]) array.getArray();
+        List<UUID> result = new ArrayList<>(values.length);
+        for (Object value : values) {
+            result.add((UUID) value);
+        }
+        return List.copyOf(result);
     }
 
     private static <E extends Enum<E>> E enumOrNull(Class<E> type, String value) {
