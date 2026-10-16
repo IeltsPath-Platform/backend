@@ -16,5 +16,10 @@ public record SubmitExerciseCommand(UUID requestId, List<Answer> answers) {
         }
     }
 
-    public record Answer(UUID questionVersionId, Object answer) {}
+    /** {@code durationMs} is null when the client did not measure the time on this question. */
+    public record Answer(UUID questionVersionId, Object answer, Long durationMs) {
+        public Answer(UUID questionVersionId, Object answer) {
+            this(questionVersionId, answer, null);
+        }
+    }
 }

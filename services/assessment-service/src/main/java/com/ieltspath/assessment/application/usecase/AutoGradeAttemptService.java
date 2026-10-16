@@ -95,6 +95,7 @@ public class AutoGradeAttemptService {
                 .collect(Collectors.toMap(AttemptResponse::attemptItemId, Function.identity()));
         AssessmentResult draft = results.save(new AssessmentResult(UUID.randomUUID(), attempt.getId(), 1,
                 AssessmentResult.DRAFT, null, null));
+        Map<UUID, Long> elapsedByItem = attemptItems.elapsedMsByItemId(items.stream().map(AttemptItem::id).toList());
         List<ItemResult> graded = new ArrayList<>(items.size());
         for (int i = 0; i < items.size(); i++) {
             AttemptItem item = items.get(i);
@@ -102,7 +103,7 @@ public class AutoGradeAttemptService {
             boolean correct = essayPassed.containsKey(item.id()) ? Boolean.TRUE.equals(essayPassed.get(item.id()))
                     : isCorrect(answer, responseByItem.get(item.id()));
             graded.add(new ItemResult(UUID.randomUUID(), draft.id(), item.id(), correct ? answer.maxScore() : 0.0,
-                    answer.maxScore(), correct, null, NO_FEEDBACK));
+                    answer.maxScore(), correct, elapsedByItem.get(item.id()), NO_FEEDBACK));
         }
         itemResults.saveAll(graded);
         List<ErrorAnalysisItem> tags = errorAnalysis(items, answers, responseByItem, essayPassed, graded);

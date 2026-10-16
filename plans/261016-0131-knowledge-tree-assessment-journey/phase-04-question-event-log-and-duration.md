@@ -1,12 +1,32 @@
 ---
 phase: 4
 title: "Event log từng câu và thời gian làm"
-status: pending
+status: completed
 priority: P1
 dependencies: [3]
 ---
 
 # Phase 4: Event log từng câu và thời gian làm
+
+## Trạng thái và ghi chú triển khai
+
+- Code và test đã xong và đã commit sau phase 8. Learning 305 test, assessment 251 test, đều xanh, không skip.
+- Migration: learning V11 (`question_attempt_events`), assessment V8 (`attempt_items.elapsed_ms`).
+- Khác với plan:
+  - `question_attempt_events` có thêm `attempt_id` (nullable). Lý do: regrade assessment phải xóa được event của chính
+    attempt đó mà không đụng event của bài khác.
+  - Essay bài học (`SubmitLessonEssayUseCase`) ghi một event cho prompt. Essay trong Practice được chấm trong luồng
+    Practice attempt, nên event của chúng do `SubmitPracticeAttemptUseCase` ghi. `SubmitPracticeEssayUseCase` không ghi
+    evidence, nên không thêm gì ở đó.
+  - `error_code` của essay luôn null: bộ chấm essay trả nhóm lỗi (GRAMMAR, TASK, ...) chưa phải mã của danh mục.
+  - `docs/contracts/practice-v1.md` không có trong repo. Nội dung `durationMs` của Practice được ghi trong
+    `lesson-learning-v1.md`.
+  - Test `LearningServiceApplicationTests` cập nhật lên phiên bản 12 và 19 bảng, vì V12 (phase 8) đã có.
+- Kiểm chứng đã có: adapter ghi và chống trùng (Testcontainers), value object (kẹp thời gian), parser (field mới và sai
+  kiểu), factory (duration và error code), auto-grade (chép thời gian), save-response (kẹp và chỉ tăng).
+- **Chưa có:** test tích hợp end-to-end từ use case nộp bài đến bảng event. Các tiêu chí "5 dòng event" và "làm lại
+  `first_submission=false`" được suy ra từ adapter và logic, chưa chạy qua use case thật.
+- `ApplyAssessmentResultUseCase` có cả thay đổi của phase 8 (Codex, commit `e710f11`). Phase 4 commit tách riêng sau đó.
 
 ## Overview
 

@@ -20,4 +20,5 @@ public class AttemptItemJpaEntity {
     @JdbcTypeCode(SqlTypes.JSON) @Column(name = "question_snapshot", columnDefinition = "JSONB", nullable = false) private String questionSnapshot;
     @JdbcTypeCode(SqlTypes.JSON) @Column(name = "answer_snapshot", columnDefinition = "JSONB") private String answerSnapshot;
     @JdbcTypeCode(SqlTypes.JSON) @Column(name = "knowledge_snapshot", columnDefinition = "JSONB") private String knowledgeSnapshot;
+    @Column(name = "elapsed_ms") private Long elapsedMs;
 }

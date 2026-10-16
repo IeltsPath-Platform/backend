@@ -20,9 +20,16 @@ public record AssessmentResult(UUID eventId, UUID userId, UUID packageVersionId,
 
     /** {@code isCorrect} is null when the item was not graded right or wrong (for example an essay). */
     public record ItemResult(UUID itemResultId, UUID questionVersionId, Boolean isCorrect, BigDecimal score,
-                             BigDecimal maxScore, List<KnowledgePointJudgment> knowledgePoints) {
+                             BigDecimal maxScore, List<KnowledgePointJudgment> knowledgePoints,
+                             Long durationMs, String errorCode) {
         public ItemResult {
             knowledgePoints = List.copyOf(knowledgePoints);
+        }
+
+        /** The v2 shape before {@code duration_ms} and {@code error_code} were added. */
+        public ItemResult(UUID itemResultId, UUID questionVersionId, Boolean isCorrect, BigDecimal score,
+                          BigDecimal maxScore, List<KnowledgePointJudgment> knowledgePoints) {
+            this(itemResultId, questionVersionId, isCorrect, score, maxScore, knowledgePoints, null, null);
         }
 
         /** Explicit correctness wins; otherwise a PASS or FAIL judgment of the KP; otherwise no evidence. */

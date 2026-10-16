@@ -17,6 +17,10 @@ import com.ieltspath.learning.application.service.PracticeProgress;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
+import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.AnswerDurations;
+import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
+import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.service.AnswerSpecGrader;
@@ -49,12 +53,14 @@ public class SubmitReviewUseCase {
     private final PracticeAttemptRepository attempts;
     private final ReviewSubmissionLog submissions;
     private final PracticeProgress practice;
+    private final QuestionEventLog questionEvents;
     private final ItemGrading grading = new ItemGrading();
 
     public SubmitReviewUseCase(LearningContentClient content, LearnerLock lock, KnowledgeEvidenceRepository evidence,
                                ReviewItemRepository reviews, PracticeAttemptRepository attempts,
                                ReviewSubmissionLog submissions,
-                               PracticeProgress practice) {
+                               PracticeProgress practice, QuestionEventLog questionEvents) {
+        this.questionEvents = questionEvents;
         this.content = content;
         this.lock = lock;
         this.evidence = evidence;
@@ -95,6 +101,8 @@ public class SubmitReviewUseCase {
 
         // A set is answered once, so every set contributes its first answers as evidence.
         List<KnowledgeEvidence> setAnswers = new ArrayList<>();
+        List<QuestionAttemptEvent> setEvents = new ArrayList<>();
+        Map<UUID, Long> durations = AnswerDurations.of(command.answers());
         List<SubmissionResult.AnswerResult> results = new ArrayList<>();
         for (int index = 0; index < items.size(); index++) {
             Item item = items.get(index);
@@ -104,9 +112,15 @@ public class SubmitReviewUseCase {
                 setAnswers.add(KnowledgeEvidence.of(kpId, grade.correct(), EvidenceSource.REVIEW_SET,
                         LessonEvidenceReference.forReviewSet(command.requestId(), item.questionVersionId(), kpId)));
             }
+            setEvents.add(QuestionAttemptEvent.of(userId, item.questionVersionId(),
+                    item.knowledgePointMappings().stream().map(LearningContentClient.KnowledgePointMapping::knowledgePointId)
+                            .distinct().toList(),
+                    grade.correct(), durations.get(item.questionVersionId()), graded.errorCodes().get(index),
+                    QuestionEventSource.REVIEW_SET, command.requestId(), true));
             results.add(new SubmissionResult.AnswerResult(item.questionVersionId(), grade.correct(),
                     grade.correctAnswer(), item.explanation()));
         }
+        questionEvents.append(setEvents);
         evidence.append(userId, setAnswers);
 
         ReviewStatus status = review.recordSetResult(set.id(), command.requestId(), graded.correct(), graded.total());

@@ -12,6 +12,7 @@ import com.ieltspath.assessment.domain.repository.AttemptItemRepository;
 import com.ieltspath.assessment.domain.repository.AttemptResponseRepository;
 import com.ieltspath.assessment.domain.repository.AttemptSectionRepository;
 import com.ieltspath.assessment.domain.vo.AttemptStatus;
+import com.ieltspath.assessment.domain.vo.ElapsedTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,6 +69,9 @@ public class SaveAttemptResponseUseCase {
                 null,
                 oldResponse.map(AttemptResponse::lockVersion).orElse(0L)
         );
+        if (command.elapsedMs() != null) {
+            items.recordElapsed(command.itemId(), ElapsedTime.clamp(command.elapsedMs()));
+        }
         AttemptResponse saved = responses.save(response);
         return new AttemptResponseResult(
                 saved.id(),

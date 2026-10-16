@@ -5,6 +5,9 @@ import com.ieltspath.learning.application.command.AssessmentResult.ItemResult;
 import com.ieltspath.learning.application.command.AssessmentResult.KnowledgePointJudgment;
 import com.ieltspath.learning.application.port.AssessmentResultLog;
 import com.ieltspath.learning.application.port.LearnerLock;
+import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
+import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.ReviewReevaluation;
 import com.ieltspath.learning.domain.aggregate.LearnerCurriculum;
@@ -57,13 +60,16 @@ public class ApplyAssessmentResultUseCase {
     private final CourseTestAssignmentRepository courseAssignments;
     @org.springframework.beans.factory.annotation.Autowired
     private com.ieltspath.learning.domain.repository.PracticeTestAssignmentRepository practiceAssignments;
+    private final QuestionEventLog questionEvents;
     private final Clock clock = Clock.systemUTC();
 
     public ApplyAssessmentResultUseCase(LearnerLock lock, KnowledgeEvidenceRepository evidence,
                                         LearnerCurriculumRepository curricula, AssessmentResultLog results,
                                         TopicTestAssignmentRepository assignments, ReviewReevaluation reviews,
                                         LearnerPlacementRepository placements, CourseProgressRepository courseProgress,
-                                        CourseTestAssignmentRepository courseAssignments) {
+                                        CourseTestAssignmentRepository courseAssignments,
+                                        QuestionEventLog questionEvents) {
+        this.questionEvents = questionEvents;
         this.lock = lock;
         this.evidence = evidence;
         this.curricula = curricula;
@@ -85,8 +91,20 @@ public class ApplyAssessmentResultUseCase {
                     result.eventId(), result.attemptId(), result.resultVersion());
             return;
         }
-        if (applied.isPresent()) evidence.removeAssessmentEvidence(userId, result.attemptId());
+        if (applied.isPresent()) {
+            evidence.removeAssessmentEvidence(userId, result.attemptId());
+            questionEvents.removeAssessmentEvents(userId, result.attemptId());
+        }
         results.recordVersion(userId, result.attemptId(), result.resultVersion());
+        // Every assessment type logs its items, placement included. An item the grader did not judge keeps a null correct.
+        List<QuestionAttemptEvent> items = new ArrayList<>();
+        for (ItemResult item : result.items()) {
+            items.add(new QuestionAttemptEvent(userId, item.questionVersionId(),
+                    item.knowledgePoints().stream().map(KnowledgePointJudgment::knowledgePointId).distinct().toList(),
+                    item.isCorrect(), item.score(), item.maxScore(), item.durationMs(), item.errorCode(),
+                    QuestionEventSource.ASSESSMENT, item.itemResultId(), result.attemptId(), true));
+        }
+        questionEvents.append(items);
         if ("PLACEMENT".equals(result.assessmentType())) {
             applyPlacement(result);
             return;

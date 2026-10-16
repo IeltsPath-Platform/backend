@@ -13,6 +13,9 @@ import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.WritingSubmissionViewAssembler;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
+import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
+import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
 import com.ieltspath.learning.domain.vo.EvidenceSource;
 import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
@@ -51,12 +54,14 @@ public class SubmitLessonEssayUseCase {
     private final EssaySubmissionFlow flow;
     private final TransactionTemplate transaction;
     private final WritingSubmissionViewAssembler view;
+    private final QuestionEventLog questionEvents;
     private final Clock clock = Clock.systemUTC();
 
     public SubmitLessonEssayUseCase(LearningContentClient content, LessonAccess access, LearnerLock lock,
                                     KnowledgeEvidenceRepository evidence, WritingSubmissionRepository essays,
                                     EssaySubmissionFlow flow, PlatformTransactionManager transactionManager,
-                                    WritingSubmissionViewAssembler view) {
+                                    WritingSubmissionViewAssembler view, QuestionEventLog questionEvents) {
+        this.questionEvents = questionEvents;
         this.content = content;
         this.access = access;
         this.lock = lock;
@@ -141,7 +146,13 @@ public class SubmitLessonEssayUseCase {
         WritingSubmission submission = essays.findForUpdate(charged.id()).orElseThrow();
         if (submission.status() == WritingSubmissionStatus.GRADED) return view.assemble(submission);
         // Every essay before the block is first passed is new writing, so each one is evidence; none after.
-        if (!essays.blockPassed(submission.userId(), submission.blockId(), submission.id())) {
+        boolean firstAttempt = !essays.blockPassed(submission.userId(), submission.blockId(), submission.id());
+        // Each essay is one event for its prompt; a repeat after the block passed is logged with first_submission=false.
+        questionEvents.append(List.of(QuestionAttemptEvent.of(submission.userId(), submission.prompt().questionVersionId(),
+                List.copyOf(new LinkedHashSet<>(submission.prompt().knowledgePointIds())),
+                Boolean.TRUE.equals(submission.passed()), null, null, QuestionEventSource.LESSON_WRITING,
+                submission.id(), firstAttempt)));
+        if (firstAttempt) {
             List<UUID> kpIds = new ArrayList<>(new LinkedHashSet<>(submission.prompt().knowledgePointIds()));
             Set<UUID> known = access.knownKnowledgePoints(submission.userId(), kpIds);
             List<KnowledgeEvidence> essayEvidence = new ArrayList<>();

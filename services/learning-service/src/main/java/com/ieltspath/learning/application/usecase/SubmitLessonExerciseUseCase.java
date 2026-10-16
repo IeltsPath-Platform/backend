@@ -16,6 +16,11 @@ import com.ieltspath.learning.application.service.PracticeProgress;
 import com.ieltspath.learning.application.service.TopicCompletion;
 import com.ieltspath.learning.domain.aggregate.LessonProgress;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
+import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.AnswerDurations;
+import com.ieltspath.learning.domain.service.ErrorTagger;
+import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
+import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.domain.repository.LessonProgressRepository;
 import com.ieltspath.learning.domain.service.AnswerSpecGrader;
 import com.ieltspath.learning.domain.service.PassMark;
@@ -46,13 +51,15 @@ public class SubmitLessonExerciseUseCase {
     private final PracticeProgress practice;
     private final TopicCompletion topicCompletion;
     private final LessonViewAssembler view;
+    private final QuestionEventLog questionEvents;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
+    private final ErrorTagger errorTagger = new ErrorTagger();
     private final Clock clock = Clock.systemUTC();
 
     public SubmitLessonExerciseUseCase(LearnerLock lock, LessonAccess access, ExerciseSubmissionLog submissions,
                                        KnowledgeEvidenceRepository evidence, LessonProgressRepository lessons,
                                        PracticeProgress practice, LessonViewAssembler view,
-                                       TopicCompletion topicCompletion) {
+                                       TopicCompletion topicCompletion, QuestionEventLog questionEvents) {
         this.lock = lock;
         this.access = access;
         this.submissions = submissions;
@@ -61,6 +68,7 @@ public class SubmitLessonExerciseUseCase {
         this.practice = practice;
         this.view = view;
         this.topicCompletion = topicCompletion;
+        this.questionEvents = questionEvents;
     }
 
     @Transactional
@@ -92,6 +100,19 @@ public class SubmitLessonExerciseUseCase {
             throw new LearningRequestException(422, "UNGRADABLE_EXERCISE", "Exercise contains unsupported questions");
         }
         boolean firstSubmission = !submissions.exists(userId, lessonId, blockId);
+        // Every submission is logged per question; only the first one also becomes mastery evidence below.
+        Map<UUID, Long> durations = AnswerDurations.of(command.answers());
+        List<QuestionAttemptEvent> events = new ArrayList<>();
+        for (int index = 0; index < questions.size(); index++) {
+            Question question = questions.get(index);
+            UUID questionId = question.questionVersionId();
+            boolean correct = grades.get(index).correct();
+            String errorCode = correct ? null : errorTagger.tag(question.answerSpec(), answers.get(questionId), false);
+            events.add(QuestionAttemptEvent.of(userId, questionId, List.copyOf(new LinkedHashSet<>(question.knowledgePointIds())),
+                    correct, durations.get(questionId), errorCode, QuestionEventSource.LESSON_EXERCISE,
+                    command.requestId(), firstSubmission));
+        }
+        questionEvents.append(events);
         Set<UUID> knownKps = firstSubmission ? access.knownKnowledgePoints(userId, exerciseKnowledgePoints(lesson))
                 : Set.of();
         // Refresh may change the first unpassed topic; authorize again before changing progress.

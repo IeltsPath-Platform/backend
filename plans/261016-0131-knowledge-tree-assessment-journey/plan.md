@@ -101,7 +101,7 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 | 2b | [Seed KP, cạnh, difficulty backfill, bộ câu](./phase-02-content-seed-tree-and-difficulty.md) | content | Còn 7 KP Listening chưa đủ 3 bộ (cần audio). Bộ Reading/Writing đã seed (V33) nhưng là bản nháp chưa duyệt |
 | 3a | [Error taxonomy: bảng, CRUD, ErrorTagger, ghi error analysis](./phase-03-content-error-taxonomy.md) | content, learning, assessment | Completed (a140b8c) |
 | 3b | [Duyệt mã lỗi chính thức và gắn distractors cho câu](./phase-03-content-error-taxonomy.md) | content | Completed (V35, V36; quyết định Q1–Q4 đã chốt) |
-| 4 | [Event log từng câu và thời gian làm](./phase-04-question-event-log-and-duration.md) | learning, assessment | Pending |
+| 4 | [Event log từng câu và thời gian làm](./phase-04-question-event-log-and-duration.md) | learning, assessment | Completed |
 | 5 | [Mastery profile 3 mức, hạn ôn, API báo cáo](./phase-05-mastery-profile-and-report.md) | learning | Pending |
 | 6 | [Giỏ ôn nhiều mức và recheck](./phase-06-review-tiers-and-recheck.md) | learning | Pending |
 | 7 | [Chẩn đoán dò ngược theo cây](./phase-07-diagnostic-backtracking.md) | learning | Pending |
@@ -113,6 +113,19 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 | 13 | [Contract, tài liệu và nghiệm thu](./phase-13-contracts-docs-and-verification.md) | docs | Pending |
 | 14 | [Học viên sửa essay và nộp lại](./phase-14-essay-revision.md) | learning | Pending |
 | 15 | [Mentor chữa essay Practice và lesson](./phase-15-mentor-practice-essays.md) | learning, assessment, access | Pending |
+
+## Phân công đang làm (một nhánh `feat/knowledge-tree-assessment-journey`)
+
+| Người | Phase | File chạm tới | Migration được dùng |
+|---|---|---|---|
+| Claude | 4 (event log) | learning: `SubmitExerciseCommand`, use case nộp bài, `QuestionEventLog` (mới), `AssessmentCompletedParser`; assessment: `SaveAttemptResponseRequest`, use case lưu câu trả lời, `AutoGradeAttemptService`, `AssessmentCompletedEventFactory`, `AssessmentCompletedV2` | learning V11, assessment V8 |
+| Codex | 8 (practice test theo mốc) | content: mốc, API admin, API nội bộ, `JdbcLearningContentReader`; learning: giao đề, `PracticeTestAssignment`, `ApplyAssessmentResultUseCase`, `LearningContentClient`; assessment: `AttemptType` | content **V38** (không dùng V32), learning **V12** (không dùng V15) |
+
+Quy tắc để không đè nhau trên cùng nhánh:
+1. Mỗi bên chỉ sửa file trong cột của mình. Nếu cần sửa file của bên kia, dừng và hỏi.
+2. Commit bằng đường dẫn cụ thể (`git add <file>`), không dùng `git add -A`.
+3. Chỉ một Maven build chạy tại một thời điểm, vì `target/` dùng chung. Codex chạy xong thì báo, Claude mới build.
+4. Phase 10 (hàng chờ giám khảo) và phase 6/7 chưa giao, sẽ bàn sau khi phase 4 và 8 xong.
 
 ## Thứ tự và phụ thuộc
 

@@ -29,8 +29,11 @@ class ApplyPlacementResultUseCaseTest {
     private final LearnerPlacementRepository placements = mock(LearnerPlacementRepository.class);
     private final CourseProgressRepository courseProgress = mock(CourseProgressRepository.class);
     private final CourseTestAssignmentRepository courseAssignments = mock(CourseTestAssignmentRepository.class);
+    private final com.ieltspath.learning.application.port.QuestionEventLog questionEvents =
+            mock(com.ieltspath.learning.application.port.QuestionEventLog.class);
     private final ApplyAssessmentResultUseCase useCase = new ApplyAssessmentResultUseCase(
-            lock, evidence, curricula, results, assignments, reviews, placements, courseProgress, courseAssignments);
+            lock, evidence, curricula, results, assignments, reviews, placements, courseProgress, courseAssignments,
+            questionEvents);
     private final UUID user = UUID.randomUUID();
     private final Instant completed = Instant.parse("2026-10-06T10:00:00Z");
 

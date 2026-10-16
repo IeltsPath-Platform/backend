@@ -115,7 +115,7 @@ The following is the L1-B5 portion of L1. The full response also contains L1's t
 
 ### `POST /lessons/{id}/exercises/{blockId}/submissions`
 
-Request: `{requestId, answers:[{questionVersionId, answer}]}`. `requestId` is a UUID; one answer for **every** question in the block is required (`422` if missing/duplicate/foreign). Reuse of a request id for the same user, lesson, and block returns the saved response; reuse in a different scope is `409 REQUEST_CONFLICT`. Reattempts submit the whole same block with a new request id. The pass threshold is at least 70% of possible score; for L1-B5's three one-point questions, 2/3 fails and 3/3 passes. Only the **first submission** for a user and block contributes mastery evidence, whether it passed or failed. Later attempts can complete the block but never add evidence. If the block completes the lesson, mark the lesson complete in the same PostgreSQL transaction, serialized by a transaction-scoped advisory lock for the user. Lesson completion does not create a review.
+Request: `{requestId, answers:[{questionVersionId, answer, durationMs?}]}`. `requestId` is a UUID; one answer for **every** question in the block is required (`422` if missing/duplicate/foreign). Reuse of a request id for the same user, lesson, and block returns the saved response; reuse in a different scope is `409 REQUEST_CONFLICT`. Reattempts submit the whole same block with a new request id. The pass threshold is at least 70% of possible score; for L1-B5's three one-point questions, 2/3 fails and 3/3 passes. Only the **first submission** for a user and block contributes mastery evidence, whether it passed or failed. Later attempts can complete the block but never add evidence. If the block completes the lesson, mark the lesson complete in the same PostgreSQL transaction, serialized by a transaction-scoped advisory lock for the user. Lesson completion does not create a review.
 
 Every result carries `hint`. On failure, it is `{questionVersionId, correct, hint}`: apply the GET policy to the union of previously wrong questions and this submission's wrong answers, including previously wrong questions now answered correctly. On passing, it is `{questionVersionId, correct, correctAnswer, explanation, hint:null}`. A block that passed earlier keeps hints null even if a later attempt fails. Replaying a `requestId` returns its original saved response, including hints, even after passing or Content edits. Hint history uses one extra query per GET or new submission; replay needs no Content read or hint query. Mastery evidence and the formula do not change, and no `hints_used` is recorded.
 
@@ -326,3 +326,17 @@ These excerpts illustrate the new section fields. Auto-grading, attempt types, o
 ## Delivery order
 
 Deploy the Java Learning Service consumer accepting a nullable `learning_goal_id` and missing `package_version_id` before Assessment starts emitting goal-less events. See [AssessmentCompleted.v2](assessment-completed-v2.md) for retry, idempotency and DLQ replay. Learner access restrictions and internal Content endpoints precede opening this learner API.
+
+## Time per question and the question event log (phase 4)
+
+`durationMs` is an optional, non-negative integer on each answer of a lesson exercise, a Practice submission, and a review set submission. The server clamps it to `[0, 7200000]` and it never affects grading or mastery. Clients that do not measure time omit it.
+
+Every submission writes one row per question to the per-question event log, in the same transaction as its evidence. Each row carries the question, its knowledge points, `correct`, `duration_ms`, the error tag of a wrong objective answer (`error_code`, or null), its source (`lesson_exercise`, `practice_set`, `review_set`, `lesson_writing`, `assessment`), and `first_submission`.
+
+- `first_submission` is true for the first counted submission of a lesson block, Practice package, or review set. A repeat is logged with `first_submission=false` and adds no mastery evidence. Replaying the same `requestId` returns the saved response and writes nothing.
+- A lesson essay is one event for its prompt. Its `error_code` is null: the essay grader's categories are not error-taxonomy codes yet.
+- An assessment result writes one event per item with the item's `duration_ms` and `error_code` from `AssessmentCompleted.v2`. A regrade replaces only the events of its own attempt.
+
+Assessment's save-response endpoint accepts an optional `elapsedMs`: the learner's running total on that item. The server keeps the larger of the stored and reported values, capped at two hours, so a late, smaller report never shrinks the stored time.
+
+The Practice contract is part of this section: `docs/contracts/practice-v1.md` does not exist in the repo yet, so Practice's `durationMs` is documented here.

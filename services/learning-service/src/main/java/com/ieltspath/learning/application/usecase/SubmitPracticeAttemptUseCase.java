@@ -3,6 +3,10 @@ package com.ieltspath.learning.application.usecase;
 import com.ieltspath.learning.application.command.SubmitExerciseCommand;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearnerLock;
+import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.AnswerDurations;
+import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
+import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageVersion;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.service.FirstAttemptMistakes;
@@ -46,6 +50,7 @@ public class SubmitPracticeAttemptUseCase {
     private final WritingSubmissionRepository essays;
     private final PracticeProgress progress;
     private final FirstAttemptMistakes mistakes;
+    private final QuestionEventLog questionEvents;
     private final ItemGrading grading = new ItemGrading();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final Clock clock = Clock.systemUTC();
@@ -53,7 +58,8 @@ public class SubmitPracticeAttemptUseCase {
     public SubmitPracticeAttemptUseCase(LearnerLock lock, PracticeAccess access, LearningContentClient content,
                                         PracticeAttemptRepository attempts, ReviewItemRepository reviews,
                                         KnowledgeEvidenceRepository evidence, PracticeProgress progress,
-                                        FirstAttemptMistakes mistakes, WritingSubmissionRepository essays) {
+                                        FirstAttemptMistakes mistakes, WritingSubmissionRepository essays,
+                                        QuestionEventLog questionEvents) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -63,6 +69,7 @@ public class SubmitPracticeAttemptUseCase {
         this.progress = progress;
         this.mistakes = mistakes;
         this.essays = essays;
+        this.questionEvents = questionEvents;
     }
 
     @Transactional
@@ -80,6 +87,9 @@ public class SubmitPracticeAttemptUseCase {
         Set<UUID> revealed = attempts.revealedPackageIds(userId);
         boolean counted = !revealed.contains(attempt.packageId());
         List<KnowledgeEvidence> firstAnswers = new ArrayList<>();
+        // Logged for every submission; a repeat of an already counted package is marked first_submission=false.
+        Map<UUID, Long> durations = AnswerDurations.of(command.answers());
+        List<QuestionAttemptEvent> events = new ArrayList<>();
         List<PracticeReviewRule.ItemOutcome> outcomes = new ArrayList<>();
         List<PracticeSubmission.Answer> results = new ArrayList<>();
         Map<LearningSkill, List<PracticeReviewRule.ItemOutcome>> outcomesBySkill = new EnumMap<>(LearningSkill.class);
@@ -95,6 +105,9 @@ public class SubmitPracticeAttemptUseCase {
             if (counted) for (UUID kp : kps) firstAnswers.add(KnowledgeEvidence.of(kp, grade.correct(),
                     EvidenceSource.PRACTICE_SET,
                     LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), kp)));
+            events.add(QuestionAttemptEvent.of(userId, item.questionVersionId(), List.copyOf(kps), grade.correct(),
+                    durations.get(item.questionVersionId()), graded.errorCodes().get(index),
+                    QuestionEventSource.PRACTICE_SET, command.requestId(), counted));
             results.add(new PracticeSubmission.Answer(item.questionVersionId(), grade.correct(),
                     grade.correctAnswer(), item.explanation()));
         }
@@ -131,6 +144,7 @@ public class SubmitPracticeAttemptUseCase {
                 graded.skillScores());
         attempt.recordResult(command.requestId(), response, clock.instant());
         attempts.saveResult(attempt);
+        questionEvents.append(events);
         evidence.append(userId, firstAnswers);
         reviews.insertPracticePending(userId, candidates);
         progress.refreshPassForLesson(userId, attempt.lessonId());

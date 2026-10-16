@@ -107,6 +107,18 @@ class AutoGradeAttemptServiceTest {
         });
     }
 
+    @Test
+    void storedElapsedTimeIsCopiedIntoTheItemResult() {
+        stubGradingOf("{\"answer\":\"A\"}");
+        when(attemptItems.elapsedMsByItemId(anyCollection())).thenReturn(Map.of(attemptItemId, 4200L));
+
+        service().gradeIfObjective(attempt());
+
+        ArgumentCaptor<List<ItemResult>> graded = ArgumentCaptor.forClass(List.class);
+        verify(itemResults).saveAll(graded.capture());
+        assertThat(graded.getValue().get(0).durationMilliseconds()).isEqualTo(4200L);
+    }
+
     /** One objective item with a stored response, graded by the real service; the result save returns its input. */
     private void stubGradingOf(String payload) {
         when(attemptItems.findByAttemptId(attemptId)).thenReturn(List.of(

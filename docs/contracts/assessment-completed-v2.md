@@ -64,6 +64,8 @@ Each `item_results[]` entry:
 | `question_version_id` | UUID | Content question version from the attempt snapshot. |
 | `is_correct` | boolean or null | Explicit correctness. `null` means the item was not graded right/wrong (for example an essay). |
 | `score`, `max_score` | number | `0 <= score <= max_score`, `max_score > 0`. |
+| `duration_ms` | integer >= 0, or null | Optional. The learner's time on the item, from the attempt's stored running total, capped at two hours. Null when the client never reported time. Added after v2 shipped; consumers must treat it as optional. |
+| `error_code` | string or null | Optional. The error-taxonomy code (for example `PARAPHRASE_TRAP`) of a wrong objective answer, from the error analysis rows. Null for correct, ungraded and essay items. Distinct from the legacy `error_type` below. |
 | `knowledge_point_mappings[]` | array | The Content snapshot taken at attempt start. |
 
 `TOPIC_GATE` and `COURSE_GATE` attempts may contain essay items. The learner submits an essay through
