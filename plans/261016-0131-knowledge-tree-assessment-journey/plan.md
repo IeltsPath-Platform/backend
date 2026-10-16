@@ -98,7 +98,7 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 |-------|------|---------|--------|
 | 1 | [Cây tri thức: cạnh tiên quyết và API](./phase-01-content-knowledge-tree.md) | content | Completed (chưa commit) |
 | 2a | [Course/topic 6.0, 7.0 INACTIVE, difficulty bắt buộc, lọc learning](./phase-02-content-seed-tree-and-difficulty.md) | content, learning | Completed (chưa commit) |
-| 2b | [Seed KP, cạnh, difficulty backfill, bộ câu](./phase-02-content-seed-tree-and-difficulty.md) | content | Một phần: backfill difficulty (V31) và KP/cạnh nháp (V32) xong, chưa duyệt; còn bộ PRACTICE_SET và duyệt nội dung |
+| 2b | [Seed KP, cạnh, difficulty backfill, bộ câu](./phase-02-content-seed-tree-and-difficulty.md) | content | Còn 7 KP Listening chưa đủ 3 bộ (cần audio). Bộ Reading/Writing đã seed (V33) nhưng là bản nháp chưa duyệt |
 | 3 | [Error taxonomy và gắn mã lỗi cho đáp án](./phase-03-content-error-taxonomy.md) | content, learning, assessment | Pending |
 | 4 | [Event log từng câu và thời gian làm](./phase-04-question-event-log-and-duration.md) | learning, assessment | Pending |
 | 5 | [Mastery profile 3 mức, hạn ôn, API báo cáo](./phase-05-mastery-profile-and-report.md) | learning | Pending |

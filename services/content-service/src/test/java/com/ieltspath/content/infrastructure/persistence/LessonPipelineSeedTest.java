@@ -866,8 +866,9 @@ class LessonPipelineSeedTest {
         // questions of V18, the 24 course questions of V21 and the 25 lesson, practice and final-test questions of V22.
         // V23 adds 33 lesson, practice and topic-test questions of the multi-skill topic, V25 the 12 placement
         // questions, V26 the placement Writing Task 1 and V27 the 88 new questions of the full-length placement,
-        // which no lesson or review may reuse either.
-        assertThat(reserved).hasSize(330);
+        // which no lesson or review may reuse either. V33 adds the 23 questions of the 15 free practice sets for
+        // Reading 6.5 and Writing.
+        assertThat(reserved).hasSize(353);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }
 
