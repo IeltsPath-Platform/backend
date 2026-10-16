@@ -71,7 +71,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
             JOIN content_sections ts ON ts.id = tsq.section_id
             JOIN content_package_versions tv ON tv.id = ts.package_version_id
             JOIN content_packages tp ON tp.id = tv.package_id
-            WHERE tp.package_type IN ('TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
+            WHERE tp.package_type IN ('TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST', 'PRACTICE_TEST')
             """;
 
     /**
@@ -517,7 +517,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 JOIN content_package_versions v ON v.id = s.package_version_id
                 JOIN content_packages p ON p.id = v.package_id
                 WHERE p.id <> tq.package_id AND v.status = 'PUBLISHED'
-                  AND p.package_type IN ('PRACTICE_SET', 'TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST')
+                  AND p.package_type IN ('PRACTICE_SET', 'TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST', 'PRACTICE_TEST')
                 ORDER BY question_id, owner_type, owner_code
                 """, Map.of("versionId", packageVersionId), (rs, i) -> new QuestionUsageConflict(
                 uuid(rs, "question_id"), QuestionUsageConflict.OwnerType.valueOf(rs.getString("owner_type")),
@@ -670,7 +670,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
         Map<UUID, List<PackageVersionContentResult.Item>> itemsBySection = new LinkedHashMap<>();
         jdbc.query("""
-                SELECT sq.section_id, sq.sort_order, sq.max_score, qv.id, qv.stem, qv.options::text AS options,
+                SELECT sq.section_id, sq.sort_order, sq.max_score, sq.group_id, qv.id, qv.stem, qv.options::text AS options,
                        qv.answer_spec::text AS answer_spec, qv.explanation, qv.hint
                 FROM section_questions sq
                 JOIN content_sections s ON s.id = sq.section_id
@@ -683,11 +683,25 @@ public class JdbcLearningContentReader implements LearningContentReader {
                     .add(new PackageVersionContentResult.Item(versionId, rs.getInt("sort_order"),
                             rs.getString("stem"), rs.getString("options"), rs.getString("answer_spec"),
                             rs.getString("explanation"), rs.getString("hint"), rs.getDouble("max_score"),
+                            rs.getObject("group_id", UUID.class),
                             mappings.getOrDefault(versionId, List.of())));
         });
 
+        Map<UUID, List<PackageVersionContentResult.QuestionGroup>> groupsBySection = new LinkedHashMap<>();
+        jdbc.query("""
+                SELECT g.id, g.section_id, g.sort_order, g.format_code, g.instructions
+                FROM section_question_groups g
+                JOIN content_sections s ON s.id = g.section_id
+                WHERE s.package_version_id = :versionId
+                ORDER BY g.section_id, g.sort_order
+                """, byVersion, rs -> {
+            groupsBySection.computeIfAbsent(uuid(rs, "section_id"), ignored -> new ArrayList<>())
+                    .add(new PackageVersionContentResult.QuestionGroup(uuid(rs, "id"), rs.getInt("sort_order"),
+                            rs.getString("format_code"), rs.getString("instructions")));
+        });
+
         List<PackageVersionContentResult.Section> sections = jdbc.query("""
-                SELECT s.id, s.title, s.skill, s.instructions, s.sort_order,
+                SELECT s.id, s.title, s.skill, s.instructions, s.sort_order, s.part_no, s.time_limit_seconds,
                        (SELECT a.text_content FROM content_asset_links al
                         JOIN content_assets a ON a.id = al.asset_id
                         WHERE al.section_id = s.id AND a.asset_type = 'PASSAGE'
@@ -705,15 +719,48 @@ public class JdbcLearningContentReader implements LearningContentReader {
             UUID sectionId = uuid(rs, "id");
             return new PackageVersionContentResult.Section(sectionId, rs.getString("title"),
                     enumOrNull(Skill.class, rs.getString("skill")), rs.getString("instructions"),
-                    rs.getInt("sort_order"), rs.getString("passage"),
+                    rs.getInt("sort_order"), (Integer) rs.getObject("part_no"), (Integer) rs.getObject("time_limit_seconds"),
+                    rs.getString("passage"),
                     rs.getObject("audio_id") == null ? null : new PackageVersionContentResult.SectionAudio(
                             uuid(rs, "audio_id"), rs.getString("audio_reference"), null,
                             (Integer) rs.getObject("audio_duration"), rs.getString("audio_transcript")),
+                    groupsBySection.getOrDefault(sectionId, List.of()),
                     itemsBySection.getOrDefault(sectionId, List.of()));
         });
 
         return Optional.of(new PackageVersionContentResult(packageVersionId, version.packageId(),
                 version.packageType(), version.topicId(), version.rules(), sections));
+    }
+
+    @Override
+    public List<String> practiceTestPublishIssues(UUID packageVersionId) {
+        record Validation(int sections, int distinctParts, int validSkills, int distinctSkills, int groupedSections,
+                          int ungroupedQuestions, int multiAnswerGroups) {}
+        List<Validation> rows = jdbc.query("""
+                SELECT (SELECT COUNT(*)::int FROM content_sections s WHERE s.package_version_id = :versionId) sections,
+                       (SELECT COUNT(DISTINCT s.part_no)::int FROM content_sections s WHERE s.package_version_id = :versionId) distinct_parts,
+                       (SELECT COUNT(*)::int FROM content_sections s WHERE s.package_version_id = :versionId
+                         AND s.part_no BETWEEN 1 AND 4 AND s.skill IN ('READING', 'LISTENING')) valid_skills,
+                       (SELECT COUNT(DISTINCT s.skill)::int FROM content_sections s WHERE s.package_version_id = :versionId) distinct_skills,
+                       (SELECT COUNT(DISTINCT g.section_id)::int FROM section_question_groups g
+                        JOIN content_sections s ON s.id = g.section_id WHERE s.package_version_id = :versionId) grouped_sections,
+                       (SELECT COUNT(*)::int FROM section_questions sq JOIN content_sections s ON s.id = sq.section_id
+                        WHERE s.package_version_id = :versionId AND sq.group_id IS NULL) ungrouped_questions,
+                       (SELECT COUNT(*)::int FROM section_question_groups g JOIN content_sections s ON s.id = g.section_id
+                        WHERE s.package_version_id = :versionId AND g.format_code = 'MULTIPLE_CHOICE_MANY') multi_answer_groups
+                """, Map.of("versionId", packageVersionId), (rs, row) -> new Validation(rs.getInt("sections"),
+                rs.getInt("distinct_parts"), rs.getInt("valid_skills"), rs.getInt("distinct_skills"), rs.getInt("grouped_sections"),
+                rs.getInt("ungrouped_questions"), rs.getInt("multi_answer_groups")));
+        if (rows.isEmpty()) return List.of("Practice test version has no sections");
+        Validation value = rows.getFirst();
+        List<String> issues = new ArrayList<>();
+        if (value.sections() == 0 || value.sections() != value.distinctParts() || value.sections() != value.validSkills()
+                || value.distinctSkills() != 1)
+            issues.add("Practice tests require unique part numbers and one supported skill per section");
+        if (value.sections() != value.groupedSections() || value.ungroupedQuestions() > 0)
+            issues.add("Every practice test section and question must belong to a question group");
+        if (value.multiAnswerGroups() > 0) issues.add("Multiple-answer groups are not supported for practice tests");
+        return List.copyOf(issues);
     }
 
     @Override
@@ -730,7 +777,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 JOIN content_package_versions v ON v.id = s.package_version_id
                 JOIN content_packages p ON p.id = v.package_id
                 WHERE sq.question_version_id IN (:ids)
-                  AND p.package_type IN ('TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST', 'PRACTICE_SET')
+                  AND p.package_type IN ('TOPIC_TEST', 'COURSE_TEST', 'MOCK_TEST', 'PLACEMENT_TEST', 'PRACTICE_SET', 'PRACTICE_TEST')
                 """, Map.of("ids", questionVersionIds), (rs, i) -> uuid(rs, "id")));
     }
 

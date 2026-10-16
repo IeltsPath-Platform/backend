@@ -31,6 +31,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +71,7 @@ class AutoGradingIntegrationTest {
     @Autowired SaveAttemptResponseUseCase saveResponse;
     @Autowired SubmitAssessmentAttemptUseCase submit;
     @Autowired GetAssessmentResultUseCase learnerResult;
+    @Autowired RecordSectionTimeUseCase recordSectionTime;
     @Autowired CreateAssessmentResultUseCase createResult;
     @Autowired JdbcTemplate jdbc;
 
@@ -213,6 +215,117 @@ class AutoGradingIntegrationTest {
         assertEquals(1, events(attemptId).size());
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {5, 1})
+    void officialPracticeStoresRawScoreAndShowsSolutionsRegardlessOfPercent(int correctCount) throws Exception {
+        UUID user = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        UUID packageId = UUID.randomUUID();
+        UUID sectionId = UUID.randomUUID();
+        List<Item> questions = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            questions.add(new Item(UUID.randomUUID(), i + 1, "Practice question " + (i + 1),
+                    List.of(new Option("A", "first", 1), new Option("B", "second", 2)), Q1,
+                    "Practice explanation " + (i + 1), BigDecimal.ONE, List.of()));
+        }
+        Section section = new Section(sectionId, "Passage 2", "READING", "Read and answer", 2, "A passage",
+                null, questions, 2, 1200, List.of());
+        when(content.findPackageVersion(versionId)).thenReturn(Optional.of(new PackageVersion(versionId, packageId,
+                "PRACTICE_TEST", List.of(section))));
+        UUID attemptId = start.execute(new StartAssessmentAttemptCommand(user, versionId, AttemptMode.TIMED,
+                AttemptChannel.WEB)).id();
+
+        List<UUID> items = itemIds(attemptId);
+        for (int i = 0; i < correctCount; i++) answer(user, attemptId, items.get(i), "{\"answer\":\"B\"}");
+        UUID attemptSectionId = jdbc.queryForObject("SELECT id FROM attempt_sections WHERE attempt_id = ?", UUID.class, attemptId);
+        recordSectionTime.execute(user, attemptId, List.of(new RecordSectionTimeUseCase.SectionTime(attemptSectionId, 95)));
+        submit.execute(new SubmitAssessmentAttemptCommand(user, attemptId));
+
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM skill_scores ss JOIN assessment_results r ON r.id = ss.result_id WHERE r.attempt_id = ?", Integer.class, attemptId));
+        assertEquals(0, BigDecimal.valueOf(correctCount).compareTo(jdbc.queryForObject(
+                "SELECT raw_score FROM skill_scores ss JOIN assessment_results r ON r.id = ss.result_id WHERE r.attempt_id = ?",
+                BigDecimal.class, attemptId)));
+        assertEquals("AUTO", jdbc.queryForObject(
+                "SELECT grading_source FROM skill_scores ss JOIN assessment_results r ON r.id = ss.result_id WHERE r.attempt_id = ?",
+                String.class, attemptId));
+        // The attempt covers the whole package, so it is a full test: its raw score is scaled to 40 questions for the band.
+        double expectedBand = correctCount == 5 ? 9.0 : 3.5;
+        assertEquals(0, BigDecimal.valueOf(expectedBand).compareTo(jdbc.queryForObject(
+                "SELECT band FROM skill_scores ss JOIN assessment_results r ON r.id = ss.result_id WHERE r.attempt_id = ?",
+                BigDecimal.class, attemptId)));
+
+        var result = learnerResult.execute(user, attemptId);
+        assertEquals(correctCount * 20.0, result.percent());
+        var practice = result.practice();
+        assertEquals(expectedBand, practice.band());
+        assertEquals(1200, practice.timeLimitSeconds(), "the section limit frozen with the attempt");
+        assertEquals(1, practice.sections().size());
+        assertEquals(95, practice.sections().getFirst().timeSpentSeconds());
+        assertEquals(5, practice.sections().getFirst().questionCount());
+        assertEquals("Passage 2", practice.sections().getFirst().title());
+        assertEquals(5, result.solutions().size(), "practice explanations are available even below the pass threshold");
+        assertEquals("Practice explanation 5", result.solutions().get(4).explanation());
+        JsonNode event = json.readTree(events(attemptId).getFirst());
+        assertEquals("OFFICIAL_PRACTICE", event.path("data").path("assessment_type").asText());
+        assertEquals(0, event.path("data").path("item_results").get(0).path("knowledge_point_mappings").size());
+    }
+
+    @Test
+    void topicGateDoesNotPersistSkillScores() {
+        UUID attemptId = startAttempt(UUID.randomUUID(), "TOPIC_TEST", List.of(Q1));
+        answer(attemptId, itemIds(attemptId).getFirst(), "{\"answer\":\"B\"}");
+
+        submit.execute(new SubmitAssessmentAttemptCommand(userId, attemptId));
+
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM skill_scores ss JOIN assessment_results r ON r.id = ss.result_id WHERE r.attempt_id = ?", Integer.class, attemptId));
+    }
+
+    @Test
+    void practicePartAndTimedFullAttemptsKeepTheirScopeAndSnapshotOnlyLearnerContent() throws Exception {
+        UUID user = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        UUID packageId = UUID.randomUUID();
+        List<Section> sections = new ArrayList<>();
+        for (int part = 1; part <= 3; part++) {
+            List<Item> questions = new ArrayList<>();
+            for (int question = 1; question <= 5; question++) {
+                questions.add(new Item(UUID.randomUUID(), question, "Question " + question,
+                        List.of(new Option("A", "first", 1), new Option("B", "second", 2)), Q1,
+                        "Explanation", BigDecimal.ONE, List.of()));
+            }
+            sections.add(new Section(UUID.randomUUID(), "Passage " + part, "READING", "Read", part,
+                    "Passage text", null, questions, part, 1200, List.of()));
+        }
+        when(content.findPackageVersion(versionId)).thenReturn(Optional.of(new PackageVersion(versionId, packageId,
+                "PRACTICE_TEST", sections)));
+
+        UUID partAttempt = start.execute(new StartAssessmentAttemptCommand(user, versionId, AttemptMode.STANDARD,
+                AttemptChannel.WEB, List.of(sections.get(1).sectionId()))).id();
+        assertEquals("PART", jdbc.queryForObject("SELECT scope FROM assessment_attempts WHERE id = ?", String.class,
+                partAttempt));
+        assertEquals(packageId, jdbc.queryForObject("SELECT package_id FROM assessment_attempts WHERE id = ?",
+                UUID.class, partAttempt));
+        assertEquals("READING", jdbc.queryForObject("SELECT skill FROM assessment_attempts WHERE id = ?",
+                String.class, partAttempt));
+        assertEquals(5, itemIds(partAttempt).size());
+        assertEquals(List.of(2), jdbc.queryForList("SELECT part_no FROM attempt_sections WHERE attempt_id = ?",
+                Integer.class, partAttempt));
+
+        Instant beforeStart = Instant.now();
+        UUID fullAttempt = start.execute(new StartAssessmentAttemptCommand(user, versionId, AttemptMode.TIMED,
+                AttemptChannel.WEB)).id();
+        Instant afterStart = Instant.now();
+        Instant expiry = jdbc.queryForObject("SELECT expires_at FROM assessment_attempts WHERE id = ?",
+                java.sql.Timestamp.class, fullAttempt).toInstant();
+        assertEquals("FULL", jdbc.queryForObject("SELECT scope FROM assessment_attempts WHERE id = ?", String.class,
+                fullAttempt));
+        assertEquals(15, itemIds(fullAttempt).size());
+        assertTrue(expiry.isAfter(beforeStart.plusSeconds(3595)) && expiry.isBefore(afterStart.plusSeconds(3605)));
+        assertFalse(jdbc.queryForObject("SELECT question_snapshot::text FROM attempt_items WHERE attempt_section_id IN " +
+                        "(SELECT id FROM attempt_sections WHERE attempt_id = ?) LIMIT 1", String.class, fullAttempt)
+                .contains("answerSpec"));
+    }
+
     @Test
     void anUngradableItemLeavesTheAttemptForAHumanGrader() {
         Map<String, Object> essay = Map.of("type", "ESSAY", "task", "TASK_2", "minWords", 250, "passBand", 6.0);
@@ -262,6 +375,10 @@ class AutoGradingIntegrationTest {
 
     private void answer(UUID attemptId, UUID itemId, String payload) {
         saveResponse.execute(new SaveAttemptResponseCommand(userId, attemptId, itemId, payload, 1, 0));
+    }
+
+    private void answer(UUID currentUser, UUID attemptId, UUID itemId, String payload) {
+        saveResponse.execute(new SaveAttemptResponseCommand(currentUser, attemptId, itemId, payload, 1, 0));
     }
 
     private List<String> events(UUID attemptId) {

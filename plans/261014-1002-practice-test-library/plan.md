@@ -14,6 +14,8 @@ source: skill
 
 # Thư viện luyện đề IELTS: full đề, bài lẻ theo part, lịch sử và lượt làm
 
+> **Cập nhật 2026-10-15:** phần Reading của plan này được thực thi bởi [`261015-1138-reading-practice-4-skills`](../261015-1138-reading-practice-4-skills/plan.md) trên nhánh `feat/practice_skills`. Seed demo là `V30__seed_reading_practice_demo.sql` (không phải `V29`: `V29` đã là `question_version_guide`), đã viết; content `V28` đã áp dụng; `stats`, phase 6 và 7 bị cắt khỏi lát cắt Reading. Plan này vẫn là tài liệu thiết kế gốc và là nơi làm tiếp Listening.
+
 ## Overview
 
 Học viên cần một thư viện đề tách khỏi lộ trình học: lọc theo kỹ năng, theo nguồn tài liệu, chọn **Full đề** hoặc **Bài lẻ**
@@ -51,7 +53,7 @@ Base: nhánh `practice_test` @ `ba02556`; lúc lập plan working tree chỉ có
 4. Gốc package Java là `com.ieltspath.<service>` (các plan cũ ghi `com.group01` là cũ). Theo layer trong `AGENTS.md` §3.1:
    không đưa JPA/Spring vào `domain`; không gọi repository trong vòng lặp; endpoint danh sách phải phân trang và lọc ở DB.
 5. **Schema (migration content `V28`, assessment `V8`) do plan [`261014-1021-practice-test-data-model`](../261014-1021-practice-test-data-model/plan.md) làm trước**
-   và là nguồn duy nhất cho bảng, cột, ràng buộc, quan hệ; plan này chỉ viết code dùng chúng và thêm migration seed `V29` ở phase 8. `V28` hoặc `V8` chưa có khi bắt tay vào làm → dừng và ghi `BLOCKED`.
+   và là nguồn duy nhất cho bảng, cột, ràng buộc, quan hệ; plan này chỉ viết code dùng chúng và thêm migration seed ở phase 8 (số `V30`, xem ghi chú đầu file). `V28` hoặc `V8` chưa có khi bắt tay vào làm → dừng và ghi `BLOCKED`.
 6. Chỉ được sửa kỳ vọng của test cũ khi thỏa **cả ba**: (a) test đỏ chỉ vì dữ liệu/số đếm do chính plan này thêm (migration, seed,
    cột mới); (b) chỉ sửa con số hoặc danh sách cho khớp, không xóa test, không nới assertion; (c) ghi vào Verification tên test,
    kỳ vọng cũ → mới, lý do. Test cũ đỏ vì lý do khác: dừng, ghi `BLOCKED`.

@@ -15,6 +15,9 @@ import com.ieltspath.assessment.domain.repository.AttemptItemKnowledgePointRepos
 import com.ieltspath.assessment.domain.repository.AttemptItemRepository;
 import com.ieltspath.assessment.domain.repository.AttemptSectionRepository;
 import com.ieltspath.assessment.domain.vo.AttemptType;
+import com.ieltspath.assessment.domain.vo.AttemptScope;
+import com.ieltspath.assessment.domain.vo.Skill;
+import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,21 +53,31 @@ public class AttemptCreator {
     @Transactional
     public AssessmentAttemptResult create(StartAssessmentAttemptCommand command, AttemptType type,
                                           ContentPackageProvider.PackageVersion packageVersion) {
-        if (packageVersion.sections().isEmpty()
-                || packageVersion.sections().stream().anyMatch(section -> section.items().isEmpty())) {
+        return create(command, type, packageVersion, packageVersion.sections(), AttemptScope.FULL, null, null);
+    }
+
+    @Transactional
+    public AssessmentAttemptResult create(StartAssessmentAttemptCommand command, AttemptType type,
+                                          ContentPackageProvider.PackageVersion packageVersion,
+                                          List<ContentPackageProvider.Section> selectedSections,
+                                          AttemptScope scope, Skill skill, Instant expiresAt) {
+        if (selectedSections.isEmpty() || selectedSections.stream().anyMatch(section -> section.items().isEmpty())) {
             throw new PackageNotAttemptableException("Package version has a section without questions");
         }
-        var attempt = AssessmentAttempt.start(command.userId(), command.packageVersionId(), type, command.mode(),
-                command.channel(), null);
+        if (type == AttemptType.OFFICIAL_PRACTICE && packageVersion.packageId() == null) {
+            throw new PackageNotAttemptableException("Package identity is missing");
+        }
+        var attempt = AssessmentAttempt.start(command.userId(), command.packageVersionId(), packageVersion.packageId(),
+                type, command.mode(), command.channel(), expiresAt, scope, skill);
         attempts.save(attempt);
 
         var sectionEntities = new ArrayList<AttemptSection>();
         var itemEntities = new ArrayList<AttemptItem>();
         var knowledgeEntities = new ArrayList<AttemptItemKnowledgePoint>();
-        for (var section : packageVersion.sections()) {
+        for (var section : selectedSections) {
             UUID sectionId = UUID.randomUUID();
             sectionEntities.add(new AttemptSection(sectionId, attempt.getId(), section.sectionId(),
-                    section.sortOrder(), sectionSnapshot(section)));
+                    section.sortOrder(), sectionSnapshot(section), null, null, section.partNo()));
             for (var item : section.items()) {
                 UUID itemId = UUID.randomUUID();
                 itemEntities.add(new AttemptItem(itemId, sectionId, item.questionVersionId(), item.sortOrder(),
@@ -89,6 +102,11 @@ public class AttemptCreator {
         snapshot.put("title", section.title());
         snapshot.put("skill", section.skill());
         snapshot.put("instructions", section.instructions());
+        snapshot.put("partNo", section.partNo());
+        snapshot.put("timeLimitSeconds", section.timeLimitSeconds());
+        snapshot.put("groups", section.groups().stream().map(group -> Map.of(
+                "groupId", group.groupId(), "sortOrder", group.sortOrder(), "formatCode", group.formatCode(),
+                "instructions", group.instructions() == null ? "" : group.instructions())).toList());
         if (section.audio() != null) {
             Map<String, Object> audio = new LinkedHashMap<>();
             audio.put("url", section.audio().mediaUrl());
@@ -108,6 +126,7 @@ public class AttemptCreator {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("stem", item.stem());
         snapshot.put("options", item.options());
+        snapshot.put("groupId", item.groupId());
         return write(snapshot);
     }
 

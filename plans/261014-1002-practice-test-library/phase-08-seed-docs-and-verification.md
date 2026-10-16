@@ -14,7 +14,7 @@ Hiện không có đề nào để hiện trong thư viện (0 `MOCK_TEST`, 0 c�
 
 ## Requirements
 - Functional:
-  - Migration `V29__seed_practice_test_demo.sql` (content) tạo, theo mẫu seed hiện có (UUID cố định, `status = 'PUBLISHED'`, version 1):
+  - Migration `V30__seed_reading_practice_demo.sql (Reading đã viết; Listening còn lại là V31 trở đi)` (content) tạo, theo mẫu seed hiện có (UUID cố định, `status = 'PUBLISHED'`, version 1):
     - Reading, nguồn `IELTS_SPACE_PRO`: một đề `PRACTICE_TEST` **3 part** (mỗi part một passage, 4-5 câu, 2-3 nhóm gồm `GAP_FILLING` và `YES_NO_NOT_GIVEN` hoặc `MATCHING_INFORMATION`).
     - Reading, nguồn `C10_C20`: một đề **1 part** (để thử `PART` khác nguồn).
     - Listening, nguồn `IELTS_SPACE_PRO`: một đề **2 part** có audio (dùng khóa object key theo bảng audio hiện có; thiếu `CONTENT_MEDIA_BASE_URL` thì Listening trả lỗi như seed Listening cũ, ghi chú trong README).
@@ -30,7 +30,7 @@ Hiện không có đề nào để hiện trong thư viện (0 `MOCK_TEST`, 0 c�
 - Non-functional: seed idempotent theo cách các seed cũ làm; không đụng dữ liệu hiện có.
 
 ## Related Code Files
-- Create: `services/content-service/src/main/resources/db/migration/V29__seed_practice_test_demo.sql`,
+- Create: `services/content-service/src/main/resources/db/migration/V30__seed_reading_practice_demo.sql (Reading đã viết; Listening còn lại là V31 trở đi)`,
   test `services/content-service/src/test/java/com/ieltspath/content/infrastructure/persistence/PracticeTestSeedTest.java` (Testcontainers)
 - Modify: các file tài liệu liệt kê trên; test cũ có kỳ vọng số đếm bị đổi bởi seed (xem dưới)
 
@@ -57,7 +57,7 @@ Hiện không có đề nào để hiện trong thư viện (0 `MOCK_TEST`, 0 c�
 ## Risk Assessment
 - Seed làm đổi số đếm ở test seed cũ; phạm vi sửa kỳ vọng bị giới hạn ở luật số 6, vượt thì `BLOCKED`.
 - Audio demo cần file mp3 thật ở bucket; nếu không có, đề Listening demo chỉ kiểm được ở mức dữ liệu. Ghi rõ trong Verification thay vì giả lập thành công.
-- Rollback: seed là migration mới; gỡ bằng migration xóa dữ liệu demo (cần duyệt vì là xóa dữ liệu), không sửa V29 đã áp dụng.
+- Rollback: seed là migration mới; gỡ bằng migration xóa dữ liệu demo (cần duyệt vì là xóa dữ liệu), không sửa migration seed đã áp dụng.
 
 ## Câu hỏi chưa giải quyết
 - Bảng quy đổi điểm thô → band chưa có nguồn được xác nhận (Q4).

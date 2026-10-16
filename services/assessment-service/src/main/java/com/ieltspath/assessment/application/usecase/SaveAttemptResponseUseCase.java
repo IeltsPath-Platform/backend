@@ -7,10 +7,12 @@ import com.ieltspath.assessment.domain.entity.AttemptSection;
 import com.ieltspath.assessment.domain.exception.AssessmentNotFoundException;
 import com.ieltspath.assessment.domain.exception.InvalidAssessmentStateException;
 import com.ieltspath.assessment.domain.exception.RevisionConflictException;
+import com.ieltspath.assessment.domain.exception.AttemptExpiredException;
 import com.ieltspath.assessment.domain.repository.AssessmentAttemptRepository;
 import com.ieltspath.assessment.domain.repository.AttemptItemRepository;
 import com.ieltspath.assessment.domain.repository.AttemptResponseRepository;
 import com.ieltspath.assessment.domain.repository.AttemptSectionRepository;
+import com.ieltspath.assessment.domain.vo.AttemptType;
 import com.ieltspath.assessment.domain.vo.AttemptStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +46,10 @@ public class SaveAttemptResponseUseCase {
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
         if (attempt.getStatus() != AttemptStatus.IN_PROGRESS) {
             throw new InvalidAssessmentStateException("Only in-progress attempts accept responses");
+        }
+        if (attempt.getExpiresAt() != null && !Instant.now().isBefore(attempt.getExpiresAt())
+                && attempt.getAttemptType() != AttemptType.OFFICIAL_PRACTICE) {
+            throw new AttemptExpiredException();
         }
 
         var item = items.findByIdAndAttemptId(command.itemId(), command.attemptId())

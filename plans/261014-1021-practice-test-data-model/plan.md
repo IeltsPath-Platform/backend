@@ -14,6 +14,8 @@ source: skill
 
 # Mô hình dữ liệu thư viện luyện đề: bảng, cột và quan hệ
 
+> **Cập nhật 2026-10-15:** phần Reading của plan này được thực thi bởi [`261015-1138-reading-practice-4-skills`](../261015-1138-reading-practice-4-skills/plan.md) trên nhánh `feat/practice_skills`. Phase 1 (content `V28`) **đã xong** và đã áp dụng. Còn lại phase 2 (assessment `V8`), được làm trong phase 3 của plan thực thi (bỏ index `idx_assessment_attempts_package_status`). Seed demo là `V30`, không phải `V29`.
+
 ## Overview
 
 Plan này là **nguồn duy nhất** cho schema của thư viện luyện đề: bảng nào, cột nào, ràng buộc nào và quan hệ giữa chúng.
@@ -121,7 +123,7 @@ Thứ tự commit: 1 → 2 → 3. Phase 1 và 2 độc lập (hai DB), nhưng c�
 
 ## Ngoài phạm vi
 
-Entity/mapper/DTO/API/use case (plan thư viện đề) · seed đề mẫu (V29, plan thư viện đề phase 8) · API/bảng quản lý nguồn tài liệu (nguồn nằm trong enum `TestSource`) · bảng lượt làm/lịch sử ·
+Entity/mapper/DTO/API/use case (plan thư viện đề) · seed đề mẫu (V30, plan thư viện đề phase 8) · API/bảng quản lý nguồn tài liệu (nguồn nằm trong enum `TestSource`) · bảng lượt làm/lịch sử ·
 bảng quy đổi band · đối chiếu lại toàn bộ `DATABASE_V5.md` với V19–V27 · FK xuyên DB · chặn khóa PRO · loại câu "chọn nhiều đáp án" (chỉ đổi `answer_spec` JSON, không đổi bảng).
 
 ## Câu hỏi mở (mặc định ghi sẵn)

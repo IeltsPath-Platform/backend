@@ -69,6 +69,7 @@ class AssessmentAnswerExposureWebMvcTest {
     @MockitoBean GetCurrentPlacementAttemptUseCase currentPlacement;
     @MockitoBean ListAttemptResponsesUseCase listResponses;
     @MockitoBean CompleteAttemptSectionUseCase completeSection;
+    @MockitoBean com.ieltspath.assessment.application.usecase.RecordSectionTimeUseCase recordSectionTime;
     @MockitoBean StartAttemptSectionUseCase startSection;
 
     private final UUID userId = UUID.randomUUID();

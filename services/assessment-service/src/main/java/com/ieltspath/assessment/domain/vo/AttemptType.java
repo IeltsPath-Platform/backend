@@ -17,6 +17,7 @@ public enum AttemptType {
             case "TOPIC_TEST" -> TOPIC_GATE;
             case "COURSE_TEST" -> COURSE_GATE;
             case "MOCK_TEST" -> MOCK;
+            case "PRACTICE_TEST" -> OFFICIAL_PRACTICE;
             case "PLACEMENT_TEST" -> PLACEMENT;
             case "QUIZ" -> QUIZ;
             default -> throw new PackageNotAttemptableException("Packages of type " + packageType

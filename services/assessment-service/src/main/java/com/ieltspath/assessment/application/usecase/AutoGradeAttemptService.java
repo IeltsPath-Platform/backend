@@ -10,6 +10,9 @@ import com.ieltspath.assessment.domain.repository.AssessmentResultRepository;
 import com.ieltspath.assessment.domain.repository.AttemptItemRepository;
 import com.ieltspath.assessment.domain.repository.AttemptResponseRepository;
 import com.ieltspath.assessment.domain.repository.ItemResultRepository;
+import com.ieltspath.assessment.domain.repository.SkillScoreRepository;
+import com.ieltspath.assessment.domain.entity.SkillScore;
+import com.ieltspath.assessment.domain.vo.GradingSource;
 import com.ieltspath.assessment.domain.service.AnswerSpecGrader;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -38,17 +41,19 @@ public class AutoGradeAttemptService {
     private final ItemResultRepository itemResults;
     private final AssessmentResultCompleter completer;
     private final ObjectMapper json;
+    private final SkillScoreRepository skillScores;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
 
     public AutoGradeAttemptService(AttemptItemRepository attemptItems, AttemptResponseRepository responses,
                                    AssessmentResultRepository results, ItemResultRepository itemResults,
-                                   AssessmentResultCompleter completer, ObjectMapper json) {
+                                   AssessmentResultCompleter completer, ObjectMapper json, SkillScoreRepository skillScores) {
         this.attemptItems = attemptItems;
         this.responses = responses;
         this.results = results;
         this.itemResults = itemResults;
         this.completer = completer;
         this.json = json;
+        this.skillScores = skillScores;
     }
 
     /** @return true when the attempt was graded and its result completed. */
@@ -93,6 +98,15 @@ public class AutoGradeAttemptService {
                     answer.maxScore(), correct, null, NO_FEEDBACK));
         }
         itemResults.saveAll(graded);
+        if (attempt.getAttemptType() == com.ieltspath.assessment.domain.vo.AttemptType.OFFICIAL_PRACTICE
+                && attempt.getSkill() != null) {
+            double rawScore = graded.stream().mapToDouble(ItemResult::score).sum();
+            double maxScore = graded.stream().mapToDouble(ItemResult::maxScore).sum();
+            Double band = com.ieltspath.assessment.domain.service.PracticeBandEstimator
+                    .estimate(attempt.getSkill(), attempt.getScope(), rawScore, maxScore).orElse(null);
+            skillScores.saveAll(List.of(new SkillScore(UUID.randomUUID(), draft.id(), attempt.getSkill(),
+                    rawScore, band, GradingSource.AUTO, null)));
+        }
         completer.complete(attempt, draft, items, graded);
         return true;
     }

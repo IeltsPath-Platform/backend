@@ -761,6 +761,9 @@ Không cho phép cả hai cùng `NULL` hoặc cùng có giá trị. Có unique c
 `media_reference` của IMAGE chỉ nhận URL `https://` hoặc data URI Base64 với MIME `image/png`, `image/jpeg`,
 `image/svg+xml`. Content kiểm bằng `MediaReferencePolicy`, giữ nguyên giá trị hợp lệ trong `mediaUrl`;
 tham chiếu sai trả `INVALID_MEDIA_REFERENCE`. API học viên nhận `images[{mediaUrl, altText}]`.
+`media_reference` của AUDIO nhận URL `https://`, object key dưới `CONTENT_MEDIA_BASE_URL`, hoặc data URI Base64 với MIME
+`audio/mpeg|ogg|wav|webm` để bản ghi nằm ngay trong DB (các đề Listening luyện tập V39 dùng cách này, mỗi bản ghi khoảng
+150 KB); nơi lưu file thật vẫn dùng URL hoặc key.
 
 `topic_prerequisites` và `topic_gate_rules` **không còn trong V5**. Thứ tự topic, cổng bài, Practice và bài ôn thuộc `learning-service` (§7).
 

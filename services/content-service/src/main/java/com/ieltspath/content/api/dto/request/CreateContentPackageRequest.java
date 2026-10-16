@@ -22,5 +22,11 @@ public record CreateContentPackageRequest(
 
         AccessLevel accessLevel,
         // Only for PRACTICE_SET: the lesson whose Practice the set belongs to.
-        UUID lessonId
-) {}
+        UUID lessonId,
+        String sourceCode
+) {
+    public CreateContentPackageRequest(String code, String title, PackageType packageType,
+                                      AccessLevel accessLevel, UUID lessonId) {
+        this(code, title, packageType, accessLevel, lessonId, null);
+    }
+}

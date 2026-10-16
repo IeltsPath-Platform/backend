@@ -54,7 +54,7 @@ public class ContentPackageClient implements ContentPackageProvider {
                 || response.sections() == null) {
             throw invalid();
         }
-        return new PackageVersion(response.packageVersionId(), response.packageType(),
+        return new PackageVersion(response.packageVersionId(), response.packageId(), response.packageType(),
                 response.sections().stream().map(ContentPackageClient::toSection).toList());
     }
 
@@ -64,7 +64,9 @@ public class ContentPackageClient implements ContentPackageProvider {
         }
         return new Section(section.sectionId(), section.title(), section.skill(), section.instructions(),
                 section.sortOrder(), section.passage(), toAudio(section.audio()),
-                section.items().stream().map(ContentPackageClient::toItem).toList());
+                section.items().stream().map(ContentPackageClient::toItem).toList(), section.partNo(),
+                section.timeLimitSeconds(), section.groups() == null ? List.of() : section.groups().stream()
+                        .map(group -> new QuestionGroup(group.groupId(), group.sortOrder(), group.formatCode(), group.instructions())).toList());
     }
 
     private static Audio toAudio(AudioResponse audio) {
@@ -93,7 +95,7 @@ public class ContentPackageClient implements ContentPackageProvider {
                     return new KnowledgePointWeight(mapping.knowledgePointId(), mapping.weight());
                 }).toList();
         return new Item(item.questionVersionId(), item.sortOrder(), item.stem(), options, item.answerSpec(),
-                item.explanation(), item.maxScore(), knowledgePoints);
+                item.explanation(), item.maxScore(), knowledgePoints, item.groupId());
     }
 
     private static ContentUnavailableException invalid() {
@@ -101,11 +103,15 @@ public class ContentPackageClient implements ContentPackageProvider {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record VersionResponse(UUID packageVersionId, String packageType, List<SectionResponse> sections) {}
+    private record VersionResponse(UUID packageVersionId, UUID packageId, String packageType, List<SectionResponse> sections) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record SectionResponse(UUID sectionId, String title, String skill, String instructions, int sortOrder,
-                                   String passage, AudioResponse audio, List<ItemResponse> items) {}
+                                   String passage, AudioResponse audio, List<ItemResponse> items, Integer partNo,
+                                   Integer timeLimitSeconds, List<GroupResponse> groups) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record GroupResponse(UUID groupId, int sortOrder, String formatCode, String instructions) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record AudioResponse(UUID assetId, String mediaUrl, Integer durationSeconds, String transcript) {}
@@ -113,7 +119,7 @@ public class ContentPackageClient implements ContentPackageProvider {
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record ItemResponse(UUID questionVersionId, int sortOrder, String stem, List<OptionResponse> options,
                                 Map<String, Object> answerSpec, String explanation, BigDecimal maxScore,
-                                List<MappingResponse> knowledgePointMappings) {}
+                                List<MappingResponse> knowledgePointMappings, UUID groupId) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record OptionResponse(String optionKey, String content, int sortOrder) {}

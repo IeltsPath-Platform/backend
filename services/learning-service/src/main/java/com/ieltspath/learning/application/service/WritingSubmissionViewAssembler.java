@@ -19,12 +19,13 @@ public class WritingSubmissionViewAssembler {
         String task = submission.prompt().task();
         String status = submission.status().name();
         if (submission.status() == WritingSubmissionStatus.GRADED) {
-            // Practice answers are shown once submitted; a lesson essay waits until its block is passed.
-            boolean showSample = submission.practiceAttemptId() != null || Boolean.TRUE.equals(submission.passed())
+            // Practice and free essays show their sample once graded; a lesson essay waits until its block is passed.
+            boolean showSample = submission.practiceAttemptId() != null || submission.isFree()
+                    || Boolean.TRUE.equals(submission.passed())
                     || essays.blockPassed(submission.userId(), submission.blockId(), submission.id());
             return new WritingSubmissionResult(submission.id(), status, task, submission.wordCount(),
                     submission.overallBand(), submission.passed(), submission.grade(), submission.pointCost(),
-                    showSample ? submission.prompt().sampleAnswer() : null, null, null);
+                    showSample ? submission.prompt().sampleAnswer() : null, null, null, submission.essayText());
         }
         if (submission.status() == WritingSubmissionStatus.PAYMENT_PENDING) {
             return new WritingSubmissionResult(submission.id(), status, task, null, null, null, null,

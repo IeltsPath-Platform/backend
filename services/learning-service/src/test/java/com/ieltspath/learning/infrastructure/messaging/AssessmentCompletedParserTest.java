@@ -77,6 +77,20 @@ class AssessmentCompletedParserTest {
     }
 
     @Test
+    void acceptsOfficialPracticeResultWithoutKnowledgePointMappings() throws Exception {
+        String practice = mutate(event(""), root -> {
+            ObjectNode data = (ObjectNode) root.get("data");
+            data.put("assessment_type", "OFFICIAL_PRACTICE");
+            ((ObjectNode) data.get("item_results").get(0)).putArray("knowledge_point_mappings");
+        });
+
+        AssessmentResult parsed = parse(practice);
+
+        assertEquals("OFFICIAL_PRACTICE", parsed.assessmentType());
+        assertTrue(parsed.items().getFirst().knowledgePoints().isEmpty());
+    }
+
+    @Test
     void contractViolationsAreRejected() throws Exception {
         String valid = event("");
         assertViolation("not json");

@@ -30,14 +30,24 @@ public record PackageVersionContentResult(
             Skill skill,
             String instructions,
             int sortOrder,
+            Integer partNo,
+            Integer timeLimitSeconds,
             String passage,
             SectionAudio audio,
+            List<QuestionGroup> groups,
             List<Item> items
     ) {
+        public Section(UUID sectionId, String title, Skill skill, String instructions, int sortOrder,
+                       String passage, SectionAudio audio, List<Item> items) {
+            this(sectionId, title, skill, instructions, sortOrder, null, null, passage, audio, List.of(), items);
+        }
         public Section withAudio(SectionAudio newAudio) {
-            return new Section(sectionId, title, skill, instructions, sortOrder, passage, newAudio, items);
+            return new Section(sectionId, title, skill, instructions, sortOrder, partNo, timeLimitSeconds,
+                    passage, newAudio, groups, items);
         }
     }
+
+    public record QuestionGroup(UUID groupId, int sortOrder, String formatCode, String instructions) {}
 
     /** {@code mediaUrl} is set once the use case has checked the stored reference; the transcript is an answer. */
     public record SectionAudio(UUID assetId, String mediaReference, String mediaUrl, Integer durationSeconds,
@@ -56,8 +66,15 @@ public record PackageVersionContentResult(
             String explanation,
             String hint,
             double maxScore,
+            UUID groupId,
             List<KnowledgePointMapping> knowledgePointMappings
-    ) {}
+    ) {
+        public Item(UUID questionVersionId, int sortOrder, String stem, String optionsJson, String answerSpecJson,
+                    String explanation, String hint, double maxScore, List<KnowledgePointMapping> knowledgePointMappings) {
+            this(questionVersionId, sortOrder, stem, optionsJson, answerSpecJson, explanation, hint, maxScore, null,
+                    knowledgePointMappings);
+        }
+    }
 
     public record KnowledgePointMapping(UUID knowledgePointId, double weight) {}
 }

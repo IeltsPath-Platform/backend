@@ -12,10 +12,10 @@ import java.util.UUID;
 
 public record AttemptStructureResponse(List<Section> sections) {
     /** {@code startedAt} is null until the learner first opens the section, {@code completedAt} until they finish it. */
-    public record Section(UUID id, UUID contentSectionId, int sortOrder, Snapshot snapshot, List<Item> items,
+    public record Section(UUID id, UUID contentSectionId, int sortOrder, Integer partNo, Snapshot snapshot, List<Item> items,
                           Instant startedAt, Instant completedAt) {}
 
-    public record Snapshot(String title, String skill, String instructions,
+    public record Snapshot(String title, String skill, String instructions, Integer partNo, List<Group> groups,
                            @JsonInclude(JsonInclude.Include.NON_NULL) String passage,
                            @JsonInclude(JsonInclude.Include.NON_NULL) Audio audio) {
         private static Snapshot from(String raw, ObjectMapper json) {
@@ -24,9 +24,13 @@ public record AttemptStructureResponse(List<Section> sections) {
                 if (value == null || !value.isObject()) return empty();
                 JsonNode audio = value.path("audio");
                 JsonNode duration = audio.path("durationSeconds");
+                var groups = new java.util.ArrayList<Group>();
+                value.path("groups").forEach(group -> groups.add(new Group(group.path("groupId").asText(),
+                        group.path("sortOrder").asInt(), text(group.path("formatCode")), text(group.path("instructions")))));
                 return new Snapshot(text(value.path("title")),
                         value.path("skill").isMissingNode() ? "READING" : text(value.path("skill")),
-                        text(value.path("instructions")), text(value.path("passage")),
+                        text(value.path("instructions")), value.path("partNo").isInt() ? value.path("partNo").intValue() : null,
+                        List.copyOf(groups), text(value.path("passage")),
                         audio.isObject() ? new Audio(text(audio.path("url")),
                                 duration.isIntegralNumber() && duration.canConvertToInt() ? duration.intValue() : null)
                                 : null);
@@ -36,7 +40,7 @@ public record AttemptStructureResponse(List<Section> sections) {
         }
 
         private static Snapshot empty() {
-            return new Snapshot(null, null, null, null, null);
+            return new Snapshot(null, null, null, null, List.of(), null, null);
         }
 
         private static String text(JsonNode value) {
@@ -45,6 +49,7 @@ public record AttemptStructureResponse(List<Section> sections) {
     }
 
     public record Audio(String url, Integer durationSeconds) {}
+    public record Group(String groupId, int sortOrder, String formatCode, String instructions) {}
 
     public record Item(UUID id, UUID questionVersionId, int sortOrder,
                        String questionSnapshot, String knowledgeSnapshot) {}
@@ -55,6 +60,7 @@ public record AttemptStructureResponse(List<Section> sections) {
                         section.id(),
                         section.contentSectionId(),
                         section.sortOrder(),
+                        section.partNo(),
                         Snapshot.from(section.snapshot(), json),
                         section.items().stream()
                                 .map(item -> new Item(

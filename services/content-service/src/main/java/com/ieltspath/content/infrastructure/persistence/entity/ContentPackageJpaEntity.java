@@ -38,6 +38,9 @@ public class ContentPackageJpaEntity {
     @Column(name = "required_feature_key", length = 100)
     private String requiredFeatureKey;
 
+    @Column(name = "source_code", length = 40)
+    private String sourceCode;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     private PublicationStatus status;

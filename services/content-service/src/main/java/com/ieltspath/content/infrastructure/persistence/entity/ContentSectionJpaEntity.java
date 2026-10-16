@@ -40,6 +40,12 @@ public class ContentSectionJpaEntity {
     @Column(name = "time_limit_seconds")
     private Integer timeLimitSeconds;
 
+    @Column(name = "part_no")
+    private Integer partNo;
+
+    @Column(name = "cover_asset_id")
+    private UUID coverAssetId;
+
     @Column(name = "instructions", columnDefinition = "TEXT")
     private String instructions;
 

@@ -2,7 +2,6 @@ package com.ieltspath.apigateway.filter;
 
 import com.ieltspath.apigateway.security.AuthProperties;
 import com.ieltspath.apigateway.service.InternalJwtService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -17,10 +16,14 @@ import java.util.Comparator;
 import java.util.Optional;
 
 @Component
-@RequiredArgsConstructor
 public class InternalJwtGatewayFilter implements GlobalFilter, Ordered {
     private final InternalJwtService internalJwtService;
     private final AuthProperties authProperties;
+
+    public InternalJwtGatewayFilter(InternalJwtService internalJwtService, AuthProperties authProperties) {
+        this.internalJwtService = internalJwtService;
+        this.authProperties = authProperties;
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {

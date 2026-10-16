@@ -3,7 +3,6 @@ package com.ieltspath.apigateway.service;
 import com.ieltspath.apigateway.security.AuthProperties;
 import com.ieltspath.commonsecurity.jwt.InternalJwtClaims;
 import com.ieltspath.commonsecurity.role.CanonicalRoles;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -18,11 +17,15 @@ import java.util.List;
 import java.util.Set;
 
 @Service
-@RequiredArgsConstructor
 public class InternalJwtService {
 
     private final JwtEncoder internalJwtEncoder;
     private final AuthProperties authProperties;
+
+    public InternalJwtService(JwtEncoder internalJwtEncoder, AuthProperties authProperties) {
+        this.internalJwtEncoder = internalJwtEncoder;
+        this.authProperties = authProperties;
+    }
 
     public String createToken(Jwt externalToken) {
         JwtClaimsSet claims = JwtClaimsSet.builder()

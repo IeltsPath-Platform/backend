@@ -14,6 +14,9 @@ public final class MediaReferencePolicy {
     private static final Pattern HTTPS_URL = Pattern.compile("^https://\\S+$");
     private static final Pattern IMAGE_DATA_URI =
             Pattern.compile("^data:image/(png|jpeg|svg\\+xml);base64,[A-Za-z0-9+/]+={0,2}$");
+    /** A recording stored in the database itself; only audio assets may use it. */
+    private static final Pattern AUDIO_DATA_URI =
+            Pattern.compile("^data:audio/(mpeg|ogg|wav|webm);base64,[A-Za-z0-9+/]+={0,2}$");
     /** A relative object key such as {@code listening/demo/ls1.mp3}: no scheme, no leading slash. */
     private static final Pattern OBJECT_KEY = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9._-]+)*$");
 
@@ -36,7 +39,11 @@ public final class MediaReferencePolicy {
             if (assetType == AssetType.IMAGE && IMAGE_DATA_URI.matcher(mediaReference).matches()) {
                 return mediaReference;
             }
-            if (assetType == AssetType.AUDIO && !baseUrl.isEmpty() && isObjectKey(mediaReference)) {
+            if (assetType == AssetType.AUDIO && AUDIO_DATA_URI.matcher(mediaReference).matches()) {
+                return mediaReference;
+            }
+            if ((assetType == AssetType.AUDIO || assetType == AssetType.IMAGE)
+                    && !baseUrl.isEmpty() && isObjectKey(mediaReference)) {
                 return baseUrl + mediaReference;
             }
         }

@@ -17,11 +17,18 @@ public record ContentPackageResult(
         UUID currentPublishedVersionId,
         Instant createdAt,
         Instant updatedAt,
-        UUID lessonId
+        UUID lessonId,
+        String sourceCode
 ) {
+    public ContentPackageResult(UUID id, String code, String title, PackageType packageType, String requiredFeatureKey,
+                                PublicationStatus status, UUID currentPublishedVersionId, Instant createdAt,
+                                Instant updatedAt, UUID lessonId) {
+        this(id, code, title, packageType, requiredFeatureKey, status, currentPublishedVersionId, createdAt,
+                updatedAt, lessonId, null);
+    }
     public static ContentPackageResult of(ContentPackage pkg) {
         return new ContentPackageResult(pkg.getId(), pkg.getCode(), pkg.getTitle(), pkg.getPackageType(),
                 pkg.getRequiredFeatureKey(), pkg.getStatus(), pkg.getCurrentPublishedVersionId(), pkg.getCreatedAt(),
-                pkg.getUpdatedAt(), pkg.getLessonId());
+                pkg.getUpdatedAt(), pkg.getLessonId(), pkg.getSourceCode());
     }
 }

@@ -98,6 +98,8 @@ public interface LearningContentReader {
 
     Optional<PackageVersionContentResult> publishedPackageVersion(UUID packageVersionId);
 
+    default List<String> practiceTestPublishIssues(UUID packageVersionId) { return List.of(); }
+
     /** The given question versions that a lesson, practice set, final test, mock test or placement test uses. */
     Set<UUID> questionVersionsReservedForLearning(Collection<UUID> questionVersionIds);
 }

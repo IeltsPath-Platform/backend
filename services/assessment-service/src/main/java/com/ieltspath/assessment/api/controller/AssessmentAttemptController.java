@@ -3,6 +3,7 @@ package com.ieltspath.assessment.api.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.api.dto.request.SaveAttemptResponseRequest;
 import com.ieltspath.assessment.api.dto.request.StartAssessmentAttemptRequest;
+import com.ieltspath.assessment.api.dto.request.SubmitAttemptRequest;
 import com.ieltspath.assessment.api.dto.response.AssessmentAttemptResponse;
 import com.ieltspath.assessment.api.dto.response.AttemptResponseResponse;
 import com.ieltspath.assessment.api.dto.response.AttemptStructureResponse;
@@ -10,6 +11,7 @@ import com.ieltspath.assessment.application.command.SaveAttemptResponseCommand;
 import com.ieltspath.assessment.application.command.StartAssessmentAttemptCommand;
 import com.ieltspath.assessment.application.command.SubmitAssessmentAttemptCommand;
 import com.ieltspath.assessment.application.usecase.CompleteAttemptSectionUseCase;
+import com.ieltspath.assessment.application.usecase.RecordSectionTimeUseCase;
 import com.ieltspath.assessment.application.usecase.StartAttemptSectionUseCase;
 import com.ieltspath.assessment.application.usecase.ExpireAssessmentAttemptUseCase;
 import com.ieltspath.assessment.application.usecase.GetAssessmentAttemptUseCase;
@@ -53,6 +55,7 @@ public class AssessmentAttemptController {
     private final ListAttemptResponsesUseCase listAttemptResponsesUseCase;
     private final StartAttemptSectionUseCase startAttemptSectionUseCase;
     private final CompleteAttemptSectionUseCase completeAttemptSectionUseCase;
+    private final RecordSectionTimeUseCase recordSectionTimeUseCase;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -63,7 +66,8 @@ public class AssessmentAttemptController {
                 currentUser.requireUserId(),
                 request.packageVersionId(),
                 request.mode(),
-                request.channel()
+                request.channel(),
+                request.sectionIds()
         ));
         return AssessmentAttemptResponse.from(result);
     }
@@ -107,7 +111,12 @@ public class AssessmentAttemptController {
     }
 
     @PostMapping("/{id}/submit")
-    public AssessmentAttemptResponse submit(@PathVariable("id") UUID id) {
+    public AssessmentAttemptResponse submit(@PathVariable("id") UUID id,
+                                            @Valid @RequestBody(required = false) SubmitAttemptRequest request) {
+        if (request != null && request.sectionSeconds() != null) {
+            recordSectionTimeUseCase.execute(currentUser.requireUserId(), id, request.sectionSeconds().stream()
+                    .map(time -> new RecordSectionTimeUseCase.SectionTime(time.sectionId(), time.seconds())).toList());
+        }
         return AssessmentAttemptResponse.from(
                 submitAssessmentAttemptUseCase.execute(new SubmitAssessmentAttemptCommand(currentUser.requireUserId(), id))
         );
