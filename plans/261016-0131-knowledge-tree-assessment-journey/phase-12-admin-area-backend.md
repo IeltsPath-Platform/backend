@@ -48,7 +48,7 @@ CREATE TABLE work_items (
     id UUID PRIMARY KEY,
     queue VARCHAR(20) NOT NULL CHECK (queue IN ('EXAMINER','CONTENT_AUTHOR')),
     kind VARCHAR(30) NOT NULL CHECK (kind IN ('MID_COURSE_REMEDIATION','POST_COURSE_REMEDIATION','LEARNER_FLAG',
-        'CONTENT_GAP','QUESTION_TOO_EASY','QUESTION_TOO_HARD')),
+        'CONTENT_GAP','QUESTION_TOO_EASY','QUESTION_TOO_HARD','EDGE_SUSPECT')),
     subject_user_id UUID, subject_ref UUID, status VARCHAR(12) NOT NULL CHECK (status IN ('OPEN','IN_PROGRESS','DONE')),
     assignee_id UUID, action TEXT, result TEXT, note TEXT, note_visible_to_learner BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -73,7 +73,16 @@ Nguồn sinh việc (idempotent theo `UNIQUE (kind, subject_ref)`):
 | Học viên cần bổ trợ giữa khóa / sau khóa | EXAMINER | `remediation_flags` (phase 9) |
 | Cờ bất thường mới | EXAMINER | `learner_flags` |
 | KP thiếu bộ câu | CONTENT_AUTHOR | `content_gap_signals` (phase 7) |
+| Cạnh tiên quyết đáng ngờ | CONTENT_AUTHOR | Job hằng ngày đọc `diagnostic_probes` (bên dưới) |
 | Câu quá dễ / quá khó | CONTENT_AUTHOR | Job hằng ngày đọc event log: câu có ≥ 20 lần nộp đầu, tỷ lệ đúng > 0.9 hoặc < 0.3, hoặc lệch so với `difficulty` |
+
+**Đánh giá chất lượng cây từ dữ liệu học viên** (mentor: "đánh giá cả Knowledge Tree có tốt hay không"):
+- Với mỗi cạnh A → B, job tính từ các phiên chẩn đoán (phase 7) đã kết luận: số phiên có B trượt và A được thăm dò,
+  tỷ lệ A thăm dò đạt, tỷ lệ A được kết luận là KP gốc.
+- Cạnh có ít nhất 20 phiên và tỷ lệ A đạt ≥ 0.80 (nền vững mà vẫn trượt B, nên cạnh không giải thích được lỗi) hoặc tỷ lệ
+  được kết luận là KP gốc < 0.10 → việc `EDGE_SUSPECT` cho CONTENT_AUTHOR kèm số liệu. Ngưỡng ở `learning.tree-quality.*`.
+- `GET /api/learning/admin/tree-quality?courseId=`: bảng thống kê theo cạnh và theo KP (số lần là KP gốc, tỷ lệ trượt,
+  mức mastery trung bình) để R&D chỉnh cây qua API của phase 1. Learning chỉ giữ id; tên KP lấy từ content.
 
 API:
 - `GET /api/learning/admin/work-items?queue=&status=` (EXAMINER chỉ thấy hàng EXAMINER; CONTENT_AUTHOR chỉ thấy hàng

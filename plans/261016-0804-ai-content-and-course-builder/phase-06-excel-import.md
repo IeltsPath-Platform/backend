@@ -3,7 +3,7 @@ phase: 6
 title: "Import Excel theo template"
 status: pending
 priority: P2
-dependencies: [1, 4, "duyệt dependency Excel"]
+dependencies: [1, 4]
 ---
 
 # Phase 6: Import Excel theo template
@@ -14,11 +14,10 @@ Mentor mô tả: import file Excel, có **template tải về ngay chỗ bấm I
 quyết định D2, một file tạo được cả cấu trúc course lẫn câu hỏi. Vì file dễ nhập sai, import chạy hai bước: **kiểm tra
 trước** (không ghi gì, trả báo cáo từng dòng) rồi **ghi** (tất cả hoặc không).
 
-## Điều kiện chặn
+## Dependency
 
-AGENTS.md §2 chỉ cho dùng công nghệ đã có trong repo; **repo chưa có thư viện đọc `.xlsx`**. Cần duyệt rõ ràng trước khi
-thêm (mặc định đề xuất Apache POI, nhánh `poi-ooxml`; hoặc phương án khác nếu bạn chọn). Chưa duyệt thì phase này không
-bắt đầu. Xem Open question 1 ở plan.md.
+Apache POI (`poi-ooxml`) đã được duyệt (D12). Chọn phiên bản tương thích với BOM Spring Boot đang dùng, ghi vào
+`pom.xml` của content-service; không thêm thư viện đọc file nào khác.
 
 ## Requirements
 
@@ -92,7 +91,7 @@ Luật kiểm tra nằm ở domain, thư viện đọc file chỉ ở infrastruc
 
 ## Implementation Steps
 
-1. Xin duyệt dependency; chốt thư viện.
+1. Thêm `poi-ooxml` vào pom của content-service, kiểm `mvn dependency:tree` không kéo xung đột.
 2. **Đỏ trước:** `CourseImportValidatorTest` (chưa cần đọc file, dựng `CourseImportModel` bằng tay).
 3. Validator và model; use case validate và import dùng model.
 4. Reader và template; test an toàn khi đọc file.

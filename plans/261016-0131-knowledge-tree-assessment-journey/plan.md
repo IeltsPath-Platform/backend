@@ -88,7 +88,7 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 - Chấm Speaking, điểm danh, BTVN, cam kết đầu ra.
 - Điều chỉnh độ khó thích ứng (IRT).
 - Gói Mock Test 4 kỹ năng.
-- AI sinh course theo yêu cầu, import course bằng Excel (để plan sau).
+- AI sinh câu hỏi và course, import Excel: có plan riêng `261016-0804-ai-content-and-course-builder`.
 - Frontend: repo riêng. Mỗi phase có mục "Bàn giao FE".
 - Cập nhật SRS (file Word).
 
@@ -109,6 +109,8 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 | 11 | [Rubric dạng dữ liệu và bộ test nghiệm thu AI](./phase-11-rubric-data-and-ai-evaluation.md) | content, assessment, learning | Pending |
 | 12 | [Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor](./phase-12-admin-area-backend.md) | learning, assessment, access | Pending |
 | 13 | [Contract, tài liệu và nghiệm thu](./phase-13-contracts-docs-and-verification.md) | docs | Pending |
+| 14 | [Học viên sửa essay và nộp lại](./phase-14-essay-revision.md) | learning | Pending |
+| 15 | [Mentor chữa essay Practice và lesson](./phase-15-mentor-practice-essays.md) | learning, assessment, access | Pending |
 
 ## Thứ tự và phụ thuộc
 
@@ -119,6 +121,7 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 8 ──> 9 <───┘ (9 cần event log cho nhóm lỗi, practice test cho Process)
 10 ──> 11 (gold set lấy từ essay giám khảo chấm)
 5, 7, 9, 10, 11 ──> 12 ──> 13
+(đã có phase đọc essay: 14 cần 4, 5; 15 cần 10, 12)
 plan 261009 (pending) ──> 6, 7 (cùng sửa ReviewItem, LessonAccessGate)
 ```
 
@@ -127,7 +130,8 @@ plan 261009 đã merge.
 
 Số migration dự kiến:
 - content: V29 (P1), V30 (P2), V31 (P3), V32 (P8), V33 (P11).
-- learning: V11 (P4), V12 (P5), V13 (P6), V14 (P7), V15 (P8), V16 (P9), V17 (P12).
+- learning: V11 (P4), V12 (P5, gồm `learning_rule_configs`), V13 (P6), V14 (P7), V15 (P8), V16 (P9), V17 (P12), V18 (P14),
+  V19 (P15, nếu cần).
 - assessment: V8 (P4), V9 (P10), V10 (P11), V11 (P12).
 
 Đánh lại số theo thứ tự merge thực tế. Không sửa migration đã merge.

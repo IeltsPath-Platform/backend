@@ -56,6 +56,10 @@ Bốn quyết định đầu do người dùng chốt ngày 2026-10-16. Các quy
 - **D8. Không thêm role.** Dùng `CONTENT_AUTHOR` và `ADMIN` có sẵn.
 - **D9. Test không gọi LLM thật** (AGENTS.md §5): dùng `ContentGenerationPort` giả hoặc `MockRestServiceServer`.
 - **D10. Không log nội dung do AI sinh, prompt hay khóa API;** log chỉ mang id, loại việc, mã lỗi.
+- **D12. Dùng Apache POI** để đọc Excel (người dùng duyệt 2026-10-16). Phiên bản cụ thể do người code chọn, phải tương
+  thích với BOM của Spring Boot đang dùng và ghi vào pom; không thêm thư viện nào khác cho phần này.
+- **D13. LLM của content dùng biến riêng `CONTENT_LLM_BASE_URL`, `CONTENT_LLM_API_KEY`, `CONTENT_LLM_MODEL`.**
+- **D14. Hạn mức mặc định 20 việc mỗi người mỗi ngày, tối đa 20 câu mỗi việc** (cấu hình được).
 - **D11. Repo public:** AI phải tự viết nội dung; prompt hướng dẫn không chép đề thương mại. Người duyệt chịu trách nhiệm
   kiểm tra khi bấm duyệt.
 
@@ -66,8 +70,7 @@ Bốn quyết định đầu do người dùng chốt ngày 2026-10-16. Các quy
    lesson trước (phase 1).
 2. **Bảng `questions` không có cột mã.** Excel không thể tham chiếu câu hỏi đã có theo mã. Thêm cột `import_ref` (unique,
    nullable) để Excel và bản nháp trỏ tới câu hỏi (phase 1).
-3. **Chưa có thư viện đọc Excel** trong repo. Đọc `.xlsx` cần thêm dependency (thường là Apache POI). AGENTS.md §2 yêu cầu
-   duyệt trước khi thêm. Đây là điều kiện chặn của phase 6 (xem Open questions).
+3. **Chưa có thư viện đọc Excel** trong repo. Đọc `.xlsx` cần thêm dependency; Apache POI đã được duyệt (D12).
 
 ## Ngoài phạm vi
 
@@ -98,8 +101,8 @@ plan 261016-0131: phase 1 (cây), 2 (seed + difficulty), 3 (mã lỗi)  ──�
 1 ──> 6 (Excel ghi lesson, câu hỏi, gói; dùng analyzer của phase 4)   4 ──> 6
 ```
 
-Làm song song được: phase 1 và phase 2. Phase 3, 4 chạy song song sau đó. Phase 5 cần 2, 3, 4. Phase 6 cần 1, 4 và chờ
-duyệt dependency Excel; không cần hạ tầng LLM của phase 2.
+Làm song song được: phase 1 và phase 2. Phase 3, 4 chạy song song sau đó. Phase 5 cần 2, 3, 4. Phase 6 cần 1 và 4; không cần
+hạ tầng LLM của phase 2.
 
 Migration content: V34 (phase 1, `import_ref`), V35 (phase 2, bản nháp và hạn mức). Các phase còn lại dự kiến không cần
 migration, trừ khi phase 4 phải đổi ràng buộc gói. Plan 261016-0131 dùng tới V33. Đánh lại theo thứ tự merge thực tế, không
@@ -125,14 +128,10 @@ sửa migration đã merge.
 ## Dependencies
 
 - Plan 261016-0131, các phase 1 (cây), 2 (difficulty, KP) và 3 (danh mục mã lỗi).
-- **Duyệt dependency đọc Excel** trước phase 6.
+- Dependency Apache POI đã được duyệt (D12).
 - Biến môi trường mới cho LLM của content (phase 2); không ghi giá trị thật vào repo.
 - FE (repo `frontend`): màn tạo yêu cầu sinh, xem và sửa bản nháp, duyệt, màn import Excel kèm tải template.
 
 ## Open questions
 
-1. **Dependency Excel:** dùng Apache POI (chuẩn, nặng) hay thư viện nhẹ hơn, hay chốt định dạng CSV thay Excel? Plan
-   mặc định POI; chưa được duyệt nên phase 6 chưa bắt đầu được.
-2. **Nhà cung cấp LLM của content:** dùng chung endpoint OpenAI-compatible như assessment (biến `CONTENT_LLM_*` mới) hay
-   cấu hình riêng?
-3. **Hạn mức mặc định:** số việc sinh mỗi người mỗi ngày (đề xuất 20 việc) và số câu tối đa mỗi việc (đề xuất 20).
+None. Ba câu hỏi ban đầu đã chốt ngày 2026-10-16 (D12, D13, D14).
