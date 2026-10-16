@@ -32,7 +32,6 @@ public class SaveAssessmentResultDetailsUseCase {
     private final ErrorAnalysisItemRepository errors;
     private final AttemptItemKnowledgePointRepository knowledgeSnapshot;
     private final ItemResultKnowledgeJudgmentRepository judgments;
-    private final com.ieltspath.assessment.application.port.BandStatisticsStore bandStatistics;
 
     public SaveAssessmentResultDetailsUseCase(AssessmentAttemptRepository attempts,
                                               AssessmentResultRepository results,
@@ -41,8 +40,7 @@ public class SaveAssessmentResultDetailsUseCase {
                                               ItemResultRepository items,
                                               ErrorAnalysisItemRepository errors,
                                               AttemptItemKnowledgePointRepository knowledgeSnapshot,
-                                              ItemResultKnowledgeJudgmentRepository judgments,
-                                              com.ieltspath.assessment.application.port.BandStatisticsStore bandStatistics) {
+                                              ItemResultKnowledgeJudgmentRepository judgments) {
         this.attempts = attempts;
         this.results = results;
         this.attemptItems = attemptItems;
@@ -51,7 +49,6 @@ public class SaveAssessmentResultDetailsUseCase {
         this.errors = errors;
         this.knowledgeSnapshot = knowledgeSnapshot;
         this.judgments = judgments;
-        this.bandStatistics = bandStatistics;
     }
 
     /** Learner entry: the latest version of the caller's own attempt. The result's band is not changed. */
@@ -64,8 +61,6 @@ public class SaveAssessmentResultDetailsUseCase {
         requireGradable(result);
         saveDetails(attempt.getId(), result, command.skillScores(), command.itemResults(), command.errors(),
                 command.knowledgeJudgments());
-        bandStatistics.markGradedSkills(result.id(), command.skillScores() == null ? List.of()
-                : command.skillScores().stream().map(SkillScoreInput::skill).toList(), false);
     }
 
     /**
@@ -84,8 +79,6 @@ public class SaveAssessmentResultDetailsUseCase {
         }
         saveDetails(result.attemptId(), result, command.skillScores(), command.itemResults(), command.errors(),
                 command.knowledgeJudgments());
-        bandStatistics.markGradedSkills(result.id(), command.skillScores() == null ? List.of()
-                : command.skillScores().stream().map(SkillScoreInput::skill).toList(), true);
         results.save(result.withGradedBand(command.overallBand()));
     }
 

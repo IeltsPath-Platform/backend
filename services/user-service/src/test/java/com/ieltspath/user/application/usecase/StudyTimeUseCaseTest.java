@@ -92,4 +92,23 @@ class StudyTimeUseCaseTest {
         verify(sessions,never()).goals(any(),any(),any());
         assertThrows(IllegalArgumentException.class,()->useCase.execute(user,today.minusDays(366),today,"DAY",null));
     }
+    @Test void weekAndMonthSumMillisecondsBeforeConvertingToSeconds() {
+        LocalDate first=LocalDate.parse("2026-10-12"), last=first.plusDays(1);
+        when(sessions.trackingStartedAt()).thenReturn(Instant.parse("2026-10-11T00:00:00Z"));
+        when(sessions.daily(user,first,last,"ALL")).thenReturn(List.of(
+                new StudySessionRepository.Daily(first,"UTC",600),
+                new StudySessionRepository.Daily(last,"Asia/Ho_Chi_Minh",600)));
+        when(sessions.goals(user,first,last)).thenReturn(List.of(new StudySessionRepository.Goal(first,30)));
+        var useCase=new GetStudyTimeStatisticsUseCase(sessions,profiles,clock);
+
+        assertTrue(useCase.execute(user,first,last,"DAY",null).days().stream()
+                .allMatch(day->day.actualSeconds()==0L));
+        for(String grain:List.of("WEEK","MONTH")) {
+            var bucket=useCase.execute(user,first,last,grain,null).days().getFirst();
+            assertEquals(1L,bucket.actualSeconds());
+            assertEquals(3600L,bucket.plannedSeconds());
+            assertEquals("MULTIPLE",bucket.timezone());
+            assertEquals("COMPLETE",bucket.status());
+        }
+    }
 }

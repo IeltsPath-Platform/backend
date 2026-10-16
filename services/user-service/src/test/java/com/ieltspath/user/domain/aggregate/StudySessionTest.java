@@ -13,6 +13,10 @@ class StudySessionTest {
                 UUID.randomUUID(),"Asia/Ho_Chi_Minh",start);
     }
     private StudySession.Interval interval(long from,long to) { return new StudySession.Interval(from,to); }
+    @Test void vocabularyReviewIsNotATrackedStudySource() {
+        assertThrows(IllegalArgumentException.class,()->StudySession.start(UUID.randomUUID(),UUID.randomUUID(),
+                "VOCABULARY_REVIEW",UUID.randomUUID(),null,"UTC",start));
+    }
     @Test void splitsAtLocalMidnightAndPreservesTotal() {
         var result=session().accept(1,1,List.of(interval(0,30000)),start.plusSeconds(30),false);
         assertEquals(30000,result.acceptedMs());

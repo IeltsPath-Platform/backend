@@ -18,11 +18,10 @@ import java.util.UUID;
 @Component
 public class HttpStudySourceVerifier implements StudySourceVerifier {
     private final RestClient client;
-    private final String learningUrl, assessmentUrl, libraryUrl;
+    private final String learningUrl, assessmentUrl;
     public HttpStudySourceVerifier(@Value("${app.study-time.learning-url:http://localhost:8086}") String learningUrl,
-            @Value("${app.study-time.assessment-url:http://localhost:8083}") String assessmentUrl,
-            @Value("${app.study-time.library-url:http://localhost:8081}") String libraryUrl) {
-        this.learningUrl=learningUrl; this.assessmentUrl=assessmentUrl; this.libraryUrl=libraryUrl;
+            @Value("${app.study-time.assessment-url:http://localhost:8083}") String assessmentUrl) {
+        this.learningUrl=learningUrl; this.assessmentUrl=assessmentUrl;
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
         factory.setReadTimeout(Duration.ofSeconds(3));
         client=RestClient.builder().requestFactory(factory).build();
@@ -31,7 +30,6 @@ public class HttpStudySourceVerifier implements StudySourceVerifier {
         String url = switch(type) {
             case "LESSON", "PRACTICE", "REVIEW" -> learningUrl+"/api/learning/statistics/study-context";
             case "ASSESSMENT" -> assessmentUrl+"/api/assessments/me/statistics/study-context";
-            case "VOCABULARY_REVIEW" -> libraryUrl+"/api/learning-support/flashcards/statistics/study-context";
             default -> throw new IllegalArgumentException("Unsupported study source");
         };
         var attributes = RequestContextHolder.getRequestAttributes();

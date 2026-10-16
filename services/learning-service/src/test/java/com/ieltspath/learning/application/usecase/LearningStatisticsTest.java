@@ -81,4 +81,38 @@ class LearningStatisticsTest {
     private ProgressLesson lesson(UUID id,Set<LearningSkill> skills) {
         return new ProgressLesson(course,"Course", new BigDecimal("5.5"),topic,id,skills);
     }
+
+    @Test void oneHundredStartedCoursesUseOneCompleteMetadataBatch() {
+        var activities = java.util.stream.IntStream.range(0,100)
+                .mapToObj(i -> new LearningProgressReader.CourseActivity(UUID.randomUUID(), null, null)).toList();
+        var courseIds = activities.stream().map(LearningProgressReader.CourseActivity::courseId).toList();
+        var lessons = courseIds.stream().map(id -> new ProgressLesson(id,"Course",BigDecimal.TEN,
+                topic,UUID.randomUUID(),Set.of(LearningSkill.READING))).toList();
+        when(reader.startedCourses(user)).thenReturn(activities);
+        when(content.progressMetadata(courseIds)).thenReturn(new ProgressMetadata("all",true,lessons));
+
+        var result = useCase.execute(user,null,0,4);
+
+        assertThat(result.totalCourses()).isEqualTo(100);
+        assertThat(result.skills()).filteredOn(s -> s.skill() == LearningSkill.READING).first()
+                .satisfies(s -> assertThat(s.totalLessons()).isEqualTo(100));
+        verify(content).progressMetadata(courseIds);
+    }
+
+    @Test void oneHundredAndOneStartedCoursesRejectsWholeScopeEvenWithCourseFilter() {
+        var activities = java.util.stream.IntStream.range(0,101)
+                .mapToObj(i -> new LearningProgressReader.CourseActivity(UUID.randomUUID(), null, null)).toList();
+        when(reader.startedCourses(user)).thenReturn(activities);
+
+        for (UUID selectedCourse : Arrays.asList(null, activities.getFirst().courseId())) {
+            assertThatThrownBy(() -> useCase.execute(user,selectedCourse,0,4))
+                    .isInstanceOfSatisfying(LearningRequestException.class, e -> {
+                        assertThat(e.getStatus()).isEqualTo(422);
+                        assertThat(e.getCode()).isEqualTo("PROGRESS_SCOPE_TOO_LARGE");
+                        assertThat(e.getMessage()).contains("100 started courses");
+                    });
+        }
+        verifyNoInteractions(content);
+        verify(reader,never()).completedLessons(any(),anyList());
+    }
 }

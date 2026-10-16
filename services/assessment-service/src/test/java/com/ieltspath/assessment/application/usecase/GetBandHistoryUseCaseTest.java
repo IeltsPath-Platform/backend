@@ -25,10 +25,10 @@ class GetBandHistoryUseCaseTest {
     }
     @Test void summaryIsNotRecomputedFromOneVisiblePage() {
         Instant at=Instant.parse("2026-10-15T00:00:00Z");
-        var points=List.of(new BandStatisticsStore.Point(UUID.randomUUID(),2,at,7,true,"AUTO","MEASURED","placement-v1"),
-                new BandStatisticsStore.Point(UUID.randomUUID(),1,at.minusSeconds(60),6,false,"AUTO","MEASURED","placement-v1"));
+        var points=List.of(new BandStatisticsStore.Point(UUID.randomUUID(),UUID.randomUUID(),2,at,at,7,true,"AUTO","PLACEMENT_ESTIMATE"),
+                new BandStatisticsStore.Point(UUID.randomUUID(),UUID.randomUUID(),1,at.minusSeconds(60),at.minusSeconds(60),6,false,"AUTO","PLACEMENT_ESTIMATE"));
         when(store.history(eq(user),any(),any(),eq("PLACEMENT"),eq("LISTENING"),isNull(),eq(2)))
-                .thenReturn(new BandStatisticsStore.Page(points,4.0,7.0,at));
+                .thenReturn(new BandStatisticsStore.Page(points,4.0,7.0,at,2));
         var response=useCase.execute(user,from,to,"PLACEMENT","LISTENING",null,1,"Asia/Ho_Chi_Minh");
         assertEquals(1,response.points().size());assertNotNull(response.nextCursor());assertEquals(3.0,response.delta());assertEquals(4.0,response.baseline());
     }
@@ -42,7 +42,7 @@ class GetBandHistoryUseCaseTest {
         LocalDate day=LocalDate.of(2026,10,15);
         Instant submitted=Instant.parse("2026-10-14T23:30:00Z");
         when(store.history(eq(user),any(),any(),eq("PLACEMENT"),eq("LISTENING"),isNull(),eq(101)))
-                .thenReturn(new BandStatisticsStore.Page(List.of(),6.0,6.0,submitted));
+                .thenReturn(new BandStatisticsStore.Page(List.of(),6.0,6.0,submitted,1));
         var response=useCase.execute(user,day,day,"PLACEMENT","LISTENING",null,100,"Asia/Ho_Chi_Minh");
         verify(store).history(user,Instant.parse("2026-10-14T17:00:00Z"),Instant.parse("2026-10-15T17:00:00Z"),
                 "PLACEMENT","LISTENING",null,101);
@@ -51,7 +51,7 @@ class GetBandHistoryUseCaseTest {
     @Test void daylightSavingDayUsesNextLocalMidnightRatherThanTwentyFourHours() {
         LocalDate day=LocalDate.of(2026,3,8);
         when(store.history(eq(user),any(),any(),eq("PLACEMENT"),eq("LISTENING"),isNull(),eq(101)))
-                .thenReturn(new BandStatisticsStore.Page(List.of(),null,null,null));
+                .thenReturn(new BandStatisticsStore.Page(List.of(),null,null,null,0));
         useCase.execute(user,day,day,"PLACEMENT","LISTENING",null,100,"America/New_York");
         verify(store).history(user,Instant.parse("2026-03-08T05:00:00Z"),Instant.parse("2026-03-09T04:00:00Z"),
                 "PLACEMENT","LISTENING",null,101);

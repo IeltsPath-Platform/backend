@@ -29,7 +29,7 @@ public record StudySession(UUID id, UUID userId, UUID clientSessionId, String so
     public static StudySession start(UUID user, UUID client, String sourceType, UUID sourceId,
                                      UUID courseId, String timezone, Instant now) {
         Objects.requireNonNull(user); Objects.requireNonNull(client); Objects.requireNonNull(sourceId);
-        if (!Set.of("LESSON", "PRACTICE", "REVIEW", "ASSESSMENT", "VOCABULARY_REVIEW").contains(sourceType))
+        if (!Set.of("LESSON", "PRACTICE", "REVIEW", "ASSESSMENT").contains(sourceType))
             throw new IllegalArgumentException("Unsupported study source");
         ZoneId.of(timezone);
         Instant preciseNow = databasePrecision(now);

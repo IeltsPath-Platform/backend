@@ -14,7 +14,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 class HttpStudySourceVerifierTest {
-    final HttpStudySourceVerifier verifier=new HttpStudySourceVerifier("http://learning.test","http://assessment.test","http://library.test");
+    final HttpStudySourceVerifier verifier=new HttpStudySourceVerifier("http://learning.test","http://assessment.test");
     MockRestServiceServer server;
     @BeforeEach void setup() {
         var builder=RestClient.builder();
@@ -42,7 +42,8 @@ class HttpStudySourceVerifierTest {
     @Test void mismatchedSourceAndUnknownOwnerAreRejected() {
         UUID source=UUID.randomUUID();
         server.expect(anything()).andRespond(withSuccess("{\"sourceId\":\""+UUID.randomUUID()+"\",\"courseId\":null}",MediaType.APPLICATION_JSON));
-        assertThrows(StudyTrackingException.class,()->verifier.verify("VOCABULARY_REVIEW",source));
+        assertThrows(StudyTrackingException.class,()->verifier.verify("REVIEW",source));
+        assertThrows(IllegalArgumentException.class,()->verifier.verify("VOCABULARY_REVIEW",source));
         assertThrows(IllegalArgumentException.class,()->verifier.verify("DEMO",source));
     }
 }

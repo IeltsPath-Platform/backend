@@ -30,9 +30,6 @@ public interface GateEssayJobStore {
     /** {@code feedback} is the grader's JSON comments, or null when it gave a band only. */
     void complete(UUID jobId, BigDecimal band, String feedback, Instant now);
 
-    /** Records that a completed placement score was substituted, never actually measured. */
-    void markFallback(UUID jobId);
-
     void fail(UUID jobId, Instant now);
 
     /** The AI jobs of the attempt's essays. */
@@ -43,10 +40,7 @@ public interface GateEssayJobStore {
                       String questionSnapshot, String answerSnapshot) {}
 
     /** {@code status} is a grading job status; {@code band} and possibly {@code feedback} are set once COMPLETED. */
-    record JobState(UUID attemptItemId, String status, BigDecimal band, String feedback, String measurementQuality) {
-        public JobState(UUID attemptItemId, String status, BigDecimal band, String feedback) {
-            this(attemptItemId, status, band, feedback, "UNKNOWN_LEGACY");
-        }
+    record JobState(UUID attemptItemId, String status, BigDecimal band, String feedback) {
         public JobState(UUID attemptItemId, String status, BigDecimal band) {
             this(attemptItemId, status, band, null);
         }

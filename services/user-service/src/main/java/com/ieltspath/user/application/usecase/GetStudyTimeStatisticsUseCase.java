@@ -42,9 +42,9 @@ public class GetStudyTimeStatisticsUseCase {
             days.add(new Day(date,total==null ? zone.getId() : total.timezone(),actual,planned,status));
         }
         return new StudyTimeStatisticsResult("AVAILABLE",now,dataFrom,"RECORDED_LOCAL_DATE",scope,
-                grain.equals("DAY") ? List.copyOf(days) : aggregate(days,grain));
+                grain.equals("DAY") ? List.copyOf(days) : aggregate(days,grain,totals));
     }
-    private List<Day> aggregate(List<Day> days,String grain) {
+    private List<Day> aggregate(List<Day> days,String grain,Map<LocalDate,StudySessionRepository.Daily> totals) {
         var groups=new LinkedHashMap<LocalDate,List<Day>>();
         for(Day day:days) {
             LocalDate key=grain.equals("WEEK") ? day.date().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) : day.date().withDayOfMonth(1);
@@ -52,14 +52,18 @@ public class GetStudyTimeStatisticsUseCase {
         }
         var result=new ArrayList<Day>();
         groups.forEach((date,values)-> {
-            Long actual=null,planned=null;
+            Long actualMs=null,planned=null;
             Set<String> zones=new HashSet<>(), statuses=new HashSet<>();
             for(Day day:values) {
-                if(day.actualSeconds()!=null) actual=(actual==null?0:actual)+day.actualSeconds();
+                if(day.actualSeconds()!=null) {
+                    var total=totals.get(day.date());
+                    actualMs=(actualMs==null?0:actualMs)+(total==null?0:total.milliseconds());
+                }
                 if(day.plannedSeconds()!=null) planned=(planned==null?0:planned)+day.plannedSeconds();
                 zones.add(day.timezone()); statuses.add(day.status());
             }
             String status=statuses.size()==1 ? statuses.iterator().next() : "PARTIAL_DAY";
+            Long actual=actualMs==null ? null : actualMs/1000;
             result.add(new Day(date,zones.size()==1 ? zones.iterator().next() : "MULTIPLE",actual,planned,status));
         });
         return List.copyOf(result);

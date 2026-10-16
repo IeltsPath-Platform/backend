@@ -172,7 +172,7 @@ Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho
 Authenticated personal APIs use `CurrentUserProvider`; existing activity CRUD does not contribute to these totals.
 
 - `POST /api/users/me/study-sessions`: `{clientSessionId, sourceType, sourceId, takeover?}`. UUID identifiers;
-  source types: `LESSON`, `PRACTICE`, `REVIEW`, `ASSESSMENT`, `VOCABULARY_REVIEW`.
+  source types: `LESSON`, `PRACTICE`, `REVIEW`, `ASSESSMENT`.
 - `POST /api/users/me/study-sessions/{id}/heartbeats` and `/close`:
   `{epoch, sequence, intervals: [{startOffsetMs, endOffsetMs}]}`. At most 16 ordered, non-overlapping
   intervals per request; offsets use the server session anchor. Close includes the final flush.
@@ -192,20 +192,22 @@ Statistics return `availability`, `generatedAt`, `dataFrom`, `timezonePolicy=REC
 `scope=ALL|courseId`, and `days`. Each bucket contains `date`, `timezone`, `actualSeconds`,
 `plannedSeconds`, and `status` (`NOT_TRACKED`, `FUTURE`, `PARTIAL_DAY`, `COMPLETE`). Actual is null
 before measurement or for future dates; a measured inactive date is zero. Course targets are null.
-Week/month buckets sum only dates inside the requested range and use the calendar bucket start date.
+Week/month buckets sum raw milliseconds for dates inside the requested range before converting to whole
+seconds, and use the calendar bucket start date.
 Mixed timezone buckets say `MULTIPLE`; historical intervals retain their recorded date and timezone.
 
 Migration V6 adds sessions, durable replay receipts, an interval ledger, daily totals, goal snapshots,
 and the activation timestamp. Goal changes apply the next local day, never overwrite a recorded day,
 and supersede pending future choices. Current active goals are snapshotted at migration; no historical
-active time or targets are inferred. Raw data is not automatically purged.
+active time or targets are inferred. Changing the profile timezone reschedules an active goal using the
+saved timezone under the same per-user lock as goal updates; unchanged timezones and users without an
+active goal do not create another snapshot. Recorded days remain unchanged. Raw data is not automatically purged.
 
 Source ownership and course context are verified once before starting, outside the database transaction,
 through each owner’s `/statistics/study-context` endpoint. Bearer and correlation ID are forwarded;
 connection/read timeouts are 2/3 seconds. Owner failure returns 503 `SOURCE_UNAVAILABLE` and must not
 block lesson submission. Config Server defaults source URLs to Compose hostnames; for services on the
-host, set `LEARNING_SERVICE_URL=http://localhost:8086`, `ASSESSMENT_SERVICE_URL=http://localhost:8083`,
-and `LIBRARY_SERVICE_URL=http://localhost:8081`.
+host, set `LEARNING_SERVICE_URL=http://localhost:8086` and `ASSESSMENT_SERVICE_URL=http://localhost:8083`.
 
 Run `mvn -q -pl services/user-service -am test` from the repository root. Study-time PostgreSQL tests
 require Docker and explicitly skip when it is unavailable.

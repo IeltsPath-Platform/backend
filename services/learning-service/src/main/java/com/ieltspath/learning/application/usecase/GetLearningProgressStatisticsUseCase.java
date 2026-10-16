@@ -27,7 +27,10 @@ public class GetLearningProgressStatisticsUseCase {
         if (page < 0 || page > 10000 || size < 1 || size > 20)
             throw new LearningRequestException(400, "INVALID_PAGE", "Page must be 0..10000 and size 1..20");
         var activities = reader.startedCourses(userId);
-        if (activities.size() > 100) throw unavailable();
+        if (activities.size() > 100) {
+            throw new LearningRequestException(422, "PROGRESS_SCOPE_TOO_LARGE",
+                    "Progress statistics support at most 100 started courses");
+        }
         if (selectedCourse != null) {
             activities = activities.stream().filter(a -> a.courseId().equals(selectedCourse)).toList();
             if (activities.isEmpty()) throw new LearningRequestException(404, "NOT_FOUND", "Started course was not found");

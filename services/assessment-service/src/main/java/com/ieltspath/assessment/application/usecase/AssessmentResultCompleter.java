@@ -39,21 +39,19 @@ public class AssessmentResultCompleter {
     private final ErrorAnalysisItemRepository errors;
     private final OutboxEventRepository outbox;
     private final AssessmentCompletedEventFactory events;
-    private final FreezeBandMeasurements bandMeasurements;
 
     public AssessmentResultCompleter(AssessmentResultRepository results,
                                      AttemptItemKnowledgePointRepository knowledgeSnapshot,
                                      ItemResultKnowledgeJudgmentRepository judgments,
                                      ErrorAnalysisItemRepository errors,
                                      OutboxEventRepository outbox,
-                                     AssessmentCompletedEventFactory events, FreezeBandMeasurements bandMeasurements) {
+                                     AssessmentCompletedEventFactory events) {
         this.results = results;
         this.knowledgeSnapshot = knowledgeSnapshot;
         this.judgments = judgments;
         this.errors = errors;
         this.outbox = outbox;
         this.events = events;
-        this.bandMeasurements = bandMeasurements;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -62,7 +60,6 @@ public class AssessmentResultCompleter {
         requireFullyGraded(items, graded);
         Instant now = Instant.now();
         AssessmentResult completed = results.save(result.complete(now));
-        bandMeasurements.freeze(attempt, completed, items, graded);
 
         List<UUID> itemIds = items.stream().map(AttemptItem::id).toList();
         List<UUID> itemResultIds = graded.stream().map(ItemResult::id).toList();

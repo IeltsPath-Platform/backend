@@ -103,6 +103,19 @@ class LearningSecurityWebMvcTest {
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
+    void oversizedProgressScopeReturnsUnprocessableEntityWithClearCode() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(userId);
+        when(statistics.execute(userId, null, 0, 4)).thenThrow(new LearningRequestException(422,
+                "PROGRESS_SCOPE_TOO_LARGE", "Progress statistics support at most 100 started courses"));
+
+        mockMvc.perform(get("/api/learning/statistics/progress"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("PROGRESS_SCOPE_TOO_LARGE"))
+                .andExpect(jsonPath("$.detail").value("Progress statistics support at most 100 started courses"));
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
     void learnerWithoutPlacementCanStillReadCourses() throws Exception {
         when(currentUser.requireUserId()).thenReturn(userId);
         when(listCourses.execute(userId)).thenReturn(List.of());

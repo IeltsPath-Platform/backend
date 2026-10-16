@@ -68,4 +68,12 @@ class StudySessionSecurityTest {
         mvc.perform(get("/api/users/me/statistics/study-time?from=invalid&to=2026-10-15")
                 .with(jwt().jwt(j->j.subject(UUID.randomUUID().toString())))).andExpect(status().isBadRequest());
     }
+    @Test void vocabularyReviewIsRejectedBeforeStartingASession() throws Exception {
+        mvc.perform(post("/api/users/me/study-sessions")
+                .with(jwt().jwt(j->j.subject(UUID.randomUUID().toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"clientSessionId\":\""+UUID.randomUUID()+"\",\"sourceType\":\"VOCABULARY_REVIEW\",\"sourceId\":\""+UUID.randomUUID()+"\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(start);
+    }
 }
