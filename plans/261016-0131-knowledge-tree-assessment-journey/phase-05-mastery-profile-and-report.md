@@ -78,6 +78,14 @@ Phase này lưu mastery profile cho từng học viên × KP, tính hạn ôn, v
     (đã tới hạn), `NONE`.
   - `evidence` lấy 5 dòng gần nhất. Code, name, skill, band lấy từ content qua client đang có.
 - `GET /api/learning/mastery` giữ nguyên để không gãy client.
+- **Cấu hình luật bởi Admin** (board: "Rule-based có thể là người cấu hình"):
+  - Migration `V12` thêm bảng `learning_rule_configs (key VARCHAR(60) PRIMARY KEY, value JSONB NOT NULL, updated_by UUID,
+    updated_at TIMESTAMPTZ)`. Khóa: `mastery.priority-below`, `mastery.maintain-from`, `mastery.review-intervals-days`,
+    `review.consolidate-days`.
+  - Giá trị trong bảng thắng giá trị yaml; không có dòng thì dùng yaml. `GET` / `PUT /api/learning/admin/rule-configs`
+    (`ADMIN`): validate (0 < priority-below < maintain-from ≤ 1, lịch tăng dần). Ghi `updated_by`.
+  - Đổi cấu hình chỉ ảnh hưởng profile cập nhật sau đó; có endpoint `POST /api/learning/admin/rule-configs/recompute`
+    chạy nền để tính lại mức của toàn bộ profile.
 
 ## Related Code Files
 

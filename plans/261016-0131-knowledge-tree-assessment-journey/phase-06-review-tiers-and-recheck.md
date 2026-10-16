@@ -40,6 +40,14 @@ giỏ; làm xong thì cập nhật mastery và hạn ôn.
   - Bài ôn không chặn chỉ có một set (`recordSetResult` đạt hay trượt đều kết thúc: `DONE` hoặc `SKIPPED`), không qua bước
     theory. Đây là quy tắc riêng cho `blocking = false`, viết trong `ReviewItem`.
   - Kết quả ghi evidence `review_set` như hiện nay, profile cập nhật qua phase 5.
+- **Gợi ý bài phù hợp từ kho đã duyệt** (đầu ra "Gợi ý bài" của board):
+  - `GET /api/learning/suggestions`: tối đa 5 gợi ý cho học viên, mỗi gợi ý có `type` (`PRACTICE_SET`, `PRACTICE_TEST`,
+    `LESSON`), mục tiêu KP, lý do (`PRIORITY`, `CONSOLIDATE`, `DUE`, `NEXT_IN_TREE`) và đường dẫn mở.
+  - Luật: ưu tiên KP mức `CONSOLIDATE` và `DUE` còn gói chưa lộ; KP mức `MAINTAIN` vững thì gợi ý KP mà nó là nền
+    (cạnh tiên quyết ngược, phase 1); chỉ gợi ý thứ `PUBLISHED`, chưa làm, đúng band course học viên đang học hoặc thấp
+    hơn. Gợi ý không bao giờ chặn tiến độ.
+  - Learning gọi content qua API nội bộ tìm gói theo KP; thêm endpoint tìm `PRACTICE_TEST` theo KP nếu chưa có.
+  - Test: `SuggestionRulesTest` (thứ tự ưu tiên, không gợi ý thứ đã làm, không vượt band).
 - **Không tính vào Process Score:** phase 9 chỉ lấy Practice và practice test theo mốc. Ghi rõ trong contract.
 
 ## Related Code Files

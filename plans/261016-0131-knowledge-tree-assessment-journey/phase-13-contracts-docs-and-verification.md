@@ -3,7 +3,7 @@ phase: 13
 title: "Contract, tài liệu và nghiệm thu"
 status: pending
 priority: P2
-dependencies: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+dependencies: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15]
 ---
 
 # Phase 13: Contract, tài liệu và nghiệm thu
@@ -19,7 +19,8 @@ Rà lại toàn bộ thay đổi, cập nhật tài liệu cho khớp code, ch�
   - Sửa: `assessment-completed-v2.md`, `answer-spec-v1.md` (+ vectors), `lesson-learning-v1.md`, `practice-v1.md`,
     `learning-content-internal-v1.md`.
   - Mới: `knowledge-tree-v1.md`, `learner-report-v1.md`, `diagnostics-v1.md`, `course-score-v1.md`,
-    `assessment-grading-v1.md`, `admin-area-v1.md`, `essay-prompt-template-v1.txt`.
+    `assessment-grading-v1.md`, `admin-area-v1.md`, `essay-prompt-template-v1.txt`, `human-review-v1.md` (phase 15). Phase 14 cập nhật `lesson-writing-v1.md` (API sửa
+  và lịch sử).
 
   Mỗi contract khớp mapping trong controller; AGENTS.md coi controller là nguồn tham chiếu.
 - **AGENTS.md:**
