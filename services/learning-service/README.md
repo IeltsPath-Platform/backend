@@ -99,6 +99,12 @@ quick-check and practice attempt questions carry Content hints; their results ke
 
 ## Submission, mastery and review state
 
+`GET /api/learning/statistics/progress` supports at most 100 started courses per learner.
+Above that limit it returns HTTP 422 with `code: PROGRESS_SCOPE_TOO_LARGE`, including when
+`courseId` is selected. This limit is checked before fetching Content metadata; results never use
+a truncated curriculum denominator. Missing or incomplete Content metadata remains HTTP 503
+`PROGRESS_UNAVAILABLE`.
+
 Submissions require a UUID `requestId` and exactly one answer per block question.
 Missing, duplicate or foreign question ids return `422 INVALID_ANSWERS`; unsupported
 answer specs return `422 UNGRADABLE_EXERCISE`. A block passes at 70% correct or more.

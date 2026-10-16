@@ -35,6 +35,19 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 class RestLearningContentClientTest {
+    @Test
+    void progressMetadataUsesOneBatchAndForwardsAuthentication() {
+        UUID course = UUID.randomUUID();
+        server.expect(requestTo(INTERNAL_PATH + "/progress-metadata"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-internal-token"))
+                .andExpect(content().json("{\"courseIds\":[\"" + course + "\"]}"))
+                .andRespond(withSuccess("{\"revision\":\"v1\",\"complete\":true,\"lessons\":[]}", MediaType.APPLICATION_JSON));
+        var result = client.progressMetadata(List.of(course));
+        assertTrue(result.complete());
+        assertEquals("v1", result.revision());
+    }
+
     private static final String BASE_URL = "http://content.test";
     private static final String INTERNAL_PATH = BASE_URL + "/internal/learning-content";
     private static final UUID TOPIC_ID = UUID.fromString("10000000-0000-4000-8000-000000000001");
