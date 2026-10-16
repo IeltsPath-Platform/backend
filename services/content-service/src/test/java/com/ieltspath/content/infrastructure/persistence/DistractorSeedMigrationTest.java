@@ -30,10 +30,10 @@ class DistractorSeedMigrationTest {
     }
 
     @Test
-    void mapsNineteenQuestionsWithTwentyFiveWrongOptions() {
-        assertThat(count("SELECT count(*) FROM question_versions WHERE answer_spec->'distractors' IS NOT NULL")).isEqualTo(19);
+    void mapsTwentyQuestionsWithThirtyOneWrongOptions() {
+        assertThat(count("SELECT count(*) FROM question_versions WHERE answer_spec->'distractors' IS NOT NULL")).isEqualTo(20);
         assertThat(count("SELECT count(*) FROM question_versions qv CROSS JOIN LATERAL "
-                + "jsonb_each_text(qv.answer_spec->'distractors') d")).isEqualTo(25);
+                + "jsonb_each_text(qv.answer_spec->'distractors') d")).isEqualTo(31);
     }
 
     @Test
@@ -50,6 +50,16 @@ class DistractorSeedMigrationTest {
         assertThat(count("SELECT count(*) FROM question_versions qv CROSS JOIN LATERAL "
                 + "jsonb_each_text(qv.answer_spec->'distractors') d WHERE d.value NOT IN "
                 + "(SELECT code FROM error_types WHERE status = 'ACTIVE')")).isZero();
+    }
+
+    @Test
+    void theThreeReviewCodesAreUsedForTheirApprovedOptions() {
+        assertThat(count("SELECT count(*) FROM question_versions qv CROSS JOIN LATERAL "
+                + "jsonb_each_text(qv.answer_spec->'distractors') d WHERE d.value = 'CONTRADICTED_BY_PASSAGE'")).isEqualTo(4);
+        assertThat(count("SELECT count(*) FROM question_versions qv CROSS JOIN LATERAL "
+                + "jsonb_each_text(qv.answer_spec->'distractors') d WHERE d.value = 'DETAIL_AS_MAIN_IDEA'")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM question_versions qv CROSS JOIN LATERAL "
+                + "jsonb_each_text(qv.answer_spec->'distractors') d WHERE d.value = 'WRONG_TIME_FRAME'")).isEqualTo(1);
     }
 
     @Test

@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Error taxonomy và gắn mã lỗi cho đáp án"
-status: in_progress
+status: completed
 priority: P1
 dependencies: []
 ---
@@ -13,12 +13,35 @@ dependencies: []
 - **3a (kỹ thuật): xong, chưa commit.** Bảng `error_types` (V34) với 25 mã nháp, CRUD và endpoint nội bộ, kiểm `distractors`
   khi tạo phiên bản câu, `ErrorTagger` ở learning và assessment dùng chung bộ vector, assessment ghi `error_analysis_items`
   tự động và chặn mã lạ khi giám khảo nhập. Test: content 312, learning 280, assessment 243, đều xanh, không skip.
-- **3b (nội dung): nháp xong, chưa duyệt.** Mã, mức severity và gợi ý sửa ở V34 là nháp. V35 gắn `distractors` cho 19 câu
-  trắc nghiệm Reading và Listening (mục đích `LEARNING`) với 25 phương án sai. Đây là phạm vi có bằng chứng trong giải thích
-  của chính câu hỏi. Còn 139 câu trắc nghiệm Reading/Listening chưa gắn. Gói duyệt (bảng mã, 19 câu, 6 phương án chưa gắn, quyết định Q1 đến Q4):
-  [plans/reports/review-error-taxonomy-pack-261016-2141-report.md](../reports/review-error-taxonomy-pack-261016-2141-report.md).
-  Phase 3 giữ `in_progress` cho đến khi người hiểu
-  IELTS duyệt.
+- **3b (nội dung): xong. Quyết định Q1–Q4 đã chốt (chưa có chuyên gia IELTS duyệt từng dòng).** V35 gắn `distractors` cho 19 câu trắc nghiệm Reading và Listening
+  (mục đích `LEARNING`), V36 thêm 3 mã (`CONTRADICTED_BY_PASSAGE`, `DETAIL_AS_MAIN_IDEA`, `WRONG_TIME_FRAME`) và gắn 6
+  phương án còn trống. Tổng: 20 câu, 31 phương án sai, 28 mã. Còn 139 câu trắc nghiệm Reading/Listening chưa gắn (Q4: giữ
+  phạm vi này). Gói duyệt: [plans/reports/review-error-taxonomy-pack-261016-2141-report.md](../reports/review-error-taxonomy-pack-261016-2141-report.md).
+
+### Kết quả duyệt (Q1–Q4)
+
+- **Q1 (thêm 3 mã): đã thêm** ở V36, nhóm READING_STRATEGY, severity 2. Gắn cho 6 phương án (mục C của gói duyệt).
+- **Q2 (severity): đồng ý.** Người duyệt lưu ý `KEYWORD_MATCH_ONLY` (mức 1) xuất hiện nhiều nhất (8 lần trong 19 câu). Chưa
+  đổi mức; nếu muốn nâng, sửa ở migration mới.
+- **Q3 (gắn vào phiên bản đã publish): chấp nhận, kèm ba điều kiện đã kiểm:**
+  - (a) Bộ chấm bỏ qua khóa lạ: đã kiểm. Learning và Assessment chỉ đọc `type`, `correct`, `accepted`, `maxWords` (không
+    duyệt khóa lạ). Game-service chỉ đọc danh sách khóa cố định (`answer`, `correctAnswer`, ...). Library tự ghi spec riêng,
+    không đọc spec của content. **Trong repo không có bộ chấm answer-spec bằng Python**: thư mục `ai-learning-service/app` không
+    có file `.py` nào.
+  - (b) Không có checksum hay hash của phiên bản câu hỏi. Checksum chỉ có ở `content_assets` (file âm thanh, ảnh), không liên
+    quan đến `answer_spec`.
+  - (c) `distractors` không lộ cho học viên: đã kiểm trong code. DTO học viên của learning (`LessonResponse`,
+    `PracticeSubmissionResponse`, `SubmissionResponse`) chỉ có `correctAnswer` và `explanation`. Assessment chỉ trả
+    `questionSnapshot` (stem, options) và `Solution` (correctAnswer, explanation, chỉ khi đạt ngưỡng). Game-service không
+    trả `answerSpecJson` (`GameItemResponse` không có trường này). Đây là kiểm tra đọc code, chưa có test tự động riêng.
+- **Q4 (phạm vi): giữ 19 câu** (sau V36 là 20 câu, do thêm câu 20/003).
+
+### Ghi chú ngoài phạm vi phase 3 (cần xem riêng)
+
+- `game-service/JacksonGameAnswerEvaluator` không đọc khóa `correct` của spec CHOICE, nên theo đọc code thì mọi câu CHOICE
+  đều bị chấm sai trong game. Lỗi này có trước phase 3 và không do `distractors` gây ra. Chưa kiểm thử, chưa sửa.
+- Chưa có người hiểu IELTS duyệt từng dòng trong gói (mục A và B). Quyết định Q1–Q4 là quyết định về thiết kế; nội dung từng
+  mã và từng cặp câu–mã vẫn là nháp nếu chưa có người duyệt riêng.
 
 ### Phạm vi 3b và cách lấy dữ liệu
 

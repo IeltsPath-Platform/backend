@@ -31,7 +31,7 @@ class ErrorTypeSeedMigrationTest {
 
     @Test
     void seedsTheTwentyFiveDraftCodesAsActive() {
-        assertThat(count("SELECT count(*) FROM error_types WHERE status = 'ACTIVE'")).isEqualTo(25);
+        assertThat(count("SELECT count(*) FROM error_types WHERE status = 'ACTIVE'")).isEqualTo(28);
     }
 
     @Test
@@ -42,9 +42,9 @@ class ErrorTypeSeedMigrationTest {
 
     @Test
     void knowledgePointLinksResolveToSeededKnowledgePoints() {
-        // Seven codes are not tied to any knowledge point (grammar, plural form, coherence, off-topic).
-        assertThat(count("SELECT count(*) FROM error_types WHERE knowledge_point_id IS NULL")).isEqualTo(7);
-        assertThat(count("SELECT count(*) FROM error_types e JOIN knowledge_points kp ON kp.id = e.knowledge_point_id")).isEqualTo(18);
+        // Nine codes are not tied to any knowledge point (grammar, plural form, coherence, off-topic, passage mismatch).
+        assertThat(count("SELECT count(*) FROM error_types WHERE knowledge_point_id IS NULL")).isEqualTo(9);
+        assertThat(count("SELECT count(*) FROM error_types e JOIN knowledge_points kp ON kp.id = e.knowledge_point_id")).isEqualTo(19);
         assertThat(count("SELECT count(*) FROM error_types e JOIN knowledge_points kp ON kp.id = e.knowledge_point_id "
                 + "WHERE e.code = 'PARAPHRASE_TRAP' AND kp.code = 'R65_PARAPHRASE'")).isEqualTo(1);
     }
