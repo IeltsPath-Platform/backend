@@ -57,14 +57,26 @@ the V40 sets enabled the intended review-and-diagnosis flow.
 
 Open items:
 
-- **Step 5 (cause found and fixed in code, demo not rerun).** `POST /api/learning/courses/{id}/test-assignments` returned
-  422 for every valid course id because `CourseController.assign` declared `@PathVariable UUID id` without a name and the
-  build does not enable `-parameters`, so Spring could not bind the id. It is now `@PathVariable("id")`, and
-  `CourseControllerTest` fails on the old code (403 expected, 422 received) and passes on the new one. The running stack
-  was built before the fix: rebuild the Learning image and repeat steps 5 and 8.
-- **Step 4 (not investigated).** Learning returned a `packageVersionId` that does not match the version published in
-  Content; cause unknown, possibly the publish done during the demo.
-- **Step 8** has no QA sample because it depends on the course-test essay of step 5.
+- **Step 5 (resolved in follow-up).** The old image returned 422 because `CourseController.assign` did not name the
+  `@PathVariable`; after rebuilding Learning, `GET /api/learning/courses` returned courseId
+  `30000000-0000-4000-8000-000000000001`, and the assignment request returned the expected 403 `COURSE_TEST_LOCKED`.
+- **Step 4 (rechecked; earlier mismatch not reproduced).** The existing Learning assignment and the Content X1 package
+  both use published version `20000000-0000-4000-8000-090000000001`. Repeating the assignment request through Gateway
+  returned that same value. The previous value recorded above could not be confirmed from current data or code.
+- **Step 8** still has no QA sample to claim or re-grade: the queue returned `totalElements=0`. Examiner quality returned
+  one aggregate entry.
 - **Phase 11** has tooling but no accuracy evidence: no gold set rated by an IELTS expert exists. A run on 30 synthetic
   essays could not finish (`LLM_REQUEST_FAILED`); synthetic scores are never accuracy evidence.
 - **`library-service`** test sources do not compile, unchanged from main; out of scope.
+
+## Follow-up after Learning image rebuild
+
+On 2026-10-17, `mvn -B -ntp -pl services/learning-service -DskipTests package` succeeded; Learning tests were not run.
+The runtime image was rebuilt from that JAR, and `learning-service` returned healthy. The live step-5 response above came
+from the rebuilt service. The step-8 QA queue and examiner-quality endpoints both returned 200; the queue had no sample.
+
+The step-4 assignment row has packageId `20000000-0000-4000-8000-080000000001` and packageVersionId
+`20000000-0000-4000-8000-090000000001`. Content's `X1` package has the same current published version ID. The repeated
+Gateway assignment response matched both values. No current Learning/Content version mismatch was found.
+
+The read-only Content database check returned **12** rows in `question_versions` where `difficulty IS NULL`.
