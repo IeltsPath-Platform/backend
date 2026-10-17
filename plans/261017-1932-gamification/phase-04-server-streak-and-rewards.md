@@ -66,5 +66,20 @@ thật, thêm đóng băng trả bằng points (03 §E.3), và đường cộng 
   D. Luật "phủ ngày mai" làm giá tăng theo liên tiếp không bao giờ đạt được: lượt cũ phải được dùng trước khi mua lượt mới,
   mà việc dùng chỉ xảy ra khi ngày đó được chấm, sau ngày mua.
 - Quyết định: mua khi chưa có streak trả `409 NO_STREAK_TO_PROTECT`. Ngày trả lời lại trong cùng ngày không thưởng lại.
-- Chưa xong: `RewardGrantRelayJob` (chờ chọn cơ chế gửi points sang access); hoàn points khi đóng băng lỗi (access chưa có
-  route nội bộ); bài essay chưa tính là ngày hoạt động (không phát sự kiện câu hỏi); thưởng KP ≥ 90% mastery +5 points.
+- Chưa xong: hoàn points khi đóng băng lỗi (access chưa có route nội bộ); bài essay chưa tính là ngày hoạt động (không phát
+  sự kiện câu hỏi); thưởng KP ≥ 90% mastery +5 points.
+
+### Relay points (2026-10-18)
+
+Người dùng chọn gửi qua RabbitMQ (hợp đồng C6 trong `work-split.md`), không dùng HTTP.
+
+- Phía learning xong: `RewardGrantMessagingConfig` (exchange `learning.points`, queue `learning.points-grant-settled`),
+  `RabbitPointsGrantPublisher`, `RewardGrantService` (gửi lô 100, gửi lại sau 5 phút nếu chưa có trả lời, bỏ cuộc sau 10 lần
+  với lỗi `NO_SETTLEMENT`), `RewardGrantRelayJob` (mỗi phút, khóa advisory, `FOR UPDATE SKIP LOCKED`),
+  `PointsGrantSettledListener` (đổi trạng thái `GRANTED` / `CAPPED` / `FAILED`). Test: `RewardGrantRelayIntegrationTest` 7,
+  `PointsGrantSettledListenerTest` 3.
+- Tiêu chí "access tắt thì grant nằm `PENDING`, bật lại thì được cộng": phía learning đạt (grant giữ PENDING và được gửi lại).
+  Chưa kiểm chứng đầu-cuối vì consumer Access của Codex chưa commit.
+- **Lệch cần Codex sửa:** consumer Access đang viết dở chỉ nhận `reason = STREAK_MILESTONE`, trong khi learning gửi thêm
+  `DAILY_QUEST` và `BADGE` (và sau này `KP_MASTERED`). Access phải nhận cả bốn giá trị của `LearningRewardReason`, nếu không
+  nhiệm vụ ngày và huy hiệu bị trả `FAILED`. Đã ghi vào C6.

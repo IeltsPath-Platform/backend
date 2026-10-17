@@ -97,8 +97,11 @@ Learning ghi thưởng vào `reward_grants` (PENDING) trong transaction nộp b�
 service nào được thêm, access không nhận lệnh cộng từ HTTP của learning.
 
 - Exchange `learning.points` (topic, durable). Learning gửi với routing key `points.grant.requested`.
-- Payload `points.grant.requested`: `{"grantId": uuid, "userId": uuid, "amount": 1..100, "reason": "STREAK_MILESTONE",
-  "referenceId": "<streakStart>:<day>"}`.
+- Payload `points.grant.requested`: `{"grantId": uuid, "userId": uuid, "amount": 1..100, "reason": one of
+  "STREAK_MILESTONE" | "KP_MASTERED" | "DAILY_QUEST" | "BADGE", "referenceId": string (tối đa 100 ký tự)}`. Learning gửi
+  hiện nay ba lý do: `STREAK_MILESTONE` (`<streakStart>:<day>`), `DAILY_QUEST` (mã nhiệm vụ), `BADGE` (mã huy hiệu).
+  Access phải nhận đủ cả bốn giá trị của `LearningRewardReason`, như endpoint `/internal/access/points/credit`; chỉ nhận
+  `STREAK_MILESTONE` thì nhiệm vụ ngày và huy hiệu bị trả `FAILED`.
 - Access: queue `access.points-grant` bind vào `points.grant.requested`; cộng bằng cùng luật với
   `POST /internal/access/points/credit`, `idempotencyKey = grantId`. Gửi kết quả lên exchange `learning.points`, routing key
   `points.grant.settled`: `{"grantId": uuid, "status": "GRANTED" | "CAPPED" | "FAILED", "error": string|null}`.

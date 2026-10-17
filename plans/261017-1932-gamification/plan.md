@@ -60,7 +60,7 @@ Points (access) ── kiếm: thưởng học (có trần/ngày) │ tiêu: h�
 | 3 | [Tim](phase-03-hearts.md) | learning, access | in_progress (gate, trừ tim, refill, PREMIUM 7 có test; thiếu refund do access chưa có route nội bộ; thiếu test HTTP 403) | 1, 2, plan 3 phase 3 |
 | 4 | [Streak phía server, đóng băng, thưởng points](phase-04-server-streak-and-rewards.md) | learning, access | in_progress (streak, đóng băng, mốc 7/30 có test DB; relay points và refund chưa làm) | 1, 2 |
 | 5 | [Nhiệm vụ ngày](phase-05-daily-quests.md) | learning | completed (V29, sinh lười, tiến độ theo câu mới, thưởng một lần; còn: test HTTP controller) | 2, 4 |
-| 6 | [Huy hiệu](phase-06-badges.md) | learning | pending | 2, 4 |
+| 6 | [Huy hiệu](phase-06-badges.md) | learning | completed (V30, 9 huy hiệu, cấp một lần, bật/tắt; còn: test HTTP controller) | 2, 4 |
 | 7 | [League tuần](phase-07-weekly-league.md) | learning, user | completed (V28, chốt tuần, bảng và lịch sử; còn: test HTTP controller, ẩn danh) | 2 |
 | 8 | [Contract, tài liệu, nghiệm thu](phase-08-contracts-and-acceptance.md) | docs | pending | tất cả |
 
