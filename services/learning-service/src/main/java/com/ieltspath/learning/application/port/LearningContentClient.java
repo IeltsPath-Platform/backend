@@ -56,6 +56,9 @@ public interface LearningContentClient {
 
     PackageVersion getPackageVersion(UUID versionId);
 
+    /** The active prerequisites of each knowledge point; a point without any maps to an empty list. */
+    Map<UUID, List<UUID>> prerequisites(List<UUID> knowledgePointIds);
+
     /** Active grading rubric for a writing task. */
     Rubric getActiveRubric(String task);
 

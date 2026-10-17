@@ -126,6 +126,16 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public Map<UUID, List<UUID>> prerequisites(List<UUID> knowledgePointIds) {
+        return response(() -> restClient.post()
+                .uri(INTERNAL_PATH + "/knowledge-points/prerequisites")
+                .headers(this::forwardRequestHeaders)
+                .body(new PrerequisitesRequest(knowledgePointIds))
+                .retrieve()
+                .body(new ParameterizedTypeReference<Map<UUID, List<UUID>>>() { }));
+    }
+
+    @Override
     public Rubric getActiveRubric(String task) {
         return get("/rubrics/active?task={task}", new ParameterizedTypeReference<>() { }, task);
     }
@@ -184,5 +194,6 @@ public class RestLearningContentClient implements LearningContentClient {
                                   int minQuestions, int limit, UUID preferredLessonId) {}
     private record AvailabilityRequest(List<UUID> knowledgePointIds, List<UUID> excludePackageIds,
                                        int minQuestions) {}
+    private record PrerequisitesRequest(List<UUID> ids) {}
     private record Availability(Map<UUID, Integer> counts) {}
 }

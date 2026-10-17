@@ -11,6 +11,7 @@ import com.ieltspath.learning.application.port.ReviewSubmissionLog;
 import com.ieltspath.learning.application.result.ReviewSubmissionResult;
 import com.ieltspath.learning.application.result.SubmissionResult;
 import com.ieltspath.learning.application.service.AnswerSheet;
+import com.ieltspath.learning.application.service.DiagnosticFlow;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.PracticeProgress;
@@ -46,7 +47,9 @@ import java.util.UUID;
  */
 @Service
 public class SubmitReviewUseCase {
+    private static final int SECOND_FAILED_SET = 2;
 
+    private final DiagnosticFlow diagnosticFlow;
     private final LearningContentClient content;
     private final LearnerLock lock;
     private final KnowledgeEvidenceRepository evidence;
@@ -62,7 +65,8 @@ public class SubmitReviewUseCase {
                                ReviewItemRepository reviews, PracticeAttemptRepository attempts,
                                ReviewSubmissionLog submissions,
                                PracticeProgress practice, QuestionEventLog questionEvents,
-                               MasteryProfileUpdater masteryProfiles) {
+                               MasteryProfileUpdater masteryProfiles, DiagnosticFlow diagnosticFlow) {
+        this.diagnosticFlow = diagnosticFlow;
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
         this.content = content;
@@ -136,6 +140,9 @@ public class SubmitReviewUseCase {
         reviews.save(review);
         submissions.save(set.id(), response);
         if (status != ReviewStatus.PENDING) practice.refreshPassForLesson(userId, review.lessonId());
+        else if (review.blocking() && review.failedSets() == SECOND_FAILED_SET) {
+            diagnosticFlow.startAfterSecondFailure(review);
+        }
         return response;
     }
 

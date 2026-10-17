@@ -4,12 +4,9 @@ import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.result.ReviewResult;
-import com.ieltspath.learning.domain.aggregate.LessonProgress;
+import com.ieltspath.learning.application.service.CompletedLessonLocator;
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
-import com.ieltspath.learning.domain.entity.TopicProgress;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
-import com.ieltspath.learning.domain.repository.LearnerCurriculumRepository;
-import com.ieltspath.learning.domain.repository.LessonProgressRepository;
 import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
@@ -20,11 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -39,23 +33,21 @@ public class StartBasketReviewUseCase {
     private final MasteryProfileRepository profiles;
     private final ReviewItemRepository reviews;
     private final PracticeAttemptRepository attempts;
-    private final LessonProgressRepository lessons;
-    private final LearnerCurriculumRepository curricula;
+    private final CompletedLessonLocator lessonLocator;
     private final KnowledgeEvidenceRepository evidence;
     private final LearningContentClient content;
     private final GetReviewUseCase getReview;
     private final Clock clock = Clock.systemUTC();
 
     public StartBasketReviewUseCase(LearnerLock lock, MasteryProfileRepository profiles, ReviewItemRepository reviews,
-                                    PracticeAttemptRepository attempts, LessonProgressRepository lessons,
-                                    LearnerCurriculumRepository curricula, KnowledgeEvidenceRepository evidence,
+                                    PracticeAttemptRepository attempts, CompletedLessonLocator lessonLocator,
+                                    KnowledgeEvidenceRepository evidence,
                                     LearningContentClient content, GetReviewUseCase getReview) {
         this.lock = lock;
         this.profiles = profiles;
         this.reviews = reviews;
         this.attempts = attempts;
-        this.lessons = lessons;
-        this.curricula = curricula;
+        this.lessonLocator = lessonLocator;
         this.evidence = evidence;
         this.content = content;
         this.getReview = getReview;
@@ -74,7 +66,7 @@ public class StartBasketReviewUseCase {
             throw new LearningRequestException(409, "NOT_IN_REVIEW_BASKET",
                     "This knowledge point is not in the review basket");
         }
-        UUID lessonId = lessonFor(userId, knowledgePointId).orElseThrow(() -> new LearningRequestException(409,
+        UUID lessonId = lessonLocator.teaching(userId, knowledgePointId).orElseThrow(() -> new LearningRequestException(409,
                 "NO_LESSON_FOR_KNOWLEDGE_POINT", "No completed lesson teaches this knowledge point"));
         Set<UUID> excluded = new HashSet<>(attempts.revealedPackageIds(userId));
         excluded.addAll(reviews.assignedPackageIds(userId));
@@ -93,20 +85,5 @@ public class StartBasketReviewUseCase {
                     .reviewId());
         }
         return getReview.execute(userId, reviewId);
-    }
-
-    /** The first completed lesson, in topic then lesson order, that teaches the point. */
-    private Optional<UUID> lessonFor(UUID userId, UUID knowledgePointId) {
-        Map<UUID, Integer> topicOrder = new HashMap<>();
-        for (TopicProgress topic : curricula.find(userId).topics()) {
-            if (topic.sequenceOrder() != null) topicOrder.put(topic.topicId(), topic.sequenceOrder());
-        }
-        return lessons.findCompleted(userId).stream()
-                .filter(lesson -> lesson.knowledgePointIds().contains(knowledgePointId))
-                .min(Comparator.<LessonProgress, Integer>comparing(lesson ->
-                                topicOrder.getOrDefault(lesson.topicId(), Integer.MAX_VALUE))
-                        .thenComparingInt(LessonProgress::sortOrder)
-                        .thenComparing(lesson -> lesson.lessonId().toString()))
-                .map(LessonProgress::lessonId);
     }
 }

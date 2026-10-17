@@ -12,6 +12,7 @@ import com.ieltspath.learning.application.result.LearnerReportResult.KnowledgePo
 import com.ieltspath.learning.application.result.LearnerReportResult.Score;
 import com.ieltspath.learning.application.service.MasteryProfileUpdater;
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
+import com.ieltspath.learning.domain.repository.DiagnosticRepository;
 import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
 import com.ieltspath.learning.domain.vo.MasteryTier;
@@ -25,6 +26,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /** Builds the Score / Errors / Evidence / Action report from the stored mastery profiles. */
@@ -36,10 +38,13 @@ public class GetLearnerReportUseCase {
     private final QuestionEventLog events;
     private final ReviewItemRepository reviews;
     private final KnowledgePointDirectory directory;
+    private final DiagnosticRepository diagnostics;
     private final Clock clock = Clock.systemUTC();
 
     public GetLearnerReportUseCase(MasteryProfileRepository profiles, QuestionEventLog events,
-                                   ReviewItemRepository reviews, KnowledgePointDirectory directory) {
+                                   ReviewItemRepository reviews, KnowledgePointDirectory directory,
+                                   DiagnosticRepository diagnostics) {
+        this.diagnostics = diagnostics;
         this.profiles = profiles;
         this.events = events;
         this.reviews = reviews;
@@ -61,6 +66,7 @@ public class GetLearnerReportUseCase {
             if (!review.blocking()) continue;
             pendingReviews.putIfAbsent(review.knowledgePointId(), review.reviewId());
         }
+        Set<UUID> diagnosing = diagnostics.probingRootKnowledgePoints(userId);
         Map<UUID, KnowledgePointDirectory.Entry> described = directory.describe();
 
         List<KnowledgePointReport> report = stored.stream().map(profile -> {
@@ -74,15 +80,18 @@ public class GetLearnerReportUseCase {
                             .map(event -> new EvidenceEntry(event.questionVersionId(), event.correct(),
                                     event.durationMs(), event.source().value(), event.errorCode(), event.at()))
                             .toList(),
-                    action(profile, pendingReviews.get(profile.knowledgePointId()), now));
+                    action(profile, pendingReviews.get(profile.knowledgePointId()),
+                            diagnosing.contains(profile.knowledgePointId()), now));
         }).sorted(Comparator.<KnowledgePointReport>comparingInt(point -> MasteryTier.valueOf(point.score().tier()).ordinal())
                 .thenComparingDouble(point -> point.score().mastery())
                 .thenComparing(point -> point.code() == null ? "￿" : point.code())).toList();
         return new LearnerReportResult(userId, now, report);
     }
 
-    private static Action action(MasteryProfile profile, UUID pendingReviewId, Instant now) {
-        if (pendingReviewId != null) return new Action("REVIEW_REQUIRED", pendingReviewId, null);
+    private static Action action(MasteryProfile profile, UUID pendingReviewId, boolean diagnosing, Instant now) {
+        if (pendingReviewId != null) {
+            return new Action(diagnosing ? "DIAGNOSING" : "REVIEW_REQUIRED", pendingReviewId, null);
+        }
         return switch (profile.tier()) {
             case PRIORITY -> new Action("NONE", null, profile.nextReviewAt());
             case CONSOLIDATE -> new Action("CONSOLIDATE", null, profile.nextReviewAt());

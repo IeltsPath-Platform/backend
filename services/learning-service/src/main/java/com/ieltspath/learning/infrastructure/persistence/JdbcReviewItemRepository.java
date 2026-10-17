@@ -244,7 +244,11 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
 
     @Override
     public List<UUID> assignedPackageIds(UUID userId) {
-        return jdbc.queryForList("SELECT DISTINCT package_id FROM review_sets WHERE user_id = :userId",
-                Map.of("userId", userId), UUID.class);
+        return jdbc.queryForList("""
+                SELECT package_id FROM review_sets WHERE user_id = :userId
+                UNION
+                SELECT p.package_id FROM diagnostic_probes p JOIN diagnostic_sessions s ON s.id = p.session_id
+                WHERE s.user_id = :userId AND p.package_id IS NOT NULL
+                """, Map.of("userId", userId), UUID.class);
     }
 }

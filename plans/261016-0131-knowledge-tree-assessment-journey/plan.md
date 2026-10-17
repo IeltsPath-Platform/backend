@@ -104,7 +104,7 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 | 4 | [Event log từng câu và thời gian làm](./phase-04-question-event-log-and-duration.md) | learning, assessment | Completed |
 | 5 | [Mastery profile 3 mức, hạn ôn, API báo cáo](./phase-05-mastery-profile-and-report.md) | learning | Completed |
 | 6 | [Giỏ ôn nhiều mức và recheck](./phase-06-review-tiers-and-recheck.md) | learning | 6a xong (chưa commit), 6b gợi ý bài chưa làm |
-| 7 | [Chẩn đoán dò ngược theo cây](./phase-07-diagnostic-backtracking.md) | learning | Pending |
+| 7 | [Chẩn đoán dò ngược theo cây](./phase-07-diagnostic-backtracking.md) | learning | Completed (chưa commit) |
 | 8 | [Practice test theo mốc course](./phase-08-practice-test-milestones.md) | content, assessment, learning | Completed (933 test của ba service xanh, không skip; xem báo cáo) |
 | 9 | [Điểm có trọng số và kết quả khóa](./phase-09-course-scoring-and-outcome.md) | learning | Pending |
 | 10 | [Hàng chờ giám khảo và chính sách AI](./phase-10-examiner-queue-and-ai-policy.md) | assessment | Completed (80123b5) |

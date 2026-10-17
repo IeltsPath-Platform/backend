@@ -22,6 +22,9 @@ public record LearnerReportResult(UUID userId, Instant generatedAt, List<Knowled
     public record EvidenceEntry(UUID questionVersionId, Boolean correct, Long durationMs, String source,
                                 String errorCode, Instant at) {}
 
-    /** {@code type}: REVIEW_REQUIRED, CONSOLIDATE, MAINTAIN_DUE or NONE (DIAGNOSING arrives with the diagnostic). */
+    /**
+     * {@code type}: REVIEW_REQUIRED, DIAGNOSING (the pending review is being diagnosed through its prerequisites),
+     * CONSOLIDATE, MAINTAIN_DUE or NONE.
+     */
     public record Action(String type, UUID reviewId, Instant dueAt) {}
 }

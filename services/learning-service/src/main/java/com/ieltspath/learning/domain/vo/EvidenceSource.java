@@ -6,7 +6,8 @@ public enum EvidenceSource {
     REVIEW_SET("review_set"),
     PRACTICE_SET("practice_set"),
     LESSON_WRITING("lesson_writing"),
-    ASSESSMENT("assessment");
+    ASSESSMENT("assessment"),
+    DIAGNOSTIC_PROBE("diagnostic_probe");
 
     private final String value;
 

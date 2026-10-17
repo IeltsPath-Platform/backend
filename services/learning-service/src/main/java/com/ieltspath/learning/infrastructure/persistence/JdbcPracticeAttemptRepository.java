@@ -123,6 +123,9 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
                 SELECT package_id FROM practice_attempts WHERE user_id = :userId AND submitted_at IS NOT NULL
                 UNION
                 SELECT package_id FROM review_sets WHERE user_id = :userId AND submitted_at IS NOT NULL
+                UNION
+                SELECT p.package_id FROM diagnostic_probes p JOIN diagnostic_sessions s ON s.id = p.session_id
+                WHERE s.user_id = :userId AND p.status = 'ANSWERED'
                 """, Map.of("userId", userId), UUID.class));
     }
 
@@ -135,6 +138,9 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
                 UNION
                 SELECT package_id FROM review_sets
                 WHERE user_id = :userId AND package_id IN (:packageIds) AND submitted_at IS NOT NULL
+                UNION
+                SELECT p.package_id FROM diagnostic_probes p JOIN diagnostic_sessions s ON s.id = p.session_id
+                WHERE s.user_id = :userId AND p.package_id IN (:packageIds) AND p.status = 'ANSWERED'
                 """, Map.of("userId", userId, "packageIds", packageIds), UUID.class));
     }
 
