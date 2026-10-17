@@ -59,6 +59,15 @@ public interface LearningContentClient {
     /** The active prerequisites of each knowledge point; a point without any maps to an empty list. */
     Map<UUID, List<UUID>> prerequisites(List<UUID> knowledgePointIds);
 
+    /** Published practice sets, practice tests and lessons for these points (at most 50), none above {@code maxBand}. */
+    SuggestionCandidates suggestionCandidates(List<UUID> knowledgePointIds, BigDecimal maxBand);
+
+    record SuggestionCandidates(List<PackageCandidate> packages, List<LessonCandidate> lessons) {}
+    record PackageCandidate(UUID packageId, UUID packageVersionId, String type, String title,
+                            List<UUID> knowledgePointIds, BigDecimal band, String skill) {}
+    record LessonCandidate(UUID lessonId, UUID topicId, String title, List<UUID> knowledgePointIds, BigDecimal band,
+                           String skill, int sortOrder) {}
+
     /** Active grading rubric for a writing task. */
     Rubric getActiveRubric(String task);
 

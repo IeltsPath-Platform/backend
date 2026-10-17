@@ -136,6 +136,15 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public SuggestionCandidates suggestionCandidates(List<UUID> knowledgePointIds, java.math.BigDecimal maxBand) {
+        return response(() -> restClient.post()
+                .uri(INTERNAL_PATH + "/suggestions/candidates")
+                .headers(this::forwardRequestHeaders)
+                .body(new SuggestionRequest(knowledgePointIds, maxBand))
+                .retrieve().body(SuggestionCandidates.class));
+    }
+
+    @Override
     public Rubric getActiveRubric(String task) {
         return get("/rubrics/active?task={task}", new ParameterizedTypeReference<>() { }, task);
     }
@@ -194,6 +203,7 @@ public class RestLearningContentClient implements LearningContentClient {
                                   int minQuestions, int limit, UUID preferredLessonId) {}
     private record AvailabilityRequest(List<UUID> knowledgePointIds, List<UUID> excludePackageIds,
                                        int minQuestions) {}
+    private record SuggestionRequest(List<UUID> knowledgePointIds, java.math.BigDecimal maxBand) {}
     private record PrerequisitesRequest(List<UUID> ids) {}
     private record Availability(Map<UUID, Integer> counts) {}
 }

@@ -12,8 +12,9 @@ dependencies: [5, "plan 261009"]
 
 - **Đã xong (6a):** bài ôn không chặn, giỏ ôn và recheck. Code và test xong, **chưa commit**. Contract:
   `docs/contracts/lesson-learning-v1.md` (mục `GET /review-basket`, `POST /review-basket/{id}/start`, trường `blocking`).
-- **Chưa làm (6b): `GET /api/learning/suggestions`** (gợi ý bài từ kho đã duyệt). Cần endpoint nội bộ mới của content
-  để tìm `PRACTICE_TEST` và `LESSON` theo KP và band; content đang do Codex giữ. Làm sau khi chốt ai làm phần content.
+- **Đã xong (6b): `GET /api/learning/suggestions`.** Content: `POST /internal/learning-content/suggestions/candidates`
+  (Codex). Learning: `GetSuggestionsUseCase`, luật `SuggestionRules` (test `SuggestionRulesTest`). Band lấy từ course có
+  topic đang học (không có thì band placement). Không gợi ý KP đang có bài ôn chặn. `openPath` null với practice test.
 - Khác với plan:
   - Migration là `V15__review_tiers.sql` (V13 là mastery profile, V14 là prompt_version của phase 11).
   - `blocking` nằm trong `PendingReview`; lọc chặn tập trung ở `LessonAccessGate.blocking`, nên mọi nơi chặn

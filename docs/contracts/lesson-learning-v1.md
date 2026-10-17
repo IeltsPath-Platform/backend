@@ -401,3 +401,22 @@ bootstrap fallback. Evaluation candidates use the current `ACTIVE` rubric; chang
 run with `passed=true`, otherwise activation returns `409 EVALUATION_NOT_PASSED`.
 See [rubric projections](./learning-content-internal-v1.md#essay-rubrics-phase-11) and
 [evaluation and activation](./assessment-grading-v1.md#ai-rubric-evaluation-and-activation-phase-11).
+
+## `GET /api/learning/suggestions`
+
+Role `CUSTOMER`. Up to five optional suggestions from published content; they never block progress.
+
+```json
+{"suggestions":[{"type":"PRACTICE_SET","id":"…","title":"…","knowledgePointId":"…","knowledgePointCode":"R40_SKIM",
+  "reason":"CONSOLIDATE","band":5.5,"skill":"READING","openPath":"/api/learning/review-basket/{kpId}/start"}]}
+```
+
+- `reason`: `CONSOLIDATE` (tier 60–79%), `DUE` (strong point whose review date passed), `NEXT_IN_TREE` (a point with no
+  evidence yet whose prerequisites are all held firmly). Weak points come first (weakest, then oldest due), then next points.
+- One suggestion per point, each item at most once. Never offered: content the learner already did (revealed Practice or
+  review sets, assigned practice tests, completed lessons) and anything above the band of the course the learner is
+  working in (the placement band before any topic is open; no suggestions without either).
+- `type`: `PRACTICE_SET`, `PRACTICE_TEST`, `LESSON`. `openPath` starts it: a lesson route, or the review-basket start for a
+  practice set of a weak point; `null` for a practice test (opened from its course list) and for a practice set of a
+  `NEXT_IN_TREE` point.
+- A point with a blocking review is not suggested; it is already required.
