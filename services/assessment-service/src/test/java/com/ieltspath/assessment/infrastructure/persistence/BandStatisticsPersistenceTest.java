@@ -43,10 +43,14 @@ class BandStatisticsPersistenceTest {
 
     private UUID attempt(UUID owner, Instant submitted, String kind) {
         UUID id = UUID.randomUUID();
+        // A practice attempt always names its package and skill; every other kind must leave the skill empty.
+        boolean practice = "OFFICIAL_PRACTICE".equals(kind);
         jdbc.update("""
-            INSERT INTO assessment_attempts(id, user_id, package_version_id, attempt_type, mode, channel, status, submitted_at)
-            VALUES(?, ?, ?, ?, 'STANDARD', 'WEB', 'SUBMITTED', ?)
-            """, id, owner, UUID.randomUUID(), kind, Timestamp.from(submitted));
+            INSERT INTO assessment_attempts(id, user_id, package_version_id, attempt_type, mode, channel, status, submitted_at,
+                                            package_id, skill)
+            VALUES(?, ?, ?, ?, 'STANDARD', 'WEB', 'SUBMITTED', ?, CAST(? AS uuid), CAST(? AS varchar))
+            """, id, owner, UUID.randomUUID(), kind, Timestamp.from(submitted),
+                practice ? UUID.randomUUID() : null, practice ? "READING" : null);
         return id;
     }
 
