@@ -109,7 +109,7 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 | 9 | [Điểm có trọng số và kết quả khóa](./phase-09-course-scoring-and-outcome.md) | learning | Completed |
 | 10 | [Hàng chờ giám khảo và chính sách AI](./phase-10-examiner-queue-and-ai-policy.md) | assessment | Completed (80123b5) |
 | 11 | [Rubric dạng dữ liệu và bộ test nghiệm thu AI](./phase-11-rubric-data-and-ai-evaluation.md) | content, assessment, learning | in_progress (chưa có gold set chuyên gia và bằng chứng chạy đánh giá thực tế) |
-| 12 | [Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor](./phase-12-admin-area-backend.md) | learning, assessment, access | Pending |
+| 12 | [Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor](./phase-12-admin-area-backend.md) | learning, assessment, access | Completed (còn kiểm route Gateway) |
 | 13 | [Contract, tài liệu và nghiệm thu](./phase-13-contracts-docs-and-verification.md) | docs | Pending |
 | 14 | [Học viên sửa essay và nộp lại](./phase-14-essay-revision.md) | learning | Completed (trừ `revisionDelta` ở báo cáo) |
 | 15 | [Mentor chữa essay Practice và lesson](./phase-15-mentor-practice-essays.md) | learning, assessment, access | Pending |

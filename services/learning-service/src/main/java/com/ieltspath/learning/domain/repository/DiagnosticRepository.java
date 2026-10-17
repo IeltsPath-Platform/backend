@@ -30,6 +30,9 @@ public interface DiagnosticRepository {
 
     void conclude(UUID sessionId, Collection<UUID> knowledgePointIds);
 
+    /** The learner's diagnoses, newest first. */
+    List<DiagnosticSession> findSessionsByUser(UUID userId);
+
     /** Root points of the learner's sessions that are still PROBING. */
     Set<UUID> probingRootKnowledgePoints(UUID userId);
 

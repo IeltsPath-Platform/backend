@@ -16,6 +16,18 @@ Mentor: "System làm gì, Mentor làm gì, R&D làm gì… cái này phải làm
 
 Phase này làm phần backend. Mỗi chức năng đặt ở service đang sở hữu dữ liệu (D11); frontend gom thành một khu quản trị.
 
+## Trạng thái và ghi chú triển khai
+
+- **Phần Assessment/Access: xong** (Codex, `dbe35e7`, `1ea5e44`, `9293d6e`). **Phần Learning: xong** (contract
+  `docs/contracts/learning-staff-area-v1.md`; learning-service 471 test xanh). Còn thiếu Gateway route (Codex kiểm).
+- Khác với plan ở phần Learning:
+  - Migration là `V19__flags_and_work_items.sql`. `work_items` thêm cột `detail` (JSON số liệu của việc).
+  - Không có job định kỳ: hàng việc được đồng bộ khi mở danh sách (`WorkItemSync`), vì service chưa có scheduler.
+  - Cờ chạy qua sự kiện `QuestionEventsAppended` sau khi commit, transaction riêng (`FlagDetector`). Cờ cùng loại không
+    nâng lại trong 24 giờ.
+  - Câu quá dễ/khó chỉ dùng tỷ lệ đúng lần nộp đầu; chưa so với `difficulty` đã gắn.
+  - Hồ sơ 360° chỉ đọc, không làm tươi dữ liệu học viên; tên khóa/KP do frontend ghép.
+
 ## Requirements
 
 ### Learning: hồ sơ học viên 360° (`ADMIN`, `EXAMINER`)

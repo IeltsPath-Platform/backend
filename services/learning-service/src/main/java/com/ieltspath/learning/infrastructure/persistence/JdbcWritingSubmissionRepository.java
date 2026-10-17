@@ -88,8 +88,8 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
                     INSERT INTO lesson_writing_submissions (id, user_id, lesson_id, block_id, question_version_id,
                     knowledge_point_ids, request_id, essay_text, word_count, prompt_snapshot, status, point_cost,
                 grading_started_at, submitted_at, source, practice_attempt_id, prompt_version, previous_submission_id,
-                    revision_no)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    revision_no, essay_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """);
             Timestamp started = Timestamp.from(submission.gradingStartedAt());
             statement.setObject(1, submission.id());
@@ -111,6 +111,7 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
             statement.setString(17, submission.promptVersion());
             statement.setObject(18, submission.previousSubmissionId());
             statement.setInt(19, submission.revisionNo());
+            statement.setString(20, com.ieltspath.learning.domain.service.AnomalyRules.essayHash(submission.essayText()));
             return statement;
         }) == 1;
     }

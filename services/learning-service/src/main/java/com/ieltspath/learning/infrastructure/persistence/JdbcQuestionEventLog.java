@@ -1,6 +1,7 @@
 package com.ieltspath.learning.infrastructure.persistence;
 
 import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.QuestionEventsAppended;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
 import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -23,8 +24,12 @@ import java.util.UUID;
 public class JdbcQuestionEventLog implements QuestionEventLog {
     private final JdbcTemplate jdbc;
 
-    public JdbcQuestionEventLog(NamedParameterJdbcTemplate namedJdbc) {
+    private final org.springframework.context.ApplicationEventPublisher publisher;
+
+    public JdbcQuestionEventLog(NamedParameterJdbcTemplate namedJdbc,
+                                org.springframework.context.ApplicationEventPublisher publisher) {
         this.jdbc = namedJdbc.getJdbcTemplate();
+        this.publisher = publisher;
     }
 
     @Override
@@ -51,6 +56,9 @@ public class JdbcQuestionEventLog implements QuestionEventLog {
             statement.setObject(12, event.attemptId(), Types.OTHER);
             statement.setBoolean(13, event.firstSubmission());
         });
+        // Learners whose events were just written are checked for anomalies once the transaction commits.
+        events.stream().map(QuestionAttemptEvent::userId).distinct()
+                .forEach(user -> publisher.publishEvent(new QuestionEventsAppended(user)));
     }
 
     @Override

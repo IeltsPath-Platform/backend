@@ -69,6 +69,12 @@ public class JdbcDiagnosticRepository implements DiagnosticRepository {
     }
 
     @Override
+    public List<DiagnosticSession> findSessionsByUser(UUID userId) {
+        return jdbc.query("SELECT " + SESSION_COLUMNS + " FROM diagnostic_sessions WHERE user_id = :userId "
+                + "ORDER BY created_at DESC", Map.of("userId", userId), session());
+    }
+
+    @Override
     public Optional<DiagnosticSession> findByRootReview(UUID reviewId) {
         return jdbc.query("SELECT " + SESSION_COLUMNS + " FROM diagnostic_sessions WHERE root_review_id = :id",
                 Map.of("id", reviewId), session()).stream().findFirst();
