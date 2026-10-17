@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Luyện tự do theo KP và cây của học viên"
-status: pending
+status: in_progress
 priority: P1
 dependencies: [2]
 ---
