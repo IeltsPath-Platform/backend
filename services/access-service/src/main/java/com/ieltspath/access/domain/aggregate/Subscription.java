@@ -131,6 +131,14 @@ public class Subscription {
         this.updatedAt = Instant.now();
     }
 
+    public void refundHumanGradingCredit() {
+        if (humanGradingCreditsUsed <= 0) {
+            throw new IllegalStateException("No consumed human grading credit to refund");
+        }
+        this.humanGradingCreditsUsed--;
+        this.updatedAt = Instant.now();
+    }
+
     public void cancel() {
         this.status = SubscriptionStatus.CANCELLED;
         this.cancelledAt = Instant.now();
