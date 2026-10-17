@@ -97,7 +97,18 @@ public class StaffInsightUseCase {
 
     @Transactional(readOnly = true)
     public QuestionStats questionStats(int minAttempts) {
-        return new QuestionStats(insight.questionStats(Math.max(minAttempts, 1), QUESTION_LIMIT));
+        var stats = insight.questionStats(Math.max(minAttempts, 1), QUESTION_LIMIT);
+        Map<UUID, String> tags;
+        try {
+            tags = stats.isEmpty() ? Map.of() : content.questionDifficulties(stats.stream()
+                    .map(stat -> stat.questionVersionId()).toList());
+        } catch (RuntimeException unavailable) {
+            // Statistics stay useful without the tag; the difficulty field is then absent.
+            tags = Map.of();
+        }
+        Map<UUID, String> tagOf = tags;
+        return new QuestionStats(stats.stream().map(stat -> stat.withDifficulty(tagOf.get(stat.questionVersionId())))
+                .toList());
     }
 
     /** Edge and knowledge point statistics for R&D; with {@code courseId} only points of that course. */

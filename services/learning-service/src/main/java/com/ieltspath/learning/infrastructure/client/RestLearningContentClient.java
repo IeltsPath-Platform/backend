@@ -136,6 +136,17 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public Map<UUID, String> questionDifficulties(java.util.Collection<UUID> questionVersionIds) {
+        if (questionVersionIds.isEmpty()) return Map.of();
+        Difficulties response = response(() -> restClient.post()
+                .uri(INTERNAL_PATH + "/questions/difficulties")
+                .headers(this::forwardRequestHeaders)
+                .body(new DifficultyRequest(List.copyOf(questionVersionIds)))
+                .retrieve().body(Difficulties.class));
+        return response.difficulties() == null ? Map.of() : response.difficulties();
+    }
+
+    @Override
     public SuggestionCandidates suggestionCandidates(List<UUID> knowledgePointIds, java.math.BigDecimal maxBand) {
         return response(() -> restClient.post()
                 .uri(INTERNAL_PATH + "/suggestions/candidates")
@@ -203,6 +214,8 @@ public class RestLearningContentClient implements LearningContentClient {
                                   int minQuestions, int limit, UUID preferredLessonId) {}
     private record AvailabilityRequest(List<UUID> knowledgePointIds, List<UUID> excludePackageIds,
                                        int minQuestions) {}
+    private record DifficultyRequest(List<UUID> questionVersionIds) {}
+    private record Difficulties(Map<UUID, String> difficulties) {}
     private record SuggestionRequest(List<UUID> knowledgePointIds, java.math.BigDecimal maxBand) {}
     private record PrerequisitesRequest(List<UUID> ids) {}
     private record Availability(Map<UUID, Integer> counts) {}

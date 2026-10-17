@@ -1,6 +1,9 @@
 package com.ieltspath.learning.application.service;
 
+import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.domain.repository.StaffInsightRepository;
+import com.ieltspath.learning.domain.service.QuestionDifficultyRules;
+import com.ieltspath.learning.domain.vo.StaffRecords;
 import com.ieltspath.learning.domain.vo.StaffRecords.Queue;
 import com.ieltspath.learning.domain.vo.StaffRecords.WorkKind;
 import org.springframework.stereotype.Component;
@@ -19,10 +22,13 @@ public class WorkItemSync {
 
     private final StaffInsightRepository insight;
     private final TreeQualitySettings tree;
+    private final LearningContentClient content;
+    private final QuestionDifficultyRules difficulty = new QuestionDifficultyRules();
 
-    public WorkItemSync(StaffInsightRepository insight, TreeQualitySettings tree) {
+    public WorkItemSync(StaffInsightRepository insight, TreeQualitySettings tree, LearningContentClient content) {
         this.insight = insight;
         this.tree = tree;
+        this.content = content;
     }
 
     /** Adds the items for everything that needs work now; returns how many were new. */
@@ -43,11 +49,16 @@ public class WorkItemSync {
             if (insight.addWorkItem(Queue.CONTENT_AUTHOR, WorkKind.CONTENT_GAP, null, kp,
                     "{\"knowledgePointId\":\"" + kp + "\"}")) added++;
         }
-        for (var stat : insight.questionStats(tree.minAttempts(), QUESTION_LIMIT)) {
-            WorkKind kind = stat.correctRate() > tree.tooEasyAbove() ? WorkKind.QUESTION_TOO_EASY
-                    : stat.correctRate() < tree.tooHardBelow() ? WorkKind.QUESTION_TOO_HARD : null;
+        var stats = insight.questionStats(tree.minAttempts(), QUESTION_LIMIT);
+        var tags = difficulties(stats);
+        for (var stat : stats) {
+            String tag = tags.get(stat.questionVersionId());
+            var verdict = difficulty.judge(stat.correctRate(), tag, tree.questionLimits());
+            WorkKind kind = verdict == QuestionDifficultyRules.Verdict.TOO_EASY ? WorkKind.QUESTION_TOO_EASY
+                    : verdict == QuestionDifficultyRules.Verdict.TOO_HARD ? WorkKind.QUESTION_TOO_HARD : null;
             if (kind != null && insight.addWorkItem(Queue.CONTENT_AUTHOR, kind, null, stat.questionVersionId(),
-                    "{\"attempts\":" + stat.attempts() + ",\"correctRate\":" + stat.correctRate() + "}")) added++;
+                    "{\"attempts\":" + stat.attempts() + ",\"correctRate\":" + stat.correctRate()
+                            + (tag == null ? "" : ",\"difficulty\":\"" + tag + "\"") + "}")) added++;
         }
         for (var edge : insight.edgeStats()) {
             if (edge.probes() >= tree.minSessions() && (edge.passRate() >= tree.passRateAtLeast()
@@ -59,6 +70,17 @@ public class WorkItemSync {
             }
         }
         return added;
+    }
+
+    /** The difficulty tags of the questions; empty when Content cannot be reached, so the general limits apply. */
+    private java.util.Map<UUID, String> difficulties(java.util.List<StaffRecords.QuestionStat> stats) {
+        if (stats.isEmpty()) return java.util.Map.of();
+        try {
+            return content.questionDifficulties(stats.stream().map(StaffRecords.QuestionStat::questionVersionId)
+                    .toList());
+        } catch (RuntimeException unavailable) {
+            return java.util.Map.of();
+        }
     }
 
     /** The stable subject of an edge's work item. */

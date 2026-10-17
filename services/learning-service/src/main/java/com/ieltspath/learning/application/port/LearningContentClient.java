@@ -59,6 +59,14 @@ public interface LearningContentClient {
     /** The active prerequisites of each knowledge point; a point without any maps to an empty list. */
     Map<UUID, List<UUID>> prerequisites(List<UUID> knowledgePointIds);
 
+    /**
+     * The difficulty tag (EASY, MEDIUM, HARD) of each question version Content knows (at most 500); untagged or unknown
+     * versions are absent. Used only for statistics, never to pick what a learner is given.
+     */
+    default Map<UUID, String> questionDifficulties(Collection<UUID> questionVersionIds) {
+        return Map.of();
+    }
+
     /** Published practice sets, practice tests and lessons for these points (at most 50), none above {@code maxBand}. */
     SuggestionCandidates suggestionCandidates(List<UUID> knowledgePointIds, BigDecimal maxBand);
 

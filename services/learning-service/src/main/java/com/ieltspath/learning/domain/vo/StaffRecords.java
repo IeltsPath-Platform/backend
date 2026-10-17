@@ -31,8 +31,18 @@ public final class StaffRecords {
 
     /** First submissions of one question: how many, and how many were right. */
     public record QuestionStat(UUID questionVersionId, int attempts, int correct, Long medianDurationMs,
-                               java.util.List<String> topErrorCodes) {
+                               java.util.List<String> topErrorCodes, String difficulty) {
+        public QuestionStat(UUID questionVersionId, int attempts, int correct, Long medianDurationMs,
+                            java.util.List<String> topErrorCodes) {
+            this(questionVersionId, attempts, correct, medianDurationMs, topErrorCodes, null);
+        }
+
         public double correctRate() { return attempts == 0 ? 0 : (double) correct / attempts; }
+
+        /** The same statistics with the difficulty tag Content gives the question; null when it has none. */
+        public QuestionStat withDifficulty(String tag) {
+            return new QuestionStat(questionVersionId, attempts, correct, medianDurationMs, topErrorCodes, tag);
+        }
     }
 
     /** Probes of prerequisite {@code from} made while diagnosing {@code to}, from concluded diagnoses. */

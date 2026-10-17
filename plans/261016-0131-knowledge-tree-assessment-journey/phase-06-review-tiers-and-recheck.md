@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Giỏ ôn nhiều mức và recheck"
-status: in_progress
+status: completed
 priority: P1
 dependencies: [5, "plan 261009"]
 ---

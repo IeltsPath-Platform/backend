@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -229,6 +230,40 @@ class StaffAreaIntegrationTest {
         assertEquals(WorkKind.QUESTION_TOO_HARD, kinds.get(hard));
         assertFalse(kinds.containsKey(fewAttempts));
         assertEquals(2, insight.questionStats(20).questions().size());
+    }
+
+    @Test
+    void theDifficultyTagMovesTheLimitsAndStatisticsStillWorkWithoutIt() {
+        UUID hardButEasy = UUID.randomUUID();
+        UUID untaggedSameRate = UUID.randomUUID();
+        UUID easyButHard = UUID.randomUUID();
+        List<QuestionAttemptEvent> batch = new ArrayList<>();
+        for (int index = 0; index < 20; index++) {
+            batch.add(event(UUID.randomUUID(), hardButEasy, index < 17, null, true));
+            batch.add(event(UUID.randomUUID(), untaggedSameRate, index < 17, null, true));
+            batch.add(event(UUID.randomUUID(), easyButHard, index < 7, null, true));
+        }
+        events.append(batch);
+        when(content.questionDifficulties(org.mockito.ArgumentMatchers.anyCollection())).thenReturn(Map.of(
+                hardButEasy, "HARD", easyButHard, "EASY"));
+
+        sync.sync();
+        var kinds = work.list(CONTENT, null, null).stream().collect(java.util.stream.Collectors.toMap(
+                item -> item.subjectRef(), item -> item.kind()));
+        assertEquals(WorkKind.QUESTION_TOO_EASY, kinds.get(hardButEasy), "85% on a question tagged HARD");
+        assertFalse(kinds.containsKey(untaggedSameRate), "85% on an untagged one is within the general limit");
+        assertEquals(WorkKind.QUESTION_TOO_HARD, kinds.get(easyButHard), "35% on a question tagged EASY");
+        var stats = insight.questionStats(20).questions().stream().collect(java.util.stream.Collectors.toMap(
+                stat -> stat.questionVersionId(), stat -> stat));
+        assertEquals("HARD", stats.get(hardButEasy).difficulty());
+        assertNull(stats.get(untaggedSameRate).difficulty());
+
+        // Content unreachable: statistics and work items still come back, without the tag.
+        when(content.questionDifficulties(org.mockito.ArgumentMatchers.anyCollection()))
+                .thenThrow(new LearningRequestException(503, "CONTENT_UNAVAILABLE", "down"));
+        assertEquals(3, insight.questionStats(20).questions().size());
+        assertNull(insight.questionStats(20).questions().getFirst().difficulty());
+        assertEquals(0, sync.sync());
     }
 
     @Test

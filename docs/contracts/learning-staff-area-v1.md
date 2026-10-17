@@ -67,8 +67,12 @@ learner (`422 NOTE_REQUIRED`, `422 NO_LEARNER`). `404` when the item is not in a
 ## Statistics for R&D (`ADMIN`, `CONTENT_AUTHOR`)
 
 - `GET /api/learning/admin/question-stats?minAttempts=20`: per question with at least `minAttempts` first submissions:
-  attempts, correct, correct rate, median duration, most frequent error codes. Questions are not compared with their
-  tagged difficulty in this version.
+  attempts, correct, correct rate, median duration, most frequent error codes and the `difficulty` tag Content gives the
+  question (`EASY`, `MEDIUM`, `HARD`; absent when untagged or when Content cannot be reached). The tag only moves the
+  work-item limits: a question tagged `HARD` is too easy from a correct rate of 80%, one tagged `EASY` is too hard up to 40%,
+  any other question beyond 90% / below 30%. It never changes what a learner is given. Content call:
+  `POST /internal/learning-content/questions/difficulties` `{ "questionVersionIds": [...] }` (at most 500) →
+  `{ "difficulties": { "<id>": "HARD" } }`.
 - `GET /api/learning/admin/tree-quality?courseId=`: per prerequisite edge A→B over concluded diagnoses (probes of A made
   while B was failing, how many passed, how often A was the gap) and per knowledge point (learners with a profile, mean
   mastery, times it was the gap, probes and failed probes). With `courseId` only points of that course.
@@ -76,4 +80,4 @@ learner (`422 NOTE_REQUIRED`, `422 NO_LEARNER`). `404` when the item is not in a
 An edge is suspect, and becomes an `EDGE_SUSPECT` item with these numbers, when it has at least 20 probes and A is passed
 at least 80% of the time (a firm base yet B still fails) or A is the gap in under 10% of them. Thresholds:
 `learning.tree-quality.{min-sessions, pass-rate-at-least, root-rate-below, min-attempts, too-easy-above,
-too-hard-below}`.
+too-hard-below, hard-tagged-easy-at, easy-tagged-hard-at}`.

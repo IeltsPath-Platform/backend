@@ -1,7 +1,7 @@
 ---
 phase: 13
 title: "Contract, tài liệu và nghiệm thu"
-status: pending
+status: in_progress
 priority: P2
 dependencies: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15]
 ---

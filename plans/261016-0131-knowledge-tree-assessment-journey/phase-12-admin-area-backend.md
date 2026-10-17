@@ -1,7 +1,7 @@
 ---
 phase: 12
 title: "Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor"
-status: pending
+status: completed
 priority: P2
 dependencies: [5, 7, 9, 10, 11]
 ---
@@ -26,7 +26,9 @@ Phase này làm phần backend. Mỗi chức năng đặt ở service đang sở
     nhiều instance không chạy trùng).
   - Cờ chạy qua sự kiện `QuestionEventsAppended` sau khi commit, transaction riêng (`FlagDetector`). Cờ cùng loại không
     nâng lại trong 24 giờ.
-  - Câu quá dễ/khó chỉ dùng tỷ lệ đúng lần nộp đầu; chưa so với `difficulty` đã gắn.
+  - Câu quá dễ/khó dùng tỷ lệ đúng lần nộp đầu; tag `difficulty` của Content chỉ dịch ngưỡng (HARD quá dễ từ 80%, EASY quá
+    khó đến 40%), không đổi bài giao cho học viên. Cần endpoint nội bộ `POST /internal/learning-content/questions/difficulties`
+    của Content; chưa có thì thống kê vẫn chạy với ngưỡng chung.
   - Hồ sơ 360° chỉ đọc, không làm tươi dữ liệu học viên; tên khóa/KP do frontend ghép.
 
 ## Requirements
