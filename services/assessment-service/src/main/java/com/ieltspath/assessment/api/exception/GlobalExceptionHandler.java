@@ -23,6 +23,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> claimed(JobAlreadyClaimedException e, HttpServletRequest r) {
         return build(HttpStatus.CONFLICT, e.getMessage(), r.getRequestURI(), null, "JOB_ALREADY_CLAIMED");
     }
+    @ExceptionHandler(HumanGradingCreditInsufficientException.class)
+    public ResponseEntity<ErrorResponse> creditsRequired(HumanGradingCreditInsufficientException e, HttpServletRequest r) {
+        return build(HttpStatus.PAYMENT_REQUIRED, e.getMessage(), r.getRequestURI(), null, "HUMAN_GRADING_CREDIT_REQUIRED");
+    }
+    @ExceptionHandler(HumanGradingCreditConflictException.class)
+    public ResponseEntity<ErrorResponse> creditConflict(HumanGradingCreditConflictException e, HttpServletRequest r) {
+        return build(HttpStatus.CONFLICT, e.getMessage(), r.getRequestURI(), null, "HUMAN_GRADING_CREDIT_CONFLICT");
+    }
     @ExceptionHandler(AssessmentNotFoundException.class)
     public ResponseEntity<ErrorResponse> notFound(AssessmentDomainException e, HttpServletRequest r) {
         return build(HttpStatus.NOT_FOUND, e.getMessage(), r.getRequestURI(), null);

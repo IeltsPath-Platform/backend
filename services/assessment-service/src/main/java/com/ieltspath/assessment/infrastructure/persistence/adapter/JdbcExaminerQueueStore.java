@@ -26,12 +26,18 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
                    j.skill, COALESCE(i.answer_snapshot->'answerSpec'->>'task', l.prompt_snapshot->>'task') AS task,
                    j.status, COALESCE(j.reason,'HUMAN_CREDIT') AS reason, j.assigned_examiner_id,
                    j.claimed_at, j.created_at,
-                   GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP-j.created_at)))::bigint AS wait_seconds
+                   GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP-j.created_at)))::bigint AS wait_seconds,
+                   j.created_at <= CURRENT_TIMESTAMP - INTERVAL '48 hours' AS overdue
             """;
     @Override public QueuePage list(String mode, String status, int page, int size) {
-        var args = Map.of("mode", mode, "status", status, "limit", size, "offset", (long)page*size);
-        var rows = jdbc.query(SELECT+FROM+" WHERE j.grading_mode=:mode AND j.status=:status ORDER BY j.created_at,j.id LIMIT :limit OFFSET :offset", args, JdbcExaminerQueueStore::entry);
-        Long total = jdbc.queryForObject("SELECT count(*) FROM grading_jobs WHERE grading_mode=:mode AND status=:status", args, Long.class);
+        return listByReason(mode, status, page, size, null);
+    }
+    @Override public QueuePage listByReason(String mode, String status, int page, int size, String reason) {
+        var args = new org.springframework.jdbc.core.namedparam.MapSqlParameterSource().addValue("mode", mode)
+                .addValue("status", status).addValue("reason", reason).addValue("limit", size)
+                .addValue("offset", (long)page*size);
+        var rows = jdbc.query(SELECT+FROM+" WHERE j.grading_mode=:mode AND j.status=:status AND (CAST(:reason AS VARCHAR) IS NULL OR j.reason=CAST(:reason AS VARCHAR)) ORDER BY j.created_at,j.id LIMIT :limit OFFSET :offset", args, JdbcExaminerQueueStore::entry);
+        Long total = jdbc.queryForObject("SELECT count(*) FROM grading_jobs WHERE grading_mode=:mode AND status=:status AND (CAST(:reason AS VARCHAR) IS NULL OR reason=CAST(:reason AS VARCHAR))", args, Long.class);
         return new QueuePage(rows, page, size, total == null ? 0 : total);
     }
     @Override public Optional<QueueEntry> find(UUID jobId) {
@@ -42,7 +48,7 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
         var args = Map.of("id",jobId,"examiner",examinerId);
         List<UUID> changed = jdbc.query("""
                 WITH target AS (
-                  SELECT j.id,s.attempt_id FROM grading_jobs j
+                  SELECT j.id,s.attempt_id,j.reason FROM grading_jobs j
                   JOIN learner_submissions l ON l.id=j.submission_id
                   LEFT JOIN attempt_items i ON i.id=l.attempt_item_id
                   LEFT JOIN attempt_sections s ON s.id=i.attempt_section_id
@@ -52,9 +58,12 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
                 UPDATE grading_jobs j SET assigned_examiner_id=:examiner,claimed_at=CURRENT_TIMESTAMP
                 FROM learner_submissions l LEFT JOIN attempt_items i ON i.id=l.attempt_item_id
                 LEFT JOIN attempt_sections s ON s.id=i.attempt_section_id,target t
-                WHERE j.submission_id=l.id AND (j.id=t.id OR s.attempt_id=t.attempt_id)
+                WHERE j.submission_id=l.id AND (j.id=t.id OR
+                    (COALESCE(t.reason,'')<>'QA_SAMPLE' AND COALESCE(j.reason,'')<>'QA_SAMPLE' AND s.attempt_id=t.attempt_id))
                   AND j.grading_mode='HUMAN' AND j.status IN ('QUEUED','PROCESSING')
                   AND (j.assigned_examiner_id IS NULL OR j.claimed_at < CURRENT_TIMESTAMP-INTERVAL '24 hours')
+                  AND (COALESCE(t.reason,'')<>'QA_SAMPLE' OR NOT EXISTS(
+                    SELECT 1 FROM essay_grade_comparisons c WHERE c.submission_id=j.submission_id AND c.examiner_id=:examiner))
                 RETURNING j.id
                 """,args,(r,n)->r.getObject("id",UUID.class));
         if (!changed.isEmpty()) jdbc.update("""
@@ -85,13 +94,14 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
                 UPDATE grading_jobs j SET status='QUEUED',assigned_examiner_id=NULL,claimed_at=NULL,completed_at=NULL
                 FROM learner_submissions l,attempt_items i,attempt_sections s
                 WHERE j.submission_id=l.id AND l.attempt_item_id=i.id AND i.attempt_section_id=s.id
-                  AND s.attempt_id=:attempt AND j.grading_mode='HUMAN' AND j.status='COMPLETED'
+                  AND s.attempt_id=:attempt AND j.grading_mode='HUMAN' AND COALESCE(j.reason,'')<>'QA_SAMPLE' AND j.status='COMPLETED'
                 """,args);
         jdbc.update("""
                 UPDATE human_reviews h SET status='QUEUED',grader_user_id=NULL,assigned_at=NULL,started_at=NULL,completed_at=NULL
                 FROM grading_jobs j,learner_submissions l,attempt_items i,attempt_sections s
                 WHERE h.grading_job_id=j.id AND j.submission_id=l.id AND l.attempt_item_id=i.id
                   AND i.attempt_section_id=s.id AND s.attempt_id=:attempt AND j.grading_mode='HUMAN'
+                  AND COALESCE(j.reason,'')<>'QA_SAMPLE'
                   AND j.status='QUEUED' AND j.assigned_examiner_id IS NULL
                 """,args);
     }
@@ -103,14 +113,14 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
                 FROM learner_submissions l,attempt_items i,attempt_sections s
                 WHERE j.submission_id=l.id AND l.attempt_item_id=i.id AND i.attempt_section_id=s.id
                 AND s.attempt_id=:attempt AND j.grading_mode='HUMAN' AND j.assigned_examiner_id=:examiner
-                AND j.status IN ('QUEUED','PROCESSING')
+                AND COALESCE(j.reason,'')<>'QA_SAMPLE' AND j.status IN ('QUEUED','PROCESSING')
                 """,args);
         jdbc.update("""
                 UPDATE human_reviews h SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP
                 FROM grading_jobs j,learner_submissions l,attempt_items i,attempt_sections s
                 WHERE h.grading_job_id=j.id AND j.submission_id=l.id AND l.attempt_item_id=i.id
                 AND i.attempt_section_id=s.id AND s.attempt_id=:attempt AND j.assigned_examiner_id=:examiner
-                AND j.grading_mode='HUMAN' AND j.status='COMPLETED'
+                AND j.grading_mode='HUMAN' AND COALESCE(j.reason,'')<>'QA_SAMPLE' AND j.status='COMPLETED'
                 """,args);
     }
     private static QueueEntry entry(ResultSet r,int n) throws SQLException {
@@ -119,6 +129,6 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
                 r.getObject("attempt_id",UUID.class),r.getObject("attempt_item_id",UUID.class),r.getString("attempt_type"),
                 r.getString("skill"),r.getString("task"),r.getString("status"),r.getString("reason"),
                 r.getObject("assigned_examiner_id",UUID.class),claimed==null?null:claimed.toInstant(),
-                r.getTimestamp("created_at").toInstant(),r.getLong("wait_seconds"));
+                r.getTimestamp("created_at").toInstant(),r.getLong("wait_seconds"),r.getBoolean("overdue"));
     }
 }

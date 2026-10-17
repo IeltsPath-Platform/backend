@@ -10,8 +10,13 @@ public class ListGradingQueueUseCase {
     public ListGradingQueueUseCase(ExaminerQueueStore store) { this.store=store; }
     @Transactional(readOnly=true)
     public ExaminerQueueStore.QueuePage execute(String mode,String status,int page,int size) {
+        return execute(mode, status, page, size, null);
+    }
+    @Transactional(readOnly=true)
+    public ExaminerQueueStore.QueuePage execute(String mode,String status,int page,int size,String reason) {
         if (!"HUMAN".equals(mode) || !java.util.Set.of("QUEUED","PROCESSING","COMPLETED","FAILED","CANCELLED").contains(status)
-                || page<0 || size<1 || size>100) throw new IllegalArgumentException("Invalid queue filters or pagination (size 1..100)");
-        return store.list(mode,status,page,size);
+                || (reason != null && !"QA_SAMPLE".equals(reason)) || page<0 || size<1 || size>100)
+            throw new IllegalArgumentException("Invalid queue filters or pagination (size 1..100)");
+        return reason == null ? store.list(mode,status,page,size) : store.listByReason(mode,status,page,size,reason);
     }
 }

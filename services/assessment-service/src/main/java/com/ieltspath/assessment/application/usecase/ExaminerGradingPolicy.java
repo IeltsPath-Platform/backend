@@ -3,6 +3,7 @@ package com.ieltspath.assessment.application.usecase;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.application.port.ExaminerQueueStore;
 import com.ieltspath.assessment.application.port.EssayGradeComparisonStore;
+import com.ieltspath.assessment.application.service.ExaminerQaService;
 import com.ieltspath.assessment.domain.entity.ItemResult;
 import com.ieltspath.assessment.domain.exception.*;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
@@ -19,16 +20,18 @@ public class ExaminerGradingPolicy {
     private final EssayGradeComparisonStore comparisons;
     private final CurrentUserProvider currentUser;
     private final ObjectMapper json;
+    private final ExaminerQaService examinerQa;
     public ExaminerGradingPolicy(ExaminerQueueStore queue,EssayGradeComparisonStore comparisons,
-                                  CurrentUserProvider currentUser,ObjectMapper json) {
+                                  CurrentUserProvider currentUser,ObjectMapper json, ExaminerQaService examinerQa) {
         this.queue=queue;this.comparisons=comparisons;this.currentUser=currentUser;this.json=json;
+        this.examinerQa=examinerQa;
     }
     @Transactional(propagation=Propagation.MANDATORY)
     public void prepareRegrade(UUID attempt) { queue.reopenCompleted(attempt); }
 
     @Transactional(propagation=Propagation.MANDATORY)
     public void requireAssignment(UUID attempt) {
-        var jobs=queue.lockAttempt(attempt);
+        var jobs=queue.lockAttempt(attempt).stream().filter(job -> !"QA_SAMPLE".equals(job.reason())).toList();
         if (jobs.isEmpty()) return;
         UUID examiner=currentUser.requireUserId();
         if (jobs.stream().anyMatch(j -> !examiner.equals(j.assignedExaminerId())))
@@ -36,7 +39,7 @@ public class ExaminerGradingPolicy {
     }
     @Transactional(propagation=Propagation.MANDATORY)
     public void complete(UUID attempt,UUID result,List<ItemResult> items) {
-        var jobs=queue.lockAttempt(attempt);
+        var jobs=queue.lockAttempt(attempt).stream().filter(job -> !"QA_SAMPLE".equals(job.reason())).toList();
         if (jobs.isEmpty() && items.stream().noneMatch(this::hasEssayBand)) return;
         UUID examiner=currentUser.requireUserId();
         if (jobs.stream().anyMatch(j -> !examiner.equals(j.assignedExaminerId())))
@@ -58,6 +61,8 @@ public class ExaminerGradingPolicy {
         }
         comparisons.recordExaminer(attempt,result,examiner,jobs.stream().map(ExaminerQueueStore.QueueEntry::submissionId).distinct().toList());
         queue.completeAttempt(attempt,examiner);
+        examinerQa.sampleCompletedEssays(jobs.stream().filter(job -> "WRITING".equals(job.skill()))
+                .map(ExaminerQueueStore.QueueEntry::submissionId).distinct().toList());
     }
     private boolean hasEssayBand(ItemResult item) {
         try {

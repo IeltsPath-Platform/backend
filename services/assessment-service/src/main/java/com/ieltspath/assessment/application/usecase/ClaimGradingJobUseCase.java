@@ -15,9 +15,9 @@ public class ClaimGradingJobUseCase {
     @Transactional
     public ExaminerQueueStore.QueueEntry execute(UUID examiner,UUID jobId) {
         var job=store.find(jobId).orElseThrow(()->new AssessmentNotFoundException("Grading job not found"));
-        if (job.attemptId()!=null) {
+        if (job.attemptId()!=null && !"QA_SAMPLE".equals(job.reason())) {
             var siblings=store.lockAttempt(job.attemptId());
-            if (siblings.stream().anyMatch(j -> !"COMPLETED".equals(j.status()) && j.assignedExaminerId()!=null
+            if (siblings.stream().filter(j -> !"QA_SAMPLE".equals(j.reason())).anyMatch(j -> !"COMPLETED".equals(j.status()) && j.assignedExaminerId()!=null
                     && !examiner.equals(j.assignedExaminerId()) && j.claimedAt()!=null
                     && !j.claimedAt().isBefore(Instant.now().minus(Duration.ofHours(24))))) {
                 throw new JobAlreadyClaimedException();
