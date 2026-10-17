@@ -12,7 +12,9 @@ import com.ieltspath.game.domain.repository.GameMatchRepository;
 import com.ieltspath.game.domain.repository.GameRoomRepository;
 import com.ieltspath.game.domain.repository.GameSessionRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -28,43 +30,55 @@ public class StartGameMatchUseCase {
     private final com.ieltspath.game.application.port.WordlyWordProvider wordProvider;
     private final com.ieltspath.game.application.port.WordlyMatchStore wordStore;
     private final OutboxWriter outboxWriter;
+    private final TransactionTemplate tx;
+    private final Clock clock;
     public StartGameMatchUseCase(GameRoomRepository roomRepository, GameMatchRepository matchRepository,
-            GameMatchPlayerRepository playerRepository, GameSessionRepository sessionRepository, OutboxWriter outboxWriter, org.springframework.context.ApplicationEventPublisher events, com.ieltspath.game.application.port.WordlyWordProvider wordProvider, com.ieltspath.game.application.port.WordlyMatchStore wordStore) {
+            GameMatchPlayerRepository playerRepository, GameSessionRepository sessionRepository, OutboxWriter outboxWriter, org.springframework.context.ApplicationEventPublisher events, com.ieltspath.game.application.port.WordlyWordProvider wordProvider, com.ieltspath.game.application.port.WordlyMatchStore wordStore, PlatformTransactionManager manager, Clock clock) {
+        this.tx=new TransactionTemplate(manager); this.clock=clock;
         this.wordProvider=wordProvider;this.wordStore=wordStore;
         this.events = events;
         this.roomRepository=roomRepository; this.matchRepository=matchRepository; this.playerRepository=playerRepository;
         this.sessionRepository=sessionRepository; this.outboxWriter=outboxWriter;
     }
 
-    @Transactional
     public GameMatchResult execute(UUID roomId, UUID hostUserId) {
-        GameRoom room=roomRepository.findForUpdate(roomId).orElseThrow(()->new GameRoomNotFoundException(roomId));
-        Instant now=Instant.now();
-        room.startMatch(hostUserId,now);
+        GameRoom preview=roomRepository.findById(roomId).orElseThrow(()->new GameRoomNotFoundException(roomId));
+        // Validate before remote work; repeat under the lock because readiness/settings may change.
+        preview.startMatch(hostUserId,clock.instant());
+        var settings=preview.wordlySettings();
         List<com.ieltspath.game.application.port.WordlyWordProvider.Word> words=List.of();
-        List<com.ieltspath.game.application.port.WordlyWordProvider.Word> pool=List.of();
-        if(room.wordlySettings()!=null) {
-            int count=room.wordlySettings().wordLimit()==null?10:room.wordlySettings().wordLimit();
-            words=wordProvider.random(count);
-            if(words.isEmpty() || (room.wordlySettings().wordLimit()!=null && words.size()!=count))
-                throw new IllegalStateException("Not enough eligible vocabulary to start this match");
-            if(words.stream().map(w->w.answer()).distinct().count()!=words.size()
-                || words.stream().anyMatch(w->w.sourceWordId()==null || w.answer()==null || !w.answer().matches("[A-Z]{1,100}") || w.meaning()==null || w.meaning().isBlank()))
-                throw new IllegalStateException("Invalid Wordly vocabulary snapshot");
-            {
-                var catalog=new java.util.ArrayList<>(wordProvider.catalog());
-                java.util.Collections.shuffle(catalog);
-                var unique=new java.util.LinkedHashMap<String,com.ieltspath.game.application.port.WordlyWordProvider.Word>();
-                for(var w:words)unique.put(w.answer(),w);
-                for(var w:catalog) {
-                    if(w.answer()==null||!w.answer().matches("[A-Z]{1,100}")||w.meaning()==null||w.meaning().isBlank()||w.sourceWordId()==null)
-                        throw new IllegalStateException("Invalid vocabulary catalog");
-                    unique.putIfAbsent(w.answer(),w);
-                }
-                pool=new java.util.ArrayList<>(unique.values());
+        String dictionary=null;
+        if(settings!=null) {
+            var catalog=wordProvider.catalog();
+            var unique=new java.util.TreeMap<String,com.ieltspath.game.application.port.WordlyWordProvider.Word>();
+            for(var w:catalog) {
+                if(w.sourceWordId()==null || w.answer()==null || !w.answer().matches("[A-Z]{1,100}") || w.meaning()==null || w.meaning().isBlank())
+                    throw new IllegalStateException("Invalid vocabulary catalog");
+                unique.putIfAbsent(w.answer(),w);
             }
-            now=Instant.now();
+            var candidates=new java.util.ArrayList<>(unique.values());
+            int count=settings.wordLimit()==null?Math.min(10,candidates.size()):settings.wordLimit();
+            if(count<1 || candidates.size()<count)
+                throw new IllegalStateException("Not enough eligible vocabulary to start this match");
+            java.util.Collections.shuffle(candidates);
+            words=List.copyOf(candidates.subList(0,count));
+            dictionary=wordStore.prepareDictionary(List.copyOf(unique.values()));
         }
+        var preparedWords=words;
+        var preparedDictionary=dictionary;
+        return tx.execute(status -> {
+            GameRoom room=roomRepository.findForUpdate(roomId).orElseThrow(()->new GameRoomNotFoundException(roomId));
+            if(!java.util.Objects.equals(settings,room.wordlySettings()))
+                throw new com.ieltspath.game.domain.exception.InvalidGameRoomStateException("Room settings changed; retry start");
+            Instant now=clock.instant();
+            room.startMatch(hostUserId,now);
+            return start(room,hostUserId,preparedWords,preparedDictionary,now);
+        });
+    }
+
+    private GameMatchResult start(GameRoom room, UUID hostUserId,
+            List<com.ieltspath.game.application.port.WordlyWordProvider.Word> words,String dictionary,Instant now) {
+        UUID roomId=room.id();
         roomRepository.save(room);
         UUID matchId=UUID.randomUUID();
         Map<String,Object> matchConfig = new java.util.LinkedHashMap<>();
@@ -96,7 +110,7 @@ public class StartGameMatchUseCase {
             sessionRepository.save(session);
         }
         if(room.wordlySettings()!=null) wordStore.initialize(matchId,words,playerIds,now,room.wordlySettings().timeEnabled());
-        if(!pool.isEmpty())wordStore.preparePool(matchId,pool);
+        if(dictionary!=null)wordStore.attachDictionary(matchId,dictionary);
         outboxWriter.append("GameMatch",matchId.toString(),"GameMatchStarted",
                 Map.of("matchId",matchId.toString(),"roomId",roomId.toString()));
         events.publishEvent(new com.ieltspath.game.application.result.MatchStartedEvent(roomId, matchId));

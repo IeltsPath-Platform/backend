@@ -23,7 +23,7 @@ class WordlyHintPostgresTest {
   jdbc.update("INSERT INTO game_match_players(id,match_id,user_id,status,joined_at,score,current_streak,best_streak) VALUES (?,?,?,'ACTIVE',now(),42,2,2)",player,match,user);
   jdbc.update("INSERT INTO game_match_words(id,match_id,sequence_number,source_word_id,answer,meaning) VALUES (?,?,1,gen_random_uuid(),'ACTOR','Actor meaning')",word,match);
   jdbc.update("INSERT INTO game_player_words(id,match_id,match_player_id,match_word_id,started_at,deadline_at) VALUES (?,?,?,?,now(),now()+interval '180 seconds')",pw,match,player,word);
-  var use=new UseWordlyHintUseCase(new WordlyHintRepositoryAdapter(jdbc));var request=UUID.randomUUID();
+  var use=new UseWordlyHintUseCase(new WordlyHintRepositoryAdapter(jdbc), java.time.Clock.systemUTC());var request=UUID.randomUUID();
   jdbc.update("UPDATE game_player_words SET started_at=now()-interval '181 seconds',deadline_at=now()-interval '1 second' WHERE id=?",pw);
   assertThrows(IllegalStateException.class,()->tx.execute(s->use.execute(match,pw,user,request)));
   jdbc.update("UPDATE game_player_words SET started_at=now(),deadline_at=now()+interval '180 seconds' WHERE id=?",pw);

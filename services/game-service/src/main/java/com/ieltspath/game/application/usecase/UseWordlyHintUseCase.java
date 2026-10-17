@@ -9,8 +9,9 @@ import java.time.Instant;
 import java.util.UUID;
 @Service
 public class UseWordlyHintUseCase {
+ private final java.time.Clock clock;
  private final WordlyHintRepository hints;
- public UseWordlyHintUseCase(WordlyHintRepository hints){this.hints=hints;}
+ public UseWordlyHintUseCase(WordlyHintRepository hints, java.time.Clock clock){this.clock=clock;this.hints=hints;}
  @Transactional
  public WordlyHintResult execute(UUID matchId,UUID wordId,UUID userId,UUID requestId) {
   java.util.Objects.requireNonNull(requestId,"Request ID is required");
@@ -21,7 +22,7 @@ public class UseWordlyHintUseCase {
    var source=history.stream().filter(g->g.id().equals(context.sourceGuessId())).findFirst().orElseThrow();
    return result(wordId,source,context.column(),context.letter());
   }
-  Instant now=Instant.now();
+  Instant now=clock.instant();
   if(!"IN_PROGRESS".equals(context.matchStatus()) || !"ACTIVE".equals(context.wordStatus()) || !"ACTIVE".equals(context.playerStatus()))
    throw new IllegalStateException("Hint requires an active word and player");
   if(context.deadline()!=null && !now.isBefore(context.deadline()))throw new IllegalStateException("Word deadline has passed");

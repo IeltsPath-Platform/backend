@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Optional;
 public interface WordlyMatchStore {
     void initialize(UUID matchId,List<WordlyWordProvider.Word> words,List<UUID> players,Instant now,boolean timed);
-    void preparePool(UUID matchId,List<WordlyWordProvider.Word> words);
+    String prepareDictionary(List<WordlyWordProvider.Word> words);
+    void attachDictionary(UUID matchId,String version);
     Optional<CurrentWordResult> current(UUID matchId,UUID userId);
 }

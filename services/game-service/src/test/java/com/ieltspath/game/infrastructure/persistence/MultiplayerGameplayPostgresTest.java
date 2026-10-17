@@ -36,7 +36,7 @@ class MultiplayerGameplayPostgresTest {
         store = new SoloGameplayRepositoryAdapter(sql, new ObjectMapper().findAndRegisterModules());
         words = new WordlyMatchStoreAdapter(sql);
         events = new CopyOnWriteArrayList<>();
-        game = new SoloGameplayUseCase(store, words, new DataSourceTransactionManager(ds), events::add);
+        game = new SoloGameplayUseCase(store, words, new DataSourceTransactionManager(ds), events::add, java.time.Clock.systemUTC());
         match = UUID.randomUUID(); room = UUID.randomUUID();
         users = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
         players = List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
@@ -58,7 +58,7 @@ class MultiplayerGameplayPostgresTest {
             """, players.get(i),match,users.get(i),room,users.get(i));
         var pool = ANSWERS.stream().map(a -> new WordlyWordProvider.Word(UUID.randomUUID(),a,"Meaning " + a)).toList();
         words.initialize(match,pool,players,Instant.now(),true);
-        words.preparePool(match,pool);
+        words.attachDictionary(match,words.prepareDictionary(pool));
     }
     CurrentWordResult current(int i) { return words.current(match,users.get(i)).orElseThrow(); }
     SoloReply solve(int i) {

@@ -33,7 +33,7 @@ class SoloGameplayPostgresTest {
         sql = new JdbcTemplate(ds);
         store = new SoloGameplayRepositoryAdapter(sql, new ObjectMapper().findAndRegisterModules());
         words = new WordlyMatchStoreAdapter(sql);
-        game = new SoloGameplayUseCase(store, words, new DataSourceTransactionManager(ds), e -> {});
+        game = new SoloGameplayUseCase(store, words, new DataSourceTransactionManager(ds), e -> {}, java.time.Clock.systemUTC());
         match = UUID.randomUUID();
         room = UUID.randomUUID();
         player = UUID.randomUUID();
@@ -75,7 +75,52 @@ class SoloGameplayPostgresTest {
         words.initialize(match, list, List.of(player), Instant.now(), false);
         var pool = new ArrayList<>(list);
         pool.add(new WordlyWordProvider.Word(UUID.randomUUID(), "EAR", "Ear"));
-        words.preparePool(match, pool);
+        words.attachDictionary(match,words.prepareDictionary(pool));
+    }
+
+    @Test
+    void dictionaryVersionsAreSharedAndKeepExistingMatchValidationStable() {
+        String version=sql.queryForObject("SELECT wordly_dictionary_version FROM game_matches WHERE id=?",String.class,match);
+        var catalog=sql.query("SELECT source_word_id,answer,meaning FROM game_wordly_dictionary_words WHERE version=? ORDER BY position",
+            (rs,n)->new WordlyWordProvider.Word(rs.getObject(1,UUID.class),rs.getString(2),rs.getString(3)),version);
+        int before=sql.queryForObject("SELECT count(*) FROM game_wordly_dictionary_words",Integer.class);
+        assertEquals(version,words.prepareDictionary(catalog));
+        assertEquals(before,sql.queryForObject("SELECT count(*) FROM game_wordly_dictionary_words",Integer.class));
+        assertEquals(0,sql.queryForObject("SELECT count(*) FROM game_match_word_pool WHERE match_id=?",Integer.class,match));
+        assertTrue(store.valid(match,"EAR"));
+        var expanded=new ArrayList<>(catalog);
+        expanded.add(new WordlyWordProvider.Word(UUID.randomUUID(),"ZEBRA","Zebra"));
+        String newer=words.prepareDictionary(expanded);
+        assertNotEquals(version,newer);
+        assertFalse(store.valid(match,"ZEBRA"));
+        assertTrue(store.valid(match,"EAR"));
+    }
+
+    @Test
+    void concurrentCreatorsCommitOnlyOneCompleteDictionary() throws Exception {
+        var catalog=List.of("ZEBRA","HORSE","SHEEP").stream()
+            .map(a->new WordlyWordProvider.Word(UUID.randomUUID(),a,"Meaning "+a)).toList();
+        var tx=new org.springframework.transaction.support.TransactionTemplate(new DataSourceTransactionManager(sql.getDataSource()));
+        try(var executor=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var gate=new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.Callable<String> create=()->{gate.await();return tx.execute(t->words.prepareDictionary(catalog));};
+            var first=executor.submit(create);var second=executor.submit(create);gate.countDown();
+            String version=first.get(15,java.util.concurrent.TimeUnit.SECONDS);
+            assertEquals(version,second.get(15,java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals(3,sql.queryForObject("SELECT count(*) FROM game_wordly_dictionary_words WHERE version=?",Integer.class,version));
+        }
+    }
+
+    @Test
+    void legacyDictionaryPoolsStillAcceptGuessesAfterUpgrade() {
+        sql.update("""
+            INSERT INTO game_match_word_pool(match_id,position,source_word_id,answer,meaning)
+            SELECT ?,position,source_word_id,answer,meaning FROM game_wordly_dictionary_words
+            WHERE version=(SELECT wordly_dictionary_version FROM game_matches WHERE id=?)
+            """,match,match);
+        sql.update("UPDATE game_matches SET wordly_dictionary_version=NULL WHERE id=?",match);
+        var current=words.current(match,user).orElseThrow();
+        assertEquals(200,game.submit(match,current.playerWordId(),user,UUID.randomUUID(),"AIR").status());
     }
 
     @Test
@@ -249,7 +294,8 @@ class SoloGameplayPostgresTest {
     @Test
     void endlessAdvancesAndStartsANewDictionaryCycle() {
         sql.update("UPDATE game_matches SET play_mode='ENDLESS',word_limit=NULL WHERE id=?", match);
-        for (String answer : List.of("AIR", "BOOK", "ACTOR", "PLANET", "WATER", "EAR", "AIR")) {
+        String cycleFirst=sql.queryForObject("SELECT answer FROM game_wordly_dictionary_words WHERE version=(SELECT wordly_dictionary_version FROM game_matches WHERE id=?) AND position=1",String.class,match);
+        for (String answer : List.of("AIR", "BOOK", "ACTOR", "PLANET", "WATER", "EAR", cycleFirst)) {
             var current = words.current(match, user).orElseThrow();
             assertEquals(
                     200,

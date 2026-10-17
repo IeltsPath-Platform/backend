@@ -20,6 +20,7 @@ public class WordlyMatchStoreAdapter implements WordlyMatchStore {
                 player_slot_number=rm.slot_number,score_reached_at=p.joined_at
             FROM game_room_members rm WHERE p.match_id=? AND p.room_member_id=rm.id
             """, matchId);
+        jdbc.update("UPDATE game_matches SET wordly_initial_word_count=? WHERE id=?",words.size(),matchId);
         List<Object[]> rows=new ArrayList<>();UUID first=null;
         for(int i=0;i<words.size();i++) {
             var w=words.get(i);UUID id=UUID.randomUUID();if(i==0)first=id;
@@ -30,10 +31,37 @@ public class WordlyMatchStoreAdapter implements WordlyMatchStore {
         for(UUID player:players)assignments.add(new Object[]{UUID.randomUUID(),matchId,player,first,Timestamp.from(now),timed?Timestamp.from(now.plusSeconds(180)):null});
         jdbc.batchUpdate("INSERT INTO game_player_words(id,match_id,match_player_id,match_word_id,started_at,deadline_at) VALUES (?,?,?,?,?,?)",assignments);
     }
-    public void preparePool(UUID matchId,List<WordlyWordProvider.Word> words) {
-        List<Object[]> rows=new ArrayList<>();
-        for(int i=0;i<words.size();i++){var w=words.get(i);rows.add(new Object[]{matchId,i+1,w.sourceWordId(),w.answer(),w.meaning()});}
-        jdbc.batchUpdate("INSERT INTO game_match_word_pool(match_id,position,source_word_id,answer,meaning) VALUES (?,?,?,?,?)",rows);
+    @org.springframework.transaction.annotation.Transactional(propagation=org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public String prepareDictionary(List<WordlyWordProvider.Word> words) {
+        var sorted=new TreeMap<String,WordlyWordProvider.Word>();
+        for(var word:words)sorted.putIfAbsent(word.answer(),word);
+        if(sorted.isEmpty())throw new IllegalArgumentException("Dictionary cannot be empty");
+        String version;
+        try {
+            var digest=java.security.MessageDigest.getInstance("SHA-256");
+            for(var word:sorted.values()) {
+                for(var value:List.of(word.answer(),word.sourceWordId().toString(),word.meaning())) {
+                    byte[] bytes=value.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    digest.update(java.nio.ByteBuffer.allocate(4).putInt(bytes.length).array());
+                    digest.update(bytes);
+                }
+            }
+            version=HexFormat.of().formatHex(digest.digest());
+        } catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+        int inserted=jdbc.update("INSERT INTO game_wordly_dictionaries(version,word_count) VALUES (?,?) ON CONFLICT DO NOTHING",version,sorted.size());
+        // A concurrent insert waits for the creator's commit, so readers never see partial versions.
+        if(inserted!=0) {
+            List<Object[]> rows=new ArrayList<>();
+            int position=0;
+            var entries=new ArrayList<>(sorted.values());
+            Collections.shuffle(entries,new Random(Long.parseUnsignedLong(version.substring(0,16),16)));
+            for(var w:entries)rows.add(new Object[]{version,++position,w.sourceWordId(),w.answer(),w.meaning()});
+            jdbc.batchUpdate("INSERT INTO game_wordly_dictionary_words(version,position,source_word_id,answer,meaning) VALUES (?,?,?,?,?)",rows);
+        }
+        return version;
+    }
+    public void attachDictionary(UUID matchId,String version) {
+        jdbc.update("UPDATE game_matches SET wordly_dictionary_version=? WHERE id=?",version,matchId);
     }
     private List<CurrentWordResult.Guess> guesses(UUID playerWordId) {
         return jdbc.query("SELECT attempt_number,guess,letter_results::text FROM game_guesses WHERE player_word_id=? AND NOT is_delete ORDER BY attempt_number",

@@ -114,7 +114,7 @@ WHERE pw.match_player_id=? AND NOT pw.is_delete AND NOT w.is_delete ORDER BY w.s
         var matches =
                 sql.queryForList(
                         """
-SELECT m.player_mode,EXISTS(SELECT 1 FROM game_match_word_pool pool WHERE pool.match_id=m.id) AS has_pool FROM game_matches m JOIN game_match_players p ON p.match_id=m.id JOIN game_player_words pw ON pw.match_player_id=p.id
+SELECT m.player_mode,(m.wordly_dictionary_version IS NOT NULL OR EXISTS(SELECT 1 FROM game_match_word_pool pool WHERE pool.match_id=m.id)) AS has_pool FROM game_matches m JOIN game_match_players p ON p.match_id=m.id JOIN game_player_words pw ON pw.match_player_id=p.id
 WHERE m.id=? AND p.user_id=? AND pw.id=? AND m.game_type='WORDLY' AND NOT m.is_delete AND NOT p.is_delete AND NOT pw.is_delete FOR SHARE OF m
 """,
                         matchId,
@@ -188,9 +188,10 @@ WHERE m.id=? AND p.user_id=? AND pw.id=? AND m.game_type='WORDLY' AND NOT m.is_d
     public boolean valid(UUID match, String guess) {
         return Boolean.TRUE.equals(
                 sql.queryForObject(
-                        "SELECT EXISTS(SELECT 1 FROM game_match_word_pool WHERE match_id=? AND"
-                            + " answer=?)",
+                        "SELECT EXISTS(SELECT 1 FROM game_wordly_dictionary_words d JOIN game_matches m ON m.wordly_dictionary_version=d.version WHERE m.id=? AND d.answer=?) OR EXISTS(SELECT 1 FROM game_match_word_pool WHERE match_id=? AND answer=?)",
                         Boolean.class,
+                        match,
+                        guess,
                         match,
                         guess));
     }
@@ -278,26 +279,33 @@ WHERE m.id=? AND p.user_id=? AND pw.id=? AND m.game_type='WORDLY' AND NOT m.is_d
                         sequence);
         UUID word;
         if (ids.isEmpty()) {
-            Integer size =
-                    sql.queryForObject(
-                            "SELECT count(*)::integer FROM game_match_word_pool WHERE match_id=?",
-                            Integer.class,
-                            s.matchId());
-            if (size == null || size == 0)
-                throw new SoloGameplayException(
-                        409,
-                        "VOCABULARY_SNAPSHOT_MISSING",
-                        "Create a new match with a vocabulary snapshot");
-            word = UUID.randomUUID();
-            sql.update(
-                    "INSERT INTO"
-                        + " game_match_words(id,match_id,sequence_number,source_word_id,answer,meaning)"
-                        + " SELECT ?,match_id,?,source_word_id,answer,meaning FROM"
-                        + " game_match_word_pool WHERE match_id=? AND position=?",
-                    word,
-                    sequence,
-                    s.matchId(),
-                    com.ieltspath.game.domain.vo.WordlyRoundRules.poolPosition(sequence, size));
+            var dictionary=sql.queryForMap("""
+                SELECT m.wordly_dictionary_version,m.wordly_initial_word_count,d.word_count
+                FROM game_matches m LEFT JOIN game_wordly_dictionaries d ON d.version=m.wordly_dictionary_version
+                WHERE m.id=?
+                """,s.matchId());
+            word=UUID.randomUUID();
+            if(dictionary.get("wordly_dictionary_version")!=null) {
+                int size=((Number)dictionary.get("word_count")).intValue();
+                int initial=((Number)dictionary.get("wordly_initial_word_count")).intValue();
+                // Finish the unplayed part of the first cycle before repeating the shared dictionary.
+                int offset=sequence<=size?sequence-initial-1:(sequence-size-1)%size;
+                sql.update("""
+                    INSERT INTO game_match_words(id,match_id,sequence_number,source_word_id,answer,meaning)
+                    SELECT ?,?,?,d.source_word_id,d.answer,d.meaning FROM game_wordly_dictionary_words d
+                    WHERE d.version=? AND (? OR NOT EXISTS (
+                        SELECT 1 FROM game_match_words initial WHERE initial.match_id=?
+                        AND initial.sequence_number<=? AND initial.answer=d.answer))
+                    ORDER BY d.position LIMIT 1 OFFSET ?
+                    """,word,s.matchId(),sequence,dictionary.get("wordly_dictionary_version"),sequence>size,s.matchId(),initial,offset);
+            } else {
+                Integer size=sql.queryForObject("SELECT count(*)::integer FROM game_match_word_pool WHERE match_id=?",Integer.class,s.matchId());
+                if(size==null || size==0)throw new SoloGameplayException(409,"VOCABULARY_SNAPSHOT_MISSING","Create a new match with a vocabulary snapshot");
+                sql.update("""
+                    INSERT INTO game_match_words(id,match_id,sequence_number,source_word_id,answer,meaning)
+                    SELECT ?,match_id,?,source_word_id,answer,meaning FROM game_match_word_pool WHERE match_id=? AND position=?
+                    """,word,sequence,s.matchId(),com.ieltspath.game.domain.vo.WordlyRoundRules.poolPosition(sequence,size));
+            }
         } else word = ids.get(0);
         sql.update(
                 "INSERT INTO"
@@ -525,7 +533,7 @@ WHERE m.id=? AND p.user_id=? AND m.game_type='WORDLY' AND NOT m.is_delete AND NO
                 """
 SELECT DISTINCT m.id FROM game_matches m JOIN game_match_players p ON p.match_id=m.id
 LEFT JOIN game_player_words pw ON pw.match_player_id=p.id AND pw.status='ACTIVE' AND NOT pw.is_delete
-WHERE m.game_type='WORDLY' AND NOT m.is_delete AND NOT p.is_delete AND EXISTS(SELECT 1 FROM game_match_word_pool pool WHERE pool.match_id=m.id)
+WHERE m.game_type='WORDLY' AND NOT m.is_delete AND NOT p.is_delete AND (m.wordly_dictionary_version IS NOT NULL OR EXISTS(SELECT 1 FROM game_match_word_pool pool WHERE pool.match_id=m.id))
  AND ((m.status='IN_PROGRESS' AND (pw.deadline_at<=clock_timestamp() OR (p.status='DISCONNECTED' AND p.reconnect_deadline_at<=clock_timestamp()))) OR EXISTS(SELECT 1 FROM game_guess_receipts g WHERE g.match_id=m.id AND g.http_status IS NULL))
 LIMIT ?
 """,

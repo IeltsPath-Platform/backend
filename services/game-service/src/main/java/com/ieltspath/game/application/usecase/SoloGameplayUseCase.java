@@ -15,6 +15,7 @@ import java.util.*;
 
 @Service
 public class SoloGameplayUseCase {
+ private final java.time.Clock clock;
     private final SoloGameplayRepository store;
     private final WordlyMatchStore words;
     private final TransactionTemplate tx;
@@ -24,7 +25,8 @@ public class SoloGameplayUseCase {
             SoloGameplayRepository store,
             WordlyMatchStore words,
             PlatformTransactionManager manager,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events, Clock clock) {
+        this.clock=clock;
         this.store = store;
         this.words = words;
         this.tx = new TransactionTemplate(manager);
@@ -170,7 +172,7 @@ public class SoloGameplayUseCase {
         if (lives <= 0) store.finish(s, "ELIMINATED", "NO_LIVES_LEFT", received, false);
         else if (s.limit() != null && processed >= s.limit())
             store.finish(s, "FINISHED", "WORD_LIMIT_REACHED", received, false);
-        else if (advance) store.advance(s, Instant.now());
+        else if (advance) store.advance(s, clock.instant());
     }
 
     private Map<String, Object> player(State s) {
@@ -225,7 +227,7 @@ public class SoloGameplayUseCase {
 
     private SoloReply error(int status, String code, String message, UUID matchId) {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("timestamp", Instant.now());
+        body.put("timestamp", clock.instant());
         body.put("status", status);
         body.put("error", status == 400 ? "Bad Request" : status == 409 ? "Conflict" : "Accepted");
         body.put("code", code);
@@ -242,7 +244,7 @@ public class SoloGameplayUseCase {
                     while (!store.pending(matchId).isEmpty()) process(matchId, userId);
                     State s = store.lock(matchId, userId);
                     if ("IN_PROGRESS".equals(s.matchStatus())) {
-                        Instant now = Instant.now();
+                        Instant now = clock.instant();
                         if (playing(s) && s.word() != null
                                 && "ACTIVE".equals(s.word().status())
                                 && s.word().deadline() != null
@@ -278,8 +280,8 @@ public class SoloGameplayUseCase {
                     State s = store.lock(matchId, userId);
                     if (!store.pending(matchId).isEmpty()) return;
                     if ("IN_PROGRESS".equals(s.matchStatus()) && playing(s)
-                            && store.reconnectExpired(matchId, userId, Instant.now())) {
-                        forfeit(s, Instant.now());
+                            && store.reconnectExpired(matchId, userId, clock.instant())) {
+                        forfeit(s, clock.instant());
                         publish(store.lock(matchId, userId));
                         return;
                     }
@@ -288,8 +290,8 @@ public class SoloGameplayUseCase {
                             && s.word() != null
                             && "ACTIVE".equals(s.word().status())
                             && s.word().deadline() != null
-                            && !Instant.now().isBefore(s.word().deadline())) {
-                        settle(s, "TIMED_OUT", s.word().attempts(), Instant.now());
+                            && !clock.instant().isBefore(s.word().deadline())) {
+                        settle(s, "TIMED_OUT", s.word().attempts(), clock.instant());
                         publish(store.lock(matchId, userId));
                     }
                 });
@@ -299,7 +301,7 @@ public class SoloGameplayUseCase {
         tx.executeWithoutResult(t -> {
             State s = store.lock(matchId, userId);
             if ("MULTIPLAYER".equals(s.playerMode()) && "IN_PROGRESS".equals(s.matchStatus()) && playing(s)) {
-                store.disconnected(matchId, userId, Instant.now());
+                store.disconnected(matchId, userId, clock.instant());
                 publish(store.lock(matchId, userId));
             }
         });
@@ -310,7 +312,7 @@ public class SoloGameplayUseCase {
         tx.executeWithoutResult(t -> {
             State s = store.lock(matchId, userId);
             if ("MULTIPLAYER".equals(s.playerMode()) && "IN_PROGRESS".equals(s.matchStatus()) && playing(s)) {
-                Instant now = Instant.now();
+                Instant now = clock.instant();
                 if (store.reconnectExpired(matchId, userId, now)) forfeit(s, now);
                 else store.reconnect(matchId, userId, now);
                 publish(store.lock(matchId, userId));
