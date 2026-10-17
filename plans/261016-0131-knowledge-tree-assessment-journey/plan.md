@@ -104,15 +104,15 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 | 4 | [Event log từng câu và thời gian làm](./phase-04-question-event-log-and-duration.md) | learning, assessment | Completed |
 | 5 | [Mastery profile 3 mức, hạn ôn, API báo cáo](./phase-05-mastery-profile-and-report.md) | learning | Completed |
 | 6 | [Giỏ ôn nhiều mức và recheck](./phase-06-review-tiers-and-recheck.md) | learning | Completed (6a + 6b) |
-| 7 | [Chẩn đoán dò ngược theo cây](./phase-07-diagnostic-backtracking.md) | learning | Completed (chưa commit) |
+| 7 | [Chẩn đoán dò ngược theo cây](./phase-07-diagnostic-backtracking.md) | learning | Completed (4a0b56e) |
 | 8 | [Practice test theo mốc course](./phase-08-practice-test-milestones.md) | content, assessment, learning | Completed (933 test của ba service xanh, không skip; xem báo cáo) |
 | 9 | [Điểm có trọng số và kết quả khóa](./phase-09-course-scoring-and-outcome.md) | learning | Completed |
 | 10 | [Hàng chờ giám khảo và chính sách AI](./phase-10-examiner-queue-and-ai-policy.md) | assessment | Completed (80123b5) |
 | 11 | [Rubric dạng dữ liệu và bộ test nghiệm thu AI](./phase-11-rubric-data-and-ai-evaluation.md) | content, assessment, learning | in_progress (chưa có gold set chuyên gia và bằng chứng chạy đánh giá thực tế) |
-| 12 | [Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor](./phase-12-admin-area-backend.md) | learning, assessment, access | Completed (còn kiểm route Gateway) |
-| 13 | [Contract, tài liệu và nghiệm thu](./phase-13-contracts-docs-and-verification.md) | docs | Pending |
+| 12 | [Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor](./phase-12-admin-area-backend.md) | learning, assessment, access | Completed (Gateway route đã có test, c014d56) |
+| 13 | [Contract, tài liệu và nghiệm thu](./phase-13-contracts-docs-and-verification.md) | docs | In progress (tài liệu xong; còn `mvn verify`, demo Compose, `acceptance.md`) |
 | 14 | [Học viên sửa essay và nộp lại](./phase-14-essay-revision.md) | learning | Completed (trừ `revisionDelta` ở báo cáo) |
-| 15 | [Mentor chữa essay Practice và lesson](./phase-15-mentor-practice-essays.md) | learning, assessment, access | Pending |
+| 15 | [Mentor chữa essay Practice và lesson](./phase-15-mentor-practice-essays.md) | learning, assessment, access | Completed (c03b9e0, 0a35bc4; chưa chạy thử nối thật hai service) |
 
 ## Phân công đang làm (một nhánh `feat/knowledge-tree-assessment-journey`)
 

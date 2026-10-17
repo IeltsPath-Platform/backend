@@ -1,7 +1,7 @@
 ---
 phase: 15
 title: "Mentor chữa essay Practice và lesson"
-status: pending
+status: completed
 priority: P2
 dependencies: [10, 12]
 ---
