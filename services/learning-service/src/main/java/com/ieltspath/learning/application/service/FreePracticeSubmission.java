@@ -38,10 +38,13 @@ public class FreePracticeSubmission {
     private final Clock clock = Clock.systemUTC();
 
     private final GamificationRecorder gamificationRecorder;
+    private final HeartsService hearts;
 
     public FreePracticeSubmission(KnowledgeEvidenceRepository evidence, PracticeAttemptRepository attempts,
                                   QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
-                                  LearningContentClient content, GamificationRecorder gamificationRecorder) {
+                                  LearningContentClient content, GamificationRecorder gamificationRecorder,
+                                  HeartsService hearts) {
+        this.hearts = hearts;
         this.evidence = evidence;
         this.attempts = attempts;
         this.questionEvents = questionEvents;
@@ -87,9 +90,15 @@ public class FreePracticeSubmission {
             results.add(new PracticeSubmission.Answer(item.questionVersionId(), grade.correct(),
                     grade.correctAnswer(), item.explanation()));
         }
-        GamificationSummary gamification = counted
+        GamificationSummary xp = counted
                 ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), correctIds(graded))
                 : gamificationRecorder.current(userId);
+        int wrong = 0;
+        for (int index = 0; index < graded.items().size(); index++) {
+            if (!graded.grades().get(index).correct()) wrong++;
+        }
+        HeartsService.Snapshot heartState = hearts.lose(userId, wrong);
+        GamificationSummary gamification = xp.withHearts(wrong, heartState.hearts(), heartState.nextHeartAt());
         PracticeSubmission response = new PracticeSubmission(attempt.id(), graded.correct(), graded.total(),
                 graded.percent(), graded.passed(), counted, List.copyOf(results), null, List.of(),
                 graded.skillScores(), gamification);

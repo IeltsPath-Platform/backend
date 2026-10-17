@@ -13,6 +13,7 @@ import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.service.FirstAttemptMistakes;
 import com.ieltspath.learning.application.service.FreePracticeSubmission;
 import com.ieltspath.learning.application.service.GamificationRecorder;
+import com.ieltspath.learning.application.service.HeartsService;
 import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.domain.vo.PracticeOrigin;
 import com.ieltspath.learning.application.service.ItemGrading;
@@ -59,6 +60,7 @@ public class SubmitPracticeAttemptUseCase {
     private final MasteryProfileUpdater masteryProfiles;
     private final FreePracticeSubmission freePractice;
     private final GamificationRecorder gamificationRecorder;
+    private final HeartsService hearts;
     private final ItemGrading grading = new ItemGrading();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final Clock clock = Clock.systemUTC();
@@ -68,7 +70,8 @@ public class SubmitPracticeAttemptUseCase {
                                         KnowledgeEvidenceRepository evidence, PracticeProgress progress,
                                         FirstAttemptMistakes mistakes, WritingSubmissionRepository essays,
                                         QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
-                                        FreePracticeSubmission freePractice, GamificationRecorder gamificationRecorder) {
+                                        FreePracticeSubmission freePractice, GamificationRecorder gamificationRecorder,
+                                        HeartsService hearts) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -82,6 +85,16 @@ public class SubmitPracticeAttemptUseCase {
         this.masteryProfiles = masteryProfiles;
         this.freePractice = freePractice;
         this.gamificationRecorder = gamificationRecorder;
+        this.hearts = hearts;
+    }
+
+    /** Wrong objective answers; essay items are graded by a tutor and never cost a heart. */
+    static int wrongObjectiveAnswers(ItemGrading.Graded graded) {
+        int wrong = 0;
+        for (int index = 0; index < graded.items().size(); index++) {
+            if (!graded.grades().get(index).correct() && !ItemGrading.isEssay(graded.items().get(index))) wrong++;
+        }
+        return wrong;
     }
 
     /** The answers of a set that are correct, in set order; a question counts once however many items it has. */
@@ -102,6 +115,8 @@ public class SubmitPracticeAttemptUseCase {
         if (attempts.findByRequestId(command.requestId()).isPresent()) {
             throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
         }
+        // Free practice costs hearts too, so the gate sits before the branch that handles it.
+        hearts.requireHearts(userId);
         if (attempt.origin() == PracticeOrigin.FREE) return freePractice.submit(userId, attempt, command);
         var lesson = access.require(userId, attempt.lessonId());
         var version = content.getPackageVersion(attempt.packageVersionId());
@@ -164,9 +179,12 @@ public class SubmitPracticeAttemptUseCase {
                 .map(candidate -> new PracticeSubmission.ReviewCreated(candidate.reviewId(),
                         candidate.knowledgePointId(), candidate.stage().name())).toList();
         // XP only for the first counted submission of a set, as evidence is.
-        GamificationSummary gamification = counted
+        GamificationSummary xp = counted
                 ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), correctQuestionIds(graded))
                 : gamificationRecorder.current(userId);
+        int wrong = wrongObjectiveAnswers(graded);
+        HeartsService.Snapshot heartState = hearts.lose(userId, wrong);
+        GamificationSummary gamification = xp.withHearts(wrong, heartState.hearts(), heartState.nextHeartAt());
         PracticeSubmission response = new PracticeSubmission(attemptId, graded.correct(), graded.total(),
                 graded.percent(), graded.passed(), counted, List.copyOf(results), transcript, created,
                 graded.skillScores(), gamification);

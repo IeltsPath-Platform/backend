@@ -57,7 +57,7 @@ Points (access) ── kiếm: thưởng học (có trần/ngày) │ tiêu: h�
 |---|---|---|---|---|
 | 1 | [Points: cộng thưởng và loại giao dịch mới](phase-01-access-points-credit.md) | access | completed | – |
 | 2 | [XP, cấp độ, cài đặt múi giờ](phase-02-xp-and-levels.md) | learning | in_progress (XP, cấp độ, múi giờ, progress có test; còn HTTP cho khối gamification và đường cộng KP qua updater) | – |
-| 3 | [Tim](phase-03-hearts.md) | learning, access | pending | 1, 2, plan 3 phase 3 |
+| 3 | [Tim](phase-03-hearts.md) | learning, access | in_progress (gate, trừ tim, refill, PREMIUM 7 có test; thiếu refund do access chưa có route nội bộ; thiếu test HTTP 403) | 1, 2, plan 3 phase 3 |
 | 4 | [Streak phía server, đóng băng, thưởng points](phase-04-server-streak-and-rewards.md) | learning, access | pending | 1, 2 |
 | 5 | [Nhiệm vụ ngày](phase-05-daily-quests.md) | learning | pending | 2, 4 |
 | 6 | [Huy hiệu](phase-06-badges.md) | learning | pending | 2, 4 |

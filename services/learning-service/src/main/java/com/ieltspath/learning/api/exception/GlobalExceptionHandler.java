@@ -1,6 +1,7 @@
 package com.ieltspath.learning.api.exception;
 
 import com.ieltspath.learning.application.exception.LearningRequestException;
+import com.ieltspath.learning.domain.exception.HeartsDepletedException;
 import com.ieltspath.learning.domain.exception.LearningGateException;
 import com.ieltspath.learning.domain.exception.PracticeAttemptAlreadySubmittedException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +28,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new LearningErrorResponse(exception.getMessage(), "ATTEMPT_ALREADY_SUBMITTED", null));
     }
+    @ExceptionHandler(HeartsDepletedException.class)
+    public ResponseEntity<LearningErrorResponse> heartsDepleted(HeartsDepletedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new LearningErrorResponse(exception.getMessage(), "HEARTS_DEPLETED", null, null, null,
+                        exception.getNextHeartAt(), exception.getRefillCost()));
+    }
+
     @ExceptionHandler(LearningGateException.class)
     public ResponseEntity<LearningErrorResponse> gate(LearningGateException exception) {
         var reviews = "REVIEW_REQUIRED".equals(exception.getCode()) ? exception.getReviews().stream()

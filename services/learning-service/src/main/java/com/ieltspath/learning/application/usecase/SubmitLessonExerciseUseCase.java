@@ -10,6 +10,7 @@ import com.ieltspath.learning.application.port.LearningContentClient.Question;
 import com.ieltspath.learning.application.result.SubmissionResult;
 import com.ieltspath.learning.application.service.AnswerSheet;
 import com.ieltspath.learning.application.service.GamificationRecorder;
+import com.ieltspath.learning.application.service.HeartsService;
 import com.ieltspath.learning.application.service.LessonAccess;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.LessonViewAssembler;
@@ -57,6 +58,7 @@ public class SubmitLessonExerciseUseCase {
     private final QuestionEventLog questionEvents;
     private final MasteryProfileUpdater masteryProfiles;
     private final GamificationRecorder gamificationRecorder;
+    private final HeartsService hearts;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
     private final ErrorTagger errorTagger = new ErrorTagger();
     private final Clock clock = Clock.systemUTC();
@@ -65,7 +67,8 @@ public class SubmitLessonExerciseUseCase {
                                        KnowledgeEvidenceRepository evidence, LessonProgressRepository lessons,
                                        PracticeProgress practice, LessonViewAssembler view,
                                        TopicCompletion topicCompletion, QuestionEventLog questionEvents,
-                                       MasteryProfileUpdater masteryProfiles, GamificationRecorder gamificationRecorder) {
+                                       MasteryProfileUpdater masteryProfiles, GamificationRecorder gamificationRecorder,
+                                       HeartsService hearts) {
         this.lock = lock;
         this.access = access;
         this.submissions = submissions;
@@ -77,6 +80,7 @@ public class SubmitLessonExerciseUseCase {
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
         this.gamificationRecorder = gamificationRecorder;
+        this.hearts = hearts;
     }
 
     @Transactional
@@ -89,6 +93,7 @@ public class SubmitLessonExerciseUseCase {
                     || !submission.blockId().equals(blockId)) throw requestConflict();
             return submission.response();
         }
+        hearts.requireHearts(userId);
         LessonAccess.Context context = access.authorize(userId, lessonId);
         Lesson lesson = context.lesson();
         Block block = lesson.blocks().stream().filter(item -> item.blockId().equals(blockId)
@@ -162,9 +167,13 @@ public class SubmitLessonExerciseUseCase {
                     view.hint(question, passed.contains(blockId), opened)));
         }
         // XP is awarded for the first submission of a block only; a repeat shows the learner's standing unchanged.
-        GamificationSummary gamification = firstSubmission
+        GamificationSummary xp = firstSubmission
                 ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), correctQuestionIds(questions, grades))
                 : gamificationRecorder.current(userId);
+        // Every lesson question is objective, so each wrong answer costs one heart; a level-up above has already refilled.
+        int wrong = (int) grades.stream().filter(grade -> !grade.correct()).count();
+        HeartsService.Snapshot heartState = hearts.lose(userId, wrong);
+        GamificationSummary gamification = xp.withHearts(wrong, heartState.hearts(), heartState.nextHeartAt());
         SubmissionResult response = new SubmissionResult(blockPassed, lessonCompleted, List.copyOf(results),
                 gamification);
         if (!submissions.save(userId, lessonId, blockId, command, response)) throw requestConflict();

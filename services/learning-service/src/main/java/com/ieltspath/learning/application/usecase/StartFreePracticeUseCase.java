@@ -7,6 +7,7 @@ import com.ieltspath.learning.application.port.LearningContentClient.PackageVers
 import com.ieltspath.learning.application.port.LearningContentClient.PracticeSet;
 import com.ieltspath.learning.application.port.LearningContentClient.Topic;
 import com.ieltspath.learning.application.result.PracticeAttemptView;
+import com.ieltspath.learning.application.service.HeartsService;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.KnowledgePointDirectory;
 import com.ieltspath.learning.application.service.PracticeAttemptViewAssembler;
@@ -49,12 +50,14 @@ public class StartFreePracticeUseCase {
     private final PracticeAttemptRepository attempts;
     private final PracticeAttemptViewAssembler view;
     private final int reserve;
+    private final HeartsService hearts;
     private final Clock clock = Clock.systemUTC();
 
     public StartFreePracticeUseCase(LearnerLock lock, LearningContentClient content, KnowledgePointDirectory directory,
                                     LearnerCurriculumRepository curricula, ReviewItemRepository reviews,
                                     PracticeAttemptRepository attempts, PracticeAttemptViewAssembler view,
-                                    @Value("${learning.free-practice.reserve:2}") int reserve) {
+                                    HeartsService hearts, @Value("${learning.free-practice.reserve:2}") int reserve) {
+        this.hearts = hearts;
         this.lock = lock;
         this.content = content;
         this.directory = directory;
@@ -68,6 +71,7 @@ public class StartFreePracticeUseCase {
     @Transactional
     public PracticeAttemptView execute(UUID userId, UUID knowledgePointId) {
         lock.lock(userId);
+        hearts.requireHearts(userId);
         Topic topic = topicOf(knowledgePointId);
         requireOpenCourse(userId, topic);
         List<PendingReview> blocking = reviews.findPending(userId).stream().filter(PendingReview::blocking)

@@ -38,11 +38,12 @@ public class GamificationRecorder {
     private final GamificationRepository repository;
     private final LearningContentClient content;
     private final LearnerTimezones timezones;
+    private final HeartsService hearts;
     private final Params params;
     private final Clock clock = Clock.systemUTC();
 
     public GamificationRecorder(GamificationRepository repository, LearningContentClient content,
-                                LearnerTimezones timezones,
+                                LearnerTimezones timezones, HeartsService hearts,
                                 @Value("${learning.gamification.xp.easy:10}") int easy,
                                 @Value("${learning.gamification.xp.medium:15}") int medium,
                                 @Value("${learning.gamification.xp.hard:20}") int hard,
@@ -54,6 +55,7 @@ public class GamificationRecorder {
         this.repository = repository;
         this.content = content;
         this.timezones = timezones;
+        this.hearts = hearts;
         this.params = new Params(easy, medium, hard, unknown, dailyCap, levelXp, consolidate, maintain);
     }
 
@@ -121,7 +123,9 @@ public class GamificationRecorder {
         int total = before + earned;
         int level = params.levelOf(total);
         if (earned > 0) repository.saveTotals(userId, total, level);
-        return new GamificationSummary(earned, capped, total, level, params.levelOf(before) < level);
+        boolean leveledUp = params.levelOf(before) < level;
+        if (leveledUp) hearts.refillOnLevelUp(userId);
+        return new GamificationSummary(earned, capped, total, level, leveledUp);
     }
 
     private LocalDate today(UUID userId) {

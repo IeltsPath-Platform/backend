@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Tim"
-status: pending
+status: in_progress
 priority: P1
 dependencies: [1, 2]
 ---
@@ -51,10 +51,17 @@ Luyện tự do phụ thuộc plan `261017-1931` phase 3.
 
 ## Success Criteria
 
-- [ ] Sai 5 câu ở Practice → 0 tim; nộp tiếp → `403 HEARTS_DEPLETED` với `nextHeartAt` = lần mất + 5h.
-- [ ] Bài ôn chặn vẫn làm được khi hết tim.
-- [ ] Hồi đầy trừ đúng 5 points một lần dù gửi lại `requestId`.
-- [ ] Học viên PREMIUM có 7 tim.
+- [ ] Sai 5 câu ở Practice → 0 tim; nộp tiếp → `403 HEARTS_DEPLETED` với `nextHeartAt` = lần mất + 5h. Đã có: `HeartsIntegrationTest.aLearnerWithNoHearts...` (gate và `nextHeartAt`). Chưa có test HTTP cho mã 403 và chưa có kịch bản Practice đủ 5 câu sai.
+- [ ] Bài ôn chặn vẫn làm được khi hết tim. Không thêm gate vào luồng ôn (`SubmitReviewUseCase`), nhưng chưa có test.
+- [x] Hồi đầy trừ đúng 5 points một lần dù gửi lại `requestId`. (test: `HeartsIntegrationTest.aRefillChargesPointsOnce...`). Gửi lại sau khi đã đầy trả `409 HEARTS_FULL`, không trừ thêm.
+- [x] Học viên PREMIUM có 7 tim. (test: `HeartsIntegrationTest.aPremiumLearnerHasSevenHearts`)
+
+## Quyết định khi làm (2026-10-17)
+
+- **Hoàn points khi refill lỗi chưa làm.** Access chưa có route refund cho học viên: `/api/access/points/refund` chỉ ADMIN. Refill trừ points trước, theo `requestId` (Access idempotent), rồi hồi tim trong transaction. Nếu lưu DB lỗi, học viên gửi lại cùng `requestId` và không bị trừ lần hai. Cần Codex thêm route nội bộ nếu muốn refund đúng plan.
+- **Max PREMIUM đọc qua `GET /api/access/me/subscription`** (200 = có gói, 204 = không). Không dùng entitlement ADMIN.
+- **Mỗi bài nộp mới đều trừ tim** (không chỉ lần đầu), theo G1.
+- **Test lesson cũ** đặt `learning.gamification.hearts.max=1000` để không bị chặn bởi tim; cần biết khi đọc test đó.
 
 ## Risk Assessment
 

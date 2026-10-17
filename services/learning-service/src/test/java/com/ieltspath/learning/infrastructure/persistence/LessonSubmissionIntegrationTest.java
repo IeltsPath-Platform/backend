@@ -60,6 +60,9 @@ import static org.mockito.Mockito.*;
         "spring.jpa.hibernate.ddl-auto=validate",
         "spring.jpa.open-in-view=false",
         "management.health.rabbit.enabled=false",
+        // These tests check answers, evidence and history, not hearts: a large heart pool keeps the hearts gate out of
+        // the way (hearts have their own tests).
+        "learning.gamification.hearts.max=1000",
         "app.auth.internal-jwt-issuer=urn:code-base:api-gateway"
 })
 @Testcontainers(disabledWithoutDocker = true)

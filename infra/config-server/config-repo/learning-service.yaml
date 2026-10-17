@@ -101,6 +101,12 @@ learning:
       # One-time milestones per knowledge point: reaching consolidate, then maintain.
       kp-consolidate: 25
       kp-maintain: 50
+    hearts:
+      # Hearts for the standard plan and for PREMIUM; one comes back every five hours below the maximum.
+      max: 5
+      premium-max: 7
+      # Points for a full refill.
+      refill-cost: 5
   messaging:
     # AssessmentCompleted.v2 consumer: delay before a failed event is retried, and attempts before the DLQ.
     retry-delay-ms: ${LEARNING_RETRY_DELAY_MS:30000}
