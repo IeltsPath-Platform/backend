@@ -32,8 +32,9 @@ public class GlobalExceptionHandler {
         var reviews = "REVIEW_REQUIRED".equals(exception.getCode()) ? exception.getReviews().stream()
                 .map(review -> new LearningErrorResponse.Review(review.reviewId(), review.lessonId(),
                         review.knowledgePointId(), review.skill())).toList() : null;
+        var lessonIds = "PRACTICE_REQUIRED".equals(exception.getCode()) ? exception.getLessonIds() : null;
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new LearningErrorResponse(exception.getMessage(), exception.getCode(), reviews));
+                .body(new LearningErrorResponse(exception.getMessage(), exception.getCode(), reviews, null, lessonIds));
     }
 
     @ExceptionHandler(LearningRequestException.class)

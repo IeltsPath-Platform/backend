@@ -47,15 +47,19 @@ public class GetTopicLessonsUseCase {
                 LessonAccess.completed(progress.get(lesson.lessonId())));
         var topicPractice = practice.forTopic(userId, topicId, completedByLesson);
         var practiceStates = topicPractice.clearances();
+        // A lesson opens once every earlier lesson is completed and its Practice passed. The topic test only needs
+        // the lessons completed here; its own Practice and review checks follow below.
         boolean previousComplete = true;
+        boolean previousOpen = true;
         List<TopicLessonsResult.LessonSummary> summaries = new ArrayList<>();
         for (var lesson : ordered) {
             boolean completed = LessonAccess.completed(progress.get(lesson.lessonId()));
+            var clearance = practiceStates.get(lesson.lessonId());
             summaries.add(new TopicLessonsResult.LessonSummary(lesson.lessonId(), lesson.code(), lesson.title(),
-                    lesson.sortOrder(), completed ? "COMPLETED" : previousComplete ? "AVAILABLE" : "LOCKED",
-                    practiceStates.get(lesson.lessonId()).status(),
-                    practiceStates.get(lesson.lessonId()).reason()));
+                    lesson.sortOrder(), completed ? "COMPLETED" : previousOpen ? "AVAILABLE" : "LOCKED",
+                    clearance.status(), clearance.reason()));
             previousComplete &= completed;
+            previousOpen &= completed && clearance.status() == PracticeStatus.PASSED;
         }
         boolean hasPendingReview = !LessonAccessGate.blocking(topicPractice.pendingReviews(), topic.skills()).isEmpty();
         boolean practicePassed = practiceStates.values().stream()

@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Review repeats until passed"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 ---

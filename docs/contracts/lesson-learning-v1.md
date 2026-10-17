@@ -76,7 +76,7 @@ Example after Lan completes L1:
 
 ### `GET /topics/{id}/lessons`
 
-The topic must be `IN_PROGRESS` or `PASSED`; otherwise `403 TOPIC_LOCKED`. Returns `{topicId, skill, hasTopicTest, lessons, testStatus}`. Lesson statuses are `LOCKED`, `AVAILABLE`, or `COMPLETED`; each lesson also has `practiceStatus` (`LOCKED`, `REQUIRED`, `PASSED`) and nullable `practicePassReason` (`FIRST_SUBMISSION`, `REVIEW_FINISHED`, `ALL_SETS_ATTEMPTED`, `NO_PRACTICE`). `testStatus` is `LOCKED`, `AVAILABLE`, `PASSED`, or `NONE` when `hasTopicTest=false`. A test is available only after all topic lessons are completed, all their practice statuses are `PASSED`, and no review of the same skill (or unassigned skill) is pending. Completing every published lesson passes a topic without a test.
+The topic must be `IN_PROGRESS` or `PASSED`; otherwise `403 TOPIC_LOCKED`. Returns `{topicId, skill, hasTopicTest, lessons, testStatus}`. Lesson statuses are `LOCKED`, `AVAILABLE`, or `COMPLETED`. A lesson that is not completed is `AVAILABLE` only when every earlier lesson of the topic is `COMPLETED` and its Practice is `PASSED`; otherwise it is `LOCKED`. Each lesson also has `practiceStatus` (`LOCKED`, `REQUIRED`, `PASSED`) and nullable `practicePassReason` (`FIRST_SUBMISSION`, `REVIEW_FINISHED`, `ALL_SETS_ATTEMPTED`, `NO_PRACTICE`). `testStatus` is `LOCKED`, `AVAILABLE`, `PASSED`, or `NONE` when `hasTopicTest=false`. A test is available only after all topic lessons are completed, all their practice statuses are `PASSED`, and no review of the same skill (or unassigned skill) is pending. Completing every published lesson passes a topic without a test.
 
 ```json
 {
@@ -94,7 +94,7 @@ The topic must be `IN_PROGRESS` or `PASSED`; otherwise `403 TOPIC_LOCKED`. Retur
 
 Lesson metadata adds `skill` from Content. A pending review blocks only lessons of the same skill; a legacy review with `skill: null` blocks every skill. The existing gate error precedence and HTTP 403 remain unchanged.
 
-The same lesson gate applies to this GET, submissions, and completion. Error precedence: pending review (`REVIEW_REQUIRED`), topic not current (`TOPIC_LOCKED`), then earlier lesson incomplete (`LESSON_LOCKED`). Returns metadata and ordered `blocks`. A question object has **only** `questionVersionId`, `sortOrder`, `stem`, `options`, `hint`; an asset can provide passage text alongside it. Exercise blocks carry `blockKind`: `EXERCISE` for auto-graded questions, `ESSAY` for a Writing essay block shaped as in [`lesson-writing-v1`](lesson-writing-v1.md) (an essay block never counts toward lesson completion, and exercise submissions to it return `409 ESSAY_BLOCK`). An `ASSET` block gives `{id, assetType, textContent?, mediaUrl?, durationSeconds?, transcript?}`: a `PASSAGE` has `textContent`; media has `mediaUrl` (never the stored reference); an `AUDIO` asset gains `transcript` only once the lesson is completed, and before that the key is absent because the transcript gives the answers away. Do not pass through Content's `answerSpec`, `explanation`, KP mappings, or solution fields. `options=null` means a fill response; a non-null array means choose an `optionKey`, including the three TFNG keys. A passed exercise block gains a separate `solutions` array of `{questionVersionId, correctAnswer, explanation}`; an unpassed block omits the `solutions` key entirely.
+The same lesson gate applies to this GET, submissions, and completion. Error precedence: blocking pending review (`REVIEW_REQUIRED`), topic not current (`TOPIC_LOCKED`), earlier lesson incomplete (`LESSON_LOCKED`), then an earlier lesson whose Practice is not passed (`PRACTICE_REQUIRED`, `403`, with `lessonIds` in lesson order). A pending review blocks a lesson when it has the lesson's skill or no skill, **or** when it belongs to an earlier lesson of the same topic, whatever its skill; `reviews` lists them so the client can lead the learner into the review. `PRACTICE_REQUIRED` is only returned when no review is pending. The first lesson of a topic has no earlier lesson and needs no Practice. Returns metadata and ordered `blocks`. A question object has **only** `questionVersionId`, `sortOrder`, `stem`, `options`, `hint`; an asset can provide passage text alongside it. Exercise blocks carry `blockKind`: `EXERCISE` for auto-graded questions, `ESSAY` for a Writing essay block shaped as in [`lesson-writing-v1`](lesson-writing-v1.md) (an essay block never counts toward lesson completion, and exercise submissions to it return `409 ESSAY_BLOCK`). An `ASSET` block gives `{id, assetType, textContent?, mediaUrl?, durationSeconds?, transcript?}`: a `PASSAGE` has `textContent`; media has `mediaUrl` (never the stored reference); an `AUDIO` asset gains `transcript` only once the lesson is completed, and before that the key is absent because the transcript gives the answers away. Do not pass through Content's `answerSpec`, `explanation`, KP mappings, or solution fields. `options=null` means a fill response; a non-null array means choose an `optionKey`, including the three TFNG keys. A passed exercise block gains a separate `solutions` array of `{questionVersionId, correctAnswer, explanation}`; an unpassed block omits the `solutions` key entirely.
 
 `hint` is always present, including when `null`, so the key does not disclose which questions have author-written hints. Learning Service reveals Content's hint only for a gradable `FILL`, or a gradable `CHOICE` with at least three options (including TFNG). Empty/absent CHOICE options are treated as the fixed three-choice TFNG fallback; one or two options and unsupported/ungradable specs are ineligible. Legacy gradable specs without `type` follow the grader's CHOICE default. A question must have been answered incorrectly in **any** saved submission for the same verified user, lesson and block, and the block must not have passed. Once opened, its hint remains even after a later correct answer while the block still fails. Before the first wrong answer, without a Content hint, or after the block has passed, `hint=null`. The runtime rule does not filter by skill; current Content seed supplies Reading hints and leaves Listening hints null. Essay prompts do not use this field.
 
@@ -151,7 +151,7 @@ Only a lesson with **no** `EXERCISE` block can be completed this way; a lesson w
 
 `POST /practice-attempts/{id}/submissions` takes `{requestId, answers:[{questionVersionId, answer}]}` with exactly one answer per question. It returns `{attemptId, correct, total, percent, passed, countedAsEvidence, results, transcript?, reviewsCreated}`; each result contains `questionVersionId`, `correct`, `correctAnswer`, `explanation`, and `hint:null`. A Listening transcript appears after submission. A repeated `requestId` returns the saved result; another request for a submitted attempt returns `409 ATTEMPT_ALREADY_SUBMITTED`. Passing is at least 70%. Only the first submission of an unrevealed package writes `practice_set` evidence and can give `FIRST_SUBMISSION`; subsequent practice of that package, including after a submitted review set, is graded and revealed but writes no evidence or review. A counted submission below 70% can create a `PRACTICE` review for each KP below 70% if that KP has no pending review and an unrevealed eligible set remains. Lesson completion itself creates no review.
 
-Practice clearance is one-way: after the lesson completes, it passes with the first applicable reason in this order: counted first practice submission at 70% or above; a completed or skipped practice-triggered review; all currently published lesson packages submitted in practice or review with no pending practice review; or no practice packages. The first passing reason is stored and later content changes do not revoke it. Reads calculate status without writing a pass row. A pending same-skill review (or legacy null-skill review) blocks practice; `REVIEW_REQUIRED` remains HTTP 403. An incomplete lesson gives `409 PRACTICE_LOCKED` on start.
+Practice clearance is one-way: after the lesson completes, it passes with the first applicable reason in this order: counted first practice submission at 70% or above; at least one practice-triggered review of the skill (or of the lesson, for sets without skills) with none still pending, where completed and skipped reviews both count as finished; all currently published lesson packages submitted in practice or review with no pending practice review; or no practice packages. The first passing reason is stored and later content changes do not revoke it. Reads calculate status without writing a pass row. A pending same-skill review (or legacy null-skill review) blocks practice; `REVIEW_REQUIRED` remains HTTP 403. An incomplete lesson gives `409 PRACTICE_LOCKED` on start.
 
 ### `GET /reviews`
 
@@ -159,7 +159,7 @@ Lists the verified learner's reviews oldest first, without a Content request. Qu
 
 ### `GET /reviews/{reviewId}`
 
-`reviewId` is a UUID. An unknown review or another learner's review returns `404 NOT_FOUND`. Besides `reviewId`, `reviewStatus`, `lessonId`, `theory` and `set`, the response has `knowledgePointId`, `skill`, `stage` (`PRACTICE` or `THEORY`), nullable `theoryReason` (`SECOND_FAIL`, `LOW_SCORE`, `WRONG_IN_LESSON`), `theoryScope`, `failedSets`, `maxFailedSets` (2) and `quickCheck`.
+`reviewId` is a UUID. An unknown review or another learner's review returns `404 NOT_FOUND`. Besides `reviewId`, `reviewStatus`, `lessonId`, `theory` and `set`, the response has `knowledgePointId`, `skill`, `stage` (`PRACTICE` or `THEORY`), nullable `theoryReason` (`SECOND_FAIL`, `LOW_SCORE`, `WRONG_IN_LESSON`), `theoryScope`, `failedSets`, `maxFailedSets` (always `null`: there is no limit) and `quickCheck`.
 
 - `theory` is the text of the lesson's TEXT blocks that teach the review's knowledge point (`theoryScope: KNOWLEDGE_POINT`), or every TEXT block when the lesson tags none (`LESSON_FALLBACK`). Audio transcripts are never part of it.
 - At `PRACTICE`, the response has the one open review set, preferring its lesson and excluding every package the learner was given in a review or whose answers were seen in submitted practice. Repeated GETs return the same open set. If no such package remains, the review becomes `SKIPPED` with no set. Set questions use the lesson allowlist with their `hint`; a Listening set adds `audio: {mediaUrl, durationSeconds}` next to `passage` (no transcript). `quickCheck` is empty.
@@ -180,8 +180,8 @@ Review questions and results reuse the lesson DTOs. Set and quick-check question
 
 The example shows BE1; the actual set includes BE1–BE4. `PS-KP1-A` is the seed package code corresponding to the example `packageId`.
 
-Review states (`maxFailedSets = 2`; Practice and review sets share the lesson's `PRACTICE_SET` packages, so practice
-uses up review sets):
+Review states (a review repeats new sets until one is passed; Practice and review sets share the lesson's
+`PRACTICE_SET` packages, so practice uses up review sets):
 
 ```text
                   review created (practice < 70%, or assessment mastery < 0.6)
@@ -191,9 +191,9 @@ uses up review sets):
         v                                          v
    GET: one unrevealed set with hints         GET: KP theory blocks + quick check
    submit set -- >= 70% --> DONE              POST theory-check --> PRACTICE
-        `-- fail -- 2nd failed set --> SKIPPED
-                 `-- otherwise --> THEORY
-   no unrevealed package left --> SKIPPED
+        `-- fail -- 1st failed set --> THEORY (read the theory once, then a new set)
+                 `-- later failed sets --> a new set at once (stage stays PRACTICE)
+   no unrevealed package left --> SKIPPED (the only way a review ends without a pass)
 ```
 
 ### `POST /reviews/{reviewId}/submissions`
@@ -237,6 +237,7 @@ New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: ar
 | 404 | `NO_PLACEMENT_TEST` | `{"detail":"No placement test is published","code":"NO_PLACEMENT_TEST"}` |
 | 403 | `TOPIC_LOCKED` | `{"detail":"Topic is locked","code":"TOPIC_LOCKED"}` |
 | 403 | `LESSON_LOCKED` | `{"detail":"Complete L1 before L2","code":"LESSON_LOCKED"}` |
+| 403 | `PRACTICE_REQUIRED` | `{"detail":"Complete practice of the earlier lessons first.","code":"PRACTICE_REQUIRED","lessonIds":["20000000-0000-4000-8000-000000000101"]}` (lesson gate; the same code is `409` when asking for a topic test, below) |
 | 403 | `TEST_LOCKED` | `{"detail":"Complete the topic lessons first","code":"TEST_LOCKED"}` |
 | 409 | `TEST_UNAVAILABLE` | `{"detail":"No published test code is available","code":"TEST_UNAVAILABLE"}` |
 | 409 | `NO_TOPIC_TEST` | `{"detail":"This topic has no final test","code":"NO_TOPIC_TEST"}` |

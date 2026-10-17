@@ -96,6 +96,75 @@ class LessonAccessGateTest {
                 .isEqualTo("LESSON_LOCKED");
     }
 
+    private static final UUID FIRST = new UUID(1, 1);
+    private static final UUID SECOND = new UUID(1, 2);
+
+    private LearningGateException lessonGate(List<PendingReview> pending, Set<LearningSkill> skills,
+                                             Set<UUID> previousLessons, TopicStatus topic, boolean previousComplete,
+                                             List<UUID> needPractice) {
+        return assertThrows(LearningGateException.class, () -> gate.authorize(pending, null, skills, previousLessons,
+                topic, previousComplete, needPractice));
+    }
+
+    @Test
+    void anEarlierLessonWhosePracticeIsNotPassedRequiresPracticeAndNamesTheLessons() {
+        var error = lessonGate(List.of(), Set.of(LearningSkill.READING), Set.of(FIRST, SECOND),
+                TopicStatus.IN_PROGRESS, true, List.of(FIRST, SECOND));
+
+        assertThat(error.getCode()).isEqualTo("PRACTICE_REQUIRED");
+        assertThat(error.getLessonIds()).containsExactly(FIRST, SECOND);
+        assertThat(error.getReviews()).isEmpty();
+        assertThat(error.getMessage()).isEqualTo("Complete practice of the earlier lessons first.");
+        assertThatThrownBy(() -> error.getLessonIds().clear()).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void aPendingReviewOfAnEarlierLessonBlocksEvenWhenItsSkillIsNotTaughtHere() {
+        var listeningReviewOfFirst = new PendingReview(new UUID(2, 1), FIRST, new UUID(2, 2), LearningSkill.LISTENING);
+
+        var error = lessonGate(List.of(listeningReviewOfFirst), Set.of(LearningSkill.READING), Set.of(FIRST),
+                TopicStatus.IN_PROGRESS, true, List.of(FIRST));
+
+        assertThat(error.getCode()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(error.getReviews()).containsExactly(listeningReviewOfFirst);
+    }
+
+    @Test
+    void aPendingReviewOfAnotherTopicAndAnotherSkillDoesNotBlock() {
+        var elsewhere = new PendingReview(new UUID(2, 3), new UUID(9, 9), new UUID(2, 4), LearningSkill.LISTENING);
+
+        assertThatCode(() -> gate.authorize(List.of(elsewhere), null, Set.of(LearningSkill.READING), Set.of(FIRST),
+                TopicStatus.IN_PROGRESS, true, List.of())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void reviewRequiredThenTopicThenLessonLockedAllComeBeforePracticeRequired() {
+        var pending = new PendingReview(new UUID(2, 5), FIRST, new UUID(2, 6), LearningSkill.READING);
+
+        assertThat(lessonGate(List.of(pending), Set.of(LearningSkill.READING), Set.of(FIRST), TopicStatus.LOCKED,
+                false, List.of(FIRST)).getCode()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(lessonGate(List.of(), Set.of(LearningSkill.READING), Set.of(FIRST), TopicStatus.LOCKED, true,
+                List.of(FIRST)).getCode()).isEqualTo("TOPIC_LOCKED");
+        assertThat(lessonGate(List.of(), Set.of(LearningSkill.READING), Set.of(FIRST), TopicStatus.IN_PROGRESS,
+                false, List.of(FIRST)).getCode()).isEqualTo("LESSON_LOCKED");
+    }
+
+    @Test
+    void noPracticeDebtLetsALessonThrough() {
+        assertThatCode(() -> gate.authorize(List.of(), null, Set.of(LearningSkill.READING), Set.of(FIRST, SECOND),
+                TopicStatus.IN_PROGRESS, true, List.of())).doesNotThrowAnyException();
+        assertThatCode(() -> gate.authorize(List.of(), null, Set.of(LearningSkill.READING), Set.of(),
+                TopicStatus.IN_PROGRESS, true, List.of())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void theCurrentReviewDoesNotBlockItsOwnLessonAccessEvenWhenItBelongsToAnEarlierLesson() {
+        var current = new PendingReview(new UUID(2, 7), FIRST, new UUID(2, 8), LearningSkill.LISTENING);
+
+        assertThatCode(() -> gate.authorize(List.of(current), current.reviewId(), Set.of(LearningSkill.READING),
+                Set.of(FIRST), TopicStatus.IN_PROGRESS, true, List.of())).doesNotThrowAnyException();
+    }
+
     @Test
     void reviewsBlockOnlyTheirSkillWhileUnspecifiedReviewsBlockEverySkill() {
         var reading = new PendingReview(new UUID(0, 10), new UUID(0, 11), new UUID(0, 12),

@@ -301,6 +301,23 @@ class LessonLearningWebMvcTest {
         assertEquals(code, response.path("code").asText());
     }
 
+    @ParameterizedTest
+    @EnumSource(LessonAction.class)
+    void practiceGateNamesTheLessonsWhosePracticeIsOpen(LessonAction action) throws Exception {
+        var earlier = UUID.randomUUID();
+        var gate = new LearningGateException("PRACTICE_REQUIRED", List.of(), List.of(earlier));
+        when(getLessonUseCase.execute(USER, LESSON)).thenThrow(gate);
+        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenThrow(gate);
+        when(completeLessonUseCase.execute(USER, LESSON)).thenThrow(gate);
+
+        JsonNode response = body(mvc.perform(authenticated(lessonAction(action)))
+                .andExpect(status().isForbidden()).andReturn());
+        assertEquals(Set.of("detail", "code", "lessonIds"), keys(response));
+        assertEquals("PRACTICE_REQUIRED", response.path("code").asText());
+        assertEquals(earlier.toString(), response.path("lessonIds").get(0).asText());
+        assertEquals(1, response.path("lessonIds").size());
+    }
+
     static Stream<String> invalidBodies() {
         return Stream.of("{}", "{\"requestId\":\"" + REQUEST + "\"}",
                 "{\"requestId\":\"" + REQUEST + "\",\"answers\":null}",

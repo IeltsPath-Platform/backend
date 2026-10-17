@@ -15,9 +15,9 @@ import java.util.UUID;
 /**
  * A review of one weak knowledge point. While PENDING it is at a stage: PRACTICE gives at most one open set, THEORY
  * asks the learner to read the knowledge point's theory and answer a quick check before the next set. A passed set
- * makes it DONE; a failed set sends it to THEORY, and after {@link ReviewRule#MAX_FAILED_REVIEW_SETS} failed sets it is
- * SKIPPED so the learner is never stuck. It is also SKIPPED when no unrevealed package is left. DONE and SKIPPED are
- * final.
+ * makes it DONE. A failed set keeps it PENDING and the learner gets a new set until one is passed; only the first failed
+ * set sends the learner back to THEORY, later failures go straight to a new set. The review is SKIPPED only when no
+ * unrevealed package is left, so the learner is never stuck. DONE and SKIPPED are final.
  */
 public final class ReviewItem {
     private final UUID id;
@@ -122,9 +122,7 @@ public final class ReviewItem {
         openSet = null;
         if (passed) {
             status = ReviewStatus.DONE;
-        } else if (++failedSets >= ReviewRule.MAX_FAILED_REVIEW_SETS) {
-            status = ReviewStatus.SKIPPED;
-        } else {
+        } else if (++failedSets == 1) {
             stage = ReviewStage.THEORY;
             theoryReason = (double) correct / total < ReviewRule.LOW_SCORE ? TheoryReason.LOW_SCORE
                     : TheoryReason.SECOND_FAIL;

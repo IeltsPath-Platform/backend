@@ -73,9 +73,9 @@ Free topics precede premium topics within each skill. A topic without a final te
 `testStatus: NONE` and passes when all published lessons are completed; requesting its
 test assignment returns `409 NO_TOPIC_TEST`. Pending reviews gate only their own skill;
 legacy reviews with no skill gate every skill. Removed topics lose their sequence order and leave
-the topic list. Lessons become available in order after earlier lessons complete.
+the topic list. Lessons become available in order after earlier lessons are completed and their Practice is passed.
 Lesson GET, submission and completion apply errors in this order:
-`REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`. Exercise blocks carry `blockKind`: essay blocks show only the prompt, task,
+`REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`, `PRACTICE_REQUIRED` (403, with `lessonIds`). Exercise blocks carry `blockKind`: essay blocks show only the prompt, task,
 minimum words, pass band and images, never count toward completion and reject exercise
 submissions with `409 ESSAY_BLOCK`. Media assets expose `mediaUrl`; an audio transcript
 appears only once the lesson is completed.
@@ -126,7 +126,8 @@ no pending review and an unrevealed eligible set remains. A package is revealed 
 either a submitted practice attempt or a submitted review set; later practice of it
 still returns solutions but writes no evidence or review. Assessment results retain
 the mastery-based review rule. A pending review blocks lesson and practice access in
-its skill until `DONE` or `SKIPPED`; a legacy review without a skill blocks every skill.
+its skill until `DONE` or `SKIPPED`; a legacy review without a skill blocks every skill. A pending review of an
+earlier lesson of the same topic also blocks the lessons after it, whatever its skill.
 
 A pending review is at stage `PRACTICE` (one set) or `THEORY` (read the KP's TEXT
 blocks, tagged in Content, then a quick check of up to 3 lesson questions). It starts
@@ -134,8 +135,9 @@ at `THEORY` when the KP scored below 40% in the practice attempt that created it
 was wrong in the first submission of the lesson's exercises; assessment reviews make
 that lesson check on first open, because the event consumer does not call Content. A
 failed set moves it to `THEORY`; the quick check (right or wrong, no evidence) moves it
-back to `PRACTICE`; the second failed set skips it. A set never reuses a package the
-learner was given in a review or submitted in practice (`ReviewRule.MAX_FAILED_REVIEW_SETS`).
+back to `PRACTICE`. Later failed sets go straight to a new set, so a review repeats until a set is
+passed and is `SKIPPED` only when no unrevealed package is left. A set never reuses a package the
+learner was given in a review or submitted in practice. `maxFailedSets` is always `null`.
 
 The final topic test needs every lesson completed and practice-cleared. Clearance is
 stored on write paths and never revoked by later package publication. Reasons, in
@@ -189,8 +191,9 @@ DLQ with header `x-learning-failure`. Settings: `LEARNING_RETRY_DELAY_MS` (30 s)
 
 Learning errors use `{detail, code}`; `REVIEW_REQUIRED` additionally includes
 `reviews` with `reviewId`, `lessonId`, `knowledgePointId`, and `skill` when known. Malformed requests return
-422. `REVIEW_REQUIRED` remains HTTP 403; `PRACTICE_LOCKED`, `PRACTICE_REQUIRED`
-(with `lessonIds`), and `ATTEMPT_ALREADY_SUBMITTED` return HTTP 409. Content reads forward the authenticated internal bearer and `X-Correlation-Id`;
+422. `REVIEW_REQUIRED` remains HTTP 403, and so is `PRACTICE_REQUIRED` at the lesson gate (with `lessonIds`);
+`PRACTICE_LOCKED`, `PRACTICE_REQUIRED` when asking for a topic test (with `lessonIds`), and
+`ATTEMPT_ALREADY_SUBMITTED` return HTTP 409. Content reads forward the authenticated internal bearer and `X-Correlation-Id`;
 missing content maps to `404 NOT_FOUND`, transport/unavailability errors to
 `503 CONTENT_UNAVAILABLE`, and other Content failures to `502 CONTENT_FAILURE`.
 

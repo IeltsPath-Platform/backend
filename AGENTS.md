@@ -169,8 +169,10 @@ src/main/java/com/ieltspath/<service>
   được áp theo từng skill; bài học hoàn thành theo các block bắt buộc, Practice phải đạt riêng cho từng skill có yêu cầu.
 - Thứ tự topic theo user từ Content `topic-sequence`, không LLM/goal; mỗi course là một chuỗi chung mọi skill. Placement
   không bắt buộc: mọi course luôn mở, placement chỉ làm được một lần (`409 PLACEMENT_ALREADY_DONE`); band chỉ gợi ý
-  course và không đổi trạng thái topic. Bài ôn vẫn chặn bài, Practice và thi topic
-  của cùng skill. Thi cuối course không chặn tiến độ topic hay course khác. `LessonAccessGate` và use case trong
+  course và không đổi trạng thái topic. Lesson sau chỉ mở khi mọi lesson trước đã hoàn thành **và** Practice của chúng đã đạt
+  (`403 PRACTICE_REQUIRED` + `lessonIds`); bài ôn còn chờ của lesson trước chặn lesson sau bất kể skill
+  (`403 REVIEW_REQUIRED`). Bài ôn lặp set mới đến khi đạt (chỉ lần trượt đầu quay lại theory), chỉ `SKIPPED` khi hết
+  package chưa lộ. Bài ôn vẫn chặn Practice và thi topic của cùng skill. Thi cuối course không chặn tiến độ topic hay course khác. `LessonAccessGate` và use case trong
   `services/learning-service/src/main/java/com/ieltspath/learning/` quyết định cổng bài; trạng thái topic suy ra khi đọc.
 - Mọi lượt ghi của một học viên chạy trong một `@Transactional` mở đầu bằng `pg_advisory_xact_lock` theo user.
 - Bằng chứng bài học chỉ ghi ở lần nộp đầu của mỗi khối; bài ôn ghi mỗi set (nộp một lần); kết quả thi ghi theo

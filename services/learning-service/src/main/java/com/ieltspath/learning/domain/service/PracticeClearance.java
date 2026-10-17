@@ -18,6 +18,10 @@ import java.util.stream.Collectors;
  * Whether a learner has cleared a lesson's Practice. When the published sets name their skills, each objective skill
  * (Reading, Listening) is cleared on its own and the Practice passes once every one of them is; Writing sets are
  * optional. Sets without skills (older Content) are judged together as before.
+ *
+ * <p>A skill (or the whole lesson) cleared through reviews needs at least one review of it and none still PENDING:
+ * a finished review next to an open one does not clear the Practice. A DONE and a SKIPPED review (no package left)
+ * both count as finished.
  */
 public final class PracticeClearance {
     private static final Set<LearningSkill> OPTIONAL = EnumSet.of(LearningSkill.WRITING);
@@ -63,12 +67,9 @@ public final class PracticeClearance {
         }
         List<ReviewFact> ofSkill = reviews.stream()
                 .filter(review -> review.skill() == null || review.skill() == skill).toList();
-        if (ofSkill.stream().anyMatch(review -> review.status() != ReviewStatus.PENDING)) {
-            return PracticePassReason.REVIEW_FINISHED;
-        }
-        if (revealed.containsAll(sets) && ofSkill.stream().noneMatch(review -> review.status() == ReviewStatus.PENDING)) {
-            return PracticePassReason.ALL_SETS_ATTEMPTED;
-        }
+        boolean nonePending = ofSkill.stream().noneMatch(review -> review.status() == ReviewStatus.PENDING);
+        if (!ofSkill.isEmpty() && nonePending) return PracticePassReason.REVIEW_FINISHED;
+        if (revealed.containsAll(sets) && nonePending) return PracticePassReason.ALL_SETS_ATTEMPTED;
         return null;
     }
 
@@ -77,11 +78,11 @@ public final class PracticeClearance {
         if (attempts.stream().anyMatch(attempt -> attempt.passed() && attempt.countedAsEvidence())) {
             return new Clearance(PracticeStatus.PASSED, PracticePassReason.FIRST_SUBMISSION);
         }
-        if (reviews.stream().anyMatch(review -> review.status() != ReviewStatus.PENDING)) {
+        boolean nonePending = reviews.stream().noneMatch(review -> review.status() == ReviewStatus.PENDING);
+        if (!reviews.isEmpty() && nonePending) {
             return new Clearance(PracticeStatus.PASSED, PracticePassReason.REVIEW_FINISHED);
         }
-        if (!publishedPackages.isEmpty() && revealedPackages.containsAll(publishedPackages)
-                && reviews.stream().noneMatch(review -> review.status() == ReviewStatus.PENDING)) {
+        if (!publishedPackages.isEmpty() && revealedPackages.containsAll(publishedPackages) && nonePending) {
             return new Clearance(PracticeStatus.PASSED, PracticePassReason.ALL_SETS_ATTEMPTED);
         }
         if (publishedPackages.isEmpty()) return new Clearance(PracticeStatus.PASSED, PracticePassReason.NO_PRACTICE);
