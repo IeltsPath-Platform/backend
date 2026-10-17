@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "League tuần"
-status: pending
+status: in_progress
 priority: P3
 dependencies: [2]
 ---
@@ -28,8 +28,9 @@ hạng, giữa giữ nguyên. 7 hạng: Bronze, Silver, Gold, Sapphire, Diamond,
   - xếp hạng trong nhóm theo `weekly_xp` giảm dần, hòa thì ai đạt trước xếp trên;
   - top 7 lên một hạng (Amethyst giữ); hạng 23–30 xuống một hạng (Bronze giữ); nhóm < 23 người thì không ai xuống;
   - một câu UPDATE theo nhóm/tập, không vòng gọi repository từng người.
-- **Tên hiển thị:** user-service mở `POST /internal/users/display-names` (body danh sách id, tối đa 50, trả `id`,
+- [x] **Tên hiển thị (Codex):** user-service mở `POST /internal/users/display-names` (body danh sách id, tối đa 50, trả `id`,
   `displayName`; không trả email). Learning gọi một lần mỗi lần xem bảng (cùng client internal ở plan 3 phase 4).
+  (test: user endpoint suite 9 tests, 0 failures/errors/skips; PostgreSQL Testcontainers ran.)
 - **API:**
   - `GET /api/learning/me/league`: hạng, nhóm tuần này, danh sách 30 người (tên, XP tuần, thứ hạng), vùng lên/xuống, thời
     điểm chốt;

@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Báo cáo theo kỹ năng và band mục tiêu"
-status: pending
+status: in_progress
 priority: P1
 dependencies: [2]
 ---
@@ -20,9 +20,9 @@ Band mục tiêu nằm ở learning goal của user-service, learning-service ch
 
 ## Requirements
 
-- **user-service:** endpoint nội bộ `GET /internal/users/{id}/learning-goal` trả `targetBand`, `examDate` (null nếu
+- [x] **user-service (Codex):** endpoint nội bộ `GET /internal/users/{id}/learning-goal` trả `targetBand`, `examDate` (null nếu
   chưa đặt). Chỉ gọi bằng internal JWT; thêm vào `internal-jwt-paths` nếu Gateway cần (chỉ service gọi nhau, không mở ra
-  ngoài).
+  ngoài). (test: user endpoint suite 9 tests, 0 failures/errors/skips; PostgreSQL Testcontainers ran.)
 - **learning-service:** `application/port/LearnerGoalClient` + adapter HTTP, kèm bearer và `X-Correlation-Id`. Lỗi hoặc
   timeout thì báo cáo vẫn trả, `target = null`.
 - **Khối `skills` trong báo cáo** (thêm trường, không đổi trường cũ):
