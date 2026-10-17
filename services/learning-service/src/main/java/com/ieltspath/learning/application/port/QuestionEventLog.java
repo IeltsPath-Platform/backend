@@ -37,6 +37,15 @@ public interface QuestionEventLog {
 
     record ErrorCount(String code, int count) {}
 
+    /**
+     * {@code revisionNo} and {@code revisionDelta} are set only for an essay event: the version number of the essay (1 for
+     * the first) and its overall band minus the band of the version it revised (null for a first essay).
+     */
     record RecentEvent(UUID questionVersionId, Boolean correct, Long durationMs, QuestionEventSource source,
-                       String errorCode, Instant at) {}
+                       String errorCode, Instant at, Integer revisionNo, java.math.BigDecimal revisionDelta) {
+        public RecentEvent(UUID questionVersionId, Boolean correct, Long durationMs, QuestionEventSource source,
+                           String errorCode, Instant at) {
+            this(questionVersionId, correct, durationMs, source, errorCode, at, null, null);
+        }
+    }
 }

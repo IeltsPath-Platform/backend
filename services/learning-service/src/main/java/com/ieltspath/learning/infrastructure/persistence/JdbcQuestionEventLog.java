@@ -118,13 +118,17 @@ public class JdbcQuestionEventLog implements QuestionEventLog {
         Map<UUID, List<RecentEvent>> recent = new HashMap<>();
         jdbc.query("""
                 SELECT point.id AS kp_id, event.question_version_id, event.correct, event.duration_ms, event.source,
-                       event.error_code, event.occurred_at
+                       event.error_code, event.occurred_at,
+                       essay.revision_no, essay.overall_band - earlier.overall_band AS revision_delta
                 FROM unnest(CAST(? AS uuid[])) AS point(id)
                 CROSS JOIN LATERAL (
                     SELECT * FROM question_attempt_events candidate
                     WHERE candidate.user_id = ? AND point.id = ANY (candidate.knowledge_point_ids)
                     ORDER BY candidate.ordinal DESC LIMIT ?
                 ) event
+                LEFT JOIN lesson_writing_submissions essay
+                       ON event.source = 'lesson_writing' AND essay.id = event.source_reference_id
+                LEFT JOIN lesson_writing_submissions earlier ON earlier.id = essay.previous_submission_id
                 ORDER BY point.id, event.ordinal DESC
                 """, statement -> {
             statement.setArray(1, JdbcKnowledgeEvidenceRepository.uuidArray(statement.getConnection(), knowledgePointIds));
@@ -138,7 +142,8 @@ public class JdbcQuestionEventLog implements QuestionEventLog {
             recent.computeIfAbsent(rows.getObject("kp_id", UUID.class), ignored -> new ArrayList<>())
                     .add(new RecentEvent(rows.getObject("question_version_id", UUID.class), correctness, durationMs,
                             QuestionEventSource.fromValue(rows.getString("source")), rows.getString("error_code"),
-                            rows.getTimestamp("occurred_at").toInstant()));
+                            rows.getTimestamp("occurred_at").toInstant(), rows.getObject("revision_no", Integer.class),
+                            rows.getBigDecimal("revision_delta")));
         });
         return recent;
     }

@@ -49,7 +49,8 @@ Role `CUSTOMER`. Always the verified caller's own report; there is no user param
   `band` is the band of the KP's course.
 - `errors`: the three most frequent error codes of the last 90 days with their counts.
 - `evidence`: the five newest question events of the KP (`durationMs` and `errorCode` may be null; `correct` is null for
-  an ungraded item).
+  an ungraded item). An essay event also has `revisionNo` and, for a revised essay, `revisionDelta` (see
+  [essay-revision-v1](essay-revision-v1.md)); the two fields are absent on other events.
 - `action.type`:
 
   | Type | When |

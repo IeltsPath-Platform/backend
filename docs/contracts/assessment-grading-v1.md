@@ -13,11 +13,13 @@ Customer submission/job creation and owner-only job lookup keep their existing c
 | GET | `/grading-jobs/{id}/essay` | Only the assigned examiner; otherwise 403. Missing/non-human job: 404. |
 
 List response: `{content: [...], page, size, totalElements}`. Each entry contains
-`id`, `submissionId`, `attemptId`, `attemptItemId`, `attemptType`, `skill`, `task`,
-`status`, `reason`, `assignedExaminerId`, `claimedAt`, `createdAt`, `waitSeconds`.
-Attempt fields may be null for standalone submissions. Timestamps use ISO-8601 UTC.
-Reason is COURSE_GATE_POLICY, LLM_FAILED, LLM_QUOTA, LLM_NOT_CONFIGURED or HUMAN_CREDIT.
-QA_SAMPLE is reserved in the schema and has no workflow yet.
+`id`, `submissionId`, `attemptId`, `attemptItemId`, `attemptType`, `source`, `skill`,
+`task`, `status`, `reason`, `assignedExaminerId`, `claimedAt`, `createdAt`,
+`waitSeconds`, and `overdue`. Attempt fields may be null for standalone submissions.
+For attempt jobs, `source` is the attempt type; standalone review jobs use `LESSON`
+or `PRACTICE`. Timestamps use ISO-8601 UTC. Reason is COURSE_GATE_POLICY,
+LLM_FAILED, LLM_QUOTA, LLM_NOT_CONFIGURED, HUMAN_CREDIT, or QA_SAMPLE. QA_SAMPLE
+jobs use the QA review routes in [admin-area-v1](admin-area-v1.md#examiner-quality-review).
 
 A claim remains QUEUED until finalization, so the default queue shows its assignee.
 After **more than 24 hours**, an unfinished claim can be replaced. Reading/saving/finalizing
@@ -29,11 +31,12 @@ the other unassigned/expired HUMAN jobs of that attempt. A live claim held by an
 examiner blocks the claim. This keeps one examiner responsible for the attempt.
 Standalone jobs are claimed individually. ADMIN follows the same claim rules.
 
-Essay response: `{jobId, attemptId, attemptItemId, prompt, essay, task, rubric}`.
-`prompt` is the snapshotted Content stem (standalone: submission stem), and `rubric`
-is the Content rubric projection for the essay task, including criteria and band
-descriptors. It contains no answer snapshot. The stored AI job records the rubric
-and shared template version as `prompt_version` in the form
+Essay response: `{jobId, attemptId, attemptItemId, prompt, essay, task, rubric, source}`.
+`prompt` is the snapshotted Content stem (standalone: submission stem). `source` is
+the attempt type for attempt jobs, or `LESSON`/`PRACTICE` for standalone reviews.
+`rubric` is the stored rubric snapshot for a standalone review; it is currently
+`null` for regular attempt jobs. The response contains no answer snapshot. The stored
+AI job records the rubric and shared template version as `prompt_version` in the form
 `<rubricCode>@<rubricVersion>+tpl<templateVersion>`.
 Queue, claim and essay responses never include LLM bands, criteria, feedback or raw
 job entities. They also never include the answer snapshot.

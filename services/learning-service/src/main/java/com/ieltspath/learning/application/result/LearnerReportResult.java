@@ -19,8 +19,24 @@ public record LearnerReportResult(UUID userId, Instant generatedAt, List<Knowled
 
     public record ErrorEntry(String code, int count) {}
 
+    /**
+     * {@code revisionNo} and {@code revisionDelta} are present only on an essay: its version number and its overall band
+     * minus the band of the version it revised (absent for a first essay). The grading is automatic, so a delta also
+     * carries the grader's noise.
+     */
     public record EvidenceEntry(UUID questionVersionId, Boolean correct, Long durationMs, String source,
-                                String errorCode, Instant at) {}
+                                String errorCode, Instant at,
+                                @com.fasterxml.jackson.annotation.JsonInclude(
+                                        com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                Integer revisionNo,
+                                @com.fasterxml.jackson.annotation.JsonInclude(
+                                        com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                BigDecimal revisionDelta) {
+        public EvidenceEntry(UUID questionVersionId, Boolean correct, Long durationMs, String source,
+                             String errorCode, Instant at) {
+            this(questionVersionId, correct, durationMs, source, errorCode, at, null, null);
+        }
+    }
 
     /**
      * {@code type}: REVIEW_REQUIRED, DIAGNOSING (the pending review is being diagnosed through its prerequisites),

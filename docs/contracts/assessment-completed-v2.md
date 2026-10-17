@@ -80,7 +80,7 @@ Each `item_results[]` entry:
 | `is_correct` | boolean or null | Explicit correctness. `null` means the item was not graded right/wrong (for example an essay). |
 | `score`, `max_score` | number | `0 <= score <= max_score`, `max_score > 0`. |
 | `duration_ms` | integer >= 0, or null | Optional. The learner's time on the item, from the attempt's stored running total, capped at two hours. Null when the client never reported time. Added after v2 shipped; consumers must treat it as optional. |
-| `error_code` | string or null | Optional. The error-taxonomy code (for example `PARAPHRASE_TRAP`) of a wrong objective answer, from the error analysis rows. Null for correct, ungraded and essay items. Distinct from the legacy `error_type` below. |
+| `error_code` | string or null | Optional. The error-taxonomy code (for example `PARAPHRASE_TRAP`) of a wrong objective answer, from the error analysis rows. Null for correct, ungraded and essay items. It is the item's first recorded error-analysis value. |
 | `knowledge_point_mappings[]` | array | The Content snapshot taken at attempt start. |
 
 `TOPIC_GATE`, `OFFICIAL_PRACTICE` and `COURSE_GATE` attempts may contain essay items.
@@ -100,7 +100,7 @@ Each `knowledge_point_mappings[]` entry:
 | `knowledge_point_id` | UUID | Content `knowledge_points.id`. `KP.code` is never identity. |
 | `weight` | number >= 0 | Attribution metadata only. It does not scale mastery, evidence quality or scheduling, and every mapped KP receives its own evidence. |
 | `qualitative_judgment` | `PASS`, `FAIL`, `NOT_ASSESSED` or null | Explicit per-KP grader outcome. |
-| `error_type` | string or null | Assessment error-analysis metadata. Legacy categories (`structural`, `deviation`, `application`, `metacognitive`) are retained for compatibility. |
+| `error_type` | string or null | Assessment error-analysis value for this KP. It may be a current error code such as `PARAPHRASE_TRAP` or a legacy category (`structural`, `deviation`, `application`, `metacognitive`). When the item's first analysis row belongs to this KP, this value can equal the top-level `error_code`; the fields differ by scope. |
 
 The event carries no correct answers, expected answers or examiner reasoning.
 

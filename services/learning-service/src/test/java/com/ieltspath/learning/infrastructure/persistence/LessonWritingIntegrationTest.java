@@ -88,6 +88,7 @@ class LessonWritingIntegrationTest {
     @Autowired SubmitLessonEssayUseCase submitLessonEssayUseCase;
     @Autowired com.ieltspath.learning.application.usecase.SubmitEssayRevisionUseCase submitEssayRevisionUseCase;
     @Autowired com.ieltspath.learning.application.usecase.GetEssayHistoryUseCase getEssayHistoryUseCase;
+    @Autowired com.ieltspath.learning.application.usecase.GetLearnerReportUseCase learnerReport;
     @Autowired GetLessonUseCase getLessonUseCase;
     @Autowired SubmitLessonExerciseUseCase submitLessonExerciseUseCase;
     @Autowired RefreshLearningTopicsUseCase topics;
@@ -101,7 +102,8 @@ class LessonWritingIntegrationTest {
         jdbc.execute("""
                 TRUNCATE review_theory_checks, diagnostic_probes, diagnostic_sessions,review_sets, review_items, lesson_exercise_submissions, kp_evidence, lesson_progress,
                 topic_progress, knowledge_point_catalog, topic_test_assignments, assessment_result_versions,
-                human_review_requests, lesson_writing_submissions, llm_daily_usage, kp_mastery_profiles RESTART IDENTITY
+                human_review_requests, lesson_writing_submissions, llm_daily_usage, kp_mastery_profiles,
+                question_attempt_events RESTART IDENTITY
                 """);
         reset(content, access, llm);
         when(content.getActiveRubric(anyString())).thenAnswer(invocation -> testRubric(invocation.getArgument(0)));
@@ -370,6 +372,18 @@ class LessonWritingIntegrationTest {
         assertEquals(revised.submissionId(), history.reviseFromSubmissionId());
         assertEquals(404, assertThrows(LearningRequestException.class,
                 () -> getEssayHistoryUseCase.execute(OTHER_USER, first.submissionId())).getStatus());
+
+        // The report's evidence shows each essay's version and how much its band moved from the version it revised.
+        var essayEvidence = learnerReport.execute(USER).knowledgePoints().stream()
+                .filter(point -> point.knowledgeId().equals(ESSAY_KP)).findFirst().orElseThrow().evidence().stream()
+                .filter(entry -> "lesson_writing".equals(entry.source())).toList();
+        assertEquals(2, essayEvidence.size());
+        var newest = essayEvidence.getFirst();
+        assertEquals(2, newest.revisionNo());
+        assertEquals(0, new BigDecimal("1.0").compareTo(newest.revisionDelta()));
+        var original = essayEvidence.get(1);
+        assertEquals(1, original.revisionNo());
+        assertNull(original.revisionDelta());
     }
 
     @Test

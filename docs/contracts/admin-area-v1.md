@@ -18,9 +18,16 @@ do not contain the original examiner or band. Jobs older than 48 hours include `
     "id": "a7f5c520-4ee8-45a5-a63b-b64fdfed2b76",
     "submissionId": "c26f2b10-d777-4888-ad68-6a51def59e01",
     "attemptId": "f0ad2c50-d55d-4dc5-af49-fac127718b93",
+    "attemptItemId": "7a50ce25-8ef1-4877-a035-9c3f922d1ca2",
+    "attemptType": "TOPIC_GATE",
+    "source": "TOPIC_GATE",
     "skill": "WRITING",
+    "task": "TASK_2",
     "status": "QUEUED",
     "reason": "QA_SAMPLE",
+    "assignedExaminerId": null,
+    "claimedAt": null,
+    "createdAt": "2026-10-17T02:00:00Z",
     "waitSeconds": 372,
     "overdue": false
   }],
@@ -85,8 +92,15 @@ Assessment forwards the learner bearer token so Access identifies the learner. B
 {"submissionId":"c26f2b10-d777-4888-ad68-6a51def59e01","remainingCredits":2}
 ```
 
-Insufficient credits return HTTP `402` (`HUMAN_GRADING_CREDIT_REQUIRED`). Reusing a submission ID as a different learner returns `409` (`HUMAN_GRADING_CREDIT_CONFLICT`). Successful
-consumption writes `HumanGradingCreditConsumed`; a successful compensation writes `HumanGradingCreditRefunded`.
+The Access endpoints return Access's standard `ErrorResponse` (`timestamp`, `status`,
+`error`, `message`, `path`, `details`); they do not include a named `code` field.
+Insufficient credits return `402`; reusing a submission ID as a different learner
+returns `409`. Assessment maps those upstream statuses on its learner-facing request
+to `HUMAN_GRADING_CREDIT_REQUIRED` and `HUMAN_GRADING_CREDIT_CONFLICT`, respectively.
+Repeating consume or refund for the same learner and submission is idempotent. A
+refund for a submission with no recorded consumption returns `400`. Successful
+consumption writes `HumanGradingCreditConsumed`; a successful compensation writes
+`HumanGradingCreditRefunded`.
 
 ## Not included
 

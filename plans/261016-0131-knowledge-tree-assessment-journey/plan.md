@@ -111,7 +111,7 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 | 11 | [Rubric dạng dữ liệu và bộ test nghiệm thu AI](./phase-11-rubric-data-and-ai-evaluation.md) | content, assessment, learning | Công cụ xong; **chưa có bằng chứng nghiệm thu** (cần gold set chuyên gia và lần chạy đánh giá thật) |
 | 12 | [Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor](./phase-12-admin-area-backend.md) | learning, assessment, access | Completed (Gateway route đã có test, c014d56) |
 | 13 | [Contract, tài liệu và nghiệm thu](./phase-13-contracts-docs-and-verification.md) | docs | In progress (tài liệu xong; còn `mvn verify`, demo Compose, `acceptance.md`) |
-| 14 | [Học viên sửa essay và nộp lại](./phase-14-essay-revision.md) | learning | Completed (trừ `revisionDelta` ở báo cáo) |
+| 14 | [Học viên sửa essay và nộp lại](./phase-14-essay-revision.md) | learning | Completed (9cf6d74, báo cáo có `revisionDelta`) |
 | 15 | [Mentor chữa essay Practice và lesson](./phase-15-mentor-practice-essays.md) | learning, assessment, access | Completed (c03b9e0, 0a35bc4; chưa chạy thử nối thật hai service) |
 
 ## Phân công đang làm (một nhánh `feat/knowledge-tree-assessment-journey`)

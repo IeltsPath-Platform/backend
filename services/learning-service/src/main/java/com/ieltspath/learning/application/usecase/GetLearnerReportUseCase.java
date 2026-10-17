@@ -78,7 +78,8 @@ public class GetLearnerReportUseCase {
                             .map(error -> new ErrorEntry(error.code(), error.count())).toList(),
                     recent.getOrDefault(profile.knowledgePointId(), List.of()).stream()
                             .map(event -> new EvidenceEntry(event.questionVersionId(), event.correct(),
-                                    event.durationMs(), event.source().value(), event.errorCode(), event.at()))
+                                    event.durationMs(), event.source().value(), event.errorCode(), event.at(),
+                                    event.revisionNo(), event.revisionDelta()))
                             .toList(),
                     action(profile, pendingReviews.get(profile.knowledgePointId()),
                             diagnosing.contains(profile.knowledgePointId()), now));

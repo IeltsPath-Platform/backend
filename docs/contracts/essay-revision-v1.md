@@ -45,7 +45,9 @@ Errors: `404 NOT_FOUND` (not the caller's), `409 NOT_REVISABLE` (not graded, or 
 - `canRevise` is false when the newest version cannot be revised (limit reached, or a revision is already in progress);
   otherwise revise from `reviseFromSubmissionId`.
 
-## Not in this version
+## In the learner report
 
-The learner report does not yet carry a `revisionDelta`, and the question event log has no `revision_no`. Both can be read
-from this history.
+An essay entry in the `evidence` block of `GET /api/learning/report` (`source = lesson_writing`) also carries `revisionNo`
+(1 for the first essay) and `revisionDelta` (its overall band minus the band of the version it revised, absent for a first
+essay). Other evidence entries do not have these fields. Both are derived from the revision chain, so the question event
+log has no `revision_no` column. The grading is automatic: a delta includes grader noise.

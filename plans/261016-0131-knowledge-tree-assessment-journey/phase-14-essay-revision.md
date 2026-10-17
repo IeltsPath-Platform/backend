@@ -18,8 +18,9 @@ dependencies: [4, 5]
   - Không dùng unique index chống rẽ nhánh: bản sửa `FAILED` phải cho thử lại bằng `requestId` mới, nên kiểm tra "đã có bản
     sửa chưa `FAILED`" nằm trong `startGrading` dưới khóa learner.
   - Gửi lại cùng `requestId` của một bản sửa thì tiếp tục/phát lại bản đó, không kiểm tra lại chuỗi.
-- **Để lại:** `revisionDelta` trong khối `evidence` của báo cáo (bước 4) và `revision_no` trên `question_attempt_events`.
-  Lịch sử đã đủ để FE vẽ so sánh; hai mục này chỉ là tiện ích, làm khi FE cần.
+- **`revisionNo` và `revisionDelta` trong khối `evidence` của báo cáo: xong (2026-10-17).** Suy ra từ chuỗi bản sửa qua
+  phép nối `lesson_writing_submissions`, nên **không** thêm cột `revision_no` vào `question_attempt_events` (một nguồn dữ
+  liệu, không nhân đôi).
 
 ## Overview
 
