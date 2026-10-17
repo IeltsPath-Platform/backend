@@ -1,5 +1,7 @@
 # Game Service
 
+Public REST/WebSocket contract: [Wordly Game v1](../../docs/contracts/wordly-game-v1.md).
+
 ## Create a Wordly room
 
 POST `/api/games/wordly/rooms` with an authenticated bearer token (local Gateway port 18080).
@@ -142,10 +144,10 @@ GET `/api/games/matches/{matchId}/words/current` returns only the caller's board
 word number/limit, columns, maxAttempts=columns+1, attemptsUsed, timer, player state and saved guesses.
 It never returns answer/source list. Nonparticipants return 404. SOLO with no active assigned word retains 404; multiplayer terminal players return 409 PLAYER_NOT_ACTIVE, or MATCH_FINISHED after match completion.
 Existing matches created before word allocation was implemented have no current word; create a new match.
-For SOLO, start also snapshots the full valid dictionary through the internal catalog API.
-The initial selected sequence comes first in the pool; remaining words are shuffled.
-Endless play consumes the pool and repeats it after exhaustion. Library changes or outages
-after start do not change an existing match. The start snapshot has a 100,000-word safety limit.
+Start pins a shared immutable dictionary version loaded through the internal catalog API.
+The randomized initial sequence comes first. Endless play then consumes remaining entries in
+a stable shuffled order before cycling through the full dictionary. Library changes or outages after
+start do not change an existing match. Catalog loading has a 100,000-word safety limit.
 
 ## Wordly hint
 
@@ -228,7 +230,7 @@ No unplayed answers are returned. End reasons: WORD_LIMIT_REACHED, NO_LIVES_LEFT
 Natural completion returns the room to WAITING and clears readiness; start a new match to
 play again. Old match results are retained. The private WORD_STATE/MATCH_FINISHED event is sent
 only to the caller's room connection after commit. Multiplayer uses the public ranking events described below.
-Matches started before V7 have no dictionary pool: guesses return VOCABULARY_SNAPSHOT_MISSING;
+Matches started before V7 without a dictionary reference/pool return VOCABULARY_SNAPSHOT_MISSING;
 create a new match. They can still be left; the timeout worker skips them.
 
 Verification: `mvn -q -pl services/game-service,services/library-service -am test`.
@@ -239,7 +241,7 @@ pending receipt versus timeout, loss of all lives, endless cycles and leave/resu
 ## Multiplayer Wordly
 
 The existing guesses, hint, match leave and result APIs support MULTIPLAYER. Start snapshots
-one shared vocabulary sequence and dictionary pool; each player advances independently.
+one shared vocabulary sequence and a reference to an immutable shared dictionary version; each player advances independently.
 Current-word and guess responses expose only the caller's board. REST room responses include
 activeMatchId; GET match includes playerMode/settings/serverTime and public player progress.
 No frontend changes are included in this backend implementation.
@@ -307,3 +309,17 @@ update an already-running process.
 Clients must wait for the server `CONNECTED` acknowledgment before expecting
 subsequent room events. Native WebSocket `onopen` can precede server-side room
 registration. The registration authorization check protects revoked membership.
+
+## Shared dictionary and start transaction
+
+V9 adds content-versioned shared dictionaries. Identical catalogs are stored once, not per match.
+Matches pin a version; vocabulary edits affect new matches only. Existing V7/V8 pools remain
+readable and no applied migration is rewritten. New matches insert no per-match pool rows.
+Game loads and validates Library vocabulary before opening the room transaction; it then locks
+the room, checks settings/readiness again and writes the match atomically. A concurrent settings
+change rejects start and can be retried. No remote Library request holds the room row lock.
+The accepted-guess dictionary is still the Library catalog: the starter 100 words are not a full
+English dictionary. Adding a broader curated lexicon is a separate data-import decision.
+Hint is intentionally free in SOLO and MULTIPLAYER, once per word; it does not reduce score,
+lives, attempts or streak. Start, gameplay and hint time decisions use an injected UTC Clock.
+Swagger already selects `/api/games/**` in Config Server; no path filter change is required.
