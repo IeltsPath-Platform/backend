@@ -65,7 +65,7 @@ Mastery MP-1.0 ──> tier INSUFFICIENT │ PRIORITY │ CONSOLIDATE │ MAINTA
 | 5 | [Bản chụp tuần, xu hướng, bản tháng](phase-05-weekly-monthly-snapshots.md) | learning | pending | 4 |
 | 6 | [Flashcard 5 hộp](phase-06-flashcard-leitner.md) | library | completed (commit `fec4c19`, test library xanh) | – |
 | 7 | [Cờ vắng học và thống kê hoạt động](phase-07-inactivity-flag-and-activity-stats.md) | learning | in_progress (cờ INACTIVE, tự đóng, DAU/WAU/MAU và giữ chân có test; chưa kiểm hàng việc EXAMINER) | – |
-| 8 | [Xem trước và xuất bản hẹn giờ](phase-08-preview-and-scheduled-publish.md) | content | pending | – |
+| 8 | [Xem trước và xuất bản hẹn giờ](phase-08-preview-and-scheduled-publish.md) | content | completed (commit `66351e9`, 22 test; còn: chạy lại scheduler test sau thay đổi annotation cuối) | – |
 | 9 | [Contract, tài liệu, nghiệm thu](phase-09-contracts-and-acceptance.md) | docs | pending | tất cả |
 
 Song song được: 1, 2, 6, 7, 8. Sau 2 thì 3 và 4; 5 sau 4.

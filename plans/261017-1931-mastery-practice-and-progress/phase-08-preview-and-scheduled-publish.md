@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: "Xem trước và xuất bản hẹn giờ"
-status: in_progress
+status: completed
 priority: P3
 dependencies: []
 ---
