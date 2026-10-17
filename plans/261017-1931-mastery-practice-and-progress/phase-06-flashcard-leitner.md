@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Flashcard 5 hộp"
-status: pending
+status: completed
 priority: P2
 dependencies: []
 ---
@@ -15,8 +15,9 @@ US-050/051 (03 §B.4) và 02 §A.7: ôn từ vựng theo 5 hộp Leitner (1, 2, 
 
 ## Prerequisite
 
-Test source của `library-service` đang không compile trên main (`plans/261016-0131-.../reports/acceptance.md`). Sửa cho
-compile được trước, commit riêng (`test(library): ...`), rồi mới làm phase này.
+The existing Library target contained stale malformed bytecode (`ClassFormatError` and JDT compile errors). Removing
+only `services/library-service/target` while Maven was idle allowed all production and test sources to compile and the
+baseline 53-test suite to pass. No source fix was needed, so there was no separate prerequisite source commit.
 
 ## Requirements
 
@@ -46,9 +47,14 @@ compile được trước, commit riêng (`test(library): ...`), rồi mới là
 
 ## Success Criteria
 
-- [ ] Thẻ mới đến hạn ngay; đúng 4 lần liên tiếp lên hộp 5 với hạn 16 ngày; sai một lần về hộp 1.
-- [ ] Danh sách đến hạn phân trang ở database, không lẫn thẻ của người khác.
-- [ ] `mvn -q -pl services/library-service -am test` xanh.
+- [x] Thẻ mới đến hạn ngay; đúng 4 lần liên tiếp lên hộp 5 với hạn 16 ngày; sai một lần về hộp 1.
+- [x] Danh sách đến hạn phân trang ở database, không lẫn thẻ của người khác.
+- [x] `mvn -B -ntp -pl services/library-service test` xanh.
+
+## Progress
+
+- Migration V3, five-box schedule, owner-scoped due listing, request ID idempotency, vocabulary metadata batching, and README documentation are complete.
+- Test: `mvn -B -ntp -pl services/library-service test` — 65 tests, 0 failures, 0 errors, 0 skipped; PostgreSQL Testcontainers ran.
 
 ## Risk Assessment
 

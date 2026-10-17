@@ -16,6 +16,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 @Repository
 @RequiredArgsConstructor
@@ -36,11 +37,22 @@ public class FlashcardRepositoryAdapter implements FlashcardRepository {
     }
 
     @Override
+    public Optional<Flashcard> findForReviewByIdAndUserId(UUID id, UUID userId) {
+        return repository.findForReviewByIdAndUserId(id, userId).map(mapper::toDomain);
+    }
+
+    @Override
     public OwnedPage<Flashcard> findByUserIdAndStatus(UUID userId, LibraryStatus status, int page, int size) {
         return JpaSupport.page(
                 repository.findByUserIdAndStatus(userId, status, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"))),
                 mapper::toDomain
         );
+    }
+
+    @Override
+    public OwnedPage<Flashcard> findDueCards(UUID userId, UUID deckId, Instant now, int page, int limit) {
+        return JpaSupport.page(repository.findDueCards(userId, deckId, now, LibraryStatus.ACTIVE,
+                PageRequest.of(page, limit)), mapper::toDomain);
     }
 
     @Override

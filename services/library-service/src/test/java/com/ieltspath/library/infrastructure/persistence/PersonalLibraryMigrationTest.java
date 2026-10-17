@@ -44,7 +44,8 @@ class PersonalLibraryMigrationTest {
                     "uq_flashcard_decks_user_name_not_deleted", "idx_notes_user_source",
                     "idx_video_learning_progress_user_updated", "idx_saved_video_segments_user_created",
                     "idx_notes_user_status_updated", "idx_flashcard_decks_user_status_updated",
-                    "idx_flashcards_user_status_updated", "idx_flashcard_deck_items_deck_sort",
+                    "idx_flashcards_user_status_updated", "idx_flashcards_user_status_due",
+                    "idx_flashcard_deck_items_deck_sort",
                     "idx_flashcard_deck_items_flashcard")) {
                 try (var rows = statement.executeQuery("SELECT to_regclass('public." + index + "')")) {
                     assertTrue(rows.next());
@@ -97,6 +98,37 @@ class PersonalLibraryMigrationTest {
         assertDeleteRejected("learning_videos", progressVideo);
         assertDeleteRejected("learning_videos", savedVideo);
         assertDeleteRejected("video_segments", segment);
+    }
+
+    @Test
+    void leitnerMigrationAddsDefaultScheduleAndReviewIdempotencyFields() throws Exception {
+        UUID cardId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        try (Connection connection = connection(); var statement = connection.createStatement()) {
+            for (String column : List.of("leitner_box", "next_review_at", "last_reviewed_at", "review_count",
+                    "last_review_request_id")) {
+                try (var rows = statement.executeQuery("SELECT column_name FROM information_schema.columns "
+                        + "WHERE table_schema='public' AND table_name='flashcards' AND column_name='" + column + "'")) {
+                    assertTrue(rows.next(), column);
+                    assertEquals(column, rows.getString(1));
+                    assertFalse(rows.next(), column);
+                }
+            }
+            try (var rows = statement.executeQuery("SELECT to_regclass('public.idx_flashcards_user_status_due')")) {
+                assertTrue(rows.next());
+                assertNotNull(rows.getString(1));
+            }
+            statement.executeUpdate("INSERT INTO flashcards (id,user_id,source_type,front,back) VALUES ('"
+                    + cardId + "','" + userId + "','MANUAL','Front','Back')");
+            try (var rows = statement.executeQuery("SELECT leitner_box,review_count,next_review_at,last_reviewed_at "
+                    + "FROM flashcards WHERE id='" + cardId + "'")) {
+                assertTrue(rows.next());
+                assertEquals(1, rows.getInt("leitner_box"));
+                assertEquals(0, rows.getInt("review_count"));
+                assertNull(rows.getObject("next_review_at"));
+                assertNull(rows.getObject("last_reviewed_at"));
+            }
+        }
     }
 
     private static void assertDeleteRejected(String table, UUID id) throws Exception {

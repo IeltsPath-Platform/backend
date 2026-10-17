@@ -10,6 +10,9 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.Instant;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -27,6 +30,13 @@ public class Flashcard {
     private LibraryStatus status;
     private final Instant createdAt;
     private Instant updatedAt;
+    @Builder.Default
+    private int leitnerBox = 1;
+    private Instant nextReviewAt;
+    private Instant lastReviewedAt;
+    @Builder.Default
+    private int reviewCount = 0;
+    private UUID lastReviewRequestId;
 
     public static Flashcard create(
             UUID userId,
@@ -48,6 +58,11 @@ public class Flashcard {
                 null,
                 LibraryStatus.ACTIVE,
                 null,
+                null,
+                1,
+                null,
+                null,
+                0,
                 null
         );
         card.applySource(sourceType, vocabularySenseId, sourceReferenceId, highlightedText, front, back);
@@ -70,6 +85,28 @@ public class Flashcard {
         boolean dropLinks = this.status == LibraryStatus.ACTIVE && status != LibraryStatus.ACTIVE;
         this.status = status;
         return dropLinks;
+    }
+
+    /** Applies one Leitner review; replaying the most recent request ID leaves the card unchanged. */
+    public boolean review(boolean correct, UUID requestId, Instant now, List<Integer> intervalsDays) {
+        if (requestId == null || now == null) {
+            throw new InvalidDataException("review request is incomplete");
+        }
+        if (requestId.equals(lastReviewRequestId)) {
+            return false;
+        }
+        if (leitnerBox < 1 || leitnerBox > 5 || intervalsDays == null || intervalsDays.size() != 5
+                || intervalsDays.stream().anyMatch(days -> days == null || days < 1)) {
+            throw new InvalidDataException("Leitner schedule is invalid");
+        }
+
+        leitnerBox = correct ? Math.min(leitnerBox + 1, 5) : 1;
+        Instant reviewedAt = now.truncatedTo(ChronoUnit.MICROS);
+        lastReviewedAt = reviewedAt;
+        nextReviewAt = reviewedAt.plus(Duration.ofDays(intervalsDays.get(leitnerBox - 1)));
+        reviewCount = Math.addExact(reviewCount, 1);
+        lastReviewRequestId = requestId;
+        return true;
     }
 
     private void applySource(

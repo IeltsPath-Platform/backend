@@ -50,6 +50,16 @@ public class FlashcardJpaEntity {
     private Instant createdAt;
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+    @Column(name = "leitner_box", nullable = false)
+    private short leitnerBox;
+    @Column(name = "next_review_at")
+    private Instant nextReviewAt;
+    @Column(name = "last_reviewed_at")
+    private Instant lastReviewedAt;
+    @Column(name = "review_count", nullable = false)
+    private int reviewCount;
+    @Column(name = "last_review_request_id")
+    private UUID lastReviewRequestId;
 
     @PrePersist
     void onCreate() {
