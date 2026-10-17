@@ -494,6 +494,8 @@ class LessonPipelineSeedTest {
                 .containsExactly(4, 4);
         assertThat(availableKp2.subList(2, 4)).extracting(PracticeSetResult::questionCount)
                 .containsExactly(3, 3);
+        assertThat(availableKp2).allSatisfy(set -> assertThat(set.band()).isEqualByComparingTo("5.5"));
+        assertThat(availableKp2).extracting(PracticeSetResult::requiredFeatureKey).containsOnlyNulls();
 
         List<UUID> excluded = new ArrayList<>();
         List<String> selectedWithExclusions = new ArrayList<>();
@@ -596,7 +598,10 @@ class LessonPipelineSeedTest {
                     });
         }
         assertThat(reader.lessonPracticeSets(lessonId("PM1")))
-                .allSatisfy(set -> assertThat(set.requiredFeatureKey()).isEqualTo("PREMIUM_CONTENT"));
+                .allSatisfy(set -> {
+                    assertThat(set.requiredFeatureKey()).isEqualTo("PREMIUM_CONTENT");
+                    assertThat(set.band()).isEqualByComparingTo("5.5");
+                });
     }
 
     @Test

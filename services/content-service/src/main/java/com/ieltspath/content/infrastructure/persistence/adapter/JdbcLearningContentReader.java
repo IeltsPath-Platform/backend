@@ -31,6 +31,7 @@ import org.springframework.stereotype.Component;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Array;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -382,7 +383,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
     /** Published practice sets of the lessons, by code, in two queries. */
     private Map<UUID, List<LessonPracticeSetResult>> practiceSetsOf(List<UUID> lessonIds, Optional<Skill> skill) {
         record SetRow(UUID lessonId, UUID packageId, UUID versionId, String code, String title, int questionCount,
-                      String requiredFeatureKey, List<Skill> skills) {}
+                      String requiredFeatureKey, List<Skill> skills, BigDecimal band) {}
         var params = new MapSqlParameterSource("lessonIds", lessonIds);
         String filter = skill.map(s -> {
             params.addValue("skill", s.name());
@@ -390,17 +391,21 @@ public class JdbcLearningContentReader implements LearningContentReader {
         }).orElse("");
         List<SetRow> rows = jdbc.query("""
                 SELECT p.lesson_id, p.id, p.current_published_version_id, p.code, p.title, p.required_feature_key,
+                       COALESCE(c.band_level, t.band_max, t.band_min) AS band,
                        ARRAY(%s) AS skills,
                        (SELECT count(*) FROM content_sections s JOIN section_questions sq ON sq.section_id = s.id
                         WHERE s.package_version_id = p.current_published_version_id) AS question_count
                 FROM content_packages p
+                LEFT JOIN lessons package_lesson ON package_lesson.id = p.lesson_id
+                LEFT JOIN topics t ON t.id = COALESCE(p.topic_id, package_lesson.topic_id)
+                LEFT JOIN courses c ON c.id = COALESCE(p.course_id, t.course_id)
                 WHERE p.lesson_id IN (:lessonIds) AND p.package_type = 'PRACTICE_SET' AND p.status = 'PUBLISHED'
                   AND p.current_published_version_id IS NOT NULL
                   %s
                 ORDER BY p.lesson_id, p.code
                 """.formatted(PRACTICE_SKILLS, filter), params, (rs, i) -> new SetRow(uuid(rs, "lesson_id"), uuid(rs, "id"),
                 uuid(rs, "current_published_version_id"), rs.getString("code"), rs.getString("title"),
-                rs.getInt("question_count"), rs.getString("required_feature_key"), skills(rs)));
+                rs.getInt("question_count"), rs.getString("required_feature_key"), skills(rs), rs.getBigDecimal("band")));
         if (rows.isEmpty()) {
             return Map.of();
         }
@@ -422,7 +427,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
             result.computeIfAbsent(row.lessonId(), ignored -> new ArrayList<>())
                     .add(new LessonPracticeSetResult(row.lessonId(), row.packageId(), row.versionId(), row.code(),
                             row.title(), row.questionCount(), pointsByVersion.getOrDefault(row.versionId(), List.of()),
-                            row.requiredFeatureKey(), row.skills()));
+                            row.requiredFeatureKey(), row.skills(), row.band()));
         }
         return result;
     }
@@ -607,7 +612,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
             params.addValue("preferredLessonId", preferredLessonId);
         }
         return jdbc.query("""
-                SELECT p.id, p.current_published_version_id, p.code,
+                SELECT p.id, p.current_published_version_id, p.code, p.required_feature_key,
+                       COALESCE(c.band_level, t.band_max, t.band_min) AS band,
                        (SELECT count(*) FROM content_sections s JOIN section_questions sq ON sq.section_id = s.id
                         WHERE s.package_version_id = p.current_published_version_id) AS question_count,
                        (SELECT count(DISTINCT sq.question_version_id) FROM content_sections s
@@ -616,12 +622,16 @@ public class JdbcLearningContentReader implements LearningContentReader {
                         WHERE s.package_version_id = p.current_published_version_id
                           AND qkp.knowledge_point_id = :knowledgePointId) AS matched_question_count
                 FROM content_packages p
+                LEFT JOIN lessons package_lesson ON package_lesson.id = p.lesson_id
+                LEFT JOIN topics t ON t.id = COALESCE(p.topic_id, package_lesson.topic_id)
+                LEFT JOIN courses c ON c.id = COALESCE(p.course_id, t.course_id)
                 WHERE %s %s
                 ORDER BY %s matched_question_count DESC, p.id
                 LIMIT :limit
                 """.formatted(eligiblePracticeSet(":knowledgePointId"), exclusion, preferred), params,
                 (rs, i) -> new PracticeSetResult(uuid(rs, "id"), uuid(rs, "current_published_version_id"),
-                        rs.getString("code"), rs.getInt("question_count"), rs.getInt("matched_question_count")));
+                        rs.getString("code"), rs.getInt("question_count"), rs.getInt("matched_question_count"),
+                        rs.getBigDecimal("band"), rs.getString("required_feature_key")));
     }
 
     @Override

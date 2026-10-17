@@ -6,6 +6,7 @@ import com.ieltspath.content.application.result.PackageVersionContentResult;
 import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.application.result.LessonPracticeSetResult;
 import com.ieltspath.content.application.result.LessonPracticeSetsResult;
+import com.ieltspath.content.application.result.PracticeSetResult;
 import com.ieltspath.content.application.command.CountPracticeSetsCommand;
 import com.ieltspath.content.application.usecase.CountAvailablePracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetActiveKnowledgePrerequisitesUseCase;
@@ -35,6 +36,7 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -211,6 +213,7 @@ class InternalLearningContentControllerTest {
                 .andExpect(jsonPath("$[0].questionCount").value(3))
                 .andExpect(jsonPath("$[0].knowledgePointIds[0]").value(kp.toString()))
                 .andExpect(jsonPath("$[0].requiredFeatureKey").value((Object) null))
+                .andExpect(jsonPath("$[0].band").value((Object) null))
                 .andExpect(jsonPath("$[0].answerSpec").doesNotExist())
                 .andExpect(jsonPath("$[0].questions").doesNotExist());
         mockMvc.perform(get("/internal/learning-content/topics/{id}/practice-sets", topicId))
@@ -330,5 +333,21 @@ class InternalLearningContentControllerTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest());
         verify(search, never()).execute(any());
+    }
+
+    @Test
+    void practiceSetSearchIncludesBandAndFeatureMetadata() throws Exception {
+        UUID packageId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        UUID knowledgePointId = UUID.randomUUID();
+        when(search.execute(any())).thenReturn(List.of(new PracticeSetResult(packageId, versionId, "PREMIUM-SET",
+                4, 3, new BigDecimal("6.5"), "PREMIUM_CONTENT")));
+
+        mockMvc.perform(post("/internal/learning-content/practice-sets/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"knowledgePointId\":\"" + knowledgePointId + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].band").value(6.5))
+                .andExpect(jsonPath("$[0].requiredFeatureKey").value("PREMIUM_CONTENT"));
     }
 }

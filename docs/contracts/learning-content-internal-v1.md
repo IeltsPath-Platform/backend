@@ -181,8 +181,13 @@ Request is `{knowledgePointId, excludePackageIds, minQuestions, limit, preferred
 {"knowledgePointId":"10000000-0000-4000-8000-000000000002","excludePackageIds":[],"minQuestions":3,"limit":1}
 ```
 
+Each result also includes `band` and `requiredFeatureKey`. `band` comes from the package's owning course when present,
+otherwise from the owning topic's upper range (or lower bound when it has no upper bound); it is `null` when no band is
+assigned. `requiredFeatureKey` is the package's Access feature, or `null` when free. These fields are additive; readers
+must tolerate `null` values.
+
 ```json
-[{"packageId":"20000000-0000-4000-8000-000000000501","packageVersionId":"20000000-0000-4000-8000-000000000601","code":"PS-KP1-A","questionCount":4,"matchedQuestionCount":4}]
+[{"packageId":"20000000-0000-4000-8000-000000000501","packageVersionId":"20000000-0000-4000-8000-000000000601","code":"PS-KP1-A","questionCount":4,"matchedQuestionCount":4,"band":5.5,"requiredFeatureKey":null}]
 ```
 
 Practice search eligibility also excludes question versions used by `COURSE_TEST`, `MOCK_TEST` or `PLACEMENT_TEST` packages. The same exclusion applies to availability counts and `hasPracticeSet`. Reservation checks also include `COURSE_TEST` questions, so they cannot be reused as practice material.
@@ -191,10 +196,10 @@ The request/response illustrates KP1 and its `PS-KP1-A` package. The V4 one-ques
 
 ## `GET /lessons/{id}/practice-sets`
 
-Added 2026-10-03. Returns the lesson's Practice: PUBLISHED `PRACTICE_SET` packages with a current version whose `lessonId` is this lesson, ordered by `code`. Each item is `{packageId, packageVersionId, code, title, questionCount, knowledgePointIds, requiredFeatureKey, skills}`; no question, answer or explanation. Optional `?skill=X` (added 2026-10-07) returns only sets whose `skills` is exactly `[X]`, so mixed sets are excluded; an unknown value or `ALL` returns `400`. `404` when the lesson is unknown or unpublished; `[]` when it has no Practice (the Writing lessons).
+Added 2026-10-03. Returns the lesson's Practice: PUBLISHED `PRACTICE_SET` packages with a current version whose `lessonId` is this lesson, ordered by `code`. Each item is `{packageId, packageVersionId, code, title, questionCount, knowledgePointIds, requiredFeatureKey, skills, band}`; `band` and `requiredFeatureKey` may be `null`. `band` follows the owning course or topic range described above. No question, answer or explanation. Optional `?skill=X` (added 2026-10-07) returns only sets whose `skills` is exactly `[X]`, so mixed sets are excluded; an unknown value or `ALL` returns `400`. `404` when the lesson is unknown or unpublished; `[]` when it has no Practice (the Writing lessons).
 
 ```json
-[{"packageId":"26000000-0000-4000-8000-080000000003","packageVersionId":"26000000-0000-4000-8000-090000000003","code":"PS-TF-A","title":"Luyện thêm PS-TF-A: False hay Not Given","questionCount":3,"knowledgePointIds":["20000000-0000-4000-8000-020000000005"],"requiredFeatureKey":null,"skills":["READING"]}]
+[{"packageId":"26000000-0000-4000-8000-080000000003","packageVersionId":"26000000-0000-4000-8000-090000000003","code":"PS-TF-A","title":"Luyện thêm PS-TF-A: False hay Not Given","questionCount":3,"knowledgePointIds":["20000000-0000-4000-8000-020000000005"],"requiredFeatureKey":null,"skills":["READING"],"band":5.5}]
 ```
 
 Content V16 links each existing practice set of at least three questions to the earliest published lesson, of the same skill, that teaches one of its KPs, and seeds sets for lessons that had none, so every published lesson of a topic with a final test has at least one. A practice set and a review set come from the same pool of packages.

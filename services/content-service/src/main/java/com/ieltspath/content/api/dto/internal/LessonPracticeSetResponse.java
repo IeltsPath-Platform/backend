@@ -2,6 +2,7 @@ package com.ieltspath.content.api.dto.internal;
 
 import com.ieltspath.content.application.result.LessonPracticeSetResult;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import com.ieltspath.content.domain.vo.Skill;
@@ -15,10 +16,12 @@ public record LessonPracticeSetResponse(
         int questionCount,
         List<UUID> knowledgePointIds,
         String requiredFeatureKey,
-        List<Skill> skills
+        List<Skill> skills,
+        BigDecimal band
 ) {
     public static LessonPracticeSetResponse from(LessonPracticeSetResult result) {
         return new LessonPracticeSetResponse(result.packageId(), result.packageVersionId(), result.code(),
-                result.title(), result.questionCount(), result.knowledgePointIds(), result.requiredFeatureKey(), result.skills());
+                result.title(), result.questionCount(), result.knowledgePointIds(), result.requiredFeatureKey(),
+                result.skills(), result.band());
     }
 }
