@@ -138,8 +138,11 @@ public class ApplyAssessmentResultUseCase {
             masteryProfiles.recordEvidence(userId, judged);
         }
         if ("OFFICIAL_PRACTICE".equals(result.assessmentType())) {
-            if (applied.isEmpty()) applyPracticeTest(result);
-            // Until review tiers exist, practice evidence must not create a blocking review.
+            if (applied.isEmpty() && !applyPracticeTest(result)) {
+                // A free practice test counts for nothing, but a wrong answer can still offer an optional review.
+                reviews.executeOptional(userId, considered, wrong, "FREE_PRACTICE_TEST");
+            }
+            // A practice test never creates a blocking review.
             return;
         }
         if ("TOPIC_GATE".equals(result.assessmentType())) applyTopicGate(result);
@@ -147,16 +150,18 @@ public class ApplyAssessmentResultUseCase {
         if (REVIEWED_TYPES.contains(result.assessmentType())) reviews.execute(userId, considered, wrong);
     }
 
-    private void applyPracticeTest(AssessmentResult result) {
-        if (result.packageVersionId() == null) return;
+    /** True when the result belongs to a course milestone assignment; false for a free practice test. */
+    private boolean applyPracticeTest(AssessmentResult result) {
+        if (result.packageVersionId() == null) return false;
         var open = practiceAssignments.findOpenForAttempt(result.userId(), result.packageVersionId(), result.completedAt());
-        if (open.isEmpty()) return;
+        if (open.isEmpty()) return false;
         BigDecimal score = result.items().stream().map(ItemResult::score).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal max = result.items().stream().map(ItemResult::maxScore).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal percent = max.signum() == 0 ? BigDecimal.ZERO
                 : score.multiply(BigDecimal.valueOf(100)).divide(max, 4, RoundingMode.HALF_UP);
         var assignment = open.get();
         if (assignment.consume(result.attemptId(), result.completedAt(), percent)) practiceAssignments.save(assignment);
+        return true;
     }
 
     private void applyPlacement(AssessmentResult result) {

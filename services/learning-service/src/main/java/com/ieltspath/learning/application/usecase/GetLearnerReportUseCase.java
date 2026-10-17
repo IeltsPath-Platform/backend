@@ -1,6 +1,6 @@
 package com.ieltspath.learning.application.usecase;
 
-import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.service.KnowledgePointDirectory;
 import com.ieltspath.learning.application.port.QuestionEventLog;
 import com.ieltspath.learning.application.port.QuestionEventLog.EventStats;
 import com.ieltspath.learning.application.port.QuestionEventLog.RecentEvent;
@@ -19,7 +19,6 @@ import com.ieltspath.learning.domain.vo.PendingReview;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
@@ -36,15 +35,15 @@ public class GetLearnerReportUseCase {
     private final MasteryProfileRepository profiles;
     private final QuestionEventLog events;
     private final ReviewItemRepository reviews;
-    private final LearningContentClient content;
+    private final KnowledgePointDirectory directory;
     private final Clock clock = Clock.systemUTC();
 
     public GetLearnerReportUseCase(MasteryProfileRepository profiles, QuestionEventLog events,
-                                   ReviewItemRepository reviews, LearningContentClient content) {
+                                   ReviewItemRepository reviews, KnowledgePointDirectory directory) {
         this.profiles = profiles;
         this.events = events;
         this.reviews = reviews;
-        this.content = content;
+        this.directory = directory;
     }
 
     @Transactional(readOnly = true)
@@ -59,12 +58,13 @@ public class GetLearnerReportUseCase {
         Map<UUID, List<RecentEvent>> recent = events.recentByKnowledgePoint(userId, pointIds, RECENT_EVIDENCE);
         Map<UUID, UUID> pendingReviews = new HashMap<>();
         for (PendingReview review : reviews.findPending(userId)) {
+            if (!review.blocking()) continue;
             pendingReviews.putIfAbsent(review.knowledgePointId(), review.reviewId());
         }
-        Map<UUID, Described> described = describe();
+        Map<UUID, KnowledgePointDirectory.Entry> described = directory.describe();
 
         List<KnowledgePointReport> report = stored.stream().map(profile -> {
-            Described meta = described.getOrDefault(profile.knowledgePointId(), Described.UNKNOWN);
+            var meta = described.getOrDefault(profile.knowledgePointId(), KnowledgePointDirectory.Entry.UNKNOWN);
             EventStats pointStats = stats.get(profile.knowledgePointId());
             return new KnowledgePointReport(profile.knowledgePointId(), meta.code(), meta.name(), meta.skill(),
                     meta.band(), new Score(profile.mastery(), profile.tier().name(), profile.evidenceCount()),
@@ -90,21 +90,5 @@ public class GetLearnerReportUseCase {
                     ? new Action("MAINTAIN_DUE", null, profile.nextReviewAt())
                     : new Action("NONE", null, profile.nextReviewAt());
         };
-    }
-
-    /** Code, name, skill and band of each knowledge point from Content's topic sequence; the first topic wins. */
-    private Map<UUID, Described> describe() {
-        Map<UUID, Described> described = new HashMap<>();
-        for (LearningContentClient.Topic topic : content.getTopicSequence()) {
-            BigDecimal band = topic.course() == null ? null : topic.course().bandLevel();
-            for (LearningContentClient.KnowledgePoint point : topic.knowledgePoints()) {
-                described.putIfAbsent(point.id(), new Described(point.code(), point.name(), point.skill(), band));
-            }
-        }
-        return described;
-    }
-
-    private record Described(String code, String name, String skill, BigDecimal band) {
-        static final Described UNKNOWN = new Described(null, null, null, null);
     }
 }

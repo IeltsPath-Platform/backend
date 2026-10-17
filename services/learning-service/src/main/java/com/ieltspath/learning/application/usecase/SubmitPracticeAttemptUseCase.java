@@ -124,7 +124,8 @@ public class SubmitPracticeAttemptUseCase {
                     kps.stream().sorted(Comparator.comparing(UUID::toString)).toList(),
                     excluded.stream().sorted(Comparator.comparing(UUID::toString)).toList(), MIN_SET_QUESTIONS);
             Set<UUID> pending = new HashSet<>();
-            reviews.findPending(userId).forEach(review -> pending.add(review.knowledgePointId()));
+            reviews.findPending(userId).stream().filter(review -> review.blocking())
+                    .forEach(review -> pending.add(review.knowledgePointId()));
             var needs = reviewNeeds(graded, outcomes, outcomesBySkill, pending, availability);
             Set<UUID> wrongInLesson = needs.isEmpty() ? Set.of() : mistakes.of(userId, lesson);
             Map<UUID, LearningSkill> kpSkills = new HashMap<>();
@@ -151,6 +152,8 @@ public class SubmitPracticeAttemptUseCase {
         evidence.append(userId, firstAnswers);
         masteryProfiles.recordEvidence(userId, firstAnswers);
         reviews.insertPracticePending(userId, candidates);
+        reviews.promoteToBlocking(userId, candidates.stream().map(PracticeReviewCandidate::knowledgePointId).toList(),
+                "PRACTICE");
         progress.refreshPassForLesson(userId, attempt.lessonId());
         return response;
     }

@@ -34,6 +34,22 @@ public interface ReviewItemRepository {
     /** Adds PENDING reviews; a knowledge point that already has one keeps it. */
     void insertPending(UUID userId, List<ReviewCandidate> candidates);
 
+    /**
+     * As {@link #insertPending(UUID, List)} with the given kind (for example {@code FREE_PRACTICE_TEST}); when
+     * {@code blocking} is false the reviews are optional.
+     */
+    void insertPending(UUID userId, List<ReviewCandidate> candidates, boolean blocking, String triggerKind);
+
+    /**
+     * Makes the learner's optional PENDING reviews of these knowledge points blocking, with the new trigger. A
+     * knowledge point can hold only one PENDING review, so a wrong answer in the main flow upgrades the optional one.
+     */
+    void promoteToBlocking(UUID userId, Collection<UUID> knowledgePointIds, String triggerKind);
+
+    /** Starts an optional PENDING review; false when the knowledge point already has a PENDING review. */
+    boolean insertOptional(UUID userId, UUID reviewId, UUID knowledgePointId, UUID lessonId, LearningSkill skill,
+                           String triggerKind);
+
     /** Writes the review's status and the set it assigned or answered since loading. */
     void save(ReviewItem review);
 

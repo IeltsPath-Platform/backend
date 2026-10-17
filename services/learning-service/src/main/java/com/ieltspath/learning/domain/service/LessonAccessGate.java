@@ -66,10 +66,14 @@ public final class LessonAccessGate {
         return blocking(pendingReviews, skills, Set.of());
     }
 
-    /** As above, plus every pending review that belongs to one of {@code lessonIds} whatever its skill. */
+    /**
+     * As above, plus every pending review that belongs to one of {@code lessonIds} whatever its skill. An optional
+     * review ({@link PendingReview#blocking()} false) never blocks.
+     */
     public static List<PendingReview> blocking(List<PendingReview> pendingReviews, Set<LearningSkill> skills,
                                                Set<UUID> lessonIds) {
-        return pendingReviews.stream().filter(review -> review.skill() == null || skills.contains(review.skill())
-                || lessonIds.contains(review.lessonId())).toList();
+        return pendingReviews.stream().filter(PendingReview::blocking)
+                .filter(review -> review.skill() == null || skills.contains(review.skill())
+                        || lessonIds.contains(review.lessonId())).toList();
     }
 }

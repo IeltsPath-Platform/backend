@@ -155,7 +155,47 @@ Practice clearance is one-way: after the lesson completes, it passes with the fi
 
 ### `GET /reviews`
 
-Lists the verified learner's reviews oldest first, without a Content request. Query parameters: `status` defaults to `PENDING`; `skill` optionally selects that skill and legacy null-skill reviews; `limit` defaults to 20, accepts 1–100, and returns HTTP 400 above 100. Each item is `{reviewId, knowledgePointId, lessonId, skill, stage, createdAt}`; `stage` is `PRACTICE` or `THEORY`. Review skill is filled from the teaching lesson's topic on curriculum refresh when possible.
+Lists the verified learner's reviews oldest first, without a Content request. Query parameters: `status` defaults to `PENDING`; `skill` optionally selects that skill and legacy null-skill reviews; `limit` defaults to 20, accepts 1–100, and returns HTTP 400 above 100. Each item is `{reviewId, knowledgePointId, lessonId, skill, stage, createdAt, blocking}`; `stage` is `PRACTICE` or `THEORY`, and `blocking` is `false` for an optional review (a UI label "Bắt buộc" / "Tự chọn"). Review skill is filled from the teaching lesson's topic on curriculum refresh when possible.
+
+### `GET /review-basket`
+
+Role `CUSTOMER`. The review basket groups what the learner can review. Nothing in `consolidate` or `due` is mandatory,
+none of it blocks a lesson, Practice or topic test, and none of it counts toward the Process Score; a result only
+updates the mastery profile.
+
+```json
+{
+  "required":    [{"reviewId":"…","knowledgePointId":"…","code":"…","name":"…","lessonId":"…","skill":"READING"}],
+  "consolidate": [{"knowledgePointId":"…","code":"…","name":"…","skill":"READING","tier":"CONSOLIDATE","mastery":0.65,
+                   "dueAt":"…","reason":"CONSOLIDATE","hasUnrevealedSet":true,"reviewId":null}],
+  "due":         [{"knowledgePointId":"…","code":"…","name":"…","skill":"READING","tier":"MAINTAIN","mastery":0.85,
+                   "dueAt":"…","reason":"DUE","hasUnrevealedSet":true,"reviewId":null}]
+}
+```
+
+- `required`: the blocking reviews that are `PENDING`.
+- `consolidate`: points at the consolidate tier (mastery 60–79%). `due`: points at the maintain tier whose `dueAt`
+  (`next_review_at`) has passed. A point with a blocking review is only listed under `required`.
+- `hasUnrevealedSet` is true when Content still has a set the learner has not seen, or the point already has an optional
+  review in progress (`reviewId`).
+
+### `POST /review-basket/{knowledgePointId}/start`
+
+Role `CUSTOMER`. Starts an optional review of the point and returns it like `GET /reviews/{reviewId}`, with the first set.
+
+- The point already has a `PENDING` review (blocking or optional): that review is returned and nothing is created.
+- Otherwise the point must be at the consolidate tier, or at the maintain tier and due; any other point answers
+  `409 NOT_IN_REVIEW_BASKET`. A point no completed lesson teaches answers `409 NO_LESSON_FOR_KNOWLEDGE_POINT`. When
+  Content has no set the learner has not seen, `409 NO_UNREVEALED_SET` is returned and nothing is created.
+- The review has `trigger_kind` `CONSOLIDATE` or `MAINTAIN` and is not blocking.
+
+An **optional review** is one set with no theory step: passing it ends the review `DONE`, failing it ends it `SKIPPED`.
+Both write `review_set` evidence and update the mastery profile. A point can hold only one `PENDING` review, so when a
+wrong answer in a graded test or Practice would create a blocking review for a point that has an optional one, that
+review is **upgraded**: it becomes blocking and takes the new trigger (`ASSESSMENT` or `PRACTICE`).
+
+A wrong answer in a **free practice test** (an `OFFICIAL_PRACTICE` result that matches no course milestone assignment)
+can create an optional review with `trigger_kind` `FREE_PRACTICE_TEST`. A milestone practice test creates no review.
 
 ### `GET /reviews/{reviewId}`
 

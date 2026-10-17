@@ -65,7 +65,7 @@ public class GetReviewUseCase {
         if (review.status() != ReviewStatus.PENDING) return result(review, focus, null, List.of());
         // Practice reviews choose their stage when created; reviews from assessment results are created by the
         // event consumer, which cannot read lessons, so the lesson check happens on first open.
-        if (review.isFresh() && !"PRACTICE".equals(review.triggerKind())
+        if (review.blocking() && review.isFresh() && !"PRACTICE".equals(review.triggerKind())
                 && mistakes.of(userId, lesson).contains(review.knowledgePointId())) {
             review.startWithTheory(TheoryReason.WRONG_IN_LESSON);
             reviews.save(review);

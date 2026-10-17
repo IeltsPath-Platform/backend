@@ -1,12 +1,30 @@
 ---
 phase: 6
 title: "Giỏ ôn nhiều mức và recheck"
-status: pending
+status: in_progress
 priority: P1
 dependencies: [5, "plan 261009"]
 ---
 
 # Phase 6: Giỏ ôn nhiều mức và recheck
+
+## Trạng thái và ghi chú triển khai
+
+- **Đã xong (6a):** bài ôn không chặn, giỏ ôn và recheck. Code và test xong, **chưa commit**. Contract:
+  `docs/contracts/lesson-learning-v1.md` (mục `GET /review-basket`, `POST /review-basket/{id}/start`, trường `blocking`).
+- **Chưa làm (6b): `GET /api/learning/suggestions`** (gợi ý bài từ kho đã duyệt). Cần endpoint nội bộ mới của content
+  để tìm `PRACTICE_TEST` và `LESSON` theo KP và band; content đang do Codex giữ. Làm sau khi chốt ai làm phần content.
+- Khác với plan:
+  - Migration là `V15__review_tiers.sql` (V13 là mastery profile, V14 là prompt_version của phase 11).
+  - `blocking` nằm trong `PendingReview`; lọc chặn tập trung ở `LessonAccessGate.blocking`, nên mọi nơi chặn
+    (`LessonAccess`, `PracticeAccess`, `AssignTopicTestUseCase`, `GetTopicLessonsUseCase`) tự bỏ qua bài ôn tự chọn.
+    `PracticeClearance` chỉ xét bài ôn `PRACTICE` (luôn chặn) nên không đổi.
+  - Bài ôn tự chọn nâng thành chặn ở cả hai luồng: kết quả thi (`ReviewReevaluation`) và Practice
+    (`SubmitPracticeAttemptUseCase`), qua `ReviewItemRepository.promoteToBlocking`.
+  - Practice test thuộc mốc không sinh bài ôn nào; chỉ practice test tự do sinh bài ôn tự chọn (`FREE_PRACTICE_TEST`).
+  - Thêm `KnowledgePointDirectory` dùng chung cho báo cáo và giỏ ôn (code, tên, skill, band từ Content).
+  - `POST .../start` từ chối KP ở mức ưu tiên hoặc duy trì chưa đến hạn (`409 NOT_IN_REVIEW_BASKET`), và KP chưa có
+    lesson đã hoàn thành dạy nó (`409 NO_LESSON_FOR_KNOWLEDGE_POINT`; `review_items.lesson_id` bắt buộc).
 
 ## Overview
 

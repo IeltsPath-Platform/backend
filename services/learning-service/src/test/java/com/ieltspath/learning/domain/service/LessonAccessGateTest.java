@@ -166,6 +166,30 @@ class LessonAccessGateTest {
     }
 
     @Test
+    void anOptionalReviewNeverLocksALesson() {
+        var optionalOfThisSkill = new PendingReview(new UUID(3, 1), FIRST, new UUID(3, 2), LearningSkill.READING, false);
+        var optionalWithoutSkill = new PendingReview(new UUID(3, 3), FIRST, new UUID(3, 4), null, false);
+
+        assertThatCode(() -> gate.authorize(List.of(optionalOfThisSkill, optionalWithoutSkill), null,
+                Set.of(LearningSkill.READING), Set.of(FIRST), TopicStatus.IN_PROGRESS, true, List.of()))
+                .doesNotThrowAnyException();
+        assertThat(LessonAccessGate.blocking(List.of(optionalOfThisSkill, optionalWithoutSkill),
+                Set.of(LearningSkill.READING))).isEmpty();
+    }
+
+    @Test
+    void aBlockingReviewStillBlocksNextToAnOptionalOne() {
+        var optional = new PendingReview(new UUID(3, 5), FIRST, new UUID(3, 6), LearningSkill.READING, false);
+        var blocking = new PendingReview(new UUID(3, 7), FIRST, new UUID(3, 8), LearningSkill.READING, true);
+
+        var error = lessonGate(List.of(optional, blocking), Set.of(LearningSkill.READING), Set.of(FIRST),
+                TopicStatus.IN_PROGRESS, true, List.of());
+
+        assertThat(error.getCode()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(error.getReviews()).containsExactly(blocking);
+    }
+
+    @Test
     void reviewsBlockOnlyTheirSkillWhileUnspecifiedReviewsBlockEverySkill() {
         var reading = new PendingReview(new UUID(0, 10), new UUID(0, 11), new UUID(0, 12),
                 LearningSkill.READING);
