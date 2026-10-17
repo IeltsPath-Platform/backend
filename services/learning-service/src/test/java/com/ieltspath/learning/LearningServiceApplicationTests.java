@@ -57,8 +57,8 @@ class LearningServiceApplicationTests {
 
     @Test
     void contextStartsWithMigratedSchemaAndPublicHealth() throws Exception {
-        assertEquals("25", flyway.info().current().getVersion().getVersion());
-        assertEquals(34, jdbc.queryForObject(
+        assertEquals("26", flyway.info().current().getVersion().getVersion());
+        assertEquals(36, jdbc.queryForObject(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_type = 'BASE TABLE' AND table_name <> 'flyway_schema_history'",
                 Integer.class));
