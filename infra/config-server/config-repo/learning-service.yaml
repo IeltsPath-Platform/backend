@@ -35,6 +35,8 @@ learning:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
   access:
     base-url: ${ACCESS_SERVICE_URL:http://localhost:8084}
+  user:
+    base-url: ${USER_SERVICE_URL:http://localhost:8081}
   # OpenAI-compatible chat completions used to grade lesson essays. Blank values turn grading off (503).
   llm:
     base-url: ${LEARNING_LLM_BASE_URL:}
