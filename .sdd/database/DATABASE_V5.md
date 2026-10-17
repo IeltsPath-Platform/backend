@@ -56,11 +56,11 @@ database; không có FK xuyên database. Bảng nào chưa có migration đượ
 | `content_db` | `content-service` | 27 | V1–V39, trừ năm bảng cũ V7 xóa; gồm `outbox_events` |
 | `library_db` | `library-service` | 11 | V1–V2 |
 | `assessment_db` | `assessment-service` | 25 | V1–V12, gồm `outbox_events` |
-| `learning_db` | `learning-service` | 30 | V1–V20 |
+| `learning_db` | `learning-service` | 45 | V1–V30 (V21–V30 thêm 15 bảng: XP, tim, streak, thưởng điểm, bản chụp, league, nhiệm vụ, huy hiệu; §7.22–§7.28) |
 | `game_db` | `game-service` | 12 | V1, gồm `outbox_events`, quiz/leaderboard (chưa có API) |
 | `community_db` | `community-service` | 4 | V1, gồm `outbox_events` |
 | `notification_db` | `notification-service` | 0 | Chưa triển khai; §10 là thiết kế |
-| **Tổng** | | **129** | 124 bảng nghiệp vụ + 5 `outbox_events` |
+| **Tổng** | | **144** | 139 bảng nghiệp vụ + 5 `outbox_events` (chưa tính migration mới của các service khác sau 2026-10-17) |
 
 ## 1.3 Source of truth sau V5
 
@@ -1610,7 +1610,7 @@ Quick-check ở bước lý thuyết của bài ôn: tối đa 3 câu tự chấ
 | `correct_count`, `total_count` | int | NOT NULL | |
 | `submitted_at` | timestamptz | NOT NULL | |
 
-## 7.15 Thay đổi bảng cũ (V6–V20)
+## 7.15 Thay đổi bảng cũ (V6–V29)
 
 | Bảng | Thay đổi | Migration |
 | --- | --- | --- |
@@ -1618,6 +1618,12 @@ Quick-check ở bước lý thuyết của bài ôn: tối đa 3 câu tự chấ
 | `kp_evidence` | `source` thêm `practice_set`, `diagnostic_probe` | V4, V16 |
 | `topic_progress` | `tested_at`, `first_test_percent` (lần thi topic test đầu, điểm giữa khóa) | V17 |
 | `lesson_writing_submissions` | `previous_submission_id`, `revision_no` (1–5, tối đa 3 lần sửa); `essay_hash` (SHA-256 essay chuẩn hóa); `prompt_version` | V14, V18, V19 |
+| `kp_mastery_profiles` | `tier` thêm `INSUFFICIENT`; `confidence` NUMERIC(6,3) NULL (trọng số suy giảm của bằng chứng dưới MP-1.0); chỉ mục `last_evidence_at` cho `MasteryDecayJob` | V21 |
+| `kp_evidence` | `question_version_id` NULL (luật cùng câu trong 7 ngày); `source` thêm `free_practice` | V21, V22 |
+| `practice_attempts` | `lesson_id` cho phép NULL; `origin` (`LESSON`/`FREE`) và `knowledge_point_id` cho luyện tự do, ràng buộc `origin = FREE` ⇔ không có lesson | V22 |
+| `question_attempt_events` | `source` thêm `free_practice`; chỉ mục `occurred_at` cho thống kê hoạt động | V22, V25 |
+| `learner_flags` | `kind` thêm `INACTIVE` | V25 |
+| `xp_ledger` | `source` thêm `STREAK` (V26) và `QUEST` (V29) | V26, V29 |
 
 ## 7.16 `question_attempt_events` (V11)
 
@@ -1655,6 +1661,48 @@ UNIQUE (`kind`, `subject_ref`) nên đồng bộ lại không nhân đôi; `note
 
 PK `submission_id` (FK → `lesson_writing_submissions`), `user_id`, `review_submission_id`: essay lesson/Practice học viên đã
 nhờ Mentor chữa, một yêu cầu cho mỗi essay (tín dụng chỉ trừ một lần). Bản chữa nằm ở Assessment.
+
+## 7.22 `learner_settings`, `xp_ledger`, `learner_xp` (V23)
+
+`learner_settings` (PK `user_id`): `timezone` IANA; ngày hạn mức XP và streak tính theo múi giờ này. `xp_ledger`: mỗi lần
+thưởng XP một dòng (`amount`, `source` `QUESTION`/`KP_CONSOLIDATE`/`KP_MAINTAIN`/`STREAK`/`QUEST`, `source_ref`,
+`local_date`, `counted`), UNIQUE (`user_id`, `source`, `source_ref`) nên lặp lại không cộng hai lần; `counted = false` là XP
+bóng vượt trần ngày. `learner_xp` (PK `user_id`): `total_xp`, `level`.
+
+## 7.23 `learner_hearts` (V24)
+
+PK `user_id`: `hearts`, `max_hearts` (5, PREMIUM 7), `last_regen_at`. Mỗi 5 giờ hồi một tim khi chưa đầy; đồng hồ dừng khi đầy.
+
+## 7.24 `learner_streaks`, `reward_grants` (V26)
+
+`learner_streaks` (PK `user_id`): chuỗi hiện tại và dài nhất, `last_active_date`, `streak_start`, `evaluated_through` (đã
+chốt từng ngày tới đó), đóng băng (`freeze_available`, `freeze_eligible_from`), cụm ngày đã đóng băng liên tiếp
+(`frozen_run_end`, `freeze_run`, đặt giá lượt kế), `lost_streak_days`. `reward_grants`: điểm access nợ học viên, ghi `PENDING`
+cùng transaction với việc phát sinh (`reason` `STREAK_MILESTONE`/`KP_MASTERED`/`DAILY_QUEST`/`BADGE`, `reference_id`,
+UNIQUE (`user_id`, `reason`, `reference_id`)); relay gửi qua RabbitMQ rồi `status` thành `GRANTED`/`CAPPED`/`FAILED`, kèm
+`attempts`, `last_error`.
+
+## 7.25 `learner_weekly_snapshots`, `learner_monthly_snapshots` (V27)
+
+PK (`user_id`, `week_start`) và (`user_id`, `month_start`): `skills` JSONB (mastery theo sáu khối), `tier_counts` JSONB,
+`answered`, `correct`, `active_minutes` (mỗi câu chặn 10 phút), `focus_kp_ids` uuid[], `estimated_band`. Giữ 12 tuần và 36 tháng.
+
+## 7.26 `league_weeks`, `league_groups`, `league_members`, `learner_league` (V28)
+
+Tuần league chạy từ Chủ nhật 00:00 UTC. `league_groups`: tối đa 30 người cùng hạng (`tier` 1–7). `league_members` (PK
+`week_start`, `user_id`): `weekly_xp`, `xp_updated_at` (hòa điểm thì ai đạt trước xếp trên), `final_rank`, `outcome`
+(`PROMOTED`/`STAYED`/`DEMOTED`) sau khi chốt tuần. `league_weeks.closed_at` làm việc chốt idempotent. `learner_league`
+(PK `user_id`): hạng học viên chơi ở tuần kế.
+
+## 7.27 `daily_quests` (V29)
+
+Ba nhiệm vụ mỗi ngày theo múi giờ học viên: `type` `PRACTICE`/`WEAKNESS`/`PRACTICE_PLUS`/`STREAK`, `target_kp_id` (nhiệm vụ
+`WEAKNESS`), `required`, `progress`, `completed_at`, `xp_reward`, `points_reward`. UNIQUE (`user_id`, `local_date`, `type`).
+
+## 7.28 `badges`, `learner_badges` (V30)
+
+`badges` (PK `code`): danh mục cố định gồm tên, mô tả, `reward_points`, `active` (Admin bật/tắt; điều kiện nằm trong code).
+`learner_badges` (PK `user_id`, `badge_code`): huy hiệu đã cấp, không gỡ.
 
 ---
 

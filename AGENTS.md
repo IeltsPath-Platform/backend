@@ -120,9 +120,13 @@ src/main/java/com/ieltspath/<service>
 
 - Mỗi service sở hữu bounded context và database; không đọc/ghi database hay dùng chung JPA entity của service khác.
 - Gọi đồng bộ service-to-service bằng HTTP tới endpoint nội bộ hoặc public của service đích, kèm bearer của request và
-  `X-Correlation-Id` (như assessment → content, library → content, game → library/content, learning → content/access).
+  `X-Correlation-Id` (như assessment → content, library → content, game → library/content, learning → content/access/user).
+  Learning gọi user-service chỉ để đọc mục tiêu band (`/internal/users/{id}/learning-goal`) và tên hiển thị
+  (`/internal/users/display-names`); lỗi hoặc timeout thì báo cáo và bảng league vẫn trả, thiếu phần đó.
 - Bất đồng bộ qua transactional outbox + RabbitMQ; event có version trong tên và contract ở `docs/contracts/`. Consumer
-  phải idempotent và có retry/dead-letter (xem consumer của learning-service).
+  phải idempotent và có retry/dead-letter (xem consumer của learning-service). Điểm thưởng của learning (streak, nhiệm vụ,
+  huy hiệu) đi qua bảng `reward_grants` (outbox) rồi exchange `learning.points` sang access, không gọi HTTP cộng điểm
+  (contract C6 trong `plans/261017-1931-mastery-practice-and-progress/reports/work-split.md`, `gamification-v1.md`).
 - `shared/` chỉ chứa technical concern dùng chung; không chuyển entity hay use case nghiệp vụ vào đó.
 - Chưa có API version prefix. Giữ path tương thích; đánh giá mọi consumer trước khi đổi API, event hoặc JWT claim contract.
 - Gateway chỉ chứa routing, security, CORS, filter, observability; KHÔNG chứa business logic.
@@ -148,7 +152,10 @@ src/main/java/com/ieltspath/<service>
   Chi tiết: `README.md` §6, `docs/system-architecture.md` §7.
 - Nhóm cấu hình nghiệp vụ: `learning.mastery.*` (ngưỡng mastery, lịch ôn; Admin ghi đè ở `learning_rule_configs`),
   `learning.flags.*` (ngưỡng cờ bất thường), `learning.tree-quality.*` (ngưỡng cạnh đáng ngờ, câu quá dễ/khó),
-  `learning.work-items.*` (chu kỳ đồng bộ hàng việc), `learning.writing.*` (hạn mức chấm essay), `assessment.ai-eval.*` (đánh giá AI), `assessment.qa.*` (tỷ lệ lấy mẫu QA
+  `learning.work-items.*` (chu kỳ đồng bộ hàng việc), `learning.writing.*` (hạn mức chấm essay), `learning.free-practice.*`
+  (số gói dự trữ cho bài ôn), `learning.gamification.*` (múi giờ mặc định, XP, tim, nhiệm vụ), `learning.rewards.*` (gửi
+  điểm thưởng sang access), `learning.snapshots.*` (bản chụp tuần/tháng, giữ 12 tuần/36 tháng), `learning.league.*` (chốt
+  tuần), `learning.user.base-url` (gọi user-service), `assessment.ai-eval.*` (đánh giá AI), `assessment.qa.*` (tỷ lệ lấy mẫu QA
   Mentor). Trọng số và ngưỡng điểm khóa nằm trong DB (`course_score_configs`), không trong yaml. Chính sách dùng AI:
   `docs/ai-policy.md`.
 - `Dockerfile.spring-service` build module Maven theo `MODULE_PATH`; Config Server có Dockerfile riêng.
@@ -199,6 +206,21 @@ src/main/java/com/ieltspath/<service>
   trò (`work_items`, `WorkItemSync` đồng bộ khi mở danh sách và mỗi 3 giờ qua `WorkItemSyncJob`, khóa advisory để chỉ một instance chạy), thống kê câu và chất lượng cây (`learning-staff-area-v1.md`).
 - Essay: sửa và nộp lại essay lesson tối đa 3 lần, chỉ từ bản mới nhất (`essay-revision-v1.md`); học viên có tín dụng
   nhờ Mentor chữa essay lesson/Practice đã chấm (`human-review-v1.md`), chỉ là phản hồi: không đổi bằng chứng, cổng hay bài ôn.
+- Luyện tự do theo KP (`POST /knowledge-points/{id}/free-practice`) không bao giờ chặn đường học: trượt không sinh bài
+  ôn chặn và không khóa gì; mỗi KP luôn giữ lại `learning.free-practice.reserve` gói chưa xem cho bài ôn
+  (`free-practice-v1.md`). Bằng chứng luyện tự do là bằng chứng luyện tập (trọng số và trần 3 bài luyện của MP-1.0).
+- Gamification (`gamification-v1.md`): XP chỉ ở lần nộp đầu, đáp án trên trần ngày là XP bóng (không tính); sai câu khách
+  quan trừ tim ở bài tập lesson, Practice và luyện tự do (hết tim thì `403 HEARTS_DEPLETED`, bài ôn vẫn nộp được); streak
+  tính ở server từ câu trả lời thật theo múi giờ học viên và là nguồn duy nhất cho thưởng (streak của user-service do client
+  gửi, không dùng); streak và nhiệm vụ ngày chạy trong transaction của lần nộp qua listener `BEFORE_COMMIT` trên
+  `QuestionEventsAppended` (mang các câu MỚI của lần ghi, nên nộp lặp không cộng thêm); XP tuần của league và huy hiệu
+  được gọi từ nơi phát sinh sự kiện, cùng transaction, và cấp đúng một lần nhờ khóa duy nhất. Mọi thưởng
+  XP đi qua sổ `xp_ledger` có khóa duy nhất theo nguồn và tham chiếu; thưởng điểm đi qua `reward_grants`. Mua bằng điểm
+  (hồi tim, đóng băng streak) dùng `requestId` làm khóa idempotent của access; thiếu điểm trả `402 INSUFFICIENT_POINTS`,
+  access lỗi trả `503 ACCESS_UNAVAILABLE`.
+- Báo cáo: `GET /api/learning/report` có khối `skills`, `focus`, `estimatedBand` (luôn là ước tính, band kỹ năng đạt khi
+  ≥ 80% KP ở band đó `MAINTAIN`) và `target` (đọc từ user-service); bản chụp tuần/tháng do `SnapshotJob` ghi và
+  `progress-snapshots-v1.md` mô tả. Cờ `INACTIVE` mở bằng job hằng ngày và tự đóng khi học viên trả lời lại.
 - Mọi lượt ghi của một học viên chạy trong một `@Transactional` mở đầu bằng `pg_advisory_xact_lock` theo user.
 - Bằng chứng bài học chỉ ghi ở lần nộp đầu của mỗi khối; bài ôn ghi mỗi set (nộp một lần); kết quả thi ghi theo
   `(attempt_id, result_version)`, chấm lại thì thay bằng chứng của version cũ.

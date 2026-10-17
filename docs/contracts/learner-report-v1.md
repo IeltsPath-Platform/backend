@@ -64,6 +64,40 @@ Role `CUSTOMER`. Always the verified caller's own report; there is no user param
 
 `GET /api/learning/mastery` is unchanged.
 
+## Skill view, focus, estimated band and target
+
+The report body also carries four blocks added after `knowledgePoints`; the fields above are unchanged. They are on both
+`GET /api/learning/report` and the staff route.
+
+```json
+{ "skills": [{ "skill": "READING", "mastery": 0.72, "tierCounts": { "PRIORITY": 0, "CONSOLIDATE": 3, "MAINTAIN": 2,
+                "INSUFFICIENT": 1 }, "kpCount": 6, "band": 6.0 }],
+  "focus": [{ "knowledgeId": "…", "code": "R60_TFNG_F_VS_NG", "name": "…", "skill": "READING", "mastery": 0.31,
+              "tier": "PRIORITY", "reviewRequired": true }],
+  "estimatedBand": { "value": 6.0, "estimated": true, "speakingIncluded": false,
+                     "nextBandHints": [{ "skill": "READING", "nextBand": 6.5, "knowledgeIds": ["…"] }] },
+  "target": { "targetBand": 7.0, "gap": 1.0, "examDate": "2027-01-20",
+              "projection": { "date": "2027-02-08", "reason": null } } }
+```
+
+- `skills`: always six blocks in the order `LISTENING`, `READING`, `WRITING`, `SPEAKING`, `GRAMMAR`, `VOCABULARY`. `mastery` is
+  the mean over the block's judged points weighted by their evidence count, and is `null` when no point is judged
+  (`INSUFFICIENT` points are counted in `tierCounts` but not in the mean). `band` is the block's estimated band, `null` for
+  `GRAMMAR`, `VOCABULARY` and for a skill with no band.
+- `focus`: at most three points in `PRIORITY` or `CONSOLIDATE`; a point with a blocking review (`reviewRequired`) comes first,
+  then the lowest mastery.
+- `estimatedBand`: always marked `estimated: true`; it is an estimate, not an exam result.
+  - A skill reaches a band when at least 80% of its points of that band are `MAINTAIN`; the skill's band is the highest such
+    band. When it reaches none, the placement band stands in, but only for a skill that has points; a skill with no points has no
+    band (Speaking has none for now).
+  - `value` is the mean of the skill bands rounded to a half band, `null` when no skill has one. Grammar and vocabulary do not
+    enter it. `speakingIncluded` is true only when Speaking has a band.
+  - `nextBandHints`: for a skill whose next band has at least 80% of its points at `CONSOLIDATE` or better, up to five points
+    still to maintain there, weakest first.
+- `target`: set only when User Service returned a goal (`GET /internal/users/{id}/learning-goal`); otherwise `null` and the
+  report is otherwise complete (a slow or failing User Service never fails the report). `gap` is the target minus `estimatedBand.value` (`null` if either is unknown).
+  `projection` is described in [progress-snapshots-v1](progress-snapshots-v1.md) and is `null` without a target band.
+
 ## Mastery rules (Admin)
 
 Role `ADMIN` for all three routes.

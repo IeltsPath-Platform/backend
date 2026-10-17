@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "Cờ vắng học và thống kê hoạt động"
-status: in_progress
+status: completed
 priority: P2
 dependencies: []
 ---
@@ -39,7 +39,7 @@ câu, cây và giám khảo. Không làm lớp hay thống kê lớp (M1).
 
 ## Success Criteria
 
-- [ ] Học viên 3 ngày không nộp bài xuất hiện trong hàng việc EXAMINER với cờ `INACTIVE`. Cờ được mở (test: `InactivityAndActivityIntegrationTest.aLearnerWhoStopped...`); chưa kiểm hàng việc: `WorkItemSync` chỉ chạy mỗi 3 giờ và chưa có test.
+- [x] Học viên 3 ngày không nộp bài xuất hiện trong hàng việc EXAMINER với cờ `INACTIVE`. (test: `InactivityAndActivityIntegrationTest.aLearnerWhoStopped...` mở cờ; `anInactiveFlagBecomesOneItemInTheExaminerQueue` kiểm hàng việc EXAMINER có đúng một mục `LEARNER_FLAG` với `detail.kind = INACTIVE`, chạy `WorkItemSync` hai lần vẫn một mục)
 - [x] Học viên quay lại học thì cờ tự đóng. (test: `InactivityAndActivityIntegrationTest.aLearnerWhoStopped...`; đóng trước khi commit qua `InactivityFlagCloser`)
 - [x] Admin xem được DAU/WAU/MAU và bảng giữ chân. (test: `InactivityAndActivityIntegrationTest.dailyWeekly...`, `ActivityStatsControllerTest`)
 

@@ -1,8 +1,10 @@
 package com.ieltspath.learning.infrastructure.persistence;
 
 import com.ieltspath.learning.application.exception.LearningRequestException;
+import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.QuestionEventLog;
 import com.ieltspath.learning.application.service.InactivityFlagSync;
+import com.ieltspath.learning.application.service.WorkItemSync;
 import com.ieltspath.learning.application.usecase.GetActivityStatsUseCase;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
 import com.ieltspath.learning.domain.vo.QuestionEventSource;
@@ -13,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -56,10 +59,27 @@ class InactivityAndActivityIntegrationTest {
     @Autowired InactivityFlagSync inactivity;
     @Autowired QuestionEventLog questionEvents;
     @Autowired GetActivityStatsUseCase stats;
+    @Autowired WorkItemSync workItems;
+    @MockitoBean LearningContentClient content;
 
     @BeforeEach
     void emptyTables() {
-        jdbc.execute("TRUNCATE question_attempt_events, learner_flags, topic_progress, course_progress");
+        jdbc.execute("TRUNCATE question_attempt_events, learner_flags, topic_progress, course_progress, work_items");
+    }
+
+    @Test
+    void anInactiveFlagBecomesOneItemInTheExaminerQueue() {
+        UUID stale = UUID.randomUUID();
+        answeredAt(stale, Instant.now().minus(Duration.ofDays(10)));
+        onCourse(stale, UUID.randomUUID(), false);
+        inactivity.run();
+
+        workItems.sync();
+        workItems.sync();
+
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM work_items WHERE queue = 'EXAMINER' "
+                + "AND kind = 'LEARNER_FLAG' AND subject_user_id = ? AND detail ->> 'kind' = 'INACTIVE'",
+                Integer.class, stale), "one EXAMINER item for the flag, however often the round runs");
     }
 
     @Test

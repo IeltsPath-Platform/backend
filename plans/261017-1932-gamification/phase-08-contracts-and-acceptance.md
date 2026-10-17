@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: "Contract, tài liệu, nghiệm thu"
-status: pending
+status: in_progress
 priority: P1
 dependencies: [1, 2, 3, 4, 5, 6, 7]
 ---
@@ -31,6 +31,17 @@ dependencies: [1, 2, 3, 4, 5, 6, 7]
 
 ## Success Criteria
 
-- [ ] Không contract nào lệch controller.
+- [ ] Không contract nào lệch controller. (phần learning đã viết và đối chiếu code; còn access và user-service của Codex)
 - [ ] Demo 1–6 chạy trên Compose sạch.
 - [ ] `mvn -B -ntp verify` xanh.
+
+## Tiến độ (2026-10-18)
+
+- Xong (phần learning, Claude): `docs/contracts/gamification-v1.md` (XP, cấp, tim, streak, đóng băng, nhiệm vụ, huy hiệu, league,
+  điểm thưởng, mã lỗi); `lesson-learning-v1.md` thêm khối `gamification`, `403 HEARTS_DEPLETED`; AGENTS.md §3.5, §3.6, §3.8;
+  `.sdd/database/DATABASE_V5.md` (bảng kiểm kê learning 30 → 45, §7.22–§7.28). Mã lỗi tôi đối chiếu với `GlobalExceptionHandler`
+  và các use case; hai mã còn thiếu handler (`INSUFFICIENT_POINTS`, `ACCESS_UNAVAILABLE`) đã được thêm cùng test.
+- Chưa làm: contract access (cộng thưởng nội bộ, loại giao dịch, trần ngày, consumer C6) và `user-internal-v1.md` thêm
+  `display-names` — thuộc Codex; `docs/system-architecture.md` không tồn tại trong repo (chỉ có `.sdd/global/system-architecture.md`,
+  không nói về nội bộ learning); chưa chạy `mvn -B -ntp verify` cả reactor, `docker compose config --quiet` và 6 kịch bản demo.
+- Không ghi "đã chạy" cho các mục trên khi chưa chạy.

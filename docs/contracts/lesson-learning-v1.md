@@ -268,6 +268,17 @@ For `DEMO_READING` the first assignment can be seed code `X1`:
 
 Request: `{requestId, answers}` with one answer for every `quickCheck` question (`[]` when there is none). Allowed only at `THEORY`, otherwise `409 THEORY_NOT_REQUIRED`. Right or wrong, the review returns to `PRACTICE` and the next GET gives a new set. No mastery evidence is written. A repeated `requestId` returns the saved response; reuse on another review gives `409 REQUEST_CONFLICT`. Response: `{reviewId, correct, total, results:[{questionVersionId, correct, correctAnswer, explanation, hint:null}], stage:"PRACTICE"}`.
 
+## Gamification block and hearts
+
+The responses of `POST /lessons/{id}/exercises/{blockId}/submissions`, of a Practice attempt submission (including free
+practice) and of `POST /reviews/{reviewId}/submissions` carry a `gamification` object with the XP, level and hearts effect of
+that submission; its fields are in [gamification-v1](gamification-v1.md#the-gamification-block-in-submissions). The heart
+fields are `null` for a review set, which costs no hearts.
+
+Starting or submitting a lesson exercise, starting or submitting a Practice attempt, and starting free practice with no hearts
+left returns `403 HEARTS_DEPLETED` (`{ "detail", "code", "nextHeartAt", "refillCost" }`). Review submissions are never refused
+for hearts, so a learner with no hearts can still clear a blocking review.
+
 ## Error body and review rule
 
 New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: array, "lessonIds"?: array }`. `reviews` is present only for `REVIEW_REQUIRED`, with each entry `{reviewId, lessonId, knowledgePointId, skill?}`; a legacy null skill is omitted. `lessonIds` is present for `PRACTICE_REQUIRED`. Do not return an answer, prompt, or token in an error. Ordinary malformed requests use HTTP 422; dependency errors retain HTTP 502/503. Examples for each new code:
@@ -281,6 +292,7 @@ New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: ar
 | 403 | `LESSON_LOCKED` | `{"detail":"Complete L1 before L2","code":"LESSON_LOCKED"}` |
 | 403 | `PRACTICE_REQUIRED` | `{"detail":"Complete practice of the earlier lessons first.","code":"PRACTICE_REQUIRED","lessonIds":["20000000-0000-4000-8000-000000000101"]}` (lesson gate; the same code is `409` when asking for a topic test, below) |
 | 403 | `TEST_LOCKED` | `{"detail":"Complete the topic lessons first","code":"TEST_LOCKED"}` |
+| 403 | `HEARTS_DEPLETED` | `{"detail":"No hearts left; wait for the next heart or refill with points","code":"HEARTS_DEPLETED","nextHeartAt":"2026-10-18T05:00:00Z","refillCost":5}` |
 | 409 | `TEST_UNAVAILABLE` | `{"detail":"No published test code is available","code":"TEST_UNAVAILABLE"}` |
 | 409 | `NO_TOPIC_TEST` | `{"detail":"This topic has no final test","code":"NO_TOPIC_TEST"}` |
 | 409 | `PRACTICE_LOCKED` | `{"detail":"Complete the lesson before practice","code":"PRACTICE_LOCKED"}` |

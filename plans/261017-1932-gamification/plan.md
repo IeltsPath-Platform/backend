@@ -62,7 +62,7 @@ Points (access) ── kiếm: thưởng học (có trần/ngày) │ tiêu: h�
 | 5 | [Nhiệm vụ ngày](phase-05-daily-quests.md) | learning | completed (V29, sinh lười, tiến độ theo câu mới, thưởng một lần; còn: test HTTP controller) | 2, 4 |
 | 6 | [Huy hiệu](phase-06-badges.md) | learning | completed (V30, 9 huy hiệu, cấp một lần, bật/tắt; còn: test HTTP controller) | 2, 4 |
 | 7 | [League tuần](phase-07-weekly-league.md) | learning, user | completed (V28, chốt tuần, bảng và lịch sử; còn: test HTTP controller, ẩn danh) | 2 |
-| 8 | [Contract, tài liệu, nghiệm thu](phase-08-contracts-and-acceptance.md) | docs | pending | tất cả |
+| 8 | [Contract, tài liệu, nghiệm thu](phase-08-contracts-and-acceptance.md) | docs | in_progress (contract learning, AGENTS.md, DATABASE_V5 xong; còn contract access/user, verify, demo) | tất cả |
 
 ## Câu hỏi mở
 
