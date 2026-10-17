@@ -155,10 +155,10 @@ API:
 
 ## Success Criteria
 
-- [ ] EXAMINER mở một trang thấy: bài chờ chấm, học viên cần bổ trợ, cờ bất thường. Mỗi việc ghi được Action / Result /
-      Note.
-- [ ] CONTENT_AUTHOR thấy: KP thiếu bộ câu, câu quá dễ / quá khó, bài cần chấm lại để đánh giá Mentor.
-- [ ] Admin xem được chất lượng từng EXAMINER.
+- [x] EXAMINER mở một trang thấy: bài chờ chấm, học viên cần bổ trợ, cờ bất thường. Mỗi việc ghi được Action / Result /
+      Note. (test: Learning: StaffAreaIntegrationTest.syncMakesOneItemPerSourceAndEachRoleSeesOnlyItsQueue, staffTakeAnItemRecordTheResultAndShowANoteToTheLearner; Assessment: GradingQueueIntegrationTest.queueFiltersPaginationAndMissingJobsAreValidated)
+- [x] CONTENT_AUTHOR thấy: KP thiếu bộ câu, câu quá dễ / quá khó, bài cần chấm lại để đánh giá Mentor. (test: StaffAreaIntegrationTest.questionsTooEasyOrTooHardBecomeContentItemsOnlyWithEnoughFirstAttempts, anEdgeThatDoesNotExplainFailuresBecomesASuspectItemWithItsNumbers; ExaminerQaControllerTest.contentAuthorCanSeeOnlyQaQueueAndSubmitBlindReview)
+- [x] Admin xem được chất lượng từng EXAMINER. (test: ExaminerQaIntegrationTest.finalizedEssayCreatesBlindQaSampleAndQualityAggregate)
 
 ## Risk Assessment
 

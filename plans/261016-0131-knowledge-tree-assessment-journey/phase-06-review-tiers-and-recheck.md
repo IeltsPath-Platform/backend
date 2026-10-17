@@ -95,9 +95,9 @@ giỏ; làm xong thì cập nhật mastery và hạn ôn.
 
 ## Success Criteria
 
-- [ ] KP 65% không chặn gì, xuất hiện ở nhóm `consolidate`.
+- [x] KP 65% không chặn gì, xuất hiện ở nhóm `consolidate`. (test: ReviewBasketIntegrationTest.theBasketListsTheRequiredReviewTheConsolidatePointsAndTheDueOnes)
 - [ ] KP 85% đến hạn ôn xuất hiện ở nhóm `due`. Làm đạt → hạn ôn lùi theo lịch.
-- [ ] Practice test tự do làm sai không khóa lesson.
+- [x] Practice test tự do làm sai không khóa lesson. (test: ReviewBasketIntegrationTest.aFreePracticeTestRaisesOnlyAnOptionalReviewAndNeverLocksALesson, PracticeTestAssignmentIntegrationTest.freePracticeWritesEvidenceWithoutScoringOrBlockingTopics)
 
 ## Risk Assessment
 
