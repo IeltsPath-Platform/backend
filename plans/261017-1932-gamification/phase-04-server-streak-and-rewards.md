@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Streak phía server, đóng băng, thưởng points"
-status: pending
+status: in_progress
 priority: P1
 dependencies: [1, 2]
 ---
@@ -53,6 +53,18 @@ thật, thêm đóng băng trả bằng points (03 §E.3), và đường cộng 
 ## Success Criteria
 
 - [ ] 7 ngày liên tiếp có nộp bài → streak 7, +100 XP, access nhận +10 points đúng một lần.
-- [ ] Bỏ 1 ngày có đóng băng → chuỗi giữ; không đóng băng → về 1 khi nộp bài lại.
+- [x] Bỏ 1 ngày có đóng băng → chuỗi giữ; không đóng băng → về 1 khi nộp bài lại. (StreakRulesTest)
 - [ ] Đóng băng lần thứ 3 liên tiếp giá 30 points.
 - [ ] access tắt: grant nằm `PENDING`, bật lại thì được cộng.
+
+## Tiến độ (2026-10-17)
+
+- Xong: `StreakRules` (11 test đơn vị), V26 (`learner_streaks`, `reward_grants`, nguồn XP `STREAK`), `StreakRecorder`
+  (ghi trong transaction nộp bài, BEFORE_COMMIT trên `QuestionEventsAppended`), `StreakUseCase`, `StreakController`
+  (`GET /api/learning/me/streak`, `POST /api/learning/me/streak/freeze`), `StreakIntegrationTest` (5 test, DB thật).
+- Điều chỉnh luật đóng băng: lượt mua ngày D phủ đúng ngày D nếu D còn trống khi được chấm, không thì ngày trống đầu tiên sau
+  D. Luật "phủ ngày mai" làm giá tăng theo liên tiếp không bao giờ đạt được: lượt cũ phải được dùng trước khi mua lượt mới,
+  mà việc dùng chỉ xảy ra khi ngày đó được chấm, sau ngày mua.
+- Quyết định: mua khi chưa có streak trả `409 NO_STREAK_TO_PROTECT`. Ngày trả lời lại trong cùng ngày không thưởng lại.
+- Chưa xong: `RewardGrantRelayJob` (chờ chọn cơ chế gửi points sang access); hoàn points khi đóng băng lỗi (access chưa có
+  route nội bộ); bài essay chưa tính là ngày hoạt động (không phát sự kiện câu hỏi); thưởng KP ≥ 90% mastery +5 points.

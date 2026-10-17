@@ -91,6 +91,21 @@ Các response KP và cây (cả nội bộ cho learning) thêm `cefrLevel` (`A1`
 
 Chỉ trong library-service và FE; learning không gọi. Không có hợp đồng nối.
 
+### C6. Points thưởng: learning → access (gamification phase 4, Claude publish và settle, Codex consume)
+
+Learning ghi thưởng vào `reward_grants` (PENDING) trong transaction nộp bài, rồi gửi qua RabbitMQ. Không có danh tính
+service nào được thêm, access không nhận lệnh cộng từ HTTP của learning.
+
+- Exchange `learning.points` (topic, durable). Learning gửi với routing key `points.grant.requested`.
+- Payload `points.grant.requested`: `{"grantId": uuid, "userId": uuid, "amount": 1..100, "reason": "STREAK_MILESTONE",
+  "referenceId": "<streakStart>:<day>"}`.
+- Access: queue `access.points-grant` bind vào `points.grant.requested`; cộng bằng cùng luật với
+  `POST /internal/access/points/credit`, `idempotencyKey = grantId`. Gửi kết quả lên exchange `learning.points`, routing key
+  `points.grant.settled`: `{"grantId": uuid, "status": "GRANTED" | "CAPPED" | "FAILED", "error": string|null}`.
+- Learning: queue `learning.points-grant-settled` nhận kết quả và đổi `reward_grants.status`. Relay gửi lại các grant còn
+  PENDING quá 5 phút; access bỏ qua grantId đã cộng (idempotent), nên gửi lại an toàn.
+- Access tắt hoặc chưa nhận: grant nằm PENDING, bật lại thì gửi tiếp (tiêu chí của gamification phase 4).
+
 ## Việc tồn từ plan 261016 (Codex)
 
 - Dựng lại image Learning rồi chạy lại demo bước 5 và 8.
