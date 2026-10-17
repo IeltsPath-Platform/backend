@@ -18,7 +18,7 @@ public record Mp1Params(int window, int maxPracticeInWindow, double halfLifeDays
                 case ASSESSMENT -> exam;
                 case REVIEW_SET -> review;
                 case DIAGNOSTIC_PROBE -> probe;
-                case LESSON_EXERCISE, PRACTICE_SET -> practice;
+                case LESSON_EXERCISE, PRACTICE_SET, FREE_PRACTICE -> practice;
                 case LESSON_WRITING -> essay;
             };
         }
@@ -38,6 +38,7 @@ public record Mp1Params(int window, int maxPracticeInWindow, double halfLifeDays
 
     /** True for evidence that counts against {@code maxPracticeInWindow}. */
     public static boolean isPractice(EvidenceSource source) {
-        return source == EvidenceSource.LESSON_EXERCISE || source == EvidenceSource.PRACTICE_SET;
+        return source == EvidenceSource.LESSON_EXERCISE || source == EvidenceSource.PRACTICE_SET
+                || source == EvidenceSource.FREE_PRACTICE;
     }
 }

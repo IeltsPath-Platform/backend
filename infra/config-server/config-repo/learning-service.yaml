@@ -63,6 +63,9 @@ learning:
     # until the team confirms MP1, then switch and rebuild all profiles once (rebuild-on-startup, or the Admin recompute).
     policy: ${LEARNING_MASTERY_POLICY:DEEPTUTOR}
     rebuild-on-startup: ${LEARNING_MASTERY_REBUILD_ON_STARTUP:false}
+  free-practice:
+    # Unseen practice sets per knowledge point kept for reviews: free practice starts only above this count.
+    reserve: 2
     # MP1 scores fall as evidence ages; the job refreshes learners who have not answered for decay-stale-after.
     decay-enabled: true
     decay-stale-after: PT24H

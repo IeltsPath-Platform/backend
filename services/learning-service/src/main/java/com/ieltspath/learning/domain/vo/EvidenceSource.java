@@ -7,7 +7,8 @@ public enum EvidenceSource {
     PRACTICE_SET("practice_set"),
     LESSON_WRITING("lesson_writing"),
     ASSESSMENT("assessment"),
-    DIAGNOSTIC_PROBE("diagnostic_probe");
+    DIAGNOSTIC_PROBE("diagnostic_probe"),
+    FREE_PRACTICE("free_practice");
 
     private final String value;
 

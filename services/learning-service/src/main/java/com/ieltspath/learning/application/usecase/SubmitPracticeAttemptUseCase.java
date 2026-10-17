@@ -11,6 +11,8 @@ import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageVersion;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.service.FirstAttemptMistakes;
+import com.ieltspath.learning.application.service.FreePracticeSubmission;
+import com.ieltspath.learning.domain.vo.PracticeOrigin;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.PracticeAccess;
@@ -53,6 +55,7 @@ public class SubmitPracticeAttemptUseCase {
     private final FirstAttemptMistakes mistakes;
     private final QuestionEventLog questionEvents;
     private final MasteryProfileUpdater masteryProfiles;
+    private final FreePracticeSubmission freePractice;
     private final ItemGrading grading = new ItemGrading();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final Clock clock = Clock.systemUTC();
@@ -61,7 +64,8 @@ public class SubmitPracticeAttemptUseCase {
                                         PracticeAttemptRepository attempts, ReviewItemRepository reviews,
                                         KnowledgeEvidenceRepository evidence, PracticeProgress progress,
                                         FirstAttemptMistakes mistakes, WritingSubmissionRepository essays,
-                                        QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles) {
+                                        QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
+                                        FreePracticeSubmission freePractice) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -73,6 +77,7 @@ public class SubmitPracticeAttemptUseCase {
         this.essays = essays;
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
+        this.freePractice = freePractice;
     }
 
     @Transactional
@@ -84,6 +89,7 @@ public class SubmitPracticeAttemptUseCase {
         if (attempts.findByRequestId(command.requestId()).isPresent()) {
             throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
         }
+        if (attempt.origin() == PracticeOrigin.FREE) return freePractice.submit(userId, attempt, command);
         var lesson = access.require(userId, attempt.lessonId());
         var version = content.getPackageVersion(attempt.packageVersionId());
         var graded = grading.grade(version, command.answers(), "Practice set", gradedEssays(userId, attempt, version));

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.learning.domain.aggregate.PracticeAttempt;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.vo.LearningSkill;
+import com.ieltspath.learning.domain.vo.PracticeOrigin;
 import com.ieltspath.learning.domain.vo.PracticeSubmission;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -21,8 +22,8 @@ import java.util.stream.Collectors;
 
 @Repository
 public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository {
-    private static final String COLUMNS = "id, user_id, lesson_id, skills, package_id, package_version_id, "
-            + "started_at, submitted_at, request_id, response";
+    private static final String COLUMNS = "id, user_id, lesson_id, origin, knowledge_point_id, skills, package_id, "
+            + "package_version_id, started_at, submitted_at, request_id, response";
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper json;
     private final RowMapper<PracticeAttempt> mapper = this::map;
@@ -147,9 +148,10 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
     @Override
     public void insert(PracticeAttempt attempt) {
         jdbc.update("""
-                INSERT INTO practice_attempts (id, user_id, lesson_id, skill, skills, package_id, package_version_id,
-                started_at)
-                VALUES (:id, :userId, :lessonId, :skill, CAST(:skills AS varchar[]), :packageId, :versionId, :startedAt)
+                INSERT INTO practice_attempts (id, user_id, lesson_id, origin, knowledge_point_id, skill, skills,
+                package_id, package_version_id, started_at)
+                VALUES (:id, :userId, :lessonId, :origin, :knowledgePointId, :skill, CAST(:skills AS varchar[]),
+                :packageId, :versionId, :startedAt)
                 """, params(attempt));
     }
 
@@ -183,6 +185,8 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
         params.put("id", attempt.id());
         params.put("userId", attempt.userId());
         params.put("lessonId", attempt.lessonId());
+        params.put("origin", attempt.origin().name());
+        params.put("knowledgePointId", attempt.knowledgePointId());
         params.put("skill", attempt.skill() == null ? null : attempt.skill().name());
         params.put("skills", array(attempt.skills()));
         params.put("packageId", attempt.packageId());
@@ -219,7 +223,8 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
         Instant submitted = row.getTimestamp("submitted_at") == null ? null
                 : row.getTimestamp("submitted_at").toInstant();
         return PracticeAttempt.restore(row.getObject("id", UUID.class), row.getObject("user_id", UUID.class),
-                row.getObject("lesson_id", UUID.class), skills(row.getArray("skills")),
+                row.getObject("lesson_id", UUID.class), row.getObject("knowledge_point_id", UUID.class),
+                PracticeOrigin.valueOf(row.getString("origin")), skills(row.getArray("skills")),
                 row.getObject("package_id", UUID.class), row.getObject("package_version_id", UUID.class),
                 row.getTimestamp("started_at").toInstant(), submitted, row.getObject("request_id", UUID.class),
                 response);

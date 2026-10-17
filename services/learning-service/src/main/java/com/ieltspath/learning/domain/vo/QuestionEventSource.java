@@ -4,6 +4,7 @@ package com.ieltspath.learning.domain.vo;
 public enum QuestionEventSource {
     LESSON_EXERCISE("lesson_exercise"),
     PRACTICE_SET("practice_set"),
+    FREE_PRACTICE("free_practice"),
     REVIEW_SET("review_set"),
     LESSON_WRITING("lesson_writing"),
     ASSESSMENT("assessment"),
