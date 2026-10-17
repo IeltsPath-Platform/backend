@@ -58,10 +58,17 @@ US-010 (03 §C.1): học viên bấm "Practice" trên một KID bất kỳ để
 
 ## Success Criteria
 
-- [ ] Học viên chọn KP bất kỳ của course mở và luyện được khi còn > 2 gói chưa lộ.
-- [ ] Luyện tự do trượt không sinh bài ôn chặn, không khóa lesson.
-- [ ] Điểm course không đổi sau luyện tự do.
-- [ ] Cây trả đúng tier cho mọi KP trong 2 query (content + profile).
+- [x] Học viên chọn KP bất kỳ của course mở và luyện được khi còn > 2 gói chưa lộ. (test: `FreePracticeIntegrationTest.freePracticeStopsAtTheReserve...`, `startingAgainReturnsTheOpenAttempt...`)
+- [x] Luyện tự do trượt không sinh bài ôn chặn, không khóa lesson. (test: `FreePracticeIntegrationTest.aFreeSetIsRecordedAsFreeEvidence...`, không có `review_items`)
+- [ ] Điểm course không đổi sau luyện tự do. Chưa có test điểm course; chỉ đảm bảo luyện tự do không ghi `lesson_id`.
+- [ ] Cây trả đúng tier cho mọi KP trong 2 query. Chỉ kiểm chứng KP chưa có bằng chứng (tier null); chưa kiểm KP có tier.
+
+Chưa xong trong phase này:
+- Gói theo band course và gói PREMIUM: `PracticeSet` của Content không có band hay `requiredFeatureKey`, nên chưa lọc. Cần Content trả thêm trường.
+- Trường `cefrLevel` của cây chờ phase 1 (content).
+- Hai test chặn bởi bài ôn (`REVIEW_REQUIRED`) chưa có test tích hợp; logic đã có trong `StartFreePracticeUseCase`.
+- Gói có essay bị loại lúc nộp (409 `FREE_PRACTICE_ESSAY_UNSUPPORTED`), không loại lúc chọn gói.
+- Contract và AGENTS.md cho luyện tự do và cây chưa cập nhật.
 
 ## Risk Assessment
 

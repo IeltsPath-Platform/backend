@@ -4,6 +4,7 @@ import com.ieltspath.learning.application.command.SubmitExerciseCommand;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.*;
+import com.ieltspath.learning.application.usecase.GetLearnerTreeUseCase;
 import com.ieltspath.learning.application.usecase.StartFreePracticeUseCase;
 import com.ieltspath.learning.application.usecase.SubmitPracticeAttemptUseCase;
 import com.ieltspath.learning.domain.vo.LearningSkill;
@@ -66,6 +67,7 @@ class FreePracticeIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired StartFreePracticeUseCase start;
     @Autowired SubmitPracticeAttemptUseCase submit;
+    @Autowired GetLearnerTreeUseCase treeUseCase;
     @MockitoBean LearningContentClient content;
 
     @BeforeEach
@@ -133,6 +135,36 @@ class FreePracticeIntegrationTest {
 
         assertEquals(403, error.getStatus());
         assertEquals("COURSE_NOT_JOINED", error.getCode());
+    }
+
+    @Test
+    void theTreeListsThePointsOfTheCourseWithFreePracticeOpen() {
+        var tree = treeUseCase.execute(enrolled(), COURSE);
+
+        assertEquals(COURSE, tree.courseId());
+        assertEquals(1, tree.knowledgePoints().size());
+        var node = tree.knowledgePoints().get(0);
+        assertEquals("R_FREE", node.code());
+        assertNull(node.mastery(), "no evidence yet, so no score or tier");
+        assertNull(node.tier());
+        assertTrue(node.practiceAvailable());
+    }
+
+    @Test
+    void theTreeClosesFreePracticeWhenOnlyTheReserveIsLeft() {
+        when(content.practiceSetAvailability(anyList(), anyList(), eq(3))).thenReturn(Map.of(KP, 2));
+
+        var node = treeUseCase.execute(enrolled(), COURSE).knowledgePoints().get(0);
+
+        assertFalse(node.practiceAvailable());
+    }
+
+    @Test
+    void aLearnerWhoIsNotTakingTheCourseGetsNoTree() {
+        LearningRequestException error = assertThrows(LearningRequestException.class,
+                () -> treeUseCase.execute(UUID.randomUUID(), COURSE));
+
+        assertEquals(403, error.getStatus());
     }
 
     @Test
