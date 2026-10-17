@@ -71,7 +71,6 @@ class AutoGradingIntegrationTest {
     @Autowired SaveAttemptResponseUseCase saveResponse;
     @Autowired SubmitAssessmentAttemptUseCase submit;
     @Autowired GetAssessmentResultUseCase learnerResult;
-    @Autowired RecordSectionTimeUseCase recordSectionTime;
     @Autowired CreateAssessmentResultUseCase createResult;
     @Autowired JdbcTemplate jdbc;
 
@@ -238,8 +237,8 @@ class AutoGradingIntegrationTest {
         List<UUID> items = itemIds(attemptId);
         for (int i = 0; i < correctCount; i++) answer(user, attemptId, items.get(i), "{\"answer\":\"B\"}");
         UUID attemptSectionId = jdbc.queryForObject("SELECT id FROM attempt_sections WHERE attempt_id = ?", UUID.class, attemptId);
-        recordSectionTime.execute(user, attemptId, List.of(new RecordSectionTimeUseCase.SectionTime(attemptSectionId, 95)));
-        submit.execute(new SubmitAssessmentAttemptCommand(user, attemptId));
+        submit.execute(new SubmitAssessmentAttemptCommand(user, attemptId,
+                List.of(new SubmitAssessmentAttemptCommand.SectionTime(attemptSectionId, 95))));
 
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM skill_scores ss JOIN assessment_results r ON r.id = ss.result_id WHERE r.attempt_id = ?", Integer.class, attemptId));
         assertEquals(0, BigDecimal.valueOf(correctCount).compareTo(jdbc.queryForObject(

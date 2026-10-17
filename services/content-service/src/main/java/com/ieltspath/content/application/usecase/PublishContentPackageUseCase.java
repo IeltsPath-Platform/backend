@@ -110,16 +110,15 @@ public class PublishContentPackageUseCase {
                 }
             }
             if (pkg.getPackageType() == PackageType.COURSE_TEST
-                    && (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableCourseQuestion(question)))) {
+                    && (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableQuestion(question)))) {
                 throw new InvalidContentStateException("COURSE_TEST requires gradable Reading or Listening questions, or Writing essays with passBand");
             }
         }
         if (pkg.getPackageType() == PackageType.PRACTICE_TEST) {
             var questions = lessons.packageQuestionSpecs(targetVersion.getId());
-            if (questions.isEmpty() || questions.stream().anyMatch(question ->
-                    question.questionType() == QuestionType.ESSAY || question.questionType() == QuestionType.SPEAKING
-                            || !autoGradable(question.answerSpecJson()))) {
-                throw new InvalidContentStateException("Practice tests require auto-gradable Reading or Listening questions");
+            if (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableQuestion(question))) {
+                throw new InvalidContentStateException(
+                        "Practice tests require auto-gradable Reading or Listening questions, or Writing essays with passBand");
             }
         }
 
@@ -147,7 +146,8 @@ public class PublishContentPackageUseCase {
                 && band.remainder(new java.math.BigDecimal("0.5")).signum() == 0;
     }
 
-    private static boolean gradableCourseQuestion(PackageQuestionSpec question) {
+    /** A Writing essay with a valid passBand, or an auto-gradable Reading or Listening question. */
+    private static boolean gradableQuestion(PackageQuestionSpec question) {
         if (question.skill() == Skill.WRITING) return validEssay(question, parseSpec(question.answerSpecJson()));
         return (question.skill() == Skill.READING || question.skill() == Skill.LISTENING)
                 && question.questionType() != QuestionType.ESSAY && question.questionType() != QuestionType.SPEAKING

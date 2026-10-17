@@ -4,10 +4,13 @@ import com.ieltspath.assessment.domain.exception.AttemptExpiredException;
 import com.ieltspath.assessment.domain.exception.InvalidAssessmentStateException;
 import com.ieltspath.assessment.domain.vo.*;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
 public final class AssessmentAttempt {
+    private static final Duration PRACTICE_GRACE = Duration.ofSeconds(30);
+
     private final UUID id;
     private final UUID userId;
     private final UUID packageVersionId;
@@ -93,13 +96,23 @@ public final class AssessmentAttempt {
         if (status != AttemptStatus.IN_PROGRESS) {
             throw new InvalidAssessmentStateException("Only an in-progress attempt can be submitted");
         }
-        if (expiresAt != null && !now.isBefore(expiresAt) && attemptType != AttemptType.OFFICIAL_PRACTICE) {
+        if (isPastDeadline(now)) {
             expire(now);
             throw new AttemptExpiredException();
         }
         status = AttemptStatus.SUBMITTED;
         submittedAt = now;
         updatedAt = now;
+    }
+
+    /**
+     * Whether the server clock has run out. A practice test gets a short grace after {@code expiresAt}, because its
+     * client submits on the deadline and the request needs time to arrive.
+     */
+    public boolean isPastDeadline(Instant now) {
+        if (expiresAt == null) return false;
+        Instant deadline = attemptType == AttemptType.OFFICIAL_PRACTICE ? expiresAt.plus(PRACTICE_GRACE) : expiresAt;
+        return !now.isBefore(deadline);
     }
 
     public void expire(Instant now) {

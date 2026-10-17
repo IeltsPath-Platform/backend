@@ -82,15 +82,14 @@ class MediaReferencePolicyTest {
     }
 
     @Test
-    void anAudioRecordingCanLiveInTheDatabaseAsADataUriButNothingElseMay() {
-        String recording = "data:audio/mpeg;base64," + "QUJD".repeat(300_000);
+    void anAudioRecordingIsNeverAcceptedAsADataUri() {
+        String recording = "data:audio/mpeg;base64," + "QUJD".repeat(1_000);
 
-        assertThat(noBase.resolve(AssetType.AUDIO, recording)).isEqualTo(recording);
+        assertThatThrownBy(() -> noBase.resolve(AssetType.AUDIO, recording))
+                .isInstanceOf(InvalidMediaReferenceException.class);
+        assertThatThrownBy(() -> policy.resolve(AssetType.AUDIO, recording))
+                .isInstanceOf(InvalidMediaReferenceException.class);
         assertThatThrownBy(() -> noBase.resolve(AssetType.IMAGE, recording))
-                .isInstanceOf(InvalidMediaReferenceException.class);
-        assertThatThrownBy(() -> noBase.resolve(AssetType.AUDIO, "data:text/html;base64,QUJD"))
-                .isInstanceOf(InvalidMediaReferenceException.class);
-        assertThatThrownBy(() -> noBase.resolve(AssetType.AUDIO, "data:audio/mpeg;base64,not base64!"))
                 .isInstanceOf(InvalidMediaReferenceException.class);
     }
 }

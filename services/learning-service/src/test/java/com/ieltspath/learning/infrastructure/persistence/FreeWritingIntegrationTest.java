@@ -137,6 +137,25 @@ class FreeWritingIntegrationTest {
     }
 
     @Test
+    void onlyThePromptsOfAPracticeTestCanBeGradedAsFreeWriting() {
+        for (String type : List.of("PLACEMENT_TEST", "MOCK_TEST", "COURSE_TEST", "TOPIC_TEST", "LESSON")) {
+            UUID version = UUID.randomUUID();
+            when(content.getPackageVersion(version)).thenReturn(new PackageVersion(version, UUID.randomUUID(), type,
+                    null, Map.of(), List.of(new Section(UUID.randomUUID(), "Task 1", "WRITING", null, 1, null, List.of(
+                    new Item(ESSAY, 1, "Prompt", null, Map.of("type", "ESSAY", "task", "TASK_2", "minWords", 250,
+                            "passBand", 5.5), "Model essay", BigDecimal.ONE, List.of()))))));
+
+            var error = assertThrows(LearningRequestException.class,
+                    () -> submitFree.execute(USER, version, ESSAY, UUID.randomUUID(), TEXT));
+
+            assertEquals("NOT_A_PRACTICE_TEST", error.getCode(), type);
+            assertEquals(422, error.getStatus(), type);
+        }
+        verify(access, never()).debit(any(), anyInt(), any(), anyString(), any());
+        verify(llm, never()).completeJson(any(), any(), anyBoolean());
+    }
+
+    @Test
     void aFailedDebitKeepsTheGradeWithheldUntilAResendIsCharged() {
         when(llm.completeJson(any(), any(), anyBoolean())).thenReturn(grade("5.0"));
         when(access.debit(any(), anyInt(), any(), anyString(), any())).thenThrow(new InsufficientPointsException());

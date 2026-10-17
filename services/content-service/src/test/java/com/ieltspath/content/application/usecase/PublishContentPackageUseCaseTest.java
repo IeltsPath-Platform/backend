@@ -257,6 +257,44 @@ class PublishContentPackageUseCaseTest {
         verify(contentPackageRepository, never()).save(any());
     }
 
+    @Test
+    void writingPracticeTestsWithAValidEssaySpecCanBePublished() {
+        ContentPackage practice = practiceTest("IELTS_SPACE_PRO");
+        ContentPackageVersion draft = practice.getVersions().getFirst();
+        when(contentPackageRepository.findById(practice.getId())).thenReturn(Optional.of(practice));
+        when(lessons.practiceTestPublishIssues(draft.getId())).thenReturn(List.of());
+        when(lessons.questionsUsedElsewhere(draft.getId())).thenReturn(List.of());
+        when(lessons.questionsWithWrongPurpose(draft.getId(), QuestionPurpose.EXAM)).thenReturn(List.of());
+        when(lessons.packageQuestionSpecs(draft.getId())).thenReturn(List.of(new PackageQuestionSpec(
+                UUID.randomUUID(), QuestionType.ESSAY, com.ieltspath.content.domain.vo.Skill.WRITING,
+                "{\"type\":\"ESSAY\",\"task\":\"TASK_2\",\"minWords\":250,\"passBand\":5.5}")));
+        when(contentPackageRepository.save(any(ContentPackage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(practice.getId(), draft.getId(), userId));
+
+        assertThat(result.status()).isEqualTo(PublicationStatus.PUBLISHED);
+    }
+
+    @Test
+    void writingPracticeTestsRejectAnEssayWithoutAValidPassBand() {
+        ContentPackage practice = practiceTest("IELTS_SPACE_PRO");
+        ContentPackageVersion draft = practice.getVersions().getFirst();
+        when(contentPackageRepository.findById(practice.getId())).thenReturn(Optional.of(practice));
+        when(lessons.practiceTestPublishIssues(draft.getId())).thenReturn(List.of());
+        when(lessons.questionsUsedElsewhere(draft.getId())).thenReturn(List.of());
+        when(lessons.questionsWithWrongPurpose(draft.getId(), QuestionPurpose.EXAM)).thenReturn(List.of());
+        when(lessons.packageQuestionSpecs(draft.getId())).thenReturn(List.of(new PackageQuestionSpec(
+                UUID.randomUUID(), QuestionType.ESSAY, com.ieltspath.content.domain.vo.Skill.WRITING,
+                "{\"type\":\"ESSAY\",\"task\":\"TASK_2\",\"minWords\":250,\"passBand\":5.3}")));
+
+        assertThatThrownBy(() -> publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
+                .isInstanceOf(InvalidContentStateException.class)
+                .hasMessageContaining("Writing essays");
+        verify(contentPackageRepository, never()).save(any());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"ESSAY", "SPEAKING"})
     void practiceTestsRejectWritingAndSpeakingQuestions(String typeName) {

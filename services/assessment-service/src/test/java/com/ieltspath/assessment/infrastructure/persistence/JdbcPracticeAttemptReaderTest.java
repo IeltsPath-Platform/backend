@@ -52,9 +52,15 @@ class JdbcPracticeAttemptReaderTest {
         insertAttempt(jdbc, learner, UUID.randomUUID(), UUID.randomUUID(), "PART", "IN_PROGRESS",
                 Instant.parse("2026-10-04T10:00:00Z"));
 
-        var fullProgress = reader.findProgress(learner, Skill.READING, AttemptScope.FULL, 500);
-        var partProgress = reader.findProgress(learner, Skill.READING, AttemptScope.PART, 500);
+        var fullProgress = reader.findProgress(learner, Skill.READING, AttemptScope.FULL, List.of());
+        var partProgress = reader.findProgress(learner, Skill.READING, AttemptScope.PART, List.of());
         var history = reader.findHistory(learner, Skill.READING, 0, 10);
+
+        assertEquals(fullProgress, reader.findProgress(learner, Skill.READING, AttemptScope.FULL, List.of(packageId)));
+        assertEquals(List.of(), reader.findProgress(learner, Skill.READING, AttemptScope.FULL,
+                List.of(UUID.randomUUID())));
+        assertEquals(partProgress, reader.findProgress(learner, Skill.READING, AttemptScope.PART, List.of(packageId)));
+        assertEquals(0, reader.findHistory(learner, Skill.READING, 2_000_000, 50).items().size());
 
         assertEquals(List.of(new com.ieltspath.assessment.application.port.PracticeAttemptReader.ProgressKey(
                 packageId, null)), fullProgress);
@@ -74,8 +80,8 @@ class JdbcPracticeAttemptReaderTest {
                 INSERT INTO assessment_attempts (id, user_id, package_version_id, package_id, attempt_type, mode,
                     channel, status, started_at, submitted_at, scope, skill)
                 VALUES (?, ?, ?, ?, 'OFFICIAL_PRACTICE', 'STANDARD', 'WEB', ?, ?, ?, ?, 'READING')
-                """, id, userId, versionId, packageId, status, submittedAt.minusSeconds(600),
-                "SUBMITTED".equals(status) ? submittedAt : null, scope);
+                """, id, userId, versionId, packageId, status, java.sql.Timestamp.from(submittedAt.minusSeconds(600)),
+                "SUBMITTED".equals(status) ? java.sql.Timestamp.from(submittedAt) : null, scope);
         return id;
     }
 

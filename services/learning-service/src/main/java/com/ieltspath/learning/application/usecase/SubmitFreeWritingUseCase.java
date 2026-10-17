@@ -28,6 +28,8 @@ import java.util.UUID;
  */
 @Service
 public class SubmitFreeWritingUseCase {
+    private static final String PRACTICE_TEST = "PRACTICE_TEST";
+
     private final LearningContentClient content;
     private final LearnerLock lock;
     private final WritingSubmissionRepository essays;
@@ -64,7 +66,12 @@ public class SubmitFreeWritingUseCase {
         }
         flow.requireGraderAvailable();
 
-        Item item = ItemGrading.orderedItems(content.getPackageVersion(packageVersionId)).stream()
+        var version = content.getPackageVersion(packageVersionId);
+        if (!PRACTICE_TEST.equals(version.packageType())) {
+            throw new LearningRequestException(422, "NOT_A_PRACTICE_TEST",
+                    "Free writing is only available for the prompts of a practice test");
+        }
+        Item item = ItemGrading.orderedItems(version).stream()
                 .filter(candidate -> candidate.questionVersionId().equals(questionVersionId))
                 .filter(ItemGrading::isEssay).findFirst()
                 .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND",

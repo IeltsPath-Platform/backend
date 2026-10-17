@@ -60,7 +60,8 @@ public class StartAssessmentAttemptUseCase {
             }
         }
         Instant expiresAt = null;
-        if (command.mode() == com.ieltspath.assessment.domain.vo.AttemptMode.TIMED) {
+        // Only practice tests run a section clock; every other package type keeps starting without a deadline.
+        if (practiceTest && command.mode() == com.ieltspath.assessment.domain.vo.AttemptMode.TIMED) {
             if (selected.stream().anyMatch(s -> s.timeLimitSeconds() == null || s.timeLimitSeconds() <= 0)) {
                 throw new PackageNotAttemptableException("Timed attempts require a time limit on every section");
             }

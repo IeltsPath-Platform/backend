@@ -34,15 +34,16 @@ class SaveAttemptResponseUseCaseTest {
                 new AttemptResponse(UUID.randomUUID(), fixture.itemId, "{}", 1, 2, Instant.now(), null)));
         when(fixture.responses.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = fixture.useCase.execute(fixture.command());
+        var result = fixture.useCase.execute(new SaveAttemptResponseCommand(fixture.userId, fixture.attemptId,
+                fixture.itemId, "{\"answer\":\"A\"}", 1, 2));
 
         assertEquals(3, result.revision());
         verify(fixture.responses).save(any());
     }
 
     @Test
-    void acceptsAnswerSaveAfterOfficialPracticeDeadline() {
-        Fixture fixture = new Fixture(AttemptType.OFFICIAL_PRACTICE, true);
+    void acceptsAnswerSaveWithinGraceAfterOfficialPracticeDeadline() {
+        Fixture fixture = new Fixture(AttemptType.OFFICIAL_PRACTICE, -10);
         when(fixture.responses.findByAttemptItemId(fixture.itemId)).thenReturn(Optional.empty());
         when(fixture.responses.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -50,6 +51,15 @@ class SaveAttemptResponseUseCaseTest {
 
         assertEquals(1, result.revision());
         verify(fixture.responses).save(any());
+    }
+
+    @Test
+    void rejectsAnswerSaveAfterOfficialPracticeGrace() {
+        Fixture fixture = new Fixture(AttemptType.OFFICIAL_PRACTICE, true);
+
+        assertThrows(AttemptExpiredException.class, () -> fixture.useCase.execute(fixture.command()));
+
+        verify(fixture.responses, org.mockito.Mockito.never()).save(any());
     }
 
     @Test
@@ -72,10 +82,15 @@ class SaveAttemptResponseUseCaseTest {
         private final SaveAttemptResponseUseCase useCase = new SaveAttemptResponseUseCase(attempts, items, responses, sections);
 
         private Fixture(AttemptType type, boolean expired) {
+            this(type, expired ? -60 : 60);
+        }
+
+        /** {@code secondsUntilDeadline} is negative once the deadline has passed. */
+        private Fixture(AttemptType type, long secondsUntilDeadline) {
             Instant now = Instant.now();
             var attempt = new AssessmentAttempt(attemptId, userId, UUID.randomUUID(), type, AttemptMode.TIMED,
                     AttemptChannel.WEB, AttemptStatus.IN_PROGRESS, now.minusSeconds(120), null,
-                    expired ? now.minusSeconds(60) : now.plusSeconds(60), 0, now.minusSeconds(120), now.minusSeconds(120));
+                    now.plusSeconds(secondsUntilDeadline), 0, now.minusSeconds(120), now.minusSeconds(120));
             when(attempts.findByIdAndUserId(attemptId, userId)).thenReturn(Optional.of(attempt));
             when(items.findByIdAndAttemptId(itemId, attemptId)).thenReturn(Optional.of(
                     new AttemptItem(itemId, UUID.randomUUID(), UUID.randomUUID(), 1, "{}", null, null)));

@@ -45,8 +45,20 @@ in one transaction:
 - `answer_snapshot` `{answerSpec, explanation, maxScore}`, which never reaches the learner before a passing result;
 - the knowledge-point mapping (`attempt_item_knowledge_points` and `knowledge_snapshot`).
 
-None of it is re-read from Content later. MVP packages have no time limit, so `expiresAt` is null. No learning goal is
-looked up; `learning_goal_id` stays null on new attempts.
+None of it is re-read from Content later. No learning goal is looked up; `learning_goal_id` stays null on new attempts.
+
+### Deadline (`expiresAt`)
+
+Only a `PRACTICE_TEST` attempt started with `mode = TIMED` has a deadline: `expiresAt` is the start time plus the sum of
+the `time_limit_seconds` of the selected sections, and every one of those sections must have a limit (otherwise the
+start fails with `PackageNotAttemptableException`). `PLACEMENT`, `MOCK`, `TOPIC_GATE`, `COURSE_GATE` and `QUIZ` attempts
+start with `expiresAt = null` whatever the mode, so they never expire and always accept answers and a submit.
+
+The server enforces the deadline, on saving a response and on submit. A practice test gets a 30 second grace after
+`expiresAt` (`AssessmentAttempt.PRACTICE_GRACE`) for the client that submits at the deadline; past it, saving a response
+returns `409 ATTEMPT_EXPIRED` and a submit commits `EXPIRED` and returns `409 ATTEMPT_EXPIRED`. The client clock is only
+a display: it must not be trusted to stop a late submit. An attempt of another type that somehow has an `expiresAt`
+follows the same rule without the grace.
 
 The learner structure maps each section snapshot to an allowlist object `{title, skill, instructions, passage?,
 audio?:{url,durationSeconds}}`; it never returns `solution` or `transcript`. An older JSON snapshot missing `skill`
@@ -66,7 +78,7 @@ Both keys are absent below 70; a passing result without section transcripts has 
   provider errors, invalid replies, or a reached daily quota create a queued human-review job. `MOCK` essays stay on the
   existing human grading path.
 - **Human:** other ungradable items are left for graders to complete through the endpoints below.
-- Submitting at or after `expiresAt` commits `EXPIRED` and returns `409 ATTEMPT_EXPIRED`.
+- Submitting after the deadline (see "Deadline" above) commits `EXPIRED` and returns `409 ATTEMPT_EXPIRED`.
 
 Both paths complete the result through `AssessmentResultCompleter`, which moves it to COMPLETED and writes
 `AssessmentCompleted.v2` (with `package_version_id`, `learning_goal_id: null`) to `outbox_events` in the same

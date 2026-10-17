@@ -104,9 +104,7 @@ public class AttemptCreator {
         snapshot.put("instructions", section.instructions());
         snapshot.put("partNo", section.partNo());
         snapshot.put("timeLimitSeconds", section.timeLimitSeconds());
-        snapshot.put("groups", section.groups().stream().map(group -> Map.of(
-                "groupId", group.groupId(), "sortOrder", group.sortOrder(), "formatCode", group.formatCode(),
-                "instructions", group.instructions() == null ? "" : group.instructions())).toList());
+        snapshot.put("groups", section.groups().stream().map(this::groupSnapshot).toList());
         if (section.audio() != null) {
             Map<String, Object> audio = new LinkedHashMap<>();
             audio.put("url", section.audio().mediaUrl());
@@ -119,6 +117,18 @@ public class AttemptCreator {
             snapshot.put("passage", section.passage());
         }
         return write(snapshot);
+    }
+
+    private Map<String, Object> groupSnapshot(ContentPackageProvider.QuestionGroup group) {
+        if (group.groupId() == null || group.formatCode() == null) {
+            throw new PackageNotAttemptableException("Every question group needs an id and a format code");
+        }
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("groupId", group.groupId());
+        snapshot.put("sortOrder", group.sortOrder());
+        snapshot.put("formatCode", group.formatCode());
+        snapshot.put("instructions", group.instructions() == null ? "" : group.instructions());
+        return snapshot;
     }
 
     /** What the learner sees: stem and options (null for a fill question), never the answer. */

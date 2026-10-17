@@ -740,7 +740,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 SELECT (SELECT COUNT(*)::int FROM content_sections s WHERE s.package_version_id = :versionId) sections,
                        (SELECT COUNT(DISTINCT s.part_no)::int FROM content_sections s WHERE s.package_version_id = :versionId) distinct_parts,
                        (SELECT COUNT(*)::int FROM content_sections s WHERE s.package_version_id = :versionId
-                         AND s.part_no BETWEEN 1 AND 4 AND s.skill IN ('READING', 'LISTENING')) valid_skills,
+                         AND s.part_no BETWEEN 1 AND 4 AND s.skill IN ('READING', 'LISTENING', 'WRITING')) valid_skills,
                        (SELECT COUNT(DISTINCT s.skill)::int FROM content_sections s WHERE s.package_version_id = :versionId) distinct_skills,
                        (SELECT COUNT(DISTINCT g.section_id)::int FROM section_question_groups g
                         JOIN content_sections s ON s.id = g.section_id WHERE s.package_version_id = :versionId) grouped_sections,

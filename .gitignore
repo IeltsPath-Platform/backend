@@ -65,3 +65,6 @@ agents/
 
 # Microsoft Office lock files
 ~$*
+
+### Local media copies (uploaded to the media bucket, never committed) ###
+services/content-service/media/

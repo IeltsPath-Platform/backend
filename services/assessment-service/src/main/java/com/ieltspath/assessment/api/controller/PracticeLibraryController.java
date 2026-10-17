@@ -27,8 +27,10 @@ public class PracticeLibraryController {
     private final GetPracticeHistoryUseCase history;
 
     @GetMapping("/progress")
-    public ProgressResponse progress(@RequestParam("skill") Skill skill, @RequestParam("scope") AttemptScope scope) {
-        var result = progress.execute(currentUser.requireUserId(), skill, scope);
+    public ProgressResponse progress(@RequestParam("skill") Skill skill, @RequestParam("scope") AttemptScope scope,
+                                     @RequestParam(name = "packageIds", required = false) List<UUID> packageIds) {
+        var result = progress.execute(currentUser.requireUserId(), skill, scope,
+                packageIds == null ? List.of() : packageIds);
         return new ProgressResponse(result.completed().stream().map(key -> new ProgressKey(key.packageId(), key.partNo())).toList());
     }
 

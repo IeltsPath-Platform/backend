@@ -16,7 +16,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** The Listening practice tests carry their recordings in the database, so every attempt can play them. */
+/** The Listening practice tests reference their recordings by object key; the audio itself is never in the database. */
 @Testcontainers(disabledWithoutDocker = true)
 class ListeningPracticeAudioSeedTest {
     @Container
@@ -32,8 +32,8 @@ class ListeningPracticeAudioSeedTest {
     }
 
     @Test
-    void everyListeningPracticeSectionHasAPlayableRecordingStoredInTheDatabase() {
-        MediaReferencePolicy noBase = new MediaReferencePolicy("");
+    void everyListeningPracticeSectionPointsAtAnObjectKeyUnderTheMediaBase() {
+        MediaReferencePolicy policy = new MediaReferencePolicy("https://media.example.test/ieltspath");
         List<Map<String, Object>> sections = sql.queryForList("""
                 SELECT s.id, a.media_reference, a.duration_seconds, a.text_content
                 FROM content_packages p
@@ -46,10 +46,18 @@ class ListeningPracticeAudioSeedTest {
 
         assertThat(sections).hasSize(12).allSatisfy(section -> {
             String reference = (String) section.get("media_reference");
-            assertThat(reference).startsWith("data:audio/mpeg;base64,");
-            assertThat(noBase.resolve(AssetType.AUDIO, reference)).isEqualTo(reference);
+            assertThat(reference).startsWith("listening/practice/").endsWith(".mp3");
+            assertThat(policy.resolve(AssetType.AUDIO, reference))
+                    .isEqualTo("https://media.example.test/ieltspath/" + reference);
             assertThat((Integer) section.get("duration_seconds")).isBetween(20, 120);
             assertThat((String) section.get("text_content")).isNotBlank();
         });
+    }
+
+    @Test
+    void noAudioAssetHoldsADataUri() {
+        assertThat(sql.queryForObject(
+                "SELECT count(*) FROM content_assets WHERE asset_type = 'AUDIO' AND media_reference LIKE 'data:%'",
+                Integer.class)).isZero();
     }
 }

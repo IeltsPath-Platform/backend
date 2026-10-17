@@ -12,7 +12,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Component
@@ -22,13 +21,14 @@ public class JdbcPracticeAttemptReader implements PracticeAttemptReader {
     public JdbcPracticeAttemptReader(NamedParameterJdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     @Override
-    public List<ProgressKey> findProgress(UUID userId, Skill skill, AttemptScope scope, int limit) {
+    public List<ProgressKey> findProgress(UUID userId, Skill skill, AttemptScope scope, List<UUID> packageIds) {
         String sql = scope == AttemptScope.FULL ? """
                 SELECT DISTINCT a.package_id, NULL::integer AS part_no
                 FROM assessment_attempts a
                 WHERE a.user_id = :userId AND a.attempt_type = 'OFFICIAL_PRACTICE'
                   AND a.skill = :skill AND a.scope = 'FULL' AND a.status = 'SUBMITTED'
-                ORDER BY a.package_id LIMIT :limit
+                  AND (:allPackages OR a.package_id = ANY (CAST(:packageIds AS uuid[])))
+                ORDER BY a.package_id
                 """ : """
                 SELECT completed.package_id, completed.part_no
                 FROM (
@@ -36,16 +36,22 @@ public class JdbcPracticeAttemptReader implements PracticeAttemptReader {
                     FROM assessment_attempts a JOIN attempt_sections s ON s.attempt_id = a.id
                     WHERE a.user_id = :userId AND a.attempt_type = 'OFFICIAL_PRACTICE'
                       AND a.skill = :skill AND a.status = 'SUBMITTED' AND a.scope = 'PART' AND s.part_no IS NOT NULL
+                      AND (:allPackages OR a.package_id = ANY (CAST(:packageIds AS uuid[])))
                     GROUP BY a.id, a.package_id, s.part_no
                     UNION
                     SELECT a.package_id, s.part_no
                     FROM assessment_attempts a JOIN attempt_sections s ON s.attempt_id = a.id
                     WHERE a.user_id = :userId AND a.attempt_type = 'OFFICIAL_PRACTICE'
                       AND a.skill = :skill AND a.status = 'SUBMITTED' AND a.scope = 'FULL' AND s.part_no IS NOT NULL
+                      AND (:allPackages OR a.package_id = ANY (CAST(:packageIds AS uuid[])))
                 ) completed
-                ORDER BY completed.package_id, completed.part_no LIMIT :limit
+                ORDER BY completed.package_id, completed.part_no
                 """;
-        return jdbc.query(sql, Map.of("userId", userId, "skill", skill.name(), "limit", limit),
+        var params = new MapSqlParameterSource().addValue("userId", userId).addValue("skill", skill.name())
+                .addValue("allPackages", packageIds.isEmpty())
+                .addValue("packageIds", packageIds.stream().map(UUID::toString)
+                        .collect(java.util.stream.Collectors.joining(",", "{", "}")));
+        return jdbc.query(sql, params,
                 (rs, row) -> new ProgressKey(rs.getObject("package_id", UUID.class), (Integer) rs.getObject("part_no")));
     }
 
@@ -53,7 +59,7 @@ public class JdbcPracticeAttemptReader implements PracticeAttemptReader {
     public HistoryPage findHistory(UUID userId, Skill skill, int page, int size) {
         var params = new MapSqlParameterSource().addValue("userId", userId)
                 .addValue("skill", skill == null ? null : skill.name()).addValue("limit", size)
-                .addValue("offset", Math.multiplyExact(page, size));
+                .addValue("offset", (long) page * size);
         String filter = "(CAST(:skill AS varchar) IS NULL OR a.skill = :skill)";
         List<HistoryItem> rows = jdbc.query("""
                 SELECT a.id, a.package_id, a.package_version_id, a.skill, a.scope, a.status, a.submitted_at,
