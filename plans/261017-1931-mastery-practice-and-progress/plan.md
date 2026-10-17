@@ -1,4 +1,4 @@
----
+﻿---
 title: "Mastery MP-1.0, luyện tự do theo KP, báo cáo tiến độ, ôn từ vựng và quản trị"
 description: "Đưa phần lõi của bộ tài liệu mentor (01-architecture-overview, 02-dev-integration-spec, 03-ba-spec) vào IELTSPath: metadata KP, mastery MP-1.0, luyện tự do theo KP, báo cáo theo kỹ năng và band mục tiêu, bản chụp tuần/tháng, flashcard 5 hộp, cờ vắng học, thống kê và xuất bản hẹn giờ"
 status: pending

@@ -21,7 +21,8 @@ public final class StaffInsightResults {
      */
     public record Overview(UUID userId, List<CourseProgress> courses, Map<String, Integer> knowledgePointsByTier,
                            List<PendingReview> pendingReviews, List<Diagnosis> diagnoses, List<Remediation> remediation,
-                           List<LearnerFlag> flags, List<WorkItem> openWork) {}
+                           List<LearnerFlag> flags, List<WorkItem> openWork,
+                           SnapshotReportResult.SnapshotView weekly) {}
 
     /** {@code status} is the course score status; {@code total} the current weighted total. */
     public record CourseProgress(UUID courseId, int topics, int topicsDone, Instant passedAt, String status,

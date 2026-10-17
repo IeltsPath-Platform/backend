@@ -4,6 +4,8 @@ import com.ieltspath.learning.application.port.LearnerGoalClient;
 import com.ieltspath.learning.application.port.QuestionEventLog;
 import com.ieltspath.learning.application.result.LearnerReportResult;
 import com.ieltspath.learning.application.service.KnowledgePointDirectory;
+import com.ieltspath.learning.application.service.SnapshotService;
+import com.ieltspath.learning.domain.repository.SnapshotRepository;
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
 import com.ieltspath.learning.domain.repository.DiagnosticRepository;
 import com.ieltspath.learning.domain.repository.LearnerPlacementRepository;
@@ -44,6 +46,7 @@ class GetLearnerReportUseCaseTest {
     private final UUID grammar = UUID.randomUUID();
 
     private final LearnerGoalClient goals = mock(LearnerGoalClient.class);
+    private final SnapshotRepository snapshots = mock(SnapshotRepository.class);
     private GetLearnerReportUseCase useCase;
 
     @BeforeEach
@@ -71,7 +74,11 @@ class GetLearnerReportUseCaseTest {
                 new PendingReview(UUID.randomUUID(), UUID.randomUUID(), listening)));
         when(diagnostics.probingRootKnowledgePoints(user)).thenReturn(Set.of());
         when(placements.find(user)).thenReturn(Optional.empty());
-        useCase = new GetLearnerReportUseCase(profiles, events, reviews, directory, diagnostics, placements, goals);
+        SnapshotService snapshotService = mock(SnapshotService.class);
+        when(snapshotService.lastWeekStart()).thenReturn(LocalDate.of(2026, 10, 12));
+        when(snapshots.range(any(), any(), any(), any())).thenReturn(List.of());
+        useCase = new GetLearnerReportUseCase(profiles, events, reviews, directory, diagnostics, placements, goals,
+                snapshots, snapshotService);
     }
 
     private MasteryProfile profile(UUID kp, double mastery, MasteryTier tier, int evidence) {

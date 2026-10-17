@@ -37,8 +37,12 @@ public record LearnerReportResult(UUID userId, Instant generatedAt, List<Knowled
 
     public record NextBandHint(String skill, BigDecimal nextBand, List<UUID> knowledgeIds) {}
 
-    /** {@code gap} is the target minus the estimated band, null when either is unknown. */
-    public record Target(BigDecimal targetBand, BigDecimal gap, LocalDate examDate) {}
+    /**
+     * {@code gap} is the target minus the estimated band, null when either is unknown. {@code projection} is the date the
+     * target is reached at the recent pace, or the reason there is none; null without a target band.
+     */
+    public record Target(BigDecimal targetBand, BigDecimal gap, LocalDate examDate,
+                         SnapshotReportResult.Projection projection) {}
 
     public record KnowledgePointReport(UUID knowledgeId, String code, String name, String skill, BigDecimal band,
                                        Score score, List<ErrorEntry> errors, List<EvidenceEntry> evidence,

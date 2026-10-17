@@ -8,7 +8,9 @@ import com.ieltspath.learning.application.result.StaffInsightResults.PendingRevi
 import com.ieltspath.learning.application.result.StaffInsightResults.QuestionStats;
 import com.ieltspath.learning.application.result.StaffInsightResults.Remediation;
 import com.ieltspath.learning.application.result.StaffInsightResults.TreeQuality;
+import com.ieltspath.learning.application.service.SnapshotService;
 import com.ieltspath.learning.application.service.TreeQualitySettings;
+import com.ieltspath.learning.domain.repository.SnapshotRepository;
 import com.ieltspath.learning.domain.entity.TopicProgress;
 import com.ieltspath.learning.domain.repository.CourseProgressRepository;
 import com.ieltspath.learning.domain.repository.DiagnosticRepository;
@@ -43,12 +45,17 @@ public class StaffInsightUseCase {
     private final RemediationFlagRepository remediation;
     private final LearningContentClient content;
     private final TreeQualitySettings settings;
+    private final SnapshotRepository snapshots;
+    private final SnapshotService snapshotService;
 
     public StaffInsightUseCase(StaffInsightRepository insight, LearnerCurriculumRepository curricula,
                                CourseProgressRepository courseProgress, GetCourseScoreUseCase scores,
                                MasteryProfileRepository profiles, ReviewItemRepository reviews,
                                DiagnosticRepository diagnostics, RemediationFlagRepository remediation,
-                               LearningContentClient content, TreeQualitySettings settings) {
+                               LearningContentClient content, TreeQualitySettings settings,
+                               SnapshotRepository snapshots, SnapshotService snapshotService) {
+        this.snapshots = snapshots;
+        this.snapshotService = snapshotService;
         this.insight = insight;
         this.curricula = curricula;
         this.courseProgress = courseProgress;
@@ -92,7 +99,9 @@ public class StaffInsightUseCase {
                 session.id(), session.rootKnowledgePointId(), session.status().name(),
                 diagnostics.findProbes(session.id()).size())).toList();
         return new Overview(userId, List.copyOf(courses), byTier, pending, diagnoses, List.copyOf(remediations),
-                insight.flagsOf(userId), insight.openWorkItemsOf(userId));
+                insight.flagsOf(userId), insight.openWorkItemsOf(userId),
+                snapshots.find(SnapshotRepository.Period.WEEK, userId, snapshotService.lastWeekStart())
+                        .map(GetSnapshotReportsUseCase::view).orElse(null));
     }
 
     @Transactional(readOnly = true)

@@ -1,7 +1,7 @@
----
+﻿---
 phase: 5
 title: "Bản chụp tuần, xu hướng, bản tháng"
-status: pending
+status: completed
 priority: P2
 dependencies: [4]
 ---
@@ -45,9 +45,21 @@ mục tiêu (03 §C.3). Plan này chỉ làm phần dữ liệu và API xem tron
 
 ## Success Criteria
 
-- [ ] Chạy job hai lần cho cùng tuần không nhân đôi dữ liệu.
-- [ ] Học viên xem được báo cáo tuần trước, xu hướng 4 tuần và dự kiến ngày đạt mục tiêu (khi đủ dữ liệu).
-- [ ] Phút học không bị đội lên bởi câu treo lâu.
+- [x] Chạy job hai lần cho cùng tuần không nhân đôi dữ liệu. (test: `SnapshotIntegrationTest.runningTheSameWeekTwiceDoesNotDuplicateRows`)
+- [x] Học viên xem được báo cáo tuần trước, xu hướng 4 tuần và dự kiến ngày đạt mục tiêu (khi đủ dữ liệu). (test: `SnapshotIntegrationTest`, `BandProjectionTest`, `ReportControllerTest`)
+- [x] Phút học không bị đội lên bởi câu treo lâu. (test: `aRunWritesActiveLearnersOnlyAndCapsEachAnswersMinutes`: 1 + 0,5 + trần 10 phút = 12)
+
+## Tiến độ (2026-10-17)
+
+- Xong: V27 (`learner_weekly_snapshots`, `learner_monthly_snapshots`), `SnapshotService` (lô 500, upsert, dọn 12 tuần/36 tháng),
+  `SnapshotJob` (thứ Hai 00:30 và ngày 1, khóa advisory, `learning.snapshots.enabled`), `GetSnapshotReportsUseCase` và ba
+  endpoint `/report/weekly`, `/report/history`, `/report/monthly`, `BandProjection` (hồi quy 4 tuần, thêm `target.projection`
+  vào báo cáo phase 4), khối `weekly` trong hồ sơ 360° của admin, `SkillRollup` dùng chung với báo cáo.
+- `focus_kp_ids` trong bản chụp chọn theo mastery thấp nhất, chưa ưu tiên KP có bài ôn chặn (job đọc theo lô, không có dữ
+  liệu bài ôn). Báo cáo trực tiếp vẫn ưu tiên KP chặn.
+- Múi giờ của job cấu hình bằng `learning.snapshots.zone` (mặc định `Asia/Ho_Chi_Minh`).
+- Chưa làm: test job chạy theo lịch cron thật (chỉ gọi `snapshotWeek` trực tiếp), thêm khối `weekly` vào contract
+  `learner-report-v1.md`.
 
 ## Risk Assessment
 

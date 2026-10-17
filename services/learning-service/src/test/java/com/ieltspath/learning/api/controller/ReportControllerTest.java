@@ -47,6 +47,7 @@ class ReportControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean CurrentUserProvider currentUser;
     @MockitoBean GetLearnerReportUseCase report;
+    @MockitoBean com.ieltspath.learning.application.usecase.GetSnapshotReportsUseCase snapshots;
     final UUID learner = UUID.randomUUID();
     final UUID other = UUID.randomUUID();
 
@@ -86,6 +87,42 @@ class ReportControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(other.toString()));
         verify(report).execute(other);
+    }
+
+    @Test
+    void theWeeklyReportIsTheCallersOwnAndTakesAMondayDate() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(learner);
+        java.time.LocalDate monday = java.time.LocalDate.of(2026, 10, 12);
+        when(snapshots.weekly(learner, monday)).thenReturn(new com.ieltspath.learning.application.result
+                .SnapshotReportResult.WeeklyReport(monday, null, List.of(), null));
+
+        mvc.perform(get("/api/learning/report/weekly").param("weekStart", "2026-10-12")
+                        .param("userId", other.toString()).with(user("customer").roles("CUSTOMER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weekStart").value("2026-10-12"))
+                .andExpect(jsonPath("$.snapshot").doesNotExist());
+        verify(snapshots).weekly(learner, monday);
+    }
+
+    @Test
+    void theHistoryDefaultsToFourWeeks() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(learner);
+        when(snapshots.history(learner, 4)).thenReturn(
+                new com.ieltspath.learning.application.result.SnapshotReportResult.History(List.of()));
+
+        mvc.perform(get("/api/learning/report/history").with(user("customer").roles("CUSTOMER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weeks").isArray());
+        verify(snapshots).history(learner, 4);
+    }
+
+    @Test
+    void staffCannotReadTheLearnersOwnPeriodReports() throws Exception {
+        mvc.perform(get("/api/learning/report/weekly").with(user("staff").roles("ADMIN")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/learning/report/monthly").with(user("staff").roles("EXAMINER")))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(snapshots);
     }
 
     @Test
