@@ -56,6 +56,23 @@ public interface LearningContentClient {
 
     PackageVersion getPackageVersion(UUID versionId);
 
+    /** Active grading rubric for a writing task. */
+    Rubric getActiveRubric(String task);
+
+    /** An immutable published rubric, including retired versions used by an activated prompt. */
+    Rubric getRubricVersion(String code, int version);
+
+    /** Error codes currently accepted by Content. */
+    List<ErrorType> activeErrorTypes();
+
+    record Rubric(String code, String task, int version, String sourceNote, List<RubricCriterion> criteria,
+                  List<RubricExample> examples) {}
+    record RubricCriterion(String code, String name, String description, int sortOrder,
+                           List<RubricBandDescriptor> bandDescriptors) {}
+    record RubricBandDescriptor(java.math.BigDecimal band, String descriptor) {}
+    record RubricExample(java.math.BigDecimal band, String prompt, String essay, String commentary) {}
+    record ErrorType(String code, String name, String category, int severity, String fixHint) {}
+
     /** The given skills in enum order, or the single legacy skill when Content did not send any. */
     static Set<LearningSkill> skillsOrSingle(Collection<LearningSkill> skills, LearningSkill single) {
         EnumSet<LearningSkill> result = EnumSet.noneOf(LearningSkill.class);

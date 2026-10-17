@@ -1,6 +1,6 @@
 # Assessment grading v1
 
-Updated: 2026-10-16. Base path `/api/assessments`. Identity comes from the verified
+Updated: 2026-10-17. Base path `/api/assessments`. Identity comes from the verified
 internal JWT. All queue and grading endpoints require `EXAMINER` or `ADMIN`.
 Customer submission/job creation and owner-only job lookup keep their existing contracts.
 
@@ -31,7 +31,10 @@ Standalone jobs are claimed individually. ADMIN follows the same claim rules.
 
 Essay response: `{jobId, attemptId, attemptItemId, prompt, essay, task, rubric}`.
 `prompt` is the snapshotted Content stem (standalone: submission stem), and `rubric`
-is currently `null`; versioned rubric retrieval belongs to the next rubric feature.
+is the Content rubric projection for the essay task, including criteria and band
+descriptors. It contains no answer snapshot. The stored AI job records the rubric
+and shared template version as `prompt_version` in the form
+`<rubricCode>@<rubricVersion>+tpl<templateVersion>`.
 Queue, claim and essay responses never include LLM bands, criteria, feedback or raw
 job entities. They also never include the answer snapshot.
 
@@ -84,7 +87,7 @@ No LLM job is created for an omitted answer. Thus even a course attempt with eve
 essay omitted is discoverable and can be scored zero by an examiner.
 
 Each submitted essay has one comparison row keyed by submission id. Actual LLM
-completion upserts band, criteria and prompt version (`essay-rubric-v1`); examiner
+completion upserts band, criteria and the applied prompt version; examiner
 finalization upserts explicit essay band, criteria, catalog error codes and examiner
 identity/time, using the actual assigned submission even if another submission
 was sent later. Either order preserves the other half. A grader-supplied essay band
@@ -113,3 +116,53 @@ projected. Band fields, scores and raw JSON are excluded. Before LLM completion 
 after a model failure, essays may be empty. After examiner finalization,
 `pendingExaminer` is false and the message explains the comments remain provisional.
 The normal learner result endpoint continues to return only completed results.
+
+## AI rubric evaluation and activation (phase 11)
+
+The admin-only routes below require `ADMIN`. Gold essays and comparisons remain internal; the examiner queue never
+exposes AI grades or comparison data.
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| POST | `/api/assessments/admin/ai-gold-essays` | Add a manually rated gold essay; returns `201 {id}`. |
+| POST | `/api/assessments/admin/ai-gold-essays/import-comparisons` | Import comparison rows with an examiner band; returns `{imported}` and skips submissions already imported. |
+| POST | `/api/assessments/admin/ai-evaluations` | Start an asynchronous evaluation, optionally scoped to `{task:"TASK_1"}` or `{task:"TASK_2"}`; returns `202 {id}`. If task is omitted, Assessment chooses the task with the largest gold set. |
+| GET | `/api/assessments/admin/ai-evaluations/{id}` | Read run metrics and per-essay comparisons. |
+| POST | `/api/assessments/admin/ai-prompt-activations` | Activate a passed evaluation with `{runId}`; returns `204`. Otherwise returns `409 EVALUATION_NOT_PASSED`. |
+
+Manual gold request fields are `task`, `prompt`, optional `chartFacts`, `essay`, `examinerBand`, optional
+`examinerCriteria`, and optional `examinerErrorCodes`. Task 1 requires chart facts when sent to the grader. The examiner
+band must be 0–9 in half-band steps. Imported rows are limited to `essay_grade_comparisons` with a final examiner band.
+
+Evaluation runs record `model`, the prompt version used, `status`, `n`, `withinHalfBand`, `mae`, `qwk`,
+`perCriterion`, `errorCodeFalsePositive`, `passed`, timestamps and item-level AI-versus-examiner differences. Metrics
+use only the requested task's gold essays. QWK uses bands rounded to 0.5; pass defaults are `withinHalfBand >= 0.80`
+and `qwk >= 0.60`, configurable as `assessment.ai-eval.min-within-half-band` and `assessment.ai-eval.min-qwk`.
+Evaluation uses its own daily cap (`assessment.ai-eval.daily-limit`, default `100`) and does not consume a learner's
+grading quota. Evaluation candidates always use the task's current Content `ACTIVE` rubric, independently of the
+version used for runtime grading. Activation requires `passed=true`; otherwise it returns `409 EVALUATION_NOT_PASSED`.
+
+Before a task has its first `ai_prompt_activations` row, Assessment's `GradeGateEssayJobUseCase` and Learning's
+`EssayGrader` both use Content's current `ACTIVE` rubric. Missing activation alone does not produce
+`PROMPT_NOT_ACTIVATED`. V39 seeds both tasks as `ACTIVE` for bootstrap, with `source_note` identifying them as AI drafts
+that have not been reviewed by an IELTS expert.
+
+After the task's first activation, both graders use only its activated `promptVersion`. Changing Content's active
+rubric does not switch either grader until a new passed run is activated. Historical lookup includes `RETIRED` rubrics
+and excludes `DRAFT`. Failure to load activation state or the required rubric never triggers bootstrap fallback:
+Assessment hands the job to an EXAMINER and Learning returns a temporary grading failure.
+
+### Internal activation lookup
+
+`GET /internal/assessments/ai-prompt-activations?task=TASK_1` requires an authenticated internal JWT and accepts
+`TASK_1` or `TASK_2`. This route is separate from the admin activation command and is not exposed through the gateway.
+It returns `{"task":"TASK_1","promptVersion":null}` when the task has no activation row, or
+`{"task":"TASK_1","promptVersion":"IELTS_WRITING_TASK_1@1+tplv1"}` for an activated version. Only a successful response
+with a null version permits bootstrap; an outage is an error.
+
+Learning calls this route using `learning.assessment.base-url`, default `http://localhost:8083`, then loads a non-null
+version through Content's `GET /internal/learning-content/rubrics/{code}/{version}`.
+See [internal Content rubric contract](./learning-content-internal-v1.md#essay-rubrics-phase-11).
+
+Phase 11 remains `in_progress` until an expert-rated gold set and a real evaluation run with persisted metrics exist.
+Bootstrap seed data and automated test fixtures do not satisfy that acceptance criterion.

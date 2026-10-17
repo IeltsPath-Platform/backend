@@ -340,3 +340,23 @@ Every submission writes one row per question to the per-question event log, in t
 Assessment's save-response endpoint accepts an optional `elapsedMs`: the learner's running total on that item. The server keeps the larger of the stored and reported values, capped at two hours, so a late, smaller report never shrinks the stored time.
 
 The Practice contract is part of this section: `docs/contracts/practice-v1.md` does not exist in the repo yet, so Practice's `durationMs` is documented here.
+
+Each graded lesson Writing essay and essay Practice submission stores the prompt version used for its LLM grade in
+`prompt_version`, formatted as `<rubricCode>@<rubricVersion>+tpl<templateVersion>`. This is an internal audit field and
+is not added to learner-facing responses.
+
+For each writing task, Learning's `EssayGrader` follows the same activation policy as Assessment's
+`GradeGateEssayJobUseCase`. Before that task's first `ai_prompt_activations` row, both use Content's `ACTIVE` rubric.
+V39 seeds both tasks as active for bootstrap, while `source_note` records that the AI draft has not been reviewed by
+an IELTS expert. Bootstrap does not establish expert approval or complete phase 11 acceptance.
+
+Learning resolves activation through authenticated internal
+`GET /internal/assessments/ai-prompt-activations?task=TASK_1`, using `learning.assessment.base-url`
+(default `http://localhost:8083`). A successful response with `promptVersion:null` permits bootstrap. Once a version
+has been activated, Learning uses that exact rubric and template version, loading Content's
+`GET /internal/learning-content/rubrics/{code}/{version}` even if the rubric is `RETIRED`. A new Content `ACTIVE` rubric
+does not switch the grader. Activation or rubric lookup failures return a temporary grading failure and never trigger
+bootstrap fallback. Evaluation candidates use the current `ACTIVE` rubric; changing the activated version requires a
+run with `passed=true`, otherwise activation returns `409 EVALUATION_NOT_PASSED`.
+See [rubric projections](./learning-content-internal-v1.md#essay-rubrics-phase-11) and
+[evaluation and activation](./assessment-grading-v1.md#ai-rubric-evaluation-and-activation-phase-11).

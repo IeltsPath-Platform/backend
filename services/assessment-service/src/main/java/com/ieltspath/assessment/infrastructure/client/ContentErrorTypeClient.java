@@ -16,26 +16,34 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Reads {@code GET /internal/learning-content/error-types}, the active codes only, with the caller's bearer. */
+/** Reads approved active error codes with the assessment service identity. */
 @Component
 public class ContentErrorTypeClient implements ErrorTypeCatalog {
     private final RestClient restClient;
+    private final AssessmentServiceTokenProvider serviceTokens;
 
     public ContentErrorTypeClient(RestClient.Builder builder,
-                                  @Value("${assessment.content.base-url:http://localhost:8082}") String contentBaseUrl) {
+                                  @Value("${assessment.content.base-url:http://localhost:8082}") String contentBaseUrl,
+                                  AssessmentServiceTokenProvider serviceTokens) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
         requestFactory.setReadTimeout(Duration.ofSeconds(5));
         this.restClient = builder.requestFactory(requestFactory).baseUrl(contentBaseUrl).build();
+        this.serviceTokens = serviceTokens;
     }
 
     @Override
     public Set<String> activeCodes() {
+        return activeErrorTypes().stream().map(ErrorType::code).collect(Collectors.toSet());
+    }
+
+    @Override
+    public List<ErrorType> activeErrorTypes() {
         List<ErrorTypeResponse> response;
         try {
             response = restClient.get()
                     .uri("/internal/learning-content/error-types")
-                    .header(HttpHeaders.AUTHORIZATION, GatewayRequestContext.bearerToken())
+                    .header(HttpHeaders.AUTHORIZATION, serviceTokens.authorizationHeader())
                     .header("X-Correlation-Id", GatewayRequestContext.correlationId())
                     .retrieve()
                     .body(new org.springframework.core.ParameterizedTypeReference<List<ErrorTypeResponse>>() {});
@@ -45,9 +53,11 @@ public class ContentErrorTypeClient implements ErrorTypeCatalog {
         if (response == null) {
             throw new ContentUnavailableException("Content Service returned no error types");
         }
-        return response.stream().map(ErrorTypeResponse::code).filter(Objects::nonNull).collect(Collectors.toSet());
+        return response.stream().filter(Objects::nonNull).filter(item -> item.code() != null)
+                .map(item -> new ErrorType(item.code(), Objects.toString(item.name(), item.code()),
+                        Objects.toString(item.fixHint(), ""))).toList();
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record ErrorTypeResponse(String code) {}
+    private record ErrorTypeResponse(String code, String name, String category, int severity, String fixHint) {}
 }

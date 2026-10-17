@@ -48,7 +48,7 @@ Response 200:
     {"code":"LR","band":6.5,"strengths":["…"],"improvements":["…"]},
     {"code":"GRA","band":6.5,"strengths":["…"],"improvements":["…"]}
   ],
-  "corrections":[{"excerpt":"peoples can save","suggestion":"people can save","category":"GRAMMAR"}],
+  "corrections":[{"excerpt":"peoples can save","suggestion":"people can save","category":"GRAMMAR","errorCode":"PLURAL_FORM"}],
   "summary":"…","pointsCharged":3,"sampleAnswer":"…"
 }
 ```
@@ -57,8 +57,9 @@ Response 200:
   most 3 items of ≤ 300 characters.
 - `overallBand` is computed by Learning Service, not taken from the LLM: the mean of the four bands rounded to the
   nearest half band, with .25 rounding up to .5 and .75 up to the next whole band.
-- `corrections`: at most 10; `excerpt` is an exact substring of the essay; `category` is `GRAMMAR`, `VOCABULARY`,
-  `COHERENCE`, `TASK` or `OTHER`.
+- `corrections`: at most 10; `excerpt` is an exact substring of the essay; `category` remains the broad category
+  (`GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK` or `OTHER`) and the additive `errorCode` identifies a matching active,
+  human-approved Content error type. A correction with an unknown, inactive or unapproved `errorCode` is omitted.
 - `summary` ≤ 600 characters. `passed = overallBand ≥ passBand`. `sampleAnswer` only when `passed` or the block was
   passed before.
 

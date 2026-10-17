@@ -125,6 +125,21 @@ public class RestLearningContentClient implements LearningContentClient {
         return get("/package-versions/{id}", new ParameterizedTypeReference<>() { }, versionId);
     }
 
+    @Override
+    public Rubric getActiveRubric(String task) {
+        return get("/rubrics/active?task={task}", new ParameterizedTypeReference<>() { }, task);
+    }
+
+    @Override
+    public Rubric getRubricVersion(String code, int version) {
+        return get("/rubrics/{code}/{version}", new ParameterizedTypeReference<>() { }, code, version);
+    }
+
+    @Override
+    public List<ErrorType> activeErrorTypes() {
+        return get("/error-types", new ParameterizedTypeReference<>() { });
+    }
+
     private <T> T get(String path, ParameterizedTypeReference<T> type, Object... uriVariables) {
         return response(() -> restClient.get()
                 .uri(INTERNAL_PATH + path, uriVariables)

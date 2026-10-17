@@ -20,4 +20,9 @@ public class ListErrorTypesUseCase {
     public List<ErrorType> execute(boolean activeOnly) {
         return activeOnly ? errorTypes.findActive() : errorTypes.findAll();
     }
+
+    /** Returns only reviewed codes that may be included in learner-facing grading output. */
+    public List<ErrorType> executeApprovedActive() {
+        return errorTypes.findApprovedActive();
+    }
 }

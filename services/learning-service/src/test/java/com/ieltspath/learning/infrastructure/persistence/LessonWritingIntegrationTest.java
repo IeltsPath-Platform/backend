@@ -92,6 +92,7 @@ class LessonWritingIntegrationTest {
     @MockitoBean LearningContentClient content;
     @MockitoBean AccessClient access;
     @MockitoBean LlmClient llm;
+    @MockitoBean com.ieltspath.learning.application.port.EssayPromptActivationProvider promptActivations;
 
     @BeforeEach
     void seed() {
@@ -101,6 +102,9 @@ class LessonWritingIntegrationTest {
                 lesson_writing_submissions, llm_daily_usage, kp_mastery_profiles RESTART IDENTITY
                 """);
         reset(content, access, llm);
+        when(content.getActiveRubric(anyString())).thenAnswer(invocation -> testRubric(invocation.getArgument(0)));
+        when(content.activeErrorTypes()).thenReturn(List.of(new LearningContentClient.ErrorType("GRAMMAR",
+                "Grammar", "GRAMMAR", 1, "Fix grammar")));
         when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
                 "Writing", 900, null, List.of(kp(KP), kp(ESSAY_KP)), LearningSkill.WRITING, true)));
         when(content.getTopicLessons(TOPIC)).thenReturn(List.of(new LearningContentClient.LessonSummary(LESSON, TOPIC,
@@ -127,6 +131,8 @@ class LessonWritingIntegrationTest {
         UUID request = UUID.randomUUID();
 
         WritingSubmissionResult result = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, request, ESSAY);
+        assertEquals("IELTS_WRITING@1+tplv1", jdbc.queryForObject(
+                "SELECT prompt_version FROM lesson_writing_submissions", String.class));
 
         assertEquals("GRADED", result.status());
         assertEquals(new BigDecimal("6.5"), result.overallBand());
@@ -329,9 +335,17 @@ class LessonWritingIntegrationTest {
 
     private static String grade(String band) {
         String criteria = String.join(",", List.of("TR", "CC", "LR", "GRA").stream()
-                .map(code -> "{\"code\":\"%s\",\"band\":%s,\"strengths\":[\"s\"],\"improvements\":[\"i\"]}"
+                .map(code -> "{\"code\":\"%s\",\"band\":%s,\"comment\":\"i\"}"
                         .formatted(code, band)).toList());
-        return "{\"criteria\":[" + criteria + "],\"corrections\":[],\"summary\":\"ok\"}";
+        return "{\"criteria\":[" + criteria + "],\"corrections\":[],\"summary\":\"ok\",\"focus\":[]}";
+    }
+
+    private static LearningContentClient.Rubric testRubric(String task) {
+        var descriptor = new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Band six.");
+        var criteria = (task.equals("TASK_1") ? List.of("TA", "CC", "LR", "GRA") : List.of("TR", "CC", "LR", "GRA"))
+                .stream().map(code -> new LearningContentClient.RubricCriterion(code, code, "Description", 1,
+                        List.of(descriptor))).toList();
+        return new LearningContentClient.Rubric("IELTS_WRITING", task, 1, "source", criteria, List.of());
     }
 
     private static LearningContentClient.KnowledgePoint kp(UUID id) {

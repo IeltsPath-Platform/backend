@@ -23,7 +23,7 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
             id, user_id, lesson_id, block_id, practice_attempt_id, request_id, essay_text, word_count,
             prompt_snapshot::text AS prompt,
             status, point_cost, debit_ledger_entry_id, failure_code, result::text AS result, overall_band, passed,
-            grading_started_at""";
+            grading_started_at, prompt_version""";
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
@@ -87,8 +87,8 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
             var statement = connection.prepareStatement("""
                     INSERT INTO lesson_writing_submissions (id, user_id, lesson_id, block_id, question_version_id,
                     knowledge_point_ids, request_id, essay_text, word_count, prompt_snapshot, status, point_cost,
-                    grading_started_at, submitted_at, source, practice_attempt_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?, ?, ?, ?)
+                grading_started_at, submitted_at, source, practice_attempt_id, prompt_version)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?)
                     """);
             Timestamp started = Timestamp.from(submission.gradingStartedAt());
             statement.setObject(1, submission.id());
@@ -107,6 +107,7 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
             statement.setTimestamp(14, started);
             statement.setString(15, submission.practiceAttemptId() == null ? "LESSON_BLOCK" : "PRACTICE_ITEM");
             statement.setObject(16, submission.practiceAttemptId());
+            statement.setString(17, submission.promptVersion());
             return statement;
         }) == 1;
     }
@@ -116,13 +117,13 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
         WritingGrade grade = submission.grade();
         return jdbc.update("""
                 UPDATE lesson_writing_submissions SET status = ?, failure_code = ?, result = CAST(? AS jsonb),
-                overall_band = ?, passed = ?, debit_ledger_entry_id = ?, grading_started_at = ?,
+                overall_band = ?, passed = ?, debit_ledger_entry_id = ?, grading_started_at = ?, prompt_version = ?,
                 graded_at = CASE WHEN ? = 'GRADED' THEN COALESCE(graded_at, clock_timestamp()) ELSE graded_at END
                 WHERE id = ? AND status = ?
                 """, submission.status().name(), submission.failureCode(),
                 grade == null ? null : write(new StoredGrade(grade.criteria(), grade.corrections(), grade.summary())),
                 submission.overallBand(), submission.passed(), submission.ledgerEntryId(),
-                Timestamp.from(submission.gradingStartedAt()), submission.status().name(), submission.id(),
+                Timestamp.from(submission.gradingStartedAt()), submission.promptVersion(), submission.status().name(), submission.id(),
                 submission.persistedStatus().name()) == 1;
     }
 
@@ -167,7 +168,7 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
                 read(row.getString("prompt"), EssayPrompt.class), row.getInt("point_cost"),
                 WritingSubmissionStatus.valueOf(row.getString("status")), row.getString("failure_code"),
                 stored == null ? null : new WritingGrade(stored.criteria(), stored.corrections(), stored.summary(), band),
-                (Boolean) row.getObject("passed"), row.getObject("debit_ledger_entry_id", UUID.class),
+                row.getString("prompt_version"), (Boolean) row.getObject("passed"), row.getObject("debit_ledger_entry_id", UUID.class),
                 row.getTimestamp("grading_started_at").toInstant());
     }
 

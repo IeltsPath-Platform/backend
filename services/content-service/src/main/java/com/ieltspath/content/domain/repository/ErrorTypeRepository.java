@@ -19,6 +19,9 @@ public interface ErrorTypeRepository {
 
     List<ErrorType> findActive();
 
-    /** The subset of {@code codes} that exists and is {@code ACTIVE}. */
+    /** Error types safe for grading output: both active and reviewed by a person. */
+    List<ErrorType> findApprovedActive();
+
+    /** The subset of {@code codes} that exists, is {@code ACTIVE}, and has been approved. */
     Set<String> findActiveCodes(Collection<String> codes);
 }

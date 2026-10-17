@@ -29,6 +29,8 @@ app:
           - /v3/api-docs/**
 
 learning:
+  assessment:
+    base-url: ${ASSESSMENT_SERVICE_URL:http://localhost:8083}
   content:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
   access:

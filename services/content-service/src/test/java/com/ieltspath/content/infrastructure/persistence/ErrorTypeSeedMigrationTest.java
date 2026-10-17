@@ -1,7 +1,9 @@
 package com.ieltspath.content.infrastructure.persistence;
 
+import com.ieltspath.content.infrastructure.persistence.adapter.JdbcErrorTypeRepository;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -10,6 +12,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,6 +40,22 @@ class ErrorTypeSeedMigrationTest {
     @Test
     void everySeededErrorTypeIsStillADraftAwaitingReview() {
         assertThat(count("SELECT count(*) FROM error_types WHERE review_status = 'DRAFT'")).isEqualTo(28);
+    }
+
+    @Test
+    void gradingCatalogAndQuestionCodesRequireHumanApproval() {
+        jdbc.getJdbcTemplate().update("UPDATE error_types SET review_status = 'APPROVED' WHERE code = 'PARAPHRASE_TRAP'");
+        var repository = new JdbcErrorTypeRepository(jdbc);
+
+        assertThat(repository.findApprovedActive()).extracting(errorType -> errorType.getCode())
+                .containsExactly("PARAPHRASE_TRAP");
+        assertThat(repository.findActiveCodes(Set.of("PARAPHRASE_TRAP", "GRAMMAR_TENSE")))
+                .containsExactly("PARAPHRASE_TRAP");
+    }
+
+    @AfterEach
+    void restoreSeedReviewStatus() {
+        jdbc.getJdbcTemplate().update("UPDATE error_types SET review_status='DRAFT' WHERE code='PARAPHRASE_TRAP'");
     }
 
     @Test

@@ -33,7 +33,8 @@ public class GlobalExceptionHandler {
             AssetNotFoundException.class,
             ReadingPassageNotFoundException.class,
             LessonNotFoundException.class,
-            PackageVersionNotFoundException.class
+            PackageVersionNotFoundException.class,
+            RubricNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFoundException(ContentDomainException ex, HttpServletRequest request) {
         log.warn("Resource not found: {}", ex.getMessage());
@@ -88,6 +89,13 @@ public class GlobalExceptionHandler {
         log.warn("Topic skill change refused: {}", ex.getMessage());
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
                 Map.of("code", "TOPIC_SKILL_LOCKED"));
+    }
+
+    @ExceptionHandler(RubricNotEditableException.class)
+    public ResponseEntity<ErrorResponse> handleRubricNotEditable(RubricNotEditableException ex,
+                                                                  HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "RUBRIC_NOT_EDITABLE"));
     }
 
     @ExceptionHandler(DuplicateCourseException.class)

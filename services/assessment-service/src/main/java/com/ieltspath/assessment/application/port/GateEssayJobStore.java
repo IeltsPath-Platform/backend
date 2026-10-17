@@ -35,6 +35,10 @@ public interface GateEssayJobStore {
     /** {@code feedback} is the grader's JSON comments, or null when it gave a band only. */
     void complete(UUID jobId, BigDecimal band, String feedback, Instant now);
 
+    default void complete(UUID jobId, BigDecimal band, String feedback, String promptVersion, Instant now) {
+        complete(jobId, band, feedback, now);
+    }
+
     void recordComparison(UUID jobId);
 
     void fail(UUID jobId, Instant now);

@@ -98,6 +98,7 @@ class PracticeEssayIntegrationTest {
     @MockitoBean LearningContentClient content;
     @MockitoBean AccessClient access;
     @MockitoBean LlmClient llm;
+    @MockitoBean com.ieltspath.learning.application.port.EssayPromptActivationProvider promptActivations;
 
     @BeforeEach
     void setUp() {
@@ -106,6 +107,9 @@ class PracticeEssayIntegrationTest {
                 + "lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments, "
                 + "assessment_result_versions CASCADE");
         reset(content, access, llm);
+        when(content.getActiveRubric(anyString())).thenAnswer(invocation -> testRubric(invocation.getArgument(0)));
+        when(content.activeErrorTypes()).thenReturn(List.of(new ErrorType("GRAMMAR", "Grammar", "GRAMMAR", 1,
+                "Fix grammar")));
         Set<LearningSkill> skills = Set.of(LearningSkill.READING, LearningSkill.WRITING);
         when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "TREES", "Trees", 955, null, List.of(
                 new KnowledgePoint(KP_READING, "TR_R", "Scanning", "PROCEDURE", "READING", "d", true),
@@ -209,6 +213,8 @@ class PracticeEssayIntegrationTest {
         when(access.debit(any(), anyInt(), any(), anyString(), any())).thenAnswer(invocation -> UUID.randomUUID());
         var essay = submitEssay.execute(USER, attempt, ESSAY, request, TEXT);
         assertTrue(essay.passed());
+        assertEquals("IELTS_WRITING@1+tplv1", jdbc.queryForObject(
+                "SELECT prompt_version FROM lesson_writing_submissions", String.class));
         verify(llm, times(1)).completeJson(any(), any(), anyBoolean());
         var result = submitPractice.execute(USER, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
         assertTrue(result.passed());
@@ -216,8 +222,15 @@ class PracticeEssayIntegrationTest {
 
     private static String grade(String band) {
         String criteria = String.join(",", List.of("TR", "CC", "LR", "GRA").stream()
-                .map(code -> "{\"code\":\"%s\",\"band\":%s,\"strengths\":[\"s\"],\"improvements\":[\"i\"]}"
+                .map(code -> "{\"code\":\"%s\",\"band\":%s,\"comment\":\"i\"}"
                         .formatted(code, band)).toList());
-        return "{\"criteria\":[" + criteria + "],\"corrections\":[],\"summary\":\"ok\"}";
+        return "{\"criteria\":[" + criteria + "],\"corrections\":[],\"summary\":\"ok\",\"focus\":[]}";
+    }
+
+    private static Rubric testRubric(String task) {
+        var descriptor = new RubricBandDescriptor(new BigDecimal("6.0"), "Band six.");
+        var criteria = (task.equals("TASK_1") ? List.of("TA", "CC", "LR", "GRA") : List.of("TR", "CC", "LR", "GRA"))
+                .stream().map(code -> new RubricCriterion(code, code, "Description", 1, List.of(descriptor))).toList();
+        return new Rubric("IELTS_WRITING", task, 1, "source", criteria, List.of());
     }
 }

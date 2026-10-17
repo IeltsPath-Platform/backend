@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.learning.application.exception.LlmUnavailableException;
 import com.ieltspath.learning.application.exception.WritingGradingException;
 import com.ieltspath.learning.application.port.LlmClient;
+import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.port.EssayPromptActivationProvider;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -15,6 +17,9 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.UUID;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import static org.mockito.Mockito.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -45,11 +50,70 @@ class EssayGraderTest {
     }
 
     private final ScriptedLlm llm = new ScriptedLlm();
-    private final EssayGrader grader = new EssayGrader(llm, new ObjectMapper());
+    private final LearningContentClient content = mock(LearningContentClient.class);
+    private final EssayPromptActivationProvider activations = mock(EssayPromptActivationProvider.class);
+    private final EssayGrader grader = new EssayGrader(llm, new ObjectMapper(), content, activations);
+
+    @org.junit.jupiter.api.BeforeEach
+    void rubricAndCatalogAreAvailable() {
+        List<LearningContentClient.RubricCriterion> criteria = List.of("TR", "CC", "LR", "GRA", "TA").stream()
+                .map(code -> new LearningContentClient.RubricCriterion(code, code, "Criterion description", 1,
+                        List.of(new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Descriptor"))))
+                .toList();
+        when(content.getActiveRubric(anyString())).thenAnswer(invocation -> new LearningContentClient.Rubric(
+                "IELTS_ESSAY", invocation.getArgument(0), 2, "source", criteria, List.of()));
+        when(content.activeErrorTypes()).thenReturn(List.of(new LearningContentClient.ErrorType("GRAMMAR", "Grammar",
+                "GRAMMAR", 1, "Fix grammar")));
+    }
 
     private static EssayPrompt task2() {
         return new EssayPrompt(UUID.randomUUID(), "Should cities plant more trees?", "TASK_2", 250,
                 new BigDecimal("6.0"), null, "Sample", List.of(), List.of(UUID.randomUUID()));
+    }
+
+    @Test
+    void taskWithoutActivationUsesTheActiveRubric() {
+        llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6")));
+
+        assertEquals("IELTS_ESSAY@2+tplv1", grader.grade(task2(), ESSAY).promptVersion());
+        verify(activations).activatedVersion("TASK_2");
+        verify(content).getActiveRubric("TASK_2");
+        verify(content, never()).getRubricVersion(anyString(), anyInt());
+    }
+
+    @Test
+    void activatedTaskUsesOnlyItsPinnedRubricEvenWhenTheActiveRubricChanges() {
+        when(activations.activatedVersion("TASK_2")).thenReturn("IELTS_ESSAY@1+tplv1");
+        var candidate = content.getActiveRubric("TASK_2");
+        when(content.getRubricVersion("IELTS_ESSAY", 1)).thenReturn(new LearningContentClient.Rubric(
+                candidate.code(), candidate.task(), 1, candidate.sourceNote(), candidate.criteria(), candidate.examples()));
+        clearInvocations(content);
+        llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6")));
+
+        assertEquals("IELTS_ESSAY@1+tplv1", grader.grade(task2(), ESSAY).promptVersion());
+        verify(content).getRubricVersion("IELTS_ESSAY", 1);
+        verify(content, never()).getActiveRubric(anyString());
+    }
+
+    @Test
+    void missingPinnedRubricDoesNotFallBackToTheActiveCandidate() {
+        when(activations.activatedVersion("TASK_2")).thenReturn("IELTS_ESSAY@1+tplv1");
+
+        assertEquals("RUBRIC_UNAVAILABLE", assertThrows(WritingGradingException.class,
+                () -> grader.grade(task2(), ESSAY)).getCode());
+        verify(content, never()).getActiveRubric(anyString());
+        assertTrue(llm.prompts.isEmpty());
+    }
+
+    @Test
+    void activationLookupOutageDoesNotEnableBootstrap() {
+        when(activations.activatedVersion("TASK_2")).thenThrow(
+                new com.ieltspath.learning.application.exception.LearningRequestException(
+                        503, "PROMPT_VERSION_UNAVAILABLE", "Unavailable"));
+
+        assertThrows(WritingGradingException.class, () -> grader.grade(task2(), ESSAY));
+        verify(content, never()).getActiveRubric(anyString());
+        assertTrue(llm.prompts.isEmpty());
     }
 
     private static EssayPrompt task1(String chartFacts) {
@@ -59,38 +123,38 @@ class EssayGraderTest {
 
     static String reply(String... criteria) {
         return """
-                {"overallBand":9,"criteria":[%s],
-                 "corrections":[{"excerpt":"Peoples can save","suggestion":"People can save","category":"GRAMMAR"},
-                                {"excerpt":"not in the essay","suggestion":"x","category":"GRAMMAR"},
-                                {"excerpt":"cities should","suggestion":"y","category":"STYLE"}],
-                 "summary":"Clear position."}""".formatted(String.join(",", criteria));
+                {"criteria":[%s],
+                 "corrections":[{"excerpt":"Peoples can save","suggestion":"People can save","errorCode":"GRAMMAR"},
+                                {"excerpt":"not in the essay","suggestion":"x","errorCode":"GRAMMAR"},
+                                {"excerpt":"cities should","suggestion":"y","errorCode":"UNKNOWN"}],
+                 "summary":"Clear position.","focus":[]}""".formatted(String.join(",", criteria));
     }
 
     static String criterion(String code, String band) {
         return """
-                {"code":"%s","band":%s,"strengths":["a","b","c","d"],"improvements":["%s"]}""".formatted(code, band,
-                "x".repeat(400));
+                {"code":"%s","band":%s,"comment":"%s"}""".formatted(code, band, "x".repeat(400));
     }
 
     @Test
     void validTask2ReplyIsNormalizedAndTheOverallBandIsComputedHere() {
         llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "7")));
 
-        WritingGrade grade = grader.grade(task2(), ESSAY);
+        WritingGrade grade = grader.grade(task2(), ESSAY).grade();
 
         assertEquals(List.of("TR", "CC", "LR", "GRA"), grade.criteria().stream().map(WritingGrade.Criterion::code).toList());
         assertEquals(new BigDecimal("6.5"), grade.overallBand(), "the model's own overallBand of 9 is ignored");
-        assertEquals(3, grade.criteria().getFirst().strengths().size());
+        assertTrue(grade.criteria().getFirst().strengths().isEmpty());
         assertEquals(300, grade.criteria().getFirst().improvements().getFirst().length());
-        assertEquals(2, grade.corrections().size(), "a correction quoting text not in the essay is dropped");
-        assertEquals("OTHER", grade.corrections().get(1).category());
+        assertEquals(1, grade.corrections().size(), "unknown error codes and excerpts are dropped");
+        assertEquals("GRAMMAR", grade.corrections().getFirst().category());
+        assertEquals("GRAMMAR", grade.corrections().getFirst().errorCode());
         assertEquals("Clear position.", grade.summary());
     }
 
     @Test
     void task1UsesTaskAchievementAndRejectsTheTask2Code() {
         llm.reply(reply(criterion("TA", "7"), criterion("CC", "7"), criterion("LR", "7"), criterion("GRA", "7")));
-        assertEquals("TA", grader.grade(task1("Sales rose from 10 to 40."), ESSAY).criteria().getFirst().code());
+        assertEquals("TA", grader.grade(task1("Sales rose from 10 to 40."), ESSAY).grade().criteria().getFirst().code());
 
         llm.reply(reply(criterion("TR", "7"), criterion("CC", "7"), criterion("LR", "7"), criterion("GRA", "7")),
                 reply(criterion("TR", "7"), criterion("CC", "7"), criterion("LR", "7"), criterion("GRA", "7")));
@@ -103,7 +167,7 @@ class EssayGraderTest {
         String valid = reply(criterion("TR", "5"), criterion("CC", "5"), criterion("LR", "5"), criterion("GRA", "5.5"));
         llm.reply("not json at all", valid);
 
-        assertEquals(new BigDecimal("5.0"), grader.grade(task2(), ESSAY).overallBand());
+        assertEquals(new BigDecimal("5.0"), grader.grade(task2(), ESSAY).grade().overallBand());
         assertEquals(List.of(false, true), llm.lowReasoning);
     }
 
@@ -159,6 +223,29 @@ class EssayGraderTest {
         assertEquals("LLM_UNAVAILABLE", assertThrows(WritingGradingException.class,
                 () -> grader.grade(task2(), ESSAY)).getCode());
         assertEquals(1, llm.prompts.size());
+    }
+
+    @Test
+    void unavailableRubricBecomesTemporaryGradingFailureWithoutCallingTheModel() {
+        when(content.getActiveRubric(anyString()))
+                .thenThrow(new com.ieltspath.learning.application.exception.LearningRequestException(
+                        503, "CONTENT_UNAVAILABLE", "Content unavailable"));
+
+        assertEquals("RUBRIC_UNAVAILABLE", assertThrows(WritingGradingException.class,
+                () -> grader.grade(task2(), ESSAY)).getCode());
+        assertTrue(llm.prompts.isEmpty());
+    }
+
+    @Test
+    void promptIncludesRubricDescriptorsAndOnlyCatalogErrorCodes() {
+        llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6")));
+
+        grader.grade(task2(), ESSAY);
+
+        String system = llm.prompts.getFirst()[0];
+        assertTrue(system.contains("Band 6: Descriptor"));
+        assertTrue(system.contains("GRAMMAR — Grammar: Fix grammar"));
+        assertFalse(system.contains("UNKNOWN"));
     }
 
     private static int count(String text, String token) {

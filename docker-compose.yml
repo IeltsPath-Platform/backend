@@ -223,6 +223,7 @@ services:
       SERVER_PORT: 8086
       LEARNING_DB_URL: jdbc:postgresql://postgres:5432/learning_db
       LEARNING_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      ASSESSMENT_SERVICE_URL: http://assessment-service:8083
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"
       RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"

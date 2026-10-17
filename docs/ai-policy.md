@@ -1,6 +1,6 @@
 # Chính sách AI trong đánh giá
 
-Cập nhật: 2026-10-16. Quyết định D6: essay của course test được giám khảo chấm mù.
+Cập nhật: 2026-10-17. Quyết định D6: essay của course test được giám khảo chấm mù.
 Topic test, practice và placement giữ chính sách LLM hiện có. Mở khóa topic, quyết
 định điểm khóa ở Learning và cảnh báo QA không thuộc thay đổi này.
 
@@ -33,5 +33,35 @@ test tính từ `services/assessment-service/src/test/java/com/ieltspath/assessm
 hoàn thành sau giám khảo. Không có API đọc bảng này cho người chấm. Điểm giám khảo,
 tiêu chí, mã lỗi, danh tính và thời điểm được lưu cùng transaction chốt kết quả,
 hoàn tất job và ghi outbox. Khi LLM lỗi, phần LLM để null thay vì giả lập điểm.
-Rubric có phiên bản và gold set sẽ được bổ sung ở tính năng rubric; API essay hiện
-trả rubric null. Chi tiết request/response: [assessment-grading-v1](contracts/assessment-grading-v1.md).
+Rubric được Content quản lý theo task, phiên bản, tiêu chí và mô tả band. Learning
+và Assessment đọc dữ liệu rubric qua API nội bộ; hai bộ chấm dùng cùng template
+`v1` tại [essay-prompt-template-v1](contracts/essay-prompt-template-v1.txt). Mỗi lần
+chấm lưu `prompt_version` theo dạng `<rubricCode>@<rubricVersion>+tpl<templateVersion>`.
+Learning trả lỗi tạm thời nếu không đọc được rubric. Với course essay, Assessment
+chuyển job cho EXAMINER khi rubric hoặc prompt đã được kích hoạt không khả dụng.
+
+LLM chỉ được gắn `errorCode` trong danh mục `ACTIVE` của Content; mã không tồn tại
+hoặc đã bị loại khỏi danh mục sẽ bị bỏ khỏi kết quả của LLM. Không dùng các mã
+do mô hình tự tạo làm bằng chứng lỗi.
+
+Trước khi từng task có dòng đầu tiên trong `ai_prompt_activations`, cả Learning `EssayGrader` và Assessment
+`GradeGateEssayJobUseCase` dùng rubric `ACTIVE` của Content để bootstrap; không báo `PROMPT_NOT_ACTIVATED` chỉ vì
+chưa có dòng. Migration `V39__rubrics.sql` seed cả `TASK_1` và `TASK_2` ở trạng thái `ACTIVE`, nhưng `source_note`
+vẫn ghi rõ đây là bản nháp do AI soạn, chưa được chuyên gia IELTS duyệt. `ACTIVE` không phải chứng nhận chuyên môn.
+
+Sau activation đầu tiên của task, cả hai bộ chấm chỉ dùng `promptVersion` đã kích hoạt, kể cả rubric `RETIRED`.
+Learning đọc activation qua API nội bộ Assessment bằng internal JWT, rồi lấy đúng phiên bản rubric từ Content.
+Không đọc được activation hoặc rubric là lỗi dịch vụ; không quay về rubric `ACTIVE` để bootstrap.
+
+Lần đánh giá ứng viên luôn dùng rubric `ACTIVE` hiện tại, độc lập phiên bản đang dùng để chấm. Đổi phiên bản đã
+kích hoạt chỉ sau khi có lần đánh giá AI đạt ngưỡng và ADMIN kích hoạt; API từ chối bằng `409 EVALUATION_NOT_PASSED`
+nếu lần chạy chưa có `passed=true`.
+Lần chạy ghi số bài, within-half-band, MAE, QWK, per-criterion và false-positive
+error-code; mặc định yêu cầu within-half-band ít nhất `0.80` và QWK ít nhất `0.60`.
+QWK dùng band làm tròn theo bước `0.5`. Trước khi prompt mới đạt, Assessment tiếp
+tục dùng prompt version đã kích hoạt gần nhất. API gold set, đánh giá và kích hoạt
+chỉ dành cho ADMIN; gold set có thể nhập thủ công hoặc lấy từ comparison đã đủ
+điểm giám khảo. Chi tiết request/response: [assessment-grading-v1](contracts/assessment-grading-v1.md).
+
+Phase 11 còn `in_progress`: cần gold set do chuyên gia chấm và lần đánh giá thật có chỉ số lưu lại. Seed bootstrap
+và test tự động không hoàn thành tiêu chí nghiệm thu này.

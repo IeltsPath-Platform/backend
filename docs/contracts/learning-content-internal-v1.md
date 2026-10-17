@@ -221,4 +221,47 @@ Package publishing enforces one owner per `question_id` across its versions: any
 
 ## Error types (phase 3a)
 
-`GET /internal/learning-content/error-types` returns the `ACTIVE` error types as a JSON array of `{"code","name","category","severity","fixHint"}`, ordered by code. Assessment reads it to refuse any error analysis code that is not in the catalogue (`422`, `details.code = UNKNOWN_ERROR_CODE`). `category` is one of `GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK`, `READING_STRATEGY`, `LISTENING_STRATEGY`, `SPELLING_NUMBER`. `severity` is 1 to 3. The public management endpoints are `GET`, `POST` and `PUT` under `/api/content/error-types`; the code cannot change after creation.
+`GET /internal/learning-content/error-types` returns error types with both `status=ACTIVE` and `review_status=APPROVED` as a JSON array of `{"code","name","category","severity","fixHint"}`, ordered by code. Assessment reads it to refuse any error analysis code that is not in the reviewed catalogue (`422`, `details.code = UNKNOWN_ERROR_CODE`). `category` is one of `GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK`, `READING_STRATEGY`, `LISTENING_STRATEGY`, `SPELLING_NUMBER`. `severity` is 1 to 3. The public management endpoints are `GET`, `POST` and `PUT` under `/api/content/error-types`; the code cannot change after creation.
+
+## Essay rubrics (phase 11)
+
+Content owns versioned IELTS Writing rubrics. Each rubric has a `code`, `task` (`TASK_1` or `TASK_2`), positive
+`version`, `status` (`DRAFT`, `ACTIVE`, `RETIRED`), `sourceNote`, ordered `criteria`, band descriptors and optional
+original examples. Each criterion is `{code,name,description,sortOrder,bandDescriptors:[{band,descriptor}]}`; each
+example is `{band,prompt,essay,commentary}`. Bands are numeric half-band values from 0 through 9. The schema allows
+only one `ACTIVE` rubric per task. Seed descriptors for bands 4–9 are original paraphrases of the public IELTS Writing
+band descriptors with the source recorded; seed essays and prompts are original material.
+Migration `V39__rubrics.sql` seeds both `TASK_1` and `TASK_2` as `ACTIVE` for bootstrap. Their `sourceNote` explicitly
+identifies the material as an AI draft that has not been reviewed by an IELTS expert; `ACTIVE` is a runtime status.
+
+The authoring routes require `ADMIN` or `CONTENT_AUTHOR`:
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| GET | `/api/content/admin/rubrics?task=TASK_1\|TASK_2` | List draft versions for the task. |
+| POST | `/api/content/admin/rubrics` | Create a `DRAFT` (`201`). Body contains `code`, `task`, `version`, `sourceNote`, `criteria`, and optional `examples`. |
+| PUT | `/api/content/admin/rubrics/{code}/{version}` | Replace a draft's task, source note, criteria and examples. Active or retired versions cannot be edited. |
+| POST | `/api/content/admin/rubrics/{code}/{version}/activate` | Activate a complete draft and retire the existing active rubric for that task. |
+
+`GET /api/content/rubrics?task=TASK_1|TASK_2` is readable by `ADMIN`, `CONTENT_AUTHOR` and `EXAMINER` and returns a
+zero-or-one-element array containing the active rubric for that task. Invalid task or rubric data returns `400`;
+attempting to edit an active or retired version returns `409 RUBRIC_NOT_EDITABLE`. A missing active rubric has no
+public list entry; internal active and historical lookups return `404` when no rubric is available.
+
+The internal prompt projection is available to service callers using their forwarded internal JWT and correlation id:
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| GET | `/internal/learning-content/rubrics/active?task=TASK_1\|TASK_2` | Return the active rubric as one object with `code`, `task`, `version`, `sourceNote`, `criteria`, and `examples`. |
+| GET | `/internal/learning-content/rubrics/{code}/{version}` | Return that saved active or retired version, never a draft. Used by both Learning and Assessment to keep grading on the activated prompt version. |
+
+These projections are internal only. Gateway denies browser/client access to `/internal/**`; Learning and Assessment must
+not read Content's database directly. Rubric data is input to the grader and does not include answer keys.
+
+For each task, both graders use the `ACTIVE` projection only before its first Assessment `ai_prompt_activations` row.
+Learning checks `GET /internal/assessments/ai-prompt-activations?task=TASK_1` using an authenticated internal JWT and
+`learning.assessment.base-url` (default `http://localhost:8083`). A successful `{"task":"TASK_1","promptVersion":null}`
+response permits bootstrap. A version string requires the historical rubric lookup above, including `RETIRED` versions;
+subsequent Content activation does not switch the runtime prompt. Activation or rubric outages never permit fallback to
+the active projection. Evaluation candidates continue to use Content's current `ACTIVE` rubric.
+See [Assessment evaluation and activation](./assessment-grading-v1.md#ai-rubric-evaluation-and-activation-phase-11).

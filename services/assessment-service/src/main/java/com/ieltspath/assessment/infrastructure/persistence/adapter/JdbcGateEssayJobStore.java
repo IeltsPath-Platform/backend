@@ -191,18 +191,29 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
+    public void complete(UUID jobId, BigDecimal band, String feedback, String promptVersion, Instant now) {
+        jdbc.update("""
+                UPDATE grading_jobs SET status = 'COMPLETED', llm_band = :band, llm_feedback = CAST(:feedback AS JSONB),
+                    prompt_version = :promptVersion, completed_at = :now, processing_started_at = NULL
+                WHERE id = :id AND grading_mode = 'AI' AND status = 'PROCESSING'
+                """, new MapSqlParameterSource().addValue("id", jobId).addValue("band", band)
+                .addValue("feedback", feedback).addValue("promptVersion", promptVersion).addValue("now", Timestamp.from(now)));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
     public void recordComparison(UUID jobId) {
             jdbc.update("""
                     INSERT INTO essay_grade_comparisons(submission_id,attempt_type,task,llm_band,llm_criteria,llm_prompt_version)
                     SELECT j.submission_id,a.attempt_type,i.answer_snapshot->'answerSpec'->>'task',j.llm_band,
-                           COALESCE(j.llm_feedback->'criteria','[]'::jsonb),:promptVersion
+                           COALESCE(j.llm_feedback->'criteria','[]'::jsonb),j.prompt_version
                     FROM grading_jobs j JOIN learner_submissions l ON l.id=j.submission_id
                     JOIN attempt_items i ON i.id=l.attempt_item_id JOIN attempt_sections s ON s.id=i.attempt_section_id
                     JOIN assessment_attempts a ON a.id=s.attempt_id WHERE j.id=:id AND j.status='COMPLETED'
                       AND j.grading_mode='AI'
                     ON CONFLICT(submission_id) DO UPDATE SET llm_band=EXCLUDED.llm_band,
                       llm_criteria=EXCLUDED.llm_criteria,llm_prompt_version=EXCLUDED.llm_prompt_version
-                    """, Map.of("id",jobId,"promptVersion",com.ieltspath.assessment.application.port.EssayGradingPort.PROMPT_VERSION));
+                    """, Map.of("id",jobId));
     }
 
     @Override

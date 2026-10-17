@@ -81,11 +81,17 @@ public class JdbcErrorTypeRepository implements ErrorTypeRepository {
     }
 
     @Override
+    public List<ErrorType> findApprovedActive() {
+        return jdbc.query("SELECT " + COLUMNS + " FROM error_types WHERE status = 'ACTIVE' AND review_status = 'APPROVED' ORDER BY code",
+                JdbcErrorTypeRepository::map);
+    }
+
+    @Override
     public Set<String> findActiveCodes(Collection<String> codes) {
         if (codes.isEmpty()) {
             return Set.of();
         }
-        return jdbc.queryForList("SELECT code FROM error_types WHERE status = 'ACTIVE' AND code IN (:codes)",
+        return jdbc.queryForList("SELECT code FROM error_types WHERE status = 'ACTIVE' AND review_status = 'APPROVED' AND code IN (:codes)",
                         new MapSqlParameterSource("codes", codes), String.class)
                 .stream().collect(Collectors.toUnmodifiableSet());
     }

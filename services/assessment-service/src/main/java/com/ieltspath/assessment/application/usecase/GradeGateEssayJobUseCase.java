@@ -6,6 +6,7 @@ import com.ieltspath.assessment.application.exception.EssayGradingException;
 import com.ieltspath.assessment.application.port.AssessmentLlmQuota;
 import com.ieltspath.assessment.application.port.EssayGradingPort;
 import com.ieltspath.assessment.application.port.GateEssayJobStore;
+import com.ieltspath.assessment.application.port.PromptActivationProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +33,7 @@ public class GradeGateEssayJobUseCase {
     private static final Logger log = LoggerFactory.getLogger(GradeGateEssayJobUseCase.class);
 
     private final GateEssayJobStore jobs;
+    private final PromptActivationProvider activations;
     private final EssayGradingPort grader;
     private final AssessmentLlmQuota quota;
     private final GateResultAssembler assembler;
@@ -47,21 +49,22 @@ public class GradeGateEssayJobUseCase {
     @Autowired
     public GradeGateEssayJobUseCase(GateEssayJobStore jobs, EssayGradingPort grader, AssessmentLlmQuota quota,
                                     GateResultAssembler assembler, PlacementGradingService placement,
-                                    PlatformTransactionManager transactionManager, ObjectMapper json,
+                                    PromptActivationProvider activations, PlatformTransactionManager transactionManager, ObjectMapper json,
                                     @Value("${assessment.llm-grading.batch-size:10}") int batchSize,
                                     @Value("${assessment.llm-grading.daily-limit:20}") int dailyLimit,
                                     @Value("${assessment.llm-grading.stuck-after:PT10M}") Duration stuckAfter,
                                     @Value("${assessment.llm-grading.quota-timezone:Asia/Ho_Chi_Minh}") String quotaZone) {
-        this(jobs, grader, quota, assembler, placement, transactionManager, json, batchSize, dailyLimit, stuckAfter,
+        this(jobs, grader, quota, assembler, placement, activations, transactionManager, json, batchSize, dailyLimit, stuckAfter,
                 ZoneId.of(quotaZone), Clock.systemUTC());
     }
 
     GradeGateEssayJobUseCase(GateEssayJobStore jobs, EssayGradingPort grader, AssessmentLlmQuota quota,
                              GateResultAssembler assembler, PlacementGradingService placement,
-                             PlatformTransactionManager transactionManager,
+                             PromptActivationProvider activations, PlatformTransactionManager transactionManager,
                              ObjectMapper json, int batchSize, int dailyLimit, Duration stuckAfter, ZoneId quotaZone,
                              Clock clock) {
         this.jobs = jobs;
+        this.activations = activations;
         this.grader = grader;
         this.quota = quota;
         this.assembler = assembler;
@@ -73,6 +76,14 @@ public class GradeGateEssayJobUseCase {
         this.stuckAfter = stuckAfter;
         this.quotaZone = quotaZone;
         this.clock = clock;
+    }
+
+    GradeGateEssayJobUseCase(GateEssayJobStore jobs, EssayGradingPort grader, AssessmentLlmQuota quota,
+                             GateResultAssembler assembler, PlacementGradingService placement,
+                             PlatformTransactionManager transactionManager, ObjectMapper json, int batchSize,
+                             int dailyLimit, Duration stuckAfter, ZoneId quotaZone, Clock clock) {
+        this(jobs, grader, quota, assembler, placement, task -> EssayGradingPort.PROMPT_VERSION,
+                transactionManager, json, batchSize, dailyLimit, stuckAfter, quotaZone, clock);
     }
 
     /** @return how many jobs were claimed. */
@@ -90,11 +101,12 @@ public class GradeGateEssayJobUseCase {
     private void gradeOne(GateEssayJobStore.ClaimedJob job) {
         EssayGradingPort.EssayGrade grade;
         try {
+            EssayGradingPort.Prompt gradingPrompt = prompt(job, activatedVersion(job));
             if (!grader.available()) throw new EssayGradingException("LLM_UNAVAILABLE");
             if (!quota.tryConsume(job.userId(), LocalDate.now(clock.withZone(quotaZone)), dailyLimit)) {
                 throw new EssayGradingException("DAILY_LIMIT_REACHED");
             }
-            grade = grader.grade(prompt(job), job.essay());
+            grade = grader.grade(gradingPrompt, job.essay());
         } catch (EssayGradingException exception) {
             handOver(job, exception.getCode());
             return;
@@ -103,7 +115,7 @@ public class GradeGateEssayJobUseCase {
             return;
         }
         transaction.executeWithoutResult(status -> {
-            jobs.complete(job.jobId(), grade.band(), grade.feedback(), clock.instant());
+            jobs.complete(job.jobId(), grade.band(), grade.feedback(), grade.promptVersion(), clock.instant());
             jobs.recordComparison(job.jobId());
             completeAttempt(job);
         });
@@ -118,7 +130,12 @@ public class GradeGateEssayJobUseCase {
     }
 
     private void handOver(GateEssayJobStore.ClaimedJob job, String code) {
-        if (placement.handles(job.attemptId())) {
+        boolean rubricFailure = switch (code) {
+            case "PROMPT_NOT_ACTIVATED", "RUBRIC_UNAVAILABLE", "PROMPT_VERSION_UNAVAILABLE",
+                 "ContentUnavailableException", "DataAccessException", "EmptyResultDataAccessException" -> true;
+            default -> false;
+        };
+        if (placement.handles(job.attemptId()) && !rubricFailure) {
             log.warn("Placement essay graded with the default band: jobId={}, code={}", job.jobId(), code);
             transaction.executeWithoutResult(status -> {
                 jobs.complete(job.jobId(), placement.defaultWritingBand(), null, clock.instant());
@@ -139,13 +156,30 @@ public class GradeGateEssayJobUseCase {
         });
     }
 
-    private EssayGradingPort.Prompt prompt(GateEssayJobStore.ClaimedJob job) {
+    private String activatedVersion(GateEssayJobStore.ClaimedJob job) {
+        try {
+            JsonNode spec = json.readTree(job.answerSnapshot()).path("answerSpec");
+            String task = spec.path("task").asText(null);
+            String version;
+            try { version = activations.activatedVersion(task); }
+            catch (RuntimeException exception) { throw new EssayGradingException("PROMPT_VERSION_UNAVAILABLE"); }
+            // A task bootstraps from Content's ACTIVE rubric until its first approved activation.
+            if (version != null && version.isBlank()) throw new EssayGradingException("PROMPT_VERSION_UNAVAILABLE");
+            return version;
+        } catch (EssayGradingException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new EssayGradingException("INVALID_PROMPT");
+        }
+    }
+
+    private EssayGradingPort.Prompt prompt(GateEssayJobStore.ClaimedJob job, String expectedPromptVersion) {
         try {
             JsonNode question = json.readTree(job.questionSnapshot());
             JsonNode spec = json.readTree(job.answerSnapshot()).path("answerSpec");
             return new EssayGradingPort.Prompt(question.path("stem").asText(null), spec.path("task").asText(null),
                     spec.path("minWords").isNumber() ? spec.get("minWords").asInt() : null,
-                    spec.path("chartFacts").asText(null));
+                    spec.path("chartFacts").asText(null), expectedPromptVersion);
         } catch (Exception exception) {
             throw new EssayGradingException("INVALID_PROMPT");
         }

@@ -78,7 +78,7 @@ public class InternalLearningContentController {
     /** Active error types only; grading and error analysis record codes from this list. */
     @GetMapping("/error-types")
     public List<ActiveErrorTypeResponse> errorTypes() {
-        return listErrorTypes.execute(true).stream().map(ActiveErrorTypeResponse::from).toList();
+        return listErrorTypes.executeApprovedActive().stream().map(ActiveErrorTypeResponse::from).toList();
     }
 
     public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint) {
