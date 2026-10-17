@@ -58,6 +58,17 @@ class AnomalyRulesTest {
     }
 
     @Test
+    void aLearnerWhoHasNotAnsweredForThreeDaysIsInactiveAndOneSecondLessIsNot() {
+        java.time.Instant now = java.time.Instant.parse("2026-10-17T12:00:00Z");
+        java.time.Duration threeDays = java.time.Duration.ofDays(3);
+
+        assertTrue(AnomalyRules.inactive(now.minus(threeDays), now, 3), "exactly three days is inactive");
+        assertTrue(AnomalyRules.inactive(now.minus(threeDays).minusSeconds(1), now, 3));
+        assertFalse(AnomalyRules.inactive(now.minus(threeDays).plusSeconds(1), now, 3));
+        assertEquals(now.minus(threeDays), AnomalyRules.inactiveCutoff(now, 3));
+    }
+
+    @Test
     void essaysDifferingOnlyInSpacingAndCaseShareAHash() {
         assertEquals(AnomalyRules.essayHash("Cities  should\nplant TREES."),
                 AnomalyRules.essayHash("cities should plant trees."));

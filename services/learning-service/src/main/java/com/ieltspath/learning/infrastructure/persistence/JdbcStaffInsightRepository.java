@@ -112,6 +112,35 @@ public class JdbcStaffInsightRepository implements StaffInsightRepository {
     }
 
     @Override
+    public int openInactivityFlags(Instant cutoff, Instant now) {
+        // One statement: the learners and their last answer come from the event log, the open course from topic
+        // progress, and an open flag already on record stops a second one.
+        return jdbc.update("""
+                INSERT INTO learner_flags (id, user_id, kind, evidence)
+                SELECT gen_random_uuid(), activity.user_id, 'INACTIVE',
+                       jsonb_build_object('lastAnswerAt', activity.last_at, 'raisedAt', CAST(:now AS text))
+                FROM (SELECT user_id, max(occurred_at) AS last_at FROM question_attempt_events GROUP BY user_id) activity
+                WHERE activity.last_at <= :cutoff
+                  AND EXISTS (SELECT 1 FROM topic_progress topic WHERE topic.user_id = activity.user_id
+                              AND topic.course_id IS NOT NULL
+                              AND NOT EXISTS (SELECT 1 FROM course_progress passed
+                                              WHERE passed.user_id = topic.user_id AND passed.course_id = topic.course_id))
+                  AND NOT EXISTS (SELECT 1 FROM learner_flags open_flag WHERE open_flag.user_id = activity.user_id
+                                  AND open_flag.kind = 'INACTIVE' AND open_flag.status = 'OPEN')
+                """, new MapSqlParameterSource().addValue("cutoff", Timestamp.from(cutoff))
+                .addValue("now", now.toString()));
+    }
+
+    @Override
+    public int dismissInactivityFlags(UUID userId) {
+        return jdbc.update("""
+                UPDATE learner_flags SET status = 'DISMISSED', reviewed_at = CURRENT_TIMESTAMP,
+                    note = 'learner answered again'
+                WHERE user_id = :userId AND kind = 'INACTIVE' AND status = 'OPEN'
+                """, new MapSqlParameterSource("userId", userId));
+    }
+
+    @Override
     public Optional<LearnerFlag> findFlag(UUID id) {
         return jdbc.query("SELECT " + FLAG_COLUMNS + " FROM learner_flags WHERE id = :id", params("id", id), FLAG)
                 .stream().findFirst();

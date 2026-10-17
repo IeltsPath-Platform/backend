@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "Cờ vắng học và thống kê hoạt động"
-status: pending
+status: in_progress
 priority: P2
 dependencies: []
 ---
@@ -39,9 +39,22 @@ câu, cây và giám khảo. Không làm lớp hay thống kê lớp (M1).
 
 ## Success Criteria
 
-- [ ] Học viên 3 ngày không nộp bài xuất hiện trong hàng việc EXAMINER với cờ `INACTIVE`.
-- [ ] Học viên quay lại học thì cờ tự đóng.
-- [ ] Admin xem được DAU/WAU/MAU và bảng giữ chân.
+- [ ] Học viên 3 ngày không nộp bài xuất hiện trong hàng việc EXAMINER với cờ `INACTIVE`. Cờ được mở (test: `InactivityAndActivityIntegrationTest.aLearnerWhoStopped...`); chưa kiểm hàng việc: `WorkItemSync` chỉ chạy mỗi 3 giờ và chưa có test.
+- [x] Học viên quay lại học thì cờ tự đóng. (test: `InactivityAndActivityIntegrationTest.aLearnerWhoStopped...`; đóng trước khi commit qua `InactivityFlagCloser`)
+- [x] Admin xem được DAU/WAU/MAU và bảng giữ chân. (test: `InactivityAndActivityIntegrationTest.dailyWeekly...`, `ActivityStatsControllerTest`)
+
+## Quyết định khi làm (2026-10-17)
+
+- **Hoạt động = có câu trả lời** trong `question_attempt_events`, không phải lần đăng nhập (plan).
+- **UTC cho mọi ngày và tuần.** Lần đầu viết SQL theo múi giờ của session DB, tuần bị lệch 7 giờ; đã sửa bằng `AT TIME ZONE 'UTC'` và khoảng tính bằng giờ.
+- **Giữ chân** định nghĩa tuần N là 168 giờ bắt đầu sau N tuần kể từ tuần đầu tiên của cohort. Tỷ lệ để trống khi tuần đó chưa kết thúc.
+- **Tắt cờ đặt ở listener `BEFORE_COMMIT`**, không ở adapter ghi event: adapter không phụ thuộc bảng cờ.
+
+## Còn mở
+
+- Truy vấn mở cờ quét toàn bộ `question_attempt_events` mỗi ngày; cần đo khi dữ liệu lớn.
+- Thống kê dựa trên giờ UTC; FE cần hiển thị đúng múi giờ khi báo cáo cho người dùng Việt Nam.
+- Không đụng doanh thu/chuyển đổi gói (plan).
 
 ## Risk Assessment
 

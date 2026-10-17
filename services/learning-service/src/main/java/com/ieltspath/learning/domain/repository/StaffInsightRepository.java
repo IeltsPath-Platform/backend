@@ -34,6 +34,15 @@ public interface StaffInsightRepository {
     /** False when the learner already has a flag of this kind raised since {@code notBefore}. */
     boolean insertFlag(UUID userId, FlagKind kind, String evidenceJson, Instant notBefore);
 
+    /**
+     * Opens an INACTIVE flag for every learner who has studied, is still on a course that is not passed, and whose last
+     * answer is at or before {@code cutoff}, unless the learner already has one open. Returns how many were opened.
+     */
+    int openInactivityFlags(Instant cutoff, Instant now);
+
+    /** Closes the learner's open INACTIVE flags because they answered again; returns how many closed. */
+    int dismissInactivityFlags(java.util.UUID userId);
+
     Optional<LearnerFlag> findFlag(UUID id);
 
     boolean reviewFlag(UUID id, FlagStatus status, UUID reviewer, String note);

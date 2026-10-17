@@ -56,7 +56,8 @@ public class JdbcQuestionEventLog implements QuestionEventLog {
             statement.setObject(12, event.attemptId(), Types.OTHER);
             statement.setBoolean(13, event.firstSubmission());
         });
-        // Learners whose events were just written are checked for anomalies once the transaction commits.
+        // Learners whose events were just written: their open flags are closed before the commit, and they are checked
+        // for anomalies once it commits.
         events.stream().map(QuestionAttemptEvent::userId).distinct()
                 .forEach(user -> publisher.publishEvent(new QuestionEventsAppended(user)));
     }

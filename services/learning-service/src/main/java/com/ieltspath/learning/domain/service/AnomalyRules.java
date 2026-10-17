@@ -1,6 +1,8 @@
 package com.ieltspath.learning.domain.service;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
@@ -33,6 +35,16 @@ public final class AnomalyRules {
     /** More than {@code burstCount} submissions inside the window the caller counted. */
     public boolean burst(long submissionsInWindow, Thresholds limits) {
         return submissionsInWindow > limits.burstCount();
+    }
+
+    /** A learner is inactive when the last answer is {@code days} days old or older. */
+    public static boolean inactive(Instant lastAnswerAt, Instant now, int days) {
+        return !lastAnswerAt.isAfter(inactiveCutoff(now, days));
+    }
+
+    /** The last answer at or before this instant makes a learner inactive. */
+    public static Instant inactiveCutoff(Instant now, int days) {
+        return now.minus(Duration.ofDays(days));
     }
 
     /** SHA-256 of the essay with all whitespace removed and letters lower-cased: copies differing only in spacing match. */

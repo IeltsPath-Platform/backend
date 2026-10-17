@@ -7,7 +7,7 @@ import java.util.UUID;
 public final class StaffRecords {
     private StaffRecords() {}
 
-    public enum FlagKind { TOO_FAST_HIGH_SCORE, BURST_SUBMISSIONS, DUPLICATE_ESSAY }
+    public enum FlagKind { TOO_FAST_HIGH_SCORE, BURST_SUBMISSIONS, DUPLICATE_ESSAY, INACTIVE }
 
     public enum FlagStatus { OPEN, CONFIRMED, DISMISSED }
 
