@@ -61,6 +61,44 @@ class PracticeTestControllerTest {
     @MockitoBean
     private com.ieltspath.content.application.usecase.GetWritingTaskUseCase writingTask;
 
+    @MockitoBean
+    private com.ieltspath.content.application.usecase.GetSpeakingTaskUseCase speakingTask;
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void speakingTaskRouteReturnsThePartAndItsQuestions() throws Exception {
+        UUID versionId = UUID.randomUUID();
+        UUID sectionId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+        when(speakingTask.execute(versionId, sectionId)).thenReturn(new com.ieltspath.content.application.port
+                .SpeakingTaskReader.SpeakingTask(UUID.randomUUID(), versionId, sectionId, "Speaking Practice Test 1",
+                "Part 1: Hometown", 1, 300, "Answer each question in about 20-30 seconds.", List.of(
+                new com.ieltspath.content.application.port.SpeakingTaskReader.Question(questionId, 1,
+                        "Where is your hometown?", 30))));
+
+        var response = mockMvc.perform(get("/api/content/practice-tests/{v}/sections/{s}/speaking-task", versionId,
+                        sectionId))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.title")
+                        .value("Part 1: Hometown"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.questions[0].prompt").value("Where is your hometown?"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.questions[0].durationSeconds").value(30))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(response).doesNotContain("answerSpec", "explanation");
+    }
+
+    @Test
+    @WithMockUser(roles = "SALES_STAFF")
+    void usersOutsidePracticeCatalogRolesCannotReadASpeakingTask() throws Exception {
+        mockMvc.perform(get("/api/content/practice-tests/{v}/sections/{s}/speaking-task", UUID.randomUUID(),
+                UUID.randomUUID())).andExpect(status().isForbidden());
+
+        verifyNoInteractions(speakingTask);
+    }
+
     @Test
     @WithMockUser(roles = "CUSTOMER")
     void rejectsNullPackageIdInsideOnlyKeyBeforeCallingSearchUseCase() throws Exception {
