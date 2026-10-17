@@ -102,7 +102,7 @@ class PracticeEssayIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        jdbc.execute("TRUNCATE lesson_writing_submissions, llm_daily_usage, review_theory_checks, diagnostic_probes, diagnostic_sessions,review_sets, "
+        jdbc.execute("TRUNCATE human_review_requests, lesson_writing_submissions, llm_daily_usage, review_theory_checks, diagnostic_probes, diagnostic_sessions,review_sets, "
                 + "review_items, practice_attempts, lesson_practice_passes, lesson_exercise_submissions, kp_evidence, "
                 + "lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments, "
                 + "assessment_result_versions CASCADE");

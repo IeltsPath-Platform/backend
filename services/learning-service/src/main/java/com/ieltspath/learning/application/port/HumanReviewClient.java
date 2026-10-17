@@ -1,0 +1,33 @@
+package com.ieltspath.learning.application.port;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Mentor review of an essay: the human-grading credit (Access, with the learner's own bearer token) and the independent
+ * review (Assessment). Failures are thrown as
+ * {@link com.ieltspath.learning.application.exception.LearningRequestException}: {@code 402} when the learner has no
+ * credit, {@code 409} for a credit conflict, {@code 503} when a service cannot be reached.
+ */
+public interface HumanReviewClient {
+    /** Spends one credit for the essay; idempotent by {@code submissionId}. Returns the credits left. */
+    int consumeCredit(UUID submissionId);
+
+    /** Gives the credit of an essay back, for a review that could not be created; idempotent. */
+    void refundCredit(UUID submissionId);
+
+    /** Idempotent by {@code requestId}; returns the id of the independent review submission. */
+    UUID createReview(CreateReview request);
+
+    /** The review as the learner may see it; grade fields are null while it is PENDING. */
+    Review fetchReview(UUID reviewSubmissionId, UUID learnerId);
+
+    record CreateReview(UUID requestId, UUID learnerId, UUID sourceSubmissionId, String source, String task,
+                        String promptStem, String essay, String rubricCode, Integer rubricVersion) {}
+
+    record Review(UUID reviewSubmissionId, String status, BigDecimal band, List<Criterion> criteria,
+                  List<String> errorCodes, String feedback) {}
+
+    record Criterion(String criterion, BigDecimal band, String comment) {}
+}

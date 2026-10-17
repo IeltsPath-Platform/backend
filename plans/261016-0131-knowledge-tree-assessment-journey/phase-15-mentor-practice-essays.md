@@ -8,6 +8,15 @@ dependencies: [10, 12]
 
 # Phase 15: Mentor chữa essay Practice và lesson
 
+## Trạng thái và ghi chú triển khai
+
+- **Hướng đã chốt (người dùng duyệt):** submission độc lập bên assessment theo `docs/contracts/human-review-v1.md`.
+- **Learning: xong** (migration `V20__human_review_requests.sql`, `HumanReviewUseCase`, `HumanReviewController`,
+  `RestHumanReviewClient`; 487 test xanh với client giả). **Assessment: Codex đang làm**; khi xong cần chạy thử nối thật
+  hai service.
+- Khác với plan: bảng riêng `human_review_requests` thay vì thêm cột vào essay; `requestId` gửi sang assessment suy ra từ
+  id essay để tạo review đúng một lần; hoàn tín dụng nuốt lỗi hoàn (tín dụng giữ theo essay nên hỏi lại không trừ hai lần).
+
 ## Overview
 
 Mentor mô tả gói có người hỗ trợ: Mentor "chữa bài tập tự luận" cho học viên đã trả tiền. Phase 12 mới nối tín dụng chấm

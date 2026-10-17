@@ -101,7 +101,7 @@ class LessonWritingIntegrationTest {
         jdbc.execute("""
                 TRUNCATE review_theory_checks, diagnostic_probes, diagnostic_sessions,review_sets, review_items, lesson_exercise_submissions, kp_evidence, lesson_progress,
                 topic_progress, knowledge_point_catalog, topic_test_assignments, assessment_result_versions,
-                lesson_writing_submissions, llm_daily_usage, kp_mastery_profiles RESTART IDENTITY
+                human_review_requests, lesson_writing_submissions, llm_daily_usage, kp_mastery_profiles RESTART IDENTITY
                 """);
         reset(content, access, llm);
         when(content.getActiveRubric(anyString())).thenAnswer(invocation -> testRubric(invocation.getArgument(0)));
