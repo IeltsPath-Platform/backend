@@ -19,6 +19,7 @@ import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.QuestionUsageConflict;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
+import com.ieltspath.content.domain.vo.QuestionDifficulty;
 import com.ieltspath.content.domain.vo.Skill;
 import com.ieltspath.content.domain.vo.ContentStatus;
 import com.ieltspath.content.domain.vo.KnowledgePointKind;
@@ -776,6 +777,24 @@ public class JdbcLearningContentReader implements LearningContentReader {
                             .add(uuid(rs, "prerequisite_id"));
                 });
         return prerequisitesByKnowledgePoint;
+    }
+
+    @Override
+    public Map<UUID, QuestionDifficulty> questionDifficulties(Collection<UUID> questionVersionIds) {
+        if (questionVersionIds.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> distinctIds = questionVersionIds.stream().distinct().toList();
+        Map<UUID, QuestionDifficulty> difficulties = new LinkedHashMap<>();
+        jdbc.query("""
+                SELECT id, difficulty
+                FROM question_versions
+                WHERE id IN (:ids) AND difficulty IS NOT NULL
+                ORDER BY id
+                """, Map.of("ids", distinctIds), rs -> {
+            difficulties.put(uuid(rs, "id"), QuestionDifficulty.valueOf(rs.getString("difficulty")));
+        });
+        return difficulties;
     }
 
     private Map<UUID, List<UUID>> lessonKnowledgePoints(List<UUID> lessonIds) {

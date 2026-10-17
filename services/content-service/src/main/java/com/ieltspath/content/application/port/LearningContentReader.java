@@ -12,6 +12,7 @@ import com.ieltspath.content.application.result.PackageQuestionSpec;
 import com.ieltspath.content.application.result.KnowledgeTreeNodeResult;
 import com.ieltspath.content.domain.vo.QuestionUsageConflict;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
+import com.ieltspath.content.domain.vo.QuestionDifficulty;
 import com.ieltspath.content.domain.vo.Skill;
 
 import java.util.Collection;
@@ -104,4 +105,7 @@ public interface LearningContentReader {
 
     /** Active knowledge points mapped to their active, direct prerequisites; unknown and inactive ids are omitted. */
     Map<UUID, List<UUID>> activeKnowledgePrerequisites(Collection<UUID> ids);
+
+    /** Question versions with a classified difficulty; unknown and unclassified ids are omitted. */
+    Map<UUID, QuestionDifficulty> questionDifficulties(Collection<UUID> questionVersionIds);
 }

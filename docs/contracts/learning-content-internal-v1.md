@@ -202,6 +202,24 @@ Added 2026-10-03. Request `{knowledgePointIds, excludePackageIds, minQuestions}`
 {"counts":{"10000000-0000-4000-8000-000000000002":3}}
 ```
 
+## `POST /questions/difficulties`
+
+Returns the stored difficulty tag for question versions in one database query. This endpoint requires an authenticated internal JWT like the other `/internal/learning-content/**` routes.
+
+Request: 1–500 question-version UUIDs. The list must not be empty and must not contain `null`.
+
+```json
+{"questionVersionIds":["20000000-0000-4000-8000-000000000201","20000000-0000-4000-8000-000000000202"]}
+```
+
+Response:
+
+```json
+{"difficulties":{"20000000-0000-4000-8000-000000000201":"EASY","20000000-0000-4000-8000-000000000202":"HARD"}}
+```
+
+Difficulty values are `EASY`, `MEDIUM`, or `HARD`. Unknown IDs and versions whose difficulty is still `NULL` are omitted from `difficulties`. Invalid or oversized input returns `400`.
+
 ## `POST /suggestions/candidates`
 
 Returns published content candidates for Learning's optional suggestions in one batched request. Like the other
