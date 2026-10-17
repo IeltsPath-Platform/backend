@@ -3,6 +3,7 @@ package com.ieltspath.learning.api.controller;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.usecase.GetLeagueUseCase;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -13,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/learning/me/league")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('CUSTOMER')")
 public class LeagueController {
     private final CurrentUserProvider currentUser;
     private final GetLeagueUseCase league;
