@@ -146,8 +146,13 @@ public interface LearningContentClient {
         }
     }
 
+    /** {@code cefrLevel} ({@code A1} to {@code C2}) and {@code canDo} are null when Content has not set them. */
     record KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
-                          String description, boolean hasPracticeSet) {
+                          String description, boolean hasPracticeSet, String cefrLevel, String canDo) {
+        public KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
+                              String description, boolean hasPracticeSet) {
+            this(id, code, name, learningType, skill, description, hasPracticeSet, null, null);
+        }
     }
 
     record LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
@@ -236,8 +241,16 @@ public interface LearningContentClient {
     record TestPackage(UUID packageId, UUID packageVersionId, String code) {
     }
 
+    /**
+     * {@code band} is the band of the course the package belongs to and {@code requiredFeatureKey} the Access feature it
+     * needs; both are null when Content does not say, which means no limit.
+     */
     record PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
-                       int matchedQuestionCount) {
+                       int matchedQuestionCount, BigDecimal band, String requiredFeatureKey) {
+        public PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
+                           int matchedQuestionCount) {
+            this(packageId, packageVersionId, code, questionCount, matchedQuestionCount, null, null);
+        }
     }
 
     /** {@code skills} are the skills of the set's questions; empty from Content that does not send them. */

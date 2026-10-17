@@ -1,7 +1,9 @@
 package com.ieltspath.learning.infrastructure.persistence;
 
 import com.ieltspath.learning.application.command.SubmitExerciseCommand;
+import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.exception.LearningRequestException;
+import com.ieltspath.learning.application.port.AccessClient;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.*;
 import com.ieltspath.learning.application.usecase.GetLearnerTreeUseCase;
@@ -69,6 +71,7 @@ class FreePracticeIntegrationTest {
     @Autowired SubmitPracticeAttemptUseCase submit;
     @Autowired GetLearnerTreeUseCase treeUseCase;
     @MockitoBean LearningContentClient content;
+    @MockitoBean AccessClient access;
 
     @BeforeEach
     void catalog() {
@@ -102,6 +105,64 @@ class FreePracticeIntegrationTest {
                 + "AND source = 'free_practice'", user));
         assertEquals(0, count("SELECT count(*) FROM review_items WHERE user_id = ?", user),
                 "a free attempt never raises a review, even when it fails");
+    }
+
+    private void offering(BigDecimal band, String featureKey) {
+        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), eq(5)))
+                .thenReturn(List.of(new PracticeSet(PACKAGE, VERSION, "P1", 2, 2, band, featureKey)));
+    }
+
+    @Test
+    void aSetAboveTheBandOfTheCourseIsNotOffered() {
+        offering(new BigDecimal("6.5"), null);
+
+        LearningRequestException error = assertThrows(LearningRequestException.class,
+                () -> start.execute(enrolled(), KP));
+
+        assertEquals("FREE_PRACTICE_EXHAUSTED", error.getCode());
+    }
+
+    @Test
+    void aSetAtOrBelowTheBandOfTheCourseIsOffered() {
+        offering(new BigDecimal("6.0"), null);
+        UUID user = enrolled();
+
+        start.execute(user, KP);
+
+        assertEquals(1, count("SELECT count(*) FROM practice_attempts WHERE user_id = ?", user));
+    }
+
+    @Test
+    void aSetThatNeedsAPlanIsHeldBackFromALearnerWithoutOne() {
+        offering(null, "PREMIUM_CONTENT");
+        when(access.premium()).thenReturn(false);
+
+        LearningRequestException error = assertThrows(LearningRequestException.class,
+                () -> start.execute(enrolled(), KP));
+
+        assertEquals("FREE_PRACTICE_EXHAUSTED", error.getCode());
+    }
+
+    @Test
+    void aSetThatNeedsAPlanIsOfferedToASubscriber() {
+        offering(null, "PREMIUM_CONTENT");
+        when(access.premium()).thenReturn(true);
+        UUID user = enrolled();
+
+        start.execute(user, KP);
+
+        assertEquals(1, count("SELECT count(*) FROM practice_attempts WHERE user_id = ?", user));
+    }
+
+    @Test
+    void whenAccessCannotAnswerTheLearnerCountsAsHavingNoPlan() {
+        offering(null, "PREMIUM_CONTENT");
+        when(access.premium()).thenThrow(new AccessUnavailableException(503));
+
+        LearningRequestException error = assertThrows(LearningRequestException.class,
+                () -> start.execute(enrolled(), KP));
+
+        assertEquals("FREE_PRACTICE_EXHAUSTED", error.getCode());
     }
 
     @Test
@@ -148,6 +209,33 @@ class FreePracticeIntegrationTest {
         assertNull(node.mastery(), "no evidence yet, so no score or tier");
         assertNull(node.tier());
         assertTrue(node.practiceAvailable());
+    }
+
+    @Test
+    void theTreeShowsTheTierOfAPointTheLearnerHasEvidenceOn() {
+        UUID user = enrolled();
+        jdbc.update("INSERT INTO kp_mastery_profiles (user_id, knowledge_point_id, mastery, tier, evidence_count, "
+                + "last_evidence_at) VALUES (?, ?, 0.7, 'CONSOLIDATE', 6, now())", user, KP);
+
+        var node = treeUseCase.execute(user, COURSE).knowledgePoints().get(0);
+
+        assertEquals("CONSOLIDATE", node.tier());
+        assertEquals(0.7, node.mastery(), 1e-9);
+        assertEquals(6, node.evidenceCount());
+    }
+
+    @Test
+    void theTreeCarriesTheCefrLevelAndCanDoContentGives() {
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(KP, "R_FREE", "Free point", "PROCEDURE", "READING", "", true, "B1",
+                        "Find the main idea of a short text")),
+                LearningSkill.READING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+
+        var node = treeUseCase.execute(enrolled(), COURSE).knowledgePoints().get(0);
+
+        assertEquals("B1", node.cefrLevel());
+        assertEquals("Find the main idea of a short text", node.canDo());
     }
 
     @Test

@@ -77,6 +77,7 @@ public class GetLearnerTreeUseCase {
             KnowledgePoint point = points.get(id);
             MasteryProfile profile = standing.get(id);
             nodes.add(new Node(id, point.code(), point.name(), point.skill(), point.learningType(),
+                    point.cefrLevel(), point.canDo(),
                     profile == null ? null : profile.mastery(),
                     profile == null ? null : profile.tier().name(),
                     profile == null ? 0 : profile.evidenceCount(),
@@ -98,7 +99,8 @@ public class GetLearnerTreeUseCase {
      * One point of the tree. {@code mastery}, {@code tier} and {@code nextReviewAt} are null, and {@code evidenceCount}
      * zero, until the point has evidence. {@code practiceAvailable} says whether free practice can start on it.
      */
-    public record Node(UUID knowledgePointId, String code, String name, String skill, String kind, Double mastery,
+    public record Node(UUID knowledgePointId, String code, String name, String skill, String kind, String cefrLevel,
+                       String canDo, Double mastery,
                        String tier, int evidenceCount, Instant nextReviewAt, List<UUID> prerequisiteIds,
                        boolean practiceAvailable) {}
 

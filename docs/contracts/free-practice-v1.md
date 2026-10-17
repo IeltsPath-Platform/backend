@@ -15,10 +15,11 @@ is open on it.
 { "courseId": "…",
   "knowledgePoints": [{
     "knowledgePointId": "…", "code": "R60_TFNG_F_VS_NG", "name": "…", "skill": "READING", "kind": "STRATEGY",
-    "mastery": 0.72, "tier": "CONSOLIDATE", "evidenceCount": 9, "nextReviewAt": "2026-10-25T00:00:00Z",
+    "cefrLevel": "B1", "canDo": "…", "mastery": 0.72, "tier": "CONSOLIDATE", "evidenceCount": 9, "nextReviewAt": "2026-10-25T00:00:00Z",
     "prerequisiteIds": ["…"], "practiceAvailable": true }] }
 ```
 
+- `cefrLevel` (`A1` to `C2`) and `canDo` come from Content and are `null` when it has not set them.
 - `mastery`, `tier`, `nextReviewAt` are `null` and `evidenceCount` is 0 for a point the learner has not touched.
 - `tier` is `PRIORITY`, `CONSOLIDATE`, `MAINTAIN` or `INSUFFICIENT` ("not enough data").
 - `practiceAvailable` is true when more unseen practice sets remain than the sets kept in reserve for reviews (see below).
@@ -38,6 +39,10 @@ attempt submission route; that response carries the `gamification` block ([gamif
 - The last unseen sets of every point are kept for reviews (`learning.free-practice.reserve`, default 2): free practice starts
   only while more unseen sets remain than that, otherwise `409 FREE_PRACTICE_EXHAUSTED`. A set the learner has seen, or that
   a review holds, is never offered again.
+- A set above the band of the learner's course is never offered. A set that needs a feature (`requiredFeatureKey`) is offered
+  only to a learner with an active plan; Access answers only yes or no for the plan, so any active plan counts, and when
+  Access cannot answer the learner counts as having none. When every candidate is filtered out the answer is
+  `FREE_PRACTICE_EXHAUSTED`.
 - `403 REVIEW_REQUIRED` while a blocking review is pending for the point.
 - `403 COURSE_NOT_OPEN`, `403 COURSE_NOT_JOINED` as above; `404 NOT_FOUND` for an unknown point; `409
   FREE_PRACTICE_UNAVAILABLE` for a point with no skill to practise.

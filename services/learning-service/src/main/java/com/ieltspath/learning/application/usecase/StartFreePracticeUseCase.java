@@ -1,6 +1,8 @@
 package com.ieltspath.learning.application.usecase;
 
+import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.exception.LearningRequestException;
+import com.ieltspath.learning.application.port.AccessClient;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageVersion;
@@ -22,6 +24,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -51,12 +54,15 @@ public class StartFreePracticeUseCase {
     private final PracticeAttemptViewAssembler view;
     private final int reserve;
     private final HeartsService hearts;
+    private final AccessClient access;
     private final Clock clock = Clock.systemUTC();
 
     public StartFreePracticeUseCase(LearnerLock lock, LearningContentClient content, KnowledgePointDirectory directory,
                                     LearnerCurriculumRepository curricula, ReviewItemRepository reviews,
                                     PracticeAttemptRepository attempts, PracticeAttemptViewAssembler view,
-                                    HeartsService hearts, @Value("${learning.free-practice.reserve:2}") int reserve) {
+                                    HeartsService hearts, AccessClient access,
+                                    @Value("${learning.free-practice.reserve:2}") int reserve) {
+        this.access = access;
         this.hearts = hearts;
         this.lock = lock;
         this.content = content;
@@ -87,8 +93,14 @@ public class StartFreePracticeUseCase {
 
         LearningSkill skill = skillOf(topic, knowledgePointId).orElseThrow(() -> new LearningRequestException(409,
                 "FREE_PRACTICE_UNAVAILABLE", "This knowledge point has no skill to practise"));
-        for (PracticeSet candidate : content.searchPracticeSets(knowledgePointId, excludedList,
-                GetReviewBasketUseCase.MIN_SET_QUESTIONS, CANDIDATES)) {
+        List<PracticeSet> candidates = content.searchPracticeSets(knowledgePointId, excludedList,
+                GetReviewBasketUseCase.MIN_SET_QUESTIONS, CANDIDATES);
+        // One question to Access for the whole list, and only when some set needs a plan.
+        boolean premium = candidates.stream().anyMatch(set -> set.requiredFeatureKey() != null) && hasPlan();
+        BigDecimal courseBand = topic.course() == null ? null : topic.course().bandLevel();
+        for (PracticeSet candidate : candidates) {
+            if (!withinBand(candidate, courseBand)) continue;
+            if (candidate.requiredFeatureKey() != null && !premium) continue;
             PackageVersion version = content.getPackageVersion(candidate.packageVersionId());
             if (ItemGrading.orderedItems(version).stream().anyMatch(ItemGrading::isEssay)) continue;
             Optional<PracticeAttempt> open = attempts.findOpen(userId, candidate.packageId());
@@ -99,6 +111,23 @@ public class StartFreePracticeUseCase {
             return view.assemble(attempt, version);
         }
         throw exhausted();
+    }
+
+    /** A set above the band of the learner's course is too hard to offer; a set with no band has no limit. */
+    private static boolean withinBand(PracticeSet set, BigDecimal courseBand) {
+        return set.band() == null || courseBand == null || set.band().compareTo(courseBand) <= 0;
+    }
+
+    /**
+     * Whether the learner has an active plan. A set that needs a feature is offered only to a learner with one; when Access
+     * cannot answer, the learner is treated as having none.
+     */
+    private boolean hasPlan() {
+        try {
+            return access.premium();
+        } catch (AccessUnavailableException unavailable) {
+            return false;
+        }
     }
 
     /** The topic that teaches the point, which Content returns only for active points. */
