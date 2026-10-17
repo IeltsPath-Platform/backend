@@ -51,4 +51,20 @@ The following responses were observed through Gateway on the clean stack:
 
 ## Acceptance status
 
-Not accepted yet. The user-reported verification excluding `library-service` is green, and the clean stack is healthy. Demo steps 1-3, 6, and the step 7 activation guard passed; the V40 sets enabled the intended review-and-diagnosis flow. Step 4 remains blocked by the Learning/Content packageVersionId mismatch, step 5 still returns 422 for the valid courseId above, and step 8 has no QA sample. Phase acceptance also remains open until an expert-rated gold set and evaluation exist. `library-service` remains explicitly out of scope.
+Closed with open items; not a full acceptance. Verification of every module except `library-service` is green (1,419
+tests, 0 failures, 0 skipped), and the clean stack is healthy. Demo steps 1-3, 6 and the step 7 activation guard passed;
+the V40 sets enabled the intended review-and-diagnosis flow.
+
+Open items:
+
+- **Step 5 (cause found and fixed in code, demo not rerun).** `POST /api/learning/courses/{id}/test-assignments` returned
+  422 for every valid course id because `CourseController.assign` declared `@PathVariable UUID id` without a name and the
+  build does not enable `-parameters`, so Spring could not bind the id. It is now `@PathVariable("id")`, and
+  `CourseControllerTest` fails on the old code (403 expected, 422 received) and passes on the new one. The running stack
+  was built before the fix: rebuild the Learning image and repeat steps 5 and 8.
+- **Step 4 (not investigated).** Learning returned a `packageVersionId` that does not match the version published in
+  Content; cause unknown, possibly the publish done during the demo.
+- **Step 8** has no QA sample because it depends on the course-test essay of step 5.
+- **Phase 11** has tooling but no accuracy evidence: no gold set rated by an IELTS expert exists. A run on 30 synthetic
+  essays could not finish (`LLM_REQUEST_FAILED`); synthetic scores are never accuracy evidence.
+- **`library-service`** test sources do not compile, unchanged from main; out of scope.
