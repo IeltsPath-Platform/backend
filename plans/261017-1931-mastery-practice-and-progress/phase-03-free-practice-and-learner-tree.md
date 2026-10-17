@@ -60,7 +60,7 @@ US-010 (03 §C.1): học viên bấm "Practice" trên một KID bất kỳ để
 
 - [x] Học viên chọn KP bất kỳ của course mở và luyện được khi còn > 2 gói chưa lộ. (test: `FreePracticeIntegrationTest.freePracticeStopsAtTheReserve...`, `startingAgainReturnsTheOpenAttempt...`)
 - [x] Luyện tự do trượt không sinh bài ôn chặn, không khóa lesson. (test: `FreePracticeIntegrationTest.aFreeSetIsRecordedAsFreeEvidence...`, không có `review_items`)
-- [ ] Điểm course không đổi sau luyện tự do. Chưa có test điểm course; chỉ đảm bảo luyện tự do không ghi `lesson_id`.
+- [x] Điểm course không đổi sau luyện tự do. (test: `FreePracticeIntegrationTest.aFreeSetNeverEntersTheProcessScoreOfTheCourse`; điểm Practice của course join theo `lesson_id`, gói tự do không có nên bị loại)
 - [x] Cây trả đúng tier cho mọi KP trong 2 query. (test: `theTreeShowsTheTierOfAPointTheLearnerHasEvidenceOn` cho KP có bằng chứng, `theTreeListsThePointsOfTheCourseWithFreePracticeOpen` cho KP chưa có; số lần gọi Content cố định, hồ sơ một query)
 
 Đã làm sau khi Codex trả `band` và `requiredFeatureKey` trên `PracticeSet` (commit `76bb9aa`) và `cefrLevel`, `canDo` trên KP:
@@ -75,7 +75,6 @@ Còn mở:
 - `practiceAvailable` và số gói chưa xem của cây chưa trừ các gói bị lọc theo band hoặc gói; cây có thể báo còn gói trong khi
   `POST free-practice` trả `FREE_PRACTICE_EXHAUSTED`.
 - Chỉ lấy tối đa 5 gói ứng viên từ Content rồi mới lọc band/gói; nếu 5 gói đầu đều bị loại thì báo hết gói dù còn gói khác.
-- Điểm course không đổi sau luyện tự do: chưa có test điểm course, chỉ đảm bảo luyện tự do không ghi `lesson_id`.
 - Gói có essay bị loại lúc nộp (409 `FREE_PRACTICE_ESSAY_UNSUPPORTED`), không loại lúc chọn gói.
 
 ## Risk Assessment

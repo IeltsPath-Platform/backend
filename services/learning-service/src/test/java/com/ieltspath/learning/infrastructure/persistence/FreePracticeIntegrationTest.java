@@ -70,6 +70,7 @@ class FreePracticeIntegrationTest {
     @Autowired StartFreePracticeUseCase start;
     @Autowired SubmitPracticeAttemptUseCase submit;
     @Autowired GetLearnerTreeUseCase treeUseCase;
+    @Autowired com.ieltspath.learning.application.port.CourseScoreData courseScoreData;
     @MockitoBean LearningContentClient content;
     @MockitoBean AccessClient access;
 
@@ -163,6 +164,23 @@ class FreePracticeIntegrationTest {
                 () -> start.execute(enrolled(), KP));
 
         assertEquals("FREE_PRACTICE_EXHAUSTED", error.getCode());
+    }
+
+    @Test
+    void aFreeSetNeverEntersTheProcessScoreOfTheCourse() {
+        UUID user = enrolled();
+        jdbc.update("UPDATE topic_progress SET course_id = ? WHERE user_id = ?", COURSE, user);
+        start.execute(user, KP);
+        UUID attempt = jdbc.queryForObject("SELECT id FROM practice_attempts WHERE user_id = ?", UUID.class, user);
+
+        submit.execute(user, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of(
+                new SubmitExerciseCommand.Answer(FIRST_QUESTION, "A"),
+                new SubmitExerciseCommand.Answer(SECOND_QUESTION, "A"))));
+
+        assertEquals(1, count("SELECT count(*) FROM practice_attempts WHERE user_id = ? AND submitted_at IS NOT NULL",
+                user), "the free set was submitted");
+        assertTrue(courseScoreData.practiceAverage(user, COURSE).isEmpty(),
+                "a free set has no lesson, so the Practice average of the course ignores it");
     }
 
     @Test
