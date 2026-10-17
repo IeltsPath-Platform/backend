@@ -6,12 +6,13 @@ import com.ieltspath.assessment.domain.exception.*;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.*;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.http.*;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -99,6 +100,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> methodNotAllowed(HttpRequestMethodNotSupportedException e, HttpServletRequest r) {
         return build(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed", r.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> responseStatus(ResponseStatusException e, HttpServletRequest r) {
+        HttpStatusCode status = e.getStatusCode();
+        HttpStatus knownStatus = HttpStatus.resolve(status.value());
+        String error = knownStatus == null ? "Request failed" : knownStatus.getReasonPhrase();
+        String reason = e.getReason();
+        return ResponseEntity.status(status).body(new ErrorResponse(LocalDateTime.now(), status.value(), error,
+                reason == null ? error : reason, r.getRequestURI(), null, reason));
     }
 
     @ExceptionHandler(Exception.class)
