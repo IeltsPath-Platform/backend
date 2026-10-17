@@ -22,7 +22,8 @@ Phase này làm phần backend. Mỗi chức năng đặt ở service đang sở
   `docs/contracts/learning-staff-area-v1.md`; learning-service 471 test xanh). Còn thiếu Gateway route (Codex kiểm).
 - Khác với plan ở phần Learning:
   - Migration là `V19__flags_and_work_items.sql`. `work_items` thêm cột `detail` (JSON số liệu của việc).
-  - Không có job định kỳ: hàng việc được đồng bộ khi mở danh sách (`WorkItemSync`), vì service chưa có scheduler.
+  - Hàng việc đồng bộ khi mở danh sách (`WorkItemSync`) và qua job định kỳ `WorkItemSyncJob` (mỗi 3 giờ, khóa advisory để
+    nhiều instance không chạy trùng).
   - Cờ chạy qua sự kiện `QuestionEventsAppended` sau khi commit, transaction riêng (`FlagDetector`). Cờ cùng loại không
     nâng lại trong 24 giờ.
   - Câu quá dễ/khó chỉ dùng tỷ lệ đúng lần nộp đầu; chưa so với `difficulty` đã gắn.

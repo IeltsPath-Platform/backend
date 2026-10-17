@@ -148,7 +148,7 @@ src/main/java/com/ieltspath/<service>
   Chi tiết: `README.md` §6, `docs/system-architecture.md` §7.
 - Nhóm cấu hình nghiệp vụ: `learning.mastery.*` (ngưỡng mastery, lịch ôn; Admin ghi đè ở `learning_rule_configs`),
   `learning.flags.*` (ngưỡng cờ bất thường), `learning.tree-quality.*` (ngưỡng cạnh đáng ngờ, câu quá dễ/khó),
-  `learning.writing.*` (hạn mức chấm essay), `assessment.ai-eval.*` (đánh giá AI), `assessment.qa.*` (tỷ lệ lấy mẫu QA
+  `learning.work-items.*` (chu kỳ đồng bộ hàng việc), `learning.writing.*` (hạn mức chấm essay), `assessment.ai-eval.*` (đánh giá AI), `assessment.qa.*` (tỷ lệ lấy mẫu QA
   Mentor). Trọng số và ngưỡng điểm khóa nằm trong DB (`course_score_configs`), không trong yaml. Chính sách dùng AI:
   `docs/ai-policy.md`.
 - `Dockerfile.spring-service` build module Maven theo `MODULE_PATH`; Config Server có Dockerfile riêng.
@@ -192,7 +192,7 @@ src/main/java/com/ieltspath/<service>
   `PRIORITY`/`CONSOLIDATE`/`MAINTAIN` và hạn ôn; Admin đổi ngưỡng ở `learning_rule_configs` và chạy lại nền. Mọi câu trả
   lời ghi một dòng vào `question_attempt_events` (thời gian, mã lỗi). Báo cáo `GET /api/learning/report`.
 - Khu quản trị: cờ bất thường (`learner_flags`, `FlagDetector` chạy sau commit, transaction riêng), hàng việc theo vai
-  trò (`work_items`, `WorkItemSync` đồng bộ khi mở danh sách), thống kê câu và chất lượng cây (`learning-staff-area-v1.md`).
+  trò (`work_items`, `WorkItemSync` đồng bộ khi mở danh sách và mỗi 3 giờ qua `WorkItemSyncJob`, khóa advisory để chỉ một instance chạy), thống kê câu và chất lượng cây (`learning-staff-area-v1.md`).
 - Essay: sửa và nộp lại essay lesson tối đa 3 lần, chỉ từ bản mới nhất (`essay-revision-v1.md`); học viên có tín dụng
   nhờ Mentor chữa essay lesson/Practice đã chấm (`human-review-v1.md`), chỉ là phản hồi: không đổi bằng chứng, cổng hay bài ôn.
 - Mọi lượt ghi của một học viên chạy trong một `@Transactional` mở đầu bằng `pg_advisory_xact_lock` theo user.

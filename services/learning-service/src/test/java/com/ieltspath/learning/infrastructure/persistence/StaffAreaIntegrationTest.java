@@ -66,6 +66,8 @@ class StaffAreaIntegrationTest {
     @Autowired WorkItemSync sync;
     @Autowired StaffWorkUseCase work;
     @Autowired StaffInsightUseCase insight;
+    @Autowired com.ieltspath.learning.infrastructure.scheduler.WorkItemSyncJob job;
+    @Autowired javax.sql.DataSource dataSource;
     @MockitoBean LearningContentClient content;
 
     private static final Set<Queue> EXAMINER = EnumSet.of(Queue.EXAMINER);
@@ -260,6 +262,28 @@ class StaffAreaIntegrationTest {
         assertEquals(20, quality.edges().getFirst().probes());
         assertEquals(1.0, quality.edges().getFirst().passRate(), 1e-9);
         assertEquals(0.0, quality.edges().getFirst().rootRate(), 1e-9);
+    }
+
+    @Test
+    void theScheduledRoundAddsNewItemsOnceAndYieldsToAnotherInstanceHoldingTheLock() throws Exception {
+        jdbc.update("INSERT INTO content_gap_signals (kp_id, occurrences, first_detected_at, last_detected_at) "
+                + "VALUES (?, 1, now(), now())", UUID.randomUUID());
+
+        assertEquals(1, job.runOnce());
+        assertEquals(0, job.runOnce(), "nothing new the second time");
+        assertEquals(1, work.list(CONTENT, null, null).size());
+
+        jdbc.update("INSERT INTO content_gap_signals (kp_id, occurrences, first_detected_at, last_detected_at) "
+                + "VALUES (?, 1, now(), now())", UUID.randomUUID());
+        try (var other = dataSource.getConnection()) {
+            other.setAutoCommit(false);
+            try (var statement = other.createStatement()) {
+                statement.execute("SELECT pg_advisory_xact_lock(hashtext('learning:work-item-sync'))");
+                assertEquals(-1, job.runOnce(), "another instance is running a round");
+            }
+            other.rollback();
+        }
+        assertEquals(1, job.runOnce(), "the skipped round is made up for by the next one");
     }
 
     @Test

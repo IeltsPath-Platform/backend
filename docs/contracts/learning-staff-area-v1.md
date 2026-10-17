@@ -46,8 +46,9 @@ records the reviewer. `422 INVALID_FLAG_STATUS` for `OPEN`, `404` when unknown.
 
 `GET /api/learning/admin/work-items?queue=&status=`: the queues the caller may see, optionally one queue
 (`403 QUEUE_NOT_ALLOWED` for another) and one status (`OPEN`, `IN_PROGRESS`, `DONE`). Listing first adds items for new
-work, so there is no background job; each source becomes at most one item (`UNIQUE (kind, subject)`) and finished work is
-never reopened.
+work, and a scheduled round does the same every 3 hours (`learning.work-items.sync-interval`, first run after
+`sync-initial-delay`, off with `sync-enabled=false`); only one service instance runs a round at a time. Each source becomes
+at most one item (`UNIQUE (kind, subject)`) and finished work is never reopened.
 
 | Kind | Queue | Source |
 | --- | --- | --- |
