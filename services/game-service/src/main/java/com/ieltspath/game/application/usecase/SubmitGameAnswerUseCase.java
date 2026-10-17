@@ -101,7 +101,7 @@ public class SubmitGameAnswerUseCase {
         if (!completed) return false;
 
         List<GameMatchPlayer> sortedPlayers = players.stream()
-                .sorted(Comparator.comparingInt(GameMatchPlayer::score).reversed()
+                .sorted(Comparator.comparingLong(GameMatchPlayer::score).reversed()
                         .thenComparingLong(GameMatchPlayer::durationMilliseconds)
                         .thenComparing(p -> p.userId().toString()))
                 .toList();

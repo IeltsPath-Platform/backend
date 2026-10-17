@@ -11,6 +11,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface GameMatchJpaRepository extends JpaRepository<GameMatchJpaEntity, UUID> {
+    @Query(value="SELECT id FROM game_matches WHERE room_id=:roomId AND status='IN_PROGRESS' AND NOT is_delete", nativeQuery=true)
+    Optional<UUID> findActiveIdByRoomId(@Param("roomId") UUID roomId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select gameMatch from GameMatchJpaEntity gameMatch where gameMatch.id = :id")
     Optional<GameMatchJpaEntity> findByIdForUpdate(@Param("id") UUID id);

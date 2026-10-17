@@ -1,6 +1,7 @@
 package com.ieltspath.game.domain.aggregate;
 
 import com.ieltspath.game.domain.exception.InvalidGameRoomStateException;
+import com.ieltspath.game.domain.vo.WordlyRoomSettings;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -21,6 +22,19 @@ public class GameRoom {
     private Instant updatedAt;
     private final Map<UUID, Member> members = new LinkedHashMap<>();
     private GameRoomStatus status = GameRoomStatus.WAITING;
+    private WordlyRoomSettings wordlySettings;
+
+    public static GameRoom wordly(UUID id, String code, UUID host, WordlyRoomSettings settings, Instant now) {
+        if (code == null || !code.matches("[A-Z0-9]{6}")) throw new IllegalArgumentException("Room code must have 6 characters");
+        java.util.Objects.requireNonNull(host, "Host is required");
+        java.util.Objects.requireNonNull(settings, "Settings are required");
+        GameRoom room = new GameRoom(id, code, host, settings.maxPlayers(), "WORDLY", "VOCABULARY",
+                "PRACTICE", Map.of(), now, null, UUID.randomUUID());
+        room.wordlySettings = settings;
+        Member member = room.members.get(host);
+        room.members.put(host, new Member(member.id(), host, MemberRole.HOST, MemberStatus.JOINED, now, 1));
+        return room;
+    }
 
     public GameRoom(UUID id, String roomCode, UUID hostUserId, int maxPlayers, Instant createdAt) {
         this(id, roomCode, hostUserId, maxPlayers, "WORD_MEANING_MATCH", "VOCABULARY", "PRACTICE",
@@ -48,7 +62,8 @@ public class GameRoom {
     public static GameRoom reconstitute(UUID id, String roomCode, UUID hostUserId, int maxPlayers,
                                         String gameType, String learningDomain, String mode,
                                         Map<String, Object> configSnapshot, Instant createdAt, Instant updatedAt,
-                                        Instant expiresAt, GameRoomStatus status, java.util.List<Member> members) {
+                                        Instant expiresAt, GameRoomStatus status, java.util.List<Member> members,
+                                        WordlyRoomSettings settings) {
         UUID hostMemberId = members.stream().filter(member -> member.role() == MemberRole.HOST)
                 .map(Member::id).findFirst().orElseThrow();
         GameRoom room = new GameRoom(id, roomCode, hostUserId, maxPlayers, gameType, learningDomain, mode,
@@ -57,6 +72,7 @@ public class GameRoom {
         members.forEach(member -> room.members.put(member.userId(), member));
         room.status = status;
         room.updatedAt = updatedAt;
+        room.wordlySettings = settings;
         return room;
     }
 
@@ -66,6 +82,7 @@ public class GameRoom {
 
     public void join(UUID memberId, UUID userId, Instant joinedAt) {
         requireWaiting();
+        if ("SOLO".equals(playerMode())) throw new InvalidGameRoomStateException("Solo rooms cannot be joined");
         Member existing = members.get(userId);
         if (existing != null && existing.status() != MemberStatus.LEFT) {
             throw new InvalidGameRoomStateException("User is already a member of this room");
@@ -73,7 +90,7 @@ public class GameRoom {
         long activeMembers = members.values().stream().filter(Member::active).count();
         if (activeMembers >= maxPlayers) throw new InvalidGameRoomStateException("Room is full");
         members.put(userId, new Member(existing == null ? memberId : existing.id(), userId,
-                MemberRole.PLAYER, MemberStatus.JOINED, joinedAt));
+                MemberRole.PLAYER, MemberStatus.JOINED, joinedAt, nextSlot()));
         updatedAt = joinedAt;
     }
 
@@ -85,6 +102,23 @@ public class GameRoom {
         updatedAt = at;
     }
 
+    public void updateSettings(UUID actorId, int initialLives, Integer wordLimit, Instant at) {
+        updateSettings(actorId, initialLives, wordLimit, null, at);
+    }
+
+    public void updateSettings(UUID actorId, int initialLives, Integer wordLimit, Boolean timeEnabled, Instant at) {
+        if (!hostUserId.equals(actorId)) throw new com.ieltspath.game.domain.exception.GameRoomForbiddenException("Only the host can edit room settings");
+        requireWaiting();
+        if (wordlySettings == null) throw new InvalidGameRoomStateException("Room is not a Wordly room");
+        WordlyRoomSettings next = new WordlyRoomSettings(wordlySettings.playerMode(), initialLives,
+                wordlySettings.playMode(), wordLimit, timeEnabled == null ? wordlySettings.timeEnabled() : timeEnabled);
+        if (next.equals(wordlySettings)) return;
+        wordlySettings = next;
+        members.replaceAll((id, member) -> member.status() == MemberStatus.READY
+                ? member.withStatus(MemberStatus.JOINED) : member);
+        updatedAt = at;
+    }
+
     public void close(UUID actorId, Instant at) {
         requireHost(actorId);
         requireWaiting();
@@ -92,10 +126,17 @@ public class GameRoom {
         updatedAt = at;
     }
 
+    public boolean canStart() {
+        long count = members.values().stream().filter(Member::active).count();
+        return status == GameRoomStatus.WAITING && count >= ("SOLO".equals(playerMode()) ? 1 : 2)
+                && members.values().stream().filter(Member::active).allMatch(m -> m.status() == MemberStatus.READY);
+    }
+
     public void startMatch(UUID actorId, Instant at) {
         requireHost(actorId);
         requireWaiting();
-        if (members.values().stream().filter(Member::active).count() < 2) {
+
+        if (members.values().stream().filter(Member::active).count() < ("SOLO".equals(playerMode()) ? 1 : 2)) {
             throw new InvalidGameRoomStateException("At least two active members are required to start");
         }
         if (members.values().stream().filter(Member::active).anyMatch(m -> m.status() != MemberStatus.READY)) {
@@ -111,10 +152,37 @@ public class GameRoom {
         if (member == null || !member.active()) throw new InvalidGameRoomStateException("User is not an active room member");
         members.put(userId, member.withStatus(MemberStatus.LEFT));
         updatedAt = leftAt;
+        if (hostUserId.equals(userId)) status = GameRoomStatus.CLOSED;
+    }
+
+    public void kick(UUID actorId, UUID userId, Instant at) {
+        if (!hostUserId.equals(actorId)) throw new com.ieltspath.game.domain.exception.GameRoomForbiddenException("Only the host can kick room members");
+        requireWaiting();
+        if (hostUserId.equals(userId)) throw new InvalidGameRoomStateException("The host cannot kick themselves");
+        Member member = members.get(userId);
+        if (member == null || !member.active()) throw new InvalidGameRoomStateException("User is not an active room member");
+        members.put(userId, member.withStatus(MemberStatus.LEFT));
+        updatedAt = at;
+    }
+
+    public void setMemberDisplayName(UUID userId, String name) {
+        if (name == null || name.isBlank() || name.length() > 255) throw new IllegalArgumentException("Valid display name is required");
+        Member member = members.get(userId);
+        if (member == null) throw new InvalidGameRoomStateException("User is not a room member");
+        members.put(userId, new Member(member.id(), userId, member.role(), member.status(), member.joinedAt(), member.slotNumber(), name.trim()));
     }
 
     private void requireWaiting() {
         if (status != GameRoomStatus.WAITING) throw new InvalidGameRoomStateException("Room is not waiting for players");
+    }
+
+    private Integer nextSlot() {
+        if (wordlySettings == null) return null;
+        for (int slot = 1; slot <= maxPlayers; slot++) {
+            final int candidate = slot;
+            if (members.values().stream().noneMatch(m -> m.active() && Integer.valueOf(candidate).equals(m.slotNumber()))) return slot;
+        }
+        throw new InvalidGameRoomStateException("Room is full");
     }
 
     private void requireHost(UUID actorId) {
@@ -128,6 +196,8 @@ public class GameRoom {
     public String gameType() { return gameType; }
     public String learningDomain() { return learningDomain; }
     public String mode() { return mode; }
+    public String playerMode() { return wordlySettings == null ? "MULTIPLAYER" : wordlySettings.playerMode().name(); }
+    public WordlyRoomSettings wordlySettings() { return wordlySettings; }
     public Map<String, Object> configSnapshot() { return configSnapshot; }
     public Instant createdAt() { return createdAt; }
     public Instant updatedAt() { return updatedAt; }
@@ -143,8 +213,12 @@ public class GameRoom {
     public enum MemberStatus { JOINED, READY, LEFT, DISCONNECTED }
     public enum GameRoomStatus { WAITING, IN_MATCH, CLOSED, EXPIRED }
 
-    public record Member(UUID id, UUID userId, MemberRole role, MemberStatus status, Instant joinedAt) {
+    public record Member(UUID id, UUID userId, MemberRole role, MemberStatus status, Instant joinedAt, Integer slotNumber, String displayName) {
+        public Member(UUID id, UUID userId, MemberRole role, MemberStatus status, Instant joinedAt, Integer slotNumber) { this(id, userId, role, status, joinedAt, slotNumber, null); }
+        public Member(UUID id, UUID userId, MemberRole role, MemberStatus status, Instant joinedAt) {
+            this(id, userId, role, status, joinedAt, null, null);
+        }
         public boolean active() { return status == MemberStatus.JOINED || status == MemberStatus.READY || status == MemberStatus.DISCONNECTED; }
-        Member withStatus(MemberStatus value) { return new Member(id, userId, role, value, joinedAt); }
+        Member withStatus(MemberStatus value) { return new Member(id, userId, role, value, joinedAt, slotNumber, displayName); }
     }
 }
