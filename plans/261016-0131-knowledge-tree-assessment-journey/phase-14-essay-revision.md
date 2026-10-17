@@ -1,12 +1,25 @@
 ---
 phase: 14
 title: "Học viên sửa essay và nộp lại"
-status: pending
+status: completed
 priority: P2
 dependencies: [4, 5]
 ---
 
 # Phase 14: Học viên sửa essay và nộp lại
+
+## Trạng thái và ghi chú triển khai
+
+- **Đã xong**, trừ hai mục nhỏ để lại. Contract `docs/contracts/essay-revision-v1.md`. Test: `WritingSubmissionTest`,
+  3 test mới trong `LessonWritingIntegrationTest`; learning-service 446 test xanh.
+- Khác với plan:
+  - Migration `V18__essay_revisions.sql` đúng như plan. Chỉ essay của block lesson được sửa; essay Practice trả
+    `409 NOT_REVISABLE`.
+  - Không dùng unique index chống rẽ nhánh: bản sửa `FAILED` phải cho thử lại bằng `requestId` mới, nên kiểm tra "đã có bản
+    sửa chưa `FAILED`" nằm trong `startGrading` dưới khóa learner.
+  - Gửi lại cùng `requestId` của một bản sửa thì tiếp tục/phát lại bản đó, không kiểm tra lại chuỗi.
+- **Để lại:** `revisionDelta` trong khối `evidence` của báo cáo (bước 4) và `revision_no` trên `question_attempt_events`.
+  Lịch sử đã đủ để FE vẽ so sánh; hai mục này chỉ là tiện ích, làm khi FE cần.
 
 ## Overview
 

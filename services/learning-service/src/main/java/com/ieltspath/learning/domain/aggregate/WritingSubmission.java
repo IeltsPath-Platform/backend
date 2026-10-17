@@ -19,6 +19,8 @@ import static com.ieltspath.learning.domain.vo.WritingSubmissionStatus.*;
  */
 public final class WritingSubmission {
     public static final String ABANDONED = "GRADING_ABANDONED";
+    /** The first essay is 1; three revisions make it 4. */
+    public static final int MAX_REVISION_NO = 4;
 
     private final UUID id;
     private final UUID userId;
@@ -38,6 +40,8 @@ public final class WritingSubmission {
     private Boolean passed;
     private UUID ledgerEntryId;
     private Instant gradingStartedAt;
+    private UUID previousSubmissionId;
+    private int revisionNo = 1;
 
     private WritingSubmission(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID practiceAttemptId,
                               UUID requestId, String essayText,
@@ -110,6 +114,30 @@ public final class WritingSubmission {
         return new WritingSubmission(id, userId, lessonId, blockId, practiceAttemptId, requestId, essayText, wordCount,
                 prompt, pointCost, status, status, failureCode, grade, promptVersion, passed, ledgerEntryId,
                 gradingStartedAt);
+    }
+
+    /**
+     * Makes this essay the revision of {@code previous}; call before it is stored, or while restoring a stored one.
+     * A revision starts from the newest graded essay of a lesson block and a learner revises three times at most.
+     */
+    public WritingSubmission revising(UUID previousSubmissionId, int revisionNo) {
+        this.previousSubmissionId = Objects.requireNonNull(previousSubmissionId, "previousSubmissionId");
+        if (revisionNo < 2 || revisionNo > MAX_REVISION_NO) {
+            throw new IllegalArgumentException("revisionNo must be between 2 and " + MAX_REVISION_NO);
+        }
+        this.revisionNo = revisionNo;
+        return this;
+    }
+
+    /** The revision number this essay's own revision would take; empty when it cannot be revised (see rules above). */
+    public java.util.OptionalInt nextRevisionNo() {
+        boolean revisable = status == GRADED && blockId != null && revisionNo < MAX_REVISION_NO;
+        return revisable ? java.util.OptionalInt.of(revisionNo + 1) : java.util.OptionalInt.empty();
+    }
+
+    /** True when the learner has used all their revisions of this essay. */
+    public boolean revisionLimitReached() {
+        return revisionNo >= MAX_REVISION_NO;
     }
 
     /** A grading that started before {@code staleBefore} outlived its request (for example a crash). */
@@ -196,4 +224,7 @@ public final class WritingSubmission {
     public Boolean passed() { return passed; }
     public UUID ledgerEntryId() { return ledgerEntryId; }
     public Instant gradingStartedAt() { return gradingStartedAt; }
+    /** The graded essay this one revises; null for a first essay. */
+    public UUID previousSubmissionId() { return previousSubmissionId; }
+    public int revisionNo() { return revisionNo; }
 }

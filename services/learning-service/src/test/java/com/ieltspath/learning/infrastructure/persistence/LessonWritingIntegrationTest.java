@@ -86,6 +86,8 @@ class LessonWritingIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired GetWritingSubmissionUseCase getWritingSubmissionUseCase;
     @Autowired SubmitLessonEssayUseCase submitLessonEssayUseCase;
+    @Autowired com.ieltspath.learning.application.usecase.SubmitEssayRevisionUseCase submitEssayRevisionUseCase;
+    @Autowired com.ieltspath.learning.application.usecase.GetEssayHistoryUseCase getEssayHistoryUseCase;
     @Autowired GetLessonUseCase getLessonUseCase;
     @Autowired SubmitLessonExerciseUseCase submitLessonExerciseUseCase;
     @Autowired RefreshLearningTopicsUseCase topics;
@@ -327,6 +329,97 @@ class LessonWritingIntegrationTest {
         assertTrue(submitted.lessonCompleted());
         assertCode(409, "ESSAY_BLOCK", () -> submitLessonExerciseUseCase.execute(USER, LESSON, ESSAY_BLOCK,
                 new com.ieltspath.learning.application.command.SubmitExerciseCommand(UUID.randomUUID(), List.of())));
+    }
+
+    @Test
+    void aRevisionIsLinkedGradedAndChargedLikeAnyEssayAndTheHistoryShowsWhatChanged() {
+        llmReplies(gradeWithError("5.5", "cool streets"), gradeWithError("6.5", "clean the air"));
+        WritingSubmissionResult first = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(),
+                ESSAY);
+        UUID request = UUID.randomUUID();
+
+        WritingSubmissionResult revised = submitEssayRevisionUseCase.execute(USER, first.submissionId(), request,
+                ESSAY + "Trees also lower noise. ");
+        assertEquals("GRADED", revised.status());
+        assertEquals(new BigDecimal("6.5"), revised.overallBand());
+        assertEquals(first.submissionId(), jdbc.queryForObject(
+                "SELECT previous_submission_id FROM lesson_writing_submissions WHERE id = ?", UUID.class,
+                revised.submissionId()));
+        assertEquals(2, jdbc.queryForObject("SELECT revision_no FROM lesson_writing_submissions WHERE id = ?",
+                Integer.class, revised.submissionId()));
+        verify(access, times(2)).debit(any(), anyInt(), any(), anyString(), any());
+        // Evidence follows the existing rule: the first essay (5.5, not passed) counted, the 6.5 one passes the block.
+        assertEquals(List.of(false, true), jdbc.queryForList("SELECT correct FROM kp_evidence "
+                + "WHERE source = 'lesson_writing' ORDER BY ordinal", Boolean.class));
+
+        // A resend of the same revision replays it and charges nothing more.
+        clearInvocations(llm, access);
+        assertEquals(revised, submitEssayRevisionUseCase.execute(USER, first.submissionId(), request, ESSAY));
+        verifyNoInteractions(llm, access);
+
+        var history = getEssayHistoryUseCase.execute(USER, revised.submissionId());
+        assertEquals(first.submissionId(), history.rootSubmissionId());
+        assertEquals(List.of(1, 2), history.versions().stream().map(v -> v.revisionNo()).toList());
+        assertNull(history.versions().getFirst().deltaOverall());
+        assertEquals(0, new BigDecimal("1.0").compareTo(history.versions().get(1).deltaOverall()));
+        assertEquals(0, new BigDecimal("1.0").compareTo(history.versions().get(1).criteria().getFirst().delta()));
+        assertEquals(List.of("GRAMMAR"), history.versions().getFirst().errorCodes());
+        assertEquals(history, getEssayHistoryUseCase.execute(USER, first.submissionId()));
+        assertTrue(history.canRevise());
+        assertEquals(3, history.nextRevisionNo());
+        assertEquals(revised.submissionId(), history.reviseFromSubmissionId());
+        assertEquals(404, assertThrows(LearningRequestException.class,
+                () -> getEssayHistoryUseCase.execute(OTHER_USER, first.submissionId())).getStatus());
+    }
+
+    @Test
+    void onlyTheNewestGradedEssayCanBeRevisedAndOnlyThreeTimes() {
+        llmReplies(grade("5"), grade("5.5"), grade("6"), grade("6.5"), grade("7"));
+        WritingSubmissionResult first = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(),
+                ESSAY);
+        WritingSubmissionResult second = submitEssayRevisionUseCase.execute(USER, first.submissionId(),
+                UUID.randomUUID(), ESSAY);
+
+        assertCode(409, "REVISION_NOT_LATEST", () -> submitEssayRevisionUseCase.execute(USER, first.submissionId(),
+                UUID.randomUUID(), ESSAY));
+        WritingSubmissionResult third = submitEssayRevisionUseCase.execute(USER, second.submissionId(),
+                UUID.randomUUID(), ESSAY);
+        WritingSubmissionResult fourth = submitEssayRevisionUseCase.execute(USER, third.submissionId(),
+                UUID.randomUUID(), ESSAY);
+        assertCode(409, "REVISION_LIMIT", () -> submitEssayRevisionUseCase.execute(USER, fourth.submissionId(),
+                UUID.randomUUID(), ESSAY));
+        assertEquals(4, count("lesson_writing_submissions"));
+        assertFalse(getEssayHistoryUseCase.execute(USER, first.submissionId()).canRevise());
+    }
+
+    @Test
+    void aRevisionNeedsAGradedEssayOfTheLearnerThatIsNotAPracticeEssay() {
+        assertCode(404, "NOT_FOUND", () -> submitEssayRevisionUseCase.execute(USER, UUID.randomUUID(),
+                UUID.randomUUID(), ESSAY));
+        llmReplies(grade("6"));
+        WritingSubmissionResult first = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(),
+                ESSAY);
+        assertCode(404, "NOT_FOUND", () -> submitEssayRevisionUseCase.execute(OTHER_USER, first.submissionId(),
+                UUID.randomUUID(), ESSAY));
+
+        when(llm.completeJson(any(), any(), anyBoolean())).thenThrow(new LlmUnavailableException(500));
+        UUID failedRequest = UUID.randomUUID();
+        assertCode(503, "GRADING_UNAVAILABLE", () -> submitEssayRevisionUseCase.execute(USER, first.submissionId(),
+                failedRequest, ESSAY));
+        // A failed revision does not stop the learner from trying again with a new request.
+        reset(llm);
+        when(llm.configured()).thenReturn(true);
+        llmReplies(grade("6.5"));
+        assertEquals("GRADED", submitEssayRevisionUseCase.execute(USER, first.submissionId(), UUID.randomUUID(), ESSAY)
+                .status());
+        assertEquals(1, count("lesson_writing_submissions WHERE status = 'FAILED'"));
+    }
+
+    private static String gradeWithError(String band, String excerpt) {
+        String criteria = String.join(",", List.of("TR", "CC", "LR", "GRA").stream()
+                .map(code -> "{\"code\":\"%s\",\"band\":%s,\"comment\":\"i\"}".formatted(code, band)).toList());
+        return "{\"criteria\":[" + criteria + "],\"corrections\":[{\"excerpt\":\"" + excerpt
+                + "\",\"suggestion\":\"fix\",\"errorCode\":\"GRAMMAR\"}],\"summary\":\"ok\",\"focus\":[]}";
     }
 
     private void llmReplies(String first, String... rest) {

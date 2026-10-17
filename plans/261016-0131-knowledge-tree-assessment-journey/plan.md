@@ -111,7 +111,7 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 | 11 | [Rubric dạng dữ liệu và bộ test nghiệm thu AI](./phase-11-rubric-data-and-ai-evaluation.md) | content, assessment, learning | in_progress (chưa có gold set chuyên gia và bằng chứng chạy đánh giá thực tế) |
 | 12 | [Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor](./phase-12-admin-area-backend.md) | learning, assessment, access | Pending |
 | 13 | [Contract, tài liệu và nghiệm thu](./phase-13-contracts-docs-and-verification.md) | docs | Pending |
-| 14 | [Học viên sửa essay và nộp lại](./phase-14-essay-revision.md) | learning | Pending |
+| 14 | [Học viên sửa essay và nộp lại](./phase-14-essay-revision.md) | learning | Completed (trừ `revisionDelta` ở báo cáo) |
 | 15 | [Mentor chữa essay Practice và lesson](./phase-15-mentor-practice-essays.md) | learning, assessment, access | Pending |
 
 ## Phân công đang làm (một nhánh `feat/knowledge-tree-assessment-journey`)

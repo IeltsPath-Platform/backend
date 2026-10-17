@@ -3,7 +3,10 @@ package com.ieltspath.learning.api.controller;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.request.SubmitEssayRequest;
 import com.ieltspath.learning.api.dto.response.WritingSubmissionResponse;
+import com.ieltspath.learning.application.result.EssayHistoryResult;
+import com.ieltspath.learning.application.usecase.GetEssayHistoryUseCase;
 import com.ieltspath.learning.application.usecase.GetWritingSubmissionUseCase;
+import com.ieltspath.learning.application.usecase.SubmitEssayRevisionUseCase;
 import com.ieltspath.learning.application.usecase.SubmitLessonEssayUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +27,8 @@ public class WritingController {
     private final CurrentUserProvider currentUser;
     private final GetWritingSubmissionUseCase getWritingSubmissionUseCase;
     private final SubmitLessonEssayUseCase submitLessonEssayUseCase;
+    private final SubmitEssayRevisionUseCase submitEssayRevisionUseCase;
+    private final GetEssayHistoryUseCase getEssayHistoryUseCase;
 
     @PostMapping("/lessons/{lessonId}/essays/{blockId}/submissions")
     public WritingSubmissionResponse submit(@PathVariable("lessonId") UUID lessonId,
@@ -36,5 +41,18 @@ public class WritingController {
     @GetMapping("/writing-submissions/{id}")
     public WritingSubmissionResponse get(@PathVariable("id") UUID id) {
         return WritingSubmissionResponse.from(getWritingSubmissionUseCase.execute(currentUser.requireUserId(), id));
+    }
+
+    /** Rewrites the graded essay {@code id} and sends it again; see contract {@code essay-revision-v1}. */
+    @PostMapping("/writing-submissions/{id}/revisions")
+    public WritingSubmissionResponse revise(@PathVariable("id") UUID id,
+                                            @Valid @RequestBody SubmitEssayRequest request) {
+        return WritingSubmissionResponse.from(submitEssayRevisionUseCase.execute(currentUser.requireUserId(), id,
+                request.requestId(), request.essayText()));
+    }
+
+    @GetMapping("/writing-submissions/{id}/history")
+    public EssayHistoryResult history(@PathVariable("id") UUID id) {
+        return getEssayHistoryUseCase.execute(currentUser.requireUserId(), id);
     }
 }

@@ -77,6 +77,15 @@ public class SubmitLessonEssayUseCase {
     }
 
     public WritingSubmissionResult execute(UUID userId, UUID lessonId, UUID blockId, UUID requestId, String essayText) {
+        return execute(userId, lessonId, blockId, requestId, essayText, null);
+    }
+
+    /**
+     * As above; with {@code revising} the new essay is stored as the next revision of that graded essay, and only when
+     * nothing else has revised it yet (checked under the learner lock, so a chain never branches).
+     */
+    public WritingSubmissionResult execute(UUID userId, UUID lessonId, UUID blockId, UUID requestId, String essayText,
+                                           WritingSubmission revising) {
         int words = flow.validate(essayText);
 
         Optional<WritingSubmission> existing = essays.findByRequestId(requestId);
@@ -100,7 +109,7 @@ public class SubmitLessonEssayUseCase {
         flow.requireBalance();
 
         WritingSubmission grading = transaction.execute(status -> startGrading(userId, lesson, block, requestId,
-                essayText, words));
+                essayText, words, revising));
         flow.grade(grading);
         return charge(grading);
     }
@@ -112,7 +121,7 @@ public class SubmitLessonEssayUseCase {
     }
 
     private WritingSubmission startGrading(UUID userId, Lesson lesson, Block block, UUID requestId, String essayText,
-                                           int words) {
+                                           int words, WritingSubmission revising) {
         lock.lock(userId);
         var context = access.authorize(userId, lesson);
         access.refresh(userId, lesson, context.progress());
@@ -133,6 +142,13 @@ public class SubmitLessonEssayUseCase {
             WritingSubmission submission = WritingSubmission.start(UUID.randomUUID(), userId, lesson.lessonId(),
                     block.blockId(), requestId, essayText, words, EssayPrompts.of(block.questions().getFirst()),
                     flow.pointCost(), now);
+            if (revising != null) {
+                if (essays.hasActiveRevision(revising.id())) {
+                    throw new LearningRequestException(409, "REVISION_NOT_LATEST",
+                            "This essay has already been revised; revise the newest version");
+                }
+                submission.revising(revising.id(), revising.revisionNo() + 1);
+            }
             essays.save(submission);
             return submission;
         }
