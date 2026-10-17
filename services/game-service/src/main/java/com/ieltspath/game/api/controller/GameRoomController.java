@@ -19,6 +19,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/games/rooms")
 public class GameRoomController {
+    private final com.ieltspath.game.application.usecase.StartGameMatchUseCase startMatch;
     private final CurrentUserProvider currentUserProvider;
     private final CreateGameRoomUseCase createRoom;
     private final GetGameRoomUseCase getRoom;
@@ -27,7 +28,8 @@ public class GameRoomController {
 
     public GameRoomController(CurrentUserProvider currentUserProvider, CreateGameRoomUseCase createRoom,
                               GetGameRoomUseCase getRoom, ChangeGameRoomMembershipUseCase membership,
-                              CreateWebSocketTicketUseCase createTicket) {
+                              CreateWebSocketTicketUseCase createTicket, com.ieltspath.game.application.usecase.StartGameMatchUseCase startMatch) {
+        this.startMatch = startMatch;
         this.currentUserProvider = currentUserProvider;
         this.createRoom = createRoom;
         this.getRoom = getRoom;
@@ -68,6 +70,11 @@ public class GameRoomController {
         return GameRoomResponse.from(membership.ready(roomId, currentUserProvider.requireUserId(), request.ready()));
     }
 
+    @PostMapping("/{roomId}/members/{userId}/kick")
+    public GameRoomResponse kick(@PathVariable("roomId") UUID roomId, @PathVariable("userId") UUID userId) {
+        return GameRoomResponse.from(membership.kick(roomId, currentUserProvider.requireUserId(), userId));
+    }
+
     @PostMapping("/{roomId}/leave")
     public GameRoomResponse leave(@PathVariable("roomId") UUID roomId) {
         return GameRoomResponse.from(membership.leave(roomId, currentUserProvider.requireUserId()));
@@ -76,6 +83,11 @@ public class GameRoomController {
     @PostMapping("/{roomId}/close")
     public GameRoomResponse close(@PathVariable("roomId") UUID roomId) {
         return GameRoomResponse.from(membership.close(roomId, currentUserProvider.requireUserId()));
+    }
+
+    @PostMapping("/{roomId}/start")
+    public com.ieltspath.game.api.dto.response.GameMatchResponse start(@PathVariable("roomId") UUID roomId) {
+        return com.ieltspath.game.api.dto.response.GameMatchResponse.from(startMatch.execute(roomId, currentUserProvider.requireUserId()));
     }
 
     @PostMapping("/{roomId}/websocket-ticket")

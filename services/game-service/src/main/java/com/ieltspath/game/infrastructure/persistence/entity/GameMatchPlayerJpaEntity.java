@@ -20,7 +20,7 @@ public class GameMatchPlayerJpaEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
     @Column(nullable = false)
-    private int score;
+    private long score;
     @Column
     private Integer rank;
     @Column(nullable = false, length = 30)
@@ -29,6 +29,9 @@ public class GameMatchPlayerJpaEntity {
     private Instant joinedAt;
     @Column(name = "finished_at")
     private Instant finishedAt;
+    @Column(name = "lives_remaining", nullable = false) private short livesRemaining = 4;
+    public int getLivesRemaining() { return livesRemaining; }
+    public void setLivesRemaining(int value) { livesRemaining = (short) value; }
 
     protected GameMatchPlayerJpaEntity() {
     }
@@ -58,7 +61,7 @@ public class GameMatchPlayerJpaEntity {
         return userId;
     }
 
-    public int getScore() {
+    public long getScore() {
         return score;
     }
 
@@ -82,7 +85,7 @@ public class GameMatchPlayerJpaEntity {
         this.rank = rank;
     }
 
-    public void updateProgress(int score, boolean finished, Instant at) {
+    public void updateProgress(long score, boolean finished, Instant at) {
         this.score = score;
         if (finished) {
             this.status = "FINISHED";

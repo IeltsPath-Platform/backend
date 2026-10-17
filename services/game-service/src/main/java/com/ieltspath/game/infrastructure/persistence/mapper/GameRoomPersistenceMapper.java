@@ -13,11 +13,11 @@ public class GameRoomPersistenceMapper {
         List<GameRoom.Member> members = memberEntities.stream()
                 .map(member -> new GameRoom.Member(member.getId(), member.getUserId(),
                         GameRoom.MemberRole.valueOf(member.getMemberRole()),
-                        GameRoom.MemberStatus.valueOf(member.getStatus()), member.getJoinedAt())).toList();
+                        GameRoom.MemberStatus.valueOf(member.getStatus()), member.getJoinedAt(), member.getSlotNumber(), member.getDisplayName())).toList();
         return GameRoom.reconstitute(entity.getId(), entity.getRoomCode(), entity.getHostUserId(),
                 entity.getMaxPlayers(), entity.getGameType(), entity.getLearningDomain(), entity.getMode(),
                 entity.getConfigSnapshot(), entity.getCreatedAt(), entity.getUpdatedAt(), entity.getExpiresAt(),
-                GameRoom.GameRoomStatus.valueOf(entity.getStatus()), members);
+                GameRoom.GameRoomStatus.valueOf(entity.getStatus()), members, entity.wordlySettings());
     }
 
     public GameRoomJpaEntity toNewEntity(GameRoom room) {

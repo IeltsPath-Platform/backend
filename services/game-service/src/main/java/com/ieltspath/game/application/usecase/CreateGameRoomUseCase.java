@@ -8,6 +8,7 @@ import com.ieltspath.game.domain.aggregate.GameRoom;
 import com.ieltspath.game.domain.aggregate.GameType;
 import com.ieltspath.game.domain.repository.GameRoomRepository;
 import org.springframework.stereotype.Service;
+import com.ieltspath.game.application.port.CurrentPlayerProfile;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
@@ -21,13 +22,15 @@ import java.util.UUID;
 @Service
 public class CreateGameRoomUseCase {
     private static final char[] CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
+    private final CurrentPlayerProfile profile;
     private final SecureRandom random = new SecureRandom();
     private final GameRoomRepository roomRepository;
     private final GameContentProvider contentProvider;
     private final OutboxWriter outboxWriter;
 
     public CreateGameRoomUseCase(GameRoomRepository roomRepository, GameContentProvider contentProvider,
-                                 OutboxWriter outboxWriter) {
+                                 OutboxWriter outboxWriter, CurrentPlayerProfile profile) {
+        this.profile = profile;
         this.roomRepository = roomRepository;
         this.contentProvider = contentProvider;
         this.outboxWriter = outboxWriter;
@@ -69,6 +72,7 @@ public class CreateGameRoomUseCase {
         snapshot.put("scoring", Map.of("rule", "one-point-per-correct-answer", "version", 1));
         GameRoom room = new GameRoom(roomId, roomCode, command.hostUserId(), command.maxPlayers(),
                 command.gameType(), command.learningDomain(), command.mode(), snapshot, now, null, UUID.randomUUID());
+        room.setMemberDisplayName(command.hostUserId(), profile.displayName());
         GameRoom saved = roomRepository.save(room);
         outboxWriter.append("GameRoom", roomId.toString(), "GameRoomCreated",
                 Map.of("roomId", roomId.toString(), "hostUserId", command.hostUserId().toString(), "roomCode", roomCode));
