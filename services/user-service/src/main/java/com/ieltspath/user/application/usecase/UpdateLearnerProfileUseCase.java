@@ -5,6 +5,7 @@ import com.ieltspath.user.application.result.LearnerProfileResult;
 import com.ieltspath.user.domain.aggregate.LearnerProfile;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.LearnerProfileRepository;
+import com.ieltspath.user.domain.repository.LearningGoalRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.vo.ProfileVisibility;
 import lombok.RequiredArgsConstructor;
@@ -12,15 +13,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class UpdateLearnerProfileUseCase {
     private final LearnerProfileRepository learnerProfileRepository;
     private final UserRepository userRepository;
+    private final LearningGoalRepository learningGoalRepository;
+    private final ScheduleStudyGoalUseCase studyGoals;
 
     @Transactional
     public LearnerProfileResult execute(UpdateLearnerProfileCommand command) {
+        studyGoals.lock(command.userId());
         LearnerProfile profile = learnerProfileRepository.findByUserId(command.userId())
                 .orElseGet(() -> {
                     if (userRepository.findById(command.userId()).isEmpty()) {
@@ -29,13 +34,14 @@ public class UpdateLearnerProfileUseCase {
                     return LearnerProfile.builder()
                             .userId(command.userId())
                             .displayName(command.displayName())
-                            .timezone(command.timezone() != null ? command.timezone() : "Asia/Ho_Chi_Minh")
+                            .timezone("Asia/Ho_Chi_Minh")
                             .visibility(ProfileVisibility.PUBLIC)
                             .createdAt(LocalDateTime.now())
                             .updatedAt(LocalDateTime.now())
                             .build();
                 });
 
+        String previousTimezone = profile.getTimezone();
         profile.updateDetails(
                 command.displayName(),
                 command.avatarReference(),
@@ -49,6 +55,9 @@ public class UpdateLearnerProfileUseCase {
         }
 
         LearnerProfile saved = learnerProfileRepository.save(profile);
+        if (!Objects.equals(previousTimezone, saved.getTimezone())) {
+            learningGoalRepository.findActiveByUserId(command.userId()).ifPresent(studyGoals::execute);
+        }
         return toResult(saved);
     }
 
