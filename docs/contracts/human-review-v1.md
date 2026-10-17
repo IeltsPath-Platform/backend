@@ -36,7 +36,6 @@ is already `GRADED`. Access credit consumption remains a separate call authentic
   "sourceSubmissionId": "9d272143-3d16-4ed8-ad24-f641eab4f906",
   "source": "PRACTICE",
   "task": "TASK_2",
-  "task": "Write an essay discussing both views.",
   "promptSnapshot": {"stem": "Some people believe..."},
   "essay": "The essay text submitted by the learner.",
   "rubric": {"code": "IELTS_WRITING_TASK_2", "version": 1, "criteria": []}

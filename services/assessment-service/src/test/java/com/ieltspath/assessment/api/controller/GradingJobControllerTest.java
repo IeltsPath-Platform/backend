@@ -26,7 +26,7 @@ class GradingJobControllerTest {
     @Test @WithMockUser(roles="EXAMINER") void essayAndQueueUseBlindProjections() throws Exception {
         UUID id=UUID.randomUUID(),examiner=UUID.randomUUID();
         org.mockito.Mockito.when(currentUser.requireUserId()).thenReturn(examiner);
-        org.mockito.Mockito.when(getEssay.execute(examiner,id)).thenReturn(new com.ieltspath.assessment.application.port.ExaminerQueueStore.Essay(id,UUID.randomUUID(),UUID.randomUUID(),"Prompt","Essay","TASK_2",null));
+        org.mockito.Mockito.when(getEssay.execute(examiner,id)).thenReturn(new com.ieltspath.assessment.application.port.ExaminerQueueStore.Essay(id,UUID.randomUUID(),UUID.randomUUID(),"Prompt","Essay","TASK_2",null,null));
         org.mockito.Mockito.when(listQueue.execute("HUMAN","QUEUED",0,20)).thenReturn(new com.ieltspath.assessment.application.port.ExaminerQueueStore.QueuePage(java.util.List.of(),0,20,0));
         mvc.perform(get("/api/assessments/grading-jobs/{id}/essay",id)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.essay").value("Essay")).andExpect(jsonPath("$..band").doesNotExist())

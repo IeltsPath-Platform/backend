@@ -15,9 +15,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.MACSigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.*;
 import static org.mockito.Mockito.when;
 
@@ -52,6 +58,15 @@ abstract class ExaminerIntegrationSupport {
     @MockitoBean EssayGradingPort grader;
     final UUID learner = UUID.randomUUID();
     final UUID examiner = UUID.randomUUID();
+
+    String internalToken(UUID subject, String role) throws Exception {
+        var claims = new JWTClaimsSet.Builder().issuer("urn:test:gateway").subject(subject.toString())
+                .expirationTime(java.util.Date.from(Instant.now().plusSeconds(300)))
+                .claim("roles", List.of(role)).build();
+        var token = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims);
+        token.sign(new MACSigner(KEY));
+        return token.serialize();
+    }
 
     UUID courseEssay() {
         return courseEssay(true);

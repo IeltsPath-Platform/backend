@@ -20,10 +20,10 @@ public interface ExaminerQueueStore {
 
     record QueuePage(List<QueueEntry> content, int page, int size, long totalElements) {}
     record QueueEntry(UUID id, UUID submissionId, UUID attemptId, UUID attemptItemId, String attemptType,
-                      String skill, String task, String status, String reason, UUID assignedExaminerId,
+                      String source, String skill, String task, String status, String reason, UUID assignedExaminerId,
                       Instant claimedAt, Instant createdAt, long waitSeconds, boolean overdue) {}
     record Essay(UUID jobId, UUID attemptId, UUID attemptItemId, String prompt, String essay, String task,
-                 Object rubric) {
+                 Object rubric, String source) {
         @Override public String toString() { return "Essay[jobId=" + jobId + "]"; }
     }
 }

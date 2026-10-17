@@ -1,6 +1,8 @@
 package com.ieltspath.assessment.infrastructure.persistence.adapter;
 
 import com.ieltspath.assessment.application.port.ExaminerQueueStore;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
@@ -13,17 +15,24 @@ import java.util.*;
 @Repository
 public class JdbcExaminerQueueStore implements ExaminerQueueStore {
     private final NamedParameterJdbcTemplate jdbc;
-    public JdbcExaminerQueueStore(NamedParameterJdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final ObjectMapper json;
+    public JdbcExaminerQueueStore(NamedParameterJdbcTemplate jdbc, ObjectMapper json) {
+        this.jdbc = jdbc;
+        this.json = json;
+    }
     private static final String FROM = """
             FROM grading_jobs j
-            JOIN learner_submissions l ON l.id=j.submission_id
+            LEFT JOIN learner_submissions l ON l.id=j.submission_id
+            LEFT JOIN human_review_submissions h ON h.id=j.human_review_submission_id
             LEFT JOIN attempt_items i ON i.id=l.attempt_item_id
             LEFT JOIN attempt_sections s ON s.id=i.attempt_section_id
             LEFT JOIN assessment_attempts a ON a.id=s.attempt_id
             """;
     private static final String SELECT = """
-            SELECT j.id, j.submission_id, a.id AS attempt_id, i.id AS attempt_item_id, a.attempt_type,
-                   j.skill, COALESCE(i.answer_snapshot->'answerSpec'->>'task', l.prompt_snapshot->>'task') AS task,
+            SELECT j.id, COALESCE(j.submission_id,j.human_review_submission_id) AS submission_id,
+                   a.id AS attempt_id, i.id AS attempt_item_id, a.attempt_type,
+                   COALESCE(h.source,a.attempt_type) AS source,j.skill,
+                   COALESCE(i.answer_snapshot->'answerSpec'->>'task', l.prompt_snapshot->>'task',h.task) AS task,
                    j.status, COALESCE(j.reason,'HUMAN_CREDIT') AS reason, j.assigned_examiner_id,
                    j.claimed_at, j.created_at,
                    GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP-j.created_at)))::bigint AS wait_seconds,
@@ -49,19 +58,21 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
         List<UUID> changed = jdbc.query("""
                 WITH target AS (
                   SELECT j.id,s.attempt_id,j.reason FROM grading_jobs j
-                  JOIN learner_submissions l ON l.id=j.submission_id
+                  LEFT JOIN learner_submissions l ON l.id=j.submission_id
                   LEFT JOIN attempt_items i ON i.id=l.attempt_item_id
                   LEFT JOIN attempt_sections s ON s.id=i.attempt_section_id
                   WHERE j.id=:id AND j.grading_mode='HUMAN' AND j.status IN ('QUEUED','PROCESSING')
                     AND (j.assigned_examiner_id IS NULL OR j.claimed_at < CURRENT_TIMESTAMP-INTERVAL '24 hours')
                 )
                 UPDATE grading_jobs j SET assigned_examiner_id=:examiner,claimed_at=CURRENT_TIMESTAMP
-                FROM learner_submissions l LEFT JOIN attempt_items i ON i.id=l.attempt_item_id
-                LEFT JOIN attempt_sections s ON s.id=i.attempt_section_id,target t
-                WHERE j.submission_id=l.id AND (j.id=t.id OR
-                    (COALESCE(t.reason,'')<>'QA_SAMPLE' AND COALESCE(j.reason,'')<>'QA_SAMPLE' AND s.attempt_id=t.attempt_id))
+                FROM target t
+                WHERE (j.id=t.id OR (t.attempt_id IS NOT NULL AND EXISTS (
+                    SELECT 1 FROM learner_submissions l JOIN attempt_items i ON i.id=l.attempt_item_id
+                    JOIN attempt_sections s ON s.id=i.attempt_section_id
+                    WHERE l.id=j.submission_id AND s.attempt_id=t.attempt_id)))
                   AND j.grading_mode='HUMAN' AND j.status IN ('QUEUED','PROCESSING')
                   AND (j.assigned_examiner_id IS NULL OR j.claimed_at < CURRENT_TIMESTAMP-INTERVAL '24 hours')
+                  AND (j.id=t.id OR (COALESCE(t.reason,'')<>'QA_SAMPLE' AND COALESCE(j.reason,'')<>'QA_SAMPLE'))
                   AND (COALESCE(t.reason,'')<>'QA_SAMPLE' OR NOT EXISTS(
                     SELECT 1 FROM essay_grade_comparisons c WHERE c.submission_id=j.submission_id AND c.examiner_id=:examiner))
                 RETURNING j.id
@@ -77,11 +88,20 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
     @Override public Optional<Essay> essay(UUID id) {
         return jdbc.query("""
                 SELECT j.id,a.id AS attempt_id,i.id AS attempt_item_id,
-                  COALESCE(i.question_snapshot->>'stem',l.prompt_snapshot->>'stem') AS prompt,l.text_payload,
-                  COALESCE(i.answer_snapshot->'answerSpec'->>'task',l.prompt_snapshot->>'task') AS task
-                """+FROM+" WHERE j.id=:id AND j.grading_mode='HUMAN'",Map.of("id",id),
-                (r,n)->new Essay(id,r.getObject("attempt_id",UUID.class),r.getObject("attempt_item_id",UUID.class),
-                        r.getString("prompt"),r.getString("text_payload"),r.getString("task"),null)).stream().findFirst();
+                  COALESCE(i.question_snapshot->>'stem',l.prompt_snapshot->>'stem',h.prompt_snapshot->>'stem') AS prompt,
+                  COALESCE(l.text_payload,h.essay_text) AS essay,
+                  COALESCE(i.answer_snapshot->'answerSpec'->>'task',l.prompt_snapshot->>'task',h.task) AS task,
+                  h.rubric_snapshot::text AS rubric,h.source
+                """+FROM+" WHERE j.id=:id AND j.grading_mode='HUMAN'",Map.of("id",id), (r,n) -> {
+            JsonNode rubric = null;
+            try {
+                if (r.getString("rubric") != null) rubric = json.readTree(r.getString("rubric"));
+            } catch (java.io.IOException exception) {
+                throw new IllegalStateException("Stored rubric snapshot is invalid", exception);
+            }
+            return new Essay(id,r.getObject("attempt_id",UUID.class),r.getObject("attempt_item_id",UUID.class),
+                    r.getString("prompt"),r.getString("essay"),r.getString("task"),rubric,r.getString("source"));
+        }).stream().findFirst();
     }
     @Override @Transactional(propagation=Propagation.MANDATORY)
     public List<QueueEntry> lockAttempt(UUID attempt) {
@@ -127,7 +147,7 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
         var claimed=r.getTimestamp("claimed_at");
         return new QueueEntry(r.getObject("id",UUID.class),r.getObject("submission_id",UUID.class),
                 r.getObject("attempt_id",UUID.class),r.getObject("attempt_item_id",UUID.class),r.getString("attempt_type"),
-                r.getString("skill"),r.getString("task"),r.getString("status"),r.getString("reason"),
+                r.getString("source"),r.getString("skill"),r.getString("task"),r.getString("status"),r.getString("reason"),
                 r.getObject("assigned_examiner_id",UUID.class),claimed==null?null:claimed.toInstant(),
                 r.getTimestamp("created_at").toInstant(),r.getLong("wait_seconds"),r.getBoolean("overdue"));
     }

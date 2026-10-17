@@ -1,6 +1,7 @@
 package com.ieltspath.assessment.infrastructure.client;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -19,6 +20,7 @@ import java.time.Duration;
 public class AccessHumanGradingCreditClient {
     private final RestClient client;
 
+    @Autowired
     public AccessHumanGradingCreditClient(RestClient.Builder builder,
             @Value("${ACCESS_SERVICE_URL:http://localhost:8084}") String baseUrl) {
         var factory = new SimpleClientHttpRequestFactory();
