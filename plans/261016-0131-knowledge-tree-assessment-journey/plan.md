@@ -205,7 +205,7 @@ None.
 Đã xác nhận bởi người dùng:
 - **2026-10-17:** D2, D3, D4 (giữa khóa là topic test, course test mở khi đã thi hết topic test, đạt đầu ra khi điểm tổng
   20/30/50 từ 70%). Phase 9 được phép bắt đầu.
-- **2026-10-16:** D14 phase 14 (giữ luật bằng chứng hiện tại cho essay nộp lại).
+- **2026-10-16:** phase 14 (giữ luật bằng chứng hiện tại cho essay nộp lại).
 
 Còn lại theo khuyến nghị, chưa xác nhận riêng: D5 (giỏ ôn chặn ở mức ưu tiên) và D6 (essay course test do EXAMINER chấm
 mù). Sửa trước khi bắt đầu phase 6 và phase 10 nếu muốn đổi.
