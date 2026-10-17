@@ -18,6 +18,8 @@ public final class TopicProgress {
     private UUID courseId;
     private Integer sequenceOrder;
     private Instant passedAt;
+    private Instant testedAt;
+    private Double firstTestPercent;
     private Set<LearningSkill> skills;
     private boolean hasTopicTest;
 
@@ -51,10 +53,26 @@ public final class TopicProgress {
         return new TopicProgress(topicId, courseId, sequenceOrder, passedAt, skills, hasTopicTest);
     }
 
+    /** As {@link #withSkills(UUID, UUID, Integer, Instant, Set, boolean)}, with the stored first topic test. */
+    public static TopicProgress withSkills(UUID topicId, UUID courseId, Integer sequenceOrder, Instant passedAt,
+                                           Set<LearningSkill> skills, boolean hasTopicTest, Instant testedAt,
+                                           Double firstTestPercent) {
+        TopicProgress topic = new TopicProgress(topicId, courseId, sequenceOrder, passedAt, skills, hasTopicTest);
+        topic.testedAt = testedAt;
+        topic.firstTestPercent = firstTestPercent;
+        return topic;
+    }
+
     public UUID topicId() { return topicId; }
     public UUID courseId() { return courseId; }
     public Integer sequenceOrder() { return sequenceOrder; }
     public Instant passedAt() { return passedAt; }
+    /** When the learner first took the topic test, whatever the score; null before that. */
+    public Instant testedAt() { return testedAt; }
+    /** Percent (0-100) of the first topic test, the learner's mid-course score for the topic. */
+    public Double firstTestPercent() { return firstTestPercent; }
+    /** The learner is through the topic: it was passed, or its test was taken. Opens the next topic. */
+    public boolean done() { return passedAt != null || testedAt != null; }
     /** The one skill of the topic, or null when it teaches none or several. */
     public LearningSkill skill() { return skills.size() == 1 ? skills.iterator().next() : null; }
     public Set<LearningSkill> skills() { return skills; }
@@ -82,6 +100,14 @@ public final class TopicProgress {
         EnumSet<LearningSkill> copy = EnumSet.noneOf(LearningSkill.class);
         if (skills != null) copy.addAll(skills);
         return Collections.unmodifiableSet(copy);
+    }
+
+    /** Records the first topic test; true when this call was that first test. Later tests change nothing. */
+    public boolean recordFirstTest(Instant now, double percent) {
+        if (testedAt != null) return false;
+        testedAt = Objects.requireNonNull(now, "now");
+        firstTestPercent = percent;
+        return true;
     }
 
     /** True when this call passed the topic; passing is one way. */

@@ -56,7 +56,11 @@ public class ListCoursesUseCase {
         for (var topic : topics) {
             if (topic.courseId() == null || topic.sequenceOrder() == null) continue;
             total.merge(topic.courseId(), 1, Integer::sum);
-            if (statuses.get(topic.topicId()) == TopicStatus.PASSED) passed.merge(topic.courseId(), 1, Integer::sum);
+            // A topic tested below 70% is done too: it no longer holds back the next topic or the course test.
+            var status = statuses.get(topic.topicId());
+            if (status == TopicStatus.PASSED || status == TopicStatus.COMPLETED) {
+                passed.merge(topic.courseId(), 1, Integer::sum);
+            }
         }
         Map<UUID, CourseProgress> completed = courseProgress.findAll(userId);
         var placement = placements.find(userId).map(value -> value.band().value()).orElse(null);

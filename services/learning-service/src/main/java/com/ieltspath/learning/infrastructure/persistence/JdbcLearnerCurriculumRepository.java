@@ -27,14 +27,16 @@ public class JdbcLearnerCurriculumRepository implements LearnerCurriculumReposit
     @Override
     public LearnerCurriculum find(UUID userId) {
         List<TopicProgress> topics = jdbc.query(
-                "SELECT topic_id, course_id, sequence_order, passed_at, skills, has_topic_test "
-                        + "FROM topic_progress WHERE user_id = ?",
+                "SELECT topic_id, course_id, sequence_order, passed_at, skills, has_topic_test, tested_at, "
+                        + "first_test_percent FROM topic_progress WHERE user_id = ?",
                 (row, index) -> {
                     Timestamp passed = row.getTimestamp("passed_at");
+                    Timestamp tested = row.getTimestamp("tested_at");
                     return TopicProgress.withSkills(row.getObject("topic_id", UUID.class),
                             row.getObject("course_id", UUID.class),
                             row.getObject("sequence_order", Integer.class), passed == null ? null : passed.toInstant(),
-                            skills(row.getArray("skills")), row.getBoolean("has_topic_test"));
+                            skills(row.getArray("skills")), row.getBoolean("has_topic_test"),
+                            tested == null ? null : tested.toInstant(), row.getObject("first_test_percent", Double.class));
                 }, userId);
         return LearnerCurriculum.restore(userId, topics);
     }
@@ -46,10 +48,13 @@ public class JdbcLearnerCurriculumRepository implements LearnerCurriculumReposit
         if (topics.isEmpty()) return;
         jdbc.batchUpdate("""
                 INSERT INTO topic_progress (user_id, topic_id, course_id, sequence_order, passed_at, skill, skills,
-                has_topic_test)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                has_topic_test, tested_at, first_test_percent)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (user_id, topic_id) DO UPDATE SET sequence_order = EXCLUDED.sequence_order,
                 passed_at = COALESCE(topic_progress.passed_at, EXCLUDED.passed_at),
+                tested_at = COALESCE(topic_progress.tested_at, EXCLUDED.tested_at),
+                first_test_percent = CASE WHEN topic_progress.tested_at IS NULL THEN EXCLUDED.first_test_percent
+                                          ELSE topic_progress.first_test_percent END,
                 course_id = EXCLUDED.course_id, skill = EXCLUDED.skill, skills = EXCLUDED.skills,
                 has_topic_test = EXCLUDED.has_topic_test, updated_at = clock_timestamp()
                 """, topics, topics.size(), (statement, topic) -> {
@@ -62,6 +67,8 @@ public class JdbcLearnerCurriculumRepository implements LearnerCurriculumReposit
             statement.setArray(7, statement.getConnection().createArrayOf("varchar",
                     topic.skills().stream().map(Enum::name).toArray()));
             statement.setBoolean(8, topic.hasTopicTest());
+            statement.setTimestamp(9, topic.testedAt() == null ? null : Timestamp.from(topic.testedAt()));
+            statement.setObject(10, topic.firstTestPercent());
         });
     }
 

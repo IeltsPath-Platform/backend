@@ -88,7 +88,8 @@ public class AssignTopicTestUseCase {
                     null, missing);
         }
         TopicStatus status = curriculum.status(topicId);
-        if (status != TopicStatus.IN_PROGRESS || topicLessons.isEmpty()
+        // A topic tested below 70% can be tested again; the first test already counted as its mid-course score.
+        if ((status != TopicStatus.IN_PROGRESS && status != TopicStatus.COMPLETED) || topicLessons.isEmpty()
                 || completed.values().stream().anyMatch(value -> !value)) {
             throw new LearningRequestException(403, "TEST_LOCKED", "Complete the topic lessons first");
         }

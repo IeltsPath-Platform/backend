@@ -87,6 +87,10 @@ class CoursePathIntegrationTest {
         jdbc.execute("TRUNCATE course_test_assignments, course_progress, learner_placements, topic_progress, "
                 + "knowledge_point_catalog, lesson_progress, assessment_result_versions, kp_evidence, review_items "
                 + "CASCADE");
+        jdbc.execute("TRUNCATE course_outcomes, remediation_flags");
+        // These tests are about the course test gate, so the final test alone decides the course.
+        jdbc.update("UPDATE course_score_configs SET process_weight = 0, mid_weight = 0, final_weight = 1 "
+                + "WHERE course_id IS NULL");
         var lower = new LearningContentClient.Course(LOWER, "IELTS_5_5", "IELTS 5.5", new BigDecimal("5.5"), true);
         var higher = new LearningContentClient.Course(HIGHER, "IELTS_6_5", "IELTS 6.5", new BigDecimal("6.5"), true);
         when(content.getTopicSequence()).thenReturn(List.of(

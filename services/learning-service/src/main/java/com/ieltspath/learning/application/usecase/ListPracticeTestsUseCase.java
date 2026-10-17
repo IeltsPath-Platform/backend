@@ -42,7 +42,7 @@ public class ListPracticeTestsUseCase {
             boolean done=a!=null && a.isConsumed();
             // Positions are local to this course, whereas topic_progress.sequence_order is global.
             boolean available=m.afterTopicSequence()>0 && m.afterTopicSequence()<=topics.size()
-                    && topics.get(m.afterTopicSequence()-1).passedAt()!=null;
+                    && topics.get(m.afterTopicSequence()-1).done();
             return new PracticeTestMilestoneResult(m.packageId(),m.packageVersionId(),m.code(),m.title(),
                     m.afterTopicSequence(),done?"DONE":available?"AVAILABLE":"LOCKED",a==null?null:a.percent());
         }).toList();

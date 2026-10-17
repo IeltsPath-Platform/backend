@@ -6,6 +6,7 @@ import com.ieltspath.learning.application.command.AssessmentResult.KnowledgePoin
 import com.ieltspath.learning.application.port.AssessmentResultLog;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.CourseOutcomeService;
 import com.ieltspath.learning.application.service.MasteryProfileUpdater;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
 import com.ieltspath.learning.domain.vo.QuestionEventSource;
@@ -15,7 +16,6 @@ import com.ieltspath.learning.domain.aggregate.LearnerCurriculum;
 import com.ieltspath.learning.domain.aggregate.TopicTestAssignment;
 import com.ieltspath.learning.domain.aggregate.LearnerPlacement;
 import com.ieltspath.learning.domain.aggregate.CourseTestAssignment;
-import com.ieltspath.learning.domain.aggregate.CourseProgress;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.LearnerCurriculumRepository;
 import com.ieltspath.learning.domain.repository.TopicTestAssignmentRepository;
@@ -41,8 +41,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Applies one completed result version in a single transaction: mastery evidence, the final-test rule and review
- * insertion. Versions are idempotent per attempt; a regrade replaces the attempt's earlier evidence.
+ * Applies one completed result version in a single transaction: mastery evidence, the topic and course test records,
+ * review insertion and what a test means for the course. Versions are idempotent per attempt; a regrade replaces the attempt's earlier evidence.
  */
 @Service
 public class ApplyAssessmentResultUseCase {
@@ -63,6 +63,7 @@ public class ApplyAssessmentResultUseCase {
     private com.ieltspath.learning.domain.repository.PracticeTestAssignmentRepository practiceAssignments;
     private final QuestionEventLog questionEvents;
     private final MasteryProfileUpdater masteryProfiles;
+    private final CourseOutcomeService outcomes;
     private final Clock clock = Clock.systemUTC();
 
     public ApplyAssessmentResultUseCase(LearnerLock lock, KnowledgeEvidenceRepository evidence,
@@ -70,7 +71,9 @@ public class ApplyAssessmentResultUseCase {
                                         TopicTestAssignmentRepository assignments, ReviewReevaluation reviews,
                                         LearnerPlacementRepository placements, CourseProgressRepository courseProgress,
                                         CourseTestAssignmentRepository courseAssignments,
-                                        QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles) {
+                                        QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
+                                        CourseOutcomeService outcomes) {
+        this.outcomes = outcomes;
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
         this.lock = lock;
@@ -145,9 +148,12 @@ public class ApplyAssessmentResultUseCase {
             // A practice test never creates a blocking review.
             return;
         }
-        if ("TOPIC_GATE".equals(result.assessmentType())) applyTopicGate(result);
-        if ("COURSE_GATE".equals(result.assessmentType())) applyCourseGate(result);
+        // The gates record the test; what it means for the course needs the reviews of the wrong points, so it runs last.
+        Runnable followUp = () -> { };
+        if ("TOPIC_GATE".equals(result.assessmentType())) followUp = applyTopicGate(result, wrong);
+        if ("COURSE_GATE".equals(result.assessmentType())) followUp = applyCourseGate(result, wrong);
         if (REVIEWED_TYPES.contains(result.assessmentType())) reviews.execute(userId, considered, wrong);
+        followUp.run();
     }
 
     /** True when the result belongs to a course milestone assignment; false for a free practice test. */
@@ -175,16 +181,20 @@ public class ApplyAssessmentResultUseCase {
         }
     }
 
-    /** Only the first completed attempt after an assignment consumes it; 70% or more passes the topic. */
-    private void applyTopicGate(AssessmentResult result) {
+    /**
+     * Only the first completed attempt after an assignment consumes it. The first topic test ever taken finishes the topic
+     * and is its mid-course score, whatever the percent; 70% or more also passes the topic. Returns the follow-up that
+     * needs the reviews of this result.
+     */
+    private Runnable applyTopicGate(AssessmentResult result, Set<UUID> wrong) {
         if (result.packageVersionId() == null) {
             log.info("Topic gate result without package version: eventId={}", result.eventId());
-            return;
+            return () -> { };
         }
         var open = assignments.findOpenForAttempt(result.userId(), result.packageVersionId(), result.completedAt());
         if (open.isEmpty()) {
             log.info("Topic gate result without an open assignment: eventId={}", result.eventId());
-            return;
+            return () -> { };
         }
         BigDecimal score = result.items().stream().map(ItemResult::score).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal max = result.items().stream().map(ItemResult::maxScore).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -193,35 +203,35 @@ public class ApplyAssessmentResultUseCase {
         TopicTestAssignment assignment = open.get();
         boolean passed = assignment.consume(result.attemptId(), percent);
         assignments.save(assignment);
-        if (passed) {
-            LearnerCurriculum curriculum = curricula.find(result.userId());
-            if (curriculum.pass(assignment.topicId(), clock.instant())) curricula.save(curriculum);
-        }
+        LearnerCurriculum curriculum = curricula.find(result.userId());
+        boolean firstTest = curriculum.recordFirstTest(assignment.topicId(), clock.instant(), percent.doubleValue());
+        boolean newlyPassed = passed && curriculum.pass(assignment.topicId(), clock.instant());
+        if (firstTest || newlyPassed) curricula.save(curriculum);
+        return () -> outcomes.afterTopicTest(result.userId(), assignment.topicId(), result.attemptId(),
+                percent.doubleValue(), firstTest, wrong);
     }
 
-    private void applyCourseGate(AssessmentResult result) {
+    /**
+     * The course test is consumed here; whether the learner passes the course is decided by the total score, not by this
+     * test alone, once the reviews of its wrong points exist.
+     */
+    private Runnable applyCourseGate(AssessmentResult result, Set<UUID> wrong) {
         if (result.packageVersionId() == null) {
             log.info("Course gate result without package version: eventId={}", result.eventId());
-            return;
+            return () -> { };
         }
         var open = courseAssignments.findOpenForAttempt(result.userId(), result.packageVersionId(), result.completedAt());
         if (open.isEmpty()) {
             log.info("Course gate result without an open assignment: eventId={}", result.eventId());
-            return;
+            return () -> { };
         }
         BigDecimal score = result.items().stream().map(ItemResult::score).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal max = result.items().stream().map(ItemResult::maxScore).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal percent = max.signum() == 0 ? BigDecimal.ZERO
                 : score.multiply(BigDecimal.valueOf(100)).divide(max, 4, RoundingMode.HALF_UP);
         CourseTestAssignment assignment = open.get();
-        boolean passed = assignment.consume(result.attemptId(), percent);
+        assignment.consume(result.attemptId(), percent);
         courseAssignments.save(assignment);
-        if (passed) {
-            CourseProgress progress = courseProgress.findAll(result.userId()).get(assignment.courseId());
-            if (progress == null) {
-                progress = CourseProgress.restore(result.userId(), assignment.courseId(), null);
-            }
-            if (progress.pass(clock.instant())) courseProgress.save(progress);
-        }
+        return () -> outcomes.afterCourseTest(result.userId(), assignment.courseId(), result.attemptId(), wrong);
     }
 }

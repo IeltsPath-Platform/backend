@@ -50,7 +50,8 @@ public final class LessonAccessGate {
         if (!blockingReviews.isEmpty()) {
             throw new LearningGateException("REVIEW_REQUIRED", blockingReviews);
         }
-        if (topicStatus != TopicStatus.IN_PROGRESS && topicStatus != TopicStatus.PASSED) {
+        if (topicStatus != TopicStatus.IN_PROGRESS && topicStatus != TopicStatus.PASSED
+                && topicStatus != TopicStatus.COMPLETED) {
             throw new LearningGateException("TOPIC_LOCKED", List.of());
         }
         if (!previousLessonsComplete) {

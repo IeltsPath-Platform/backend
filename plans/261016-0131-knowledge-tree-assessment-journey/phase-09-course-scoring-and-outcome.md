@@ -1,12 +1,24 @@
 ---
 phase: 9
 title: "Điểm có trọng số và kết quả khóa"
-status: pending
+status: completed
 priority: P1
 dependencies: [4, 8]
 ---
 
 # Phase 9: Điểm có trọng số và kết quả khóa
+
+## Trạng thái và ghi chú triển khai
+
+- **Đã xong.** Contract `docs/contracts/course-score-v1.md`. Test: `CourseScoreCalculatorTest`, `TopicStatusDeriverTest`,
+  `CourseOutcomeIntegrationTest`, `ScoreConfigAdminControllerTest`; toàn bộ learning-service 434 test xanh.
+- Khác với plan:
+  - Migration là `V17__course_scoring.sql` (V16 là chẩn đoán). Backfill `tested_at` cho topic đã thi từ trước.
+  - `course_outcomes.status` chỉ có `PASSED`/`REMEDIATION`; `RETEST_READY` suy ra khi bài ôn của lần thi không còn `PENDING`.
+  - `remediation_flags.review_ids` và `course_outcomes.review_ids` lưu bài ôn chặn của KP sai; cờ mở khi còn bài `PENDING`.
+  - Thêm `409 REMEDIATION_REQUIRED` khi thi lại trước khi xong bài ôn.
+  - Quyết định đạt/trượt khóa nằm ở `CourseOutcomeService`, chạy sau `ReviewReevaluation` trong cùng transaction.
+  - Practice chỉ tính từ lesson có trong `lesson_progress` của topic thuộc course.
 
 ## Overview
 

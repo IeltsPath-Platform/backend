@@ -35,7 +35,7 @@ class ApplyPlacementResultUseCaseTest {
             mock(com.ieltspath.learning.application.service.MasteryProfileUpdater.class);
     private final ApplyAssessmentResultUseCase useCase = new ApplyAssessmentResultUseCase(
             lock, evidence, curricula, results, assignments, reviews, placements, courseProgress, courseAssignments,
-            questionEvents, masteryProfiles);
+            questionEvents, masteryProfiles, mock(com.ieltspath.learning.application.service.CourseOutcomeService.class));
     private final UUID user = UUID.randomUUID();
     private final Instant completed = Instant.parse("2026-10-06T10:00:00Z");
 
