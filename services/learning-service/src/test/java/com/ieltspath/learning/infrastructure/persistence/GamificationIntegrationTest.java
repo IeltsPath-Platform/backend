@@ -159,6 +159,24 @@ class GamificationIntegrationTest {
     }
 
     @Test
+    void theDailyCapFollowsTheLearnersLocalDay() {
+        UUID user = UUID.randomUUID();
+        timezones.save(user, "Etc/GMT+12");
+        gamification.recordCorrectAnswers(user, UUID.randomUUID(), questions(5));
+
+        GamificationSummary atTheCap = gamification.recordCorrectAnswers(user, UUID.randomUUID(), questions(1));
+        assertEquals(0, atTheCap.xpEarned(), "five hard answers filled the 100 XP of this local day");
+        assertTrue(atTheCap.xpCapped());
+
+        // UTC+14 is 26 hours ahead of UTC-12, so it is always on a later calendar day: the cap starts again there.
+        timezones.save(user, "Pacific/Kiritimati");
+        GamificationSummary nextDay = gamification.recordCorrectAnswers(user, UUID.randomUUID(), questions(1));
+
+        assertEquals(20, nextDay.xpEarned());
+        assertFalse(nextDay.xpCapped());
+    }
+
+    @Test
     void theLearnerTimezoneIsSavedAndAnInvalidOneIsRefused() {
         UUID user = UUID.randomUUID();
         assertEquals("Asia/Ho_Chi_Minh", timezones.timezoneOf(user), "the default before any choice");

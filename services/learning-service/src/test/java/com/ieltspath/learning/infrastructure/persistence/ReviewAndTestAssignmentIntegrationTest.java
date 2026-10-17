@@ -225,6 +225,27 @@ class ReviewAndTestAssignmentIntegrationTest {
     }
 
     @Test
+    void aBlockingReviewCanBeSubmittedWithNoHeartsAndAWrongAnswerThereCostsNone() {
+        jdbc.update("INSERT INTO learner_hearts (user_id, hearts, max_hearts, last_regen_at) VALUES (?, 0, 5, now()) "
+                + "ON CONFLICT (user_id) DO UPDATE SET hearts = 0, max_hearts = 5, last_regen_at = now()", USER);
+        try {
+            UUID review = pendingReview(USER);
+            when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt(), eq(LESSON)))
+                    .thenReturn(List.of(practice(PACKAGE_A)));
+            UUID set = getReviewUseCase.execute(USER, review).set().reviewSetId();
+
+            ReviewSubmissionResult wrong = assertDoesNotThrow(
+                    () -> submitReviewUseCase.execute(USER, review, command(set, UUID.randomUUID(), "B")));
+
+            assertNotNull(wrong.reviewStatus());
+            assertNull(wrong.gamification().heartsLost(), "a review set does not cost hearts");
+            assertEquals(0, jdbc.queryForObject("SELECT hearts FROM learner_hearts WHERE user_id = ?", Integer.class, USER));
+        } finally {
+            jdbc.update("DELETE FROM learner_hearts WHERE user_id = ?", USER);
+        }
+    }
+
+    @Test
     void reviewOfAnotherLearnerIsNotFoundAndNoPackageSkipsTheReview() {
         UUID review = pendingReview(USER);
         var notFound = assertThrows(LearningRequestException.class, () -> getReviewUseCase.execute(OTHER_USER, review));

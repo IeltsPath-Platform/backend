@@ -51,8 +51,8 @@ Luyện tự do phụ thuộc plan `261017-1931` phase 3.
 
 ## Success Criteria
 
-- [ ] Sai 5 câu ở Practice → 0 tim; nộp tiếp → `403 HEARTS_DEPLETED` với `nextHeartAt` = lần mất + 5h. Đã có: `HeartsIntegrationTest.aLearnerWithNoHearts...` (gate và `nextHeartAt`). Chưa có test HTTP cho mã 403 và chưa có kịch bản Practice đủ 5 câu sai.
-- [ ] Bài ôn chặn vẫn làm được khi hết tim. Không thêm gate vào luồng ôn (`SubmitReviewUseCase`), nhưng chưa có test.
+- [x] Sai 5 câu ở Practice → 0 tim; nộp tiếp → `403 HEARTS_DEPLETED` với `nextHeartAt` = lần mất + 5h. (test: `HeartsTest` cho trừ về 0 và không âm, `HeartsIntegrationTest.aLearnerWithNoHearts...` cho gate và `nextHeartAt`, `LessonLearningWebMvcTest.aLearnerWithNoHeartsIsRefusedWithTheTimeOfTheNextHeartAndTheRefillPrice` cho mã 403 qua HTTP). Chưa có một kịch bản đơn nối cả chuỗi 5 câu sai trong một Practice thật.
+- [x] Bài ôn chặn vẫn làm được khi hết tim. (test: `ReviewAndTestAssignmentIntegrationTest.aBlockingReviewCanBeSubmittedWithNoHeartsAndAWrongAnswerThereCostsNone`: tim = 0, nộp set ôn sai không bị chặn và không trừ tim)
 - [x] Hồi đầy trừ đúng 5 points một lần dù gửi lại `requestId`. (test: `HeartsIntegrationTest.aRefillChargesPointsOnce...`). Gửi lại sau khi đã đầy trả `409 HEARTS_FULL`, không trừ thêm.
 - [x] Học viên PREMIUM có 7 tim. (test: `HeartsIntegrationTest.aPremiumLearnerHasSevenHearts`)
 
