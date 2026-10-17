@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: "Xem trước và xuất bản hẹn giờ"
-status: pending
+status: in_progress
 priority: P3
 dependencies: []
 ---
@@ -37,8 +37,15 @@ US-102: xem trước nội dung trước khi xuất bản. US-104: hẹn giờ x
 
 ## Success Criteria
 
-- [ ] Người soạn xem được bản nháp đúng như học viên sẽ thấy.
-- [ ] Version hẹn giờ tự xuất bản trong vòng 1 phút sau `publishAt`.
+- [x] Người soạn xem được bản nháp đúng như học viên sẽ thấy.
+- [x] Version hẹn giờ tự xuất bản trong vòng 1 phút sau `publishAt`.
+
+Implementation: V43 stores package-version schedules and safe failure codes. Admin preview returns learner-safe
+sections with answer specs and audio transcripts in a separate `answers` block. The once-per-minute scheduler runs the
+existing publish validation/use case under a PostgreSQL advisory lock; failed attempts remain `DRAFT` and expose only a
+safe error code. Authors can list and cancel pending or failed schedules.
+
+(test: focused content-service suite, 22 tests, 0 failures, 0 errors, 0 skipped; PostgreSQL Testcontainers ran.)
 
 ## Risk Assessment
 

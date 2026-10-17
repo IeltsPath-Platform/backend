@@ -37,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = {
-        QuestionController.class, ContentPackageController.class, ContentAssetController.class,
+        QuestionController.class, ContentPackageController.class, ContentPackageAdminController.class, ContentAssetController.class,
         KnowledgePointController.class, TopicController.class, ReadingController.class, CourseController.class
 }, properties = {
         "spring.cloud.config.enabled=false",
@@ -109,6 +109,10 @@ class ContentAuthorizationWebMvcTest {
     @MockitoBean AddPackageVersionUseCase addPackageVersion;
     @MockitoBean AddContentSectionUseCase addSection;
     @MockitoBean PublishContentPackageUseCase publishPackage;
+    @MockitoBean GetPackageVersionPreviewUseCase previewPackageVersion;
+    @MockitoBean SchedulePackagePublicationUseCase schedulePackagePublication;
+    @MockitoBean CancelPackagePublicationScheduleUseCase cancelPackagePublicationSchedule;
+    @MockitoBean ListPackagePublicationSchedulesUseCase listPackagePublicationSchedules;
     @MockitoBean GetContentAssetUseCase getAsset;
     @MockitoBean CreateContentAssetUseCase createAsset;
     @MockitoBean LinkAssetUseCase linkAsset;
@@ -150,7 +154,9 @@ class ContentAuthorizationWebMvcTest {
         mockMvc.perform(get("/api/content/admin/questions")).andExpect(status().isForbidden());
         mockMvc.perform(get("/api/content/packages")).andExpect(status().isForbidden());
         mockMvc.perform(get("/api/content/packages/{id}", id)).andExpect(status().isForbidden());
-        verifyNoInteractions(listQuestions, getQuestionDetail, listPackages, getPackageDetail);
+        mockMvc.perform(get("/api/content/admin/packages/{id}/versions/{versionId}/preview", id, UUID.randomUUID()))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(listQuestions, getQuestionDetail, listPackages, getPackageDetail, previewPackageVersion);
     }
 
     @Test
@@ -190,6 +196,20 @@ class ContentAuthorizationWebMvcTest {
                 .content("{\"topicId\":\"" + id + "\",\"code\":\"R55_EXAMPLE\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\"}"))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(createQuestion, createPackage, createAsset, linkAsset, createKnowledgePoint);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void learnerCannotChangePackagePublicationSchedules() throws Exception {
+        UUID versionId = UUID.randomUUID();
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/content/admin/packages/{id}/versions/{versionId}/schedule", id, versionId)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"publishAt\":\"2030-01-01T00:00:00Z\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/api/content/admin/packages/{id}/versions/{versionId}/schedule", id, versionId))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(schedulePackagePublication, cancelPackagePublicationSchedule);
     }
 
     @Test

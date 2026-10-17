@@ -81,6 +81,8 @@ public class ContentPackagePersistenceMapper {
                 entity.getSchemaVersion(),
                 entity.getPublishedAt(),
                 entity.getPublishedBy(),
+                entity.getPublishAt(),
+                entity.getLastPublishError(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
                 sections
@@ -104,6 +106,8 @@ public class ContentPackagePersistenceMapper {
                 .schemaVersion(domain.getSchemaVersion())
                 .publishedAt(domain.getPublishedAt())
                 .publishedBy(domain.getPublishedBy())
+                .publishAt(domain.getPublishAt())
+                .lastPublishError(domain.getLastPublishError())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .sections(sectionEntities)

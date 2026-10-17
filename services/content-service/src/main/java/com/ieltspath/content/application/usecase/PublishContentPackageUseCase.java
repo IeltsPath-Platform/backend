@@ -45,20 +45,36 @@ public class PublishContentPackageUseCase {
     }
 
     public ContentPackageResult execute(PublishContentPackageCommand command) {
-        ContentPackage pkg = contentPackageRepository.findById(command.packageId())
-                .orElseThrow(() -> new ContentPackageNotFoundException(command.packageId()));
+        ContentPackage pkg = loadPackage(command.packageId());
+        ContentPackageVersion targetVersion = targetVersion(pkg, command.versionId());
+        validate(pkg, targetVersion);
 
-        ContentPackageVersion targetVersion = null;
-        for (ContentPackageVersion v : pkg.getVersions()) {
-            if (v.getId().equals(command.versionId())) {
-                targetVersion = v;
-                break;
-            }
-        }
+        targetVersion.publish(command.publishedBy());
+        pkg.publishVersion(targetVersion.getId());
 
-        if (targetVersion == null) {
-            throw new InvalidContentStateException("Version " + command.versionId() + " does not belong to package " + command.packageId());
-        }
+        return ContentPackageResult.of(contentPackageRepository.save(pkg));
+    }
+
+    /** Run the same checks as publish without changing or saving the version. */
+    public void validateForPublish(UUID packageId, UUID versionId) {
+        ContentPackage pkg = loadPackage(packageId);
+        validate(pkg, targetVersion(pkg, versionId));
+    }
+
+    private ContentPackage loadPackage(UUID packageId) {
+        return contentPackageRepository.findById(packageId)
+                .orElseThrow(() -> new ContentPackageNotFoundException(packageId));
+    }
+
+    private static ContentPackageVersion targetVersion(ContentPackage pkg, UUID versionId) {
+        return pkg.getVersions().stream()
+                .filter(v -> v.getId().equals(versionId))
+                .findFirst()
+                .orElseThrow(() -> new InvalidContentStateException(
+                        "Version " + versionId + " does not belong to package " + pkg.getId()));
+    }
+
+    private void validate(ContentPackage pkg, ContentPackageVersion targetVersion) {
 
         // A lesson's Practice measures only skills taught by that lesson.
         if (pkg.getLessonId() != null
@@ -103,10 +119,6 @@ public class PublishContentPackageUseCase {
             }
         }
 
-        targetVersion.publish(command.publishedBy());
-        pkg.publishVersion(targetVersion.getId());
-
-        return ContentPackageResult.of(contentPackageRepository.save(pkg));
     }
 
     private static JsonNode parseSpec(String raw) {

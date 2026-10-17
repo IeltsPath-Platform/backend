@@ -42,8 +42,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Plain SQL projections of the published curriculum. Collections are loaded per request with {@code IN} lists and
- * joined in memory by id, so no method issues one query per row.
+ * Plain SQL projections of the curriculum. Collections are loaded per request with {@code IN} lists and joined in
+ * memory by id, so no method issues one query per row.
  */
 @Component
 public class JdbcLearningContentReader implements LearningContentReader {
@@ -626,14 +626,24 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
     @Override
     public Optional<PackageVersionContentResult> publishedPackageVersion(UUID packageVersionId) {
+        return packageVersionContent(packageVersionId, true);
+    }
+
+    @Override
+    public Optional<PackageVersionContentResult> packageVersionContent(UUID packageVersionId) {
+        return packageVersionContent(packageVersionId, false);
+    }
+
+    private Optional<PackageVersionContentResult> packageVersionContent(UUID packageVersionId, boolean publishedOnly) {
         record VersionRow(UUID packageId, PackageType packageType, UUID topicId, String rules) {}
         Map<String, Object> byVersion = Map.of("versionId", packageVersionId);
-        List<VersionRow> found = jdbc.query("""
+        String publicationFilter = publishedOnly ? " AND v.status = 'PUBLISHED'" : "";
+        List<VersionRow> found = jdbc.query(("""
                 SELECT v.package_id, p.package_type, p.topic_id, v.rules::text AS rules
                 FROM content_package_versions v
                 JOIN content_packages p ON p.id = v.package_id
-                WHERE v.id = :versionId AND v.status = 'PUBLISHED'
-                """, byVersion, (rs, i) -> new VersionRow(uuid(rs, "package_id"),
+                WHERE v.id = :versionId%s
+                """).formatted(publicationFilter), byVersion, (rs, i) -> new VersionRow(uuid(rs, "package_id"),
                 PackageType.valueOf(rs.getString("package_type")), uuid(rs, "topic_id"), rs.getString("rules")));
         if (found.isEmpty()) {
             return Optional.empty();

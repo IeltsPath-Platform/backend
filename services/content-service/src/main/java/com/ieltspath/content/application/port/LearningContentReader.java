@@ -23,8 +23,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Read projections of the published curriculum for the learning flow. Every method runs a fixed number of queries,
- * whatever the size of the result.
+ * Read projections of the curriculum for the learning flow and author preview. Every method runs a fixed number of
+ * queries, whatever the size of the result; {@link #packageVersionContent(UUID)} may include a draft version.
  *
  * <p>A practice set is <em>eligible</em> for a knowledge point when it is a published {@code PRACTICE_SET} whose
  * current version has at least {@code minQuestions} questions, at least one of them measuring the knowledge point,
@@ -97,6 +97,9 @@ public interface LearningContentReader {
                                                int minQuestions, int limit, UUID preferredLessonId);
 
     Optional<PackageVersionContentResult> publishedPackageVersion(UUID packageVersionId);
+
+    /** Package version content for author preview, including draft versions. */
+    Optional<PackageVersionContentResult> packageVersionContent(UUID packageVersionId);
 
     /** The given question versions that a lesson, practice set, final test, mock test or placement test uses. */
     Set<UUID> questionVersionsReservedForLearning(Collection<UUID> questionVersionIds);
