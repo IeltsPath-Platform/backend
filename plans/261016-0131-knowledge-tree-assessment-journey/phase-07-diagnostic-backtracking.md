@@ -141,8 +141,8 @@ bài ôn cho KP gốc trước.
 
 ## Success Criteria
 
-- [ ] Kịch bản của mentor chạy được: B trượt → dò A, X, Y → chốt điểm tắc → giao bài ôn KP gốc → quay lại B.
-- [ ] Không học viên nào bị kẹt: mọi nhánh đều kết thúc.
+- [x] Kịch bản của mentor chạy được: B trượt → dò A, X, Y → chốt điểm tắc → giao bài ôn KP gốc → quay lại B. (test: DiagnosticIntegrationTest.aFailedPrerequisiteIsTheGapAndTheReviewWaitsForItsReview, aFailedProbeWalksBackToItsOwnPrerequisite)
+- [x] Không học viên nào bị kẹt: mọi nhánh đều kết thúc. (test: PrerequisiteDiagnosisTest.depthThreeStops, theProbeBudgetStops)
 - [ ] `GET /api/learning/report` trả `action.type = DIAGNOSING` khi phiên đang chạy.
 
 ## Risk Assessment

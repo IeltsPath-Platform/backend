@@ -78,9 +78,9 @@ Phase này thêm chuỗi bản, so sánh và giới hạn lần sửa. **Không 
 
 ## Success Criteria
 
-- [ ] Nộp lại tạo bản mới nối với bản trước; lịch sử trả delta đúng.
+- [x] Nộp lại tạo bản mới nối với bản trước; lịch sử trả delta đúng. (test: LessonWritingIntegrationTest.aRevisionIsLinkedGradedAndChargedLikeAnyEssayAndTheHistoryShowsWhatChanged)
 - [ ] Luật bằng chứng không đổi: test hiện có của `SubmitLessonEssayUseCase` vẫn xanh nguyên vẹn.
-- [ ] Vượt 3 lần sửa → 409; không rẽ nhánh từ bản cũ.
+- [x] Vượt 3 lần sửa → 409; không rẽ nhánh từ bản cũ. (test: LessonWritingIntegrationTest.onlyTheNewestGradedEssayCanBeRevisedAndOnlyThreeTimes)
 
 ## Risk Assessment
 

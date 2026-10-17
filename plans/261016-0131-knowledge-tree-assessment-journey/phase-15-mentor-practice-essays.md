@@ -69,8 +69,8 @@ rồi chốt một trong hai hướng, ghi vào báo cáo phase:
 ## Success Criteria
 
 - [ ] Học viên có tín dụng yêu cầu chữa một essay lesson hoặc Practice và nhận được phản hồi của giám khảo.
-- [ ] Tín dụng chỉ trừ một lần cho mỗi essay.
-- [ ] Phản hồi của Mentor không đổi mastery, cổng hay bài ôn.
+- [x] Tín dụng chỉ trừ một lần cho mỗi essay. (test: HumanReviewIntegrationTest.aGradedLessonEssayIsSentOnceAndAskingAgainSpendsNothing)
+- [x] Phản hồi của Mentor không đổi mastery, cổng hay bài ôn. (test: HumanReviewIntegrationTest.aMentorReviewIsFeedbackOnlyAndWritesNoEvidenceOrReviews)
 
 ## Risk Assessment
 

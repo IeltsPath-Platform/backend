@@ -115,8 +115,8 @@ qua event `AssessmentCompleted.v2` (D9).
 
 ## Success Criteria
 
-- [ ] Nộp Practice 5 câu kèm `durationMs` → 5 dòng event có `duration_ms`, `first_submission=true`.
-- [ ] Làm lại cùng gói → event `first_submission=false`, không thêm `kp_evidence`.
+- [x] Nộp Practice 5 câu kèm `durationMs` → 5 dòng event có `duration_ms`, `first_submission=true`. (test: QuestionEventLogIntegrationTest.writesOneRowPerQuestionWithItsDurationKnowledgePointAndFirstSubmissionFlag)
+- [x] Làm lại cùng gói → event `first_submission=false`, không thêm `kp_evidence`. (test: QuestionEventLogIntegrationTest.aLaterSubmissionOfTheSameQuestionIsLoggedAsARepeat)
 - [ ] Bài thi có câu chọn phương án gắn mã → event có `error_code`.
 
 ## Risk Assessment

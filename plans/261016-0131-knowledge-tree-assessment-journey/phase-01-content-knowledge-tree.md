@@ -163,10 +163,10 @@ infrastructure/persistence/adapter/JdbcKnowledgePrerequisiteRepository (NamedPar
 
 ## Success Criteria
 
-- [ ] Không thể lưu vòng, kể cả vòng dài (A→B→C→A) và hai PUT đồng thời.
-- [ ] Ngưng KP không làm gãy câu hỏi hoặc lesson đang gắn (`question_knowledge_points`, `lesson_knowledge_points` giữ
+- [x] Không thể lưu vòng, kể cả vòng dài (A→B→C→A) và hai PUT đồng thời. (test: KnowledgeTreeIntegrationTest.readsPrerequisiteEdgesAndRejectsAnIntroducedCycle, concurrentOpposingPrerequisiteUpdatesAllowOnlyOneEdge)
+- [x] Ngưng KP không làm gãy câu hỏi hoặc lesson đang gắn (`question_knowledge_points`, `lesson_knowledge_points` giữ (test: KnowledgeTreeIntegrationTest.inactiveKnowledgePointIsHiddenFromDefaultTreeAndInternalPrerequisitesUntilReactivated)
   nguyên); bật lại khôi phục cạnh.
-- [ ] Đổi `topicId` của KP đang dùng → `409 KNOWLEDGE_POINT_IN_USE`.
+- [x] Đổi `topicId` của KP đang dùng → `409 KNOWLEDGE_POINT_IN_USE`. (test: KnowledgeTreeIntegrationTest.changingTopicIsRejectedWhenKnowledgePointHasPublishedQuestionOrLessonUsage)
 - [ ] Contract `knowledge-tree-v1.md` khớp controller.
 
 ## Risk Assessment

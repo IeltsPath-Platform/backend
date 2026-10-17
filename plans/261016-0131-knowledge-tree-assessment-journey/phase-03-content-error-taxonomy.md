@@ -168,7 +168,7 @@ Phase này tạo danh mục chuẩn, gắn mã lỗi cho từng phương án sai
 
 ## Success Criteria
 
-- [ ] Chọn phương án đã gắn mã → kết quả chấm có `errorCode` đúng.
+- [x] Chọn phương án đã gắn mã → kết quả chấm có `errorCode` đúng. (test: ItemGradingErrorCodesTest.wrongObjectiveAnswersCarryTheirErrorTagAndCorrectOnesDoNot)
 - [ ] Câu điền sai chính tả nhẹ → `SPELLING`; sai số → `NUMBER_FORMAT`.
 - [ ] `distractors` không xuất hiện trong response gửi học viên trước khi nộp.
 - [ ] Giám khảo không lưu được mã ngoài danh mục.

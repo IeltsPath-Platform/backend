@@ -132,9 +132,9 @@ Phase này lưu mastery profile cho từng học viên × KP, tính hạn ôn, v
 
 ## Success Criteria
 
-- [ ] Sau mỗi lần nộp, profile của các KP liên quan đúng mức và đúng hạn ôn.
-- [ ] Báo cáo trả đủ 4 khối cho mọi KP học viên đã có evidence.
-- [ ] Đổi ngưỡng trong cấu hình thì mức thay đổi theo mà không cần sửa code.
+- [x] Sau mỗi lần nộp, profile của các KP liên quan đúng mức và đúng hạn ôn. (test: MasteryProfileIntegrationTest.anAssessmentResultWritesATierADueDateTheMedianTimeAndTheTopError)
+- [x] Báo cáo trả đủ 4 khối cho mọi KP học viên đã có evidence. (test: MasteryProfileIntegrationTest.theReportCarriesScoreErrorsEvidenceAndActionForEveryPointWithEvidence)
+- [x] Đổi ngưỡng trong cấu hình thì mức thay đổi theo mà không cần sửa code. (test: MasteryProfileIntegrationTest.changingTheRulesMovesTiersOnlyAfterTheRecompute)
 
 ## Risk Assessment
 

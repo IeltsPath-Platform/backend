@@ -133,9 +133,9 @@ Nghĩa là điểm giữa khóa đang khóa thi cuối khóa, ngược với boa
 
 ## Success Criteria
 
-- [ ] Kịch bản trong `CourseOutcomeIntegrationTest` chạy đúng.
-- [ ] Admin đổi trọng số → điểm tổng của kết quả chưa chốt thay đổi theo.
-- [ ] Không học viên nào bị khóa thi cuối khóa vì điểm giữa khóa.
+- [x] Kịch bản trong `CourseOutcomeIntegrationTest` chạy đúng. (test: CourseOutcomeIntegrationTest.aWeakTopicTestStillOpensTheNextTopicAndTheCourseTestAndTheWeightedTotalDecidesTheCourse)
+- [x] Admin đổi trọng số → điểm tổng của kết quả chưa chốt thay đổi theo. (test: CourseOutcomeIntegrationTest.anAdminChangeMovesTheScoreOfAnUndecidedCourseButNotOfAPassedOne)
+- [x] Không học viên nào bị khóa thi cuối khóa vì điểm giữa khóa. (test: CourseOutcomeIntegrationTest.aWeakTopicTestStillOpensTheNextTopicAndTheCourseTestAndTheWeightedTotalDecidesTheCourse)
 
 ## Risk Assessment
 

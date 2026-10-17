@@ -88,7 +88,7 @@ Mentor yêu cầu "dựng một cái cây từ band 5.5 cho đến band 7". Seed
 
 ### Success Criteria (2a)
 
-- [ ] Course 6.0, 7.0 và 6 topic tương ứng ở trạng thái `INACTIVE`.
+- [x] Course 6.0, 7.0 và 6 topic tương ứng ở trạng thái `INACTIVE`. (test: KnowledgeTreeSeedTest.seedsOnlyTheInactiveCoursesAndSkillTopicsForBandsSixAndSeven)
 - [ ] Học viên không thấy course 6.0, 7.0 trong danh sách course và topic sequence.
 - [ ] Tạo version câu hỏi không có `difficulty` → `400 DIFFICULTY_REQUIRED`.
 
@@ -166,10 +166,10 @@ Không có.
 
 ### Success Criteria (2b)
 
-- [ ] `GET /api/content/knowledge-tree` có node ở đủ 4 band × 3 skill, không vòng.
+- [x] `GET /api/content/knowledge-tree` có node ở đủ 4 band × 3 skill, không vòng. (test: KnowledgeTreeDraftSeedMigrationTest.treeCoversFourBandsAndThreeSkills, treeIsAcyclic)
 - [ ] 100% `question_versions` có difficulty.
 - [ ] Mỗi KP của course 5.5, 6.5 có ít nhất 3 gói `PRACTICE_SET` đã publish.
-- [ ] Mọi KP cũ giữ nguyên `topic_id` và `code`.
+- [x] Mọi KP cũ giữ nguyên `topic_id` và `code`. (test: KnowledgeTreeDraftSeedMigrationTest.keepsEveryOlderKnowledgePointUnchanged)
 
 ### Risk Assessment
 
