@@ -29,7 +29,7 @@ Reading/Listening questions or Writing essays with a numeric `passBand`, as for 
 
 **Status: approved 2026-10-01. Updated 2026-10-16: active status on topic sequence entries and filtering in learner refresh. Earlier updates added course sequence metadata and course final-test packages, derived `skills`, and mixed-skill course tests.**
 
-Content Service owns these ten routes under `/internal/learning-content` (three practice routes added 2026-10-03; course test packages added 2026-10-07). They require a verified internal JWT; callers forward the request bearer and `X-Correlation-Id`. Gateway must explicitly deny client access to `/internal/**`. Responses here can contain `answerSpec` and `explanation` and must never be proxied to a learner unchanged. This contract uses Content's camelCase JSON names. Vocabulary/video catalog data belongs to Library Service; Content V7 removed those tables. The `VOCABULARY` block contains logical sense IDs only, with no Content-owned vocabulary entity or cross-database lookup.
+Content Service owns these routes under `/internal/learning-content` (three practice routes added 2026-10-03; course test packages added 2026-10-07). They require a verified internal JWT; callers forward the request bearer and `X-Correlation-Id`. Gateway must explicitly deny client access to `/internal/**`. Responses here can contain `answerSpec` and `explanation` and must never be proxied to a learner unchanged. This contract uses Content's camelCase JSON names. Vocabulary/video catalog data belongs to Library Service; Content V7 removed those tables. The `VOCABULARY` block contains logical sense IDs only, with no Content-owned vocabulary entity or cross-database lookup.
 
 Examples use real codes, stems, answers, and passages from [`seed-content.md`](../../plans/260930-2057-mvp-reading-writing-listening-roadmap/seed-content.md). The existing V4 UUIDs for DEMO_READING and KP1 are real; other example UUIDs illustrate relationships rather than fixing V9 migration IDs. A `404` means the id is unknown or unpublished. Collections are sorted as described below.
 
@@ -201,6 +201,36 @@ Added 2026-10-03. Request `{knowledgePointIds, excludePackageIds, minQuestions}`
 {"knowledgePointIds":["10000000-0000-4000-8000-000000000002"],"excludePackageIds":["20000000-0000-4000-8000-080000000004"]}
 {"counts":{"10000000-0000-4000-8000-000000000002":3}}
 ```
+
+## `POST /suggestions/candidates`
+
+Returns published content candidates for Learning's optional suggestions in one batched request. Like the other
+`/internal/learning-content/**` routes, this requires a verified internal JWT and is not exposed by the Gateway.
+
+Request (1–50 distinct or repeated UUIDs; `maxBand` is a number from 0 through 9):
+
+```json
+{"knowledgePointIds":["20000000-0000-4000-8000-000000000003"],"maxBand":5.5}
+```
+
+Response (illustrative IDs):
+
+```json
+{
+  "packages":[{"packageId":"20000000-0000-4000-8000-000000000301","packageVersionId":"20000000-0000-4000-8000-000000000401","type":"PRACTICE_SET","title":"Topic sentence practice","knowledgePointIds":["20000000-0000-4000-8000-000000000003"],"band":5.5,"skill":"READING"}],
+  "lessons":[{"lessonId":"20000000-0000-4000-8000-000000000101","topicId":"10000000-0000-4000-8000-000000000001","title":"Câu chủ đề nằm ở đâu","knowledgePointIds":["20000000-0000-4000-8000-000000000003"],"band":5.5,"skill":"READING","sortOrder":1}]
+}
+```
+
+`packages` includes `PRACTICE_SET` and `PRACTICE_TEST` only. A package and its current version must both be
+`PUBLISHED`; a lesson must be `PUBLISHED`. The mapped KP, its topic and course must be active, and content tied to a
+lesson, topic or course must have an active published owner. Each item includes all its active target KP IDs so the
+caller can match several requested KPs without further Content calls. Unknown or inactive KP IDs simply have no
+matches. Package `band` is the highest of its owner course band and the bands of the KPs measured by its current
+version; lesson `band` comes from its course. Both are at most `maxBand`. `skill` is the single skill of the active
+mapped KPs, or `null` for a mixed-skill item. Packages are ordered by band, type, then ID; lessons by band, topic
+order, lesson order, then ID. Invalid input returns `400`. Learning chooses at most five, removes already attempted
+content, and builds learner-facing paths; this internal endpoint makes no learner-specific selection.
 
 ## `GET /package-versions/{id}`
 
