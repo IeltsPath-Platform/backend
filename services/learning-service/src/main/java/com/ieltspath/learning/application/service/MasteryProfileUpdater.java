@@ -45,6 +45,7 @@ public class MasteryProfileUpdater {
     private final MasteryRulesProvider rules;
     private final MasteryFormulaSettings formulas;
     private final GamificationRecorder gamification;
+    private final BadgeService badges;
     private final Clock clock;
     private final MasteryCalculator calculator = new MasteryCalculator();
 
@@ -54,13 +55,15 @@ public class MasteryProfileUpdater {
     @Autowired
     public MasteryProfileUpdater(KnowledgeEvidenceRepository evidence, MasteryProfileRepository profiles,
                                  QuestionEventLog events, MasteryRulesProvider rules,
-                                 MasteryFormulaSettings formulas, GamificationRecorder gamification) {
-        this(evidence, profiles, events, rules, formulas, gamification, Clock.systemUTC());
+                                 MasteryFormulaSettings formulas, GamificationRecorder gamification,
+                                 BadgeService badges) {
+        this(evidence, profiles, events, rules, formulas, gamification, badges, Clock.systemUTC());
     }
 
     MasteryProfileUpdater(KnowledgeEvidenceRepository evidence, MasteryProfileRepository profiles,
                           QuestionEventLog events, MasteryRulesProvider rules, MasteryFormulaSettings formulas,
-                          GamificationRecorder gamification, Clock clock) {
+                          GamificationRecorder gamification, BadgeService badges, Clock clock) {
+        this.badges = badges;
         this.evidence = evidence;
         this.profiles = profiles;
         this.events = events;
@@ -171,6 +174,9 @@ public class MasteryProfileUpdater {
                             profile.tier() == MasteryTier.MAINTAIN))
                     .toList();
             gamification.recordRises(userId, rises);
+            if (updated.stream().anyMatch(profile -> profile.tier() == MasteryTier.MAINTAIN)) {
+                badges.onMaintained(userId);
+            }
         }
         if (rebuild) {
             Set<UUID> gone = new HashSet<>(knowledgePointIds);

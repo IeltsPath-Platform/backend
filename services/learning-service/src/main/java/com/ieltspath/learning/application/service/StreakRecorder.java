@@ -25,10 +25,12 @@ public class StreakRecorder {
     private final GamificationRecorder gamification;
     private final RewardGrantRepository rewards;
     private final LearnerTimezones timezones;
+    private final BadgeService badges;
     private final Clock clock = Clock.systemUTC();
 
     public StreakRecorder(StreakRepository streaks, GamificationRecorder gamification, RewardGrantRepository rewards,
-                          LearnerTimezones timezones) {
+                          LearnerTimezones timezones, BadgeService badges) {
+        this.badges = badges;
         this.streaks = streaks;
         this.gamification = gamification;
         this.rewards = rewards;
@@ -42,6 +44,8 @@ public class StreakRecorder {
         StreakState before = streaks.find(userId).orElse(StreakState.empty());
         StreakRules.Recorded recorded = StreakRules.recordAnswer(before, today);
         streaks.save(userId, recorded.state());
+        // The streak only grows on the first answer of a day, which is the only time its badges need checking.
+        if (!today.equals(before.lastActive())) badges.onStreak(userId, recorded.state().currentDays());
         for (int days : recorded.milestones()) {
             payMilestone(userId, recorded.state().streakStart(), days);
         }

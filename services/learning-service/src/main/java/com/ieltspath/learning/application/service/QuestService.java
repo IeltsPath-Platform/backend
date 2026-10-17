@@ -48,12 +48,13 @@ public class QuestService {
     private final GamificationRecorder gamification;
     private final RewardGrantRepository rewards;
     private final LearnerTimezones timezones;
+    private final BadgeService badges;
     private final Params params;
     private final Clock clock = Clock.systemUTC();
 
     public QuestService(QuestRepository quests, MasteryProfileRepository profiles, ReviewItemRepository reviews,
                         LearningContentClient content, GamificationRecorder gamification,
-                        RewardGrantRepository rewards, LearnerTimezones timezones,
+                        RewardGrantRepository rewards, LearnerTimezones timezones, BadgeService badges,
                         @Value("${learning.gamification.quests.practice-required:5}") int practiceRequired,
                         @Value("${learning.gamification.quests.practice-xp:20}") int practiceXp,
                         @Value("${learning.gamification.quests.practice-points:5}") int practicePoints,
@@ -69,6 +70,7 @@ public class QuestService {
         this.gamification = gamification;
         this.rewards = rewards;
         this.timezones = timezones;
+        this.badges = badges;
         this.params = new Params(practiceRequired, practiceXp, practicePoints, weaknessRequired, weaknessXp,
                 plusRequired, plusXp, streakXp);
     }
@@ -125,6 +127,7 @@ public class QuestService {
         if (quest.pointsReward() > 0) {
             rewards.enqueue(userId, REWARD_REASON, quest.id().toString(), quest.pointsReward());
         }
+        badges.onQuestCompleted(userId);
     }
 
     /**

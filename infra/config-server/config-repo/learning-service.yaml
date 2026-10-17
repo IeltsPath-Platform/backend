@@ -120,6 +120,13 @@ learning:
       plus-required: 10
       plus-xp: 30
       streak-xp: 10
+  rewards:
+    # Points owed to learners (streak, quests, badges) go to Access over RabbitMQ. A grant with no answer after resend-after
+    # is sent again; after max-sends sends it is given up and kept as failed.
+    relay-enabled: true
+    batch: 100
+    resend-after: PT5M
+    max-sends: 10
   messaging:
     # AssessmentCompleted.v2 consumer: delay before a failed event is retried, and attempts before the DLQ.
     retry-delay-ms: ${LEARNING_RETRY_DELAY_MS:30000}

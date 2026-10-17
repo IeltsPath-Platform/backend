@@ -37,12 +37,14 @@ public class CourseOutcomeService {
     private final ReviewItemRepository reviews;
     private final LearnerCurriculumRepository curricula;
     private final CourseProgressRepository courseProgress;
+    private final BadgeService badges;
     private final Clock clock = Clock.systemUTC();
 
     public CourseOutcomeService(CourseScoreConfigRepository configs, CourseScoreService scores, CourseScoreData data,
                                 CourseOutcomeRepository outcomes, RemediationFlagRepository flags,
                                 ReviewItemRepository reviews, LearnerCurriculumRepository curricula,
-                                CourseProgressRepository courseProgress) {
+                                CourseProgressRepository courseProgress, BadgeService badges) {
+        this.badges = badges;
         this.configs = configs;
         this.scores = scores;
         this.data = data;
@@ -56,6 +58,8 @@ public class CourseOutcomeService {
     /** The first test of a topic below the configured line asks for supplementary work; later tests do not. */
     public void afterTopicTest(UUID userId, UUID topicId, UUID attemptId, double percent, boolean firstTest,
                                Set<UUID> wrongKnowledgePoints) {
+        // Called once per recorded topic test, so any topic test the learner takes earns the first-test badge.
+        badges.onTopicTest(userId);
         if (!firstTest) return;
         UUID courseId = curricula.find(userId).topic(topicId).map(topic -> topic.courseId()).orElse(null);
         if (courseId == null) return;
@@ -81,6 +85,7 @@ public class CourseOutcomeService {
             CourseProgress progress = courseProgress.findAll(userId).get(courseId);
             if (progress == null) progress = CourseProgress.restore(userId, courseId, null);
             if (progress.pass(clock.instant())) courseProgress.save(progress);
+            badges.onCoursePassed(userId);
             return;
         }
         List<UUID> reviewIds = blockingReviewsOf(userId, wrongKnowledgePoints);
