@@ -109,6 +109,17 @@ learning:
       premium-max: 7
       # Points for a full refill.
       refill-cost: 5
+    quests:
+      # Daily quests: answers needed and the reward of each. Points are paid through the reward queue.
+      practice-required: 5
+      practice-xp: 20
+      practice-points: 5
+      weakness-required: 3
+      weakness-xp: 30
+      # The longer practice quest that replaces the weakness quest when no point suits.
+      plus-required: 10
+      plus-xp: 30
+      streak-xp: 10
   messaging:
     # AssessmentCompleted.v2 consumer: delay before a failed event is retried, and attempts before the DLQ.
     retry-delay-ms: ${LEARNING_RETRY_DELAY_MS:30000}

@@ -29,6 +29,7 @@ public class GamificationRecorder {
     static final String KP_CONSOLIDATE = "KP_CONSOLIDATE";
     static final String KP_MAINTAIN = "KP_MAINTAIN";
     static final String STREAK = "STREAK";
+    static final String QUEST = "QUEST";
 
     /** A knowledge point that reached consolidate; {@code maintained} also means it reached maintain. */
     public record Rise(UUID knowledgePointId, boolean maintained) {}
@@ -113,7 +114,17 @@ public class GamificationRecorder {
      * run pays once. Like knowledge-point milestones, it is not limited by the daily cap.
      */
     public void recordStreakMilestone(UUID userId, String milestoneRef, int xp) {
-        LedgerEntry entry = new LedgerEntry(STREAK, milestoneRef, xp, true, today(userId));
+        payOnce(userId, STREAK, milestoneRef, xp);
+    }
+
+    /** XP for a completed daily quest, paid once per quest and, like milestones, outside the daily cap. */
+    public void recordQuestReward(UUID userId, String questId, int xp) {
+        payOnce(userId, QUEST, questId, xp);
+    }
+
+    private void payOnce(UUID userId, String source, String reference, int xp) {
+        if (xp <= 0) return;
+        LedgerEntry entry = new LedgerEntry(source, reference, xp, true, today(userId));
         boolean[] fresh = repository.insertLedger(userId, List.of(entry));
         if (fresh[0]) apply(userId, repository.totalXp(userId), xp, false);
     }

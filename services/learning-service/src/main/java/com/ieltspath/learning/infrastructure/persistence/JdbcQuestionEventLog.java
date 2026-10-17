@@ -35,7 +35,7 @@ public class JdbcQuestionEventLog implements QuestionEventLog {
     @Override
     public void append(List<QuestionAttemptEvent> events) {
         if (events.isEmpty()) return;
-        jdbc.batchUpdate("""
+        int[][] inserted = jdbc.batchUpdate("""
                 INSERT INTO question_attempt_events (id, user_id, question_version_id, knowledge_point_ids, correct, score,
                     max_score, duration_ms, error_code, source, source_reference_id, attempt_id, first_submission)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -58,8 +58,14 @@ public class JdbcQuestionEventLog implements QuestionEventLog {
         });
         // Learners whose events were just written: their open flags are closed before the commit, and they are checked
         // for anomalies once it commits.
-        events.stream().map(QuestionAttemptEvent::userId).distinct()
-                .forEach(user -> publisher.publishEvent(new QuestionEventsAppended(user)));
+        // One batch holds every row, so its counts line up with the events; a row already stored counts 0.
+        int[] counts = inserted.length == 0 ? new int[0] : inserted[0];
+        List<QuestionAttemptEvent> fresh = new ArrayList<>();
+        for (int index = 0; index < events.size(); index++) {
+            if (index < counts.length && counts[index] != 0) fresh.add(events.get(index));
+        }
+        events.stream().map(QuestionAttemptEvent::userId).distinct().forEach(user -> publisher.publishEvent(
+                new QuestionEventsAppended(user, fresh.stream().filter(event -> event.userId().equals(user)).toList())));
     }
 
     @Override
