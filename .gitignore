@@ -65,3 +65,6 @@ agents/
 
 # Microsoft Office lock files
 ~$*
+
+# Local Maven repository cache
+.mvn-cache/
