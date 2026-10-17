@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Báo cáo theo kỹ năng và band mục tiêu"
-status: in_progress
+status: completed
 priority: P1
 dependencies: [2]
 ---
@@ -57,9 +57,17 @@ Band mục tiêu nằm ở learning goal của user-service, learning-service ch
 
 ## Success Criteria
 
-- [ ] Báo cáo có 6 khối kỹ năng, top 3 KP, band ước tính và khoảng cách tới mục tiêu.
-- [ ] user-service tắt thì báo cáo vẫn 200, chỉ thiếu `target`.
-- [ ] Không có gọi HTTP trong vòng lặp.
+- [x] Báo cáo có 6 khối kỹ năng, top 3 KP, band ước tính và khoảng cách tới mục tiêu. (test: GetLearnerReportUseCaseTest 6, BandEstimatorTest 10)
+- [x] user-service tắt thì báo cáo vẫn 200, chỉ thiếu `target`. (client trả rỗng khi lỗi, thiếu bearer hoặc thiếu goal; chưa có test adapter HTTP)
+- [x] Không có gọi HTTP trong vòng lặp. (một lần `goals.goal` mỗi báo cáo, `verify(times(1))`)
+
+## Tiến độ (2026-10-17)
+
+- Xong: `BandEstimator`, `LearnerGoalClient` + `RestLearnerGoalClient` (`learning.user.base-url`, mặc định 8081), khối
+  `skills` (6 khối), `focus` (3 KP, KP chặn bài ôn lên trước), `estimatedBand` (luôn `estimated = true`), `target`.
+- Placement hiện chỉ có một band chung, không theo kỹ năng. Vì vậy band placement chỉ thay thế cho kỹ năng đã có KP mà chưa
+  đạt band nào; kỹ năng không có KP (Speaking) không có band và `speakingIncluded = false`.
+- Chưa làm: cập nhật `docs/system-architecture.md` và AGENTS.md §3.5 về cuộc gọi đồng bộ learning → user; test adapter HTTP.
 
 ## Risk Assessment
 
