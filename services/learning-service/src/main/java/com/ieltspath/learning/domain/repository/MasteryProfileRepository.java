@@ -33,4 +33,8 @@ public interface MasteryProfileRepository {
 
     /** Profiles after the given key in (learner, knowledge point) order; a null key starts from the beginning. */
     List<MasteryProfile> findBatchAfter(UUID afterUserId, UUID afterKnowledgePointId, int limit);
+
+    /** Like {@link #findBatchAfter} but only profiles whose newest evidence is older than {@code staleBefore}. */
+    List<MasteryProfile> findStaleBatchAfter(java.time.Instant staleBefore, UUID afterUserId,
+                                             UUID afterKnowledgePointId, int limit);
 }

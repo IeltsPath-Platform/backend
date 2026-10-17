@@ -59,6 +59,29 @@ learning:
     consolidate-days: 3
     # Fill profiles for evidence that predates them after startup; idempotent.
     backfill-on-startup: true
+    # DEEPTUTOR (last five answers, no decay) or MP1 (below). Changing it changes every learner's tier: keep DEEPTUTOR
+    # until the team confirms MP1, then switch and rebuild all profiles once (rebuild-on-startup, or the Admin recompute).
+    policy: ${LEARNING_MASTERY_POLICY:DEEPTUTOR}
+    rebuild-on-startup: ${LEARNING_MASTERY_REBUILD_ON_STARTUP:false}
+    # MP1 scores fall as evidence ages; the job refreshes learners who have not answered for decay-stale-after.
+    decay-enabled: true
+    decay-stale-after: PT24H
+    decay-interval: P1D
+    mp1:
+      window: 8
+      max-practice-in-window: 3
+      half-life-days: 30
+      min-evidence: 3
+      min-distinct-days: 2
+      min-confidence: 1.0
+      hysteresis: 0.03
+      same-item-days: 7
+      source-weights:
+        exam: 1.0
+        review: 1.0
+        probe: 1.0
+        practice: 0.6
+        essay: 0.5
   messaging:
     # AssessmentCompleted.v2 consumer: delay before a failed event is retried, and attempts before the DLQ.
     retry-delay-ms: ${LEARNING_RETRY_DELAY_MS:30000}

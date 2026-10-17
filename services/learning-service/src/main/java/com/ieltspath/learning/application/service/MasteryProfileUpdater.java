@@ -8,6 +8,8 @@ import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
 import com.ieltspath.learning.domain.service.MasteryCalculator;
 import com.ieltspath.learning.domain.service.MasteryPolicy;
+import com.ieltspath.learning.domain.service.Mp1MasteryCalculator;
+import com.ieltspath.learning.domain.vo.EvidencePoint;
 import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import com.ieltspath.learning.domain.vo.MasteryHistory;
 import com.ieltspath.learning.domain.vo.MasteryTier;
@@ -38,27 +40,35 @@ public class MasteryProfileUpdater {
     private final MasteryProfileRepository profiles;
     private final QuestionEventLog events;
     private final MasteryRulesProvider rules;
+    private final MasteryFormulaSettings formulas;
     private final Clock clock;
     private final MasteryCalculator calculator = new MasteryCalculator();
 
+    /** How a profile is brought up to date: from new evidence, from scratch, or because time passed. */
+    private enum Mode { RECORD, REBUILD, DECAY }
+
     @Autowired
     public MasteryProfileUpdater(KnowledgeEvidenceRepository evidence, MasteryProfileRepository profiles,
-                                 QuestionEventLog events, MasteryRulesProvider rules) {
-        this(evidence, profiles, events, rules, Clock.systemUTC());
+                                 QuestionEventLog events, MasteryRulesProvider rules,
+                                 MasteryFormulaSettings formulas) {
+        this(evidence, profiles, events, rules, formulas, Clock.systemUTC());
     }
 
     MasteryProfileUpdater(KnowledgeEvidenceRepository evidence, MasteryProfileRepository profiles,
-                          QuestionEventLog events, MasteryRulesProvider rules, Clock clock) {
+                          QuestionEventLog events, MasteryRulesProvider rules, MasteryFormulaSettings formulas,
+                          Clock clock) {
         this.evidence = evidence;
         this.profiles = profiles;
         this.events = events;
         this.rules = rules;
+        this.formulas = formulas;
         this.clock = clock;
     }
 
     /** Call right after {@code evidence.append}; the streak moves by the newest outcome of each point. */
     public void recordEvidence(UUID userId, List<KnowledgeEvidence> appended) {
-        update(userId, appended.stream().map(KnowledgeEvidence::knowledgePointId).collect(Collectors.toSet()), false);
+        update(userId, appended.stream().map(KnowledgeEvidence::knowledgePointId).collect(Collectors.toSet()),
+                Mode.RECORD);
     }
 
     /**
@@ -66,12 +76,29 @@ public class MasteryProfileUpdater {
      * is the run of right answers at the end of the recent history, and a point left without evidence loses its profile.
      */
     public void rebuild(UUID userId, Collection<UUID> knowledgePointIds) {
-        update(userId, new HashSet<>(knowledgePointIds), true);
+        update(userId, new HashSet<>(knowledgePointIds), Mode.REBUILD);
     }
 
-    private void update(UUID userId, Set<UUID> knowledgePointIds, boolean rebuild) {
+    /**
+     * Recomputes the MP-1.0 score of points whose evidence aged: no new answer arrived, so the streak stays and the
+     * tier is held by the hysteresis margin. Does nothing under the other formula, whose score never changes with time.
+     */
+    public void decay(UUID userId, Collection<UUID> knowledgePointIds) {
+        if (!formulas.usesMp1()) return;
+        update(userId, new HashSet<>(knowledgePointIds), Mode.DECAY);
+    }
+
+    /** Evidence rows read per point for MP-1.0; far more than the window so repeats and capped practice are skipped. */
+    private static final int MP1_EVIDENCE_READ = 60;
+
+    private void update(UUID userId, Set<UUID> knowledgePointIds, Mode mode) {
         if (knowledgePointIds.isEmpty()) return;
+        boolean rebuild = mode == Mode.REBUILD;
+        boolean mp1 = formulas.usesMp1();
+        Mp1MasteryCalculator mp1Calculator = new Mp1MasteryCalculator(formulas.params());
         MasteryPolicy policy = new MasteryPolicy(rules.current());
+        Map<UUID, List<EvidencePoint>> points = mp1
+                ? evidence.findEvidencePoints(userId, knowledgePointIds, MP1_EVIDENCE_READ) : Map.of();
         List<MasteryHistory> histories = evidence.findMasteryHistories(userId, knowledgePointIds);
         Map<UUID, Instant> lastEvidence = evidence.lastEvidenceAt(userId, knowledgePointIds);
         Map<UUID, EventStats> stats = events.statsByKnowledgePoint(userId, knowledgePointIds,
@@ -85,20 +112,42 @@ public class MasteryProfileUpdater {
             if (history.evidenceCount() == 0 || history.correctness().isEmpty() || !lastEvidence.containsKey(pointId)) {
                 continue;
             }
-            withEvidence.add(pointId);
-            double mastery = MasteryPolicy.stored(calculator.compute(history.correctness()));
-            MasteryTier tier = policy.tier(mastery);
-            boolean lastCorrect = history.correctness().get(history.correctness().size() - 1);
             MasteryProfile before = previous.get(pointId);
-            int streak = rebuild ? trailingRightAnswers(history.correctness())
-                    : policy.nextStreak(before == null ? null : before.successStreak(),
-                    before == null ? null : before.tier(), tier, lastCorrect);
+            List<EvidencePoint> pointEvidence = points.get(pointId);
+            if (mp1 && (pointEvidence == null || pointEvidence.isEmpty())) continue;
+            withEvidence.add(pointId);
+
+            double mastery;
+            MasteryTier tier;
+            Double confidence = null;
+            List<Boolean> outcomes;
+            if (mp1) {
+                var result = mp1Calculator.compute(pointEvidence, clock.instant());
+                mastery = MasteryPolicy.stored(result.mastery());
+                confidence = result.confidence();
+                // A rebuild starts from scratch, so it is cut plainly; otherwise the held tier resists small moves.
+                tier = policy.tier(mastery, result.sufficient(), rebuild || before == null ? null : before.tier(),
+                        formulas.params().hysteresis());
+                outcomes = pointEvidence.stream().map(EvidencePoint::correct).toList();
+            } else {
+                mastery = MasteryPolicy.stored(calculator.compute(history.correctness()));
+                tier = policy.tier(mastery);
+                outcomes = history.correctness();
+            }
+            boolean lastCorrect = outcomes.get(outcomes.size() - 1);
+            int streak = switch (mode) {
+                case REBUILD -> trailingRightAnswers(outcomes);
+                case DECAY -> before == null ? trailingRightAnswers(outcomes) : before.successStreak();
+                case RECORD -> policy.nextStreak(before == null ? null : before.successStreak(),
+                        before == null ? null : before.tier(), tier, lastCorrect);
+            };
             Instant last = lastEvidence.get(pointId);
             EventStats pointStats = stats.get(pointId);
             updated.add(new MasteryProfile(userId, pointId, mastery, tier, (int) history.evidenceCount(), streak, last,
                     policy.nextReviewAt(tier, last, streak),
                     pointStats == null ? null : pointStats.medianDurationMs(),
-                    pointStats == null ? List.of() : pointStats.errors().stream().map(ErrorCount::code).toList()));
+                    pointStats == null ? List.of() : pointStats.errors().stream().map(ErrorCount::code).toList(),
+                    confidence));
         }
         profiles.upsert(updated);
         if (rebuild) {

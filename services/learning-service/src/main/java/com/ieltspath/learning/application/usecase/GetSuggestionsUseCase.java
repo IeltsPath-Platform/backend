@@ -123,7 +123,9 @@ public class GetSuggestionsUseCase {
         Set<UUID> firm = all.stream().filter(profile -> profile.tier() == MasteryTier.MAINTAIN)
                 .map(MasteryProfile::knowledgePointId).collect(Collectors.toSet());
         if (firm.isEmpty()) return List.of();
-        Set<UUID> known = all.stream().map(MasteryProfile::knowledgePointId).collect(Collectors.toSet());
+        // A point without enough evidence to judge is still new to the learner.
+        Set<UUID> known = all.stream().filter(profile -> profile.tier() != MasteryTier.INSUFFICIENT)
+                .map(MasteryProfile::knowledgePointId).collect(Collectors.toSet());
         List<UUID> unseen = described.keySet().stream().filter(kp -> !known.contains(kp))
                 .sorted(Comparator.comparing(UUID::toString)).limit(TREE_PROBE).toList();
         if (unseen.isEmpty()) return List.of();

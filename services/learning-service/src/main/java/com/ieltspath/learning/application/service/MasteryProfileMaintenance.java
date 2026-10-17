@@ -29,6 +29,7 @@ public class MasteryProfileMaintenance {
     private final MasteryProfileRepository profiles;
     private final MasteryProfileUpdater updater;
     private final MasteryRulesProvider rules;
+    private final MasteryFormulaSettings formulas;
     private final LearnerLock lock;
     private final TransactionTemplate transaction;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(task -> {
@@ -39,11 +40,12 @@ public class MasteryProfileMaintenance {
     private final AtomicBoolean running = new AtomicBoolean();
 
     public MasteryProfileMaintenance(MasteryProfileRepository profiles, MasteryProfileUpdater updater,
-                                     MasteryRulesProvider rules, LearnerLock lock,
+                                     MasteryRulesProvider rules, MasteryFormulaSettings formulas, LearnerLock lock,
                                      PlatformTransactionManager transactionManager) {
         this.profiles = profiles;
         this.updater = updater;
         this.rules = rules;
+        this.formulas = formulas;
         this.lock = lock;
         this.transaction = new TransactionTemplate(transactionManager);
     }
@@ -76,8 +78,85 @@ public class MasteryProfileMaintenance {
         log.info("Mastery profile backfill finished: learners={}", learners);
     }
 
-    /** Applies the rules in force now to every stored profile; the score and evidence are not touched. */
+    /** Starts a rebuild of every profile from its evidence. Returns false when another job is already running. */
+    public boolean startRebuild() {
+        return start("rebuild", this::rebuildAll);
+    }
+
+    /**
+     * Rebuilds every stored profile from its evidence under the formula in force: the way to move all learners onto a
+     * different formula. Each learner commits on its own, so a failure leaves the others done.
+     */
+    public void rebuildAll() {
+        UUID afterUser = null;
+        UUID afterPoint = null;
+        int learners = 0;
+        while (true) {
+            List<MasteryProfile> batch = profiles.findBatchAfter(afterUser, afterPoint, BATCH_SIZE);
+            if (batch.isEmpty()) break;
+            learners += forEachLearner(batch, updater::rebuild);
+            MasteryProfile last = batch.get(batch.size() - 1);
+            afterUser = last.userId();
+            afterPoint = last.knowledgePointId();
+        }
+        log.info("Mastery profile rebuild finished: learners={}", learners);
+    }
+
+    /**
+     * MP-1.0 scores fall as evidence ages even when the learner does not return. Recomputes the profiles whose newest
+     * evidence is older than {@code staleAfter}, in batches. Does nothing under the other formula. Safe to run again.
+     */
+    public int decayStale(java.time.Duration staleAfter) {
+        if (!formulas.usesMp1()) return 0;
+        java.time.Instant staleBefore = java.time.Instant.now().minus(staleAfter);
+        UUID afterUser = null;
+        UUID afterPoint = null;
+        int profilesSeen = 0;
+        while (true) {
+            List<MasteryProfile> batch = profiles.findStaleBatchAfter(staleBefore, afterUser, afterPoint, BATCH_SIZE);
+            if (batch.isEmpty()) break;
+            forEachLearner(batch, updater::decay);
+            profilesSeen += batch.size();
+            MasteryProfile last = batch.get(batch.size() - 1);
+            afterUser = last.userId();
+            afterPoint = last.knowledgePointId();
+        }
+        log.info("Mastery decay finished: profiles={}", profilesSeen);
+        return profilesSeen;
+    }
+
+    /** Groups a batch by learner and runs the action for each in its own locked transaction; returns learners done. */
+    private int forEachLearner(List<MasteryProfile> batch,
+                               java.util.function.BiConsumer<UUID, Set<UUID>> action) {
+        java.util.Map<UUID, Set<UUID>> byLearner = new java.util.LinkedHashMap<>();
+        for (MasteryProfile profile : batch) {
+            byLearner.computeIfAbsent(profile.userId(), ignored -> new java.util.HashSet<>())
+                    .add(profile.knowledgePointId());
+        }
+        int done = 0;
+        for (var entry : byLearner.entrySet()) {
+            try {
+                transaction.executeWithoutResult(status -> {
+                    lock.lock(entry.getKey());
+                    action.accept(entry.getKey(), entry.getValue());
+                });
+                done++;
+            } catch (RuntimeException exception) {
+                log.warn("Mastery maintenance failed for one learner, continuing: userId={}", entry.getKey(), exception);
+            }
+        }
+        return done;
+    }
+
+    /**
+     * Applies the rules in force now to every stored profile. Under MP-1.0 that means rebuilding the scores, because
+     * the formula decides them; otherwise only tier and review date change and the score and evidence are not touched.
+     */
     public void recomputeAll() {
+        if (formulas.usesMp1()) {
+            rebuildAll();
+            return;
+        }
         MasteryPolicy policy = new MasteryPolicy(rules.current());
         UUID afterUser = null;
         UUID afterPoint = null;

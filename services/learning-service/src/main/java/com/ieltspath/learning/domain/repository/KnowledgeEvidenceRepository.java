@@ -1,5 +1,6 @@
 package com.ieltspath.learning.domain.repository;
 
+import com.ieltspath.learning.domain.vo.EvidencePoint;
 import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import com.ieltspath.learning.domain.vo.MasteryHistory;
 
@@ -26,6 +27,12 @@ public interface KnowledgeEvidenceRepository {
 
     /** The same history for only the given catalog knowledge points. */
     List<MasteryHistory> findMasteryHistories(UUID userId, Collection<UUID> knowledgePointIds);
+
+    /**
+     * The newest {@code perPoint} evidence rows of each given point, oldest first, for the MP-1.0 formula. Points
+     * without evidence are absent.
+     */
+    Map<UUID, List<EvidencePoint>> findEvidencePoints(UUID userId, Collection<UUID> knowledgePointIds, int perPoint);
 
     /** When each of the given knowledge points last received evidence; points without evidence are absent. */
     Map<UUID, Instant> lastEvidenceAt(UUID userId, Collection<UUID> knowledgePointIds);

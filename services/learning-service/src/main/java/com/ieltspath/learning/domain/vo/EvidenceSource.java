@@ -14,4 +14,11 @@ public enum EvidenceSource {
     EvidenceSource(String value) { this.value = value; }
 
     public String value() { return value; }
+
+    public static EvidenceSource fromValue(String stored) {
+        for (EvidenceSource source : values()) {
+            if (source.value.equals(stored)) return source;
+        }
+        throw new IllegalArgumentException("Unknown evidence source: " + stored);
+    }
 }

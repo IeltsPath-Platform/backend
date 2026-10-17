@@ -61,7 +61,7 @@ public class StartBasketReviewUseCase {
         if (existing.isPresent()) return getReview.execute(userId, existing.get().reviewId());
 
         MasteryProfile profile = profiles.find(userId, List.of(knowledgePointId)).get(knowledgePointId);
-        if (profile == null || profile.tier() == MasteryTier.PRIORITY
+        if (profile == null || profile.tier() == MasteryTier.PRIORITY || profile.tier() == MasteryTier.INSUFFICIENT
                 || (profile.tier() == MasteryTier.MAINTAIN && !GetReviewBasketUseCase.isDue(profile, clock.instant()))) {
             throw new LearningRequestException(409, "NOT_IN_REVIEW_BASKET",
                     "This knowledge point is not in the review basket");

@@ -93,6 +93,51 @@ class MasteryPolicyTest {
     }
 
     @Test
+    void anInsufficientPointHasNoTierDueDateOrStreakGrowth() {
+        assertThat(policy.tier(0.9, false, MasteryTier.MAINTAIN, 0.03)).isEqualTo(MasteryTier.INSUFFICIENT);
+        assertThat(policy.nextReviewAt(MasteryTier.INSUFFICIENT, LAST, 3)).isNull();
+        assertThat(policy.nextStreak(2, MasteryTier.MAINTAIN, MasteryTier.INSUFFICIENT, true)).isEqualTo(2);
+        assertThat(policy.nextStreak(1, MasteryTier.INSUFFICIENT, MasteryTier.MAINTAIN, true)).isEqualTo(2);
+    }
+
+    @Test
+    void withoutAPreviousTierTheThresholdsApplyPlainly() {
+        assertThat(policy.tier(0.80, true, null, 0.03)).isEqualTo(MasteryTier.MAINTAIN);
+        assertThat(policy.tier(0.80, true, MasteryTier.INSUFFICIENT, 0.03)).isEqualTo(MasteryTier.MAINTAIN);
+        assertThat(policy.tier(0.59, true, MasteryTier.INSUFFICIENT, 0.03)).isEqualTo(MasteryTier.PRIORITY);
+    }
+
+    @Test
+    void aTierChangesOnlyOncePastTheThresholdByTheMargin() {
+        // up: from CONSOLIDATE, 0.82 is past 0.80 but not by 0.03
+        assertThat(policy.tier(0.82, true, MasteryTier.CONSOLIDATE, 0.03)).isEqualTo(MasteryTier.CONSOLIDATE);
+        assertThat(policy.tier(0.83, true, MasteryTier.CONSOLIDATE, 0.03)).isEqualTo(MasteryTier.MAINTAIN);
+        // down: from MAINTAIN, 0.78 is under 0.80 but not by 0.03
+        assertThat(policy.tier(0.78, true, MasteryTier.MAINTAIN, 0.03)).isEqualTo(MasteryTier.MAINTAIN);
+        assertThat(policy.tier(0.76, true, MasteryTier.MAINTAIN, 0.03)).isEqualTo(MasteryTier.CONSOLIDATE);
+        // the lower threshold works the same way
+        assertThat(policy.tier(0.58, true, MasteryTier.CONSOLIDATE, 0.03)).isEqualTo(MasteryTier.CONSOLIDATE);
+        assertThat(policy.tier(0.56, true, MasteryTier.CONSOLIDATE, 0.03)).isEqualTo(MasteryTier.PRIORITY);
+        assertThat(policy.tier(0.62, true, MasteryTier.PRIORITY, 0.03)).isEqualTo(MasteryTier.PRIORITY);
+        assertThat(policy.tier(0.63, true, MasteryTier.PRIORITY, 0.03)).isEqualTo(MasteryTier.CONSOLIDATE);
+    }
+
+    @Test
+    void aScoreSwingingAroundAThresholdDoesNotFlipTheTier() {
+        MasteryTier tier = MasteryTier.MAINTAIN;
+        for (double score : new double[]{0.82, 0.78, 0.81, 0.79, 0.80, 0.78}) {
+            tier = policy.tier(score, true, tier, 0.03);
+            assertThat(tier).isEqualTo(MasteryTier.MAINTAIN);
+        }
+    }
+
+    @Test
+    void aBigJumpCrossesBothThresholds() {
+        assertThat(policy.tier(0.90, true, MasteryTier.PRIORITY, 0.03)).isEqualTo(MasteryTier.MAINTAIN);
+        assertThat(policy.tier(0.20, true, MasteryTier.MAINTAIN, 0.03)).isEqualTo(MasteryTier.PRIORITY);
+    }
+
+    @Test
     void rulesRejectNonsense() {
         assertThatThrownBy(() -> new MasteryRules(0.8, 0.6, List.of(7), 3)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new MasteryRules(0.0, 0.8, List.of(7), 3)).isInstanceOf(IllegalArgumentException.class);

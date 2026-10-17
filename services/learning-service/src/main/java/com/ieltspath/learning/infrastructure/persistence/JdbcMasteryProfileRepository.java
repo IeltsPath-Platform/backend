@@ -25,7 +25,7 @@ import java.util.UUID;
 public class JdbcMasteryProfileRepository implements MasteryProfileRepository {
     private static final String COLUMNS = """
             user_id, knowledge_point_id, mastery, tier, evidence_count, success_streak, last_evidence_at,
-            next_review_at, median_duration_ms, top_error_codes""";
+            next_review_at, median_duration_ms, top_error_codes, confidence""";
     private static final RowMapper<MasteryProfile> MAPPER = JdbcMasteryProfileRepository::map;
     private final JdbcTemplate jdbc;
 
@@ -60,13 +60,15 @@ public class JdbcMasteryProfileRepository implements MasteryProfileRepository {
         if (profiles.isEmpty()) return;
         jdbc.batchUpdate("""
                 INSERT INTO kp_mastery_profiles (user_id, knowledge_point_id, mastery, tier, evidence_count,
-                    success_streak, last_evidence_at, next_review_at, median_duration_ms, top_error_codes, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    success_streak, last_evidence_at, next_review_at, median_duration_ms, top_error_codes, confidence,
+                    updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT (user_id, knowledge_point_id) DO UPDATE SET mastery = EXCLUDED.mastery,
                     tier = EXCLUDED.tier, evidence_count = EXCLUDED.evidence_count,
                     success_streak = EXCLUDED.success_streak, last_evidence_at = EXCLUDED.last_evidence_at,
                     next_review_at = EXCLUDED.next_review_at, median_duration_ms = EXCLUDED.median_duration_ms,
-                    top_error_codes = EXCLUDED.top_error_codes, updated_at = CURRENT_TIMESTAMP
+                    top_error_codes = EXCLUDED.top_error_codes, confidence = EXCLUDED.confidence,
+                    updated_at = CURRENT_TIMESTAMP
                 """, profiles, profiles.size(), (statement, profile) -> {
             statement.setObject(1, profile.userId());
             statement.setObject(2, profile.knowledgePointId());
@@ -80,6 +82,9 @@ public class JdbcMasteryProfileRepository implements MasteryProfileRepository {
             statement.setObject(9, profile.medianDurationMs(), Types.BIGINT);
             statement.setArray(10, statement.getConnection().createArrayOf("varchar",
                     profile.topErrorCodes().toArray()));
+            if (profile.confidence() == null) statement.setNull(11, Types.NUMERIC);
+            else statement.setBigDecimal(11, BigDecimal.valueOf(profile.confidence())
+                    .setScale(3, java.math.RoundingMode.HALF_UP));
         });
     }
 
@@ -141,16 +146,31 @@ public class JdbcMasteryProfileRepository implements MasteryProfileRepository {
                 MAPPER, afterUserId, afterKnowledgePointId, limit);
     }
 
+    @Override
+    public List<MasteryProfile> findStaleBatchAfter(java.time.Instant staleBefore, UUID afterUserId,
+                                                    UUID afterKnowledgePointId, int limit) {
+        Timestamp before = Timestamp.from(staleBefore);
+        if (afterUserId == null) {
+            return jdbc.query("SELECT " + COLUMNS + " FROM kp_mastery_profiles WHERE last_evidence_at < ? "
+                    + "ORDER BY user_id, knowledge_point_id LIMIT ?", MAPPER, before, limit);
+        }
+        return jdbc.query("SELECT " + COLUMNS + " FROM kp_mastery_profiles WHERE last_evidence_at < ? "
+                + "AND (user_id, knowledge_point_id) > (?, ?) ORDER BY user_id, knowledge_point_id LIMIT ?",
+                MAPPER, before, afterUserId, afterKnowledgePointId, limit);
+    }
+
     private static MasteryProfile map(ResultSet rows, int rowNumber) throws SQLException {
         Timestamp next = rows.getTimestamp("next_review_at");
         long median = rows.getLong("median_duration_ms");
         Long medianMs = rows.wasNull() ? null : median;
+        BigDecimal confidenceValue = rows.getBigDecimal("confidence");
         Object[] codes = (Object[]) rows.getArray("top_error_codes").getArray();
         return new MasteryProfile(rows.getObject("user_id", UUID.class),
                 rows.getObject("knowledge_point_id", UUID.class), rows.getBigDecimal("mastery").doubleValue(),
                 MasteryTier.valueOf(rows.getString("tier")), rows.getInt("evidence_count"),
                 rows.getInt("success_streak"), rows.getTimestamp("last_evidence_at").toInstant(),
                 next == null ? null : next.toInstant(), medianMs,
-                Arrays.stream(codes).map(String::valueOf).toList());
+                Arrays.stream(codes).map(String::valueOf).toList(),
+                confidenceValue == null ? null : confidenceValue.doubleValue());
     }
 }

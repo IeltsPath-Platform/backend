@@ -118,7 +118,8 @@ public class SubmitReviewUseCase {
             for (UUID kpId : new LinkedHashSet<>(item.knowledgePointMappings().stream()
                     .map(LearningContentClient.KnowledgePointMapping::knowledgePointId).toList())) {
                 setAnswers.add(KnowledgeEvidence.of(kpId, grade.correct(), EvidenceSource.REVIEW_SET,
-                        LessonEvidenceReference.forReviewSet(command.requestId(), item.questionVersionId(), kpId)));
+                        LessonEvidenceReference.forReviewSet(command.requestId(), item.questionVersionId(), kpId))
+                        .forQuestion(item.questionVersionId()));
             }
             setEvents.add(QuestionAttemptEvent.of(userId, item.questionVersionId(),
                     item.knowledgePointMappings().stream().map(LearningContentClient.KnowledgePointMapping::knowledgePointId)

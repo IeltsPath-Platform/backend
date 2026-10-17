@@ -1,6 +1,8 @@
 package com.ieltspath.learning.infrastructure.persistence;
 
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
+import com.ieltspath.learning.domain.vo.EvidencePoint;
+import com.ieltspath.learning.domain.vo.EvidenceSource;
 import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import com.ieltspath.learning.domain.vo.MasteryHistory;
 import com.ieltspath.learning.domain.vo.LearningSkill;
@@ -24,7 +26,7 @@ public class JdbcKnowledgeEvidenceRepository implements KnowledgeEvidenceReposit
         if (evidence.isEmpty()) return;
         jdbc.batchUpdate("""
                 INSERT INTO kp_evidence (id, user_id, kp_id, correct, source, source_reference_id, attempt_id,
-                result_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                result_version, question_version_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (user_id, source, source_reference_id) DO NOTHING
                 """, evidence, evidence.size(), (statement, item) -> {
             statement.setObject(1, UUID.randomUUID());
@@ -35,7 +37,32 @@ public class JdbcKnowledgeEvidenceRepository implements KnowledgeEvidenceReposit
             statement.setObject(6, item.sourceReferenceId());
             statement.setObject(7, item.attemptId());
             statement.setObject(8, item.resultVersion());
+            statement.setObject(9, item.questionVersionId());
         });
+    }
+
+    @Override
+    public Map<UUID, List<EvidencePoint>> findEvidencePoints(UUID userId, Collection<UUID> knowledgePointIds,
+                                                             int perPoint) {
+        if (knowledgePointIds.isEmpty()) return Map.of();
+        Map<UUID, List<EvidencePoint>> found = new HashMap<>();
+        jdbc.query("""
+                SELECT kp_id, correct, source, created_at, question_version_id FROM (
+                    SELECT kp_id, correct, source, created_at, question_version_id, ordinal,
+                    row_number() OVER (PARTITION BY kp_id ORDER BY ordinal DESC) AS recency
+                    FROM kp_evidence WHERE user_id = ? AND kp_id = ANY (?)
+                ) newest WHERE recency <= ? ORDER BY kp_id, ordinal
+                """, statement -> {
+            statement.setObject(1, userId);
+            statement.setArray(2, uuidArray(statement.getConnection(), knowledgePointIds));
+            statement.setInt(3, perPoint);
+        }, rows -> {
+            found.computeIfAbsent(rows.getObject("kp_id", UUID.class), ignored -> new ArrayList<>())
+                    .add(new EvidencePoint(rows.getBoolean("correct"), EvidenceSource.fromValue(rows.getString("source")),
+                            rows.getTimestamp("created_at").toInstant(),
+                            rows.getObject("question_version_id", UUID.class)));
+        });
+        return found;
     }
 
     @Override

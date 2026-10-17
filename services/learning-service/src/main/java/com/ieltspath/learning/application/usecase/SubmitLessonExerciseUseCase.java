@@ -134,7 +134,8 @@ public class SubmitLessonExerciseUseCase {
                     if (knownKps.contains(kpId)) {
                         firstAnswers.add(KnowledgeEvidence.of(kpId, grades.get(index).correct(),
                                 EvidenceSource.LESSON_EXERCISE,
-                                LessonEvidenceReference.create(command.requestId(), question.questionVersionId(), kpId)));
+                                LessonEvidenceReference.create(command.requestId(), question.questionVersionId(), kpId))
+                                .forQuestion(question.questionVersionId()));
                     } else {
                         log.warn("Unknown lesson evidence KP: userId={}, questionVersionId={}, kpId={}",
                                 userId, question.questionVersionId(), kpId);

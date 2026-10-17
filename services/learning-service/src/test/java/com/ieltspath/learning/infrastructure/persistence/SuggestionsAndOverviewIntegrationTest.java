@@ -199,7 +199,8 @@ class SuggestionsAndOverviewIntegrationTest {
         assertEquals(1, courseView.topics());
         assertEquals(0, courseView.topicsDone());
         assertEquals("IN_PROGRESS", courseView.status());
-        assertEquals(Map.of("PRIORITY", 0, "CONSOLIDATE", 1, "MAINTAIN", 2), overview.knowledgePointsByTier());
+        assertEquals(Map.of("PRIORITY", 0, "CONSOLIDATE", 1, "MAINTAIN", 2, "INSUFFICIENT", 0),
+                overview.knowledgePointsByTier());
         assertEquals(List.of(review), overview.pendingReviews().stream().map(r -> r.reviewId()).toList());
         assertEquals(1, overview.flags().size());
         assertEquals(1, overview.openWork().size());

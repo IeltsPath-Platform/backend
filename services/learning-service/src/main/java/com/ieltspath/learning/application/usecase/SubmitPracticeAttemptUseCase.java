@@ -107,7 +107,8 @@ public class SubmitPracticeAttemptUseCase {
             if (itemSkill != null) outcomesBySkill.computeIfAbsent(itemSkill, ignored -> new ArrayList<>()).add(outcome);
             if (counted) for (UUID kp : kps) firstAnswers.add(KnowledgeEvidence.of(kp, grade.correct(),
                     EvidenceSource.PRACTICE_SET,
-                    LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), kp)));
+                    LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), kp))
+                    .forQuestion(item.questionVersionId()));
             events.add(QuestionAttemptEvent.of(userId, item.questionVersionId(), List.copyOf(kps), grade.correct(),
                     durations.get(item.questionVersionId()), graded.errorCodes().get(index),
                     QuestionEventSource.PRACTICE_SET, command.requestId(), counted));

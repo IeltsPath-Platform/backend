@@ -114,7 +114,7 @@ public class SubmitDiagnosticProbeUseCase {
             for (UUID kpId : new LinkedHashSet<>(mapped)) {
                 answers.add(KnowledgeEvidence.of(kpId, correct, EvidenceSource.DIAGNOSTIC_PROBE,
                         LessonEvidenceReference.forDiagnosticProbe(command.requestId(), item.questionVersionId(),
-                                kpId)));
+                                kpId)).forQuestion(item.questionVersionId()));
             }
             events.add(QuestionAttemptEvent.of(userId, item.questionVersionId(), mapped, correct,
                     durations.get(item.questionVersionId()), graded.errorCodes().get(index),

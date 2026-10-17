@@ -94,7 +94,7 @@ public class GetLearnerReportUseCase {
             return new Action(diagnosing ? "DIAGNOSING" : "REVIEW_REQUIRED", pendingReviewId, null);
         }
         return switch (profile.tier()) {
-            case PRIORITY -> new Action("NONE", null, profile.nextReviewAt());
+            case PRIORITY, INSUFFICIENT -> new Action("NONE", null, profile.nextReviewAt());
             case CONSOLIDATE -> new Action("CONSOLIDATE", null, profile.nextReviewAt());
             case MAINTAIN -> profile.nextReviewAt() != null && !profile.nextReviewAt().isAfter(now)
                     ? new Action("MAINTAIN_DUE", null, profile.nextReviewAt())
