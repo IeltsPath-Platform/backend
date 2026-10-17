@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Points: cộng thưởng và loại giao dịch mới"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 ---
@@ -38,9 +38,11 @@ dependencies: []
 
 ## Success Criteria
 
-- [ ] Cộng thưởng cùng key hai lần chỉ cộng một lần.
-- [ ] Ngày đã kiếm 18, cộng 5 → nhận 2, `capped = true`.
-- [ ] Trừ cho hồi tim và đóng băng ghi đúng loại giao dịch.
+- [x] Cộng thưởng cùng key song song chỉ cộng một lần; yêu cầu bị chặn hết hạn mức vẫn phát lại cùng kết quả. (test: `PointCreditIntegrationTest.concurrentCreditWithSameKeyAppliesTheDailyCapOnlyOnce`)
+- [x] Ngày đã kiếm 18, cộng 5 → nhận 2, `capped = true`. (test: `PointCreditIntegrationTest.concurrentCreditWithSameKeyAppliesTheDailyCapOnlyOnce`)
+- [x] Trừ cho hồi tim và đóng băng ghi đúng loại giao dịch; loại giao dịch không thuộc CHECK bị từ chối. (test: `PointCreditIntegrationTest.debitMapsNewReferencesToTheirLedgerTypesAndMigrationRejectsUnknownType`)
+- [x] Chỉ internal JWT truy cập được endpoint credit; request không xác thực nhận 401. (test: `PointCreditIntegrationTest.creditRejectsRequestsWithoutInternalJwt`)
+- Validation (test: `mvn -B -ntp -pl services/access-service test`; 54 tests, 0 failures, 0 errors, 0 skipped; PostgreSQL Testcontainers ran.)
 
 ## Bàn giao FE
 

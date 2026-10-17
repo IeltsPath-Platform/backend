@@ -35,8 +35,8 @@ public class PointLedgerEntryJpaEntity {
     @Column(name = "reference_type", nullable = false)
     private String referenceType;
 
-    @Column(name = "reference_id", nullable = false)
-    private UUID referenceId;
+    @Column(name = "reference_id", nullable = false, length = 100)
+    private String referenceId;
 
     @Column(name = "idempotency_key", nullable = false, unique = true)
     private String idempotencyKey;

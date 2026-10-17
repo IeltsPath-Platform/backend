@@ -1,8 +1,12 @@
 package com.ieltspath.access.api.controller;
 
 import com.ieltspath.access.api.dto.request.DebitPointsRequest;
+import com.ieltspath.access.api.dto.request.CreditPointsRequest;
 import com.ieltspath.access.api.dto.response.PointLedgerResponse;
+import com.ieltspath.access.api.dto.response.CreditPointsResponse;
+import com.ieltspath.access.application.command.CreditPointsCommand;
 import com.ieltspath.access.application.command.DebitPointsCommand;
+import com.ieltspath.access.application.usecase.CreditPointsUseCase;
 import com.ieltspath.access.application.usecase.DebitPointsUseCase;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import jakarta.validation.Valid;
@@ -20,6 +24,19 @@ public class InternalPointsController {
 
     private final CurrentUserProvider currentUserProvider;
     private final DebitPointsUseCase debitPointsUseCase;
+    private final CreditPointsUseCase creditPointsUseCase;
+
+    @PostMapping("/points/credit")
+    public CreditPointsResponse creditPoints(@Valid @RequestBody CreditPointsRequest request) {
+        return CreditPointsResponse.from(creditPointsUseCase.execute(new CreditPointsCommand(
+                currentUserProvider.requireUserId(),
+                request.userId(),
+                request.amount(),
+                request.reason(),
+                request.referenceId(),
+                request.idempotencyKey()
+        )));
+    }
 
     @PostMapping("/points/debit")
     public PointLedgerResponse debitPoints(@Valid @RequestBody DebitPointsRequest request) {
