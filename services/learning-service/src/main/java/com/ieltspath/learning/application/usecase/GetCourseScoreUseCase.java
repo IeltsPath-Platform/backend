@@ -58,9 +58,14 @@ public class GetCourseScoreUseCase {
         List<CourseScoreResult.Flag> remediation = flags.findByCourse(userId, courseId).stream()
                 .map(flag -> new CourseScoreResult.Flag(flag.kind().name(), flag.topicId(), flag.open(),
                         flag.createdAt())).toList();
-        return new CourseScoreResult(courseId, status, components,
-                new CourseScoreResult.Weights(score.processWeight(), score.midWeight(), score.finalWeight(),
-                        score.practiceShare(), score.practiceTestShare()),
+        // A decided course shows the weights its decision used, so total, components and weights agree.
+        var weights = decided && stored.containsKey(CourseScoreService.WEIGHT_PROCESS)
+                ? new CourseScoreResult.Weights(stored.get(CourseScoreService.WEIGHT_PROCESS),
+                        stored.get(CourseScoreService.WEIGHT_MID), stored.get(CourseScoreService.WEIGHT_FINAL),
+                        stored.get(CourseScoreService.SHARE_PRACTICE), stored.get(CourseScoreService.SHARE_PRACTICE_TEST))
+                : new CourseScoreResult.Weights(score.processWeight(), score.midWeight(), score.finalWeight(),
+                        score.practiceShare(), score.practiceTestShare());
+        return new CourseScoreResult(courseId, status, components, weights,
                 decided ? outcome.get().total() : score.total(), config.passThreshold().doubleValue(),
                 config.midRemediationBelow().doubleValue(),
                 outcome.map(CourseOutcome::topErrorCodes).orElse(List.of()), remediation,

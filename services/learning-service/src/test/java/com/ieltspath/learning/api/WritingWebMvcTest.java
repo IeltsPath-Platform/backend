@@ -153,6 +153,23 @@ class WritingWebMvcTest {
         assertFalse(raw.contains("chartFacts"));
     }
 
+    @Test
+    void revisionAndHistoryAreForLearnersOnly() throws Exception {
+        String body = "{\"requestId\":\"%s\",\"essayText\":\"essay\"}".formatted(UUID.randomUUID());
+        for (String role : List.of("EXAMINER", "ADMIN", "CONTENT_AUTHOR", "SALES_STAFF")) {
+            var staff = org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                    .user("staff").roles(role);
+            mvc.perform(post("/api/learning/writing-submissions/{id}/revisions", SUBMISSION).with(staff)
+                    .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+            mvc.perform(get("/api/learning/writing-submissions/{id}/history", SUBMISSION).with(staff))
+                    .andExpect(status().isForbidden());
+        }
+        var learner = org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                .user("learner").roles("CUSTOMER");
+        mvc.perform(get("/api/learning/writing-submissions/{id}/history", SUBMISSION).with(learner))
+                .andExpect(status().isOk());
+    }
+
     private MockHttpServletRequestBuilder authenticated(MockHttpServletRequestBuilder request) {
         return request.with(jwt().jwt(token -> token.subject(USER.toString())));
     }

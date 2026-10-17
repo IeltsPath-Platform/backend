@@ -45,6 +45,7 @@ public class WritingController {
 
     /** Rewrites the graded essay {@code id} and sends it again; see contract {@code essay-revision-v1}. */
     @PostMapping("/writing-submissions/{id}/revisions")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('CUSTOMER')")
     public WritingSubmissionResponse revise(@PathVariable("id") UUID id,
                                             @Valid @RequestBody SubmitEssayRequest request) {
         return WritingSubmissionResponse.from(submitEssayRevisionUseCase.execute(currentUser.requireUserId(), id,
@@ -52,6 +53,7 @@ public class WritingController {
     }
 
     @GetMapping("/writing-submissions/{id}/history")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('CUSTOMER')")
     public EssayHistoryResult history(@PathVariable("id") UUID id) {
         return getEssayHistoryUseCase.execute(currentUser.requireUserId(), id);
     }

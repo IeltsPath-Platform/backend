@@ -185,7 +185,12 @@ class CourseOutcomeIntegrationTest {
 
         config.update(UUID.randomUUID(), null, new BigDecimal("0.5"), new BigDecimal("0.5"), new BigDecimal("0.0"),
                 new BigDecimal("0.64"), new BigDecimal("0.36"), new BigDecimal("0.7"), new BigDecimal("0.6"));
-        assertEquals(decided, score.execute(user, COURSE).total(), 1e-9, "a passed course keeps its decision");
+        var kept = score.execute(user, COURSE);
+        assertEquals(decided, kept.total(), 1e-9, "a passed course keeps its decision");
+        // The weights shown are the ones the decision used, not the new configuration.
+        assertEquals(0.0, kept.weights().process(), 1e-9);
+        assertEquals(0.2, kept.weights().mid(), 1e-9);
+        assertEquals(0.8, kept.weights().finalTest(), 1e-9);
     }
 
     @Test

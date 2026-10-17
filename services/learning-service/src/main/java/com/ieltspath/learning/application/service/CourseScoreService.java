@@ -22,6 +22,12 @@ import java.util.UUID;
  */
 @Service
 public class CourseScoreService {
+    public static final String WEIGHT_PROCESS = "weightProcess";
+    public static final String WEIGHT_MID = "weightMid";
+    public static final String WEIGHT_FINAL = "weightFinal";
+    public static final String SHARE_PRACTICE = "sharePractice";
+    public static final String SHARE_PRACTICE_TEST = "sharePracticeTest";
+
     private final CourseScoreData data;
     private final LearnerCurriculumRepository curricula;
     private final LearningContentClient content;
@@ -71,6 +77,12 @@ public class CourseScoreService {
         if (score.process() != null) map.put("process", score.process());
         if (score.mid() != null) map.put("mid", score.mid());
         if (score.finalTest() != null) map.put("final", score.finalTest());
+        // The weights and threshold the decision used, so a decided course never mixes them with a later configuration.
+        map.put(WEIGHT_PROCESS, score.processWeight());
+        map.put(WEIGHT_MID, score.midWeight());
+        map.put(WEIGHT_FINAL, score.finalWeight());
+        map.put(SHARE_PRACTICE, score.practiceShare());
+        map.put(SHARE_PRACTICE_TEST, score.practiceTestShare());
         return map;
     }
 
