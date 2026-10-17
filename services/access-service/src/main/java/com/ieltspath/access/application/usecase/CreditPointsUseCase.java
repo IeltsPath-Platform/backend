@@ -6,6 +6,7 @@ import com.ieltspath.access.domain.exception.PointsActorMismatchException;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
+import java.util.UUID;
 
 @Service
 public class CreditPointsUseCase {
@@ -17,6 +18,18 @@ public class CreditPointsUseCase {
 
     public PointCreditResult execute(CreditPointsCommand command) {
         if (!Objects.equals(command.actorUserId(), command.userId())) throw new PointsActorMismatchException();
+        return creditValidated(command);
+    }
+
+    public PointCreditResult executeLearningReward(UUID grantId, UUID userId, int amount,
+                                                   com.ieltspath.access.domain.vo.LearningRewardReason reason,
+                                                   String referenceId) {
+        if (grantId == null || userId == null) throw new IllegalArgumentException("Invalid point grant request");
+        return creditValidated(new CreditPointsCommand(userId, userId, amount, reason, referenceId,
+                grantId.toString()));
+    }
+
+    private PointCreditResult creditValidated(CreditPointsCommand command) {
         if (command.amount() < 1 || command.amount() > 100 || command.reason() == null
                 || command.referenceId() == null || command.referenceId().isBlank()
                 || command.referenceId().length() > 100 || command.idempotencyKey() == null
