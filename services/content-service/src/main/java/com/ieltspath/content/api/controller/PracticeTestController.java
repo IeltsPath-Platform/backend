@@ -3,9 +3,11 @@ package com.ieltspath.content.api.controller;
 import com.ieltspath.content.api.dto.request.SearchPracticeTestsRequest;
 import com.ieltspath.content.api.dto.response.PracticeTestCardResponse;
 import com.ieltspath.content.api.dto.response.PracticeTestPageResponse;
+import com.ieltspath.content.api.dto.response.SpeakingTaskResponse;
 import com.ieltspath.content.api.dto.response.WritingTaskResponse;
 import com.ieltspath.content.application.command.SearchPracticeTestsCommand;
 import com.ieltspath.content.application.port.PracticeTestCatalogReader;
+import com.ieltspath.content.application.usecase.GetSpeakingTaskUseCase;
 import com.ieltspath.content.application.usecase.GetWritingTaskUseCase;
 import com.ieltspath.content.application.usecase.ListPracticeTestFormatsUseCase;
 import com.ieltspath.content.application.usecase.ListTestSourcesUseCase;
@@ -27,6 +29,7 @@ public class PracticeTestController {
     private final ListTestSourcesUseCase sources;
     private final ListPracticeTestFormatsUseCase formats;
     private final GetWritingTaskUseCase writingTask;
+    private final GetSpeakingTaskUseCase speakingTask;
 
     @PostMapping("/search")
     @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
@@ -62,6 +65,14 @@ public class PracticeTestController {
     public WritingTaskResponse writingTask(@PathVariable("packageVersionId") UUID packageVersionId,
                                            @PathVariable("sectionId") UUID sectionId) {
         return WritingTaskResponse.from(writingTask.execute(packageVersionId, sectionId));
+    }
+
+    /** The questions of one Speaking part (Part 1, 2 or 3), for the recording workspace. */
+    @GetMapping("/{packageVersionId}/sections/{sectionId}/speaking-task")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    public SpeakingTaskResponse speakingTask(@PathVariable("packageVersionId") UUID packageVersionId,
+                                             @PathVariable("sectionId") UUID sectionId) {
+        return SpeakingTaskResponse.from(speakingTask.execute(packageVersionId, sectionId));
     }
 
     private static List<PracticeTestCatalogReader.Key> map(List<SearchPracticeTestsRequest.Key> keys) {
