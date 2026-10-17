@@ -764,6 +764,10 @@ tham chiếu sai trả `INVALID_MEDIA_REFERENCE`. API học viên nhận `images
 
 `topic_prerequisites` và `topic_gate_rules` **không còn trong V5**. Thứ tự topic, cổng bài, Practice và bài ôn thuộc `learning-service` (§7).
 
+**Đảo quyết định (2026-10-16):** cây tiên quyết nay có ở cấp KP, là đồ thị không vòng, ở bảng `knowledge_point_prerequisites`
+của Content (xem `docs/contracts/knowledge-tree-v1.md`). Bảng này chỉ lưu quan hệ giữa các KP; thứ tự topic và cổng bài vẫn
+thuộc `learning-service`, và `topic_prerequisites` vẫn không tồn tại.
+
 `package_lexical_entries` cũng chưa đưa vào MVP. Nếu sau này có feature "Vocabulary in this lesson" hoặc pre-learn vocabulary theo package, mapping package ↔ vocabulary sense sẽ được bổ sung khi business flow đó được chốt.
 
 ## 5.10 `learning_videos`
@@ -1237,7 +1241,7 @@ pronunciationScore = 82
 
 # 7. Learning Service — tiến độ học, bằng chứng mastery, bài ôn, mã đề
 
-`learning-service` (Java, `learning_db`, Flyway V1–V5) từ 2026-10-01. Bằng chứng gắn với user; mastery của KP tính khi
+`learning-service` (Java, `learning_db`, Flyway V1–V20) từ 2026-10-01; bảng V6 trở đi ở §7.15–7.21. Bằng chứng gắn với user; mastery của KP tính khi
 đọc bằng `compute_mastery` (port từ DeepTutor v1.6.9: 5 lần gần nhất, trọng số 0.5→1.0, trần 0.5/0.8 khi có 1/2 lần).
 Ghi progress/evidence, bài ôn, giao đề và các transaction bắt đầu/kết thúc chấm Writing mở đầu bằng
 `pg_advisory_xact_lock(hashtext(user_id))`. Quota và trạng thái trung gian Writing hiện dùng SQL cập nhật nguyên tử
@@ -1445,6 +1449,52 @@ Quick-check ở bước lý thuyết của bài ôn: tối đa 3 câu tự chấ
 | `answers`, `response` | jsonb | NOT NULL | |
 | `correct_count`, `total_count` | int | NOT NULL | |
 | `submitted_at` | timestamptz | NOT NULL | |
+
+## 7.15 Thay đổi bảng cũ (V6–V20)
+
+| Bảng | Thay đổi | Migration |
+| --- | --- | --- |
+| `review_items` | `blocking` BOOLEAN NOT NULL DEFAULT TRUE (bài ôn tùy chọn không chặn); `trigger_kind` thêm `CONSOLIDATE`, `MAINTAIN`, `FREE_PRACTICE_TEST`, `DIAGNOSTIC`; `waiting_on_review_ids` uuid[] (bài ôn gốc chờ bài ôn KP nền) | V15, V16 |
+| `kp_evidence` | `source` thêm `practice_set`, `diagnostic_probe` | V4, V16 |
+| `topic_progress` | `tested_at`, `first_test_percent` (lần thi topic test đầu, điểm giữa khóa) | V17 |
+| `lesson_writing_submissions` | `previous_submission_id`, `revision_no` (1–5, tối đa 3 lần sửa); `essay_hash` (SHA-256 essay chuẩn hóa); `prompt_version` | V14, V18, V19 |
+
+## 7.16 `question_attempt_events` (V11)
+
+Mỗi câu trả lời một dòng, ghi cùng transaction với bài nộp: `user_id`, `question_version_id`, `knowledge_point_ids`,
+`correct`, `score`, `duration_ms`, `error_code`, `source`, `source_reference_id`, `attempt_id`, `first_submission`,
+`occurred_at`. UNIQUE (`user_id`, `source`, `source_reference_id`, `question_version_id`). Nguồn của báo cáo, cờ bất
+thường và thống kê câu.
+
+## 7.17 `kp_mastery_profiles`, `learning_rule_configs` (V13)
+
+`kp_mastery_profiles` (PK `user_id`, `knowledge_point_id`): `mastery`, `tier` (`PRIORITY`/`CONSOLIDATE`/`MAINTAIN`),
+`success_streak`, `next_review_at`, thống kê thời gian và mã lỗi; dẫn xuất từ `kp_evidence`, dựng lại được. `learning_rule_configs`
+là ghi đè của Admin cho ngưỡng và lịch ôn (key, JSON, `updated_by`).
+
+## 7.18 `diagnostic_sessions`, `diagnostic_probes`, `content_gap_signals` (V16)
+
+Một phiên chẩn đoán cho mỗi bài ôn gốc (`root_review_id` UNIQUE, `status` `PROBING`/`CONCLUDED`, `conclusion_kp_ids`).
+`diagnostic_probes`: mỗi KP tiên quyết một lần thăm dò (`depth` 1–3, `status` `OPEN`/`ANSWERED`/`NO_SET`, đúng/tổng,
+UNIQUE (`session_id`, `kp_id`)). `content_gap_signals` (PK `kp_id`): số lần bài ôn hết gói chưa lộ, cho R&D.
+
+## 7.19 `course_score_configs`, `remediation_flags`, `course_outcomes` (V17)
+
+`course_score_configs`: trọng số Process/giữa khóa/cuối khóa (tổng 1), tỷ lệ Practice/practice test (tổng 1), ngưỡng đạt,
+ngưỡng bổ trợ giữa khóa; một dòng `course_id` NULL là mặc định (0.2/0.3/0.5, 0.64/0.36, 0.70, 0.60). `remediation_flags`
+(`MID_COURSE`/`POST_COURSE`, UNIQUE (`source_attempt_id`, `kind`), `review_ids`): mở khi còn bài ôn `PENDING`.
+`course_outcomes` (PK `user_id`, `course_id`): `PASSED`/`REMEDIATION`, tổng, thành phần và trọng số đã dùng khi quyết định.
+
+## 7.20 `learner_flags`, `work_items` (V19)
+
+`learner_flags`: cờ bất thường (`TOO_FAST_HIGH_SCORE`, `BURST_SUBMISSIONS`, `DUPLICATE_ESSAY`), `evidence` JSON, trạng
+thái `OPEN`/`CONFIRMED`/`DISMISSED`, người duyệt. `work_items`: việc cho hàng `EXAMINER` hoặc `CONTENT_AUTHOR`,
+UNIQUE (`kind`, `subject_ref`) nên đồng bộ lại không nhân đôi; `note_visible_to_learner` cho ghi chú học viên đọc được.
+
+## 7.21 `human_review_requests` (V20)
+
+PK `submission_id` (FK → `lesson_writing_submissions`), `user_id`, `review_submission_id`: essay lesson/Practice học viên đã
+nhờ Mentor chữa, một yêu cầu cho mỗi essay (tín dụng chỉ trừ một lần). Bản chữa nằm ở Assessment.
 
 ---
 

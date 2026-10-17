@@ -8,6 +8,16 @@ dependencies: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15]
 
 # Phase 13: Contract, tài liệu và nghiệm thu
 
+## Trạng thái và ghi chú triển khai
+
+- **Phần learning và tài liệu chung: xong** — contract learning đã rà với controller (`lesson-learning-v1`,
+  `lesson-writing-v1` trỏ tới contract mới; `practice-v1` không tồn tại, Practice nằm trong `lesson-learning-v1`),
+  `AGENTS.md` §3.6 và §3.8, `DATABASE_V5.md` (§7.15–7.21, đảo quyết định về cây KP), `docs/demo/knowledge-tree-demo.md`,
+  `reports/fe-handoff.md`.
+- **Chưa làm:** bảng assessment/content/access mới trong `DATABASE_V5.md` (chủ service bổ sung), rà contract phía
+  assessment/content, `mvn -B -ntp verify` cả reactor, chạy kịch bản demo trên Compose sạch và `reports/acceptance.md`
+  (Codex đang nhận), danh sách phase `completed` cuối cùng, board FigJam.
+
 ## Overview
 
 Rà lại toàn bộ thay đổi, cập nhật tài liệu cho khớp code, chạy nghiệm thu đầu-cuối và chuẩn bị bằng chứng trình hội

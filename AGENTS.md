@@ -146,6 +146,11 @@ src/main/java/com/ieltspath/<service>
   Tài khoản/điểm demo của user/access chỉ được ghi khi `DEMO_DATA_ENABLED=true` (Compose local mặc định bật).
   Game chọn snapshot `VOCABULARY` từ library và `GRAMMAR` từ content; trong Compose các base URL trỏ theo tên service.
   Chi tiết: `README.md` §6, `docs/system-architecture.md` §7.
+- Nhóm cấu hình nghiệp vụ: `learning.mastery.*` (ngưỡng mastery, lịch ôn; Admin ghi đè ở `learning_rule_configs`),
+  `learning.flags.*` (ngưỡng cờ bất thường), `learning.tree-quality.*` (ngưỡng cạnh đáng ngờ, câu quá dễ/khó),
+  `learning.writing.*` (hạn mức chấm essay), `assessment.ai-eval.*` (đánh giá AI), `assessment.qa.*` (tỷ lệ lấy mẫu QA
+  Mentor). Trọng số và ngưỡng điểm khóa nằm trong DB (`course_score_configs`), không trong yaml. Chính sách dùng AI:
+  `docs/ai-policy.md`.
 - `Dockerfile.spring-service` build module Maven theo `MODULE_PATH`; Config Server có Dockerfile riêng.
 
 ### 3.7 Hiệu năng persistence, N+1 và độ phức tạp
@@ -172,8 +177,24 @@ src/main/java/com/ieltspath/<service>
   course và không đổi trạng thái topic. Lesson sau chỉ mở khi mọi lesson trước đã hoàn thành **và** Practice của chúng đã đạt
   (`403 PRACTICE_REQUIRED` + `lessonIds`); bài ôn còn chờ của lesson trước chặn lesson sau bất kể skill
   (`403 REVIEW_REQUIRED`). Bài ôn lặp set mới đến khi đạt (chỉ lần trượt đầu quay lại theory), chỉ `SKIPPED` khi hết
-  package chưa lộ. Bài ôn vẫn chặn Practice và thi topic của cùng skill. Thi cuối course không chặn tiến độ topic hay course khác. `LessonAccessGate` và use case trong
-  `services/learning-service/src/main/java/com/ieltspath/learning/` quyết định cổng bài; trạng thái topic suy ra khi đọc.
+  package chưa lộ. Bài ôn **chặn** (`blocking = true`) vẫn chặn Practice và thi topic của cùng skill; bài ôn **tùy chọn**
+  (giỏ ôn, practice test tự do) không bao giờ chặn. Thi cuối course không chặn tiến độ topic hay course khác.
+  `LessonAccessGate` và use case trong `services/learning-service/src/main/java/com/ieltspath/learning/` quyết định cổng
+  bài; trạng thái topic suy ra khi đọc.
+- Điểm và kết quả khóa: lần thi topic test đầu tiên (điểm nào cũng được) hoàn tất topic (`COMPLETED` dưới 70%, `PASSED`
+  từ 70%) và mở topic sau; course test mở khi mọi topic đã thi. Đạt khóa theo điểm tổng có trọng số (Process, giữa khóa,
+  cuối khóa; Admin chỉnh ở `course_score_configs`), không theo course test riêng lẻ: dưới ngưỡng thì `REMEDIATION`, làm
+  xong bài ôn thì thi lại (`CourseScoreCalculator`, `CourseOutcomeService`; contract `docs/contracts/course-score-v1.md`).
+- Chẩn đoán dò ngược: bài ôn chặn trượt set thứ hai hoặc hết gói thì thăm dò KP tiên quyết (tối đa 3 tầng, 6 lần), KP
+  gốc nhận bài ôn chặn `DIAGNOSTIC` và bài ôn gốc chờ chúng (`PrerequisiteDiagnosis`, `DiagnosticFlow`; contract
+  `diagnostics-v1.md`). Bài ôn sinh từ chẩn đoán không chẩn đoán lại.
+- Mastery theo KP: `kp_mastery_profiles` ghi cùng transaction với bằng chứng (`MasteryProfileUpdater`), ba mức
+  `PRIORITY`/`CONSOLIDATE`/`MAINTAIN` và hạn ôn; Admin đổi ngưỡng ở `learning_rule_configs` và chạy lại nền. Mọi câu trả
+  lời ghi một dòng vào `question_attempt_events` (thời gian, mã lỗi). Báo cáo `GET /api/learning/report`.
+- Khu quản trị: cờ bất thường (`learner_flags`, `FlagDetector` chạy sau commit, transaction riêng), hàng việc theo vai
+  trò (`work_items`, `WorkItemSync` đồng bộ khi mở danh sách), thống kê câu và chất lượng cây (`learning-staff-area-v1.md`).
+- Essay: sửa và nộp lại essay lesson tối đa 3 lần, chỉ từ bản mới nhất (`essay-revision-v1.md`); học viên có tín dụng
+  nhờ Mentor chữa essay lesson/Practice đã chấm (`human-review-v1.md`), chỉ là phản hồi: không đổi bằng chứng, cổng hay bài ôn.
 - Mọi lượt ghi của một học viên chạy trong một `@Transactional` mở đầu bằng `pg_advisory_xact_lock` theo user.
 - Bằng chứng bài học chỉ ghi ở lần nộp đầu của mỗi khối; bài ôn ghi mỗi set (nộp một lần); kết quả thi ghi theo
   `(attempt_id, result_version)`, chấm lại thì thay bằng chứng của version cũ.

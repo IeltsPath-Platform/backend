@@ -73,6 +73,13 @@ Only the owner can read a submission; another user's id → 404.
 | `PAYMENT_PENDING` | `{submissionId, status, code}`; the grade is withheld until payment succeeds |
 | `GRADING`, `FAILED` | `{submissionId, status, failureCode}` |
 
+## Revisions and Mentor review
+
+A graded lesson essay can be rewritten and sent again (`POST /writing-submissions/{id}/revisions`, `GET
+/writing-submissions/{id}/history`): see [essay-revision-v1](essay-revision-v1.md). A learner with a human-grading credit
+can ask a Mentor to review a graded essay (`POST`/`GET /writing-submissions/{id}/human-review`): see
+[human-review-v1](human-review-v1.md). Neither changes the evidence rule above.
+
 ## Idempotency and payment
 
 - `requestId` identifies one grading. Resending the same `requestId`: `GRADED` → the stored response; `PAYMENT_PENDING`
