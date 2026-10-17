@@ -11,5 +11,12 @@ import java.util.UUID;
  */
 public record WritingSubmissionResult(UUID submissionId, String status, String task, Integer wordCount,
                                       BigDecimal overallBand, Boolean passed, WritingGrade grade,
-                                      Integer pointsCharged, String sampleAnswer, String code, String failureCode) {
+                                      Integer pointsCharged, String sampleAnswer, String code, String failureCode,
+                                      String essayText) {
+    public WritingSubmissionResult(UUID submissionId, String status, String task, Integer wordCount,
+                                   BigDecimal overallBand, Boolean passed, WritingGrade grade, Integer pointsCharged,
+                                   String sampleAnswer, String code, String failureCode) {
+        this(submissionId, status, task, wordCount, overallBand, passed, grade, pointsCharged, sampleAnswer, code,
+                failureCode, null);
+    }
 }

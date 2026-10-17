@@ -12,7 +12,8 @@ public record SectionQuestionResponse(
         UUID questionVersionId,
         int sortOrder,
         BigDecimal maxScore,
-        Instant createdAt
+        Instant createdAt,
+        UUID groupId
 ) {
     public static SectionQuestionResponse from(SectionQuestionResult result) {
         return new SectionQuestionResponse(
@@ -21,7 +22,8 @@ public record SectionQuestionResponse(
                 result.questionVersionId(),
                 result.sortOrder(),
                 result.maxScore(),
-                result.createdAt()
+                result.createdAt(),
+                result.groupId()
         );
     }
 }

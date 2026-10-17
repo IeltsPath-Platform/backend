@@ -45,9 +45,11 @@ public final class WritingSubmission {
                               Boolean passed, UUID ledgerEntryId, Instant gradingStartedAt) {
         this.id = Objects.requireNonNull(id, "id");
         this.userId = Objects.requireNonNull(userId, "userId");
-        this.lessonId = Objects.requireNonNull(lessonId, "lessonId");
-        if ((blockId == null) == (practiceAttemptId == null)) {
-            throw new IllegalArgumentException("An essay belongs to a lesson block or to a practice attempt");
+        this.lessonId = lessonId;
+        boolean free = lessonId == null && blockId == null && practiceAttemptId == null;
+        if (!free && (lessonId == null || (blockId == null) == (practiceAttemptId == null))) {
+            throw new IllegalArgumentException(
+                    "An essay belongs to a lesson block, to a practice attempt, or to no lesson at all (free writing)");
         }
         this.blockId = blockId;
         this.practiceAttemptId = practiceAttemptId;
@@ -81,6 +83,13 @@ public final class WritingSubmission {
         return new WritingSubmission(id, userId, lessonId, null, Objects.requireNonNull(practiceAttemptId,
                 "practiceAttemptId"), requestId, essayText, wordCount, prompt, pointCost, GRADING, null, null, null,
                 null, null, Objects.requireNonNull(now, "now"));
+    }
+
+    /** A new free-writing essay, answering a prompt of the library outside any lesson; GRADING from {@code now}. */
+    public static WritingSubmission startFree(UUID id, UUID userId, UUID requestId, String essayText, int wordCount,
+                                              EssayPrompt prompt, int pointCost, Instant now) {
+        return new WritingSubmission(id, userId, null, null, null, requestId, essayText, wordCount, prompt, pointCost,
+                GRADING, null, null, null, null, null, Objects.requireNonNull(now, "now"));
     }
 
     public static WritingSubmission restore(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID requestId,
@@ -161,8 +170,11 @@ public final class WritingSubmission {
     public WritingSubmissionStatus persistedStatus() { return persistedStatus; }
     public UUID id() { return id; }
     public UUID userId() { return userId; }
+    /** The lesson of the essay; null for free writing. */
     public UUID lessonId() { return lessonId; }
-    /** The lesson essay block; null for a practice essay. */
+    /** An essay written for a library prompt, owned by no lesson, block or practice attempt. */
+    public boolean isFree() { return lessonId == null; }
+    /** The lesson essay block; null for a practice or free essay. */
     public UUID blockId() { return blockId; }
     /** The practice attempt the essay answers; null for a lesson essay. */
     public UUID practiceAttemptId() { return practiceAttemptId; }

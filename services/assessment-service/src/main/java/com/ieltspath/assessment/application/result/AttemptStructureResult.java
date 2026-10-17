@@ -5,10 +5,10 @@ import java.util.List;
 import java.util.UUID;
 
 public record AttemptStructureResult(List<Section> sections) {
-    public record Section(UUID id, UUID contentSectionId, int sortOrder, String snapshot, List<Item> items,
+    public record Section(UUID id, UUID contentSectionId, int sortOrder, Integer partNo, String snapshot, List<Item> items,
                           Instant startedAt, Instant completedAt) {
         public Section(UUID id, UUID contentSectionId, int sortOrder, String snapshot, List<Item> items) {
-            this(id, contentSectionId, sortOrder, snapshot, items, null, null);
+            this(id, contentSectionId, sortOrder, null, snapshot, items, null, null);
         }
     }
 

@@ -4,14 +4,100 @@ import com.ieltspath.assessment.application.command.SaveAttemptResponseCommand;
 import com.ieltspath.assessment.domain.aggregate.AssessmentAttempt;
 import com.ieltspath.assessment.domain.entity.AttemptItem;
 import com.ieltspath.assessment.domain.entity.AttemptResponse;
-import com.ieltspath.assessment.domain.repository.*;
-import com.ieltspath.assessment.domain.vo.*;
-import org.junit.jupiter.api.Test; import org.junit.jupiter.api.extension.ExtendWith; import org.mockito.Mock; import org.mockito.junit.jupiter.MockitoExtension;
-import java.time.Instant; import java.util.Optional; import java.util.UUID;
-import static org.junit.jupiter.api.Assertions.*; import static org.mockito.Mockito.*;
+import com.ieltspath.assessment.domain.exception.AttemptExpiredException;
+import com.ieltspath.assessment.domain.repository.AssessmentAttemptRepository;
+import com.ieltspath.assessment.domain.repository.AttemptItemRepository;
+import com.ieltspath.assessment.domain.repository.AttemptResponseRepository;
+import com.ieltspath.assessment.domain.repository.AttemptSectionRepository;
+import com.ieltspath.assessment.domain.vo.AttemptChannel;
+import com.ieltspath.assessment.domain.vo.AttemptMode;
+import com.ieltspath.assessment.domain.vo.AttemptStatus;
+import com.ieltspath.assessment.domain.vo.AttemptType;
+import org.junit.jupiter.api.Test;
 
-@ExtendWith(MockitoExtension.class)
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 class SaveAttemptResponseUseCaseTest {
- @Mock AssessmentAttemptRepository attempts; @Mock AttemptItemRepository items; @Mock AttemptResponseRepository responses; @Mock com.ieltspath.assessment.domain.repository.AttemptSectionRepository sections;
- @Test void savesNextRevision(){UUID user=UUID.randomUUID(),attemptId=UUID.randomUUID(),itemId=UUID.randomUUID(); var attempt=AssessmentAttempt.start(user,UUID.randomUUID(),AttemptType.QUIZ,AttemptMode.STANDARD,AttemptChannel.WEB,null); when(attempts.findByIdAndUserId(attemptId,user)).thenReturn(Optional.of(new AssessmentAttempt(attemptId,user,attempt.getPackageVersionId(),attempt.getAttemptType(),attempt.getMode(),attempt.getChannel(),AttemptStatus.IN_PROGRESS,attempt.getStartedAt(),null,null,0,attempt.getCreatedAt(),attempt.getUpdatedAt()))); when(items.findByIdAndAttemptId(itemId,attemptId)).thenReturn(Optional.of(new AttemptItem(itemId,UUID.randomUUID(),UUID.randomUUID(),1,"{}",null,null))); when(responses.findByAttemptItemId(itemId)).thenReturn(Optional.of(new AttemptResponse(UUID.randomUUID(),itemId,"{}",1,2,Instant.now(),null))); when(responses.save(any())).thenAnswer(i->i.getArgument(0)); var result=new SaveAttemptResponseUseCase(attempts,items,responses,sections).execute(new SaveAttemptResponseCommand(user,attemptId,itemId,"{\"answer\":\"A\"}",1,2)); assertEquals(3,result.revision()); verify(responses).save(any()); }
+    @Test
+    void savesNextRevision() {
+        Fixture fixture = new Fixture(AttemptType.QUIZ, false);
+        when(fixture.responses.findByAttemptItemId(fixture.itemId)).thenReturn(Optional.of(
+                new AttemptResponse(UUID.randomUUID(), fixture.itemId, "{}", 1, 2, Instant.now(), null)));
+        when(fixture.responses.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = fixture.useCase.execute(new SaveAttemptResponseCommand(fixture.userId, fixture.attemptId,
+                fixture.itemId, "{\"answer\":\"A\"}", 1, 2));
+
+        assertEquals(3, result.revision());
+        verify(fixture.responses).save(any());
+    }
+
+    @Test
+    void acceptsAnswerSaveWithinGraceAfterOfficialPracticeDeadline() {
+        Fixture fixture = new Fixture(AttemptType.OFFICIAL_PRACTICE, -10);
+        when(fixture.responses.findByAttemptItemId(fixture.itemId)).thenReturn(Optional.empty());
+        when(fixture.responses.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = fixture.useCase.execute(fixture.command());
+
+        assertEquals(1, result.revision());
+        verify(fixture.responses).save(any());
+    }
+
+    @Test
+    void rejectsAnswerSaveAfterOfficialPracticeGrace() {
+        Fixture fixture = new Fixture(AttemptType.OFFICIAL_PRACTICE, true);
+
+        assertThrows(AttemptExpiredException.class, () -> fixture.useCase.execute(fixture.command()));
+
+        verify(fixture.responses, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void rejectsAnswerSaveAfterNonPracticeDeadline() {
+        Fixture fixture = new Fixture(AttemptType.TOPIC_GATE, true);
+
+        assertThrows(AttemptExpiredException.class, () -> fixture.useCase.execute(fixture.command()));
+
+        verify(fixture.responses, org.mockito.Mockito.never()).save(any());
+    }
+
+    private final class Fixture {
+        private final UUID userId = UUID.randomUUID();
+        private final UUID attemptId = UUID.randomUUID();
+        private final UUID itemId = UUID.randomUUID();
+        private final AssessmentAttemptRepository attempts = mock(AssessmentAttemptRepository.class);
+        private final AttemptItemRepository items = mock(AttemptItemRepository.class);
+        private final AttemptResponseRepository responses = mock(AttemptResponseRepository.class);
+        private final AttemptSectionRepository sections = mock(AttemptSectionRepository.class);
+        private final SaveAttemptResponseUseCase useCase = new SaveAttemptResponseUseCase(attempts, items, responses, sections);
+
+        private Fixture(AttemptType type, boolean expired) {
+            this(type, expired ? -60 : 60);
+        }
+
+        /** {@code secondsUntilDeadline} is negative once the deadline has passed. */
+        private Fixture(AttemptType type, long secondsUntilDeadline) {
+            Instant now = Instant.now();
+            var attempt = new AssessmentAttempt(attemptId, userId, UUID.randomUUID(), type, AttemptMode.TIMED,
+                    AttemptChannel.WEB, AttemptStatus.IN_PROGRESS, now.minusSeconds(120), null,
+                    now.plusSeconds(secondsUntilDeadline), 0, now.minusSeconds(120), now.minusSeconds(120));
+            when(attempts.findByIdAndUserId(attemptId, userId)).thenReturn(Optional.of(attempt));
+            when(items.findByIdAndAttemptId(itemId, attemptId)).thenReturn(Optional.of(
+                    new AttemptItem(itemId, UUID.randomUUID(), UUID.randomUUID(), 1, "{}", null, null)));
+        }
+
+        private SaveAttemptResponseCommand command() {
+            return new SaveAttemptResponseCommand(userId, attemptId, itemId, "{\"answer\":\"A\"}", 1, 0);
+        }
+    }
 }

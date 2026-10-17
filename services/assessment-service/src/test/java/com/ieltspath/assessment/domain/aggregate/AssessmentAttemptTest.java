@@ -18,6 +18,19 @@ class AssessmentAttemptTest {
         assertThrows(AttemptExpiredException.class,()->attempt.submit(Instant.now())); assertEquals(AttemptStatus.EXPIRED,attempt.getStatus());
         assertThrows(AttemptExpiredException.class,()->attempt.submit(Instant.now())); assertNull(attempt.getSubmittedAt());
     }
+    @Test void practiceTestDeadlineIsEnforcedAfterAShortGrace(){
+        var late=AssessmentAttempt.start(UUID.randomUUID(),UUID.randomUUID(),AttemptType.OFFICIAL_PRACTICE,AttemptMode.TIMED,AttemptChannel.WEB,Instant.now().minusSeconds(120));
+        assertTrue(late.isPastDeadline(Instant.now()));
+        assertThrows(AttemptExpiredException.class,()->late.submit(Instant.now())); assertEquals(AttemptStatus.EXPIRED,late.getStatus());
+
+        var justOver=AssessmentAttempt.start(UUID.randomUUID(),UUID.randomUUID(),AttemptType.OFFICIAL_PRACTICE,AttemptMode.TIMED,AttemptChannel.WEB,Instant.now().minusSeconds(5));
+        assertFalse(justOver.isPastDeadline(Instant.now()));
+        justOver.submit(Instant.now()); assertEquals(AttemptStatus.SUBMITTED,justOver.getStatus());
+    }
+    @Test void attemptWithoutDeadlineIsNeverLate(){
+        var attempt=AssessmentAttempt.start(UUID.randomUUID(),UUID.randomUUID(),AttemptType.OFFICIAL_PRACTICE,AttemptMode.STANDARD,AttemptChannel.WEB,null);
+        assertFalse(attempt.isPastDeadline(Instant.now().plusSeconds(86_400)));
+    }
     @Test void typeComesFromTheContentPackage(){
         assertEquals(AttemptType.TOPIC_GATE,AttemptType.forContentPackageType("TOPIC_TEST"));
         assertEquals(AttemptType.MOCK,AttemptType.forContentPackageType("MOCK_TEST"));

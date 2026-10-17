@@ -10,6 +10,13 @@ public record AddContentSectionCommand(
         Skill skill,
         int sortOrder,
         Integer timeLimitSeconds,
-        String instructions
-) {}
+        String instructions,
+        Integer partNo,
+        UUID coverAssetId
+) {
+    public AddContentSectionCommand(UUID packageVersionId, String title, Skill skill, int sortOrder,
+                                    Integer timeLimitSeconds, String instructions) {
+        this(packageVersionId, title, skill, sortOrder, timeLimitSeconds, instructions, null, null);
+    }
+}
 

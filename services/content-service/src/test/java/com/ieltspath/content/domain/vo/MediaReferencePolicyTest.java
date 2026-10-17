@@ -31,11 +31,18 @@ class MediaReferencePolicyTest {
             "/internal/charts/roofs.png",
             "data:text/html;base64,PHNjcmlwdD4=",
             "data:image/svg+xml,<svg onload=alert(1)>",
-            "https://cdn.example.com/a b.png",
-            "charts/roofs.png"
+            "https://cdn.example.com/a b.png"
     })
     void otherImageReferencesAreRejected(String reference) {
         assertThatThrownBy(() -> policy.resolve(AssetType.IMAGE, reference))
+                .isInstanceOf(InvalidMediaReferenceException.class);
+    }
+
+    @Test
+    void imageObjectKeyIsJoinedToBaseAndRejectedWithoutBaseUrl() {
+        assertThat(policy.resolve(AssetType.IMAGE, "charts/roofs.png"))
+                .isEqualTo("https://media.example.test/ieltspath/charts/roofs.png");
+        assertThatThrownBy(() -> noBase.resolve(AssetType.IMAGE, "charts/roofs.png"))
                 .isInstanceOf(InvalidMediaReferenceException.class);
     }
 
@@ -53,7 +60,7 @@ class MediaReferencePolicyTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "../x.mp3", "listening/../../x.mp3", "/x.mp3", "javascript:alert(1)", "file:///x.mp3",
-            "data:audio/mpeg;base64,AAAA", "listening//x.mp3"
+            "data:audio/x-evil;base64,AAAA", "data:audio/mpeg;base64,not base64!", "listening//x.mp3"
     })
     void unsafeAudioReferencesAreRejected(String reference) {
         assertThatThrownBy(() -> policy.resolve(AssetType.AUDIO, reference))
@@ -72,5 +79,17 @@ class MediaReferencePolicyTest {
     void baseUrlMustBeHttps() {
         assertThatThrownBy(() -> new MediaReferencePolicy("http://media.example.test/"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void anAudioRecordingIsNeverAcceptedAsADataUri() {
+        String recording = "data:audio/mpeg;base64," + "QUJD".repeat(1_000);
+
+        assertThatThrownBy(() -> noBase.resolve(AssetType.AUDIO, recording))
+                .isInstanceOf(InvalidMediaReferenceException.class);
+        assertThatThrownBy(() -> policy.resolve(AssetType.AUDIO, recording))
+                .isInstanceOf(InvalidMediaReferenceException.class);
+        assertThatThrownBy(() -> noBase.resolve(AssetType.IMAGE, recording))
+                .isInstanceOf(InvalidMediaReferenceException.class);
     }
 }

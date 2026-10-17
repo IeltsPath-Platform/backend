@@ -36,7 +36,9 @@ public class AddContentSectionUseCase {
                 command.skill(),
                 command.sortOrder(),
                 command.timeLimitSeconds(),
-                command.instructions()
+                command.instructions(),
+                command.partNo(),
+                command.coverAssetId()
         );
 
         targetVersion.addSection(section);
@@ -49,6 +51,8 @@ public class AddContentSectionUseCase {
                 section.getSkill(),
                 section.getSortOrder(),
                 section.getTimeLimitSeconds(),
+                section.getPartNo(),
+                section.getCoverAssetId(),
                 section.getInstructions(),
                 section.getCreatedAt(),
                 section.getUpdatedAt(),

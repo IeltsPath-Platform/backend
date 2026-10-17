@@ -9,6 +9,7 @@ public enum PackageType {
     /** A topic's final test; created only by seed, always attached to a topic. */
     TOPIC_TEST,
     /** A course's final test; created only by seed, always attached to a course. */
-    COURSE_TEST
+    COURSE_TEST,
+    PRACTICE_TEST
 }
 

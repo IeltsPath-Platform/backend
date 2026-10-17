@@ -63,7 +63,8 @@ public class GetContentPackageDetailUseCase {
                             q.getQuestionVersionId(),
                             q.getSortOrder(),
                             q.getMaxScore(),
-                            q.getCreatedAt()
+                            q.getCreatedAt(),
+                            q.getGroupId()
                     ));
                 }
                 sectionResults.add(new ContentSectionResult(
@@ -73,6 +74,8 @@ public class GetContentPackageDetailUseCase {
                         sec.getSkill(),
                         sec.getSortOrder(),
                         sec.getTimeLimitSeconds(),
+                        sec.getPartNo(),
+                        sec.getCoverAssetId(),
                         sec.getInstructions(),
                         sec.getCreatedAt(),
                         sec.getUpdatedAt(),
@@ -95,7 +98,8 @@ public class GetContentPackageDetailUseCase {
                 publishedBy,
                 pkg.getCreatedAt(),
                 pkg.getUpdatedAt(),
-                sectionResults
+                sectionResults,
+                pkg.getSourceCode()
         );
     }
 }
