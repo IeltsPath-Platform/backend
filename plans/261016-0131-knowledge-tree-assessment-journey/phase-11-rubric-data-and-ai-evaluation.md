@@ -1,7 +1,7 @@
 ---
 phase: 11
 title: "Rubric dạng dữ liệu và bộ test nghiệm thu AI"
-status: in_progress
+status: tooling_complete
 priority: P2
 dependencies: [3, 10]
 ---
@@ -114,8 +114,13 @@ chuyên môn chấm và ít nhất một lần đánh giá thật có chỉ số
 - [x] Không kích hoạt được prompt chưa đạt ngưỡng.
 
 Bằng chứng kiểm tra tự động: [báo cáo xác minh](./reports/phase-11-verification.md). Content, Learning và Assessment
-chạy đủ 1.074 test, không fail, error hoặc skip. Hai tiêu chí còn mở ở trên cần dữ liệu và lần chạy nghiệm thu thực tế;
-phase giữ trạng thái `in_progress`.
+chạy đủ 1.074 test, không fail, error hoặc skip.
+
+**Quyết định (2026-10-17): phase kết thúc ở mức công cụ, chưa có bằng chứng nghiệm thu.** Rubric dạng dữ liệu, bộ chấm,
+đánh giá AI và cổng kích hoạt đều chạy và có test. Chưa có gold set do chuyên gia IELTS chấm và chưa có lần chạy đánh giá
+thật, nên **không được nói hệ thống đã chứng minh độ chính xác của AI** khi trình hội đồng; rubric hạt giống và các chỉ
+số hiện có chỉ là bản nháp chưa chuyên gia duyệt. Hai tiêu chí còn mở ở trên cần dữ liệu và lần chạy nghiệm thu thực tế;
+khi có người chấm thì làm theo `docs/demo/knowledge-tree-demo.md` bước 7.
 
 ## Risk Assessment
 
