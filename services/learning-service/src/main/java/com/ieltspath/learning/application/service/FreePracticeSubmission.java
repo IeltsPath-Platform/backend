@@ -8,6 +8,7 @@ import com.ieltspath.learning.domain.aggregate.PracticeAttempt;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.vo.EvidenceSource;
+import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import com.ieltspath.learning.domain.vo.PracticeSubmission;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
@@ -36,14 +37,25 @@ public class FreePracticeSubmission {
     private final ItemGrading grading = new ItemGrading();
     private final Clock clock = Clock.systemUTC();
 
+    private final GamificationRecorder gamificationRecorder;
+
     public FreePracticeSubmission(KnowledgeEvidenceRepository evidence, PracticeAttemptRepository attempts,
                                   QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
-                                  LearningContentClient content) {
+                                  LearningContentClient content, GamificationRecorder gamificationRecorder) {
         this.evidence = evidence;
         this.attempts = attempts;
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
         this.content = content;
+        this.gamificationRecorder = gamificationRecorder;
+    }
+
+    private static List<UUID> correctIds(ItemGrading.Graded graded) {
+        List<UUID> correct = new ArrayList<>();
+        for (int index = 0; index < graded.items().size(); index++) {
+            if (graded.grades().get(index).correct()) correct.add(graded.items().get(index).questionVersionId());
+        }
+        return correct;
     }
 
     /** The caller has checked that the attempt is the learner's, open, and that this request id is new. */
@@ -75,9 +87,12 @@ public class FreePracticeSubmission {
             results.add(new PracticeSubmission.Answer(item.questionVersionId(), grade.correct(),
                     grade.correctAnswer(), item.explanation()));
         }
+        GamificationSummary gamification = counted
+                ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), correctIds(graded))
+                : gamificationRecorder.current(userId);
         PracticeSubmission response = new PracticeSubmission(attempt.id(), graded.correct(), graded.total(),
                 graded.percent(), graded.passed(), counted, List.copyOf(results), null, List.of(),
-                graded.skillScores());
+                graded.skillScores(), gamification);
         attempt.recordResult(command.requestId(), response, clock.instant());
         attempts.saveResult(attempt);
         questionEvents.append(events);

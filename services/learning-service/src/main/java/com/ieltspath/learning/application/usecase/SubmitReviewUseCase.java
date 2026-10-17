@@ -12,6 +12,8 @@ import com.ieltspath.learning.application.result.ReviewSubmissionResult;
 import com.ieltspath.learning.application.result.SubmissionResult;
 import com.ieltspath.learning.application.service.AnswerSheet;
 import com.ieltspath.learning.application.service.DiagnosticFlow;
+import com.ieltspath.learning.application.service.GamificationRecorder;
+import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.PracticeProgress;
@@ -59,13 +61,16 @@ public class SubmitReviewUseCase {
     private final PracticeProgress practice;
     private final QuestionEventLog questionEvents;
     private final MasteryProfileUpdater masteryProfiles;
+    private final GamificationRecorder gamificationRecorder;
     private final ItemGrading grading = new ItemGrading();
 
     public SubmitReviewUseCase(LearningContentClient content, LearnerLock lock, KnowledgeEvidenceRepository evidence,
                                ReviewItemRepository reviews, PracticeAttemptRepository attempts,
                                ReviewSubmissionLog submissions,
                                PracticeProgress practice, QuestionEventLog questionEvents,
-                               MasteryProfileUpdater masteryProfiles, DiagnosticFlow diagnosticFlow) {
+                               MasteryProfileUpdater masteryProfiles, DiagnosticFlow diagnosticFlow,
+                               GamificationRecorder gamificationRecorder) {
+        this.gamificationRecorder = gamificationRecorder;
         this.diagnosticFlow = diagnosticFlow;
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
@@ -136,8 +141,15 @@ public class SubmitReviewUseCase {
         ReviewStatus status = review.recordSetResult(set.id(), command.requestId(), graded.correct(), graded.total());
         Section first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);
         String transcript = first != null && first.audio() != null ? first.audio().transcript() : null;
+        // Every set is answered once, so each set's correct answers earn XP.
+        List<UUID> correctIds = new ArrayList<>();
+        for (int index = 0; index < items.size(); index++) {
+            if (grades.get(index).correct()) correctIds.add(items.get(index).questionVersionId());
+        }
+        GamificationSummary gamification = gamificationRecorder.recordCorrectAnswers(userId, command.requestId(),
+                correctIds);
         ReviewSubmissionResult response = new ReviewSubmissionResult(status.name(), passed, List.copyOf(results),
-                transcript, review.stage().name(), review.failedSets());
+                transcript, review.stage().name(), review.failedSets(), gamification);
         reviews.save(review);
         submissions.save(set.id(), response);
         if (status != ReviewStatus.PENDING) practice.refreshPassForLesson(userId, review.lessonId());

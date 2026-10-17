@@ -41,6 +41,7 @@ public class MasteryProfileUpdater {
     private final QuestionEventLog events;
     private final MasteryRulesProvider rules;
     private final MasteryFormulaSettings formulas;
+    private final GamificationRecorder gamification;
     private final Clock clock;
     private final MasteryCalculator calculator = new MasteryCalculator();
 
@@ -50,18 +51,19 @@ public class MasteryProfileUpdater {
     @Autowired
     public MasteryProfileUpdater(KnowledgeEvidenceRepository evidence, MasteryProfileRepository profiles,
                                  QuestionEventLog events, MasteryRulesProvider rules,
-                                 MasteryFormulaSettings formulas) {
-        this(evidence, profiles, events, rules, formulas, Clock.systemUTC());
+                                 MasteryFormulaSettings formulas, GamificationRecorder gamification) {
+        this(evidence, profiles, events, rules, formulas, gamification, Clock.systemUTC());
     }
 
     MasteryProfileUpdater(KnowledgeEvidenceRepository evidence, MasteryProfileRepository profiles,
                           QuestionEventLog events, MasteryRulesProvider rules, MasteryFormulaSettings formulas,
-                          Clock clock) {
+                          GamificationRecorder gamification, Clock clock) {
         this.evidence = evidence;
         this.profiles = profiles;
         this.events = events;
         this.rules = rules;
         this.formulas = formulas;
+        this.gamification = gamification;
         this.clock = clock;
     }
 
@@ -150,6 +152,15 @@ public class MasteryProfileUpdater {
                     confidence));
         }
         profiles.upsert(updated);
+        // Only live evidence pays milestone XP; a rebuild or decay re-derives scores that were already paid for.
+        if (mode == Mode.RECORD) {
+            List<GamificationRecorder.Rise> rises = updated.stream()
+                    .filter(profile -> profile.tier() != MasteryTier.PRIORITY && profile.tier() != MasteryTier.INSUFFICIENT)
+                    .map(profile -> new GamificationRecorder.Rise(profile.knowledgePointId(),
+                            profile.tier() == MasteryTier.MAINTAIN))
+                    .toList();
+            gamification.recordRises(userId, rises);
+        }
         if (rebuild) {
             Set<UUID> gone = new HashSet<>(knowledgePointIds);
             gone.removeAll(withEvidence);

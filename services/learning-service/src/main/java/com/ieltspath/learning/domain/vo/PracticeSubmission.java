@@ -9,15 +9,22 @@ import java.util.UUID;
  */
 public record PracticeSubmission(UUID attemptId, int correct, int total, double percent, boolean passed,
                                  boolean countedAsEvidence, List<Answer> results, String transcript,
-                                 List<ReviewCreated> reviewsCreated, List<SkillScore> skillScores) {
+                                 List<ReviewCreated> reviewsCreated, List<SkillScore> skillScores,
+                                 GamificationSummary gamification) {
     public PracticeSubmission {
         skillScores = skillScores == null ? List.of() : List.copyOf(skillScores);
     }
     public PracticeSubmission(UUID attemptId, int correct, int total, double percent, boolean passed,
                               boolean countedAsEvidence, List<Answer> results, String transcript,
+                              List<ReviewCreated> reviewsCreated, List<SkillScore> skillScores) {
+        this(attemptId, correct, total, percent, passed, countedAsEvidence, results, transcript, reviewsCreated,
+                skillScores, null);
+    }
+    public PracticeSubmission(UUID attemptId, int correct, int total, double percent, boolean passed,
+                              boolean countedAsEvidence, List<Answer> results, String transcript,
                               List<ReviewCreated> reviewsCreated) {
         this(attemptId, correct, total, percent, passed, countedAsEvidence, results, transcript, reviewsCreated,
-                null);
+                null, null);
     }
     public record SkillScore(LearningSkill skill, int correct, int total, double percent, boolean passed) {}
     public record Answer(UUID questionVersionId, boolean correct, String correctAnswer, String explanation) {}

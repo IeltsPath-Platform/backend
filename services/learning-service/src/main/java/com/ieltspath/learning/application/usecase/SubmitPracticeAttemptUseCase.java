@@ -12,6 +12,8 @@ import com.ieltspath.learning.application.port.LearningContentClient.PackageVers
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.service.FirstAttemptMistakes;
 import com.ieltspath.learning.application.service.FreePracticeSubmission;
+import com.ieltspath.learning.application.service.GamificationRecorder;
+import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.domain.vo.PracticeOrigin;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
@@ -56,6 +58,7 @@ public class SubmitPracticeAttemptUseCase {
     private final QuestionEventLog questionEvents;
     private final MasteryProfileUpdater masteryProfiles;
     private final FreePracticeSubmission freePractice;
+    private final GamificationRecorder gamificationRecorder;
     private final ItemGrading grading = new ItemGrading();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final Clock clock = Clock.systemUTC();
@@ -65,7 +68,7 @@ public class SubmitPracticeAttemptUseCase {
                                         KnowledgeEvidenceRepository evidence, PracticeProgress progress,
                                         FirstAttemptMistakes mistakes, WritingSubmissionRepository essays,
                                         QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
-                                        FreePracticeSubmission freePractice) {
+                                        FreePracticeSubmission freePractice, GamificationRecorder gamificationRecorder) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -78,6 +81,16 @@ public class SubmitPracticeAttemptUseCase {
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
         this.freePractice = freePractice;
+        this.gamificationRecorder = gamificationRecorder;
+    }
+
+    /** The answers of a set that are correct, in set order; a question counts once however many items it has. */
+    private static List<UUID> correctQuestionIds(ItemGrading.Graded graded) {
+        List<UUID> correct = new ArrayList<>();
+        for (int index = 0; index < graded.items().size(); index++) {
+            if (graded.grades().get(index).correct()) correct.add(graded.items().get(index).questionVersionId());
+        }
+        return correct;
     }
 
     @Transactional
@@ -150,9 +163,13 @@ public class SubmitPracticeAttemptUseCase {
         List<PracticeSubmission.ReviewCreated> created = candidates.stream()
                 .map(candidate -> new PracticeSubmission.ReviewCreated(candidate.reviewId(),
                         candidate.knowledgePointId(), candidate.stage().name())).toList();
+        // XP only for the first counted submission of a set, as evidence is.
+        GamificationSummary gamification = counted
+                ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), correctQuestionIds(graded))
+                : gamificationRecorder.current(userId);
         PracticeSubmission response = new PracticeSubmission(attemptId, graded.correct(), graded.total(),
                 graded.percent(), graded.passed(), counted, List.copyOf(results), transcript, created,
-                graded.skillScores());
+                graded.skillScores(), gamification);
         attempt.recordResult(command.requestId(), response, clock.instant());
         attempts.saveResult(attempt);
         questionEvents.append(events);

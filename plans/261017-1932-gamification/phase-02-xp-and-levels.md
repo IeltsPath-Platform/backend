@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "XP, cấp độ, cài đặt múi giờ"
-status: pending
+status: in_progress
 priority: P1
 dependencies: []
 ---
@@ -52,6 +52,12 @@ trả lời. Cấp độ theo mốc XP. Các luật theo ngày (trần XP, strea
 
 ## Success Criteria
 
-- [ ] 12 câu HARD đúng trong một ngày cho 100 XP tính + 140 shadow.
-- [ ] KP lên MAINTAIN lần hai không cộng thêm.
-- [ ] Response nộp bài có khối `gamification`.
+- [x] 12 câu HARD đúng trong một ngày cho 100 XP tính + 140 shadow. (test: `GamificationIntegrationTest.twelveHardAnswersInADayCountOneHundredAndShadowTheRest`, `XpRulesTest.twelveHardAnswersInOneDayCountOneHundredAndShadowTheRest`)
+- [x] KP lên MAINTAIN lần hai không cộng thêm. (test: `GamificationIntegrationTest.aKnowledgePointPaysEachMilestoneOnce`, qua `GamificationRecorder.recordRises`)
+- [ ] Response nộp bài có khối `gamification`. Đã map vào `SubmissionResponse`, `PracticeSubmissionResponse`, `ReviewSubmissionResponse`; chưa có test HTTP kiểm tra khối này.
+
+Chưa xong trong phase này:
+- `MasteryProfileUpdater` gọi `recordRises` ở chế độ `RECORD`; chưa có test riêng cho đường này (test hiện tại kiểm tra trực tiếp recorder).
+- Chưa có test cho trần ngày theo múi giờ của học viên (đã có test cho cap theo ngày, chưa có test cho ranh giới nửa đêm).
+- Contract `xp` và `settings` chưa viết; để phase 8.
+- `GET/PUT /api/learning/me/settings` và `GET /api/learning/me/progress` đã có `@WebMvcTest` (3 test).

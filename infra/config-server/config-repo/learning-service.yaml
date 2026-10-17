@@ -85,6 +85,22 @@ learning:
         probe: 1.0
         practice: 0.6
         essay: 0.5
+  gamification:
+    # Learner timezone when none is chosen; the daily XP cap resets at its midnight.
+    default-timezone: ${LEARNING_DEFAULT_TIMEZONE:Asia/Ho_Chi_Minh}
+    xp:
+      # XP of a correct first answer by its difficulty tag; an untagged question gets unknown.
+      easy: 10
+      medium: 15
+      hard: 20
+      unknown: 10
+      # Answer XP counted per learner day; the rest is kept as shadow XP.
+      daily-cap: 100
+      # XP for each level: level = 1 + total / level-xp.
+      level-xp: 1000
+      # One-time milestones per knowledge point: reaching consolidate, then maintain.
+      kp-consolidate: 25
+      kp-maintain: 50
   messaging:
     # AssessmentCompleted.v2 consumer: delay before a failed event is retried, and attempts before the DLQ.
     retry-delay-ms: ${LEARNING_RETRY_DELAY_MS:30000}

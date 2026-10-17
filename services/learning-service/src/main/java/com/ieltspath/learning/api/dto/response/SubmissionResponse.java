@@ -3,10 +3,13 @@ package com.ieltspath.learning.api.dto.response;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.ieltspath.learning.application.result.SubmissionResult;
 
+import com.ieltspath.learning.domain.vo.GamificationSummary;
+
 import java.util.List;
 import java.util.UUID;
 
-public record SubmissionResponse(boolean blockPassed, boolean lessonCompleted, List<Result> results) {
+public record SubmissionResponse(boolean blockPassed, boolean lessonCompleted, List<Result> results,
+                                 GamificationSummary gamification) {
     public sealed interface Result permits Correctness, SolvedAnswer {}
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Correctness(UUID questionVersionId, boolean correct, String hint) implements Result {
@@ -26,6 +29,6 @@ public record SubmissionResponse(boolean blockPassed, boolean lessonCompleted, L
         List<Result> answers = result.results().stream().<Result>map(answer -> result.blockPassed()
                 ? new SolvedAnswer(answer.questionVersionId(), answer.correct(), answer.correctAnswer(), answer.explanation())
                 : new Correctness(answer.questionVersionId(), answer.correct(), answer.hint())).toList();
-        return new SubmissionResponse(result.blockPassed(), result.lessonCompleted(), answers);
+        return new SubmissionResponse(result.blockPassed(), result.lessonCompleted(), answers, result.gamification());
     }
 }

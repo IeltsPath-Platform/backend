@@ -9,6 +9,7 @@ import com.ieltspath.learning.application.port.LearningContentClient.Lesson;
 import com.ieltspath.learning.application.port.LearningContentClient.Question;
 import com.ieltspath.learning.application.result.SubmissionResult;
 import com.ieltspath.learning.application.service.AnswerSheet;
+import com.ieltspath.learning.application.service.GamificationRecorder;
 import com.ieltspath.learning.application.service.LessonAccess;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.LessonViewAssembler;
@@ -26,6 +27,7 @@ import com.ieltspath.learning.domain.repository.LessonProgressRepository;
 import com.ieltspath.learning.domain.service.AnswerSpecGrader;
 import com.ieltspath.learning.domain.service.PassMark;
 import com.ieltspath.learning.domain.vo.EvidenceSource;
+import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +56,7 @@ public class SubmitLessonExerciseUseCase {
     private final LessonViewAssembler view;
     private final QuestionEventLog questionEvents;
     private final MasteryProfileUpdater masteryProfiles;
+    private final GamificationRecorder gamificationRecorder;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
     private final ErrorTagger errorTagger = new ErrorTagger();
     private final Clock clock = Clock.systemUTC();
@@ -62,7 +65,7 @@ public class SubmitLessonExerciseUseCase {
                                        KnowledgeEvidenceRepository evidence, LessonProgressRepository lessons,
                                        PracticeProgress practice, LessonViewAssembler view,
                                        TopicCompletion topicCompletion, QuestionEventLog questionEvents,
-                                       MasteryProfileUpdater masteryProfiles) {
+                                       MasteryProfileUpdater masteryProfiles, GamificationRecorder gamificationRecorder) {
         this.lock = lock;
         this.access = access;
         this.submissions = submissions;
@@ -73,6 +76,7 @@ public class SubmitLessonExerciseUseCase {
         this.topicCompletion = topicCompletion;
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
+        this.gamificationRecorder = gamificationRecorder;
     }
 
     @Transactional
@@ -157,7 +161,12 @@ public class SubmitLessonExerciseUseCase {
                     blockPassed ? grade.correctAnswer() : null, blockPassed ? question.explanation() : null,
                     view.hint(question, passed.contains(blockId), opened)));
         }
-        SubmissionResult response = new SubmissionResult(blockPassed, lessonCompleted, List.copyOf(results));
+        // XP is awarded for the first submission of a block only; a repeat shows the learner's standing unchanged.
+        GamificationSummary gamification = firstSubmission
+                ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), correctQuestionIds(questions, grades))
+                : gamificationRecorder.current(userId);
+        SubmissionResult response = new SubmissionResult(blockPassed, lessonCompleted, List.copyOf(results),
+                gamification);
         if (!submissions.save(userId, lessonId, blockId, command, response)) throw requestConflict();
         boolean newlyCompleted = lessonCompleted && progress.complete(clock.instant());
         lessons.save(progress);
@@ -166,6 +175,14 @@ public class SubmitLessonExerciseUseCase {
             topicCompletion.onLessonCompleted(userId, lesson.topicId());
         }
         return response;
+    }
+
+    private static List<UUID> correctQuestionIds(List<Question> questions, List<AnswerSpecGrader.Grade> grades) {
+        List<UUID> correct = new ArrayList<>();
+        for (int index = 0; index < questions.size(); index++) {
+            if (grades.get(index).correct()) correct.add(questions.get(index).questionVersionId());
+        }
+        return correct;
     }
 
     private static Set<UUID> exerciseKnowledgePoints(Lesson lesson) {
