@@ -4,7 +4,11 @@ import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.service.GamificationRecorder;
 import com.ieltspath.learning.application.service.LearnerTimezones;
+import com.ieltspath.learning.application.service.MasteryProfileUpdater;
+import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
+import com.ieltspath.learning.domain.vo.EvidenceSource;
 import com.ieltspath.learning.domain.vo.GamificationSummary;
+import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +60,8 @@ class GamificationIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired GamificationRecorder gamification;
     @Autowired LearnerTimezones timezones;
+    @Autowired KnowledgeEvidenceRepository evidence;
+    @Autowired MasteryProfileUpdater masteryProfiles;
     @MockitoBean LearningContentClient content;
 
     @BeforeEach
@@ -106,6 +112,35 @@ class GamificationIntegrationTest {
         gamification.recordRises(user, List.of(new GamificationRecorder.Rise(point, true)));
 
         assertEquals(75, gamification.progress(user).totalXp(), "25 for consolidate plus 50 for maintain, once");
+    }
+
+    @Test
+    void onlyPracticeEvidenceEarnsMilestoneXp() {
+        UUID user = UUID.randomUUID();
+        UUID diagnosed = UUID.randomUUID();
+        UUID practiced = UUID.randomUUID();
+        UUID topic = UUID.randomUUID();
+        jdbc.update("INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set) "
+                + "VALUES (?, ?, TRUE), (?, ?, TRUE)", diagnosed, topic, practiced, topic);
+
+        // Three right answers reach maintain, but a diagnostic probe is not practice, so it pays nothing.
+        List<KnowledgeEvidence> probes = correctEvidence(diagnosed, EvidenceSource.DIAGNOSTIC_PROBE, 3);
+        evidence.append(user, probes);
+        masteryProfiles.recordEvidence(user, probes);
+        assertEquals(0, gamification.progress(user).totalXp());
+
+        List<KnowledgeEvidence> reviews = correctEvidence(practiced, EvidenceSource.REVIEW_SET, 3);
+        evidence.append(user, reviews);
+        masteryProfiles.recordEvidence(user, reviews);
+        assertEquals(75, gamification.progress(user).totalXp());
+    }
+
+    private static List<KnowledgeEvidence> correctEvidence(UUID kp, EvidenceSource source, int count) {
+        List<KnowledgeEvidence> rows = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            rows.add(KnowledgeEvidence.of(kp, true, source, UUID.randomUUID()));
+        }
+        return rows;
     }
 
     @Test

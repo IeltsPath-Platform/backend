@@ -19,7 +19,10 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import com.ieltspath.learning.domain.vo.EvidenceSource;
+
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -69,16 +72,22 @@ public class MasteryProfileUpdater {
 
     /** Call right after {@code evidence.append}; the streak moves by the newest outcome of each point. */
     public void recordEvidence(UUID userId, List<KnowledgeEvidence> appended) {
-        update(userId, appended.stream().map(KnowledgeEvidence::knowledgePointId).collect(Collectors.toSet()),
-                Mode.RECORD);
+        Set<UUID> touched = appended.stream().map(KnowledgeEvidence::knowledgePointId).collect(Collectors.toSet());
+        // Milestone XP is paid only for practice evidence: tests and essays do not earn it.
+        Set<UUID> practiced = appended.stream().filter(item -> PRACTICE_SOURCES.contains(item.source()))
+                .map(KnowledgeEvidence::knowledgePointId).collect(Collectors.toSet());
+        update(userId, touched, Mode.RECORD, practiced);
     }
+
+    private static final Set<EvidenceSource> PRACTICE_SOURCES = EnumSet.of(EvidenceSource.LESSON_EXERCISE,
+            EvidenceSource.PRACTICE_SET, EvidenceSource.REVIEW_SET, EvidenceSource.FREE_PRACTICE);
 
     /**
      * Rebuilds the profiles of the given points from their evidence alone, for a regrade or the first fill. The streak
      * is the run of right answers at the end of the recent history, and a point left without evidence loses its profile.
      */
     public void rebuild(UUID userId, Collection<UUID> knowledgePointIds) {
-        update(userId, new HashSet<>(knowledgePointIds), Mode.REBUILD);
+        update(userId, new HashSet<>(knowledgePointIds), Mode.REBUILD, Set.of());
     }
 
     /**
@@ -87,13 +96,14 @@ public class MasteryProfileUpdater {
      */
     public void decay(UUID userId, Collection<UUID> knowledgePointIds) {
         if (!formulas.usesMp1()) return;
-        update(userId, new HashSet<>(knowledgePointIds), Mode.DECAY);
+        update(userId, new HashSet<>(knowledgePointIds), Mode.DECAY, Set.of());
     }
 
     /** Evidence rows read per point for MP-1.0; far more than the window so repeats and capped practice are skipped. */
     private static final int MP1_EVIDENCE_READ = 60;
 
-    private void update(UUID userId, Set<UUID> knowledgePointIds, Mode mode) {
+    /** {@code practiced} are the points whose new evidence came from practice; only they can earn milestone XP. */
+    private void update(UUID userId, Set<UUID> knowledgePointIds, Mode mode, Set<UUID> practiced) {
         if (knowledgePointIds.isEmpty()) return;
         boolean rebuild = mode == Mode.REBUILD;
         boolean mp1 = formulas.usesMp1();
@@ -155,6 +165,7 @@ public class MasteryProfileUpdater {
         // Only live evidence pays milestone XP; a rebuild or decay re-derives scores that were already paid for.
         if (mode == Mode.RECORD) {
             List<GamificationRecorder.Rise> rises = updated.stream()
+                    .filter(profile -> practiced.contains(profile.knowledgePointId()))
                     .filter(profile -> profile.tier() != MasteryTier.PRIORITY && profile.tier() != MasteryTier.INSUFFICIENT)
                     .map(profile -> new GamificationRecorder.Rise(profile.knowledgePointId(),
                             profile.tier() == MasteryTier.MAINTAIN))
