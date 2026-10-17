@@ -1,6 +1,7 @@
 package com.ieltspath.content.application.result;
 
 import com.ieltspath.content.domain.vo.LearningType;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.Skill;
 
 import java.util.List;
@@ -65,6 +66,16 @@ public record TopicSequenceResult(
             LearningType learningType,
             Skill skill,
             String description,
-            boolean hasPracticeSet
-    ) {}
+            boolean hasPracticeSet,
+            CefrLevel cefrLevel,
+            String canDo,
+            String scopeIn,
+            String scopeOut
+    ) {
+        public KnowledgePointEntry(UUID id, UUID topicId, String code, String name, LearningType learningType,
+                                   Skill skill, String description, boolean hasPracticeSet) {
+            this(id, topicId, code, name, learningType, skill, description, hasPracticeSet,
+                    null, null, null, null);
+        }
+    }
 }

@@ -3,6 +3,7 @@ package com.ieltspath.content.api.dto.request;
 import com.ieltspath.content.domain.vo.KnowledgePointKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -18,5 +19,9 @@ public record UpdateKnowledgePointRequest(
         @NotNull(message = "kind is required") KnowledgePointKind kind,
         LearningType learningType,
         Skill skill,
-        String description
+        String description,
+        CefrLevel cefrLevel,
+        String canDo,
+        String scopeIn,
+        String scopeOut
 ) {}

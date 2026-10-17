@@ -10,15 +10,21 @@ The following routes require `ADMIN` or `CONTENT_AUTHOR`:
 | Method | Path | Behavior |
 | --- | --- | --- |
 | `POST` | `/api/content/knowledge-points` | Create a knowledge point. |
-| `PUT` | `/api/content/knowledge-points/{id}` | Replace its topic, code, name, kind, learning type, skill, and description. |
+| `PUT` | `/api/content/knowledge-points/{id}` | Replace its topic, code, name, kind, learning type, skill, description, CEFR level, can-do statement, and scope. |
 | `DELETE` | `/api/content/knowledge-points/{id}` | Set status to `INACTIVE`; repeated calls return `204`. |
 | `POST` | `/api/content/knowledge-points/{id}/activate` | Set status to `ACTIVE` and return the knowledge point. |
 | `GET` | `/api/content/knowledge-points/{id}/prerequisites` | Return direct prerequisites, including inactive points and their status. |
 | `PUT` | `/api/content/knowledge-points/{id}/prerequisites` | Replace the full prerequisite set (up to 300 IDs); duplicate IDs are collapsed and an empty array clears the set. |
 
-New or changed knowledge point codes must match `^[RLW](55|60|65|70)_[A-Z0-9_]{2,60}$`. An unchanged legacy code is
-accepted by `PUT`. Codes are checked for format only; the prefix is not compared with the point's skill or course band.
-An active point must have a `learningType`; activation without one returns `400`.
+New or changed knowledge point codes must match `^[RLWGV](55|60|65|70)_[A-Z0-9_]{2,60}$`. `G` codes are for
+`GRAMMAR` points with `skill=ALL`; `V` codes are for `VOCABULARY` points with `skill=ALL`. `R`, `L`, and `W` retain
+their existing format checks. An unchanged legacy code is accepted by `PUT`. An active point must have a
+`learningType`; activation without one returns `400`.
+
+Create and update requests accept nullable `cefrLevel` (`A1` through `C2`), `canDo`, `scopeIn`, and `scopeOut`. On
+creation, a missing `cefrLevel` is inferred from the owning course band when available; the other metadata fields
+default to `null`. Updating with null clears the corresponding metadata. These fields are also included in the
+knowledge point response.
 
 Changing `topicId` returns `409 KNOWLEDGE_POINT_IN_USE` when the point is linked to a published question version or a
 lesson. Other fields, including `code`, can still be updated.
@@ -41,9 +47,10 @@ Optional query parameters:
 | `includeInactive` | Include inactive points. Honored for `ADMIN` and `CONTENT_AUTHOR`; ignored for `EXAMINER`. |
 
 The response is `{ "nodes": [...], "edges": [...] }`. Each node contains `id`, `code`, `name`, `skill`, `kind`,
-`learningType`, `band`, `courseId`, `topicId`, `lessonIds`, and `status`. `band` and `courseId` are `null` when the
-point's topic is not attached to a course. Each edge is `{ "from": "<prerequisiteId>", "to": "<knowledgePointId>" }`.
-An edge is included only when both endpoint nodes are present in the response.
+`learningType`, `band`, `courseId`, `topicId`, `lessonIds`, `status`, `cefrLevel`, `canDo`, `scopeIn`, and `scopeOut`.
+The four metadata fields are nullable. `band` and `courseId` are `null` when the point's topic is not attached to a
+course. Each edge is `{ "from": "<prerequisiteId>", "to": "<knowledgePointId>" }`. An edge is included only when
+both endpoint nodes are present in the response.
 
 ## Internal learning read
 

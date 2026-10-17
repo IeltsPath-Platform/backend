@@ -5,6 +5,7 @@ import com.ieltspath.content.application.result.KnowledgeTreeNodeResult;
 import com.ieltspath.content.application.result.KnowledgeTreeResult;
 import com.ieltspath.content.application.usecase.GetKnowledgeTreeUseCase;
 import com.ieltspath.content.domain.vo.ContentStatus;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.KnowledgePointKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.Skill;
@@ -58,7 +59,11 @@ class KnowledgeTreeControllerTest {
 
         mockMvc.perform(get("/api/content/knowledge-tree"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.nodes[0].id").value(nodeId.toString()));
+                .andExpect(jsonPath("$.nodes[0].id").value(nodeId.toString()))
+                .andExpect(jsonPath("$.nodes[0].cefrLevel").value("B1"))
+                .andExpect(jsonPath("$.nodes[0].canDo").value("Identify the main idea."))
+                .andExpect(jsonPath("$.nodes[0].scopeIn").value("Short texts"))
+                .andExpect(jsonPath("$.nodes[0].scopeOut").value("Long-form inference"));
     }
 
     @Test
@@ -102,6 +107,7 @@ class KnowledgeTreeControllerTest {
     private KnowledgeTreeResult tree(UUID id, ContentStatus status) {
         return new KnowledgeTreeResult(List.of(new KnowledgeTreeNodeResult(id, "R55_TREE", "Tree node",
                 Skill.READING, KnowledgePointKind.GRAMMAR, LearningType.CONCEPT, new BigDecimal("5.5"),
-                UUID.randomUUID(), UUID.randomUUID(), List.of(), status)), List.of());
+                UUID.randomUUID(), UUID.randomUUID(), List.of(), status, CefrLevel.B1,
+                "Identify the main idea.", "Short texts", "Long-form inference")), List.of());
     }
 }

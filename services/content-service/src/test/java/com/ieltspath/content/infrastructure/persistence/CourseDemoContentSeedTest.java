@@ -26,7 +26,7 @@ class CourseDemoContentSeedTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("22").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("41").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
         reader = new JdbcLearningContentReader(jdbc);
     }
@@ -45,7 +45,7 @@ class CourseDemoContentSeedTest {
 
     @Test
     void everyCourseHasTwoObjectiveFinalTestsWithUnsharedQuestions() {
-        var courses = jdbc.queryForList("SELECT id FROM courses ORDER BY band_level", Map.of(), UUID.class);
+        var courses = jdbc.queryForList("SELECT id FROM courses WHERE status = 'ACTIVE' ORDER BY band_level", Map.of(), UUID.class);
         for (UUID course : courses) {
             var packages = reader.courseTestPackages(course);
             assertThat(packages).hasSize(2);

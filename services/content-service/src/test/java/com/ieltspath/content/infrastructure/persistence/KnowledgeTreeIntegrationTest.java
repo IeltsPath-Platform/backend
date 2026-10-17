@@ -12,6 +12,7 @@ import com.ieltspath.content.domain.exception.PrerequisiteCycleException;
 import com.ieltspath.content.domain.repository.KnowledgePointRepository;
 import com.ieltspath.content.domain.repository.TopicRepository;
 import com.ieltspath.content.domain.vo.ContentStatus;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.KnowledgePointKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.Skill;
@@ -72,6 +73,7 @@ class KnowledgeTreeIntegrationTest {
     private JdbcLearningContentReader reader;
     private JdbcKnowledgePrerequisiteRepository prerequisiteRepository;
     private JdbcTestKnowledgePointRepository knowledgePointRepository;
+    private KnowledgePointRepositoryAdapter productionKnowledgePointRepository;
     private JdbcTestTopicRepository topicRepository;
     private GetKnowledgeTreeUseCase getKnowledgeTree;
     private GetActiveKnowledgePrerequisitesUseCase getActivePrerequisites;
@@ -90,7 +92,7 @@ class KnowledgeTreeIntegrationTest {
         dataSource.setURL(POSTGRES.getJdbcUrl());
         dataSource.setUser(POSTGRES.getUsername());
         dataSource.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").target("29").load().migrate();
+        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
 
         LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
         factory.setDataSource(dataSource);
@@ -121,7 +123,7 @@ class KnowledgeTreeIntegrationTest {
         entityManager = entityManagerFactory.createEntityManager();
         var jpaKnowledgePointRepository = new JpaRepositoryFactory(entityManager)
                 .getRepository(KnowledgePointJpaRepository.class);
-        var productionKnowledgePointRepository = new KnowledgePointRepositoryAdapter(
+        productionKnowledgePointRepository = new KnowledgePointRepositoryAdapter(
                 jpaKnowledgePointRepository, new KnowledgePointPersistenceMapper());
         getKnowledgeTree = new GetKnowledgeTreeUseCase(reader, prerequisiteRepository);
         getActivePrerequisites = new GetActiveKnowledgePrerequisitesUseCase(reader);
@@ -171,13 +173,40 @@ class KnowledgeTreeIntegrationTest {
 
         var tree = getKnowledgeTree.execute(course, Skill.READING, false);
         assertThat(tree.nodes()).extracting(node -> node.id()).containsExactlyInAnyOrder(a, b, c);
-        assertThat(tree.edges()).containsExactlyInAnyOrder(
+        assertThat(tree.edges().stream().filter(edge -> knowledgePointIds.contains(edge.to())).toList())
+                .containsExactlyInAnyOrder(
                 new com.ieltspath.content.application.result.KnowledgeTreeResult.Edge(a, b),
                 new com.ieltspath.content.application.result.KnowledgeTreeResult.Edge(b, c));
 
         assertThatThrownBy(() -> replace(a, List.of(c)))
                 .isInstanceOf(PrerequisiteCycleException.class);
-        assertThat(prerequisiteRepository.findAll()).hasSize(2);
+        assertThat(prerequisiteRepository.findAll().stream()
+                .filter(edge -> knowledgePointIds.contains(edge.knowledgePointId())).toList()).hasSize(2);
+    }
+
+    @Test
+    void knowledgePointMetadataPersistsAndAppearsInTheInternalTreeProjection() {
+        UUID course = course();
+        UUID topic = topic(course, Skill.READING);
+        UUID id = knowledgePoint(topic, "METADATA");
+        jdbc.update("""
+                UPDATE knowledge_points
+                SET cefr_level='B1', can_do='Find the main idea.', scope_in='Short passages.', scope_out='Long inference chains.'
+                WHERE id=?
+                """, id);
+
+        KnowledgePoint persisted = productionKnowledgePointRepository.findById(id).orElseThrow();
+        assertThat(persisted.getCefrLevel()).isEqualTo(CefrLevel.B1);
+        assertThat(persisted.getCanDo()).isEqualTo("Find the main idea.");
+        assertThat(persisted.getScopeIn()).isEqualTo("Short passages.");
+        assertThat(persisted.getScopeOut()).isEqualTo("Long inference chains.");
+
+        var node = reader.knowledgeTreeNodes(course, Skill.READING, false).stream()
+                .filter(candidate -> candidate.id().equals(id)).findFirst().orElseThrow();
+        assertThat(node.cefrLevel()).isEqualTo(CefrLevel.B1);
+        assertThat(node.canDo()).isEqualTo("Find the main idea.");
+        assertThat(node.scopeIn()).isEqualTo("Short passages.");
+        assertThat(node.scopeOut()).isEqualTo("Long inference chains.");
     }
 
     @Test
@@ -197,7 +226,8 @@ class KnowledgeTreeIntegrationTest {
             start.countDown();
 
             assertThat(List.of(aDependsOnB.get(), bDependsOnA.get())).containsExactlyInAnyOrder(true, false);
-            assertThat(prerequisiteRepository.findAll()).hasSize(1);
+            assertThat(prerequisiteRepository.findAll().stream()
+                    .filter(edge -> knowledgePointIds.contains(edge.knowledgePointId())).toList()).hasSize(1);
         } finally {
             executor.shutdownNow();
         }

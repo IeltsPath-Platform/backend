@@ -10,16 +10,14 @@ import com.ieltspath.content.domain.exception.KnowledgePointNotFoundException;
 import com.ieltspath.content.domain.exception.TopicNotFoundException;
 import com.ieltspath.content.domain.repository.KnowledgePointRepository;
 import com.ieltspath.content.domain.repository.TopicRepository;
+import com.ieltspath.content.domain.vo.KnowledgePointCodeRules;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.regex.Pattern;
 
 @Service
 @Transactional
 public class UpdateKnowledgePointUseCase {
-    private static final Pattern CODE_PATTERN = Pattern.compile("^[RLW](55|60|65|70)_[A-Z0-9_]{2,60}$");
-
     private final KnowledgePointRepository knowledgePointRepository;
     private final TopicRepository topicRepository;
 
@@ -36,19 +34,23 @@ public class UpdateKnowledgePointUseCase {
             throw new TopicNotFoundException(command.topicId());
         }
         if (!knowledgePoint.getCode().equals(command.code())) {
-            if (!CODE_PATTERN.matcher(command.code()).matches()) {
+            if (!KnowledgePointCodeRules.isValid(command.code(), command.kind(), command.skill())) {
                 throw new InvalidKnowledgePointCodeException(command.code());
             }
             knowledgePointRepository.findByCode(command.code())
                     .filter(existing -> !existing.getId().equals(id))
                     .ifPresent(existing -> { throw new DuplicateCodeException("KnowledgePoint", command.code()); });
         }
+        if (!KnowledgePointCodeRules.isPrefixCompatible(command.code(), command.kind(), command.skill())) {
+            throw new InvalidKnowledgePointCodeException(command.code());
+        }
         if (!knowledgePoint.getTopicId().equals(command.topicId()) && knowledgePointRepository.isInUse(id)) {
             throw new KnowledgePointInUseException(id);
         }
 
         knowledgePoint.update(command.topicId(), command.code(), command.name(), command.kind(),
-                command.learningType(), command.skill(), command.description());
+                command.learningType(), command.skill(), command.description(), command.cefrLevel(), command.canDo(),
+                command.scopeIn(), command.scopeOut());
         return KnowledgePointResult.from(knowledgePointRepository.save(knowledgePoint));
     }
 }

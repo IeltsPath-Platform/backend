@@ -56,7 +56,11 @@ public class KnowledgePointController {
                 request.kind(),
                 request.learningType(),
                 request.skill(),
-                request.description()
+                request.description(),
+                request.cefrLevel(),
+                request.canDo(),
+                request.scopeIn(),
+                request.scopeOut()
         ));
         return KnowledgePointResponse.from(result);
     }
@@ -67,7 +71,8 @@ public class KnowledgePointController {
                                                        @Valid @RequestBody UpdateKnowledgePointRequest request) {
         KnowledgePointResult result = updateKnowledgePointUseCase.execute(id, new UpdateKnowledgePointCommand(
                 request.topicId(), request.code(), request.name(), request.kind(), request.learningType(),
-                request.skill(), request.description()));
+                request.skill(), request.description(), request.cefrLevel(), request.canDo(), request.scopeIn(),
+                request.scopeOut()));
         return KnowledgePointResponse.from(result);
     }
 

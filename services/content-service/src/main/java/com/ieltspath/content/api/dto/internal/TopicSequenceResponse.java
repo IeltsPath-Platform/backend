@@ -2,6 +2,7 @@ package com.ieltspath.content.api.dto.internal;
 
 import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.domain.vo.LearningType;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.Skill;
 
 import java.util.List;
@@ -28,14 +29,16 @@ public record TopicSequenceResponse(
         }
     }
     public record KnowledgePoint(UUID id, String code, String name, LearningType learningType, Skill skill,
-                                 String description, boolean hasPracticeSet) {}
+                                 String description, boolean hasPracticeSet, CefrLevel cefrLevel, String canDo,
+                                 String scopeIn, String scopeOut) {}
 
     public static TopicSequenceResponse from(TopicSequenceResult result) {
         return new TopicSequenceResponse(result.topicId(), result.code(), result.name(), result.sortOrder(),
                 result.requiredFeatureKey(),
                 result.knowledgePoints().stream()
                         .map(kp -> new KnowledgePoint(kp.id(), kp.code(), kp.name(), kp.learningType(), kp.skill(),
-                                kp.description(), kp.hasPracticeSet()))
+                                kp.description(), kp.hasPracticeSet(), kp.cefrLevel(), kp.canDo(), kp.scopeIn(),
+                                kp.scopeOut()))
                         .toList(),
                 result.skill(), result.hasTopicTest(), Course.from(result.course()), result.skills(), result.active());
     }

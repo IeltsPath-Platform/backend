@@ -23,6 +23,7 @@ import com.ieltspath.content.domain.vo.QuestionDifficulty;
 import com.ieltspath.content.domain.vo.Skill;
 import com.ieltspath.content.domain.vo.ContentStatus;
 import com.ieltspath.content.domain.vo.KnowledgePointKind;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -146,6 +147,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
         Map<UUID, List<TopicSequenceResult.KnowledgePointEntry>> pointsByTopic = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT kp.id, kp.topic_id, kp.code, kp.name, kp.learning_type, kp.skill, kp.description,
+                       kp.cefr_level, kp.can_do, kp.scope_in, kp.scope_out,
                        EXISTS (SELECT 1 FROM content_packages p WHERE %s) AS has_practice_set
                 FROM knowledge_points kp
                 WHERE kp.status = 'ACTIVE' AND kp.topic_id IN (:topicIds)
@@ -161,7 +163,9 @@ public class JdbcLearningContentReader implements LearningContentReader {
                                     uuid(rs, "id"), topicId, rs.getString("code"), rs.getString("name"),
                                     enumOrNull(LearningType.class, rs.getString("learning_type")),
                                     enumOrNull(Skill.class, rs.getString("skill")),
-                                    rs.getString("description"), rs.getBoolean("has_practice_set")));
+                                    rs.getString("description"), rs.getBoolean("has_practice_set"),
+                                    enumOrNull(CefrLevel.class, rs.getString("cefr_level")),
+                                    rs.getString("can_do"), rs.getString("scope_in"), rs.getString("scope_out")));
                 });
 
         return topics.stream()
@@ -733,6 +737,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
         }
         return jdbc.query("""
                 SELECT kp.id, kp.code, kp.name, kp.skill, kp.kind, kp.learning_type,
+                       kp.cefr_level, kp.can_do, kp.scope_in, kp.scope_out,
                        c.band_level AS band, c.id AS course_id, kp.topic_id, kp.status,
                        ARRAY(SELECT lkp.lesson_id FROM lesson_knowledge_points lkp
                              WHERE lkp.knowledge_point_id = kp.id ORDER BY lkp.lesson_id) AS lesson_ids
@@ -746,7 +751,9 @@ public class JdbcLearningContentReader implements LearningContentReader {
                         KnowledgePointKind.valueOf(rs.getString("kind")),
                         enumOrNull(LearningType.class, rs.getString("learning_type")),
                         rs.getBigDecimal("band"), nullableUuid(rs, "course_id"), uuid(rs, "topic_id"),
-                        uuids(rs.getArray("lesson_ids")), ContentStatus.valueOf(rs.getString("status"))));
+                        uuids(rs.getArray("lesson_ids")), ContentStatus.valueOf(rs.getString("status")),
+                        enumOrNull(CefrLevel.class, rs.getString("cefr_level")), rs.getString("can_do"),
+                        rs.getString("scope_in"), rs.getString("scope_out")));
     }
 
     @Override

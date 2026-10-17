@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Metadata KP và cây đủ 6 miền"
-status: pending
+status: in_progress
 priority: P2
 dependencies: []
 ---
@@ -56,9 +56,14 @@ Listening, Reading, Writing, Speaking, Grammar, Vocabulary. KP hiện tại ch�
 
 ## Success Criteria
 
-- [ ] KP có thể lưu và đọc `cefrLevel`, `canDo`, `scopeIn`, `scopeOut`; KP cũ không lỗi.
-- [ ] Tạo KP Grammar với mã `G55_...` được; mã sai tiền tố → `400`.
+- [x] KP có thể lưu và đọc `cefrLevel`, `canDo`, `scopeIn`, `scopeOut`; KP cũ không lỗi.
+- [x] Tạo KP Grammar với mã `G55_...` được; mã sai tiền tố → `400`.
 - [ ] Cây có KP Grammar/Vocab nối vào KP chiến lược, không có vòng.
+
+## Progress
+
+- Schema, API metadata và proposal `reports/seed-grammar-vocab.md` hoàn tất. V42 seed vẫn chờ người có chuyên môn IELTS duyệt.
+- Test: `mvn -B -ntp -f pom.xml -pl services/content-service test` — 407 tests, 0 failures, 0 errors, 0 skipped; PostgreSQL Testcontainers ran.
 
 ## Risk Assessment
 

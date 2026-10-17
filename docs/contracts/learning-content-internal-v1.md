@@ -55,7 +55,7 @@ Returns an array of ACTIVE topics that belong to an ACTIVE course and have at le
     "skill": "READING", "hasTopicTest": true, "active": true,
     "course": {"courseId":"30000000-0000-4000-8000-000000000001","code":"IELTS_5_5","name":"IELTS 5.5","bandLevel":5.5,"hasCourseTest":true,"active":true},
     "knowledgePoints": [
-      {"id":"20000000-0000-4000-8000-000000000003","code":"DR_TOPIC_SENTENCE","name":"Câu chủ đề","learningType":"PROCEDURE","skill":"READING","description":null,"hasPracticeSet":true}
+      {"id":"20000000-0000-4000-8000-000000000003","code":"DR_TOPIC_SENTENCE","name":"Câu chủ đề","learningType":"PROCEDURE","skill":"READING","description":null,"cefrLevel":null,"canDo":null,"scopeIn":null,"scopeOut":null,"hasPracticeSet":true}
     ]
   },
   {
@@ -64,13 +64,23 @@ Returns an array of ACTIVE topics that belong to an ACTIVE course and have at le
     "skill": "READING", "hasTopicTest": true, "active": true,
     "course": {"courseId":"30000000-0000-4000-8000-000000000001","code":"IELTS_5_5","name":"IELTS 5.5","bandLevel":5.5,"hasCourseTest":true,"active":true},
     "knowledgePoints": [
-      {"id":"20000000-0000-4000-8000-000000000005","code":"TFNG_FALSE_VS_NOT_GIVEN","name":"False hay Not Given","learningType":"PROCEDURE","skill":"READING","description":null,"hasPracticeSet":true}
+      {"id":"20000000-0000-4000-8000-000000000005","code":"TFNG_FALSE_VS_NOT_GIVEN","name":"False hay Not Given","learningType":"PROCEDURE","skill":"READING","description":null,"cefrLevel":null,"canDo":null,"scopeIn":null,"scopeOut":null,"hasPracticeSet":true}
     ]
   }
 ]
 ```
 
-The example shows representative KPs; the real response includes **all** ACTIVE KPs of each returned topic (KP1–KP4 for `DEMO_READING`, KP5 for `TFNG_SKILLS`). `hasPracticeSet` uses the same eligible-package predicate as search, including the no-overlap rule below. It is computed in a batched query, not by one query per KP. The topic object is `{topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, skills, active}`; `skill` and `hasTopicTest` were added 2026-10-03, `course` and `skills` on 2026-10-07, and `active` on 2026-10-16. Existing readers that ignore unknown fields keep working. Content V15 moved the Writing knowledge points `DEMO_READING_W1_CHART` and `DEMO_READING_W2_OPINION`, with their essay blocks (same block ids), from Reading lessons L3/L4 to `DEMO_WRITING` lessons W1/W2 (sort 950, no final test). `requiredFeatureKey` (added 2026-10-02) is the Access feature needed to learn the topic, `null` when free; the seed marks `PREMIUM_MATCHING_INFO` and `PREMIUM_SENTENCE_COMPLETION` (sort 930, 940) with `PREMIUM_CONTENT`.
+Each knowledge point now also contains nullable `cefrLevel` (`A1`–`C2`), `canDo`, `scopeIn`, and `scopeOut`. The
+example shows representative KPs; the real response includes **all** ACTIVE KPs of each returned topic (KP1–KP4 for
+`DEMO_READING`, KP5 for `TFNG_SKILLS`). `hasPracticeSet` uses the same eligible-package predicate as search,
+including the no-overlap rule below. It is computed in a batched query, not by one query per KP. The topic object is
+`{topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, skills, active}`;
+`skill` and `hasTopicTest` were added 2026-10-03, `course` and `skills` on 2026-10-07, and `active` on 2026-10-16.
+Existing readers that ignore unknown fields keep working. Content V15 moved the Writing knowledge points
+`DEMO_READING_W1_CHART` and `DEMO_READING_W2_OPINION`, with their essay blocks (same block ids), from Reading lessons
+L3/L4 to `DEMO_WRITING` lessons W1/W2 (sort 950, no final test). `requiredFeatureKey` (added 2026-10-02) is the
+Access feature needed to learn the topic, `null` when free; the seed marks `PREMIUM_MATCHING_INFO` and
+`PREMIUM_SENTENCE_COMPLETION` (sort 930, 940) with `PREMIUM_CONTENT`.
 
 ## `GET /topics/{id}/lessons`
 

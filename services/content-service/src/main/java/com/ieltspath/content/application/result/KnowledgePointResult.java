@@ -2,6 +2,7 @@ package com.ieltspath.content.application.result;
 
 import com.ieltspath.content.domain.aggregate.KnowledgePoint;
 import com.ieltspath.content.domain.vo.ContentStatus;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.KnowledgePointKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.Skill;
@@ -20,8 +21,19 @@ public record KnowledgePointResult(
         String description,
         ContentStatus status,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        CefrLevel cefrLevel,
+        String canDo,
+        String scopeIn,
+        String scopeOut
 ) {
+    public KnowledgePointResult(UUID id, UUID topicId, String code, String name, KnowledgePointKind kind,
+                                LearningType learningType, Skill skill, String description, ContentStatus status,
+                                Instant createdAt, Instant updatedAt) {
+        this(id, topicId, code, name, kind, learningType, skill, description, status, createdAt, updatedAt,
+                null, null, null, null);
+    }
+
     public static KnowledgePointResult from(KnowledgePoint kp) {
         return new KnowledgePointResult(
                 kp.getId(),
@@ -34,7 +46,11 @@ public record KnowledgePointResult(
                 kp.getDescription(),
                 kp.getStatus(),
                 kp.getCreatedAt(),
-                kp.getUpdatedAt()
+                kp.getUpdatedAt(),
+                kp.getCefrLevel(),
+                kp.getCanDo(),
+                kp.getScopeIn(),
+                kp.getScopeOut()
         );
     }
 }

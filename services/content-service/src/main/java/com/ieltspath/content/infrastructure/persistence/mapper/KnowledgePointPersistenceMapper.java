@@ -18,6 +18,10 @@ public class KnowledgePointPersistenceMapper {
                 entity.getLearningType(),
                 entity.getSkill(),
                 entity.getDescription(),
+                entity.getCefrLevel(),
+                entity.getCanDo(),
+                entity.getScopeIn(),
+                entity.getScopeOut(),
                 entity.getStatus(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
@@ -35,6 +39,10 @@ public class KnowledgePointPersistenceMapper {
                 .learningType(domain.getLearningType())
                 .skill(domain.getSkill())
                 .description(domain.getDescription())
+                .cefrLevel(domain.getCefrLevel())
+                .canDo(domain.getCanDo())
+                .scopeIn(domain.getScopeIn())
+                .scopeOut(domain.getScopeOut())
                 .status(domain.getStatus())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())

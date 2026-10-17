@@ -2,6 +2,8 @@ package com.ieltspath.content.api.controller;
 
 import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.result.KnowledgePointResult;
+import com.ieltspath.content.application.command.CreateKnowledgePointCommand;
+import com.ieltspath.content.application.command.UpdateKnowledgePointCommand;
 import com.ieltspath.content.application.usecase.CreateKnowledgePointUseCase;
 import com.ieltspath.content.application.usecase.ActivateKnowledgePointUseCase;
 import com.ieltspath.content.application.usecase.DeactivateKnowledgePointUseCase;
@@ -14,6 +16,7 @@ import com.ieltspath.content.domain.exception.KnowledgePointInUseException;
 import com.ieltspath.content.domain.exception.KnowledgePointNotFoundException;
 import com.ieltspath.content.domain.exception.PrerequisiteCycleException;
 import com.ieltspath.content.domain.vo.ContentStatus;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.KnowledgePointKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +34,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.times;
@@ -93,6 +97,73 @@ class KnowledgePointControllerTest {
     }
 
     @Test
+    void exposesNullableCefrAndScopeMetadataForExistingKnowledgePoints() throws Exception {
+        when(getKnowledgePointsUseCase.execute(null)).thenReturn(List.of(result(UUID.randomUUID(), LearningType.MEMORY)));
+
+        mockMvc.perform(get("/api/content/knowledge-points"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].cefrLevel").hasJsonPath())
+                .andExpect(jsonPath("$[0].canDo").hasJsonPath())
+                .andExpect(jsonPath("$[0].scopeIn").hasJsonPath())
+                .andExpect(jsonPath("$[0].scopeOut").hasJsonPath());
+    }
+
+    @Test
+    void returnsCefrAndScopeMetadataWhenPresent() throws Exception {
+        UUID id = UUID.randomUUID();
+        Instant now = Instant.parse("2026-10-17T00:00:00Z");
+        when(getKnowledgePointsUseCase.execute(null)).thenReturn(List.of(new KnowledgePointResult(id,
+                UUID.randomUUID(), "G55_COMPLEX_SENTENCES", "Complex sentences", KnowledgePointKind.GRAMMAR,
+                LearningType.CONCEPT, com.ieltspath.content.domain.vo.Skill.ALL, "Legacy description",
+                ContentStatus.ACTIVE, now, now, CefrLevel.B1, "Can form a clear complex sentence.",
+                "Basic subordinate clauses", "Advanced clause reduction")));
+
+        mockMvc.perform(get("/api/content/knowledge-points"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].cefrLevel").value("B1"))
+                .andExpect(jsonPath("$[0].canDo").value("Can form a clear complex sentence."))
+                .andExpect(jsonPath("$[0].scopeIn").value("Basic subordinate clauses"))
+                .andExpect(jsonPath("$[0].scopeOut").value("Advanced clause reduction"));
+    }
+
+    @Test
+    void acceptsGrammarKnowledgePointCodeAndAllSkill() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(createKnowledgePointUseCase.execute(any())).thenReturn(result(id, LearningType.CONCEPT));
+
+        mockMvc.perform(post("/api/content/knowledge-points")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"topicId":"%s","code":"G55_COMPLEX_SENTENCES","name":"Complex sentences",
+                                 "kind":"GRAMMAR","learningType":"CONCEPT","skill":"ALL"}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isCreated());
+
+        verify(createKnowledgePointUseCase).execute(any());
+    }
+
+    @Test
+    void forwardsCefrCanDoAndScopeFieldsWhenCreatingKnowledgePoints() throws Exception {
+        when(createKnowledgePointUseCase.execute(any())).thenReturn(result(UUID.randomUUID(), LearningType.CONCEPT));
+
+        mockMvc.perform(post("/api/content/knowledge-points")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"topicId":"%s","code":"G60_PERFECT_TENSES","name":"Perfect tenses",
+                                 "kind":"GRAMMAR","learningType":"CONCEPT","skill":"ALL",
+                                 "cefrLevel":"B1","canDo":"Connect events to a reference time.",
+                                 "scopeIn":"Present perfect","scopeOut":"Perfect continuous forms"}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isCreated());
+
+        verify(createKnowledgePointUseCase).execute(argThat((CreateKnowledgePointCommand command) ->
+                command.cefrLevel() == CefrLevel.B1
+                        && "Connect events to a reference time.".equals(command.canDo())
+                        && "Present perfect".equals(command.scopeIn())
+                        && "Perfect continuous forms".equals(command.scopeOut())));
+    }
+
+    @Test
     void rejectsMissingLearningTypeOnKnowledgePointCreation() throws Exception {
         mockMvc.perform(post("/api/content/knowledge-points")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -148,20 +219,32 @@ class KnowledgePointControllerTest {
     void updatesKnowledgePointTopicAndCode() throws Exception {
         UUID id = UUID.randomUUID();
         UUID topicId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-10-17T00:00:00Z");
         when(updateKnowledgePointUseCase.execute(org.mockito.ArgumentMatchers.eq(id), any()))
                 .thenReturn(new KnowledgePointResult(id, topicId, "R60_UPDATED", "Updated", KnowledgePointKind.GRAMMAR,
-                        LearningType.CONCEPT, null, null, ContentStatus.ACTIVE, Instant.now(), Instant.now()));
+                        LearningType.CONCEPT, null, null, ContentStatus.ACTIVE, now, now, CefrLevel.B2,
+                        "Can express a clear comparison.", "Basic comparatives", "Rhetorical comparisons"));
 
         mockMvc.perform(put("/api/content/knowledge-points/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"topicId":"%s","code":"R60_UPDATED","name":"Updated","kind":"GRAMMAR","learningType":"CONCEPT"}
+                                {"topicId":"%s","code":"R60_UPDATED","name":"Updated","kind":"GRAMMAR","learningType":"CONCEPT",
+                                 "cefrLevel":"B2","canDo":"Can express a clear comparison.",
+                                 "scopeIn":"Basic comparatives","scopeOut":"Rhetorical comparisons"}
                                 """.formatted(topicId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.topicId").value(topicId.toString()))
-                .andExpect(jsonPath("$.code").value("R60_UPDATED"));
+                .andExpect(jsonPath("$.code").value("R60_UPDATED"))
+                .andExpect(jsonPath("$.cefrLevel").value("B2"))
+                .andExpect(jsonPath("$.canDo").value("Can express a clear comparison."))
+                .andExpect(jsonPath("$.scopeIn").value("Basic comparatives"))
+                .andExpect(jsonPath("$.scopeOut").value("Rhetorical comparisons"));
 
-        verify(updateKnowledgePointUseCase).execute(org.mockito.ArgumentMatchers.eq(id), any());
+        verify(updateKnowledgePointUseCase).execute(org.mockito.ArgumentMatchers.eq(id),
+                argThat((UpdateKnowledgePointCommand command) -> command.cefrLevel() == CefrLevel.B2
+                        && "Can express a clear comparison.".equals(command.canDo())
+                        && "Basic comparatives".equals(command.scopeIn())
+                        && "Rhetorical comparisons".equals(command.scopeOut())));
     }
 
     @Test

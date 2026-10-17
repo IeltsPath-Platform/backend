@@ -21,6 +21,7 @@ import com.ieltspath.content.domain.exception.LessonNotFoundException;
 import com.ieltspath.content.domain.exception.TopicNotFoundException;
 import com.ieltspath.content.domain.vo.AssetType;
 import com.ieltspath.content.domain.vo.BlockType;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.Skill;
@@ -74,15 +75,23 @@ class InternalLearningContentControllerTest {
         UUID course = UUID.randomUUID();
         UUID pkg = UUID.randomUUID();
         UUID version = UUID.randomUUID();
+        UUID knowledgePointId = UUID.randomUUID();
+        var knowledgePoint = new TopicSequenceResult.KnowledgePointEntry(knowledgePointId, UUID.randomUUID(),
+                "G55_COMPLEX_SENTENCES", "Complex sentences", com.ieltspath.content.domain.vo.LearningType.CONCEPT,
+                Skill.ALL, null, true, CefrLevel.B1, "Can use a subordinate clause.", "Basic clauses", "Reduced clauses");
         when(topicSequence.execute()).thenReturn(List.of(new TopicSequenceResult(UUID.randomUUID(), "TOPIC", "Topic",
-                1, null, List.of(), Skill.READING, false,
+                1, null, List.of(knowledgePoint), Skill.READING, false,
                 new TopicSequenceResult.CourseEntry(course, "IELTS_5_5", "IELTS 5.5", new java.math.BigDecimal("5.5"), true))));
         when(courseTests.execute(course)).thenReturn(List.of(
                 new com.ieltspath.content.application.result.TopicTestPackageResult(pkg, version, "FINAL")));
         mockMvc.perform(get("/internal/learning-content/topic-sequence"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].course.courseId").value(course.toString()))
                 .andExpect(jsonPath("$[0].course.bandLevel").value(5.5))
-                .andExpect(jsonPath("$[0].course.hasCourseTest").value(true));
+                .andExpect(jsonPath("$[0].course.hasCourseTest").value(true))
+                .andExpect(jsonPath("$[0].knowledgePoints[0].cefrLevel").value("B1"))
+                .andExpect(jsonPath("$[0].knowledgePoints[0].canDo").value("Can use a subordinate clause."))
+                .andExpect(jsonPath("$[0].knowledgePoints[0].scopeIn").value("Basic clauses"))
+                .andExpect(jsonPath("$[0].knowledgePoints[0].scopeOut").value("Reduced clauses"));
         mockMvc.perform(get("/internal/learning-content/courses/{id}/test-packages", course))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].packageId").value(pkg.toString()))
                 .andExpect(jsonPath("$[0].packageVersionId").value(version.toString()))
