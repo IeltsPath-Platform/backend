@@ -59,7 +59,7 @@ Mastery MP-1.0 ──> tier INSUFFICIENT │ PRIORITY │ CONSOLIDATE │ MAINTA
 | # | Phase | Service | Status | Phụ thuộc |
 |---|---|---|---|---|
 | 1 | [Metadata KP và cây đủ 6 miền](phase-01-kp-metadata-and-domains.md) | content | pending | – |
-| 2 | [Mastery MP-1.0](phase-02-mastery-mp1.md) | learning | pending | – |
+| 2 | [Mastery MP-1.0](phase-02-mastery-mp1.md) | learning | completed (công thức sau cờ `DEEPTUTOR`; chờ xác nhận bật `MP1`) | – |
 | 3 | [Luyện tự do theo KP và cây của học viên](phase-03-free-practice-and-learner-tree.md) | learning, content | pending | 2 |
 | 4 | [Báo cáo theo kỹ năng và band mục tiêu](phase-04-skill-report-and-target-band.md) | learning, user | pending | 2 |
 | 5 | [Bản chụp tuần, xu hướng, bản tháng](phase-05-weekly-monthly-snapshots.md) | learning | pending | 4 |

@@ -78,11 +78,11 @@ với 2. Mọi nguồn tính như nhau, không giảm theo thời gian. Tài li�
 
 ## Success Criteria
 
-- [ ] Với `policy=MP1`, học viên có 2 bằng chứng thấy tier `INSUFFICIENT`, không bị đưa vào giỏ ôn.
-- [ ] Bằng chứng 60 ngày tuổi có trọng số 0.25 so với bằng chứng mới.
-- [ ] Mastery dao động 78–82 không làm tier nhảy qua lại.
-- [ ] Bài ôn chặn sinh ra đúng như trước ở bộ test hiện có của plan 261009 và plan 1.
-- [ ] `policy=DEEPTUTOR` cho kết quả giống hệt hiện tại.
+- [x] Với `policy=MP1`, học viên có bằng chứng chưa đủ thấy tier `INSUFFICIENT`, không bị đưa vào giỏ ôn. (test: `Mp1MasteryIntegrationTest.aPointWithTooLittleEvidence...`, `Mp1MasteryCalculatorTest.oneOrTwoPiecesOfEvidenceAreNotEnough`)
+- [x] Bằng chứng 60 ngày tuổi có trọng số 0.25 so với bằng chứng mới. (test: `Mp1MasteryCalculatorTest.evidenceHalvesEveryThirtyDays`)
+- [x] Mastery dao động 78–82 không làm tier nhảy qua lại. (test: `MasteryPolicyTest.aScoreSwingingAroundAThresholdDoesNotFlipTheTier`)
+- [x] Bài ôn chặn sinh ra đúng như trước ở bộ test hiện có của plan 261009 và plan 1. (test: toàn bộ learning-service 523/0/0)
+- [x] `policy=DEEPTUTOR` cho kết quả giống hệt hiện tại. (test: `MasteryProfileIntegrationTest` và `MasteryCalculatorTest` giữ nguyên)
 
 ## Risk Assessment
 

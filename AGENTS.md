@@ -168,8 +168,12 @@ src/main/java/com/ieltspath/<service>
 - Trạng thái nằm trong aggregate (`LessonProgress`, `LearnerCurriculum`, `ReviewItem`, `TopicTestAssignment`,
   `WritingSubmission`); thay đổi trạng thái qua method của aggregate rồi lưu bằng `domain/repository`, adapter JDBC
   không chứa luật. Khóa, replay theo `requestId`, hạn mức LLM là port ở `application/port`.
-- Không còn path DeepTutor: bằng chứng học lưu theo user ở `kp_evidence`; mastery của KP tính khi đọc bằng
-  `MasteryCalculator` (port `compute_mastery` của DeepTutor v1.6.9, Apache-2.0; giữ comment ghi nguồn và giá trị test gốc).
+- Bằng chứng học lưu theo user ở `kp_evidence` (kèm `question_version_id` khi có câu hỏi). Công thức mặc định là
+  `MasteryCalculator` (port `compute_mastery` của DeepTutor v1.6.9, Apache-2.0; giữ comment ghi nguồn và giá trị test gốc):
+  5 kết quả gần nhất, không giảm theo thời gian. Công thức MP-1.0 (`Mp1MasteryCalculator`) chọn bằng
+  `learning.mastery.policy=MP1`: cửa sổ 8 bằng chứng, tối đa 3 bài luyện, trọng số nguồn, giảm theo tuổi (half-life 30
+  ngày), cùng câu trong 7 ngày tính một lần, tier `INSUFFICIENT` khi chưa đủ dữ liệu, biên đệm 0.03 khi đổi tier. Điểm
+  MP-1.0 giảm theo thời gian qua `MasteryDecayJob`. Đổi công thức phải chạy rebuild cho mọi hồ sơ.
 - Skill của lesson suy ra từ câu hỏi trong các block; lesson có thể chứa nhiều skill. Khóa lesson, review và Practice
   được áp theo từng skill; bài học hoàn thành theo các block bắt buộc, Practice phải đạt riêng cho từng skill có yêu cầu.
 - Thứ tự topic theo user từ Content `topic-sequence`, không LLM/goal; mỗi course là một chuỗi chung mọi skill. Placement

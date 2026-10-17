@@ -12,8 +12,8 @@ result. A retake adds events but no evidence, so it changes no profile.
 
 | Field | Meaning |
 | --- | --- |
-| `mastery` | Score 0–1 with three decimals, from the existing recency-weighted calculator (last five outcomes). |
-| `tier` | `PRIORITY` below `priority-below`, `CONSOLIDATE` below `maintain-from`, otherwise `MAINTAIN`. The tier is cut on the stored three-decimal value. |
+| `mastery` | Score 0–1 with three decimals. Under `DEEPTUTOR`: the recency-weighted calculator (last five outcomes). Under `MP1`: the weighted share of the newest valid evidence, and it falls as evidence ages. |
+| `tier` | `PRIORITY` below `priority-below`, `CONSOLIDATE` below `maintain-from`, otherwise `MAINTAIN`. The tier is cut on the stored three-decimal value. Under `MP1` a point with too little evidence has `INSUFFICIENT` ("chưa đủ dữ liệu", no review, not in the basket), and a judged point changes tier only past the threshold by 0.03. |
 | `success_streak` | Grows by one when the newest evidence is right and the tier did not fall; resets to 0 when it is wrong; unchanged when it is right but the tier fell. |
 | `next_review_at` | `PRIORITY`: none (a blocking review covers it). `CONSOLIDATE`: last evidence + `consolidate-days`. `MAINTAIN`: last evidence + `review-intervals-days[min(streak, last)]`. |
 | `median_duration_ms`, `top_error_codes` | From the question event log of the last 90 days: median time and the three most frequent error codes. |
@@ -86,8 +86,9 @@ Role `ADMIN` for all three routes.
   `mastery.review-intervals-days`, `review.consolidate-days`. A stored value wins over the service configuration
   `learning.mastery.*`; without a row the configuration applies. `learning.review-mastery-threshold` is the older name of
   `learning.mastery.priority-below` and is its default.
-- A change takes effect for profiles written afterwards. `recompute` moves the tier and review date of the stored ones; it
-  never touches the score or the evidence. A profile that new evidence changed while the job ran is skipped, because it is
+- A change takes effect for profiles written afterwards. `recompute` moves the tier and review date of the stored ones and
+  never touches the score or the evidence under `DEEPTUTOR`. Under `MP1` it rebuilds each score from the evidence, because
+  the formula decides the score. A profile that new evidence changed while the job ran is skipped, because it is
   already on the new rules.
 - `priorityBelow` is also the line below which a wrong answer creates a blocking review, so changing it changes which
   reviews are created from then on. Existing reviews are not touched.
