@@ -24,40 +24,31 @@ Added the current Assessment, Content, and Access table definitions to `.sdd/dat
 
 ## Reactor verification
 
-Command: `mvn -B -ntp verify`
+The user reports that `mvn -B -ntp verify` excluding `library-service` passed on this tree: **1,419 tests, 0 failures, 0 errors, 0 skipped**. This full run was not repeated during this acceptance continuation.
 
-Result: **BUILD FAILURE** at `library-service` `testCompile`; the reactor did not complete.
+The focused rerun performed earlier for Content and Assessment was `mvn -B -ntp -pl services/content-service,services/assessment-service -am test`: **714 tests, 0 failures, 0 errors, 0 skipped**. Testcontainers ran against Docker.
 
-| Module completed in this run | Tests | Failures | Errors | Skipped |
-| --- | ---: | ---: | ---: | ---: |
-| common-security | 8 | 0 | 0 | 0 |
-| api-gateway | 9 | 0 | 0 | 0 |
-| config-server | 1 | 0 | 0 | 0 |
-| eureka-server | 1 | 0 | 0 | 0 |
-| user-service | 106 | 0 | 0 | 0 |
-| access-service | 49 | 0 | 0 | 0 |
-| content-service | 396 | 0 | 0 | 0 |
-| **Total before failure** | **570** | **0** | **0** | **0** |
-
-Testcontainers started successfully in the modules that ran, including Content; no completed module reported skipped tests. Content applied/validated Flyway through V39. The reactor stopped while compiling Library test sources, before Library tests and before Learning, Assessment, Game, Notification, or Community ran. Representative unresolved Library test references include `library.domain.vo`, `library.infrastructure.adapter`, `library.infrastructure.persistence.mapper`, `NoteRepository`, and `SavePracticeQuestionFlashcardUseCase`. Learning source was not changed. Existing older Learning/Assessment Surefire reports were not counted as results from this reactor run.
+`library-service` is outside this acceptance scope. Its existing test-source compilation issue on main was not fixed, and no new library JAR was built.
 
 ## Compose and demo
 
-`docker compose down -v` completed. The first `up -d --build` attempt exposed an ambiguous `NamedParameterJdbcTemplate.query` overload in the new Content reader; the lambda was made an explicit block and the requested build was rerun. `docker compose up -d --build` then completed successfully, and all Compose containers reported healthy.
+`docker compose down -v` completed and removed the database and RabbitMQ volumes, including the previous demo account/data. The requested `docker compose up -d --build` was attempted, but the Dockerfile Maven builds received HTTP 429 from Maven Central while resolving Spring Boot 3.5.14 and Spring Cloud 2025.0.0 BOMs. Serialized retries also received 429.
 
-The demo was run through Gateway with the seeded accounts. Results below are the responses observed on this clean stack.
+To continue on the clean volumes, runtime images for the ten services with verified local JARs were rebuilt one at a time from those JARs; the existing `library-service` image was retained because the service is out of scope. The stack was started with `docker compose up -d --no-build`. All Compose containers reported healthy. This used the verified artifacts but did not complete the requested Compose Maven image build.
+
+The following responses were observed through Gateway on the clean stack:
 
 | Demo step | Result |
 | --- | --- |
-| 1. Tree edit and cycle refusal | `GET /api/content/knowledge-tree` returned 200. `PUT /api/content/knowledge-points/{B}/prerequisites` with `{"prerequisiteIds":[A]}` returned 200 and the GET showed A. The attempted cycle on A returned 422 and left the tree unchanged. The demo prose shows a raw `[A]` body; the controller requires the object wrapper. |
-| 2. Practice review and diagnosis | Completed the prerequisite lessons and Practice, then failed the B set. The review entered `THEORY`; after two failed review sets, Learning created a diagnostic session. Failing A's probe concluded A, and B became `WAITING_ON_PREREQUISITES`. Passing A's review did not provide another B set: the remaining unrevealed sets were exhausted, so B became `SKIPPED`; L3 Practice then read `PASSED` with `REVIEW_FINISHED`. This differs from the script's expected new B set. The documented setup says to add unseen sets, but the Content HTTP controllers currently expose no section-question association operation for creating a populated set through that API. |
-| 3. Learner report, basket, suggestions | All three GETs returned 200. The report showed B as `DIAGNOSING`, the basket showed its required review, and suggestions returned the next lesson (L4). |
-| 4. Topic test and Examiner work | Completed the four lessons/Practice sets, assigned and submitted the topic test at 50% (2/4). The learner's topic became `COMPLETED` and the next topic became `IN_PROGRESS`. Course score recorded `MID_COURSE` with `open:false`; the open Examiner queue had a `LEARNER_FLAG` (`BURST_SUBMISSIONS`) but no `MID_COURSE_REMEDIATION` item. Thus the queue/claim/DONE/note portion did not run. |
-| 5. Course test, essay grading, remediation, retest | The course had 1 of 7 topics passed and `testStatus=LOCKED`; score was `IN_PROGRESS`, total 0.121. Course-test assignment returned 422 `{"detail":"Invalid request"}` both with an empty JSON object and with no request body, rather than the documented `COURSE_TEST_LOCKED`. No course essay or human grading/retest could be performed. |
-| 6. Score configuration | Admin GET/PUT succeeded. Changing weights moved the undecided course total from 0.121 to 0.1521; restoring defaults returned it to 0.121. No passed course was available to check score immutability. |
-| 7. Gold essay evaluation and activation | Manual gold creation succeeded; evaluation returned 202 and completed with `n=1`, within-half-band 0.0, MAE 1.0, QWK 0.0, `passed:false`. The activation attempt returned 500 `Internal Server Error`; the contract expects 409 `EVALUATION_NOT_PASSED`. The single manually entered demo sample is not an expert-rated acceptance gold set. |
-| 8. QA re-grade and Examiner quality | QA queue returned 200 with `totalElements=0`; examiner-quality returned an empty result. There was no sample to claim or re-grade. |
+| 1. Tree edit and cycle refusal | As ADMIN, tree GET returned 200. Adding `DR_TOPIC_SENTENCE` as a prerequisite of `DR_MATCHING_HEADINGS` returned 200 and the prerequisite GET showed it. The reverse edge returned 422 `PREREQUISITE_CYCLE`; the cycle was rejected. |
+| 2. Practice review and diagnosis | Completed the Reading lessons and initial Practice sets, then failed the `PS-KP4-A` set (0/4). Learning created the `DR_MATCHING_HEADINGS` review. After its theory check and two failed review sets, the review entered `DIAGNOSING`. The `DR_TOPIC_SENTENCE` probe failed 0/3 and the diagnosis concluded that KP. The gap review was passed; the blocked B review resumed with the V40 `PS-KP4-D` set and was passed. The newly seeded review sets supported the scripted path. |
+| 3. Learner report and recommendations | `GET /api/learning/report`, `GET /api/learning/review-basket`, and `GET /api/learning/suggestions` all returned 200. The report and basket included review/mastery state, and suggestions returned `PS-KP3-D`. |
+| 4. Topic test and Examiner work | Topic-test assignment returned 200 with packageVersionId `20000000-0000-4000-8000-000000000001`. Starting that Assessment attempt returned 404 `Package version not found`. The Content database has published X1 at version `20000000-0000-4000-8000-090000000001`, so the Learning assignment's version ID does not match the published Content version. The 50% submission and remediation work item could not be produced. The Examiner work queue contained a `LEARNER_FLAG/BURST_SUBMISSIONS`, not a `MID_COURSE_REMEDIATION` item. |
+| 5. Course test and remediation | `GET /api/learning/courses` returned courseId `30000000-0000-4000-8000-000000000001` for IELTS 5.5. Posting to `/api/learning/courses/30000000-0000-4000-8000-000000000001/test-assignments` returned 422 `{"detail":"Invalid request"}`, not the expected 403 `COURSE_TEST_LOCKED`. This is the exact courseId used. No course attempt, essay grading, remediation, or retest could be run. |
+| 6. Score configuration | Admin GET and PUT returned 200. With default weights the learner's in-progress course total was 0.096; changing process/mid/final weights from 0.20/0.30/0.50 to 0.25/0.25/0.50 changed it to 0.120. Restoring the defaults returned the total to 0.096. |
+| 7. Gold essay evaluation and activation | Added one demo-only manual sample (201), then started an evaluation (202). It finished DONE with n=1, within-half-band 1.0, MAE 0.5, QWK 0.0, and `passed=false`. Activation returned 409 with `EVALUATION_NOT_PASSED`. This single sample is synthetic and is not an expert-rated acceptance gold set. |
+| 8. QA re-grade and Examiner quality | QA queue returned 200 with `totalElements=0`; examiner-quality returned 200 with an empty result. No sample was available to claim or re-grade. |
 
 ## Acceptance status
 
-Not accepted yet. Content and the database reference changes are in place, and 570 tests passed with zero skips before the reactor stopped. The full reactor remains red because Library test compilation fails; Learning and Assessment were not reached in this run. Demo steps 4, 5, 7, and 8 have the gaps recorded above, and step 2 exhausted its seeded unseen sets.
+Not accepted yet. The user-reported verification excluding `library-service` is green, and the clean stack is healthy. Demo steps 1-3, 6, and the step 7 activation guard passed; the V40 sets enabled the intended review-and-diagnosis flow. Step 4 remains blocked by the Learning/Content packageVersionId mismatch, step 5 still returns 422 for the valid courseId above, and step 8 has no QA sample. Phase acceptance also remains open until an expert-rated gold set and evaluation exist. `library-service` remains explicitly out of scope.
