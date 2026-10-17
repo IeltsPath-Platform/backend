@@ -40,11 +40,12 @@ public class GamificationRecorder {
     private final LearningContentClient content;
     private final LearnerTimezones timezones;
     private final HeartsService hearts;
+    private final LeagueService league;
     private final Params params;
     private final Clock clock = Clock.systemUTC();
 
     public GamificationRecorder(GamificationRepository repository, LearningContentClient content,
-                                LearnerTimezones timezones, HeartsService hearts,
+                                LearnerTimezones timezones, HeartsService hearts, LeagueService league,
                                 @Value("${learning.gamification.xp.easy:10}") int easy,
                                 @Value("${learning.gamification.xp.medium:15}") int medium,
                                 @Value("${learning.gamification.xp.hard:20}") int hard,
@@ -57,6 +58,7 @@ public class GamificationRecorder {
         this.content = content;
         this.timezones = timezones;
         this.hearts = hearts;
+        this.league = league;
         this.params = new Params(easy, medium, hard, unknown, dailyCap, levelXp, consolidate, maintain);
     }
 
@@ -133,7 +135,11 @@ public class GamificationRecorder {
     private GamificationSummary apply(UUID userId, int before, int earned, boolean capped) {
         int total = before + earned;
         int level = params.levelOf(total);
-        if (earned > 0) repository.saveTotals(userId, total, level);
+        if (earned > 0) {
+            repository.saveTotals(userId, total, level);
+            // Only XP that counted reaches the league; capped answers were never part of `earned`.
+            league.addWeeklyXp(userId, earned);
+        }
         boolean leveledUp = params.levelOf(before) < level;
         if (leveledUp) hearts.refillOnLevelUp(userId);
         return new GamificationSummary(earned, capped, total, level, leveledUp);

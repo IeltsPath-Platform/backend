@@ -61,7 +61,7 @@ Points (access) ── kiếm: thưởng học (có trần/ngày) │ tiêu: h�
 | 4 | [Streak phía server, đóng băng, thưởng points](phase-04-server-streak-and-rewards.md) | learning, access | in_progress (streak, đóng băng, mốc 7/30 có test DB; relay points và refund chưa làm) | 1, 2 |
 | 5 | [Nhiệm vụ ngày](phase-05-daily-quests.md) | learning | pending | 2, 4 |
 | 6 | [Huy hiệu](phase-06-badges.md) | learning | pending | 2, 4 |
-| 7 | [League tuần](phase-07-weekly-league.md) | learning, user | pending | 2 |
+| 7 | [League tuần](phase-07-weekly-league.md) | learning, user | completed (V28, chốt tuần, bảng và lịch sử; còn: test HTTP controller, ẩn danh) | 2 |
 | 8 | [Contract, tài liệu, nghiệm thu](phase-08-contracts-and-acceptance.md) | docs | pending | tất cả |
 
 ## Câu hỏi mở

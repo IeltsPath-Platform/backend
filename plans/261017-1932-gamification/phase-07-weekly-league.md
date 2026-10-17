@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "League tuần"
-status: in_progress
+status: completed
 priority: P3
 dependencies: [2]
 ---
@@ -46,9 +46,21 @@ hạng, giữa giữ nguyên. 7 hạng: Bronze, Silver, Gold, Sapphire, Diamond,
 
 ## Success Criteria
 
-- [ ] Nhóm không bao giờ quá 30 người.
-- [ ] Sau chốt tuần, top 7 lên hạng, 23–30 xuống hạng đúng luật.
-- [ ] Bảng xếp hạng chỉ có tên hiển thị, không có email.
+- [x] Nhóm không bao giờ quá 30 người. (test: `LeagueIntegrationTest.learnersJoiningAtTheSameTimeNeverOverfillAGroup` 40 luồng song song; `thirtyOneLearnersFillOneGroupAndOpenASecond`)
+- [x] Sau chốt tuần, top 7 lên hạng, 23–30 xuống hạng đúng luật. (test: `closingAWeekPromotesTheTopSevenAndDemotesRanksTwentyThreeAndBelow`, `LeagueRulesTest` 13)
+- [x] Bảng xếp hạng chỉ có tên hiển thị, không có email. (bảng chỉ có hạng, tên, XP tuần, cờ `you`, vùng; không có user id người khác. Test: `theTableShowsDisplayNamesAndZonesAndAsksForNamesOnce`)
+
+## Tiến độ (2026-10-17)
+
+- Xong: V28 (`league_weeks`, `league_groups`, `league_members`, `learner_league`), `LeagueRules`, `LeagueService`
+  (vào nhóm khi có XP tính đầu tuần, khóa advisory theo tuần và hạng), `LeagueCloseJob` (Chủ nhật 00:00 UTC, một câu SQL xếp
+  hạng cả tuần), `DisplayNameClient` + `RestDisplayNameClient` (một lần gọi cho cả bảng), `GetLeagueUseCase`,
+  `LeagueController` (`GET /api/learning/me/league`, `/history?weeks=1..26`), cộng XP tuần trong `GamificationRecorder`.
+- Quyết định: hạng lưu số 1..7; tuần league chạy Chủ nhật đến Chủ nhật theo UTC; hòa XP thì người đạt mức đó trước xếp trên
+  (`xp_updated_at`); nhóm dưới 23 người không ai xuống hạng, nhưng top 7 vẫn lên (nhóm 7 người trở xuống thì tất cả lên).
+  Người dùng chọn giữ đúng tài liệu, không thêm ngưỡng nhóm tối thiểu (2026-10-17).
+- Chỉ XP `counted` vào league: XP vượt trần 100/ngày (shadow) không vào. Test: 12 câu khó earn 240, vào league 100.
+- Chưa làm: test HTTP cho `LeagueController`, test adapter `RestDisplayNameClient`, ẩn danh (câu hỏi mở của plan).
 
 ## Risk Assessment
 
