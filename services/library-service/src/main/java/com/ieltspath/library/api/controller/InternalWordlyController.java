@@ -20,7 +20,7 @@ public class InternalWordlyController {
         return new Response(words.page(request.after()==null?"":request.after(),request.limit()).stream().map(w->new Item(w.sourceWordId(),w.answer(),w.meaning())).toList());
     }
     public record PageRequest(String after,@NotNull @Min(1) @jakarta.validation.constraints.Max(500) Integer limit){}
-    public record Request(@NotNull @Min(1) Integer count){}
+    public record Request(@NotNull @Min(1) @jakarta.validation.constraints.Max(100) Integer count){}
     public record Item(UUID sourceWordId,String answer,String meaning){}
     public record Response(List<Item> words){}
 }
