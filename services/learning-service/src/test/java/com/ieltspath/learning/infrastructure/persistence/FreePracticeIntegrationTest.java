@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -81,7 +82,7 @@ class FreePracticeIntegrationTest {
                 LearningSkill.READING, true,
                 new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
         when(content.practiceSetAvailability(anyList(), anyList(), eq(3))).thenReturn(Map.of(KP, 5));
-        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), eq(5)))
+        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt()))
                 .thenReturn(List.of(new PracticeSet(PACKAGE, VERSION, "P1", 2, 2)));
         when(content.getPackageVersion(VERSION)).thenReturn(version());
     }
@@ -109,7 +110,7 @@ class FreePracticeIntegrationTest {
     }
 
     private void offering(BigDecimal band, String featureKey) {
-        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), eq(5)))
+        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt()))
                 .thenReturn(List.of(new PracticeSet(PACKAGE, VERSION, "P1", 2, 2, band, featureKey)));
     }
 

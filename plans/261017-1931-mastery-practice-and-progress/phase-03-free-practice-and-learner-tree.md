@@ -74,7 +74,7 @@ US-010 (03 §C.1): học viên bấm "Practice" trên một KID bất kỳ để
 Còn mở:
 - `practiceAvailable` và số gói chưa xem của cây chưa trừ các gói bị lọc theo band hoặc gói; cây có thể báo còn gói trong khi
   `POST free-practice` trả `FREE_PRACTICE_EXHAUSTED`.
-- Chỉ lấy tối đa 5 gói ứng viên từ Content rồi mới lọc band/gói; nếu 5 gói đầu đều bị loại thì báo hết gói dù còn gói khác.
+- Chỉ lấy tối đa 10 gói ứng viên từ Content (giới hạn của Content) rồi mới lọc band/gói; nếu 10 gói đầu đều bị loại thì báo hết gói dù còn gói khác. Muốn hết hẳn cần Content lọc theo band/tính năng ở phía họ (việc của Codex).
 - Gói có essay bị loại lúc nộp (409 `FREE_PRACTICE_ESSAY_UNSUPPORTED`), không loại lúc chọn gói.
 
 ## Risk Assessment

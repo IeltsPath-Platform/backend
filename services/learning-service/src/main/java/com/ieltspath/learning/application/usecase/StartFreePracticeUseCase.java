@@ -42,8 +42,8 @@ import java.util.UUID;
  */
 @Service
 public class StartFreePracticeUseCase {
-    /** Sets fetched from Content before one with no essay is chosen. */
-    private static final int CANDIDATES = 5;
+    /** Sets fetched from Content before one within band, plan and with no essay is chosen; 10 is Content's maximum. */
+    private static final int CANDIDATES = 10;
 
     private final LearnerLock lock;
     private final LearningContentClient content;
