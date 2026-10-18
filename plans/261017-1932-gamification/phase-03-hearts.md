@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Tim"
-status: in_progress
+status: completed
 priority: P1
 dependencies: [1, 2]
 ---
@@ -58,9 +58,9 @@ Luyện tự do phụ thuộc plan `261017-1931` phase 3.
 
 ## Quyết định khi làm (2026-10-17)
 
-- **Hoàn points khi refill lỗi chưa làm.** Access chưa có route refund cho học viên: `/api/access/points/refund` chỉ ADMIN. Refill trừ points trước, theo `requestId` (Access idempotent), rồi hồi tim trong transaction. Nếu lưu DB lỗi, học viên gửi lại cùng `requestId` và không bị trừ lần hai. Cần Codex thêm route nội bộ nếu muốn refund đúng plan.
+- **Không có route hoàn points; người dùng đã chốt 2026-10-18.** Refill trừ points trước, theo `requestId` (Access idempotent), rồi hồi tim trong transaction. Nếu lưu DB lỗi, học viên gửi lại cùng `requestId` và không bị trừ lần hai. Rủi ro còn lại: học viên không gửi lại thì mất 5 points mà tim chưa hồi; xử lý bằng `/api/access/points/refund` của ADMIN khi có khiếu nại. Không thêm route hoàn cho học viên.
 - **Max PREMIUM đọc qua `GET /api/access/me/subscription`** (200 = có gói, 204 = không). Không dùng entitlement ADMIN.
-- **Mỗi bài nộp mới đều trừ tim** (không chỉ lần đầu), theo G1.
+- **Mỗi bài nộp mới đều trừ tim** (không chỉ lần đầu), theo G1; người dùng xác nhận giữ nguyên 2026-10-18.
 - **Test lesson cũ** đặt `learning.gamification.hearts.max=1000` để không bị chặn bởi tim; cần biết khi đọc test đó.
 
 ## Risk Assessment

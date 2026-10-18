@@ -62,7 +62,9 @@ Listening, Reading, Writing, Speaking, Grammar, Vocabulary. KP hiện tại ch�
 
 ## Progress
 
-- Schema, API metadata và proposal `reports/seed-grammar-vocab.md` hoàn tất. V42 seed vẫn chờ người có chuyên môn IELTS duyệt.
+- Schema, API metadata và proposal `reports/seed-grammar-vocab.md` hoàn tất. Người dùng duyệt seed 2026-10-18. Số migration:
+  V42 trống nhưng V43 và V44 đã áp dụng, Flyway từ chối V42 trên DB đã có V44 (trừ khi bật `out-of-order`), nên seed dùng
+  **V45** (hoặc số kế tiếp còn trống), vẫn để KP `INACTIVE`.
 - Test: `mvn -B -ntp -f pom.xml -pl services/content-service test` — 407 tests, 0 failures, 0 errors, 0 skipped; PostgreSQL Testcontainers ran.
 
 ## Risk Assessment

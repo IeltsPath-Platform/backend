@@ -66,7 +66,8 @@ thật, thêm đóng băng trả bằng points (03 §E.3), và đường cộng 
   D. Luật "phủ ngày mai" làm giá tăng theo liên tiếp không bao giờ đạt được: lượt cũ phải được dùng trước khi mua lượt mới,
   mà việc dùng chỉ xảy ra khi ngày đó được chấm, sau ngày mua.
 - Quyết định: mua khi chưa có streak trả `409 NO_STREAK_TO_PROTECT`. Ngày trả lời lại trong cùng ngày không thưởng lại.
-- Chưa xong: hoàn points khi đóng băng lỗi (access chưa có route nội bộ).
+- Không có route hoàn points khi đóng băng lỗi; người dùng đã chốt 2026-10-18. Mua freeze trừ points trước theo `requestId`
+  (Access idempotent), gửi lại cùng `requestId` không trừ hai lần; rủi ro còn lại xử lý bằng refund của ADMIN.
 - Essay đã chấm (lesson và Practice) ghi sự kiện câu hỏi nên đã tính là ngày hoạt động của streak (kiểm tra 2026-10-18; ghi chú
   "chưa tính" trước đây là sai). Test: `LessonWritingIntegrationTest.aGradedLessonEssayCountsAsADayOfActivity...`.
 - Thưởng KP ≥ 90% mastery: +5 points một lần cho mỗi KP, chỉ khi bằng chứng là luyện tập (cùng bộ lọc với XP mốc KP).
@@ -88,4 +89,5 @@ Người dùng chọn gửi qua RabbitMQ (hợp đồng C6 trong `work-split.md`
   learning gửi thêm `DAILY_QUEST`, `BADGE`, `KP_MASTERED`; các lý do đó bị trả `FAILED INVALID_PAYLOAD` và relay không gửi
   lại. Codex đã sửa trong working tree ngày 2026-10-18 (`LearningRewardReason.valueOf`, test cho ba lý do còn lại); đã đọc
   diff, đúng; **chưa commit** và chưa chạy đầu-cuối cùng learning. Đã ghi vào C6.
-- Chưa có route hoàn điểm khi trừ điểm thành công mà thao tác sau đó lỗi (hồi tim, mua freeze); chờ người dùng quyết chính sách.
+- Chính sách hoàn điểm đã chốt: không thêm route (xem trên). Phase này chỉ còn chờ Codex commit consumer Access và chạy thử
+  đầu-cuối learning ↔ Access qua RabbitMQ (tiêu chí "access tắt thì grant nằm `PENDING`, bật lại thì được cộng").
