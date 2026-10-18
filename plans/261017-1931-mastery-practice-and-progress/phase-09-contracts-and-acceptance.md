@@ -34,7 +34,7 @@ dependencies: [1, 2, 3, 4, 5, 6, 7, 8]
 
 ## Success Criteria
 
-- [ ] Không contract nào lệch controller. (phần learning đã viết và đối chiếu code; còn phần của Codex)
+- [x] Không contract nào lệch controller. (đối chiếu code 2026-10-18, xem Tiến độ; `knowledge-tree-v1.md` do Codex đối chiếu)
 - [ ] Demo 1–7 chạy trên Compose sạch.
 - [x] `mvn -B -ntp verify` xanh, không skip. (cả reactor, 0 bỏ qua, 2026-10-18; xem `reports/acceptance.md`)
 
@@ -46,8 +46,12 @@ dependencies: [1, 2, 3, 4, 5, 6, 7, 8]
 - Xong (Codex, commit dd6362c và 649f623): `flashcard-srs-v1.md`, `content-scheduled-publish-v1.md`, `user-internal-v1.md`
   (learning goal, display names), `access-points-v1.md`, README library và content, `knowledge-tree-v1.md`. Tôi đã đối chiếu
   `user-internal-v1.md` với `InternalUserController` và client của learning, và `access-points-v1.md` với listener Access
-  (lý do thưởng, thông điệp C6); `flashcard-srs-v1.md` và `content-scheduled-publish-v1.md` do Codex viết, tôi chưa đối chiếu
-  với controller.
+  (lý do thưởng, thông điệp C6). `flashcard-srs-v1.md` khớp `FlashcardController` (`/due`, `/{id}/reviews`),
+  `FlashcardResponse`, `PageResponse`, giới hạn `limit` 1–50, `library.srs.intervals-days` 5 giá trị, thứ tự thẻ đến hạn
+  (thẻ chưa ôn trước), route Gateway `/api/learning-support/flashcards/**`. `content-scheduled-publish-v1.md` khớp
+  `ContentPackageAdminController` (preview, `PUT/DELETE .../schedule`, `GET .../publication-schedules`), vai trò
+  `ADMIN`/`CONTENT_AUTHOR`, mã `400`/`404`/`422` và các mã lỗi an toàn của `ScheduledPublishJob`. Chưa đối chiếu: hành vi
+  "bỏ qua lần xem lại cùng `requestId`" và "thẻ của người khác trả `404`" (chỉ đọc contract, tin test của Codex).
 - Đã chạy (2026-10-18): `docker compose config --quiet` (exit 0); `mvn -B -ntp -o verify` cả reactor xanh, 0 bỏ qua (chi tiết
   trong `reports/acceptance.md`). `reports/acceptance.md` đã có.
 - Chưa làm: 7 kịch bản demo trên Compose sạch. `docs/system-architecture.md` không tồn tại trong repo.
