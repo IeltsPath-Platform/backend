@@ -1,5 +1,6 @@
 package com.ieltspath.learning.application.service;
 
+import com.ieltspath.learning.domain.repository.KnowledgePointCatalogRepository;
 import com.ieltspath.learning.domain.repository.SnapshotRepository;
 import com.ieltspath.learning.domain.repository.SnapshotRepository.Activity;
 import com.ieltspath.learning.domain.repository.SnapshotRepository.Period;
@@ -7,6 +8,7 @@ import com.ieltspath.learning.domain.repository.SnapshotRepository.ProfileRow;
 import com.ieltspath.learning.domain.repository.SnapshotRepository.Snapshot;
 import com.ieltspath.learning.domain.service.BandEstimator;
 import com.ieltspath.learning.domain.service.SkillRollup;
+import com.ieltspath.learning.domain.vo.KnowledgePointCatalogEntry;
 import com.ieltspath.learning.domain.vo.MasteryTier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,24 +44,24 @@ public class SnapshotService {
     static final int ACTIVE_WINDOW_DAYS = 14;
 
     private final SnapshotRepository repository;
-    private final KnowledgePointDirectory directory;
+    private final KnowledgePointCatalogRepository catalog;
     private final ZoneId zone;
     private final int keepWeeks;
     private final int keepMonths;
     private final Clock clock;
 
     @Autowired
-    public SnapshotService(SnapshotRepository repository, KnowledgePointDirectory directory,
+    public SnapshotService(SnapshotRepository repository, KnowledgePointCatalogRepository catalog,
                            @Value("${learning.snapshots.zone:Asia/Ho_Chi_Minh}") String zone,
                            @Value("${learning.snapshots.keep-weeks:12}") int keepWeeks,
                            @Value("${learning.snapshots.keep-months:36}") int keepMonths) {
-        this(repository, directory, ZoneId.of(zone), keepWeeks, keepMonths, Clock.systemUTC());
+        this(repository, catalog, ZoneId.of(zone), keepWeeks, keepMonths, Clock.systemUTC());
     }
 
-    SnapshotService(SnapshotRepository repository, KnowledgePointDirectory directory, ZoneId zone, int keepWeeks,
+    SnapshotService(SnapshotRepository repository, KnowledgePointCatalogRepository catalog, ZoneId zone, int keepWeeks,
                     int keepMonths, Clock clock) {
         this.repository = repository;
-        this.directory = directory;
+        this.catalog = catalog;
         this.zone = zone;
         this.keepWeeks = keepWeeks;
         this.keepMonths = keepMonths;
@@ -98,7 +100,7 @@ public class SnapshotService {
         Instant from = start.atStartOfDay(zone).toInstant();
         Instant to = end.atStartOfDay(zone).toInstant();
         List<UUID> active = repository.usersActiveSince(clock.instant().minus(Duration.ofDays(ACTIVE_WINDOW_DAYS)));
-        Map<UUID, KnowledgePointDirectory.Entry> described = active.isEmpty() ? Map.of() : directory.describe();
+        Map<UUID, KnowledgePointDirectory.Entry> described = active.isEmpty() ? Map.of() : describe();
         int written = 0;
         for (int offset = 0; offset < active.size(); offset += BATCH) {
             List<UUID> batch = active.subList(offset, Math.min(offset + BATCH, active.size()));
@@ -116,6 +118,19 @@ public class SnapshotService {
         log.info("Snapshots written: period={} start={} learners={} elapsedMs={}", period, start, written,
                 Duration.ofNanos(System.nanoTime() - began).toMillis());
         return written;
+    }
+
+    /**
+     * The skill and band of every point, read from the catalog the learners' own requests keep fresh. A run has no
+     * learner request, hence no gateway token to call Content with.
+     */
+    private Map<UUID, KnowledgePointDirectory.Entry> describe() {
+        Map<UUID, KnowledgePointDirectory.Entry> described = new java.util.HashMap<>();
+        for (KnowledgePointCatalogEntry entry : catalog.findAll()) {
+            described.put(entry.knowledgePointId(), new KnowledgePointDirectory.Entry(null, null,
+                    entry.skill() == null ? null : entry.skill().name(), entry.band()));
+        }
+        return described;
     }
 
     private Snapshot build(UUID userId, LocalDate start, Activity activity, List<ProfileRow> rows, BigDecimal placement,

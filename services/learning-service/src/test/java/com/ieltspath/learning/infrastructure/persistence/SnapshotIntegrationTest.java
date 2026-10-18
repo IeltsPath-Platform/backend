@@ -2,14 +2,16 @@ package com.ieltspath.learning.infrastructure.persistence;
 
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.result.SnapshotReportResult;
-import com.ieltspath.learning.application.service.KnowledgePointDirectory;
 import com.ieltspath.learning.application.service.SnapshotService;
 import com.ieltspath.learning.application.usecase.GetSnapshotReportsUseCase;
 import com.ieltspath.learning.application.usecase.GetSuggestionsUseCase;
+import com.ieltspath.learning.domain.repository.KnowledgePointCatalogRepository;
 import com.ieltspath.learning.domain.repository.SnapshotRepository;
 import com.ieltspath.learning.domain.repository.SnapshotRepository.Period;
 import com.ieltspath.learning.domain.repository.SnapshotRepository.Snapshot;
 import com.ieltspath.learning.domain.service.SkillRollup;
+import com.ieltspath.learning.domain.vo.KnowledgePointCatalogEntry;
+import com.ieltspath.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,13 +31,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Base64;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 /** The snapshot run, its retention, and the weekly, history and monthly reports built from the stored rows. */
 @SpringBootTest(properties = {
@@ -66,20 +66,24 @@ class SnapshotIntegrationTest {
     @Autowired SnapshotService service;
     @Autowired SnapshotRepository snapshots;
     @Autowired GetSnapshotReportsUseCase reports;
-    @MockitoBean KnowledgePointDirectory directory;
+    @Autowired KnowledgePointCatalogRepository catalog;
     @MockitoBean GetSuggestionsUseCase suggestions;
 
     private final UUID readingA = UUID.randomUUID();
     private final UUID readingB = UUID.randomUUID();
 
+    /**
+     * The snapshot run reads the skill and band of each point from the catalog table: it runs with no learner request,
+     * so it has no gateway token to ask Content with, and no Content client is wired in this test.
+     */
     @BeforeEach
-    void cleanAndDescribe() {
+    void cleanAndFillCatalog() {
         jdbc.execute("TRUNCATE question_attempt_events, kp_mastery_profiles, learner_placements, "
-                + "learner_weekly_snapshots, learner_monthly_snapshots");
-        Map<UUID, KnowledgePointDirectory.Entry> described = new LinkedHashMap<>();
-        described.put(readingA, new KnowledgePointDirectory.Entry("R1", "Reading 1", "READING", new BigDecimal("6.0")));
-        described.put(readingB, new KnowledgePointDirectory.Entry("R2", "Reading 2", "READING", new BigDecimal("6.0")));
-        when(directory.describe()).thenReturn(described);
+                + "learner_weekly_snapshots, learner_monthly_snapshots, knowledge_point_catalog");
+        UUID topic = UUID.randomUUID();
+        catalog.upsert(List.of(
+                new KnowledgePointCatalogEntry(readingA, topic, true, LearningSkill.READING, new BigDecimal("6.0")),
+                new KnowledgePointCatalogEntry(readingB, topic, true, LearningSkill.READING, new BigDecimal("6.0"))));
     }
 
     @Test

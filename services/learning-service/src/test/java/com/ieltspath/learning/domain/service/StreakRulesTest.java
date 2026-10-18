@@ -111,6 +111,15 @@ class StreakRulesTest {
     }
 
     @Test
+    void theThirdConsecutiveFreezeCostsThirtyAndTheFifthFifty() {
+        StreakState twoFrozen = new StreakState(7, 7, MON, MON, MON.plusDays(10), false, null, MON.plusDays(10), 2, 0);
+        StreakState fourFrozen = new StreakState(7, 7, MON, MON, MON.plusDays(10), false, null, MON.plusDays(10), 4, 0);
+
+        assertThat(StreakRules.freezeCost(twoFrozen, MON.plusDays(10))).isEqualTo(30);
+        assertThat(StreakRules.freezeCost(fourFrozen, MON.plusDays(10))).isEqualTo(50);
+    }
+
+    @Test
     void aSixthConsecutiveFreezeIsOverTheLimit() {
         StreakState run = new StreakState(7, 7, MON, MON, MON.plusDays(10), false, null, MON.plusDays(10), 5, 0);
         assertThat(StreakRules.overLimit(run, MON.plusDays(10))).isTrue();

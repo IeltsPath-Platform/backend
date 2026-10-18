@@ -1419,6 +1419,7 @@ Bảng dùng chung mọi học viên, ghi lại từ Content `topic-sequence` m�
 | `topic_id` | uuid | NOT NULL, INDEX | |
 | `has_practice_set` | boolean | NOT NULL | Content có gói `PRACTICE_SET` đủ điều kiện cho KP; không có thì không chèn bài ôn |
 | `skill` | varchar(20) | NULL | V3. Skill của KP (hoặc của topic); dùng điền skill cho bài ôn cũ |
+| `band` | numeric(3,1) | NULL | V31. Band của khóa chứa topic; job snapshot đọc skill và band ở đây vì job không có JWT để gọi Content. NULL tới lần học viên mở danh sách khóa sau migration |
 | `refreshed_at` | timestamptz | NOT NULL | |
 
 ## 7.2 `topic_progress`

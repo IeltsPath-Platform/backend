@@ -58,7 +58,8 @@ public class RefreshLearningTopicsUseCase {
         for (var topic : topics) {
             for (var kp : topic.knowledgePoints()) {
                 LearningSkill skill = kp.skill() == null ? topic.skill() : LearningSkill.valueOf(kp.skill());
-                entries.add(new KnowledgePointCatalogEntry(kp.id(), topic.topicId(), kp.hasPracticeSet(), skill));
+                entries.add(new KnowledgePointCatalogEntry(kp.id(), topic.topicId(), kp.hasPracticeSet(), skill,
+                        topic.course() == null ? null : topic.course().bandLevel()));
             }
         }
         LearnerCurriculum curriculum = curricula.find(userId);

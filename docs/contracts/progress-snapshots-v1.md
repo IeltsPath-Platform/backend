@@ -20,7 +20,10 @@ of a learner in the staff overview (see [learning-staff-area-v1](learning-staff-
 
 A snapshot takes the learner's mastery as it stands when the run happens (Monday 00:30 for the week before, the first of the
 month 00:30 for the month before, in `learning.snapshots.zone`, default `Asia/Ho_Chi_Minh`) and counts the answers of the
-period. Only learners with an answer in the last 14 days get one. A rerun replaces a snapshot, never duplicates it. Weekly
+period. The run has no learner request, so it reads each point's skill and course band from Learning's own catalog (filled
+whenever a learner opens the course list), not from Content; until a learner has opened the list after a fresh database or
+migration, a snapshot carries no skill or band, and the next run replaces it. Only learners with an answer in the last 14
+days get one. A rerun replaces a snapshot, never duplicates it. Weekly
 snapshots are kept 12 weeks and monthly ones 36 months. The monthly snapshot is built from the month's own data, not from the
 weekly ones, because weeks cross month ends.
 
