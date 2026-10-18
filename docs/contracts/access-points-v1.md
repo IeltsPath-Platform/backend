@@ -12,7 +12,7 @@ learner's internal token, mint unlimited points. `POST /internal/access/points/c
 `reason` is one of `STREAK_MILESTONE`, `KP_MASTERED`, `DAILY_QUEST`, or `BADGE`. `amount` is 1 through 100,
 `referenceId` is 1 through 100 characters, and the idempotency key (the grant ID) is at most 120 characters.
 
-The daily learning-reward limit is shared by `STREAK_MILESTONE`, `KP_MASTERED`, and `DAILY_QUEST`, uses the UTC day, and
+The daily learning-reward limit is shared by `STREAK_MILESTONE`, `KP_MASTERED`, and `DAILY_QUEST`, uses a rolling 24 hours (not a calendar day), and
 defaults to 20 points. `BADGE` grants are exempt from the limit and do not count toward the daily total. Configure the limit
 with `access.points.daily-earn-limit` or `ACCESS_POINTS_DAILY_EARN_LIMIT`. A partially granted request is `capped`;
 when no points remain, nothing is granted and no ledger entry is written. Replaying the same grant with the same user,
@@ -23,6 +23,11 @@ request data is a conflict.
 
 Access consumes `points.grant.requested` on durable queue `access.points-grant`, bound to durable topic exchange
 `learning.points` with routing key `points.grant.requested`.
+
+Learning publishes with publisher confirms and mandatory routing. A grant counts as sent only after the broker confirms
+it and no queue returned it as unroutable; the queue is declared by Access, so a grant sent before Access has declared
+it is returned, stays pending without using up one of its sends, and goes out on a later run. A grant given up after
+its last send is logged as a warning with its id and the reason.
 
 ```json
 {
@@ -36,7 +41,7 @@ Access consumes `points.grant.requested` on durable queue `access.points-grant`,
 
 The reason set and amount/reference limits are the ones above. Access uses `grantId` as the idempotency key.
 The daily limit applies to the three non-badge reasons; `BADGE` grants are always full (within normal request validation)
-and are excluded from the amount counted for that UTC day.
+and are excluded from the amount counted for the rolling 24 hours.
 It publishes a result to `learning.points` with routing key `points.grant.settled`:
 
 ```json

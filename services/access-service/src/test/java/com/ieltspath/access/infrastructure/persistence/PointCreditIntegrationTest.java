@@ -109,6 +109,21 @@ class PointCreditIntegrationTest {
     }
 
     @Test
+    void theLimitIsARollingDayNotACalendarDay() {
+        UUID recent = UUID.randomUUID();
+        seedEarningsAt(recent, 20, "KP_MASTERED", Instant.now().minus(java.time.Duration.ofHours(23)));
+        PointCreditResult stillCapped = grant(recent, 5, "kp-recent", LearningRewardReason.KP_MASTERED);
+        assertEquals(0, stillCapped.granted(), "20 points earned 23 hours ago still count, whatever the date is");
+        assertEquals(true, stillCapped.capped());
+
+        UUID old = UUID.randomUUID();
+        seedEarningsAt(old, 20, "KP_MASTERED", Instant.now().minus(java.time.Duration.ofHours(25)));
+        PointCreditResult freed = grant(old, 5, "kp-old", LearningRewardReason.KP_MASTERED);
+        assertEquals(5, freed.granted(), "points earned more than a day ago no longer count");
+        assertEquals(false, freed.capped());
+    }
+
+    @Test
     void creditingPointsOverHttpIsNotExposed() {
         UUID userId = UUID.randomUUID();
         String body = "{\"userId\":\"" + userId + "\",\"amount\":5,\"reason\":\"BADGE\","
@@ -218,9 +233,13 @@ class PointCreditIntegrationTest {
     }
 
     private void seedDailyEarnings(UUID userId, int amount, String reason) {
+        seedEarningsAt(userId, amount, reason,
+                LocalDate.now(ZoneOffset.UTC).atStartOfDay().plusSeconds(1).toInstant(ZoneOffset.UTC));
+    }
+
+    private void seedEarningsAt(UUID userId, int amount, String reason, Instant today) {
         jdbc.update("INSERT INTO point_wallets(user_id, balance, total_credited, total_debited) VALUES (?, ?, ?, 0)",
                 userId, amount, amount);
-        Instant today = LocalDate.now(ZoneOffset.UTC).atStartOfDay().plusSeconds(1).toInstant(ZoneOffset.UTC);
         jdbc.update("""
                 INSERT INTO point_ledger_entries
                     (id, user_id, delta, balance_after, transaction_type, reference_type, reference_id,

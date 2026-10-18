@@ -22,7 +22,7 @@ dependencies: []
   - body `{ userId, amount, reason, referenceId, idempotencyKey }`; `reason` thuộc tập cố định (`STREAK_MILESTONE`,
     `KP_MASTERED`, `DAILY_QUEST`, `BADGE`);
   - cùng `idempotencyKey` trả lại kết quả cũ, không cộng hai lần;
-  - **trần ngày** `access.points.daily-earn-limit` (mặc định 20, theo ngày UTC; lý do `BADGE` được miễn trần và không làm giảm ngân sách của lý do khác, chốt 2026-10-18; Access `f2f50e8`, test `LearningPointsGrantListenerIntegrationTest.badgeGrantsAreExemptFromDailyLimit...` và `PointCreditIntegrationTest.badgeCreditsBypass...`): vượt thì cộng phần còn lại, trả
+  - **trần ngày** `access.points.daily-earn-limit` (mặc định 20, cửa sổ trượt 24 giờ gần nhất thay vì ngày UTC, chốt 2026-10-18; lý do `BADGE` được miễn trần và không làm giảm ngân sách của lý do khác, chốt 2026-10-18; Access `f2f50e8`, test `LearningPointsGrantListenerIntegrationTest.badgeGrantsAreExemptFromDailyLimit...` và `PointCreditIntegrationTest.badgeCreditsBypass...`): vượt thì cộng phần còn lại, trả
     `granted` và `capped = true`; đã hết trần thì `granted = 0` (vẫn 200, không lỗi, để relay không thử lại mãi).
 - **Trừ points** dùng endpoint debit có sẵn với `referenceType` mới `HEART_REFILL` / `STREAK_FREEZE`, map sang loại giao
   dịch tương ứng. Thiếu points → mã lỗi hiện có (`INSUFFICIENT_POINTS` hoặc mã tương đương đang dùng; kiểm trước khi

@@ -18,8 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -31,6 +30,8 @@ public class CreditPointsWriter {
     private final PointWalletRepository walletRepository;
     private final PointLedgerRepository ledgerRepository;
     private final PointCreditRequestRepository creditRequestRepository;
+    private static final Duration WINDOW = Duration.ofHours(24);
+
     private final int dailyLimit;
 
     public CreditPointsWriter(PointWalletRepository walletRepository,
@@ -46,8 +47,7 @@ public class CreditPointsWriter {
 
     @Transactional
     public PointCreditResult credit(CreditPointsCommand command) {
-        LocalDate todayUtc = LocalDate.now(ZoneOffset.UTC);
-        creditRequestRepository.lock(command.idempotencyKey(), command.userId(), todayUtc);
+        creditRequestRepository.lock(command.idempotencyKey(), command.userId());
 
         var previous = creditRequestRepository.findByIdempotencyKey(command.idempotencyKey());
         if (previous.isPresent()) return replay(previous.get(), command);
@@ -55,8 +55,9 @@ public class CreditPointsWriter {
             throw new DuplicateIdempotencyException(command.idempotencyKey());
         }
 
-        Instant startOfDayUtc = todayUtc.atStartOfDay().toInstant(ZoneOffset.UTC);
-        long earnedToday = creditRequestRepository.sumGrantedSince(command.userId(), startOfDayUtc);
+        // A rolling 24 hours rather than a calendar day: a day boundary (UTC or the learner's) would let the limit be
+        // used up just before it and again just after.
+        long earnedToday = creditRequestRepository.sumGrantedSince(command.userId(), Instant.now().minus(WINDOW));
         int granted = command.reason() == LearningRewardReason.BADGE
                 ? command.amount()
                 : (int) Math.min(command.amount(), Math.max(0L, (long) dailyLimit - earnedToday));

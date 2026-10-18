@@ -9,7 +9,6 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,10 +22,11 @@ public class JdbcPointCreditRequestRepository implements PointCreditRequestRepos
     }
 
     @Override
-    public void lock(String idempotencyKey, UUID userId, LocalDate utcDate) {
+    public void lock(String idempotencyKey, UUID userId) {
         jdbc.query("SELECT pg_advisory_xact_lock(hashtext('point-credit-key'), hashtext(?))", rs -> {}, idempotencyKey);
-        jdbc.query("SELECT pg_advisory_xact_lock(hashtext('point-credit-day'), hashtext(?))", rs -> {},
-                userId + ":" + utcDate);
+        // One lock per learner: the limit is a rolling window, so credits of one learner must always be counted in turn.
+        jdbc.query("SELECT pg_advisory_xact_lock(hashtext('point-credit-user'), hashtext(?))", rs -> {},
+                userId.toString());
     }
 
     @Override
