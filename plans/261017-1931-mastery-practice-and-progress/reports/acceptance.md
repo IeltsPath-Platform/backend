@@ -1,17 +1,19 @@
 # Acceptance: mastery, practice and progress (plan 261017-1931)
 
-Updated 2026-10-18. Only what was run is marked as run. "Compose" columns are empty until someone runs the demo on a clean
-Compose stack; nothing below claims they were.
+Updated 2026-10-18. Demo cells stay blank until each API scenario has run. The clean-stack attempt is recorded below; Compose
+startup failed, so none of the demos ran.
 
 ## Verification run so far
 
 | Check | Result |
 |---|---|
-| `mvn -B -ntp -o -pl services/learning-service test` | 712 tests, 0 failures, 0 skipped, PostgreSQL 15 Testcontainers ran (2026-10-18) |
-| Content suite | Codex reports 419 tests, 0 failures (V44 included); not rerun by me |
-| Library suite | Codex reports 67 tests, 0 failures (V4 vocab seed); not rerun by me |
-| `mvn -B -ntp -o verify` whole reactor | BUILD SUCCESS, 23 min 34 s, 0 failures, 0 skipped, Testcontainers ran (2026-10-18 07:57, working tree with Codex's in-progress edits, not a clean commit). Tests per module: common-security 8, api-gateway 9, config-server 1, eureka-server 1, user-service 115, access-service 65, content-service 421, library-service 67, learning-service 712, assessment-service 309, game-service 15, notification-service 1, community-service 25 |
+| `mvn -B -ntp -pl services/access-service test` | 65 tests, 0 failures, 0 errors, 0 skipped; PostgreSQL 15 Testcontainers ran (2026-10-18) |
+| Content V45 migration test | `GrammarVocabularySeedMigrationTest`: 2 tests, 0 failures/errors/skips, PostgreSQL 15.19 Testcontainers applied V45 (included in full verify) |
+| `mvn -B -ntp verify` whole reactor | BUILD SUCCESS, 24 min 27 s, 1,751 tests, 0 failures, 0 errors, 0 skipped; Testcontainers ran (2026-10-18, code changes later committed without further source edits). Per module: common-security 8, api-gateway 9, config-server 1, eureka-server 1, user-service 115, access-service 65, content-service 421, library-service 67, learning-service 714, assessment-service 309, game-service 15, notification-service 1, community-service 25 |
 | `docker compose config --quiet` | exit 0 (2026-10-18) |
+| Clean Compose stack | `down -v` succeeded. `docker compose --parallel 1 up -d --build` failed before services started: BuildKit returned `rpc error ... EOF`, then Docker Engine became unavailable. Engine recovered, but Windows C: still reports 0 GB free after pruning 4.78 GB of inactive BuildKit cache. No demo API calls were made. |
+
+The seven Compose cells below are intentionally blank because none of the scenarios ran.
 
 ## Demos
 
@@ -27,13 +29,12 @@ Compose stack; nothing below claims they were.
 
 ## Open
 
-- Phase 1: the Grammar/Vocab seed was approved on 2026-10-18; Codex still has to add it (migration number V45, because V43 and
-  V44 are taken) with the new points `INACTIVE`. The tree criterion "Grammar/Vocab points linked to strategy points, no cycle"
-  stays open until then.
+- Phase 1: the approved Grammar/Vocab proposal is seeded by V45 as 13 `INACTIVE` points, linked as prerequisites to strategy
+  points. The PostgreSQL migration test confirms the new graph is acyclic; this tree criterion is closed.
 - Phase 3 is closed with a known limit: the tree's `practiceAvailable` is an upper bound (it does not subtract sets the band,
   plan or essay filter removes) and only 10 candidates are fetched before filtering. Exact figures need Content to filter by
   band and feature; the start route answers `FREE_PRACTICE_EXHAUSTED` when nothing is left.
-- Codex: contracts `flashcard-srs-v1.md`, `content-scheduled-publish-v1.md`, `user-internal-v1.md` (learning goal), READMEs of
-  library and content.
-- Whoever runs Compose: the seven demos. A final `mvn verify` over a clean commit once Codex has committed.
+- Compose acceptance remains open: free/compact Docker's C: storage, start the clean stack, then run demos 1–7 through Gateway.
+- Contract review found `knowledge-tree-v1.md` consistent with controller behavior; the Access, user, SRS, and scheduled-publish
+  contracts and Content/Library READMEs were updated and committed.
 - `docs/system-architecture.md` does not exist in the repo.

@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Metadata KP và cây đủ 6 miền"
-status: in_progress
+status: completed
 priority: P2
 dependencies: []
 ---
@@ -58,13 +58,14 @@ Listening, Reading, Writing, Speaking, Grammar, Vocabulary. KP hiện tại ch�
 
 - [x] KP có thể lưu và đọc `cefrLevel`, `canDo`, `scopeIn`, `scopeOut`; KP cũ không lỗi.
 - [x] Tạo KP Grammar với mã `G55_...` được; mã sai tiền tố → `400`.
-- [ ] Cây có KP Grammar/Vocab nối vào KP chiến lược, không có vòng.
+- [x] Cây có KP Grammar/Vocab nối vào KP chiến lược, không có vòng. (test: `GrammarVocabularySeedMigrationTest` trên PostgreSQL: 13 KP, 13 cạnh tới KP `STRATEGY` đang `ACTIVE`, 0 vòng)
 
 ## Progress
 
 - Schema, API metadata và proposal `reports/seed-grammar-vocab.md` hoàn tất. Người dùng duyệt seed 2026-10-18. Số migration:
   V42 trống nhưng V43 và V44 đã áp dụng, Flyway từ chối V42 trên DB đã có V44 (trừ khi bật `out-of-order`), nên seed dùng
-  **V45** (hoặc số kế tiếp còn trống), vẫn để KP `INACTIVE`.
+  **V45**, vẫn để KP `INACTIVE`. Xong: commit 649f623 (13 KP, 13 cạnh). Học viên chỉ thấy các KP này khi Content chuyển
+  sang `ACTIVE`.
 - Test: `mvn -B -ntp -f pom.xml -pl services/content-service test` — 407 tests, 0 failures, 0 errors, 0 skipped; PostgreSQL Testcontainers ran.
 
 ## Risk Assessment

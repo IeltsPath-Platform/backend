@@ -58,7 +58,7 @@ Mastery MP-1.0 ──> tier INSUFFICIENT │ PRIORITY │ CONSOLIDATE │ MAINTA
 
 | # | Phase | Service | Status | Phụ thuộc |
 |---|---|---|---|---|
-| 1 | [Metadata KP và cây đủ 6 miền](phase-01-kp-metadata-and-domains.md) | content | in_progress (CEFR, can-do, phạm vi đã commit `316f763`; còn seed Grammar/Vocab chờ duyệt và kiểm vòng cạnh) | – |
+| 1 | [Metadata KP và cây đủ 6 miền](phase-01-kp-metadata-and-domains.md) | content | completed (CEFR, can-do, phạm vi `316f763`; seed 13 KP Grammar/Vocab `INACTIVE` + 13 cạnh, không vòng, V45 `649f623`) | – |
 | 2 | [Mastery MP-1.0](phase-02-mastery-mp1.md) | learning | completed (công thức sau cờ `DEEPTUTOR`; chờ xác nhận bật `MP1`) | – |
 | 3 | [Luyện tự do theo KP và cây của học viên](phase-03-free-practice-and-learner-tree.md) | learning, content | completed (luyện tự do, cây, lọc band/gói, CEFR; `practiceAvailable` của cây chỉ gần đúng, xem phase) | 2 |
 | 4 | [Báo cáo theo kỹ năng và band mục tiêu](phase-04-skill-report-and-target-band.md) | learning, user | completed (còn: docs kiến trúc, test adapter HTTP) | 2 |

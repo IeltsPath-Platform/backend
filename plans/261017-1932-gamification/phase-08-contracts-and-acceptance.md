@@ -33,7 +33,7 @@ dependencies: [1, 2, 3, 4, 5, 6, 7]
 
 - [ ] Không contract nào lệch controller. (phần learning đã viết và đối chiếu code; còn access và user-service của Codex)
 - [ ] Demo 1–6 chạy trên Compose sạch.
-- [ ] `mvn -B -ntp verify` xanh.
+- [x] `mvn -B -ntp verify` xanh. (cả reactor, 2026-10-18; xem `reports/acceptance.md`)
 
 ## Tiến độ (2026-10-18)
 
@@ -41,7 +41,10 @@ dependencies: [1, 2, 3, 4, 5, 6, 7]
   điểm thưởng, mã lỗi); `lesson-learning-v1.md` thêm khối `gamification`, `403 HEARTS_DEPLETED`; AGENTS.md §3.5, §3.6, §3.8;
   `.sdd/database/DATABASE_V5.md` (bảng kiểm kê learning 30 → 45, §7.22–§7.28). Mã lỗi tôi đối chiếu với `GlobalExceptionHandler`
   và các use case; hai mã còn thiếu handler (`INSUFFICIENT_POINTS`, `ACCESS_UNAVAILABLE`) đã được thêm cùng test.
-- Chưa làm: contract access (cộng thưởng nội bộ, loại giao dịch, trần ngày, consumer C6) và `user-internal-v1.md` thêm
-  `display-names` — thuộc Codex; `docs/system-architecture.md` không tồn tại trong repo (chỉ có `.sdd/global/system-architecture.md`,
-  không nói về nội bộ learning); chưa chạy `mvn -B -ntp verify` cả reactor, `docker compose config --quiet` và 6 kịch bản demo.
-- Không ghi "đã chạy" cho các mục trên khi chưa chạy.
+- Xong (Codex, commit dd6362c): `access-points-v1.md` (cộng thưởng nội bộ, trần ngày, consumer C6) và `user-internal-v1.md`
+  (display-names). Tôi đã đối chiếu cả hai với `InternalUserController`, client của learning và listener Access.
+- Đã chạy (2026-10-18): `docker compose config --quiet` (exit 0); `mvn -B -ntp -o verify` cả reactor xanh, 0 bỏ qua; vòng
+  khứ hồi điểm thưởng với RabbitMQ thật (`PointsGrantBrokerRoundTripTest`, Access được mô phỏng). Xem `reports/acceptance.md`.
+- Chưa làm: 6 kịch bản demo trên Compose sạch và một grant chạy qua consumer Access thật. `docs/system-architecture.md` không
+  tồn tại trong repo (chỉ có `.sdd/global/system-architecture.md`, không nói về nội bộ learning).
+- Không ghi "đã chạy" cho các mục chưa chạy.

@@ -36,15 +36,19 @@ dependencies: [1, 2, 3, 4, 5, 6, 7, 8]
 
 - [ ] Không contract nào lệch controller. (phần learning đã viết và đối chiếu code; còn phần của Codex)
 - [ ] Demo 1–7 chạy trên Compose sạch.
-- [ ] `mvn -B -ntp verify` xanh, không skip.
+- [x] `mvn -B -ntp verify` xanh, không skip. (cả reactor, 0 bỏ qua, 2026-10-18; xem `reports/acceptance.md`)
 
 ## Tiến độ (2026-10-18)
 
 - Xong (phần learning, Claude): `learner-report-v1.md` (khối `skills`, `focus`, `estimatedBand`, `target`, tier
   `INSUFFICIENT` đã có); tạo `progress-snapshots-v1.md` và `free-practice-v1.md`; `learning-staff-area-v1.md` (cờ `INACTIVE`,
   thống kê hoạt động, khối `weekly`); AGENTS.md §3.5, §3.6, §3.8; `.sdd/database/DATABASE_V5.md` (§7.15, §7.22–§7.28).
-- Chưa làm (thuộc Codex): `knowledge-tree-v1.md` (trường KP mới, đã được Codex sửa), `flashcard-srs-v1.md`,
-  `content-scheduled-publish-v1.md`, `user-internal-v1.md` (learning goal), README của library và content.
-- Chưa làm: `mvn -B -ntp verify` cả reactor (gồm library) và `docker compose config --quiet`; 7 kịch bản demo trên Compose;
-  `reports/acceptance.md` của plan này. `docs/system-architecture.md` không tồn tại trong repo.
-- Không ghi "đã chạy" cho các mục trên khi chưa chạy.
+- Xong (Codex, commit dd6362c và 649f623): `flashcard-srs-v1.md`, `content-scheduled-publish-v1.md`, `user-internal-v1.md`
+  (learning goal, display names), `access-points-v1.md`, README library và content, `knowledge-tree-v1.md`. Tôi đã đối chiếu
+  `user-internal-v1.md` với `InternalUserController` và client của learning, và `access-points-v1.md` với listener Access
+  (lý do thưởng, thông điệp C6); `flashcard-srs-v1.md` và `content-scheduled-publish-v1.md` do Codex viết, tôi chưa đối chiếu
+  với controller.
+- Đã chạy (2026-10-18): `docker compose config --quiet` (exit 0); `mvn -B -ntp -o verify` cả reactor xanh, 0 bỏ qua (chi tiết
+  trong `reports/acceptance.md`). `reports/acceptance.md` đã có.
+- Chưa làm: 7 kịch bản demo trên Compose sạch. `docs/system-architecture.md` không tồn tại trong repo.
+- Không ghi "đã chạy" cho các mục chưa chạy.

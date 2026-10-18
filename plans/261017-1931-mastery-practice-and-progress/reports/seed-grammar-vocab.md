@@ -1,7 +1,9 @@
 # Proposed Grammar and Vocabulary knowledge points
 
-**Review status: pending IELTS subject-matter approval.** This is a content proposal only. No seed migration has been
-created, so none of these knowledge points or prerequisite edges are present in the database.
+**Review status: approved by the project owner on 2026-10-18.** Seeded by Content migration
+`V45__seed_grammar_vocabulary_knowledge_points.sql` (commit 649f623) with every point `INACTIVE`: 13 points and 13
+prerequisite edges, checked on PostgreSQL by `GrammarVocabularySeedMigrationTest` (counts, CEFR, strategy targets, no
+cycle). Points stay hidden from learners until Content activates them.
 
 The proposed entries use `skill = ALL`; their CEFR labels are initial suggestions and may be revised by the reviewer.
 `scopeIn` and `scopeOut` describe the boundary of each learning point.
