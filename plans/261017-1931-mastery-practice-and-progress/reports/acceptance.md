@@ -10,8 +10,8 @@ Compose stack; nothing below claims they were.
 | `mvn -B -ntp -o -pl services/learning-service test` | 712 tests, 0 failures, 0 skipped, PostgreSQL 15 Testcontainers ran (2026-10-18) |
 | Content suite | Codex reports 419 tests, 0 failures (V44 included); not rerun by me |
 | Library suite | Codex reports 67 tests, 0 failures (V4 vocab seed); not rerun by me |
-| `mvn -B -ntp verify` whole reactor | not run |
-| `docker compose config --quiet` | not run |
+| `mvn -B -ntp -o verify` whole reactor | BUILD SUCCESS, 23 min 34 s, 0 failures, 0 skipped, Testcontainers ran (2026-10-18 07:57, working tree with Codex's in-progress edits, not a clean commit). Tests per module: common-security 8, api-gateway 9, config-server 1, eureka-server 1, user-service 115, access-service 65, content-service 421, library-service 67, learning-service 712, assessment-service 309, game-service 15, notification-service 1, community-service 25 |
+| `docker compose config --quiet` | exit 0 (2026-10-18) |
 
 ## Demos
 
@@ -35,5 +35,5 @@ Compose stack; nothing below claims they were.
   band and feature; the start route answers `FREE_PRACTICE_EXHAUSTED` when nothing is left.
 - Codex: contracts `flashcard-srs-v1.md`, `content-scheduled-publish-v1.md`, `user-internal-v1.md` (learning goal), READMEs of
   library and content.
-- Whoever runs Compose: the seven demos, `mvn verify` over the whole reactor, `docker compose config --quiet`.
+- Whoever runs Compose: the seven demos. A final `mvn verify` over a clean commit once Codex has committed.
 - `docs/system-architecture.md` does not exist in the repo.

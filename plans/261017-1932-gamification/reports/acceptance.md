@@ -8,8 +8,8 @@ Compose stack; nothing below claims they were.
 | Check | Result |
 |---|---|
 | `mvn -B -ntp -o -pl services/learning-service test` | 712 tests, 0 failures, 0 skipped, PostgreSQL 15 Testcontainers ran (2026-10-18, after commit 14ff31d plus the plan notes) |
-| `mvn -B -ntp verify` whole reactor | not run |
-| `docker compose config --quiet` | not run |
+| `mvn -B -ntp -o verify` whole reactor | BUILD SUCCESS, 23 min 34 s, 0 failures, 0 skipped, Testcontainers ran (2026-10-18 07:57, working tree with Codex's in-progress edits to Access, Content and docs, not a clean commit). Tests per module: common-security 8, api-gateway 9, config-server 1, eureka-server 1, user-service 115, access-service 65, content-service 421, library-service 67, learning-service 712, assessment-service 309, game-service 15, notification-service 1, community-service 25 |
+| `docker compose config --quiet` | exit 0 (2026-10-18) |
 | Access suite (`LearningPointsGrantListener` with all four reasons) | Codex reports 64 tests, 0 failures; the fix is not committed yet and I did not rerun it |
 | Learning ↔ Access over a real RabbitMQ | not run |
 
@@ -39,6 +39,6 @@ To close a seeded week without waiting for Sunday, start learning-service with `
 ## Open
 
 - Codex: commit the Access listener fix; contracts for Access points credit and for `display-names` in `user-internal-v1.md`.
-- Whoever runs Compose: demos 1 to 6 above, `mvn verify` over the whole reactor, `docker compose config --quiet`, and a real
-  grant going from learning through RabbitMQ to Access and back as `GRANTED`.
+- Whoever runs Compose: demos 1 to 6 above, and a real grant going from learning through RabbitMQ to Access and back as
+  `GRANTED`. A final `mvn verify` over a clean commit once Codex has committed.
 - `docs/system-architecture.md` does not exist; `.sdd/global/system-architecture.md` does not describe learning internals.
