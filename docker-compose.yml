@@ -206,6 +206,7 @@ services:
       RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"
       RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
       CONTENT_SERVICE_URL: http://content-service:8082
+      ACCESS_SERVICE_URL: http://access-service:8084
       ASSESSMENT_LLM_BASE_URL: "${ASSESSMENT_LLM_BASE_URL:-}"
       ASSESSMENT_LLM_API_KEY: "${ASSESSMENT_LLM_API_KEY:-}"
       ASSESSMENT_LLM_MODEL: "${ASSESSMENT_LLM_MODEL:-}"
@@ -215,6 +216,8 @@ services:
       rabbitmq:
         condition: service_healthy
       content-service:
+        condition: service_healthy
+      access-service:
         condition: service_healthy
 
   learning-service:
