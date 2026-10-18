@@ -40,6 +40,13 @@ To close a seeded week without waiting for Sunday, start learning-service with `
 - Hearts are charged on every new submission, as built.
 - A graded essay counts as an active day and as a practice answer on its first submission; it earns no answer XP and costs no heart.
 
+## Daily points limit (2026-10-18)
+
+Badge rewards are outside the 20 points a day limit and do not use up its budget; streak, quest and knowledge-point rewards
+share it. Access commit `f2f50e8`. `mvn -B -ntp -o -pl services/access-service test`: 66 tests, 0 failures, 0 skipped (run
+after the commit). Covered by `LearningPointsGrantListenerIntegrationTest.badgeGrantsAreExemptFromDailyLimitAndDailyQuestsOnlyUseTheRemainingAllowance`
+(a 50 point badge is granted in full with 18 of 20 already earned; a quest then gets only the 2 left and is `CAPPED`).
+
 ## Open
 
 - Access listener, invalid-reason HTTP handling, and contract updates are committed (`168da2a`, `8c5d9ec`, `dd6362c`).

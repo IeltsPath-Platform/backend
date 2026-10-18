@@ -193,7 +193,7 @@ Access answers on `points.grant.settled` with `{ grantId, status: GRANTED | CAPP
 the point id), `DAILY_QUEST` or `BADGE`. Access accepts every value of `LearningRewardReason` and credits a grant id once,
 so a resend is safe; a grant with no answer is sent again after 5 minutes and given up after 10 sends. Points Access caps per
 day are reported as `CAPPED`: streak, quest and knowledge-point rewards share the daily limit; badge rewards are outside it
-because a badge is earned once (agreed 2026-10-18, Access change pending). The agreed message shape is contract C6 in
+because a badge is earned once (agreed 2026-10-18; Access commit `f2f50e8`). The agreed message shape is contract C6 in
 `plans/261017-1931-mastery-practice-and-progress/reports/work-split.md`; Access HTTP credit and consumer behavior are in
 the [Access points contract](access-points-v1.md).
 
