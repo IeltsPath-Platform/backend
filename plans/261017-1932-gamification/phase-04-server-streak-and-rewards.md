@@ -84,8 +84,8 @@ Người dùng chọn gửi qua RabbitMQ (hợp đồng C6 trong `work-split.md`
   `PointsGrantSettledListenerTest` 3.
 - Tiêu chí "access tắt thì grant nằm `PENDING`, bật lại thì được cộng": phía learning đạt (grant giữ PENDING và được gửi lại).
   Chưa kiểm chứng đầu-cuối: consumer Access đã commit (0ad9d31) nhưng chưa chạy cùng learning.
-- **Lệch cần Codex sửa (còn nguyên sau 0ad9d31, đọc code ngày 2026-10-18):** `LearningPointsGrantListener.parse()` chỉ nhận
-  `reason = STREAK_MILESTONE`, trong khi learning gửi thêm `DAILY_QUEST` và `BADGE` (và sau này `KP_MASTERED`). Enum
-  `LearningRewardReason` của Access đã có đủ bốn giá trị, chỉ listener chặn. Hậu quả: điểm thưởng nhiệm vụ ngày và huy hiệu
-  bị trả `FAILED INVALID_PAYLOAD`, relay không gửi lại. Báo cáo của Codex ghi "Concerns: Không" là chưa đúng. Đã ghi vào C6.
+- **Lệch lý do thưởng:** `LearningPointsGrantListener.parse()` (0ad9d31) chỉ nhận `reason = STREAK_MILESTONE`, trong khi
+  learning gửi thêm `DAILY_QUEST`, `BADGE`, `KP_MASTERED`; các lý do đó bị trả `FAILED INVALID_PAYLOAD` và relay không gửi
+  lại. Codex đã sửa trong working tree ngày 2026-10-18 (`LearningRewardReason.valueOf`, test cho ba lý do còn lại); đã đọc
+  diff, đúng; **chưa commit** và chưa chạy đầu-cuối cùng learning. Đã ghi vào C6.
 - Chưa có route hoàn điểm khi trừ điểm thành công mà thao tác sau đó lỗi (hồi tim, mua freeze); chờ người dùng quyết chính sách.
