@@ -12,8 +12,9 @@ import java.util.Map;
 
 /**
  * Which mastery formula is in force and the MP-1.0 parameters. The formula is {@code learning.mastery.policy}
- * ({@code DEEPTUTOR} until the team confirms MP-1.0), and a {@code mastery.policy} row in {@code learning_rule_configs}
- * overrides it. The parameters come from {@code learning.mastery.mp1.*}.
+ * (the shipped Config Server value is {@code MP1}; {@code DEEPTUTOR} is only the fallback when no value is supplied, which
+ * is what the tests run on), and a {@code mastery.policy} row in {@code learning_rule_configs} overrides it. The
+ * parameters come from {@code learning.mastery.mp1.*}.
  */
 @Slf4j
 @Component

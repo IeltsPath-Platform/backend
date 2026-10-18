@@ -29,7 +29,7 @@ với 2. Mọi nguồn tính như nhau, không giảm theo thời gian. Tài li�
 - **Domain:** `Mp1MasteryCalculator` (domain/service, thuần Java) nhận danh sách bằng chứng `(outcome, source, occurredAt,
   questionId)` và `now`, trả `(mastery, confidence, sufficient)`. Biên đệm nằm ở `MasteryPolicy` vì cần tier cũ.
 - **Giữ `MasteryCalculator`** nguyên văn cùng comment nguồn DeepTutor và test gốc (AGENTS.md §5). Chọn công thức bằng
-  `learning.mastery.policy: DEEPTUTOR | MP1` (mặc định `DEEPTUTOR` tới khi người dùng xác nhận, xem câu hỏi mở của plan);
+  `learning.mastery.policy: DEEPTUTOR | MP1` (người dùng xác nhận bật MP1 làm mặc định của Config Server ngày 2026-10-18; giá trị dự phòng trong code vẫn `DEEPTUTOR`);
   Admin ghi đè được qua `learning_rule_configs`.
 - **Tham số** trong `learning.mastery.mp1.*`: `window`, `max-practice-in-window`, `half-life-days`, `min-evidence`,
   `min-distinct-days`, `min-confidence`, `hysteresis`, `same-item-days`, `source-weights.*`. Đưa vào `MasteryRules` và

@@ -177,8 +177,9 @@ src/main/java/com/ieltspath/<service>
   không chứa luật. Khóa, replay theo `requestId`, hạn mức LLM là port ở `application/port`.
 - Bằng chứng học lưu theo user ở `kp_evidence` (kèm `question_version_id` khi có câu hỏi). Công thức mặc định là
   `MasteryCalculator` (port `compute_mastery` của DeepTutor v1.6.9, Apache-2.0; giữ comment ghi nguồn và giá trị test gốc):
-  5 kết quả gần nhất, không giảm theo thời gian. Công thức MP-1.0 (`Mp1MasteryCalculator`) chọn bằng
-  `learning.mastery.policy=MP1`: cửa sổ 8 bằng chứng, tối đa 3 bài luyện, trọng số nguồn, giảm theo tuổi (half-life 30
+  5 kết quả gần nhất, không giảm theo thời gian; nó vẫn là giá trị dự phòng trong code (test chạy trên nó) và chọn lại được
+  bằng `LEARNING_MASTERY_POLICY=DEEPTUTOR`. Công thức mặc định của Config Server từ 2026-10-18 là MP-1.0
+  (`Mp1MasteryCalculator`, `learning.mastery.policy=MP1`): cửa sổ 8 bằng chứng, tối đa 3 bài luyện, trọng số nguồn, giảm theo tuổi (half-life 30
   ngày), cùng câu trong 7 ngày tính một lần, tier `INSUFFICIENT` khi chưa đủ dữ liệu, biên đệm 0.03 khi đổi tier. Điểm
   MP-1.0 giảm theo thời gian qua `MasteryDecayJob`. Đổi công thức phải chạy rebuild cho mọi hồ sơ.
 - Skill của lesson suy ra từ câu hỏi trong các block; lesson có thể chứa nhiều skill. Khóa lesson, review và Practice

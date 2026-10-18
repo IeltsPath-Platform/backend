@@ -18,7 +18,7 @@ Một vài từ dùng trong tài liệu:
 
 | Chủ đề | Trước | Sau |
 |---|---|---|
-| Đánh giá mức nắm KP | Chỉ nhìn tỷ lệ đúng/sai, mọi lần làm có giá trị như nhau, không phai theo thời gian | Có công thức mới, tính cả thời gian, nguồn bài và số ngày. Có mức mới "Chưa đủ dữ liệu". *Đang tắt, chờ bạn xác nhận bật* |
+| Đánh giá mức nắm KP | Chỉ nhìn tỷ lệ đúng/sai, mọi lần làm có giá trị như nhau, không phai theo thời gian | Có công thức mới, tính cả thời gian, nguồn bài và số ngày. Có mức mới "Chưa đủ dữ liệu". *Đã bật làm mặc định theo quyết định ngày 18/10* |
 | Thông tin của KP | Chỉ có tên, mô tả | Thêm mức CEFR, "học viên làm được gì" (can-do), phạm vi trong và ngoài |
 | Cây kiến thức | Chỉ có KP chiến lược | Thêm 13 KP Grammar và Vocabulary, nối vào KP chiến lược. *Đang ẩn với học viên* |
 | Luyện tập | Chỉ luyện được KP nằm trong giỏ ôn đến hạn | Học viên tự chọn bất kỳ KP của khóa đang học để luyện |
@@ -53,7 +53,7 @@ Một vài từ dùng trong tài liệu:
   - Cùng một câu làm lại trong 7 ngày không tính thêm.
   - Cần ít nhất 3 bằng chứng trên 2 ngày khác nhau. Nếu chưa đủ, KP hiện **"Chưa đủ dữ liệu"** thay vì bị xếp mức quá sớm.
   - Ngưỡng 60% và 80% giữ nguyên.
-- **Công thức cũ vẫn còn** và vẫn là mặc định. Công thức mới đã xong và kiểm thử, nhưng **chưa bật** cho đến khi bạn quyết.
+- **Công thức mới là mặc định** từ quyết định ngày 18/10. Công thức cũ vẫn còn và bật lại được bằng một biến cấu hình. Khi đổi công thức, mức của học viên đang học có thể đổi, nên môi trường đã có dữ liệu cần tính lại một lần.
 - **KP có thêm thông tin:** mức CEFR (A1–C2), một câu "học viên làm được gì", phạm vi nằm trong và ngoài KP.
 - **Cây kiến thức đủ 6 miền:** thêm 8 KP Grammar (câu phức, mệnh đề quan hệ, bị động, so sánh, thì hoàn thành, mạo từ, hòa hợp chủ vị, từ nối) và 5 KP Vocabulary (kết hợp từ học thuật, từ vựng mô tả biểu đồ, từ đồng nghĩa, dạng từ, chủ đề IELTS thông dụng). Mỗi KP gắn vào KP chiến lược mà nó hỗ trợ. **Chúng đang ẩn**, học viên chỉ thấy khi Content chuyển sang hoạt động. Không có KP Speaking vì chưa chấm được Speaking.
 
@@ -180,7 +180,7 @@ Lưu ý cho người dùng:
 | XP mốc KP chỉ tính cho bằng chứng luyện tập | Có |
 | Giới hạn XP câu trả lời mỗi ngày | 100 |
 | Luật league nhóm nhỏ | Giữ đúng theo tài liệu mentor: top 7 luôn lên hạng kể cả nhóm nhỏ, nhóm dưới 23 người không ai xuống hạng |
-| Công thức mastery mặc định | Giữ công thức cũ; công thức mới tắt cho tới khi xác nhận |
+| Công thức mastery mặc định | Công thức mới (bạn chọn bật ngày 18/10; khuyến nghị lúc đó là giữ công thức cũ tới khi có dữ liệu học viên thật) |
 | Điểm thưởng đi từ Learning sang Access | Qua hàng chờ để không mất nếu một bên tạm lỗi |
 | Hoàn điểm khi lỗi giữa chừng | Không thêm chức năng; xử lý thủ công khi có khiếu nại |
 | Tim trừ khi nào | Mỗi lần nộp bài mới |
@@ -197,7 +197,6 @@ Lưu ý cho người dùng:
 **Chưa làm hoặc chưa chạy:**
 - Trên hệ thống dựng thật, chưa thử: nộp bài ôn khi hết tim, nhánh lỗi của xuất bản hẹn giờ, và so sánh tuần này với tuần trước trong báo cáo tuần (mới có một tuần dữ liệu).
 - Nội dung khóa học hiện chưa có câu nào gắn độ khó "Khó", nên mức thưởng 20 XP của câu khó chưa xảy ra với nội dung thật cho tới khi có người gắn nhãn.
-- Công thức mastery mới chưa bật.
 - 13 KP Grammar và Vocabulary chưa kích hoạt cho học viên.
 
 **Giao diện học viên:**

@@ -59,7 +59,7 @@ Mastery MP-1.0 ──> tier INSUFFICIENT │ PRIORITY │ CONSOLIDATE │ MAINTA
 | # | Phase | Service | Status | Phụ thuộc |
 |---|---|---|---|---|
 | 1 | [Metadata KP và cây đủ 6 miền](phase-01-kp-metadata-and-domains.md) | content | completed (CEFR, can-do, phạm vi `316f763`; seed 13 KP Grammar/Vocab `INACTIVE` + 13 cạnh, không vòng, V45 `649f623`) | – |
-| 2 | [Mastery MP-1.0](phase-02-mastery-mp1.md) | learning | completed (công thức sau cờ `DEEPTUTOR`; chờ xác nhận bật `MP1`) | – |
+| 2 | [Mastery MP-1.0](phase-02-mastery-mp1.md) | learning | completed (công thức sau cờ; MP1 là mặc định của Config Server từ 2026-10-18, `DEEPTUTOR` còn là dự phòng trong code) | – |
 | 3 | [Luyện tự do theo KP và cây của học viên](phase-03-free-practice-and-learner-tree.md) | learning, content | completed (luyện tự do, cây, lọc band/gói, CEFR; `practiceAvailable` của cây chỉ gần đúng, xem phase) | 2 |
 | 4 | [Báo cáo theo kỹ năng và band mục tiêu](phase-04-skill-report-and-target-band.md) | learning, user | completed (adapter HTTP có test `RestUserServiceClientsTest`; `docs/system-architecture.md` không tồn tại trong repo) | 2 |
 | 5 | [Bản chụp tuần, xu hướng, bản tháng](phase-05-weekly-monthly-snapshots.md) | learning | completed (V27, job, 3 endpoint, dự báo ngày đạt mục tiêu; job cron đã chạy thật trên Compose và sửa lỗi thiếu JWT bằng V31; contract có) | 4 |
@@ -80,8 +80,10 @@ Song song được: 1, 2, 6, 7, 8. Sau 2 thì 3 và 4; 5 sau 4.
 
 ## Câu hỏi mở
 
-- Thay công thức mastery mặc định (M4) đổi tier của học viên đang học. Cần người dùng xác nhận trước khi bật cờ
-  `learning.mastery.policy=MP1` ở môi trường thật (phase 2 mặc định để `DEEPTUTOR` cho tới khi xác nhận).
+- Thay công thức mastery mặc định (M4) đổi tier của học viên đang học. **Đã chốt 2026-10-18:** người dùng chọn bật MP1 làm mặc
+  định (khuyến nghị của tôi là giữ `DEEPTUTOR` tới khi có dữ liệu học viên thật để so; người dùng quyết khác). Cấu hình dùng chung
+  của Config Server đặt `MP1`; giá trị dự phòng trong code vẫn `DEEPTUTOR` nên test không đổi. Môi trường đã có dữ liệu học
+  phải chạy `POST /api/learning/admin/rule-configs/recompute` một lần sau khi đổi, vì tier của học viên sẽ đổi.
 - Speaking chưa có KP. Band tổng tạm lấy band Speaking của placement nếu có, không có thì tính trên 3 kỹ năng (phase 4).
 - KP Grammar/Vocabulary phải do người hiểu IELTS soạn và duyệt (D14 plan 1: nội dung tự viết, không chép Cambridge).
 - Số migration là tạm, lấy số kế tiếp lúc code.

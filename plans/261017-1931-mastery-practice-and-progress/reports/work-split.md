@@ -25,7 +25,7 @@
    các module `common-*` một lần. Chỉ `mvn verify` cả reactor một lần ở cuối, do một bên chạy khi bên kia đã dừng.
 5. **Commit nhỏ, mỗi phase một commit, không đẩy khi đỏ.** `git pull --rebase --autostash` ngay trước `git push`. Không
    `--force`. Không sửa plan của phase người khác; chỉ đánh dấu phase của mình.
-6. **Không bật cờ nguy hiểm trên môi trường thật.** `learning.mastery.policy` mặc định `DEEPTUTOR` (cần người dùng xác nhận
+6. **Không bật cờ nguy hiểm trên môi trường thật.** `learning.mastery.policy` mặc định `DEEPTUTOR` lúc chia việc; người dùng đã xác nhận bật MP1 ngày 2026-10-18 (cần người dùng xác nhận
    mới chuyển `MP1`). Trần points/ngày mặc định 20 chờ người dùng chốt.
 7. **Test đỏ trước, rồi mới code**, đúng như từng phase đã ghi. Integration phải chạy Testcontainers thật (skipped ≠ xanh).
 
