@@ -1,5 +1,7 @@
 package com.ieltspath.community.infrastructure.messaging;
 
+import com.ieltspath.events.community.CommunityMessaging;
+
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -9,10 +11,9 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class CommunityMessagingConfig {
-    public static final String EXCHANGE = "community.events";
 
     @Bean
-    TopicExchange communityEventsExchange(@Value("${community.messaging.exchange:community.events}") String name) {
+    TopicExchange communityEventsExchange(@Value("${community.messaging.exchange:" + CommunityMessaging.EXCHANGE + "}") String name) {
         return new TopicExchange(name, true, false);
     }
 

@@ -3,7 +3,7 @@ package com.ieltspath.community.infrastructure.messaging;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.community.application.port.CommunityEventOutbox;
-import com.ieltspath.community.application.port.CommunityEventTypes;
+import com.ieltspath.events.community.CommunityEventTypes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;

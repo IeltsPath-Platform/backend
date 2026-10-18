@@ -1,5 +1,7 @@
 package com.ieltspath.community.infrastructure.messaging;
 
+import com.ieltspath.events.community.CommunityMessaging;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -12,7 +14,7 @@ import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
-import com.ieltspath.community.application.port.CommunityEventTypes;
+import com.ieltspath.events.community.CommunityEventTypes;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -48,7 +50,7 @@ public class CommunityOutboxRelay {
     private final Duration lease;
 
     public CommunityOutboxRelay(JdbcTemplate jdbc, RabbitTemplate rabbit, ObjectMapper objectMapper,
-                                @Value("${community.messaging.exchange:community.events}") String exchange,
+                                @Value("${community.messaging.exchange:" + CommunityMessaging.EXCHANGE + "}") String exchange,
                                 @Value("${community.outbox.relay.batch-size:50}") int batchSize,
                                 @Value("${community.outbox.relay.confirm-timeout:PT5S}") Duration confirmTimeout,
                                 @Value("${community.outbox.relay.enabled:true}") boolean enabled,

@@ -1,7 +1,7 @@
 package com.ieltspath.community.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ieltspath.community.application.port.CommunityEventTypes;
+import com.ieltspath.events.community.CommunityEventTypes;
 import com.ieltspath.community.infrastructure.messaging.CommunityEventOutboxAdapter;
 import com.ieltspath.community.infrastructure.messaging.CommunityOutboxRelay;
 import org.junit.jupiter.api.Test;

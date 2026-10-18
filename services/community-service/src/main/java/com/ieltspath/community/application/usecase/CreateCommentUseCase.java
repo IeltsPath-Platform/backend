@@ -9,7 +9,7 @@ import com.ieltspath.community.domain.exception.CommunityNotFoundException;
 import com.ieltspath.community.domain.repository.CommentRepository;
 import com.ieltspath.community.domain.repository.PostRepository;
 import com.ieltspath.community.application.port.CommunityEventOutbox;
-import com.ieltspath.community.application.port.CommunityEventTypes;
+import com.ieltspath.events.community.CommunityEventTypes;
 import com.ieltspath.community.application.port.PublicProfileClient;
 import lombok.RequiredArgsConstructor;
 import java.util.LinkedHashSet;
