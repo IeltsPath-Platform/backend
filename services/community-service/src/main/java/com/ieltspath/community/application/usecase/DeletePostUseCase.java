@@ -17,7 +17,7 @@ public class DeletePostUseCase {
     public void execute(CommunityActor actor, DeletePostCommand command) {
         var post = posts.findById(command.postId())
                 .orElseThrow(() -> new CommunityNotFoundException("Post not found"));
-        post.delete(actor.userId());
+        post.delete(actor.userId(), actor.administrator());
         posts.save(post);
     }
 }

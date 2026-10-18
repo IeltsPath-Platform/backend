@@ -274,7 +274,37 @@ services:
       SERVER_PORT: 8089
       COMMUNITY_DB_URL: jdbc:postgresql://postgres:5432/community_db
       COMMUNITY_DB_PASSWORD: "${POSTGRES_PASSWORD}"
-    depends_on: *after-infra
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
+      USER_SERVICE_URL: http://user-service:8085
+    depends_on:
+      <<: *after-infra
+      rabbitmq:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+
+  notification-service:
+    <<: *spring-service
+    build:
+      context: .
+      dockerfile: Dockerfile.spring-service
+      args:
+        MODULE_PATH: services/notification-service
+    environment:
+      <<: *spring-env
+      SERVER_PORT: 8088
+      NOTIFICATION_DB_URL: jdbc:postgresql://postgres:5432/notification_db
+      NOTIFICATION_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
+      FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:5173}"
+    depends_on:
+      <<: *after-infra
+      rabbitmq:
+        condition: service_healthy
 
 networks:
   codebase-network:

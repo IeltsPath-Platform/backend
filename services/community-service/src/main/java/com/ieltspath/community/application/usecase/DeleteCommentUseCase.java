@@ -17,7 +17,7 @@ public class DeleteCommentUseCase {
     public void execute(CommunityActor actor, DeleteCommentCommand command) {
         var comment = comments.findById(command.commentId())
                 .orElseThrow(() -> new CommunityNotFoundException("Comment not found"));
-        comment.delete(actor.userId());
+        comment.delete(actor.userId(), actor.administrator());
         comments.save(comment);
     }
 }

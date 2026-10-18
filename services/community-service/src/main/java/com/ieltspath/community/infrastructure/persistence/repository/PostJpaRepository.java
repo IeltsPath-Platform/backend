@@ -1,6 +1,7 @@
 package com.ieltspath.community.infrastructure.persistence.repository;
 
 import com.ieltspath.community.domain.vo.ContentStatus;
+import com.ieltspath.community.domain.vo.PostCategory;
 import com.ieltspath.community.infrastructure.persistence.entity.PostJpaEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,4 +11,5 @@ import java.util.UUID;
 
 public interface PostJpaRepository extends JpaRepository<PostJpaEntity, UUID> {
     Page<PostJpaEntity> findByStatus(ContentStatus status, Pageable pageable);
+    Page<PostJpaEntity> findByStatusAndCategory(ContentStatus status, PostCategory category, Pageable pageable);
 }

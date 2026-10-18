@@ -67,8 +67,9 @@ public class Comment {
         updatedAt = Instant.now();
     }
 
-    public void delete(UUID actor) {
-        requireAuthor(actor);
+    public void delete(UUID actor) { delete(actor, false); }
+    public void delete(UUID actor, boolean administrator) {
+        if (!administrator) requireAuthor(actor);
         requireActive();
         status = ContentStatus.DELETED;
         updatedAt = Instant.now();

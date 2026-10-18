@@ -27,6 +27,11 @@ public class PostJpaEntity {
     public Instant createdAt;
     @Column(name = "updated_at", nullable = false)
     public Instant updatedAt;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(name = "image_urls", nullable = false, columnDefinition = "jsonb")
+    public java.util.List<String> imageUrls = java.util.List.of();
+    @Column(name = "video_url") public String videoUrl;
+    @Column(name = "target_band", precision = 2, scale = 1) public java.math.BigDecimal targetBand;
     @Version
     public Long version;
 

@@ -16,7 +16,6 @@ public class PostReactionJpaEntity {
     @Id
     @Column(name = "user_id")
     public UUID userId;
-    @Id
     @Enumerated(EnumType.STRING)
     @Column(name = "reaction_type")
     public ReactionType reactionType;
