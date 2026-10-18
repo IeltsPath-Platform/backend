@@ -64,10 +64,11 @@ class PublicProfilePersistenceTest {
                 visible,"Mina IELTS","COMMUNITY",hidden,"Mina private","PRIVATE");
         jdbc.update("UPDATE users SET full_name='Mina account' WHERE id=?", unrelated);
         var results=repository.searchVisibleByName(viewer,"mina",2);
-        assertEquals(2, results.size());
+        assertEquals(1, results.size());
         assertTrue(results.stream().noneMatch(profile -> profile.id().equals(hidden)));
         assertTrue(results.stream().anyMatch(profile -> profile.id().equals(visible)));
-        assertTrue(results.stream().anyMatch(profile -> profile.id().equals(unrelated)));
+        // A user who never created a profile is not searchable by their real account name.
+        assertTrue(results.stream().noneMatch(profile -> profile.id().equals(unrelated)));
     }
 
     @Test
@@ -78,6 +79,8 @@ class PublicProfilePersistenceTest {
         UUID userWithUnderscore = user();
         jdbc.update("UPDATE users SET full_name='100%% guaranteed' WHERE id=?", userWithPercent);
         jdbc.update("UPDATE users SET full_name='user__name' WHERE id=?", userWithUnderscore);
+        jdbc.update("INSERT INTO learner_profiles(user_id,display_name,profile_visibility) VALUES (?,'Normal learner','PUBLIC'),(?,'100%% guaranteed','PUBLIC'),(?,'user__name','PUBLIC')",
+                normal, userWithPercent, userWithUnderscore);
 
         var percentResults = repository.searchVisibleByName(viewer, "%%", 10);
         assertEquals(1, percentResults.size());

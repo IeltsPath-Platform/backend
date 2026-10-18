@@ -68,6 +68,14 @@ class GetPublicProfilesUseCaseTest {
     }
 
     @Test
+    void realAccountNameOfUserWithoutProfileIsHiddenFromOthers() {
+        UUID other = UUID.randomUUID();
+        when(repository.findByUserIds(Set.of(other))).thenReturn(List.of(
+                new PublicProfile(other, null, "Real Account Name", null, null, null, null, null)));
+        assertEquals("Learner", useCase.execute(viewer, other).displayName());
+    }
+
+    @Test
     void mentionSearchValidatesBoundsAndUsesVisibleProfileRepositoryQuery() {
         UUID found=UUID.randomUUID();
         when(repository.searchVisibleByName(viewer,"Lan",8)).thenReturn(List.of(profile(found,ProfileVisibility.COMMUNITY,null)));

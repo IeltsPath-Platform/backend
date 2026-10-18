@@ -49,7 +49,7 @@ public class PublicProfileRepositoryAdapter implements PublicProfileRepository {
                 LEFT JOIN learning_goals g ON g.user_id = u.id AND g.status = 'ACTIVE'
                 LEFT JOIN streaks s ON s.user_id = u.id
                 WHERE u.status = 'ACTIVE'
-                  AND (p.profile_visibility IS NULL OR p.profile_visibility IN ('PUBLIC','COMMUNITY') OR u.id = :viewerId)
+                  AND (p.profile_visibility IN ('PUBLIC','COMMUNITY') OR u.id = :viewerId)
                   AND lower(coalesce(nullif(trim(p.display_name), ''), u.full_name)) LIKE :query ESCAPE '\\'
                 ORDER BY lower(coalesce(nullif(trim(p.display_name), ''), u.full_name)), u.id
                 LIMIT :limit
