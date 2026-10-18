@@ -1,8 +1,10 @@
 package com.ieltspath.assessment.infrastructure.messaging;
 
+import com.ieltspath.events.assessment.AssessmentCompletedV2;
+
 import com.ieltspath.events.assessment.AssessmentMessaging;
 
-import com.ieltspath.assessment.application.event.AssessmentCompletedV2;
+
 import com.ieltspath.assessment.domain.entity.OutboxEvent;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
