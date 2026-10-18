@@ -7,9 +7,9 @@ import java.util.Set;
 import java.util.UUID;
 
 public interface ReactionRepository {
-    void add(UUID postId, UUID userId, ReactionType type);
+    boolean add(UUID postId, UUID userId, ReactionType type);
 
-    void remove(UUID postId, UUID userId, ReactionType type);
+    boolean remove(UUID postId, UUID userId, ReactionType type);
 
     Map<ReactionType, Long> counts(UUID postId);
 

@@ -41,4 +41,30 @@ class CommunityDomainTest {
         assertThrows(CommunityException.class, () -> p.moderate(ContentStatus.ACTIVE));
     }
     @Test void commentKeepsParentReference(){UUID parent=UUID.randomUUID();Comment c=Comment.create(UUID.randomUUID(),UUID.randomUUID(),parent,"Reply");assertEquals(parent,c.getParentCommentId());}
+
+    @Test
+    void administratorCannotEditPostOfAnotherAuthor() {
+        UUID author = UUID.randomUUID();
+        Post p = Post.create(author, PostCategory.GENERAL, "Title", "Body");
+        assertThrows(CommunityForbiddenException.class, () -> p.edit(UUID.randomUUID(), PostCategory.QUESTION, "New Title", "New Body"));
+    }
+
+    @Test
+    void administratorCannotEditCommentOfAnotherAuthor() {
+        UUID author = UUID.randomUUID();
+        Comment comment = Comment.create(UUID.randomUUID(), author, null, "Body");
+        assertThrows(CommunityForbiddenException.class, () -> comment.edit(UUID.randomUUID(), "New Body"));
+    }
+
+    @Test
+    void administratorCanDeletePostAndComment() {
+        UUID author = UUID.randomUUID(), admin = UUID.randomUUID();
+        Post p = Post.create(author, PostCategory.GENERAL, "Title", "Body");
+        p.delete(admin, true);
+        assertEquals(ContentStatus.DELETED, p.getStatus());
+
+        Comment c = Comment.create(UUID.randomUUID(), author, null, "Body");
+        c.delete(admin, true);
+        assertEquals(ContentStatus.DELETED, c.getStatus());
+    }
 }

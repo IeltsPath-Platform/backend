@@ -17,11 +17,18 @@ public interface PostReactionJpaRepository extends JpaRepository<PostReactionJpa
             value = """
                     INSERT INTO post_reactions(post_id, user_id, reaction_type, created_at)
                     VALUES (:postId, :userId, :type, CURRENT_TIMESTAMP)
-                    ON CONFLICT DO NOTHING
+                    ON CONFLICT(post_id,user_id) DO UPDATE
+                    SET reaction_type=EXCLUDED.reaction_type, created_at=EXCLUDED.created_at
+                    WHERE post_reactions.reaction_type IS DISTINCT FROM EXCLUDED.reaction_type
                     """,
             nativeQuery = true
     )
-    void insertIgnore(@Param("postId") UUID postId, @Param("userId") UUID userId, @Param("type") String type);
+    int insertOrReplace(@Param("postId") UUID postId, @Param("userId") UUID userId, @Param("type") String type);
+
+    @Modifying
+    @Query("delete from PostReactionJpaEntity r where r.postId = :postId and r.userId = :userId and r.reactionType = :type")
+    int remove(@Param("postId") UUID postId, @Param("userId") UUID userId,
+               @Param("type") com.ieltspath.community.domain.vo.ReactionType type);
 
     @Query("""
             select r.reactionType, count(r)

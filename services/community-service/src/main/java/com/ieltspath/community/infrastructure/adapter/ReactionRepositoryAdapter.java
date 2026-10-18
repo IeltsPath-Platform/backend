@@ -14,12 +14,12 @@ import java.util.*;
 public class ReactionRepositoryAdapter implements ReactionRepository {
     private final PostReactionJpaRepository repository;
 
-    public void add(UUID postId, UUID userId, ReactionType type) {
-        repository.insertIgnore(postId, userId, type.name());
+    public boolean add(UUID postId, UUID userId, ReactionType type) {
+        return repository.insertOrReplace(postId, userId, type.name()) > 0;
     }
 
-    public void remove(UUID postId, UUID userId, ReactionType type) {
-        repository.deleteById(new PostReactionId(postId, userId, type));
+    public boolean remove(UUID postId, UUID userId, ReactionType type) {
+        return repository.remove(postId, userId, type) > 0;
     }
 
     public Map<ReactionType, Long> counts(UUID postId) {

@@ -15,10 +15,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class CreatePostUseCase {
     private final PostRepository posts;
     private final ReactionRepository reactions;
+    private final com.ieltspath.community.application.port.MediaPolicy mediaPolicy;
 
     @Transactional
     public PostResult execute(CommunityActor actor, CreatePostCommand command) {
-        Post saved = posts.save(Post.create(actor.userId(), command.category(), command.title(), command.body()));
+        mediaPolicy.validate(command.imageUrls(), command.videoUrl());
+        Post post = Post.create(actor.userId(), command.category(), command.title(), command.body());
+        post.setMedia(command.imageUrls(), command.videoUrl(), command.targetBand());
+        Post saved = posts.save(post);
         return PostResult.from(saved, reactions.counts(saved.getId()));
     }
 }

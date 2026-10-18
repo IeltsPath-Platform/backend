@@ -4,6 +4,7 @@ import com.ieltspath.community.domain.aggregate.Post;
 import com.ieltspath.community.domain.repository.PostRepository;
 import com.ieltspath.community.domain.vo.CommunityPage;
 import com.ieltspath.community.domain.vo.ContentStatus;
+import com.ieltspath.community.domain.vo.PostCategory;
 import com.ieltspath.community.infrastructure.persistence.mapper.PostPersistenceMapper;
 import com.ieltspath.community.infrastructure.persistence.repository.PostJpaRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,13 @@ public class PostRepositoryAdapter implements PostRepository {
     public CommunityPage<Post> findByStatus(ContentStatus status, int page, int size) {
         var sort = Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"));
         var result = repository.findByStatus(status, PageRequest.of(page, size, sort));
+        return new CommunityPage<>(result.getContent().stream().map(mapper::toDomain).toList(), result.getTotalElements());
+    }
+
+    @Override
+    public CommunityPage<Post> findByStatusAndCategory(ContentStatus status, PostCategory category, int page, int size) {
+        var sort = Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"));
+        var result = repository.findByStatusAndCategory(status, category, PageRequest.of(page, size, sort));
         return new CommunityPage<>(result.getContent().stream().map(mapper::toDomain).toList(), result.getTotalElements());
     }
 }

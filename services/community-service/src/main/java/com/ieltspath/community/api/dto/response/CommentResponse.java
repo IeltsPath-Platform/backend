@@ -14,12 +14,13 @@ public record CommentResponse(
         String body,
         ContentStatus status,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        com.ieltspath.community.application.result.PublicProfile author,long replyCount
 ) {
     public static CommentResponse from(CommentResult result) {
         return new CommentResponse(
                 result.id(), result.postId(), result.authorId(), result.parentCommentId(), result.body(),
-                result.status(), result.createdAt(), result.updatedAt()
+                result.status(), result.createdAt(), result.updatedAt(), result.author(), result.replyCount()
         );
     }
 }
