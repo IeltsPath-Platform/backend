@@ -1,12 +1,8 @@
 package com.ieltspath.access.api.controller;
 
 import com.ieltspath.access.api.dto.request.DebitPointsRequest;
-import com.ieltspath.access.api.dto.request.CreditPointsRequest;
 import com.ieltspath.access.api.dto.response.PointLedgerResponse;
-import com.ieltspath.access.api.dto.response.CreditPointsResponse;
-import com.ieltspath.access.application.command.CreditPointsCommand;
 import com.ieltspath.access.application.command.DebitPointsCommand;
-import com.ieltspath.access.application.usecase.CreditPointsUseCase;
 import com.ieltspath.access.application.usecase.DebitPointsUseCase;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import jakarta.validation.Valid;
@@ -16,7 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Service-to-service point operations; the Gateway denies {@code /internal/**} to clients. */
+/**
+ * Service-to-service point spending; the Gateway denies {@code /internal/**} to clients. Points are earned only through
+ * the {@code access.points-grant} message, never over HTTP, because any internal token could otherwise mint points.
+ */
 @RestController
 @RequestMapping("/internal/access")
 @RequiredArgsConstructor
@@ -24,19 +23,6 @@ public class InternalPointsController {
 
     private final CurrentUserProvider currentUserProvider;
     private final DebitPointsUseCase debitPointsUseCase;
-    private final CreditPointsUseCase creditPointsUseCase;
-
-    @PostMapping("/points/credit")
-    public CreditPointsResponse creditPoints(@Valid @RequestBody CreditPointsRequest request) {
-        return CreditPointsResponse.from(creditPointsUseCase.execute(new CreditPointsCommand(
-                currentUserProvider.requireUserId(),
-                request.userId(),
-                request.amount(),
-                request.reason(),
-                request.referenceId(),
-                request.idempotencyKey()
-        )));
-    }
 
     @PostMapping("/points/debit")
     public PointLedgerResponse debitPoints(@Valid @RequestBody DebitPointsRequest request) {

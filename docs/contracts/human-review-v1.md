@@ -24,8 +24,8 @@ only: no evidence, no reviews, no change to Practice or gates. Learning stores o
 
 ## Create a review
 
-Learning calls Assessment with an internal service JWT after validating that the essay belongs to the current learner and
-is already `GRADED`. Access credit consumption remains a separate call authenticated with the learner bearer token.
+Learning calls Assessment with the learner's own internal JWT after validating that the essay belongs to the current
+learner and is already `GRADED`. Access credit consumption remains a separate call authenticated with the learner bearer token.
 
 ### `POST /internal/assessments/human-reviews`
 
@@ -41,6 +41,9 @@ is already `GRADED`. Access credit consumption remains a separate call authentic
   "rubric": {"code": "IELTS_WRITING_TASK_2", "version": 1, "criteria": []}
 }
 ```
+
+The review always belongs to the authenticated learner (the JWT subject). `learnerId` is optional and only checked: a
+value that differs from the JWT subject returns `403`.
 
 `source` is `LESSON` or `PRACTICE`; `task` is `TASK_1` or `TASK_2`. `requestId` is the idempotency key. Repeating it
 with the same payload returns the same review ID. Reusing it with another payload, or requesting a second review for the
@@ -58,7 +61,7 @@ attempt or result ID.
 
 ## Read a review
 
-### `GET /internal/assessments/human-reviews/{reviewSubmissionId}?learnerId={learnerId}`
+### `GET /internal/assessments/human-reviews/{reviewSubmissionId}`
 
 ```json
 {
@@ -70,6 +73,8 @@ attempt or result ID.
   "feedback": "Develop the main position further."
 }
 ```
+
+Only the authenticated learner can read their review; another learner's review answers `404`, as an unknown id does.
 
 Pending response uses `status: "PENDING"` with grade fields omitted. A `DONE` response contains the examiner's overall
 band, criteria, error codes, and feedback. The response never includes the examiner's identity. The review is feedback

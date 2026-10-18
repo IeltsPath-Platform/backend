@@ -9,7 +9,8 @@ import java.util.UUID;
 
 public record CreateHumanReviewRequest(
         @NotNull UUID requestId,
-        @NotNull UUID learnerId,
+        /** Optional and never trusted: the review always belongs to the authenticated learner; a different id is refused. */
+        UUID learnerId,
         @NotNull UUID sourceSubmissionId,
         @NotNull Source source,
         @NotBlank @Pattern(regexp = "TASK_[12]") String task,

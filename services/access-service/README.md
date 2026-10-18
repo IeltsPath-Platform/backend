@@ -11,7 +11,7 @@ Gói học, subscription, activation key và ví point. Cổng 8084, DB `access_
 | Học viên | `GET /api/access/me/subscription`, `GET /api/access/me/points`, `GET /api/access/me/points/history`, `POST /api/access/me/keys/activate` | Người dùng đăng nhập, theo subject của token |
 | Admin | `/api/access/admin/**` | `ADMIN` |
 | Thao tác trên user khác | `GET /api/access/users/{userId}/entitlement`, `POST /api/access/users/{userId}/consume-human-grading`, `POST /api/access/points/refund` | Chỉ `ADMIN`; chưa service nào gọi |
-| Nội bộ | `POST /internal/access/points/debit`, `POST /internal/access/points/credit` | Service khác, mang bearer của học viên |
+| Nội bộ | `POST /internal/access/points/debit` | Service khác, mang bearer của học viên. Không có route cộng điểm: điểm chỉ được cộng qua message `points.grant.requested` (queue `access.points-grant`) |
 
 ## Luật của `/internal/access/**`
 

@@ -10,4 +10,6 @@ public interface HumanGradingCreditConsumptionRepository {
     Optional<HumanGradingCreditConsumption> findBySubmissionId(UUID submissionId);
     void save(HumanGradingCreditConsumption consumption);
     void markRefunded(UUID submissionId, int remainingCredits);
+    /** Charges a submission whose earlier credit was refunded: clears the refund and records the new debit. */
+    void markReconsumed(UUID submissionId, UUID subscriptionId, int remainingCredits);
 }

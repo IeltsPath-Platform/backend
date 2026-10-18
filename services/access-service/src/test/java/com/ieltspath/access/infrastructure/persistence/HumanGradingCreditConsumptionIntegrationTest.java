@@ -65,6 +65,29 @@ class HumanGradingCreditConsumptionIntegrationTest {
     }
 
     @Test
+    void consumingAgainAfterARefundChargesTheCreditAgain() {
+        UUID user = UUID.randomUUID();
+        UUID subscription = activeSubscription(user, 2);
+        UUID submission = UUID.randomUUID();
+
+        assertEquals(1, credits.execute(new ConsumeHumanGradingCreditCommand(user, submission)));
+        assertEquals(2, credits.refund(new RefundHumanGradingCreditCommand(user, submission)));
+        entityManager.flush();
+        assertEquals(0, usedCredits(subscription));
+
+        assertEquals(1, credits.execute(new ConsumeHumanGradingCreditCommand(user, submission)));
+        assertEquals(1, credits.execute(new ConsumeHumanGradingCreditCommand(user, submission)));
+        entityManager.flush();
+        assertEquals(1, usedCredits(subscription));
+        assertEquals(2, count("SELECT count(*) FROM outbox_events WHERE event_type='HumanGradingCreditConsumed'"));
+
+        assertEquals(2, credits.refund(new RefundHumanGradingCreditCommand(user, submission)));
+        assertEquals(2, credits.refund(new RefundHumanGradingCreditCommand(user, submission)));
+        entityManager.flush();
+        assertEquals(0, usedCredits(subscription));
+    }
+
+    @Test
     void submissionIdCannotConsumeAnotherUsersCredit() {
         UUID user = UUID.randomUUID();
         UUID subscription = activeSubscription(user, 2);

@@ -1,7 +1,9 @@
 package com.ieltspath.access.infrastructure.persistence;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ieltspath.access.application.result.PointCreditResult;
+import com.ieltspath.access.application.usecase.CreditPointsUseCase;
+import com.ieltspath.access.domain.vo.LearningRewardReason;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @Testcontainers
@@ -58,64 +61,69 @@ class PointCreditIntegrationTest {
     @Autowired TestRestTemplate rest;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper objectMapper;
+    @Autowired CreditPointsUseCase credits;
 
     @Test
-    void internalLearnerCanReceiveDailyCappedReward() throws Exception {
+    void learnerReceivesAGrantedReward() {
         UUID userId = UUID.randomUUID();
         jdbc.update("INSERT INTO point_wallets(user_id, balance, total_credited, total_debited) VALUES (?, 0, 0, 0)",
                 userId);
-        ResponseEntity<String> response = rest.postForEntity("/internal/access/points/credit",
-                request(creditBody(userId, 5, "reward-123", "kp-123"), signedInternalToken(userId)), String.class);
 
-        assertEquals(200, response.getStatusCode().value());
-        JsonNode json = objectMapper.readTree(response.getBody());
-        assertEquals(5, json.path("granted").asInt());
-        assertEquals(false, json.path("capped").asBoolean());
-        assertEquals(5, json.path("balance").asLong());
-        assertNotNull(json.path("transactionId").textValue());
+        PointCreditResult result = credits.executeLearningReward(UUID.randomUUID(), userId, 5,
+                LearningRewardReason.KP_MASTERED, "kp-123");
+
+        assertEquals(5, result.granted());
+        assertEquals(false, result.capped());
+        assertEquals(5, result.balance());
+        assertNotNull(result.transactionId());
     }
 
     @Test
-    void badgeCreditsBypassAndDoNotConsumeTheDailyLimitWhileDailyQuestStillUsesIt() throws Exception {
+    void badgeCreditsBypassAndDoNotConsumeTheDailyLimitWhileDailyQuestStillUsesIt() {
         UUID userId = UUID.randomUUID();
         seedDailyEarnings(userId, 18, "STREAK_MILESTONE");
-        String token = signedInternalToken(userId);
 
-        JsonNode firstBadge = postCredit(userId, 50, "badge-before-cap", "badge:STREAK_7", "BADGE", token);
-        assertEquals(50, firstBadge.path("granted").asInt());
-        assertEquals(false, firstBadge.path("capped").asBoolean());
-        assertEquals(68, firstBadge.path("balance").asLong());
+        PointCreditResult firstBadge = grant(userId, 50, "badge:STREAK_7", LearningRewardReason.BADGE);
+        assertEquals(50, firstBadge.granted());
+        assertEquals(false, firstBadge.capped());
+        assertEquals(68, firstBadge.balance());
 
-        JsonNode dailyQuestWithRoom = postCredit(userId, 5, "quest-with-room", "quest:daily:1", "DAILY_QUEST", token);
-        assertEquals(2, dailyQuestWithRoom.path("granted").asInt());
-        assertEquals(true, dailyQuestWithRoom.path("capped").asBoolean());
-        assertEquals(70, dailyQuestWithRoom.path("balance").asLong());
+        PointCreditResult dailyQuestWithRoom = grant(userId, 5, "quest:daily:1", LearningRewardReason.DAILY_QUEST);
+        assertEquals(2, dailyQuestWithRoom.granted());
+        assertEquals(true, dailyQuestWithRoom.capped());
+        assertEquals(70, dailyQuestWithRoom.balance());
 
-        JsonNode badgeAfterCap = postCredit(userId, 50, "badge-after-cap", "badge:QUEST_COMPLETE", "BADGE", token);
-        assertEquals(50, badgeAfterCap.path("granted").asInt());
-        assertEquals(false, badgeAfterCap.path("capped").asBoolean());
-        assertEquals(120, badgeAfterCap.path("balance").asLong());
+        PointCreditResult badgeAfterCap = grant(userId, 50, "badge:QUEST_COMPLETE", LearningRewardReason.BADGE);
+        assertEquals(50, badgeAfterCap.granted());
+        assertEquals(false, badgeAfterCap.capped());
+        assertEquals(120, badgeAfterCap.balance());
 
-        JsonNode dailyQuestAfterCap = postCredit(userId, 1, "quest-after-cap", "quest:daily:2", "DAILY_QUEST", token);
-        assertEquals(0, dailyQuestAfterCap.path("granted").asInt());
-        assertEquals(true, dailyQuestAfterCap.path("capped").asBoolean());
-        assertEquals(120, dailyQuestAfterCap.path("balance").asLong());
-        assertEquals(true, dailyQuestAfterCap.path("transactionId").isNull());
+        PointCreditResult dailyQuestAfterCap = grant(userId, 1, "quest:daily:2", LearningRewardReason.DAILY_QUEST);
+        assertEquals(0, dailyQuestAfterCap.granted());
+        assertEquals(true, dailyQuestAfterCap.capped());
+        assertEquals(120, dailyQuestAfterCap.balance());
+        assertNull(dailyQuestAfterCap.transactionId());
 
         assertEquals(100L, sumGrantedForReason(userId, "BADGE"));
         assertEquals(20L, sumDailyLimitEligibleRewards(userId));
     }
 
     @Test
-    void creditRejectsRequestsWithoutInternalJwt() {
-        ResponseEntity<String> response = rest.postForEntity("/internal/access/points/credit",
-                request("{}", null), String.class);
+    void creditingPointsOverHttpIsNotExposed() {
+        UUID userId = UUID.randomUUID();
+        String body = "{\"userId\":\"" + userId + "\",\"amount\":5,\"reason\":\"BADGE\","
+                + "\"referenceId\":\"badge:STREAK_7\",\"idempotencyKey\":\"http-credit\"}";
 
-        assertEquals(401, response.getStatusCode().value());
+        ResponseEntity<String> response = rest.postForEntity("/internal/access/points/credit",
+                request(body, signedInternalToken(userId)), String.class);
+
+        assertEquals(404, response.getStatusCode().value());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM point_ledger_entries WHERE user_id = ?",
+                Integer.class, userId));
     }
 
     @Test
-    void concurrentCreditWithSameKeyAppliesTheDailyCapOnlyOnce() throws Exception {
+    void concurrentGrantWithSameIdAppliesTheDailyCapOnlyOnce() throws Exception {
         UUID userId = UUID.randomUUID();
         jdbc.update("INSERT INTO point_wallets(user_id, balance, total_credited, total_debited) VALUES (?, 18, 18, 0)",
                 userId);
@@ -128,52 +136,50 @@ class PointCreditIntegrationTest {
                 VALUES (?, ?, 18, 18, 'LEARNING_REWARD', 'KP_MASTERED', 'kp-prior', 'prior-reward', ?)
                 """, existingLedgerId, userId, java.sql.Timestamp.from(today));
 
-        String token = signedInternalToken(userId);
-        String body = creditBody(userId, 5, "reward-concurrent", "kp-456");
+        UUID grantId = UUID.randomUUID();
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
-            Future<ResponseEntity<String>> first = executor.submit(() -> {
+            Future<PointCreditResult> first = executor.submit(() -> {
                 start.await();
-                return rest.postForEntity("/internal/access/points/credit", request(body, token), String.class);
+                return credits.executeLearningReward(grantId, userId, 5, LearningRewardReason.KP_MASTERED, "kp-456");
             });
-            Future<ResponseEntity<String>> second = executor.submit(() -> {
+            Future<PointCreditResult> second = executor.submit(() -> {
                 start.await();
-                return rest.postForEntity("/internal/access/points/credit", request(body, token), String.class);
+                return credits.executeLearningReward(grantId, userId, 5, LearningRewardReason.KP_MASTERED, "kp-456");
             });
             start.countDown();
-            JsonNode firstJson = objectMapper.readTree(first.get(30, TimeUnit.SECONDS).getBody());
-            JsonNode secondJson = objectMapper.readTree(second.get(30, TimeUnit.SECONDS).getBody());
+            PointCreditResult firstResult = first.get(30, TimeUnit.SECONDS);
+            PointCreditResult secondResult = second.get(30, TimeUnit.SECONDS);
 
-            assertEquals(2, firstJson.path("granted").asInt());
-            assertEquals(true, firstJson.path("capped").asBoolean());
-            assertEquals(20, firstJson.path("balance").asLong());
-            assertEquals(firstJson.path("transactionId").asText(), secondJson.path("transactionId").asText());
+            assertEquals(2, firstResult.granted());
+            assertEquals(true, firstResult.capped());
+            assertEquals(20, firstResult.balance());
+            assertEquals(firstResult.transactionId(), secondResult.transactionId());
             assertEquals(20L, jdbc.queryForObject("SELECT balance FROM point_wallets WHERE user_id = ?", Long.class, userId));
             assertEquals(20L, jdbc.queryForObject("""
                     SELECT COALESCE(SUM(delta), 0) FROM point_ledger_entries
                     WHERE user_id = ? AND transaction_type = 'LEARNING_REWARD'
                     """, Long.class, userId));
             assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM point_credit_requests WHERE idempotency_key = ?",
-                    Integer.class, "reward-concurrent"));
+                    Integer.class, grantId.toString()));
         } finally {
             executor.shutdownNow();
         }
 
-        ResponseEntity<String> fullyCapped = rest.postForEntity("/internal/access/points/credit",
-                request(creditBody(userId, 3, "reward-full", "kp-789"), token), String.class);
-        assertEquals(200, fullyCapped.getStatusCode().value());
-        JsonNode fullyCappedJson = objectMapper.readTree(fullyCapped.getBody());
-        assertEquals(0, fullyCappedJson.path("granted").asInt());
-        assertEquals(true, fullyCappedJson.path("capped").asBoolean());
-        assertEquals(20, fullyCappedJson.path("balance").asLong());
-        assertEquals(true, fullyCappedJson.path("transactionId").isNull());
+        UUID fullGrant = UUID.randomUUID();
+        PointCreditResult fullyCapped = credits.executeLearningReward(fullGrant, userId, 3,
+                LearningRewardReason.KP_MASTERED, "kp-789");
+        assertEquals(0, fullyCapped.granted());
+        assertEquals(true, fullyCapped.capped());
+        assertEquals(20, fullyCapped.balance());
+        assertNull(fullyCapped.transactionId());
 
-        ResponseEntity<String> replay = rest.postForEntity("/internal/access/points/credit",
-                request(creditBody(userId, 3, "reward-full", "kp-789"), token), String.class);
-        assertEquals(fullyCapped.getBody(), replay.getBody());
+        PointCreditResult replay = credits.executeLearningReward(fullGrant, userId, 3,
+                LearningRewardReason.KP_MASTERED, "kp-789");
+        assertEquals(fullyCapped, replay);
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM point_ledger_entries WHERE idempotency_key = ?",
-                Integer.class, "reward-full"));
+                Integer.class, fullGrant.toString()));
     }
 
     @Test
@@ -207,22 +213,8 @@ class PointCreditIntegrationTest {
         return new HttpEntity<>(body, headers);
     }
 
-    private static String creditBody(UUID userId, int amount, String idempotencyKey, String referenceId) {
-        return creditBody(userId, amount, idempotencyKey, referenceId, "KP_MASTERED");
-    }
-
-    private JsonNode postCredit(UUID userId, int amount, String idempotencyKey, String referenceId,
-                                String reason, String token) throws Exception {
-        ResponseEntity<String> response = rest.postForEntity("/internal/access/points/credit",
-                request(creditBody(userId, amount, idempotencyKey, referenceId, reason), token), String.class);
-        assertEquals(200, response.getStatusCode().value());
-        return objectMapper.readTree(response.getBody());
-    }
-
-    private static String creditBody(UUID userId, int amount, String idempotencyKey, String referenceId, String reason) {
-        return "{\"userId\":\"" + userId + "\",\"amount\":" + amount
-                + ",\"reason\":\"" + reason + "\",\"referenceId\":\"" + referenceId
-                + "\",\"idempotencyKey\":\"" + idempotencyKey + "\"}";
+    private PointCreditResult grant(UUID userId, int amount, String referenceId, LearningRewardReason reason) {
+        return credits.executeLearningReward(UUID.randomUUID(), userId, amount, reason, referenceId);
     }
 
     private void seedDailyEarnings(UUID userId, int amount, String reason) {

@@ -2,21 +2,17 @@ package com.ieltspath.access.api.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.access.api.dto.request.DebitPointsRequest;
-import com.ieltspath.access.application.command.CreditPointsCommand;
 import com.ieltspath.access.api.dto.request.RefundPointsRequest;
-import com.ieltspath.access.application.result.PointCreditResult;
 import com.ieltspath.access.application.command.DebitPointsCommand;
 import com.ieltspath.access.application.result.PointLedgerResult;
 import com.ieltspath.access.application.result.UserEntitlementResult;
 import com.ieltspath.access.application.usecase.ConsumeHumanGradingCreditUseCase;
-import com.ieltspath.access.application.usecase.CreditPointsUseCase;
 import com.ieltspath.access.application.usecase.DebitPointsUseCase;
 import com.ieltspath.access.application.usecase.GetUserEntitlementUseCase;
 import com.ieltspath.access.application.usecase.RefundPointsUseCase;
 import com.ieltspath.access.domain.exception.InsufficientPointsException;
 import com.ieltspath.access.domain.exception.PointsActorMismatchException;
 import com.ieltspath.access.domain.vo.PointTransactionType;
-import com.ieltspath.access.domain.vo.LearningRewardReason;
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import org.junit.jupiter.api.Test;
@@ -67,7 +63,6 @@ class InternalAccessControllerTest {
     @MockitoBean CurrentUserProvider currentUserProvider;
     @MockitoBean GetUserEntitlementUseCase getUserEntitlementUseCase;
     @MockitoBean DebitPointsUseCase debitPointsUseCase;
-    @MockitoBean CreditPointsUseCase creditPointsUseCase;
     @MockitoBean RefundPointsUseCase refundPointsUseCase;
     @MockitoBean ConsumeHumanGradingCreditUseCase consumeHumanGradingCreditUseCase;
 
@@ -97,39 +92,13 @@ class InternalAccessControllerTest {
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
-    void creditUsesTheAuthenticatedLearnerAndReturnsTheCappedAmount() throws Exception {
-        when(currentUserProvider.requireUserId()).thenReturn(userId);
-        UUID transactionId = UUID.randomUUID();
-        when(creditPointsUseCase.execute(any())).thenReturn(new PointCreditResult(2, true, 20, transactionId));
-        String body = "{\"userId\":\"" + userId + "\",\"amount\":5,\"reason\":\"KP_MASTERED\","
-                + "\"referenceId\":\"kp-123\",\"idempotencyKey\":\"credit-123\"}";
+    void creditingPointsOverHttpIsNotExposed() throws Exception {
+        String body = "{\"userId\":\"" + userId + "\",\"amount\":5,\"reason\":\"BADGE\","
+                + "\"referenceId\":\"badge:STREAK_7\",\"idempotencyKey\":\"credit-123\"}";
 
         mockMvc.perform(post("/internal/access/points/credit")
                         .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.granted").value(2))
-                .andExpect(jsonPath("$.capped").value(true))
-                .andExpect(jsonPath("$.balance").value(20))
-                .andExpect(jsonPath("$.transactionId").value(transactionId.toString()));
-
-        ArgumentCaptor<CreditPointsCommand> captor = ArgumentCaptor.forClass(CreditPointsCommand.class);
-        verify(creditPointsUseCase).execute(captor.capture());
-        assertThat(captor.getValue().actorUserId()).isEqualTo(userId);
-        assertThat(captor.getValue().reason()).isEqualTo(LearningRewardReason.KP_MASTERED);
-        assertThat(captor.getValue().referenceId()).isEqualTo("kp-123");
-    }
-
-    @Test
-    @WithMockUser(roles = "CUSTOMER")
-    void creditRejectsUnknownLearningRewardReasonAsBadRequest() throws Exception {
-        String body = "{\"userId\":\"" + userId + "\",\"amount\":5,\"reason\":\"UNKNOWN\","
-                + "\"referenceId\":\"kp-123\",\"idempotencyKey\":\"credit-unknown\"}";
-
-        mockMvc.perform(post("/internal/access/points/credit")
-                        .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isBadRequest());
-
-        verifyNoInteractions(creditPointsUseCase);
+                .andExpect(status().isNotFound());
     }
 
     @Test

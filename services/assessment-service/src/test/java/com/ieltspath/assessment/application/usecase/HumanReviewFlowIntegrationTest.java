@@ -77,7 +77,7 @@ class HumanReviewFlowIntegrationTest extends ExaminerIntegrationSupport {
                                  "errorCodes":["COHESION_DEVICE_OVERUSE"],"feedback":"Develop the position."}
                                 """))
                 .andExpect(status().isNoContent());
-        mvc.perform(get("/internal/assessments/human-reviews/{id}", reviewId).param("learnerId", learner.toString())
+        mvc.perform(get("/internal/assessments/human-reviews/{id}", reviewId)
                         .header("Authorization", "Bearer " + learnerToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("DONE"))
@@ -87,8 +87,8 @@ class HumanReviewFlowIntegrationTest extends ExaminerIntegrationSupport {
                 .andExpect(jsonPath("$.feedback").value("Develop the position."))
                 .andExpect(jsonPath("$.graderUserId").doesNotExist());
         mvc.perform(get("/internal/assessments/human-reviews/{id}", reviewId)
-                        .param("learnerId", UUID.randomUUID().toString())
-                        .header("Authorization", "Bearer " + learnerToken))
+                        .param("learnerId", learner.toString())
+                        .header("Authorization", "Bearer " + internalToken(UUID.randomUUID(), "CUSTOMER")))
                 .andExpect(status().isNotFound());
         assertEquals(0, count("SELECT count(*) FROM assessment_results"));
     }

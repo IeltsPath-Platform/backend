@@ -50,4 +50,13 @@ public class JdbcHumanGradingCreditConsumptionRepository implements HumanGrading
                 WHERE submission_id = ? AND refunded_at IS NULL
                 """, remainingCredits, submissionId);
     }
+
+    @Override
+    public void markReconsumed(UUID submissionId, UUID subscriptionId, int remainingCredits) {
+        jdbc.update("""
+                UPDATE human_grading_credit_consumptions
+                SET refunded_at = NULL, subscription_id = ?, remaining_credits = ?
+                WHERE submission_id = ? AND refunded_at IS NOT NULL
+                """, subscriptionId, remainingCredits, submissionId);
+    }
 }

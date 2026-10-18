@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.api.dto.request.CompleteHumanReviewRequest;
 import com.ieltspath.assessment.application.port.HumanReviewStore;
 import com.ieltspath.assessment.application.service.HumanReviewService;
+import com.ieltspath.assessment.domain.exception.AssessmentNotFoundException;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -55,6 +57,7 @@ class InternalHumanReviewControllerTest {
         UUID requestId = UUID.randomUUID();
         UUID reviewId = UUID.randomUUID();
         UUID learnerId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(learnerId);
         when(service.create(org.mockito.ArgumentMatchers.any())).thenReturn(
                 new HumanReviewStore.Review(requestId, reviewId, "PENDING"));
         when(service.get(reviewId, learnerId)).thenReturn(
@@ -70,11 +73,33 @@ class InternalHumanReviewControllerTest {
                 .andExpect(jsonPath("$.reviewSubmissionId").value(reviewId.toString()))
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.band").doesNotExist());
-        mvc.perform(get("/internal/assessments/human-reviews/{id}", reviewId)
-                        .param("learnerId", learnerId.toString()))
+        mvc.perform(get("/internal/assessments/human-reviews/{id}", reviewId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.criteria").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void readsAndCreatesOnlyForTheAuthenticatedLearner() throws Exception {
+        UUID caller = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(caller);
+        when(service.get(reviewId, caller)).thenThrow(new AssessmentNotFoundException("Human review not found"));
+        String body = """
+                {"requestId":"%s","learnerId":"%s","sourceSubmissionId":"%s","source":"LESSON",
+                 "task":"TASK_1","promptSnapshot":{"stem":"Describe the chart."},"essay":"Essay text.",
+                 "rubric":{"code":"IELTS_WRITING_TASK_1","version":1}}
+                """.formatted(UUID.randomUUID(), other, UUID.randomUUID());
+
+        mvc.perform(get("/internal/assessments/human-reviews/{id}", reviewId)
+                        .param("learnerId", other.toString()))
+                .andExpect(status().isNotFound());
+        verify(service).get(reviewId, caller);
+        mvc.perform(post("/internal/assessments/human-reviews").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+        verify(service, never()).create(org.mockito.ArgumentMatchers.any());
     }
 
     @Test

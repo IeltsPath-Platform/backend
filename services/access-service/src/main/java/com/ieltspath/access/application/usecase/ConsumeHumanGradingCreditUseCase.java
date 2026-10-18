@@ -44,21 +44,38 @@ public class ConsumeHumanGradingCreditUseCase {
         if (existing.isPresent()) {
             var consumption = existing.get();
             requireSameUser(command.userId(), consumption.userId());
-            return consumption.remainingCredits();
+            if (consumption.refundedAt() == null) {
+                return consumption.remainingCredits();
+            }
+            // The earlier credit was refunded, so this attempt is a new request and costs a credit again.
+            Subscription subscription = debit(command.userId());
+            int remaining = subscription.getRemainingCredits();
+            consumptionRepository.markReconsumed(command.submissionId(), subscription.getId(), remaining);
+            recordConsumed(subscription, command, remaining);
+            return remaining;
         }
-        Subscription subscription = subscriptionRepository.findActiveByUserId(command.userId())
-                .orElseThrow(() -> new InsufficientCreditsException(null, 0));
-        subscription.consumeHumanGradingCredit();
-        subscriptionRepository.save(subscription);
+        Subscription subscription = debit(command.userId());
         int remaining = subscription.getRemainingCredits();
         consumptionRepository.save(new HumanGradingCreditConsumption(command.submissionId(), command.userId(),
                 subscription.getId(), remaining, null));
+        recordConsumed(subscription, command, remaining);
+        return remaining;
+    }
+
+    private Subscription debit(java.util.UUID userId) {
+        Subscription subscription = subscriptionRepository.findActiveByUserId(userId)
+                .orElseThrow(() -> new InsufficientCreditsException(null, 0));
+        subscription.consumeHumanGradingCredit();
+        subscriptionRepository.save(subscription);
+        return subscription;
+    }
+
+    private void recordConsumed(Subscription subscription, ConsumeHumanGradingCreditCommand command, int remaining) {
         outboxEventRepository.save(OutboxEvent.create(
                 "Subscription", subscription.getId(), "HumanGradingCreditConsumed",
                 String.format("{\"userId\":\"%s\",\"subscriptionId\":\"%s\",\"submissionId\":\"%s\",\"remainingCredits\":%d}",
                         command.userId(), subscription.getId(), command.submissionId(), remaining)
         ));
-        return remaining;
     }
 
     private int consume(java.util.UUID userId, java.util.UUID submissionId) {

@@ -66,8 +66,8 @@ public class RestHumanReviewClient implements HumanReviewClient {
 
     @Override
     public Review fetchReview(UUID reviewSubmissionId, UUID learnerId) {
-        return call(() -> assessment.get().uri("/internal/assessments/human-reviews/{id}?learnerId={learner}",
-                reviewSubmissionId, learnerId).headers(this::forward).retrieve().body(Review.class));
+        return call(() -> assessment.get().uri("/internal/assessments/human-reviews/{id}", reviewSubmissionId)
+                .headers(this::forward).retrieve().body(Review.class));
     }
 
     private static Map<String, Object> body(CreateReview request) {
