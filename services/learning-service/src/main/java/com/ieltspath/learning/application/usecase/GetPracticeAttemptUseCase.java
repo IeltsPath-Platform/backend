@@ -6,6 +6,7 @@ import com.ieltspath.learning.application.result.PracticeAttemptView;
 import com.ieltspath.learning.application.service.PracticeAttemptViewAssembler;
 import com.ieltspath.learning.application.service.PracticeAccess;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
+import com.ieltspath.learning.domain.vo.PracticeOrigin;
 import com.ieltspath.learning.domain.vo.PracticeSubmission;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +33,8 @@ public class GetPracticeAttemptUseCase {
         var attempt = attempts.findOwned(userId, attemptId)
                 .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Practice attempt was not found"));
         if (attempt.submitted()) return new Result(null, attempt.response());
-        access.require(userId, attempt.lessonId());
+        // A free attempt has no lesson to re-check; its owner is already checked above.
+        if (attempt.origin() == PracticeOrigin.LESSON) access.require(userId, attempt.lessonId());
         return new Result(view.assemble(attempt, content.getPackageVersion(attempt.packageVersionId())), null);
     }
 

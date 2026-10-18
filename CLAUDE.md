@@ -80,7 +80,7 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 
 ## 5. Cạm bẫy đã biết
 
-- Khi chạy user-service trên host, đặt `LEARNING_SERVICE_URL` và `ASSESSMENT_SERVICE_URL` trỏ tới localhost của service tương ứng; config-repo mặc định dùng tên service trong Docker.
+- config-repo của user-service mặc định `LEARNING_SERVICE_URL` và `ASSESSMENT_SERVICE_URL` là localhost (chạy trên host). Docker Compose đặt hai biến này sang tên service trong mạng Docker.
 - `CONTENT_SERVICE_URL` của game-service trong config-repo mặc định `http://content-service:8082` (tên trong Docker) và ghi
   đè default local → khi chạy game trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082`.
 - Game gọi library qua `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) cho `VOCABULARY`, gọi content qua

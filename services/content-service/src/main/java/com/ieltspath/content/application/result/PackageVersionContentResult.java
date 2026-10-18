@@ -7,8 +7,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * A published package version with sections, items, answer specs and knowledge point mappings, for services that
- * grade or deliver it. JSON values ({@code rulesJson}, {@code optionsJson}, {@code answerSpecJson}) are kept as stored.
+ * A package version with sections, items, answer specs and knowledge point mappings, for services that grade or
+ * deliver it, or for author preview. JSON values ({@code rulesJson}, {@code optionsJson}, {@code answerSpecJson}) are
+ * kept as stored.
  */
 public record PackageVersionContentResult(
         UUID packageVersionId,

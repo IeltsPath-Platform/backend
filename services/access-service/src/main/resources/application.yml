@@ -1,6 +1,10 @@
 server:
   port: ${SERVER_PORT:8084}
 
+access:
+  points:
+    daily-earn-limit: ${ACCESS_POINTS_DAILY_EARN_LIMIT:20}
+
 spring:
   application:
     name: access-service

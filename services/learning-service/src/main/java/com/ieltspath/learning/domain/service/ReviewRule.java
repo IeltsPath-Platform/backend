@@ -13,8 +13,6 @@ import java.util.Set;
 import java.util.UUID;
 
 public final class ReviewRule {
-    /** The failure that created the review is the first; the second sends to theory, the third skips the review. */
-    public static final int MAX_FAILED_REVIEW_SETS = 2;
     /** Below this share of correct answers a learner reads the theory before any practice set. */
     public static final double LOW_SCORE = 0.40;
 

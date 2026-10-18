@@ -13,6 +13,8 @@ class WordlyVocabularyPostgresTest {
  @Test void filtersInvalidInactiveAndDuplicateWords() {
   var ds=new DriverManagerDataSource(db.getJdbcUrl(),db.getUsername(),db.getPassword());
   Flyway.configure().dataSource(ds).load().migrate();var sql=new JdbcTemplate(ds);
+  // The development vocabulary seeded by migration would otherwise be drawn next to the words under test.
+  sql.execute("TRUNCATE vocabulary_items CASCADE");
   for(String word:java.util.List.of("air","AIR","book","two words","hello-world")) {
    var id=java.util.UUID.randomUUID();
    sql.update("INSERT INTO vocabulary_items(id,lemma,normalized_lemma) VALUES (?,?,?)",id,word,word);

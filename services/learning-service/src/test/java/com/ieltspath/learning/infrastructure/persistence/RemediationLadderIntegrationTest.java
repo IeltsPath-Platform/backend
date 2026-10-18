@@ -98,7 +98,7 @@ class RemediationLadderIntegrationTest {
     }
 
     @Test
-    void failedReviewSetLeadsToTheoryThenANewUnrevealedSetThenSkip() {
+    void failedReviewSetLeadsToTheoryThenNewSetsAndEndsOnlyWhenNoUnrevealedPackageIsLeft() {
         UUID user = UUID.randomUUID();
         PackageVersion first = practiceSet(kpA, kpA);
         PackageVersion second = practiceSet(kpA, kpA);
@@ -149,9 +149,53 @@ class RemediationLadderIntegrationTest {
 
         var next = getReview.execute(user, reviewId);
         assertEquals(third.packageId(), next.set().packageId());
-        var skipped = submitReview.execute(user, reviewId, new SubmitReviewCommand(next.set().reviewSetId(),
+        var failedAgain = submitReview.execute(user, reviewId, new SubmitReviewCommand(next.set().reviewSetId(),
                 UUID.randomUUID(), answers(items(third), "B", "B").answers()));
-        assertEquals("SKIPPED", skipped.reviewStatus());
+        assertEquals("PENDING", failedAgain.reviewStatus());
+        assertEquals("PRACTICE", failedAgain.stage(), "only the first failed set sends the learner back to theory");
+
+        // Every package has been revealed, so the review ends instead of leaving the learner stuck.
+        var exhausted = getReview.execute(user, reviewId);
+        assertEquals("SKIPPED", exhausted.reviewStatus());
+        assertNull(exhausted.set());
+        assertNull(exhausted.maxFailedSets());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING'",
+                Integer.class, user));
+    }
+
+    @Test
+    void aReviewKeepsGivingNewSetsAfterEveryFailureUntilOneIsPassed() {
+        UUID user = UUID.randomUUID();
+        PackageVersion first = practiceSet(kpA, kpA);
+        PackageVersion second = practiceSet(kpA, kpA);
+        PackageVersion third = practiceSet(kpA, kpA);
+        PackageVersion fourth = practiceSet(kpA, kpA);
+        topics.execute(user);
+        exercise.execute(user, lesson, block, answers(List.of(lessonQuestionA, lessonQuestionB), "A", "A"));
+        var attempt = start.execute(user, lesson, first.packageId());
+        var submitted = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "B"));
+        UUID reviewId = submitted.reviewsCreated().getFirst().reviewId();
+
+        var setOne = getReview.execute(user, reviewId);
+        assertEquals(second.packageId(), setOne.set().packageId());
+        assertEquals("THEORY", submitReview.execute(user, reviewId, new SubmitReviewCommand(setOne.set().reviewSetId(),
+                UUID.randomUUID(), answers(items(second), "B", "B").answers())).stage());
+        theoryCheck.execute(user, reviewId, new SubmitExerciseCommand(UUID.randomUUID(),
+                List.of(new SubmitExerciseCommand.Answer(lessonQuestionA, "A"))));
+
+        var setTwo = getReview.execute(user, reviewId);
+        assertEquals(third.packageId(), setTwo.set().packageId());
+        var failedTwice = submitReview.execute(user, reviewId, new SubmitReviewCommand(setTwo.set().reviewSetId(),
+                UUID.randomUUID(), answers(items(third), "B", "B").answers()));
+        assertEquals("PENDING", failedTwice.reviewStatus());
+        assertEquals("PRACTICE", failedTwice.stage());
+
+        var setThree = getReview.execute(user, reviewId);
+        assertEquals(fourth.packageId(), setThree.set().packageId());
+        assertNull(setThree.maxFailedSets());
+        var passed = submitReview.execute(user, reviewId, new SubmitReviewCommand(setThree.set().reviewSetId(),
+                UUID.randomUUID(), answers(items(fourth), "A", "A").answers()));
+        assertEquals("DONE", passed.reviewStatus());
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING'",
                 Integer.class, user));
     }

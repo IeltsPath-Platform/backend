@@ -17,11 +17,14 @@ import java.util.UUID;
 @Service
 public class CreateAssessmentResultUseCase {
     private final AssessmentAttemptRepository attempts; private final AssessmentResultRepository results;
-    public CreateAssessmentResultUseCase(AssessmentAttemptRepository attempts, AssessmentResultRepository results){this.attempts=attempts;this.results=results;}
+    private final ExaminerGradingPolicy examinerPolicy;
+    public CreateAssessmentResultUseCase(AssessmentAttemptRepository attempts, AssessmentResultRepository results,
+                                          ExaminerGradingPolicy examinerPolicy){this.attempts=attempts;this.results=results;this.examinerPolicy=examinerPolicy;}
     /** Grader entry (EXAMINER/ADMIN, enforced by the controller): any learner's attempt. */
     @Transactional
     public AssessmentResultResult executeForGrader(UUID attemptId, Double overallBand){
         var attempt=attempts.findById(attemptId).orElseThrow(()->new AssessmentNotFoundException("Assessment attempt not found"));
+        examinerPolicy.requireAssignment(attemptId);
         return openNextVersion(attempt,overallBand);
     }
     private AssessmentResultResult openNextVersion(AssessmentAttempt attempt, Double overallBand){
@@ -30,6 +33,7 @@ public class CreateAssessmentResultUseCase {
         if(latest.isPresent()&&latest.get().isGradable()) throw new InvalidAssessmentStateException("The latest result version is still being graded");
         int version=latest.map(r->r.resultVersion()+1).orElse(1);
         var saved=results.save(new AssessmentResult(UUID.randomUUID(),attempt.getId(),version,AssessmentResult.DRAFT,overallBand,null));
+        if (latest.isPresent() && latest.get().isCompleted()) examinerPolicy.prepareRegrade(attempt.getId());
         return new AssessmentResultResult(saved.id(),saved.attemptId(),saved.resultVersion(),saved.status(),saved.overallBand(),saved.completedAt());
     }
 }

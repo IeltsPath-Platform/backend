@@ -11,12 +11,20 @@ import com.ieltspath.learning.application.port.ReviewSubmissionLog;
 import com.ieltspath.learning.application.result.ReviewSubmissionResult;
 import com.ieltspath.learning.application.result.SubmissionResult;
 import com.ieltspath.learning.application.service.AnswerSheet;
+import com.ieltspath.learning.application.service.DiagnosticFlow;
+import com.ieltspath.learning.application.service.GamificationRecorder;
+import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.PracticeProgress;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
+import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.MasteryProfileUpdater;
+import com.ieltspath.learning.application.service.AnswerDurations;
+import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
+import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.service.AnswerSpecGrader;
@@ -41,7 +49,9 @@ import java.util.UUID;
  */
 @Service
 public class SubmitReviewUseCase {
+    private static final int SECOND_FAILED_SET = 2;
 
+    private final DiagnosticFlow diagnosticFlow;
     private final LearningContentClient content;
     private final LearnerLock lock;
     private final KnowledgeEvidenceRepository evidence;
@@ -49,12 +59,21 @@ public class SubmitReviewUseCase {
     private final PracticeAttemptRepository attempts;
     private final ReviewSubmissionLog submissions;
     private final PracticeProgress practice;
+    private final QuestionEventLog questionEvents;
+    private final MasteryProfileUpdater masteryProfiles;
+    private final GamificationRecorder gamificationRecorder;
     private final ItemGrading grading = new ItemGrading();
 
     public SubmitReviewUseCase(LearningContentClient content, LearnerLock lock, KnowledgeEvidenceRepository evidence,
                                ReviewItemRepository reviews, PracticeAttemptRepository attempts,
                                ReviewSubmissionLog submissions,
-                               PracticeProgress practice) {
+                               PracticeProgress practice, QuestionEventLog questionEvents,
+                               MasteryProfileUpdater masteryProfiles, DiagnosticFlow diagnosticFlow,
+                               GamificationRecorder gamificationRecorder) {
+        this.gamificationRecorder = gamificationRecorder;
+        this.diagnosticFlow = diagnosticFlow;
+        this.questionEvents = questionEvents;
+        this.masteryProfiles = masteryProfiles;
         this.content = content;
         this.lock = lock;
         this.evidence = evidence;
@@ -95,6 +114,8 @@ public class SubmitReviewUseCase {
 
         // A set is answered once, so every set contributes its first answers as evidence.
         List<KnowledgeEvidence> setAnswers = new ArrayList<>();
+        List<QuestionAttemptEvent> setEvents = new ArrayList<>();
+        Map<UUID, Long> durations = AnswerDurations.of(command.answers());
         List<SubmissionResult.AnswerResult> results = new ArrayList<>();
         for (int index = 0; index < items.size(); index++) {
             Item item = items.get(index);
@@ -102,21 +123,35 @@ public class SubmitReviewUseCase {
             for (UUID kpId : new LinkedHashSet<>(item.knowledgePointMappings().stream()
                     .map(LearningContentClient.KnowledgePointMapping::knowledgePointId).toList())) {
                 setAnswers.add(KnowledgeEvidence.of(kpId, grade.correct(), EvidenceSource.REVIEW_SET,
-                        LessonEvidenceReference.forReviewSet(command.requestId(), item.questionVersionId(), kpId)));
+                        LessonEvidenceReference.forReviewSet(command.requestId(), item.questionVersionId(), kpId))
+                        .forQuestion(item.questionVersionId()));
             }
+            setEvents.add(QuestionAttemptEvent.of(userId, item.questionVersionId(),
+                    item.knowledgePointMappings().stream().map(LearningContentClient.KnowledgePointMapping::knowledgePointId)
+                            .distinct().toList(),
+                    grade.correct(), durations.get(item.questionVersionId()), graded.errorCodes().get(index),
+                    QuestionEventSource.REVIEW_SET, command.requestId(), true));
             results.add(new SubmissionResult.AnswerResult(item.questionVersionId(), grade.correct(),
                     grade.correctAnswer(), item.explanation()));
         }
+        questionEvents.append(setEvents);
         evidence.append(userId, setAnswers);
+        masteryProfiles.recordEvidence(userId, setAnswers);
 
         ReviewStatus status = review.recordSetResult(set.id(), command.requestId(), graded.correct(), graded.total());
         Section first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);
         String transcript = first != null && first.audio() != null ? first.audio().transcript() : null;
+        // Every set is answered once, so each set's correct answers earn XP.
+        GamificationSummary gamification = gamificationRecorder.recordCorrectAnswers(userId, command.requestId(),
+                graded.correctQuestionIds());
         ReviewSubmissionResult response = new ReviewSubmissionResult(status.name(), passed, List.copyOf(results),
-                transcript, review.stage().name(), review.failedSets());
+                transcript, review.stage().name(), review.failedSets(), gamification);
         reviews.save(review);
         submissions.save(set.id(), response);
         if (status != ReviewStatus.PENDING) practice.refreshPassForLesson(userId, review.lessonId());
+        else if (review.blocking() && review.failedSets() == SECOND_FAILED_SET) {
+            diagnosticFlow.startAfterSecondFailure(review);
+        }
         return response;
     }
 

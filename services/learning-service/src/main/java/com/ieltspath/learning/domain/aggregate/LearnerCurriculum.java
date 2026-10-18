@@ -9,8 +9,9 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * A learner's ordered topics. Content decides the order; the learner passes topics one way. The first unpassed topic in
- * order is IN_PROGRESS and the rest LOCKED ({@link TopicStatusDeriver}).
+ * A learner's ordered topics. Content decides the order; the learner finishes topics one way, by passing the topic test
+ * or just taking it. The first unfinished topic of a course in order is IN_PROGRESS and the rest LOCKED
+ * ({@link TopicStatusDeriver}).
  */
 public final class LearnerCurriculum {
     private static final TopicStatusDeriver STATUSES = new TopicStatusDeriver();
@@ -62,6 +63,14 @@ public final class LearnerCurriculum {
     /** True when this call passed the topic; a topic not in the curriculum yet is recorded without an order. */
     public boolean pass(UUID topicId, Instant now) {
         return topics.computeIfAbsent(topicId, id -> new TopicProgress(id, null, null)).pass(now);
+    }
+
+    /**
+     * The learner took the topic test: the first one counts as the mid-course score and finishes the topic, whatever the
+     * percent. True when this call was that first test.
+     */
+    public boolean recordFirstTest(UUID topicId, Instant now, double percent) {
+        return topics.computeIfAbsent(topicId, id -> new TopicProgress(id, null, null)).recordFirstTest(now, percent);
     }
 
     public Map<UUID, TopicStatus> statuses() { return STATUSES.derive(topics()); }

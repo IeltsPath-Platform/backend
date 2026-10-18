@@ -13,7 +13,7 @@ public record PointLedgerResponse(
         long balanceAfter,
         PointTransactionType transactionType,
         String referenceType,
-        UUID referenceId,
+        String referenceId,
         String description,
         Instant createdAt
         ) {
@@ -30,5 +30,12 @@ public record PointLedgerResponse(
                 r.description(),
                 r.createdAt()
         );
+    }
+
+    public PointLedgerResponse(UUID id, UUID userId, long delta, long balanceAfter,
+                               PointTransactionType transactionType, String referenceType, UUID referenceId,
+                               String description, Instant createdAt) {
+        this(id, userId, delta, balanceAfter, transactionType, referenceType,
+                referenceId == null ? null : referenceId.toString(), description, createdAt);
     }
 }

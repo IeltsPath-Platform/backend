@@ -1,7 +1,7 @@
 ---
 title: "Cây tri thức, chẩn đoán và hành trình đánh giá theo board mentor"
 description: "Dựng cây KP có cạnh tiên quyết, event log từng câu, mastery 3 mức, chẩn đoán dò ngược, điểm có trọng số 20/30/50, hàng chờ giám khảo, rubric và bộ test AI, khu quản trị"
-status: pending
+status: in_progress
 priority: P1
 branch: "feat/knowledge-tree-assessment-journey"
 tags: [content-service, learning-service, assessment-service, access-service, knowledge-tree, mastery, diagnostics, scoring, ai-policy]
@@ -88,7 +88,7 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 - Chấm Speaking, điểm danh, BTVN, cam kết đầu ra.
 - Điều chỉnh độ khó thích ứng (IRT).
 - Gói Mock Test 4 kỹ năng.
-- AI sinh course theo yêu cầu, import course bằng Excel (để plan sau).
+- AI sinh câu hỏi và course, import Excel: có plan riêng `261016-0804-ai-content-and-course-builder`.
 - Frontend: repo riêng. Mỗi phase có mục "Bàn giao FE".
 - Cập nhật SRS (file Word).
 
@@ -96,19 +96,39 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 
 | Phase | Name | Service | Status |
 |-------|------|---------|--------|
-| 1 | [Cây tri thức: cạnh tiên quyết và API](./phase-01-content-knowledge-tree.md) | content | Pending |
-| 2 | [Seed cây band 5.5 → 7 và difficulty](./phase-02-content-seed-tree-and-difficulty.md) | content | Pending |
-| 3 | [Error taxonomy và gắn mã lỗi cho đáp án](./phase-03-content-error-taxonomy.md) | content, learning, assessment | Pending |
-| 4 | [Event log từng câu và thời gian làm](./phase-04-question-event-log-and-duration.md) | learning, assessment | Pending |
-| 5 | [Mastery profile 3 mức, hạn ôn, API báo cáo](./phase-05-mastery-profile-and-report.md) | learning | Pending |
-| 6 | [Giỏ ôn nhiều mức và recheck](./phase-06-review-tiers-and-recheck.md) | learning | Pending |
-| 7 | [Chẩn đoán dò ngược theo cây](./phase-07-diagnostic-backtracking.md) | learning | Pending |
-| 8 | [Practice test theo mốc course](./phase-08-practice-test-milestones.md) | content, assessment, learning | Pending |
-| 9 | [Điểm có trọng số và kết quả khóa](./phase-09-course-scoring-and-outcome.md) | learning | Pending |
-| 10 | [Hàng chờ giám khảo và chính sách AI](./phase-10-examiner-queue-and-ai-policy.md) | assessment | Pending |
-| 11 | [Rubric dạng dữ liệu và bộ test nghiệm thu AI](./phase-11-rubric-data-and-ai-evaluation.md) | content, assessment, learning | Pending |
-| 12 | [Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor](./phase-12-admin-area-backend.md) | learning, assessment, access | Pending |
-| 13 | [Contract, tài liệu và nghiệm thu](./phase-13-contracts-docs-and-verification.md) | docs | Pending |
+| 1 | [Cây tri thức: cạnh tiên quyết và API](./phase-01-content-knowledge-tree.md) | content | Completed (ef2d259) |
+| 2a | [Course/topic 6.0, 7.0 INACTIVE, difficulty bắt buộc, lọc learning](./phase-02-content-seed-tree-and-difficulty.md) | content, learning | Completed (ef2d259) |
+| 2b | [Seed KP, cạnh, difficulty backfill, bộ câu](./phase-02-content-seed-tree-and-difficulty.md) | content | Còn 7 KP Listening chưa đủ 3 bộ (cần audio). Bộ Reading/Writing đã seed (V44) nhưng là **bản nháp chưa duyệt: không giao cho học viên thật** cho tới khi người hiểu IELTS duyệt (xem phase 2b) |
+| 3a | [Error taxonomy: bảng, CRUD, ErrorTagger, ghi error analysis](./phase-03-content-error-taxonomy.md) | content, learning, assessment | Completed (a140b8c) |
+| 3b | [Duyệt mã lỗi chính thức và gắn distractors cho câu](./phase-03-content-error-taxonomy.md) | content | Completed (V35, V36; quyết định Q1–Q4 đã chốt) |
+| 4 | [Event log từng câu và thời gian làm](./phase-04-question-event-log-and-duration.md) | learning, assessment | Completed |
+| 5 | [Mastery profile 3 mức, hạn ôn, API báo cáo](./phase-05-mastery-profile-and-report.md) | learning | Completed |
+| 6 | [Giỏ ôn nhiều mức và recheck](./phase-06-review-tiers-and-recheck.md) | learning | Completed (6a + 6b) |
+| 7 | [Chẩn đoán dò ngược theo cây](./phase-07-diagnostic-backtracking.md) | learning | Completed (4a0b56e) |
+| 8 | [Practice test theo mốc course](./phase-08-practice-test-milestones.md) | content, assessment, learning | Completed (933 test của ba service xanh, không skip; xem báo cáo) |
+| 9 | [Điểm có trọng số và kết quả khóa](./phase-09-course-scoring-and-outcome.md) | learning | Completed |
+| 10 | [Hàng chờ giám khảo và chính sách AI](./phase-10-examiner-queue-and-ai-policy.md) | assessment | Completed (80123b5) |
+| 11 | [Rubric dạng dữ liệu và bộ test nghiệm thu AI](./phase-11-rubric-data-and-ai-evaluation.md) | content, assessment, learning | **Công cụ xong, chưa nghiệm thu**: chưa có bằng chứng (cần gold set chuyên gia và lần chạy đánh giá thật). Không bật mặc định quyết định nào dựa trên kết quả đánh giá AI |
+| 12 | [Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor](./phase-12-admin-area-backend.md) | learning, assessment, access | Completed (Gateway route đã có test, c014d56) |
+| 13 | [Contract, tài liệu và nghiệm thu](./phase-13-contracts-docs-and-verification.md) | docs | Đóng, còn mục mở (contract và tài liệu xong; `mvn verify` xanh toàn reactor; demo Compose bước 4, 5, 8 đã chạy lại trên project riêng ngày 2026-10-18 và đạt; còn bước 5 chưa chạy phần bài viết của đề cuối khóa vì đề seed không có essay, và Phase 11 chưa nghiệm thu; xem `reports/acceptance.md`) |
+| 14 | [Học viên sửa essay và nộp lại](./phase-14-essay-revision.md) | learning | Completed (9cf6d74, báo cáo có `revisionDelta`) |
+| 15 | [Mentor chữa essay Practice và lesson](./phase-15-mentor-practice-essays.md) | learning, assessment, access | Completed (c03b9e0, 0a35bc4; chưa chạy thử nối thật hai service) |
+
+## Phân công đang làm (một nhánh `feat/knowledge-tree-assessment-journey`)
+
+| Người | Phase | File chạm tới | Migration được dùng |
+|---|---|---|---|
+| Claude | plan 261009, rồi phase 9 | learning: `ReviewItem`, `ReviewRule`, `PracticeClearance`, `LessonAccessGate`, `LessonAccess`, `GetTopicLessonsUseCase`; phase 9: `ApplyAssessmentResultUseCase`, `TopicStatusDeriver`, `AssignCourseTestUseCase`, `CourseProgress` | learning **V15** (V14 dành cho phase 11) |
+| Codex | 11 (rubric dạng dữ liệu, bộ test nghiệm thu AI) | content: rubric, API, seed; assessment: gold set, đánh giá, kích hoạt prompt, `OpenAiCompatibleEssayGrader`, `GradeGateEssayJobUseCase`; learning chỉ `EssayGrader`, client đọc rubric, lưu `prompt_version` | content **V39**, assessment **V10**, learning **V14** |
+
+Đã xong: phase 4 (Claude, commit `85ad593`), phase 8 (Codex, commit `e710f11`), phase 10 (Codex, commit `80123b5`) và
+phase 5 (Claude).
+
+Quy tắc để không đè nhau trên cùng nhánh:
+1. Mỗi bên chỉ sửa file trong cột của mình. Nếu cần sửa file của bên kia, dừng và hỏi.
+2. Commit bằng đường dẫn cụ thể (`git add <file>`), không dùng `git add -A`.
+3. Chỉ một Maven build chạy tại một thời điểm, vì `target/` dùng chung. Codex chạy xong thì báo, Claude mới build.
+4. Phase 9 làm sau plan 261009, cùng người giữ learning. Phase 6/7 chờ plan 261009.
 
 ## Thứ tự và phụ thuộc
 
@@ -119,6 +139,7 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 8 ──> 9 <───┘ (9 cần event log cho nhóm lỗi, practice test cho Process)
 10 ──> 11 (gold set lấy từ essay giám khảo chấm)
 5, 7, 9, 10, 11 ──> 12 ──> 13
+(đã có phase đọc essay: 14 cần 4, 5; 15 cần 10, 12)
 plan 261009 (pending) ──> 6, 7 (cùng sửa ReviewItem, LessonAccessGate)
 ```
 
@@ -127,7 +148,8 @@ plan 261009 đã merge.
 
 Số migration dự kiến:
 - content: V29 (P1), V30 (P2), V31 (P3), V32 (P8), V33 (P11).
-- learning: V11 (P4), V12 (P5), V13 (P6), V14 (P7), V15 (P8), V16 (P9), V17 (P12).
+- learning: V11 (P4), V12 (P5, gồm `learning_rule_configs`), V13 (P6), V14 (P7), V15 (P8), V16 (P9), V17 (P12), V18 (P14),
+  V19 (P15, nếu cần).
 - assessment: V8 (P4), V9 (P10), V10 (P11), V11 (P12).
 
 Đánh lại số theo thứ tự merge thực tế. Không sửa migration đã merge.
@@ -178,5 +200,15 @@ Số migration dự kiến:
 
 ## Open questions
 
-Các khuyến nghị D2, D4, D5 và D6 chưa được người dùng xác nhận riêng từng điểm; plan đang làm theo đúng khuyến nghị.
-Muốn đổi điểm nào thì sửa trước khi bắt đầu phase 8–10.
+None.
+
+Đã xác nhận bởi người dùng:
+- **2026-10-17:** D2, D3, D4 (giữa khóa là topic test, course test mở khi đã thi hết topic test, đạt đầu ra khi điểm tổng
+  20/30/50 từ 70%). Phase 9 được phép bắt đầu.
+- **2026-10-16:** phase 14 (giữ luật bằng chứng hiện tại cho essay nộp lại).
+
+Còn lại theo khuyến nghị, chưa xác nhận riêng: D5 (giỏ ôn chặn ở mức ưu tiên) và D6 (essay course test do EXAMINER chấm
+mù). Sửa trước khi bắt đầu phase 6 và phase 10 nếu muốn đổi.
+
+Số migration trong plan là dự kiến; đánh lại theo thứ tự merge thực tế (ví dụ phase 9 có thể thành V17 nếu một phase
+trước đó đã dùng V16).

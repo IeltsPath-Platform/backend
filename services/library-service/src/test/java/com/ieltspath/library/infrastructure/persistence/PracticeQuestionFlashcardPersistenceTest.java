@@ -2,6 +2,8 @@ package com.ieltspath.library.infrastructure.persistence;
 
 import com.ieltspath.library.application.result.SavedFlashcard;
 import com.ieltspath.library.application.usecase.SavePracticeQuestionFlashcardUseCase;
+import com.ieltspath.library.application.usecase.ReviewFlashcardUseCase;
+import com.ieltspath.library.config.FlashcardSrsProperties;
 import com.ieltspath.library.domain.aggregate.Flashcard;
 import com.ieltspath.library.domain.exception.ConflictException;
 import com.ieltspath.library.domain.repository.FlashcardRepository;
@@ -9,6 +11,7 @@ import com.ieltspath.library.domain.vo.FlashcardSourceType;
 import com.ieltspath.library.domain.vo.LibraryStatus;
 import com.ieltspath.library.domain.vo.OwnedPage;
 import com.ieltspath.library.infrastructure.adapter.FlashcardRepositoryAdapter;
+import com.ieltspath.library.infrastructure.adapter.FlashcardVocabularyMetadataAdapter;
 import com.ieltspath.library.infrastructure.persistence.mapper.FlashcardMapperImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +42,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DataJpaTest
 @Testcontainers(disabledWithoutDocker = true)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({FlashcardRepositoryAdapter.class, FlashcardMapperImpl.class, SavePracticeQuestionFlashcardUseCase.class})
+@Import({FlashcardRepositoryAdapter.class, FlashcardVocabularyMetadataAdapter.class, FlashcardMapperImpl.class,
+        SavePracticeQuestionFlashcardUseCase.class, ReviewFlashcardUseCase.class, FlashcardSrsProperties.class})
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
@@ -56,6 +60,8 @@ class PracticeQuestionFlashcardPersistenceTest {
     private FlashcardRepository cards;
     @Autowired
     private SavePracticeQuestionFlashcardUseCase savePracticeQuestion;
+    @Autowired
+    private ReviewFlashcardUseCase reviewFlashcard;
 
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
@@ -80,6 +86,25 @@ class PracticeQuestionFlashcardPersistenceTest {
         assertFalse(second.created());
         assertEquals(first.flashcard().id(), second.flashcard().id());
         assertEquals(1, cards.findByUserIdAndStatus(userId, LibraryStatus.ACTIVE, 0, 20).total());
+    }
+
+    @Test
+    void repeatingTheLastReviewRequestDoesNotAdvanceOrCountTheCardTwice() {
+        UUID userId = UUID.randomUUID();
+        Flashcard stored = cards.save(Flashcard.create(userId, FlashcardSourceType.MANUAL,
+                null, null, null, "Front", "Back"));
+        UUID requestId = UUID.randomUUID();
+
+        var first = reviewFlashcard.execute(userId, stored.getId(), true, requestId);
+        var replay = reviewFlashcard.execute(userId, stored.getId(), false, requestId);
+        Flashcard persisted = cards.findByIdAndUserId(stored.getId(), userId).orElseThrow();
+
+        assertEquals(2, first.leitnerBox());
+        assertEquals(first.leitnerBox(), replay.leitnerBox());
+        assertEquals(first.nextReviewAt(), replay.nextReviewAt());
+        assertEquals(1, replay.reviewCount());
+        assertEquals(2, persisted.getLeitnerBox());
+        assertEquals(1, persisted.getReviewCount());
     }
 
     @Test
@@ -136,8 +161,19 @@ class PracticeQuestionFlashcardPersistenceTest {
             }
 
             @Override
+            public Optional<Flashcard> findForReviewByIdAndUserId(UUID id, UUID owner) {
+                return cards.findForReviewByIdAndUserId(id, owner);
+            }
+
+            @Override
             public OwnedPage<Flashcard> findByUserIdAndStatus(UUID owner, LibraryStatus status, int page, int size) {
                 return cards.findByUserIdAndStatus(owner, status, page, size);
+            }
+
+            @Override
+            public OwnedPage<Flashcard> findDueCards(UUID owner, UUID deckId, java.time.Instant now,
+                                                     int page, int limit) {
+                return cards.findDueCards(owner, deckId, now, page, limit);
             }
 
             @Override

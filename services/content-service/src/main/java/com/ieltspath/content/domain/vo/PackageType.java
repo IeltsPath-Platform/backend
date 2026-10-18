@@ -4,12 +4,12 @@ public enum PackageType {
     MOCK_TEST,
     PLACEMENT_TEST,
     PRACTICE_SET,
+    PRACTICE_TEST,
     QUIZ,
     LESSON,
     /** A topic's final test; created only by seed, always attached to a topic. */
     TOPIC_TEST,
     /** A course's final test; created only by seed, always attached to a course. */
-    COURSE_TEST,
-    PRACTICE_TEST
+    COURSE_TEST
 }
 

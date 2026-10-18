@@ -73,6 +73,11 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public List<PracticeTestMilestone> getPracticeTestMilestones(UUID courseId) {
+        return get("/courses/{id}/practice-test-milestones", new ParameterizedTypeReference<>() { }, courseId);
+    }
+
+    @Override
     public List<TestPackage> getPlacementTestPackages() {
         return get("/placement-packages", new ParameterizedTypeReference<>() { });
     }
@@ -127,6 +132,51 @@ public class RestLearningContentClient implements LearningContentClient {
         return get("/package-versions/{id}", new ParameterizedTypeReference<>() { }, versionId);
     }
 
+    @Override
+    public Map<UUID, List<UUID>> prerequisites(List<UUID> knowledgePointIds) {
+        return response(() -> restClient.post()
+                .uri(INTERNAL_PATH + "/knowledge-points/prerequisites")
+                .headers(this::forwardRequestHeaders)
+                .body(new PrerequisitesRequest(knowledgePointIds))
+                .retrieve()
+                .body(new ParameterizedTypeReference<Map<UUID, List<UUID>>>() { }));
+    }
+
+    @Override
+    public Map<UUID, String> questionDifficulties(java.util.Collection<UUID> questionVersionIds) {
+        if (questionVersionIds.isEmpty()) return Map.of();
+        Difficulties response = response(() -> restClient.post()
+                .uri(INTERNAL_PATH + "/questions/difficulties")
+                .headers(this::forwardRequestHeaders)
+                .body(new DifficultyRequest(List.copyOf(questionVersionIds)))
+                .retrieve().body(Difficulties.class));
+        return response.difficulties() == null ? Map.of() : response.difficulties();
+    }
+
+    @Override
+    public SuggestionCandidates suggestionCandidates(List<UUID> knowledgePointIds, java.math.BigDecimal maxBand) {
+        return response(() -> restClient.post()
+                .uri(INTERNAL_PATH + "/suggestions/candidates")
+                .headers(this::forwardRequestHeaders)
+                .body(new SuggestionRequest(knowledgePointIds, maxBand))
+                .retrieve().body(SuggestionCandidates.class));
+    }
+
+    @Override
+    public Rubric getActiveRubric(String task) {
+        return get("/rubrics/active?task={task}", new ParameterizedTypeReference<>() { }, task);
+    }
+
+    @Override
+    public Rubric getRubricVersion(String code, int version) {
+        return get("/rubrics/{code}/{version}", new ParameterizedTypeReference<>() { }, code, version);
+    }
+
+    @Override
+    public List<ErrorType> activeErrorTypes() {
+        return get("/error-types", new ParameterizedTypeReference<>() { });
+    }
+
     private <T> T get(String path, ParameterizedTypeReference<T> type, Object... uriVariables) {
         return response(() -> restClient.get()
                 .uri(INTERNAL_PATH + path, uriVariables)
@@ -171,5 +221,9 @@ public class RestLearningContentClient implements LearningContentClient {
                                   int minQuestions, int limit, UUID preferredLessonId) {}
     private record AvailabilityRequest(List<UUID> knowledgePointIds, List<UUID> excludePackageIds,
                                        int minQuestions) {}
+    private record DifficultyRequest(List<UUID> questionVersionIds) {}
+    private record Difficulties(Map<UUID, String> difficulties) {}
+    private record SuggestionRequest(List<UUID> knowledgePointIds, java.math.BigDecimal maxBand) {}
+    private record PrerequisitesRequest(List<UUID> ids) {}
     private record Availability(Map<UUID, Integer> counts) {}
 }

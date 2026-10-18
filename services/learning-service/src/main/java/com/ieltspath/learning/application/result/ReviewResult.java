@@ -9,11 +9,28 @@ import java.util.UUID;
  * {@code set} is null once the review is no longer pending and at the theory stage. {@code theory} holds the TEXT
  * blocks that teach the knowledge point ({@code theoryScope = KNOWLEDGE_POINT}) or, when the lesson tags none, every
  * TEXT block ({@code LESSON_FALLBACK}). {@code quickCheck} is non-empty only at the theory stage.
+ *
+ * <p>{@code state} is {@code DIAGNOSING} while the learner has probes of the prerequisites to answer,
+ * {@code WAITING_ON_PREREQUISITES} while the reviews of the gap points are open, otherwise {@code ACTIVE}; in the first
+ * two the review gives no set. {@code diagnosticSessionId} is set once a diagnosis was opened for the review.
  */
 public record ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, List<String> theory, ReviewSet set,
                            UUID knowledgePointId, LearningSkill skill, String stage, String theoryReason,
-                           String theoryScope, int failedSets, int maxFailedSets,
-                           List<LessonResult.Question> quickCheck) {
+                           String theoryScope, int failedSets, Integer maxFailedSets,
+                           List<LessonResult.Question> quickCheck, String state, UUID diagnosticSessionId,
+                           List<UUID> waitingOnReviewIds) {
+    public static final String ACTIVE = "ACTIVE";
+    public static final String DIAGNOSING = "DIAGNOSING";
+    public static final String WAITING_ON_PREREQUISITES = "WAITING_ON_PREREQUISITES";
+
+    public ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, List<String> theory, ReviewSet set,
+                        UUID knowledgePointId, LearningSkill skill, String stage, String theoryReason,
+                        String theoryScope, int failedSets, Integer maxFailedSets,
+                        List<LessonResult.Question> quickCheck) {
+        this(reviewId, reviewStatus, lessonId, theory, set, knowledgePointId, skill, stage, theoryReason, theoryScope,
+                failedSets, maxFailedSets, quickCheck, ACTIVE, null, List.of());
+    }
+
     public record ReviewSet(UUID reviewSetId, UUID packageId, UUID packageVersionId, String passage, Audio audio,
                             List<LessonResult.Question> questions) {}
 

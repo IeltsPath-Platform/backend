@@ -99,6 +99,53 @@ class PracticeClearanceTest {
     }
 
     @Test
+    void aSkillWaitsForEveryOneOfItsReviewsNotJustTheFirstFinishedOne() {
+        var oneDoneOnePending = List.of(new PracticeClearance.ReviewFact(ReviewStatus.DONE, LearningSkill.READING),
+                new PracticeClearance.ReviewFact(ReviewStatus.PENDING, LearningSkill.READING));
+        assertEquals(PracticeStatus.REQUIRED, rule.derive(true, Map.of(readingSet, R), List.of(), Set.of(),
+                oneDoneOnePending, null).status());
+
+        var bothDone = List.of(new PracticeClearance.ReviewFact(ReviewStatus.DONE, LearningSkill.READING),
+                new PracticeClearance.ReviewFact(ReviewStatus.DONE, LearningSkill.READING));
+        var cleared = rule.derive(true, Map.of(readingSet, R), List.of(), Set.of(), bothDone, null);
+        assertEquals(PracticeStatus.PASSED, cleared.status());
+        assertEquals(PracticePassReason.REVIEW_FINISHED, cleared.reason());
+
+        var doneAndSkipped = List.of(new PracticeClearance.ReviewFact(ReviewStatus.DONE, LearningSkill.READING),
+                new PracticeClearance.ReviewFact(ReviewStatus.SKIPPED, LearningSkill.READING));
+        assertEquals(PracticeStatus.PASSED, rule.derive(true, Map.of(readingSet, R), List.of(), Set.of(),
+                doneAndSkipped, null).status());
+    }
+
+    @Test
+    void aPendingReviewOfAnotherSkillDoesNotHoldBackAClearedSkill() {
+        var reviews = List.of(new PracticeClearance.ReviewFact(ReviewStatus.DONE, LearningSkill.READING),
+                new PracticeClearance.ReviewFact(ReviewStatus.PENDING, LearningSkill.LISTENING));
+        assertEquals(PracticeStatus.PASSED, rule.derive(true, Map.of(readingSet, R), List.of(), Set.of(), reviews,
+                null).status());
+    }
+
+    @Test
+    void withoutSkillsAPendingReviewKeepsThePracticeRequiredEvenWhenAnotherReviewIsDone() {
+        var mixedStates = List.of(new PracticeClearance.ReviewFact(ReviewStatus.DONE),
+                new PracticeClearance.ReviewFact(ReviewStatus.PENDING));
+        assertEquals(PracticeStatus.REQUIRED,
+                rule.derive(true, Set.of(set), List.of(), Set.of(), mixedStates, null).status());
+
+        var allFinished = List.of(new PracticeClearance.ReviewFact(ReviewStatus.DONE),
+                new PracticeClearance.ReviewFact(ReviewStatus.SKIPPED));
+        assertEquals(PracticePassReason.REVIEW_FINISHED,
+                rule.derive(true, Set.of(set), List.of(), Set.of(), allFinished, null).reason());
+    }
+
+    @Test
+    void aFirstSubmissionPassStillWinsWhileOtherSkillsReviewsAreOpen() {
+        var result = rule.derive(true, Map.of(readingSet, R), List.of(passed(readingSet, R)), Set.of(readingSet),
+                List.of(new PracticeClearance.ReviewFact(ReviewStatus.PENDING, LearningSkill.READING)), null);
+        assertEquals(PracticePassReason.FIRST_SUBMISSION, result.reason());
+    }
+
+    @Test
     void emptyCatalogPassesAfterLessonCompletion() {
         assertEquals(PracticeStatus.LOCKED,
                 rule.derive(false, Set.of(), List.of(), Set.of(), List.of(), null).status());

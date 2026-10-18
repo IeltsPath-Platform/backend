@@ -29,10 +29,14 @@ app:
           - /v3/api-docs/**
 
 learning:
+  assessment:
+    base-url: ${ASSESSMENT_SERVICE_URL:http://localhost:8083}
   content:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
   access:
     base-url: ${ACCESS_SERVICE_URL:http://localhost:8084}
+  user:
+    base-url: ${USER_SERVICE_URL:http://localhost:8085}
   # OpenAI-compatible chat completions used to grade lesson essays. Blank values turn grading off (503).
   llm:
     base-url: ${LEARNING_LLM_BASE_URL:}
@@ -45,7 +49,89 @@ learning:
     daily-grading-limit: ${LEARNING_WRITING_DAILY_GRADING_LIMIT:10}
     quota-timezone: Asia/Ho_Chi_Minh
     grading-timeout-seconds: 20
+  # Older name of mastery.priority-below; it is the default for that key.
   review-mastery-threshold: 0.6
+  # Default mastery tiers and review schedule. Admin overrides win (PUT /api/learning/admin/rule-configs). The review
+  # schedule is a convention, not tuned against learner data.
+  mastery:
+    priority-below: ${learning.review-mastery-threshold}
+    maintain-from: 0.8
+    # A maintained point is reviewed after review-intervals-days[success streak] days, capped at the last entry.
+    review-intervals-days: 7,14,30,45,60
+    consolidate-days: 3
+    # Fill profiles for evidence that predates them after startup; idempotent.
+    backfill-on-startup: true
+    # DEEPTUTOR (last five answers, no decay) or MP1 (below). MP1 is the default here (confirmed 2026-10-18). Switching
+    # the formula changes every learner's tier: rebuild all profiles once after a switch (rebuild-on-startup, or the
+    # Admin recompute). Set LEARNING_MASTERY_POLICY=DEEPTUTOR to go back.
+    policy: ${LEARNING_MASTERY_POLICY:MP1}
+    rebuild-on-startup: ${LEARNING_MASTERY_REBUILD_ON_STARTUP:false}
+  free-practice:
+    # Unseen practice sets per knowledge point kept for reviews: free practice starts only above this count.
+    reserve: 2
+    # MP1 scores fall as evidence ages; the job refreshes learners who have not answered for decay-stale-after.
+    decay-enabled: true
+    decay-stale-after: PT24H
+    decay-interval: P1D
+    mp1:
+      window: 8
+      max-practice-in-window: 3
+      half-life-days: 30
+      min-evidence: 3
+      min-distinct-days: 2
+      min-confidence: 1.0
+      hysteresis: 0.03
+      same-item-days: 7
+      source-weights:
+        exam: 1.0
+        review: 1.0
+        probe: 1.0
+        practice: 0.6
+        essay: 0.5
+  gamification:
+    # Learner timezone when none is chosen; the daily XP cap resets at its midnight.
+    default-timezone: ${LEARNING_DEFAULT_TIMEZONE:Asia/Ho_Chi_Minh}
+    xp:
+      # XP of a correct first answer by its difficulty tag; an untagged question gets unknown.
+      easy: 10
+      medium: 15
+      hard: 20
+      unknown: 10
+      # Answer XP counted per learner day; the rest is kept as shadow XP.
+      daily-cap: 100
+      # XP for each level: level = 1 + total / level-xp.
+      level-xp: 1000
+      # One-time milestones per knowledge point: reaching consolidate, then maintain.
+      kp-consolidate: 25
+      kp-maintain: 50
+    hearts:
+      # Hearts for the standard plan and for PREMIUM; one comes back every five hours below the maximum.
+      max: 5
+      premium-max: 7
+      # Points for a full refill.
+      refill-cost: 5
+    quests:
+      # Daily quests: answers needed and the reward of each. Points are paid through the reward queue.
+      practice-required: 5
+      practice-xp: 20
+      practice-points: 5
+      weakness-required: 3
+      weakness-xp: 30
+      # The longer practice quest that replaces the weakness quest when no point suits.
+      plus-required: 10
+      plus-xp: 30
+      streak-xp: 10
+  rewards:
+    # Points owed to learners (streak, quests, badges) go to Access over RabbitMQ. A grant with no answer after resend-after
+    # is sent again; after max-sends sends it is given up and kept as failed.
+    relay-enabled: true
+    batch: 100
+    resend-after: PT5M
+    max-sends: 10
+    # Points for the first time a knowledge point reaches this mastery through practice.
+    kp-mastered:
+      threshold: 0.9
+      points: 5
   messaging:
     # AssessmentCompleted.v2 consumer: delay before a failed event is retried, and attempts before the DLQ.
     retry-delay-ms: ${LEARNING_RETRY_DELAY_MS:30000}

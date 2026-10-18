@@ -201,14 +201,16 @@ class MultiSkillLessonIntegrationTest {
     }
 
     @Test
-    void aReadingReviewLocksLessonsAndTheTestThatTeachReadingButNotAListeningOnlyLesson() {
+    void aReadingReviewOfTheFirstLessonLocksItsLessonTheNextLessonWhateverItsSkillAndTheTopicTest() {
         completeMixedLesson("A");
         jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill) "
                 + "VALUES (?, ?, ?, ?, 'PENDING', 'READING')", UUID.randomUUID(), USER, KP_READING, MIXED);
 
         assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
                 () -> getLesson.execute(USER, MIXED)).getCode());
-        assertDoesNotThrow(() -> getLesson.execute(USER, LISTENING_ONLY));
+        // The review belongs to an earlier lesson of the topic, so it also stops the Listening-only lesson after it.
+        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
+                () -> getLesson.execute(USER, LISTENING_ONLY)).getCode());
         assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
                 () -> assignTopicTest.execute(USER, TOPIC)).getCode());
     }

@@ -5,7 +5,10 @@ import com.ieltspath.assessment.infrastructure.persistence.mapper.AssessmentPers
 import com.ieltspath.assessment.infrastructure.persistence.repository.AttemptItemJpaRepository;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -19,5 +22,24 @@ import java.util.UUID;
 
     public Set<UUID> findExistingIdsByAttemptId(Set<UUID> itemIds, UUID attemptId) {
         return itemIds.isEmpty() ? Set.of() : repository.findExistingIdsByAttemptId(itemIds, attemptId);
+    }
+
+    @Override
+    public void recordElapsed(UUID attemptItemId, long elapsedMs) {
+        repository.findById(attemptItemId).ifPresent(entity -> {
+            long stored = entity.getElapsedMs() == null ? 0L : entity.getElapsedMs();
+            entity.setElapsedMs(Math.max(stored, elapsedMs));
+            repository.save(entity);
+        });
+    }
+
+    @Override
+    public Map<UUID, Long> elapsedMsByItemId(Collection<UUID> attemptItemIds) {
+        if (attemptItemIds.isEmpty()) return Map.of();
+        Map<UUID, Long> elapsed = new HashMap<>();
+        repository.findAllById(attemptItemIds).forEach(entity -> {
+            if (entity.getElapsedMs() != null) elapsed.put(entity.getId(), entity.getElapsedMs());
+        });
+        return elapsed;
     }
 }

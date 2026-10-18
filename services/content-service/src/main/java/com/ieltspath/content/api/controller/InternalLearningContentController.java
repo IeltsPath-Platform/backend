@@ -1,6 +1,7 @@
 package com.ieltspath.content.api.controller;
 
 import com.ieltspath.content.api.dto.internal.LessonContentResponse;
+import com.ieltspath.content.api.dto.internal.KnowledgePointPrerequisitesRequest;
 import com.ieltspath.content.api.dto.internal.PracticeSetSkillFilter;
 import com.ieltspath.content.api.dto.internal.LessonPracticeSetResponse;
 import com.ieltspath.content.api.dto.internal.PracticeSetAvailabilityRequest;
@@ -15,6 +16,7 @@ import com.ieltspath.content.api.dto.internal.TopicTestPackageResponse;
 import com.ieltspath.content.application.command.CountPracticeSetsCommand;
 import com.ieltspath.content.application.command.SearchPracticeSetsCommand;
 import com.ieltspath.content.application.usecase.CountAvailablePracticeSetsUseCase;
+import com.ieltspath.content.application.usecase.GetActiveKnowledgePrerequisitesUseCase;
 import com.ieltspath.content.application.usecase.GetLessonPracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetTopicPracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetLessonContentUseCase;
@@ -24,6 +26,7 @@ import com.ieltspath.content.application.usecase.GetTopicSequenceUseCase;
 import com.ieltspath.content.application.usecase.GetTopicTestPackagesUseCase;
 import com.ieltspath.content.application.usecase.GetCourseTestPackagesUseCase;
 import com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase;
+import com.ieltspath.content.application.usecase.ListErrorTypesUseCase;
 import com.ieltspath.content.application.usecase.SearchPracticeSetsUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +39,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -57,10 +61,31 @@ public class InternalLearningContentController {
     private final CountAvailablePracticeSetsUseCase countAvailablePracticeSets;
     private final GetCourseTestPackagesUseCase getCourseTestPackages;
     private final GetPlacementTestPackagesUseCase getPlacementTestPackages;
+    private final ListErrorTypesUseCase listErrorTypes;
+    private final GetActiveKnowledgePrerequisitesUseCase getActiveKnowledgePrerequisites;
+
+    @PostMapping("/knowledge-points/prerequisites")
+    public Map<UUID, List<UUID>> knowledgePointPrerequisites(
+            @Valid @RequestBody KnowledgePointPrerequisitesRequest request) {
+        return getActiveKnowledgePrerequisites.execute(request.ids());
+    }
 
     @GetMapping("/placement-packages")
     public List<TopicTestPackageResponse> placementPackages() {
         return getPlacementTestPackages.execute().stream().map(TopicTestPackageResponse::from).toList();
+    }
+
+    /** Active error types only; grading and error analysis record codes from this list. */
+    @GetMapping("/error-types")
+    public List<ActiveErrorTypeResponse> errorTypes() {
+        return listErrorTypes.executeApprovedActive().stream().map(ActiveErrorTypeResponse::from).toList();
+    }
+
+    public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint) {
+        static ActiveErrorTypeResponse from(com.ieltspath.content.domain.aggregate.ErrorType errorType) {
+            return new ActiveErrorTypeResponse(errorType.getCode(), errorType.getName(),
+                    errorType.getCategory().name(), errorType.getSeverity(), errorType.getFixHint());
+        }
     }
 
     @GetMapping("/courses/{id}/test-packages")

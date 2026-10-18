@@ -13,6 +13,10 @@ import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.WritingSubmissionViewAssembler;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
+import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.MasteryProfileUpdater;
+import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
+import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
 import com.ieltspath.learning.domain.vo.EvidenceSource;
 import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
@@ -51,12 +55,17 @@ public class SubmitLessonEssayUseCase {
     private final EssaySubmissionFlow flow;
     private final TransactionTemplate transaction;
     private final WritingSubmissionViewAssembler view;
+    private final QuestionEventLog questionEvents;
+    private final MasteryProfileUpdater masteryProfiles;
     private final Clock clock = Clock.systemUTC();
 
     public SubmitLessonEssayUseCase(LearningContentClient content, LessonAccess access, LearnerLock lock,
                                     KnowledgeEvidenceRepository evidence, WritingSubmissionRepository essays,
                                     EssaySubmissionFlow flow, PlatformTransactionManager transactionManager,
-                                    WritingSubmissionViewAssembler view) {
+                                    WritingSubmissionViewAssembler view, QuestionEventLog questionEvents,
+                                    MasteryProfileUpdater masteryProfiles) {
+        this.questionEvents = questionEvents;
+        this.masteryProfiles = masteryProfiles;
         this.content = content;
         this.access = access;
         this.lock = lock;
@@ -68,6 +77,15 @@ public class SubmitLessonEssayUseCase {
     }
 
     public WritingSubmissionResult execute(UUID userId, UUID lessonId, UUID blockId, UUID requestId, String essayText) {
+        return execute(userId, lessonId, blockId, requestId, essayText, null);
+    }
+
+    /**
+     * As above; with {@code revising} the new essay is stored as the next revision of that graded essay, and only when
+     * nothing else has revised it yet (checked under the learner lock, so a chain never branches).
+     */
+    public WritingSubmissionResult execute(UUID userId, UUID lessonId, UUID blockId, UUID requestId, String essayText,
+                                           WritingSubmission revising) {
         int words = flow.validate(essayText);
 
         Optional<WritingSubmission> existing = essays.findByRequestId(requestId);
@@ -91,7 +109,7 @@ public class SubmitLessonEssayUseCase {
         flow.requireBalance();
 
         WritingSubmission grading = transaction.execute(status -> startGrading(userId, lesson, block, requestId,
-                essayText, words));
+                essayText, words, revising));
         flow.grade(grading);
         return charge(grading);
     }
@@ -103,7 +121,7 @@ public class SubmitLessonEssayUseCase {
     }
 
     private WritingSubmission startGrading(UUID userId, Lesson lesson, Block block, UUID requestId, String essayText,
-                                           int words) {
+                                           int words, WritingSubmission revising) {
         lock.lock(userId);
         var context = access.authorize(userId, lesson);
         access.refresh(userId, lesson, context.progress());
@@ -124,6 +142,13 @@ public class SubmitLessonEssayUseCase {
             WritingSubmission submission = WritingSubmission.start(UUID.randomUUID(), userId, lesson.lessonId(),
                     block.blockId(), requestId, essayText, words, EssayPrompts.of(block.questions().getFirst()),
                     flow.pointCost(), now);
+            if (revising != null) {
+                if (essays.hasActiveRevision(revising.id())) {
+                    throw new LearningRequestException(409, "REVISION_NOT_LATEST",
+                            "This essay has already been revised; revise the newest version");
+                }
+                submission.revising(revising.id(), revising.revisionNo() + 1);
+            }
             essays.save(submission);
             return submission;
         }
@@ -141,7 +166,13 @@ public class SubmitLessonEssayUseCase {
         WritingSubmission submission = essays.findForUpdate(charged.id()).orElseThrow();
         if (submission.status() == WritingSubmissionStatus.GRADED) return view.assemble(submission);
         // Every essay before the block is first passed is new writing, so each one is evidence; none after.
-        if (!essays.blockPassed(submission.userId(), submission.blockId(), submission.id())) {
+        boolean firstAttempt = !essays.blockPassed(submission.userId(), submission.blockId(), submission.id());
+        // Each essay is one event for its prompt; a repeat after the block passed is logged with first_submission=false.
+        questionEvents.append(List.of(QuestionAttemptEvent.of(submission.userId(), submission.prompt().questionVersionId(),
+                List.copyOf(new LinkedHashSet<>(submission.prompt().knowledgePointIds())),
+                Boolean.TRUE.equals(submission.passed()), null, null, QuestionEventSource.LESSON_WRITING,
+                submission.id(), firstAttempt)));
+        if (firstAttempt) {
             List<UUID> kpIds = new ArrayList<>(new LinkedHashSet<>(submission.prompt().knowledgePointIds()));
             Set<UUID> known = access.knownKnowledgePoints(submission.userId(), kpIds);
             List<KnowledgeEvidence> essayEvidence = new ArrayList<>();
@@ -155,6 +186,7 @@ public class SubmitLessonEssayUseCase {
                 }
             }
             evidence.append(submission.userId(), essayEvidence);
+            masteryProfiles.recordEvidence(submission.userId(), essayEvidence);
         }
         submission.markGraded(ledgerEntryId);
         essays.save(submission);

@@ -96,7 +96,7 @@ class JdbcWritingTaskReaderTest {
                 JOIN content_sections s ON s.package_version_id = v.id
                 JOIN section_questions sq ON sq.section_id = s.id
                 JOIN question_versions qv ON qv.id = sq.question_version_id
-                WHERE p.package_type = 'PRACTICE_TEST' AND s.skill = 'WRITING'
+                WHERE p.package_type = 'PRACTICE_TEST' AND p.source_code IS NOT NULL AND s.skill = 'WRITING'
                   AND (qv.guide IS NULL OR jsonb_array_length(COALESCE(qv.guide_steps, '[]'::jsonb)) <> 6)
                 """, String.class);
         assertThat(missing).isEmpty();
@@ -110,7 +110,7 @@ class JdbcWritingTaskReaderTest {
                 JOIN content_package_versions v ON v.id = p.current_published_version_id
                 JOIN content_sections s ON s.package_version_id = v.id
                 JOIN section_questions sq ON sq.section_id = s.id
-                WHERE p.package_type = 'PRACTICE_TEST' AND s.skill = 'WRITING'
+                WHERE p.package_type = 'PRACTICE_TEST' AND p.source_code IS NOT NULL AND s.skill = 'WRITING'
                   AND (SELECT count(*) FROM content_asset_links l WHERE l.question_version_id = sq.question_version_id)
                       <> CASE WHEN s.part_no = 1 THEN 1 ELSE 0 END
                 """, String.class);

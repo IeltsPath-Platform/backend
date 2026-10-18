@@ -49,6 +49,12 @@ public class ContentPackageVersionJpaEntity {
     @Column(name = "published_by")
     private UUID publishedBy;
 
+    @Column(name = "publish_at")
+    private Instant publishAt;
+
+    @Column(name = "last_publish_error", length = 100)
+    private String lastPublishError;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

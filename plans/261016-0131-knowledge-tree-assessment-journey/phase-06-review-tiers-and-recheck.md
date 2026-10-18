@@ -1,12 +1,31 @@
 ---
 phase: 6
 title: "Giỏ ôn nhiều mức và recheck"
-status: pending
+status: completed
 priority: P1
 dependencies: [5, "plan 261009"]
 ---
 
 # Phase 6: Giỏ ôn nhiều mức và recheck
+
+## Trạng thái và ghi chú triển khai
+
+- **Đã xong (6a):** bài ôn không chặn, giỏ ôn và recheck. Code và test xong, **chưa commit**. Contract:
+  `docs/contracts/lesson-learning-v1.md` (mục `GET /review-basket`, `POST /review-basket/{id}/start`, trường `blocking`).
+- **Đã xong (6b): `GET /api/learning/suggestions`.** Content: `POST /internal/learning-content/suggestions/candidates`
+  (Codex). Learning: `GetSuggestionsUseCase`, luật `SuggestionRules` (test `SuggestionRulesTest`). Band lấy từ course có
+  topic đang học (không có thì band placement). Không gợi ý KP đang có bài ôn chặn. `openPath` null với practice test.
+- Khác với plan:
+  - Migration là `V15__review_tiers.sql` (V13 là mastery profile, V14 là prompt_version của phase 11).
+  - `blocking` nằm trong `PendingReview`; lọc chặn tập trung ở `LessonAccessGate.blocking`, nên mọi nơi chặn
+    (`LessonAccess`, `PracticeAccess`, `AssignTopicTestUseCase`, `GetTopicLessonsUseCase`) tự bỏ qua bài ôn tự chọn.
+    `PracticeClearance` chỉ xét bài ôn `PRACTICE` (luôn chặn) nên không đổi.
+  - Bài ôn tự chọn nâng thành chặn ở cả hai luồng: kết quả thi (`ReviewReevaluation`) và Practice
+    (`SubmitPracticeAttemptUseCase`), qua `ReviewItemRepository.promoteToBlocking`.
+  - Practice test thuộc mốc không sinh bài ôn nào; chỉ practice test tự do sinh bài ôn tự chọn (`FREE_PRACTICE_TEST`).
+  - Thêm `KnowledgePointDirectory` dùng chung cho báo cáo và giỏ ôn (code, tên, skill, band từ Content).
+  - `POST .../start` từ chối KP ở mức ưu tiên hoặc duy trì chưa đến hạn (`409 NOT_IN_REVIEW_BASKET`), và KP chưa có
+    lesson đã hoàn thành dạy nó (`409 NO_LESSON_FOR_KNOWLEDGE_POINT`; `review_items.lesson_id` bắt buộc).
 
 ## Overview
 
@@ -40,6 +59,14 @@ giỏ; làm xong thì cập nhật mastery và hạn ôn.
   - Bài ôn không chặn chỉ có một set (`recordSetResult` đạt hay trượt đều kết thúc: `DONE` hoặc `SKIPPED`), không qua bước
     theory. Đây là quy tắc riêng cho `blocking = false`, viết trong `ReviewItem`.
   - Kết quả ghi evidence `review_set` như hiện nay, profile cập nhật qua phase 5.
+- **Gợi ý bài phù hợp từ kho đã duyệt** (đầu ra "Gợi ý bài" của board):
+  - `GET /api/learning/suggestions`: tối đa 5 gợi ý cho học viên, mỗi gợi ý có `type` (`PRACTICE_SET`, `PRACTICE_TEST`,
+    `LESSON`), mục tiêu KP, lý do (`PRIORITY`, `CONSOLIDATE`, `DUE`, `NEXT_IN_TREE`) và đường dẫn mở.
+  - Luật: ưu tiên KP mức `CONSOLIDATE` và `DUE` còn gói chưa lộ; KP mức `MAINTAIN` vững thì gợi ý KP mà nó là nền
+    (cạnh tiên quyết ngược, phase 1); chỉ gợi ý thứ `PUBLISHED`, chưa làm, đúng band course học viên đang học hoặc thấp
+    hơn. Gợi ý không bao giờ chặn tiến độ.
+  - Learning gọi content qua API nội bộ tìm gói theo KP; thêm endpoint tìm `PRACTICE_TEST` theo KP nếu chưa có.
+  - Test: `SuggestionRulesTest` (thứ tự ưu tiên, không gợi ý thứ đã làm, không vượt band).
 - **Không tính vào Process Score:** phase 9 chỉ lấy Practice và practice test theo mốc. Ghi rõ trong contract.
 
 ## Related Code Files
@@ -68,9 +95,9 @@ giỏ; làm xong thì cập nhật mastery và hạn ôn.
 
 ## Success Criteria
 
-- [ ] KP 65% không chặn gì, xuất hiện ở nhóm `consolidate`.
+- [x] KP 65% không chặn gì, xuất hiện ở nhóm `consolidate`. (test: ReviewBasketIntegrationTest.theBasketListsTheRequiredReviewTheConsolidatePointsAndTheDueOnes)
 - [ ] KP 85% đến hạn ôn xuất hiện ở nhóm `due`. Làm đạt → hạn ôn lùi theo lịch.
-- [ ] Practice test tự do làm sai không khóa lesson.
+- [x] Practice test tự do làm sai không khóa lesson. (test: ReviewBasketIntegrationTest.aFreePracticeTestRaisesOnlyAnOptionalReviewAndNeverLocksALesson, PracticeTestAssignmentIntegrationTest.freePracticeWritesEvidenceWithoutScoringOrBlockingTopics)
 
 ## Risk Assessment
 

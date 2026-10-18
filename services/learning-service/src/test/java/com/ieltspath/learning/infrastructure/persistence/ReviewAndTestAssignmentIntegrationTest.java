@@ -97,10 +97,10 @@ class ReviewAndTestAssignmentIntegrationTest {
     @BeforeEach
     void resetDataAndCurriculum() {
         jdbc.execute("""
-                TRUNCATE review_theory_checks, review_sets, review_items, practice_attempts, lesson_practice_passes,
+                TRUNCATE review_theory_checks, diagnostic_probes, diagnostic_sessions,review_sets, review_items, practice_attempts, lesson_practice_passes,
                 lesson_exercise_submissions, kp_evidence,
                 lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments,
-                assessment_result_versions RESTART IDENTITY
+                assessment_result_versions, kp_mastery_profiles RESTART IDENTITY
                 """);
         when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "LISTEN", "Listening", 920, null,
                 List.of(new KnowledgePoint(KP, "LS_NUM", "Numbers", "PROCEDURE", "LISTENING", "d", true)),
@@ -195,6 +195,12 @@ class ReviewAndTestAssignmentIntegrationTest {
         assertNull(getReviewUseCase.execute(USER, review).set());
         assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'review_set'",
                 Integer.class));
+        // Every knowledge point that received evidence has a mastery profile.
+        int profiled = jdbc.queryForObject("SELECT count(*) FROM kp_mastery_profiles WHERE user_id = ?",
+                Integer.class, USER);
+        assertTrue(profiled > 0);
+        assertEquals(jdbc.queryForObject("SELECT count(DISTINCT kp_id) FROM kp_evidence WHERE user_id = ?",
+                Integer.class, USER), profiled);
         // A skipped review no longer gates lessons.
         assertDoesNotThrow(() -> getLessonUseCase.execute(USER, LESSON));
     }
@@ -216,6 +222,27 @@ class ReviewAndTestAssignmentIntegrationTest {
         var closed = assertThrows(LearningRequestException.class,
                 () -> submitReviewUseCase.execute(USER, review, command(set, UUID.randomUUID(), "A")));
         assertEquals("REVIEW_SET_CLOSED", closed.getCode());
+    }
+
+    @Test
+    void aBlockingReviewCanBeSubmittedWithNoHeartsAndAWrongAnswerThereCostsNone() {
+        jdbc.update("INSERT INTO learner_hearts (user_id, hearts, max_hearts, last_regen_at) VALUES (?, 0, 5, now()) "
+                + "ON CONFLICT (user_id) DO UPDATE SET hearts = 0, max_hearts = 5, last_regen_at = now()", USER);
+        try {
+            UUID review = pendingReview(USER);
+            when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt(), eq(LESSON)))
+                    .thenReturn(List.of(practice(PACKAGE_A)));
+            UUID set = getReviewUseCase.execute(USER, review).set().reviewSetId();
+
+            ReviewSubmissionResult wrong = assertDoesNotThrow(
+                    () -> submitReviewUseCase.execute(USER, review, command(set, UUID.randomUUID(), "B")));
+
+            assertNotNull(wrong.reviewStatus());
+            assertNull(wrong.gamification().heartsLost(), "a review set does not cost hearts");
+            assertEquals(0, jdbc.queryForObject("SELECT hearts FROM learner_hearts WHERE user_id = ?", Integer.class, USER));
+        } finally {
+            jdbc.update("DELETE FROM learner_hearts WHERE user_id = ?", USER);
+        }
     }
 
     @Test

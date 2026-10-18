@@ -33,6 +33,24 @@ six-question Reading `COURSE_TEST`; these packages are seed-managed and exposed 
 `hasCourseTest` flag and `GET /internal/learning-content/courses/{id}/test-packages`. The seed and representative
 6.5 sequence response are covered in the [internal learning content contract](../../docs/contracts/learning-content-internal-v1.md).
 
+V45 seeds 13 Grammar and Vocabulary knowledge points from the approved proposal. They retain the proposal's CEFR,
+can-do and scope metadata, start as `INACTIVE`, and point to their related active strategy knowledge points as
+prerequisites. Author tree reads can include these nodes with `includeInactive=true`; Learning's internal prerequisite
+read filters inactive points until they are activated. See the [knowledge tree contract](../../docs/contracts/knowledge-tree-v1.md).
+
+## Package preview and scheduled publication
+
+Authors can preview any package version, including a `DRAFT`, at
+`GET /api/content/admin/packages/{packageId}/versions/{versionId}/preview`. The `sections` payload omits answer
+specifications and audio transcripts; a separate `answers` array contains them for author review. Schedule a draft
+with `PUT .../schedule` and `{ "publishAt": "<future ISO-8601 instant>" }`, cancel with `DELETE .../schedule`, and
+read pending or failed schedules at `GET /api/content/admin/packages/{packageId}/publication-schedules`. All routes
+require `ADMIN` or `CONTENT_AUTHOR`. Scheduling runs the same checks as an immediate publish. V43 stores the due
+instant and a safe error code; a once-per-minute job uses a PostgreSQL advisory lock and the existing publish use case.
+A `PRACTICE_TEST` created without `sourceCode` is an internal course checkpoint: the practice library lists only
+tests with a supported source that are not course milestones. See the [preview and scheduled publication contract](../../docs/contracts/content-scheduled-publish-v1.md) for response
+shapes and retry behavior.
+
 V22 is mock demo content so each Academic course covers Reading, Listening and Writing and can rotate final tests.
 IELTS 6.5 gains `LISTENING_6_5_DETAIL` (two knowledge points, one lesson, a practice set per knowledge point and a
 topic test) and `WRITING_6_5_DISCUSSION` (one Task 2 essay lesson with `passBand` 6.5, no topic test). The Listening

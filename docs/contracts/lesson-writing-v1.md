@@ -48,7 +48,7 @@ Response 200:
     {"code":"LR","band":6.5,"strengths":["…"],"improvements":["…"]},
     {"code":"GRA","band":6.5,"strengths":["…"],"improvements":["…"]}
   ],
-  "corrections":[{"excerpt":"peoples can save","suggestion":"people can save","category":"GRAMMAR"}],
+  "corrections":[{"excerpt":"peoples can save","suggestion":"people can save","category":"GRAMMAR","errorCode":"PLURAL_FORM"}],
   "summary":"…","pointsCharged":3,"sampleAnswer":"…"
 }
 ```
@@ -57,8 +57,9 @@ Response 200:
   most 3 items of ≤ 300 characters.
 - `overallBand` is computed by Learning Service, not taken from the LLM: the mean of the four bands rounded to the
   nearest half band, with .25 rounding up to .5 and .75 up to the next whole band.
-- `corrections`: at most 10; `excerpt` is an exact substring of the essay; `category` is `GRAMMAR`, `VOCABULARY`,
-  `COHERENCE`, `TASK` or `OTHER`.
+- `corrections`: at most 10; `excerpt` is an exact substring of the essay; `category` remains the broad category
+  (`GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK` or `OTHER`) and the additive `errorCode` identifies a matching active,
+  human-approved Content error type. A correction with an unknown, inactive or unapproved `errorCode` is omitted.
 - `summary` ≤ 600 characters. `passed = overallBand ≥ passBand`. `sampleAnswer` only when `passed` or the block was
   passed before.
 
@@ -71,6 +72,13 @@ Only the owner can read a submission; another user's id → 404.
 | `GRADED` | Same as the POST response |
 | `PAYMENT_PENDING` | `{submissionId, status, code}`; the grade is withheld until payment succeeds |
 | `GRADING`, `FAILED` | `{submissionId, status, failureCode}` |
+
+## Revisions and Mentor review
+
+A graded lesson essay can be rewritten and sent again (`POST /writing-submissions/{id}/revisions`, `GET
+/writing-submissions/{id}/history`): see [essay-revision-v1](essay-revision-v1.md). A learner with a human-grading credit
+can ask a Mentor to review a graded essay (`POST`/`GET /writing-submissions/{id}/human-review`): see
+[human-review-v1](human-review-v1.md). Neither changes the evidence rule above.
 
 ## Idempotency and payment
 

@@ -1,6 +1,9 @@
 package com.ieltspath.learning.api.exception;
 
+import com.ieltspath.learning.application.exception.AccessUnavailableException;
+import com.ieltspath.learning.application.exception.InsufficientPointsException;
 import com.ieltspath.learning.application.exception.LearningRequestException;
+import com.ieltspath.learning.domain.exception.HeartsDepletedException;
 import com.ieltspath.learning.domain.exception.LearningGateException;
 import com.ieltspath.learning.domain.exception.PracticeAttemptAlreadySubmittedException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,13 +30,36 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new LearningErrorResponse(exception.getMessage(), "ATTEMPT_ALREADY_SUBMITTED", null));
     }
+    @ExceptionHandler(HeartsDepletedException.class)
+    public ResponseEntity<LearningErrorResponse> heartsDepleted(HeartsDepletedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new LearningErrorResponse(exception.getMessage(), "HEARTS_DEPLETED", null, null, null,
+                        exception.getNextHeartAt(), exception.getRefillCost()));
+    }
+
+    /** A purchase with points (a heart refill, a streak freeze) that the balance cannot cover. */
+    @ExceptionHandler(InsufficientPointsException.class)
+    public ResponseEntity<LearningErrorResponse> insufficientPoints(InsufficientPointsException exception) {
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                .body(new LearningErrorResponse("Not enough points", "INSUFFICIENT_POINTS", null));
+    }
+
+    /** Access could not be reached or refused the request; nothing was charged, so the purchase can be tried again. */
+    @ExceptionHandler(AccessUnavailableException.class)
+    public ResponseEntity<LearningErrorResponse> accessUnavailable(AccessUnavailableException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new LearningErrorResponse("Points service is unavailable; try again later",
+                        "ACCESS_UNAVAILABLE", null));
+    }
+
     @ExceptionHandler(LearningGateException.class)
     public ResponseEntity<LearningErrorResponse> gate(LearningGateException exception) {
         var reviews = "REVIEW_REQUIRED".equals(exception.getCode()) ? exception.getReviews().stream()
                 .map(review -> new LearningErrorResponse.Review(review.reviewId(), review.lessonId(),
                         review.knowledgePointId(), review.skill())).toList() : null;
+        var lessonIds = "PRACTICE_REQUIRED".equals(exception.getCode()) ? exception.getLessonIds() : null;
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new LearningErrorResponse(exception.getMessage(), exception.getCode(), reviews));
+                .body(new LearningErrorResponse(exception.getMessage(), exception.getCode(), reviews, null, lessonIds));
     }
 
     @ExceptionHandler(LearningRequestException.class)

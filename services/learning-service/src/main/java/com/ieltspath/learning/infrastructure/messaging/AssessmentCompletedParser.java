@@ -91,7 +91,25 @@ public class AssessmentCompletedParser {
             judgments.add(new AssessmentResult.KnowledgePointJudgment(uuid(mapping, "knowledge_point_id"), value));
         }
         return new AssessmentResult.ItemResult(uuid(item, "item_result_id"), uuid(item, "question_version_id"),
-                correct == null || correct.isNull() ? null : correct.booleanValue(), score, max, judgments);
+                correct == null || correct.isNull() ? null : correct.booleanValue(), score, max, judgments,
+                optionalDuration(item), optionalText(item, "error_code"));
+    }
+
+    /** Optional on every payload: older producers never sent it. A negative or fractional value is a contract violation. */
+    private static Long optionalDuration(JsonNode item) {
+        JsonNode value = item.get("duration_ms");
+        if (value == null || value.isNull()) return null;
+        if (!value.isIntegralNumber() || value.longValue() < 0) {
+            throw new ContractViolationException("duration_ms must be a non-negative integer or null");
+        }
+        return value.longValue();
+    }
+
+    private static String optionalText(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) return null;
+        if (!value.isTextual()) throw new ContractViolationException(field + " must be a string or null");
+        return value.asText();
     }
 
     private static JsonNode object(JsonNode node, String field) {

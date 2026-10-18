@@ -188,10 +188,9 @@ class PublishContentPackageUseCaseTest {
         verify(contentPackageRepository).save(practice);
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"", "UNKNOWN_SOURCE"})
-    void practiceTestsRequireASupportedSource(String sourceCode) {
-        ContentPackage practice = practiceTest(sourceCode.isBlank() ? null : sourceCode);
+    @Test
+    void aPracticeTestWithAnUnknownSourceCannotBePublished() {
+        ContentPackage practice = practiceTest("UNKNOWN_SOURCE");
         when(contentPackageRepository.findById(practice.getId())).thenReturn(Optional.of(practice));
 
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(new PublishContentPackageCommand(
@@ -199,6 +198,25 @@ class PublishContentPackageUseCaseTest {
                 .isInstanceOf(InvalidContentStateException.class)
                 .hasMessageContaining("supported test source");
         verify(contentPackageRepository, never()).save(any());
+    }
+
+    @Test
+    void aPracticeTestWithoutASourceIsAnInternalCheckpointAndCanBePublished() {
+        ContentPackage checkpoint = practiceTest(null);
+        ContentPackageVersion draft = checkpoint.getVersions().getFirst();
+        when(contentPackageRepository.findById(checkpoint.getId())).thenReturn(Optional.of(checkpoint));
+        when(lessons.practiceTestPublishIssues(draft.getId())).thenReturn(List.of());
+        when(lessons.questionsUsedElsewhere(draft.getId())).thenReturn(List.of());
+        when(lessons.questionsWithWrongPurpose(draft.getId(), QuestionPurpose.EXAM)).thenReturn(List.of());
+        when(lessons.packageQuestionSpecs(draft.getId())).thenReturn(List.of(new PackageQuestionSpec(
+                UUID.randomUUID(), QuestionType.MULTIPLE_CHOICE, com.ieltspath.content.domain.vo.Skill.READING,
+                "{\"type\":\"CHOICE\",\"correct\":\"A\"}")));
+        when(contentPackageRepository.save(any(ContentPackage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(checkpoint.getId(), draft.getId(), userId));
+
+        assertThat(result.status()).isEqualTo(PublicationStatus.PUBLISHED);
     }
 
     @Test
@@ -322,5 +340,34 @@ class PublishContentPackageUseCaseTest {
                 PackageType.PRACTICE_TEST, null, null, source);
         pkg.addVersion(ContentPackageVersion.create(pkg.getId(), 1, "{}"));
         return pkg;
+    }
+
+    @Test
+    void practiceTestCannotPublishAQuestionOwnedByAnotherPackage() {
+        ContentPackage practice = practiceTest("IELTS_SPACE_PRO");
+        ContentPackageVersion draft = practice.getVersions().getFirst();
+        when(contentPackageRepository.findById(practice.getId())).thenReturn(Optional.of(practice));
+        when(lessons.questionsUsedElsewhere(draft.getId())).thenReturn(List.of(
+                new QuestionUsageConflict(UUID.randomUUID(), QuestionUsageConflict.OwnerType.LESSON, "L1")));
+
+        assertThatThrownBy(() -> publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
+                .isInstanceOf(QuestionAlreadyUsedException.class);
+        verify(contentPackageRepository, never()).save(any());
+    }
+
+    @Test
+    void practiceTestEssayWithoutPassBandCannotPublish() {
+        ContentPackage practice = practiceTest("IELTS_SPACE_PRO");
+        ContentPackageVersion draft = practice.getVersions().getFirst();
+        when(contentPackageRepository.findById(practice.getId())).thenReturn(Optional.of(practice));
+        when(lessons.packageQuestionSpecs(draft.getId())).thenReturn(List.of(new PackageQuestionSpec(
+                UUID.randomUUID(), QuestionType.ESSAY, com.ieltspath.content.domain.vo.Skill.WRITING,
+                "{\"type\":\"ESSAY\",\"task\":\"TASK_2\"}")));
+
+        assertThatThrownBy(() -> publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(practice.getId(), draft.getId(), userId)))
+                .isInstanceOf(InvalidContentStateException.class);
+        verify(contentPackageRepository, never()).save(any());
     }
 }

@@ -25,7 +25,7 @@ class StudyContextTest {
     final LearningContentClient.Lesson lesson=new LearningContentClient.Lesson(lessonId,topicId,"L","Lesson",null,1,List.of(),List.of(),LearningSkill.READING);
 
     @Test void lessonUsesExistingGateAndTrustedCourse() {
-        when(lessons.authorize(user,lessonId)).thenReturn(new LessonAccess.Context(lesson,null,true));
+        when(lessons.authorize(user,lessonId)).thenReturn(new LessonAccess.Context(lesson,null,true,java.util.Set.of(),List.of()));
         course();
         var result=useCase.execute(user,"LESSON",lessonId);
         assertThat(result.courseId()).isEqualTo(courseId);

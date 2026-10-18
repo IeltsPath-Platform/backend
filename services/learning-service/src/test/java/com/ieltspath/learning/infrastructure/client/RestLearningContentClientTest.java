@@ -35,6 +35,48 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 class RestLearningContentClientTest {
+
+    @Test
+    void readsPracticeTestMilestonesWithVerifiedBearerAndCorrelation() {
+        UUID course=UUID.randomUUID();
+        requestWithCorrelation("practice-test-milestone");
+        server.expect(requestTo(INTERNAL_PATH+"/courses/"+course+"/practice-test-milestones"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header(HttpHeaders.AUTHORIZATION,"Bearer test-internal-token"))
+                .andExpect(header(SecurityHeaders.CORRELATION_ID,"practice-test-milestone"))
+                .andRespond(withSuccess("[{\"packageId\":\""+PACKAGE_ID+"\",\"packageVersionId\":\""+VERSION_ID
+                        +"\",\"code\":\"PT\",\"title\":\"Checkpoint\",\"afterTopicSequence\":2}]",MediaType.APPLICATION_JSON));
+        var result=client.getPracticeTestMilestones(course);
+        assertEquals(1,result.size());
+        assertEquals(VERSION_ID,result.getFirst().packageVersionId());
+        assertEquals(2,result.getFirst().afterTopicSequence());
+    }
+
+    @Test
+    void readsActiveRubricAndTheErrorTypeCatalog() {
+        server.expect(requestTo(INTERNAL_PATH + "/rubrics/active?task=TASK_2"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"code":"IELTS_WRITING","task":"TASK_2","version":2,"sourceNote":"Public descriptors",
+                         "criteria":[{"code":"TR","name":"Task Response","description":"Evaluate the response",
+                           "sortOrder":1,"bandDescriptors":[{"band":6.0,"descriptor":"Addresses the task."}]}],
+                         "examples":[{"band":6.0,"prompt":"Question","essay":"Original essay","commentary":"Reason"}]}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(INTERNAL_PATH + "/error-types"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        [{"code":"GRAMMAR","name":"Grammar","category":"GRAMMAR","severity":1,"fixHint":"Check tense."}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var rubric = client.getActiveRubric("TASK_2");
+        var errors = client.activeErrorTypes();
+
+        assertEquals("IELTS_WRITING", rubric.code());
+        assertEquals(2, rubric.version());
+        assertEquals(new BigDecimal("6.0"), rubric.criteria().getFirst().bandDescriptors().getFirst().band());
+        assertEquals("GRAMMAR", errors.getFirst().code());
+    }
+
     @Test
     void progressMetadataUsesOneBatchAndForwardsAuthentication() {
         UUID course = UUID.randomUUID();
@@ -47,8 +89,17 @@ class RestLearningContentClientTest {
         assertTrue(result.complete());
         assertEquals("v1", result.revision());
     }
-
     private static final String BASE_URL = "http://content.test";
+
+    @Test
+    void readsThePublishedHistoricalRubricForAnActivatedPrompt() {
+        server.expect(requestTo(INTERNAL_PATH + "/rubrics/IELTS_WRITING/1"))
+                .andRespond(withSuccess("""
+                        {"code":"IELTS_WRITING","task":"TASK_2","version":1,"sourceNote":"source",
+                         "criteria":[],"examples":[]}
+                        """, MediaType.APPLICATION_JSON));
+        assertEquals(1, client.getRubricVersion("IELTS_WRITING", 1).version());
+    }
     private static final String INTERNAL_PATH = BASE_URL + "/internal/learning-content";
     private static final UUID TOPIC_ID = UUID.fromString("10000000-0000-4000-8000-000000000001");
     private static final UUID KP_ID = UUID.fromString("20000000-0000-4000-8000-000000000003");

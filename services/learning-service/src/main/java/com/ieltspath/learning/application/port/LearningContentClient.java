@@ -30,6 +30,11 @@ public interface LearningContentClient {
 
     List<TestPackage> getCourseTestPackages(UUID courseId);
 
+    List<PracticeTestMilestone> getPracticeTestMilestones(UUID courseId);
+
+    record PracticeTestMilestone(UUID packageId, UUID packageVersionId, String code, String title,
+                                 int afterTopicSequence) {}
+
     /** Published placement tests, ordered by package id. */
     List<TestPackage> getPlacementTestPackages();
 
@@ -57,6 +62,43 @@ public interface LearningContentClient {
 
     PackageVersion getPackageVersion(UUID versionId);
 
+    /** The active prerequisites of each knowledge point; a point without any maps to an empty list. */
+    Map<UUID, List<UUID>> prerequisites(List<UUID> knowledgePointIds);
+
+    /**
+     * The difficulty tag (EASY, MEDIUM, HARD) of each question version Content knows (at most 500); untagged or unknown
+     * versions are absent. Used only for statistics, never to pick what a learner is given.
+     */
+    default Map<UUID, String> questionDifficulties(Collection<UUID> questionVersionIds) {
+        return Map.of();
+    }
+
+    /** Published practice sets, practice tests and lessons for these points (at most 50), none above {@code maxBand}. */
+    SuggestionCandidates suggestionCandidates(List<UUID> knowledgePointIds, BigDecimal maxBand);
+
+    record SuggestionCandidates(List<PackageCandidate> packages, List<LessonCandidate> lessons) {}
+    record PackageCandidate(UUID packageId, UUID packageVersionId, String type, String title,
+                            List<UUID> knowledgePointIds, BigDecimal band, String skill) {}
+    record LessonCandidate(UUID lessonId, UUID topicId, String title, List<UUID> knowledgePointIds, BigDecimal band,
+                           String skill, int sortOrder) {}
+
+    /** Active grading rubric for a writing task. */
+    Rubric getActiveRubric(String task);
+
+    /** An immutable published rubric, including retired versions used by an activated prompt. */
+    Rubric getRubricVersion(String code, int version);
+
+    /** Error codes currently accepted by Content. */
+    List<ErrorType> activeErrorTypes();
+
+    record Rubric(String code, String task, int version, String sourceNote, List<RubricCriterion> criteria,
+                  List<RubricExample> examples) {}
+    record RubricCriterion(String code, String name, String description, int sortOrder,
+                           List<RubricBandDescriptor> bandDescriptors) {}
+    record RubricBandDescriptor(java.math.BigDecimal band, String descriptor) {}
+    record RubricExample(java.math.BigDecimal band, String prompt, String essay, String commentary) {}
+    record ErrorType(String code, String name, String category, int severity, String fixHint) {}
+
     /** The given skills in enum order, or the single legacy skill when Content did not send any. */
     static Set<LearningSkill> skillsOrSingle(Collection<LearningSkill> skills, LearningSkill single) {
         EnumSet<LearningSkill> result = EnumSet.noneOf(LearningSkill.class);
@@ -71,13 +113,21 @@ public interface LearningContentClient {
      */
     record Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                  List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
-                 Set<LearningSkill> skills) {
+                 Set<LearningSkill> skills, Boolean active) {
         public Topic {
             skills = skillsOrSingle(skills, skill);
+            active = active == null || active;
+        }
+        public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                     List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
+                     Set<LearningSkill> skills) {
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
+                    skills, true);
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course) {
-            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, null);
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
+                    null, true);
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest) {
@@ -92,10 +142,23 @@ public interface LearningContentClient {
         }
     }
 
-    record Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {}
+    record Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest, Boolean active) {
+        public Course {
+            active = active == null || active;
+        }
 
+        public Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {
+            this(courseId, code, name, bandLevel, hasCourseTest, true);
+        }
+    }
+
+    /** {@code cefrLevel} ({@code A1} to {@code C2}) and {@code canDo} are null when Content has not set them. */
     record KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
-                          String description, boolean hasPracticeSet) {
+                          String description, boolean hasPracticeSet, String cefrLevel, String canDo) {
+        public KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
+                              String description, boolean hasPracticeSet) {
+            this(id, code, name, learningType, skill, description, hasPracticeSet, null, null);
+        }
     }
 
     record LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
@@ -184,8 +247,16 @@ public interface LearningContentClient {
     record TestPackage(UUID packageId, UUID packageVersionId, String code) {
     }
 
+    /**
+     * {@code band} is the band of the course the package belongs to and {@code requiredFeatureKey} the Access feature it
+     * needs; both are null when Content does not say, which means no limit.
+     */
     record PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
-                       int matchedQuestionCount) {
+                       int matchedQuestionCount, BigDecimal band, String requiredFeatureKey) {
+        public PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
+                           int matchedQuestionCount) {
+            this(packageId, packageVersionId, code, questionCount, matchedQuestionCount, null, null);
+        }
     }
 
     /** {@code skills} are the skills of the set's questions; empty from Content that does not send them. */

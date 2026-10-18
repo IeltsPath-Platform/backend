@@ -30,6 +30,21 @@ OutboxRelay                                                     committed row ->
 - `uq_outbox_assessment_completed_result` allows at most one `AssessmentCompleted.v2`
   row per result version.
 
+### Course essay grading policy
+
+COURSE_GATE attempts containing essays require a human examiner to finalize the
+result. Submitted essays queue both an LLM job (comparison and provisional text
+feedback only) and a HUMAN job with reason COURSE_GATE_POLICY. LLM completion never
+finalizes this result or emits this event. The assigned examiner saves item scores,
+judgments and band through the grading API, then finalizes; comparison data, human
+job completion, result completion and outbox insertion commit atomically. Missing
+LLM grades do not prevent human finalization. Objective-only course tests retain
+deterministic auto grading. Topic, practice and placement LLM policies are unchanged.
+
+The event schema and consumer behavior do not change. Provisional feedback and
+LLM/examiner comparison fields are not added to AssessmentCompleted.v2. See
+[assessment-grading-v1](assessment-grading-v1.md) and [AI policy](../ai-policy.md).
+
 ## Envelope
 
 | Field | Type | Notes |
@@ -64,14 +79,19 @@ Each `item_results[]` entry:
 | `question_version_id` | UUID | Content question version from the attempt snapshot. |
 | `is_correct` | boolean or null | Explicit correctness. `null` means the item was not graded right/wrong (for example an essay). |
 | `score`, `max_score` | number | `0 <= score <= max_score`, `max_score > 0`. |
+| `duration_ms` | integer >= 0, or null | Optional. The learner's time on the item, from the attempt's stored running total, capped at two hours. Null when the client never reported time. Added after v2 shipped; consumers must treat it as optional. |
+| `error_code` | string or null | Optional. The error-taxonomy code (for example `PARAPHRASE_TRAP`) of a wrong objective answer, from the error analysis rows. Null for correct, ungraded and essay items. It is the item's first recorded error-analysis value. |
 | `knowledge_point_mappings[]` | array | The Content snapshot taken at attempt start. |
 
-`TOPIC_GATE` and `COURSE_GATE` attempts may contain essay items. The learner submits an essay through
-`POST /api/assessments/submissions` before submitting the attempt. A submitted essay is graded asynchronously by the
-Assessment LLM at no point cost; the result and this event are created after all AI essay jobs for the attempt finish.
-An essay without a submitted response scores zero and creates no grading job. If the LLM is unavailable, returns an
-invalid grade, or the learner has reached the daily limit, Assessment queues the essay for EXAMINER review; the event is
-then emitted when the examiner completes the result. The `AssessmentCompleted.v2` payload shape does not change.
+`TOPIC_GATE`, `OFFICIAL_PRACTICE` and `COURSE_GATE` attempts may contain essay items.
+The learner submits an essay through `POST /api/assessments/submissions` before
+submitting the attempt. Topic/practice essays retain asynchronous free LLM grading:
+all successful jobs complete the result/event, omissions score zero without jobs,
+and unavailable/invalid/quota-limited LLM grading falls back to an examiner.
+Course essays instead always queue HUMAN grading alongside the provisional LLM
+job; course omissions are stored as explicit blank responses and queued for HUMAN
+only. The course result/event requires examiner finalization in every essay case,
+including all-omitted attempts. The payload shape does not change.
 
 Each `knowledge_point_mappings[]` entry:
 
@@ -80,7 +100,7 @@ Each `knowledge_point_mappings[]` entry:
 | `knowledge_point_id` | UUID | Content `knowledge_points.id`. `KP.code` is never identity. |
 | `weight` | number >= 0 | Attribution metadata only. It does not scale mastery, evidence quality or scheduling, and every mapped KP receives its own evidence. |
 | `qualitative_judgment` | `PASS`, `FAIL`, `NOT_ASSESSED` or null | Explicit per-KP grader outcome. |
-| `error_type` | string or null | Assessment error-analysis metadata. Legacy categories (`structural`, `deviation`, `application`, `metacognitive`) are retained for compatibility. |
+| `error_type` | string or null | Assessment error-analysis value for this KP. It may be a current error code such as `PARAPHRASE_TRAP` or a legacy category (`structural`, `deviation`, `application`, `metacognitive`). When the item's first analysis row belongs to this KP, this value can equal the top-level `error_code`; the fields differ by scope. |
 
 The event carries no correct answers, expected answers or examiner reasoning.
 
@@ -163,6 +183,11 @@ Consumer delivery rules:
    `event_type` and `result_version`. Republish to `assessment.events` with routing key
    `assessment.completed.v2` and publisher confirmation. ACK the DLQ copy only after
    confirmed routing. Do not invent a learning goal or rewrite the event.
-5. Verify queue counts settle and `assessment_result_versions` advances.
+5. A `COURSE_GATE` result is scored with the number of practice-test milestones that Learning kept when the course test
+   was assigned (`course_milestone_counts`), because an event carries no learner token for Content. The number is kept
+   when a learner is assigned the test, views the course score or lists the course practice tests. An event that arrives
+   before the number is kept fails with `MILESTONE_COUNT_UNKNOWN` and is tried again, then parked in the DLQ. After a
+   deploy, replay those parked messages once the learner has opened the course score or the test assignment (steps above).
+6. Verify queue counts settle and `assessment_result_versions` advances.
    Result-version and evidence idempotency make redelivery safe; keep the DLQ copy
    when publication confirmation fails.

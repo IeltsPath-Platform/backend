@@ -13,6 +13,7 @@ import com.ieltspath.assessment.domain.vo.AttemptChannel;
 import com.ieltspath.assessment.domain.vo.AttemptMode;
 import com.ieltspath.assessment.domain.vo.AttemptStatus;
 import com.ieltspath.assessment.domain.vo.AttemptType;
+import com.ieltspath.assessment.domain.vo.ElapsedTime;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -39,6 +40,18 @@ class SaveAttemptResponseUseCaseTest {
 
         assertEquals(3, result.revision());
         verify(fixture.responses).save(any());
+    }
+
+    @Test
+    void recordsReportedElapsedTimeClampedToTwoHours() {
+        Fixture fixture = new Fixture(AttemptType.QUIZ, false);
+        when(fixture.responses.findByAttemptItemId(fixture.itemId)).thenReturn(Optional.empty());
+        when(fixture.responses.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        fixture.useCase.execute(new SaveAttemptResponseCommand(fixture.userId, fixture.attemptId, fixture.itemId,
+                "{\"answer\":\"A\"}", 1, 0, 99_999_999L));
+
+        verify(fixture.items).recordElapsed(fixture.itemId, ElapsedTime.MAX_MILLIS);
     }
 
     @Test

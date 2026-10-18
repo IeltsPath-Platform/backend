@@ -146,6 +146,66 @@ class LessonLearningWebMvcTest {
     }
 
     @Test
+    void anExerciseSubmissionCarriesTheXpAndHeartsOfTheSubmission() throws Exception {
+        var summary = new com.ieltspath.learning.domain.vo.GamificationSummary(40, false, 1240, 2, false, 1, 4,
+                Instant.parse("2026-10-18T05:00:00Z"));
+        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenReturn(new SubmissionResult(
+                true, true, List.of(new SubmissionResult.AnswerResult(QUESTION, true, "A", "Why")), summary));
+
+        JsonNode block = body(mvc.perform(authenticated(submission(validBody())))
+                .andExpect(status().isOk()).andReturn()).path("gamification");
+
+        assertEquals(40, block.path("xpEarned").asInt());
+        assertFalse(block.path("xpCapped").asBoolean());
+        assertEquals(1240, block.path("totalXp").asInt());
+        assertEquals(2, block.path("level").asInt());
+        assertEquals(1, block.path("heartsLost").asInt());
+        assertEquals(4, block.path("heartsRemaining").asInt());
+        assertEquals("2026-10-18T05:00:00Z", block.path("nextHeartAt").asText());
+    }
+
+    @Test
+    void aSubmissionThatCostsNoHeartsOmitsTheHeartFields() throws Exception {
+        var reviewSummary = new com.ieltspath.learning.domain.vo.GamificationSummary(10, true, 510, 1, false);
+        var review = new ReviewSubmissionResult("DONE", true,
+                List.of(new SubmissionResult.AnswerResult(QUESTION, true, "A", "Why")), null, "PRACTICE", 0,
+                reviewSummary);
+
+        JsonNode block = json.valueToTree(ReviewSubmissionResponse.from(review)).path("gamification");
+
+        assertEquals(10, block.path("xpEarned").asInt());
+        assertTrue(block.path("xpCapped").asBoolean(), "XP past the daily cap is reported");
+        assertTrue(block.path("heartsRemaining").isNull() || !block.has("heartsRemaining"));
+    }
+
+    @Test
+    void aPracticeSubmissionResponseKeepsTheGamificationBlock() throws Exception {
+        var summary = new com.ieltspath.learning.domain.vo.GamificationSummary(60, false, 300, 1, false, 2, 3,
+                Instant.parse("2026-10-18T05:00:00Z"));
+        var submission = new com.ieltspath.learning.domain.vo.PracticeSubmission(UUID.randomUUID(), 3, 5, 60.0, false,
+                true, List.of(), null, List.of(), List.of(), summary);
+
+        JsonNode block = json.valueToTree(
+                com.ieltspath.learning.api.dto.response.PracticeSubmissionResponse.from(submission)).path("gamification");
+
+        assertEquals(60, block.path("xpEarned").asInt());
+        assertEquals(3, block.path("heartsRemaining").asInt());
+    }
+
+    @Test
+    void aLearnerWithNoHeartsIsRefusedWithTheTimeOfTheNextHeartAndTheRefillPrice() throws Exception {
+        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenThrow(
+                new com.ieltspath.learning.domain.exception.HeartsDepletedException(
+                        Instant.parse("2026-10-18T05:00:00Z"), 5));
+
+        mvc.perform(authenticated(submission(validBody())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HEARTS_DEPLETED"))
+                .andExpect(jsonPath("$.nextHeartAt").value("2026-10-18T05:00:00Z"))
+                .andExpect(jsonPath("$.refillCost").value(5));
+    }
+
+    @Test
     void listsOwnedReviewsWithSkillAndRejectsExcessiveLimit() throws Exception {
         when(listReviews.execute(USER, ReviewStatus.PENDING, LearningSkill.READING, 20))
                 .thenReturn(List.of(new ReviewListEntry(REVIEW, KP, LESSON, LearningSkill.READING,
@@ -299,6 +359,23 @@ class LessonLearningWebMvcTest {
                 .andExpect(status().isForbidden()).andReturn());
         assertEquals(Set.of("detail", "code"), keys(response));
         assertEquals(code, response.path("code").asText());
+    }
+
+    @ParameterizedTest
+    @EnumSource(LessonAction.class)
+    void practiceGateNamesTheLessonsWhosePracticeIsOpen(LessonAction action) throws Exception {
+        var earlier = UUID.randomUUID();
+        var gate = new LearningGateException("PRACTICE_REQUIRED", List.of(), List.of(earlier));
+        when(getLessonUseCase.execute(USER, LESSON)).thenThrow(gate);
+        when(submitLessonExerciseUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any())).thenThrow(gate);
+        when(completeLessonUseCase.execute(USER, LESSON)).thenThrow(gate);
+
+        JsonNode response = body(mvc.perform(authenticated(lessonAction(action)))
+                .andExpect(status().isForbidden()).andReturn());
+        assertEquals(Set.of("detail", "code", "lessonIds"), keys(response));
+        assertEquals("PRACTICE_REQUIRED", response.path("code").asText());
+        assertEquals(earlier.toString(), response.path("lessonIds").get(0).asText());
+        assertEquals(1, response.path("lessonIds").size());
     }
 
     static Stream<String> invalidBodies() {

@@ -1,7 +1,7 @@
 ---
 phase: 12
 title: "Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor"
-status: pending
+status: completed
 priority: P2
 dependencies: [5, 7, 9, 10, 11]
 ---
@@ -15,6 +15,21 @@ Mentor: "System làm gì, Mentor làm gì, R&D làm gì… cái này phải làm
 đã chữa nhằm đánh giá chất lượng Mentor.
 
 Phase này làm phần backend. Mỗi chức năng đặt ở service đang sở hữu dữ liệu (D11); frontend gom thành một khu quản trị.
+
+## Trạng thái và ghi chú triển khai
+
+- **Phần Assessment/Access: xong** (Codex, `dbe35e7`, `1ea5e44`, `9293d6e`). **Phần Learning: xong** (contract
+  `docs/contracts/learning-staff-area-v1.md`; learning-service 471 test xanh). Còn thiếu Gateway route (Codex kiểm).
+- Khác với plan ở phần Learning:
+  - Migration là `V19__flags_and_work_items.sql`. `work_items` thêm cột `detail` (JSON số liệu của việc).
+  - Hàng việc đồng bộ khi mở danh sách (`WorkItemSync`) và qua job định kỳ `WorkItemSyncJob` (mỗi 3 giờ, khóa advisory để
+    nhiều instance không chạy trùng).
+  - Cờ chạy qua sự kiện `QuestionEventsAppended` sau khi commit, transaction riêng (`FlagDetector`). Cờ cùng loại không
+    nâng lại trong 24 giờ.
+  - Câu quá dễ/khó dùng tỷ lệ đúng lần nộp đầu; tag `difficulty` của Content chỉ dịch ngưỡng (HARD quá dễ từ 80%, EASY quá
+    khó đến 40%), không đổi bài giao cho học viên. Cần endpoint nội bộ `POST /internal/learning-content/questions/difficulties`
+    của Content; chưa có thì thống kê vẫn chạy với ngưỡng chung.
+  - Hồ sơ 360° chỉ đọc, không làm tươi dữ liệu học viên; tên khóa/KP do frontend ghép.
 
 ## Requirements
 
@@ -48,7 +63,7 @@ CREATE TABLE work_items (
     id UUID PRIMARY KEY,
     queue VARCHAR(20) NOT NULL CHECK (queue IN ('EXAMINER','CONTENT_AUTHOR')),
     kind VARCHAR(30) NOT NULL CHECK (kind IN ('MID_COURSE_REMEDIATION','POST_COURSE_REMEDIATION','LEARNER_FLAG',
-        'CONTENT_GAP','QUESTION_TOO_EASY','QUESTION_TOO_HARD')),
+        'CONTENT_GAP','QUESTION_TOO_EASY','QUESTION_TOO_HARD','EDGE_SUSPECT')),
     subject_user_id UUID, subject_ref UUID, status VARCHAR(12) NOT NULL CHECK (status IN ('OPEN','IN_PROGRESS','DONE')),
     assignee_id UUID, action TEXT, result TEXT, note TEXT, note_visible_to_learner BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -73,7 +88,16 @@ Nguồn sinh việc (idempotent theo `UNIQUE (kind, subject_ref)`):
 | Học viên cần bổ trợ giữa khóa / sau khóa | EXAMINER | `remediation_flags` (phase 9) |
 | Cờ bất thường mới | EXAMINER | `learner_flags` |
 | KP thiếu bộ câu | CONTENT_AUTHOR | `content_gap_signals` (phase 7) |
+| Cạnh tiên quyết đáng ngờ | CONTENT_AUTHOR | Job hằng ngày đọc `diagnostic_probes` (bên dưới) |
 | Câu quá dễ / quá khó | CONTENT_AUTHOR | Job hằng ngày đọc event log: câu có ≥ 20 lần nộp đầu, tỷ lệ đúng > 0.9 hoặc < 0.3, hoặc lệch so với `difficulty` |
+
+**Đánh giá chất lượng cây từ dữ liệu học viên** (mentor: "đánh giá cả Knowledge Tree có tốt hay không"):
+- Với mỗi cạnh A → B, job tính từ các phiên chẩn đoán (phase 7) đã kết luận: số phiên có B trượt và A được thăm dò,
+  tỷ lệ A thăm dò đạt, tỷ lệ A được kết luận là KP gốc.
+- Cạnh có ít nhất 20 phiên và tỷ lệ A đạt ≥ 0.80 (nền vững mà vẫn trượt B, nên cạnh không giải thích được lỗi) hoặc tỷ lệ
+  được kết luận là KP gốc < 0.10 → việc `EDGE_SUSPECT` cho CONTENT_AUTHOR kèm số liệu. Ngưỡng ở `learning.tree-quality.*`.
+- `GET /api/learning/admin/tree-quality?courseId=`: bảng thống kê theo cạnh và theo KP (số lần là KP gốc, tỷ lệ trượt,
+  mức mastery trung bình) để R&D chỉnh cây qua API của phase 1. Learning chỉ giữ id; tên KP lấy từ content.
 
 API:
 - `GET /api/learning/admin/work-items?queue=&status=` (EXAMINER chỉ thấy hàng EXAMINER; CONTENT_AUTHOR chỉ thấy hàng
@@ -131,10 +155,10 @@ API:
 
 ## Success Criteria
 
-- [ ] EXAMINER mở một trang thấy: bài chờ chấm, học viên cần bổ trợ, cờ bất thường. Mỗi việc ghi được Action / Result /
-      Note.
-- [ ] CONTENT_AUTHOR thấy: KP thiếu bộ câu, câu quá dễ / quá khó, bài cần chấm lại để đánh giá Mentor.
-- [ ] Admin xem được chất lượng từng EXAMINER.
+- [x] EXAMINER mở một trang thấy: bài chờ chấm, học viên cần bổ trợ, cờ bất thường. Mỗi việc ghi được Action / Result /
+      Note. (test: Learning: StaffAreaIntegrationTest.syncMakesOneItemPerSourceAndEachRoleSeesOnlyItsQueue, staffTakeAnItemRecordTheResultAndShowANoteToTheLearner; Assessment: GradingQueueIntegrationTest.queueFiltersPaginationAndMissingJobsAreValidated)
+- [x] CONTENT_AUTHOR thấy: KP thiếu bộ câu, câu quá dễ / quá khó, bài cần chấm lại để đánh giá Mentor. (test: StaffAreaIntegrationTest.questionsTooEasyOrTooHardBecomeContentItemsOnlyWithEnoughFirstAttempts, anEdgeThatDoesNotExplainFailuresBecomesASuspectItemWithItsNumbers; ExaminerQaControllerTest.contentAuthorCanSeeOnlyQaQueueAndSubmitBlindReview)
+- [x] Admin xem được chất lượng từng EXAMINER. (test: ExaminerQaIntegrationTest.finalizedEssayCreatesBlindQaSampleAndQualityAggregate)
 
 ## Risk Assessment
 

@@ -9,8 +9,10 @@ import com.ieltspath.content.application.result.PracticeSetResult;
 import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.application.result.TopicTestPackageResult;
 import com.ieltspath.content.application.result.PackageQuestionSpec;
+import com.ieltspath.content.application.result.KnowledgeTreeNodeResult;
 import com.ieltspath.content.domain.vo.QuestionUsageConflict;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
+import com.ieltspath.content.domain.vo.QuestionDifficulty;
 import com.ieltspath.content.domain.vo.Skill;
 
 import java.util.Collection;
@@ -21,8 +23,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Read projections of the published curriculum for the learning flow. Every method runs a fixed number of queries,
- * whatever the size of the result.
+ * Read projections of the curriculum for the learning flow and author preview. Every method runs a fixed number of
+ * queries, whatever the size of the result; {@link #packageVersionContent(UUID)} may include a draft version.
  *
  * <p>A practice set is <em>eligible</em> for a knowledge point when it is a published {@code PRACTICE_SET} whose
  * current version has at least {@code minQuestions} questions, at least one of them measuring the knowledge point,
@@ -98,8 +100,19 @@ public interface LearningContentReader {
 
     Optional<PackageVersionContentResult> publishedPackageVersion(UUID packageVersionId);
 
+    /** Package version content for author preview, including draft versions. */
+    Optional<PackageVersionContentResult> packageVersionContent(UUID packageVersionId);
+
     default List<String> practiceTestPublishIssues(UUID packageVersionId) { return List.of(); }
 
     /** The given question versions that a lesson, practice set, final test, mock test or placement test uses. */
     Set<UUID> questionVersionsReservedForLearning(Collection<UUID> questionVersionIds);
+
+    List<KnowledgeTreeNodeResult> knowledgeTreeNodes(UUID courseId, Skill skill, boolean includeInactive);
+
+    /** Active knowledge points mapped to their active, direct prerequisites; unknown and inactive ids are omitted. */
+    Map<UUID, List<UUID>> activeKnowledgePrerequisites(Collection<UUID> ids);
+
+    /** Question versions with a classified difficulty; unknown and unclassified ids are omitted. */
+    Map<UUID, QuestionDifficulty> questionDifficulties(Collection<UUID> questionVersionIds);
 }

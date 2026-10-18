@@ -37,6 +37,12 @@ public interface WritingSubmissionRepository {
      */
     boolean save(WritingSubmission submission);
 
+    /** Whether a revision of the submission exists that is not FAILED (graded, or being graded). */
+    boolean hasActiveRevision(UUID submissionId);
+
+    /** The graded revision of the submission, if any. */
+    Optional<WritingSubmission> findGradedRevision(UUID submissionId);
+
     /** Whether the learner has a GRADED, passed submission for the block, other than {@code excludeId}. */
     boolean blockPassed(UUID userId, UUID blockId, UUID excludeId);
 

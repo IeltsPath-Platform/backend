@@ -142,7 +142,15 @@ DELETE /api/users/{id}
 POST /api/learning-support/activities
 GET  /api/learning-support/activities
 GET  /api/learning-support/streak
+GET  /internal/users/{userId}/learning-goal
+POST /internal/users/display-names
 ```
+
+The two `/internal/users/**` routes require a verified internal service JWT and are not exposed to clients through the
+Gateway. The learning-goal response contains `targetBand` and `examDate`; both are `null` when the user has no active
+goal, while an unknown user returns 404. The display-name request accepts 1–50 IDs in one batch. It uses a learner
+profile's `displayName` when available, falls back to the account `fullName`, omits unknown IDs, and never returns email.
+These reads use the existing `users`, `learning_goals`, and `learner_profiles` tables; no migration is needed.
 
 ## Chạy local
 

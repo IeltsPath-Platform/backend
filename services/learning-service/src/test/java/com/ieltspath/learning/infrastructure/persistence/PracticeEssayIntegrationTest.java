@@ -98,14 +98,18 @@ class PracticeEssayIntegrationTest {
     @MockitoBean LearningContentClient content;
     @MockitoBean AccessClient access;
     @MockitoBean LlmClient llm;
+    @MockitoBean com.ieltspath.learning.application.port.EssayPromptActivationProvider promptActivations;
 
     @BeforeEach
     void setUp() {
-        jdbc.execute("TRUNCATE lesson_writing_submissions, llm_daily_usage, review_theory_checks, review_sets, "
+        jdbc.execute("TRUNCATE human_review_requests, lesson_writing_submissions, llm_daily_usage, review_theory_checks, diagnostic_probes, diagnostic_sessions,review_sets, "
                 + "review_items, practice_attempts, lesson_practice_passes, lesson_exercise_submissions, kp_evidence, "
                 + "lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments, "
                 + "assessment_result_versions CASCADE");
         reset(content, access, llm);
+        when(content.getActiveRubric(anyString())).thenAnswer(invocation -> testRubric(invocation.getArgument(0)));
+        when(content.activeErrorTypes()).thenReturn(List.of(new ErrorType("GRAMMAR", "Grammar", "GRAMMAR", 1,
+                "Fix grammar")));
         Set<LearningSkill> skills = Set.of(LearningSkill.READING, LearningSkill.WRITING);
         when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "TREES", "Trees", 955, null, List.of(
                 new KnowledgePoint(KP_READING, "TR_R", "Scanning", "PROCEDURE", "READING", "d", true),
@@ -145,6 +149,7 @@ class PracticeEssayIntegrationTest {
 
     @Test
     void anEssayIsGradedAndChargedOnceThenCountsAsWritingWithoutAReviewOrAPracticeRequirement() {
+        jdbc.update("DELETE FROM question_attempt_events WHERE user_id = ? AND question_version_id = ?", USER, ESSAY);
         var attempt = startPractice.execute(USER, LESSON, WRITING_SET).attemptId();
         assertEquals("ESSAY_NOT_GRADED", assertThrows(LearningRequestException.class,
                 () -> submitPractice.execute(USER, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of())))
@@ -169,6 +174,9 @@ class PracticeEssayIntegrationTest {
         assertTrue(result.reviewsCreated().isEmpty());
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'practice_set' "
                 + "AND kp_id = ? AND correct = false", Integer.class, KP_WRITING));
+        // The essay is one question event of the submission, and every question event is a day of activity.
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM question_attempt_events WHERE user_id = ? "
+                + "AND question_version_id = ? AND source = 'practice_set'", Integer.class, USER, ESSAY));
         assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(USER, LESSON).practiceStatus());
 
         var reading = startPractice.execute(USER, LESSON, READING_SET).attemptId();
@@ -209,6 +217,8 @@ class PracticeEssayIntegrationTest {
         when(access.debit(any(), anyInt(), any(), anyString(), any())).thenAnswer(invocation -> UUID.randomUUID());
         var essay = submitEssay.execute(USER, attempt, ESSAY, request, TEXT);
         assertTrue(essay.passed());
+        assertEquals("IELTS_WRITING@1+tplv1", jdbc.queryForObject(
+                "SELECT prompt_version FROM lesson_writing_submissions", String.class));
         verify(llm, times(1)).completeJson(any(), any(), anyBoolean());
         var result = submitPractice.execute(USER, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
         assertTrue(result.passed());
@@ -216,8 +226,15 @@ class PracticeEssayIntegrationTest {
 
     private static String grade(String band) {
         String criteria = String.join(",", List.of("TR", "CC", "LR", "GRA").stream()
-                .map(code -> "{\"code\":\"%s\",\"band\":%s,\"strengths\":[\"s\"],\"improvements\":[\"i\"]}"
+                .map(code -> "{\"code\":\"%s\",\"band\":%s,\"comment\":\"i\"}"
                         .formatted(code, band)).toList());
-        return "{\"criteria\":[" + criteria + "],\"corrections\":[],\"summary\":\"ok\"}";
+        return "{\"criteria\":[" + criteria + "],\"corrections\":[],\"summary\":\"ok\",\"focus\":[]}";
+    }
+
+    private static Rubric testRubric(String task) {
+        var descriptor = new RubricBandDescriptor(new BigDecimal("6.0"), "Band six.");
+        var criteria = (task.equals("TASK_1") ? List.of("TA", "CC", "LR", "GRA") : List.of("TR", "CC", "LR", "GRA"))
+                .stream().map(code -> new RubricCriterion(code, code, "Description", 1, List.of(descriptor))).toList();
+        return new Rubric("IELTS_WRITING", task, 1, "source", criteria, List.of());
     }
 }

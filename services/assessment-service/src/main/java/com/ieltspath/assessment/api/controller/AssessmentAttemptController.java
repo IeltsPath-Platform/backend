@@ -136,7 +136,8 @@ public class AssessmentAttemptController {
                 itemId,
                 request.payload(),
                 request.schemaVersion(),
-                request.expectedRevision()
+                request.expectedRevision(),
+                request.elapsedMs()
         ));
         return AttemptResponseResponse.from(result);
     }

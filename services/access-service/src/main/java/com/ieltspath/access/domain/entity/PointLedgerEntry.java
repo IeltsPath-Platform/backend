@@ -13,12 +13,17 @@ public class PointLedgerEntry {
     private final long balanceAfter;
     private final PointTransactionType transactionType;
     private final String referenceType;
-    private final UUID referenceId;
+    private final String referenceId;
     private final String idempotencyKey;
     private final String description;
     private final Instant createdAt;
 
     public PointLedgerEntry(UUID id, UUID userId, long delta, long balanceAfter, PointTransactionType transactionType, String referenceType, UUID referenceId, String idempotencyKey, String description, Instant createdAt) {
+        this(id, userId, delta, balanceAfter, transactionType, referenceType,
+                referenceId == null ? null : referenceId.toString(), idempotencyKey, description, createdAt);
+    }
+
+    public PointLedgerEntry(UUID id, UUID userId, long delta, long balanceAfter, PointTransactionType transactionType, String referenceType, String referenceId, String idempotencyKey, String description, Instant createdAt) {
         this.id = id;
         this.userId = userId;
         this.delta = delta;
@@ -32,6 +37,10 @@ public class PointLedgerEntry {
     }
 
     public static PointLedgerEntry create(UUID userId, long delta, long balanceAfter, PointTransactionType transactionType, String referenceType, UUID referenceId, String idempotencyKey, String description) {
+        return new PointLedgerEntry(UUID.randomUUID(), userId, delta, balanceAfter, transactionType, referenceType, referenceId, idempotencyKey, description, Instant.now());
+    }
+
+    public static PointLedgerEntry create(UUID userId, long delta, long balanceAfter, PointTransactionType transactionType, String referenceType, String referenceId, String idempotencyKey, String description) {
         return new PointLedgerEntry(UUID.randomUUID(), userId, delta, balanceAfter, transactionType, referenceType, referenceId, idempotencyKey, description, Instant.now());
     }
 
@@ -59,7 +68,7 @@ public class PointLedgerEntry {
         return referenceType;
     }
 
-    public UUID getReferenceId() {
+    public String getReferenceId() {
         return referenceId;
     }
 

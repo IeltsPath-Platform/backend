@@ -6,7 +6,9 @@ import com.ieltspath.library.application.result.SavedFlashcard;
 import com.ieltspath.library.application.usecase.CreateFlashcardUseCase;
 import com.ieltspath.library.application.usecase.DeleteFlashcardUseCase;
 import com.ieltspath.library.application.usecase.GetFlashcardUseCase;
+import com.ieltspath.library.application.usecase.GetDueFlashcardsUseCase;
 import com.ieltspath.library.application.usecase.ListFlashcardsUseCase;
+import com.ieltspath.library.application.usecase.ReviewFlashcardUseCase;
 import com.ieltspath.library.application.usecase.SavePracticeQuestionFlashcardUseCase;
 import com.ieltspath.library.application.usecase.UpdateFlashcardUseCase;
 import com.ieltspath.library.domain.aggregate.Flashcard;
@@ -74,6 +76,10 @@ class FlashcardPracticeQuestionSecurityTest {
     private DeleteFlashcardUseCase deleteFlashcardUseCase;
     @MockBean
     private SavePracticeQuestionFlashcardUseCase savePracticeQuestionFlashcardUseCase;
+    @MockBean
+    private GetDueFlashcardsUseCase getDueFlashcardsUseCase;
+    @MockBean
+    private ReviewFlashcardUseCase reviewFlashcardUseCase;
 
     @DynamicPropertySource
     static void hmacProperties(DynamicPropertyRegistry registry) {

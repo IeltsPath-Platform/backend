@@ -30,3 +30,14 @@ Lesson and review `answers[]` carry `{"questionVersionId":"…","answer":"…"}`
 ```
 
 With Q12's spec, the parsed answer above is correct. A missing response row, a payload `{}`, or `{"answer":null}` is an omitted answer and scores zero. A malformed payload or an `answer` of another JSON type is invalid input and must not silently match an accepted answer. See [the shared vectors](answer-spec-v1-vectors.json); vector `response` is normally the extracted string or `null`, while a JSON object represents the parsed assessment payload. Vectors normally have `gradable=true` implicitly. The `{}` vector adds `"gradable":false`; its required `correct:false` is only a placeholder, and consumers must take the ungradable/manual path rather than assign zero.
+
+## Error tags (phase 3a, additive)
+
+Two optional keys tell consumers which error a wrong objective answer reflects. Neither changes grading, and `schema_version` stays `1`.
+
+- `distractors` on a `CHOICE` spec maps a wrong option key to an error code, for example `{"type":"CHOICE","correct":"A","distractors":{"B":"PARAPHRASE_TRAP"}}`. Content refuses a version when a key is not one of its options, when the value is not text, or when a code is not an `ACTIVE` error type (`422`, `details.code = UNKNOWN_ERROR_CODE`). A `FILL` spec has no options, so it cannot carry `distractors`.
+- `maxWords` on a `FILL` spec is the word limit used for the `WORD_LIMIT_EXCEEDED` tag. It does not change whether an answer is correct.
+
+A tag is assigned only to a wrong, gradable objective answer. `CHOICE` takes its code from `distractors`. A wrong `FILL` answer is classified in this order: over `maxWords`, then a number in another value or format (`NUMBER_FORMAT`), then a missing or extra trailing `s` (`PLURAL_FORM`), then at most two edits from an accepted answer (`SPELLING`). Anything else has no tag. A correct, omitted or ungradable answer has no tag.
+
+Learner responses never include `distractors` or `maxWords`. Learning builds its responses from explicit fields (`correctAnswer`, `explanation`), not from the raw spec. The shared vectors for tags are in [answer-spec-error-tags-v1-vectors.json](answer-spec-error-tags-v1-vectors.json). Learning and Assessment each implement this tagger and must pass the same vectors.

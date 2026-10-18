@@ -75,6 +75,7 @@ class FreeWritingIntegrationTest {
     @MockitoBean LearningContentClient content;
     @MockitoBean AccessClient access;
     @MockitoBean LlmClient llm;
+    @MockitoBean com.ieltspath.learning.application.port.EssayPromptActivationProvider promptActivations;
 
     @BeforeEach
     void setUp() {
@@ -90,6 +91,9 @@ class FreeWritingIntegrationTest {
                 new Item(OBJECTIVE, 2, "Pick", null, Map.of("type", "CHOICE", "correct", "A"), "Because",
                         BigDecimal.ONE, List.of()))))));
         when(llm.configured()).thenReturn(true);
+        // No prompt version has been activated yet, so the grader bootstraps from the active rubric of the task.
+        when(content.getActiveRubric(anyString())).thenAnswer(invocation -> rubric(invocation.getArgument(0)));
+        when(content.activeErrorTypes()).thenReturn(List.of());
         when(access.balance()).thenReturn(30L);
         when(access.debit(any(), anyInt(), any(), anyString(), any())).thenAnswer(invocation -> UUID.randomUUID());
     }
@@ -170,6 +174,14 @@ class FreeWritingIntegrationTest {
         assertEquals("GRADED", essay.status());
         assertFalse(essay.passed());
         verify(llm, times(1)).completeJson(any(), any(), anyBoolean());
+    }
+
+    private static LearningContentClient.Rubric rubric(String task) {
+        var descriptor = new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Band six.");
+        var criteria = (task.equals("TASK_1") ? List.of("TA", "CC", "LR", "GRA") : List.of("TR", "CC", "LR", "GRA"))
+                .stream().map(code -> new LearningContentClient.RubricCriterion(code, code, "Description", 1,
+                        List.of(descriptor))).toList();
+        return new LearningContentClient.Rubric("IELTS_WRITING", task, 1, "source", criteria, List.of());
     }
 
     private static String grade(String band) {

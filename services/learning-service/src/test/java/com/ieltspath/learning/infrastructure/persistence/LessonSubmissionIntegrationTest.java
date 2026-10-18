@@ -60,6 +60,9 @@ import static org.mockito.Mockito.*;
         "spring.jpa.hibernate.ddl-auto=validate",
         "spring.jpa.open-in-view=false",
         "management.health.rabbit.enabled=false",
+        // These tests check answers, evidence and history, not hearts: a large heart pool keeps the hearts gate out of
+        // the way (hearts have their own tests).
+        "learning.gamification.hearts.max=1000",
         "app.auth.internal-jwt-issuer=urn:code-base:api-gateway"
 })
 @Testcontainers(disabledWithoutDocker = true)
@@ -107,10 +110,10 @@ class LessonSubmissionIntegrationTest {
     @BeforeEach
     void resetDataAndCurriculum() {
         jdbc.execute("""
-                TRUNCATE review_theory_checks, review_sets, review_items, practice_attempts, lesson_practice_passes,
+                TRUNCATE review_theory_checks, diagnostic_probes, diagnostic_sessions,review_sets, review_items, practice_attempts, lesson_practice_passes,
                 lesson_exercise_submissions, kp_evidence,
                 lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments,
-                assessment_result_versions RESTART IDENTITY
+                assessment_result_versions, kp_mastery_profiles RESTART IDENTITY
                 """);
         when(content.getTopicSequence()).thenReturn(List.of(
                 new LearningContentClient.Topic(TOPIC, "FIRST", "First topic", 900, null,
@@ -300,6 +303,10 @@ class LessonSubmissionIntegrationTest {
         assertNull(failed.results().getFirst().explanation());
         assertEquals(Boolean.FALSE, jdbc.queryForObject(
                 "SELECT correct FROM kp_evidence WHERE user_id = ? AND kp_id = ?", Boolean.class, USER, KP));
+        // The first answer also writes the knowledge point's mastery profile.
+        assertEquals("PRIORITY", jdbc.queryForObject(
+                "SELECT tier FROM kp_mastery_profiles WHERE user_id = ? AND knowledge_point_id = ?", String.class,
+                USER, KP));
         assertEquals(failed, submitLessonExerciseUseCase.execute(USER, LESSON, BLOCK, command(firstRequest, "A")));
 
         UUID retryRequest = UUID.randomUUID();
@@ -327,6 +334,13 @@ class LessonSubmissionIntegrationTest {
                 .filter(item -> item.knowledgePointId().equals(KP)).findFirst().orElseThrow();
         assertEquals(0.0, result.mastery());
         assertEquals(1, result.evidenceCount());
+        // The passing retake added no evidence, so the profile still describes the single first answer.
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT evidence_count FROM kp_mastery_profiles WHERE user_id = ? AND knowledge_point_id = ?",
+                Integer.class, USER, KP));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT success_streak FROM kp_mastery_profiles WHERE user_id = ? AND knowledge_point_id = ?",
+                Integer.class, USER, KP));
     }
 
     enum ChangedScope { USER, LESSON, BLOCK }

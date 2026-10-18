@@ -77,7 +77,7 @@ class AssessmentResultIntegrationTest {
     void seed() {
         jdbc.execute("TRUNCATE learner_placements");
         jdbc.execute("""
-                TRUNCATE review_theory_checks, review_sets, review_items, lesson_exercise_submissions, kp_evidence,
+                TRUNCATE review_theory_checks, diagnostic_probes, diagnostic_sessions,review_sets, review_items, lesson_exercise_submissions, kp_evidence,
                 lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments,
                 assessment_result_versions RESTART IDENTITY
                 """);

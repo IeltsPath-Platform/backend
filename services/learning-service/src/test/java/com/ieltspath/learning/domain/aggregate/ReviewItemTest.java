@@ -41,7 +41,88 @@ class ReviewItemTest {
         low.completeTheory();
         assertThat(low.stage()).isEqualTo(ReviewStage.PRACTICE);
         assertThat(low.theoryCompletedCount()).isEqualTo(1);
-        assertThat(low.recordSetResult(assign(low), UUID.randomUUID(), 2, 4)).isEqualTo(ReviewStatus.SKIPPED);
+        assertThat(low.recordSetResult(assign(low), UUID.randomUUID(), 2, 4)).isEqualTo(ReviewStatus.PENDING);
+    }
+
+    @Test
+    void aFailedReviewRepeatsNewSetsUntilItIsPassedAndOnlyTheFirstFailureAsksForTheory() {
+        ReviewItem review = pending(0);
+
+        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 1, 4)).isEqualTo(ReviewStatus.PENDING);
+        assertThat(review.stage()).isEqualTo(ReviewStage.THEORY);
+        review.completeTheory();
+
+        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 0, 4)).isEqualTo(ReviewStatus.PENDING);
+        assertThat(review.failedSets()).isEqualTo(2);
+        assertThat(review.stage()).as("a second failure goes straight to a new set").isEqualTo(ReviewStage.PRACTICE);
+
+        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 2, 4)).isEqualTo(ReviewStatus.PENDING);
+        assertThat(review.failedSets()).isEqualTo(3);
+        assertThat(review.stage()).isEqualTo(ReviewStage.PRACTICE);
+        assertThat(review.theoryCompletedCount()).isEqualTo(1);
+
+        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 4, 4)).isEqualTo(ReviewStatus.DONE);
+        assertThat(review.failedSets()).isEqualTo(3);
+    }
+
+    @Test
+    void aReviewThatStartedAtTheoryAsksForTheoryAgainOnlyAfterItsFirstFailedSet() {
+        ReviewItem review = pending(0);
+        review.startWithTheory(TheoryReason.WRONG_IN_LESSON);
+        review.completeTheory();
+
+        review.recordSetResult(assign(review), UUID.randomUUID(), 3, 5);
+        assertThat(review.stage()).isEqualTo(ReviewStage.THEORY);
+        assertThat(review.theoryReason()).isEqualTo(TheoryReason.SECOND_FAIL);
+        review.completeTheory();
+
+        review.recordSetResult(assign(review), UUID.randomUUID(), 1, 4);
+        assertThat(review.stage()).isEqualTo(ReviewStage.PRACTICE);
+        assertThat(review.status()).isEqualTo(ReviewStatus.PENDING);
+    }
+
+    private static ReviewItem optional() {
+        return ReviewItem.restore(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                ReviewStatus.PENDING, null, 0, null, ReviewStage.PRACTICE, null, 0, "CONSOLIDATE", false);
+    }
+
+    @Test
+    void anOptionalReviewIsASingleSetThatEndsDoneWhenPassed() {
+        ReviewItem review = optional();
+        assertThat(review.blocking()).isFalse();
+
+        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 3, 4)).isEqualTo(ReviewStatus.DONE);
+        assertThat(review.stage()).isEqualTo(ReviewStage.PRACTICE);
+    }
+
+    @Test
+    void anOptionalReviewEndsSkippedWhenItsOnlySetIsFailedAndNeverAsksForTheory() {
+        ReviewItem review = optional();
+
+        assertThat(review.recordSetResult(assign(review), UUID.randomUUID(), 1, 4)).isEqualTo(ReviewStatus.SKIPPED);
+        assertThat(review.stage()).isEqualTo(ReviewStage.PRACTICE);
+        assertThat(review.theoryReason()).isNull();
+        assertThat(review.failedSets()).isEqualTo(1);
+        assertThatThrownBy(() -> assign(review)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void anOptionalReviewCannotStartWithTheory() {
+        ReviewItem review = optional();
+        assertThatThrownBy(() -> review.startWithTheory(TheoryReason.WRONG_IN_LESSON))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void reviewsRestoredWithoutAFlagAreBlocking() {
+        assertThat(pending(0).blocking()).isTrue();
+    }
+
+    @Test
+    void aReviewWithNoPackageLeftCanStillBeSkippedWhilePending() {
+        ReviewItem review = pending(3);
+        review.skip();
+        assertThat(review.status()).isEqualTo(ReviewStatus.SKIPPED);
     }
 
     @Test

@@ -19,6 +19,8 @@ import static com.ieltspath.learning.domain.vo.WritingSubmissionStatus.*;
  */
 public final class WritingSubmission {
     public static final String ABANDONED = "GRADING_ABANDONED";
+    /** The first essay is 1; three revisions make it 4. */
+    public static final int MAX_REVISION_NO = 4;
 
     private final UUID id;
     private final UUID userId;
@@ -34,15 +36,18 @@ public final class WritingSubmission {
     private WritingSubmissionStatus persistedStatus;
     private String failureCode;
     private WritingGrade grade;
+    private String promptVersion;
     private Boolean passed;
     private UUID ledgerEntryId;
     private Instant gradingStartedAt;
+    private UUID previousSubmissionId;
+    private int revisionNo = 1;
 
     private WritingSubmission(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID practiceAttemptId,
                               UUID requestId, String essayText,
                               int wordCount, EssayPrompt prompt, int pointCost, WritingSubmissionStatus status,
                               WritingSubmissionStatus persistedStatus, String failureCode, WritingGrade grade,
-                              Boolean passed, UUID ledgerEntryId, Instant gradingStartedAt) {
+                              String promptVersion, Boolean passed, UUID ledgerEntryId, Instant gradingStartedAt) {
         this.id = Objects.requireNonNull(id, "id");
         this.userId = Objects.requireNonNull(userId, "userId");
         this.lessonId = lessonId;
@@ -62,6 +67,7 @@ public final class WritingSubmission {
         this.persistedStatus = persistedStatus;
         this.failureCode = failureCode;
         this.grade = grade;
+        this.promptVersion = promptVersion;
         this.passed = passed;
         this.ledgerEntryId = ledgerEntryId;
         this.gradingStartedAt = gradingStartedAt;
@@ -73,7 +79,7 @@ public final class WritingSubmission {
                                          Instant now) {
         return new WritingSubmission(id, userId, lessonId, Objects.requireNonNull(blockId, "blockId"), null,
                 requestId, essayText, wordCount, prompt, pointCost, GRADING, null, null, null, null, null,
-                Objects.requireNonNull(now, "now"));
+                null, Objects.requireNonNull(now, "now"));
     }
 
     /** A new essay for a question of a practice attempt, GRADING from {@code now}; not stored yet. */
@@ -82,14 +88,14 @@ public final class WritingSubmission {
                                                  int pointCost, Instant now) {
         return new WritingSubmission(id, userId, lessonId, null, Objects.requireNonNull(practiceAttemptId,
                 "practiceAttemptId"), requestId, essayText, wordCount, prompt, pointCost, GRADING, null, null, null,
-                null, null, Objects.requireNonNull(now, "now"));
+                null, null, null, Objects.requireNonNull(now, "now"));
     }
 
     /** A new free-writing essay, answering a prompt of the library outside any lesson; GRADING from {@code now}. */
     public static WritingSubmission startFree(UUID id, UUID userId, UUID requestId, String essayText, int wordCount,
                                               EssayPrompt prompt, int pointCost, Instant now) {
         return new WritingSubmission(id, userId, null, null, null, requestId, essayText, wordCount, prompt, pointCost,
-                GRADING, null, null, null, null, null, Objects.requireNonNull(now, "now"));
+                GRADING, null, null, null, null, null, null, Objects.requireNonNull(now, "now"));
     }
 
     public static WritingSubmission restore(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID requestId,
@@ -97,7 +103,7 @@ public final class WritingSubmission {
                                            WritingSubmissionStatus status, String failureCode, WritingGrade grade,
                                            Boolean passed, UUID ledgerEntryId, Instant gradingStartedAt) {
         return restore(id, userId, lessonId, blockId, null, requestId, essayText, wordCount, prompt, pointCost, status,
-                failureCode, grade, passed, ledgerEntryId, gradingStartedAt);
+                failureCode, grade, null, passed, ledgerEntryId, gradingStartedAt);
     }
 
     public static WritingSubmission restore(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID practiceAttemptId,
@@ -105,8 +111,42 @@ public final class WritingSubmission {
                                            int pointCost, WritingSubmissionStatus status, String failureCode,
                                            WritingGrade grade, Boolean passed, UUID ledgerEntryId,
                                            Instant gradingStartedAt) {
+        return restore(id, userId, lessonId, blockId, practiceAttemptId, requestId, essayText, wordCount, prompt,
+                pointCost, status, failureCode, grade, null, passed, ledgerEntryId, gradingStartedAt);
+    }
+
+    public static WritingSubmission restore(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID practiceAttemptId,
+                                           UUID requestId, String essayText, int wordCount, EssayPrompt prompt,
+                                           int pointCost, WritingSubmissionStatus status, String failureCode,
+                                           WritingGrade grade, String promptVersion, Boolean passed,
+                                           UUID ledgerEntryId, Instant gradingStartedAt) {
         return new WritingSubmission(id, userId, lessonId, blockId, practiceAttemptId, requestId, essayText, wordCount,
-                prompt, pointCost, status, status, failureCode, grade, passed, ledgerEntryId, gradingStartedAt);
+                prompt, pointCost, status, status, failureCode, grade, promptVersion, passed, ledgerEntryId,
+                gradingStartedAt);
+    }
+
+    /**
+     * Makes this essay the revision of {@code previous}; call before it is stored, or while restoring a stored one.
+     * A revision starts from the newest graded essay of a lesson block and a learner revises three times at most.
+     */
+    public WritingSubmission revising(UUID previousSubmissionId, int revisionNo) {
+        this.previousSubmissionId = Objects.requireNonNull(previousSubmissionId, "previousSubmissionId");
+        if (revisionNo < 2 || revisionNo > MAX_REVISION_NO) {
+            throw new IllegalArgumentException("revisionNo must be between 2 and " + MAX_REVISION_NO);
+        }
+        this.revisionNo = revisionNo;
+        return this;
+    }
+
+    /** The revision number this essay's own revision would take; empty when it cannot be revised (see rules above). */
+    public java.util.OptionalInt nextRevisionNo() {
+        boolean revisable = status == GRADED && blockId != null && revisionNo < MAX_REVISION_NO;
+        return revisable ? java.util.OptionalInt.of(revisionNo + 1) : java.util.OptionalInt.empty();
+    }
+
+    /** True when the learner has used all their revisions of this essay. */
+    public boolean revisionLimitReached() {
+        return revisionNo >= MAX_REVISION_NO;
     }
 
     /** A grading that started before {@code staleBefore} outlived its request (for example a crash). */
@@ -136,8 +176,13 @@ public final class WritingSubmission {
 
     /** GRADING → PAYMENT_PENDING with the grade withheld until payment; passes at the prompt's pass band. */
     public void recordGrade(WritingGrade grade) {
+        recordGrade(grade, null);
+    }
+
+    public void recordGrade(WritingGrade grade, String promptVersion) {
         require(GRADING);
         this.grade = Objects.requireNonNull(grade, "grade");
+        this.promptVersion = promptVersion;
         this.passed = prompt.passBand() != null && grade.overallBand().compareTo(prompt.passBand()) >= 0;
         this.failureCode = null;
         status = PAYMENT_PENDING;
@@ -186,8 +231,12 @@ public final class WritingSubmission {
     public WritingSubmissionStatus status() { return status; }
     public String failureCode() { return failureCode; }
     public WritingGrade grade() { return grade; }
+    public String promptVersion() { return promptVersion; }
     public BigDecimal overallBand() { return grade == null ? null : grade.overallBand(); }
     public Boolean passed() { return passed; }
     public UUID ledgerEntryId() { return ledgerEntryId; }
     public Instant gradingStartedAt() { return gradingStartedAt; }
+    /** The graded essay this one revises; null for a first essay. */
+    public UUID previousSubmissionId() { return previousSubmissionId; }
+    public int revisionNo() { return revisionNo; }
 }

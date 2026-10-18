@@ -220,7 +220,7 @@ class LessonPipelineSeedTest {
                 update(connection, "UPDATE content_packages SET package_type = '" + type + "' WHERE code = 'MOCK-LESSON'");
                 assertThat(sameTransaction.searchPracticeSets(kp1, List.of(), 3, 10, null))
                         .extracting(PracticeSetResult::code).doesNotContain("PS-KP1-A");
-                assertThat(sameTransaction.countEligiblePracticeSets(List.of(kp1), List.of(), 3).get(kp1)).isEqualTo(3);
+                assertThat(sameTransaction.countEligiblePracticeSets(List.of(kp1), List.of(), 3).get(kp1)).isEqualTo(4);
             }
             update(connection, """
                     INSERT INTO questions (id, question_type, skill, purpose)
@@ -487,21 +487,35 @@ class LessonPipelineSeedTest {
     @Test
     void practiceSetSearchHonoursExclusionsAndSkipsTheOneQuestionDemoPackage() {
         UUID kp2 = kpId("DR_IDEA_OR_DETAIL");
-        PracticeSetResult first = reader.searchPracticeSets(kp2, List.of(), 3, 1, null).get(0);
-        PracticeSetResult second = reader.searchPracticeSets(kp2, List.of(first.packageId()), 3, 1, null).get(0);
-        assertThat(Set.of(first.code(), second.code())).containsExactlyInAnyOrder("PS-KP2-A", "PS-KP2-B");
-        // The four-question sets come before the three-question V18 set.
-        PracticeSetResult third = reader.searchPracticeSets(kp2, List.of(first.packageId(), second.packageId()), 3, 1,
-                null).get(0);
-        assertThat(third.code()).isEqualTo("PS-KP2-C");
-        assertThat(reader.searchPracticeSets(kp2, List.of(first.packageId(), second.packageId(), third.packageId()), 3,
-                1, null)).isEmpty();
+        List<PracticeSetResult> availableKp2 = reader.searchPracticeSets(kp2, List.of(), 3, 10, null);
+        assertThat(availableKp2).extracting(PracticeSetResult::code)
+                .containsExactly("PS-KP2-A", "PS-KP2-B", "PS-KP2-C", "PS-KP2-D");
+        assertThat(availableKp2.subList(0, 2)).extracting(PracticeSetResult::questionCount)
+                .containsExactly(4, 4);
+        assertThat(availableKp2.subList(2, 4)).extracting(PracticeSetResult::questionCount)
+                .containsExactly(3, 3);
+        assertThat(availableKp2).allSatisfy(set -> assertThat(set.band()).isEqualByComparingTo("5.5"));
+        assertThat(availableKp2).extracting(PracticeSetResult::requiredFeatureKey).containsOnlyNulls();
+
+        List<UUID> excluded = new ArrayList<>();
+        List<String> selectedWithExclusions = new ArrayList<>();
+        for (int i = 0; i < availableKp2.size(); i++) {
+            PracticeSetResult next = reader.searchPracticeSets(kp2, excluded, 3, 1, null).get(0);
+            selectedWithExclusions.add(next.code());
+            excluded.add(next.packageId());
+        }
+        assertThat(selectedWithExclusions).containsExactlyElementsOf(availableKp2.stream()
+                .map(PracticeSetResult::code).toList());
+        assertThat(reader.searchPracticeSets(kp2, excluded, 3, 1, null)).isEmpty();
+
+        PracticeSetResult first = availableKp2.get(0);
         assertThat(first.questionCount()).isEqualTo(4);
         assertThat(first.matchedQuestionCount()).isEqualTo(4);
 
         List<PracticeSetResult> kp1 = reader.searchPracticeSets(kpId("DEMO_READING_MAIN_IDEA"), List.of(), 3, 10, null);
-        // Four questions each for A and B, three for the V16 sets C and D.
-        assertThat(kp1).extracting(PracticeSetResult::code).containsExactly("PS-KP1-A", "PS-KP1-B", "PS-KP1-C", "PS-KP1-D");
+        // Four-question sets come first; the three-question sets retain package-id ordering.
+        assertThat(kp1).extracting(PracticeSetResult::code)
+                .containsExactly("PS-KP1-A", "PS-KP1-B", "PS-KP1-E", "PS-KP1-C", "PS-KP1-D");
     }
 
     @Test
@@ -513,7 +527,7 @@ class LessonPipelineSeedTest {
             return readerOn(connection).searchPracticeSets(kpId("DEMO_READING_MAIN_IDEA"), List.of(), 3, 10,
                     lessonId("L4")).stream().map(PracticeSetResult::code).toList();
         });
-        assertThat(codes).containsExactly("PS-KP1-D", "PS-KP1-A", "PS-KP1-B", "PS-KP1-C");
+        assertThat(codes).containsExactly("PS-KP1-D", "PS-KP1-A", "PS-KP1-B", "PS-KP1-E", "PS-KP1-C");
     }
 
     @Test
@@ -527,13 +541,15 @@ class LessonPipelineSeedTest {
         });
         assertThat(lessonOfPackage).containsExactlyEntriesOf(new java.util.TreeMap<>(Map.ofEntries(
                 Map.entry("PS-KP1-A", "L2"), Map.entry("PS-KP1-B", "L2"), Map.entry("PS-KP1-C", "L2"),
-                Map.entry("PS-KP1-D", "L2"), Map.entry("PS-KP2-A", "L3"), Map.entry("PS-KP2-B", "L3"),
+                Map.entry("PS-KP1-D", "L2"), Map.entry("PS-KP1-E", "L2"),
+                Map.entry("PS-KP2-A", "L3"), Map.entry("PS-KP2-B", "L3"), Map.entry("PS-KP2-D", "L3"),
                 Map.entry("PS-KP3-A", "L1"), Map.entry("PS-KP4-A", "L4"), Map.entry("PS-NUM", "LS1"),
                 Map.entry("PS-SPELL", "LS1"), Map.entry("PS-PARA", "LS2"), Map.entry("PS-TRAP", "LS2"),
                 Map.entry("PS-TF-A", "TF1"), Map.entry("PS-PM1-A", "PM1"), Map.entry("PS-PM2-A", "PM2"),
                 Map.entry("PS-PS1-A", "PS1"), Map.entry("PS-PS2-A", "PS2"),
-                Map.entry("PS-KP3-B", "L1"), Map.entry("PS-KP3-C", "L1"), Map.entry("PS-KP2-C", "L3"),
-                Map.entry("PS-KP4-B", "L4"), Map.entry("PS-KP4-C", "L4"), Map.entry("PS-TF-B", "TF1"),
+                Map.entry("PS-KP3-B", "L1"), Map.entry("PS-KP3-C", "L1"), Map.entry("PS-KP3-D", "L1"),
+                Map.entry("PS-KP2-C", "L3"), Map.entry("PS-KP4-B", "L4"), Map.entry("PS-KP4-C", "L4"),
+                Map.entry("PS-KP4-D", "L4"), Map.entry("PS-TF-B", "TF1"),
                 Map.entry("PS-TF-C", "TF1"), Map.entry("PS-PM1-B", "PM1"), Map.entry("PS-PM2-B", "PM2"),
                 Map.entry("PS-PS1-B", "PS1"), Map.entry("PS-PS2-B", "PS2"),
                 Map.entry("R65-PS-INFERENCE", "R65-I1"), Map.entry("R65-PS-PARAPHRASE", "R65-I1"),
@@ -582,7 +598,10 @@ class LessonPipelineSeedTest {
                     });
         }
         assertThat(reader.lessonPracticeSets(lessonId("PM1")))
-                .allSatisfy(set -> assertThat(set.requiredFeatureKey()).isEqualTo("PREMIUM_CONTENT"));
+                .allSatisfy(set -> {
+                    assertThat(set.requiredFeatureKey()).isEqualTo("PREMIUM_CONTENT");
+                    assertThat(set.band()).isEqualByComparingTo("5.5");
+                });
     }
 
     @Test
@@ -613,7 +632,7 @@ class LessonPipelineSeedTest {
         UUID setA = jdbc.queryForObject("SELECT id FROM content_packages WHERE code = 'PS-KP1-A'", Map.of(), UUID.class);
 
         assertThat(reader.countEligiblePracticeSets(List.of(kp1, kp5, unknown), List.of(setA), 3))
-                .containsExactlyInAnyOrderEntriesOf(Map.of(kp1, 3, kp5, 3, unknown, 0));
+                .containsExactlyInAnyOrderEntriesOf(Map.of(kp1, 4, kp5, 3, unknown, 0));
     }
 
     @Test
@@ -868,8 +887,11 @@ class LessonPipelineSeedTest {
         // questions, V26 the placement Writing Task 1 and V27 the 88 new questions of the full-length placement.
         // V30 adds the 31 questions of the three Reading practice tests, which no lesson or review may reuse either.
         // V31 and V32 add the 48 and 153 questions of the further Reading, Listening, Writing and Speaking practice tests.
-        // V37 adds the 12 essays of the six further Writing practice tests.
-        assertThat(reserved).hasSize(574);
+        // V37 adds the 12 essays of the six further Writing practice tests. V44 adds the 23 questions of the 15 free
+        // practice sets for Reading 6.5 and Writing.
+        // Every seeded question belongs to learning or an assessment, including the new practice checkpoints.
+        assertThat(all).hasSizeGreaterThanOrEqualTo(574);
+        assertThat(reserved).containsExactlyInAnyOrderElementsOf(all);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }
 

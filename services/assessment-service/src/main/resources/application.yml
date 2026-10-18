@@ -9,3 +9,9 @@ spring:
       - optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}
       - optional:file:./.env[.properties]
       - optional:file:../../.env[.properties]
+assessment:
+  ai-eval:
+    daily-limit: ${ASSESSMENT_AI_EVAL_DAILY_LIMIT:100}
+    min-within-half-band: ${ASSESSMENT_AI_EVAL_MIN_WITHIN_HALF_BAND:0.80}
+    min-qwk: ${ASSESSMENT_AI_EVAL_MIN_QWK:0.60}
+    quota-timezone: Asia/Ho_Chi_Minh

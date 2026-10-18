@@ -9,5 +9,9 @@ public record WritingGrade(List<Criterion> criteria, List<Correction> correction
     public record Criterion(String code, BigDecimal band, List<String> strengths, List<String> improvements) {}
 
     /** {@code excerpt} is an exact substring of the essay. */
-    public record Correction(String excerpt, String suggestion, String category) {}
+    public record Correction(String excerpt, String suggestion, String category, String errorCode) {
+        public Correction(String excerpt, String suggestion, String category) {
+            this(excerpt, suggestion, category, null);
+        }
+    }
 }

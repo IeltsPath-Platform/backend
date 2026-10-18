@@ -86,21 +86,29 @@ class LessonWritingIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired GetWritingSubmissionUseCase getWritingSubmissionUseCase;
     @Autowired SubmitLessonEssayUseCase submitLessonEssayUseCase;
+    @Autowired com.ieltspath.learning.application.usecase.SubmitEssayRevisionUseCase submitEssayRevisionUseCase;
+    @Autowired com.ieltspath.learning.application.usecase.GetEssayHistoryUseCase getEssayHistoryUseCase;
+    @Autowired com.ieltspath.learning.application.usecase.GetLearnerReportUseCase learnerReport;
     @Autowired GetLessonUseCase getLessonUseCase;
     @Autowired SubmitLessonExerciseUseCase submitLessonExerciseUseCase;
     @Autowired RefreshLearningTopicsUseCase topics;
     @MockitoBean LearningContentClient content;
     @MockitoBean AccessClient access;
     @MockitoBean LlmClient llm;
+    @MockitoBean com.ieltspath.learning.application.port.EssayPromptActivationProvider promptActivations;
 
     @BeforeEach
     void seed() {
         jdbc.execute("""
-                TRUNCATE review_theory_checks, review_sets, review_items, lesson_exercise_submissions, kp_evidence, lesson_progress,
+                TRUNCATE review_theory_checks, diagnostic_probes, diagnostic_sessions,review_sets, review_items, lesson_exercise_submissions, kp_evidence, lesson_progress,
                 topic_progress, knowledge_point_catalog, topic_test_assignments, assessment_result_versions,
-                lesson_writing_submissions, llm_daily_usage RESTART IDENTITY
+                human_review_requests, lesson_writing_submissions, llm_daily_usage, kp_mastery_profiles,
+                question_attempt_events RESTART IDENTITY
                 """);
         reset(content, access, llm);
+        when(content.getActiveRubric(anyString())).thenAnswer(invocation -> testRubric(invocation.getArgument(0)));
+        when(content.activeErrorTypes()).thenReturn(List.of(new LearningContentClient.ErrorType("GRAMMAR",
+                "Grammar", "GRAMMAR", 1, "Fix grammar")));
         when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
                 "Writing", 900, null, List.of(kp(KP), kp(ESSAY_KP)), LearningSkill.WRITING, true)));
         when(content.getTopicLessons(TOPIC)).thenReturn(List.of(new LearningContentClient.LessonSummary(LESSON, TOPIC,
@@ -127,6 +135,8 @@ class LessonWritingIntegrationTest {
         UUID request = UUID.randomUUID();
 
         WritingSubmissionResult result = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, request, ESSAY);
+        assertEquals("IELTS_WRITING@1+tplv1", jdbc.queryForObject(
+                "SELECT prompt_version FROM lesson_writing_submissions", String.class));
 
         assertEquals("GRADED", result.status());
         assertEquals(new BigDecimal("6.5"), result.overallBand());
@@ -145,6 +155,20 @@ class LessonWritingIntegrationTest {
         assertEquals(result, getWritingSubmissionUseCase.execute(USER, result.submissionId()));
         assertEquals(404, assertThrows(LearningRequestException.class,
                 () -> getWritingSubmissionUseCase.execute(OTHER_USER, result.submissionId())).getStatus());
+    }
+
+    @Test
+    void aGradedLessonEssayCountsAsADayOfActivityForTheStreakAndTheStreakQuest() {
+        jdbc.update("DELETE FROM learner_streaks WHERE user_id = ?", USER);
+        jdbc.update("DELETE FROM daily_quests WHERE user_id = ?", USER);
+        llmReplies(grade("6.5"));
+
+        submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY);
+
+        assertEquals(1, jdbc.queryForObject("SELECT current_days FROM learner_streaks WHERE user_id = ?",
+                Integer.class, USER), "the essay is the day's first activity");
+        assertEquals(1, jdbc.queryForObject("SELECT progress FROM daily_quests WHERE user_id = ? AND type = 'STREAK'",
+                Integer.class, USER));
     }
 
     @Test
@@ -218,6 +242,8 @@ class LessonWritingIntegrationTest {
         assertEquals(ledger, jdbc.queryForObject("SELECT debit_ledger_entry_id FROM lesson_writing_submissions",
                 UUID.class));
         assertEquals(1, count("kp_evidence WHERE source = 'lesson_writing'"));
+        // The essay evidence also reached the knowledge point's mastery profile.
+        assertEquals(1, count("kp_mastery_profiles"));
     }
 
     @Test
@@ -321,15 +347,126 @@ class LessonWritingIntegrationTest {
                 new com.ieltspath.learning.application.command.SubmitExerciseCommand(UUID.randomUUID(), List.of())));
     }
 
+    @Test
+    void aRevisionIsLinkedGradedAndChargedLikeAnyEssayAndTheHistoryShowsWhatChanged() {
+        llmReplies(gradeWithError("5.5", "cool streets"), gradeWithError("6.5", "clean the air"));
+        WritingSubmissionResult first = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(),
+                ESSAY);
+        UUID request = UUID.randomUUID();
+
+        WritingSubmissionResult revised = submitEssayRevisionUseCase.execute(USER, first.submissionId(), request,
+                ESSAY + "Trees also lower noise. ");
+        assertEquals("GRADED", revised.status());
+        assertEquals(new BigDecimal("6.5"), revised.overallBand());
+        assertEquals(first.submissionId(), jdbc.queryForObject(
+                "SELECT previous_submission_id FROM lesson_writing_submissions WHERE id = ?", UUID.class,
+                revised.submissionId()));
+        assertEquals(2, jdbc.queryForObject("SELECT revision_no FROM lesson_writing_submissions WHERE id = ?",
+                Integer.class, revised.submissionId()));
+        verify(access, times(2)).debit(any(), anyInt(), any(), anyString(), any());
+        // Evidence follows the existing rule: the first essay (5.5, not passed) counted, the 6.5 one passes the block.
+        assertEquals(List.of(false, true), jdbc.queryForList("SELECT correct FROM kp_evidence "
+                + "WHERE source = 'lesson_writing' ORDER BY ordinal", Boolean.class));
+
+        // A resend of the same revision replays it and charges nothing more.
+        clearInvocations(llm, access);
+        assertEquals(revised, submitEssayRevisionUseCase.execute(USER, first.submissionId(), request, ESSAY));
+        verifyNoInteractions(llm, access);
+
+        var history = getEssayHistoryUseCase.execute(USER, revised.submissionId());
+        assertEquals(first.submissionId(), history.rootSubmissionId());
+        assertEquals(List.of(1, 2), history.versions().stream().map(v -> v.revisionNo()).toList());
+        assertNull(history.versions().getFirst().deltaOverall());
+        assertEquals(0, new BigDecimal("1.0").compareTo(history.versions().get(1).deltaOverall()));
+        assertEquals(0, new BigDecimal("1.0").compareTo(history.versions().get(1).criteria().getFirst().delta()));
+        assertEquals(List.of("GRAMMAR"), history.versions().getFirst().errorCodes());
+        assertEquals(history, getEssayHistoryUseCase.execute(USER, first.submissionId()));
+        assertTrue(history.canRevise());
+        assertEquals(3, history.nextRevisionNo());
+        assertEquals(revised.submissionId(), history.reviseFromSubmissionId());
+        assertEquals(404, assertThrows(LearningRequestException.class,
+                () -> getEssayHistoryUseCase.execute(OTHER_USER, first.submissionId())).getStatus());
+
+        // The report's evidence shows each essay's version and how much its band moved from the version it revised.
+        var essayEvidence = learnerReport.execute(USER).knowledgePoints().stream()
+                .filter(point -> point.knowledgeId().equals(ESSAY_KP)).findFirst().orElseThrow().evidence().stream()
+                .filter(entry -> "lesson_writing".equals(entry.source())).toList();
+        assertEquals(2, essayEvidence.size());
+        var newest = essayEvidence.getFirst();
+        assertEquals(2, newest.revisionNo());
+        assertEquals(0, new BigDecimal("1.0").compareTo(newest.revisionDelta()));
+        var original = essayEvidence.get(1);
+        assertEquals(1, original.revisionNo());
+        assertNull(original.revisionDelta());
+    }
+
+    @Test
+    void onlyTheNewestGradedEssayCanBeRevisedAndOnlyThreeTimes() {
+        llmReplies(grade("5"), grade("5.5"), grade("6"), grade("6.5"), grade("7"));
+        WritingSubmissionResult first = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(),
+                ESSAY);
+        WritingSubmissionResult second = submitEssayRevisionUseCase.execute(USER, first.submissionId(),
+                UUID.randomUUID(), ESSAY);
+
+        assertCode(409, "REVISION_NOT_LATEST", () -> submitEssayRevisionUseCase.execute(USER, first.submissionId(),
+                UUID.randomUUID(), ESSAY));
+        WritingSubmissionResult third = submitEssayRevisionUseCase.execute(USER, second.submissionId(),
+                UUID.randomUUID(), ESSAY);
+        WritingSubmissionResult fourth = submitEssayRevisionUseCase.execute(USER, third.submissionId(),
+                UUID.randomUUID(), ESSAY);
+        assertCode(409, "REVISION_LIMIT", () -> submitEssayRevisionUseCase.execute(USER, fourth.submissionId(),
+                UUID.randomUUID(), ESSAY));
+        assertEquals(4, count("lesson_writing_submissions"));
+        assertFalse(getEssayHistoryUseCase.execute(USER, first.submissionId()).canRevise());
+    }
+
+    @Test
+    void aRevisionNeedsAGradedEssayOfTheLearnerThatIsNotAPracticeEssay() {
+        assertCode(404, "NOT_FOUND", () -> submitEssayRevisionUseCase.execute(USER, UUID.randomUUID(),
+                UUID.randomUUID(), ESSAY));
+        llmReplies(grade("6"));
+        WritingSubmissionResult first = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(),
+                ESSAY);
+        assertCode(404, "NOT_FOUND", () -> submitEssayRevisionUseCase.execute(OTHER_USER, first.submissionId(),
+                UUID.randomUUID(), ESSAY));
+
+        when(llm.completeJson(any(), any(), anyBoolean())).thenThrow(new LlmUnavailableException(500));
+        UUID failedRequest = UUID.randomUUID();
+        assertCode(503, "GRADING_UNAVAILABLE", () -> submitEssayRevisionUseCase.execute(USER, first.submissionId(),
+                failedRequest, ESSAY));
+        // A failed revision does not stop the learner from trying again with a new request.
+        reset(llm);
+        when(llm.configured()).thenReturn(true);
+        llmReplies(grade("6.5"));
+        assertEquals("GRADED", submitEssayRevisionUseCase.execute(USER, first.submissionId(), UUID.randomUUID(), ESSAY)
+                .status());
+        assertEquals(1, count("lesson_writing_submissions WHERE status = 'FAILED'"));
+    }
+
+    private static String gradeWithError(String band, String excerpt) {
+        String criteria = String.join(",", List.of("TR", "CC", "LR", "GRA").stream()
+                .map(code -> "{\"code\":\"%s\",\"band\":%s,\"comment\":\"i\"}".formatted(code, band)).toList());
+        return "{\"criteria\":[" + criteria + "],\"corrections\":[{\"excerpt\":\"" + excerpt
+                + "\",\"suggestion\":\"fix\",\"errorCode\":\"GRAMMAR\"}],\"summary\":\"ok\",\"focus\":[]}";
+    }
+
     private void llmReplies(String first, String... rest) {
         when(llm.completeJson(any(), any(), anyBoolean())).thenReturn(first, rest);
     }
 
     private static String grade(String band) {
         String criteria = String.join(",", List.of("TR", "CC", "LR", "GRA").stream()
-                .map(code -> "{\"code\":\"%s\",\"band\":%s,\"strengths\":[\"s\"],\"improvements\":[\"i\"]}"
+                .map(code -> "{\"code\":\"%s\",\"band\":%s,\"comment\":\"i\"}"
                         .formatted(code, band)).toList());
-        return "{\"criteria\":[" + criteria + "],\"corrections\":[],\"summary\":\"ok\"}";
+        return "{\"criteria\":[" + criteria + "],\"corrections\":[],\"summary\":\"ok\",\"focus\":[]}";
+    }
+
+    private static LearningContentClient.Rubric testRubric(String task) {
+        var descriptor = new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Band six.");
+        var criteria = (task.equals("TASK_1") ? List.of("TA", "CC", "LR", "GRA") : List.of("TR", "CC", "LR", "GRA"))
+                .stream().map(code -> new LearningContentClient.RubricCriterion(code, code, "Description", 1,
+                        List.of(descriptor))).toList();
+        return new LearningContentClient.Rubric("IELTS_WRITING", task, 1, "source", criteria, List.of());
     }
 
     private static LearningContentClient.KnowledgePoint kp(UUID id) {

@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Practice-gated lesson gate"
-status: pending
+status: completed
 priority: P1
 dependencies: [1, 2]
 ---

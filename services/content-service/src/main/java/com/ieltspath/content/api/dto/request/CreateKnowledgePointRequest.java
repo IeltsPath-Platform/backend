@@ -3,8 +3,10 @@ package com.ieltspath.content.api.dto.request;
 import com.ieltspath.content.domain.vo.KnowledgePointKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
@@ -15,6 +17,8 @@ public record CreateKnowledgePointRequest(
 
         @NotBlank(message = "code is required")
         @Size(max = 100, message = "code must not exceed 100 characters")
+        @Pattern(regexp = "^[RLWGV](55|60|65|70)_[A-Z0-9_]{2,60}$",
+                message = "code must use the format R55_EXAMPLE, G55_EXAMPLE, or V60_EXAMPLE")
         String code,
 
         @NotBlank(message = "name is required")
@@ -28,5 +32,9 @@ public record CreateKnowledgePointRequest(
         LearningType learningType,
 
         Skill skill,
-        String description
+        String description,
+        CefrLevel cefrLevel,
+        String canDo,
+        String scopeIn,
+        String scopeOut
 ) {}

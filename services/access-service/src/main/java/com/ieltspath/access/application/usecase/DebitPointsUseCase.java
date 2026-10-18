@@ -48,11 +48,11 @@ public class DebitPointsUseCase {
 
     /** A key may only be replayed by the same debit; anything else is a client reusing a key by mistake. */
     private static PointLedgerResult replay(PointLedgerEntry entry, DebitPointsCommand command) {
-        boolean sameDebit = entry.getTransactionType() == PointTransactionType.AI_GRADING_DEBIT
+        boolean sameDebit = entry.getTransactionType() == transactionType(command.referenceType())
                 && entry.getUserId().equals(command.userId())
                 && entry.getDelta() == -command.amount()
                 && Objects.equals(entry.getReferenceType(), command.referenceType())
-                && Objects.equals(entry.getReferenceId(), command.referenceId());
+                && Objects.equals(entry.getReferenceId(), command.referenceId().toString());
         if (!sameDebit) {
             throw new DuplicateIdempotencyException(command.idempotencyKey());
         }
@@ -65,5 +65,13 @@ public class DebitPointsUseCase {
                 e.getTransactionType(), e.getReferenceType(), e.getReferenceId(),
                 e.getDescription(), e.getCreatedAt()
         );
+    }
+
+    private static PointTransactionType transactionType(String referenceType) {
+        return switch (referenceType) {
+            case "HEART_REFILL" -> PointTransactionType.HEART_REFILL_DEBIT;
+            case "STREAK_FREEZE" -> PointTransactionType.STREAK_FREEZE_DEBIT;
+            default -> PointTransactionType.AI_GRADING_DEBIT;
+        };
     }
 }

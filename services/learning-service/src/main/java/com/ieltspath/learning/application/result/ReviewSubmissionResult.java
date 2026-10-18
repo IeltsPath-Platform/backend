@@ -1,5 +1,7 @@
 package com.ieltspath.learning.application.result;
 
+import com.ieltspath.learning.domain.vo.GamificationSummary;
+
 import java.util.List;
 
 /**
@@ -8,9 +10,13 @@ import java.util.List;
  */
 public record ReviewSubmissionResult(String reviewStatus, boolean setPassed,
                                      List<SubmissionResult.AnswerResult> results, String transcript,
-                                     String stage, Integer failedSets) {
+                                     String stage, Integer failedSets, GamificationSummary gamification) {
+    public ReviewSubmissionResult(String reviewStatus, boolean setPassed, List<SubmissionResult.AnswerResult> results,
+                                  String transcript, String stage, Integer failedSets) {
+        this(reviewStatus, setPassed, results, transcript, stage, failedSets, null);
+    }
     public ReviewSubmissionResult(String reviewStatus, boolean setPassed, List<SubmissionResult.AnswerResult> results,
                                   String transcript) {
-        this(reviewStatus, setPassed, results, transcript, null, null);
+        this(reviewStatus, setPassed, results, transcript, null, null, null);
     }
 }

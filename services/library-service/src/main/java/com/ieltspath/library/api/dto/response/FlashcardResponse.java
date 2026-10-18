@@ -9,10 +9,14 @@ import java.util.UUID;
 
 public record FlashcardResponse(UUID id, UUID userId, FlashcardSourceType sourceType, UUID vocabularySenseId,
                                 UUID sourceReferenceId, String highlightedText, String front, String back,
-                                LibraryStatus status, Instant createdAt, Instant updatedAt) {
+                                LibraryStatus status, Instant createdAt, Instant updatedAt, int leitnerBox,
+                                Instant nextReviewAt, Instant lastReviewedAt, int reviewCount, String ipa,
+                                String pronunciationAudioReference, String exampleSentence) {
     public static FlashcardResponse from(FlashcardResult result) {
         return new FlashcardResponse(result.id(), result.userId(), result.sourceType(), result.vocabularySenseId(),
                 result.sourceReferenceId(), result.highlightedText(), result.front(), result.back(), result.status(),
-                result.createdAt(), result.updatedAt());
+                result.createdAt(), result.updatedAt(), result.leitnerBox(), result.nextReviewAt(),
+                result.lastReviewedAt(), result.reviewCount(), result.ipa(), result.pronunciationAudioReference(),
+                result.exampleSentence());
     }
 }

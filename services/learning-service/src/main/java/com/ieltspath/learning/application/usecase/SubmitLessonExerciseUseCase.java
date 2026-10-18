@@ -9,6 +9,8 @@ import com.ieltspath.learning.application.port.LearningContentClient.Lesson;
 import com.ieltspath.learning.application.port.LearningContentClient.Question;
 import com.ieltspath.learning.application.result.SubmissionResult;
 import com.ieltspath.learning.application.service.AnswerSheet;
+import com.ieltspath.learning.application.service.GamificationRecorder;
+import com.ieltspath.learning.application.service.HeartsService;
 import com.ieltspath.learning.application.service.LessonAccess;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.LessonViewAssembler;
@@ -16,10 +18,17 @@ import com.ieltspath.learning.application.service.PracticeProgress;
 import com.ieltspath.learning.application.service.TopicCompletion;
 import com.ieltspath.learning.domain.aggregate.LessonProgress;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
+import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.MasteryProfileUpdater;
+import com.ieltspath.learning.application.service.AnswerDurations;
+import com.ieltspath.learning.domain.service.ErrorTagger;
+import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
+import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.domain.repository.LessonProgressRepository;
 import com.ieltspath.learning.domain.service.AnswerSpecGrader;
 import com.ieltspath.learning.domain.service.PassMark;
 import com.ieltspath.learning.domain.vo.EvidenceSource;
+import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,13 +55,20 @@ public class SubmitLessonExerciseUseCase {
     private final PracticeProgress practice;
     private final TopicCompletion topicCompletion;
     private final LessonViewAssembler view;
+    private final QuestionEventLog questionEvents;
+    private final MasteryProfileUpdater masteryProfiles;
+    private final GamificationRecorder gamificationRecorder;
+    private final HeartsService hearts;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
+    private final ErrorTagger errorTagger = new ErrorTagger();
     private final Clock clock = Clock.systemUTC();
 
     public SubmitLessonExerciseUseCase(LearnerLock lock, LessonAccess access, ExerciseSubmissionLog submissions,
                                        KnowledgeEvidenceRepository evidence, LessonProgressRepository lessons,
                                        PracticeProgress practice, LessonViewAssembler view,
-                                       TopicCompletion topicCompletion) {
+                                       TopicCompletion topicCompletion, QuestionEventLog questionEvents,
+                                       MasteryProfileUpdater masteryProfiles, GamificationRecorder gamificationRecorder,
+                                       HeartsService hearts) {
         this.lock = lock;
         this.access = access;
         this.submissions = submissions;
@@ -61,6 +77,10 @@ public class SubmitLessonExerciseUseCase {
         this.practice = practice;
         this.view = view;
         this.topicCompletion = topicCompletion;
+        this.questionEvents = questionEvents;
+        this.masteryProfiles = masteryProfiles;
+        this.gamificationRecorder = gamificationRecorder;
+        this.hearts = hearts;
     }
 
     @Transactional
@@ -73,6 +93,7 @@ public class SubmitLessonExerciseUseCase {
                     || !submission.blockId().equals(blockId)) throw requestConflict();
             return submission.response();
         }
+        hearts.requireHearts(userId);
         LessonAccess.Context context = access.authorize(userId, lessonId);
         Lesson lesson = context.lesson();
         Block block = lesson.blocks().stream().filter(item -> item.blockId().equals(blockId)
@@ -92,6 +113,19 @@ public class SubmitLessonExerciseUseCase {
             throw new LearningRequestException(422, "UNGRADABLE_EXERCISE", "Exercise contains unsupported questions");
         }
         boolean firstSubmission = !submissions.exists(userId, lessonId, blockId);
+        // Every submission is logged per question; only the first one also becomes mastery evidence below.
+        Map<UUID, Long> durations = AnswerDurations.of(command.answers());
+        List<QuestionAttemptEvent> events = new ArrayList<>();
+        for (int index = 0; index < questions.size(); index++) {
+            Question question = questions.get(index);
+            UUID questionId = question.questionVersionId();
+            boolean correct = grades.get(index).correct();
+            String errorCode = correct ? null : errorTagger.tag(question.answerSpec(), answers.get(questionId), false);
+            events.add(QuestionAttemptEvent.of(userId, questionId, List.copyOf(new LinkedHashSet<>(question.knowledgePointIds())),
+                    correct, durations.get(questionId), errorCode, QuestionEventSource.LESSON_EXERCISE,
+                    command.requestId(), firstSubmission));
+        }
+        questionEvents.append(events);
         Set<UUID> knownKps = firstSubmission ? access.knownKnowledgePoints(userId, exerciseKnowledgePoints(lesson))
                 : Set.of();
         // Refresh may change the first unpassed topic; authorize again before changing progress.
@@ -109,7 +143,8 @@ public class SubmitLessonExerciseUseCase {
                     if (knownKps.contains(kpId)) {
                         firstAnswers.add(KnowledgeEvidence.of(kpId, grades.get(index).correct(),
                                 EvidenceSource.LESSON_EXERCISE,
-                                LessonEvidenceReference.create(command.requestId(), question.questionVersionId(), kpId)));
+                                LessonEvidenceReference.create(command.requestId(), question.questionVersionId(), kpId))
+                                .forQuestion(question.questionVersionId()));
                     } else {
                         log.warn("Unknown lesson evidence KP: userId={}, questionVersionId={}, kpId={}",
                                 userId, question.questionVersionId(), kpId);
@@ -117,6 +152,7 @@ public class SubmitLessonExerciseUseCase {
                 }
             }
             evidence.append(userId, firstAnswers);
+            masteryProfiles.recordEvidence(userId, firstAnswers);
         }
         // Essay blocks never gate completion: a learner without points can still finish every lesson.
         boolean lessonCompleted = LessonAccess.completed(context.progress()) || lesson.blocks().stream()
@@ -130,7 +166,16 @@ public class SubmitLessonExerciseUseCase {
                     blockPassed ? grade.correctAnswer() : null, blockPassed ? question.explanation() : null,
                     view.hint(question, passed.contains(blockId), opened)));
         }
-        SubmissionResult response = new SubmissionResult(blockPassed, lessonCompleted, List.copyOf(results));
+        // XP is awarded for the first submission of a block only; a repeat shows the learner's standing unchanged.
+        GamificationSummary xp = firstSubmission
+                ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), correctQuestionIds(questions, grades))
+                : gamificationRecorder.current(userId);
+        // Every lesson question is objective, so each wrong answer costs one heart; a level-up above has already refilled.
+        int wrong = (int) grades.stream().filter(grade -> !grade.correct()).count();
+        HeartsService.Snapshot heartState = hearts.lose(userId, wrong);
+        GamificationSummary gamification = xp.withHearts(wrong, heartState.hearts(), heartState.nextHeartAt());
+        SubmissionResult response = new SubmissionResult(blockPassed, lessonCompleted, List.copyOf(results),
+                gamification);
         if (!submissions.save(userId, lessonId, blockId, command, response)) throw requestConflict();
         boolean newlyCompleted = lessonCompleted && progress.complete(clock.instant());
         lessons.save(progress);
@@ -139,6 +184,14 @@ public class SubmitLessonExerciseUseCase {
             topicCompletion.onLessonCompleted(userId, lesson.topicId());
         }
         return response;
+    }
+
+    private static List<UUID> correctQuestionIds(List<Question> questions, List<AnswerSpecGrader.Grade> grades) {
+        List<UUID> correct = new ArrayList<>();
+        for (int index = 0; index < questions.size(); index++) {
+            if (grades.get(index).correct()) correct.add(questions.get(index).questionVersionId());
+        }
+        return correct;
     }
 
     private static Set<UUID> exerciseKnowledgePoints(Lesson lesson) {

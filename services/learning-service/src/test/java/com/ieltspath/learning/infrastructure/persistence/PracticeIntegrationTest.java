@@ -114,10 +114,10 @@ class PracticeIntegrationTest {
         assertEquals("PRACTICE_LOCKED", locked.getCode());
 
         complete.execute(user, firstLesson);
-        complete.execute(user, secondLesson);
-        var required = assertThrows(LearningRequestException.class, () -> tests.execute(user, topic));
-        assertEquals("PRACTICE_REQUIRED", required.getCode());
-        assertEquals(Set.of(firstLesson, secondLesson), Set.copyOf(required.getLessonIds()));
+        // The second lesson stays closed until the Practice of the first one is passed.
+        var closed = assertThrows(LearningGateException.class, () -> complete.execute(user, secondLesson));
+        assertEquals("PRACTICE_REQUIRED", closed.getCode());
+        assertEquals(List.of(firstLesson), closed.getLessonIds());
 
         var first = start.execute(user, firstLesson, firstPackage);
         var passed = submit.execute(user, first.attemptId(), answers(firstQuestion, secondQuestion, "A", "A"));
@@ -125,9 +125,17 @@ class PracticeIntegrationTest {
         assertTrue(passed.countedAsEvidence());
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source='practice_set'",
                 Integer.class));
+        // Every knowledge point that received evidence has a mastery profile.
+        int profiled = jdbc.queryForObject("SELECT count(*) FROM kp_mastery_profiles WHERE user_id = ?",
+                Integer.class, user);
+        assertTrue(profiled > 0);
+        assertEquals(jdbc.queryForObject("SELECT count(DISTINCT kp_id) FROM kp_evidence WHERE user_id = ?",
+                Integer.class, user), profiled);
         assertEquals("PASSED", catalog.execute(user, firstLesson).practiceStatus().name());
-        assertEquals(List.of(secondLesson), assertThrows(LearningRequestException.class,
-                () -> tests.execute(user, topic)).getLessonIds());
+        complete.execute(user, secondLesson);
+        var required = assertThrows(LearningRequestException.class, () -> tests.execute(user, topic));
+        assertEquals("PRACTICE_REQUIRED", required.getCode());
+        assertEquals(List.of(secondLesson), required.getLessonIds());
 
         var second = start.execute(user, firstLesson, firstPackage);
         assertFalse(submit.execute(user, second.attemptId(), answers(firstQuestion, secondQuestion, "A", "A"))

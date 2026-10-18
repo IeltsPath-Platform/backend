@@ -1,12 +1,29 @@
 ---
 phase: 7
 title: "Chẩn đoán dò ngược theo cây"
-status: pending
+status: completed
 priority: P1
 dependencies: [1, 2, 6]
 ---
 
 # Phase 7: Chẩn đoán dò ngược theo cây
+
+## Trạng thái và ghi chú triển khai
+
+- **Đã xong.** Contract: `docs/contracts/diagnostics-v1.md`. Test: `PrerequisiteDiagnosisTest` (9), `DiagnosticIntegrationTest` (6).
+- Khác với plan:
+  - Migration là `V16__diagnostics.sql` (V14 là prompt_version của phase 11, V15 là phase 6).
+  - Không tách `DiagnosticSession`/`DiagnosticProbe` thành aggregate: là record trong `domain/vo`, luật nằm ở
+    `PrerequisiteDiagnosis` (thuần) và luồng ở `DiagnosticFlow` (application/service). `DiagnosticStarter` gộp vào đó.
+  - Điểm kích hoạt: `SubmitReviewUseCase` (set trượt thứ 2) và `GetReviewUseCase` (hết gói, gọi sau khi `skip()` để bài ôn
+    B đã `SKIPPED` thì không bị đặt trạng thái chờ).
+  - Bài ôn sinh từ chẩn đoán (`DIAGNOSTIC`) không mở chẩn đoán nữa, để việc dò ngược hữu hạn.
+  - Gói của thăm dò tính là đã lộ cho Practice/bài ôn (`revealedPackageIds`, `assignedPackageIds` gộp `diagnostic_probes`).
+    Thăm dò mở mà gói bị lộ nơi khác thì đổi gói khi học viên mở (`GetDiagnosticProbeUseCase`) hoặc thành `NO_SET`.
+  - Bài ôn KP gốc dùng lesson đã hoàn thành dạy KP đó (`CompletedLessonLocator`, tách ra từ giỏ ôn), không có thì lesson của B.
+  - Gửi lại cùng `requestId` trả lại kết quả cũ, không ghi gì thêm.
+  - `GET /report` trả `action.type = DIAGNOSING` (kèm `reviewId` của B) khi phiên của B đang `PROBING`.
+  - Chưa có API đọc `content_gap_signals`; phase 12 sẽ dùng bảng này.
 
 ## Overview
 
@@ -124,8 +141,8 @@ bài ôn cho KP gốc trước.
 
 ## Success Criteria
 
-- [ ] Kịch bản của mentor chạy được: B trượt → dò A, X, Y → chốt điểm tắc → giao bài ôn KP gốc → quay lại B.
-- [ ] Không học viên nào bị kẹt: mọi nhánh đều kết thúc.
+- [x] Kịch bản của mentor chạy được: B trượt → dò A, X, Y → chốt điểm tắc → giao bài ôn KP gốc → quay lại B. (test: DiagnosticIntegrationTest.aFailedPrerequisiteIsTheGapAndTheReviewWaitsForItsReview, aFailedProbeWalksBackToItsOwnPrerequisite)
+- [x] Không học viên nào bị kẹt: mọi nhánh đều kết thúc. (test: PrerequisiteDiagnosisTest.depthThreeStops, theProbeBudgetStops)
 - [ ] `GET /api/learning/report` trả `action.type = DIAGNOSING` khi phiên đang chạy.
 
 ## Risk Assessment

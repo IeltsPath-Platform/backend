@@ -1,12 +1,35 @@
 ---
 phase: 5
 title: "Mastery profile 3 mức, hạn ôn, API báo cáo"
-status: pending
+status: completed
 priority: P1
 dependencies: [4]
 ---
 
 # Phase 5: Mastery profile 3 mức, hạn ôn, API báo cáo
+
+## Trạng thái và ghi chú triển khai
+
+- Code và test đã xong và đã commit. Learning 344 test, 0 fail, 0 skip. Contract: `docs/contracts/learner-report-v1.md`.
+- Khác với plan:
+  - Migration là `V13__kp_mastery_profiles.sql` (không phải V12, vì V12 đã dùng cho `practice_test_assignments`). Bảng
+    `learning_rule_configs` nằm cùng migration.
+  - Hook cập nhật profile gọi trực tiếp `MasteryProfileUpdater` ở 5 chỗ ghi evidence (lesson, Practice, set ôn, essay bài
+    học, kết quả assessment), không dùng decorator của repository.
+  - `MasteryRules` (domain) giữ ngưỡng và lịch ôn; `MasteryRulesProvider` ghép cấu hình yaml với giá trị Admin ghi đè.
+    `ReviewReevaluation` đọc ngưỡng chặn từ provider này, nên đổi `priority-below` cũng đổi ngưỡng sinh bài ôn chặn
+    (từ lúc đó trở đi; bài ôn đã có không đổi).
+  - `removeAssessmentEvidence` trả về tập KP bị xóa để chấm lại dựng lại đúng các profile bị ảnh hưởng. KP mất hết evidence
+    thì mất profile.
+  - Streak: một lần gọi cập nhật tính một nhịp theo kết quả mới nhất của KP, không cộng từng câu. Khi dựng lại
+    (chấm lại, backfill) streak là số câu đúng liên tiếp cuối lịch sử gần.
+  - Recompute dùng so khớp `(mastery, evidence_count, success_streak)` để bỏ qua profile vừa được evidence mới đổi.
+  - `DIAGNOSING` chưa được trả về (phase 7).
+- Kiểm chứng: `MasteryPolicyTest` (biên 0.599 / 0.6 / 0.8, lịch ôn, streak), `MasteryProfileIntegrationTest` (assessment
+  qua use case thật, chấm lại, redelivery, đổi luật + recompute, ngưỡng chặn, backfill idempotent, báo cáo đủ 4 khối),
+  `ReportControllerTest`, `RuleConfigControllerTest`, và bốn test tích hợp có sẵn (bài học, Practice, set ôn, essay) được
+  thêm kiểm tra profile.
+- **Chưa có:** test hiệu năng của cập nhật đồng bộ. Test báo cáo dùng `LearningContentClient` giả.
 
 ## Overview
 
@@ -78,6 +101,14 @@ Phase này lưu mastery profile cho từng học viên × KP, tính hạn ôn, v
     (đã tới hạn), `NONE`.
   - `evidence` lấy 5 dòng gần nhất. Code, name, skill, band lấy từ content qua client đang có.
 - `GET /api/learning/mastery` giữ nguyên để không gãy client.
+- **Cấu hình luật bởi Admin** (board: "Rule-based có thể là người cấu hình"):
+  - Migration `V12` thêm bảng `learning_rule_configs (key VARCHAR(60) PRIMARY KEY, value JSONB NOT NULL, updated_by UUID,
+    updated_at TIMESTAMPTZ)`. Khóa: `mastery.priority-below`, `mastery.maintain-from`, `mastery.review-intervals-days`,
+    `review.consolidate-days`.
+  - Giá trị trong bảng thắng giá trị yaml; không có dòng thì dùng yaml. `GET` / `PUT /api/learning/admin/rule-configs`
+    (`ADMIN`): validate (0 < priority-below < maintain-from ≤ 1, lịch tăng dần). Ghi `updated_by`.
+  - Đổi cấu hình chỉ ảnh hưởng profile cập nhật sau đó; có endpoint `POST /api/learning/admin/rule-configs/recompute`
+    chạy nền để tính lại mức của toàn bộ profile.
 
 ## Related Code Files
 
@@ -101,9 +132,9 @@ Phase này lưu mastery profile cho từng học viên × KP, tính hạn ôn, v
 
 ## Success Criteria
 
-- [ ] Sau mỗi lần nộp, profile của các KP liên quan đúng mức và đúng hạn ôn.
-- [ ] Báo cáo trả đủ 4 khối cho mọi KP học viên đã có evidence.
-- [ ] Đổi ngưỡng trong cấu hình thì mức thay đổi theo mà không cần sửa code.
+- [x] Sau mỗi lần nộp, profile của các KP liên quan đúng mức và đúng hạn ôn. (test: MasteryProfileIntegrationTest.anAssessmentResultWritesATierADueDateTheMedianTimeAndTheTopError)
+- [x] Báo cáo trả đủ 4 khối cho mọi KP học viên đã có evidence. (test: MasteryProfileIntegrationTest.theReportCarriesScoreErrorsEvidenceAndActionForEveryPointWithEvidence)
+- [x] Đổi ngưỡng trong cấu hình thì mức thay đổi theo mà không cần sửa code. (test: MasteryProfileIntegrationTest.changingTheRulesMovesTiersOnlyAfterTheRecompute)
 
 ## Risk Assessment
 

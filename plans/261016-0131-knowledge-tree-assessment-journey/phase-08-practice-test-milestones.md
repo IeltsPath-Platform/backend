@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: "Practice test theo mốc course"
-status: pending
+status: completed
 priority: P2
 dependencies: []
 ---
@@ -23,12 +23,12 @@ Practice test làm tự do vẫn được làm nhưng không tính điểm (D5).
 
 - **Assessment:** `AttemptType.forContentPackageType("PRACTICE_TEST")` → `OFFICIAL_PRACTICE`. Không cần migration vì
   CHECK đã có `OFFICIAL_PRACTICE`. Parser của learning đã nhận `OFFICIAL_PRACTICE`.
-- **Content, migration `V32__practice_test_milestones.sql`:**
+- **Content, migration `V38__practice_test_milestones.sql`:**
 
   ```sql
   CREATE TABLE course_practice_test_milestones (
       course_id UUID NOT NULL REFERENCES courses(id),
-      package_id UUID NOT NULL REFERENCES content_packages(id),
+      package_id UUID NOT NULL UNIQUE REFERENCES content_packages(id),
       after_topic_sequence INTEGER NOT NULL CHECK (after_topic_sequence > 0),
       PRIMARY KEY (course_id, package_id)
   );
@@ -39,7 +39,7 @@ Practice test làm tự do vẫn được làm nhưng không tính điểm (D5).
   - API nội bộ: `GET /internal/learning-content/courses/{id}/practice-test-milestones`, trả package, version đang
     publish, mốc.
   - Seed: mỗi course 5.5 và 6.5 có ít nhất 1 mốc, sau topic giữa lộ trình.
-- **Learning, migration `V15__practice_test_assignments.sql`:**
+- **Learning, migration `V12__practice_test_assignments.sql`:**
 
   ```sql
   CREATE TABLE practice_test_assignments (
@@ -69,8 +69,8 @@ Practice test làm tự do vẫn được làm nhưng không tính điểm (D5).
 ## Related Code Files
 
 - assessment: `domain/vo/AttemptType.java`, `AttemptTypeTest`
-- content: migration V32, use case, controller admin, `InternalLearningContentController`, `JdbcLearningContentReader`
-- learning: migration V15, `domain/aggregate/PracticeTestAssignment.java`, use case giao đề và liệt kê,
+- content: migration V38, use case, controller admin, `InternalPracticeTestMilestoneController`, `JdbcLearningContentReader`
+- learning: migration V12, `domain/aggregate/PracticeTestAssignment.java`, use case giao đề và liệt kê,
   `ApplyAssessmentResultUseCase`, `LearningContentClient` thêm hàm đọc mốc
 - Test:
   - `AttemptTypeTest` (`PRACTICE_TEST` → `OFFICIAL_PRACTICE`);
@@ -89,10 +89,25 @@ Practice test làm tự do vẫn được làm nhưng không tính điểm (D5).
 
 ## Success Criteria
 
-- [ ] Học viên làm được practice test thuộc mốc. Điểm lần đầu được lưu cho phase 9.
-- [ ] Practice test tự do không ảnh hưởng điểm và không khóa lesson.
+- [x] Học viên làm được practice test thuộc mốc. Điểm lần đầu được lưu cho phase 9.
+- [x] Practice test tự do không ảnh hưởng điểm và không khóa lesson.
+
+Kiểm chứng 2026-10-16: `mvn -q -B -ntp -pl services/assessment-service,services/content-service,services/learning-service -am test`
+thoát 0. Content 377 test; learning 305 test; assessment 251 test; không failure/error/skip. `git diff --check` qua.
+Chi tiết: [báo cáo triển khai](../reports/pm-261016-2250-practice-test-milestones.md).
 
 ## Risk Assessment
+
+- Mốc dùng vị trí topic **trong course**, không dùng trực tiếp `sequence_order` toàn curriculum.
+- Một package chỉ thuộc mốc của một course vì assignment có khóa duy nhất `(user_id, package_id)`.
+- Điểm đóng băng theo kết quả hoàn thành khớp đầu tiên được consumer áp dụng, giống topic assignment;
+  replay/regrade/retake không đổi điểm đó. Regrade của lần làm tự do đã áp dụng không được ăn assignment tạo sau.
+- Chưa có review tiers: `OFFICIAL_PRACTICE` giữ evidence/event nhưng không gọi bộ sinh review chặn.
+  Sinh review không chặn sẽ nối ở phase 6. Không đổi review hoặc hành vi topic test hiện có.
+- Seed V38 là hai checkpoint Reading/Writing ngắn, nội dung tự viết, không phải đề IELTS đầy đủ.
+- Người dùng cho phép bổ sung `OFFICIAL_PRACTICE` vào `EnqueueGateEssayGradingService` và test tương ứng.
+- Người dùng cho phép sửa thêm `PackageType`, `JdbcGateEssayJobStore`, `PublishContentPackageUseCase` và test:
+  đọc được đề practice, worker lấy job `OFFICIAL_PRACTICE`, publisher kiểm ownership/purpose/essay.
 
 - Practice test là đề dài đủ 4 phần, essay chấm LLM qua luồng gate essay hiện có. Kiểm tra luồng chấm essay có nhận
   attempt `OFFICIAL_PRACTICE` không; nếu chưa thì mở thêm, và LLM vẫn là bên chấm vì đây không phải quyết định đạt/trượt.

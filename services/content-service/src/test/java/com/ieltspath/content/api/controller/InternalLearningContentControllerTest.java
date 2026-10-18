@@ -6,8 +6,10 @@ import com.ieltspath.content.application.result.PackageVersionContentResult;
 import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.application.result.LessonPracticeSetResult;
 import com.ieltspath.content.application.result.LessonPracticeSetsResult;
+import com.ieltspath.content.application.result.PracticeSetResult;
 import com.ieltspath.content.application.command.CountPracticeSetsCommand;
 import com.ieltspath.content.application.usecase.CountAvailablePracticeSetsUseCase;
+import com.ieltspath.content.application.usecase.GetActiveKnowledgePrerequisitesUseCase;
 import com.ieltspath.content.application.usecase.GetLessonContentUseCase;
 import com.ieltspath.content.application.usecase.GetLessonPracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetTopicPracticeSetsUseCase;
@@ -20,6 +22,7 @@ import com.ieltspath.content.domain.exception.LessonNotFoundException;
 import com.ieltspath.content.domain.exception.TopicNotFoundException;
 import com.ieltspath.content.domain.vo.AssetType;
 import com.ieltspath.content.domain.vo.BlockType;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.Skill;
@@ -33,6 +36,7 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -73,15 +77,23 @@ class InternalLearningContentControllerTest {
         UUID course = UUID.randomUUID();
         UUID pkg = UUID.randomUUID();
         UUID version = UUID.randomUUID();
+        UUID knowledgePointId = UUID.randomUUID();
+        var knowledgePoint = new TopicSequenceResult.KnowledgePointEntry(knowledgePointId, UUID.randomUUID(),
+                "G55_COMPLEX_SENTENCES", "Complex sentences", com.ieltspath.content.domain.vo.LearningType.CONCEPT,
+                Skill.ALL, null, true, CefrLevel.B1, "Can use a subordinate clause.", "Basic clauses", "Reduced clauses");
         when(topicSequence.execute()).thenReturn(List.of(new TopicSequenceResult(UUID.randomUUID(), "TOPIC", "Topic",
-                1, null, List.of(), Skill.READING, false,
+                1, null, List.of(knowledgePoint), Skill.READING, false,
                 new TopicSequenceResult.CourseEntry(course, "IELTS_5_5", "IELTS 5.5", new java.math.BigDecimal("5.5"), true))));
         when(courseTests.execute(course)).thenReturn(List.of(
                 new com.ieltspath.content.application.result.TopicTestPackageResult(pkg, version, "FINAL")));
         mockMvc.perform(get("/internal/learning-content/topic-sequence"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].course.courseId").value(course.toString()))
                 .andExpect(jsonPath("$[0].course.bandLevel").value(5.5))
-                .andExpect(jsonPath("$[0].course.hasCourseTest").value(true));
+                .andExpect(jsonPath("$[0].course.hasCourseTest").value(true))
+                .andExpect(jsonPath("$[0].knowledgePoints[0].cefrLevel").value("B1"))
+                .andExpect(jsonPath("$[0].knowledgePoints[0].canDo").value("Can use a subordinate clause."))
+                .andExpect(jsonPath("$[0].knowledgePoints[0].scopeIn").value("Basic clauses"))
+                .andExpect(jsonPath("$[0].knowledgePoints[0].scopeOut").value("Reduced clauses"));
         mockMvc.perform(get("/internal/learning-content/courses/{id}/test-packages", course))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].packageId").value(pkg.toString()))
                 .andExpect(jsonPath("$[0].packageVersionId").value(version.toString()))
@@ -108,6 +120,10 @@ class InternalLearningContentControllerTest {
     private final GetLessonPracticeSetsUseCase lessonPracticeSets = mock(GetLessonPracticeSetsUseCase.class);
     private final GetTopicPracticeSetsUseCase topicPracticeSets = mock(GetTopicPracticeSetsUseCase.class);
     private final CountAvailablePracticeSetsUseCase availability = mock(CountAvailablePracticeSetsUseCase.class);
+    private final com.ieltspath.content.application.usecase.ListErrorTypesUseCase errorTypes =
+            mock(com.ieltspath.content.application.usecase.ListErrorTypesUseCase.class);
+    private final GetActiveKnowledgePrerequisitesUseCase activeKnowledgePrerequisites =
+            mock(GetActiveKnowledgePrerequisitesUseCase.class);
     private final com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase placementTests =
             mock(com.ieltspath.content.application.usecase.GetPlacementTestPackagesUseCase.class);
     private MockMvc mockMvc;
@@ -118,7 +134,7 @@ class InternalLearningContentControllerTest {
         validator.afterPropertiesSet();
         mockMvc = MockMvcBuilders.standaloneSetup(new InternalLearningContentController(topicSequence, topicLessons,
                         lessonContent, testPackages, search, packageVersion, lessonPracticeSets, topicPracticeSets,
-                        availability, courseTests, placementTests))
+                        availability, courseTests, placementTests, errorTypes, activeKnowledgePrerequisites))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -140,6 +156,47 @@ class InternalLearningContentControllerTest {
     }
 
     @Test
+    void activeKnowledgePointWithoutPrerequisitesIsReturnedWithAnEmptyList() throws Exception {
+        UUID activeId = UUID.randomUUID();
+        when(activeKnowledgePrerequisites.execute(List.of(activeId))).thenReturn(Map.of(activeId, List.of()));
+
+        mockMvc.perform(post("/internal/learning-content/knowledge-points/prerequisites")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"%s\"]}".formatted(activeId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['%s']".formatted(activeId)).isArray())
+                .andExpect(jsonPath("$['%s']".formatted(activeId)).isEmpty());
+    }
+
+    @Test
+    void missingAndInactiveKnowledgePointsAreOmittedFromPrerequisiteResponse() throws Exception {
+        UUID inactiveId = UUID.randomUUID();
+        UUID missingId = UUID.randomUUID();
+        when(activeKnowledgePrerequisites.execute(List.of(inactiveId, missingId))).thenReturn(Map.of());
+
+        mockMvc.perform(post("/internal/learning-content/knowledge-points/prerequisites")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"%s\",\"%s\"]}".formatted(inactiveId, missingId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isMap())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void prerequisiteResponseContainsOnlyActivePrerequisites() throws Exception {
+        UUID activeId = UUID.randomUUID();
+        UUID activePrerequisiteId = UUID.randomUUID();
+        when(activeKnowledgePrerequisites.execute(List.of(activeId))).thenReturn(
+                Map.of(activeId, List.of(activePrerequisiteId)));
+
+        mockMvc.perform(post("/internal/learning-content/knowledge-points/prerequisites")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"%s\"]}".formatted(activeId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['%s'][0]".formatted(activeId)).value(activePrerequisiteId.toString()));
+    }
+
+    @Test
     void lessonAndTopicPracticeSetsCarryNoQuestionsOrAnswers() throws Exception {
         UUID lessonId = UUID.randomUUID();
         UUID topicId = UUID.randomUUID();
@@ -156,6 +213,7 @@ class InternalLearningContentControllerTest {
                 .andExpect(jsonPath("$[0].questionCount").value(3))
                 .andExpect(jsonPath("$[0].knowledgePointIds[0]").value(kp.toString()))
                 .andExpect(jsonPath("$[0].requiredFeatureKey").value((Object) null))
+                .andExpect(jsonPath("$[0].band").value((Object) null))
                 .andExpect(jsonPath("$[0].answerSpec").doesNotExist())
                 .andExpect(jsonPath("$[0].questions").doesNotExist());
         mockMvc.perform(get("/internal/learning-content/topics/{id}/practice-sets", topicId))
@@ -275,5 +333,21 @@ class InternalLearningContentControllerTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest());
         verify(search, never()).execute(any());
+    }
+
+    @Test
+    void practiceSetSearchIncludesBandAndFeatureMetadata() throws Exception {
+        UUID packageId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        UUID knowledgePointId = UUID.randomUUID();
+        when(search.execute(any())).thenReturn(List.of(new PracticeSetResult(packageId, versionId, "PREMIUM-SET",
+                4, 3, new BigDecimal("6.5"), "PREMIUM_CONTENT")));
+
+        mockMvc.perform(post("/internal/learning-content/practice-sets/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"knowledgePointId\":\"" + knowledgePointId + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].band").value(6.5))
+                .andExpect(jsonPath("$[0].requiredFeatureKey").value("PREMIUM_CONTENT"));
     }
 }

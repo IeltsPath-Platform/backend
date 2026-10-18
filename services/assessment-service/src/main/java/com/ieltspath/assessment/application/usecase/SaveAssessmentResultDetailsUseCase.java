@@ -6,6 +6,8 @@ import com.ieltspath.assessment.application.command.KnowledgeJudgmentInput;
 import com.ieltspath.assessment.application.command.SaveAssessmentResultDetailsCommand;
 import com.ieltspath.assessment.application.command.SaveGradingDetailsCommand;
 import com.ieltspath.assessment.application.command.SkillScoreInput;
+import com.ieltspath.assessment.application.exception.UnknownErrorCodeException;
+import com.ieltspath.assessment.application.port.ErrorTypeCatalog;
 import com.ieltspath.assessment.domain.entity.AssessmentResult;
 import com.ieltspath.assessment.domain.entity.ErrorAnalysisItem;
 import com.ieltspath.assessment.domain.entity.ItemResult;
@@ -32,6 +34,8 @@ public class SaveAssessmentResultDetailsUseCase {
     private final ErrorAnalysisItemRepository errors;
     private final AttemptItemKnowledgePointRepository knowledgeSnapshot;
     private final ItemResultKnowledgeJudgmentRepository judgments;
+    private final ErrorTypeCatalog errorTypes;
+    private final ExaminerGradingPolicy examinerPolicy;
 
     public SaveAssessmentResultDetailsUseCase(AssessmentAttemptRepository attempts,
                                               AssessmentResultRepository results,
@@ -40,7 +44,8 @@ public class SaveAssessmentResultDetailsUseCase {
                                               ItemResultRepository items,
                                               ErrorAnalysisItemRepository errors,
                                               AttemptItemKnowledgePointRepository knowledgeSnapshot,
-                                              ItemResultKnowledgeJudgmentRepository judgments) {
+                                              ItemResultKnowledgeJudgmentRepository judgments,
+                                              ErrorTypeCatalog errorTypes, ExaminerGradingPolicy examinerPolicy) {
         this.attempts = attempts;
         this.results = results;
         this.attemptItems = attemptItems;
@@ -49,6 +54,8 @@ public class SaveAssessmentResultDetailsUseCase {
         this.errors = errors;
         this.knowledgeSnapshot = knowledgeSnapshot;
         this.judgments = judgments;
+        this.errorTypes = errorTypes;
+        this.examinerPolicy = examinerPolicy;
     }
 
     /** Learner entry: the latest version of the caller's own attempt. The result's band is not changed. */
@@ -56,6 +63,9 @@ public class SaveAssessmentResultDetailsUseCase {
     public void execute(SaveAssessmentResultDetailsCommand command) {
         var attempt = attempts.findByIdAndUserId(command.attemptId(), command.userId())
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
+        if (attempt.getAttemptType() == com.ieltspath.assessment.domain.vo.AttemptType.COURSE_GATE) {
+            throw new com.ieltspath.assessment.domain.exception.AssessmentAccessDeniedException("Course results can only be edited by an examiner");
+        }
         var result = results.findLatestForUpdateByAttemptId(attempt.getId())
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
         requireGradable(result);
@@ -74,6 +84,7 @@ public class SaveAssessmentResultDetailsUseCase {
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
         requireGradable(result);
         var latest = results.findLatestByAttemptId(result.attemptId()).orElse(result);
+        examinerPolicy.requireAssignment(result.attemptId());
         if (latest.resultVersion() != result.resultVersion()) {
             throw new InvalidAssessmentStateException("Only the latest result version can be graded");
         }
@@ -151,6 +162,12 @@ public class SaveAssessmentResultDetailsUseCase {
         }
 
         if (errorInputs != null && !errorInputs.isEmpty()) {
+            Set<String> activeCodes = errorTypes.activeCodes();
+            List<String> unknownCodes = errorInputs.stream().map(ErrorAnalysisInput::errorType)
+                    .filter(code -> !activeCodes.contains(code)).distinct().toList();
+            if (!unknownCodes.isEmpty()) {
+                throw new UnknownErrorCodeException(unknownCodes);
+            }
             Set<UUID> submittedErrorIds = new HashSet<>();
             for (ErrorAnalysisInput error : errorInputs) {
                 if (error.id() == null || !submittedErrorIds.add(error.id())) {

@@ -3,9 +3,19 @@ package com.ieltspath.learning.application.usecase;
 import com.ieltspath.learning.application.command.SubmitExerciseCommand;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearnerLock;
+import com.ieltspath.learning.application.port.QuestionEventLog;
+import com.ieltspath.learning.application.service.MasteryProfileUpdater;
+import com.ieltspath.learning.application.service.AnswerDurations;
+import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
+import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageVersion;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.service.FirstAttemptMistakes;
+import com.ieltspath.learning.application.service.FreePracticeSubmission;
+import com.ieltspath.learning.application.service.GamificationRecorder;
+import com.ieltspath.learning.application.service.HeartsService;
+import com.ieltspath.learning.domain.vo.GamificationSummary;
+import com.ieltspath.learning.domain.vo.PracticeOrigin;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.PracticeAccess;
@@ -46,6 +56,11 @@ public class SubmitPracticeAttemptUseCase {
     private final WritingSubmissionRepository essays;
     private final PracticeProgress progress;
     private final FirstAttemptMistakes mistakes;
+    private final QuestionEventLog questionEvents;
+    private final MasteryProfileUpdater masteryProfiles;
+    private final FreePracticeSubmission freePractice;
+    private final GamificationRecorder gamificationRecorder;
+    private final HeartsService hearts;
     private final ItemGrading grading = new ItemGrading();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final Clock clock = Clock.systemUTC();
@@ -53,7 +68,10 @@ public class SubmitPracticeAttemptUseCase {
     public SubmitPracticeAttemptUseCase(LearnerLock lock, PracticeAccess access, LearningContentClient content,
                                         PracticeAttemptRepository attempts, ReviewItemRepository reviews,
                                         KnowledgeEvidenceRepository evidence, PracticeProgress progress,
-                                        FirstAttemptMistakes mistakes, WritingSubmissionRepository essays) {
+                                        FirstAttemptMistakes mistakes, WritingSubmissionRepository essays,
+                                        QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
+                                        FreePracticeSubmission freePractice, GamificationRecorder gamificationRecorder,
+                                        HeartsService hearts) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -63,6 +81,20 @@ public class SubmitPracticeAttemptUseCase {
         this.progress = progress;
         this.mistakes = mistakes;
         this.essays = essays;
+        this.questionEvents = questionEvents;
+        this.masteryProfiles = masteryProfiles;
+        this.freePractice = freePractice;
+        this.gamificationRecorder = gamificationRecorder;
+        this.hearts = hearts;
+    }
+
+    /** Wrong objective answers; essay items are graded by a tutor and never cost a heart. */
+    static int wrongObjectiveAnswers(ItemGrading.Graded graded) {
+        int wrong = 0;
+        for (int index = 0; index < graded.items().size(); index++) {
+            if (!graded.grades().get(index).correct() && !ItemGrading.isEssay(graded.items().get(index))) wrong++;
+        }
+        return wrong;
     }
 
     @Transactional
@@ -74,12 +106,18 @@ public class SubmitPracticeAttemptUseCase {
         if (attempts.findByRequestId(command.requestId()).isPresent()) {
             throw new LearningRequestException(409, "REQUEST_CONFLICT", "requestId belongs to another submission");
         }
+        // Free practice costs hearts too, so the gate sits before the branch that handles it.
+        hearts.requireHearts(userId);
+        if (attempt.origin() == PracticeOrigin.FREE) return freePractice.submit(userId, attempt, command);
         var lesson = access.require(userId, attempt.lessonId());
         var version = content.getPackageVersion(attempt.packageVersionId());
         var graded = grading.grade(version, command.answers(), "Practice set", gradedEssays(userId, attempt, version));
         Set<UUID> revealed = attempts.revealedPackageIds(userId);
         boolean counted = !revealed.contains(attempt.packageId());
         List<KnowledgeEvidence> firstAnswers = new ArrayList<>();
+        // Logged for every submission; a repeat of an already counted package is marked first_submission=false.
+        Map<UUID, Long> durations = AnswerDurations.of(command.answers());
+        List<QuestionAttemptEvent> events = new ArrayList<>();
         List<PracticeReviewRule.ItemOutcome> outcomes = new ArrayList<>();
         List<PracticeSubmission.Answer> results = new ArrayList<>();
         Map<LearningSkill, List<PracticeReviewRule.ItemOutcome>> outcomesBySkill = new EnumMap<>(LearningSkill.class);
@@ -94,7 +132,11 @@ public class SubmitPracticeAttemptUseCase {
             if (itemSkill != null) outcomesBySkill.computeIfAbsent(itemSkill, ignored -> new ArrayList<>()).add(outcome);
             if (counted) for (UUID kp : kps) firstAnswers.add(KnowledgeEvidence.of(kp, grade.correct(),
                     EvidenceSource.PRACTICE_SET,
-                    LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), kp)));
+                    LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), kp))
+                    .forQuestion(item.questionVersionId()));
+            events.add(QuestionAttemptEvent.of(userId, item.questionVersionId(), List.copyOf(kps), grade.correct(),
+                    durations.get(item.questionVersionId()), graded.errorCodes().get(index),
+                    QuestionEventSource.PRACTICE_SET, command.requestId(), counted));
             results.add(new PracticeSubmission.Answer(item.questionVersionId(), grade.correct(),
                     grade.correctAnswer(), item.explanation()));
         }
@@ -108,7 +150,8 @@ public class SubmitPracticeAttemptUseCase {
                     kps.stream().sorted(Comparator.comparing(UUID::toString)).toList(),
                     excluded.stream().sorted(Comparator.comparing(UUID::toString)).toList(), MIN_SET_QUESTIONS);
             Set<UUID> pending = new HashSet<>();
-            reviews.findPending(userId).forEach(review -> pending.add(review.knowledgePointId()));
+            reviews.findPending(userId).stream().filter(review -> review.blocking())
+                    .forEach(review -> pending.add(review.knowledgePointId()));
             var needs = reviewNeeds(graded, outcomes, outcomesBySkill, pending, availability);
             Set<UUID> wrongInLesson = needs.isEmpty() ? Set.of() : mistakes.of(userId, lesson);
             Map<UUID, LearningSkill> kpSkills = new HashMap<>();
@@ -126,13 +169,24 @@ public class SubmitPracticeAttemptUseCase {
         List<PracticeSubmission.ReviewCreated> created = candidates.stream()
                 .map(candidate -> new PracticeSubmission.ReviewCreated(candidate.reviewId(),
                         candidate.knowledgePointId(), candidate.stage().name())).toList();
+        // XP only for the first counted submission of a set, as evidence is.
+        GamificationSummary xp = counted
+                ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), graded.correctQuestionIds())
+                : gamificationRecorder.current(userId);
+        int wrong = wrongObjectiveAnswers(graded);
+        HeartsService.Snapshot heartState = hearts.lose(userId, wrong);
+        GamificationSummary gamification = xp.withHearts(wrong, heartState.hearts(), heartState.nextHeartAt());
         PracticeSubmission response = new PracticeSubmission(attemptId, graded.correct(), graded.total(),
                 graded.percent(), graded.passed(), counted, List.copyOf(results), transcript, created,
-                graded.skillScores());
+                graded.skillScores(), gamification);
         attempt.recordResult(command.requestId(), response, clock.instant());
         attempts.saveResult(attempt);
+        questionEvents.append(events);
         evidence.append(userId, firstAnswers);
+        masteryProfiles.recordEvidence(userId, firstAnswers);
         reviews.insertPracticePending(userId, candidates);
+        reviews.promoteToBlocking(userId, candidates.stream().map(PracticeReviewCandidate::knowledgePointId).toList(),
+                "PRACTICE");
         progress.refreshPassForLesson(userId, attempt.lessonId());
         return response;
     }

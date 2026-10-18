@@ -13,6 +13,7 @@ public record SubmitReviewRequest(@NotNull UUID reviewSetId, @NotNull UUID reque
                                   @NotNull List<@NotNull @Valid Answer> answers) {
     public SubmitReviewCommand toCommand() {
         return new SubmitReviewCommand(reviewSetId, requestId, answers.stream()
-                .map(answer -> new SubmitExerciseCommand.Answer(answer.questionVersionId(), answer.answer())).toList());
+                .map(answer -> new SubmitExerciseCommand.Answer(answer.questionVersionId(), answer.answer(),
+                        answer.durationMs())).toList());
     }
 }

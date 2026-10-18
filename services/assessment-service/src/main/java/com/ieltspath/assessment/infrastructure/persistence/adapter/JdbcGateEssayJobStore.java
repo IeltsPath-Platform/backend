@@ -69,22 +69,68 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void enqueueHuman(UUID submissionId, UUID userId, String idempotencyKey) {
+        enqueueHuman(submissionId, userId, idempotencyKey, "LLM_FAILED");
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void enqueueHuman(UUID submissionId, UUID userId, String idempotencyKey, String reason) {
         String sql = """
                 INSERT INTO grading_jobs (id, submission_id, user_id, skill, grading_mode, status,
-                                          point_cost_snapshot, idempotency_key, created_at)
-                SELECT gen_random_uuid(), id, user_id, skill, 'HUMAN', 'QUEUED', NULL, :key, CURRENT_TIMESTAMP
+                                          point_cost_snapshot, idempotency_key, created_at, reason)
+                SELECT gen_random_uuid(), id, user_id, skill, 'HUMAN', 'QUEUED', NULL, :key, CURRENT_TIMESTAMP, :reason
                 FROM learner_submissions
                 WHERE id = :submissionId AND user_id = :userId AND status = 'SUBMITTED'
                 ON CONFLICT (idempotency_key) DO NOTHING
                 RETURNING id
                 """;
         List<UUID> inserted = jdbc.query(sql, new MapSqlParameterSource().addValue("submissionId", submissionId)
-                        .addValue("userId", userId).addValue("key", idempotencyKey),
+                        .addValue("userId", userId).addValue("key", idempotencyKey).addValue("reason", reason),
                 (rs, rowNum) -> rs.getObject("id", UUID.class));
         if (!inserted.isEmpty()) {
             jdbc.update("INSERT INTO human_reviews (id, grading_job_id, status) VALUES (gen_random_uuid(), :jobId, 'QUEUED')",
                     Map.of("jobId", inserted.getFirst()));
         }
+    }
+
+    @Override
+    public boolean jobExists(String idempotencyKey) {
+        Integer found = jdbc.queryForObject("SELECT count(*) FROM grading_jobs WHERE idempotency_key = :key",
+                Map.of("key", idempotencyKey), Integer.class);
+        return found != null && found > 0;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void enqueueCourseHuman(Collection<UUID> essayItemIds, UUID userId, Map<UUID, UUID> submitted) {
+        if (essayItemIds.isEmpty()) return;
+        var missing=essayItemIds.stream().filter(id->!submitted.containsKey(id)).toList();
+        var args=new MapSqlParameterSource().addValue("ids",essayItemIds).addValue("user",userId)
+                .addValue("missing",missing.isEmpty()?List.of(new UUID(0,0)):missing)
+                .addValue("frozen",submitted.isEmpty()?List.of(new UUID(0,0)):submitted.values());
+        jdbc.update("""
+                INSERT INTO learner_submissions(id,user_id,attempt_item_id,prompt_snapshot,skill,text_payload,status,submission_key)
+                SELECT gen_random_uuid(),:user,i.id,
+                  jsonb_build_object('stem',i.question_snapshot->>'stem','task',i.answer_snapshot->'answerSpec'->>'task','omitted',true),
+                  'WRITING','','SUBMITTED','course-omitted:'||i.id
+                FROM attempt_items i WHERE i.id IN (:missing)
+                ON CONFLICT(user_id,submission_key) DO NOTHING
+                """,args);
+        jdbc.update("""
+                INSERT INTO grading_jobs(id,submission_id,user_id,skill,grading_mode,status,idempotency_key,reason)
+                SELECT gen_random_uuid(),l.id,:user,'WRITING','HUMAN','QUEUED','gate-essay:'||l.attempt_item_id||':human','COURSE_GATE_POLICY'
+                FROM (SELECT DISTINCT ON(attempt_item_id) id,attempt_item_id FROM learner_submissions
+                  WHERE attempt_item_id IN (:ids) AND user_id=:user AND status='SUBMITTED' AND skill='WRITING'
+                  AND (id IN (:frozen) OR (attempt_item_id IN (:missing) AND submission_key='course-omitted:'||attempt_item_id))
+                  AND text_payload IS NOT NULL ORDER BY attempt_item_id,submitted_at DESC,id DESC) l
+                ON CONFLICT(idempotency_key) DO NOTHING
+                """,args);
+        jdbc.update("""
+                INSERT INTO human_reviews(id,grading_job_id,status)
+                SELECT gen_random_uuid(),j.id,'QUEUED' FROM grading_jobs j JOIN learner_submissions l ON l.id=j.submission_id
+                WHERE l.attempt_item_id IN (:ids) AND j.user_id=:user AND j.grading_mode='HUMAN'
+                ON CONFLICT(grading_job_id) DO NOTHING
+                """,args);
     }
 
     @Override
@@ -111,7 +157,7 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
                     JOIN attempt_sections ase ON ase.id = ai.attempt_section_id
                     JOIN assessment_attempts aa ON aa.id = ase.attempt_id
                     WHERE gj.grading_mode = 'AI' AND gj.status = 'QUEUED'
-                      AND aa.attempt_type IN ('TOPIC_GATE', 'COURSE_GATE', 'PLACEMENT')
+                      AND aa.attempt_type IN ('TOPIC_GATE', 'COURSE_GATE', 'PLACEMENT', 'OFFICIAL_PRACTICE')
                     ORDER BY gj.created_at, gj.id
                     LIMIT :limit
                     FOR UPDATE OF gj SKIP LOCKED
@@ -148,6 +194,33 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
                 WHERE id = :id AND grading_mode = 'AI' AND status = 'PROCESSING'
                 """, new MapSqlParameterSource().addValue("id", jobId).addValue("band", band)
                 .addValue("feedback", feedback).addValue("now", Timestamp.from(now)));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void complete(UUID jobId, BigDecimal band, String feedback, String promptVersion, Instant now) {
+        jdbc.update("""
+                UPDATE grading_jobs SET status = 'COMPLETED', llm_band = :band, llm_feedback = CAST(:feedback AS JSONB),
+                    prompt_version = :promptVersion, completed_at = :now, processing_started_at = NULL
+                WHERE id = :id AND grading_mode = 'AI' AND status = 'PROCESSING'
+                """, new MapSqlParameterSource().addValue("id", jobId).addValue("band", band)
+                .addValue("feedback", feedback).addValue("promptVersion", promptVersion).addValue("now", Timestamp.from(now)));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordComparison(UUID jobId) {
+            jdbc.update("""
+                    INSERT INTO essay_grade_comparisons(submission_id,attempt_type,task,llm_band,llm_criteria,llm_prompt_version)
+                    SELECT j.submission_id,a.attempt_type,i.answer_snapshot->'answerSpec'->>'task',j.llm_band,
+                           COALESCE(j.llm_feedback->'criteria','[]'::jsonb),j.prompt_version
+                    FROM grading_jobs j JOIN learner_submissions l ON l.id=j.submission_id
+                    JOIN attempt_items i ON i.id=l.attempt_item_id JOIN attempt_sections s ON s.id=i.attempt_section_id
+                    JOIN assessment_attempts a ON a.id=s.attempt_id WHERE j.id=:id AND j.status='COMPLETED'
+                      AND j.grading_mode='AI'
+                    ON CONFLICT(submission_id) DO UPDATE SET llm_band=EXCLUDED.llm_band,
+                      llm_criteria=EXCLUDED.llm_criteria,llm_prompt_version=EXCLUDED.llm_prompt_version
+                    """, Map.of("id",jobId));
     }
 
     @Override
