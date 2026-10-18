@@ -1,5 +1,7 @@
 package com.ieltspath.notification.application;
 
+import com.ieltspath.events.community.CommunityEvent;
+
 import com.ieltspath.events.community.CommunityEventTypes;
 
 import com.ieltspath.notification.domain.repository.NotificationRepository;
@@ -7,7 +9,6 @@ import com.ieltspath.notification.domain.vo.Notification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,8 +26,6 @@ public class RecordCommunityEventUseCase {
         this.preferences = preferences;
     }
 
-    public record CommunityEvent(UUID eventId, String eventType, Instant occurredAt, UUID actorId, UUID recipientId,
-                                 UUID postId, UUID commentId) { }
 
     /**
      * @param routingKey the routing key the message arrived with; must equal the event type

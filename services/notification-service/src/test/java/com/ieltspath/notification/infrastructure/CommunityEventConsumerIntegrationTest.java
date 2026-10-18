@@ -1,5 +1,7 @@
 package com.ieltspath.notification.infrastructure;
 
+import com.ieltspath.events.community.CommunityEvent;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.events.community.CommunityEventTypes;
 import com.ieltspath.notification.application.NotificationPreferenceService;
@@ -32,6 +34,57 @@ import static org.mockito.Mockito.verify;
 @Testcontainers(disabledWithoutDocker = true)
 class CommunityEventConsumerIntegrationTest {
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:15-alpine");
+    @Container static final org.testcontainers.containers.GenericContainer<?> RABBIT =
+            new org.testcontainers.containers.GenericContainer<>("rabbitmq:3.13-management-alpine")
+                    .withExposedPorts(5672)
+                    .waitingFor(org.testcontainers.containers.wait.strategy.Wait.forLogMessage(".*Server startup complete.*", 1));
+
+    @Test
+    void consumesTheSharedRecordDeliveredByRabbitAndAcknowledgesTheOriginalDelivery() throws Exception {
+        var source = new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        org.flywaydb.core.Flyway.configure().dataSource(source).locations("filesystem:src/main/resources/db/migration").load().migrate();
+        var jdbc = new JdbcTemplate(source);
+        var socket = mock(SimpMessagingTemplate.class);
+        var mapper = new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        var connection = new org.springframework.amqp.rabbit.connection.CachingConnectionFactory(
+                RABBIT.getHost(), RABBIT.getMappedPort(5672));
+        try {
+            var rabbit = new RabbitTemplate(connection);
+            var admin = new org.springframework.amqp.rabbit.core.RabbitAdmin(connection);
+            var topology = new NotificationMessagingConfig(new org.springframework.core.env.StandardEnvironment());
+            admin.declareExchange(topology.communityExchange());
+            admin.declareQueue(topology.notificationQueue());
+            admin.declareBinding(topology.notificationBinding());
+            var event = new CommunityEvent(UUID.randomUUID(), CommunityEventTypes.USER_FOLLOWED,
+                    Instant.parse("2026-10-01T09:10:00Z"), UUID.randomUUID(), UUID.randomUUID(), null, null);
+            var properties = new MessageProperties();
+            properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+            properties.setMessageId(event.eventId().toString());
+            rabbit.send(com.ieltspath.events.community.CommunityMessaging.EXCHANGE, event.eventType(),
+                    new Message(mapper.writeValueAsBytes(event), properties));
+            var consumer = new CommunityEventConsumer(mapper, recordEvent(jdbc), socket, rabbit);
+            rabbit.execute(channel -> {
+                var delivery = channel.basicGet(topology.notificationQueue().getName(), false);
+                org.junit.jupiter.api.Assertions.assertNotNull(delivery);
+                var deliveredProperties = new org.springframework.amqp.rabbit.support.DefaultMessagePropertiesConverter()
+                        .toMessageProperties(delivery.getProps(), delivery.getEnvelope(), "UTF-8");
+                try {
+                    consumer.receive(new Message(delivery.getBody(), deliveredProperties), channel);
+                } catch (Exception failure) {
+                    throw new IllegalStateException(failure);
+                }
+                // Acknowledged deliveries cannot be requeued by recovery on the same channel.
+                channel.basicRecover(true);
+                org.junit.jupiter.api.Assertions.assertNull(channel.basicGet(topology.notificationQueue().getName(), true));
+                return null;
+            });
+            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM notifications WHERE id=?", Integer.class, event.eventId()));
+            verify(socket).convertAndSendToUser(eq(event.recipientId().toString()), eq("/queue/notifications"), any(Object.class));
+        } finally {
+            connection.destroy();
+        }
+    }
 
     @Test void duplicateDeliveryCreatesOneMentionNotificationAndOnePush() throws Exception {
         var source = new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
