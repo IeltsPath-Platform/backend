@@ -30,8 +30,9 @@ Compose stack; nothing below claims they were.
 - Phase 1: the Grammar/Vocab seed was approved on 2026-10-18; Codex still has to add it (migration number V45, because V43 and
   V44 are taken) with the new points `INACTIVE`. The tree criterion "Grammar/Vocab points linked to strategy points, no cycle"
   stays open until then.
-- Phase 3: the tree's `practiceAvailable` does not subtract sets that the band or plan filter removes, and only 10 candidates
-  are fetched before filtering. Exact figures need Content to filter by band and feature.
+- Phase 3 is closed with a known limit: the tree's `practiceAvailable` is an upper bound (it does not subtract sets the band,
+  plan or essay filter removes) and only 10 candidates are fetched before filtering. Exact figures need Content to filter by
+  band and feature; the start route answers `FREE_PRACTICE_EXHAUSTED` when nothing is left.
 - Codex: contracts `flashcard-srs-v1.md`, `content-scheduled-publish-v1.md`, `user-internal-v1.md` (learning goal), READMEs of
   library and content.
 - Whoever runs Compose: the seven demos, `mvn verify` over the whole reactor, `docker compose config --quiet`.
