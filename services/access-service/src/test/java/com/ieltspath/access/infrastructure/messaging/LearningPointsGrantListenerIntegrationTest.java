@@ -1,6 +1,9 @@
 package com.ieltspath.access.infrastructure.messaging;
 
+import com.ieltspath.access.domain.vo.LearningRewardReason;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -62,6 +65,24 @@ class LearningPointsGrantListenerIntegrationTest {
         assertSettlements(grantId, "GRANTED", 2);
     }
 
+    @ParameterizedTest
+    @EnumSource(value = LearningRewardReason.class, names = {"KP_MASTERED", "DAILY_QUEST", "BADGE"})
+    void grantsEachAdditionalLearningRewardReasonOnceWhenTheSameGrantIsDeliveredAgain(LearningRewardReason reason) {
+        UUID grantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Message message = grantMessage(grantId, userId, 4, reason.name(), "reward:" + reason.name());
+
+        listener.onPointsGrantRequested(message);
+        listener.onPointsGrantRequested(message);
+
+        assertEquals(4L, balance(userId));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM point_ledger_entries WHERE idempotency_key = ?",
+                Integer.class, grantId.toString()));
+        assertEquals(reason.name(), jdbc.queryForObject(
+                "SELECT reason FROM point_credit_requests WHERE idempotency_key = ?", String.class, grantId.toString()));
+        assertSettlements(grantId, "GRANTED", 2);
+    }
+
     @Test
     void reportsCappedWhenTheDailyCreditLimitIsReached() {
         UUID grantId = UUID.randomUUID();
@@ -77,6 +98,24 @@ class LearningPointsGrantListenerIntegrationTest {
         assertSettlements(grantId, "CAPPED", 1);
     }
 
+    @ParameterizedTest
+    @EnumSource(value = LearningRewardReason.class, names = {"KP_MASTERED", "DAILY_QUEST", "BADGE"})
+    void reportsEachAdditionalLearningRewardReasonCappedAtTheDailyCreditLimit(LearningRewardReason reason) {
+        UUID grantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        listener.onPointsGrantRequested(grantMessage(UUID.randomUUID(), userId, 19,
+                reason.name(), "reward:" + reason.name() + ":first"));
+        reset(rabbitTemplate);
+
+        listener.onPointsGrantRequested(grantMessage(grantId, userId, 3,
+                reason.name(), "reward:" + reason.name() + ":second"));
+
+        assertEquals(20L, balance(userId));
+        assertEquals(reason.name(), jdbc.queryForObject(
+                "SELECT reason FROM point_credit_requests WHERE idempotency_key = ?", String.class, grantId.toString()));
+        assertSettlements(grantId, "CAPPED", 1);
+    }
+
     @Test
     void reportsInvalidPayloadAsFailedWithoutCrediting() {
         UUID grantId = UUID.randomUUID();
@@ -86,7 +125,19 @@ class LearningPointsGrantListenerIntegrationTest {
                 "STREAK_MILESTONE", "streak:2026-10-03:7"));
 
         assertEquals(0L, balance(userId));
-        assertSettlements(grantId, "FAILED", 1);
+        assertSettlements(grantId, "FAILED", 1, "INVALID_PAYLOAD");
+    }
+
+    @Test
+    void reportsUnknownRewardReasonAsInvalidPayload() {
+        UUID grantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        listener.onPointsGrantRequested(grantMessage(grantId, userId, 5,
+                "UNKNOWN_REASON", "reward:unknown"));
+
+        assertEquals(0L, balance(userId));
+        assertSettlements(grantId, "FAILED", 1, "INVALID_PAYLOAD");
     }
 
     private long balance(UUID userId) {
@@ -95,6 +146,10 @@ class LearningPointsGrantListenerIntegrationTest {
     }
 
     private void assertSettlements(UUID grantId, String status, int count) {
+        assertSettlements(grantId, status, count, null);
+    }
+
+    private void assertSettlements(UUID grantId, String status, int count, String error) {
         ArgumentCaptor<PointsGrantSettled> settlement = ArgumentCaptor.forClass(PointsGrantSettled.class);
         verify(rabbitTemplate, times(count)).convertAndSend(
                 eq(LearningPointsMessagingConfig.EXCHANGE),
@@ -102,6 +157,7 @@ class LearningPointsGrantListenerIntegrationTest {
         settlement.getAllValues().forEach(value -> {
             assertEquals(grantId, value.grantId());
             assertEquals(status, value.status());
+            assertEquals(error, value.error());
         });
     }
 

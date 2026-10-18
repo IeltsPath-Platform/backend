@@ -79,14 +79,11 @@ public class LearningPointsGrantListener {
             int amount = amountNode.intValue();
             if (amount < 1 || amount > 100) throw new InvalidGrantPayload(grantId);
 
-            String reasonValue = text(root, "reason");
-            if (!LearningRewardReason.STREAK_MILESTONE.name().equals(reasonValue)) {
-                throw new InvalidGrantPayload(grantId);
-            }
+            LearningRewardReason reason = LearningRewardReason.valueOf(text(root, "reason"));
             String referenceId = text(root, "referenceId");
             if (referenceId.isBlank() || referenceId.length() > 100) throw new InvalidGrantPayload(grantId);
 
-            return new GrantRequest(grantId, userId, amount, LearningRewardReason.STREAK_MILESTONE, referenceId);
+            return new GrantRequest(grantId, userId, amount, reason, referenceId);
         } catch (IOException | IllegalArgumentException malformed) {
             throw new InvalidGrantPayload(grantId);
         }
