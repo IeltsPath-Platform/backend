@@ -171,7 +171,7 @@ public class MasteryProfileUpdater {
                     .filter(profile -> practiced.contains(profile.knowledgePointId()))
                     .filter(profile -> profile.tier() != MasteryTier.PRIORITY && profile.tier() != MasteryTier.INSUFFICIENT)
                     .map(profile -> new GamificationRecorder.Rise(profile.knowledgePointId(),
-                            profile.tier() == MasteryTier.MAINTAIN))
+                            profile.tier() == MasteryTier.MAINTAIN, profile.mastery()))
                     .toList();
             gamification.recordRises(userId, rises);
             if (updated.stream().anyMatch(profile -> profile.tier() == MasteryTier.MAINTAIN)) {

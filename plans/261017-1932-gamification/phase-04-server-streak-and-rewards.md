@@ -67,7 +67,10 @@ thật, thêm đóng băng trả bằng points (03 §E.3), và đường cộng 
   mà việc dùng chỉ xảy ra khi ngày đó được chấm, sau ngày mua.
 - Quyết định: mua khi chưa có streak trả `409 NO_STREAK_TO_PROTECT`. Ngày trả lời lại trong cùng ngày không thưởng lại.
 - Chưa xong: hoàn points khi đóng băng lỗi (access chưa có route nội bộ); bài essay chưa tính là ngày hoạt động (không phát
-  sự kiện câu hỏi); thưởng KP ≥ 90% mastery +5 points.
+  sự kiện câu hỏi).
+- Thưởng KP ≥ 90% mastery: +5 points một lần cho mỗi KP, chỉ khi bằng chứng là luyện tập (cùng bộ lọc với XP mốc KP).
+  `GamificationRecorder.recordRises` xếp hàng grant `KP_MASTERED` với `referenceId` = id KP; hàng đợi bỏ qua lần lặp.
+  Ngưỡng và số điểm cấu hình `learning.rewards.kp-mastered.*`. Test: `GamificationIntegrationTest.aPointAtNinetyPercent...`.
 
 ### Relay points (2026-10-18)
 

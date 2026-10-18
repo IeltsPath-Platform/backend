@@ -185,12 +185,15 @@ this week.
 
 ## Points rewards
 
-Streak milestones, completed quests and badges owe the learner points. The amount is queued as a `PENDING` grant in the same
-transaction as the thing that earned it. A relay sends each grant to Access on exchange `learning.points` (routing key
-`points.grant.requested`, payload `{ grantId, userId, amount, reason, referenceId }`) and Access answers on
-`points.grant.settled` with `{ grantId, status: GRANTED | CAPPED | FAILED, error }`. `reason` is `STREAK_MILESTONE`,
-`DAILY_QUEST` or `BADGE`. Access credits a grant id once, so a resend is safe; a grant with no answer is sent again after 5
-minutes and given up after 10 sends. Points Access caps per day are reported as `CAPPED`. The agreed message shape is contract C6 in `plans/261017-1931-mastery-practice-and-progress/reports/work-split.md`.
+Mastered knowledge points, streak milestones, completed quests and badges owe the learner points. The amount is queued as a
+`PENDING` grant in the same transaction as the thing that earned it. A relay sends each grant to Access on exchange
+`learning.points` (routing key `points.grant.requested`, payload `{ grantId, userId, amount, reason, referenceId }`) and
+Access answers on `points.grant.settled` with `{ grantId, status: GRANTED | CAPPED | FAILED, error }`. `reason` is one of
+`STREAK_MILESTONE`, `KP_MASTERED` (+5 points the first time a point reaches 90% mastery through practice; `referenceId` is
+the point id), `DAILY_QUEST` or `BADGE`. Access accepts every value of `LearningRewardReason` and credits a grant id once,
+so a resend is safe; a grant with no answer is sent again after 5 minutes and given up after 10 sends. Points Access caps per
+day are reported as `CAPPED`. The agreed message shape is contract C6 in
+`plans/261017-1931-mastery-practice-and-progress/reports/work-split.md`.
 
 ## Configuration
 

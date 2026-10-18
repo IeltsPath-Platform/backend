@@ -3,6 +3,7 @@ package com.ieltspath.learning.application.service;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.domain.repository.GamificationRepository;
 import com.ieltspath.learning.domain.repository.GamificationRepository.LedgerEntry;
+import com.ieltspath.learning.domain.repository.RewardGrantRepository;
 import com.ieltspath.learning.domain.service.XpRules;
 import com.ieltspath.learning.domain.service.XpRules.Award;
 import com.ieltspath.learning.domain.service.XpRules.Candidate;
@@ -30,9 +31,17 @@ public class GamificationRecorder {
     static final String KP_MAINTAIN = "KP_MAINTAIN";
     static final String STREAK = "STREAK";
     static final String QUEST = "QUEST";
+    static final String KP_MASTERED_REWARD = "KP_MASTERED";
 
-    /** A knowledge point that reached consolidate; {@code maintained} also means it reached maintain. */
-    public record Rise(UUID knowledgePointId, boolean maintained) {}
+    /**
+     * A knowledge point that reached consolidate; {@code maintained} also means it reached maintain, and
+     * {@code mastery} is its score after the answers that raised it.
+     */
+    public record Rise(UUID knowledgePointId, boolean maintained, double mastery) {
+        public Rise(UUID knowledgePointId, boolean maintained) {
+            this(knowledgePointId, maintained, 0);
+        }
+    }
 
     /** The learner's progress: counted XP, the level, the XP needed for the next one, and today's answer XP. */
     public record Progress(int totalXp, int level, int nextLevelAt, int xpToNextLevel, long xpToday, int dailyCap) {}
@@ -43,12 +52,17 @@ public class GamificationRecorder {
     private final HeartsService hearts;
     private final LeagueService league;
     private final BadgeService badges;
+    private final RewardGrantRepository rewards;
+    private final double masteredAt;
+    private final int masteredPoints;
     private final Params params;
     private final Clock clock = Clock.systemUTC();
 
     public GamificationRecorder(GamificationRepository repository, LearningContentClient content,
                                 LearnerTimezones timezones, HeartsService hearts, LeagueService league,
-                                BadgeService badges,
+                                BadgeService badges, RewardGrantRepository rewards,
+                                @Value("${learning.rewards.kp-mastered.threshold:0.9}") double masteredAt,
+                                @Value("${learning.rewards.kp-mastered.points:5}") int masteredPoints,
                                 @Value("${learning.gamification.xp.easy:10}") int easy,
                                 @Value("${learning.gamification.xp.medium:15}") int medium,
                                 @Value("${learning.gamification.xp.hard:20}") int hard,
@@ -63,6 +77,9 @@ public class GamificationRecorder {
         this.hearts = hearts;
         this.league = league;
         this.badges = badges;
+        this.rewards = rewards;
+        this.masteredAt = masteredAt;
+        this.masteredPoints = masteredPoints;
         this.params = new Params(easy, medium, hard, unknown, dailyCap, levelXp, consolidate, maintain);
     }
 
@@ -103,6 +120,10 @@ public class GamificationRecorder {
             String ref = rise.knowledgePointId().toString();
             entries.add(new LedgerEntry(KP_CONSOLIDATE, ref, params.consolidateXp(), true, today));
             if (rise.maintained()) entries.add(new LedgerEntry(KP_MAINTAIN, ref, params.maintainXp(), true, today));
+            // Points, not XP: queued once per point (the queue ignores a repeat), paid later through Access.
+            if (masteredPoints > 0 && rise.mastery() >= masteredAt) {
+                rewards.enqueue(userId, KP_MASTERED_REWARD, ref, masteredPoints);
+            }
         }
         boolean[] fresh = repository.insertLedger(userId, entries);
         int earned = 0;

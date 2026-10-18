@@ -115,6 +115,21 @@ class GamificationIntegrationTest {
     }
 
     @Test
+    void aPointAtNinetyPercentEarnsFivePointsOnceAndOneBelowEarnsNone() {
+        UUID user = UUID.randomUUID();
+        UUID mastered = UUID.randomUUID();
+        UUID almost = UUID.randomUUID();
+
+        gamification.recordRises(user, List.of(new GamificationRecorder.Rise(mastered, true, 0.93),
+                new GamificationRecorder.Rise(almost, true, 0.89)));
+        gamification.recordRises(user, List.of(new GamificationRecorder.Rise(mastered, true, 0.97)));
+
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM reward_grants WHERE user_id = ?", Integer.class, user));
+        assertEquals(5, jdbc.queryForObject("SELECT amount FROM reward_grants WHERE user_id = ? AND reason = 'KP_MASTERED' "
+                + "AND reference_id = ? AND status = 'PENDING'", Integer.class, user, mastered.toString()));
+    }
+
+    @Test
     void onlyPracticeEvidenceEarnsMilestoneXp() {
         UUID user = UUID.randomUUID();
         UUID diagnosed = UUID.randomUUID();

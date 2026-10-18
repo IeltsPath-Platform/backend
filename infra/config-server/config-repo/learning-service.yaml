@@ -127,6 +127,10 @@ learning:
     batch: 100
     resend-after: PT5M
     max-sends: 10
+    # Points for the first time a knowledge point reaches this mastery through practice.
+    kp-mastered:
+      threshold: 0.9
+      points: 5
   messaging:
     # AssessmentCompleted.v2 consumer: delay before a failed event is retried, and attempts before the DLQ.
     retry-delay-ms: ${LEARNING_RETRY_DELAY_MS:30000}
