@@ -14,11 +14,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.ieltspath.community.application.port.CommunityEventTypes;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -43,12 +44,16 @@ public class CommunityOutboxRelay {
     private final int batchSize;
     private final Duration confirmTimeout;
     private final boolean enabled;
+    private final int maxAttempts;
+    private final Duration lease;
 
     public CommunityOutboxRelay(JdbcTemplate jdbc, RabbitTemplate rabbit, ObjectMapper objectMapper,
                                 @Value("${community.messaging.exchange:community.events}") String exchange,
                                 @Value("${community.outbox.relay.batch-size:50}") int batchSize,
                                 @Value("${community.outbox.relay.confirm-timeout:PT5S}") Duration confirmTimeout,
-                                @Value("${community.outbox.relay.enabled:true}") boolean enabled) {
+                                @Value("${community.outbox.relay.enabled:true}") boolean enabled,
+                                @Value("${community.outbox.relay.max-attempts:12}") int maxAttempts,
+                                @Value("${community.outbox.relay.lease:PT60S}") Duration lease) {
         this.jdbc = jdbc;
         this.rabbit = rabbit;
         this.objectMapper = objectMapper;
@@ -56,20 +61,31 @@ public class CommunityOutboxRelay {
         this.batchSize = Math.max(1, Math.min(batchSize, 200));
         this.confirmTimeout = confirmTimeout;
         this.enabled = enabled;
+        this.maxAttempts = Math.max(1, maxAttempts);
+        this.lease = lease;
     }
 
-    @Transactional
+    /**
+     * Claims a batch with a short lease in one statement, then publishes outside any transaction so a slow
+     * broker never holds row locks or a database connection. Delivery is at-least-once: the consumer
+     * de-duplicates by event id.
+     */
     public int publishPendingBatch() {
         if (!enabled) return 0;
-        List<OutboxRow> rows = jdbc.query("""
-                SELECT id,event_type,payload::text payload,created_at,retry_count
-                FROM outbox_events
-                WHERE published_at IS NULL AND (next_attempt_at IS NULL OR next_attempt_at <= now())
-                ORDER BY created_at,id
-                LIMIT ? FOR UPDATE SKIP LOCKED
+        List<OutboxRow> rows = new ArrayList<>(jdbc.query("""
+                UPDATE outbox_events
+                SET next_attempt_at = now() + make_interval(secs => ?)
+                WHERE id IN (
+                    SELECT id FROM outbox_events
+                    WHERE published_at IS NULL AND failed_at IS NULL
+                      AND (next_attempt_at IS NULL OR next_attempt_at <= now())
+                    ORDER BY created_at, id
+                    LIMIT ? FOR UPDATE SKIP LOCKED)
+                RETURNING id, event_type, payload::text payload, created_at, retry_count
                 """, (rs, row) -> new OutboxRow(rs.getObject("id", java.util.UUID.class),
                 rs.getString("event_type"), rs.getString("payload"), rs.getTimestamp("created_at").toInstant(),
-                rs.getInt("retry_count")), batchSize);
+                rs.getInt("retry_count")), lease.toSeconds(), batchSize));
+        rows.sort(Comparator.comparing(OutboxRow::createdAt).thenComparing(OutboxRow::id));
         int published = 0;
         for (OutboxRow row : rows) {
             try {
@@ -77,16 +93,24 @@ public class CommunityOutboxRelay {
                 jdbc.update("UPDATE outbox_events SET published_at=?, last_error=NULL WHERE id=?",
                         java.sql.Timestamp.from(Instant.now()), row.id());
                 published++;
+            } catch (UnsupportedEventException exception) {
+                jdbc.update("UPDATE outbox_events SET failed_at=now(), last_error=? WHERE id=?",
+                        exception.getClass().getSimpleName(), row.id());
+                log.error("Community event is not publishable eventId={} type={}", row.id(), row.eventType());
             } catch (RuntimeException exception) {
                 jdbc.update("""
                         UPDATE outbox_events
                         SET retry_count=retry_count+1,
                             next_attempt_at=now() + make_interval(secs => LEAST(3600, power(2, LEAST(retry_count, 11))::integer)),
+                            failed_at=CASE WHEN retry_count+1 >= ? THEN now() END,
                             last_error=?
                         WHERE id=?
-                        """, exception.getClass().getSimpleName(), row.id());
+                        """, maxAttempts, exception.getClass().getSimpleName(), row.id());
                 log.warn("Community event publish failed eventId={} type={} errorType={}",
                         row.id(), row.eventType(), exception.getClass().getSimpleName());
+                // The broker is the likely cause: stop here so one outage costs one confirm timeout, not one per row.
+                // The remaining claimed rows become due again when their lease expires.
+                break;
             }
         }
         return published;
@@ -94,7 +118,7 @@ public class CommunityOutboxRelay {
 
     private void publish(OutboxRow row) {
         String route = ROUTING_KEYS.get(row.eventType());
-        if (route == null) throw new IllegalStateException("Unsupported community event type");
+        if (route == null) throw new UnsupportedEventException();
         try {
             JsonNode payload = objectMapper.readTree(row.payload());
             Message message = MessageBuilder.withBody(row.payload().getBytes(StandardCharsets.UTF_8))
@@ -119,6 +143,10 @@ public class CommunityOutboxRelay {
             if (exception instanceof RuntimeException runtimeException) throw runtimeException;
             throw new IllegalStateException("Could not publish event", exception);
         }
+    }
+
+    private static final class UnsupportedEventException extends RuntimeException {
+        UnsupportedEventException() { super("Unsupported community event type"); }
     }
 
     private record OutboxRow(java.util.UUID id, String eventType, String payload, Instant createdAt, int retryCount) { }

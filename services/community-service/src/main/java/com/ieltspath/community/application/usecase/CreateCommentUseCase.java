@@ -13,10 +13,11 @@ import com.ieltspath.community.application.port.CommunityEventTypes;
 import com.ieltspath.community.application.port.PublicProfileClient;
 import lombok.RequiredArgsConstructor;
 import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
@@ -25,10 +26,30 @@ public class CreateCommentUseCase {
     private final CommentRepository comments;
     private final CommunityEventOutbox outbox;
     private final PublicProfileClient profiles;
+    private final TransactionTemplate transaction;
     private static final Pattern MENTION = Pattern.compile("@\\[([^\\]]+)]\\(([0-9a-fA-F-]{36})\\)");
 
-    @Transactional
     public CommentResult execute(CommunityActor actor, CreateCommentCommand command) {
+        // Mentions are verified against user-service before any row is locked: a slow remote call must not
+        // hold the parent comment lock or a database connection.
+        Set<UUID> mentionIds = requireValidMentions(command.body());
+        return transaction.execute(status -> save(actor, command, mentionIds));
+    }
+
+    private Set<UUID> requireValidMentions(String body) {
+        var mentionIds = new LinkedHashSet<UUID>();
+        var matcher = MENTION.matcher(body);
+        while (matcher.find()) {
+            try { mentionIds.add(UUID.fromString(matcher.group(2))); }
+            catch (IllegalArgumentException invalid) { throw new CommunityException("Mention contains an invalid user"); }
+        }
+        if (mentionIds.size() > 5) throw new CommunityException("A comment can mention at most five users");
+        if (!mentionIds.isEmpty() && !profiles.findProfiles(mentionIds).keySet().containsAll(mentionIds))
+            throw new CommunityException("Mentioned user was not found or is not visible");
+        return mentionIds;
+    }
+
+    private CommentResult save(CommunityActor actor, CreateCommentCommand command, Set<UUID> mentionIds) {
         var post = CommunityApplicationSupport.requireVisiblePost(posts, command.postId(), actor);
         var recipientId = post.getAuthorId();
         var reply = command.parentCommentId() != null;
@@ -45,15 +66,6 @@ public class CreateCommentUseCase {
         var saved = comments.save(Comment.create(
                 command.postId(), actor.userId(), command.parentCommentId(), command.body()
         ));
-        var matcher = MENTION.matcher(command.body());
-        var mentionIds = new LinkedHashSet<UUID>();
-        while (matcher.find()) {
-            try { mentionIds.add(UUID.fromString(matcher.group(2))); }
-            catch (IllegalArgumentException invalid) { throw new CommunityException("Mention contains an invalid user"); }
-        }
-        if (mentionIds.size() > 5) throw new CommunityException("A comment can mention at most five users");
-        if (!mentionIds.isEmpty() && profiles.findProfiles(mentionIds).keySet().containsAll(mentionIds) == false)
-            throw new CommunityException("Mentioned user was not found or is not visible");
         for (UUID mentionId : mentionIds) {
             if (!actor.userId().equals(mentionId))
                 outbox.record(CommunityEventTypes.COMMENT_MENTIONED, actor.userId(), mentionId, command.postId(), saved.getId());

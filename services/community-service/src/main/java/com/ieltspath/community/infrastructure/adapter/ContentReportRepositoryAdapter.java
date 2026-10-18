@@ -26,11 +26,15 @@ public class ContentReportRepositoryAdapter implements ContentReportRepository {
 
     @Override
     public ContentReport save(ContentReport report) {
-        jdbc.update("""
-                INSERT INTO community_reports(id,reporter_id,content_type,content_id,reason,status,created_at)
-                VALUES (?,?,?,?,?,'PENDING',?)
-                """, report.getId(), report.getReporterId(), report.getContentType().name(), report.getContentId(),
-                report.getReason(), Timestamp.from(report.getCreatedAt()));
+        try {
+            jdbc.update("""
+                    INSERT INTO community_reports(id,reporter_id,content_type,content_id,reason,status,created_at)
+                    VALUES (?,?,?,?,?,'PENDING',?)
+                    """, report.getId(), report.getReporterId(), report.getContentType().name(), report.getContentId(),
+                    report.getReason(), Timestamp.from(report.getCreatedAt()));
+        } catch (org.springframework.dao.DuplicateKeyException duplicate) {
+            throw new com.ieltspath.community.domain.exception.CommunityConflictException("You have already reported this content");
+        }
         return report;
     }
 

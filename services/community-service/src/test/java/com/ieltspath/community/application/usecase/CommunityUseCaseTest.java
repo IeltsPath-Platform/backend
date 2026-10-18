@@ -43,7 +43,7 @@ class CommunityUseCaseTest {
         when(comments.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(profiles.findProfiles(Set.of(target, actorId))).thenReturn(Map.of(target, com.ieltspath.community.application.result.PublicProfile.anonymous(target), actorId, com.ieltspath.community.application.result.PublicProfile.anonymous(actorId)));
         var body = "@[A](" + target + ") @[B](" + target + ") @[Me](" + actorId + ")";
-        new CreateCommentUseCase(posts, comments, outbox, profiles).execute(new CommunityActor(actorId, false),
+        new CreateCommentUseCase(posts, comments, outbox, profiles, immediateTransaction()).execute(new CommunityActor(actorId, false),
                 new com.ieltspath.community.application.command.CreateCommentCommand(post.getId(), null, body));
         verify(outbox, times(1)).record(eq("community.comment-mentioned.v1"), eq(actorId), eq(target), eq(post.getId()), any());
         verify(outbox, never()).record(eq("community.comment-mentioned.v1"), eq(actorId), eq(actorId), any(), any());
@@ -55,7 +55,7 @@ class CommunityUseCaseTest {
         Post post = Post.create(UUID.randomUUID(), PostCategory.GENERAL, null, "body");
         when(posts.findById(post.getId())).thenReturn(Optional.of(post));
         String body = java.util.stream.IntStream.range(0, 6).mapToObj(i -> "@[M](" + UUID.randomUUID() + ")").collect(java.util.stream.Collectors.joining(" "));
-        assertThrows(CommunityException.class, () -> new CreateCommentUseCase(posts, comments, outbox, profiles).execute(
+        assertThrows(CommunityException.class, () -> new CreateCommentUseCase(posts, comments, outbox, profiles, immediateTransaction()).execute(
                 new CommunityActor(actorId, false), new com.ieltspath.community.application.command.CreateCommentCommand(post.getId(), null, body)));
         verifyNoInteractions(outbox);
     }
@@ -66,7 +66,7 @@ class CommunityUseCaseTest {
         Post post = Post.create(UUID.randomUUID(), PostCategory.GENERAL, null, "body");
         when(posts.findById(post.getId())).thenReturn(Optional.of(post));
         when(profiles.findProfiles(Set.of(target))).thenReturn(Map.of());
-        assertThrows(CommunityException.class, () -> new CreateCommentUseCase(posts, comments, outbox, profiles).execute(
+        assertThrows(CommunityException.class, () -> new CreateCommentUseCase(posts, comments, outbox, profiles, immediateTransaction()).execute(
                 new CommunityActor(actorId, false), new com.ieltspath.community.application.command.CreateCommentCommand(post.getId(), null, "@[Member](" + target + ")")));
     }
 
@@ -192,7 +192,7 @@ class CommunityUseCaseTest {
         when(posts.findById(postId)).thenReturn(Optional.of(post));
         when(comments.findByIdForUpdate(parent.getId())).thenReturn(Optional.of(parent));
 
-        assertThrows(CommunityException.class, () -> new CreateCommentUseCase(posts, comments, outbox, id -> Map.of()).execute(
+        assertThrows(CommunityException.class, () -> new CreateCommentUseCase(posts, comments, outbox, id -> Map.of(), immediateTransaction()).execute(
                 new CommunityActor(UUID.randomUUID(), false),
                 new com.ieltspath.community.application.command.CreateCommentCommand(
                         postId, parent.getId(), "child"
@@ -265,5 +265,11 @@ class CommunityUseCaseTest {
         );
 
         verify(reactions).remove(postId, userId, ReactionType.LOVE);
+    }
+    private static org.springframework.transaction.support.TransactionTemplate immediateTransaction() {
+        var template = org.mockito.Mockito.mock(org.springframework.transaction.support.TransactionTemplate.class);
+        org.mockito.Mockito.when(template.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation ->
+                ((org.springframework.transaction.support.TransactionCallback<?>) invocation.getArgument(0)).doInTransaction(null));
+        return template;
     }
 }
