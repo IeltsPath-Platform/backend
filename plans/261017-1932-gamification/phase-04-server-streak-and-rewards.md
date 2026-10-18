@@ -66,8 +66,9 @@ thật, thêm đóng băng trả bằng points (03 §E.3), và đường cộng 
   D. Luật "phủ ngày mai" làm giá tăng theo liên tiếp không bao giờ đạt được: lượt cũ phải được dùng trước khi mua lượt mới,
   mà việc dùng chỉ xảy ra khi ngày đó được chấm, sau ngày mua.
 - Quyết định: mua khi chưa có streak trả `409 NO_STREAK_TO_PROTECT`. Ngày trả lời lại trong cùng ngày không thưởng lại.
-- Chưa xong: hoàn points khi đóng băng lỗi (access chưa có route nội bộ); bài essay chưa tính là ngày hoạt động (không phát
-  sự kiện câu hỏi).
+- Chưa xong: hoàn points khi đóng băng lỗi (access chưa có route nội bộ).
+- Essay đã chấm (lesson và Practice) ghi sự kiện câu hỏi nên đã tính là ngày hoạt động của streak (kiểm tra 2026-10-18; ghi chú
+  "chưa tính" trước đây là sai). Test: `LessonWritingIntegrationTest.aGradedLessonEssayCountsAsADayOfActivity...`.
 - Thưởng KP ≥ 90% mastery: +5 points một lần cho mỗi KP, chỉ khi bằng chứng là luyện tập (cùng bộ lọc với XP mốc KP).
   `GamificationRecorder.recordRises` xếp hàng grant `KP_MASTERED` với `referenceId` = id KP; hàng đợi bỏ qua lần lặp.
   Ngưỡng và số điểm cấu hình `learning.rewards.kp-mastered.*`. Test: `GamificationIntegrationTest.aPointAtNinetyPercent...`.

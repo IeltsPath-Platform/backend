@@ -75,7 +75,7 @@ Starting or submitting a lesson exercise, a Practice attempt or free practice wi
 
 The streak is counted on the server from submitted answers, in the learner's local day. A day with an answer continues it.
 An empty day is covered by a freeze if one is owned, otherwise the streak breaks and the lost length is kept for display.
-Essays do not count as an answered day (they write no question events). The old client-reported streak in User Service is
+A graded essay (lesson or Practice) counts as an answered day like any other answer: it writes a question event. The old client-reported streak in User Service is
 unchanged and is not used for rewards.
 
 ### `GET /me/streak`
@@ -130,8 +130,8 @@ Three quests per local day, made on first use of the day:
       "target": null } ] }
 ```
 
-Only the first submission of a question counts, and only judged objective answers; exams, diagnostic probes and essays do
-not. The target is a `PRIORITY` or `CONSOLIDATE` point with a practice set or a blocking review, a blocked one first, then the
+Only the first submission of a question counts, and only judged answers (a graded essay is one); exams and diagnostic probes
+do not. The weakness quest counts free practice and review answers on the target point only. The target is a `PRIORITY` or `CONSOLIDATE` point with a practice set or a blocking review, a blocked one first, then the
 lowest mastery. A reward is paid once, when the quest completes; there is no claim endpoint.
 
 ## Badges

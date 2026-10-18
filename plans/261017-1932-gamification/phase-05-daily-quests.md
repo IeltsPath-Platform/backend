@@ -51,13 +51,14 @@ với mastery.
   `QuestRecorder` (BEFORE_COMMIT trên `QuestionEventsAppended`), `GetQuestsUseCase`, `GET /api/learning/me/quests`,
   khóa `learning.gamification.quests.*`.
 - `QuestionEventsAppended` mang thêm danh sách câu MỚI của lần ghi (lần nộp lặp không có câu mới nên không cộng tiến độ).
-- Chỉ đếm câu khách quan có chấm đúng/sai, lần nộp đầu, từ lesson, Practice, luyện tự do, ôn. Thi, thăm dò chẩn đoán và
-  essay không tính. `WEAKNESS` chỉ đếm câu của KP mục tiêu ở luyện tự do hoặc ôn. `STREAK` xong khi có bất kỳ câu mới nào.
+- Chỉ đếm câu có chấm đạt/không đạt (essay đã chấm là một câu), lần nộp đầu, từ lesson, Practice, luyện tự do, ôn. Thi và
+  thăm dò chẩn đoán không tính. `WEAKNESS` chỉ đếm câu của KP mục tiêu ở luyện tự do hoặc ôn. `STREAK` xong khi có bất kỳ câu mới nào.
 - Thưởng XP qua sổ XP khóa theo mã nhiệm vụ (không bị trần 100/ngày, như mốc KP); points qua `reward_grants` (lý do
   `DAILY_QUEST`), chỉ nhiệm vụ `PRACTICE` có points (+5).
 - Chọn KP mục tiêu cần Content (KP nào còn gói luyện): Content lỗi thì thay bằng `PRACTICE_PLUS`, không làm hỏng lần nộp.
 - Test HTTP `QuestController` đã có (`GamificationBoardsControllerTest`, gồm 403 cho vai trò khác CUSTOMER).
-- Chưa làm: nhiệm vụ ngày không tính bài essay (không phát câu hỏi).
+- Essay đã chấm (lesson và Practice) tính là câu luyện tập lần đầu và là hoạt động của ngày (2026-10-18; trước đó doc ghi sai là không tính).
+  Test: `LessonWritingIntegrationTest.aGradedLessonEssayCountsAsADayOfActivity...`, `QuestRulesTest`.
 
 ## Bàn giao FE
 

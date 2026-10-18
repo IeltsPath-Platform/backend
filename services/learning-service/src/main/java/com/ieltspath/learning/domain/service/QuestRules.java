@@ -42,11 +42,13 @@ public final class QuestRules {
     }
 
     /**
-     * Whether an answer counts as a practice answer: an objective, judged answer from a lesson, Practice, free practice
-     * or review, on its first submission. Exams, diagnostic probes and essays do not count.
+     * Whether an answer counts as a practice answer: a judged answer from a lesson (an exercise or an essay), Practice
+     * (an essay is an item of the set), free practice or review, on its first submission. Exams and diagnostic probes
+     * do not count.
      */
     public static boolean isPracticeAnswer(QuestionEventSource source, Boolean correct, boolean firstSubmission) {
         return firstSubmission && correct != null && (source == QuestionEventSource.LESSON_EXERCISE
+                || source == QuestionEventSource.LESSON_WRITING
                 || source == QuestionEventSource.PRACTICE_SET || source == QuestionEventSource.FREE_PRACTICE
                 || source == QuestionEventSource.REVIEW_SET);
     }

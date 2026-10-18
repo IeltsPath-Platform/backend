@@ -64,7 +64,8 @@ class QuestRulesTest {
         assertThat(QuestRules.isPracticeAnswer(QuestionEventSource.REVIEW_SET, true, true)).isTrue();
         assertThat(QuestRules.isPracticeAnswer(QuestionEventSource.ASSESSMENT, true, true)).isFalse();
         assertThat(QuestRules.isPracticeAnswer(QuestionEventSource.DIAGNOSTIC_PROBE, true, true)).isFalse();
-        assertThat(QuestRules.isPracticeAnswer(QuestionEventSource.LESSON_WRITING, true, true)).isFalse();
+        assertThat(QuestRules.isPracticeAnswer(QuestionEventSource.LESSON_WRITING, false, true)).as("a graded essay").isTrue();
+        assertThat(QuestRules.isPracticeAnswer(QuestionEventSource.LESSON_WRITING, true, false)).as("a rewrite").isFalse();
         assertThat(QuestRules.isPracticeAnswer(QuestionEventSource.LESSON_EXERCISE, null, true)).as("not judged").isFalse();
         assertThat(QuestRules.isPracticeAnswer(QuestionEventSource.LESSON_EXERCISE, true, false)).as("a repeat").isFalse();
     }

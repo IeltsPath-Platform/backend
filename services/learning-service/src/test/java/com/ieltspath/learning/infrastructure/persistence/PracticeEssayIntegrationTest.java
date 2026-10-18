@@ -149,6 +149,7 @@ class PracticeEssayIntegrationTest {
 
     @Test
     void anEssayIsGradedAndChargedOnceThenCountsAsWritingWithoutAReviewOrAPracticeRequirement() {
+        jdbc.update("DELETE FROM question_attempt_events WHERE user_id = ? AND question_version_id = ?", USER, ESSAY);
         var attempt = startPractice.execute(USER, LESSON, WRITING_SET).attemptId();
         assertEquals("ESSAY_NOT_GRADED", assertThrows(LearningRequestException.class,
                 () -> submitPractice.execute(USER, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of())))
@@ -173,6 +174,9 @@ class PracticeEssayIntegrationTest {
         assertTrue(result.reviewsCreated().isEmpty());
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'practice_set' "
                 + "AND kp_id = ? AND correct = false", Integer.class, KP_WRITING));
+        // The essay is one question event of the submission, and every question event is a day of activity.
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM question_attempt_events WHERE user_id = ? "
+                + "AND question_version_id = ? AND source = 'practice_set'", Integer.class, USER, ESSAY));
         assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(USER, LESSON).practiceStatus());
 
         var reading = startPractice.execute(USER, LESSON, READING_SET).attemptId();

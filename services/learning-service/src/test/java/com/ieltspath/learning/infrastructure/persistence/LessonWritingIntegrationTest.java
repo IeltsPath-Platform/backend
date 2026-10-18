@@ -158,6 +158,20 @@ class LessonWritingIntegrationTest {
     }
 
     @Test
+    void aGradedLessonEssayCountsAsADayOfActivityForTheStreakAndTheStreakQuest() {
+        jdbc.update("DELETE FROM learner_streaks WHERE user_id = ?", USER);
+        jdbc.update("DELETE FROM daily_quests WHERE user_id = ?", USER);
+        llmReplies(grade("6.5"));
+
+        submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY);
+
+        assertEquals(1, jdbc.queryForObject("SELECT current_days FROM learner_streaks WHERE user_id = ?",
+                Integer.class, USER), "the essay is the day's first activity");
+        assertEquals(1, jdbc.queryForObject("SELECT progress FROM daily_quests WHERE user_id = ? AND type = 'STREAK'",
+                Integer.class, USER));
+    }
+
+    @Test
     void essayValidationAndBalanceRunBeforeAnyRowOrLlmCall() {
         assertCode(422, "ESSAY_EMPTY", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), "  "));
         assertCode(422, "ESSAY_TOO_SHORT", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(),
