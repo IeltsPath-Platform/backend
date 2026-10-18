@@ -59,9 +59,9 @@ Points (access) ── kiếm: thưởng học (có trần/ngày) │ tiêu: h�
 | 2 | [XP, cấp độ, cài đặt múi giờ](phase-02-xp-and-levels.md) | learning | completed (XP, cấp độ, múi giờ, khối `gamification` qua HTTP, ranh giới ngày theo múi giờ) | – |
 | 3 | [Tim](phase-03-hearts.md) | learning, access | in_progress (gate, trừ tim, refill, PREMIUM 7, 403 qua HTTP, bài ôn khi hết tim đều có test; chỉ còn refund, chờ Codex thêm route nội bộ ở access) | 1, 2, plan 3 phase 3 |
 | 4 | [Streak phía server, đóng băng, thưởng points](phase-04-server-streak-and-rewards.md) | learning, access | in_progress (streak, đóng băng, mốc 7/30 có test DB; relay points và refund chưa làm) | 1, 2 |
-| 5 | [Nhiệm vụ ngày](phase-05-daily-quests.md) | learning | completed (V29, sinh lười, tiến độ theo câu mới, thưởng một lần; còn: test HTTP controller) | 2, 4 |
-| 6 | [Huy hiệu](phase-06-badges.md) | learning | completed (V30, 9 huy hiệu, cấp một lần, bật/tắt; còn: test HTTP controller) | 2, 4 |
-| 7 | [League tuần](phase-07-weekly-league.md) | learning, user | completed (V28, chốt tuần, bảng và lịch sử; còn: test HTTP controller, ẩn danh) | 2 |
+| 5 | [Nhiệm vụ ngày](phase-05-daily-quests.md) | learning | completed (V29, sinh lười, tiến độ theo câu mới, thưởng một lần, test HTTP controller) | 2, 4 |
+| 6 | [Huy hiệu](phase-06-badges.md) | learning | completed (V30, 9 huy hiệu, cấp một lần, bật/tắt, test HTTP controller) | 2, 4 |
+| 7 | [League tuần](phase-07-weekly-league.md) | learning, user | completed (V28, chốt tuần, bảng và lịch sử, test HTTP controller và adapter tên hiển thị; còn: ẩn danh) | 2 |
 | 8 | [Contract, tài liệu, nghiệm thu](phase-08-contracts-and-acceptance.md) | docs | in_progress (contract learning, AGENTS.md, DATABASE_V5 xong; còn contract access/user, verify, demo) | tất cả |
 
 ## Câu hỏi mở

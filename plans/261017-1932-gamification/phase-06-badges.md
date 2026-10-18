@@ -53,7 +53,8 @@ dependencies: [2, 4]
 - Điểm thưởng huy hiệu do tôi chọn (bảng điều kiện không nêu): STREAK_7 5, STREAK_30 15, STREAK_100 50, KP_MAINTAIN_10 5,
   KP_MAINTAIN_50 20, FIRST_TOPIC_TEST 3, COURSE_PASSED 20, LEVEL_10 20, QUESTS_30 10. Đi qua `reward_grants` (lý do `BADGE`).
 - Huy hiệu bị tắt không được cấp mới nhưng người đã có vẫn thấy. Danh sách chỉ hiện huy hiệu đang bật (và huy hiệu đã có).
-- Chưa làm: test HTTP `BadgeController` (vai trò ADMIN/CUSTOMER); thông báo trong app khi vừa đạt (việc của FE/thông báo).
+- Test HTTP `BadgeController` đã có (`GamificationBoardsControllerTest`: kệ huy hiệu, ADMIN bật/tắt, CUSTOMER bị 403, body thiếu `active` bị từ chối, mã lạ 404).
+- Chưa làm: thông báo trong app khi vừa đạt (việc của FE/thông báo).
 
 ## Bàn giao FE
 

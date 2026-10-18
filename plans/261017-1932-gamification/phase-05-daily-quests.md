@@ -56,7 +56,8 @@ với mastery.
 - Thưởng XP qua sổ XP khóa theo mã nhiệm vụ (không bị trần 100/ngày, như mốc KP); points qua `reward_grants` (lý do
   `DAILY_QUEST`), chỉ nhiệm vụ `PRACTICE` có points (+5).
 - Chọn KP mục tiêu cần Content (KP nào còn gói luyện): Content lỗi thì thay bằng `PRACTICE_PLUS`, không làm hỏng lần nộp.
-- Chưa làm: test HTTP `QuestController`; nhiệm vụ ngày không tính bài essay (không phát câu hỏi).
+- Test HTTP `QuestController` đã có (`GamificationBoardsControllerTest`, gồm 403 cho vai trò khác CUSTOMER).
+- Chưa làm: nhiệm vụ ngày không tính bài essay (không phát câu hỏi).
 
 ## Bàn giao FE
 

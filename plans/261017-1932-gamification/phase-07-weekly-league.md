@@ -60,7 +60,8 @@ hạng, giữa giữ nguyên. 7 hạng: Bronze, Silver, Gold, Sapphire, Diamond,
   (`xp_updated_at`); nhóm dưới 23 người không ai xuống hạng, nhưng top 7 vẫn lên (nhóm 7 người trở xuống thì tất cả lên).
   Người dùng chọn giữ đúng tài liệu, không thêm ngưỡng nhóm tối thiểu (2026-10-17).
 - Chỉ XP `counted` vào league: XP vượt trần 100/ngày (shadow) không vào. Test: 12 câu khó earn 240, vào league 100.
-- Chưa làm: test HTTP cho `LeagueController`, test adapter `RestDisplayNameClient`, ẩn danh (câu hỏi mở của plan).
+- Test HTTP `LeagueController` (`GamificationBoardsControllerTest`) và test adapter `RestDisplayNameClient` (`RestUserServiceClientsTest`) đã có.
+- Chưa làm: ẩn danh (câu hỏi mở của plan).
 
 ## Risk Assessment
 
