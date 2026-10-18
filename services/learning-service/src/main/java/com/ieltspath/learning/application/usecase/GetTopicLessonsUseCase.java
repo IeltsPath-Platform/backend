@@ -57,7 +57,7 @@ public class GetTopicLessonsUseCase {
             var clearance = practiceStates.get(lesson.lessonId());
             summaries.add(new TopicLessonsResult.LessonSummary(lesson.lessonId(), lesson.code(), lesson.title(),
                     lesson.sortOrder(), completed ? "COMPLETED" : previousOpen ? "AVAILABLE" : "LOCKED",
-                    clearance.status(), clearance.reason()));
+                    clearance.status(), clearance.reason(), lesson.estimatedMinutes()));
             previousComplete &= completed;
             previousOpen &= completed && clearance.status() == PracticeStatus.PASSED;
         }

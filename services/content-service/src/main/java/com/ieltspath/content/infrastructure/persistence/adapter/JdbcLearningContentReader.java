@@ -138,7 +138,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
     @Override
     public List<TopicSequenceResult> topicSequence(int minPracticeQuestions) {
         record TopicRow(UUID id, String code, String name, int sortOrder, String requiredFeatureKey, Skill skill,
-                        boolean hasTopicTest, TopicSequenceResult.CourseEntry course, List<Skill> skills) {}
+                        boolean hasTopicTest, TopicSequenceResult.CourseEntry course, List<Skill> skills,
+                        int lessonCount) {}
         // Course metadata is read with the topic; topics outside an active course do not join the curriculum.
         List<TopicRow> topics = jdbc.query("""
                 SELECT t.id, t.code, t.name, t.sort_order, t.required_feature_key, t.skill,
@@ -149,6 +150,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
                                WHERE p.topic_id = t.id AND p.package_type = 'TOPIC_TEST'
                                  AND p.status = 'PUBLISHED' AND p.current_published_version_id IS NOT NULL)
                            AS has_topic_test,
+                       (SELECT count(*) FROM lessons l
+                        WHERE l.topic_id = t.id AND l.status = 'PUBLISHED') AS lesson_count,
                        c.id AS course_id, c.code AS course_code, c.name AS course_name, c.band_level,
                        EXISTS (SELECT 1 FROM content_packages p
                                WHERE p.course_id = c.id AND p.package_type = 'COURSE_TEST'
@@ -163,7 +166,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 rs.getInt("sort_order"), rs.getString("required_feature_key"),
                 enumOrNull(Skill.class, rs.getString("skill")), rs.getBoolean("has_topic_test"),
                 new TopicSequenceResult.CourseEntry(uuid(rs, "course_id"), rs.getString("course_code"),
-                        rs.getString("course_name"), rs.getBigDecimal("band_level"), rs.getBoolean("has_course_test")), skills(rs)));
+                        rs.getString("course_name"), rs.getBigDecimal("band_level"), rs.getBoolean("has_course_test")), skills(rs),
+                rs.getInt("lesson_count")));
         if (topics.isEmpty()) {
             return List.of();
         }
@@ -208,14 +212,16 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
     @Override
     public List<LessonSummaryResult> publishedLessons(UUID topicId) {
-        record LessonRow(UUID id, String code, String title, String summary, int sortOrder, List<Skill> skills) {}
+        record LessonRow(UUID id, String code, String title, String summary, int sortOrder, List<Skill> skills,
+                         Integer estimatedMinutes) {}
         List<LessonRow> lessons = jdbc.query("""
-                SELECT l.id, l.code, l.title, l.summary, l.sort_order, ARRAY(%s) AS skills
+                SELECT l.id, l.code, l.title, l.summary, l.sort_order, l.estimated_minutes, ARRAY(%s) AS skills
                 FROM lessons l
                 WHERE l.topic_id = :topicId AND l.status = 'PUBLISHED'
                 ORDER BY l.sort_order
                 """.formatted(LESSON_SKILLS), Map.of("topicId", topicId), (rs, i) -> new LessonRow(uuid(rs, "id"), rs.getString("code"),
-                rs.getString("title"), rs.getString("summary"), rs.getInt("sort_order"), skills(rs)));
+                rs.getString("title"), rs.getString("summary"), rs.getInt("sort_order"), skills(rs),
+                (Integer) rs.getObject("estimated_minutes")));
         if (lessons.isEmpty()) {
             return List.of();
         }
@@ -234,7 +240,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
         return lessons.stream()
                 .map(l -> new LessonSummaryResult(l.id(), topicId, l.code(), l.title(), l.summary(), l.sortOrder(),
                         knowledgePoints.getOrDefault(l.id(), List.of()),
-                        exerciseBlocks.getOrDefault(l.id(), List.of()), l.skills()))
+                        exerciseBlocks.getOrDefault(l.id(), List.of()), l.skills(), l.estimatedMinutes()))
                 .toList();
     }
 

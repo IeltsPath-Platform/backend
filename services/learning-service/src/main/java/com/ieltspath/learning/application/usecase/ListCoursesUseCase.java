@@ -7,11 +7,13 @@ import com.ieltspath.learning.domain.aggregate.CourseProgress;
 import com.ieltspath.learning.domain.repository.CourseProgressRepository;
 import com.ieltspath.learning.domain.repository.LearnerCurriculumRepository;
 import com.ieltspath.learning.domain.repository.LearnerPlacementRepository;
+import com.ieltspath.learning.domain.repository.LessonProgressRepository;
 import com.ieltspath.learning.domain.vo.TopicStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,15 +27,17 @@ public class ListCoursesUseCase {
     private final LearnerCurriculumRepository curricula;
     private final CourseProgressRepository courseProgress;
     private final LearnerPlacementRepository placements;
+    private final LessonProgressRepository lessonProgress;
 
     public ListCoursesUseCase(LearnerLock lock, RefreshLearningTopicsUseCase refreshTopics,
                               LearnerCurriculumRepository curricula, CourseProgressRepository courseProgress,
-                              LearnerPlacementRepository placements) {
+                              LearnerPlacementRepository placements, LessonProgressRepository lessonProgress) {
         this.lock = lock;
         this.refreshTopics = refreshTopics;
         this.curricula = curricula;
         this.courseProgress = courseProgress;
         this.placements = placements;
+        this.lessonProgress = lessonProgress;
     }
 
     @Transactional
@@ -53,6 +57,17 @@ public class ListCoursesUseCase {
         var statuses = curriculum.statuses();
         Map<UUID, Integer> total = new LinkedHashMap<>();
         Map<UUID, Integer> passed = new LinkedHashMap<>();
+        Map<UUID, Integer> completedLessons = new LinkedHashMap<>();
+        Map<UUID, Integer> totalLessons = new LinkedHashMap<>();
+        Map<UUID, Instant> lastStudied = new LinkedHashMap<>();
+        Map<UUID, Instant> studiedTopics = lessonProgress.lastStudiedByTopic(userId);
+        for (TopicResult topic : refreshed) {
+            if (topic.course() == null) continue;
+            completedLessons.merge(topic.course().courseId(), topic.completedLessonCount(), Integer::sum);
+            totalLessons.merge(topic.course().courseId(), topic.totalLessonCount(), Integer::sum);
+            Instant studied = studiedTopics.get(topic.topicId());
+            if (studied != null) lastStudied.merge(topic.course().courseId(), studied, (a, b) -> a.isAfter(b) ? a : b);
+        }
         for (var topic : topics) {
             if (topic.courseId() == null || topic.sequenceOrder() == null) continue;
             total.merge(topic.courseId(), 1, Integer::sum);
@@ -76,7 +91,9 @@ public class ListCoursesUseCase {
                             : passedCount < topicCount ? "LOCKED" : "AVAILABLE";
                     return new CourseResult(course.courseId(), course.code(), course.name(), course.bandLevel(), topicCount,
                             passedCount, course.courseId().equals(recommended), testStatus,
-                            progress == null ? null : progress.passedAt());
+                            progress == null ? null : progress.passedAt(),
+                            completedLessons.getOrDefault(course.courseId(), 0),
+                            totalLessons.getOrDefault(course.courseId(), 0), lastStudied.get(course.courseId()));
                 }).toList();
     }
 

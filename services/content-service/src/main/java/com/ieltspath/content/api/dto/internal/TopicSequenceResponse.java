@@ -19,7 +19,8 @@ public record TopicSequenceResponse(
         boolean hasTopicTest,
         Course course,
         List<Skill> skills,
-        boolean active
+        boolean active,
+        int lessonCount
 ) {
     public record Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
                          boolean hasCourseTest, boolean active) {
@@ -40,6 +41,7 @@ public record TopicSequenceResponse(
                                 kp.description(), kp.hasPracticeSet(), kp.cefrLevel(), kp.canDo(), kp.scopeIn(),
                                 kp.scopeOut()))
                         .toList(),
-                result.skill(), result.hasTopicTest(), Course.from(result.course()), result.skills(), result.active());
+                result.skill(), result.hasTopicTest(), Course.from(result.course()), result.skills(), result.active(),
+                result.lessonCount());
     }
 }

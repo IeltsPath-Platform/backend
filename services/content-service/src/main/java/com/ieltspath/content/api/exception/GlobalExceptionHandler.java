@@ -33,6 +33,7 @@ public class GlobalExceptionHandler {
             AssetNotFoundException.class,
             ReadingPassageNotFoundException.class,
             LessonNotFoundException.class,
+            LessonResourceNotFoundException.class,
             PackageVersionNotFoundException.class,
             RubricNotFoundException.class
     })
@@ -102,6 +103,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleDuplicateCourse(DuplicateCourseException ex, HttpServletRequest request) {
         log.warn("Course conflict: {}", ex.getMessage());
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(DuplicateLessonResourceOrderException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateLessonResourceOrder(DuplicateLessonResourceOrderException ex,
+                                                                           HttpServletRequest request) {
+        log.warn("Lesson resource conflict: {}", ex.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "DUPLICATE_RESOURCE_ORDER"));
     }
 
     @ExceptionHandler(DifficultyRequiredException.class)
