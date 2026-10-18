@@ -1,5 +1,7 @@
 package com.ieltspath.notification.application;
 
+import com.ieltspath.events.community.CommunityEventTypes;
+
 import com.ieltspath.notification.domain.repository.NotificationPreferenceRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +18,7 @@ public class NotificationPreferenceService {
     @Transactional(readOnly = true)
     public List<NotificationPreference> list(UUID recipientId) {
         var saved = preferences.findAll(recipientId);
-        return NotificationEventTypes.ORDERED.stream()
+        return CommunityEventTypes.ORDERED.stream()
                 .map(type -> new NotificationPreference(type, saved.getOrDefault(type, true))).toList();
     }
 
@@ -34,7 +36,7 @@ public class NotificationPreferenceService {
     }
 
     private void requireEventType(String eventType) {
-        if (!NotificationEventTypes.ALL.contains(eventType))
+        if (!CommunityEventTypes.ALL.contains(eventType))
             throw new IllegalArgumentException("Unsupported notification event type");
     }
 }

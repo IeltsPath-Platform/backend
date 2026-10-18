@@ -1,7 +1,7 @@
 package com.ieltspath.notification.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ieltspath.notification.application.NotificationEventTypes;
+import com.ieltspath.events.community.CommunityEventTypes;
 import com.ieltspath.notification.application.NotificationPreferenceService;
 import com.ieltspath.notification.application.RecordCommunityEventUseCase;
 import com.ieltspath.notification.infrastructure.persistence.NotificationPreferenceRepositoryAdapter;
@@ -41,11 +41,11 @@ class CommunityEventConsumerIntegrationTest {
         var mapper = new ObjectMapper();
         var consumer = new CommunityEventConsumer(mapper, recordEvent(jdbc), socket, mock(RabbitTemplate.class));
         UUID event=UUID.randomUUID(), actor=UUID.randomUUID(), recipient=UUID.randomUUID(), post=UUID.randomUUID(), comment=UUID.randomUUID();
-        byte[] body=eventJson(event,NotificationEventTypes.COMMENT_MENTIONED,actor,recipient,post,comment)
+        byte[] body=eventJson(event,CommunityEventTypes.COMMENT_MENTIONED,actor,recipient,post,comment)
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8);
         Channel channel=mock(Channel.class);
         for (int i=0;i<2;i++) {
-            var properties=new MessageProperties(); properties.setReceivedRoutingKey(NotificationEventTypes.COMMENT_MENTIONED);
+            var properties=new MessageProperties(); properties.setReceivedRoutingKey(CommunityEventTypes.COMMENT_MENTIONED);
             properties.setMessageId(event.toString()); properties.setDeliveryTag(i+1);
             consumer.receive(new Message(body, properties), channel);
         }
@@ -63,28 +63,28 @@ class CommunityEventConsumerIntegrationTest {
         var mapper = new ObjectMapper();
         var consumer = new CommunityEventConsumer(mapper, recordEvent(jdbc), socket, mock(RabbitTemplate.class));
         UUID actor=UUID.randomUUID(), recipient=UUID.randomUUID(), post=UUID.randomUUID(), comment=UUID.randomUUID();
-        preferences.update(recipient, NotificationEventTypes.COMMENT_MENTIONED, false);
+        preferences.update(recipient, CommunityEventTypes.COMMENT_MENTIONED, false);
         Channel channel=mock(Channel.class);
         int deliveryTag=0;
-        for (String eventType : NotificationEventTypes.ORDERED) {
+        for (String eventType : CommunityEventTypes.ORDERED) {
             UUID event=UUID.randomUUID();
-            UUID eventPost=NotificationEventTypes.USER_FOLLOWED.equals(eventType)?null:post;
-            UUID eventComment=eventType.equals(NotificationEventTypes.POST_COMMENTED)
-                    || eventType.equals(NotificationEventTypes.COMMENT_REPLIED)
-                    || eventType.equals(NotificationEventTypes.COMMENT_MENTIONED) ? comment : null;
+            UUID eventPost=CommunityEventTypes.USER_FOLLOWED.equals(eventType)?null:post;
+            UUID eventComment=eventType.equals(CommunityEventTypes.POST_COMMENTED)
+                    || eventType.equals(CommunityEventTypes.COMMENT_REPLIED)
+                    || eventType.equals(CommunityEventTypes.COMMENT_MENTIONED) ? comment : null;
             var properties=new MessageProperties(); properties.setReceivedRoutingKey(eventType);
             properties.setMessageId(event.toString()); properties.setDeliveryTag(++deliveryTag);
             byte[] body=eventJson(event,eventType,actor,recipient,eventPost,eventComment)
                     .getBytes(java.nio.charset.StandardCharsets.UTF_8);
             consumer.receive(new Message(body,properties),channel);
         }
-        assertEquals(NotificationEventTypes.ORDERED.size()-1,
+        assertEquals(CommunityEventTypes.ORDERED.size()-1,
                 jdbc.queryForObject("SELECT count(*) FROM notifications WHERE recipient_id=?",Integer.class,recipient));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM notifications WHERE recipient_id=? AND event_type=?",
-                Integer.class,recipient,NotificationEventTypes.COMMENT_MENTIONED));
-        verify(socket,times(NotificationEventTypes.ORDERED.size()-1))
+                Integer.class,recipient,CommunityEventTypes.COMMENT_MENTIONED));
+        verify(socket,times(CommunityEventTypes.ORDERED.size()-1))
                 .convertAndSendToUser(eq(recipient.toString()),eq("/queue/notifications"),any());
-        verify(channel,times(NotificationEventTypes.ORDERED.size())).basicAck(anyLong(),eq(false));
+        verify(channel,times(CommunityEventTypes.ORDERED.size())).basicAck(anyLong(),eq(false));
     }
 
     private static RecordCommunityEventUseCase recordEvent(JdbcTemplate jdbc) {

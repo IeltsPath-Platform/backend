@@ -1,5 +1,7 @@
 package com.ieltspath.notification.application;
 
+import com.ieltspath.events.community.CommunityEventTypes;
+
 import com.ieltspath.notification.domain.repository.NotificationPreferenceRepository;
 import org.junit.jupiter.api.Test;
 
@@ -14,8 +16,8 @@ class NotificationPreferenceServiceTest {
 
     @Test void savesPreferenceForOneSupportedEventType() {
         UUID owner=UUID.randomUUID();
-        service.update(owner,NotificationEventTypes.COMMENT_MENTIONED,false);
-        verify(repository).save(owner,NotificationEventTypes.COMMENT_MENTIONED,false);
+        service.update(owner,CommunityEventTypes.COMMENT_MENTIONED,false);
+        verify(repository).save(owner,CommunityEventTypes.COMMENT_MENTIONED,false);
     }
 
     @Test void rejectsUnknownEventTypeWithoutWriting() {
