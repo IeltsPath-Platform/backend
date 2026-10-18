@@ -10,16 +10,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/** A request reads the milestones from Content and keeps the count; an event, which has no learner token, uses it. */
+/** A request reads the milestones from Content and keeps the count; an event reads only what was kept. */
 class CourseMilestonesTest {
     private final UUID course = UUID.randomUUID();
     private final LearningContentClient content = mock(LearningContentClient.class);
@@ -31,49 +31,50 @@ class CourseMilestonesTest {
     }
 
     @Test
-    void aRequestReadsTheCountFromContent() {
+    void aRequestReadsTheCountFromContentAndKeepsIt() {
         when(content.getPracticeTestMilestones(course)).thenReturn(List.of(milestone(), milestone()));
 
-        assertEquals(2, milestones.count(course));
+        assertEquals(2, milestones.countForRequest(course));
 
-        verify(counts, never()).find(any());
+        verify(counts).saveIfChanged(course, 2);
     }
 
     @Test
-    void keepingStoresTheCurrentCount() {
-        when(content.getPracticeTestMilestones(course)).thenReturn(List.of(milestone(), milestone()));
+    void aCourseWithoutAKeptCountAsksContentOnceToKeepOne() {
+        when(counts.find(course)).thenReturn(Optional.empty());
+        when(content.getPracticeTestMilestones(course)).thenReturn(List.of(milestone()));
 
-        milestones.keep(course);
+        milestones.ensureKnown(course);
 
-        verify(counts).save(course, 2);
+        verify(counts).saveIfChanged(course, 1);
     }
 
     @Test
-    void anEventWithoutALearnerTokenUsesTheKeptCount() {
-        when(content.getPracticeTestMilestones(course))
-                .thenThrow(new LearningRequestException(401, "UNAUTHORIZED", "Authenticated gateway JWT required"));
+    void aCourseWithAKeptCountDoesNotCallContentAgain() {
         when(counts.find(course)).thenReturn(Optional.of(3));
 
-        assertEquals(3, milestones.count(course));
+        milestones.ensureKnown(course);
 
-        verify(counts, never()).save(any(), anyInt());
+        verifyNoInteractions(content);
+        verify(counts, never()).saveIfChanged(any(), anyInt());
     }
 
     @Test
-    void withoutATokenAndNothingKeptTheFailureStandsSoTheEventIsRetried() {
-        var unauthorized = new LearningRequestException(401, "UNAUTHORIZED", "Authenticated gateway JWT required");
-        when(content.getPracticeTestMilestones(course)).thenThrow(unauthorized);
+    void anEventReadsTheKeptCountAndNeverCallsContent() {
+        when(counts.find(course)).thenReturn(Optional.of(3));
+
+        assertEquals(3, milestones.countForEvent(course));
+
+        verifyNoInteractions(content);
+    }
+
+    @Test
+    void anEventWithoutAKeptCountFailsSoItIsTriedAgainOnceARequestHasKeptOne() {
         when(counts.find(course)).thenReturn(Optional.empty());
 
-        assertSame(unauthorized, assertThrows(LearningRequestException.class, () -> milestones.count(course)));
-    }
+        var failure = assertThrows(LearningRequestException.class, () -> milestones.countForEvent(course));
 
-    @Test
-    void aContentOutageIsNotHiddenBehindAKeptCount() {
-        when(content.getPracticeTestMilestones(course))
-                .thenThrow(new LearningRequestException(503, "CONTENT_UNAVAILABLE", "Learning content is unavailable"));
-
-        assertEquals(503, assertThrows(LearningRequestException.class, () -> milestones.count(course)).getStatus());
-        verify(counts, never()).find(any());
+        assertEquals("MILESTONE_COUNT_UNKNOWN", failure.getCode());
+        verifyNoInteractions(content);
     }
 }

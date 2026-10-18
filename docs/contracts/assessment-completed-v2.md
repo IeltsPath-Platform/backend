@@ -183,6 +183,11 @@ Consumer delivery rules:
    `event_type` and `result_version`. Republish to `assessment.events` with routing key
    `assessment.completed.v2` and publisher confirmation. ACK the DLQ copy only after
    confirmed routing. Do not invent a learning goal or rewrite the event.
-5. Verify queue counts settle and `assessment_result_versions` advances.
+5. A `COURSE_GATE` result is scored with the number of practice-test milestones that Learning kept when the course test
+   was assigned (`course_milestone_counts`), because an event carries no learner token for Content. The number is kept
+   when a learner is assigned the test, views the course score or lists the course practice tests. An event that arrives
+   before the number is kept fails with `MILESTONE_COUNT_UNKNOWN` and is tried again, then parked in the DLQ. After a
+   deploy, replay those parked messages once the learner has opened the course score or the test assignment (steps above).
+6. Verify queue counts settle and `assessment_result_versions` advances.
    Result-version and evidence idempotency make redelivery safe; keep the DLQ copy
    when publication confirmation fails.

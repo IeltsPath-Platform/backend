@@ -5,7 +5,8 @@ import java.util.UUID;
 
 /** The number of practice-test milestones of each course, as Content last reported it. */
 public interface CourseMilestoneCountRepository {
-    void save(UUID courseId, int count);
+    /** Writes the count when the course has none or a different one; independent of the caller's transaction. */
+    void saveIfChanged(UUID courseId, int count);
 
     Optional<Integer> find(UUID courseId);
 }

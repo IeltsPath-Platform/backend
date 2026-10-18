@@ -8,9 +8,10 @@ import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 /**
- * The number of practice-test milestones of a course. Content only answers a call that carries a learner's gateway
- * token, so a request reads it from Content; applying an assessment event has no token and uses the count kept when
- * the course test was assigned, which always happens through a request.
+ * The number of practice-test milestones of a course. Content only answers a call that carries a gateway token of a
+ * learner, so the number is read from Content inside a request and kept; applying an assessment event has no token and
+ * must not call Content, so it reads only the kept number. A course test can be assigned only through a request, which
+ * keeps the number if it is not there yet, and a request that reads the milestones refreshes it when it changed.
  */
 @Component
 public class CourseMilestones {
@@ -22,18 +23,26 @@ public class CourseMilestones {
         this.counts = counts;
     }
 
-    /** Reads the count from Content, or the kept one when the call carries no learner token. */
-    public int count(UUID courseId) {
-        try {
-            return content.getPracticeTestMilestones(courseId).size();
-        } catch (LearningRequestException noLearnerToken) {
-            if (noLearnerToken.getStatus() != 401) throw noLearnerToken;
-            return counts.find(courseId).orElseThrow(() -> noLearnerToken);
-        }
+    /** For a request: reads the count from Content and keeps it when it is new or changed. */
+    public int countForRequest(UUID courseId) {
+        int count = content.getPracticeTestMilestones(courseId).size();
+        counts.saveIfChanged(courseId, count);
+        return count;
     }
 
-    /** Keeps the current count for the events of this course; call it from a request that may write. */
-    public void keep(UUID courseId) {
-        counts.save(courseId, content.getPracticeTestMilestones(courseId).size());
+    /** For a request that already holds the milestones it read from Content. */
+    public void remember(UUID courseId, int count) {
+        counts.saveIfChanged(courseId, count);
+    }
+
+    /** For a request: makes sure a count is kept, asking Content only when none is. */
+    public void ensureKnown(UUID courseId) {
+        if (counts.find(courseId).isEmpty()) countForRequest(courseId);
+    }
+
+    /** For an event: the kept count, never a call to Content. Without one the event fails and is tried again. */
+    public int countForEvent(UUID courseId) {
+        return counts.find(courseId).orElseThrow(() -> new LearningRequestException(503, "MILESTONE_COUNT_UNKNOWN",
+                "The practice test milestones of this course are not known yet"));
     }
 }

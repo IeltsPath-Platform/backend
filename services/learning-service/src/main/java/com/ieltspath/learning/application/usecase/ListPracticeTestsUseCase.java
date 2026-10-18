@@ -1,6 +1,7 @@
 package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.exception.LearningRequestException;
+import com.ieltspath.learning.application.service.CourseMilestones;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.result.PracticeTestMilestoneResult;
@@ -21,9 +22,11 @@ public class ListPracticeTestsUseCase {
     private final LearnerCurriculumRepository curricula;
     private final LearningContentClient content;
     private final PracticeTestAssignmentRepository assignments;
+    private final CourseMilestones milestoneCounts;
     public ListPracticeTestsUseCase(LearnerLock lock,RefreshLearningTopicsUseCase refresh,
-            LearnerCurriculumRepository curricula,LearningContentClient content,PracticeTestAssignmentRepository assignments) {
-        this.lock=lock;this.refresh=refresh;this.curricula=curricula;this.content=content;this.assignments=assignments;
+            LearnerCurriculumRepository curricula,LearningContentClient content,PracticeTestAssignmentRepository assignments,
+            CourseMilestones milestoneCounts) {
+        this.milestoneCounts=milestoneCounts;this.lock=lock;this.refresh=refresh;this.curricula=curricula;this.content=content;this.assignments=assignments;
     }
     @Transactional
     public List<PracticeTestMilestoneResult> execute(UUID userId,UUID courseId) {
@@ -34,6 +37,7 @@ public class ListPracticeTestsUseCase {
                 .sorted(Comparator.comparingInt(TopicProgress::sequenceOrder)).toList();
         if (topics.isEmpty()) throw new LearningRequestException(404,"COURSE_NOT_FOUND","Active course not found");
         var milestones=content.getPracticeTestMilestones(courseId);
+        milestoneCounts.remember(courseId,milestones.size());
         var assigned=assignments.findByCourse(userId,courseId).stream()
                 .collect(Collectors.toMap(PracticeTestAssignment::packageId,Function.identity()));
         return milestones.stream().sorted(Comparator.comparingInt(LearningContentClient.PracticeTestMilestone::afterTopicSequence)

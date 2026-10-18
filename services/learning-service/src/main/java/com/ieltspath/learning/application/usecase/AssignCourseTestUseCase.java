@@ -70,8 +70,9 @@ public class AssignCourseTestUseCase {
             throw new LearningRequestException(409, "REMEDIATION_REQUIRED",
                     "Finish the reviews from the course test before taking it again");
         }
-        // The result of this test is applied by an event that cannot ask Content for the milestones itself.
-        milestones.keep(courseId);
+        // The result of this test is applied by an event that cannot ask Content for the milestones, so a count must be
+        // kept by now, including for a test that was assigned before counts were kept.
+        milestones.ensureKnown(courseId);
         var open = assignments.findOpen(userId, courseId);
         if (open.isPresent()) return result(open.get());
         List<TestPackage> packages = content.getCourseTestPackages(courseId);

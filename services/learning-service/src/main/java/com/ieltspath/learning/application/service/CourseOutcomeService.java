@@ -38,13 +38,16 @@ public class CourseOutcomeService {
     private final LearnerCurriculumRepository curricula;
     private final CourseProgressRepository courseProgress;
     private final BadgeService badges;
+    private final CourseMilestones milestones;
     private final Clock clock = Clock.systemUTC();
 
     public CourseOutcomeService(CourseScoreConfigRepository configs, CourseScoreService scores, CourseScoreData data,
                                 CourseOutcomeRepository outcomes, RemediationFlagRepository flags,
                                 ReviewItemRepository reviews, LearnerCurriculumRepository curricula,
-                                CourseProgressRepository courseProgress, BadgeService badges) {
+                                CourseProgressRepository courseProgress, BadgeService badges,
+                                CourseMilestones milestones) {
         this.badges = badges;
+        this.milestones = milestones;
         this.configs = configs;
         this.scores = scores;
         this.data = data;
@@ -76,7 +79,7 @@ public class CourseOutcomeService {
      */
     public void afterCourseTest(UUID userId, UUID courseId, UUID attemptId, Set<UUID> wrongKnowledgePoints) {
         CourseScoreConfig config = configs.effective(courseId);
-        var evaluation = scores.evaluate(userId, courseId, config);
+        var evaluation = scores.evaluate(userId, courseId, config, milestones.countForEvent(courseId));
         double total = evaluation.score().total();
         var components = CourseScoreService.asMap(evaluation);
         if (scores.passes(config, total)) {

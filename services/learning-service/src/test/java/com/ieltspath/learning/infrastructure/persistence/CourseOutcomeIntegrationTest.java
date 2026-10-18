@@ -34,6 +34,9 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -200,11 +203,11 @@ class CourseOutcomeIntegrationTest {
         topicTest(TOPIC_TWO, TOPIC_TWO_PACKAGE, TOPIC_TWO_VERSION, 4, 4);
         assignCourseTest.execute(user, COURSE);
 
-        // Applying the event runs outside a request, so Content refuses the milestones call; the count kept at
-        // assignment stands in for it and the course is decided instead of the event failing and being retried.
-        when(content.getPracticeTestMilestones(COURSE))
-                .thenThrow(new LearningRequestException(401, "UNAUTHORIZED", "Authenticated gateway JWT required"));
+        // Applying the event runs outside a request, so Content would refuse the milestones call; the count kept at
+        // assignment is used and Content is not asked at all.
+        reset(content);
         courseTest(VERSION_A, 5, 5);
+        verify(content, never()).getPracticeTestMilestones(COURSE);
 
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM course_progress WHERE user_id = ? "
                 + "AND course_id = ? AND passed_at IS NOT NULL", Integer.class, user, COURSE));

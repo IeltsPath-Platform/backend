@@ -2,6 +2,7 @@ package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.result.CourseScoreResult;
+import com.ieltspath.learning.application.service.CourseMilestones;
 import com.ieltspath.learning.application.service.CourseScoreService;
 import com.ieltspath.learning.domain.repository.CourseOutcomeRepository;
 import com.ieltspath.learning.domain.repository.CourseScoreConfigRepository;
@@ -22,12 +23,14 @@ public class GetCourseScoreUseCase {
     private final LearnerCurriculumRepository curricula;
     private final CourseScoreConfigRepository configs;
     private final CourseScoreService scores;
+    private final CourseMilestones milestones;
     private final CourseOutcomeRepository outcomes;
     private final RemediationFlagRepository flags;
 
     public GetCourseScoreUseCase(LearnerCurriculumRepository curricula, CourseScoreConfigRepository configs,
                                  CourseScoreService scores, CourseOutcomeRepository outcomes,
-                                 RemediationFlagRepository flags) {
+                                 RemediationFlagRepository flags, CourseMilestones milestones) {
+        this.milestones = milestones;
         this.curricula = curricula;
         this.configs = configs;
         this.scores = scores;
@@ -40,7 +43,7 @@ public class GetCourseScoreUseCase {
         boolean known = curricula.find(userId).topics().stream().anyMatch(topic -> courseId.equals(topic.courseId()));
         if (!known) throw new LearningRequestException(404, "COURSE_NOT_FOUND", "Course was not found");
         CourseScoreConfig config = configs.effective(courseId);
-        var evaluation = scores.evaluate(userId, courseId, config);
+        var evaluation = scores.evaluate(userId, courseId, config, milestones.countForRequest(courseId));
         var score = evaluation.score();
         var outcome = outcomes.find(userId, courseId);
 
