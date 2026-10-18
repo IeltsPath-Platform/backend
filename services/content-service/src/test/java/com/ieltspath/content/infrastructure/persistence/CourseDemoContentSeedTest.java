@@ -26,10 +26,8 @@ class CourseDemoContentSeedTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("22").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("58").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
-        // This test pins an older schema; the lesson query reads the column a later migration adds.
-        jdbc.getJdbcOperations().execute("ALTER TABLE lessons ADD COLUMN estimated_minutes INT");
         reader = new JdbcLearningContentReader(jdbc);
     }
 
@@ -47,7 +45,7 @@ class CourseDemoContentSeedTest {
 
     @Test
     void everyCourseHasTwoObjectiveFinalTestsWithUnsharedQuestions() {
-        var courses = jdbc.queryForList("SELECT id FROM courses ORDER BY band_level", Map.of(), UUID.class);
+        var courses = jdbc.queryForList("SELECT id FROM courses WHERE status = 'ACTIVE' ORDER BY band_level", Map.of(), UUID.class);
         for (UUID course : courses) {
             var packages = reader.courseTestPackages(course);
             assertThat(packages).hasSize(2);

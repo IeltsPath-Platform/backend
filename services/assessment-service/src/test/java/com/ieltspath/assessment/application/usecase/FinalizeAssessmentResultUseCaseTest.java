@@ -213,6 +213,6 @@ class FinalizeAssessmentResultUseCaseTest {
     private FinalizeAssessmentResultUseCase useCase() {
         return new FinalizeAssessmentResultUseCase(results, attempts, attemptItems, itemResults,
                 new AssessmentResultCompleter(results, knowledgeSnapshot, judgments, errors, outbox,
-                        new AssessmentCompletedEventFactory(objectMapper)));
+                        new AssessmentCompletedEventFactory(objectMapper)), org.mockito.Mockito.mock(ExaminerGradingPolicy.class));
     }
 }

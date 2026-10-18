@@ -19,8 +19,8 @@ class WritingSubmissionTest {
             new BigDecimal("6"), null, "Sample", List.of(), List.of(UUID.randomUUID()));
 
     private static WritingSubmission grading() {
-        return WritingSubmission.startPractice(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                UUID.randomUUID(), UUID.randomUUID(), "essay", 260, PROMPT, 3, NOW);
+        return WritingSubmission.start(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), "essay", 260, PROMPT, 3, NOW);
     }
 
     private static WritingGrade band(String overall) {
@@ -45,6 +45,44 @@ class WritingSubmissionTest {
         assertThat(submission.status()).isEqualTo(GRADED);
         assertThat(submission.ledgerEntryId()).isEqualTo(ledger);
         assertThat(submission.failureCode()).isNull();
+    }
+
+    private static WritingSubmission graded(int revisionNo) {
+        WritingSubmission submission = grading();
+        submission.recordGrade(band("6.0"));
+        submission.markGraded(UUID.randomUUID());
+        return revisionNo == 1 ? submission : submission.revising(UUID.randomUUID(), revisionNo);
+    }
+
+    @Test
+    void aGradedLessonEssayCanBeRevisedUntilItsThirdRevision() {
+        assertThat(graded(1).nextRevisionNo()).hasValue(2);
+        assertThat(graded(3).nextRevisionNo()).hasValue(4);
+        assertThat(graded(4).nextRevisionNo()).isEmpty();
+        assertThat(graded(4).revisionLimitReached()).isTrue();
+        assertThat(graded(3).revisionLimitReached()).isFalse();
+    }
+
+    @Test
+    void onlyAGradedLessonEssayCanBeRevised() {
+        assertThat(grading().nextRevisionNo()).isEmpty();
+        WritingSubmission practice = WritingSubmission.startPractice(UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "essay", 260, PROMPT, 3, NOW);
+        practice.recordGrade(band("6.0"));
+        practice.markGraded(UUID.randomUUID());
+        assertThat(practice.nextRevisionNo()).isEmpty();
+    }
+
+    @Test
+    void aRevisionRecordsItsPredecessorAndANumberInRange() {
+        UUID previous = UUID.randomUUID();
+        WritingSubmission revision = grading().revising(previous, 2);
+        assertThat(revision.previousSubmissionId()).isEqualTo(previous);
+        assertThat(revision.revisionNo()).isEqualTo(2);
+        assertThat(grading().previousSubmissionId()).isNull();
+        assertThat(grading().revisionNo()).isEqualTo(1);
+        assertThatThrownBy(() -> grading().revising(previous, 1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> grading().revising(previous, 5)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

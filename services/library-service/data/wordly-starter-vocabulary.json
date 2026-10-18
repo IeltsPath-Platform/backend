@@ -1,0 +1,602 @@
+[
+  {
+    "lemma": "air",
+    "vietnameseMeaning": "không khí",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about air today."
+  },
+  {
+    "lemma": "ear",
+    "vietnameseMeaning": "tai",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about ear today."
+  },
+  {
+    "lemma": "sky",
+    "vietnameseMeaning": "bầu trời",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about sky today."
+  },
+  {
+    "lemma": "sun",
+    "vietnameseMeaning": "mặt trời",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about sun today."
+  },
+  {
+    "lemma": "sea",
+    "vietnameseMeaning": "biển",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about sea today."
+  },
+  {
+    "lemma": "map",
+    "vietnameseMeaning": "bản đồ",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about map today."
+  },
+  {
+    "lemma": "pen",
+    "vietnameseMeaning": "bút mực",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about pen today."
+  },
+  {
+    "lemma": "cup",
+    "vietnameseMeaning": "cốc",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about cup today."
+  },
+  {
+    "lemma": "box",
+    "vietnameseMeaning": "hộp",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about box today."
+  },
+  {
+    "lemma": "dog",
+    "vietnameseMeaning": "chó",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about dog today."
+  },
+  {
+    "lemma": "cat",
+    "vietnameseMeaning": "mèo",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about cat today."
+  },
+  {
+    "lemma": "bat",
+    "vietnameseMeaning": "con dơi",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about bat today."
+  },
+  {
+    "lemma": "bed",
+    "vietnameseMeaning": "giường",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about bed today."
+  },
+  {
+    "lemma": "bus",
+    "vietnameseMeaning": "xe buýt",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about bus today."
+  },
+  {
+    "lemma": "car",
+    "vietnameseMeaning": "ô tô",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about car today."
+  },
+  {
+    "lemma": "ice",
+    "vietnameseMeaning": "nước đá",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about ice today."
+  },
+  {
+    "lemma": "art",
+    "vietnameseMeaning": "nghệ thuật",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about art today."
+  },
+  {
+    "lemma": "joy",
+    "vietnameseMeaning": "niềm vui",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about joy today."
+  },
+  {
+    "lemma": "law",
+    "vietnameseMeaning": "luật pháp",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about law today."
+  },
+  {
+    "lemma": "key",
+    "vietnameseMeaning": "chìa khóa",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about key today."
+  },
+  {
+    "lemma": "book",
+    "vietnameseMeaning": "sách",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about book today."
+  },
+  {
+    "lemma": "bird",
+    "vietnameseMeaning": "chim",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about bird today."
+  },
+  {
+    "lemma": "fish",
+    "vietnameseMeaning": "cá",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about fish today."
+  },
+  {
+    "lemma": "tree",
+    "vietnameseMeaning": "cây",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about tree today."
+  },
+  {
+    "lemma": "leaf",
+    "vietnameseMeaning": "lá cây",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about leaf today."
+  },
+  {
+    "lemma": "rain",
+    "vietnameseMeaning": "mưa",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about rain today."
+  },
+  {
+    "lemma": "snow",
+    "vietnameseMeaning": "tuyết",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about snow today."
+  },
+  {
+    "lemma": "wind",
+    "vietnameseMeaning": "gió",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about wind today."
+  },
+  {
+    "lemma": "star",
+    "vietnameseMeaning": "ngôi sao",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about star today."
+  },
+  {
+    "lemma": "moon",
+    "vietnameseMeaning": "mặt trăng",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about moon today."
+  },
+  {
+    "lemma": "lake",
+    "vietnameseMeaning": "hồ",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about lake today."
+  },
+  {
+    "lemma": "river",
+    "vietnameseMeaning": "sông",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about river today."
+  },
+  {
+    "lemma": "hill",
+    "vietnameseMeaning": "đồi",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about hill today."
+  },
+  {
+    "lemma": "rock",
+    "vietnameseMeaning": "đá",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about rock today."
+  },
+  {
+    "lemma": "sand",
+    "vietnameseMeaning": "cát",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about sand today."
+  },
+  {
+    "lemma": "soil",
+    "vietnameseMeaning": "đất trồng",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about soil today."
+  },
+  {
+    "lemma": "seed",
+    "vietnameseMeaning": "hạt giống",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about seed today."
+  },
+  {
+    "lemma": "root",
+    "vietnameseMeaning": "rễ cây",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about root today."
+  },
+  {
+    "lemma": "flower",
+    "vietnameseMeaning": "hoa",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about flower today."
+  },
+  {
+    "lemma": "forest",
+    "vietnameseMeaning": "rừng",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about forest today."
+  },
+  {
+    "lemma": "apple",
+    "vietnameseMeaning": "quả táo",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about apple today."
+  },
+  {
+    "lemma": "bread",
+    "vietnameseMeaning": "bánh mì",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about bread today."
+  },
+  {
+    "lemma": "rice",
+    "vietnameseMeaning": "gạo",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about rice today."
+  },
+  {
+    "lemma": "milk",
+    "vietnameseMeaning": "sữa",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about milk today."
+  },
+  {
+    "lemma": "water",
+    "vietnameseMeaning": "nước",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about water today."
+  },
+  {
+    "lemma": "salt",
+    "vietnameseMeaning": "muối",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about salt today."
+  },
+  {
+    "lemma": "sugar",
+    "vietnameseMeaning": "đường",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about sugar today."
+  },
+  {
+    "lemma": "honey",
+    "vietnameseMeaning": "mật ong",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about honey today."
+  },
+  {
+    "lemma": "lemon",
+    "vietnameseMeaning": "quả chanh",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about lemon today."
+  },
+  {
+    "lemma": "peach",
+    "vietnameseMeaning": "quả đào",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about peach today."
+  },
+  {
+    "lemma": "chair",
+    "vietnameseMeaning": "ghế",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about chair today."
+  },
+  {
+    "lemma": "table",
+    "vietnameseMeaning": "bàn",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about table today."
+  },
+  {
+    "lemma": "desk",
+    "vietnameseMeaning": "bàn học",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about desk today."
+  },
+  {
+    "lemma": "door",
+    "vietnameseMeaning": "cửa ra vào",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about door today."
+  },
+  {
+    "lemma": "wall",
+    "vietnameseMeaning": "tường",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about wall today."
+  },
+  {
+    "lemma": "floor",
+    "vietnameseMeaning": "sàn nhà",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about floor today."
+  },
+  {
+    "lemma": "roof",
+    "vietnameseMeaning": "mái nhà",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about roof today."
+  },
+  {
+    "lemma": "room",
+    "vietnameseMeaning": "phòng",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about room today."
+  },
+  {
+    "lemma": "house",
+    "vietnameseMeaning": "ngôi nhà",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about house today."
+  },
+  {
+    "lemma": "window",
+    "vietnameseMeaning": "cửa sổ",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about window today."
+  },
+  {
+    "lemma": "school",
+    "vietnameseMeaning": "trường học",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about school today."
+  },
+  {
+    "lemma": "class",
+    "vietnameseMeaning": "lớp học",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about class today."
+  },
+  {
+    "lemma": "lesson",
+    "vietnameseMeaning": "bài học",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about lesson today."
+  },
+  {
+    "lemma": "pencil",
+    "vietnameseMeaning": "bút chì",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about pencil today."
+  },
+  {
+    "lemma": "paper",
+    "vietnameseMeaning": "giấy",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about paper today."
+  },
+  {
+    "lemma": "letter",
+    "vietnameseMeaning": "chữ cái",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about letter today."
+  },
+  {
+    "lemma": "number",
+    "vietnameseMeaning": "con số",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about number today."
+  },
+  {
+    "lemma": "answer",
+    "vietnameseMeaning": "câu trả lời",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about answer today."
+  },
+  {
+    "lemma": "question",
+    "vietnameseMeaning": "câu hỏi",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about question today."
+  },
+  {
+    "lemma": "teacher",
+    "vietnameseMeaning": "giáo viên",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about teacher today."
+  },
+  {
+    "lemma": "student",
+    "vietnameseMeaning": "học sinh",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about student today."
+  },
+  {
+    "lemma": "friend",
+    "vietnameseMeaning": "bạn bè",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about friend today."
+  },
+  {
+    "lemma": "family",
+    "vietnameseMeaning": "gia đình",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about family today."
+  },
+  {
+    "lemma": "mother",
+    "vietnameseMeaning": "mẹ",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about mother today."
+  },
+  {
+    "lemma": "father",
+    "vietnameseMeaning": "cha",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about father today."
+  },
+  {
+    "lemma": "sister",
+    "vietnameseMeaning": "chị hoặc em gái",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about sister today."
+  },
+  {
+    "lemma": "brother",
+    "vietnameseMeaning": "anh hoặc em trai",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about brother today."
+  },
+  {
+    "lemma": "child",
+    "vietnameseMeaning": "đứa trẻ",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about child today."
+  },
+  {
+    "lemma": "baby",
+    "vietnameseMeaning": "em bé",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about baby today."
+  },
+  {
+    "lemma": "parent",
+    "vietnameseMeaning": "cha hoặc mẹ",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about parent today."
+  },
+  {
+    "lemma": "doctor",
+    "vietnameseMeaning": "bác sĩ",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about doctor today."
+  },
+  {
+    "lemma": "nurse",
+    "vietnameseMeaning": "y tá",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about nurse today."
+  },
+  {
+    "lemma": "driver",
+    "vietnameseMeaning": "tài xế",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about driver today."
+  },
+  {
+    "lemma": "actor",
+    "vietnameseMeaning": "diễn viên nam",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about actor today."
+  },
+  {
+    "lemma": "artist",
+    "vietnameseMeaning": "nghệ sĩ",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about artist today."
+  },
+  {
+    "lemma": "farmer",
+    "vietnameseMeaning": "nông dân",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about farmer today."
+  },
+  {
+    "lemma": "worker",
+    "vietnameseMeaning": "người lao động",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about worker today."
+  },
+  {
+    "lemma": "pilot",
+    "vietnameseMeaning": "phi công",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about pilot today."
+  },
+  {
+    "lemma": "chef",
+    "vietnameseMeaning": "đầu bếp",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about chef today."
+  },
+  {
+    "lemma": "singer",
+    "vietnameseMeaning": "ca sĩ",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about singer today."
+  },
+  {
+    "lemma": "city",
+    "vietnameseMeaning": "thành phố",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about city today."
+  },
+  {
+    "lemma": "town",
+    "vietnameseMeaning": "thị trấn",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about town today."
+  },
+  {
+    "lemma": "village",
+    "vietnameseMeaning": "làng",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about village today."
+  },
+  {
+    "lemma": "street",
+    "vietnameseMeaning": "đường phố",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about street today."
+  },
+  {
+    "lemma": "road",
+    "vietnameseMeaning": "con đường",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about road today."
+  },
+  {
+    "lemma": "bridge",
+    "vietnameseMeaning": "cây cầu",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about bridge today."
+  },
+  {
+    "lemma": "market",
+    "vietnameseMeaning": "chợ",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about market today."
+  },
+  {
+    "lemma": "shop",
+    "vietnameseMeaning": "cửa hàng",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about shop today."
+  },
+  {
+    "lemma": "park",
+    "vietnameseMeaning": "công viên",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about park today."
+  },
+  {
+    "lemma": "garden",
+    "vietnameseMeaning": "khu vườn",
+    "partOfSpeech": "NOUN",
+    "exampleSentence": "We learned about garden today."
+  }
+]

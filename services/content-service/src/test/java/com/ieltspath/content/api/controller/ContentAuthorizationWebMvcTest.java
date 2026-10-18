@@ -37,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = {
-        QuestionController.class, ContentPackageController.class, ContentAssetController.class,
+        QuestionController.class, ContentPackageController.class, ContentPackageAdminController.class, ContentAssetController.class,
         KnowledgePointController.class, TopicController.class, ReadingController.class, CourseController.class
 }, properties = {
         "spring.cloud.config.enabled=false",
@@ -109,11 +109,20 @@ class ContentAuthorizationWebMvcTest {
     @MockitoBean AddPackageVersionUseCase addPackageVersion;
     @MockitoBean AddContentSectionUseCase addSection;
     @MockitoBean PublishContentPackageUseCase publishPackage;
+    @MockitoBean GetPackageVersionPreviewUseCase previewPackageVersion;
+    @MockitoBean SchedulePackagePublicationUseCase schedulePackagePublication;
+    @MockitoBean CancelPackagePublicationScheduleUseCase cancelPackagePublicationSchedule;
+    @MockitoBean ListPackagePublicationSchedulesUseCase listPackagePublicationSchedules;
     @MockitoBean GetContentAssetUseCase getAsset;
     @MockitoBean CreateContentAssetUseCase createAsset;
     @MockitoBean LinkAssetUseCase linkAsset;
     @MockitoBean GetKnowledgePointsUseCase getKnowledgePoints;
     @MockitoBean CreateKnowledgePointUseCase createKnowledgePoint;
+    @MockitoBean UpdateKnowledgePointUseCase updateKnowledgePoint;
+    @MockitoBean DeactivateKnowledgePointUseCase deactivateKnowledgePoint;
+    @MockitoBean ActivateKnowledgePointUseCase activateKnowledgePoint;
+    @MockitoBean GetKnowledgePointPrerequisitesUseCase getKnowledgePointPrerequisites;
+    @MockitoBean ReplaceKnowledgePointPrerequisitesUseCase replaceKnowledgePointPrerequisites;
     @MockitoBean GetTopicTreeUseCase getTopicTree;
     @MockitoBean GetTopicUseCase getTopic;
     @MockitoBean CreateTopicUseCase createTopic;
@@ -145,7 +154,9 @@ class ContentAuthorizationWebMvcTest {
         mockMvc.perform(get("/api/content/admin/questions")).andExpect(status().isForbidden());
         mockMvc.perform(get("/api/content/packages")).andExpect(status().isForbidden());
         mockMvc.perform(get("/api/content/packages/{id}", id)).andExpect(status().isForbidden());
-        verifyNoInteractions(listQuestions, getQuestionDetail, listPackages, getPackageDetail);
+        mockMvc.perform(get("/api/content/admin/packages/{id}/versions/{versionId}/preview", id, UUID.randomUUID()))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(listQuestions, getQuestionDetail, listPackages, getPackageDetail, previewPackageVersion);
     }
 
     @Test
@@ -182,9 +193,23 @@ class ContentAuthorizationWebMvcTest {
                 .content("{\"assetType\":\"PASSAGE\",\"textContent\":\"Paragraph\"}"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/content/knowledge-points").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"topicId\":\"" + id + "\",\"code\":\"KP1\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\"}"))
+                .content("{\"topicId\":\"" + id + "\",\"code\":\"R55_EXAMPLE\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\"}"))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(createQuestion, createPackage, createAsset, linkAsset, createKnowledgePoint);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void learnerCannotChangePackagePublicationSchedules() throws Exception {
+        UUID versionId = UUID.randomUUID();
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/content/admin/packages/{id}/versions/{versionId}/schedule", id, versionId)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"publishAt\":\"2030-01-01T00:00:00Z\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/api/content/admin/packages/{id}/versions/{versionId}/schedule", id, versionId))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(schedulePackagePublication, cancelPackagePublicationSchedule);
     }
 
     @Test
@@ -217,7 +242,7 @@ class ContentAuthorizationWebMvcTest {
                 Skill.READING, null, PublicationStatus.DRAFT, null, Instant.now(), Instant.now()));
         when(createPackage.execute(any())).thenReturn(new ContentPackageResult(id, "PS-KP1-A", "Practice",
                 PackageType.PRACTICE_SET, null, PublicationStatus.DRAFT, null, Instant.now(), Instant.now(), null));
-        when(createKnowledgePoint.execute(any())).thenReturn(new KnowledgePointResult(id, id, "KP1", "KP1",
+        when(createKnowledgePoint.execute(any())).thenReturn(new KnowledgePointResult(id, id, "R55_EXAMPLE", "KP1",
                 KnowledgePointKind.GRAMMAR, LearningType.CONCEPT, null, null, ContentStatus.ACTIVE,
                 Instant.now(), Instant.now()));
         when(createAsset.execute(any())).thenReturn(new ContentAssetResult(
@@ -236,7 +261,7 @@ class ContentAuthorizationWebMvcTest {
                 .content("{\"assetType\":\"PASSAGE\",\"textContent\":\"Paragraph\"}"))
                 .andExpect(status().isCreated());
         mockMvc.perform(post("/api/content/knowledge-points").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"topicId\":\"" + id + "\",\"code\":\"KP1\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\"}"))
+                .content("{\"topicId\":\"" + id + "\",\"code\":\"R55_EXAMPLE\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\"}"))
                 .andExpect(status().isCreated());
     }
 

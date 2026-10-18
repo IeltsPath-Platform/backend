@@ -40,6 +40,12 @@ public class AssessmentCompletedEventFactory {
             }
         }
 
+        // One error analysis row per knowledge point shares the item's tag, so the first row names the item's error.
+        Map<UUID, String> errorByItemResult = new HashMap<>();
+        for (ErrorAnalysisItem error : errors) {
+            errorByItemResult.putIfAbsent(error.itemResultId(), error.errorType());
+        }
+
         List<AssessmentCompletedV2.ItemResult> eventItems = new ArrayList<>();
         for (AttemptItem item : items) {
             ItemResult graded = resultByItem.get(item.id());
@@ -55,7 +61,8 @@ public class AssessmentCompletedEventFactory {
                     })
                     .toList();
             eventItems.add(new AssessmentCompletedV2.ItemResult(graded.id(), item.questionVersionId(), graded.correct(),
-                    decimal(graded.score()), decimal(graded.maxScore()), mappings));
+                    decimal(graded.score()), decimal(graded.maxScore()), mappings, graded.durationMilliseconds(),
+                    errorByItemResult.get(graded.id())));
         }
 
         return new AssessmentCompletedV2(eventId, AssessmentCompletedV2.EVENT_TYPE, occurredAt,

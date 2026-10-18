@@ -15,7 +15,8 @@ import java.util.UUID;
 public record ReviewResponse(UUID reviewId, String reviewStatus, UUID lessonId, List<String> theory, ReviewSet set,
                              UUID knowledgePointId, LearningSkill skill, String stage, String theoryReason,
                              String theoryScope, int failedSets, Integer maxFailedSets,
-                             List<LessonResponse.Question> quickCheck) {
+                             List<LessonResponse.Question> quickCheck, String state, UUID diagnosticSessionId,
+                             List<UUID> waitingOnReviewIds) {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record ReviewSet(UUID reviewSetId, UUID packageId, UUID packageVersionId, String passage, Audio audio,
                             List<LessonResponse.Question> questions) {}
@@ -30,10 +31,11 @@ public record ReviewResponse(UUID reviewId, String reviewStatus, UUID lessonId, 
                         set.audio() == null ? null : new Audio(set.audio().mediaUrl(), set.audio().durationSeconds()),
                         questions(set.questions())),
                 result.knowledgePointId(), result.skill(), result.stage(), result.theoryReason(), result.theoryScope(),
-                result.failedSets(), result.maxFailedSets(), questions(result.quickCheck()));
+                result.failedSets(), result.maxFailedSets(), questions(result.quickCheck()), result.state(),
+                result.diagnosticSessionId(), result.waitingOnReviewIds());
     }
 
-    private static List<LessonResponse.Question> questions(List<LessonResult.Question> questions) {
+    public static List<LessonResponse.Question> questions(List<LessonResult.Question> questions) {
         return questions.stream().map(question -> new LessonResponse.Question(question.questionVersionId(),
                 question.sortOrder(), question.stem(), question.options() == null ? null : question.options().stream()
                 .map(option -> new LessonResponse.Option(option.optionKey(), option.content(), option.sortOrder()))

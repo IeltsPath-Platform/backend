@@ -142,7 +142,15 @@ DELETE /api/users/{id}
 POST /api/learning-support/activities
 GET  /api/learning-support/activities
 GET  /api/learning-support/streak
+GET  /internal/users/{userId}/learning-goal
+POST /internal/users/display-names
 ```
+
+The two `/internal/users/**` routes require a verified internal service JWT and are not exposed to clients through the
+Gateway. The learning-goal response contains `targetBand` and `examDate`; both are `null` when the user has no active
+goal, while an unknown user returns 404. The display-name request accepts 1–50 IDs in one batch. It uses a learner
+profile's `displayName` when available, falls back to the account `fullName`, omits unknown IDs, and never returns email.
+These reads use the existing `users`, `learning_goals`, and `learner_profiles` tables; no migration is needed.
 
 ## Chạy local
 
@@ -166,3 +174,67 @@ Health: /actuator/health
 ```
 
 Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho frontend. Frontend đi qua API Gateway.
+
+## Community public profiles
+
+- `GET /api/users/{userId}/public-profile` requires authentication and returns
+  `{id, displayName, avatarUrl, bio, targetBand, streak}`.
+- `POST /internal/users/public-profiles` accepts `{userIds: UUID[]}` (at most 100 entries; empty is allowed)
+  and returns `{profiles: [...]}`. It uses the forwarded internal JWT's viewer identity and is blocked at Gateway.
+  IDs are deduplicated in input order. Missing or hidden profiles are omitted.
+- `GET /internal/users/public-profiles/search?q=...&limit=8` is an authenticated internal lookup for community mention suggestions. It returns at most 10 active public/community-visible profiles; private profiles are omitted except the viewer's own profile.
+- `PUBLIC` and `COMMUNITY` profiles are visible to authenticated members. A `PRIVATE` profile is visible only
+  to its owner; other viewers receive 404 from the single-profile endpoint. Neither endpoint grants an admin bypass.
+- Existing users without a learner profile follow the current default profile policy: account full name (or
+  `Learner`) and public visibility, without creating a profile on read. No email, phone, roles, timezone,
+  self-reported band, exam date, or schedule are returned.
+- `targetBand` is the current active learning goal's target, otherwise null. `streak` is the stored current-day
+  streak, otherwise zero. `avatarUrl` contains the existing avatar reference only if it is an absolute HTTP(S)
+  URL with a host and no user credentials; opaque references return null. Bio/avatar are edited through the
+  existing `PUT /api/users/me/profile` API (`avatarReference`, `bio`). No schema change is required.
+- The bounded batch uses a single query joining profile, active goal, and streak in `user_db`.
+
+## Recorded study time
+
+Authenticated personal APIs use `CurrentUserProvider`; existing activity CRUD does not contribute to these totals.
+
+- `POST /api/users/me/study-sessions`: `{clientSessionId, sourceType, sourceId, takeover?}`. UUID identifiers;
+  source types: `LESSON`, `PRACTICE`, `REVIEW`, `ASSESSMENT`.
+- `POST /api/users/me/study-sessions/{id}/heartbeats` and `/close`:
+  `{epoch, sequence, intervals: [{startOffsetMs, endOffsetMs}]}`. At most 16 ordered, non-overlapping
+  intervals per request; offsets use the server session anchor. Close includes the final flush.
+- `GET /api/users/me/statistics/study-time?from=YYYY-MM-DD&to=YYYY-MM-DD&grain=DAY&courseId=UUID`:
+  inclusive range, at most 366 days; grain is `DAY` (default), `WEEK`, or `MONTH`; course is optional.
+
+Start returns `sessionId`, `epoch`, `serverStartedAt`, `serverNow`, `leaseExpiresAt`, `nextSequence`,
+`heartbeatSeconds=30`, `idleSeconds=120`, `leaseSeconds=90`, `status`, and `totalAcceptedMs`.
+Heartbeat/close return `sessionId`, `epoch`, `sequence`, `acceptedMs`, `totalAcceptedMs`, `leaseExpiresAt`,
+and `status`. Retry the same payload/sequence after a lost response. A conflicting payload returns
+409 `PAYLOAD_CONFLICT`. A closed/expired session is never revived: use a new `clientSessionId`.
+Only one session holds a user lease; explicit takeover closes the previous session without filling gaps.
+The client excludes hidden/idle time; the server limits submitted intervals to elapsed server time and
+the latest 90 seconds. This measures recorded activity, not verified human attention.
+
+Statistics return `availability`, `generatedAt`, `dataFrom`, `timezonePolicy=RECORDED_LOCAL_DATE`,
+`scope=ALL|courseId`, and `days`. Each bucket contains `date`, `timezone`, `actualSeconds`,
+`plannedSeconds`, and `status` (`NOT_TRACKED`, `FUTURE`, `PARTIAL_DAY`, `COMPLETE`). Actual is null
+before measurement or for future dates; a measured inactive date is zero. Course targets are null.
+Week/month buckets sum raw milliseconds for dates inside the requested range before converting to whole
+seconds, and use the calendar bucket start date.
+Mixed timezone buckets say `MULTIPLE`; historical intervals retain their recorded date and timezone.
+
+Migration V6 adds sessions, durable replay receipts, an interval ledger, daily totals, goal snapshots,
+and the activation timestamp. Goal changes apply the next local day, never overwrite a recorded day,
+and supersede pending future choices. Current active goals are snapshotted at migration; no historical
+active time or targets are inferred. Changing the profile timezone reschedules an active goal using the
+saved timezone under the same per-user lock as goal updates; unchanged timezones and users without an
+active goal do not create another snapshot. Recorded days remain unchanged. Raw data is not automatically purged.
+
+Source ownership and course context are verified once before starting, outside the database transaction,
+through each owner’s `/statistics/study-context` endpoint. Bearer and correlation ID are forwarded;
+connection/read timeouts are 2/3 seconds. Owner failure returns 503 `SOURCE_UNAVAILABLE` and must not
+block lesson submission. Config Server defaults source URLs to Compose hostnames; for services on the
+host, set `LEARNING_SERVICE_URL=http://localhost:8086` and `ASSESSMENT_SERVICE_URL=http://localhost:8083`.
+
+Run `mvn -q -pl services/user-service -am test` from the repository root. Study-time PostgreSQL tests
+require Docker and explicitly skip when it is unavailable.

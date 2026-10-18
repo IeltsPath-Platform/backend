@@ -62,10 +62,12 @@ public final class ReviewRule {
 
     /**
      * Stage of a new review: a knowledge point scored below {@link #LOW_SCORE} in the practice attempt that created
-     * it starts with the theory. {@code kpPercent} is null for reviews not created by a practice attempt.
+     * it, or answered wrong on the first submission of the lesson's exercises, starts with the theory.
+     * {@code kpPercent} is null for reviews not created by a practice attempt.
      */
-    public static Start initialStage(Double kpPercent) {
+    public static Start initialStage(Double kpPercent, boolean wrongInLesson) {
         if (kpPercent != null && kpPercent < LOW_SCORE) return new Start(ReviewStage.THEORY, TheoryReason.LOW_SCORE);
+        if (wrongInLesson) return new Start(ReviewStage.THEORY, TheoryReason.WRONG_IN_LESSON);
         return new Start(ReviewStage.PRACTICE, null);
     }
 

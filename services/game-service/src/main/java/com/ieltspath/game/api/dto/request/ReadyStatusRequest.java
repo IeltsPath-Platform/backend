@@ -1,3 +1,3 @@
 package com.ieltspath.game.api.dto.request;
-
-public record ReadyStatusRequest(boolean ready) {}
+import jakarta.validation.constraints.NotNull;
+public record ReadyStatusRequest(@NotNull Boolean ready) {}

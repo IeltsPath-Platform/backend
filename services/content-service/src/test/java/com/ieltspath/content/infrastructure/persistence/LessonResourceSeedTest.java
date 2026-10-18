@@ -19,7 +19,7 @@ class LessonResourceSeedTest {
     @BeforeAll
     static void migrate() {
         Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-                .locations("classpath:db/migration").target("29").load().migrate();
+                .locations("classpath:db/migration").target("57").load().migrate();
     }
 
     @Test

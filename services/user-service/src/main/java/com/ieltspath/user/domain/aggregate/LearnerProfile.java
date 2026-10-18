@@ -6,7 +6,9 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.DateTimeException;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Getter
@@ -32,9 +34,19 @@ public class LearnerProfile {
         this.bio = bio;
         this.selfReportedBand = selfReportedBand;
         if (timezone != null && !timezone.isBlank()) {
-            this.timezone = timezone.trim();
+            String normalizedTimezone = timezone.trim();
+            if (isValidTimezone(normalizedTimezone)) this.timezone = normalizedTimezone;
         }
         touch();
+    }
+
+    private static boolean isValidTimezone(String timezone) {
+        try {
+            ZoneId.of(timezone);
+            return true;
+        } catch (DateTimeException ignored) {
+            return false;
+        }
     }
 
     public void changeVisibility(ProfileVisibility visibility) {
@@ -49,4 +61,3 @@ public class LearnerProfile {
         this.updatedAt = LocalDateTime.now();
     }
 }
-

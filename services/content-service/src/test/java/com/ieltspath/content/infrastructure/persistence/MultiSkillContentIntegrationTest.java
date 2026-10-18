@@ -62,8 +62,8 @@ class MultiSkillContentIntegrationTest {
 
     @Test
     void sequenceDerivesSkillsFromPublishedLessonsEvenWhenTopicSkillIsNull() {
-        teaches("READING");
-        teaches("LISTENING");
+        exercise("READING", 1);
+        exercise("LISTENING", 2);
         var entry = reader.topicSequence(1).stream().filter(t -> t.topicId().equals(topic)).findFirst();
         assertThat(entry).isPresent();
         JsonNode payload = json.valueToTree(entry.orElseThrow());
@@ -72,10 +72,14 @@ class MultiSkillContentIntegrationTest {
     }
 
     @Test
-    void lessonAndSummaryExposeTheSkillsOfTheirKnowledgePointsWithoutDuplicates() {
-        teaches("READING");
-        teaches("READING");
-        teaches("WRITING");
+    void lessonAndSummaryIncludeTextKnowledgePointSkillsAndDeduplicateExerciseSkills() {
+        exercise("READING", 1);
+        exercise("READING", 2);
+        UUID kp = UUID.randomUUID();
+        UUID block = UUID.randomUUID();
+        sql.update("INSERT INTO knowledge_points(id,topic_id,code,name,kind,learning_type,skill) VALUES (?,?,'MULTI_WRITING','Writing','STRATEGY','PROCEDURE','WRITING')", kp, topic);
+        sql.update("INSERT INTO lesson_blocks(id,lesson_id,sort_order,block_type,text_content) VALUES (?,?,3,'TEXT','Writing theory')", block, lesson);
+        sql.update("INSERT INTO lesson_block_knowledge_points(block_id,knowledge_point_id) VALUES (?,?)", block, kp);
         JsonNode detail = json.valueToTree(reader.publishedLesson(lesson).orElseThrow());
         JsonNode summary = json.valueToTree(reader.publishedLessons(topic).getFirst());
         assertThat(detail.path("skills").toString()).isEqualTo("[\"READING\",\"WRITING\"]");
@@ -84,8 +88,8 @@ class MultiSkillContentIntegrationTest {
     }
 
     @Test
-    void singleSkillComesFromTheLessonsKnowledgePointsRatherThanTopicMetadata() {
-        teaches("LISTENING");
+    void singleSkillCompatibilityComesFromExercisesRatherThanTopicMetadata() {
+        exercise("LISTENING", 1);
         sql.update("UPDATE topics SET skill='READING' WHERE id=?", topic);
         assertThat(reader.publishedLesson(lesson).orElseThrow().skill().name()).isEqualTo("LISTENING");
         assertThat(reader.topicSequence(1).stream().filter(t -> t.topicId().equals(topic)).findFirst().orElseThrow().skill().name())
@@ -114,11 +118,15 @@ class MultiSkillContentIntegrationTest {
 
     @Test
     void topicSkillsExcludeDraftLessonsAndAllKnowledgePoints() {
-        teaches("READING");
+        exercise("READING", 1);
         UUID draft = UUID.randomUUID();
         sql.update("INSERT INTO lessons(id,topic_id,code,title,sort_order,status) VALUES (?,?,'MULTI_DRAFT','Draft lesson',2,'DRAFT')", draft, topic);
-        teaches(draft, "WRITING");
-        teaches("ALL");
+        exercise(draft, "WRITING", 1);
+        UUID kp = UUID.randomUUID();
+        UUID block = UUID.randomUUID();
+        sql.update("INSERT INTO knowledge_points(id,topic_id,code,name,kind,learning_type,skill) VALUES (?,?,'MULTI_ALL','General','STRATEGY','PROCEDURE','ALL')", kp, topic);
+        sql.update("INSERT INTO lesson_blocks(id,lesson_id,sort_order,block_type,text_content) VALUES (?,?,2,'TEXT','General theory')", block, lesson);
+        sql.update("INSERT INTO lesson_block_knowledge_points(block_id,knowledge_point_id) VALUES (?,?)", block, kp);
 
         var entry = reader.topicSequence(1).stream().filter(t -> t.topicId().equals(topic)).findFirst().orElseThrow();
         assertThat(entry.skills()).containsExactly(Skill.READING);
@@ -130,8 +138,8 @@ class MultiSkillContentIntegrationTest {
 
     @Test
     void practicePublishingAcceptsContainedSkillsAndRejectsSkillsOutsideLesson() {
-        teaches("READING");
-        teaches("LISTENING");
+        exercise("READING", 1);
+        exercise("LISTENING", 2);
         UUID mixed = practice("MULTI_ALLOWED", "READING", "LISTENING");
         UUID outside = practice("MULTI_OUTSIDE", "READING", "WRITING");
         assertThat(reader.packageVersionLeavesLessonSkills(mixed, lesson)).isFalse();
@@ -158,14 +166,17 @@ class MultiSkillContentIntegrationTest {
         return versionId;
     }
 
-    private void teaches(String skill) {
-        teaches(lesson, skill);
+    private void exercise(String skill, int order) {
+        exercise(lesson, skill, order);
     }
 
-    /** A lesson teaches the skills of its knowledge points. */
-    private void teaches(UUID ownerLesson, String skill) {
-        UUID kp = UUID.randomUUID();
-        sql.update("INSERT INTO knowledge_points(id,topic_id,code,name,kind,learning_type,skill) VALUES (?,?,?,'Knowledge point','STRATEGY','PROCEDURE',?)", kp, topic, "MULTI_KP_" + kp, skill);
-        sql.update("INSERT INTO lesson_knowledge_points(lesson_id,knowledge_point_id) VALUES (?,?)", ownerLesson, kp);
+    private void exercise(UUID ownerLesson, String skill, int order) {
+        UUID question = UUID.randomUUID();
+        UUID version = UUID.randomUUID();
+        UUID block = UUID.randomUUID();
+        sql.update("INSERT INTO questions(id,question_type,skill,status,purpose) VALUES (?,'MULTIPLE_CHOICE',?,'PUBLISHED','LEARNING')", question, skill);
+        sql.update("INSERT INTO question_versions(id,question_id,version_number,stem,answer_spec,status) VALUES (?,?,1,'Which statement is correct?','{\"type\":\"CHOICE\",\"correct\":\"A\"}'::jsonb,'PUBLISHED')", version, question);
+        sql.update("INSERT INTO lesson_blocks(id,lesson_id,sort_order,block_type) VALUES (?,?,?,'EXERCISE')", block, ownerLesson, order);
+        sql.update("INSERT INTO lesson_block_questions(block_id,question_version_id,sort_order) VALUES (?,?,1)", block, version);
     }
 }

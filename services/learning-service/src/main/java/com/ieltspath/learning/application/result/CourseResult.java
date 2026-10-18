@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * {@code completedLessonCount} and {@code totalLessonCount} count the lessons of the course's topics;
+ * {@code completedLessonCount} and {@code totalLessonCount} count the lessons of the course topics;
  * {@code lastStudiedAt} is when the learner last opened one of its lessons or submitted one of its practice sets, null
  * when they never did.
  */

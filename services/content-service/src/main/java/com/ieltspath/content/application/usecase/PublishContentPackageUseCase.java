@@ -20,6 +20,8 @@ import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.QuestionType;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.domain.vo.TestSource;
+import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.application.result.PackageQuestionSpec;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,9 +37,6 @@ public class PublishContentPackageUseCase {
     private static final Pattern WHITESPACE = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
 
     private final ContentPackageRepository contentPackageRepository;
-    /** The answer-spec type of a Writing question graded as an essay. */
-    private static final String ESSAY_SPEC_TYPE = "ESSAY";
-
     private final LearningContentReader lessons;
 
     public PublishContentPackageUseCase(ContentPackageRepository contentPackageRepository,
@@ -47,20 +46,36 @@ public class PublishContentPackageUseCase {
     }
 
     public ContentPackageResult execute(PublishContentPackageCommand command) {
-        ContentPackage pkg = contentPackageRepository.findById(command.packageId())
-                .orElseThrow(() -> new ContentPackageNotFoundException(command.packageId()));
+        ContentPackage pkg = loadPackage(command.packageId());
+        ContentPackageVersion targetVersion = targetVersion(pkg, command.versionId());
+        validate(pkg, targetVersion);
 
-        ContentPackageVersion targetVersion = null;
-        for (ContentPackageVersion v : pkg.getVersions()) {
-            if (v.getId().equals(command.versionId())) {
-                targetVersion = v;
-                break;
-            }
-        }
+        targetVersion.publish(command.publishedBy());
+        pkg.publishVersion(targetVersion.getId());
 
-        if (targetVersion == null) {
-            throw new InvalidContentStateException("Version " + command.versionId() + " does not belong to package " + command.packageId());
-        }
+        return ContentPackageResult.of(contentPackageRepository.save(pkg));
+    }
+
+    /** Run the same checks as publish without changing or saving the version. */
+    public void validateForPublish(UUID packageId, UUID versionId) {
+        ContentPackage pkg = loadPackage(packageId);
+        validate(pkg, targetVersion(pkg, versionId));
+    }
+
+    private ContentPackage loadPackage(UUID packageId) {
+        return contentPackageRepository.findById(packageId)
+                .orElseThrow(() -> new ContentPackageNotFoundException(packageId));
+    }
+
+    private static ContentPackageVersion targetVersion(ContentPackage pkg, UUID versionId) {
+        return pkg.getVersions().stream()
+                .filter(v -> v.getId().equals(versionId))
+                .findFirst()
+                .orElseThrow(() -> new InvalidContentStateException(
+                        "Version " + versionId + " does not belong to package " + pkg.getId()));
+    }
+
+    private void validate(ContentPackage pkg, ContentPackageVersion targetVersion) {
 
         // A lesson's Practice measures only skills taught by that lesson.
         if (pkg.getLessonId() != null
@@ -69,15 +84,28 @@ public class PublishContentPackageUseCase {
                     + "lesson's taught skills");
         }
 
+        if (pkg.getPackageType() == PackageType.PRACTICE_TEST) {
+            // No source means an internal test (a course checkpoint); a source that is present must be a supported one.
+            if (pkg.getSourceCode() != null) {
+                try {
+                    TestSource.valueOf(pkg.getSourceCode());
+                } catch (RuntimeException invalidSource) {
+                    throw new InvalidContentStateException("Practice tests require a supported test source");
+                }
+            }
+            List<String> issues = lessons.practiceTestPublishIssues(targetVersion.getId());
+            if (!issues.isEmpty()) throw new InvalidContentStateException(String.join("; ", issues));
+        }
+
         switch (pkg.getPackageType()) {
-            case PRACTICE_SET, TOPIC_TEST, COURSE_TEST, MOCK_TEST, PLACEMENT_TEST -> {
+            case PRACTICE_SET, TOPIC_TEST, COURSE_TEST, MOCK_TEST, PLACEMENT_TEST, PRACTICE_TEST -> {
                 lessons.lockQuestionsForPublishing(targetVersion.getId());
                 List<QuestionUsageConflict> conflicts = lessons.questionsUsedElsewhere(targetVersion.getId());
                 if (!conflicts.isEmpty()) {
                     throw new QuestionAlreadyUsedException(conflicts);
                 }
                 QuestionPurpose requiredPurpose = switch (pkg.getPackageType()) {
-                    case MOCK_TEST -> QuestionPurpose.EXAM;
+                    case MOCK_TEST, PRACTICE_TEST -> QuestionPurpose.EXAM;
                     case PLACEMENT_TEST -> QuestionPurpose.PLACEMENT;
                     default -> QuestionPurpose.LEARNING;
                 };
@@ -95,20 +123,23 @@ public class PublishContentPackageUseCase {
             for (var question : questions) {
                 JsonNode spec = parseSpec(question.answerSpecJson());
                 if ((question.questionType() == QuestionType.ESSAY
-                        || ESSAY_SPEC_TYPE.equals(spec.path("type").asText())) && !validEssay(question, spec)) {
+                        || LessonBlockKind.ESSAY_SPEC_TYPE.equals(spec.path("type").asText())) && !validEssay(question, spec)) {
                     throw new InvalidContentStateException("Writing essays require passBand from 0 to 9 in steps of 0.5");
                 }
             }
             if (pkg.getPackageType() == PackageType.COURSE_TEST
-                    && (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableCourseQuestion(question)))) {
+                    && (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableQuestion(question)))) {
                 throw new InvalidContentStateException("COURSE_TEST requires gradable Reading or Listening questions, or Writing essays with passBand");
             }
         }
+        if (pkg.getPackageType() == PackageType.PRACTICE_TEST) {
+            var questions = lessons.packageQuestionSpecs(targetVersion.getId());
+            if (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableQuestion(question))) {
+                throw new InvalidContentStateException(
+                        "Practice tests require auto-gradable Reading or Listening questions, or Writing essays with passBand");
+            }
+        }
 
-        targetVersion.publish(command.publishedBy());
-        pkg.publishVersion(targetVersion.getId());
-
-        return ContentPackageResult.of(contentPackageRepository.save(pkg));
     }
 
     private static JsonNode parseSpec(String raw) {
@@ -122,14 +153,15 @@ public class PublishContentPackageUseCase {
 
     private static boolean validEssay(PackageQuestionSpec question, JsonNode spec) {
         if (question.skill() != Skill.WRITING || question.questionType() != QuestionType.ESSAY
-                || !ESSAY_SPEC_TYPE.equals(spec.path("type").asText())
+                || !LessonBlockKind.ESSAY_SPEC_TYPE.equals(spec.path("type").asText())
                 || !spec.path("passBand").isNumber()) return false;
         var band = spec.path("passBand").decimalValue();
         return band.signum() >= 0 && band.compareTo(java.math.BigDecimal.valueOf(9)) <= 0
                 && band.remainder(new java.math.BigDecimal("0.5")).signum() == 0;
     }
 
-    private static boolean gradableCourseQuestion(PackageQuestionSpec question) {
+    /** A Writing essay with a valid passBand, or an auto-gradable Reading or Listening question. */
+    private static boolean gradableQuestion(PackageQuestionSpec question) {
         if (question.skill() == Skill.WRITING) return validEssay(question, parseSpec(question.answerSpecJson()));
         return (question.skill() == Skill.READING || question.skill() == Skill.LISTENING)
                 && question.questionType() != QuestionType.ESSAY && question.questionType() != QuestionType.SPEAKING

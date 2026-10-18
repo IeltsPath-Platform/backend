@@ -120,9 +120,13 @@ src/main/java/com/ieltspath/<service>
 
 - Mỗi service sở hữu bounded context và database; không đọc/ghi database hay dùng chung JPA entity của service khác.
 - Gọi đồng bộ service-to-service bằng HTTP tới endpoint nội bộ hoặc public của service đích, kèm bearer của request và
-  `X-Correlation-Id` (như assessment → content, library → content, game → library/content, learning → content/access).
+  `X-Correlation-Id` (như assessment → content, library → content, game → library/content, learning → content/access/user).
+  Learning gọi user-service chỉ để đọc mục tiêu band (`/internal/users/{id}/learning-goal`) và tên hiển thị
+  (`/internal/users/display-names`); lỗi hoặc timeout thì báo cáo và bảng league vẫn trả, thiếu phần đó.
 - Bất đồng bộ qua transactional outbox + RabbitMQ; event có version trong tên và contract ở `docs/contracts/`. Consumer
-  phải idempotent và có retry/dead-letter (xem consumer của learning-service).
+  phải idempotent và có retry/dead-letter (xem consumer của learning-service). Điểm thưởng của learning (streak, nhiệm vụ,
+  huy hiệu) đi qua bảng `reward_grants` (outbox) rồi exchange `learning.points` sang access, không gọi HTTP cộng điểm
+  (contract C6 trong `plans/261017-1931-mastery-practice-and-progress/reports/work-split.md`, `gamification-v1.md`).
 - `shared/` chỉ chứa technical concern dùng chung; không chuyển entity hay use case nghiệp vụ vào đó.
 - Chưa có API version prefix. Giữ path tương thích; đánh giá mọi consumer trước khi đổi API, event hoặc JWT claim contract.
 - Gateway chỉ chứa routing, security, CORS, filter, observability; KHÔNG chứa business logic.
@@ -146,6 +150,14 @@ src/main/java/com/ieltspath/<service>
   Tài khoản/điểm demo của user/access chỉ được ghi khi `DEMO_DATA_ENABLED=true` (Compose local mặc định bật).
   Game chọn snapshot `VOCABULARY` từ library và `GRAMMAR` từ content; trong Compose các base URL trỏ theo tên service.
   Chi tiết: `README.md` §6, `docs/system-architecture.md` §7.
+- Nhóm cấu hình nghiệp vụ: `learning.mastery.*` (ngưỡng mastery, lịch ôn; Admin ghi đè ở `learning_rule_configs`),
+  `learning.flags.*` (ngưỡng cờ bất thường), `learning.tree-quality.*` (ngưỡng cạnh đáng ngờ, câu quá dễ/khó),
+  `learning.work-items.*` (chu kỳ đồng bộ hàng việc), `learning.writing.*` (hạn mức chấm essay), `learning.free-practice.*`
+  (số gói dự trữ cho bài ôn), `learning.gamification.*` (múi giờ mặc định, XP, tim, nhiệm vụ), `learning.rewards.*` (gửi
+  điểm thưởng sang access), `learning.snapshots.*` (bản chụp tuần/tháng, giữ 12 tuần/36 tháng), `learning.league.*` (chốt
+  tuần), `learning.user.base-url` (gọi user-service), `assessment.ai-eval.*` (đánh giá AI), `assessment.qa.*` (tỷ lệ lấy mẫu QA
+  Mentor). Trọng số và ngưỡng điểm khóa nằm trong DB (`course_score_configs`), không trong yaml. Chính sách dùng AI:
+  `docs/ai-policy.md`.
 - `Dockerfile.spring-service` build module Maven theo `MODULE_PATH`; Config Server có Dockerfile riêng.
 
 ### 3.7 Hiệu năng persistence, N+1 và độ phức tạp
@@ -163,15 +175,53 @@ src/main/java/com/ieltspath/<service>
 - Trạng thái nằm trong aggregate (`LessonProgress`, `LearnerCurriculum`, `ReviewItem`, `TopicTestAssignment`,
   `WritingSubmission`); thay đổi trạng thái qua method của aggregate rồi lưu bằng `domain/repository`, adapter JDBC
   không chứa luật. Khóa, replay theo `requestId`, hạn mức LLM là port ở `application/port`.
-- Không còn path DeepTutor: bằng chứng học lưu theo user ở `kp_evidence`; mastery của KP tính khi đọc bằng
-  `MasteryCalculator` (port `compute_mastery` của DeepTutor v1.6.9, Apache-2.0; giữ comment ghi nguồn và giá trị test gốc).
+- Bằng chứng học lưu theo user ở `kp_evidence` (kèm `question_version_id` khi có câu hỏi). Công thức mặc định là
+  `MasteryCalculator` (port `compute_mastery` của DeepTutor v1.6.9, Apache-2.0; giữ comment ghi nguồn và giá trị test gốc):
+  5 kết quả gần nhất, không giảm theo thời gian; nó vẫn là giá trị dự phòng trong code (test chạy trên nó) và chọn lại được
+  bằng `LEARNING_MASTERY_POLICY=DEEPTUTOR`. Công thức mặc định của Config Server từ 2026-10-18 là MP-1.0
+  (`Mp1MasteryCalculator`, `learning.mastery.policy=MP1`): cửa sổ 8 bằng chứng, tối đa 3 bài luyện, trọng số nguồn, giảm theo tuổi (half-life 30
+  ngày), cùng câu trong 7 ngày tính một lần, tier `INSUFFICIENT` khi chưa đủ dữ liệu, biên đệm 0.03 khi đổi tier. Điểm
+  MP-1.0 giảm theo thời gian qua `MasteryDecayJob`. Đổi công thức phải chạy rebuild cho mọi hồ sơ.
 - Skill của lesson suy ra từ câu hỏi trong các block; lesson có thể chứa nhiều skill. Khóa lesson, review và Practice
   được áp theo từng skill; bài học hoàn thành theo các block bắt buộc, Practice phải đạt riêng cho từng skill có yêu cầu.
 - Thứ tự topic theo user từ Content `topic-sequence`, không LLM/goal; mỗi course là một chuỗi chung mọi skill. Placement
   không bắt buộc: mọi course luôn mở, placement chỉ làm được một lần (`409 PLACEMENT_ALREADY_DONE`); band chỉ gợi ý
-  course và không đổi trạng thái topic. Bài ôn vẫn chặn bài, Practice và thi topic
-  của cùng skill. Thi cuối course không chặn tiến độ topic hay course khác. `LessonAccessGate` và use case trong
-  `services/learning-service/src/main/java/com/ieltspath/learning/` quyết định cổng bài; trạng thái topic suy ra khi đọc.
+  course và không đổi trạng thái topic. Lesson sau chỉ mở khi mọi lesson trước đã hoàn thành **và** Practice của chúng đã đạt
+  (`403 PRACTICE_REQUIRED` + `lessonIds`); bài ôn còn chờ của lesson trước chặn lesson sau bất kể skill
+  (`403 REVIEW_REQUIRED`). Bài ôn lặp set mới đến khi đạt (chỉ lần trượt đầu quay lại theory), chỉ `SKIPPED` khi hết
+  package chưa lộ. Bài ôn **chặn** (`blocking = true`) vẫn chặn Practice và thi topic của cùng skill; bài ôn **tùy chọn**
+  (giỏ ôn, practice test tự do) không bao giờ chặn. Thi cuối course không chặn tiến độ topic hay course khác.
+  `LessonAccessGate` và use case trong `services/learning-service/src/main/java/com/ieltspath/learning/` quyết định cổng
+  bài; trạng thái topic suy ra khi đọc.
+- Điểm và kết quả khóa: lần thi topic test đầu tiên (điểm nào cũng được) hoàn tất topic (`COMPLETED` dưới 70%, `PASSED`
+  từ 70%) và mở topic sau; course test mở khi mọi topic đã thi. Đạt khóa theo điểm tổng có trọng số (Process, giữa khóa,
+  cuối khóa; Admin chỉnh ở `course_score_configs`), không theo course test riêng lẻ: dưới ngưỡng thì `REMEDIATION`, làm
+  xong bài ôn thì thi lại (`CourseScoreCalculator`, `CourseOutcomeService`; contract `docs/contracts/course-score-v1.md`).
+- Chẩn đoán dò ngược: bài ôn chặn trượt set thứ hai hoặc hết gói thì thăm dò KP tiên quyết (tối đa 3 tầng, 6 lần), KP
+  gốc nhận bài ôn chặn `DIAGNOSTIC` và bài ôn gốc chờ chúng (`PrerequisiteDiagnosis`, `DiagnosticFlow`; contract
+  `diagnostics-v1.md`). Bài ôn sinh từ chẩn đoán không chẩn đoán lại.
+- Mastery theo KP: `kp_mastery_profiles` ghi cùng transaction với bằng chứng (`MasteryProfileUpdater`), ba mức
+  `PRIORITY`/`CONSOLIDATE`/`MAINTAIN` và hạn ôn; Admin đổi ngưỡng ở `learning_rule_configs` và chạy lại nền. Mọi câu trả
+  lời ghi một dòng vào `question_attempt_events` (thời gian, mã lỗi). Báo cáo `GET /api/learning/report`.
+- Khu quản trị: cờ bất thường (`learner_flags`, `FlagDetector` chạy sau commit, transaction riêng), hàng việc theo vai
+  trò (`work_items`, `WorkItemSync` đồng bộ khi mở danh sách và mỗi 3 giờ qua `WorkItemSyncJob`, khóa advisory để chỉ một instance chạy), thống kê câu và chất lượng cây (`learning-staff-area-v1.md`).
+- Essay: sửa và nộp lại essay lesson tối đa 3 lần, chỉ từ bản mới nhất (`essay-revision-v1.md`); học viên có tín dụng
+  nhờ Mentor chữa essay lesson/Practice đã chấm (`human-review-v1.md`), chỉ là phản hồi: không đổi bằng chứng, cổng hay bài ôn.
+- Luyện tự do theo KP (`POST /knowledge-points/{id}/free-practice`) không bao giờ chặn đường học: trượt không sinh bài
+  ôn chặn và không khóa gì; mỗi KP luôn giữ lại `learning.free-practice.reserve` gói chưa xem cho bài ôn
+  (`free-practice-v1.md`). Bằng chứng luyện tự do là bằng chứng luyện tập (trọng số và trần 3 bài luyện của MP-1.0).
+- Gamification (`gamification-v1.md`): XP chỉ ở lần nộp đầu, đáp án trên trần ngày là XP bóng (không tính); sai câu khách
+  quan trừ tim ở bài tập lesson, Practice và luyện tự do (hết tim thì `403 HEARTS_DEPLETED`, bài ôn vẫn nộp được); streak
+  tính ở server từ câu trả lời thật theo múi giờ học viên và là nguồn duy nhất cho thưởng (streak của user-service do client
+  gửi, không dùng); streak và nhiệm vụ ngày chạy trong transaction của lần nộp qua listener `BEFORE_COMMIT` trên
+  `QuestionEventsAppended` (mang các câu MỚI của lần ghi, nên nộp lặp không cộng thêm); XP tuần của league và huy hiệu
+  được gọi từ nơi phát sinh sự kiện, cùng transaction, và cấp đúng một lần nhờ khóa duy nhất. Mọi thưởng
+  XP đi qua sổ `xp_ledger` có khóa duy nhất theo nguồn và tham chiếu; thưởng điểm đi qua `reward_grants`. Mua bằng điểm
+  (hồi tim, đóng băng streak) dùng `requestId` làm khóa idempotent của access; thiếu điểm trả `402 INSUFFICIENT_POINTS`,
+  access lỗi trả `503 ACCESS_UNAVAILABLE`.
+- Báo cáo: `GET /api/learning/report` có khối `skills`, `focus`, `estimatedBand` (luôn là ước tính, band kỹ năng đạt khi
+  ≥ 80% KP ở band đó `MAINTAIN`) và `target` (đọc từ user-service); bản chụp tuần/tháng do `SnapshotJob` ghi và
+  `progress-snapshots-v1.md` mô tả. Cờ `INACTIVE` mở bằng job hằng ngày và tự đóng khi học viên trả lời lại.
 - Mọi lượt ghi của một học viên chạy trong một `@Transactional` mở đầu bằng `pg_advisory_xact_lock` theo user.
 - Bằng chứng bài học chỉ ghi ở lần nộp đầu của mỗi khối; bài ôn ghi mỗi set (nộp một lần); kết quả thi ghi theo
   `(attempt_id, result_version)`, chấm lại thì thay bằng chứng của version cũ.
@@ -253,9 +303,8 @@ Khi không có convention cụ thể, theo code lân cận trong cùng module.
 
 1. Đọc file này, `README.md` và README/config của module bị ảnh hưởng trước khi sửa code.
 2. Giữ thay đổi trong đúng bounded context. Chỉ sửa `common-security`, Gateway, Config Server hoặc Docker khi contract thật sự cần.
-3. BẮT BUỘC định hướng bằng Graphify trước khi đọc source để tiết kiệm token. Khi `graphify-out/graph.json` tồn tại, TUYỆT ĐỐI
-   KHÔNG grep hoặc đọc nhiều file để "tìm hiểu codebase" khi chưa chạy `graphify query/explain/path/affected`; chỉ mở file
-   nguồn của node mà graph trả về (graph đã loại `third_party/` và `*.md`). Tên trùng nhau thì dùng dạng `path::Symbol`.
+3. Khi `graphify-out/graph.json` tồn tại, định hướng bằng Graphify trước khi đọc nhiều source (graph đã loại `third_party/`
+   và `*.md`). Tên trùng nhau thì dùng dạng `path::Symbol`.
 
 ```powershell
 graphify query "<câu hỏi về codebase>"

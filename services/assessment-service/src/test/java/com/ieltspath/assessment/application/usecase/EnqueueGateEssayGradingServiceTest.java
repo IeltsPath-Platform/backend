@@ -54,7 +54,7 @@ class EnqueueGateEssayGradingServiceTest {
 
     @Test
     void gateWithOmittedEssayScoresItZeroAndCompletesWithoutCreatingJob() {
-        AssessmentAttempt attempt = attempt(AttemptType.COURSE_GATE);
+        AssessmentAttempt attempt = attempt(AttemptType.TOPIC_GATE);
         UUID essayId = UUID.randomUUID();
         UUID objectiveId = UUID.randomUUID();
         when(items.findByAttemptId(attempt.getId())).thenReturn(List.of(item(essayId, ESSAY), item(objectiveId, OBJECTIVE)));
@@ -92,6 +92,18 @@ class EnqueueGateEssayGradingServiceTest {
 
     private EnqueueGateEssayGradingService service() {
         return new EnqueueGateEssayGradingService(items, jobs, autoGrader, placementGrading, json);
+    }
+
+    @Test
+    void officialPracticeEssayUsesTheExistingAiQueue() {
+        AssessmentAttempt attempt = attempt(AttemptType.OFFICIAL_PRACTICE);
+        UUID essayId = UUID.randomUUID();
+        UUID submissionId = UUID.randomUUID();
+        when(items.findByAttemptId(attempt.getId())).thenReturn(List.of(item(essayId, ESSAY)));
+        when(jobs.submittedEssays(List.of(essayId))).thenReturn(Map.of(essayId, submissionId));
+        service().enqueueOrGrade(attempt);
+        verify(jobs).enqueueAi(Map.of(essayId, submissionId), userId);
+        verifyNoInteractions(autoGrader, placementGrading);
     }
 
     @Test

@@ -9,7 +9,30 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
 
+community:
+  user-service:
+    base-url: ${USER_SERVICE_URL:http://localhost:8085}
+  media:
+    image-hosts: ${COMMUNITY_IMAGE_HOSTS:images.unsplash.com,i.imgur.com}
+    video-hosts: ${COMMUNITY_VIDEO_HOSTS:youtube.com,www.youtube.com,youtu.be,loom.com,www.loom.com,drive.google.com}
+  messaging:
+    exchange: community.events
+  outbox:
+    relay:
+      enabled: ${COMMUNITY_OUTBOX_RELAY_ENABLED:true}
+      poll-interval: PT2S
+      batch-size: 50
+      confirm-timeout: PT5S
 app:
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}

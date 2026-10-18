@@ -1,0 +1,4818 @@
+[
+  {
+    "lemma": "pollution",
+    "ipa": "/pəˈluːʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The presence of harmful substances in the air, water or soil.",
+        "vietnameseMeaning": "sự ô nhiễm",
+        "exampleSentence": "Air pollution is a serious problem in many large cities.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "climate",
+    "ipa": "/ˈklaɪmət/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The usual weather conditions of a particular region.",
+        "vietnameseMeaning": "khí hậu",
+        "exampleSentence": "The climate in this region is warm and dry.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "emission",
+    "ipa": "/ɪˈmɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An amount of gas or another substance released into the air.",
+        "vietnameseMeaning": "khí thải",
+        "exampleSentence": "Carbon emissions from cars have risen sharply.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "renewable",
+    "ipa": "/rɪˈnjuːəbl/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Able to be replaced naturally, so that it never runs out.",
+        "vietnameseMeaning": "có thể tái tạo",
+        "exampleSentence": "Many countries are investing in renewable energy.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "conservation",
+    "ipa": "/ˌkɒnsəˈveɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The protection of nature and natural resources.",
+        "vietnameseMeaning": "sự bảo tồn",
+        "exampleSentence": "Wildlife conservation needs long-term funding.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "habitat",
+    "ipa": "/ˈhæbɪtæt/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The natural home of an animal or plant.",
+        "vietnameseMeaning": "môi trường sống",
+        "exampleSentence": "Deforestation destroys the habitat of many species.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "deforestation",
+    "ipa": "/diːˌfɒrɪˈsteɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The cutting down of large areas of forest.",
+        "vietnameseMeaning": "nạn phá rừng",
+        "exampleSentence": "Deforestation contributes to climate change.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "sustainable",
+    "ipa": "/səˈsteɪnəbl/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Able to continue for a long time without harming the environment.",
+        "vietnameseMeaning": "bền vững",
+        "exampleSentence": "Sustainable farming protects the soil for future generations.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "extinction",
+    "ipa": "/ɪkˈstɪŋkʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The situation in which a species no longer exists.",
+        "vietnameseMeaning": "sự tuyệt chủng",
+        "exampleSentence": "Many large animals are close to extinction.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "ecosystem",
+    "ipa": "/ˈiːkəʊsɪstəm/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "All the living things in an area and the way they affect each other.",
+        "vietnameseMeaning": "hệ sinh thái",
+        "exampleSentence": "Coral reefs are a fragile ecosystem.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "biodiversity",
+    "ipa": "/ˌbaɪəʊdaɪˈvɜːsəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The variety of plant and animal life in a place.",
+        "vietnameseMeaning": "đa dạng sinh học",
+        "exampleSentence": "The rainforest has remarkable biodiversity.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "fossil fuel",
+    "ipa": "/ˈfɒsl ˈfjuːəl/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A fuel such as coal or oil that formed from ancient plants and animals.",
+        "vietnameseMeaning": "nhiên liệu hóa thạch",
+        "exampleSentence": "Burning fossil fuels releases carbon dioxide.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "drought",
+    "ipa": "/draʊt/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A long period with very little rain.",
+        "vietnameseMeaning": "hạn hán",
+        "exampleSentence": "The drought destroyed most of the crops.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "flood",
+    "ipa": "/flʌd/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A large amount of water covering land that is usually dry.",
+        "vietnameseMeaning": "trận lũ",
+        "exampleSentence": "The flood forced hundreds of families to leave their homes.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "recycle",
+    "ipa": "/ˌriːˈsaɪkl/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To process used materials so that they can be used again.",
+        "vietnameseMeaning": "tái chế",
+        "exampleSentence": "Students are encouraged to recycle paper and plastic.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "waste",
+    "ipa": "/weɪst/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Material that is no longer needed and is thrown away.",
+        "vietnameseMeaning": "rác thải",
+        "exampleSentence": "Food waste makes up a large share of household rubbish.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "landfill",
+    "ipa": "/ˈlændfɪl/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A place where rubbish is buried in the ground.",
+        "vietnameseMeaning": "bãi chôn lấp rác",
+        "exampleSentence": "Too much plastic ends up in landfill.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "resource",
+    "ipa": "/rɪˈzɔːs/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A supply of something useful, such as water or minerals.",
+        "vietnameseMeaning": "tài nguyên",
+        "exampleSentence": "Fresh water is a limited resource.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "endangered",
+    "ipa": "/ɪnˈdeɪndʒəd/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "At risk of disappearing completely.",
+        "vietnameseMeaning": "có nguy cơ tuyệt chủng",
+        "exampleSentence": "The tiger is an endangered species.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "global warming",
+    "ipa": "/ˌɡləʊbl ˈwɔːmɪŋ/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The gradual rise in the temperature of the Earth.",
+        "vietnameseMeaning": "sự nóng lên toàn cầu",
+        "exampleSentence": "Global warming is melting the polar ice caps.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "atmosphere",
+    "ipa": "/ˈætməsfɪə/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The layer of gases around the Earth.",
+        "vietnameseMeaning": "khí quyển",
+        "exampleSentence": "Greenhouse gases trap heat in the atmosphere.",
+        "imageUrl": null,
+        "sortOrder": 0
+      },
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The feeling or mood of a place.",
+        "vietnameseMeaning": "bầu không khí",
+        "exampleSentence": "The cafe has a relaxed atmosphere.",
+        "imageUrl": null,
+        "sortOrder": 1
+      }
+    ]
+  },
+  {
+    "lemma": "contaminate",
+    "ipa": "/kənˈtæmɪneɪt/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To make something dirty or harmful by adding a substance to it.",
+        "vietnameseMeaning": "làm nhiễm bẩn",
+        "exampleSentence": "Chemicals from the factory contaminated the river.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "preserve",
+    "ipa": "/prɪˈzɜːv/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To keep something in its original or good condition.",
+        "vietnameseMeaning": "bảo tồn",
+        "exampleSentence": "The government wants to preserve the old forest.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "erosion",
+    "ipa": "/ɪˈrəʊʒn/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The gradual wearing away of soil or rock by wind or water.",
+        "vietnameseMeaning": "sự xói mòn",
+        "exampleSentence": "Planting trees helps to prevent soil erosion.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "carbon footprint",
+    "ipa": "/ˈkɑːbən ˈfʊtprɪnt/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The amount of carbon dioxide produced by a person, group or activity.",
+        "vietnameseMeaning": "dấu chân carbon",
+        "exampleSentence": "Cycling to work lowers your carbon footprint.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "wildlife",
+    "ipa": "/ˈwaɪldlaɪf/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Animals and plants that live in natural conditions.",
+        "vietnameseMeaning": "động thực vật hoang dã",
+        "exampleSentence": "National parks protect wildlife from hunters.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "hazardous",
+    "ipa": "/ˈhæzədəs/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Dangerous, especially to health or safety.",
+        "vietnameseMeaning": "nguy hiểm",
+        "exampleSentence": "Hazardous waste must be stored safely.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "tackle",
+    "ipa": "/ˈtækl/",
+    "pronunciationAudioReference": null,
+    "topic": "Môi trường",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To make a determined effort to deal with a difficult problem.",
+        "vietnameseMeaning": "giải quyết",
+        "exampleSentence": "Cities must tackle air pollution quickly.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "curriculum",
+    "ipa": "/kəˈrɪkjələm/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The subjects taught in a school or college.",
+        "vietnameseMeaning": "chương trình học",
+        "exampleSentence": "The curriculum includes science, art and music.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "tuition",
+    "ipa": "/tjuˈɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Teaching, or the money paid for it.",
+        "vietnameseMeaning": "học phí",
+        "exampleSentence": "Tuition fees rise every year at many universities.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "literacy",
+    "ipa": "/ˈlɪtərəsi/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The ability to read and write.",
+        "vietnameseMeaning": "khả năng biết đọc biết viết",
+        "exampleSentence": "The programme aims to improve adult literacy.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "scholarship",
+    "ipa": "/ˈskɒləʃɪp/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Money given to a student to pay for their studies.",
+        "vietnameseMeaning": "học bổng",
+        "exampleSentence": "She won a scholarship to study in Canada.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "enrol",
+    "ipa": "/ɪnˈrəʊl/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To officially join a course or school.",
+        "vietnameseMeaning": "đăng ký nhập học",
+        "exampleSentence": "He decided to enrol on an evening course.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "graduate",
+    "ipa": "/ˈɡrædʒuət/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A person who has completed a university degree.",
+        "vietnameseMeaning": "sinh viên tốt nghiệp",
+        "exampleSentence": "Graduates often struggle to find their first job.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "lecture",
+    "ipa": "/ˈlektʃə/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A talk given to a group of students on a subject.",
+        "vietnameseMeaning": "bài giảng",
+        "exampleSentence": "The lecture on marine biology lasted two hours.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "assignment",
+    "ipa": "/əˈsaɪnmənt/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A piece of work given to a student as part of a course.",
+        "vietnameseMeaning": "bài tập được giao",
+        "exampleSentence": "The assignment must be handed in on Friday.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "deadline",
+    "ipa": "/ˈdedlaɪn/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A time or date by which something must be finished.",
+        "vietnameseMeaning": "hạn chót",
+        "exampleSentence": "I missed the deadline for the application.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "vocational",
+    "ipa": "/vəʊˈkeɪʃənl/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Relating to skills needed for a particular job.",
+        "vietnameseMeaning": "thuộc về nghề nghiệp",
+        "exampleSentence": "Vocational training prepares students for work.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "compulsory",
+    "ipa": "/kəmˈpʌlsəri/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Required by a rule or law.",
+        "vietnameseMeaning": "bắt buộc",
+        "exampleSentence": "Education is compulsory until the age of sixteen.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "qualification",
+    "ipa": "/ˌkwɒlɪfɪˈkeɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An exam passed or a course completed that shows you can do something.",
+        "vietnameseMeaning": "bằng cấp",
+        "exampleSentence": "You need a teaching qualification for this job.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "undergraduate",
+    "ipa": "/ˌʌndəˈɡrædʒuət/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A student who is studying for a first degree.",
+        "vietnameseMeaning": "sinh viên đại học",
+        "exampleSentence": "Most undergraduates live on campus in their first year.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "syllabus",
+    "ipa": "/ˈsɪləbəs/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A list of the topics covered in a course.",
+        "vietnameseMeaning": "đề cương môn học",
+        "exampleSentence": "The syllabus is available on the course website.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "tutor",
+    "ipa": "/ˈtjuːtə/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A teacher who works with one student or a small group.",
+        "vietnameseMeaning": "gia sư",
+        "exampleSentence": "My tutor gave me helpful feedback on my essay.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "campus",
+    "ipa": "/ˈkæmpəs/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The land and buildings of a university.",
+        "vietnameseMeaning": "khuôn viên trường",
+        "exampleSentence": "The campus has a library, a gym and several cafes.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "academic",
+    "ipa": "/ˌækəˈdemɪk/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Relating to education, especially at college or university.",
+        "vietnameseMeaning": "thuộc về học thuật",
+        "exampleSentence": "Her academic results improved this year.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "plagiarism",
+    "ipa": "/ˈpleɪdʒərɪzəm/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Copying someone else's work and presenting it as your own.",
+        "vietnameseMeaning": "đạo văn",
+        "exampleSentence": "Plagiarism can lead to a student being expelled.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "assessment",
+    "ipa": "/əˈsesmənt/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A judgement about the quality or level of someone's work.",
+        "vietnameseMeaning": "sự đánh giá",
+        "exampleSentence": "Continuous assessment reduces pressure at exam time.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "motivation",
+    "ipa": "/ˌməʊtɪˈveɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The reason or desire that makes someone want to do something.",
+        "vietnameseMeaning": "động lực",
+        "exampleSentence": "Praise from teachers increases students' motivation.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "pupil",
+    "ipa": "/ˈpjuːpl/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A child who attends school.",
+        "vietnameseMeaning": "học sinh",
+        "exampleSentence": "Each pupil receives a free textbook.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "dissertation",
+    "ipa": "/ˌdɪsəˈteɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A long piece of writing for a university degree.",
+        "vietnameseMeaning": "luận văn",
+        "exampleSentence": "He is writing a dissertation on urban planning.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "seminar",
+    "ipa": "/ˈsemɪnɑː/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A class in which a small group discusses a topic.",
+        "vietnameseMeaning": "buổi hội thảo chuyên đề",
+        "exampleSentence": "Students present their ideas in weekly seminars.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "peer",
+    "ipa": "/pɪə/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A person of the same age or status as you.",
+        "vietnameseMeaning": "bạn đồng trang lứa",
+        "exampleSentence": "Teenagers are strongly influenced by their peers.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "extracurricular",
+    "ipa": "/ˌekstrəkəˈrɪkjələ/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Done outside the normal school timetable.",
+        "vietnameseMeaning": "ngoại khóa",
+        "exampleSentence": "Sport is the most popular extracurricular activity.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "distance learning",
+    "ipa": "/ˈdɪstəns ˈlɜːnɪŋ/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A way of studying in which students learn away from the school or university.",
+        "vietnameseMeaning": "học từ xa",
+        "exampleSentence": "Distance learning allows people to study while working.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "revise",
+    "ipa": "/rɪˈvaɪz/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To study again what you have learned before an exam.",
+        "vietnameseMeaning": "ôn tập",
+        "exampleSentence": "I need to revise for my history test.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "drop out",
+    "ipa": "/ˌdrɒp ˈaʊt/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "PHRASAL_VERB",
+        "englishDefinition": "To leave a school or course before finishing it.",
+        "vietnameseMeaning": "bỏ học giữa chừng",
+        "exampleSentence": "Many students drop out because of financial problems.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "bilingual",
+    "ipa": "/baɪˈlɪŋɡwəl/",
+    "pronunciationAudioReference": null,
+    "topic": "Giáo dục",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Able to speak two languages well.",
+        "vietnameseMeaning": "song ngữ",
+        "exampleSentence": "Bilingual children often switch easily between languages.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "innovation",
+    "ipa": "/ˌɪnəˈveɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A new idea, method or invention.",
+        "vietnameseMeaning": "sự đổi mới",
+        "exampleSentence": "Technological innovation has changed the way we work.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "automation",
+    "ipa": "/ˌɔːtəˈmeɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The use of machines to do work without human control.",
+        "vietnameseMeaning": "tự động hóa",
+        "exampleSentence": "Automation has reduced the need for factory workers.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "artificial intelligence",
+    "ipa": "/ˌɑːtɪfɪʃl ɪnˈtelɪdʒəns/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Computer systems that can do tasks that normally need human thinking.",
+        "vietnameseMeaning": "trí tuệ nhân tạo",
+        "exampleSentence": "Artificial intelligence is used to detect diseases early.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "algorithm",
+    "ipa": "/ˈælɡərɪðəm/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A set of rules that a computer follows to solve a problem.",
+        "vietnameseMeaning": "thuật toán",
+        "exampleSentence": "The algorithm recommends videos based on what you watch.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "digital",
+    "ipa": "/ˈdɪdʒɪtl/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Using or storing information as numbers on computers.",
+        "vietnameseMeaning": "kỹ thuật số",
+        "exampleSentence": "Digital cameras have replaced film cameras.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "device",
+    "ipa": "/dɪˈvaɪs/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A small machine made for a particular purpose.",
+        "vietnameseMeaning": "thiết bị",
+        "exampleSentence": "Most people carry at least one electronic device.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "software",
+    "ipa": "/ˈsɒftweə/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Programs that run on a computer.",
+        "vietnameseMeaning": "phần mềm",
+        "exampleSentence": "The company sells accounting software to small businesses.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "cybersecurity",
+    "ipa": "/ˌsaɪbəsɪˈkjʊərəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Protection of computer systems from attack or theft.",
+        "vietnameseMeaning": "an ninh mạng",
+        "exampleSentence": "Banks spend millions on cybersecurity.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "privacy",
+    "ipa": "/ˈprɪvəsi/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The right to keep personal information to yourself.",
+        "vietnameseMeaning": "quyền riêng tư",
+        "exampleSentence": "Many users worry about privacy on social media.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "surveillance",
+    "ipa": "/səˈveɪləns/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Careful watching of a person or place, especially by the authorities.",
+        "vietnameseMeaning": "sự giám sát",
+        "exampleSentence": "Surveillance cameras are common in city centres.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "network",
+    "ipa": "/ˈnetwɜːk/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A group of connected computers or systems.",
+        "vietnameseMeaning": "mạng lưới",
+        "exampleSentence": "The school network was down all morning.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "platform",
+    "ipa": "/ˈplætfɔːm/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A website or system that people use to share or sell things.",
+        "vietnameseMeaning": "nền tảng",
+        "exampleSentence": "Video platforms have changed how people learn.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "interface",
+    "ipa": "/ˈɪntəfeɪs/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The way a user interacts with a computer or program.",
+        "vietnameseMeaning": "giao diện",
+        "exampleSentence": "The app has a simple and friendly interface.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "virtual",
+    "ipa": "/ˈvɜːtʃuəl/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Existing on a computer rather than in the real world.",
+        "vietnameseMeaning": "ảo",
+        "exampleSentence": "Virtual classrooms let students join from home.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "robot",
+    "ipa": "/ˈrəʊbɒt/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A machine that can perform tasks automatically.",
+        "vietnameseMeaning": "robot",
+        "exampleSentence": "Robots now assemble most of the cars in this factory.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "download",
+    "ipa": "/ˌdaʊnˈləʊd/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To copy a file from the internet to your own device.",
+        "vietnameseMeaning": "tải xuống",
+        "exampleSentence": "You can download the report from our website.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "broadband",
+    "ipa": "/ˈbrɔːdbænd/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A fast internet connection.",
+        "vietnameseMeaning": "băng thông rộng",
+        "exampleSentence": "Rural areas still lack reliable broadband.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "encryption",
+    "ipa": "/ɪnˈkrɪpʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The process of changing data into a secret code.",
+        "vietnameseMeaning": "mã hóa",
+        "exampleSentence": "Encryption keeps your messages private.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "database",
+    "ipa": "/ˈdeɪtəbeɪs/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A large organised collection of information stored on a computer.",
+        "vietnameseMeaning": "cơ sở dữ liệu",
+        "exampleSentence": "The hospital keeps patient records in a secure database.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "application",
+    "ipa": "/ˌæplɪˈkeɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A computer program designed for a particular use.",
+        "vietnameseMeaning": "ứng dụng",
+        "exampleSentence": "This application helps you track your spending.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "invent",
+    "ipa": "/ɪnˈvent/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To create something that did not exist before.",
+        "vietnameseMeaning": "phát minh",
+        "exampleSentence": "Who invented the first telephone?",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "upgrade",
+    "ipa": "/ˌʌpˈɡreɪd/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To improve something by replacing it with a newer version.",
+        "vietnameseMeaning": "nâng cấp",
+        "exampleSentence": "You should upgrade your software regularly.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "obsolete",
+    "ipa": "/ˈɒbsəliːt/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "No longer used because something better exists.",
+        "vietnameseMeaning": "lỗi thời",
+        "exampleSentence": "Typewriters became obsolete with the arrival of computers.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "social media",
+    "ipa": "/ˌsəʊʃl ˈmiːdiə/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Websites and apps where people share content and communicate.",
+        "vietnameseMeaning": "mạng xã hội",
+        "exampleSentence": "Teenagers spend hours each day on social media.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "breakthrough",
+    "ipa": "/ˈbreɪkθruː/",
+    "pronunciationAudioReference": null,
+    "topic": "Công nghệ",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An important discovery or development.",
+        "vietnameseMeaning": "bước đột phá",
+        "exampleSentence": "Scientists announced a breakthrough in battery technology.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "obesity",
+    "ipa": "/əʊˈbiːsəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The condition of being very overweight.",
+        "vietnameseMeaning": "bệnh béo phì",
+        "exampleSentence": "Childhood obesity is increasing in many countries.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "diet",
+    "ipa": "/ˈdaɪət/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The food that a person usually eats.",
+        "vietnameseMeaning": "chế độ ăn",
+        "exampleSentence": "A healthy diet includes plenty of vegetables.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "nutrition",
+    "ipa": "/njuˈtrɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The process of getting the food needed for health and growth.",
+        "vietnameseMeaning": "dinh dưỡng",
+        "exampleSentence": "Good nutrition is vital for young children.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "epidemic",
+    "ipa": "/ˌepɪˈdemɪk/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A sudden spread of a disease to many people.",
+        "vietnameseMeaning": "dịch bệnh",
+        "exampleSentence": "The epidemic spread quickly across the region.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "vaccine",
+    "ipa": "/ˈvæksiːn/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A substance that protects the body from a disease.",
+        "vietnameseMeaning": "vắc-xin",
+        "exampleSentence": "A new vaccine was developed within a year.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "symptom",
+    "ipa": "/ˈsɪmptəm/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A sign that a person has an illness.",
+        "vietnameseMeaning": "triệu chứng",
+        "exampleSentence": "A high temperature is a common symptom of flu.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "diagnosis",
+    "ipa": "/ˌdaɪəɡˈnəʊsɪs/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The identification of an illness after examining a patient.",
+        "vietnameseMeaning": "chẩn đoán",
+        "exampleSentence": "Early diagnosis improves the chance of recovery.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "treatment",
+    "ipa": "/ˈtriːtmənt/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Medical care given to a patient for an illness or injury.",
+        "vietnameseMeaning": "phương pháp điều trị",
+        "exampleSentence": "The treatment lasted for six months.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "chronic",
+    "ipa": "/ˈkrɒnɪk/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Lasting for a long time or happening again and again.",
+        "vietnameseMeaning": "mãn tính",
+        "exampleSentence": "He suffers from chronic back pain.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "immune",
+    "ipa": "/ɪˈmjuːn/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Protected against a particular disease.",
+        "vietnameseMeaning": "miễn dịch",
+        "exampleSentence": "Most adults are immune to measles.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "sedentary",
+    "ipa": "/ˈsedntri/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Involving a lot of sitting and little physical activity.",
+        "vietnameseMeaning": "ít vận động",
+        "exampleSentence": "A sedentary lifestyle increases the risk of heart disease.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "mental health",
+    "ipa": "/ˌmentl ˈhelθ/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The condition of a person's mind and emotions.",
+        "vietnameseMeaning": "sức khỏe tâm thần",
+        "exampleSentence": "Schools are paying more attention to mental health.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "stress",
+    "ipa": "/stres/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A feeling of worry caused by difficult circumstances.",
+        "vietnameseMeaning": "căng thẳng",
+        "exampleSentence": "Exams cause a lot of stress for students.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "anxiety",
+    "ipa": "/æŋˈzaɪəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A strong feeling of worry or fear.",
+        "vietnameseMeaning": "chứng lo âu",
+        "exampleSentence": "Many people feel anxiety before a job interview.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "therapy",
+    "ipa": "/ˈθerəpi/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Treatment to help someone recover from a problem.",
+        "vietnameseMeaning": "liệu pháp",
+        "exampleSentence": "Physical therapy helped him walk again.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "surgery",
+    "ipa": "/ˈsɜːdʒəri/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Medical treatment in which a doctor cuts the body to repair it.",
+        "vietnameseMeaning": "phẫu thuật",
+        "exampleSentence": "She needed surgery on her knee.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "prescription",
+    "ipa": "/prɪˈskrɪpʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A written order from a doctor for medicine.",
+        "vietnameseMeaning": "đơn thuốc",
+        "exampleSentence": "You need a prescription to buy this medicine.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "hygiene",
+    "ipa": "/ˈhaɪdʒiːn/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The practice of keeping yourself and your surroundings clean.",
+        "vietnameseMeaning": "vệ sinh",
+        "exampleSentence": "Good hygiene prevents the spread of infection.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "disease",
+    "ipa": "/dɪˈziːz/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An illness of the body or mind.",
+        "vietnameseMeaning": "bệnh tật",
+        "exampleSentence": "Heart disease is a leading cause of death.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "infection",
+    "ipa": "/ɪnˈfekʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An illness caused by bacteria or a virus.",
+        "vietnameseMeaning": "sự nhiễm trùng",
+        "exampleSentence": "The wound became infected and needed antibiotics.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "recover",
+    "ipa": "/rɪˈkʌvə/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To become well again after an illness or injury.",
+        "vietnameseMeaning": "hồi phục",
+        "exampleSentence": "He took three weeks to recover from the operation.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "lifestyle",
+    "ipa": "/ˈlaɪfstaɪl/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The way a person lives, including habits and activities.",
+        "vietnameseMeaning": "lối sống",
+        "exampleSentence": "An active lifestyle benefits both body and mind.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "wellbeing",
+    "ipa": "/ˌwelˈbiːɪŋ/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The state of being comfortable, healthy and happy.",
+        "vietnameseMeaning": "sức khỏe và hạnh phúc",
+        "exampleSentence": "Regular exercise improves overall wellbeing.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "balanced",
+    "ipa": "/ˈbælənst/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Having the right mix of different things.",
+        "vietnameseMeaning": "cân bằng",
+        "exampleSentence": "A balanced diet contains protein, fibre and vitamins.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "calorie",
+    "ipa": "/ˈkæləri/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A unit for measuring the energy in food.",
+        "vietnameseMeaning": "ca-lo",
+        "exampleSentence": "Fast food is often high in calories.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "malnutrition",
+    "ipa": "/ˌmælnjuˈtrɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A condition caused by not eating enough healthy food.",
+        "vietnameseMeaning": "suy dinh dưỡng",
+        "exampleSentence": "Malnutrition affects millions of children worldwide.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "life expectancy",
+    "ipa": "/ˈlaɪf ɪkˌspektənsi/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The number of years a person is likely to live.",
+        "vietnameseMeaning": "tuổi thọ trung bình",
+        "exampleSentence": "Life expectancy has risen because of better healthcare.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "ageing",
+    "ipa": "/ˈeɪdʒɪŋ/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Becoming older.",
+        "vietnameseMeaning": "già hóa",
+        "exampleSentence": "Japan has an ageing population.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "outbreak",
+    "ipa": "/ˈaʊtbreɪk/",
+    "pronunciationAudioReference": null,
+    "topic": "Sức khỏe",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A sudden start of a disease or violence.",
+        "vietnameseMeaning": "sự bùng phát",
+        "exampleSentence": "Officials are trying to control the outbreak.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "community",
+    "ipa": "/kəˈmjuːnəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A group of people living in the same area or sharing interests.",
+        "vietnameseMeaning": "cộng đồng",
+        "exampleSentence": "The local community raised money for the school.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "poverty",
+    "ipa": "/ˈpɒvəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The state of being very poor.",
+        "vietnameseMeaning": "sự nghèo đói",
+        "exampleSentence": "Education can help families escape poverty.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "inequality",
+    "ipa": "/ˌɪnɪˈkwɒləti/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An unfair difference between groups in a society.",
+        "vietnameseMeaning": "sự bất bình đẳng",
+        "exampleSentence": "Income inequality has grown over the past decade.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "immigration",
+    "ipa": "/ˌɪmɪˈɡreɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The movement of people into a country to live there.",
+        "vietnameseMeaning": "sự nhập cư",
+        "exampleSentence": "Immigration has made the city more diverse.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "urbanisation",
+    "ipa": "/ˌɜːbənaɪˈzeɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The growth of towns and cities.",
+        "vietnameseMeaning": "đô thị hóa",
+        "exampleSentence": "Rapid urbanisation puts pressure on housing.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "population",
+    "ipa": "/ˌpɒpjuˈleɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The number of people living in a place.",
+        "vietnameseMeaning": "dân số",
+        "exampleSentence": "The population of the city has doubled since 1990.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "generation",
+    "ipa": "/ˌdʒenəˈreɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "All the people born at about the same time.",
+        "vietnameseMeaning": "thế hệ",
+        "exampleSentence": "The younger generation uses technology differently.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "tradition",
+    "ipa": "/trəˈdɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A custom passed down from one generation to the next.",
+        "vietnameseMeaning": "truyền thống",
+        "exampleSentence": "Eating together is an important family tradition.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "diversity",
+    "ipa": "/daɪˈvɜːsəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The state of including many different types of people or things.",
+        "vietnameseMeaning": "sự đa dạng",
+        "exampleSentence": "Cultural diversity makes workplaces more creative.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "discrimination",
+    "ipa": "/dɪˌskrɪmɪˈneɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Unfair treatment of people because of their race, age, gender or beliefs.",
+        "vietnameseMeaning": "sự phân biệt đối xử",
+        "exampleSentence": "Laws now protect workers from discrimination.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "crime",
+    "ipa": "/kraɪm/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An illegal act that can be punished by law.",
+        "vietnameseMeaning": "tội phạm",
+        "exampleSentence": "Street crime has fallen in recent years.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "welfare",
+    "ipa": "/ˈwelfeə/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Help given by the state to people in need.",
+        "vietnameseMeaning": "phúc lợi xã hội",
+        "exampleSentence": "The government increased welfare payments for the elderly.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "homeless",
+    "ipa": "/ˈhəʊmləs/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Having no place to live.",
+        "vietnameseMeaning": "vô gia cư",
+        "exampleSentence": "Charities provide meals for homeless people.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "gender",
+    "ipa": "/ˈdʒendə/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Whether a person is male or female, as shown by social roles.",
+        "vietnameseMeaning": "giới tính",
+        "exampleSentence": "Gender equality is a goal in many societies.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "stereotype",
+    "ipa": "/ˈsteriətaɪp/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A fixed and oversimplified idea about a type of person.",
+        "vietnameseMeaning": "định kiến rập khuôn",
+        "exampleSentence": "Advertisements often reinforce gender stereotypes.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "culture",
+    "ipa": "/ˈkʌltʃə/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The customs, beliefs and way of life of a group of people.",
+        "vietnameseMeaning": "văn hóa",
+        "exampleSentence": "Food is an important part of Vietnamese culture.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "heritage",
+    "ipa": "/ˈherɪtɪdʒ/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The traditions and buildings passed down from the past.",
+        "vietnameseMeaning": "di sản",
+        "exampleSentence": "The old town is a World Heritage site.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "minority",
+    "ipa": "/maɪˈnɒrəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A smaller group within a larger group.",
+        "vietnameseMeaning": "nhóm thiểu số",
+        "exampleSentence": "Ethnic minorities are well represented in the council.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "citizen",
+    "ipa": "/ˈsɪtɪzn/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A person who legally belongs to a country.",
+        "vietnameseMeaning": "công dân",
+        "exampleSentence": "Every citizen has the right to vote.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "volunteer",
+    "ipa": "/ˌvɒlənˈtɪə/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A person who does work without being paid.",
+        "vietnameseMeaning": "tình nguyện viên",
+        "exampleSentence": "Volunteers cleaned the beach on Sunday.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "charity",
+    "ipa": "/ˈtʃærəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An organisation that raises money to help people in need.",
+        "vietnameseMeaning": "tổ chức từ thiện",
+        "exampleSentence": "The concert raised money for a local charity.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "elderly",
+    "ipa": "/ˈeldəli/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Old, used politely for older people.",
+        "vietnameseMeaning": "cao tuổi",
+        "exampleSentence": "The elderly often feel lonely in big cities.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "rural",
+    "ipa": "/ˈrʊərəl/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Relating to the countryside.",
+        "vietnameseMeaning": "thuộc nông thôn",
+        "exampleSentence": "Many young people leave rural areas to find work.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "urban",
+    "ipa": "/ˈɜːbən/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Relating to towns and cities.",
+        "vietnameseMeaning": "thuộc đô thị",
+        "exampleSentence": "Urban life is faster and more expensive.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "migrate",
+    "ipa": "/maɪˈɡreɪt/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To move from one place to another to live or work.",
+        "vietnameseMeaning": "di cư",
+        "exampleSentence": "Workers migrate to cities in search of better pay.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "isolation",
+    "ipa": "/ˌaɪsəˈleɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Xã hội",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The state of being alone or separate from others.",
+        "vietnameseMeaning": "sự cô lập",
+        "exampleSentence": "Social isolation can harm mental health.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "legislation",
+    "ipa": "/ˌledʒɪsˈleɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Laws made by a government.",
+        "vietnameseMeaning": "luật pháp",
+        "exampleSentence": "New legislation protects consumers from false advertising.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "regulate",
+    "ipa": "/ˈreɡjuleɪt/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To control something by rules or laws.",
+        "vietnameseMeaning": "điều chỉnh bằng quy định",
+        "exampleSentence": "The state should regulate food prices.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "policy",
+    "ipa": "/ˈpɒləsi/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A plan of action agreed by a government or organisation.",
+        "vietnameseMeaning": "chính sách",
+        "exampleSentence": "The new housing policy was widely criticised.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "authority",
+    "ipa": "/ɔːˈθɒrəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The power to give orders or make decisions.",
+        "vietnameseMeaning": "chính quyền, thẩm quyền",
+        "exampleSentence": "Local authorities are responsible for rubbish collection.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "tax",
+    "ipa": "/tæks/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Money paid to the government from income or purchases.",
+        "vietnameseMeaning": "thuế",
+        "exampleSentence": "A higher tax on sugary drinks may reduce sales.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "subsidy",
+    "ipa": "/ˈsʌbsədi/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Money given by the government to help an industry.",
+        "vietnameseMeaning": "trợ cấp",
+        "exampleSentence": "Farmers receive a subsidy to keep food prices low.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "penalty",
+    "ipa": "/ˈpenəlti/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A punishment for breaking a rule or law.",
+        "vietnameseMeaning": "hình phạt",
+        "exampleSentence": "The penalty for dropping litter is a fine.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "enforce",
+    "ipa": "/ɪnˈfɔːs/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To make people obey a law or rule.",
+        "vietnameseMeaning": "thực thi",
+        "exampleSentence": "Police officers enforce the speed limit.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "ban",
+    "ipa": "/bæn/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To officially forbid something.",
+        "vietnameseMeaning": "cấm",
+        "exampleSentence": "Several cities have banned smoking in parks.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "prohibit",
+    "ipa": "/prəˈhɪbɪt/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To stop something by law or rule.",
+        "vietnameseMeaning": "ngăn cấm",
+        "exampleSentence": "The law prohibits children from working in factories.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "fine",
+    "ipa": "/faɪn/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Money that must be paid as a punishment.",
+        "vietnameseMeaning": "tiền phạt",
+        "exampleSentence": "Drivers face a heavy fine for using a phone.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "criminal",
+    "ipa": "/ˈkrɪmɪnl/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A person who has committed a crime.",
+        "vietnameseMeaning": "tội phạm",
+        "exampleSentence": "Prison should help criminals return to society.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "sentence",
+    "ipa": "/ˈsentəns/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The punishment given to someone found guilty in court.",
+        "vietnameseMeaning": "bản án",
+        "exampleSentence": "He received a five-year prison sentence.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "rehabilitation",
+    "ipa": "/ˌriːəˌbɪlɪˈteɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Help for a person to return to a normal life.",
+        "vietnameseMeaning": "sự phục hồi, cải tạo",
+        "exampleSentence": "Rehabilitation programmes reduce reoffending.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "deter",
+    "ipa": "/dɪˈtɜː/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To make someone decide not to do something.",
+        "vietnameseMeaning": "ngăn chặn, răn đe",
+        "exampleSentence": "Harsh punishments may deter young people from crime.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "democracy",
+    "ipa": "/dɪˈmɒkrəsi/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A system in which people choose their leaders by voting.",
+        "vietnameseMeaning": "nền dân chủ",
+        "exampleSentence": "Free elections are essential in a democracy.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "election",
+    "ipa": "/ɪˈlekʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An occasion when people vote to choose a leader.",
+        "vietnameseMeaning": "cuộc bầu cử",
+        "exampleSentence": "Turnout in the election was unusually high.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "legal",
+    "ipa": "/ˈliːɡl/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Allowed by law.",
+        "vietnameseMeaning": "hợp pháp",
+        "exampleSentence": "It is legal to drive from the age of seventeen.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "obligation",
+    "ipa": "/ˌɒblɪˈɡeɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Something that you must do because of a law or duty.",
+        "vietnameseMeaning": "nghĩa vụ",
+        "exampleSentence": "Parents have an obligation to send children to school.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "constitution",
+    "ipa": "/ˌkɒnstɪˈtjuːʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The basic laws of a country.",
+        "vietnameseMeaning": "hiến pháp",
+        "exampleSentence": "The constitution guarantees freedom of speech.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "budget",
+    "ipa": "/ˈbʌdʒɪt/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A plan for how money will be spent.",
+        "vietnameseMeaning": "ngân sách",
+        "exampleSentence": "The city has a limited budget for public transport.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "fund",
+    "ipa": "/fʌnd/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To provide money for something.",
+        "vietnameseMeaning": "tài trợ",
+        "exampleSentence": "The state funds most university research.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "restrict",
+    "ipa": "/rɪˈstrɪkt/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To limit something in size, amount or range.",
+        "vietnameseMeaning": "hạn chế",
+        "exampleSentence": "Governments should restrict advertising to children.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "impose",
+    "ipa": "/ɪmˈpəʊz/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To officially force a rule, tax or punishment on people.",
+        "vietnameseMeaning": "áp đặt",
+        "exampleSentence": "The council imposed a charge on plastic bags.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "amend",
+    "ipa": "/əˈmend/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To change a law or document slightly to improve it.",
+        "vietnameseMeaning": "sửa đổi",
+        "exampleSentence": "Parliament voted to amend the immigration law.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "implement",
+    "ipa": "/ˈɪmplɪment/",
+    "pronunciationAudioReference": null,
+    "topic": "Chính phủ và pháp luật",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To put a plan or decision into action.",
+        "vietnameseMeaning": "thực hiện",
+        "exampleSentence": "The school will implement the new rules in September.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "employment",
+    "ipa": "/ɪmˈplɔɪmənt/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The state of having a paid job.",
+        "vietnameseMeaning": "việc làm",
+        "exampleSentence": "Tourism provides employment for thousands of people.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "salary",
+    "ipa": "/ˈsæləri/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A fixed amount of money paid to an employee each month.",
+        "vietnameseMeaning": "tiền lương",
+        "exampleSentence": "She was offered a higher salary at another company.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "wage",
+    "ipa": "/weɪdʒ/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Money paid to a worker, usually by the hour or week.",
+        "vietnameseMeaning": "tiền công",
+        "exampleSentence": "The minimum wage rose by three per cent.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "income",
+    "ipa": "/ˈɪŋkʌm/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Money that a person or business earns.",
+        "vietnameseMeaning": "thu nhập",
+        "exampleSentence": "Families on low incomes struggle with rent.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "profit",
+    "ipa": "/ˈprɒfɪt/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Money gained when income is greater than costs.",
+        "vietnameseMeaning": "lợi nhuận",
+        "exampleSentence": "The company made a record profit last year.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "revenue",
+    "ipa": "/ˈrevənjuː/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Money received by a business or government.",
+        "vietnameseMeaning": "doanh thu",
+        "exampleSentence": "Tourism brings in a large amount of revenue.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "consumer",
+    "ipa": "/kənˈsjuːmə/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A person who buys goods or services.",
+        "vietnameseMeaning": "người tiêu dùng",
+        "exampleSentence": "Consumers are choosing greener products.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "demand",
+    "ipa": "/dɪˈmɑːnd/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The amount of a product that people want to buy.",
+        "vietnameseMeaning": "nhu cầu",
+        "exampleSentence": "There is growing demand for electric cars.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "supply",
+    "ipa": "/səˈplaɪ/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The amount of something available for people to use.",
+        "vietnameseMeaning": "nguồn cung",
+        "exampleSentence": "A shortage of supply pushed prices up.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "inflation",
+    "ipa": "/ɪnˈfleɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A general rise in prices over time.",
+        "vietnameseMeaning": "lạm phát",
+        "exampleSentence": "Inflation makes everyday goods more expensive.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "recession",
+    "ipa": "/rɪˈseʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A period when the economy gets weaker.",
+        "vietnameseMeaning": "suy thoái kinh tế",
+        "exampleSentence": "Many shops closed during the recession.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "economy",
+    "ipa": "/ɪˈkɒnəmi/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The system of money, trade and industry in a country.",
+        "vietnameseMeaning": "nền kinh tế",
+        "exampleSentence": "The economy grew by four per cent last year.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "industry",
+    "ipa": "/ˈɪndəstri/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The production of goods in factories, or a particular business sector.",
+        "vietnameseMeaning": "ngành công nghiệp",
+        "exampleSentence": "The tourism industry employs many young people.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "manufacture",
+    "ipa": "/ˌmænjuˈfæktʃə/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To make goods in large numbers using machines.",
+        "vietnameseMeaning": "sản xuất",
+        "exampleSentence": "The company manufactures furniture for export.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "export",
+    "ipa": "/ɪkˈspɔːt/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To sell goods to another country.",
+        "vietnameseMeaning": "xuất khẩu",
+        "exampleSentence": "Vietnam exports coffee and rice to many countries.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "import",
+    "ipa": "/ɪmˈpɔːt/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To bring goods into a country to sell them.",
+        "vietnameseMeaning": "nhập khẩu",
+        "exampleSentence": "The country imports most of its oil.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "trade",
+    "ipa": "/treɪd/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The buying and selling of goods between people or countries.",
+        "vietnameseMeaning": "thương mại",
+        "exampleSentence": "International trade has increased rapidly.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "globalisation",
+    "ipa": "/ˌɡləʊbəlaɪˈzeɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The process by which the world becomes more connected through trade and culture.",
+        "vietnameseMeaning": "toàn cầu hóa",
+        "exampleSentence": "Globalisation has created jobs but also threatened local industries.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "competition",
+    "ipa": "/ˌkɒmpəˈtɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A situation in which companies try to win customers from each other.",
+        "vietnameseMeaning": "sự cạnh tranh",
+        "exampleSentence": "Competition keeps prices low for consumers.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "entrepreneur",
+    "ipa": "/ˌɒntrəprəˈnɜː/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A person who starts a business and takes financial risks.",
+        "vietnameseMeaning": "doanh nhân khởi nghiệp",
+        "exampleSentence": "The young entrepreneur opened her first shop at twenty.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "commute",
+    "ipa": "/kəˈmjuːt/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To travel regularly between home and work.",
+        "vietnameseMeaning": "đi làm hằng ngày",
+        "exampleSentence": "He commutes to the city by train.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "colleague",
+    "ipa": "/ˈkɒliːɡ/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A person you work with.",
+        "vietnameseMeaning": "đồng nghiệp",
+        "exampleSentence": "My colleagues organised a farewell party.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "promotion",
+    "ipa": "/prəˈməʊʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A move to a more important job.",
+        "vietnameseMeaning": "sự thăng chức",
+        "exampleSentence": "She worked hard and earned a promotion.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "retire",
+    "ipa": "/rɪˈtaɪə/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To stop working because of age.",
+        "vietnameseMeaning": "nghỉ hưu",
+        "exampleSentence": "Many people retire at the age of sixty-five.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "workforce",
+    "ipa": "/ˈwɜːkfɔːs/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "All the people who work in a company or country.",
+        "vietnameseMeaning": "lực lượng lao động",
+        "exampleSentence": "The workforce is becoming older.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "productivity",
+    "ipa": "/ˌprɒdʌkˈtɪvəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The rate at which goods are produced or work is done.",
+        "vietnameseMeaning": "năng suất",
+        "exampleSentence": "Flexible hours can raise productivity.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "freelance",
+    "ipa": "/ˈfriːlɑːns/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Working for different companies rather than one employer.",
+        "vietnameseMeaning": "làm việc tự do",
+        "exampleSentence": "She works as a freelance designer.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "unemployment",
+    "ipa": "/ˌʌnɪmˈplɔɪmənt/",
+    "pronunciationAudioReference": null,
+    "topic": "Kinh tế và việc làm",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The situation of having no job.",
+        "vietnameseMeaning": "tình trạng thất nghiệp",
+        "exampleSentence": "Youth unemployment remains a serious concern.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "research",
+    "ipa": "/rɪˈsɜːtʃ/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Careful study to discover new facts.",
+        "vietnameseMeaning": "nghiên cứu",
+        "exampleSentence": "Medical research has led to many new treatments.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "experiment",
+    "ipa": "/ɪkˈsperɪmənt/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A scientific test to find out what happens.",
+        "vietnameseMeaning": "thí nghiệm",
+        "exampleSentence": "The students carried out an experiment on plant growth.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "hypothesis",
+    "ipa": "/haɪˈpɒθəsɪs/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An idea that is suggested as an explanation and can be tested.",
+        "vietnameseMeaning": "giả thuyết",
+        "exampleSentence": "The results supported the original hypothesis.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "evidence",
+    "ipa": "/ˈevɪdəns/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Facts or signs that show something is true.",
+        "vietnameseMeaning": "bằng chứng",
+        "exampleSentence": "There is strong evidence that exercise improves memory.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "theory",
+    "ipa": "/ˈθɪəri/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An idea or set of ideas that explains something.",
+        "vietnameseMeaning": "lý thuyết",
+        "exampleSentence": "Darwin's theory of evolution changed biology.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "analyse",
+    "ipa": "/ˈænəlaɪz/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To examine something carefully in order to understand it.",
+        "vietnameseMeaning": "phân tích",
+        "exampleSentence": "Scientists analysed samples from the river.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "finding",
+    "ipa": "/ˈfaɪndɪŋ/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A result that is discovered through research.",
+        "vietnameseMeaning": "kết quả nghiên cứu",
+        "exampleSentence": "The main finding was that sleep improves learning.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "survey",
+    "ipa": "/ˈsɜːveɪ/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A study in which many people are asked the same questions.",
+        "vietnameseMeaning": "cuộc khảo sát",
+        "exampleSentence": "A survey of 500 students showed that most prefer online classes.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "sample",
+    "ipa": "/ˈsɑːmpl/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A small amount or number taken to represent the whole.",
+        "vietnameseMeaning": "mẫu",
+        "exampleSentence": "The sample included people of all ages.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "correlation",
+    "ipa": "/ˌkɒrəˈleɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A connection between two things that change together.",
+        "vietnameseMeaning": "mối tương quan",
+        "exampleSentence": "There is a correlation between income and health.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "discover",
+    "ipa": "/dɪˈskʌvə/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To find or learn something for the first time.",
+        "vietnameseMeaning": "khám phá",
+        "exampleSentence": "Researchers discovered a new species of frog.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "evolve",
+    "ipa": "/ɪˈvɒlv/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To develop gradually over a long time.",
+        "vietnameseMeaning": "tiến hóa",
+        "exampleSentence": "Birds evolved from small dinosaurs.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "genetic",
+    "ipa": "/dʒəˈnetɪk/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Relating to genes and how features pass from parents to children.",
+        "vietnameseMeaning": "thuộc di truyền",
+        "exampleSentence": "Some diseases have a genetic cause.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "laboratory",
+    "ipa": "/ləˈbɒrətri/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A room or building where scientific work is done.",
+        "vietnameseMeaning": "phòng thí nghiệm",
+        "exampleSentence": "The vaccine was tested in a laboratory.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "variable",
+    "ipa": "/ˈveəriəbl/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A factor that can change in an experiment.",
+        "vietnameseMeaning": "biến số",
+        "exampleSentence": "Temperature was the only variable in the test.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "accurate",
+    "ipa": "/ˈækjərət/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Correct and exact.",
+        "vietnameseMeaning": "chính xác",
+        "exampleSentence": "The instrument gives accurate measurements.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "estimate",
+    "ipa": "/ˈestɪmət/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A rough calculation of a size, amount or value.",
+        "vietnameseMeaning": "ước tính",
+        "exampleSentence": "The estimate suggests that sales will double.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "observe",
+    "ipa": "/əbˈzɜːv/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To watch something carefully.",
+        "vietnameseMeaning": "quan sát",
+        "exampleSentence": "Scientists observed the birds for three months.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "conclude",
+    "ipa": "/kənˈkluːd/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To decide that something is true after thinking about the facts.",
+        "vietnameseMeaning": "kết luận",
+        "exampleSentence": "The study concluded that the drug was safe.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "significant",
+    "ipa": "/sɪɡˈnɪfɪkənt/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Large or important enough to be noticed.",
+        "vietnameseMeaning": "đáng kể",
+        "exampleSentence": "There was a significant improvement in test scores.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "method",
+    "ipa": "/ˈmeθəd/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A particular way of doing something.",
+        "vietnameseMeaning": "phương pháp",
+        "exampleSentence": "The researchers used a new method to count the fish.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "phenomenon",
+    "ipa": "/fɪˈnɒmɪnən/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Something that exists and can be observed, especially something unusual.",
+        "vietnameseMeaning": "hiện tượng",
+        "exampleSentence": "The northern lights are a natural phenomenon.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "species",
+    "ipa": "/ˈspiːʃiːz/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A group of animals or plants of the same kind.",
+        "vietnameseMeaning": "loài",
+        "exampleSentence": "Over a thousand species live in this forest.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "fossil",
+    "ipa": "/ˈfɒsl/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The remains of a plant or animal preserved in rock.",
+        "vietnameseMeaning": "hóa thạch",
+        "exampleSentence": "A dinosaur fossil was found near the village.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "gravity",
+    "ipa": "/ˈɡrævəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The force that pulls objects towards the Earth.",
+        "vietnameseMeaning": "trọng lực",
+        "exampleSentence": "Gravity keeps the planets in orbit around the sun.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "radiation",
+    "ipa": "/ˌreɪdiˈeɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Energy sent out as waves or particles.",
+        "vietnameseMeaning": "bức xạ",
+        "exampleSentence": "Too much radiation can damage the body.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "approach",
+    "ipa": "/əˈprəʊtʃ/",
+    "pronunciationAudioReference": null,
+    "topic": "Khoa học và nghiên cứu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A way of dealing with a problem or task.",
+        "vietnameseMeaning": "cách tiếp cận",
+        "exampleSentence": "Scientists take a different approach to the problem.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "increase",
+    "ipa": "/ɪnˈkriːs/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To become larger in amount or number.",
+        "vietnameseMeaning": "tăng",
+        "exampleSentence": "The number of visitors increased steadily.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "decrease",
+    "ipa": "/dɪˈkriːs/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To become smaller in amount or number.",
+        "vietnameseMeaning": "giảm",
+        "exampleSentence": "Sales decreased in the second quarter.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "rise",
+    "ipa": "/raɪz/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To go up in level, amount or value.",
+        "vietnameseMeaning": "tăng lên",
+        "exampleSentence": "Prices rose by ten per cent in 2020.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "fall",
+    "ipa": "/fɔːl/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To go down in level, amount or value.",
+        "vietnameseMeaning": "giảm xuống",
+        "exampleSentence": "The unemployment rate fell to five per cent.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "fluctuate",
+    "ipa": "/ˈflʌktʃueɪt/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To change often between higher and lower levels.",
+        "vietnameseMeaning": "dao động",
+        "exampleSentence": "Oil prices fluctuated throughout the year.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "remain",
+    "ipa": "/rɪˈmeɪn/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To stay the same.",
+        "vietnameseMeaning": "giữ nguyên",
+        "exampleSentence": "The figure remained stable at around 20 per cent.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "peak",
+    "ipa": "/piːk/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To reach the highest point.",
+        "vietnameseMeaning": "đạt đỉnh",
+        "exampleSentence": "Sales peaked in December.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "plateau",
+    "ipa": "/plæˈtəʊ/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To stop rising and stay at a steady level.",
+        "vietnameseMeaning": "đi ngang, ổn định",
+        "exampleSentence": "The number of users plateaued after 2018.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "dip",
+    "ipa": "/dɪp/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A small and short fall in a level or amount.",
+        "vietnameseMeaning": "sự giảm nhẹ",
+        "exampleSentence": "There was a slight dip in March.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "surge",
+    "ipa": "/sɜːdʒ/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A sudden and large increase.",
+        "vietnameseMeaning": "sự tăng vọt",
+        "exampleSentence": "The report shows a surge in online shopping.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "decline",
+    "ipa": "/dɪˈklaɪn/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A gradual fall in number, quality or strength.",
+        "vietnameseMeaning": "sự suy giảm",
+        "exampleSentence": "The decline in newspaper sales continued.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "soar",
+    "ipa": "/sɔː/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To rise quickly to a very high level.",
+        "vietnameseMeaning": "tăng vọt",
+        "exampleSentence": "House prices soared during the 2000s.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "plummet",
+    "ipa": "/ˈplʌmɪt/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To fall suddenly and by a large amount.",
+        "vietnameseMeaning": "giảm mạnh",
+        "exampleSentence": "Profits plummeted after the factory closed.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "gradually",
+    "ipa": "/ˈɡrædʒuəli/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "Slowly and by small amounts.",
+        "vietnameseMeaning": "dần dần",
+        "exampleSentence": "The temperature gradually increased.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "sharply",
+    "ipa": "/ˈʃɑːpli/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "Suddenly and by a large amount.",
+        "vietnameseMeaning": "đột ngột",
+        "exampleSentence": "Exports fell sharply in 2009.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "steadily",
+    "ipa": "/ˈstedɪli/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "At a regular and continuous rate.",
+        "vietnameseMeaning": "đều đặn",
+        "exampleSentence": "The population has grown steadily since 1950.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "proportion",
+    "ipa": "/prəˈpɔːʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A part of a whole.",
+        "vietnameseMeaning": "tỷ lệ, phần",
+        "exampleSentence": "A large proportion of the budget is spent on health.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "percentage",
+    "ipa": "/pəˈsentɪdʒ/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An amount expressed as a part of one hundred.",
+        "vietnameseMeaning": "tỷ lệ phần trăm",
+        "exampleSentence": "The percentage of women in the workforce has risen.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "figure",
+    "ipa": "/ˈfɪɡə/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A number, especially in official statistics.",
+        "vietnameseMeaning": "con số",
+        "exampleSentence": "The latest figures show a fall in crime.",
+        "imageUrl": null,
+        "sortOrder": 0
+      },
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A person who is important or well known.",
+        "vietnameseMeaning": "nhân vật",
+        "exampleSentence": "He is a respected figure in the film industry.",
+        "imageUrl": null,
+        "sortOrder": 1
+      }
+    ]
+  },
+  {
+    "lemma": "trend",
+    "ipa": "/trend/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A general direction in which something is changing.",
+        "vietnameseMeaning": "xu hướng",
+        "exampleSentence": "The graph shows a clear upward trend.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "overall",
+    "ipa": "/ˌəʊvərˈɔːl/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "Taking everything into account.",
+        "vietnameseMeaning": "nhìn chung",
+        "exampleSentence": "Overall, the number of students increased.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "approximately",
+    "ipa": "/əˈprɒksɪmətli/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "About, not exactly.",
+        "vietnameseMeaning": "xấp xỉ",
+        "exampleSentence": "Approximately 60 per cent of people agreed.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "majority",
+    "ipa": "/məˈdʒɒrəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The larger part of a group.",
+        "vietnameseMeaning": "đa số",
+        "exampleSentence": "The majority of respondents prefer public transport.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "double",
+    "ipa": "/ˈdʌbl/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To become twice as large.",
+        "vietnameseMeaning": "tăng gấp đôi",
+        "exampleSentence": "The number of cars doubled in ten years.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "account for",
+    "ipa": "/əˈkaʊnt fɔː/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "PHRASAL_VERB",
+        "englishDefinition": "To form a particular part or amount of something.",
+        "vietnameseMeaning": "chiếm",
+        "exampleSentence": "Housing accounts for 30 per cent of spending.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "respectively",
+    "ipa": "/rɪˈspektɪvli/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "In the order mentioned.",
+        "vietnameseMeaning": "tương ứng lần lượt",
+        "exampleSentence": "Sales in 2019 and 2020 were 5 and 8 million respectively.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "significantly",
+    "ipa": "/sɪɡˈnɪfɪkəntli/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "By a large and noticeable amount.",
+        "vietnameseMeaning": "đáng kể",
+        "exampleSentence": "Costs fell significantly after the change.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "dramatically",
+    "ipa": "/drəˈmætɪkli/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "In a sudden and very noticeable way.",
+        "vietnameseMeaning": "đột biến, mạnh mẽ",
+        "exampleSentence": "Energy use dropped dramatically in summer.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "slightly",
+    "ipa": "/ˈslaɪtli/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "By a small amount.",
+        "vietnameseMeaning": "một chút",
+        "exampleSentence": "The price rose slightly in April.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "ratio",
+    "ipa": "/ˈreɪʃiəʊ/",
+    "pronunciationAudioReference": null,
+    "topic": "Mô tả số liệu",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The relationship between two amounts, shown as a pair of numbers.",
+        "vietnameseMeaning": "tỷ số",
+        "exampleSentence": "The ratio of teachers to students is one to twenty.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "argue",
+    "ipa": "/ˈɑːɡjuː/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To give reasons to support an opinion.",
+        "vietnameseMeaning": "lập luận",
+        "exampleSentence": "Some experts argue that homework is unnecessary.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "advocate",
+    "ipa": "/ˈædvəkeɪt/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To publicly support an idea or plan.",
+        "vietnameseMeaning": "ủng hộ",
+        "exampleSentence": "Doctors advocate regular exercise.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "assert",
+    "ipa": "/əˈsɜːt/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To state something firmly as true.",
+        "vietnameseMeaning": "khẳng định",
+        "exampleSentence": "He asserted that the policy had failed.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "claim",
+    "ipa": "/kleɪm/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To say that something is true without proof.",
+        "vietnameseMeaning": "tuyên bố, cho rằng",
+        "exampleSentence": "Critics claim that the tax is unfair.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "imply",
+    "ipa": "/ɪmˈplaɪ/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To suggest something without saying it directly.",
+        "vietnameseMeaning": "ngụ ý",
+        "exampleSentence": "The results imply that diet affects mood.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "illustrate",
+    "ipa": "/ˈɪləstreɪt/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To show the meaning of something by examples.",
+        "vietnameseMeaning": "minh họa",
+        "exampleSentence": "The chart illustrates changes in population.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "emphasise",
+    "ipa": "/ˈemfəsaɪz/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To give special importance to something.",
+        "vietnameseMeaning": "nhấn mạnh",
+        "exampleSentence": "The teacher emphasised the need for practice.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "consequence",
+    "ipa": "/ˈkɒnsɪkwəns/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A result of an action or situation.",
+        "vietnameseMeaning": "hệ quả",
+        "exampleSentence": "Obesity is a consequence of poor diet and inactivity.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "advantage",
+    "ipa": "/ədˈvɑːntɪdʒ/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Something that helps you to be better or more successful.",
+        "vietnameseMeaning": "ưu điểm",
+        "exampleSentence": "One advantage of online learning is flexibility.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "disadvantage",
+    "ipa": "/ˌdɪsədˈvɑːntɪdʒ/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Something that makes a situation worse.",
+        "vietnameseMeaning": "nhược điểm",
+        "exampleSentence": "A major disadvantage is the high cost.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "benefit",
+    "ipa": "/ˈbenɪfɪt/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A helpful or good effect.",
+        "vietnameseMeaning": "lợi ích",
+        "exampleSentence": "Exercise has many health benefits.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "drawback",
+    "ipa": "/ˈdrɔːbæk/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A disadvantage or problem.",
+        "vietnameseMeaning": "điểm bất lợi",
+        "exampleSentence": "The main drawback of the plan is its cost.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "essential",
+    "ipa": "/ɪˈsenʃl/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Absolutely necessary.",
+        "vietnameseMeaning": "thiết yếu",
+        "exampleSentence": "Clean water is essential for life.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "fundamental",
+    "ipa": "/ˌfʌndəˈmentl/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Forming the base or most important part.",
+        "vietnameseMeaning": "cơ bản, nền tảng",
+        "exampleSentence": "Respect is fundamental to any relationship.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "controversial",
+    "ipa": "/ˌkɒntrəˈvɜːʃl/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "ADJECTIVE",
+        "englishDefinition": "Causing public disagreement.",
+        "vietnameseMeaning": "gây tranh cãi",
+        "exampleSentence": "Animal testing is a controversial subject.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "impact",
+    "ipa": "/ˈɪmpækt/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A strong effect on something.",
+        "vietnameseMeaning": "tác động",
+        "exampleSentence": "Social media has a big impact on young people.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "factor",
+    "ipa": "/ˈfæktə/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "One of several things that influence a result.",
+        "vietnameseMeaning": "yếu tố",
+        "exampleSentence": "Cost is a key factor when choosing a university.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "issue",
+    "ipa": "/ˈɪʃuː/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An important topic that people discuss.",
+        "vietnameseMeaning": "vấn đề",
+        "exampleSentence": "Traffic congestion is a major issue in big cities.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "tend to",
+    "ipa": "/ˈtend tuː/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "PHRASAL_VERB",
+        "englishDefinition": "To be likely to do something or to happen often.",
+        "vietnameseMeaning": "có xu hướng",
+        "exampleSentence": "Young people tend to spend more time online.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "assume",
+    "ipa": "/əˈsjuːm/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To accept that something is true without checking.",
+        "vietnameseMeaning": "cho rằng, giả định",
+        "exampleSentence": "People often assume that expensive means better.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "acknowledge",
+    "ipa": "/əkˈnɒlɪdʒ/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To accept that something is true or exists.",
+        "vietnameseMeaning": "thừa nhận",
+        "exampleSentence": "We must acknowledge the risks of the plan.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "maintain",
+    "ipa": "/meɪnˈteɪn/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "VERB",
+        "englishDefinition": "To keep something at the same level, or to state an opinion firmly.",
+        "vietnameseMeaning": "duy trì, khẳng định",
+        "exampleSentence": "She maintains that school uniforms are unnecessary.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "contrast",
+    "ipa": "/ˈkɒntrɑːst/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A clear difference between two things.",
+        "vietnameseMeaning": "sự tương phản",
+        "exampleSentence": "There is a sharp contrast between city and village life.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "moreover",
+    "ipa": "/mɔːrˈəʊvə/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "Also, and more importantly.",
+        "vietnameseMeaning": "hơn nữa",
+        "exampleSentence": "The plan is cheap; moreover, it is quick to carry out.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "nevertheless",
+    "ipa": "/ˌnevəðəˈles/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "In spite of that.",
+        "vietnameseMeaning": "tuy nhiên, dù vậy",
+        "exampleSentence": "The test was hard; nevertheless, most students passed.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "whereas",
+    "ipa": "/weərˈæz/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "CONJUNCTION",
+        "englishDefinition": "Used to compare two different things.",
+        "vietnameseMeaning": "trong khi đó",
+        "exampleSentence": "Cities are crowded, whereas villages are quiet.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "therefore",
+    "ipa": "/ˈðeəfɔː/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "For that reason.",
+        "vietnameseMeaning": "vì vậy",
+        "exampleSentence": "Prices are rising; therefore, many people save less.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "consequently",
+    "ipa": "/ˈkɒnsɪkwəntli/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "As a result.",
+        "vietnameseMeaning": "do đó",
+        "exampleSentence": "The factory closed; consequently, many workers lost their jobs.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "although",
+    "ipa": "/ɔːlˈðəʊ/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "CONJUNCTION",
+        "englishDefinition": "In spite of the fact that.",
+        "vietnameseMeaning": "mặc dù",
+        "exampleSentence": "Although it was expensive, the course was worth it.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "likewise",
+    "ipa": "/ˈlaɪkwaɪz/",
+    "pronunciationAudioReference": null,
+    "topic": "Lập luận và từ nối",
+    "senses": [
+      {
+        "partOfSpeech": "ADVERB",
+        "englishDefinition": "In the same way.",
+        "vietnameseMeaning": "tương tự như vậy",
+        "exampleSentence": "Parents should be role models; likewise, teachers should set an example.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "tourism",
+    "ipa": "/ˈtʊərɪzəm/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The business of providing services for people who travel for pleasure.",
+        "vietnameseMeaning": "ngành du lịch",
+        "exampleSentence": "Tourism is the main source of income for the island.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "destination",
+    "ipa": "/ˌdestɪˈneɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The place where someone or something is going.",
+        "vietnameseMeaning": "điểm đến",
+        "exampleSentence": "Da Nang is a popular holiday destination.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "accommodation",
+    "ipa": "/əˌkɒməˈdeɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A place to live or stay.",
+        "vietnameseMeaning": "chỗ ở",
+        "exampleSentence": "Student accommodation is cheap near the campus.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "itinerary",
+    "ipa": "/aɪˈtɪnərəri/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A detailed plan of a journey.",
+        "vietnameseMeaning": "lịch trình",
+        "exampleSentence": "Our itinerary includes three cities in five days.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "passport",
+    "ipa": "/ˈpɑːspɔːt/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An official document that you need to travel abroad.",
+        "vietnameseMeaning": "hộ chiếu",
+        "exampleSentence": "You must show your passport at the border.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "journey",
+    "ipa": "/ˈdʒɜːni/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "An act of travelling from one place to another.",
+        "vietnameseMeaning": "chuyến đi",
+        "exampleSentence": "The journey from Hanoi to Hue takes about an hour by plane.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "landmark",
+    "ipa": "/ˈlændmɑːk/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A building or place that is easy to recognise.",
+        "vietnameseMeaning": "địa danh nổi tiếng",
+        "exampleSentence": "The tower is the best-known landmark in the city.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "attraction",
+    "ipa": "/əˈtrækʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A place that people visit for interest or enjoyment.",
+        "vietnameseMeaning": "điểm thu hút",
+        "exampleSentence": "The museum is a major tourist attraction.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "infrastructure",
+    "ipa": "/ˈɪnfrəstrʌktʃə/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "The basic systems of a country, such as roads and electricity.",
+        "vietnameseMeaning": "cơ sở hạ tầng",
+        "exampleSentence": "Good infrastructure attracts foreign investment.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "congestion",
+    "ipa": "/kənˈdʒestʃən/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A situation in which a place is too crowded, especially with traffic.",
+        "vietnameseMeaning": "tình trạng ùn tắc",
+        "exampleSentence": "Traffic congestion wastes time and fuel.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "pedestrian",
+    "ipa": "/pəˈdestriən/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A person who walks rather than travels in a vehicle.",
+        "vietnameseMeaning": "người đi bộ",
+        "exampleSentence": "The new bridge is for pedestrians only.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "public transport",
+    "ipa": "/ˌpʌblɪk ˈtrænspɔːt/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Buses, trains and other services that anyone can use.",
+        "vietnameseMeaning": "giao thông công cộng",
+        "exampleSentence": "Public transport is cheaper than owning a car.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "advertisement",
+    "ipa": "/ədˈvɜːtɪsmənt/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A notice that tries to persuade people to buy something.",
+        "vietnameseMeaning": "quảng cáo",
+        "exampleSentence": "The advertisement for the phone appeared everywhere.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "broadcast",
+    "ipa": "/ˈbrɔːdkɑːst/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A programme on television or radio.",
+        "vietnameseMeaning": "chương trình phát sóng",
+        "exampleSentence": "The live broadcast attracted millions of viewers.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "journalist",
+    "ipa": "/ˈdʒɜːnəlɪst/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A person who writes news reports for newspapers or television.",
+        "vietnameseMeaning": "nhà báo",
+        "exampleSentence": "The journalist interviewed the mayor.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "celebrity",
+    "ipa": "/səˈlebrəti/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A famous person.",
+        "vietnameseMeaning": "người nổi tiếng",
+        "exampleSentence": "Celebrities often influence what young people buy.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "entertainment",
+    "ipa": "/ˌentəˈteɪnmənt/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "Films, music and other things that people enjoy watching.",
+        "vietnameseMeaning": "giải trí",
+        "exampleSentence": "Home entertainment has changed with streaming.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "documentary",
+    "ipa": "/ˌdɒkjuˈmentri/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A film that gives facts about a real subject.",
+        "vietnameseMeaning": "phim tài liệu",
+        "exampleSentence": "The documentary explains how glaciers are melting.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "exhibition",
+    "ipa": "/ˌeksɪˈbɪʃn/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A public show of art or other objects.",
+        "vietnameseMeaning": "buổi triển lãm",
+        "exampleSentence": "The exhibition features paintings from the last century.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "festival",
+    "ipa": "/ˈfestɪvl/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A special event or celebration, often held every year.",
+        "vietnameseMeaning": "lễ hội",
+        "exampleSentence": "The lantern festival attracts visitors from abroad.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "museum",
+    "ipa": "/mjuˈziːəm/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A building where important objects are kept and shown.",
+        "vietnameseMeaning": "bảo tàng",
+        "exampleSentence": "Entry to the national museum is free on Sundays.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  },
+  {
+    "lemma": "cuisine",
+    "ipa": "/kwɪˈziːn/",
+    "pronunciationAudioReference": null,
+    "topic": "Du lịch và truyền thông",
+    "senses": [
+      {
+        "partOfSpeech": "NOUN",
+        "englishDefinition": "A style of cooking.",
+        "vietnameseMeaning": "ẩm thực",
+        "exampleSentence": "Vietnamese cuisine is famous for fresh herbs.",
+        "imageUrl": null,
+        "sortOrder": 0
+      }
+    ]
+  }
+]

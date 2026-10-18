@@ -6,4 +6,5 @@ public interface GameMatchRepository {
     GameMatch save(GameMatch match);
     Optional<GameMatch> findById(UUID id);
     Optional<GameMatch> findForUpdate(UUID id);
+    Optional<UUID> findActiveIdByRoomId(UUID roomId);
 }

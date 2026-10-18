@@ -6,18 +6,21 @@ import com.ieltspath.learning.application.port.LearningContentClient.Item;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageVersion;
 import com.ieltspath.learning.application.port.LearningContentClient.Section;
 import com.ieltspath.learning.domain.service.AnswerSpecGrader;
+import com.ieltspath.learning.domain.service.ErrorTagger;
 import com.ieltspath.learning.domain.service.PassMark;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.PracticeSubmission;
 
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 public final class ItemGrading {
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
+    private final ErrorTagger errorTagger = new ErrorTagger();
 
     public Graded grade(PackageVersion version, List<SubmitExerciseCommand.Answer> submitted) {
         return grade(version, submitted, "Practice set");
@@ -57,7 +60,14 @@ public final class ItemGrading {
         List<PracticeSubmission.SkillScore> scores = skillScores(itemSkills, grades);
         boolean passed = scores.isEmpty() ? PassMark.passes(correct, items.size())
                 : scores.stream().allMatch(PracticeSubmission.SkillScore::passed);
-        return new Graded(items, grades, correct, items.size(), passed, itemSkills, scores);
+        List<String> errorCodes = new java.util.ArrayList<>(items.size());
+        for (int index = 0; index < items.size(); index++) {
+            Item item = items.get(index);
+            boolean gradedObjective = !isEssay(item) && grades.get(index).gradable();
+            errorCodes.add(gradedObjective ? errorTagger.tag(item.answerSpec(),
+                    answers.get(item.questionVersionId()), grades.get(index).correct()) : null);
+        }
+        return new Graded(items, grades, correct, items.size(), passed, itemSkills, scores, errorCodes);
     }
 
     /** One score per skill of the items, in enum order; items of an unknown skill are left out. */
@@ -101,11 +111,24 @@ public final class ItemGrading {
 
     /**
      * {@code itemSkills} is the skill of each item's section, aligned with {@code items}; {@code passed} holds when
-     * every skill in {@code skillScores} passes.
+     * every skill in {@code skillScores} passes. {@code errorCodes} is aligned with {@code items} too: the error tag of
+     * a wrong objective answer, or null.
      */
     public record Graded(List<Item> items, List<AnswerSpecGrader.Grade> grades,
                          int correct, int total, boolean passed, List<LearningSkill> itemSkills,
-                         List<PracticeSubmission.SkillScore> skillScores) {
+                         List<PracticeSubmission.SkillScore> skillScores, List<String> errorCodes) {
         public double percent() { return (double) correct / total; }
+
+        /**
+         * The questions answered correctly, in set order. A question with several items is correct only when every item
+         * of it is, and counts once however many items it has, so XP and its daily cap are charged per question.
+         */
+        public List<UUID> correctQuestionIds() {
+            Map<UUID, Boolean> allCorrect = new LinkedHashMap<>();
+            for (int index = 0; index < items.size(); index++) {
+                allCorrect.merge(items.get(index).questionVersionId(), grades.get(index).correct(), Boolean::logicalAnd);
+            }
+            return allCorrect.entrySet().stream().filter(Map.Entry::getValue).map(Map.Entry::getKey).toList();
+        }
     }
 }

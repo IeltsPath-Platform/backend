@@ -7,9 +7,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record ReviewListResponse(UUID reviewId, UUID knowledgePointId, UUID lessonId,
-                                 LearningSkill skill, String stage, Instant createdAt, UUID sourcePackageId) {
+                                 LearningSkill skill, String stage, Instant createdAt,
+                                 UUID sourcePackageId, boolean blocking) {
     public static ReviewListResponse from(ReviewListEntry entry) {
         return new ReviewListResponse(entry.reviewId(), entry.knowledgePointId(), entry.lessonId(),
-                entry.skill(), entry.stage().name(), entry.createdAt(), entry.sourcePackageId());
+                entry.skill(), entry.stage().name(), entry.createdAt(), entry.sourcePackageId(), entry.blocking());
     }
 }

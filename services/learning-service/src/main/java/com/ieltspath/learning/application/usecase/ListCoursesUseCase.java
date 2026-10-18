@@ -46,29 +46,36 @@ public class ListCoursesUseCase {
         List<TopicResult> refreshed = refreshTopics.execute(userId);
         Map<UUID, TopicResult.Course> courses = new LinkedHashMap<>();
         Map<UUID, Boolean> courseHasTest = new LinkedHashMap<>();
-        Map<UUID, Integer> completedLessons = new LinkedHashMap<>();
-        Map<UUID, Integer> totalLessons = new LinkedHashMap<>();
-        Map<UUID, Instant> lastStudied = new LinkedHashMap<>();
-        Map<UUID, Instant> studiedTopics = lessonProgress.lastStudiedByTopic(userId);
         for (TopicResult topic : refreshed) {
             TopicResult.Course course = topic.course();
             if (course == null) continue;
             courses.putIfAbsent(course.courseId(), course);
             courseHasTest.putIfAbsent(course.courseId(), topic.hasCourseTest());
-            completedLessons.merge(course.courseId(), topic.completedLessonCount(), Integer::sum);
-            totalLessons.merge(course.courseId(), topic.totalLessonCount(), Integer::sum);
-            Instant studied = studiedTopics.get(topic.topicId());
-            if (studied != null) lastStudied.merge(course.courseId(), studied, (a, b) -> a.isAfter(b) ? a : b);
         }
         var curriculum = curricula.find(userId);
         var topics = curriculum.topics();
         var statuses = curriculum.statuses();
         Map<UUID, Integer> total = new LinkedHashMap<>();
         Map<UUID, Integer> passed = new LinkedHashMap<>();
+        Map<UUID, Integer> completedLessons = new LinkedHashMap<>();
+        Map<UUID, Integer> totalLessons = new LinkedHashMap<>();
+        Map<UUID, Instant> lastStudied = new LinkedHashMap<>();
+        Map<UUID, Instant> studiedTopics = lessonProgress.lastStudiedByTopic(userId);
+        for (TopicResult topic : refreshed) {
+            if (topic.course() == null) continue;
+            completedLessons.merge(topic.course().courseId(), topic.completedLessonCount(), Integer::sum);
+            totalLessons.merge(topic.course().courseId(), topic.totalLessonCount(), Integer::sum);
+            Instant studied = studiedTopics.get(topic.topicId());
+            if (studied != null) lastStudied.merge(topic.course().courseId(), studied, (a, b) -> a.isAfter(b) ? a : b);
+        }
         for (var topic : topics) {
             if (topic.courseId() == null || topic.sequenceOrder() == null) continue;
             total.merge(topic.courseId(), 1, Integer::sum);
-            if (statuses.get(topic.topicId()) == TopicStatus.PASSED) passed.merge(topic.courseId(), 1, Integer::sum);
+            // A topic tested below 70% is done too: it no longer holds back the next topic or the course test.
+            var status = statuses.get(topic.topicId());
+            if (status == TopicStatus.PASSED || status == TopicStatus.COMPLETED) {
+                passed.merge(topic.courseId(), 1, Integer::sum);
+            }
         }
         Map<UUID, CourseProgress> completed = courseProgress.findAll(userId);
         var placement = placements.find(userId).map(value -> value.band().value()).orElse(null);

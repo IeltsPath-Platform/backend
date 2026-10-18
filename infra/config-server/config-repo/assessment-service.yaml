@@ -31,6 +31,11 @@ assessment:
     daily-limit: ${ASSESSMENT_LLM_DAILY_LIMIT:20}
     stuck-after: PT10M
     quota-timezone: Asia/Ho_Chi_Minh
+  ai-eval:
+    daily-limit: ${ASSESSMENT_AI_EVAL_DAILY_LIMIT:100}
+    min-within-half-band: ${ASSESSMENT_AI_EVAL_MIN_WITHIN_HALF_BAND:0.80}
+    min-qwk: ${ASSESSMENT_AI_EVAL_MIN_QWK:0.60}
+    quota-timezone: Asia/Ho_Chi_Minh
   content:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
   messaging:

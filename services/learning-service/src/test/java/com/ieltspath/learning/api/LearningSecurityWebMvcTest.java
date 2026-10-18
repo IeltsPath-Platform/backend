@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = {LearningSecurityWebMvcTest.ProtectedController.class, CourseController.class,
-        PlacementController.class}, properties = {
+        PlacementController.class, com.ieltspath.learning.api.controller.LearningStatisticsController.class}, properties = {
         "spring.config.import=",
         "spring.cloud.config.enabled=false",
         "eureka.client.enabled=false",
@@ -67,7 +67,52 @@ class LearningSecurityWebMvcTest {
     @MockitoBean AssignCourseTestUseCase assignCourseTest;
     @MockitoBean GetPlacementTestUseCase getPlacementTest;
 
+    @MockitoBean com.ieltspath.learning.application.usecase.GetLearningProgressStatisticsUseCase statistics;
+    @MockitoBean com.ieltspath.learning.application.usecase.GetStudyContextUseCase studyContext;
+
+    @Test
+    void anonymousStatisticsCannotReadProgressOrStudyContexts() throws Exception {
+        mockMvc.perform(get("/api/learning/statistics/progress")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/learning/statistics/study-context").param("sourceType", "LESSON")
+                .param("sourceId", UUID.randomUUID().toString())).andExpect(status().isUnauthorized());
+        verifyNoInteractions(statistics, studyContext);
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void nonLearnerCannotReadStatistics() throws Exception {
+        mockMvc.perform(get("/api/learning/statistics/progress")).andExpect(status().isForbidden());
+        verifyNoInteractions(statistics);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void studyContextAlwaysUsesAuthenticatedIdentity() throws Exception {
+        UUID source = UUID.randomUUID();
+        UUID course = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(userId);
+        when(studyContext.execute(userId, "LESSON", source)).thenReturn(
+                new com.ieltspath.learning.application.result.StudyContextResult("LESSON", source, course));
+        mockMvc.perform(get("/api/learning/statistics/study-context").param("sourceType", "LESSON")
+                .param("sourceId", source.toString()).header("X-User-Id", UUID.randomUUID().toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.courseId").value(course.toString()))
+                .andExpect(jsonPath("$.sourceId").value(source.toString()));
+    }
+
     private final UUID userId = UUID.randomUUID();
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void oversizedProgressScopeReturnsUnprocessableEntityWithClearCode() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(userId);
+        when(statistics.execute(userId, null, 0, 4)).thenThrow(new LearningRequestException(422,
+                "PROGRESS_SCOPE_TOO_LARGE", "Progress statistics support at most 100 started courses"));
+
+        mockMvc.perform(get("/api/learning/statistics/progress"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("PROGRESS_SCOPE_TOO_LARGE"))
+                .andExpect(jsonPath("$.detail").value("Progress statistics support at most 100 started courses"));
+    }
 
     @Test
     @WithMockUser(roles = "CUSTOMER")

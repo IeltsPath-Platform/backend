@@ -27,7 +27,7 @@ public record TopicResult(UUID topicId, String code, String name, int sequenceOr
                        int completedLessonCount, String requiredFeatureKey, LearningSkill skill,
                        boolean hasTopicTest, Course course, boolean hasCourseTest) {
         this(topicId, code, name, sequenceOrder, status, completedLessonCount, requiredFeatureKey, skill,
-                hasTopicTest, course, hasCourseTest, null);
+                hasTopicTest, course, hasCourseTest, null, 0);
     }
     public TopicResult(UUID topicId, String code, String name, int sequenceOrder, TopicStatus status,
                        int completedLessonCount, String requiredFeatureKey, LearningSkill skill,

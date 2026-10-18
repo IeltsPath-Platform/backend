@@ -45,6 +45,8 @@ public class RefreshLearningTopicsUseCase {
         lock.lock(userId);
         var topics = content.getTopicSequence()
                 .stream()
+                .filter(topic -> Boolean.TRUE.equals(topic.active()))
+                .filter(topic -> topic.course() == null || Boolean.TRUE.equals(topic.course().active()))
                 .sorted(Comparator.comparing((LearningContentClient.Topic topic) ->
                                 topic.course() == null ? null : topic.course().bandLevel(),
                                 Comparator.nullsLast(Comparator.naturalOrder()))
@@ -56,7 +58,8 @@ public class RefreshLearningTopicsUseCase {
         for (var topic : topics) {
             for (var kp : topic.knowledgePoints()) {
                 LearningSkill skill = kp.skill() == null ? topic.skill() : LearningSkill.valueOf(kp.skill());
-                entries.add(new KnowledgePointCatalogEntry(kp.id(), topic.topicId(), kp.hasPracticeSet(), skill));
+                entries.add(new KnowledgePointCatalogEntry(kp.id(), topic.topicId(), kp.hasPracticeSet(), skill,
+                        topic.course() == null ? null : topic.course().bandLevel()));
             }
         }
         LearnerCurriculum curriculum = curricula.find(userId);

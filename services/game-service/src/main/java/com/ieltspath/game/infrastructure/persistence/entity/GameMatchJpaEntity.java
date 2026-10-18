@@ -36,6 +36,11 @@ public class GameMatchJpaEntity {
     private Instant endedAt;
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+    @Column(name = "player_mode", nullable = false) private String playerMode = "MULTIPLAYER";
+    @Column(name = "play_mode", nullable = false) private String playMode = "FINITE";
+    @Column(name = "initial_lives", nullable = false) private short initialLives = 4;
+    @Column(name = "word_time_limit_seconds") private Short wordTimeLimitSeconds = 180;
+    @Column(name = "word_limit") private Integer wordLimit = 10;
 
     protected GameMatchJpaEntity() {
     }
@@ -46,6 +51,13 @@ public class GameMatchJpaEntity {
         this.gameType = gameType;
         this.learningDomain = learningDomain;
         this.configSnapshot = configSnapshot;
+        if ("WORDLY".equals(gameType)) {
+            wordTimeLimitSeconds = Boolean.FALSE.equals(configSnapshot.get("timeEnabled")) ? null : (short) 180;
+            playerMode = (String) configSnapshot.get("playerMode");
+            playMode = (String) configSnapshot.get("playMode");
+            initialLives = ((Number) configSnapshot.get("initialLives")).shortValue();
+            wordLimit = (Integer) configSnapshot.get("wordLimit");
+        }
         this.contentSnapshot = contentSnapshot;
         this.status = "IN_PROGRESS";
         this.startedAt = now;

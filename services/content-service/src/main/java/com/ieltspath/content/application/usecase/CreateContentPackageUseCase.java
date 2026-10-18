@@ -36,13 +36,22 @@ public class CreateContentPackageUseCase {
         if (command.lessonId() != null && !lessons.lessonExists(command.lessonId())) {
             throw new InvalidPackageLessonException("Lesson " + command.lessonId() + " does not exist");
         }
+        // A practice test without a source is internal (a course checkpoint) and is not listed in the library.
+        if (command.packageType() != PackageType.PRACTICE_TEST && command.sourceCode() != null) {
+            throw new IllegalArgumentException("sourceCode is only valid for PRACTICE_TEST");
+        }
+        if (command.sourceCode() != null) {
+            try { com.ieltspath.content.domain.vo.TestSource.valueOf(command.sourceCode()); }
+            catch (RuntimeException invalidSource) { throw new IllegalArgumentException("sourceCode is not a supported test source"); }
+        }
 
         ContentPackage pkg = ContentPackage.create(
                 command.code(),
                 command.title(),
                 command.packageType(),
                 command.requiredFeatureKey(),
-                command.lessonId()
+                command.lessonId(),
+                command.sourceCode()
         );
 
         return ContentPackageResult.of(contentPackageRepository.save(pkg));

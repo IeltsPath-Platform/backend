@@ -119,7 +119,7 @@ class ReviewRuleTest {
     }
 
     @Test
-    void validatesThreshold() {
+    void validatesTheThreshold() {
         for (double invalid : new double[]{0.0, -0.1, 1.1, Double.NaN, Double.POSITIVE_INFINITY}) {
             assertThatThrownBy(() -> new ReviewRule(invalid)).isInstanceOf(IllegalArgumentException.class);
         }
@@ -127,10 +127,14 @@ class ReviewRuleTest {
     }
 
     @Test
-    void newReviewsStartWithTheoryOnlyWhenTheScoreIsLow() {
-        assertThat(ReviewRule.initialStage(0.25))
+    void newReviewsStartWithTheoryWhenTheScoreIsLowOrTheLessonWasAlreadyWrong() {
+        assertThat(ReviewRule.initialStage(0.25, false))
                 .isEqualTo(new ReviewRule.Start(ReviewStage.THEORY, TheoryReason.LOW_SCORE));
-        assertThat(ReviewRule.initialStage(0.5)).isEqualTo(new ReviewRule.Start(ReviewStage.PRACTICE, null));
-        assertThat(ReviewRule.initialStage(null).stage()).isEqualTo(ReviewStage.PRACTICE);
+        assertThat(ReviewRule.initialStage(0.25, true).theoryReason()).isEqualTo(TheoryReason.LOW_SCORE);
+        assertThat(ReviewRule.initialStage(0.5, true))
+                .isEqualTo(new ReviewRule.Start(ReviewStage.THEORY, TheoryReason.WRONG_IN_LESSON));
+        assertThat(ReviewRule.initialStage(null, true).theoryReason()).isEqualTo(TheoryReason.WRONG_IN_LESSON);
+        assertThat(ReviewRule.initialStage(0.5, false)).isEqualTo(new ReviewRule.Start(ReviewStage.PRACTICE, null));
+        assertThat(ReviewRule.initialStage(null, false).stage()).isEqualTo(ReviewStage.PRACTICE);
     }
 }

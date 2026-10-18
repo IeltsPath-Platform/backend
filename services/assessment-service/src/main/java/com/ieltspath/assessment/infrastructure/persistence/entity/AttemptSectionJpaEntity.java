@@ -32,4 +32,8 @@ public class AttemptSectionJpaEntity {
     private Instant startedAt;
     @Column(name = "completed_at")
     private Instant completedAt;
+    @Column(name = "part_no")
+    private Integer partNo;
+    @Column(name = "time_spent_seconds")
+    private Integer timeSpentSeconds;
 }

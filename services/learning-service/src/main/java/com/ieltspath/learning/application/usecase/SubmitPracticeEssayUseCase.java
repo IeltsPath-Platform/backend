@@ -104,6 +104,10 @@ public class SubmitPracticeEssayUseCase {
                                            int words) {
         lock.lock(userId);
         PracticeAttempt attempt = owned(userId, attemptId);
+        if (attempt.origin() == com.ieltspath.learning.domain.vo.PracticeOrigin.FREE) {
+            throw new LearningRequestException(409, "FREE_PRACTICE_ESSAY_UNSUPPORTED",
+                    "Free practice does not take essays");
+        }
         access.require(userId, attempt.lessonId());
         Instant now = clock.instant();
         boolean gradingInProgress = false;

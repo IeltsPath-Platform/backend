@@ -36,9 +36,11 @@ class GameSchemaPostgresTest {
             assertTrue(tables.containsAll(Set.of(
                     "game_sessions", "game_answers", "game_rooms", "game_room_members", "game_matches",
                     "game_match_players", "game_events", "quiz_events", "quiz_participations",
-                    "leaderboard_periods", "leaderboard_entries", "outbox_events", "flyway_schema_history"
+                    "leaderboard_periods", "leaderboard_entries", "outbox_events", "flyway_schema_history",
+                    "game_match_words", "game_player_words", "game_guesses", "game_match_word_pool", "game_guess_receipts",
+                    "game_wordly_dictionaries", "game_wordly_dictionary_words"
             )));
-            assertEquals(13, tables.size());
+            assertEquals(20, tables.size());
         }
     }
 }

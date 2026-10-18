@@ -18,6 +18,8 @@ public class ContentPackageVersion {
     private int schemaVersion;
     private Instant publishedAt;
     private UUID publishedBy;
+    private Instant publishAt;
+    private String lastPublishError;
     private final Instant createdAt;
     private Instant updatedAt;
     private final List<ContentSection> sections;
@@ -25,6 +27,14 @@ public class ContentPackageVersion {
     public ContentPackageVersion(UUID id, UUID packageId, int versionNumber,
                                  PublicationStatus status, String rulesJson, int schemaVersion,
                                  Instant publishedAt, UUID publishedBy,
+                                 Instant createdAt, Instant updatedAt, List<ContentSection> sections) {
+        this(id, packageId, versionNumber, status, rulesJson, schemaVersion, publishedAt, publishedBy,
+                null, null, createdAt, updatedAt, sections);
+    }
+
+    public ContentPackageVersion(UUID id, UUID packageId, int versionNumber,
+                                 PublicationStatus status, String rulesJson, int schemaVersion,
+                                 Instant publishedAt, UUID publishedBy, Instant publishAt, String lastPublishError,
                                  Instant createdAt, Instant updatedAt, List<ContentSection> sections) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.packageId = Objects.requireNonNull(packageId, "packageId must not be null");
@@ -34,6 +44,8 @@ public class ContentPackageVersion {
         this.schemaVersion = schemaVersion > 0 ? schemaVersion : 1;
         this.publishedAt = publishedAt;
         this.publishedBy = publishedBy;
+        this.publishAt = publishAt;
+        this.lastPublishError = lastPublishError;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.updatedAt = updatedAt != null ? updatedAt : this.createdAt;
         this.sections = sections != null ? new ArrayList<>(sections) : new ArrayList<>();
@@ -49,7 +61,37 @@ public class ContentPackageVersion {
         this.status = PublicationStatus.PUBLISHED;
         this.publishedBy = publishedBy;
         this.publishedAt = Instant.now();
+        this.publishAt = null;
+        this.lastPublishError = null;
         this.updatedAt = this.publishedAt;
+    }
+
+    public void schedulePublication(Instant publishAt) {
+        this.publishAt = Objects.requireNonNull(publishAt, "publishAt must not be null");
+        this.lastPublishError = null;
+        this.updatedAt = Instant.now();
+    }
+
+    public void cancelScheduledPublication() {
+        this.publishAt = null;
+        this.lastPublishError = null;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Keeps the due time, so the job tries again: for a failure that may pass by itself. */
+    public void recordScheduledPublicationError(String errorCode) {
+        this.lastPublishError = Objects.requireNonNull(errorCode, "errorCode must not be null");
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * Drops the due time and keeps the reason: the package breaks a publishing rule, and the same attempt would fail
+     * again until an author changes it, possibly weeks later and out of the blue. The author reschedules after fixing.
+     */
+    public void rejectScheduledPublication(String errorCode) {
+        this.publishAt = null;
+        this.lastPublishError = Objects.requireNonNull(errorCode, "errorCode must not be null");
+        this.updatedAt = Instant.now();
     }
 
     public void addSection(ContentSection section) {
@@ -65,6 +107,8 @@ public class ContentPackageVersion {
     public int getSchemaVersion() { return schemaVersion; }
     public Instant getPublishedAt() { return publishedAt; }
     public UUID getPublishedBy() { return publishedBy; }
+    public Instant getPublishAt() { return publishAt; }
+    public String getLastPublishError() { return lastPublishError; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public List<ContentSection> getSections() { return Collections.unmodifiableList(sections); }

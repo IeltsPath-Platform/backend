@@ -4,13 +4,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.domain.aggregate.AssessmentAttempt;
 import com.ieltspath.assessment.domain.entity.AssessmentResult;
 import com.ieltspath.assessment.domain.entity.AttemptItem;
+import com.ieltspath.assessment.domain.entity.AttemptItemKnowledgePoint;
+import com.ieltspath.assessment.domain.entity.ErrorAnalysisItem;
 import com.ieltspath.assessment.domain.entity.AttemptResponse;
 import com.ieltspath.assessment.domain.entity.ItemResult;
 import com.ieltspath.assessment.domain.repository.AssessmentResultRepository;
+import com.ieltspath.assessment.domain.repository.AttemptItemKnowledgePointRepository;
 import com.ieltspath.assessment.domain.repository.AttemptItemRepository;
 import com.ieltspath.assessment.domain.repository.AttemptResponseRepository;
+import com.ieltspath.assessment.domain.repository.ErrorAnalysisItemRepository;
 import com.ieltspath.assessment.domain.repository.ItemResultRepository;
+import com.ieltspath.assessment.domain.repository.SkillScoreRepository;
+import com.ieltspath.assessment.domain.entity.SkillScore;
+import com.ieltspath.assessment.domain.vo.GradingSource;
 import com.ieltspath.assessment.domain.service.AnswerSpecGrader;
+import com.ieltspath.assessment.domain.service.ErrorTagger;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,19 +44,28 @@ public class AutoGradeAttemptService {
     private final AttemptResponseRepository responses;
     private final AssessmentResultRepository results;
     private final ItemResultRepository itemResults;
+    private final ErrorAnalysisItemRepository errors;
+    private final AttemptItemKnowledgePointRepository knowledgeSnapshot;
     private final AssessmentResultCompleter completer;
     private final ObjectMapper json;
+    private final SkillScoreRepository skillScores;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
+    private final ErrorTagger errorTagger = new ErrorTagger();
 
     public AutoGradeAttemptService(AttemptItemRepository attemptItems, AttemptResponseRepository responses,
                                    AssessmentResultRepository results, ItemResultRepository itemResults,
-                                   AssessmentResultCompleter completer, ObjectMapper json) {
+                                   ErrorAnalysisItemRepository errors,
+                                   AttemptItemKnowledgePointRepository knowledgeSnapshot,
+                                   AssessmentResultCompleter completer, ObjectMapper json, SkillScoreRepository skillScores) {
         this.attemptItems = attemptItems;
         this.responses = responses;
         this.results = results;
         this.itemResults = itemResults;
+        this.errors = errors;
+        this.knowledgeSnapshot = knowledgeSnapshot;
         this.completer = completer;
         this.json = json;
+        this.skillScores = skillScores;
     }
 
     /** @return true when the attempt was graded and its result completed. */
@@ -71,6 +88,8 @@ public class AutoGradeAttemptService {
         List<AnswerSnapshot> answers = new ArrayList<>(items.size());
         for (AttemptItem item : items) {
             Optional<AnswerSnapshot> answer = AnswerSnapshot.parse(json, item.answerSnapshot());
+            if (attempt.getAttemptType() == com.ieltspath.assessment.domain.vo.AttemptType.COURSE_GATE
+                    && answer.isPresent() && answer.get().gradableEssay()) return false;
             boolean essay = answer.isPresent() && essayPassed.containsKey(item.id()) && answer.get().gradableEssay();
             if (answer.isEmpty() || !essay && !answer.get().autoGradable(grader)) {
                 return false;
@@ -83,6 +102,7 @@ public class AutoGradeAttemptService {
                 .collect(Collectors.toMap(AttemptResponse::attemptItemId, Function.identity()));
         AssessmentResult draft = results.save(new AssessmentResult(UUID.randomUUID(), attempt.getId(), 1,
                 AssessmentResult.DRAFT, null, null));
+        Map<UUID, Long> elapsedByItem = attemptItems.elapsedMsByItemId(items.stream().map(AttemptItem::id).toList());
         List<ItemResult> graded = new ArrayList<>(items.size());
         for (int i = 0; i < items.size(); i++) {
             AttemptItem item = items.get(i);
@@ -90,11 +110,69 @@ public class AutoGradeAttemptService {
             boolean correct = essayPassed.containsKey(item.id()) ? Boolean.TRUE.equals(essayPassed.get(item.id()))
                     : isCorrect(answer, responseByItem.get(item.id()));
             graded.add(new ItemResult(UUID.randomUUID(), draft.id(), item.id(), correct ? answer.maxScore() : 0.0,
-                    answer.maxScore(), correct, null, NO_FEEDBACK));
+                    answer.maxScore(), correct, elapsedByItem.get(item.id()), NO_FEEDBACK));
         }
         itemResults.saveAll(graded);
+        List<ErrorAnalysisItem> tags = errorAnalysis(items, answers, responseByItem, essayPassed, graded);
+        if (!tags.isEmpty()) {
+            errors.saveAll(tags);
+        }
+        if (attempt.getAttemptType() == com.ieltspath.assessment.domain.vo.AttemptType.OFFICIAL_PRACTICE
+                && attempt.getSkill() != null) {
+            double rawScore = graded.stream().mapToDouble(ItemResult::score).sum();
+            double maxScore = graded.stream().mapToDouble(ItemResult::maxScore).sum();
+            Double band = com.ieltspath.assessment.domain.service.PracticeBandEstimator
+                    .estimate(attempt.getSkill(), attempt.getScope(), rawScore, maxScore).orElse(null);
+            skillScores.saveAll(List.of(new SkillScore(UUID.randomUUID(), draft.id(), attempt.getSkill(),
+                    rawScore, band, GradingSource.AUTO, null)));
+        }
         completer.complete(attempt, draft, items, graded);
         return true;
+    }
+
+    /**
+     * One error row per knowledge point of each wrong objective item that has an error tag. An item with no mapped
+     * knowledge point still gets one row, with a null knowledge point, so the tag is not lost.
+     */
+    private List<ErrorAnalysisItem> errorAnalysis(List<AttemptItem> items, List<AnswerSnapshot> answers,
+                                                  Map<UUID, AttemptResponse> responseByItem,
+                                                  Map<UUID, Boolean> essayPassed, List<ItemResult> graded) {
+        Map<UUID, List<UUID>> knowledgeByItem = knowledgeSnapshot.findByAttemptItemIds(
+                        items.stream().map(AttemptItem::id).toList()).stream()
+                .collect(Collectors.groupingBy(AttemptItemKnowledgePoint::attemptItemId,
+                        Collectors.mapping(AttemptItemKnowledgePoint::knowledgePointId, Collectors.toList())));
+        List<ErrorAnalysisItem> rows = new ArrayList<>();
+        for (int i = 0; i < items.size(); i++) {
+            AttemptItem item = items.get(i);
+            if (essayPassed.containsKey(item.id()) || graded.get(i).correct()) {
+                continue;
+            }
+            String tag = errorTagger.tag(answers.get(i).answerSpec(),
+                    responseAnswer(responseByItem.get(item.id())), false);
+            if (tag == null) {
+                continue;
+            }
+            List<UUID> knowledgePoints = knowledgeByItem.getOrDefault(item.id(), List.of());
+            if (knowledgePoints.isEmpty()) {
+                rows.add(new ErrorAnalysisItem(UUID.randomUUID(), graded.get(i).id(), null, tag, null));
+            }
+            for (UUID knowledgePoint : knowledgePoints) {
+                rows.add(new ErrorAnalysisItem(UUID.randomUUID(), graded.get(i).id(), knowledgePoint, tag, null));
+            }
+        }
+        return rows;
+    }
+
+    /** The submitted {@code answer} string of a stored response, or null when omitted or not a string. */
+    private String responseAnswer(AttemptResponse response) {
+        if (response == null) {
+            return null;
+        }
+        try {
+            return ErrorTagger.answerOf(json.readValue(response.payload(), Object.class));
+        } catch (Exception exception) {
+            return null;
+        }
     }
 
     /**

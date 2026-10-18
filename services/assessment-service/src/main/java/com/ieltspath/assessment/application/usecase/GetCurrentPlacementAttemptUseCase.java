@@ -28,8 +28,6 @@ public class GetCurrentPlacementAttemptUseCase {
         return attempts.findByUserId(userId).stream()
                 .filter(attempt -> attempt.getAttemptType() == AttemptType.PLACEMENT)
                 .max(Comparator.comparing(AssessmentAttempt::getCreatedAt))
-                .map(a -> new AssessmentAttemptResult(a.getId(), a.getUserId(), a.getPackageVersionId(),
-                        a.getAttemptType(), a.getMode(), a.getChannel(), a.getStatus(), a.getStartedAt(),
-                        a.getSubmittedAt(), a.getExpiresAt(), a.getRowVersion(), a.getCreatedAt(), a.getUpdatedAt()));
+                .map(AssessmentAttemptResult::from);
     }
 }

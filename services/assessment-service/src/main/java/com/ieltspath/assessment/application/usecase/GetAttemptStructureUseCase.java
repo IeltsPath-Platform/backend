@@ -43,6 +43,7 @@ public class GetAttemptStructureUseCase {
                         section.id(),
                         section.contentSectionId(),
                         section.sortOrder(),
+                        section.partNo(),
                         section.snapshot(),
                         grouped.getOrDefault(section.id(), List.of()).stream()
                                 .map(item -> new AttemptStructureResult.Item(

@@ -58,6 +58,30 @@ class TopicStatusDeriverTest {
     }
 
     @Test
+    void aTopicTestedBelowThePassMarkIsCompletedAndStillOpensTheNextTopic() {
+        var tested = new TopicProgress(first, 1, null);
+        tested.recordFirstTest(passedAt, 42.0);
+
+        var result = deriver.derive(List.of(tested, new TopicProgress(second, 2, null),
+                new TopicProgress(third, 3, null)));
+
+        assertThat(result).containsEntry(first, TopicStatus.COMPLETED)
+                .containsEntry(second, TopicStatus.IN_PROGRESS).containsEntry(third, TopicStatus.LOCKED);
+    }
+
+    @Test
+    void passingAfterTheFirstTestMakesTheTopicPassedButKeepsTheFirstScore() {
+        var topic = new TopicProgress(first, 1, null);
+        assertThat(topic.recordFirstTest(passedAt, 42.0)).isTrue();
+        assertThat(topic.recordFirstTest(passedAt.plusSeconds(60), 90.0)).isFalse();
+        topic.pass(passedAt.plusSeconds(60));
+
+        assertThat(deriver.derive(List.of(topic))).containsEntry(first, TopicStatus.PASSED);
+        assertThat(topic.firstTestPercent()).isEqualTo(42.0);
+        assertThat(topic.done()).isTrue();
+    }
+
+    @Test
     void tiesUseStableTopicIds() {
         assertThat(deriver.derive(List.of(new TopicProgress(second, 1, null),
                 new TopicProgress(first, 1, null))))

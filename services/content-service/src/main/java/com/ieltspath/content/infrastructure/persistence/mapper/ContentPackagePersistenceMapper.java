@@ -36,7 +36,8 @@ public class ContentPackagePersistenceMapper {
                 entity.getUpdatedAt(),
                 versions,
                 entity.getLessonId(),
-                entity.getCourseId()
+                entity.getCourseId(),
+                entity.getSourceCode()
         );
     }
 
@@ -54,6 +55,7 @@ public class ContentPackagePersistenceMapper {
                 .title(domain.getTitle())
                 .packageType(domain.getPackageType())
                 .requiredFeatureKey(domain.getRequiredFeatureKey())
+                .sourceCode(domain.getSourceCode())
                 .status(domain.getStatus())
                 .currentPublishedVersionId(domain.getCurrentPublishedVersionId())
                 .lessonId(domain.getLessonId())
@@ -81,6 +83,8 @@ public class ContentPackagePersistenceMapper {
                 entity.getSchemaVersion(),
                 entity.getPublishedAt(),
                 entity.getPublishedBy(),
+                entity.getPublishAt(),
+                entity.getLastPublishError(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
                 sections
@@ -104,6 +108,8 @@ public class ContentPackagePersistenceMapper {
                 .schemaVersion(domain.getSchemaVersion())
                 .publishedAt(domain.getPublishedAt())
                 .publishedBy(domain.getPublishedBy())
+                .publishAt(domain.getPublishAt())
+                .lastPublishError(domain.getLastPublishError())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .sections(sectionEntities)
@@ -128,7 +134,9 @@ public class ContentPackagePersistenceMapper {
                 entity.getInstructions(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
-                questions
+                questions,
+                entity.getPartNo(),
+                entity.getCoverAssetId()
         );
     }
 
@@ -147,6 +155,8 @@ public class ContentPackagePersistenceMapper {
                 .skill(domain.getSkill())
                 .sortOrder(domain.getSortOrder())
                 .timeLimitSeconds(domain.getTimeLimitSeconds())
+                .partNo(domain.getPartNo())
+                .coverAssetId(domain.getCoverAssetId())
                 .instructions(domain.getInstructions())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
@@ -162,7 +172,8 @@ public class ContentPackagePersistenceMapper {
                 entity.getQuestionVersionId(),
                 entity.getSortOrder(),
                 entity.getMaxScore(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getGroupId()
         );
     }
 
@@ -174,6 +185,7 @@ public class ContentPackagePersistenceMapper {
                 .questionVersionId(domain.getQuestionVersionId())
                 .sortOrder(domain.getSortOrder())
                 .maxScore(domain.getMaxScore())
+                .groupId(domain.getGroupId())
                 .createdAt(domain.getCreatedAt())
                 .build();
     }

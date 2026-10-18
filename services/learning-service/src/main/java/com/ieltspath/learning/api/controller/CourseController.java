@@ -32,7 +32,7 @@ public class CourseController {
 
     @PostMapping("/{id}/test-assignments")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public TestAssignmentResponse assign(@PathVariable UUID id) {
+    public TestAssignmentResponse assign(@PathVariable("id") UUID id) {
         return TestAssignmentResponse.from(assignCourseTest.execute(currentUser.requireUserId(), id));
     }
 }

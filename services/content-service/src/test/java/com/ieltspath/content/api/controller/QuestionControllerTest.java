@@ -10,6 +10,7 @@ import com.ieltspath.content.application.result.QuestionResult;
 import com.ieltspath.content.application.result.QuestionVersionResult;
 import com.ieltspath.content.application.usecase.*;
 import com.ieltspath.content.domain.exception.QuestionNotFoundException;
+import com.ieltspath.content.domain.exception.DifficultyRequiredException;
 import com.ieltspath.content.domain.vo.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +31,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doThrow;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -196,5 +198,17 @@ class QuestionControllerTest {
     void invalidPurposeFilterReturns400() throws Exception {
         mockMvc.perform(get("/api/content/questions?purpose=INVALID"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void missingDifficultyReturns400WithErrorCode() throws Exception {
+        UUID questionId = UUID.randomUUID();
+        doThrow(new DifficultyRequiredException()).when(addQuestionVersionUseCase).execute(any());
+
+        mockMvc.perform(post("/api/content/questions/" + questionId + "/versions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"versionNumber\":1,\"stem\":\"A question stem\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.code").value("DIFFICULTY_REQUIRED"));
     }
 }

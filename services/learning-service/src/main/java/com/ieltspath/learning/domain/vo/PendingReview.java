@@ -3,9 +3,17 @@ package com.ieltspath.learning.domain.vo;
 import java.util.Objects;
 import java.util.UUID;
 
-public record PendingReview(UUID reviewId, UUID lessonId, UUID knowledgePointId, LearningSkill skill) {
+/**
+ * A review the learner has not finished. Only a {@code blocking} one holds back lessons, Practice and topic tests; an
+ * optional one (picked from the review basket, or from a free practice test) never does.
+ */
+public record PendingReview(UUID reviewId, UUID lessonId, UUID knowledgePointId, LearningSkill skill,
+                            boolean blocking) {
+    public PendingReview(UUID reviewId, UUID lessonId, UUID knowledgePointId, LearningSkill skill) {
+        this(reviewId, lessonId, knowledgePointId, skill, true);
+    }
     public PendingReview(UUID reviewId, UUID lessonId, UUID knowledgePointId) {
-        this(reviewId, lessonId, knowledgePointId, null);
+        this(reviewId, lessonId, knowledgePointId, null, true);
     }
     public PendingReview {
         Objects.requireNonNull(reviewId, "reviewId");

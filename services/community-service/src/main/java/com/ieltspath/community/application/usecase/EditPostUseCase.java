@@ -15,12 +15,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class EditPostUseCase {
     private final PostRepository posts;
     private final ReactionRepository reactions;
+    private final com.ieltspath.community.application.port.MediaPolicy mediaPolicy;
 
     @Transactional
     public PostResult execute(CommunityActor actor, EditPostCommand command) {
+        mediaPolicy.validate(command.imageUrls(), command.videoUrl());
         var post = posts.findById(command.postId())
                 .orElseThrow(() -> new CommunityNotFoundException("Post not found"));
         post.edit(actor.userId(), command.category(), command.title(), command.body());
+        post.setMedia(command.imageUrls(), command.videoUrl(), command.targetBand());
         var saved = posts.save(post);
         return PostResult.from(saved, reactions.counts(saved.getId()));
     }

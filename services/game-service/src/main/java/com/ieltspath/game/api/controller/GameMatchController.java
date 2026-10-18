@@ -22,7 +22,7 @@ public class GameMatchController {
     }
 
     @GetMapping("/{matchId}")
-    public GameMatchResponse get(@PathVariable UUID matchId) {
+    public GameMatchResponse get(@PathVariable("matchId") UUID matchId) {
         return GameMatchResponse.from(getMatchState.execute(matchId, currentUserProvider.requireUserId()));
     }
 }

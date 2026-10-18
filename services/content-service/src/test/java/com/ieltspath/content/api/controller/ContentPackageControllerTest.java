@@ -163,7 +163,7 @@ class ContentPackageControllerTest {
         UUID questionId = UUID.randomUUID();
         when(publishContentPackageUseCase.execute(any()))
                 .thenThrow(new QuestionAlreadyUsedException(List.of(
-                        new QuestionUsageConflict(questionId, QuestionUsageConflict.OwnerType.PACKAGE, "PS-KP1-A"))))
+                        new QuestionUsageConflict(questionId, QuestionUsageConflict.OwnerType.LESSON, "L1"))))
                 .thenThrow(new QuestionPurposeMismatchException(QuestionPurpose.EXAM, List.of(questionId)));
         String path = "/api/content/packages/" + UUID.randomUUID() + "/publish";
         String request = "{\"versionId\":\"" + UUID.randomUUID() + "\"}";

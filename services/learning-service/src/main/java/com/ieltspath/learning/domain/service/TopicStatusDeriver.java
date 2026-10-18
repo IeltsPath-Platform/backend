@@ -25,6 +25,8 @@ public final class TopicStatusDeriver {
             TopicStatus status;
             if (topic.passedAt() != null) {
                 status = TopicStatus.PASSED;
+            } else if (topic.testedAt() != null) {
+                status = TopicStatus.COMPLETED;
             } else if (openCourses.add(topic.courseId())) {
                 status = TopicStatus.IN_PROGRESS;
             } else {

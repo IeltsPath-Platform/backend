@@ -2,7 +2,10 @@ package com.ieltspath.assessment.application.usecase;
 
 import com.ieltspath.assessment.application.command.ItemResultInput;
 import com.ieltspath.assessment.application.command.KnowledgeJudgmentInput;
+import com.ieltspath.assessment.application.command.ErrorAnalysisInput;
 import com.ieltspath.assessment.application.command.SaveAssessmentResultDetailsCommand;
+import com.ieltspath.assessment.application.exception.UnknownErrorCodeException;
+import com.ieltspath.assessment.application.port.ErrorTypeCatalog;
 import com.ieltspath.assessment.application.command.SaveGradingDetailsCommand;
 import com.ieltspath.assessment.domain.aggregate.AssessmentAttempt;
 import com.ieltspath.assessment.domain.entity.AssessmentResult;
@@ -38,6 +41,7 @@ class SaveAssessmentResultDetailsUseCaseTest {
     @Mock ErrorAnalysisItemRepository errors;
     @Mock AttemptItemKnowledgePointRepository knowledgeSnapshot;
     @Mock ItemResultKnowledgeJudgmentRepository judgments;
+    @Mock ErrorTypeCatalog errorTypes;
 
     private final UUID userId = UUID.randomUUID();
     private final UUID attemptId = UUID.randomUUID();
@@ -201,6 +205,19 @@ class SaveAssessmentResultDetailsUseCaseTest {
         return new SaveGradingDetailsCommand(resultId, overallBand, null, itemResults, null, knowledgeJudgments);
     }
 
+    @Test
+    void errorAnalysisWithAnUnknownCodeIsRefusedAndNothingIsSaved() {
+        stubAttempt();
+        stubDraft();
+        when(errorTypes.activeCodes()).thenReturn(Set.of("PARAPHRASE_TRAP"));
+
+        assertThrows(UnknownErrorCodeException.class, () -> useCase().execute(new SaveAssessmentResultDetailsCommand(
+                userId, attemptId, null, null, List.of(new ErrorAnalysisInput(UUID.randomUUID(), attemptItemId,
+                        null, "NOT_A_CODE", null)), null)));
+
+        verify(errors, never()).saveAll(any());
+    }
+
     private void stubAttempt() {
         Instant now = Instant.now();
         when(attempts.findByIdAndUserId(attemptId, userId)).thenReturn(Optional.of(new AssessmentAttempt(attemptId,
@@ -220,6 +237,6 @@ class SaveAssessmentResultDetailsUseCaseTest {
 
     private SaveAssessmentResultDetailsUseCase useCase() {
         return new SaveAssessmentResultDetailsUseCase(attempts, results, attemptItems, skills, items, errors,
-                knowledgeSnapshot, judgments);
+                knowledgeSnapshot, judgments, errorTypes, org.mockito.Mockito.mock(ExaminerGradingPolicy.class));
     }
 }

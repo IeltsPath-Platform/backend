@@ -14,9 +14,13 @@ import java.util.UUID;
 
 /**
  * A review of one weak knowledge point. While PENDING it is at a stage: PRACTICE gives at most one open set, THEORY
- * asks the learner to read the lesson summary before the next set. A passed set makes it DONE. The first failed set
- * sends it to THEORY; later failed sets go straight to a new set, until one passes. It is SKIPPED only when no
- * unrevealed package is left. DONE and SKIPPED are final.
+ * asks the learner to read the knowledge point's theory and answer a quick check before the next set. A passed set
+ * makes it DONE. A failed set keeps it PENDING and the learner gets a new set until one is passed; only the first failed
+ * set sends the learner back to THEORY, later failures go straight to a new set. The review is SKIPPED only when no
+ * unrevealed package is left, so the learner is never stuck. DONE and SKIPPED are final.
+ *
+ * <p>An optional review ({@code blocking = false}, picked from the review basket or created from a free practice test)
+ * never blocks anything and has no theory step: it is one set, DONE when passed and SKIPPED when failed.
  */
 public final class ReviewItem {
     private final UUID id;
@@ -25,6 +29,7 @@ public final class ReviewItem {
     private final UUID lessonId;
     private final LearningSkill skill;
     private final String triggerKind;
+    private final boolean blocking;
     private ReviewStatus status;
     private ReviewStage stage;
     private TheoryReason theoryReason;
@@ -36,7 +41,7 @@ public final class ReviewItem {
 
     private ReviewItem(UUID id, UUID userId, UUID knowledgePointId, UUID lessonId, ReviewStatus status,
                        ReviewSet openSet, int failedSets, LearningSkill skill, ReviewStage stage,
-                       TheoryReason theoryReason, int theoryCompletedCount, String triggerKind) {
+                       TheoryReason theoryReason, int theoryCompletedCount, String triggerKind, boolean blocking) {
         this.id = Objects.requireNonNull(id, "id");
         this.userId = Objects.requireNonNull(userId, "userId");
         this.knowledgePointId = Objects.requireNonNull(knowledgePointId, "knowledgePointId");
@@ -49,6 +54,7 @@ public final class ReviewItem {
         this.theoryReason = theoryReason;
         this.theoryCompletedCount = theoryCompletedCount;
         this.triggerKind = triggerKind;
+        this.blocking = blocking;
     }
 
     public static ReviewItem restore(UUID id, UUID userId, UUID knowledgePointId, UUID lessonId, ReviewStatus status,
@@ -65,8 +71,16 @@ public final class ReviewItem {
     public static ReviewItem restore(UUID id, UUID userId, UUID knowledgePointId, UUID lessonId, ReviewStatus status,
                                      ReviewSet openSet, int failedSets, LearningSkill skill, ReviewStage stage,
                                      TheoryReason theoryReason, int theoryCompletedCount, String triggerKind) {
+        return restore(id, userId, knowledgePointId, lessonId, status, openSet, failedSets, skill, stage, theoryReason,
+                theoryCompletedCount, triggerKind, true);
+    }
+
+    public static ReviewItem restore(UUID id, UUID userId, UUID knowledgePointId, UUID lessonId, ReviewStatus status,
+                                     ReviewSet openSet, int failedSets, LearningSkill skill, ReviewStage stage,
+                                     TheoryReason theoryReason, int theoryCompletedCount, String triggerKind,
+                                     boolean blocking) {
         return new ReviewItem(id, userId, knowledgePointId, lessonId, status, openSet, failedSets, skill, stage,
-                theoryReason, theoryCompletedCount, triggerKind);
+                theoryReason, theoryCompletedCount, triggerKind, blocking);
     }
 
     /** Gives the learner a new practice set; only a PENDING review at PRACTICE without an open set takes one. */
@@ -94,6 +108,20 @@ public final class ReviewItem {
         status = ReviewStatus.SKIPPED;
     }
 
+    /** True while the review has not given a set or theory yet, so its starting stage can still be decided. */
+    public boolean isFresh() {
+        return status == ReviewStatus.PENDING && stage == ReviewStage.PRACTICE && openSet == null && failedSets == 0
+                && theoryCompletedCount == 0;
+    }
+
+    /** Sends a fresh review to the theory before its first set (knowledge point already wrong in the lesson). */
+    public void startWithTheory(TheoryReason reason) {
+        if (!blocking) throw new IllegalStateException("An optional review has no theory step");
+        if (!isFresh()) throw new IllegalStateException("Review has already started");
+        stage = ReviewStage.THEORY;
+        theoryReason = Objects.requireNonNull(reason, "reason");
+    }
+
     /** Whether {@code setId} is this review's open set, the only one that may be answered. */
     public boolean acceptsAnswersFor(UUID setId) {
         return status == ReviewStatus.PENDING && openSet != null && openSet.id().equals(setId);
@@ -108,12 +136,13 @@ public final class ReviewItem {
         openSet = null;
         if (passed) {
             status = ReviewStatus.DONE;
+        } else if (!blocking) {
+            failedSets++;
+            status = ReviewStatus.SKIPPED;
         } else if (++failedSets == 1) {
             stage = ReviewStage.THEORY;
             theoryReason = (double) correct / total < ReviewRule.LOW_SCORE ? TheoryReason.LOW_SCORE
                     : TheoryReason.SECOND_FAIL;
-        } else {
-            stage = ReviewStage.PRACTICE;
         }
         return status;
     }
@@ -140,6 +169,8 @@ public final class ReviewItem {
     public TheoryReason theoryReason() { return theoryReason; }
     public int theoryCompletedCount() { return theoryCompletedCount; }
     public int failedSets() { return failedSets; }
+    /** False for an optional review: it never locks a lesson, Practice or topic test. */
+    public boolean blocking() { return blocking; }
     /** {@code PRACTICE}, {@code ASSESSMENT}, or null for reviews created before triggers were recorded. */
     public String triggerKind() { return triggerKind; }
     public Optional<ReviewSet> openSet() { return Optional.ofNullable(openSet); }

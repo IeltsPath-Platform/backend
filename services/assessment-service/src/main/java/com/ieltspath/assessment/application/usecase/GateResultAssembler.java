@@ -16,9 +16,9 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Completes the result of a topic or course test once the LLM has graded every essay that was sent: an essay passes
+ * Completes a topic or practice result once the LLM has graded every essay that was sent: an essay passes
  * when its band reaches the item's pass band and an essay never sent scores zero. Nothing happens while a job is
- * still open, when a job failed (an examiner grades the attempt instead) or when a result already exists.
+ * still open, when a job failed, when a result already exists, or for a course gate, which requires an examiner.
  */
 @Component
 public class GateResultAssembler {
@@ -44,7 +44,8 @@ public class GateResultAssembler {
     @Transactional
     public boolean completeIfGraded(UUID attemptId) {
         var attempt = attempts.findById(attemptId).orElse(null);
-        if (attempt == null || results.findLatestForUpdateByAttemptId(attemptId).isPresent()) return false;
+        if (attempt == null || attempt.getAttemptType() == com.ieltspath.assessment.domain.vo.AttemptType.COURSE_GATE
+                || results.findLatestForUpdateByAttemptId(attemptId).isPresent()) return false;
         List<GateEssayJobStore.JobState> states = jobs.aiJobs(attemptId);
         if (states.isEmpty() || states.stream()
                 .anyMatch(state -> !GradingJobStatus.COMPLETED.name().equals(state.status()))) {

@@ -1,6 +1,7 @@
 package com.ieltspath.content.infrastructure.persistence;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ieltspath.content.application.result.LessonContentResult;
 import com.ieltspath.content.application.result.LessonSummaryResult;
 import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.domain.vo.*;
@@ -29,10 +30,8 @@ class MultiSkillSeedTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("23").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("58").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
-        // This test pins an older schema; the lesson query reads the column a later migration adds.
-        jdbc.getJdbcOperations().execute("ALTER TABLE lessons ADD COLUMN estimated_minutes INT");
         reader = new JdbcLearningContentReader(jdbc);
     }
 
@@ -48,12 +47,15 @@ class MultiSkillSeedTest {
     }
 
     @Test
-    void bothLessonsTeachEverySkillThroughTheirKnowledgePoints() {
+    void bothLessonsTeachEverySkillAndEachTheoryBlockNamesItsKnowledgePoints() {
         List<LessonSummaryResult> lessons = reader.publishedLessons(topic().topicId());
         assertThat(lessons).extracting(LessonSummaryResult::code).containsExactly("T1", "T2");
         for (LessonSummaryResult lesson : lessons) {
             assertThat(lesson.skills()).as(lesson.code()).containsExactlyElementsOf(ALL_THREE);
-            assertThat(lesson.knowledgePointIds()).isNotEmpty();
+            LessonContentResult content = reader.publishedLesson(lesson.lessonId()).orElseThrow();
+            assertThat(content.skills()).containsExactlyElementsOf(ALL_THREE);
+            assertThat(content.blocks()).filteredOn(block -> block.blockType() == BlockType.TEXT).hasSize(3)
+                    .allSatisfy(block -> assertThat(block.knowledgePointIds()).isNotEmpty());
         }
     }
 

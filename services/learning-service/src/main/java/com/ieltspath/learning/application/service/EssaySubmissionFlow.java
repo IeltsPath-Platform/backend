@@ -10,7 +10,6 @@ import com.ieltspath.learning.application.result.WritingSubmissionResult;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
 import com.ieltspath.learning.domain.service.WritingScore;
-import com.ieltspath.learning.domain.vo.WritingGrade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -87,16 +86,16 @@ public class EssaySubmissionFlow {
             essays.save(grading);
             throw new LearningRequestException(429, "DAILY_LIMIT_REACHED", "Daily grading limit reached");
         }
-        WritingGrade grade;
+        EssayGrader.GradedEssay graded;
         try {
-            grade = grader.grade(grading.prompt(), grading.essayText());
+            graded = grader.grade(grading.prompt(), grading.essayText());
         } catch (WritingGradingException exception) {
             grading.fail(exception.getCode());
             essays.save(grading);
             log.warn("Essay grading failed: submissionId={}, code={}", grading.id(), exception.getCode());
             throw gradingUnavailable(grading.id());
         }
-        grading.recordGrade(grade);
+        grading.recordGrade(graded.grade(), graded.promptVersion());
         // False when the grading was abandoned and taken over by another request meanwhile.
         if (!essays.save(grading)) throw gradingInProgress();
     }

@@ -4,7 +4,12 @@ import com.ieltspath.assessment.domain.vo.AttemptChannel;
 import com.ieltspath.assessment.domain.vo.AttemptMode;
 
 import java.util.UUID;
+import java.util.List;
 
 /** Everything else (type, sections, items, answers, knowledge points) comes from the Content package version. */
 public record StartAssessmentAttemptCommand(UUID userId, UUID packageVersionId, AttemptMode mode,
-                                            AttemptChannel channel) {}
+                                            AttemptChannel channel, List<UUID> sectionIds) {
+    public StartAssessmentAttemptCommand(UUID userId, UUID packageVersionId, AttemptMode mode, AttemptChannel channel) {
+        this(userId, packageVersionId, mode, channel, null);
+    }
+}

@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Practice clearance waits for every review"
-status: pending
+status: completed
 priority: P1
 dependencies: []
 ---

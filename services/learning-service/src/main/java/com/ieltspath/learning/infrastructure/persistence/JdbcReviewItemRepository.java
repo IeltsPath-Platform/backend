@@ -31,7 +31,7 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
     public Optional<ReviewItem> findOwned(UUID userId, UUID reviewId) {
         return jdbc.query("""
                 SELECT r.id, r.knowledge_point_id, r.lesson_id, r.status, r.skill, r.stage, r.theory_reason,
-                r.theory_completed_count, r.trigger_kind, s.id AS set_id, s.package_id, s.package_version_id,
+                r.theory_completed_count, r.trigger_kind, r.blocking, s.id AS set_id, s.package_id, s.package_version_id,
                 (SELECT count(*) FROM review_sets f WHERE f.review_item_id = r.id AND f.passed = FALSE) AS failed_sets
                 FROM review_items r
                 LEFT JOIN review_sets s ON s.review_item_id = r.id AND s.submitted_at IS NULL
@@ -46,18 +46,19 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
                     row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")),
                     ReviewStage.valueOf(row.getString("stage")),
                     row.getString("theory_reason") == null ? null : TheoryReason.valueOf(row.getString("theory_reason")),
-                    row.getInt("theory_completed_count"), row.getString("trigger_kind"));
+                    row.getInt("theory_completed_count"), row.getString("trigger_kind"), row.getBoolean("blocking"));
         }).stream().findFirst();
     }
 
     @Override
     public List<PendingReview> findPending(UUID userId) {
         return jdbc.query("""
-                SELECT id, lesson_id, knowledge_point_id, skill FROM review_items
+                SELECT id, lesson_id, knowledge_point_id, skill, blocking FROM review_items
                 WHERE user_id = :userId AND status = 'PENDING' ORDER BY created_at, id
                 """, Map.of("userId", userId), (row, index) -> new PendingReview(row.getObject("id", UUID.class),
                 row.getObject("lesson_id", UUID.class), row.getObject("knowledge_point_id", UUID.class),
-                row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill"))));
+                row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")),
+                row.getBoolean("blocking")));
     }
 
     @Override
@@ -78,7 +79,7 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         List<PracticeReviewState> practice = new ArrayList<>();
         if (lessonIds.isEmpty()) return new TopicReviewSnapshot(findPending(userId), List.of());
         jdbc.query("""
-                SELECT id, lesson_id, knowledge_point_id, status, skill, trigger_kind
+                SELECT id, lesson_id, knowledge_point_id, status, skill, trigger_kind, blocking
                 FROM review_items
                 WHERE user_id = :userId
                   AND (status = 'PENDING' OR (lesson_id IN (:lessonIds) AND trigger_kind = 'PRACTICE'))
@@ -89,7 +90,7 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
             ReviewStatus status = ReviewStatus.valueOf(row.getString("status"));
             LearningSkill skill = skill(row.getString("skill"));
             if (status == ReviewStatus.PENDING) pending.add(new PendingReview(row.getObject("id", UUID.class),
-                    lessonId, kpId, skill));
+                    lessonId, kpId, skill, row.getBoolean("blocking")));
             if ("PRACTICE".equals(row.getString("trigger_kind")) && lessonIds.contains(lessonId)) {
                 practice.add(new PracticeReviewState(lessonId, kpId, status, skill));
             }
@@ -129,7 +130,8 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         params.put("skill", skill == null ? null : skill.name());
         params.put("limit", limit);
         return jdbc.query("""
-                SELECT r.id, r.knowledge_point_id, r.lesson_id, r.skill, r.stage, r.created_at, a.package_id
+                SELECT r.id, r.knowledge_point_id, r.lesson_id, r.skill, r.stage, r.created_at, a.package_id,
+                       r.blocking
                 FROM review_items r LEFT JOIN practice_attempts a ON a.id = r.source_attempt_id
                 WHERE r.user_id = :userId AND r.status = :status
                   AND (CAST(:skill AS varchar) IS NULL OR r.skill = :skill OR r.skill IS NULL)
@@ -138,7 +140,7 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
                 row.getObject("knowledge_point_id", UUID.class), row.getObject("lesson_id", UUID.class),
                 row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")),
                 ReviewStage.valueOf(row.getString("stage")), row.getTimestamp("created_at").toInstant(),
-                row.getObject("package_id", UUID.class)));
+                row.getObject("package_id", UUID.class), row.getBoolean("blocking")));
     }
 
     @Override
@@ -154,10 +156,16 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
 
     @Override
     public void insertPending(UUID userId, List<ReviewCandidate> candidates) {
+        insertPending(userId, candidates, true, "ASSESSMENT");
+    }
+
+    @Override
+    public void insertPending(UUID userId, List<ReviewCandidate> candidates, boolean blocking, String triggerKind) {
         if (candidates.isEmpty()) return;
         jdbc.getJdbcOperations().batchUpdate("""
-                INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind)
-                VALUES (?, ?, ?, ?, 'PENDING', ?, 'ASSESSMENT')
+                INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind,
+                                          blocking)
+                VALUES (?, ?, ?, ?, 'PENDING', ?, ?, ?)
                 ON CONFLICT (user_id, knowledge_point_id) WHERE status = 'PENDING' DO NOTHING
                 """, candidates, candidates.size(), (statement, review) -> {
             statement.setObject(1, UUID.randomUUID());
@@ -165,7 +173,37 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
             statement.setObject(3, review.knowledgePointId());
             statement.setObject(4, review.lessonId());
             statement.setString(5, review.skill() == null ? null : review.skill().name());
+            statement.setString(6, triggerKind);
+            statement.setBoolean(7, blocking);
         });
+    }
+
+    @Override
+    public void promoteToBlocking(UUID userId, Collection<UUID> knowledgePointIds, String triggerKind) {
+        if (knowledgePointIds.isEmpty()) return;
+        jdbc.update("""
+                UPDATE review_items SET blocking = TRUE, trigger_kind = :triggerKind
+                WHERE user_id = :userId AND status = 'PENDING' AND blocking = FALSE
+                  AND knowledge_point_id IN (:kpIds)
+                """, Map.of("userId", userId, "triggerKind", triggerKind, "kpIds", knowledgePointIds));
+    }
+
+    @Override
+    public boolean insertOptional(UUID userId, UUID reviewId, UUID knowledgePointId, UUID lessonId,
+                                  LearningSkill skill, String triggerKind) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("id", reviewId);
+        params.put("userId", userId);
+        params.put("kpId", knowledgePointId);
+        params.put("lessonId", lessonId);
+        params.put("skill", skill == null ? null : skill.name());
+        params.put("triggerKind", triggerKind);
+        return jdbc.update("""
+                INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind,
+                                          blocking)
+                VALUES (:id, :userId, :kpId, :lessonId, 'PENDING', :skill, :triggerKind, FALSE)
+                ON CONFLICT (user_id, knowledge_point_id) WHERE status = 'PENDING' DO NOTHING
+                """, params) == 1;
     }
 
     /** Called once per loaded review: inserts the set it assigned, closes the set it answered, then the status. */
@@ -208,7 +246,11 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
 
     @Override
     public List<UUID> assignedPackageIds(UUID userId) {
-        return jdbc.queryForList("SELECT DISTINCT package_id FROM review_sets WHERE user_id = :userId",
-                Map.of("userId", userId), UUID.class);
+        return jdbc.queryForList("""
+                SELECT package_id FROM review_sets WHERE user_id = :userId
+                UNION
+                SELECT p.package_id FROM diagnostic_probes p JOIN diagnostic_sessions s ON s.id = p.session_id
+                WHERE s.user_id = :userId AND p.package_id IS NOT NULL
+                """, Map.of("userId", userId), UUID.class);
     }
 }

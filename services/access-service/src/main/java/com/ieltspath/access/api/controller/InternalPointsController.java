@@ -12,7 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Service-to-service point operations; the Gateway denies {@code /internal/**} to clients. */
+/**
+ * Service-to-service point spending; the Gateway denies {@code /internal/**} to clients. Points are earned only through
+ * the {@code access.points-grant} message, never over HTTP, because any internal token could otherwise mint points.
+ */
 @RestController
 @RequestMapping("/internal/access")
 @RequiredArgsConstructor

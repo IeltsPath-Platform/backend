@@ -9,3 +9,7 @@ spring:
       - optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}
       - optional:file:./.env[.properties]
       - optional:file:../../.env[.properties]
+
+library:
+  srs:
+    intervals-days: [1, 2, 4, 8, 16]

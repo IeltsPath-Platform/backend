@@ -9,6 +9,7 @@ import com.ieltspath.learning.application.result.ReviewResult;
 import com.ieltspath.learning.application.result.ReviewSubmissionResult;
 import com.ieltspath.learning.application.usecase.AssignTopicTestUseCase;
 import com.ieltspath.learning.application.usecase.GetLessonUseCase;
+import com.ieltspath.learning.application.usecase.SubmitLessonExerciseUseCase;
 import com.ieltspath.learning.application.usecase.RefreshLearningTopicsUseCase;
 import com.ieltspath.learning.application.usecase.GetReviewUseCase;
 import com.ieltspath.learning.application.usecase.SubmitReviewUseCase;
@@ -73,6 +74,9 @@ class ReviewAndTestAssignmentIntegrationTest {
     private static final UUID OTHER_USER = UUID.randomUUID();
     private static final UUID TOPIC = UUID.randomUUID();
     private static final UUID LESSON = UUID.randomUUID();
+    private static final UUID EXERCISE_BLOCK = UUID.randomUUID();
+    private static final UUID ESSAY_BLOCK = UUID.randomUUID();
+    private static final UUID QUESTION = UUID.randomUUID();
     private static final UUID KP = UUID.randomUUID();
     private static final UUID PACKAGE_A = UUID.randomUUID();
     private static final UUID PACKAGE_B = UUID.randomUUID();
@@ -85,6 +89,7 @@ class ReviewAndTestAssignmentIntegrationTest {
     @Autowired SubmitReviewUseCase submitReviewUseCase;
     @Autowired AssignTopicTestUseCase tests;
     @Autowired GetLessonUseCase getLessonUseCase;
+    @Autowired SubmitLessonExerciseUseCase submitLessonExerciseUseCase;
     @Autowired RefreshLearningTopicsUseCase topics;
     @Autowired CompleteLessonUseCase completeLessonUseCase;
     @MockitoBean LearningContentClient content;
@@ -92,34 +97,62 @@ class ReviewAndTestAssignmentIntegrationTest {
     @BeforeEach
     void resetDataAndCurriculum() {
         jdbc.execute("""
-                TRUNCATE review_theory_checks, review_sets, review_items, practice_attempts, lesson_practice_passes,
-                kp_evidence,
+                TRUNCATE review_theory_checks, diagnostic_probes, diagnostic_sessions,review_sets, review_items, practice_attempts, lesson_practice_passes,
+                lesson_exercise_submissions, kp_evidence,
                 lesson_progress, topic_progress, knowledge_point_catalog, topic_test_assignments,
-                assessment_result_versions RESTART IDENTITY
+                assessment_result_versions, kp_mastery_profiles RESTART IDENTITY
                 """);
         when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "LISTEN", "Listening", 920, null,
                 List.of(new KnowledgePoint(KP, "LS_NUM", "Numbers", "PROCEDURE", "LISTENING", "d", true)),
                 LearningSkill.LISTENING, true)));
         when(content.getTopicLessons(TOPIC)).thenReturn(List.of(new LessonSummary(LESSON, TOPIC, "LS1", "Form", null,
-                1, List.of(KP))));
-        when(content.getLesson(LESSON)).thenReturn(new Lesson(LESSON, TOPIC, "LS1", "Form", null,
-                "Read the gaps first.", 1, List.of(KP)));
+                1, List.of(KP), List.of(EXERCISE_BLOCK, ESSAY_BLOCK))));
+        Asset audio = new Asset(UUID.randomUUID(), "AUDIO", "Caller: It is Thompson.", "listening/demo/ls1.mp3", 45,
+                "https://media.example.test/listening/demo/ls1.mp3");
+        Question choice = new Question(QUESTION, 1, "Surname?", List.of(new Option("A", "Thompson", 1),
+                new Option("B", "Thomson", 2), new Option("C", "Tomson", 3)),
+                Map.of("type", "CHOICE", "correct", "A"), "Spelled out", List.of(KP));
+        Question essay = new Question(UUID.randomUUID(), 1, "Describe the chart.", null,
+                Map.of("type", "ESSAY", "task", "TASK_1", "minWords", 150, "passBand", 6.0, "chartFacts", "secret"),
+                "Model answer", List.of(KP), List.of(new QuestionAsset(UUID.randomUUID(), "IMAGE",
+                "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=", "Bar chart", 1)));
+        when(content.getLesson(LESSON)).thenReturn(new Lesson(LESSON, TOPIC, "LS1", "Form", null, 1, List.of(KP),
+                List.of(new Block(UUID.randomUUID(), "TEXT", 1, "Read the gaps first.", null, null, null),
+                        new Block(UUID.randomUUID(), "ASSET", 2, null, audio, null, null),
+                        new Block(EXERCISE_BLOCK, "EXERCISE", 3, null, null, null, List.of(choice), "EXERCISE"),
+                        new Block(ESSAY_BLOCK, "EXERCISE", 4, null, null, null, List.of(essay), "ESSAY"))));
         when(content.getPackageVersion(any())).thenAnswer(invocation -> practiceSet(invocation.getArgument(0)));
         when(content.getTopicTestPackages(TOPIC)).thenReturn(List.of(new TestPackage(TEST_X, UUID.randomUUID(), "X3"),
                 new TestPackage(TEST_Y, UUID.randomUUID(), "X4")));
         topics.execute(USER);
     }
 
-    // ---- lessons ----
+    // ---- lessons with essay and audio blocks ----
 
     @Test
-    void aLessonShowsItsStatusAndCompletesOnConfirmation() {
-        assertEquals("AVAILABLE", getLessonUseCase.execute(USER, LESSON).status());
+    void essayBlockNeitherBlocksCompletionNorAcceptsExerciseAnswersAndTranscriptWaitsForCompletion() {
+        var before = getLessonUseCase.execute(USER, LESSON);
+        var audio = before.blocks().get(1).asset();
+        assertEquals("https://media.example.test/listening/demo/ls1.mp3", audio.mediaUrl());
+        assertNull(audio.transcript());
+        assertNull(audio.textContent());
+        var essay = before.blocks().get(3);
+        assertEquals("ESSAY", essay.blockKind());
+        assertNull(essay.questions());
+        assertEquals("TASK_1", essay.essay().task());
+        assertEquals(150, essay.essay().minWords());
+        assertEquals("Bar chart", essay.essay().images().getFirst().altText());
 
-        completeLessonUseCase.execute(USER, LESSON);
+        var essayAnswer = new SubmitExerciseCommand(UUID.randomUUID(),
+                List.of(new SubmitExerciseCommand.Answer(essay.essay().questionVersionId(), "An essay")));
+        var conflict = assertThrows(LearningRequestException.class,
+                () -> submitLessonExerciseUseCase.execute(USER, LESSON, ESSAY_BLOCK, essayAnswer));
+        assertEquals("ESSAY_BLOCK", conflict.getCode());
 
-        assertEquals("COMPLETED", getLessonUseCase.execute(USER, LESSON).status());
-        assertDoesNotThrow(() -> completeLessonUseCase.execute(USER, LESSON));
+        var result = submitLessonExerciseUseCase.execute(USER, LESSON, EXERCISE_BLOCK, new SubmitExerciseCommand(UUID.randomUUID(),
+                List.of(new SubmitExerciseCommand.Answer(QUESTION, "A"))));
+        assertTrue(result.lessonCompleted());
+        assertEquals("Caller: It is Thompson.", getLessonUseCase.execute(USER, LESSON).blocks().get(1).asset().transcript());
     }
 
     // ---- reviews ----
@@ -151,8 +184,8 @@ class ReviewAndTestAssignmentIntegrationTest {
 
         ReviewResult theory = getReviewUseCase.execute(USER, review);
         assertNull(theory.set());
-        assertTrue(theory.quickCheck().isEmpty());
-        theoryCheck.execute(USER, review, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
+        theoryCheck.execute(USER, review, new SubmitExerciseCommand(UUID.randomUUID(), theory.quickCheck().stream()
+                .map(question -> new SubmitExerciseCommand.Answer(question.questionVersionId(), "A")).toList()));
 
         // The only package has been revealed, so no further set is assigned.
         ReviewResult third = getReviewUseCase.execute(USER, review);
@@ -162,6 +195,12 @@ class ReviewAndTestAssignmentIntegrationTest {
         assertNull(getReviewUseCase.execute(USER, review).set());
         assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'review_set'",
                 Integer.class));
+        // Every knowledge point that received evidence has a mastery profile.
+        int profiled = jdbc.queryForObject("SELECT count(*) FROM kp_mastery_profiles WHERE user_id = ?",
+                Integer.class, USER);
+        assertTrue(profiled > 0);
+        assertEquals(jdbc.queryForObject("SELECT count(DISTINCT kp_id) FROM kp_evidence WHERE user_id = ?",
+                Integer.class, USER), profiled);
         // A skipped review no longer gates lessons.
         assertDoesNotThrow(() -> getLessonUseCase.execute(USER, LESSON));
     }
@@ -183,6 +222,27 @@ class ReviewAndTestAssignmentIntegrationTest {
         var closed = assertThrows(LearningRequestException.class,
                 () -> submitReviewUseCase.execute(USER, review, command(set, UUID.randomUUID(), "A")));
         assertEquals("REVIEW_SET_CLOSED", closed.getCode());
+    }
+
+    @Test
+    void aBlockingReviewCanBeSubmittedWithNoHeartsAndAWrongAnswerThereCostsNone() {
+        jdbc.update("INSERT INTO learner_hearts (user_id, hearts, max_hearts, last_regen_at) VALUES (?, 0, 5, now()) "
+                + "ON CONFLICT (user_id) DO UPDATE SET hearts = 0, max_hearts = 5, last_regen_at = now()", USER);
+        try {
+            UUID review = pendingReview(USER);
+            when(content.searchPracticeSets(eq(KP), anyList(), eq(3), anyInt(), eq(LESSON)))
+                    .thenReturn(List.of(practice(PACKAGE_A)));
+            UUID set = getReviewUseCase.execute(USER, review).set().reviewSetId();
+
+            ReviewSubmissionResult wrong = assertDoesNotThrow(
+                    () -> submitReviewUseCase.execute(USER, review, command(set, UUID.randomUUID(), "B")));
+
+            assertNotNull(wrong.reviewStatus());
+            assertNull(wrong.gamification().heartsLost(), "a review set does not cost hearts");
+            assertEquals(0, jdbc.queryForObject("SELECT hearts FROM learner_hearts WHERE user_id = ?", Integer.class, USER));
+        } finally {
+            jdbc.update("DELETE FROM learner_hearts WHERE user_id = ?", USER);
+        }
     }
 
     @Test
@@ -253,20 +313,20 @@ class ReviewAndTestAssignmentIntegrationTest {
                 new Topic(writing, "WRITE", "Writing", 4, null, List.of(), LearningSkill.WRITING, false,
                         writingCourse)));
         when(content.getTopicLessons(readingFirst)).thenReturn(List.of(new LessonSummary(firstLesson, readingFirst,
-                "R1", "First", null, 1, List.of())));
+                "R1", "First", null, 1, List.of(), List.of())));
         when(content.getTopicLessons(readingNext)).thenReturn(List.of(new LessonSummary(nextLesson, readingNext,
-                "R2", "Next", null, 1, List.of())));
+                "R2", "Next", null, 1, List.of(), List.of())));
         when(content.getTopicLessons(writing)).thenReturn(List.of(
-                new LessonSummary(writingFirst, writing, "W1", "Writing one", null, 1, List.of()),
-                new LessonSummary(writingLast, writing, "W2", "Writing two", null, 2, List.of())));
+                new LessonSummary(writingFirst, writing, "W1", "Writing one", null, 1, List.of(), List.of()),
+                new LessonSummary(writingLast, writing, "W2", "Writing two", null, 2, List.of(), List.of())));
         when(content.getLesson(firstLesson)).thenReturn(new Lesson(firstLesson, readingFirst, "R1", "First", null,
-                null, 1, List.of(), LearningSkill.READING));
+                1, List.of(), List.of(), LearningSkill.READING));
         when(content.getLesson(nextLesson)).thenReturn(new Lesson(nextLesson, readingNext, "R2", "Next", null,
-                null, 1, List.of(), LearningSkill.READING));
+                1, List.of(), List.of(), LearningSkill.READING));
         when(content.getLesson(writingFirst)).thenReturn(new Lesson(writingFirst, writing, "W1", "Writing one", null,
-                null, 1, List.of(), LearningSkill.WRITING));
+                1, List.of(), List.of(), LearningSkill.WRITING));
         when(content.getLesson(writingLast)).thenReturn(new Lesson(writingLast, writing, "W2", "Writing two", null,
-                null, 2, List.of(), LearningSkill.WRITING));
+                2, List.of(), List.of(), LearningSkill.WRITING));
 
         var initial = topics.execute(USER);
         assertEquals(TopicStatus.IN_PROGRESS, initial.stream().filter(t -> t.topicId().equals(readingFirst))
@@ -303,7 +363,8 @@ class ReviewAndTestAssignmentIntegrationTest {
     }
 
     private void completeLesson() {
-        completeLessonUseCase.execute(USER, LESSON);
+        submitLessonExerciseUseCase.execute(USER, LESSON, EXERCISE_BLOCK, new SubmitExerciseCommand(UUID.randomUUID(),
+                List.of(new SubmitExerciseCommand.Answer(QUESTION, "A"))));
     }
 
     private void consume(UUID assignmentId) {

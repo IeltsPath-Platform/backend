@@ -2,8 +2,7 @@ package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.result.LessonPracticeSetsResult;
-import com.ieltspath.learning.application.service.LessonAccess;
-import com.ieltspath.learning.domain.repository.LessonProgressRepository;
+import com.ieltspath.learning.application.service.PracticeAccess;
 import com.ieltspath.learning.application.service.PracticeProgress;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
@@ -19,19 +18,16 @@ import java.util.Optional;
 @Service
 public class GetLessonPracticeSetsUseCase {
     private final LearningContentClient content;
-    private final LessonAccess lessonAccess;
-    private final LessonProgressRepository lessons;
+    private final PracticeAccess access;
     private final PracticeProgress progress;
     private final PracticeAttemptRepository attempts;
     private final ReviewItemRepository reviews;
 
-    public GetLessonPracticeSetsUseCase(LearningContentClient content, LessonAccess lessonAccess,
-                                        LessonProgressRepository lessons,
+    public GetLessonPracticeSetsUseCase(LearningContentClient content, PracticeAccess access,
                                         PracticeProgress progress, PracticeAttemptRepository attempts,
                                         ReviewItemRepository reviews) {
         this.content = content;
-        this.lessonAccess = lessonAccess;
-        this.lessons = lessons;
+        this.access = access;
         this.progress = progress;
         this.attempts = attempts;
         this.reviews = reviews;
@@ -49,10 +45,9 @@ public class GetLessonPracticeSetsUseCase {
         var allSets = content.lessonPracticeSets(lessonId);
         var sets = skill.isEmpty() ? allSets : allSets.stream()
                 .filter(set -> set.skills().equals(Set.of(skill.get()))).toList();
-        boolean completed = lessons.find(userId, lessonId).map(LessonAccess::completed).orElse(false);
-        boolean open = lessonAccess.isOpen(userId, lesson.topicId(), lessonId);
+        boolean completed = access.completed(userId, lessonId);
         boolean blocked = !LessonAccessGate.blocking(reviews.findPending(userId), lesson.skills()).isEmpty();
-        var clearance = progress.forLesson(userId, lessonId, open, allSets);
+        var clearance = progress.forLesson(userId, lessonId, completed, allSets);
         var summaries = attempts.summarizeForLesson(userId, lessonId,
                 sets.stream().map(LearningContentClient.LessonPracticeSet::packageId).toList());
         Set<UUID> revealed = attempts.revealedPackageIds(userId,
@@ -62,7 +57,7 @@ public class GetLessonPracticeSetsUseCase {
         List<LessonPracticeSetsResult.Item> items = new ArrayList<>();
         for (var set : sets) {
             var summary = byPackage.get(set.packageId());
-            String status = !open || blocked ? "LOCKED"
+            String status = !completed || blocked ? "LOCKED"
                     : summary != null && summary.open() ? "IN_PROGRESS"
                     : summary != null && summary.passed() ? "PASSED"
                     : summary != null && summary.attempted() ? "ATTEMPTED" : "AVAILABLE";

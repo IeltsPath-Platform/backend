@@ -18,6 +18,31 @@ public class Post {
     private ContentStatus status;
     private Instant updatedAt;
     private Long version;
+    private java.util.List<String> imageUrls = java.util.List.of();
+    private String videoUrl;
+    private java.math.BigDecimal targetBand;
+    public java.util.List<String> getImageUrls() { return imageUrls; }
+    public String getVideoUrl() { return videoUrl; }
+    public java.math.BigDecimal getTargetBand() { return targetBand; }
+    public void setMedia(java.util.List<String> images, String video, java.math.BigDecimal band) {
+        if (images != null && images.size() > 4) throw new CommunityException("At most four images are allowed");
+        if (band != null && (band.signum() < 0 || band.compareTo(java.math.BigDecimal.valueOf(9)) > 0
+                || band.remainder(new java.math.BigDecimal("0.5")).signum() != 0)) {
+            throw new CommunityException("Target band must be between 0 and 9 in half-band steps");
+        }
+        imageUrls = images == null ? java.util.List.of() : java.util.List.copyOf(images);
+        imageUrls.forEach(Post::requireHttps);
+        if (video != null) requireHttps(video);
+        videoUrl = video; targetBand = band;
+    }
+    private static void requireHttps(String value) {
+        try {
+            var uri = java.net.URI.create(value);
+            if (value.length() > 500 || !"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null
+                    || uri.getUserInfo() != null || (uri.getPort() != -1 && uri.getPort() != 443)) throw new IllegalArgumentException();
+        } catch (RuntimeException e) { throw new CommunityException("Media must be a valid HTTPS URL"); }
+    }
+
 
     public Post(
             UUID id,
@@ -84,8 +109,9 @@ public class Post {
         this.updatedAt = Instant.now();
     }
 
-    public void delete(UUID actor) {
-        requireAuthor(actor);
+    public void delete(UUID actor) { delete(actor, false); }
+    public void delete(UUID actor, boolean administrator) {
+        if (!administrator) requireAuthor(actor);
         requireActive();
         status = ContentStatus.DELETED;
         updatedAt = Instant.now();

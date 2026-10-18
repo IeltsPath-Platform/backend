@@ -7,6 +7,7 @@ import com.ieltspath.content.domain.entity.QuestionVersion;
 import com.ieltspath.content.domain.repository.QuestionRepository;
 import com.ieltspath.content.domain.vo.QuestionType;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.domain.vo.QuestionDifficulty;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -58,7 +59,7 @@ class GetGameContentSnapshotUseCaseTest {
     private static Question publishedQuestion() {
         Question question = Question.create(QuestionType.FILL_IN_BLANK, Skill.WRITING, null);
         QuestionVersion version = QuestionVersion.create(question.getId(), 1, "She ___ to school.", null,
-                "{\"type\":\"FILL\",\"accepted\":[\"goes\"]}", null, null);
+                "{\"type\":\"FILL\",\"accepted\":[\"goes\"]}", null, QuestionDifficulty.MEDIUM);
         version.publish();
         question.addVersion(version);
         question.publishVersion(version.getId());

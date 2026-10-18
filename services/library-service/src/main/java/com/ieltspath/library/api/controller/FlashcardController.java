@@ -2,10 +2,12 @@ package com.ieltspath.library.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.library.api.dto.request.CreateFlashcardRequest;
+import com.ieltspath.library.api.dto.request.ReviewFlashcardRequest;
 import com.ieltspath.library.api.dto.request.UpdateFlashcardRequest;
 import com.ieltspath.library.api.dto.response.FlashcardResponse;
 import com.ieltspath.library.api.dto.response.PageResponse;
 import com.ieltspath.library.application.query.PageQuery;
+import com.ieltspath.library.application.query.DueFlashcardsQuery;
 import com.ieltspath.library.application.result.SavedFlashcard;
 import com.ieltspath.library.application.usecase.*;
 import com.ieltspath.library.domain.exception.InvalidDataException;
@@ -30,6 +32,8 @@ public class FlashcardController {
     private final ListFlashcardsUseCase listFlashcardsUseCase;
     private final DeleteFlashcardUseCase deleteFlashcardUseCase;
     private final SavePracticeQuestionFlashcardUseCase savePracticeQuestionFlashcardUseCase;
+    private final GetDueFlashcardsUseCase getDueFlashcardsUseCase;
+    private final ReviewFlashcardUseCase reviewFlashcardUseCase;
 
     @PostMapping
     public ResponseEntity<FlashcardResponse> create(@Valid @RequestBody CreateFlashcardRequest request) {
@@ -66,6 +70,23 @@ public class FlashcardController {
                 listFlashcardsUseCase.execute(currentUserProvider.requireUserId(), status, new PageQuery(page, size)),
                 FlashcardResponse::from
         );
+    }
+
+    @GetMapping("/due")
+    public PageResponse<FlashcardResponse> due(
+            @RequestParam(name = "deckId", required = false) UUID deckId,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "limit", defaultValue = "20") int limit
+    ) {
+        return PageResponse.from(getDueFlashcardsUseCase.execute(currentUserProvider.requireUserId(),
+                new DueFlashcardsQuery(deckId, page, limit)), FlashcardResponse::from);
+    }
+
+    @PostMapping("/{id}/reviews")
+    public FlashcardResponse review(@PathVariable("id") UUID id,
+                                    @Valid @RequestBody ReviewFlashcardRequest request) {
+        return FlashcardResponse.from(reviewFlashcardUseCase.execute(currentUserProvider.requireUserId(), id,
+                request.correct(), request.requestId()));
     }
 
     @GetMapping("/{id}")

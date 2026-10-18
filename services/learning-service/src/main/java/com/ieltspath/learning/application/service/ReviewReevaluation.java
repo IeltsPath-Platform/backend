@@ -9,7 +9,6 @@ import com.ieltspath.learning.domain.service.MasteryCalculator;
 import com.ieltspath.learning.domain.service.ReviewRule;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.PendingReview;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -22,20 +21,33 @@ public class ReviewReevaluation {
     private final LearnerCurriculumRepository curricula;
     private final LessonProgressRepository lessons;
     private final ReviewItemRepository reviews;
-    private final ReviewRule rule;
+    private final MasteryRulesProvider rules;
     private final MasteryCalculator masteryCalculator = new MasteryCalculator();
 
     public ReviewReevaluation(KnowledgeEvidenceRepository evidence, LearnerCurriculumRepository curricula,
                               LessonProgressRepository lessons, ReviewItemRepository reviews,
-                              @Value("${learning.review-mastery-threshold:0.6}") double threshold) {
+                              MasteryRulesProvider rules) {
         this.evidence = evidence;
         this.curricula = curricula;
         this.lessons = lessons;
         this.reviews = reviews;
-        this.rule = new ReviewRule(threshold);
+        this.rules = rules;
     }
 
+    /** Reviews from a graded test or Practice: blocking, and an optional review of the same point is upgraded. */
     public void execute(UUID userId, Set<UUID> consideredKps, Set<UUID> wrongKps) {
+        run(userId, consideredKps, wrongKps, true, "ASSESSMENT");
+    }
+
+    /** Reviews raised by a test that does not count (a free practice test): optional, they never block. */
+    public void executeOptional(UUID userId, Set<UUID> consideredKps, Set<UUID> wrongKps, String triggerKind) {
+        run(userId, consideredKps, wrongKps, false, triggerKind);
+    }
+
+    private void run(UUID userId, Set<UUID> consideredKps, Set<UUID> wrongKps, boolean blocking,
+                     String triggerKind) {
+        // A review is created below the priority threshold, which Admin can change.
+        ReviewRule rule = new ReviewRule(rules.current().priorityBelow());
         Map<UUID, Double> mastery = new HashMap<>();
         Set<UUID> practiceKps = new HashSet<>();
         Map<UUID, LearningSkill> kpSkills = new HashMap<>();
@@ -58,9 +70,15 @@ public class ReviewReevaluation {
                 lessonsByKp.computeIfAbsent(kpId, ignored -> new ArrayList<>()).add(completed);
             }
         }
-        Set<UUID> pending = reviews.findPending(userId).stream().map(PendingReview::knowledgePointId)
-                .collect(Collectors.toSet());
-        reviews.insertPending(userId, rule.reevaluate(consideredKps, wrongKps, mastery, lessonsByKp, practiceKps,
-                pending, kpSkills));
+        // A blocking review only waits for other blocking ones: an optional review of the same point is upgraded.
+        Set<UUID> pending = reviews.findPending(userId).stream().filter(review -> !blocking || review.blocking())
+                .map(PendingReview::knowledgePointId).collect(Collectors.toSet());
+        var candidates = rule.reevaluate(consideredKps, wrongKps, mastery, lessonsByKp, practiceKps, pending,
+                kpSkills);
+        reviews.insertPending(userId, candidates, blocking, triggerKind);
+        if (blocking) {
+            reviews.promoteToBlocking(userId, candidates.stream().map(ReviewRule.ReviewCandidate::knowledgePointId)
+                    .collect(Collectors.toSet()), triggerKind);
+        }
     }
 }

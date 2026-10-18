@@ -1,6 +1,7 @@
 package com.ieltspath.content.application.result;
 
 import com.ieltspath.content.domain.vo.LearningType;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.Skill;
 
 import java.util.List;
@@ -24,6 +25,7 @@ public record TopicSequenceResult(
         boolean hasTopicTest,
         CourseEntry course,
         List<Skill> skills,
+        boolean active,
         int lessonCount
 ) {
     public TopicSequenceResult {
@@ -33,16 +35,16 @@ public record TopicSequenceResult(
 
     public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                                List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest,
-                               CourseEntry course, List<Skill> skills) {
-        this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, skills,
-                0);
+                               CourseEntry course) {
+        this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
+                skill == null ? List.of() : List.of(skill), true, 0);
     }
 
     public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                                List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest,
-                               CourseEntry course) {
-        this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
-                skill == null ? List.of() : List.of(skill));
+                               CourseEntry course, List<Skill> skills) {
+        this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, skills,
+                true, 0);
     }
 
     public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
@@ -50,7 +52,12 @@ public record TopicSequenceResult(
         this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, null);
     }
 
-    public record CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {}
+    public record CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
+                              boolean active) {
+        public CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {
+            this(courseId, code, name, bandLevel, hasCourseTest, true);
+        }
+    }
 
     /** {@code hasPracticeSet}: at least one practice set is eligible for review of this knowledge point. */
     public record KnowledgePointEntry(
@@ -61,6 +68,16 @@ public record TopicSequenceResult(
             LearningType learningType,
             Skill skill,
             String description,
-            boolean hasPracticeSet
-    ) {}
+            boolean hasPracticeSet,
+            CefrLevel cefrLevel,
+            String canDo,
+            String scopeIn,
+            String scopeOut
+    ) {
+        public KnowledgePointEntry(UUID id, UUID topicId, String code, String name, LearningType learningType,
+                                   Skill skill, String description, boolean hasPracticeSet) {
+            this(id, topicId, code, name, learningType, skill, description, hasPracticeSet,
+                    null, null, null, null);
+        }
+    }
 }

@@ -35,7 +35,7 @@ class CreateAssessmentResultUseCaseTest {
                 new AssessmentResult(UUID.randomUUID(), attemptId, 1, AssessmentResult.COMPLETED, 6.0, Instant.now())));
         when(results.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var result = new CreateAssessmentResultUseCase(attempts, results).executeForGrader(attemptId, 7.0);
+        var result = new CreateAssessmentResultUseCase(attempts, results, org.mockito.Mockito.mock(ExaminerGradingPolicy.class)).executeForGrader(attemptId, 7.0);
 
         assertEquals(2, result.resultVersion());
         assertEquals(AssessmentResult.DRAFT, result.status());
@@ -50,7 +50,7 @@ class CreateAssessmentResultUseCaseTest {
                 new AssessmentResult(UUID.randomUUID(), attemptId, 1, AssessmentResult.DRAFT, 9.0, null)));
 
         assertThrows(InvalidAssessmentStateException.class,
-                () -> new CreateAssessmentResultUseCase(attempts, results).executeForGrader(attemptId, null));
+                () -> new CreateAssessmentResultUseCase(attempts, results, org.mockito.Mockito.mock(ExaminerGradingPolicy.class)).executeForGrader(attemptId, null));
         verify(results, never()).save(any());
     }
 
@@ -59,7 +59,7 @@ class CreateAssessmentResultUseCaseTest {
         stubAttemptById(AttemptStatus.IN_PROGRESS);
 
         assertThrows(InvalidAssessmentStateException.class,
-                () -> new CreateAssessmentResultUseCase(attempts, results).executeForGrader(attemptId, null));
+                () -> new CreateAssessmentResultUseCase(attempts, results, org.mockito.Mockito.mock(ExaminerGradingPolicy.class)).executeForGrader(attemptId, null));
         verify(results, never()).save(any());
     }
 
@@ -68,7 +68,7 @@ class CreateAssessmentResultUseCaseTest {
         when(attempts.findById(attemptId)).thenReturn(Optional.empty());
 
         assertThrows(AssessmentNotFoundException.class,
-                () -> new CreateAssessmentResultUseCase(attempts, results).executeForGrader(attemptId, null));
+                () -> new CreateAssessmentResultUseCase(attempts, results, org.mockito.Mockito.mock(ExaminerGradingPolicy.class)).executeForGrader(attemptId, null));
     }
 
     private void stubAttemptById(AttemptStatus status) {

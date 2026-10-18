@@ -14,7 +14,7 @@ import com.ieltspath.learning.domain.repository.ReviewItemRepository;
 import com.ieltspath.learning.domain.service.LessonAccessGate;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.MasteryHistory;
-import com.ieltspath.learning.domain.vo.PendingReview;
+import com.ieltspath.learning.domain.vo.PracticeStatus;
 import com.ieltspath.learning.domain.vo.TopicStatus;
 import org.springframework.stereotype.Component;
 
@@ -23,8 +23,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * The one lesson gate shared by reading a lesson, its Practice, and completion: pending review,
- * then topic, then earlier lessons. Callers hold the learner's lock.
+ * The one lesson gate shared by reading a lesson, exercise and essay submissions, and completion: pending review,
+ * then topic, then earlier lessons, then the Practice of those lessons. Callers hold the learner's lock.
  */
 @Component
 public class LessonAccess {
@@ -34,76 +34,70 @@ public class LessonAccess {
     private final ReviewItemRepository reviews;
     private final KnowledgeEvidenceRepository evidence;
     private final RefreshLearningTopicsUseCase refreshTopics;
+    private final PracticeProgress practice;
+    private final RecordCourseStudyActivity courseActivity;
     private final LessonAccessGate gate = new LessonAccessGate();
 
     public LessonAccess(LearningContentClient content, LessonProgressRepository lessons,
                         LearnerCurriculumRepository curricula, ReviewItemRepository reviews,
-                        KnowledgeEvidenceRepository evidence, RefreshLearningTopicsUseCase refreshTopics) {
+                        KnowledgeEvidenceRepository evidence, RefreshLearningTopicsUseCase refreshTopics,
+                        PracticeProgress practice, RecordCourseStudyActivity courseActivity) {
         this.content = content;
         this.lessons = lessons;
         this.curricula = curricula;
         this.reviews = reviews;
         this.evidence = evidence;
         this.refreshTopics = refreshTopics;
+        this.practice = practice;
+        this.courseActivity = courseActivity;
     }
 
-    /** Reading or completing a lesson: a review the lesson itself created does not hold the lesson back. */
     public Context authorize(UUID userId, UUID lessonId) {
         return authorize(userId, content.getLesson(lessonId));
     }
 
     public Context authorize(UUID userId, Lesson lesson) {
-        return authorize(userId, lesson, true);
-    }
-
-    /** Starting or answering the lesson's Practice: every pending review of the lesson's skills comes first. */
-    public Context authorizePractice(UUID userId, UUID lessonId) {
-        return authorize(userId, content.getLesson(lessonId), false);
-    }
-
-    private Context authorize(UUID userId, Lesson lesson, boolean ownReviewsAllowed) {
         var summaries = orderedLessons(content.getTopicLessons(lesson.topicId()));
         var progress = lessons.findByTopic(userId, lesson.topicId());
         boolean previousComplete = true;
         boolean found = false;
+        List<UUID> previousIds = new ArrayList<>();
         for (var summary : summaries) {
             if (summary.lessonId().equals(lesson.lessonId())) { found = true; break; }
             previousComplete &= completed(progress.get(summary.lessonId()));
+            previousIds.add(summary.lessonId());
         }
         var topic = topic(userId, lesson.topicId());
-        gate.authorize(pendingReviews(userId, lesson.lessonId(), ownReviewsAllowed), null, skillsOf(lesson, topic),
-                status(userId, lesson.topicId()), previousComplete);
+        List<UUID> needPractice = found && previousComplete
+                ? lessonsNeedingPractice(userId, lesson.topicId(), previousIds, progress) : List.of();
+        Set<UUID> previous = Set.copyOf(previousIds);
+        gate.authorize(reviews.findPending(userId), null, skillsOf(lesson, topic), previous,
+                status(userId, lesson.topicId()), previousComplete, needPractice);
         if (!found) throw new LearningRequestException(404, "NOT_FOUND", "Lesson was not found");
-        return new Context(lesson, progress.get(lesson.lessonId()), previousComplete);
+        return new Context(lesson, progress.get(lesson.lessonId()), previousComplete, previous, needPractice);
+    }
+
+    /**
+     * The earlier lessons whose Practice is not passed, in lesson order. A lesson with no Practice counts as passed. A
+     * pass found here is stored, so a lesson that opened is not locked again when Content later publishes more sets.
+     * The first lesson of a topic has no earlier lesson, so Content is not asked for Practice at all.
+     */
+    private List<UUID> lessonsNeedingPractice(UUID userId, UUID topicId, List<UUID> previousIds,
+                                              Map<UUID, LessonProgress> progress) {
+        if (previousIds.isEmpty()) return List.of();
+        Map<UUID, Boolean> completedByLesson = new LinkedHashMap<>();
+        for (UUID id : previousIds) completedByLesson.put(id, completed(progress.get(id)));
+        var states = practice.forTopic(userId, topicId, completedByLesson).clearances();
+        practice.persistPassed(userId, states);
+        return previousIds.stream().filter(id -> states.get(id).status() != PracticeStatus.PASSED).toList();
     }
 
     /** Checks the gate again after a curriculum refresh may have changed the learner's current topic. */
     public void reauthorize(UUID userId, Context context) {
         var topic = topic(userId, context.lesson().topicId());
-        gate.authorize(pendingReviews(userId, context.lesson().lessonId(), true), null,
-                skillsOf(context.lesson(), topic), status(userId, context.lesson().topicId()),
-                context.previousLessonsComplete());
-    }
-
-    private List<PendingReview> pendingReviews(UUID userId, UUID lessonId, boolean ownReviewsAllowed) {
-        var pending = reviews.findPending(userId);
-        return ownReviewsAllowed ? pending.stream().filter(review -> !review.lessonId().equals(lessonId)).toList()
-                : pending;
-    }
-
-    /**
-     * Whether the lesson is open: its topic is open and every earlier lesson is completed. Reads only and never
-     * refreshes the curriculum, so read-only paths can call it without the learner's lock.
-     */
-    public boolean isOpen(UUID userId, UUID topicId, UUID lessonId) {
-        TopicStatus topicStatus = status(userId, topicId);
-        if (topicStatus != TopicStatus.IN_PROGRESS && topicStatus != TopicStatus.PASSED) return false;
-        var progress = lessons.findByTopic(userId, topicId);
-        for (var summary : orderedLessons(content.getTopicLessons(topicId))) {
-            if (summary.lessonId().equals(lessonId)) return true;
-            if (!completed(progress.get(summary.lessonId()))) return false;
-        }
-        return false;
+        gate.authorize(reviews.findPending(userId), null, skillsOf(context.lesson(), topic),
+                context.previousLessonIds(), status(userId, context.lesson().topicId()),
+                context.previousLessonsComplete(), context.lessonsNeedingPractice());
     }
 
     public TopicProgress topic(UUID userId, UUID topicId) {
@@ -128,6 +122,7 @@ public class LessonAccess {
      * The learner's progress in the lesson, placed where Content currently has it and saved; created on first use.
      */
     public LessonProgress refresh(UUID userId, Lesson lesson, LessonProgress current) {
+        courseActivity.record(userId, lesson.topicId());
         LessonProgress progress = current != null ? current
                 : lessons.find(userId, lesson.lessonId()).orElseGet(() -> LessonProgress.start(userId,
                 lesson.lessonId(), lesson.topicId(), lesson.sortOrder(), lesson.knowledgePointIds()));
@@ -160,5 +155,10 @@ public class LessonAccess {
                 .thenComparing(lesson -> lesson.lessonId().toString())).toList();
     }
 
-    public record Context(Lesson lesson, LessonProgress progress, boolean previousLessonsComplete) {}
+    /**
+     * {@code previousLessonIds} are the lessons before this one in the topic; {@code lessonsNeedingPractice} are the
+     * ones among them whose Practice was not passed when the lesson was opened.
+     */
+    public record Context(Lesson lesson, LessonProgress progress, boolean previousLessonsComplete,
+                          Set<UUID> previousLessonIds, List<UUID> lessonsNeedingPractice) {}
 }

@@ -22,6 +22,18 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class GradeGateEssayJobUseCaseTest {
+    @Test
+    @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+    void providerFailureDoesNotLogEssayOrPrompt(org.springframework.boot.test.system.CapturedOutput output) {
+        stubClaim();
+        when(grader.available()).thenReturn(true);
+        when(quota.tryConsume(eq(userId),any(LocalDate.class),eq(4))).thenReturn(true);
+        when(grader.grade(any(),anyString())).thenThrow(new IllegalStateException("submitted essay SECRET_PROVIDER_PAYLOAD"));
+        useCase().gradeBatch();
+        assertFalse(output.getAll().contains("submitted essay"));
+        assertFalse(output.getAll().contains("SECRET_PROVIDER_PAYLOAD"));
+        assertTrue(output.getAll().contains("IllegalStateException"));
+    }
     private final GateEssayJobStore jobs = mock(GateEssayJobStore.class);
     private final EssayGradingPort grader = mock(EssayGradingPort.class);
     private final AssessmentLlmQuota quota = mock(AssessmentLlmQuota.class);
@@ -62,10 +74,28 @@ class GradeGateEssayJobUseCaseTest {
 
         assertEquals(1, useCase().gradeBatch());
 
-        verify(jobs).complete(jobId, new BigDecimal("6.0"), "{\"summary\":\"ok\"}", now);
+        verify(jobs).complete(jobId, new BigDecimal("6.0"), "{\"summary\":\"ok\"}",
+                EssayGradingPort.PROMPT_VERSION, now);
         verify(assembler).completeIfGraded(attemptId);
         verify(jobs).claim(5, now);
         verify(jobs).requeueStuck(now.minus(Duration.ofMinutes(10)));
+    }
+
+    @Test
+    void graderUsesTheExactPreviouslyActivatedPromptVersion() {
+        stubClaim();
+        when(grader.available()).thenReturn(true);
+        when(quota.tryConsume(eq(userId), any(LocalDate.class), eq(4))).thenReturn(true);
+        when(grader.grade(any(), eq("submitted essay"))).thenReturn(
+                new EssayGradingPort.EssayGrade(new BigDecimal("6.0"), null, "task2-rubric@3+tplv1"));
+        var useCase = useCase(task -> "task2-rubric@3+tplv1");
+
+        useCase.gradeBatch();
+
+        var prompt = org.mockito.ArgumentCaptor.forClass(EssayGradingPort.Prompt.class);
+        verify(grader).grade(prompt.capture(), eq("submitted essay"));
+        assertEquals("task2-rubric@3+tplv1", prompt.getValue().expectedPromptVersion());
+        verify(jobs).complete(jobId, new BigDecimal("6.0"), null, "task2-rubric@3+tplv1", now);
     }
 
     @Test
@@ -76,7 +106,7 @@ class GradeGateEssayJobUseCaseTest {
         assertEquals(1, useCase().gradeBatch());
 
         verify(jobs).fail(jobId, now);
-        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human");
+        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human", "LLM_NOT_CONFIGURED");
         verify(grader, never()).grade(any(), any());
         verifyNoInteractions(assembler);
     }
@@ -91,7 +121,7 @@ class GradeGateEssayJobUseCaseTest {
         useCase().gradeBatch();
 
         verify(jobs).fail(jobId, now);
-        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human");
+        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human", "LLM_FAILED");
         verify(assembler, never()).completeIfGraded(any());
     }
 
@@ -104,7 +134,7 @@ class GradeGateEssayJobUseCaseTest {
         useCase().gradeBatch();
 
         verify(jobs).fail(jobId, now);
-        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human");
+        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human", "LLM_QUOTA");
         verify(grader, never()).grade(any(), any());
     }
 
@@ -118,7 +148,7 @@ class GradeGateEssayJobUseCaseTest {
 
         useCase().gradeBatch();
 
-        verify(jobs).complete(jobId, new BigDecimal("6.5"), null, now);
+        verify(jobs).complete(jobId, new BigDecimal("6.5"), null, EssayGradingPort.PROMPT_VERSION, now);
         verify(placement).completeIfGraded(attemptId);
         verifyNoInteractions(assembler);
     }
@@ -139,6 +169,68 @@ class GradeGateEssayJobUseCaseTest {
     }
 
     @Test
+    void placementRubricActivationFailureHandsOffToExaminerInsteadOfDefaultBand() {
+        stubClaim();
+        when(placement.handles(attemptId)).thenReturn(true);
+        when(grader.available()).thenReturn(true);
+        when(quota.tryConsume(eq(userId), any(LocalDate.class), eq(4))).thenReturn(true);
+        when(grader.grade(any(), anyString())).thenThrow(new EssayGradingException("RUBRIC_UNAVAILABLE"));
+
+        useCase().gradeBatch();
+
+        verify(jobs).fail(jobId, now);
+        verify(jobs).enqueueHuman(submissionId, userId, "gate-essay:" + itemId + ":human", "LLM_FAILED");
+        verify(jobs, never()).complete(eq(jobId), any(), any(), any(Instant.class));
+    }
+
+    @Test
+    void taskWithoutActivationGradesWithTheActiveRubric() {
+        stubClaim();
+        when(grader.available()).thenReturn(true);
+        when(quota.tryConsume(eq(userId), any(LocalDate.class), eq(4))).thenReturn(true);
+        when(grader.grade(any(), anyString())).thenAnswer(invocation -> {
+            EssayGradingPort.Prompt prompt = invocation.getArgument(0);
+            assertNull(prompt.expectedPromptVersion());
+            return new EssayGradingPort.EssayGrade(new BigDecimal("6.0"), null,
+                    "IELTS_WRITING_TASK_2@1+tplv1", List.of());
+        });
+
+        useCase(task -> null).gradeBatch();
+
+        verify(jobs).complete(jobId, new BigDecimal("6.0"), null, "IELTS_WRITING_TASK_2@1+tplv1", now);
+        verify(jobs, never()).fail(any(), any());
+    }
+
+    @Test
+    void activatedTaskPassesOnlyThePinnedPromptVersionToTheGrader() {
+        stubClaim();
+        when(grader.available()).thenReturn(true);
+        when(quota.tryConsume(eq(userId), any(LocalDate.class), eq(4))).thenReturn(true);
+        String activated = "IELTS_WRITING_TASK_2@1+tplv1";
+        when(grader.grade(any(), anyString())).thenAnswer(invocation -> {
+            EssayGradingPort.Prompt prompt = invocation.getArgument(0);
+            assertEquals(activated, prompt.expectedPromptVersion());
+            return new EssayGradingPort.EssayGrade(new BigDecimal("6.0"), null, activated, List.of());
+        });
+
+        useCase(task -> activated).gradeBatch();
+
+        verify(jobs).complete(jobId, new BigDecimal("6.0"), null, activated, now);
+    }
+
+    @Test
+    void activationLookupFailureDoesNotFallBackToBootstrap() {
+        stubClaim();
+        when(placement.handles(attemptId)).thenReturn(true);
+
+        useCase(task -> { throw new IllegalStateException("unavailable"); }).gradeBatch();
+
+        verify(jobs).fail(jobId, now);
+        verify(grader, never()).grade(any(), any());
+        verify(quota, never()).tryConsume(any(), any(), anyInt());
+    }
+
+    @Test
     void processingJobsOlderThanTheRecoveryWindowAreRequeued() {
         when(jobs.claim(5, now)).thenReturn(List.of());
 
@@ -155,7 +247,11 @@ class GradeGateEssayJobUseCaseTest {
     }
 
     private GradeGateEssayJobUseCase useCase() {
-        return new GradeGateEssayJobUseCase(jobs, grader, quota, assembler, placement, tx, new ObjectMapper(),
+        return useCase(task -> EssayGradingPort.PROMPT_VERSION);
+    }
+
+    private GradeGateEssayJobUseCase useCase(PromptActivationProvider activations) {
+        return new GradeGateEssayJobUseCase(jobs, grader, quota, assembler, placement, activations, tx, new ObjectMapper(),
                 5, 4, Duration.ofMinutes(10), ZoneId.of("UTC"), java.time.Clock.fixed(now, ZoneId.of("UTC")));
     }
 

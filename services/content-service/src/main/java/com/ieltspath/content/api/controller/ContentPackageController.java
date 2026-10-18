@@ -68,7 +68,8 @@ public class ContentPackageController {
                 request.title(),
                 request.packageType(),
                 AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT"),
-                request.lessonId()
+                request.lessonId(),
+                request.sourceCode()
         ));
         return ContentPackageResponse.from(result);
     }
@@ -101,7 +102,9 @@ public class ContentPackageController {
                 request.skill(),
                 request.sortOrder(),
                 request.timeLimitSeconds(),
-                request.instructions()
+                request.instructions(),
+                request.partNo(),
+                request.coverAssetId()
         ));
         return ContentSectionResponse.from(result);
     }

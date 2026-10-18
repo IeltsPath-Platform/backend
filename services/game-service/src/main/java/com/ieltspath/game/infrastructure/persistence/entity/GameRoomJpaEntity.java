@@ -6,6 +6,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.hibernate.annotations.SQLRestriction;
+import com.ieltspath.game.domain.vo.WordlyRoomSettings;
 
 import java.time.Instant;
 import java.util.Map;
@@ -13,6 +15,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "game_rooms")
+@SQLRestriction("is_delete = false")
 public class GameRoomJpaEntity {
     @Id
     private UUID id;
@@ -39,6 +42,35 @@ public class GameRoomJpaEntity {
     private Instant updatedAt;
     @Column(name = "expires_at")
     private Instant expiresAt;
+    @Column(name = "player_mode", nullable = false)
+    private String playerMode = "MULTIPLAYER";
+    @Column(name = "initial_lives", nullable = false)
+    private short initialLives = 4;
+    @Column(name = "word_time_limit_seconds")
+    private Short wordTimeLimitSeconds = 180;
+    @Column(name = "play_mode", nullable = false)
+    private String playMode = "FINITE";
+    @Column(name = "word_limit")
+    private Integer wordLimit = 10;
+    @Column(name = "is_delete", nullable = false)
+    private boolean isDelete;
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    public WordlyRoomSettings wordlySettings() {
+        return "WORDLY".equals(gameType) ? new WordlyRoomSettings(
+                WordlyRoomSettings.PlayerMode.valueOf(playerMode), initialLives,
+                WordlyRoomSettings.PlayMode.valueOf(playMode), wordLimit, wordTimeLimitSeconds != null) : null;
+    }
+
+    public void setWordlySettings(WordlyRoomSettings settings) {
+        if (settings == null) return;
+        playerMode = settings.playerMode().name();
+        initialLives = (short) settings.initialLives();
+        wordTimeLimitSeconds = settings.timeEnabled() ? (short) 180 : null;
+        playMode = settings.playMode().name();
+        wordLimit = settings.wordLimit();
+    }
 
     protected GameRoomJpaEntity() {
     }
@@ -110,5 +142,6 @@ public class GameRoomJpaEntity {
     public void setStatus(String status, Instant updatedAt) {
         this.status = status;
         this.updatedAt = updatedAt;
+        if ("CLOSED".equals(status)) { this.isDelete = true; this.deletedAt = updatedAt; }
     }
 }

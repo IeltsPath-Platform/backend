@@ -7,6 +7,7 @@ import com.ieltspath.learning.application.port.AccessClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -44,10 +45,19 @@ public class RestAccessClient implements AccessClient {
     }
 
     @Override
-    public UUID debit(UUID userId, int amount, UUID referenceId, String idempotencyKey, String description) {
+    public boolean premium() {
+        // Access answers 200 while a subscription is active and 204 when there is none; other statuses are failures.
+        ResponseEntity<Void> response = call(() -> restClient.get().uri("/api/access/me/subscription")
+                .headers(this::forwardRequestHeaders).retrieve().toBodilessEntity());
+        return response.getStatusCode().value() == 200;
+    }
+
+    @Override
+    public UUID debit(UUID userId, int amount, String referenceType, UUID referenceId, String idempotencyKey,
+                      String description) {
         Ledger ledger = call(() -> restClient.post().uri("/internal/access/points/debit")
                 .headers(this::forwardRequestHeaders)
-                .body(new Debit(userId, amount, REFERENCE_TYPE, referenceId, idempotencyKey, description))
+                .body(new Debit(userId, amount, referenceType, referenceId, idempotencyKey, description))
                 .retrieve().body(Ledger.class));
         if (ledger.id() == null) throw new AccessUnavailableException(null);
         return ledger.id();

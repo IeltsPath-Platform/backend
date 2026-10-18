@@ -1,5 +1,6 @@
 package com.ieltspath.learning.api.dto.response;
 
+import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.PracticeSubmission;
 
@@ -9,7 +10,7 @@ import java.util.UUID;
 public record PracticeSubmissionResponse(UUID attemptId, int correct, int total, double percent, boolean passed,
                                          boolean countedAsEvidence, List<SubmissionResponse.SolvedAnswer> results,
                                          String transcript, List<ReviewCreated> reviewsCreated,
-                                         List<SkillScore> skillScores) {
+                                         List<SkillScore> skillScores, GamificationSummary gamification) {
     public record ReviewCreated(UUID reviewId, UUID knowledgePointId, String stage) {}
     public record SkillScore(LearningSkill skill, int correct, int total, double percent, boolean passed) {}
 
@@ -21,6 +22,6 @@ public record PracticeSubmissionResponse(UUID attemptId, int correct, int total,
                 result.reviewsCreated().stream().map(review -> new ReviewCreated(review.reviewId(),
                         review.knowledgePointId(), review.stage())).toList(),
                 result.skillScores().stream().map(score -> new SkillScore(score.skill(), score.correct(),
-                        score.total(), score.percent(), score.passed())).toList());
+                        score.total(), score.percent(), score.passed())).toList(), result.gamification());
     }
 }

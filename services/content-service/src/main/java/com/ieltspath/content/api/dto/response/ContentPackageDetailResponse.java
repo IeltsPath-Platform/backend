@@ -24,7 +24,8 @@ public record ContentPackageDetailResponse(
         UUID publishedBy,
         Instant createdAt,
         Instant updatedAt,
-        List<ContentSectionResponse> sections
+        List<ContentSectionResponse> sections,
+        String sourceCode
 ) {
     public static ContentPackageDetailResponse from(ContentPackageDetailResult result) {
         List<ContentSectionResponse> sectionResponses = result.sections() != null
@@ -44,7 +45,8 @@ public record ContentPackageDetailResponse(
                 result.publishedBy(),
                 result.createdAt(),
                 result.updatedAt(),
-                sectionResponses
+                sectionResponses,
+                result.sourceCode()
         );
     }
 }

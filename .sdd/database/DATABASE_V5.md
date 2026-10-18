@@ -45,26 +45,28 @@ database; không có FK xuyên database. Bảng nào chưa có migration đượ
 | Canonical IELTS curriculum, bài học và câu hỏi | Chỉ `content_db` sở hữu; catalog từ vựng/video thuộc `library_db` |
 | Formal assessment | Chỉ `assessment_db` sở hữu |
 
-## 1.1 Kiểm kê bảng theo migration (2026-10-03)
+## 1.1 Kiểm kê bảng theo migration (2026-10-17)
+
+Đếm theo các migration hiện có trong repo; Content đã trừ năm bảng từ vựng/video bị V7 xóa. Số lượng gồm cả `outbox_events`.
 
 | Database | Service | Số bảng | Ghi chú |
 | :--- | :--- | ---: | :--- |
 | `user_db` | `user-service` | 10 | V1–V5 |
-| `access_db` | `access-service` | 9 | gồm `outbox_events` |
-| `content_db` | `content-service` | 18 | V1–V18, gồm `outbox_events` |
+| `access_db` | `access-service` | 10 | V1–V3, gồm `outbox_events` |
+| `content_db` | `content-service` | 27 | V1–V39, trừ năm bảng cũ V7 xóa; gồm `outbox_events` |
 | `library_db` | `library-service` | 11 | V1–V2 |
-| `assessment_db` | `assessment-service` | 16 | V1–V4, gồm `outbox_events` |
-| `learning_db` | `learning-service` | 14 | V1–V5 |
+| `assessment_db` | `assessment-service` | 25 | V1–V12, gồm `outbox_events` |
+| `learning_db` | `learning-service` | 45 | V1–V30 (V21–V30 thêm 15 bảng: XP, tim, streak, thưởng điểm, bản chụp, league, nhiệm vụ, huy hiệu; §7.22–§7.28) |
 | `game_db` | `game-service` | 12 | V1, gồm `outbox_events`, quiz/leaderboard (chưa có API) |
 | `community_db` | `community-service` | 4 | V1, gồm `outbox_events` |
 | `notification_db` | `notification-service` | 0 | Chưa triển khai; §10 là thiết kế |
-| **Tổng** | | **94** | 89 bảng nghiệp vụ + 5 `outbox_events` |
+| **Tổng** | | **144** | 139 bảng nghiệp vụ + 5 `outbox_events` (chưa tính migration mới của các service khác sau 2026-10-17) |
 
 ## 1.3 Source of truth sau V5
 
 ```text
 content_db
-= canonical IELTS topics / KPs / question bank / bài học
+= canonical IELTS courses / topics / KPs / question bank / bài học / error taxonomy / rubrics
 
 library_db
 = vocabulary_items / vocabulary_senses / learning_videos / video_segments /
@@ -73,7 +75,10 @@ library_db
   video_learning_progress / saved_video_segments (library V2)
 
 assessment_db
-= formal attempts / results / item results / formal error analysis
+= formal attempts / results / item results / formal error analysis / examiner queues / AI evaluation / human reviews
+
+access_db
+= subscriptions and entitlements / point wallet and ledger / human grading credit consumption
 
 learning_db
 = topic/lesson progress, exercise submissions, reviews, test assignments
@@ -424,6 +429,19 @@ Thuộc tính chính:
 | `description?` | text | — | Mô tả bổ sung nếu cần. |
 | `created_at` | timestamptz | — | Thời điểm phát sinh. |
 
+## 3.9 `human_grading_credit_consumptions` (Access V3)
+
+Ghi nhận một lần tiêu thụ credit chấm người thật và lần hoàn credit bù nếu khởi tạo job Assessment thất bại. `submission_id` là khóa idempotency xuyên service; Access không đặt FK sang database Assessment.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `submission_id` | uuid | PK; logical reference → `Assessment.human_review_submissions` | Bài gửi chấm tương ứng; lặp consume/refund không tạo thêm bản ghi. |
+| `user_id` | uuid | Logical ref ↗ `Identity.users` | Learner sở hữu lượt chấm. |
+| `subscription_id` | uuid | FK → `subscriptions` ON DELETE RESTRICT | Gói Premium đã dùng credit. |
+| `remaining_credits` | integer | CHECK `>= 0` | Số lượt còn lại sau khi consume. |
+| `consumed_at` | timestamptz | DEFAULT CURRENT_TIMESTAMP | Thời điểm trừ credit. |
+| `refunded_at?` | timestamptz | NULL cho tới khi refund | Thời điểm hoàn credit bù. |
+
 ### Luồng activation chính
 
 ```text
@@ -473,6 +491,7 @@ Thuộc tính chính:
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
 | `band_min?` | numeric(2,1) | CHECK 0.0–9.0, bội số 0.5, `≤ band_max` | Band IELTS thấp nhất mà topic hướng tới. NULL = không giới hạn dưới. |
 | `band_max?` | numeric(2,1) | CHECK 0.0–9.0, bội số 0.5 | Band IELTS cao nhất mà topic hướng tới. NULL = không giới hạn trên. |
+| `course_id?` | uuid | FK → `courses`; INDEX | Content V19. Course chứa topic; NULL được giữ cho topic legacy chưa được gán. |
 | `required_feature_key?` | varchar(100) | Logical ref ↗ `Access.plan_features.feature_key` | V5.1. Topic trả phí; `NULL` = miễn phí. Seed V14 gắn `PREMIUM_CONTENT` cho hai topic premium; Learning chưa kiểm gói. |
 | `skill?` | varchar(20) | CHECK `LISTENING`/`READING`/`WRITING`/`SPEAKING`; INDEX (`skill`, `sort_order`) | Content V15. Skill duy nhất mà các bài của topic dạy; bài thừa hưởng skill này. Không nhận `ALL`. Topic `ACTIVE` có bài `PUBLISHED` phải có skill; đổi skill khi đã có bài `PUBLISHED` → `409 TOPIC_SKILL_LOCKED`. |
 | `created_at` | — | — | Thời điểm tạo bản ghi. |
@@ -511,6 +530,30 @@ Các category nghiệp vụ như Grammar/Vocabulary/Strategy chỉ là metadata 
 
 Listening seed dùng `learning_type = PROCEDURE`, `kind = STRATEGY` cho `LS_NUM`, `LS_SPELL`, `LS_PARA`, `LS_TRAP`.
 `MasteryCalculator` chỉ nhận các kết quả đúng/sai.
+
+### Content course catalog: `courses` (V19)
+
+Course gom các topic theo band mục tiêu và là owner của course test, milestone Practice. Đây là catalog curriculum của Content, không phải tiến độ học viên.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh course. |
+| `code` | varchar(100) | UNIQUE | Mã course ổn định. |
+| `name` | varchar(255) | — | Tên hiển thị. |
+| `band_level` | numeric(2,1) | UNIQUE; CHECK 0–9, bước 0.5 | Band mục tiêu của course. |
+| `status` | varchar(20) | `ACTIVE`, `INACTIVE` | Trạng thái catalog. |
+| `created_at`, `updated_at` | timestamptz | — | Thời điểm tạo/cập nhật. |
+
+### `knowledge_point_prerequisites` (Content V29)
+
+Quan hệ prerequisite trực tiếp giữa các KP. Đây là graph dùng cho curriculum; không lưu trạng thái hoàn thành theo học viên.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `knowledge_point_id` | uuid | FK → `knowledge_points` ON DELETE CASCADE | KP cần prerequisite. |
+| `prerequisite_id` | uuid | FK → `knowledge_points` ON DELETE CASCADE | KP phải học trước. |
+| `created_at` | timestamptz | DEFAULT CURRENT_TIMESTAMP | Thời điểm thêm cạnh. |
+| `PK(knowledge_point_id, prerequisite_id)` | — | Composite PK; CHECK hai id khác nhau | Mỗi cạnh chỉ xuất hiện một lần, không tự prerequisite. Việc từ chối chu trình nhiều cạnh do ứng dụng kiểm tra trước khi lưu. |
 
 ## 4.3 `vocabulary_items`
 
@@ -557,7 +600,17 @@ Ví dụ từ `record` có thể có một sense `NOUN` với nghĩa "bản ghi"
 
 # 5. Content — Đề, bài học, câu hỏi; Library — video catalog
 
-Content sở hữu §5.1–§5.9 và §5.13–§5.18. `learning_videos`, `video_segments`, `video_segment_lexical_entries` (§5.10–§5.12) thuộc `library_db` từ library V1; content V7 đã xóa ba bảng video cũ. Số mục giữ nguyên để không làm gãy các tham chiếu nội bộ.
+Content sở hữu §5.1–§5.9 và §5.13–§5.23. `learning_videos`, `video_segments`, `video_segment_lexical_entries` (§5.10–§5.12) thuộc `library_db` từ library V1; content V7 đã xóa ba bảng video cũ. Số mục giữ nguyên để không làm gãy các tham chiếu nội bộ.
+
+### Course Practice checkpoints: `course_practice_test_milestones` (Content V38)
+
+Gắn một `PRACTICE_TEST` với course và vị trí topic để Learning chèn checkpoint giữa course.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `course_id` | uuid | FK → `courses`; một phần PK | Course sở hữu checkpoint. |
+| `package_id` | uuid | FK → `content_packages`; UNIQUE | Gói đề Practice của checkpoint. |
+| `after_topic_sequence` | integer | CHECK `> 0` | Vị trí sau topic thứ mấy. |
 
 ## 5.1 `content_packages`
 
@@ -570,8 +623,10 @@ Thuộc tính chính:
 | `id` | uuid | PK | Định danh duy nhất của bản ghi. |
 | `code` | — | — | Mã nghiệp vụ ổn định. |
 | `title` | — | — | Tiêu đề. |
-| `package_type` | varchar(50) | CHECK `MOCK_TEST`/`PLACEMENT_TEST`/`PRACTICE_SET`/`QUIZ`/`LESSON`/`TOPIC_TEST` | Loại package. `TOPIC_TEST` là một mã đề cuối của topic. |
+| `package_type` | varchar(50) | CHECK `MOCK_TEST`/`PLACEMENT_TEST`/`PRACTICE_SET`/`QUIZ`/`LESSON`/`TOPIC_TEST`/`COURSE_TEST`/`PRACTICE_TEST` | Loại package. `TOPIC_TEST` là mã đề cuối topic; `COURSE_TEST` là đề cuối course; `PRACTICE_TEST` là checkpoint Practice. |
 | `topic_id?` | uuid | FK → `topics`; CHECK bắt buộc khi `package_type = 'TOPIC_TEST'` | V5.2. Topic mà mã đề thuộc về. Một topic có nhiều mã đề; learning-service giao mã đề cho học viên (§7.7). |
+| `course_id?` | uuid | FK → `courses`; INDEX; bắt buộc với `COURSE_TEST` | Content V20. Course sở hữu course test. |
+| `source_code?` | varchar(40) | CHECK dạng mã in hoa; chỉ cho `PRACTICE_TEST`; INDEX partial | Content V28. Nguồn/nhóm đề Practice như `IELTS_SPACE_PRO`. |
 | `lesson_id?` | uuid | FK → `lessons`; CHECK chỉ khi `package_type = 'PRACTICE_SET'`; partial INDEX | Content V16. Bài mà đề Practice thuộc về. Tạo gói với bài không tồn tại hoặc gói không phải `PRACTICE_SET` → `422 INVALID_PACKAGE_LESSON`; publish khi câu khác skill của topic bài cũng bị từ chối. |
 | `required_feature_key?` | varchar(100) | Logical ref ↗ `Access.plan_features.feature_key` | Feature cần có để truy cập package; `NULL` nếu không có feature gate riêng. Không FK xuyên service. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
@@ -614,6 +669,8 @@ Thuộc tính chính:
 | `sort_order` | — | — | Thứ tự hiển thị/xử lý. |
 | `time_limit_seconds?` | — | — | Thuộc tính nghiệp vụ của bảng. |
 | `instructions` | — | — | Thuộc tính nghiệp vụ của bảng. |
+| `part_no?` | integer | > 0; UNIQUE cùng `package_version_id` khi có giá trị | Content V28. Số part của practice test. |
+| `cover_asset_id?` | uuid | FK → `content_assets` | Content V28. Ảnh bìa part nếu có. |
 | `UQ(package_version_id, sort_order)` | — | `UQ(package_version_id, sort_order)` | Ràng buộc duy nhất cho tổ hợp cột. |
 
 
@@ -654,7 +711,7 @@ Thuộc tính chính:
 | `schema_version` | integer | — | Phiên bản schema của payload. |
 | `explanation` | — | — | Thuộc tính nghiệp vụ của bảng. |
 | `hint?` | text | NULL được phép; API thêm version giới hạn 500 ký tự | Content V13. Gợi ý hướng dẫn đọc lại, không chứa đáp án. Learning chỉ mở cho answer spec tự chấm hợp lệ: `FILL` hoặc `CHOICE` có ≥3 lựa chọn; TFNG hỗ trợ options thiếu/rỗng. Câu hai lựa chọn không hiện gợi ý. Mở sau khi câu đó từng sai trong cùng user/bài/khối chưa đạt, giữ cả khi lần sau trả lời đúng nhưng khối vẫn trượt; khối đạt thì `hint = null`. Câu của đề Practice và set ôn luôn kèm hint (V5.5); đề cuối và game không dùng. |
-| `difficulty?` | — | — | Thuộc tính nghiệp vụ của bảng. |
+| `difficulty?` | varchar(50) | `EASY`, `MEDIUM`, `HARD`; NULL được phép | V30/V31. Difficulty gắn với immutable question version. V31 backfill khi band course xác định duy nhất; câu chưa phân loại hoặc có band xung đột giữ NULL. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
 | `UQ(question_id, version_number)` | — | `UQ(question_id, version_number)` | Ràng buộc duy nhất cho tổ hợp cột. |
 
@@ -687,7 +744,20 @@ Thuộc tính chính:
 | `question_version_id` | uuid | FK → `question_versions` | Định danh phiên bản câu hỏi liên quan. |
 | `sort_order` | — | — | Thứ tự hiển thị/xử lý. |
 | `max_score` | — | — | Thuộc tính nghiệp vụ của bảng. |
+| `group_id?` | uuid | Composite FK (`group_id`, `section_id`) → `section_question_groups`; NULL nếu câu không thuộc nhóm | Content V28. Gắn câu với nhóm trong chính section đó. |
 | `UQ(section_id, sort_order)` | — | `UQ(section_id, sort_order)` | Ràng buộc duy nhất cho tổ hợp cột. |
+
+### `section_question_groups` (Content V28)
+
+Nhóm một dãy câu hỏi cùng dạng trong section, ví dụ một cụm câu có chung hướng dẫn. `section_questions.group_id` có thể NULL với câu không thuộc nhóm.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh nhóm. |
+| `section_id` | uuid | FK → `content_sections` ON DELETE CASCADE | Section chứa nhóm. |
+| `sort_order` | integer | UNIQUE cùng `section_id` | Thứ tự nhóm trong section. |
+| `format_code` | varchar(40) | CHECK dạng mã in hoa | Mã dạng câu do ứng dụng định nghĩa. |
+| `instructions?` | text | — | Hướng dẫn chung cho nhóm câu hỏi. |
 
 
 ## 5.7 `question_knowledge_points`
@@ -761,8 +831,15 @@ Không cho phép cả hai cùng `NULL` hoặc cùng có giá trị. Có unique c
 `media_reference` của IMAGE chỉ nhận URL `https://` hoặc data URI Base64 với MIME `image/png`, `image/jpeg`,
 `image/svg+xml`. Content kiểm bằng `MediaReferencePolicy`, giữ nguyên giá trị hợp lệ trong `mediaUrl`;
 tham chiếu sai trả `INVALID_MEDIA_REFERENCE`. API học viên nhận `images[{mediaUrl, altText}]`.
+`media_reference` của AUDIO nhận URL `https://`, object key dưới `CONTENT_MEDIA_BASE_URL`, hoặc data URI Base64 với MIME
+`audio/mpeg|ogg|wav|webm` để bản ghi nằm ngay trong DB (các đề Listening luyện tập V39 dùng cách này, mỗi bản ghi khoảng
+150 KB); nơi lưu file thật vẫn dùng URL hoặc key.
 
 `topic_prerequisites` và `topic_gate_rules` **không còn trong V5**. Thứ tự topic, cổng bài, Practice và bài ôn thuộc `learning-service` (§7).
+
+**Đảo quyết định (2026-10-16):** cây tiên quyết nay có ở cấp KP, là đồ thị không vòng, ở bảng `knowledge_point_prerequisites`
+của Content (xem `docs/contracts/knowledge-tree-v1.md`). Bảng này chỉ lưu quan hệ giữa các KP; thứ tự topic và cổng bài vẫn
+thuộc `learning-service`, và `topic_prerequisites` vẫn không tồn tại.
 
 `package_lexical_entries` cũng chưa đưa vào MVP. Nếu sau này có feature "Vocabulary in this lesson" hoặc pre-learn vocabulary theo package, mapping package ↔ vocabulary sense sẽ được bổ sung khi business flow đó được chốt.
 
@@ -988,6 +1065,75 @@ Luật:
   `answer-spec-v1`.
 
 ---
+## 5.19 `error_types` (Content V34, V37)
+
+Catalog mã lỗi objective dùng chung với answer spec, Assessment error analysis và gợi ý khắc phục. V34 seed catalog ban đầu; V37 thêm bước duyệt chuyên môn riêng với trạng thái hoạt động.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh bản ghi. |
+| `code` | varchar(60) | UNIQUE; CHECK mã in hoa | Mã ổn định được lưu trong answer spec và error analysis. |
+| `name` | varchar(255) | — | Tên lỗi. |
+| `category` | varchar(30) | CHECK taxonomy | Nhóm grammar, vocabulary, coherence, task, strategy hoặc spelling/number. |
+| `severity` | smallint | CHECK 1–3 | Mức độ ảnh hưởng. |
+| `knowledge_point_id?` | uuid | FK → `knowledge_points` | KP liên quan nếu có. |
+| `fix_hint` | text | NOT NULL | Gợi ý khắc phục. |
+| `status` | varchar(20) | `ACTIVE`, `INACTIVE`; INDEX | Có được sử dụng trong hệ thống hay không. |
+| `review_status` | varchar(20) | `DRAFT`, `APPROVED` | V37. Chỉ mã đã duyệt mới được đưa vào kết quả hiển thị cho học viên. |
+| `created_at`, `updated_at` | timestamptz | — | Thời điểm tạo/cập nhật. |
+
+## 5.20 `rubrics` (Content V39)
+
+Version rubric Writing theo `TASK_1`/`TASK_2`. Mỗi task chỉ có một rubric `ACTIVE`; source note giữ xuất xứ và trạng thái duyệt của rubric.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh rubric version. |
+| `code` | varchar(80) | Một phần của UNIQUE `(code, rubric_version)` | Mã rubric ổn định. |
+| `task` | varchar(10) | `TASK_1`, `TASK_2` | Dạng bài Writing. |
+| `rubric_version` | integer | CHECK `> 0`; UNIQUE cùng `code` | Version bất biến sau khi không còn là draft. |
+| `status` | varchar(10) | `DRAFT`, `ACTIVE`, `RETIRED`; partial unique mỗi task ACTIVE | Trạng thái runtime. |
+| `source_note` | text | NOT NULL | Nguồn/paraphrase và ghi chú duyệt. Seed hiện tại là bản nháp chưa được người có chuyên môn IELTS duyệt dù đang `ACTIVE` để bootstrap. |
+| `created_at`, `updated_at` | timestamptz | — | Thời điểm tạo/cập nhật. |
+
+## 5.21 `rubric_criteria` (Content V39)
+
+Tiêu chí theo thứ tự của một rubric; code tiêu chí duy nhất trong cùng rubric.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh tiêu chí. |
+| `rubric_id` | uuid | FK → `rubrics` ON DELETE CASCADE | Rubric sở hữu tiêu chí. |
+| `code` | varchar(8) | `TR`, `TA`, `CC`, `LR`, `GRA`; UNIQUE cùng rubric | Mã tiêu chí IELTS. |
+| `name` | varchar(120) | — | Tên tiêu chí. |
+| `description` | text | — | Diễn giải tiêu chí. |
+| `sort_order` | integer | CHECK `> 0`; UNIQUE cùng rubric | Thứ tự chấm. |
+
+## 5.22 `rubric_band_descriptors` (Content V39)
+
+Mô tả năng lực ở từng half-band của một tiêu chí.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh descriptor. |
+| `criterion_id` | uuid | FK → `rubric_criteria` ON DELETE CASCADE | Tiêu chí được mô tả. |
+| `band` | numeric(2,1) | CHECK 0–9, bước 0.5; UNIQUE cùng criterion | Band IELTS. |
+| `descriptor` | text | NOT NULL | Mô tả tiêu chí ở band này. |
+
+## 5.23 `rubric_examples` (Content V39)
+
+Ví dụ bài viết và nhận xét gốc dùng làm dữ liệu hiệu chuẩn; không phải câu trả lời mẫu lấy từ ngân hàng Assessment.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh ví dụ. |
+| `rubric_id` | uuid | FK → `rubrics` ON DELETE CASCADE | Rubric sở hữu ví dụ. |
+| `band` | numeric(2,1) | CHECK 0–9, bước 0.5 | Band ví dụ. |
+| `prompt` | text | NOT NULL | Đề bài gốc. |
+| `essay` | text | NOT NULL | Bài viết gốc. |
+| `commentary` | text | NOT NULL | Nhận xét chấm. |
+| `created_at` | timestamptz | DEFAULT CURRENT_TIMESTAMP | Thời điểm tạo. |
+
 # 6. Assessment — Làm bài, nộp bài và kết quả
 
 ## 6.1 `assessment_attempts`
@@ -1050,12 +1196,23 @@ Thuộc tính chính:
 | `id` | uuid | PK | Định danh duy nhất của bản ghi. |
 | `attempt_section_id` | uuid | FK → `attempt_sections` | Định danh đối tượng `attempt_section` liên quan. |
 | `question_version_id` | uuid | Logical ref ↗ `Content` | Định danh phiên bản câu hỏi liên quan. |
+| `elapsed_ms?` | bigint | CHECK NULL hoặc `>= 0` | V8. Thời gian học viên dành cho câu này, được ghi theo delta. |
 | `sort_order` | — | — | Thứ tự hiển thị/xử lý. |
 | `question_snapshot` | jsonb | — | V5.2: đề và lựa chọn, **không** có đáp án. Assessment tự lấy từ Content khi tạo attempt. |
 | `answer_snapshot` | jsonb | — | V5.2: `{answerSpec, explanation, maxScore}` chép từ Content khi tạo attempt; dùng để tự chấm; không bao giờ trả cho học viên. |
 | `knowledge_snapshot` | jsonb | — | Tham chiếu tới đối tượng liên quan. |
 | `UQ(attempt_section_id, sort_order)` | — | `UQ(attempt_section_id, sort_order)` | Ràng buộc duy nhất cho tổ hợp cột. |
 
+
+### `attempt_item_knowledge_points` (Assessment V4)
+
+Snapshot KP và trọng số của câu tại thời điểm tạo attempt. Knowledge point ID là logical reference sang Content, không FK xuyên database.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `attempt_item_id` | uuid | FK → `attempt_items` ON DELETE RESTRICT; một phần PK | Câu trong attempt. |
+| `knowledge_point_id` | uuid | Logical ref ↗ `Content.knowledge_points`; một phần PK | KP được câu hỏi kiểm tra. |
+| `weight` | numeric(5,2) | CHECK `>= 0` | Trọng số mapping tại lúc làm bài. |
 
 ## 6.4 `attempt_responses`
 
@@ -1162,6 +1319,16 @@ Thuộc tính chính:
 | `UQ(result_id, attempt_item_id)` | — | `UQ(result_id, attempt_item_id)` | Ràng buộc duy nhất cho tổ hợp cột. |
 
 
+### `item_result_knowledge_judgments` (Assessment V4)
+
+Kết quả judgment của từng KP cho item result; cho phép lưu pass/fail/not-assessed độc lập với error code chi tiết.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `item_result_id` | uuid | FK → `item_results` ON DELETE RESTRICT; một phần PK | Kết quả câu. |
+| `knowledge_point_id` | uuid | Logical ref ↗ `Content.knowledge_points`; một phần PK | KP được đánh giá. |
+| `judgment` | varchar(20) | `PASS`, `FAIL`, `NOT_ASSESSED` | Judgment cho KP. |
+
 ## 6.9 `error_analysis_items`
 
 Phân loại lỗi theo knowledge point để phục vụ mastery và luyện điểm yếu. Nó gắn lỗi cụ thể với knowledge point, biến kết quả assessment thành tín hiệu đầu vào cho mastery/adaptive learning.
@@ -1237,7 +1404,7 @@ pronunciationScore = 82
 
 # 7. Learning Service — tiến độ học, bằng chứng mastery, bài ôn, mã đề
 
-`learning-service` (Java, `learning_db`, Flyway V1–V5) từ 2026-10-01. Bằng chứng gắn với user; mastery của KP tính khi
+`learning-service` (Java, `learning_db`, Flyway V1–V20) từ 2026-10-01; bảng V6 trở đi ở §7.15–7.21. Bằng chứng gắn với user; mastery của KP tính khi
 đọc bằng `compute_mastery` (port từ DeepTutor v1.6.9: 5 lần gần nhất, trọng số 0.5→1.0, trần 0.5/0.8 khi có 1/2 lần).
 Ghi progress/evidence, bài ôn, giao đề và các transaction bắt đầu/kết thúc chấm Writing mở đầu bằng
 `pg_advisory_xact_lock(hashtext(user_id))`. Quota và trạng thái trung gian Writing hiện dùng SQL cập nhật nguyên tử
@@ -1255,6 +1422,18 @@ Bảng dùng chung mọi học viên, ghi lại từ Content `topic-sequence` m�
 | `topic_id` | uuid | NOT NULL, INDEX | |
 | `has_practice_set` | boolean | NOT NULL | Content có gói `PRACTICE_SET` đủ điều kiện cho KP; không có thì không chèn bài ôn |
 | `skill` | varchar(20) | NULL | V3. Skill của KP (hoặc của topic); dùng điền skill cho bài ôn cũ |
+| `band` | numeric(3,1) | NULL | V31. Band của khóa chứa topic; job snapshot đọc skill và band ở đây vì job không có JWT để gọi Content. NULL tới lần học viên mở danh sách khóa sau migration |
+| `refreshed_at` | timestamptz | NOT NULL | |
+
+## 7.1a `course_milestone_counts`
+
+Số milestone practice test của từng khóa, ghi khi học viên được giao đề cuối khóa. Consumer áp kết quả đề cuối không có
+JWT để hỏi Content nên dùng số này khi tính điểm khóa. Lúc đọc điểm trong request vẫn hỏi Content trực tiếp.
+
+| Cột | Kiểu | Ràng buộc | Ghi chú |
+| --- | --- | --- | --- |
+| `course_id` | uuid | PK | Khóa của Content |
+| `milestone_count` | integer | NOT NULL, `>= 0` | V34 |
 | `refreshed_at` | timestamptz | NOT NULL | |
 
 ## 7.2 `topic_progress`
@@ -1445,6 +1624,100 @@ Quick-check ở bước lý thuyết của bài ôn: tối đa 3 câu tự chấ
 | `answers`, `response` | jsonb | NOT NULL | |
 | `correct_count`, `total_count` | int | NOT NULL | |
 | `submitted_at` | timestamptz | NOT NULL | |
+
+## 7.15 Thay đổi bảng cũ (V6–V29)
+
+| Bảng | Thay đổi | Migration |
+| --- | --- | --- |
+| `review_items` | `blocking` BOOLEAN NOT NULL DEFAULT TRUE (bài ôn tùy chọn không chặn); `trigger_kind` thêm `CONSOLIDATE`, `MAINTAIN`, `FREE_PRACTICE_TEST`, `DIAGNOSTIC`; `waiting_on_review_ids` uuid[] (bài ôn gốc chờ bài ôn KP nền) | V15, V16 |
+| `kp_evidence` | `source` thêm `practice_set`, `diagnostic_probe` | V4, V16 |
+| `topic_progress` | `tested_at`, `first_test_percent` (lần thi topic test đầu, điểm giữa khóa) | V17 |
+| `lesson_writing_submissions` | `previous_submission_id`, `revision_no` (1–5, tối đa 3 lần sửa); `essay_hash` (SHA-256 essay chuẩn hóa); `prompt_version` | V14, V18, V19 |
+| `kp_mastery_profiles` | `tier` thêm `INSUFFICIENT`; `confidence` NUMERIC(6,3) NULL (trọng số suy giảm của bằng chứng dưới MP-1.0); chỉ mục `last_evidence_at` cho `MasteryDecayJob` | V21 |
+| `kp_evidence` | `question_version_id` NULL (luật cùng câu trong 7 ngày); `source` thêm `free_practice` | V21, V22 |
+| `practice_attempts` | `lesson_id` cho phép NULL; `origin` (`LESSON`/`FREE`) và `knowledge_point_id` cho luyện tự do, ràng buộc `origin = FREE` ⇔ không có lesson | V22 |
+| `question_attempt_events` | `source` thêm `free_practice`; chỉ mục `occurred_at` cho thống kê hoạt động | V22, V25 |
+| `learner_flags` | `kind` thêm `INACTIVE` | V25 |
+| `xp_ledger` | `source` thêm `STREAK` (V26) và `QUEST` (V29) | V26, V29 |
+
+## 7.16 `question_attempt_events` (V11)
+
+Mỗi câu trả lời một dòng, ghi cùng transaction với bài nộp: `user_id`, `question_version_id`, `knowledge_point_ids`,
+`correct`, `score`, `duration_ms`, `error_code`, `source`, `source_reference_id`, `attempt_id`, `first_submission`,
+`occurred_at`. UNIQUE (`user_id`, `source`, `source_reference_id`, `question_version_id`). Nguồn của báo cáo, cờ bất
+thường và thống kê câu.
+
+## 7.17 `kp_mastery_profiles`, `learning_rule_configs` (V13)
+
+`kp_mastery_profiles` (PK `user_id`, `knowledge_point_id`): `mastery`, `tier` (`PRIORITY`/`CONSOLIDATE`/`MAINTAIN`),
+`success_streak`, `next_review_at`, thống kê thời gian và mã lỗi; dẫn xuất từ `kp_evidence`, dựng lại được. `learning_rule_configs`
+là ghi đè của Admin cho ngưỡng và lịch ôn (key, JSON, `updated_by`).
+
+## 7.18 `diagnostic_sessions`, `diagnostic_probes`, `content_gap_signals` (V16)
+
+Một phiên chẩn đoán cho mỗi bài ôn gốc (`root_review_id` UNIQUE, `status` `PROBING`/`CONCLUDED`, `conclusion_kp_ids`).
+`diagnostic_probes`: mỗi KP tiên quyết một lần thăm dò (`depth` 1–3, `status` `OPEN`/`ANSWERED`/`NO_SET`, đúng/tổng,
+UNIQUE (`session_id`, `kp_id`)). `content_gap_signals` (PK `kp_id`): số lần bài ôn hết gói chưa lộ, cho R&D.
+
+## 7.19 `course_score_configs`, `remediation_flags`, `course_outcomes` (V17)
+
+`course_score_configs`: trọng số Process/giữa khóa/cuối khóa (tổng 1), tỷ lệ Practice/practice test (tổng 1), ngưỡng đạt,
+ngưỡng bổ trợ giữa khóa; một dòng `course_id` NULL là mặc định (0.2/0.3/0.5, 0.64/0.36, 0.70, 0.60). `remediation_flags`
+(`MID_COURSE`/`POST_COURSE`, UNIQUE (`source_attempt_id`, `kind`), `review_ids`): mở khi còn bài ôn `PENDING`.
+`course_outcomes` (PK `user_id`, `course_id`): `PASSED`/`REMEDIATION`, tổng, thành phần và trọng số đã dùng khi quyết định.
+
+## 7.20 `learner_flags`, `work_items` (V19)
+
+`learner_flags`: cờ bất thường (`TOO_FAST_HIGH_SCORE`, `BURST_SUBMISSIONS`, `DUPLICATE_ESSAY`), `evidence` JSON, trạng
+thái `OPEN`/`CONFIRMED`/`DISMISSED`, người duyệt. `work_items`: việc cho hàng `EXAMINER` hoặc `CONTENT_AUTHOR`,
+UNIQUE (`kind`, `subject_ref`) nên đồng bộ lại không nhân đôi; `note_visible_to_learner` cho ghi chú học viên đọc được.
+
+## 7.21 `human_review_requests` (V20)
+
+PK `submission_id` (FK → `lesson_writing_submissions`), `user_id`, `review_submission_id`: essay lesson/Practice học viên đã
+nhờ Mentor chữa, một yêu cầu cho mỗi essay (tín dụng chỉ trừ một lần). Bản chữa nằm ở Assessment.
+
+## 7.22 `learner_settings`, `xp_ledger`, `learner_xp` (V23)
+
+`learner_settings` (PK `user_id`): `timezone` IANA; ngày hạn mức XP và streak tính theo múi giờ này. `xp_ledger`: mỗi lần
+thưởng XP một dòng (`amount`, `source` `QUESTION`/`KP_CONSOLIDATE`/`KP_MAINTAIN`/`STREAK`/`QUEST`, `source_ref`,
+`local_date`, `counted`), UNIQUE (`user_id`, `source`, `source_ref`) nên lặp lại không cộng hai lần; `counted = false` là XP
+bóng vượt trần ngày. `learner_xp` (PK `user_id`): `total_xp`, `level`.
+
+## 7.23 `learner_hearts` (V24)
+
+PK `user_id`: `hearts`, `max_hearts` (5, PREMIUM 7), `last_regen_at`. Mỗi 5 giờ hồi một tim khi chưa đầy; đồng hồ dừng khi đầy.
+
+## 7.24 `learner_streaks`, `reward_grants` (V26)
+
+`learner_streaks` (PK `user_id`): chuỗi hiện tại và dài nhất, `last_active_date`, `streak_start`, `evaluated_through` (đã
+chốt từng ngày tới đó), đóng băng (`freeze_available`, `freeze_eligible_from`), cụm ngày đã đóng băng liên tiếp
+(`frozen_run_end`, `freeze_run`, đặt giá lượt kế), `lost_streak_days`. `reward_grants`: điểm access nợ học viên, ghi `PENDING`
+cùng transaction với việc phát sinh (`reason` `STREAK_MILESTONE`/`KP_MASTERED`/`DAILY_QUEST`/`BADGE`, `reference_id`,
+UNIQUE (`user_id`, `reason`, `reference_id`)); relay gửi qua RabbitMQ rồi `status` thành `GRANTED`/`CAPPED`/`FAILED`, kèm
+`attempts`, `last_error`.
+
+## 7.25 `learner_weekly_snapshots`, `learner_monthly_snapshots` (V27)
+
+PK (`user_id`, `week_start`) và (`user_id`, `month_start`): `skills` JSONB (mastery theo sáu khối), `tier_counts` JSONB,
+`answered`, `correct`, `active_minutes` (mỗi câu chặn 10 phút), `focus_kp_ids` uuid[], `estimated_band`. Giữ 12 tuần và 36 tháng.
+
+## 7.26 `league_weeks`, `league_groups`, `league_members`, `learner_league` (V28)
+
+Tuần league chạy từ Chủ nhật 00:00 UTC. `league_groups`: tối đa 30 người cùng hạng (`tier` 1–7). `league_members` (PK
+`week_start`, `user_id`): `weekly_xp`, `xp_updated_at` (hòa điểm thì ai đạt trước xếp trên), `final_rank`, `outcome`
+(`PROMOTED`/`STAYED`/`DEMOTED`) sau khi chốt tuần. `league_weeks.closed_at` làm việc chốt idempotent. `learner_league`
+(PK `user_id`): hạng học viên chơi ở tuần kế.
+
+## 7.27 `daily_quests` (V29)
+
+Ba nhiệm vụ mỗi ngày theo múi giờ học viên: `type` `PRACTICE`/`WEAKNESS`/`PRACTICE_PLUS`/`STREAK`, `target_kp_id` (nhiệm vụ
+`WEAKNESS`), `required`, `progress`, `completed_at`, `xp_reward`, `points_reward`. UNIQUE (`user_id`, `local_date`, `type`).
+
+## 7.28 `badges`, `learner_badges` (V30)
+
+`badges` (PK `code`): danh mục cố định gồm tên, mô tả, `reward_points`, `active` (Admin bật/tắt; điều kiện nằm trong code).
+`learner_badges` (PK `user_id`, `badge_code`): huy hiệu đã cấp, không gỡ.
 
 ---
 
@@ -2149,7 +2422,8 @@ Thuộc tính chính:
 | Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
 | :--- | :--- | :--- | :--- |
 | `id` | uuid | PK | Định danh grading job. |
-| `submission_id` | uuid | FK → `learner_submissions` | Submission Writing/Speaking cần chấm. |
+| `submission_id?` | uuid | FK → `learner_submissions` ON DELETE RESTRICT | Submission Writing/Speaking cần chấm; NULL với standalone human review. |
+| `human_review_submission_id?` | uuid | UNIQUE FK → `human_review_submissions` ON DELETE RESTRICT | V12. Standalone human-review submission. Chính xác một trong hai submission ID phải có giá trị. |
 | `user_id` | uuid | Logical ref ↗ `Identity.users` | Learner yêu cầu chấm. |
 | `skill` | — | — | `WRITING`, `SPEAKING`. |
 | `grading_mode` | — | — | `AI`, `HUMAN`. |
@@ -2157,6 +2431,10 @@ Thuộc tính chính:
 | `point_cost_snapshot?` | integer | — | Cost đã chốt khi tạo AI job; `NULL` cho human grading. |
 | `point_ledger_entry_id?` | uuid | Logical ref ↗ `Access.point_ledger_entries` | Ledger entry đã debit point cho AI job. |
 | `premium_subscription_id?` | uuid | Logical ref ↗ `Plans.subscriptions` | Subscription dùng để xác thực human grading. |
+| `assigned_examiner_id?` | uuid | Logical ref ↗ `Identity.users` | V9. Examiner đã claim job. |
+| `claimed_at?` | timestamptz | — | V9. Thời điểm claim. |
+| `reason?` | varchar(30) | `LLM_FAILED`, `LLM_QUOTA`, `LLM_NOT_CONFIGURED`, `COURSE_GATE_POLICY`, `HUMAN_CREDIT`, `QA_SAMPLE` | V9. Lý do phải đưa job vào hàng chờ người chấm. |
+| `prompt_version?` | varchar(100) | — | V10. Rubric và template version dùng để chấm AI. |
 | `idempotency_key` | varchar(255) | UNIQUE | Chống tạo/trừ tiền cho cùng một request nhiều lần. |
 | `created_at` | timestamptz | — | Thời điểm tạo. |
 | `completed_at?` | timestamptz | — | Thời điểm hoàn tất. |
@@ -2180,7 +2458,136 @@ Thuộc tính chính:
 | `completed_at?` | timestamptz | — | Thời điểm hoàn tất. |
 | `reviewer_note?` | text | — | Ghi chú nội bộ của grader nếu cần. |
 
-Điểm/feedback cuối cùng tiếp tục được phản ánh vào các bảng kết quả Assessment như `assessment_results`, `skill_scores`, `item_results`. Các cấu trúc grading nâng cao như rubric chi tiết, transcript hoặc feedback revision chưa nằm trong baseline hiện tại.
+Với job của attempt, điểm/feedback cuối cùng được phản ánh vào `assessment_results`, `skill_scores` và `item_results`. Standalone human review lưu kết quả trong `human_review_submissions`, không tạo attempt, result hay mastery.
+
+## 13.4 `llm_usage_daily` (Assessment V6)
+
+Hạn mức chấm AI learner theo user và ngày.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `user_id` | uuid | Một phần PK; logical ref ↗ `Identity.users` | Learner được tính quota. |
+| `usage_date` | date | Một phần PK | Ngày sử dụng theo lịch service. |
+| `count` | integer | CHECK `>= 0` | Số lượt đã dùng. |
+
+## 13.5 `essay_grade_comparisons` (Assessment V9)
+
+Snapshot AI và examiner để calibration, import gold data và QA. Một submission có tối đa một comparison.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `submission_id` | uuid | PK, FK → `learner_submissions` | Submission được so sánh. |
+| `attempt_type`, `task` | varchar | — | Loại attempt và Writing task. |
+| `llm_band?`, `examiner_band?` | numeric(2,1) | CHECK 0–9 | Band AI và examiner. |
+| `llm_criteria?`, `examiner_criteria?` | jsonb | — | Tiêu chí từng bên. |
+| `llm_prompt_version?` | varchar(120) | — | Prompt version dùng cho điểm AI. |
+| `examiner_error_codes?` | varchar(60)[] | — | Error codes examiner chọn. |
+| `examiner_id?` | uuid | Logical ref ↗ `Identity.users` | Examiner thực hiện chấm. |
+| `examiner_graded_at?` | timestamptz | — | Thời điểm có đủ kết quả examiner. |
+
+## 13.6 `ai_gold_essays` (Assessment V10)
+
+Gold essay do admin nhập hoặc import từ comparison đã có điểm examiner. Bản ghi là dữ liệu chuẩn để so sánh kết quả AI.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh gold essay. |
+| `task` | varchar(10) | `TASK_1`, `TASK_2` | Loại Writing task. |
+| `prompt` | text | NOT NULL | Đề bài. |
+| `chart_facts?` | text | — | Dữ kiện biểu đồ cho Task 1. |
+| `essay` | text | NOT NULL | Bài essay. |
+| `examiner_band` | numeric(2,1) | CHECK 0–9, bước 0.5 | Band chuẩn của examiner. |
+| `examiner_criteria` | jsonb | NOT NULL, default `[]` | Điểm/nhận xét tiêu chí chuẩn. |
+| `examiner_error_codes` | varchar(60)[] | NOT NULL, default `{}` | Error codes chuẩn. |
+| `source` | varchar(20) | `COMPARISON`, `MANUAL` | Nguồn gold essay. |
+| `comparison_submission_id?` | uuid | UNIQUE FK → `learner_submissions` | Submission nguồn khi import comparison. |
+| `created_by` | uuid | Logical ref ↗ `Identity.users` | Admin nhập/import. |
+| `created_at` | timestamptz | DEFAULT CURRENT_TIMESTAMP | Thời điểm tạo. |
+
+## 13.7 `ai_eval_runs` (Assessment V10)
+
+Một lần đánh giá prompt trên gold set của một task; metrics quyết định có thể kích hoạt prompt hay không.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh evaluation run. |
+| `task` | varchar(10) | `TASK_1`, `TASK_2` | Task được đánh giá. |
+| `model` | varchar(200) | NOT NULL | Model được gọi. |
+| `prompt_version` | varchar(100) | NOT NULL | Version rubric và template được chạy. |
+| `status` | varchar(10) | `RUNNING`, `DONE`, `FAILED` | Trạng thái run. |
+| `n` | integer | CHECK `>= 0` | Số gold essays được chấm. |
+| `within_half_band`, `mae`, `qwk` | numeric | NULL tới khi có kết quả | Metrics band. |
+| `per_criterion` | jsonb | NOT NULL, default `{}` | Metrics theo từng criterion. |
+| `error_code_false_positive?` | numeric(6,5) | — | Tỷ lệ false positive của error codes. |
+| `passed?` | boolean | — | Kết quả so với các ngưỡng cấu hình. |
+| `started_at`, `finished_at?` | timestamptz | — | Thời điểm chạy. |
+| `failure_code?` | varchar(50) | — | Lý do run thất bại. |
+
+## 13.8 `ai_eval_items` (Assessment V10)
+
+Kết quả AI và diff theo từng gold essay trong một run.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `run_id` | uuid | FK → `ai_eval_runs` ON DELETE CASCADE; một phần PK | Evaluation run. |
+| `gold_id` | uuid | FK → `ai_gold_essays`; một phần PK | Gold essay. |
+| `llm_band?` | numeric(2,1) | CHECK 0–9 | Band AI. |
+| `llm_criteria?` | jsonb | — | Điểm AI theo criterion. |
+| `llm_error_codes?` | varchar(60)[] | — | Error codes AI. |
+| `diff` | jsonb | NOT NULL, default `{}` | So sánh AI với examiner. |
+
+## 13.9 `ai_prompt_activations` (Assessment V10)
+
+Prompt version đang dùng cho mỗi task. `task` làm primary key nên mỗi task chỉ có một activation hiện hành.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `task` | varchar(10) | PK; `TASK_1`, `TASK_2` | Task được kích hoạt. |
+| `prompt_version` | varchar(100) | NOT NULL | Prompt version hiện hành. |
+| `run_id` | uuid | FK → `ai_eval_runs` | Run đã đạt ngưỡng. |
+| `activated_by` | uuid | Logical ref ↗ `Identity.users` | Admin kích hoạt. |
+| `activated_at` | timestamptz | DEFAULT CURRENT_TIMESTAMP | Thời điểm kích hoạt. |
+
+## 13.10 `ai_eval_daily_usage` (Assessment V10)
+
+Hạn mức evaluation độc lập với quota chấm bài learner.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `usage_date` | date | PK | Ngày evaluation. |
+| `units` | integer | CHECK `>= 0` | Số essay units đã dùng. |
+
+## 13.11 `examiner_qa_reviews` (Assessment V11)
+
+Kết quả blind re-grade một submission để đo chất lượng examiner. Bảng không cho reviewer tự chấm lại bài của chính mình.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh lần QA. |
+| `submission_id` | uuid | UNIQUE FK → `learner_submissions` ON DELETE RESTRICT | Submission được lấy mẫu. |
+| `examiner_id`, `reviewer_id` | uuid | Logical ref ↗ `Identity.users`; phải khác nhau | Examiner gốc và người re-grade. |
+| `examiner_band`, `reviewer_band` | numeric(2,1) | CHECK 0–9, bước 0.5 | Hai band để so sánh. |
+| `reviewer_criteria` | jsonb | NOT NULL | Tiêu chí blind review. |
+| `note?` | text | — | Ghi chú QA. |
+| `created_at` | timestamptz | DEFAULT CURRENT_TIMESTAMP | Thời điểm review. |
+
+## 13.12 `human_review_submissions` (Assessment V12)
+
+Standalone bài essay gửi examiner, độc lập với assessment attempt. Idempotency theo `request_id`; `source_submission_id` UNIQUE liên kết đến source essay. Dữ liệu prompt và rubric được snapshot để queue mù danh tính learner.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh bài review. |
+| `request_id` | uuid | UNIQUE | Idempotency key từ caller. |
+| `learner_id` | uuid | Logical ref ↗ `Identity.users` | Chủ bài; không đưa vào examiner projection. |
+| `source_submission_id` | uuid | UNIQUE | ID bài nguồn ở Learning. |
+| `source`, `task` | varchar | `LESSON`/`PRACTICE`; `TASK_1`/`TASK_2` | Nguồn bài và dạng Writing. |
+| `prompt_snapshot`, `rubric_snapshot` | jsonb | NOT NULL | Snapshot prompt và rubric tại thời điểm gửi. |
+| `essay_text` | text | NOT NULL | Nội dung essay. |
+| `band?`, `criteria?`, `error_codes?`, `feedback?` | numeric/jsonb/array/text | Tất cả NULL khi pending hoặc cùng có khi done | Kết quả examiner. |
+| `created_at`, `completed_at?` | timestamptz | — | Thời điểm gửi và hoàn tất. |
+
+CHECK bảo đảm trường điểm đều vắng mặt khi pending hoặc hoàn tất đồng bộ khi done.
 
 ---
 

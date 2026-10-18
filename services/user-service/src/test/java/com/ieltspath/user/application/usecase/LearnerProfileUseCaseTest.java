@@ -3,9 +3,11 @@ package com.ieltspath.user.application.usecase;
 import com.ieltspath.user.application.command.UpdateLearnerProfileCommand;
 import com.ieltspath.user.application.result.LearnerProfileResult;
 import com.ieltspath.user.domain.aggregate.LearnerProfile;
+import com.ieltspath.user.domain.aggregate.LearningGoal;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.LearnerProfileRepository;
+import com.ieltspath.user.domain.repository.LearningGoalRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.ProfileVisibility;
@@ -28,11 +30,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class LearnerProfileUseCaseTest {
     @Mock private LearnerProfileRepository learnerProfileRepository;
     @Mock private UserRepository userRepository;
+    @Mock private LearningGoalRepository learningGoalRepository;
+    @Mock private ScheduleStudyGoalUseCase studyGoals;
 
     private GetLearnerProfileUseCase getLearnerProfileUseCase;
     private UpdateLearnerProfileUseCase updateLearnerProfileUseCase;
@@ -41,7 +48,8 @@ class LearnerProfileUseCaseTest {
     @BeforeEach
     void setUp() {
         getLearnerProfileUseCase = new GetLearnerProfileUseCase(learnerProfileRepository, userRepository);
-        updateLearnerProfileUseCase = new UpdateLearnerProfileUseCase(learnerProfileRepository, userRepository);
+        updateLearnerProfileUseCase = new UpdateLearnerProfileUseCase(learnerProfileRepository, userRepository,
+                learningGoalRepository, studyGoals);
         deleteLearnerProfileUseCase = new DeleteLearnerProfileUseCase(learnerProfileRepository);
     }
 
@@ -129,10 +137,84 @@ class LearnerProfileUseCaseTest {
     }
 
     @Test
+    void timezoneChangeLocksBeforeReadingAndReschedulesActiveGoalAfterSavingProfile() {
+        UUID userId = UUID.randomUUID();
+        LearnerProfile existing = existingProfile(userId, "Asia/Ho_Chi_Minh");
+        LearningGoal goal = LearningGoal.builder().userId(userId).build();
+        when(learnerProfileRepository.findByUserId(userId)).thenReturn(Optional.of(existing));
+        when(learnerProfileRepository.save(existing)).thenAnswer(inv -> inv.getArgument(0));
+        when(learningGoalRepository.findActiveByUserId(userId)).thenReturn(Optional.of(goal));
+
+        var result = updateLearnerProfileUseCase.execute(timezoneCommand(userId, " America/Los_Angeles "));
+
+        assertEquals("America/Los_Angeles", result.timezone());
+        var order = inOrder(studyGoals, learnerProfileRepository, learningGoalRepository);
+        order.verify(studyGoals).lock(userId);
+        order.verify(learnerProfileRepository).findByUserId(userId);
+        order.verify(learnerProfileRepository).save(existing);
+        order.verify(learningGoalRepository).findActiveByUserId(userId);
+        order.verify(studyGoals).execute(goal);
+    }
+
+    @Test
+    void unchangedOrOmittedTimezoneDoesNotRescheduleGoal() {
+        UUID userId = UUID.randomUUID();
+        LearnerProfile existing = existingProfile(userId, "UTC");
+        when(learnerProfileRepository.findByUserId(userId)).thenReturn(Optional.of(existing));
+        when(learnerProfileRepository.save(existing)).thenAnswer(inv -> inv.getArgument(0));
+
+        for (String timezone : new String[]{" UTC ", null, " "}) {
+            assertEquals("UTC", updateLearnerProfileUseCase.execute(timezoneCommand(userId, timezone)).timezone());
+        }
+
+        verifyNoInteractions(learningGoalRepository);
+        verify(studyGoals, never()).execute(any());
+    }
+
+    @Test
+    void invalidTimezoneKeepsExistingZoneAndStillUpdatesProfile() {
+        UUID userId = UUID.randomUUID();
+        LearnerProfile existing = existingProfile(userId, "Asia/Ho_Chi_Minh");
+        when(learnerProfileRepository.findByUserId(userId)).thenReturn(Optional.of(existing));
+        when(learnerProfileRepository.save(existing)).thenAnswer(inv -> inv.getArgument(0));
+
+        var command = new UpdateLearnerProfileCommand(userId, "Updated learner", null, "Updated bio",
+                null, "Not/A_Timezone", null);
+        var result = updateLearnerProfileUseCase.execute(command);
+
+        assertEquals("Updated learner", result.displayName());
+        assertEquals("Asia/Ho_Chi_Minh", result.timezone());
+        verify(learnerProfileRepository).save(existing);
+        verifyNoInteractions(learningGoalRepository);
+        verify(studyGoals, never()).execute(any());
+    }
+
+    @Test
+    void changedTimezoneWithoutActiveGoalDoesNotScheduleATarget() {
+        UUID userId = UUID.randomUUID();
+        LearnerProfile existing = existingProfile(userId, "UTC");
+        when(learnerProfileRepository.findByUserId(userId)).thenReturn(Optional.of(existing));
+        when(learnerProfileRepository.save(existing)).thenAnswer(inv -> inv.getArgument(0));
+        when(learningGoalRepository.findActiveByUserId(userId)).thenReturn(Optional.empty());
+
+        updateLearnerProfileUseCase.execute(timezoneCommand(userId, "Asia/Ho_Chi_Minh"));
+
+        verify(studyGoals, never()).execute(any());
+    }
+
+    private LearnerProfile existingProfile(UUID userId, String timezone) {
+        return LearnerProfile.builder().userId(userId).displayName("Learner")
+                .visibility(ProfileVisibility.PUBLIC).timezone(timezone).build();
+    }
+
+    private UpdateLearnerProfileCommand timezoneCommand(UUID userId, String timezone) {
+        return new UpdateLearnerProfileCommand(userId, "Learner", null, null, null, timezone, null);
+    }
+
+    @Test
     void deleteLearnerProfileDeletesByUserId() {
         UUID userId = UUID.randomUUID();
         deleteLearnerProfileUseCase.execute(userId);
         verify(learnerProfileRepository).deleteByUserId(userId);
     }
 }
-

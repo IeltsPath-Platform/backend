@@ -46,7 +46,7 @@ public class PointDebitWriter {
                 command.userId(),
                 -command.amount(),
                 wallet.getBalance(),
-                PointTransactionType.AI_GRADING_DEBIT,
+                transactionType(command.referenceType()),
                 command.referenceType(),
                 command.referenceId(),
                 command.idempotencyKey(),
@@ -59,5 +59,13 @@ public class PointDebitWriter {
         ));
 
         return DebitPointsUseCase.toResult(savedEntry);
+    }
+
+    private static PointTransactionType transactionType(String referenceType) {
+        return switch (referenceType) {
+            case "HEART_REFILL" -> PointTransactionType.HEART_REFILL_DEBIT;
+            case "STREAK_FREEZE" -> PointTransactionType.STREAK_FREEZE_DEBIT;
+            default -> PointTransactionType.AI_GRADING_DEBIT;
+        };
     }
 }

@@ -7,6 +7,7 @@ import com.ieltspath.learning.domain.vo.ReviewStatus;
 
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -14,53 +15,78 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Whether a learner has cleared a lesson's Practice: every required set has been submitted as Practice at least once
- * and no review it created is still pending. A set a review served as material does not count as submitted. Required sets are those with an objective skill (Reading, Listening) or no
- * skill (older Content); Writing sets are optional. A lesson without required sets is {@code NO_PRACTICE} even before
- * it opens; otherwise its Practice is LOCKED until the lesson opens. A PASSED Practice is what completes a lesson that
- * has required sets.
+ * Whether a learner has cleared a lesson's Practice. When the published sets name their skills, each objective skill
+ * (Reading, Listening) is cleared on its own and the Practice passes once every one of them is; Writing sets are
+ * optional. Sets without skills (older Content) are judged together as before.
+ *
+ * <p>A skill (or the whole lesson) cleared through reviews needs at least one review of it and none still PENDING:
+ * a finished review next to an open one does not clear the Practice. A DONE and a SKIPPED review (no package left)
+ * both count as finished.
  */
 public final class PracticeClearance {
     private static final Set<LearningSkill> OPTIONAL = EnumSet.of(LearningSkill.WRITING);
+    private static final List<PracticePassReason> STRENGTH = List.of(PracticePassReason.FIRST_SUBMISSION,
+            PracticePassReason.REVIEW_FINISHED, PracticePassReason.ALL_SETS_ATTEMPTED);
 
-    public Clearance derive(boolean lessonOpen, Set<UUID> publishedPackages, List<AttemptFact> attempts,
-                            Set<UUID> submittedPackages, List<ReviewFact> reviews, PracticePassReason stored) {
-        return derive(lessonOpen, publishedPackages.stream()
+    public Clearance derive(boolean lessonCompleted, Set<UUID> publishedPackages, List<AttemptFact> attempts,
+                            Set<UUID> revealedPackages, List<ReviewFact> reviews, PracticePassReason stored) {
+        return derive(lessonCompleted, publishedPackages.stream()
                         .collect(Collectors.toMap(id -> id, id -> Set.<LearningSkill>of())), attempts,
-                submittedPackages, reviews, stored);
+                revealedPackages, reviews, stored);
     }
 
-    /**
-     * {@code publishedSets} maps each published set of the lesson to the skills of its questions. The reason is
-     * {@code FIRST_SUBMISSION} when every required set passed at its first submission and no review was needed,
-     * {@code REVIEW_FINISHED} when reviews were needed and are all finished, else {@code ALL_SETS_ATTEMPTED}.
-     */
-    public Clearance derive(boolean lessonOpen, Map<UUID, Set<LearningSkill>> publishedSets,
-                            List<AttemptFact> attempts, Set<UUID> submittedPackages, List<ReviewFact> reviews,
+    /** {@code publishedSets} maps each published set of the lesson to the skills of its questions. */
+    public Clearance derive(boolean lessonCompleted, Map<UUID, Set<LearningSkill>> publishedSets,
+                            List<AttemptFact> attempts, Set<UUID> revealedPackages, List<ReviewFact> reviews,
                             PracticePassReason stored) {
         if (stored != null) return new Clearance(PracticeStatus.PASSED, stored);
-        Map<UUID, Set<LearningSkill>> required = new HashMap<>();
-        publishedSets.forEach((packageId, skills) -> {
-            Set<LearningSkill> objective = skills.stream().filter(skill -> !OPTIONAL.contains(skill))
-                    .collect(Collectors.toSet());
-            if (skills.isEmpty() || !objective.isEmpty()) required.put(packageId, objective);
-        });
-        if (required.isEmpty()) return new Clearance(PracticeStatus.PASSED, PracticePassReason.NO_PRACTICE);
-        if (!lessonOpen) return new Clearance(PracticeStatus.LOCKED, null);
-        boolean pending = reviews.stream().anyMatch(review -> review.status() == ReviewStatus.PENDING);
-        if (pending || !submittedPackages.containsAll(required.keySet())) {
-            return new Clearance(PracticeStatus.REQUIRED, null);
+        if (!lessonCompleted) return new Clearance(PracticeStatus.LOCKED, null);
+        if (publishedSets.values().stream().allMatch(Set::isEmpty)) {
+            return wholeLesson(publishedSets.keySet(), attempts, revealedPackages, reviews);
         }
-        if (!reviews.isEmpty()) return new Clearance(PracticeStatus.PASSED, PracticePassReason.REVIEW_FINISHED);
-        return new Clearance(PracticeStatus.PASSED, everySetPassedFirst(required, attempts)
-                ? PracticePassReason.FIRST_SUBMISSION : PracticePassReason.ALL_SETS_ATTEMPTED);
+        Map<LearningSkill, Set<UUID>> setsBySkill = new HashMap<>();
+        publishedSets.forEach((packageId, skills) -> skills.stream().filter(skill -> !OPTIONAL.contains(skill))
+                .forEach(skill -> setsBySkill.computeIfAbsent(skill, ignored -> new HashSet<>())
+                        .add(packageId)));
+        if (setsBySkill.isEmpty()) return new Clearance(PracticeStatus.PASSED, PracticePassReason.NO_PRACTICE);
+        PracticePassReason weakest = null;
+        for (var entry : setsBySkill.entrySet()) {
+            PracticePassReason reason = skillReason(entry.getKey(), entry.getValue(), attempts, revealedPackages,
+                    reviews);
+            if (reason == null) return new Clearance(PracticeStatus.REQUIRED, null);
+            if (weakest == null || STRENGTH.indexOf(reason) > STRENGTH.indexOf(weakest)) weakest = reason;
+        }
+        return new Clearance(PracticeStatus.PASSED, weakest);
     }
 
-    private static boolean everySetPassedFirst(Map<UUID, Set<LearningSkill>> required, List<AttemptFact> attempts) {
-        return required.entrySet().stream().allMatch(set -> attempts.stream().anyMatch(attempt ->
-                attempt.packageId().equals(set.getKey()) && attempt.countedAsEvidence()
-                        && (set.getValue().isEmpty() ? attempt.passed()
-                        : attempt.passedSkills().containsAll(set.getValue()))));
+    /** The reason one skill is cleared, or null when it is not yet. */
+    private static PracticePassReason skillReason(LearningSkill skill, Set<UUID> sets, List<AttemptFact> attempts,
+                                                  Set<UUID> revealed, List<ReviewFact> reviews) {
+        if (attempts.stream().anyMatch(attempt -> attempt.countedAsEvidence() && attempt.passedSkills().contains(skill))) {
+            return PracticePassReason.FIRST_SUBMISSION;
+        }
+        List<ReviewFact> ofSkill = reviews.stream()
+                .filter(review -> review.skill() == null || review.skill() == skill).toList();
+        boolean nonePending = ofSkill.stream().noneMatch(review -> review.status() == ReviewStatus.PENDING);
+        if (!ofSkill.isEmpty() && nonePending) return PracticePassReason.REVIEW_FINISHED;
+        if (revealed.containsAll(sets) && nonePending) return PracticePassReason.ALL_SETS_ATTEMPTED;
+        return null;
+    }
+
+    private static Clearance wholeLesson(Set<UUID> publishedPackages, List<AttemptFact> attempts,
+                                         Set<UUID> revealedPackages, List<ReviewFact> reviews) {
+        if (attempts.stream().anyMatch(attempt -> attempt.passed() && attempt.countedAsEvidence())) {
+            return new Clearance(PracticeStatus.PASSED, PracticePassReason.FIRST_SUBMISSION);
+        }
+        boolean nonePending = reviews.stream().noneMatch(review -> review.status() == ReviewStatus.PENDING);
+        if (!reviews.isEmpty() && nonePending) {
+            return new Clearance(PracticeStatus.PASSED, PracticePassReason.REVIEW_FINISHED);
+        }
+        if (!publishedPackages.isEmpty() && revealedPackages.containsAll(publishedPackages) && nonePending) {
+            return new Clearance(PracticeStatus.PASSED, PracticePassReason.ALL_SETS_ATTEMPTED);
+        }
+        if (publishedPackages.isEmpty()) return new Clearance(PracticeStatus.PASSED, PracticePassReason.NO_PRACTICE);
+        return new Clearance(PracticeStatus.REQUIRED, null);
     }
 
     /** {@code passedSkills} are the skills that reached the pass mark in that submission. */

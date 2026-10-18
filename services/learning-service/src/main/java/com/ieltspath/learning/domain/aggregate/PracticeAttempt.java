@@ -2,6 +2,7 @@ package com.ieltspath.learning.domain.aggregate;
 
 import com.ieltspath.learning.domain.exception.PracticeAttemptAlreadySubmittedException;
 import com.ieltspath.learning.domain.vo.LearningSkill;
+import com.ieltspath.learning.domain.vo.PracticeOrigin;
 import com.ieltspath.learning.domain.vo.PracticeSubmission;
 
 import java.time.Instant;
@@ -11,10 +12,16 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * One attempt at a practice set. A lesson attempt belongs to its lesson; a free attempt has no lesson and belongs to the
+ * knowledge point the learner chose.
+ */
 public final class PracticeAttempt {
     private final UUID id;
     private final UUID userId;
     private final UUID lessonId;
+    private final UUID knowledgePointId;
+    private final PracticeOrigin origin;
     private final Set<LearningSkill> skills;
     private final UUID packageId;
     private final UUID packageVersionId;
@@ -23,12 +30,20 @@ public final class PracticeAttempt {
     private UUID requestId;
     private PracticeSubmission response;
 
-    private PracticeAttempt(UUID id, UUID userId, UUID lessonId, Set<LearningSkill> skills, UUID packageId,
-                            UUID packageVersionId, Instant startedAt, Instant submittedAt, UUID requestId,
-                            PracticeSubmission response) {
+    private PracticeAttempt(UUID id, UUID userId, UUID lessonId, UUID knowledgePointId, PracticeOrigin origin,
+                            Set<LearningSkill> skills, UUID packageId, UUID packageVersionId, Instant startedAt,
+                            Instant submittedAt, UUID requestId, PracticeSubmission response) {
         this.id = Objects.requireNonNull(id);
         this.userId = Objects.requireNonNull(userId);
-        this.lessonId = Objects.requireNonNull(lessonId);
+        this.origin = Objects.requireNonNull(origin);
+        if (origin == PracticeOrigin.LESSON) {
+            this.lessonId = Objects.requireNonNull(lessonId, "A lesson attempt needs its lesson");
+            this.knowledgePointId = knowledgePointId;
+        } else {
+            if (lessonId != null) throw new IllegalArgumentException("A free attempt has no lesson");
+            this.lessonId = null;
+            this.knowledgePointId = Objects.requireNonNull(knowledgePointId, "A free attempt needs its knowledge point");
+        }
         EnumSet<LearningSkill> copy = EnumSet.noneOf(LearningSkill.class);
         Objects.requireNonNull(skills).forEach(skill -> copy.add(Objects.requireNonNull(skill)));
         if (copy.isEmpty()) throw new IllegalArgumentException("A practice attempt needs at least one skill");
@@ -49,7 +64,15 @@ public final class PracticeAttempt {
     /** {@code skills} are the skills of the practice set's questions. */
     public static PracticeAttempt start(UUID id, UUID userId, UUID lessonId, Set<LearningSkill> skills,
                                         UUID packageId, UUID versionId, Instant now) {
-        return new PracticeAttempt(id, userId, lessonId, skills, packageId, versionId, now, null, null, null);
+        return new PracticeAttempt(id, userId, lessonId, null, PracticeOrigin.LESSON, skills, packageId, versionId,
+                now, null, null, null);
+    }
+
+    /** A free attempt on one knowledge point; it has no lesson, so nothing it does depends on one. */
+    public static PracticeAttempt startFree(UUID id, UUID userId, UUID knowledgePointId, Set<LearningSkill> skills,
+                                            UUID packageId, UUID versionId, Instant now) {
+        return new PracticeAttempt(id, userId, null, knowledgePointId, PracticeOrigin.FREE, skills, packageId,
+                versionId, now, null, null, null);
     }
 
     public static PracticeAttempt restore(UUID id, UUID userId, UUID lessonId, LearningSkill skill, UUID packageId,
@@ -62,8 +85,17 @@ public final class PracticeAttempt {
     public static PracticeAttempt restore(UUID id, UUID userId, UUID lessonId, Set<LearningSkill> skills,
                                           UUID packageId, UUID versionId, Instant startedAt, Instant submittedAt,
                                           UUID requestId, PracticeSubmission response) {
-        return new PracticeAttempt(id, userId, lessonId, skills, packageId, versionId, startedAt, submittedAt,
-                requestId, response);
+        return new PracticeAttempt(id, userId, lessonId, null, PracticeOrigin.LESSON, skills, packageId, versionId,
+                startedAt, submittedAt, requestId, response);
+    }
+
+    /** Restores any attempt as stored, including the origin and the knowledge point of a free one. */
+    public static PracticeAttempt restore(UUID id, UUID userId, UUID lessonId, UUID knowledgePointId,
+                                          PracticeOrigin origin, Set<LearningSkill> skills, UUID packageId,
+                                          UUID versionId, Instant startedAt, Instant submittedAt, UUID requestId,
+                                          PracticeSubmission response) {
+        return new PracticeAttempt(id, userId, lessonId, knowledgePointId, origin, skills, packageId, versionId,
+                startedAt, submittedAt, requestId, response);
     }
 
     /** True for a new submission; the same request id replays the saved response. */
@@ -85,7 +117,11 @@ public final class PracticeAttempt {
 
     public UUID id() { return id; }
     public UUID userId() { return userId; }
+    /** The lesson of a lesson attempt; null for a free attempt. */
     public UUID lessonId() { return lessonId; }
+    /** The knowledge point a free attempt is for; null for a lesson attempt. */
+    public UUID knowledgePointId() { return knowledgePointId; }
+    public PracticeOrigin origin() { return origin; }
     /** The one skill of the set, or null for a set that mixes skills. */
     public LearningSkill skill() { return skills.size() == 1 ? skills.iterator().next() : null; }
     public Set<LearningSkill> skills() { return skills; }

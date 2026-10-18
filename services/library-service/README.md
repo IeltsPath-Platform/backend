@@ -7,14 +7,29 @@ Compose stack runs Library with the other deployed services; PostgreSQL publishe
 
 Flyway V1 creates the five catalog tables: `vocabulary_items`, `vocabulary_senses`, `learning_videos`,
 `video_segments`, `video_segment_lexical_entries`. V2 creates six personal-library tables: `flashcard_decks`,
-`flashcards`, `flashcard_deck_items`, `notes`, `video_learning_progress`, `saved_video_segments`. Four V2 foreign keys
-to catalog tables use `ON DELETE RESTRICT`; there is no `outbox_events` table. Data is not copied from the former
-service/database.
+`flashcards`, `flashcard_deck_items`, `notes`, `video_learning_progress`, `saved_video_segments`. V3 adds the
+five-box flashcard review schedule. V4 seeds 300 mock vocabulary items and 302 senses for local demos, using stable
+UUIDv5 identifiers and idempotent inserts. Four V2 foreign keys to catalog tables use `ON DELETE RESTRICT`; there is no
+`outbox_events` table. Data is not copied from the former service/database.
 
 Gateway routes `/api/content/videos/**`, `/api/content/vocabulary/**` and `/api/content/admin/vocabulary/**` here.
 It also routes `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` here; the public
 paths and request/response shapes remain the same. Catalog writes require `ADMIN` or `CONTENT_AUTHOR`; personal
 library writes are owner-scoped.
+
+## Flashcard review schedule
+
+`GET /api/learning-support/flashcards/due?deckId=<uuid>&page=0&limit=20` returns the authenticated learner's active
+due cards, ordered with never-reviewed cards first and then by their next review time. The query filters to an active
+deck owned by that learner when `deckId` is provided. Results are paged in PostgreSQL; `limit` defaults to 20 and
+cannot exceed 50. Card responses include the Leitner box and schedule; cards linked to a vocabulary sense also include
+the item's `ipa`, `pronunciationAudioReference`, and the sense's `exampleSentence`.
+
+`POST /api/learning-support/flashcards/{id}/reviews` accepts
+`{"correct":true,"requestId":"<uuid>"}` and returns the updated card. A correct answer advances one box up to 5;
+an incorrect answer resets the card to box 1. Replaying the most recent `requestId` is a no-op. The interval for the
+resulting box comes from `library.srs.intervals-days`, defaulting to `[1, 2, 4, 8, 16]`.
+See the [flashcard SRS contract](../../docs/contracts/flashcard-srs-v1.md) for request, response, and ownership details.
 
 When saving a video, Library verifies its topic through Content's `GET /api/content/topics/{id}`, forwarding the
 authenticated bearer token and `X-Correlation-Id`. The HTTP client uses a 2-second connection and 5-second read
@@ -37,3 +52,23 @@ For the full container stack, run `docker compose up -d --build`. To run Library
 | `GATEWAY_INTERNAL_JWT_SECRET` | Verifies Gateway's internal JWT; use the same value as Gateway |
 
 Verify with `mvn -q -pl services/library-service -am test`. Migration tests use Testcontainers and require Docker.
+
+## Wordly random vocabulary
+
+POST `/internal/game-content/wordly/random` accepts `{"count":10}` (integer 1-100) and
+returns `{"words":[{"sourceWordId":"<sense UUID>","answer":"AIR","meaning":"..."}]}`.
+This is a service-to-service endpoint protected by the existing internal JWT mechanism,
+not a Gateway/browser route. It returns up to count unique uppercase alphabetic answers
+(1–100 letters), using ACTIVE items/senses with a nonblank Vietnamese meaning. Senses are
+selected deterministically by sort_order/id before randomizing the distinct words.
+The caller decides whether fewer than count words are sufficient for its game mode.
+`data/wordly-starter-vocabulary.json` contains the 100-word starter dataset imported through
+the ADMIN vocabulary API for local testing. It is not an automatic production seed.
+
+
+POST `/internal/game-content/wordly/catalog` accepts `{"after":"","limit":500}`.
+It returns the same words shape, ordered by uppercase answer, strictly after the cursor
+(the previous page's last answer). limit is 1–500; an empty page ends pagination.
+It uses the same ACTIVE/meaning/alphabetic filters as random and the same internal JWT.
+Game stores these pages as a shared immutable dictionary version for guess validation and endless progression.
+This endpoint is internal; it must not be exposed as a browser/Gateway route.

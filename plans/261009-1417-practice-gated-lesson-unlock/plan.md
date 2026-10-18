@@ -1,7 +1,7 @@
 ---
 title: "Practice-gated lesson unlock"
 description: "Lesson sau chỉ mở khi Practice của mọi lesson trước PASSED; bài ôn lặp đến khi đạt, hết bộ câu mới cho qua"
-status: cancelled
+status: in_progress
 priority: P1
 branch: "main"
 tags: [learning-service, lesson-gate, practice, review, tdd]
@@ -13,8 +13,6 @@ source: skill
 ---
 
 # Practice-gated lesson unlock
-
-> Superseded by 261014-2229-lesson-theory-only-practice-gated-unlock (2026-10-14). Not implemented as written.
 
 ## Overview
 
@@ -50,10 +48,10 @@ Chế độ: `--tdd`: mỗi phase viết/sửa test cho hành vi mới trước,
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Review repeats until passed](./phase-01-review-repeats-until-passed.md) | Pending |
-| 2 | [Practice clearance waits for every review](./phase-02-practice-clearance-waits-for-every-review.md) | Pending |
-| 3 | [Practice-gated lesson gate](./phase-03-practice-gated-lesson-gate.md) | Pending |
-| 4 | [Fixtures docs and verification](./phase-04-fixtures-docs-and-verification.md) | Pending |
+| 1 | [Review repeats until passed](./phase-01-review-repeats-until-passed.md) | Completed |
+| 2 | [Practice clearance waits for every review](./phase-02-practice-clearance-waits-for-every-review.md) | Completed |
+| 3 | [Practice-gated lesson gate](./phase-03-practice-gated-lesson-gate.md) | Completed |
+| 4 | [Fixtures docs and verification](./phase-04-fixtures-docs-and-verification.md) | In progress (còn smoke, compile reactor) |
 
 Thứ tự: 1 → 2 → 3 → 4. Phase 1 và 2 độc lập về file nhưng phase 3 dựa trên luật của cả hai.
 

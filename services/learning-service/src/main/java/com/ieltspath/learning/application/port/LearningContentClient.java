@@ -14,18 +14,40 @@ import java.util.Set;
 import java.util.UUID;
 
 public interface LearningContentClient {
+    ProgressMetadata progressMetadata(List<UUID> courseIds);
+
+    record ProgressMetadata(String revision, boolean complete, List<ProgressLesson> lessons) {}
+    record ProgressLesson(UUID courseId, String courseName, BigDecimal bandLevel, UUID topicId,
+                          UUID lessonId, Set<LearningSkill> skills) {}
+
     List<Topic> getTopicSequence();
 
     List<LessonSummary> getTopicLessons(UUID topicId);
 
     Lesson getLesson(UUID lessonId);
 
-    /** A published lesson's Markdown summary and its slide and document links. Callers apply the lesson gate. */
-    LessonResources getLessonResources(UUID lessonId);
-
     List<TestPackage> getTopicTestPackages(UUID topicId);
 
     List<TestPackage> getCourseTestPackages(UUID courseId);
+
+    List<PracticeTestMilestone> getPracticeTestMilestones(UUID courseId);
+
+    /** A published lesson's Markdown summary and its slide and document links. Callers apply the lesson gate. */
+    LessonResources getLessonResources(UUID lessonId);
+
+    /** {@code summaryMarkdown} is {@code null} when the lesson has none; links are in order. */
+    record LessonResources(UUID lessonId, String summaryMarkdown, List<ResourceLink> slides,
+                           List<ResourceLink> documents) {
+        public LessonResources {
+            slides = slides == null ? List.of() : List.copyOf(slides);
+            documents = documents == null ? List.of() : List.copyOf(documents);
+        }
+    }
+
+    record ResourceLink(UUID id, String title, String url, int sortOrder) {}
+
+    record PracticeTestMilestone(UUID packageId, UUID packageVersionId, String code, String title,
+                                 int afterTopicSequence) {}
 
     /** Published placement tests, ordered by package id. */
     List<TestPackage> getPlacementTestPackages();
@@ -54,6 +76,43 @@ public interface LearningContentClient {
 
     PackageVersion getPackageVersion(UUID versionId);
 
+    /** The active prerequisites of each knowledge point; a point without any maps to an empty list. */
+    Map<UUID, List<UUID>> prerequisites(List<UUID> knowledgePointIds);
+
+    /**
+     * The difficulty tag (EASY, MEDIUM, HARD) of each question version Content knows (at most 500); untagged or unknown
+     * versions are absent. Used only for statistics, never to pick what a learner is given.
+     */
+    default Map<UUID, String> questionDifficulties(Collection<UUID> questionVersionIds) {
+        return Map.of();
+    }
+
+    /** Published practice sets, practice tests and lessons for these points (at most 50), none above {@code maxBand}. */
+    SuggestionCandidates suggestionCandidates(List<UUID> knowledgePointIds, BigDecimal maxBand);
+
+    record SuggestionCandidates(List<PackageCandidate> packages, List<LessonCandidate> lessons) {}
+    record PackageCandidate(UUID packageId, UUID packageVersionId, String type, String title,
+                            List<UUID> knowledgePointIds, BigDecimal band, String skill) {}
+    record LessonCandidate(UUID lessonId, UUID topicId, String title, List<UUID> knowledgePointIds, BigDecimal band,
+                           String skill, int sortOrder) {}
+
+    /** Active grading rubric for a writing task. */
+    Rubric getActiveRubric(String task);
+
+    /** An immutable published rubric, including retired versions used by an activated prompt. */
+    Rubric getRubricVersion(String code, int version);
+
+    /** Error codes currently accepted by Content. */
+    List<ErrorType> activeErrorTypes();
+
+    record Rubric(String code, String task, int version, String sourceNote, List<RubricCriterion> criteria,
+                  List<RubricExample> examples) {}
+    record RubricCriterion(String code, String name, String description, int sortOrder,
+                           List<RubricBandDescriptor> bandDescriptors) {}
+    record RubricBandDescriptor(java.math.BigDecimal band, String descriptor) {}
+    record RubricExample(java.math.BigDecimal band, String prompt, String essay, String commentary) {}
+    record ErrorType(String code, String name, String category, int severity, String fixHint) {}
+
     /** The given skills in enum order, or the single legacy skill when Content did not send any. */
     static Set<LearningSkill> skillsOrSingle(Collection<LearningSkill> skills, LearningSkill single) {
         EnumSet<LearningSkill> result = EnumSet.noneOf(LearningSkill.class);
@@ -69,19 +128,27 @@ public interface LearningContentClient {
      */
     record Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                  List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
-                 Set<LearningSkill> skills, int lessonCount) {
+                 Set<LearningSkill> skills, Boolean active, int lessonCount) {
         public Topic {
             skills = skillsOrSingle(skills, skill);
+            active = active == null || active;
+        }
+        public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                     List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
+                     Set<LearningSkill> skills, Boolean active) {
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
+                    skills, active, 0);
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
                      Set<LearningSkill> skills) {
             this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
-                    skills, 0);
+                    skills, true, 0);
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course) {
-            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, null);
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
+                    null, true, 0);
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest) {
@@ -96,68 +163,127 @@ public interface LearningContentClient {
         }
     }
 
-    record Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {}
+    record Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest, Boolean active) {
+        public Course {
+            active = active == null || active;
+        }
 
-    record KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
-                          String description, boolean hasPracticeSet) {
+        public Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {
+            this(courseId, code, name, bandLevel, hasCourseTest, true);
+        }
     }
 
-    /** {@code estimatedMinutes} is null when the author has not set a duration. */
+    /** {@code cefrLevel} ({@code A1} to {@code C2}) and {@code canDo} are null when Content has not set them. */
+    record KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
+                          String description, boolean hasPracticeSet, String cefrLevel, String canDo) {
+        public KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
+                              String description, boolean hasPracticeSet) {
+            this(id, code, name, learningType, skill, description, hasPracticeSet, null, null);
+        }
+    }
+
     record LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
-                         int sortOrder, List<UUID> knowledgePointIds, Set<LearningSkill> skills,
-                         Integer estimatedMinutes) {
+                         int sortOrder, List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds,
+                         Set<LearningSkill> skills, Integer estimatedMinutes) {
         public LessonSummary {
             skills = skillsOrSingle(skills, null);
         }
         public LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
-                             int sortOrder, List<UUID> knowledgePointIds, Set<LearningSkill> skills) {
-            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, skills, null);
+                             int sortOrder, List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds,
+                             Set<LearningSkill> skills) {
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, skills, null);
         }
         public LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
-                             int sortOrder, List<UUID> knowledgePointIds) {
-            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, null);
+                             int sortOrder, List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds) {
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, null, null);
         }
     }
 
-    /**
-     * {@code summaryMarkdown} is the lesson's Markdown summary, {@code null} when it has none. {@code skills} are the
-     * skills the lesson teaches; a response without them falls back to {@code skill}.
-     */
-    record Lesson(UUID lessonId, UUID topicId, String code, String title, String summary, String summaryMarkdown,
-                  int sortOrder, List<UUID> knowledgePointIds, LearningSkill skill, Set<LearningSkill> skills) {
+    /** {@code skills} are the skills the lesson teaches; a response without them falls back to {@code skill}. */
+    record Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
+                  int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks, LearningSkill skill,
+                  Set<LearningSkill> skills) {
         public Lesson {
             skills = skillsOrSingle(skills, skill);
         }
-        public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary, String summaryMarkdown,
-                      int sortOrder, List<UUID> knowledgePointIds, LearningSkill skill) {
-            this(lessonId, topicId, code, title, summary, summaryMarkdown, sortOrder, knowledgePointIds, skill, null);
+        public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
+                      int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks, LearningSkill skill) {
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, skill, null);
         }
-        public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary, String summaryMarkdown,
-                      int sortOrder, List<UUID> knowledgePointIds) {
-            this(lessonId, topicId, code, title, summary, summaryMarkdown, sortOrder, knowledgePointIds, null);
+        public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
+                      int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks) {
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, null);
         }
+    }
+
+    /** {@code blockKind} is {@code EXERCISE} or {@code ESSAY} on exercise blocks; absent means {@code EXERCISE}. */
+    /** {@code knowledgePointIds}: the KPs a TEXT block teaches, or the KPs of an exercise block's questions. */
+    record Block(UUID blockId, String blockType, int sortOrder, String textContent, Asset asset,
+                 List<UUID> vocabularySenseIds, List<Question> questions, String blockKind,
+                 List<UUID> knowledgePointIds) {
+        public Block(UUID blockId, String blockType, int sortOrder, String textContent, Asset asset,
+                     List<UUID> vocabularySenseIds, List<Question> questions, String blockKind) {
+            this(blockId, blockType, sortOrder, textContent, asset, vocabularySenseIds, questions, blockKind, null);
+        }
+
+        public Block(UUID blockId, String blockType, int sortOrder, String textContent, Asset asset,
+                     List<UUID> vocabularySenseIds, List<Question> questions) {
+            this(blockId, blockType, sortOrder, textContent, asset, vocabularySenseIds, questions, null);
+        }
+
+        public boolean isExercise() {
+            return "EXERCISE".equals(blockType) && !isEssay();
+        }
+
+        public boolean isEssay() {
+            return "EXERCISE".equals(blockType) && "ESSAY".equals(blockKind);
+        }
+    }
+
+    /** {@code assets} are the images of an essay question; Content omits them elsewhere. */
+    record Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
+                    Map<String, Object> answerSpec, String explanation, List<UUID> knowledgePointIds,
+                    List<QuestionAsset> assets, String hint) {
+        public Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
+                        Map<String, Object> answerSpec, String explanation, List<UUID> knowledgePointIds,
+                        List<QuestionAsset> assets) {
+            this(questionVersionId, sortOrder, stem, options, answerSpec, explanation, knowledgePointIds, assets, null);
+        }
+
+        public Question(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
+                        Map<String, Object> answerSpec, String explanation, List<UUID> knowledgePointIds) {
+            this(questionVersionId, sortOrder, stem, options, answerSpec, explanation, knowledgePointIds, null);
+        }
+    }
+
+    record QuestionAsset(UUID assetId, String assetType, String mediaUrl, String altText, int sortOrder) {
     }
 
     record Option(String optionKey, String content, int sortOrder) {
     }
 
-    record TestPackage(UUID packageId, UUID packageVersionId, String code) {
-    }
-
-    record PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
-                       int matchedQuestionCount) {
-    }
-
-    /** {@code summaryMarkdown} is {@code null} when the lesson has none; links are in order. */
-    record LessonResources(UUID lessonId, String summaryMarkdown, List<ResourceLink> slides,
-                           List<ResourceLink> documents) {
-        public LessonResources {
-            slides = slides == null ? List.of() : List.copyOf(slides);
-            documents = documents == null ? List.of() : List.copyOf(documents);
+    /** For {@code AUDIO}, {@code textContent} is the transcript and {@code mediaUrl} the playable URL. */
+    record Asset(UUID id, String assetType, String textContent, String mediaReference,
+                 Integer durationSeconds, String mediaUrl) {
+        public Asset(UUID id, String assetType, String textContent, String mediaReference, Integer durationSeconds) {
+            this(id, assetType, textContent, mediaReference, durationSeconds, null);
         }
     }
 
-    record ResourceLink(UUID id, String title, String url, int sortOrder) {}
+    record TestPackage(UUID packageId, UUID packageVersionId, String code) {
+    }
+
+    /**
+     * {@code band} is the band of the course the package belongs to and {@code requiredFeatureKey} the Access feature it
+     * needs; both are null when Content does not say, which means no limit.
+     */
+    record PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
+                       int matchedQuestionCount, BigDecimal band, String requiredFeatureKey) {
+        public PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
+                           int matchedQuestionCount) {
+            this(packageId, packageVersionId, code, questionCount, matchedQuestionCount, null, null);
+        }
+    }
 
     /** {@code skills} are the skills of the set's questions; empty from Content that does not send them. */
     record LessonPracticeSet(UUID packageId, UUID packageVersionId, String code, String title,

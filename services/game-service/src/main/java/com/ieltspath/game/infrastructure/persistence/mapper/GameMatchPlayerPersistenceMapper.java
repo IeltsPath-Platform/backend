@@ -9,7 +9,7 @@ public class GameMatchPlayerPersistenceMapper {
     public GameMatchPlayer toDomain(GameMatchPlayerJpaEntity entity) {
         return new GameMatchPlayer(entity.getId(), entity.getMatchId(), entity.getRoomMemberId(), entity.getUserId(),
                 entity.getScore(), entity.getRank(), GameMatchPlayer.Status.valueOf(entity.getStatus()),
-                entity.getJoinedAt(), entity.getFinishedAt());
+                entity.getJoinedAt(), entity.getFinishedAt(), entity.getLivesRemaining());
     }
 
     public GameMatchPlayerJpaEntity toNewEntity(GameMatchPlayer player) {

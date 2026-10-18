@@ -2,6 +2,7 @@ package com.ieltspath.content.api.dto.response;
 
 import com.ieltspath.content.application.result.KnowledgePointResult;
 import com.ieltspath.content.domain.vo.ContentStatus;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.KnowledgePointKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.Skill;
@@ -20,7 +21,11 @@ public record KnowledgePointResponse(
         String description,
         ContentStatus status,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        CefrLevel cefrLevel,
+        String canDo,
+        String scopeIn,
+        String scopeOut
 ) {
     public static KnowledgePointResponse from(KnowledgePointResult result) {
         return new KnowledgePointResponse(
@@ -34,7 +39,11 @@ public record KnowledgePointResponse(
                 result.description(),
                 result.status(),
                 result.createdAt(),
-                result.updatedAt()
+                result.updatedAt(),
+                result.cefrLevel(),
+                result.canDo(),
+                result.scopeIn(),
+                result.scopeOut()
         );
     }
 }

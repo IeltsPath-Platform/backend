@@ -7,7 +7,6 @@ import com.ieltspath.learning.application.service.PracticeProgress;
 import com.ieltspath.learning.domain.exception.LearningGateException;
 import com.ieltspath.learning.domain.repository.LessonProgressRepository;
 import com.ieltspath.learning.domain.service.LessonAccessGate;
-import com.ieltspath.learning.domain.vo.PendingReview;
 import com.ieltspath.learning.domain.vo.PracticeStatus;
 import com.ieltspath.learning.domain.vo.TopicStatus;
 import org.springframework.stereotype.Service;
@@ -43,31 +42,24 @@ public class GetTopicLessonsUseCase {
         if (topicStatus == TopicStatus.LOCKED) throw new LearningGateException("TOPIC_LOCKED", List.of());
         var ordered = LessonAccess.orderedLessons(content.getTopicLessons(topicId));
         var progress = lessons.findByTopic(userId, topicId);
-        Map<UUID, Boolean> openByLesson = new HashMap<>();
-        boolean earlierComplete = true;
-        for (var lesson : ordered) {
-            openByLesson.put(lesson.lessonId(), earlierComplete);
-            earlierComplete &= LessonAccess.completed(progress.get(lesson.lessonId()));
-        }
-        var topicPractice = practice.forTopic(userId, topicId, openByLesson);
+        Map<UUID, Boolean> completedByLesson = new HashMap<>();
+        for (var lesson : ordered) completedByLesson.put(lesson.lessonId(),
+                LessonAccess.completed(progress.get(lesson.lessonId())));
+        var topicPractice = practice.forTopic(userId, topicId, completedByLesson);
         var practiceStates = topicPractice.clearances();
+        // A lesson opens once every earlier lesson is completed and its Practice passed. The topic test only needs
+        // the lessons completed here; its own Practice and review checks follow below.
         boolean previousComplete = true;
+        boolean previousOpen = true;
         List<TopicLessonsResult.LessonSummary> summaries = new ArrayList<>();
         for (var lesson : ordered) {
             boolean completed = LessonAccess.completed(progress.get(lesson.lessonId()));
-            // The same rule as the lesson gate: a pending review blocks the other lessons teaching its skill, not
-            // the lesson that created it, which stays open to read.
-            var blocking = completed ? List.<PendingReview>of() : LessonAccessGate.blocking(
-                    topicPractice.pendingReviews().stream()
-                            .filter(review -> !review.lessonId().equals(lesson.lessonId())).toList(),
-                    lesson.skills().isEmpty() ? topic.skills() : lesson.skills());
-            UUID blockingReviewId = blocking.isEmpty() ? null : blocking.getFirst().reviewId();
-            boolean open = previousComplete && blockingReviewId == null;
+            var clearance = practiceStates.get(lesson.lessonId());
             summaries.add(new TopicLessonsResult.LessonSummary(lesson.lessonId(), lesson.code(), lesson.title(),
-                    lesson.sortOrder(), completed ? "COMPLETED" : open ? "AVAILABLE" : "LOCKED",
-                    practiceStates.get(lesson.lessonId()).status(),
-                    practiceStates.get(lesson.lessonId()).reason(), lesson.estimatedMinutes(), blockingReviewId));
+                    lesson.sortOrder(), completed ? "COMPLETED" : previousOpen ? "AVAILABLE" : "LOCKED",
+                    clearance.status(), clearance.reason(), lesson.estimatedMinutes()));
             previousComplete &= completed;
+            previousOpen &= completed && clearance.status() == PracticeStatus.PASSED;
         }
         boolean hasPendingReview = !LessonAccessGate.blocking(topicPractice.pendingReviews(), topic.skills()).isEmpty();
         boolean practicePassed = practiceStates.values().stream()

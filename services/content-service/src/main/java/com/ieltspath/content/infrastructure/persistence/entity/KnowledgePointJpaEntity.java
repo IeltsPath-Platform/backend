@@ -1,6 +1,7 @@
 package com.ieltspath.content.infrastructure.persistence.entity;
 
 import com.ieltspath.content.domain.vo.ContentStatus;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.KnowledgePointKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.Skill;
@@ -48,6 +49,19 @@ public class KnowledgePointJpaEntity {
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cefr_level", length = 2)
+    private CefrLevel cefrLevel;
+
+    @Column(name = "can_do", columnDefinition = "TEXT")
+    private String canDo;
+
+    @Column(name = "scope_in", columnDefinition = "TEXT")
+    private String scopeIn;
+
+    @Column(name = "scope_out", columnDefinition = "TEXT")
+    private String scopeOut;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)

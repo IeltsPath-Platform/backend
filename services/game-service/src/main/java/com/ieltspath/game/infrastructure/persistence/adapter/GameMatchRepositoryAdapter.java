@@ -40,4 +40,9 @@ public class GameMatchRepositoryAdapter implements GameMatchRepository {
     public Optional<GameMatch> findById(UUID id) {
         return repository.findById(id).map(mapper::toDomain);
     }
+
+    @Override
+    public Optional<UUID> findActiveIdByRoomId(UUID roomId) {
+        return repository.findActiveIdByRoomId(roomId);
+    }
 }

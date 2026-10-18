@@ -33,6 +33,9 @@ public class SectionQuestionJpaEntity {
     @Column(name = "max_score", nullable = false, precision = 5, scale = 2)
     private BigDecimal maxScore;
 
+    @Column(name = "group_id")
+    private UUID groupId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

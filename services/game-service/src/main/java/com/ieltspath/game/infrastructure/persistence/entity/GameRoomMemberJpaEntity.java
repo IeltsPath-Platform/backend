@@ -4,12 +4,14 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "game_room_members")
+@SQLRestriction("is_delete = false")
 public class GameRoomMemberJpaEntity {
     @Id
     private UUID id;
@@ -29,6 +31,19 @@ public class GameRoomMemberJpaEntity {
     private Instant leftAt;
     @Column(name = "last_seen_at")
     private Instant lastSeenAt;
+    @Column(name = "slot_number")
+    private Short slotNumber;
+    @Column(name = "display_name", length = 255)
+    private String displayName;
+    public String getDisplayName() { return displayName; }
+    public void setDisplayName(String value) { displayName = value; }
+    @Column(name = "is_delete", nullable = false)
+    private boolean isDelete;
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    public Integer getSlotNumber() { return slotNumber == null ? null : slotNumber.intValue(); }
+    public void setSlotNumber(Integer slot) { slotNumber = slot == null ? null : slot.shortValue(); }
 
     protected GameRoomMemberJpaEntity() {
     }

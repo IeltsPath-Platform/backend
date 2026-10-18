@@ -12,7 +12,7 @@ public class AssessmentPersistenceMapper {
     public AssessmentAttempt toDomain(AssessmentAttemptJpaEntity e) {
         return new AssessmentAttempt(e.getId(), e.getUserId(), e.getPackageVersionId(), e.getAttemptType(), e.getMode(),
                 e.getChannel(), e.getStatus(), e.getStartedAt(), e.getSubmittedAt(), e.getExpiresAt(),
-                e.getRowVersion(), e.getCreatedAt(), e.getUpdatedAt(), e.getLearningGoalId());
+                e.getRowVersion(), e.getCreatedAt(), e.getUpdatedAt(), e.getLearningGoalId(), e.getPackageId(), e.getScope(), e.getSkill());
     }
     public AssessmentAttemptJpaEntity toEntity(AssessmentAttempt d) {
         var e = new AssessmentAttemptJpaEntity();
@@ -21,11 +21,12 @@ public class AssessmentPersistenceMapper {
         e.setStartedAt(d.getStartedAt()); e.setSubmittedAt(d.getSubmittedAt()); e.setExpiresAt(d.getExpiresAt());
         e.setRowVersion(d.getRowVersion()); e.setCreatedAt(d.getCreatedAt()); e.setUpdatedAt(d.getUpdatedAt());
         e.setLearningGoalId(d.getLearningGoalId());
+        e.setPackageId(d.getPackageId()); e.setScope(d.getScope()); e.setSkill(d.getSkill());
         return e;
     }
-    public AttemptSection toDomain(AttemptSectionJpaEntity e) { return new AttemptSection(e.getId(), e.getAttemptId(), e.getContentSectionId(), e.getSortOrder(), e.getSnapshot(), e.getStartedAt(), e.getCompletedAt()); }
+    public AttemptSection toDomain(AttemptSectionJpaEntity e) { return new AttemptSection(e.getId(), e.getAttemptId(), e.getContentSectionId(), e.getSortOrder(), e.getSnapshot(), e.getStartedAt(), e.getCompletedAt(), e.getPartNo(), e.getTimeSpentSeconds()); }
     public AttemptSectionJpaEntity toEntity(AttemptSection d) {
-        var e = new AttemptSectionJpaEntity(); e.setId(d.id()); e.setAttemptId(d.attemptId()); e.setContentSectionId(d.contentSectionId()); e.setSortOrder(d.sortOrder()); e.setSnapshot(d.snapshot()); e.setStartedAt(d.startedAt()); e.setCompletedAt(d.completedAt()); return e;
+        var e = new AttemptSectionJpaEntity(); e.setId(d.id()); e.setAttemptId(d.attemptId()); e.setContentSectionId(d.contentSectionId()); e.setSortOrder(d.sortOrder()); e.setSnapshot(d.snapshot()); e.setStartedAt(d.startedAt()); e.setCompletedAt(d.completedAt()); e.setPartNo(d.partNo()); e.setTimeSpentSeconds(d.timeSpentSeconds()); return e;
     }
     public AttemptItem toDomain(AttemptItemJpaEntity e) { return new AttemptItem(e.getId(), e.getAttemptSectionId(), e.getQuestionVersionId(), e.getSortOrder(), e.getQuestionSnapshot(), e.getAnswerSnapshot(), e.getKnowledgeSnapshot()); }
     public AttemptItemJpaEntity toEntity(AttemptItem d) {

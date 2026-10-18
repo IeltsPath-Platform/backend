@@ -41,7 +41,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {InternalAccessController.class, InternalPointsController.class}, properties = {
+@WebMvcTest(controllers = {InternalAccessController.class, InternalPointsController.class,
+        InternalHumanGradingController.class}, properties = {
         "spring.cloud.config.enabled=false",
         "app.auth.internal-jwt-issuer=urn:code-base:api-gateway"
 })
@@ -87,6 +88,43 @@ class InternalAccessControllerTest {
         ArgumentCaptor<DebitPointsCommand> captor = ArgumentCaptor.forClass(DebitPointsCommand.class);
         verify(debitPointsUseCase).execute(captor.capture());
         assertThat(captor.getValue().actorUserId()).isEqualTo(userId);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void creditingPointsOverHttpIsNotExposed() throws Exception {
+        String body = "{\"userId\":\"" + userId + "\",\"amount\":5,\"reason\":\"BADGE\","
+                + "\"referenceId\":\"badge:STREAK_7\",\"idempotencyKey\":\"credit-123\"}";
+
+        mockMvc.perform(post("/internal/access/points/credit")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void humanGradingCreditConsumeAndRefundUseTheAuthenticatedLearner() throws Exception {
+        when(currentUserProvider.requireUserId()).thenReturn(userId);
+        when(consumeHumanGradingCreditUseCase.consume(any()))
+                .thenReturn(new ConsumeHumanGradingCreditUseCase.Consumption(2, true));
+        when(consumeHumanGradingCreditUseCase.refund(any())).thenReturn(3);
+        UUID submissionId = UUID.randomUUID();
+        String body = objectMapper.writeValueAsString(new com.ieltspath.access.api.dto.request.HumanGradingCreditRequest(submissionId));
+
+        mockMvc.perform(post("/internal/access/human-grading/consume").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.submissionId").value(submissionId.toString()))
+                .andExpect(jsonPath("$.remainingCredits").value(2))
+                .andExpect(jsonPath("$.charged").value(true));
+        mockMvc.perform(post("/internal/access/human-grading/refund").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.remainingCredits").value(3));
+
+        ArgumentCaptor<com.ieltspath.access.application.command.ConsumeHumanGradingCreditCommand> captor =
+                ArgumentCaptor.forClass(com.ieltspath.access.application.command.ConsumeHumanGradingCreditCommand.class);
+        verify(consumeHumanGradingCreditUseCase).consume(captor.capture());
+        assertThat(captor.getValue().userId()).isEqualTo(userId);
+        assertThat(captor.getValue().submissionId()).isEqualTo(submissionId);
+        verify(consumeHumanGradingCreditUseCase).refund(
+                new com.ieltspath.access.application.command.RefundHumanGradingCreditCommand(userId, submissionId));
     }
 
     @Test

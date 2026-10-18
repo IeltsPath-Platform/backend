@@ -1,12 +1,24 @@
 ---
 phase: 4
 title: "Fixtures docs and verification"
-status: pending
+status: in_progress
 priority: P1
 dependencies: [3]
 ---
 
 # Phase 4: Fixtures docs and verification
+
+## Trạng thái và ghi chú triển khai
+
+- Đã xong: toàn bộ test learning-service xanh (369 test, 0 fail, 0 skip, Testcontainers chạy thật). Fixture cũ phải đổi
+  vì luật mới: `PracticeIntegrationTest` (làm Practice lesson 1 trước khi hoàn thành lesson 2),
+  `MultiSkillLessonIntegrationTest` (bài ôn của lesson trước chặn lesson sau bất kể skill). Không tắt cổng ở test nào.
+  Test mới: `PracticeGatedLessonUnlockIntegrationTest` (L1 → Practice → L2, bài ôn đạt, hết package, không có Practice).
+- Đã cập nhật: `docs/contracts/lesson-learning-v1.md`, `AGENTS.md` §3.8, `services/learning-service/README.md`.
+- **Chưa làm:**
+  - `docs/system-architecture.md` và `docs/fe-main-flow-guide.md` không có trong repo backend này (không tìm thấy).
+  - `mvn -q compile -DskipTests` cả reactor: bị chặn bởi `JdbcRubricRepository` của content-service (đang do phase 11 sửa dở).
+  - Smoke qua Gateway bằng docker compose và `graphify update .`.
 
 ## Overview
 

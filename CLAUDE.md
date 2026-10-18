@@ -1,6 +1,6 @@
 # CLAUDE.md — IELTSPath backend
 
-- Cập nhật lần cuối: 2026-10-07; dữ kiện đã kiểm với code sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
+- Cập nhật lần cuối: 2026-10-15 (bổ sung URL service khi user-service chạy trên host); dữ kiện kiến trúc đã kiểm ngày 2026-10-07 sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
 - Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
@@ -80,6 +80,7 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 
 ## 5. Cạm bẫy đã biết
 
+- config-repo của user-service mặc định `LEARNING_SERVICE_URL` và `ASSESSMENT_SERVICE_URL` là localhost (chạy trên host). Docker Compose đặt hai biến này sang tên service trong mạng Docker.
 - `CONTENT_SERVICE_URL` của game-service trong config-repo mặc định `http://content-service:8082` (tên trong Docker) và ghi
   đè default local → khi chạy game trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082`.
 - Game gọi library qua `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) cho `VOCABULARY`, gọi content qua
@@ -123,8 +124,7 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 
 Graph ở `graphify-out/` chỉ chứa code first-party (đã loại `third_party/` và `*.md` trong `.graphifyignore`).
 
-- BẮT BUỘC: khi `graphify-out/graph.json` tồn tại, mọi câu hỏi về codebase phải chạy `graphify query "<câu hỏi>"`,
-  `graphify explain "<Symbol>"` hoặc `graphify path "<A>" "<B>"` TRƯỚC khi grep/đọc file; chỉ mở file nguồn của node graph trả về.
-  Tên trùng thì dùng `path::Symbol`.
+- Khi `graphify-out/graph.json` tồn tại, câu hỏi về codebase: chạy `graphify query "<câu hỏi>"`, `graphify explain "<Symbol>"` hoặc
+  `graphify path "<A>" "<B>"` trước khi grep/đọc nhiều file. Tên trùng thì dùng `path::Symbol`.
 - Chỉ đọc `graphify-out/GRAPH_REPORT.md` khi cần review kiến trúc rộng.
 - Sau khi sửa code: `graphify update .` (AST, không tốn API); thêm `--force` khi số node giảm có chủ đích.

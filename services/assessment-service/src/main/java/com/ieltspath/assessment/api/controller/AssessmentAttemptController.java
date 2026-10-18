@@ -3,6 +3,7 @@ package com.ieltspath.assessment.api.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.api.dto.request.SaveAttemptResponseRequest;
 import com.ieltspath.assessment.api.dto.request.StartAssessmentAttemptRequest;
+import com.ieltspath.assessment.api.dto.request.SubmitAttemptRequest;
 import com.ieltspath.assessment.api.dto.response.AssessmentAttemptResponse;
 import com.ieltspath.assessment.api.dto.response.AttemptResponseResponse;
 import com.ieltspath.assessment.api.dto.response.AttemptStructureResponse;
@@ -63,7 +64,8 @@ public class AssessmentAttemptController {
                 currentUser.requireUserId(),
                 request.packageVersionId(),
                 request.mode(),
-                request.channel()
+                request.channel(),
+                request.sectionIds()
         ));
         return AssessmentAttemptResponse.from(result);
     }
@@ -107,10 +109,14 @@ public class AssessmentAttemptController {
     }
 
     @PostMapping("/{id}/submit")
-    public AssessmentAttemptResponse submit(@PathVariable("id") UUID id) {
-        return AssessmentAttemptResponse.from(
-                submitAssessmentAttemptUseCase.execute(new SubmitAssessmentAttemptCommand(currentUser.requireUserId(), id))
-        );
+    public AssessmentAttemptResponse submit(@PathVariable("id") UUID id,
+                                            @Valid @RequestBody(required = false) SubmitAttemptRequest request) {
+        List<SubmitAssessmentAttemptCommand.SectionTime> sectionTimes = request == null || request.sectionSeconds() == null
+                ? List.of()
+                : request.sectionSeconds().stream()
+                        .map(time -> new SubmitAssessmentAttemptCommand.SectionTime(time.sectionId(), time.seconds())).toList();
+        return AssessmentAttemptResponse.from(submitAssessmentAttemptUseCase.execute(
+                new SubmitAssessmentAttemptCommand(currentUser.requireUserId(), id, sectionTimes)));
     }
 
     @PostMapping("/{id}/expire")
@@ -130,7 +136,8 @@ public class AssessmentAttemptController {
                 itemId,
                 request.payload(),
                 request.schemaVersion(),
-                request.expectedRevision()
+                request.expectedRevision(),
+                request.elapsedMs()
         ));
         return AttemptResponseResponse.from(result);
     }

@@ -21,6 +21,14 @@ public interface GateEssayJobStore {
     /** Queues a job for a human examiner unless one with {@code idempotencyKey} exists. */
     void enqueueHuman(UUID submissionId, UUID userId, String idempotencyKey);
 
+    void enqueueHuman(UUID submissionId, UUID userId, String idempotencyKey, String reason);
+
+    /** True when a job with {@code idempotencyKey} exists, whatever its status. */
+    boolean jobExists(String idempotencyKey);
+
+    /** Includes explicit blank submissions for omitted course essays so every essay is discoverable. */
+    void enqueueCourseHuman(Collection<UUID> essayItemIds, UUID userId, Map<UUID, UUID> submitted);
+
     /** Puts AI jobs that have been PROCESSING since before {@code startedBefore} back in the queue. */
     int requeueStuck(Instant startedBefore);
 
@@ -29,6 +37,12 @@ public interface GateEssayJobStore {
 
     /** {@code feedback} is the grader's JSON comments, or null when it gave a band only. */
     void complete(UUID jobId, BigDecimal band, String feedback, Instant now);
+
+    default void complete(UUID jobId, BigDecimal band, String feedback, String promptVersion, Instant now) {
+        complete(jobId, band, feedback, now);
+    }
+
+    void recordComparison(UUID jobId);
 
     void fail(UUID jobId, Instant now);
 

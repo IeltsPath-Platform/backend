@@ -36,7 +36,8 @@ public final class MediaReferencePolicy {
             if (assetType == AssetType.IMAGE && IMAGE_DATA_URI.matcher(mediaReference).matches()) {
                 return mediaReference;
             }
-            if (assetType == AssetType.AUDIO && !baseUrl.isEmpty() && isObjectKey(mediaReference)) {
+            if ((assetType == AssetType.AUDIO || assetType == AssetType.IMAGE)
+                    && !baseUrl.isEmpty() && isObjectKey(mediaReference)) {
                 return baseUrl + mediaReference;
             }
         }

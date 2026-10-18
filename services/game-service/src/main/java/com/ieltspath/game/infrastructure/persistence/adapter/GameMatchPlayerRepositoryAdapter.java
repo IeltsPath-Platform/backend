@@ -26,6 +26,7 @@ public class GameMatchPlayerRepositoryAdapter implements GameMatchPlayerReposito
     @Override
     public GameMatchPlayer save(GameMatchPlayer p) {
         GameMatchPlayerJpaEntity e = repository.findById(p.id()).orElseGet(() -> mapper.toNewEntity(p));
+        e.setLivesRemaining(p.livesRemaining());
         e.updateProgress(p.score(), p.status() == GameMatchPlayer.Status.FINISHED, p.finishedAt() == null ? p.joinedAt() : p.finishedAt());
         if (p.rank() != null) e.setRank(p.rank());
         repository.save(e);

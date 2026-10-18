@@ -77,6 +77,20 @@ class AssessmentCompletedParserTest {
     }
 
     @Test
+    void acceptsOfficialPracticeResultWithoutKnowledgePointMappings() throws Exception {
+        String practice = mutate(event(""), root -> {
+            ObjectNode data = (ObjectNode) root.get("data");
+            data.put("assessment_type", "OFFICIAL_PRACTICE");
+            ((ObjectNode) data.get("item_results").get(0)).putArray("knowledge_point_mappings");
+        });
+
+        AssessmentResult parsed = parse(practice);
+
+        assertEquals("OFFICIAL_PRACTICE", parsed.assessmentType());
+        assertTrue(parsed.items().getFirst().knowledgePoints().isEmpty());
+    }
+
+    @Test
     void contractViolationsAreRejected() throws Exception {
         String valid = event("");
         assertViolation("not json");
@@ -89,6 +103,43 @@ class AssessmentCompletedParserTest {
         assertViolation(mutate(valid, root -> ((ObjectNode) root.get("data").get("item_results").get(0)
                 .get("knowledge_point_mappings").get(0)).put("qualitative_judgment", "MAYBE")));
         assertViolation(mutate(valid, root -> ((ObjectNode) root.get("data")).put("package_version_id", "x")));
+    }
+
+    @Test
+    void durationAndErrorCodeAreOptionalAndCarriedWhenPresent() throws Exception {
+        AssessmentResult withoutNewFields = parse(event(""));
+        assertNull(withoutNewFields.items().getFirst().durationMs());
+        assertNull(withoutNewFields.items().getFirst().errorCode());
+
+        String withFields = mutate(event(""), root -> {
+            ObjectNode item = (ObjectNode) root.get("data").get("item_results").get(0);
+            item.put("duration_ms", 4200);
+            item.put("error_code", "PARAPHRASE_TRAP");
+        });
+        AssessmentResult parsed = parse(withFields);
+        assertEquals(4200L, parsed.items().getFirst().durationMs());
+        assertEquals("PARAPHRASE_TRAP", parsed.items().getFirst().errorCode());
+
+        String explicitNulls = mutate(event(""), root -> {
+            ObjectNode item = (ObjectNode) root.get("data").get("item_results").get(0);
+            item.putNull("duration_ms");
+            item.putNull("error_code");
+        });
+        assertNull(parse(explicitNulls).items().getFirst().durationMs());
+        assertNull(parse(explicitNulls).items().getFirst().errorCode());
+    }
+
+    @Test
+    void malformedDurationOrErrorCodeIsAContractViolation() throws Exception {
+        String valid = event("");
+        assertViolation(mutate(valid, root -> ((ObjectNode) root.get("data").get("item_results").get(0))
+                .put("duration_ms", -1)));
+        assertViolation(mutate(valid, root -> ((ObjectNode) root.get("data").get("item_results").get(0))
+                .put("duration_ms", 1.5)));
+        assertViolation(mutate(valid, root -> ((ObjectNode) root.get("data").get("item_results").get(0))
+                .put("duration_ms", "fast")));
+        assertViolation(mutate(valid, root -> ((ObjectNode) root.get("data").get("item_results").get(0))
+                .put("error_code", 7)));
     }
 
     private void assertViolation(String body) {
