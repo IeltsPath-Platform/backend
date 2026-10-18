@@ -14,6 +14,12 @@ spring:
     locations: classpath:db/migration,classpath:db/callback
     placeholders:
       demoData: ${DEMO_DATA_ENABLED:false}
+  # Learning sends the points it owes (streak, quests, badges, mastered points) over RabbitMQ; Access answers on the same broker.
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD}
 
 app:
   auth:
