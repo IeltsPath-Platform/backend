@@ -67,7 +67,9 @@ Points (access) ── kiếm: thưởng học (có trần/ngày) │ tiêu: h�
 ## Câu hỏi mở
 
 - **Kinh tế points:** points kiếm từ học dùng được để chấm AI (mỗi lần 3 points), nên mỗi học viên có thể dùng LLM nhiều
-  hơn mà không trả tiền. Trần mặc định 20 points/ngày (tối đa ~6 lần chấm). Cần người dùng chốt con số.
+  hơn mà không trả tiền. Trần mặc định 20 points/ngày (tối đa ~6 lần chấm). **Đã chốt 2026-10-18:** giữ 20/ngày cho thưởng
+  lặp lại (streak, nhiệm vụ, KP); thưởng huy hiệu (`BADGE`) không tính vào trần vì chỉ nhận một lần (huy hiệu có mức 20 và 50
+  điểm, vượt trần thì phần dư mất hẳn do `CAPPED` là trạng thái cuối). Cần Codex sửa Access.
 - **Hạng league:** tài liệu ghi "5 leagues" nhưng liệt kê 7 (Bronze, Silver, Gold, Sapphire, Diamond, Ruby, Amethyst) và
   kèm khoảng XP mâu thuẫn với luật lên/xuống hạng. Plan dùng 7 hạng và luật lên/xuống hạng, bỏ khoảng XP.
 - **Ẩn danh trên bảng xếp hạng** (03 Part J #8): mặc định hiện tên hiển thị; có thể thêm tùy chọn ẩn danh sau.
