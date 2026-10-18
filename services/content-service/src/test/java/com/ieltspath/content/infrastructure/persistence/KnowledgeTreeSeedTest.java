@@ -27,7 +27,7 @@ class KnowledgeTreeSeedTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("30").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("41").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
     }
 

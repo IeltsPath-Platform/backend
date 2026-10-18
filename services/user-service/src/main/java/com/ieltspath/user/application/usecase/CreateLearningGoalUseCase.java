@@ -20,9 +20,11 @@ import java.time.LocalDateTime;
 public class CreateLearningGoalUseCase {
     private final LearningGoalRepository learningGoalRepository;
     private final UserRepository userRepository;
+    private final ScheduleStudyGoalUseCase studyGoals;
 
     @Transactional
     public LearningGoalResult execute(CreateLearningGoalCommand command) {
+        studyGoals.lock(command.userId());
         if (userRepository.findById(command.userId()).isEmpty()) {
             throw new UserNotFoundException("Không tìm thấy người dùng với id: " + command.userId());
         }
@@ -52,6 +54,7 @@ public class CreateLearningGoalUseCase {
             newGoal.updateGoal(command.targetBand(), command.examDate(), command.availableMinutesPerDay());
 
             LearningGoal saved = learningGoalRepository.save(newGoal);
+            studyGoals.execute(saved);
             return toResult(saved);
         } catch (DataIntegrityViolationException exception) {
             throw new LearningGoalConflictException("An active learning goal already exists for this user");

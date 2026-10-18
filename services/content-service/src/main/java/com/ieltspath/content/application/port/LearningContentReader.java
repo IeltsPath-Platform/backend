@@ -34,6 +34,8 @@ import java.util.UUID;
  */
 public interface LearningContentReader {
 
+    com.ieltspath.content.application.result.ProgressMetadataResult progressMetadata(Collection<UUID> courseIds);
+
     /** Active topics in active courses, with a skill and published lesson, by skill, course band, topic order and id. */
     List<TopicSequenceResult> topicSequence(int minPracticeQuestions);
 
@@ -100,6 +102,8 @@ public interface LearningContentReader {
 
     /** Package version content for author preview, including draft versions. */
     Optional<PackageVersionContentResult> packageVersionContent(UUID packageVersionId);
+
+    default List<String> practiceTestPublishIssues(UUID packageVersionId) { return List.of(); }
 
     /** The given question versions that a lesson, practice set, final test, mock test or placement test uses. */
     Set<UUID> questionVersionsReservedForLearning(Collection<UUID> questionVersionIds);

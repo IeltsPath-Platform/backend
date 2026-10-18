@@ -9,6 +9,7 @@ import com.ieltspath.assessment.application.port.ContentPackageProvider.Item;
 import com.ieltspath.assessment.application.port.ContentPackageProvider.KnowledgePointWeight;
 import com.ieltspath.assessment.application.port.ContentPackageProvider.Option;
 import com.ieltspath.assessment.application.port.ContentPackageProvider.PackageVersion;
+import com.ieltspath.assessment.application.port.ContentPackageProvider.QuestionGroup;
 import com.ieltspath.assessment.application.port.ContentPackageProvider.Section;
 import com.ieltspath.assessment.domain.aggregate.AssessmentAttempt;
 import com.ieltspath.assessment.domain.entity.AttemptItem;
@@ -117,6 +118,61 @@ class StartAssessmentAttemptUseCaseTest {
         assertThrows(AssessmentNotFoundException.class, () -> useCase().execute(command()));
 
         verifyNoInteractions(attempts, sections, items, knowledgeSnapshot);
+    }
+
+    @Test
+    void timedModeNeverAddsADeadlineToPackagesThatAreNotPracticeTests() {
+        for (String type : List.of("PLACEMENT_TEST", "QUIZ", "MOCK_TEST", "TOPIC_TEST", "COURSE_TEST")) {
+            when(content.findPackageVersion(versionId)).thenReturn(Optional.of(version(type, "Paragraph A.")));
+
+            var started = useCase().execute(new StartAssessmentAttemptCommand(userId, versionId, AttemptMode.TIMED,
+                    AttemptChannel.WEB));
+
+            assertNull(started.expiresAt(), type);
+        }
+    }
+
+    @Test
+    void timedPracticeTestNeedsATimeLimitOnEverySection() {
+        when(content.findPackageVersion(versionId)).thenReturn(Optional.of(version("PRACTICE_TEST", "Paragraph A.")));
+
+        assertThrows(PackageNotAttemptableException.class, () -> useCase().execute(new StartAssessmentAttemptCommand(
+                userId, versionId, AttemptMode.TIMED, AttemptChannel.WEB)));
+    }
+
+    @Test
+    void aQuestionGroupWithoutAnIdOrFormatCodeIsNotAttemptable() {
+        for (QuestionGroup group : List.of(new QuestionGroup(null, 1, "MATCHING", "x"),
+                new QuestionGroup(UUID.randomUUID(), 1, null, "x"))) {
+            when(content.findPackageVersion(versionId)).thenReturn(Optional.of(versionWithGroup(group)));
+
+            assertThrows(PackageNotAttemptableException.class, () -> useCase().execute(command()));
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void questionGroupsAreFrozenInTheSectionSnapshotAndMissingInstructionsBecomeEmpty() throws Exception {
+        UUID groupId = UUID.randomUUID();
+        when(content.findPackageVersion(versionId)).thenReturn(Optional.of(
+                versionWithGroup(new QuestionGroup(groupId, 2, "MATCHING", null))));
+
+        useCase().execute(command());
+
+        ArgumentCaptor<List<AttemptSection>> savedSections = ArgumentCaptor.forClass(List.class);
+        verify(sections).saveAll(savedSections.capture());
+        JsonNode group = json.readTree(savedSections.getValue().getFirst().snapshot()).get("groups").get(0);
+        assertEquals(groupId.toString(), group.get("groupId").asText());
+        assertEquals(2, group.get("sortOrder").asInt());
+        assertEquals("MATCHING", group.get("formatCode").asText());
+        assertEquals("", group.get("instructions").asText());
+    }
+
+    private PackageVersion versionWithGroup(QuestionGroup group) {
+        Section plain = version("TOPIC_TEST", "Paragraph A.").sections().getFirst();
+        return new PackageVersion(versionId, "TOPIC_TEST", List.of(new Section(plain.sectionId(), plain.title(),
+                plain.skill(), plain.instructions(), plain.sortOrder(), plain.passage(), plain.audio(), plain.items(),
+                null, null, List.of(group))));
     }
 
     private StartAssessmentAttemptCommand command() {

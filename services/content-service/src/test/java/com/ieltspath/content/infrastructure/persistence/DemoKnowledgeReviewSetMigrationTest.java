@@ -26,7 +26,7 @@ class DemoKnowledgeReviewSetMigrationTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("40").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("51").load().migrate();
         jdbc = new JdbcTemplate(source);
     }
 

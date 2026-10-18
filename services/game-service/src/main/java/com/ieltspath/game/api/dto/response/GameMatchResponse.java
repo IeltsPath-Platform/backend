@@ -7,13 +7,16 @@ import java.util.List;
 import java.util.UUID;
 
 public record GameMatchResponse(UUID matchId, UUID roomId, UUID sessionId, String status, Instant startedAt,
-                                List<GameMatchPlayerResponse> players) {
+                                List<GameMatchPlayerResponse> players, String playerMode, java.util.Map<String,Object> settings,
+                                com.ieltspath.game.application.result.WordlyRankingResult.Player ownPlayer,
+                                com.ieltspath.game.application.result.WordlyRankingResult ranking) {
     public GameMatchResponse {
         players = List.copyOf(players);
     }
 
     public static GameMatchResponse from(GameMatchResult result) {
         return new GameMatchResponse(result.matchId(), result.roomId(), result.sessionId(), result.status(),
-                result.startedAt(), result.players().stream().map(GameMatchPlayerResponse::from).toList());
+                result.startedAt(), result.players().stream().map(GameMatchPlayerResponse::from).toList(),
+                result.playerMode(),result.settings(),result.ownPlayer(),result.ranking());
     }
 }

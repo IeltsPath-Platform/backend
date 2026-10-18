@@ -46,6 +46,13 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public ProgressMetadata progressMetadata(List<UUID> courseIds) {
+        return response(() -> restClient.post().uri(INTERNAL_PATH + "/progress-metadata")
+                .headers(this::forwardRequestHeaders).body(Map.of("courseIds", courseIds))
+                .retrieve().body(ProgressMetadata.class));
+    }
+
+    @Override
     public List<LessonSummary> getTopicLessons(UUID topicId) {
         return get("/topics/{id}/lessons", new ParameterizedTypeReference<>() { }, topicId);
     }

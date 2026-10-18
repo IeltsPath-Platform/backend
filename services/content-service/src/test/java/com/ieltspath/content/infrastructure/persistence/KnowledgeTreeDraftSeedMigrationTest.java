@@ -50,11 +50,11 @@ class KnowledgeTreeDraftSeedMigrationTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("31").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("42").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
         oldKnowledgePointsBefore = jdbc.queryForList(
                 "SELECT id, code, topic_id, status FROM knowledge_points ORDER BY code", Map.of());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("32").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("43").load().migrate();
     }
 
     @Test

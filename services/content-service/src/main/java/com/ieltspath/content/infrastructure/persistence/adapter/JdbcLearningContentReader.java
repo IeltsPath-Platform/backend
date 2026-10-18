@@ -113,6 +113,29 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     @Override
+    public com.ieltspath.content.application.result.ProgressMetadataResult progressMetadata(Collection<UUID> courseIds) {
+        if (courseIds.isEmpty()) return new com.ieltspath.content.application.result.ProgressMetadataResult("empty", true, List.of());
+        var rows = jdbc.query("""
+                SELECT c.id AS course_id, c.name AS course_name, c.band_level, t.id AS topic_id,
+                       l.id AS lesson_id, ARRAY(SELECT skill FROM (%s) ls ORDER BY skill) AS skills
+                FROM courses c JOIN topics t ON t.course_id = c.id
+                JOIN lessons l ON l.topic_id = t.id
+                WHERE c.id IN (:courseIds) AND c.status = 'ACTIVE' AND t.status = 'ACTIVE'
+                  AND l.status = 'PUBLISHED'
+                ORDER BY c.id, t.sort_order, t.id, l.sort_order, l.id
+                LIMIT 10001
+                """.formatted(LESSON_SKILLS), Map.of("courseIds", courseIds), (rs, i) ->
+                new com.ieltspath.content.application.result.ProgressMetadataResult.Lesson(
+                        uuid(rs, "course_id"), rs.getString("course_name"), rs.getBigDecimal("band_level"),
+                        uuid(rs, "topic_id"), uuid(rs, "lesson_id"), skills(rs)));
+        // Hash the denominator and skill membership, including removals; timestamps alone miss deletions.
+        String revision = UUID.nameUUIDFromBytes(rows.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+        boolean complete = rows.size() <= 10000;
+        return new com.ieltspath.content.application.result.ProgressMetadataResult(revision, complete,
+                complete ? rows : List.of());
+    }
+
+    @Override
     public List<TopicSequenceResult> topicSequence(int minPracticeQuestions) {
         record TopicRow(UUID id, String code, String name, int sortOrder, String requiredFeatureKey, Skill skill,
                         boolean hasTopicTest, TopicSequenceResult.CourseEntry course, List<Skill> skills) {}
@@ -676,7 +699,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
         Map<UUID, List<PackageVersionContentResult.Item>> itemsBySection = new LinkedHashMap<>();
         jdbc.query("""
-                SELECT sq.section_id, sq.sort_order, sq.max_score, qv.id, qv.stem, qv.options::text AS options,
+                SELECT sq.section_id, sq.sort_order, sq.max_score, sq.group_id, qv.id, qv.stem, qv.options::text AS options,
                        qv.answer_spec::text AS answer_spec, qv.explanation, qv.hint
                 FROM section_questions sq
                 JOIN content_sections s ON s.id = sq.section_id
@@ -689,11 +712,25 @@ public class JdbcLearningContentReader implements LearningContentReader {
                     .add(new PackageVersionContentResult.Item(versionId, rs.getInt("sort_order"),
                             rs.getString("stem"), rs.getString("options"), rs.getString("answer_spec"),
                             rs.getString("explanation"), rs.getString("hint"), rs.getDouble("max_score"),
+                            rs.getObject("group_id", UUID.class),
                             mappings.getOrDefault(versionId, List.of())));
         });
 
+        Map<UUID, List<PackageVersionContentResult.QuestionGroup>> groupsBySection = new LinkedHashMap<>();
+        jdbc.query("""
+                SELECT g.id, g.section_id, g.sort_order, g.format_code, g.instructions
+                FROM section_question_groups g
+                JOIN content_sections s ON s.id = g.section_id
+                WHERE s.package_version_id = :versionId
+                ORDER BY g.section_id, g.sort_order
+                """, byVersion, rs -> {
+            groupsBySection.computeIfAbsent(uuid(rs, "section_id"), ignored -> new ArrayList<>())
+                    .add(new PackageVersionContentResult.QuestionGroup(uuid(rs, "id"), rs.getInt("sort_order"),
+                            rs.getString("format_code"), rs.getString("instructions")));
+        });
+
         List<PackageVersionContentResult.Section> sections = jdbc.query("""
-                SELECT s.id, s.title, s.skill, s.instructions, s.sort_order,
+                SELECT s.id, s.title, s.skill, s.instructions, s.sort_order, s.part_no, s.time_limit_seconds,
                        (SELECT a.text_content FROM content_asset_links al
                         JOIN content_assets a ON a.id = al.asset_id
                         WHERE al.section_id = s.id AND a.asset_type = 'PASSAGE'
@@ -711,15 +748,48 @@ public class JdbcLearningContentReader implements LearningContentReader {
             UUID sectionId = uuid(rs, "id");
             return new PackageVersionContentResult.Section(sectionId, rs.getString("title"),
                     enumOrNull(Skill.class, rs.getString("skill")), rs.getString("instructions"),
-                    rs.getInt("sort_order"), rs.getString("passage"),
+                    rs.getInt("sort_order"), (Integer) rs.getObject("part_no"), (Integer) rs.getObject("time_limit_seconds"),
+                    rs.getString("passage"),
                     rs.getObject("audio_id") == null ? null : new PackageVersionContentResult.SectionAudio(
                             uuid(rs, "audio_id"), rs.getString("audio_reference"), null,
                             (Integer) rs.getObject("audio_duration"), rs.getString("audio_transcript")),
+                    groupsBySection.getOrDefault(sectionId, List.of()),
                     itemsBySection.getOrDefault(sectionId, List.of()));
         });
 
         return Optional.of(new PackageVersionContentResult(packageVersionId, version.packageId(),
                 version.packageType(), version.topicId(), version.rules(), sections));
+    }
+
+    @Override
+    public List<String> practiceTestPublishIssues(UUID packageVersionId) {
+        record Validation(int sections, int distinctParts, int validSkills, int distinctSkills, int groupedSections,
+                          int ungroupedQuestions, int multiAnswerGroups) {}
+        List<Validation> rows = jdbc.query("""
+                SELECT (SELECT COUNT(*)::int FROM content_sections s WHERE s.package_version_id = :versionId) sections,
+                       (SELECT COUNT(DISTINCT s.part_no)::int FROM content_sections s WHERE s.package_version_id = :versionId) distinct_parts,
+                       (SELECT COUNT(*)::int FROM content_sections s WHERE s.package_version_id = :versionId
+                         AND s.part_no BETWEEN 1 AND 4 AND s.skill IN ('READING', 'LISTENING', 'WRITING')) valid_skills,
+                       (SELECT COUNT(DISTINCT s.skill)::int FROM content_sections s WHERE s.package_version_id = :versionId) distinct_skills,
+                       (SELECT COUNT(DISTINCT g.section_id)::int FROM section_question_groups g
+                        JOIN content_sections s ON s.id = g.section_id WHERE s.package_version_id = :versionId) grouped_sections,
+                       (SELECT COUNT(*)::int FROM section_questions sq JOIN content_sections s ON s.id = sq.section_id
+                        WHERE s.package_version_id = :versionId AND sq.group_id IS NULL) ungrouped_questions,
+                       (SELECT COUNT(*)::int FROM section_question_groups g JOIN content_sections s ON s.id = g.section_id
+                        WHERE s.package_version_id = :versionId AND g.format_code = 'MULTIPLE_CHOICE_MANY') multi_answer_groups
+                """, Map.of("versionId", packageVersionId), (rs, row) -> new Validation(rs.getInt("sections"),
+                rs.getInt("distinct_parts"), rs.getInt("valid_skills"), rs.getInt("distinct_skills"), rs.getInt("grouped_sections"),
+                rs.getInt("ungrouped_questions"), rs.getInt("multi_answer_groups")));
+        if (rows.isEmpty()) return List.of("Practice test version has no sections");
+        Validation value = rows.getFirst();
+        List<String> issues = new ArrayList<>();
+        if (value.sections() == 0 || value.sections() != value.distinctParts() || value.sections() != value.validSkills()
+                || value.distinctSkills() != 1)
+            issues.add("Practice tests require unique part numbers and one supported skill per section");
+        if (value.sections() != value.groupedSections() || value.ungroupedQuestions() > 0)
+            issues.add("Every practice test section and question must belong to a question group");
+        if (value.multiAnswerGroups() > 0) issues.add("Multiple-answer groups are not supported for practice tests");
+        return List.copyOf(issues);
     }
 
     @Override

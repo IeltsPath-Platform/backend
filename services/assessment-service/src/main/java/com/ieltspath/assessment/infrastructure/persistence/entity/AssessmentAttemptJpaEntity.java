@@ -4,6 +4,8 @@ import com.ieltspath.assessment.domain.vo.AttemptChannel;
 import com.ieltspath.assessment.domain.vo.AttemptMode;
 import com.ieltspath.assessment.domain.vo.AttemptStatus;
 import com.ieltspath.assessment.domain.vo.AttemptType;
+import com.ieltspath.assessment.domain.vo.AttemptScope;
+import com.ieltspath.assessment.domain.vo.Skill;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -42,4 +44,10 @@ public class AssessmentAttemptJpaEntity {
     private Instant updatedAt;
     @Column(name = "learning_goal_id")
     private UUID learningGoalId;
+    @Column(name = "package_id")
+    private UUID packageId;
+    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 10)
+    private AttemptScope scope = AttemptScope.FULL;
+    @Enumerated(EnumType.STRING) @Column(length = 20)
+    private Skill skill;
 }

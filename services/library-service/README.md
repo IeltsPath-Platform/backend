@@ -52,3 +52,23 @@ For the full container stack, run `docker compose up -d --build`. To run Library
 | `GATEWAY_INTERNAL_JWT_SECRET` | Verifies Gateway's internal JWT; use the same value as Gateway |
 
 Verify with `mvn -q -pl services/library-service -am test`. Migration tests use Testcontainers and require Docker.
+
+## Wordly random vocabulary
+
+POST `/internal/game-content/wordly/random` accepts `{"count":10}` (integer 1-100) and
+returns `{"words":[{"sourceWordId":"<sense UUID>","answer":"AIR","meaning":"..."}]}`.
+This is a service-to-service endpoint protected by the existing internal JWT mechanism,
+not a Gateway/browser route. It returns up to count unique uppercase alphabetic answers
+(1–100 letters), using ACTIVE items/senses with a nonblank Vietnamese meaning. Senses are
+selected deterministically by sort_order/id before randomizing the distinct words.
+The caller decides whether fewer than count words are sufficient for its game mode.
+`data/wordly-starter-vocabulary.json` contains the 100-word starter dataset imported through
+the ADMIN vocabulary API for local testing. It is not an automatic production seed.
+
+
+POST `/internal/game-content/wordly/catalog` accepts `{"after":"","limit":500}`.
+It returns the same words shape, ordered by uppercase answer, strictly after the cursor
+(the previous page's last answer). limit is 1–500; an empty page ends pagination.
+It uses the same ACTIVE/meaning/alphabetic filters as random and the same internal JWT.
+Game stores these pages as a shared immutable dictionary version for guess validation and endless progression.
+This endpoint is internal; it must not be exposed as a browser/Gateway route.

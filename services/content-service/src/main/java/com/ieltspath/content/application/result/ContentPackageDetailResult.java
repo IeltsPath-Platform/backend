@@ -21,5 +21,15 @@ public record ContentPackageDetailResult(
         UUID publishedBy,
         Instant createdAt,
         Instant updatedAt,
-        List<ContentSectionResult> sections
-) {}
+        List<ContentSectionResult> sections,
+        String sourceCode
+) {
+    public ContentPackageDetailResult(UUID id, String code, String title, PackageType packageType,
+                                     String requiredFeatureKey, PublicationStatus status,
+                                     UUID currentPublishedVersionId, int versionNumber, String rulesJson,
+                                     Instant publishedAt, UUID publishedBy, Instant createdAt, Instant updatedAt,
+                                     List<ContentSectionResult> sections) {
+        this(id, code, title, packageType, requiredFeatureKey, status, currentPublishedVersionId, versionNumber,
+                rulesJson, publishedAt, publishedBy, createdAt, updatedAt, sections, null);
+    }
+}

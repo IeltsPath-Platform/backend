@@ -34,6 +34,7 @@ public class GameRoomRepositoryAdapter implements GameRoomRepository {
     public GameRoom save(GameRoom room) {
         GameRoomJpaEntity entity = roomJpaRepository.findById(room.id()).orElseGet(() -> mapper.toNewEntity(room));
         entity.setStatus(room.status().name(), room.updatedAt());
+        entity.setWordlySettings(room.wordlySettings());
         roomJpaRepository.save(entity);
         Map<UUID, GameRoomMemberJpaEntity> existingByUser = new HashMap<>();
         memberJpaRepository.findAllByRoomIdOrderByJoinedAt(room.id())
@@ -42,6 +43,8 @@ public class GameRoomRepositoryAdapter implements GameRoomRepository {
             GameRoomMemberJpaEntity memberEntity = existingByUser.computeIfAbsent(member.userId(), ignored ->
                     mapper.toNewEntity(room, member));
             memberEntity.update(member.role().name(), member.status().name(), member.joinedAt(), room.updatedAt());
+            memberEntity.setSlotNumber(member.slotNumber());
+            memberEntity.setDisplayName(member.displayName());
             memberJpaRepository.save(memberEntity);
         }
         return room;

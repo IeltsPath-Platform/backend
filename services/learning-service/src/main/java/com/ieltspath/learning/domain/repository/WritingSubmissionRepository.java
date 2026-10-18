@@ -24,6 +24,9 @@ public interface WritingSubmissionRepository {
     /** The learner's GRADING submissions for one essay question of a practice attempt. */
     List<WritingSubmission> findGradingForPractice(UUID userId, UUID practiceAttemptId, UUID questionVersionId);
 
+    /** The learner's GRADING free-writing submissions for one essay question. */
+    List<WritingSubmission> findGradingFree(UUID userId, UUID questionVersionId);
+
     /** The newest submission of each essay question of the attempt, keyed by question version. */
     Map<UUID, WritingSubmission> latestForPractice(UUID userId, UUID practiceAttemptId);
 

@@ -4,10 +4,13 @@ import com.ieltspath.assessment.domain.exception.AttemptExpiredException;
 import com.ieltspath.assessment.domain.exception.InvalidAssessmentStateException;
 import com.ieltspath.assessment.domain.vo.*;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
 public final class AssessmentAttempt {
+    private static final Duration PRACTICE_GRACE = Duration.ofSeconds(30);
+
     private final UUID id;
     private final UUID userId;
     private final UUID packageVersionId;
@@ -24,19 +27,31 @@ public final class AssessmentAttempt {
     // Kept only for attempts started before goals stopped being captured; new attempts store null and
     // AssessmentCompleted.v2 always announces a null goal.
     private final UUID learningGoalId;
+    private final UUID packageId;
+    private final AttemptScope scope;
+    private final Skill skill;
 
     public AssessmentAttempt(UUID id, UUID userId, UUID packageVersionId, AttemptType attemptType,
                              AttemptMode mode, AttemptChannel channel, AttemptStatus status,
                              Instant startedAt, Instant submittedAt, Instant expiresAt,
                              long rowVersion, Instant createdAt, Instant updatedAt) {
         this(id, userId, packageVersionId, attemptType, mode, channel, status, startedAt, submittedAt, expiresAt,
-                rowVersion, createdAt, updatedAt, null);
+                rowVersion, createdAt, updatedAt, null, null, AttemptScope.FULL, null);
     }
 
     public AssessmentAttempt(UUID id, UUID userId, UUID packageVersionId, AttemptType attemptType,
                              AttemptMode mode, AttemptChannel channel, AttemptStatus status,
                              Instant startedAt, Instant submittedAt, Instant expiresAt,
                              long rowVersion, Instant createdAt, Instant updatedAt, UUID learningGoalId) {
+        this(id, userId, packageVersionId, attemptType, mode, channel, status, startedAt, submittedAt, expiresAt,
+                rowVersion, createdAt, updatedAt, learningGoalId, null, AttemptScope.FULL, null);
+    }
+
+    public AssessmentAttempt(UUID id, UUID userId, UUID packageVersionId, AttemptType attemptType,
+                             AttemptMode mode, AttemptChannel channel, AttemptStatus status,
+                             Instant startedAt, Instant submittedAt, Instant expiresAt,
+                             long rowVersion, Instant createdAt, Instant updatedAt, UUID learningGoalId,
+                             UUID packageId, AttemptScope scope, Skill skill) {
         this.id = id;
         this.userId = userId;
         this.packageVersionId = packageVersionId;
@@ -51,13 +66,22 @@ public final class AssessmentAttempt {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.learningGoalId = learningGoalId;
+        this.packageId = packageId;
+        this.scope = scope == null ? AttemptScope.FULL : scope;
+        this.skill = skill;
     }
 
     public static AssessmentAttempt start(UUID userId, UUID packageVersionId, AttemptType type,
                                           AttemptMode mode, AttemptChannel channel, Instant expiresAt) {
+        return start(userId, packageVersionId, null, type, mode, channel, expiresAt, AttemptScope.FULL, null);
+    }
+
+    public static AssessmentAttempt start(UUID userId, UUID packageVersionId, UUID packageId, AttemptType type,
+                                          AttemptMode mode, AttemptChannel channel, Instant expiresAt,
+                                          AttemptScope scope, Skill skill) {
         Instant now = Instant.now();
         return new AssessmentAttempt(UUID.randomUUID(), userId, packageVersionId, type, mode, channel,
-                AttemptStatus.IN_PROGRESS, now, null, expiresAt, 0, now, now, null);
+                AttemptStatus.IN_PROGRESS, now, null, expiresAt, 0, now, now, null, packageId, scope, skill);
     }
 
     /**
@@ -72,13 +96,23 @@ public final class AssessmentAttempt {
         if (status != AttemptStatus.IN_PROGRESS) {
             throw new InvalidAssessmentStateException("Only an in-progress attempt can be submitted");
         }
-        if (expiresAt != null && !now.isBefore(expiresAt)) {
+        if (isPastDeadline(now)) {
             expire(now);
             throw new AttemptExpiredException();
         }
         status = AttemptStatus.SUBMITTED;
         submittedAt = now;
         updatedAt = now;
+    }
+
+    /**
+     * Whether the server clock has run out. A practice test gets a short grace after {@code expiresAt}, because its
+     * client submits on the deadline and the request needs time to arrive.
+     */
+    public boolean isPastDeadline(Instant now) {
+        if (expiresAt == null) return false;
+        Instant deadline = attemptType == AttemptType.OFFICIAL_PRACTICE ? expiresAt.plus(PRACTICE_GRACE) : expiresAt;
+        return !now.isBefore(deadline);
     }
 
     public void expire(Instant now) {
@@ -105,4 +139,7 @@ public final class AssessmentAttempt {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public UUID getLearningGoalId() { return learningGoalId; }
+    public UUID getPackageId() { return packageId; }
+    public AttemptScope getScope() { return scope; }
+    public Skill getSkill() { return skill; }
 }

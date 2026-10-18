@@ -76,6 +76,19 @@ class RestLearningContentClientTest {
         assertEquals(new BigDecimal("6.0"), rubric.criteria().getFirst().bandDescriptors().getFirst().band());
         assertEquals("GRAMMAR", errors.getFirst().code());
     }
+
+    @Test
+    void progressMetadataUsesOneBatchAndForwardsAuthentication() {
+        UUID course = UUID.randomUUID();
+        server.expect(requestTo(INTERNAL_PATH + "/progress-metadata"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-internal-token"))
+                .andExpect(content().json("{\"courseIds\":[\"" + course + "\"]}"))
+                .andRespond(withSuccess("{\"revision\":\"v1\",\"complete\":true,\"lessons\":[]}", MediaType.APPLICATION_JSON));
+        var result = client.progressMetadata(List.of(course));
+        assertTrue(result.complete());
+        assertEquals("v1", result.revision());
+    }
     private static final String BASE_URL = "http://content.test";
 
     @Test

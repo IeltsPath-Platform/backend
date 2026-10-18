@@ -137,6 +137,19 @@ clears the range.
   | `listening/placement/part3.mp3` | 170 | placement Listening Part 3 |
   | `listening/placement/part4.mp3` | 190 | placement Listening Part 4 |
 
+- The Listening practice tests (V32, durations from V35, keys kept by V39) reference 12 files. The recordings are
+  text-to-speech renderings of the transcripts; keep a local copy in `services/content-service/media/` (ignored by
+  Git) and upload them under the same keys. The database only ever holds the key, never the audio:
+
+  | Key | Seconds | Used by |
+  | --- | --- | --- |
+  | `listening/practice/pt-listening-01-s1.mp3` … `s4.mp3` | 50, 48, 59, 39 | PT-LISTENING-01 sections 1–4 |
+  | `listening/practice/pt-listening-02-s1.mp3` … `s4.mp3` | 41, 42, 48, 36 | PT-LISTENING-02 sections 1–4 |
+  | `listening/practice/pt-listening-03-s1.mp3` … `s4.mp3` | 39, 42, 46, 35 | PT-LISTENING-03 sections 1–4 |
+
+  Until the files are uploaded and `CONTENT_MEDIA_BASE_URL` is set, these tests answer `INVALID_MEDIA_REFERENCE` when
+  the audio is requested. Once both are done no migration is needed: the URL is `CONTENT_MEDIA_BASE_URL` + key.
+
 ## Verification
 
 ```powershell

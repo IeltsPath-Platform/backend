@@ -15,7 +15,7 @@ class ExaminerQueueMigrationIntegrationTest {
     @Container static final PostgreSQLContainer<?> POSTGRES=new PostgreSQLContainer<>("postgres:15-alpine");
     @Test void upgradesDuplicateLegacyJobsAndFindsOmittedCourseEssays() {
         var source=new DriverManagerDataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).target("8").load().migrate();
+        Flyway.configure().dataSource(source).target("10").load().migrate();
         var jdbc=new JdbcTemplate(source);
         UUID user=UUID.randomUUID(),attempt=UUID.randomUUID(),section=UUID.randomUUID(),item=UUID.randomUUID(),omitted=UUID.randomUUID(),submission=UUID.randomUUID();
         jdbc.update("INSERT INTO assessment_attempts(id,user_id,package_version_id,attempt_type,mode,channel,status) VALUES(?,?,?,'COURSE_GATE','STANDARD','WEB','SUBMITTED')",attempt,user,UUID.randomUUID());

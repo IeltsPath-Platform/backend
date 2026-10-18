@@ -13,6 +13,7 @@ import com.ieltspath.assessment.domain.repository.AttemptItemRepository;
 import com.ieltspath.assessment.domain.repository.AttemptResponseRepository;
 import com.ieltspath.assessment.domain.repository.ErrorAnalysisItemRepository;
 import com.ieltspath.assessment.domain.repository.ItemResultRepository;
+import com.ieltspath.assessment.domain.repository.SkillScoreRepository;
 import com.ieltspath.assessment.domain.vo.AttemptChannel;
 import com.ieltspath.assessment.domain.vo.AttemptMode;
 import com.ieltspath.assessment.domain.vo.AttemptStatus;
@@ -136,6 +137,6 @@ class AutoGradeAttemptServiceTest {
 
     private AutoGradeAttemptService service() {
         return new AutoGradeAttemptService(attemptItems, responses, results, itemResults, errors, knowledgeSnapshot,
-                mock(AssessmentResultCompleter.class), new ObjectMapper());
+                mock(AssessmentResultCompleter.class), new ObjectMapper(), mock(SkillScoreRepository.class));
     }
 }

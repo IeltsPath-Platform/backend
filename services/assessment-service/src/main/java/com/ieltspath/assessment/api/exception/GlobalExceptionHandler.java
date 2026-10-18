@@ -38,7 +38,9 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({InvalidAssessmentStateException.class, IllegalArgumentException.class,
-            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            org.springframework.web.method.annotation.HandlerMethodValidationException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class})
     public ResponseEntity<ErrorResponse> bad(Exception e, HttpServletRequest r) {
         return build(HttpStatus.BAD_REQUEST, e.getMessage(), r.getRequestURI(), null);
     }

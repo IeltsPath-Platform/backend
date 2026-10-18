@@ -31,7 +31,7 @@ class QuestionDifficultyBackfillMigrationTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("30").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("41").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
 
         // One version outside any course or package, and one whose author already chose a difficulty.
@@ -40,7 +40,7 @@ class QuestionDifficultyBackfillMigrationTest {
         totalBefore = count("SELECT count(*) FROM question_versions");
         nullBefore = count("SELECT count(*) FROM question_versions WHERE difficulty IS NULL");
 
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("31").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("42").load().migrate();
     }
 
     @Test

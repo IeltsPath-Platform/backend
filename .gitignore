@@ -68,3 +68,6 @@ agents/
 
 # Local Maven repository cache
 .mvn-cache/
+
+### Local media copies (uploaded to the media bucket, never committed) ###
+services/content-service/media/

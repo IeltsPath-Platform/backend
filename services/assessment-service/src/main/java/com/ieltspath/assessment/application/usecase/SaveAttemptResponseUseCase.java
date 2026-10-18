@@ -7,6 +7,7 @@ import com.ieltspath.assessment.domain.entity.AttemptSection;
 import com.ieltspath.assessment.domain.exception.AssessmentNotFoundException;
 import com.ieltspath.assessment.domain.exception.InvalidAssessmentStateException;
 import com.ieltspath.assessment.domain.exception.RevisionConflictException;
+import com.ieltspath.assessment.domain.exception.AttemptExpiredException;
 import com.ieltspath.assessment.domain.repository.AssessmentAttemptRepository;
 import com.ieltspath.assessment.domain.repository.AttemptItemRepository;
 import com.ieltspath.assessment.domain.repository.AttemptResponseRepository;
@@ -45,6 +46,9 @@ public class SaveAttemptResponseUseCase {
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
         if (attempt.getStatus() != AttemptStatus.IN_PROGRESS) {
             throw new InvalidAssessmentStateException("Only in-progress attempts accept responses");
+        }
+        if (attempt.isPastDeadline(Instant.now())) {
+            throw new AttemptExpiredException();
         }
 
         var item = items.findByIdAndAttemptId(command.itemId(), command.attemptId())

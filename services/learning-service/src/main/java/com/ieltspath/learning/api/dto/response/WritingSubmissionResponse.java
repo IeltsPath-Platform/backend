@@ -15,7 +15,7 @@ import java.util.UUID;
 public record WritingSubmissionResponse(UUID submissionId, String status, String task, Integer wordCount,
                                         BigDecimal overallBand, Boolean passed, List<Criterion> criteria,
                                         List<Correction> corrections, String summary, Integer pointsCharged,
-                                        String sampleAnswer, String code, String failureCode) {
+                                        String sampleAnswer, String code, String failureCode, String essayText) {
     public record Criterion(String code, BigDecimal band, List<String> strengths, List<String> improvements) {}
 
     public record Correction(String excerpt, String suggestion, String category) {}
@@ -30,6 +30,6 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
                 grade == null ? null : grade.corrections().stream().map(correction -> new Correction(
                         correction.excerpt(), correction.suggestion(), correction.category())).toList(),
                 grade == null ? null : grade.summary(), result.pointsCharged(), result.sampleAnswer(), result.code(),
-                result.failureCode());
+                result.failureCode(), result.essayText());
     }
 }

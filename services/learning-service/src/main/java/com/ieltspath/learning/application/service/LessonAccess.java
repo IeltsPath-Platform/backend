@@ -35,12 +35,13 @@ public class LessonAccess {
     private final KnowledgeEvidenceRepository evidence;
     private final RefreshLearningTopicsUseCase refreshTopics;
     private final PracticeProgress practice;
+    private final RecordCourseStudyActivity courseActivity;
     private final LessonAccessGate gate = new LessonAccessGate();
 
     public LessonAccess(LearningContentClient content, LessonProgressRepository lessons,
                         LearnerCurriculumRepository curricula, ReviewItemRepository reviews,
                         KnowledgeEvidenceRepository evidence, RefreshLearningTopicsUseCase refreshTopics,
-                        PracticeProgress practice) {
+                        PracticeProgress practice, RecordCourseStudyActivity courseActivity) {
         this.content = content;
         this.lessons = lessons;
         this.curricula = curricula;
@@ -48,6 +49,7 @@ public class LessonAccess {
         this.evidence = evidence;
         this.refreshTopics = refreshTopics;
         this.practice = practice;
+        this.courseActivity = courseActivity;
     }
 
     public Context authorize(UUID userId, UUID lessonId) {
@@ -120,6 +122,7 @@ public class LessonAccess {
      * The learner's progress in the lesson, placed where Content currently has it and saved; created on first use.
      */
     public LessonProgress refresh(UUID userId, Lesson lesson, LessonProgress current) {
+        courseActivity.record(userId, lesson.topicId());
         LessonProgress progress = current != null ? current
                 : lessons.find(userId, lesson.lessonId()).orElseGet(() -> LessonProgress.start(userId,
                 lesson.lessonId(), lesson.topicId(), lesson.sortOrder(), lesson.knowledgePointIds()));

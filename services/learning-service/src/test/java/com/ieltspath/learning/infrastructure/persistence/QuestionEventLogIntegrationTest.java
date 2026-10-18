@@ -31,7 +31,7 @@ class QuestionEventLogIntegrationTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("11").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("13").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
         log = new JdbcQuestionEventLog(jdbc, event -> { });
     }

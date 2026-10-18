@@ -11,13 +11,21 @@ import com.ieltspath.assessment.domain.repository.AssessmentResultRepository;
 import com.ieltspath.assessment.domain.repository.AttemptItemRepository;
 import com.ieltspath.assessment.domain.repository.AttemptSectionRepository;
 import com.ieltspath.assessment.domain.repository.ItemResultRepository;
+import com.ieltspath.assessment.domain.repository.SkillScoreRepository;
 import com.ieltspath.assessment.domain.service.AnswerSpecGrader;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import com.ieltspath.assessment.domain.aggregate.AssessmentAttempt;
+import com.ieltspath.assessment.domain.entity.AttemptSection;
+import com.ieltspath.assessment.domain.entity.SkillScore;
+import com.ieltspath.assessment.domain.vo.AttemptType;
+
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Objects;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -37,23 +45,26 @@ public class GetAssessmentResultUseCase {
     private final AttemptItemRepository attemptItems;
     private final ItemResultRepository itemResults;
     private final AttemptSectionRepository sections;
+    private final SkillScoreRepository skillScores;
     private final ObjectMapper json;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
 
     public GetAssessmentResultUseCase(AssessmentAttemptRepository attempts, AssessmentResultRepository results,
                                       AttemptItemRepository attemptItems, ItemResultRepository itemResults,
-                                      AttemptSectionRepository sections, ObjectMapper json) {
+                                      AttemptSectionRepository sections, SkillScoreRepository skillScores,
+                                      ObjectMapper json) {
         this.attempts = attempts;
         this.results = results;
         this.attemptItems = attemptItems;
         this.itemResults = itemResults;
         this.sections = sections;
+        this.skillScores = skillScores;
         this.json = json;
     }
 
     @Transactional(readOnly = true)
     public LearnerAssessmentResult execute(UUID userId, UUID attemptId) {
-        attempts.findByIdAndUserId(attemptId, userId)
+        var attempt = attempts.findByIdAndUserId(attemptId, userId)
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment attempt not found"));
         var result = results.findLatestCompletedByAttemptId(attemptId)
                 .orElseThrow(() -> new AssessmentNotFoundException("Assessment result not found"));
@@ -76,10 +87,46 @@ public class GetAssessmentResultUseCase {
         double percent = maxScore.signum() == 0 ? 0.0
                 : score.multiply(BigDecimal.valueOf(100)).divide(maxScore, 2, RoundingMode.HALF_UP).doubleValue();
 
+        boolean showSolutions = percent >= SOLUTIONS_PERCENT
+                || attempt.getAttemptType() == com.ieltspath.assessment.domain.vo.AttemptType.OFFICIAL_PRACTICE;
         return new LearnerAssessmentResult(result.id(), result.attemptId(), result.resultVersion(), result.status(),
                 result.completedAt(), score.doubleValue(), maxScore.doubleValue(), percent, itemViews,
-                percent >= SOLUTIONS_PERCENT ? solutions(items) : null,
-                percent >= SOLUTIONS_PERCENT ? sectionSolutions(attemptId) : null);
+                showSolutions ? solutions(items) : null,
+                showSolutions ? sectionSolutions(attemptId) : null,
+                practice(attempt, result.id(), items));
+    }
+
+    /** Only a practice test result carries timing and band; every other attempt keeps its former shape. */
+    private LearnerAssessmentResult.Practice practice(AssessmentAttempt attempt, UUID resultId, List<AttemptItem> items) {
+        if (attempt.getAttemptType() != AttemptType.OFFICIAL_PRACTICE) return null;
+        Map<UUID, Long> questionCount = items.stream().collect(Collectors.groupingBy(AttemptItem::attemptSectionId,
+                Collectors.counting()));
+        List<LearnerAssessmentResult.SectionSummary> summaries = new ArrayList<>();
+        boolean everySectionHasLimit = true;
+        int limitTotal = 0;
+        for (var section : sections.findByAttemptId(attempt.getId()).stream()
+                .sorted(Comparator.comparingInt(AttemptSection::sortOrder)).toList()) {
+            String title = null;
+            Integer limit = null;
+            try {
+                var snapshot = section.snapshot() == null ? null : json.readTree(section.snapshot());
+                if (snapshot != null) {
+                    if (snapshot.path("title").isTextual()) title = snapshot.path("title").textValue();
+                    if (snapshot.path("timeLimitSeconds").isInt()) limit = snapshot.path("timeLimitSeconds").intValue();
+                }
+            } catch (JsonProcessingException exception) {
+                // A snapshot that is not valid JSON has neither title nor limit.
+            }
+            if (limit == null) everySectionHasLimit = false; else limitTotal += limit;
+            summaries.add(new LearnerAssessmentResult.SectionSummary(section.id(), section.partNo(), title,
+                    questionCount.getOrDefault(section.id(), 0L).intValue(), section.timeSpentSeconds(), limit));
+        }
+        Double band = attempt.getSkill() == null ? null : skillScores.findByResultId(resultId).stream()
+                .filter(score -> score.skill() == attempt.getSkill()).map(SkillScore::band)
+                .filter(Objects::nonNull).findFirst().orElse(null);
+        return new LearnerAssessmentResult.Practice(attempt.getScope(), attempt.getSkill(), attempt.getMode(),
+                attempt.getStartedAt(), attempt.getSubmittedAt(), everySectionHasLimit && !summaries.isEmpty() ? limitTotal : null,
+                band, List.copyOf(summaries));
     }
 
     private List<LearnerAssessmentResult.SectionSolution> sectionSolutions(UUID attemptId) {

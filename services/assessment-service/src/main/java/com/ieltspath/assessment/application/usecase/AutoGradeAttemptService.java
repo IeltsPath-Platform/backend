@@ -14,6 +14,9 @@ import com.ieltspath.assessment.domain.repository.AttemptItemRepository;
 import com.ieltspath.assessment.domain.repository.AttemptResponseRepository;
 import com.ieltspath.assessment.domain.repository.ErrorAnalysisItemRepository;
 import com.ieltspath.assessment.domain.repository.ItemResultRepository;
+import com.ieltspath.assessment.domain.repository.SkillScoreRepository;
+import com.ieltspath.assessment.domain.entity.SkillScore;
+import com.ieltspath.assessment.domain.vo.GradingSource;
 import com.ieltspath.assessment.domain.service.AnswerSpecGrader;
 import com.ieltspath.assessment.domain.service.ErrorTagger;
 import org.springframework.stereotype.Service;
@@ -45,6 +48,7 @@ public class AutoGradeAttemptService {
     private final AttemptItemKnowledgePointRepository knowledgeSnapshot;
     private final AssessmentResultCompleter completer;
     private final ObjectMapper json;
+    private final SkillScoreRepository skillScores;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
     private final ErrorTagger errorTagger = new ErrorTagger();
 
@@ -52,7 +56,7 @@ public class AutoGradeAttemptService {
                                    AssessmentResultRepository results, ItemResultRepository itemResults,
                                    ErrorAnalysisItemRepository errors,
                                    AttemptItemKnowledgePointRepository knowledgeSnapshot,
-                                   AssessmentResultCompleter completer, ObjectMapper json) {
+                                   AssessmentResultCompleter completer, ObjectMapper json, SkillScoreRepository skillScores) {
         this.attemptItems = attemptItems;
         this.responses = responses;
         this.results = results;
@@ -61,6 +65,7 @@ public class AutoGradeAttemptService {
         this.knowledgeSnapshot = knowledgeSnapshot;
         this.completer = completer;
         this.json = json;
+        this.skillScores = skillScores;
     }
 
     /** @return true when the attempt was graded and its result completed. */
@@ -111,6 +116,15 @@ public class AutoGradeAttemptService {
         List<ErrorAnalysisItem> tags = errorAnalysis(items, answers, responseByItem, essayPassed, graded);
         if (!tags.isEmpty()) {
             errors.saveAll(tags);
+        }
+        if (attempt.getAttemptType() == com.ieltspath.assessment.domain.vo.AttemptType.OFFICIAL_PRACTICE
+                && attempt.getSkill() != null) {
+            double rawScore = graded.stream().mapToDouble(ItemResult::score).sum();
+            double maxScore = graded.stream().mapToDouble(ItemResult::maxScore).sum();
+            Double band = com.ieltspath.assessment.domain.service.PracticeBandEstimator
+                    .estimate(attempt.getSkill(), attempt.getScope(), rawScore, maxScore).orElse(null);
+            skillScores.saveAll(List.of(new SkillScore(UUID.randomUUID(), draft.id(), attempt.getSkill(),
+                    rawScore, band, GradingSource.AUTO, null)));
         }
         completer.complete(attempt, draft, items, graded);
         return true;

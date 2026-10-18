@@ -27,9 +27,50 @@ they are not full-length IELTS mocks. Practice-test questions are reserved again
 Publishing a `PRACTICE_TEST` locks its question rows, checks ownership and `EXAM` purpose, and requires gradable
 Reading/Listening questions or Writing essays with a numeric `passBand`, as for course-test grading support.
 
-**Status: approved 2026-10-01. Updated 2026-10-16: active status on topic sequence entries and filtering in learner refresh. Earlier updates added course sequence metadata and course final-test packages, derived `skills`, and mixed-skill course tests.**
+**Status: approved 2026-10-01. Updated 2026-10-16: active status on topic sequence entries and filtering in learner refresh; bounded progress metadata for dashboard statistics. Earlier updates added course sequence metadata and course final-test packages, derived `skills`, and mixed-skill course tests.**
 
-Content Service owns these routes under `/internal/learning-content` (three practice routes added 2026-10-03; course test packages added 2026-10-07). They require a verified internal JWT; callers forward the request bearer and `X-Correlation-Id`. Gateway must explicitly deny client access to `/internal/**`. Responses here can contain `answerSpec` and `explanation` and must never be proxied to a learner unchanged. This contract uses Content's camelCase JSON names. Vocabulary/video catalog data belongs to Library Service; Content V7 removed those tables. The `VOCABULARY` block contains logical sense IDs only, with no Content-owned vocabulary entity or cross-database lookup.
+Content Service owns these routes under `/internal/learning-content` (three practice routes added 2026-10-03; course test packages added 2026-10-07; progress metadata added 2026-10-16). They require a verified internal JWT; callers forward the request bearer and `X-Correlation-Id`. Gateway must explicitly deny client access to `/internal/**`. Except for the metadata-only route below, responses here can contain `answerSpec` and `explanation` and must never be proxied to a learner unchanged. This contract uses Content's camelCase JSON names. Vocabulary/video catalog data belongs to Library Service; Content V7 removed those tables. The `VOCABULARY` block contains logical sense IDs only, with no Content-owned vocabulary entity or cross-database lookup.
+
+## `POST /progress-metadata`
+
+Learning uses this single batch read to obtain the current published lesson denominator for the learner's started courses.
+The request contains 1–100 non-null UUIDs, counted before deduplication:
+
+```json
+{"courseIds":["30000000-0000-4000-8000-000000000001"]}
+```
+
+HTTP 200 response:
+
+```json
+{
+  "revision":"a2da7a64-bc31-31cb-8d23-dd7464456473",
+  "complete":true,
+  "lessons":[{
+    "courseId":"30000000-0000-4000-8000-000000000001",
+    "courseName":"IELTS 5.5",
+    "bandLevel":5.5,
+    "topicId":"10000000-0000-4000-8000-000000000001",
+    "lessonId":"20000000-0000-4000-8000-000000000101",
+    "skills":["READING"]
+  }]
+}
+```
+
+The example revision is illustrative. `revision` is an opaque fingerprint of the returned metadata, including lesson
+membership, skills and course labels; additions, removals or changes may change it. Only ACTIVE courses, ACTIVE topics
+and PUBLISHED lessons qualify. Unknown/inactive IDs contribute no rows; they do not cause 404. Lessons are ordered by
+course ID, topic order/ID and lesson order/ID. Skills are distinct and alphabetically ordered. This response contains no
+questions, answers, `answerSpec`, `chartFacts`, explanations, transcript or learner data.
+
+The query probes at most 10,001 rows. Up to 10,000 lessons returns `complete=true`; overflow returns HTTP 200 with
+`complete=false` and `lessons=[]`. Callers must reject an incomplete denominator, never show a percentage from a
+truncated set. No matching lessons returns `complete=true, lessons=[]`; the revision remains opaque.
+
+Errors use Content's existing `ErrorResponse`: HTTP 400 for missing/empty/over-100 `courseIds`, null elements or malformed
+UUID/JSON; HTTP 401 for missing/invalid internal authentication. This internal route is not exposed in public Swagger or
+through Gateway. The public consumer and its 422/503 behavior are documented in
+[dashboard statistics](dashboard-statistics-v1.md).
 
 Examples use real codes, stems, answers, and passages from [`seed-content.md`](../../plans/260930-2057-mvp-reading-writing-listening-roadmap/seed-content.md). The existing V4 UUIDs for DEMO_READING and KP1 are real; other example UUIDs illustrate relationships rather than fixing V9 migration IDs. A `404` means the id is unknown or unpublished. Collections are sorted as described below.
 

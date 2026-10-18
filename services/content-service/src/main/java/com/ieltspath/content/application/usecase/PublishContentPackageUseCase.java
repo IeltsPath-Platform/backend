@@ -20,6 +20,7 @@ import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.QuestionType;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.domain.vo.TestSource;
 import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.application.result.PackageQuestionSpec;
 import org.springframework.stereotype.Service;
@@ -83,8 +84,18 @@ public class PublishContentPackageUseCase {
                     + "lesson's taught skills");
         }
 
+        if (pkg.getPackageType() == PackageType.PRACTICE_TEST) {
+            try {
+                TestSource.valueOf(pkg.getSourceCode());
+            } catch (RuntimeException invalidSource) {
+                throw new InvalidContentStateException("Practice tests require a supported test source");
+            }
+            List<String> issues = lessons.practiceTestPublishIssues(targetVersion.getId());
+            if (!issues.isEmpty()) throw new InvalidContentStateException(String.join("; ", issues));
+        }
+
         switch (pkg.getPackageType()) {
-            case PRACTICE_SET, PRACTICE_TEST, TOPIC_TEST, COURSE_TEST, MOCK_TEST, PLACEMENT_TEST -> {
+            case PRACTICE_SET, TOPIC_TEST, COURSE_TEST, MOCK_TEST, PLACEMENT_TEST, PRACTICE_TEST -> {
                 lessons.lockQuestionsForPublishing(targetVersion.getId());
                 List<QuestionUsageConflict> conflicts = lessons.questionsUsedElsewhere(targetVersion.getId());
                 if (!conflicts.isEmpty()) {
@@ -113,9 +124,16 @@ public class PublishContentPackageUseCase {
                     throw new InvalidContentStateException("Writing essays require passBand from 0 to 9 in steps of 0.5");
                 }
             }
-            if ((pkg.getPackageType() == PackageType.COURSE_TEST || pkg.getPackageType() == PackageType.PRACTICE_TEST)
-                    && (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableCourseQuestion(question)))) {
-                throw new InvalidContentStateException("Tests require gradable Reading or Listening questions, or Writing essays with passBand");
+            if (pkg.getPackageType() == PackageType.COURSE_TEST
+                    && (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableQuestion(question)))) {
+                throw new InvalidContentStateException("COURSE_TEST requires gradable Reading or Listening questions, or Writing essays with passBand");
+            }
+        }
+        if (pkg.getPackageType() == PackageType.PRACTICE_TEST) {
+            var questions = lessons.packageQuestionSpecs(targetVersion.getId());
+            if (questions.isEmpty() || questions.stream().anyMatch(question -> !gradableQuestion(question))) {
+                throw new InvalidContentStateException(
+                        "Practice tests require auto-gradable Reading or Listening questions, or Writing essays with passBand");
             }
         }
 
@@ -139,7 +157,8 @@ public class PublishContentPackageUseCase {
                 && band.remainder(new java.math.BigDecimal("0.5")).signum() == 0;
     }
 
-    private static boolean gradableCourseQuestion(PackageQuestionSpec question) {
+    /** A Writing essay with a valid passBand, or an auto-gradable Reading or Listening question. */
+    private static boolean gradableQuestion(PackageQuestionSpec question) {
         if (question.skill() == Skill.WRITING) return validEssay(question, parseSpec(question.answerSpecJson()));
         return (question.skill() == Skill.READING || question.skill() == Skill.LISTENING)
                 && question.questionType() != QuestionType.ESSAY && question.questionType() != QuestionType.SPEAKING

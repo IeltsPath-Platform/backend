@@ -25,7 +25,7 @@ class CourseSeedTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("41").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("52").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
         reader = new JdbcLearningContentReader(jdbc);
     }
@@ -78,8 +78,7 @@ class CourseSeedTest {
         assertThat(courses).hasSize(2);
         for (UUID course : courses) {
             var packages = reader.courseTestPackages(course);
-            assertThat(packages).hasSize(2);
-            for (var test : packages) {
+            assertThat(packages).hasSize(2).allSatisfy(test -> {
                 var payload = reader.publishedPackageVersion(test.packageVersionId()).orElseThrow();
                 assertThat(payload.packageType()).isEqualTo(PackageType.COURSE_TEST);
                 assertThat(payload.sections()).singleElement().satisfies(section -> {
@@ -89,7 +88,7 @@ class CourseSeedTest {
                 assertThat(reader.questionsUsedElsewhere(test.packageVersionId())).isEmpty();
                 assertThat(reader.questionsWithWrongPurpose(test.packageVersionId(), QuestionPurpose.LEARNING)).isEmpty();
                 assertThat(reader.packageQuestionSpecs(test.packageVersionId())).allMatch(question -> question.skill() == Skill.READING && question.questionType() != QuestionType.ESSAY);
-            }
+            });
         }
     }
 

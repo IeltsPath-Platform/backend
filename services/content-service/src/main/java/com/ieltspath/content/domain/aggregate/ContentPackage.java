@@ -14,6 +14,7 @@ public class ContentPackage {
     private String title;
     private PackageType packageType;
     private String requiredFeatureKey;
+    private String sourceCode;
     private PublicationStatus status;
     private UUID currentPublishedVersionId;
     private final Instant createdAt;
@@ -35,11 +36,20 @@ public class ContentPackage {
                           String requiredFeatureKey, PublicationStatus status,
                           UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
                           List<ContentPackageVersion> versions, UUID lessonId, UUID courseId) {
+        this(id, code, title, packageType, requiredFeatureKey, status, currentPublishedVersionId, createdAt, updatedAt,
+                versions, lessonId, courseId, null);
+    }
+
+    public ContentPackage(UUID id, String code, String title, PackageType packageType,
+                          String requiredFeatureKey, PublicationStatus status,
+                          UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
+                          List<ContentPackageVersion> versions, UUID lessonId, UUID courseId, String sourceCode) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.code = Objects.requireNonNull(code, "code must not be null");
         this.title = Objects.requireNonNull(title, "title must not be null");
         this.packageType = Objects.requireNonNull(packageType, "packageType must not be null");
         this.requiredFeatureKey = requiredFeatureKey;
+        this.sourceCode = sourceCode;
         this.status = status != null ? status : PublicationStatus.DRAFT;
         this.currentPublishedVersionId = currentPublishedVersionId;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
@@ -56,14 +66,19 @@ public class ContentPackage {
     }
 
     public static ContentPackage create(String code, String title, PackageType packageType, String requiredFeatureKey) {
-        return create(code, title, packageType, requiredFeatureKey, null);
+        return create(code, title, packageType, requiredFeatureKey, null, null);
     }
 
     public static ContentPackage create(String code, String title, PackageType packageType, String requiredFeatureKey,
                                         UUID lessonId) {
+        return create(code, title, packageType, requiredFeatureKey, lessonId, null);
+    }
+
+    public static ContentPackage create(String code, String title, PackageType packageType, String requiredFeatureKey,
+                                        UUID lessonId, String sourceCode) {
         Instant now = Instant.now();
         return new ContentPackage(UUID.randomUUID(), code, title, packageType, requiredFeatureKey,
-                PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), lessonId);
+                PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), lessonId, null, sourceCode);
     }
 
     public void publishVersion(UUID versionId) {
@@ -92,6 +107,7 @@ public class ContentPackage {
     public String getRequiredFeatureKey() {
         return requiredFeatureKey;
     }
+    public String getSourceCode() { return sourceCode; }
     public PublicationStatus getStatus() { return status; }
     public UUID getCurrentPublishedVersionId() { return currentPublishedVersionId; }
     public Instant getCreatedAt() { return createdAt; }

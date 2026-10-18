@@ -884,11 +884,13 @@ class LessonPipelineSeedTest {
         // the 10 questions of the paid topics, the 21 practice questions of V16 and the 43 practice and final-test
         // questions of V18, the 24 course questions of V21 and the 25 lesson, practice and final-test questions of V22.
         // V23 adds 33 lesson, practice and topic-test questions of the multi-skill topic, V25 the 12 placement
-        // questions, V26 the placement Writing Task 1 and V27 the 88 new questions of the full-length placement,
-        // which no lesson or review may reuse either. V33 adds the 23 questions of the 15 free practice sets for
-        // Reading 6.5 and Writing.
+        // questions, V26 the placement Writing Task 1 and V27 the 88 new questions of the full-length placement.
+        // V30 adds the 31 questions of the three Reading practice tests, which no lesson or review may reuse either.
+        // V31 and V32 add the 48 and 153 questions of the further Reading, Listening, Writing and Speaking practice tests.
+        // V37 adds the 12 essays of the six further Writing practice tests. V44 adds the 23 questions of the 15 free
+        // practice sets for Reading 6.5 and Writing.
         // Every seeded question belongs to learning or an assessment, including the new practice checkpoints.
-        assertThat(all).hasSizeGreaterThanOrEqualTo(353);
+        assertThat(all).hasSizeGreaterThanOrEqualTo(574);
         assertThat(reserved).containsExactlyInAnyOrderElementsOf(all);
         assertThat(reader.questionVersionsReservedForLearning(List.of(UUID.randomUUID()))).isEmpty();
     }

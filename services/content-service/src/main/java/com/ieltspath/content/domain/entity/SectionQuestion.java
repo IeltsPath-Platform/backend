@@ -11,16 +11,23 @@ public class SectionQuestion {
     private final UUID questionVersionId;
     private int sortOrder;
     private BigDecimal maxScore;
+    private UUID groupId;
     private final Instant createdAt;
 
     public SectionQuestion(UUID id, UUID sectionId, UUID questionVersionId,
                            int sortOrder, BigDecimal maxScore, Instant createdAt) {
+        this(id, sectionId, questionVersionId, sortOrder, maxScore, createdAt, null);
+    }
+
+    public SectionQuestion(UUID id, UUID sectionId, UUID questionVersionId,
+                           int sortOrder, BigDecimal maxScore, Instant createdAt, UUID groupId) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.sectionId = Objects.requireNonNull(sectionId, "sectionId must not be null");
         this.questionVersionId = Objects.requireNonNull(questionVersionId, "questionVersionId must not be null");
         this.sortOrder = sortOrder;
         this.maxScore = maxScore != null ? maxScore : BigDecimal.ONE;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
+        this.groupId = groupId;
     }
 
     public static SectionQuestion create(UUID sectionId, UUID questionVersionId, int sortOrder, BigDecimal maxScore) {
@@ -32,6 +39,7 @@ public class SectionQuestion {
     public UUID getQuestionVersionId() { return questionVersionId; }
     public int getSortOrder() { return sortOrder; }
     public BigDecimal getMaxScore() { return maxScore; }
+    public UUID getGroupId() { return groupId; }
     public Instant getCreatedAt() { return createdAt; }
 }
 

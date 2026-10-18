@@ -10,6 +10,12 @@ public record SectionQuestionResult(
         UUID questionVersionId,
         int sortOrder,
         BigDecimal maxScore,
-        Instant createdAt
-) {}
+        Instant createdAt,
+        UUID groupId
+) {
+    public SectionQuestionResult(UUID id, UUID sectionId, UUID questionVersionId, int sortOrder,
+                                 BigDecimal maxScore, Instant createdAt) {
+        this(id, sectionId, questionVersionId, sortOrder, maxScore, createdAt, null);
+    }
+}
 

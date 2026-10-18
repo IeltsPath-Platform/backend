@@ -65,6 +65,13 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
     }
 
     @Override
+    public List<WritingSubmission> findGradingFree(UUID userId, UUID questionVersionId) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM lesson_writing_submissions WHERE user_id = ? "
+                        + "AND source = 'FREE_WRITING' AND question_version_id = ? AND status = 'GRADING'",
+                this::submission, userId, questionVersionId);
+    }
+
+    @Override
     public Map<UUID, WritingSubmission> latestForPractice(UUID userId, UUID practiceAttemptId) {
         Map<UUID, WritingSubmission> latest = new HashMap<>();
         jdbc.query("SELECT DISTINCT ON (question_version_id) question_version_id AS question, " + COLUMNS
@@ -106,7 +113,8 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
             statement.setInt(12, submission.pointCost());
             statement.setTimestamp(13, started);
             statement.setTimestamp(14, started);
-            statement.setString(15, submission.practiceAttemptId() == null ? "LESSON_BLOCK" : "PRACTICE_ITEM");
+            statement.setString(15, submission.isFree() ? "FREE_WRITING"
+                    : submission.practiceAttemptId() == null ? "LESSON_BLOCK" : "PRACTICE_ITEM");
             statement.setObject(16, submission.practiceAttemptId());
             statement.setString(17, submission.promptVersion());
             statement.setObject(18, submission.previousSubmissionId());

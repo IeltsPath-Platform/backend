@@ -14,6 +14,12 @@ import java.util.Set;
 import java.util.UUID;
 
 public interface LearningContentClient {
+    ProgressMetadata progressMetadata(List<UUID> courseIds);
+
+    record ProgressMetadata(String revision, boolean complete, List<ProgressLesson> lessons) {}
+    record ProgressLesson(UUID courseId, String courseName, BigDecimal bandLevel, UUID topicId,
+                          UUID lessonId, Set<LearningSkill> skills) {}
+
     List<Topic> getTopicSequence();
 
     List<LessonSummary> getTopicLessons(UUID topicId);
