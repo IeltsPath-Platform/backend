@@ -98,7 +98,7 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 |-------|------|---------|--------|
 | 1 | [Cây tri thức: cạnh tiên quyết và API](./phase-01-content-knowledge-tree.md) | content | Completed (ef2d259) |
 | 2a | [Course/topic 6.0, 7.0 INACTIVE, difficulty bắt buộc, lọc learning](./phase-02-content-seed-tree-and-difficulty.md) | content, learning | Completed (ef2d259) |
-| 2b | [Seed KP, cạnh, difficulty backfill, bộ câu](./phase-02-content-seed-tree-and-difficulty.md) | content | Còn 7 KP Listening chưa đủ 3 bộ (cần audio). Bộ Reading/Writing đã seed (V33) nhưng là bản nháp chưa duyệt |
+| 2b | [Seed KP, cạnh, difficulty backfill, bộ câu](./phase-02-content-seed-tree-and-difficulty.md) | content | Còn 7 KP Listening chưa đủ 3 bộ (cần audio). Bộ Reading/Writing đã seed (V44) nhưng là **bản nháp chưa duyệt: không giao cho học viên thật** cho tới khi người hiểu IELTS duyệt (xem phase 2b) |
 | 3a | [Error taxonomy: bảng, CRUD, ErrorTagger, ghi error analysis](./phase-03-content-error-taxonomy.md) | content, learning, assessment | Completed (a140b8c) |
 | 3b | [Duyệt mã lỗi chính thức và gắn distractors cho câu](./phase-03-content-error-taxonomy.md) | content | Completed (V35, V36; quyết định Q1–Q4 đã chốt) |
 | 4 | [Event log từng câu và thời gian làm](./phase-04-question-event-log-and-duration.md) | learning, assessment | Completed |
@@ -108,7 +108,7 @@ Bài ôn trượt 2 set / hết bộ câu ──> Chẩn đoán dò ngược KP 
 | 8 | [Practice test theo mốc course](./phase-08-practice-test-milestones.md) | content, assessment, learning | Completed (933 test của ba service xanh, không skip; xem báo cáo) |
 | 9 | [Điểm có trọng số và kết quả khóa](./phase-09-course-scoring-and-outcome.md) | learning | Completed |
 | 10 | [Hàng chờ giám khảo và chính sách AI](./phase-10-examiner-queue-and-ai-policy.md) | assessment | Completed (80123b5) |
-| 11 | [Rubric dạng dữ liệu và bộ test nghiệm thu AI](./phase-11-rubric-data-and-ai-evaluation.md) | content, assessment, learning | Công cụ xong; **chưa có bằng chứng nghiệm thu** (cần gold set chuyên gia và lần chạy đánh giá thật) |
+| 11 | [Rubric dạng dữ liệu và bộ test nghiệm thu AI](./phase-11-rubric-data-and-ai-evaluation.md) | content, assessment, learning | **Công cụ xong, chưa nghiệm thu**: chưa có bằng chứng (cần gold set chuyên gia và lần chạy đánh giá thật). Không bật mặc định quyết định nào dựa trên kết quả đánh giá AI |
 | 12 | [Khu quản trị: hồ sơ 360°, cờ, hàng việc, đánh giá Mentor](./phase-12-admin-area-backend.md) | learning, assessment, access | Completed (Gateway route đã có test, c014d56) |
 | 13 | [Contract, tài liệu và nghiệm thu](./phase-13-contracts-docs-and-verification.md) | docs | Đóng, còn mục mở (contract và tài liệu xong; `mvn verify` xanh trừ library-service; demo Compose chưa đạt trọn: lỗi bước 5 đã sửa trong code, cần dựng lại image và chạy lại bước 4, 5, 8; xem `reports/acceptance.md`) |
 | 14 | [Học viên sửa essay và nộp lại](./phase-14-essay-revision.md) | learning | Completed (9cf6d74, báo cáo có `revisionDelta`) |

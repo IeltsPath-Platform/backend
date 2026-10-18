@@ -64,6 +64,12 @@ Points (access) ── kiếm: thưởng học (có trần/ngày) │ tiêu: h�
 | 7 | [League tuần](phase-07-weekly-league.md) | learning, user | completed (V28, chốt tuần, bảng và lịch sử, test HTTP controller và adapter tên hiển thị; còn: ẩn danh) | 2 |
 | 8 | [Contract, tài liệu, nghiệm thu](phase-08-contracts-and-acceptance.md) | docs | completed (contract, AGENTS.md, DATABASE_V5, verify cả reactor, demo 1–6 chạy trên Compose thật; xem `reports/acceptance.md`) | tất cả |
 
+## Việc tiếp theo
+
+- **Dời lấy giới hạn tim ra ngoài learner lock và transaction.** Hiện mỗi lần nộp gọi `access.premium()` một lần (ở
+  `HeartsService.requireHearts`) nhưng vẫn trong transaction và lúc giữ lock của học viên. Cần lấy giới hạn trước khi
+  lock, truyền vào các bước sau; đổi chữ ký của các use case nộp bài và controller tương ứng.
+
 ## Câu hỏi mở
 
 - **Kinh tế points:** points kiếm từ học dùng được để chấm AI (mỗi lần 3 points), nên mỗi học viên có thể dùng LLM nhiều

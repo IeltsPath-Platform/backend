@@ -6,6 +6,9 @@ priority: P2
 dependencies: [3, 10]
 ---
 
+> **Trạng thái (2026-10-18): công cụ xong, chưa nghiệm thu.** Chưa có gold set do chuyên gia IELTS chấm và chưa có lần chạy đánh giá thật nên chưa có bằng chứng độ chính xác. Không bật mặc định quyết định nào dựa trên kết quả đánh giá AI.
+
+
 # Phase 11: Rubric dạng dữ liệu và bộ test nghiệm thu AI
 
 ## Overview

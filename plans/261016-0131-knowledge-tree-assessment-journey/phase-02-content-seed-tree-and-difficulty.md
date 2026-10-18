@@ -13,6 +13,9 @@ Phase này tách làm hai phần:
   learning, test.
 - **2b (nội dung, chờ duyệt):** KP mới, cạnh, difficulty cho câu cũ, bộ câu. Không bắt đầu khi chưa có người hiểu IELTS
   duyệt bảng ở bước 1 của 2b.
+  **Trạng thái hiện tại:** bộ câu Reading và Writing đã seed nhưng là **bản nháp, chưa có người hiểu IELTS duyệt**.
+  Không giao các gói đó cho học viên thật cho tới khi duyệt xong (giống cờ `review_status` của mã lỗi); chỉ dùng cho
+  phát triển và demo.
 
 ## Overview
 
@@ -28,6 +31,13 @@ Mentor yêu cầu "dựng một cái cây từ band 5.5 cho đến band 7". Seed
   - KP cũ của course 5.5 hiện band 5.5, KP cũ của 6.5 hiện band 6.5, dù độ khó thực tế của chúng cao hơn.
   - Band 6.0 và 7.0 chỉ có KP mới (`R60_*`, `L60_*`, `W60_*`, `R70_*`, `L70_*`, `W70_*`). Band 6.0 vì vậy mỏng. Khi trình
     hội đồng, nói rõ đây là dữ liệu bắt đầu và nhóm nội dung sẽ bổ sung.
+- **P2-f. Ngoại lệ của `difficulty` (quyết định 2026-10-18).** `difficulty` bắt buộc với câu thuộc khóa học: API tạo
+  version câu hỏi từ chối khi thiếu (`400 DIFFICULTY_REQUIRED`) và V42 gán cho các câu suy ra được từ course. Câu chỉ
+  dùng trong đề thư viện (practice test có nguồn, seed của thư viện đề) không thuộc course nào nên V42 không suy ra
+  được; chúng được phép `NULL` và V42 không bịa giá trị. Học viên và Learning xử lý `NULL` như câu chưa gắn nhãn: XP
+  tính như mức không rõ (10), thống kê dễ/khó dùng ngưỡng chung, báo cáo của nhân sự bỏ trường `difficulty`, và
+  `POST /questions/difficulties` bỏ những câu này khỏi kết quả. Test của V42 chỉ chấp nhận `NULL` ở câu không thuộc
+  course và đề thư viện.
 - **P2-c. Cạnh đặt theo độ khó thực tế, không theo band hiển thị.** Ví dụ `TFNG_FALSE_VS_NOT_GIVEN` (5.5) →
   `R65_EVIDENCE_INFERENCE` (6.5) là hợp lệ.
 - **P2-d. ID mới không dùng dải `29000000-...`.** Dải này đã có 106 UUID trong migration cũ. Course 6.0/7.0 dùng
