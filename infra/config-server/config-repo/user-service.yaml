@@ -17,8 +17,8 @@ spring:
 
 app:
   study-time:
-    learning-url: ${LEARNING_SERVICE_URL:http://learning-service:8086}
-    assessment-url: ${ASSESSMENT_SERVICE_URL:http://assessment-service:8083}
+    learning-url: ${LEARNING_SERVICE_URL:http://localhost:8086}
+    assessment-url: ${ASSESSMENT_SERVICE_URL:http://localhost:8083}
   auth:
     external-jwt-issuer: ${EXTERNAL_JWT_ISSUER:urn:code-base:auth}
     external-jwt-secret: ${EXTERNAL_JWT_SECRET:FaU24nQz6jxA6m3ihV49zlGXoncSfkNMgYpgC7XPKXc=}
