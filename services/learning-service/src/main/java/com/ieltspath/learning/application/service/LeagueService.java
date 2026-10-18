@@ -29,14 +29,22 @@ public class LeagueService {
 
     /**
      * Adds counted XP to the learner's week. The first XP of the week places them in a group of the tier they play in;
-     * a learner with no XP in the week is in no group.
+     * a learner with no XP in the week is in no group. Before the job closes the learner's previous week, the tier they
+     * play in is the one that week's final rank leads to, not the tier it started from.
      */
     public void addWeeklyXp(UUID userId, int xp) {
         if (xp <= 0) return;
         Instant now = clock.instant();
         LocalDate week = LeagueRules.weekStart(now);
         if (repository.addXp(userId, week, xp, now)) return;
-        repository.join(userId, week, repository.tierOf(userId).orElse(LeagueTier.LOWEST), xp, now);
+        repository.join(userId, week, tierToPlay(userId, week), xp, now);
+    }
+
+    private int tierToPlay(UUID userId, LocalDate week) {
+        return repository.latestUnclosedWeekBefore(userId, week)
+                .map(played -> LeagueRules.tierAfter(played.tier(), played.rank(), LeagueRules.PROMOTE_TOP,
+                        LeagueRules.DEMOTE_FROM))
+                .orElseGet(() -> repository.tierOf(userId).orElse(LeagueTier.LOWEST));
     }
 
     /** Closes every finished week not yet closed; returns how many weeks were closed. Safe to run again. */

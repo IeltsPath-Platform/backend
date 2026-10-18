@@ -78,7 +78,18 @@ public class ContentPackageVersion {
         this.updatedAt = Instant.now();
     }
 
+    /** Keeps the due time, so the job tries again: for a failure that may pass by itself. */
     public void recordScheduledPublicationError(String errorCode) {
+        this.lastPublishError = Objects.requireNonNull(errorCode, "errorCode must not be null");
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * Drops the due time and keeps the reason: the package breaks a publishing rule, and the same attempt would fail
+     * again until an author changes it, possibly weeks later and out of the blue. The author reschedules after fixing.
+     */
+    public void rejectScheduledPublication(String errorCode) {
+        this.publishAt = null;
         this.lastPublishError = Objects.requireNonNull(errorCode, "errorCode must not be null");
         this.updatedAt = Instant.now();
     }

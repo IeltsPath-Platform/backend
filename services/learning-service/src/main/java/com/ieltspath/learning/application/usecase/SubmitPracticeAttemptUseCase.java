@@ -97,15 +97,6 @@ public class SubmitPracticeAttemptUseCase {
         return wrong;
     }
 
-    /** The answers of a set that are correct, in set order; a question counts once however many items it has. */
-    private static List<UUID> correctQuestionIds(ItemGrading.Graded graded) {
-        List<UUID> correct = new ArrayList<>();
-        for (int index = 0; index < graded.items().size(); index++) {
-            if (graded.grades().get(index).correct()) correct.add(graded.items().get(index).questionVersionId());
-        }
-        return correct;
-    }
-
     @Transactional
     public PracticeSubmission execute(UUID userId, UUID attemptId, SubmitExerciseCommand command) {
         lock.lock(userId);
@@ -180,7 +171,7 @@ public class SubmitPracticeAttemptUseCase {
                         candidate.knowledgePointId(), candidate.stage().name())).toList();
         // XP only for the first counted submission of a set, as evidence is.
         GamificationSummary xp = counted
-                ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), correctQuestionIds(graded))
+                ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), graded.correctQuestionIds())
                 : gamificationRecorder.current(userId);
         int wrong = wrongObjectiveAnswers(graded);
         HeartsService.Snapshot heartState = hearts.lose(userId, wrong);

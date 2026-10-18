@@ -53,14 +53,6 @@ public class FreePracticeSubmission {
         this.gamificationRecorder = gamificationRecorder;
     }
 
-    private static List<UUID> correctIds(ItemGrading.Graded graded) {
-        List<UUID> correct = new ArrayList<>();
-        for (int index = 0; index < graded.items().size(); index++) {
-            if (graded.grades().get(index).correct()) correct.add(graded.items().get(index).questionVersionId());
-        }
-        return correct;
-    }
-
     /** The caller has checked that the attempt is the learner's, open, and that this request id is new. */
     public PracticeSubmission submit(UUID userId, PracticeAttempt attempt, SubmitExerciseCommand command) {
         var version = content.getPackageVersion(attempt.packageVersionId());
@@ -91,7 +83,7 @@ public class FreePracticeSubmission {
                     grade.correctAnswer(), item.explanation()));
         }
         GamificationSummary xp = counted
-                ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), correctIds(graded))
+                ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), graded.correctQuestionIds())
                 : gamificationRecorder.current(userId);
         int wrong = 0;
         for (int index = 0; index < graded.items().size(); index++) {

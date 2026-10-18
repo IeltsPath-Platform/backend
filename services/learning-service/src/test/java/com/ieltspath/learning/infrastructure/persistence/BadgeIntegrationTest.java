@@ -3,6 +3,8 @@ package com.ieltspath.learning.infrastructure.persistence;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.service.BadgeService;
 import com.ieltspath.learning.application.service.QuestionEventsAppended;
+import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
+import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.application.service.StreakRecorder;
 import com.ieltspath.learning.application.usecase.BadgesUseCase;
 import com.ieltspath.learning.domain.repository.StreakRepository;
@@ -66,8 +68,8 @@ class BadgeIntegrationTest {
         streaks.save(user, new StreakState(6, 6, yesterday, yesterday.minusDays(5), yesterday, false, null, null, 0,
                 0));
 
-        streakRecorder.onAnswers(new QuestionEventsAppended(user));
-        streakRecorder.onAnswers(new QuestionEventsAppended(user));
+        streakRecorder.onAnswers(answered(user));
+        streakRecorder.onAnswers(answered(user));
 
         assertEquals(List.of("STREAK_7"), held(user));
         assertEquals(1, count("SELECT count(*) FROM reward_grants WHERE user_id = '" + user
@@ -169,5 +171,11 @@ class BadgeIntegrationTest {
     private int count(String sql) {
         Integer value = jdbc.queryForObject(sql, Integer.class);
         return value == null ? 0 : value;
+    }
+
+    /** One new answer the learner submitted in a lesson, as a write of the event log reports it. */
+    private static QuestionEventsAppended answered(UUID user) {
+        return new QuestionEventsAppended(user, java.util.List.of(QuestionAttemptEvent.of(user, UUID.randomUUID(),
+                java.util.List.of(), true, null, null, QuestionEventSource.LESSON_EXERCISE, UUID.randomUUID(), true)));
     }
 }

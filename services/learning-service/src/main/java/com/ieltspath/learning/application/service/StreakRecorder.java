@@ -8,14 +8,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
 /**
  * Counts a learner's answered day when their question events are written. It runs before the submission commits, so the
- * streak, its milestone XP and the queued points commit together with the answer. Days are judged in the learner's
- * timezone.
+ * streak, its milestone XP and the queued points commit together with the answer. The day is the one the learner
+ * submitted the answer, judged in their timezone. A write with no new answer (a replayed submission) and assessment
+ * results (finalised when grading ends, not when the learner answered) do not count.
  */
 @Component
 public class StreakRecorder {
@@ -26,7 +27,6 @@ public class StreakRecorder {
     private final RewardGrantRepository rewards;
     private final LearnerTimezones timezones;
     private final BadgeService badges;
-    private final Clock clock = Clock.systemUTC();
 
     public StreakRecorder(StreakRepository streaks, GamificationRecorder gamification, RewardGrantRepository rewards,
                           LearnerTimezones timezones, BadgeService badges) {
@@ -40,7 +40,10 @@ public class StreakRecorder {
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     public void onAnswers(QuestionEventsAppended appended) {
         UUID userId = appended.userId();
-        LocalDate today = LocalDate.now(clock.withZone(timezones.zoneOf(userId)));
+        Instant answeredAt = appended.submittedAnswers().stream().map(event -> event.answeredAt())
+                .max(Instant::compareTo).orElse(null);
+        if (answeredAt == null) return;
+        LocalDate today = LocalDate.ofInstant(answeredAt, timezones.zoneOf(userId));
         StreakState before = streaks.find(userId).orElse(StreakState.empty());
         StreakRules.Recorded recorded = StreakRules.recordAnswer(before, today);
         streaks.save(userId, recorded.state());

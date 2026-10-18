@@ -16,6 +16,10 @@ import java.util.UUID;
 /**
  * Hearts of a learner. Callers hold the learner lock. The maximum follows the plan: PREMIUM has more hearts, and when
  * Access cannot say which plan a learner is on, the maximum already stored is kept.
+ *
+ * <p>Asking Access for the plan is an HTTP call made while the caller holds a transaction, so a submission makes it
+ * once: {@link #requireHearts} opens the submission and reads the plan. The steps after it ({@link #lose},
+ * {@link #refillOnLevelUp}) work on the hearts and maximum that call stored.
  */
 @Component
 public class HeartsService {
@@ -51,7 +55,7 @@ public class HeartsService {
 
     /** Takes the hearts of the wrong objective answers of one new submission; the learner may end at zero. */
     public Snapshot lose(UUID userId, int wrongAnswers) {
-        Hearts hearts = load(userId);
+        Hearts hearts = loadStored(userId);
         hearts.lose(wrongAnswers, clock.instant());
         repository.save(hearts);
         return view(hearts);
@@ -72,7 +76,7 @@ public class HeartsService {
 
     /** A level-up refills the hearts for free. */
     public void refillOnLevelUp(UUID userId) {
-        Hearts hearts = load(userId);
+        Hearts hearts = loadStored(userId);
         hearts.refillFull(clock.instant());
         repository.save(hearts);
     }
@@ -85,6 +89,18 @@ public class HeartsService {
         hearts.setMax(max, now);
         hearts.regen(now);
         repository.save(hearts);
+        return hearts;
+    }
+
+    /**
+     * The learner's hearts as last stored, with the time regained and no call to Access (the caller saves it): for the steps of a submission
+     * that follow {@link #requireHearts}, which stored the plan's maximum. A learner with no hearts yet starts full at the
+     * standard maximum, which the next {@link #load} corrects for a PREMIUM plan.
+     */
+    private Hearts loadStored(UUID userId) {
+        Instant now = clock.instant();
+        Hearts hearts = repository.find(userId).orElseGet(() -> Hearts.start(userId, standardMax, now));
+        hearts.regen(now);
         return hearts;
     }
 

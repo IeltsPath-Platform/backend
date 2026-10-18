@@ -16,6 +16,8 @@ body `{ "detail": string, "code": string }`.
 - Milestone XP is not capped: a knowledge point reaching consolidate (+25) and maintain (+50), once per point and only for
   practice evidence; streak milestones; completed daily quests.
 - The level is `1 + totalXp / levelXp` (default 1000 XP per level). Reaching a new level refills the hearts for free.
+- XP is charged per question, not per item: a question with several items earns XP once, and only when every item of
+  it is correct. The same unit counts toward the daily cap.
 - The day is the learner's local day. `GET /me/settings` returns `{ "timezone": "Asia/Ho_Chi_Minh" }` (the default until
   chosen); `PUT /me/settings` with `{ "timezone": "<IANA region id>" }` saves it. An offset or abbreviation such as `UTC+3`
   is `400 INVALID_TIMEZONE`.
@@ -44,7 +46,8 @@ and costs nothing more.
 
 A wrong objective answer costs one heart in a lesson exercise, a lesson Practice set and free practice. Review sets, quick
 checks, diagnostic probes, practice tests, topic and course tests, placement and essays cost none. The standard maximum is 5
-(PREMIUM 7). One heart comes back every 5 hours while below the maximum; the clock stops while hearts are full. A learner
+(PREMIUM 7; Learning reads the plan from Access once per submission, and keeps the stored maximum when Access cannot
+answer). One heart comes back every 5 hours while below the maximum; the clock stops while hearts are full. A learner
 may finish with zero hearts; the next start or submission of a heart-costing kind is refused until a heart returns.
 
 ### `GET /me/hearts`
@@ -102,6 +105,13 @@ Response: the same body as `GET /me/streak`.
 | 402 | `INSUFFICIENT_POINTS` | The balance cannot cover `nextFreezeCost` |
 | 503 | `ACCESS_UNAVAILABLE` | Access could not be reached; nothing was charged |
 
+### What counts as a study day
+
+A day counts when the learner submits an answer in Learning (lesson, Practice, free practice, review, diagnostic): the day
+is the one of the submission, in the learner's timezone. An assessment result does not count, for the streak or for the
+daily quests: it is finalised when grading ends, which can be days after the learner answered, so crediting it would
+pay a day the learner did not study. Applying or regrading a result, or replaying a submission, changes neither.
+
 ### Streak rewards
 
 Each multiple of 7 days pays +100 XP and +10 points; day 30 pays +500 XP (no points). A milestone pays once per streak run.
@@ -110,14 +120,15 @@ Each multiple of 7 days pays +100 XP and +10 points; day 30 pays +500 XP (no poi
 
 ### `GET /me/quests`
 
-Three quests per local day, made on first use of the day:
+Three quests per local day, made on first use of the day in the learner's own request (choosing the weakness target
+reads Content with that request's token, so a message consumer never makes them):
 
 | Type | Done when | Reward |
 | --- | --- | --- |
 | `PRACTICE` | 5 objective answers (lesson, Practice, free practice, review) | +20 XP, +5 points |
 | `WEAKNESS` | 3 answers on the target point in free practice or review | +30 XP |
 | `PRACTICE_PLUS` | 10 objective answers; replaces `WEAKNESS` when no point suits | +30 XP |
-| `STREAK` | any new answer today | +10 XP |
+| `STREAK` | any new answer submitted today (not an assessment result) | +10 XP |
 
 ```json
 { "date": "2026-10-18", "completed": 1,
@@ -163,7 +174,8 @@ group of up to 30 learners of the same tier (Bronze, Silver, Gold, Sapphire, Dia
 XP; on a tie, whoever reached that XP first ranks higher. When the week closes the top 7 move up a tier and, in a group of
 at least 23, ranks 23 and below move down; the others stay. A group of 7 or fewer is promoted whole, and a group under 23
 demotes nobody. Amethyst stays at the top and Bronze at the bottom. A learner with no XP in the week is in no group and keeps
-their tier.
+their tier. A learner whose previous week has not been closed yet plays the new week in the tier that previous rank leads to
+(top 7 up, rank 23 and below down), the same one the close will give them.
 
 ### `GET /me/league`
 
@@ -191,11 +203,14 @@ Mastered knowledge points, streak milestones, completed quests and badges owe th
 Access answers on `points.grant.settled` with `{ grantId, status: GRANTED | CAPPED | FAILED, error }`. `reason` is one of
 `STREAK_MILESTONE`, `KP_MASTERED` (+5 points the first time a point reaches 90% mastery through practice; `referenceId` is
 the point id), `DAILY_QUEST` or `BADGE`. Access accepts every value of `LearningRewardReason` and credits a grant id once,
-so a resend is safe; a grant with no answer is sent again after 5 minutes and given up after 10 sends. Points Access caps per
+so a resend is safe; a grant with no answer is sent again after 5 minutes and given up after 10 sends. Access's answer
+is read from `learning.points-grant-settled`; an answer that cannot be read goes to `learning.points-grant-settled.dlq`,
+and a failure to record it is retried through `learning.points-grant-settled.retry` (30 seconds, 5 times) before it is
+dead-lettered too. Points Access caps per
 day are reported as `CAPPED`: streak, quest and knowledge-point rewards share the daily limit; badge rewards are outside it
 because a badge is earned once (agreed 2026-10-18; Access commit `f2f50e8`). The agreed message shape is contract C6 in
-`plans/261017-1931-mastery-practice-and-progress/reports/work-split.md`; Access HTTP credit and consumer behavior are in
-the [Access points contract](access-points-v1.md).
+`plans/261017-1931-mastery-practice-and-progress/reports/work-split.md`; Access's consumer behavior is in
+the [Access points contract](access-points-v1.md); Access has no HTTP route that credits points.
 
 ## Configuration
 

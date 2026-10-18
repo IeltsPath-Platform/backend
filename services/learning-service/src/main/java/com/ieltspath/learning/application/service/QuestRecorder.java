@@ -18,6 +18,6 @@ public class QuestRecorder {
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT, fallbackExecution = true)
     public void onAnswers(QuestionEventsAppended appended) {
-        quests.record(appended.userId(), appended.events());
+        quests.record(appended.userId(), appended.submittedAnswers());
     }
 }

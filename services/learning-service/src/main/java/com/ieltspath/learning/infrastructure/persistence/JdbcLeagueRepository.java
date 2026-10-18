@@ -28,6 +28,22 @@ public class JdbcLeagueRepository implements LeagueRepository {
     }
 
     @Override
+    public Optional<PlayedWeek> latestUnclosedWeekBefore(UUID userId, LocalDate current) {
+        return jdbc.query("""
+                SELECT me.tier, ranked.rnk
+                FROM league_members me
+                JOIN league_weeks w ON w.week_start = me.week_start
+                JOIN LATERAL (
+                    SELECT user_id, row_number() OVER (ORDER BY weekly_xp DESC, xp_updated_at ASC, user_id) AS rnk
+                    FROM league_members WHERE group_id = me.group_id
+                ) ranked ON ranked.user_id = me.user_id
+                WHERE me.user_id = ? AND me.week_start < ? AND w.closed_at IS NULL
+                ORDER BY me.week_start DESC LIMIT 1
+                """, (rows, index) -> new PlayedWeek(rows.getInt("tier"), rows.getInt("rnk")), userId,
+                Date.valueOf(current)).stream().findFirst();
+    }
+
+    @Override
     public boolean addXp(UUID userId, LocalDate week, int xp, Instant now) {
         return jdbc.update("UPDATE league_members SET weekly_xp = weekly_xp + ?, xp_updated_at = ? "
                 + "WHERE week_start = ? AND user_id = ?", xp, Timestamp.from(now), Date.valueOf(week), userId) > 0;

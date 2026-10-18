@@ -47,6 +47,16 @@ public final class LeagueRules {
         };
     }
 
+    /**
+     * The tier a learner plays in after finishing a week at {@code rank}: up from the top {@code promoteTop}, down from
+     * {@code demoteFrom}. A rank of {@code demoteFrom} or more only exists in a group at least that large, so the group
+     * size needs no check. {@code closeWeek} applies the same rule in SQL.
+     */
+    public static int tierAfter(int tier, int rank, int promoteTop, int demoteFrom) {
+        Outcome outcome = rank <= promoteTop ? Outcome.PROMOTED : rank >= demoteFrom ? Outcome.DEMOTED : Outcome.STAYED;
+        return next(LeagueTier.ofLevel(tier), outcome).level();
+    }
+
     /** The Sunday that starts the league week {@code at} falls in, in UTC. */
     public static LocalDate weekStart(Instant at) {
         return at.atZone(ZoneOffset.UTC).toLocalDate().with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));

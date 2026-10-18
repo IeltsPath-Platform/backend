@@ -14,8 +14,17 @@ public interface LeagueRepository {
     /** One week a learner played; the rank and outcome are null until the week closes. */
     record HistoryRow(LocalDate weekStart, int tier, int weeklyXp, Integer finalRank, String outcome) {}
 
+    /** An earlier week the learner played: the tier they played in and the rank they hold in their group so far. */
+    record PlayedWeek(int tier, int rank) {}
+
     /** The tier the learner plays in; empty before they have ever been placed. */
     Optional<Integer> tierOf(UUID userId);
+
+    /**
+     * The latest week before {@code current} that the learner played and that is not closed yet; empty when there is
+     * none. Until that week closes, {@link #tierOf} still holds the tier they had before it.
+     */
+    Optional<PlayedWeek> latestUnclosedWeekBefore(UUID userId, LocalDate current);
 
     /** Adds XP to a learner already in a group this week; false when they are not in one yet. */
     boolean addXp(UUID userId, LocalDate week, int xp, Instant now);

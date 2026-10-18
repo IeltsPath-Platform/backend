@@ -7,6 +7,8 @@ import com.ieltspath.learning.application.service.QuestionEventsAppended;
 import com.ieltspath.learning.application.service.StreakRecorder;
 import com.ieltspath.learning.application.usecase.StreakUseCase;
 import com.ieltspath.learning.domain.repository.StreakRepository;
+import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
+import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import com.ieltspath.learning.domain.vo.StreakState;
 import com.ieltspath.learning.domain.vo.StreakView;
 import org.junit.jupiter.api.Test;
@@ -70,12 +72,37 @@ class StreakIntegrationTest {
     @MockitoBean AccessClient access;
 
     @Test
-    void aSeventhDayPaysOneHundredXpAndQueuesTenPointsOnce() {
+    void aWriteWithNoNewAnswerLeavesTheStreakAlone() {
         UUID user = UUID.randomUUID();
         seedStreak(user, 6, yesterday());
 
         recorder.onAnswers(new QuestionEventsAppended(user));
-        recorder.onAnswers(new QuestionEventsAppended(user));
+
+        assertEquals(6, streaks.find(user).orElseThrow().currentDays());
+        assertEquals(0, gamification.progress(user).totalXp());
+    }
+
+    @Test
+    void anAssessmentResultFinalisedLaterDoesNotCountAsAStudyDay() {
+        UUID user = UUID.randomUUID();
+        seedStreak(user, 6, yesterday());
+        QuestionAttemptEvent graded = new QuestionAttemptEvent(user, UUID.randomUUID(), java.util.List.of(), true, null,
+                null, null, null, QuestionEventSource.ASSESSMENT, UUID.randomUUID(), UUID.randomUUID(), true, null);
+
+        recorder.onAnswers(new QuestionEventsAppended(user, java.util.List.of(graded)));
+
+        assertEquals(6, streaks.find(user).orElseThrow().currentDays());
+        assertEquals(yesterday(), streaks.find(user).orElseThrow().lastActive());
+        assertEquals(0, gamification.progress(user).totalXp());
+    }
+
+    @Test
+    void aSeventhDayPaysOneHundredXpAndQueuesTenPointsOnce() {
+        UUID user = UUID.randomUUID();
+        seedStreak(user, 6, yesterday());
+
+        recorder.onAnswers(answered(user));
+        recorder.onAnswers(answered(user));
 
         assertEquals(7, streaks.find(user).orElseThrow().currentDays());
         assertEquals(100, gamification.progress(user).totalXp(), "the milestone XP, paid once");
@@ -87,7 +114,7 @@ class StreakIntegrationTest {
         UUID user = UUID.randomUUID();
         seedStreak(user, 29, yesterday());
 
-        recorder.onAnswers(new QuestionEventsAppended(user));
+        recorder.onAnswers(answered(user));
 
         assertEquals(30, streaks.find(user).orElseThrow().currentDays());
         assertEquals(500, gamification.progress(user).totalXp());
@@ -145,5 +172,11 @@ class StreakIntegrationTest {
     private int pendingPoints(UUID user, int amount) {
         return jdbc.queryForObject("SELECT count(*) FROM reward_grants WHERE user_id = ? AND reason = "
                 + "'STREAK_MILESTONE' AND amount = ? AND status = 'PENDING'", Integer.class, user, amount);
+    }
+
+    /** One new answer the learner submitted in a lesson, as a write of the event log reports it. */
+    private static QuestionEventsAppended answered(UUID user) {
+        return new QuestionEventsAppended(user, java.util.List.of(QuestionAttemptEvent.of(user, UUID.randomUUID(),
+                java.util.List.of(), true, null, null, QuestionEventSource.LESSON_EXERCISE, UUID.randomUUID(), true)));
     }
 }

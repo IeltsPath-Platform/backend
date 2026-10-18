@@ -34,7 +34,9 @@ import java.util.UUID;
 /**
  * A learner's three daily quests: made on first use of the day, advanced by the answers a submission writes, and paid
  * once when completed. Callers hold the learner lock and run in the submission transaction, so progress and reward commit
- * with the answers that earned them.
+ * with the answers that earned them. Quests are only made inside a learner's own request: choosing the weakness target
+ * reads Content with that request's bearer token, which a message consumer does not have, so a result applied by the
+ * consumer never reaches this service (see {@link QuestionEventsAppended#submittedAnswers()}).
  */
 @Component
 public class QuestService {
@@ -94,10 +96,15 @@ public class QuestService {
         return quests.find(userId, today);
     }
 
-    /** Advances today's quests with the new answers of a submission and pays those it completes. */
+    /**
+     * Advances the quests of the day the learner answered with the new answers of a submission, and pays those it
+     * completes. {@code events} are answers submitted in Learning, never assessment results.
+     */
     public void record(UUID userId, List<QuestionAttemptEvent> events) {
         if (events.isEmpty()) return;
-        LocalDate today = today(userId);
+        Instant answeredAt = events.stream().map(QuestionAttemptEvent::answeredAt).max(Instant::compareTo)
+                .orElseThrow(() -> new IllegalArgumentException("Quest progress needs submitted answers"));
+        LocalDate today = LocalDate.ofInstant(answeredAt, timezones.zoneOf(userId));
         List<Quest> todays = ensureToday(userId, today);
         UUID target = todays.stream().filter(quest -> quest.type().equals(Type.WEAKNESS.name())).findFirst()
                 .map(Quest::targetKnowledgePointId).orElse(null);
@@ -155,7 +162,8 @@ public class QuestService {
             }
             return QuestRules.pickWeakness(candidates);
         } catch (RuntimeException failure) {
-            log.warn("Quest target unavailable, using the longer practice quest: userId={}", userId, failure);
+            log.warn("Quest target unavailable, using the longer practice quest: userId={}, errorType={}", userId,
+                    failure.getClass().getSimpleName());
             return Optional.empty();
         }
     }

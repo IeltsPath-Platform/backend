@@ -13,6 +13,9 @@ import java.util.UUID;
 
 @Service
 public class RecordScheduledPublicationFailureUseCase {
+    /** The only code of a failure worth retrying: the cause is unknown and may be temporary. */
+    public static final String UNKNOWN_FAILURE = "PUBLISH_FAILED";
+
     private final ContentPackageRepository packages;
 
     public RecordScheduledPublicationFailureUseCase(ContentPackageRepository packages) {
@@ -25,7 +28,11 @@ public class RecordScheduledPublicationFailureUseCase {
                 .orElseThrow(() -> new ContentPackageNotFoundException(packageId));
         ContentPackageVersion version = SchedulePackagePublicationUseCase.findVersion(pkg, versionId);
         if (version.getStatus() == PublicationStatus.DRAFT) {
-            version.recordScheduledPublicationError(errorCode);
+            if (UNKNOWN_FAILURE.equals(errorCode)) {
+                version.recordScheduledPublicationError(errorCode);
+            } else {
+                version.rejectScheduledPublication(errorCode);
+            }
             packages.save(pkg);
         }
     }

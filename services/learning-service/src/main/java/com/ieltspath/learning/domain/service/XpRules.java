@@ -51,7 +51,10 @@ public final class XpRules {
     public record Award(UUID questionVersionId, int amount, boolean counted) {}
 
     /**
-     * Awards the correct answers of one submission in order. An answer that would push the day over the cap is kept as
+     * Awards the correct answers of one submission in order. The candidates are questions, not items: a question with
+     * several items is listed once, and only when every item of it is correct.
+     *
+     * <p> An answer that would push the day over the cap is kept as
      * shadow XP ({@code counted = false}); a later answer that still fits under the cap counts. {@code alreadyCounted}
      * is the answer XP the learner has already counted today.
      */

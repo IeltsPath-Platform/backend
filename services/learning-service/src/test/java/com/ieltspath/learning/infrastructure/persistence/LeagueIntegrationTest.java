@@ -157,6 +157,8 @@ class LeagueIntegrationTest {
                     + "'"));
             assertEquals(LeagueRules.next(com.ieltspath.learning.domain.vo.LeagueTier.GOLD, expected).level(),
                     count("SELECT tier FROM learner_league WHERE user_id = '" + full.get(index) + "'"));
+            assertEquals(LeagueRules.tierAfter(3, rank, LeagueRules.PROMOTE_TOP, LeagueRules.DEMOTE_FROM),
+                    count("SELECT tier FROM learner_league WHERE user_id = '" + full.get(index) + "'"));
         }
         assertEquals(29, count("SELECT final_rank FROM league_members WHERE user_id = '" + full.get(0) + "'"));
         assertEquals(30, count("SELECT final_rank FROM league_members WHERE user_id = '" + full.get(1) + "'"));
@@ -164,6 +166,46 @@ class LeagueIntegrationTest {
                 + ids(small) + ")"), "a group under 23 demotes nobody");
         assertEquals(7, count("SELECT count(*) FROM league_members WHERE outcome = 'PROMOTED' AND user_id IN ("
                 + ids(small) + ")"));
+    }
+
+    @Test
+    void aLearnerWhoEarnsXpBeforeTheLastWeekClosesPlaysInTheTierThatWeekLeadsTo() {
+        LocalDate past = thisWeek.minusWeeks(1);
+        Instant base = Instant.parse("2026-01-01T00:00:00Z");
+        UUID leader = UUID.randomUUID();
+        UUID middle = UUID.randomUUID();
+        UUID last = UUID.randomUUID();
+        repository.join(leader, past, 3, 300, base);
+        repository.join(middle, past, 3, 200, base.plusSeconds(1));
+        for (int index = 0; index < 27; index++) {
+            repository.join(UUID.randomUUID(), past, 3, 100 - index, base.plusSeconds(10 + index));
+        }
+        repository.join(last, past, 3, 1, base.plusSeconds(100));
+        jdbc.update("INSERT INTO learner_league (user_id, tier) VALUES (?, 3), (?, 3), (?, 3)", leader, middle, last);
+
+        for (UUID user : List.of(leader, last)) {
+            league.addWeeklyXp(user, 10);
+        }
+
+        assertEquals(4, count("SELECT tier FROM league_members WHERE week_start = '" + thisWeek
+                + "' AND user_id = '" + leader + "'"), "first place moves up before the old week is closed");
+        assertEquals(2, count("SELECT tier FROM league_members WHERE week_start = '" + thisWeek
+                + "' AND user_id = '" + last + "'"), "a rank of 23 or below moves down");
+
+        closeJob.runOnce();
+
+        assertEquals(4, count("SELECT tier FROM learner_league WHERE user_id = '" + leader + "'"));
+        assertEquals(2, count("SELECT tier FROM learner_league WHERE user_id = '" + last + "'"));
+    }
+
+    @Test
+    void aLearnerWithNoUnclosedWeekPlaysInTheTierTheyAreIn() {
+        UUID user = UUID.randomUUID();
+        jdbc.update("INSERT INTO learner_league (user_id, tier) VALUES (?, 5)", user);
+
+        league.addWeeklyXp(user, 10);
+
+        assertEquals(5, count("SELECT tier FROM league_members WHERE user_id = '" + user + "'"));
     }
 
     @Test

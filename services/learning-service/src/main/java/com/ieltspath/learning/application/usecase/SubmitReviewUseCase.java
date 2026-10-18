@@ -142,12 +142,8 @@ public class SubmitReviewUseCase {
         Section first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);
         String transcript = first != null && first.audio() != null ? first.audio().transcript() : null;
         // Every set is answered once, so each set's correct answers earn XP.
-        List<UUID> correctIds = new ArrayList<>();
-        for (int index = 0; index < items.size(); index++) {
-            if (grades.get(index).correct()) correctIds.add(items.get(index).questionVersionId());
-        }
         GamificationSummary gamification = gamificationRecorder.recordCorrectAnswers(userId, command.requestId(),
-                correctIds);
+                graded.correctQuestionIds());
         ReviewSubmissionResult response = new ReviewSubmissionResult(status.name(), passed, List.copyOf(results),
                 transcript, review.stage().name(), review.failedSets(), gamification);
         reviews.save(review);

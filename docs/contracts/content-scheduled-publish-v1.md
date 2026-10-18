@@ -94,6 +94,9 @@ current schedule or recorded failure returns an empty array. Unknown packages re
 a version ID that does not belong to the package returns `400` for the schedule and cancel routes.
 
 The publisher checks due drafts once per minute by default and serializes workers with a PostgreSQL advisory lock.
-Failures leave the version in `DRAFT`, retain its due time for retry, and store a safe code in `lastPublishError`;
-rescheduling or successful publication clears that error. Safe codes include `QUESTION_ALREADY_USED`,
-`QUESTION_PURPOSE_MISMATCH`, `INVALID_PACKAGE_LESSON`, `INVALID_CONTENT_STATE`, and `PUBLISH_FAILED`.
+Failures leave the version in `DRAFT` and store a safe code in `lastPublishError`; rescheduling or successful
+publication clears that error. A failure that breaks a publishing rule (`QUESTION_ALREADY_USED`,
+`QUESTION_PURPOSE_MISMATCH`, `INVALID_PACKAGE_LESSON`, `INVALID_CONTENT_STATE`) also clears `publishAt`: the same
+attempt would fail again until an author changes the package, and retrying would publish it unannounced weeks
+later. The author reads the code in the publication schedules, fixes the package and schedules it again. Only
+`PUBLISH_FAILED` (a cause the job cannot tell, possibly temporary) keeps `publishAt`, so the next minute retries it.

@@ -71,7 +71,7 @@ public class ScheduledPublishJob {
         if (failure instanceof QuestionPurposeMismatchException) return "QUESTION_PURPOSE_MISMATCH";
         if (failure instanceof InvalidPackageLessonException) return "INVALID_PACKAGE_LESSON";
         if (failure instanceof InvalidContentStateException) return "INVALID_CONTENT_STATE";
-        return "PUBLISH_FAILED";
+        return RecordScheduledPublicationFailureUseCase.UNKNOWN_FAILURE;
     }
 
     private record DueVersion(UUID packageId, UUID versionId) {}

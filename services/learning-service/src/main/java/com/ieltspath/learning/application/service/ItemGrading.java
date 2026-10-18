@@ -13,6 +13,7 @@ import com.ieltspath.learning.domain.vo.PracticeSubmission;
 
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -117,5 +118,17 @@ public final class ItemGrading {
                          int correct, int total, boolean passed, List<LearningSkill> itemSkills,
                          List<PracticeSubmission.SkillScore> skillScores, List<String> errorCodes) {
         public double percent() { return (double) correct / total; }
+
+        /**
+         * The questions answered correctly, in set order. A question with several items is correct only when every item
+         * of it is, and counts once however many items it has, so XP and its daily cap are charged per question.
+         */
+        public List<UUID> correctQuestionIds() {
+            Map<UUID, Boolean> allCorrect = new LinkedHashMap<>();
+            for (int index = 0; index < items.size(); index++) {
+                allCorrect.merge(items.get(index).questionVersionId(), grades.get(index).correct(), Boolean::logicalAnd);
+            }
+            return allCorrect.entrySet().stream().filter(Map.Entry::getValue).map(Map.Entry::getKey).toList();
+        }
     }
 }

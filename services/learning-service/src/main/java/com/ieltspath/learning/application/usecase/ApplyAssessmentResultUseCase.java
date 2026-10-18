@@ -109,7 +109,7 @@ public class ApplyAssessmentResultUseCase {
             items.add(new QuestionAttemptEvent(userId, item.questionVersionId(),
                     item.knowledgePoints().stream().map(KnowledgePointJudgment::knowledgePointId).distinct().toList(),
                     item.isCorrect(), item.score(), item.maxScore(), item.durationMs(), item.errorCode(),
-                    QuestionEventSource.ASSESSMENT, item.itemResultId(), result.attemptId(), true));
+                    QuestionEventSource.ASSESSMENT, item.itemResultId(), result.attemptId(), true, null));
         }
         questionEvents.append(items);
         if ("PLACEMENT".equals(result.assessmentType())) {

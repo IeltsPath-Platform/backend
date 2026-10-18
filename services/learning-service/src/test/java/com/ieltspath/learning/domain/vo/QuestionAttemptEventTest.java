@@ -32,10 +32,28 @@ class QuestionAttemptEventTest {
     void onlyAssessmentEventsCarryAnAttempt() {
         assertThrows(IllegalArgumentException.class, () -> new QuestionAttemptEvent(UUID.randomUUID(), UUID.randomUUID(),
                 List.of(), true, BigDecimal.ONE, BigDecimal.ONE, null, null, QuestionEventSource.ASSESSMENT,
-                UUID.randomUUID(), null, true));
+                UUID.randomUUID(), null, true, null));
         assertThrows(IllegalArgumentException.class, () -> new QuestionAttemptEvent(UUID.randomUUID(), UUID.randomUUID(),
                 List.of(), true, BigDecimal.ONE, BigDecimal.ONE, null, null, QuestionEventSource.LESSON_EXERCISE,
-                UUID.randomUUID(), UUID.randomUUID(), true));
+                UUID.randomUUID(), UUID.randomUUID(), true, java.time.Instant.now()));
+    }
+
+    @Test
+    void onlyAssessmentEventsLackAnAnswerTime() {
+        assertThrows(IllegalArgumentException.class, () -> new QuestionAttemptEvent(UUID.randomUUID(), UUID.randomUUID(),
+                List.of(), true, null, null, null, null, QuestionEventSource.LESSON_EXERCISE,
+                UUID.randomUUID(), null, true, null));
+        assertThrows(IllegalArgumentException.class, () -> new QuestionAttemptEvent(UUID.randomUUID(), UUID.randomUUID(),
+                List.of(), true, null, null, null, null, QuestionEventSource.ASSESSMENT,
+                UUID.randomUUID(), UUID.randomUUID(), true, java.time.Instant.now()));
+    }
+
+    @Test
+    void anAnswerIsStampedWhenItIsSubmitted() {
+        java.time.Instant before = java.time.Instant.now();
+        QuestionAttemptEvent event = QuestionAttemptEvent.of(UUID.randomUUID(), UUID.randomUUID(), List.of(), true,
+                null, null, QuestionEventSource.LESSON_EXERCISE, UUID.randomUUID(), true);
+        assertEquals(true, !event.answeredAt().isBefore(before) && !event.answeredAt().isAfter(java.time.Instant.now()));
     }
 
     @Test

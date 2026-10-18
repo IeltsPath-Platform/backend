@@ -83,9 +83,9 @@ class QuestionEventLogIntegrationTest {
         UUID otherAttempt = UUID.randomUUID();
         log.append(List.of(
                 new QuestionAttemptEvent(user, UUID.randomUUID(), List.of(), true, BigDecimal.ONE, BigDecimal.ONE, null,
-                        null, QuestionEventSource.ASSESSMENT, UUID.randomUUID(), attempt, true),
+                        null, QuestionEventSource.ASSESSMENT, UUID.randomUUID(), attempt, true, null),
                 new QuestionAttemptEvent(user, UUID.randomUUID(), List.of(), true, BigDecimal.ONE, BigDecimal.ONE, null,
-                        null, QuestionEventSource.ASSESSMENT, UUID.randomUUID(), otherAttempt, true),
+                        null, QuestionEventSource.ASSESSMENT, UUID.randomUUID(), otherAttempt, true, null),
                 QuestionAttemptEvent.of(user, UUID.randomUUID(), List.of(), true, null, null,
                         QuestionEventSource.LESSON_EXERCISE, UUID.randomUUID(), true)));
 

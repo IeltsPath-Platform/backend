@@ -141,21 +141,24 @@ class QuestIntegrationTest {
     }
 
     @Test
-    void examAnswersDoNotCountAsPracticeButStillCountAsActivity() {
+    void examAnswersCountNeitherAsPracticeNorAsActivity() {
         UUID user = UUID.randomUUID();
-        UUID attempt = UUID.randomUUID();
         inTransaction(() -> quests.view(user));
-        List<QuestionAttemptEvent> exam = new ArrayList<>();
-        for (int index = 0; index < 5; index++) {
-            exam.add(new QuestionAttemptEvent(user, UUID.randomUUID(), List.of(), true, null, null, 1000L, null,
-                    QuestionEventSource.ASSESSMENT, UUID.randomUUID(), attempt, true));
-        }
 
-        inTransaction(() -> { events.append(exam); return null; });
+        inTransaction(() -> { events.append(exam(user, 5)); return null; });
 
         GetQuestsUseCase.QuestsView view = inTransaction(() -> quests.view(user));
         assertEquals(0, view.quests().get(0).progress());
-        assertTrue(view.quests().get(2).completed(), "any answer is activity today");
+        assertFalse(view.quests().get(2).completed(), "a result finalised by grading says nothing about today's study");
+    }
+
+    @Test
+    void anExamResultAppliedByTheConsumerMakesNoQuests() {
+        UUID user = UUID.randomUUID();
+
+        inTransaction(() -> { events.append(exam(user, 5)); return null; });
+
+        assertEquals(0, count("SELECT count(*) FROM daily_quests WHERE user_id = '" + user + "'"));
     }
 
     @Test
@@ -166,6 +169,16 @@ class QuestIntegrationTest {
         timezones.save(late, "Etc/GMT+12");
 
         assertNotEquals(inTransaction(() -> quests.view(early)).date(), inTransaction(() -> quests.view(late)).date());
+    }
+
+    private static List<QuestionAttemptEvent> exam(UUID user, int count) {
+        UUID attempt = UUID.randomUUID();
+        List<QuestionAttemptEvent> exam = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            exam.add(new QuestionAttemptEvent(user, UUID.randomUUID(), List.of(), true, null, null, 1000L, null,
+                    QuestionEventSource.ASSESSMENT, UUID.randomUUID(), attempt, true, null));
+        }
+        return exam;
     }
 
     private <T> T inTransaction(java.util.function.Supplier<T> work) {

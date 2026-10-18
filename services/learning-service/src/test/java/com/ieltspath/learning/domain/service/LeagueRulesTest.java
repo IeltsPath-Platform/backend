@@ -19,6 +19,13 @@ class LeagueRulesTest {
         assertThat(LeagueRules.outcome(rank, size)).isEqualTo(expected);
     }
 
+    @ParameterizedTest
+    @CsvSource({"3,1,4", "3,7,4", "3,8,3", "3,22,3", "3,23,2", "3,30,2", "7,1,7", "1,30,1"})
+    void theTierAfterAWeekFollowsTheFinalRank(int tier, int rank, int expected) {
+        assertThat(LeagueRules.tierAfter(tier, rank, LeagueRules.PROMOTE_TOP, LeagueRules.DEMOTE_FROM))
+                .isEqualTo(expected);
+    }
+
     @Test
     void aSmallGroupDemotesNobody() {
         for (int rank = 1; rank <= 22; rank++) {
