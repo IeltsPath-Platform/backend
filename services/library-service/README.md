@@ -8,7 +8,8 @@ Compose stack runs Library with the other deployed services; PostgreSQL publishe
 Flyway V1 creates the five catalog tables: `vocabulary_items`, `vocabulary_senses`, `learning_videos`,
 `video_segments`, `video_segment_lexical_entries`. V2 creates six personal-library tables: `flashcard_decks`,
 `flashcards`, `flashcard_deck_items`, `notes`, `video_learning_progress`, `saved_video_segments`. V3 adds the
-five-box flashcard review schedule. Four V2 foreign keys to catalog tables use `ON DELETE RESTRICT`; there is no
+five-box flashcard review schedule. V4 seeds 300 mock vocabulary items and 302 senses for local demos, using stable
+UUIDv5 identifiers and idempotent inserts. Four V2 foreign keys to catalog tables use `ON DELETE RESTRICT`; there is no
 `outbox_events` table. Data is not copied from the former service/database.
 
 Gateway routes `/api/content/videos/**`, `/api/content/vocabulary/**` and `/api/content/admin/vocabulary/**` here.
@@ -28,6 +29,7 @@ the item's `ipa`, `pronunciationAudioReference`, and the sense's `exampleSentenc
 `{"correct":true,"requestId":"<uuid>"}` and returns the updated card. A correct answer advances one box up to 5;
 an incorrect answer resets the card to box 1. Replaying the most recent `requestId` is a no-op. The interval for the
 resulting box comes from `library.srs.intervals-days`, defaulting to `[1, 2, 4, 8, 16]`.
+See the [flashcard SRS contract](../../docs/contracts/flashcard-srs-v1.md) for request, response, and ownership details.
 
 When saving a video, Library verifies its topic through Content's `GET /api/content/topics/{id}`, forwarding the
 authenticated bearer token and `X-Correlation-Id`. The HTTP client uses a 2-second connection and 5-second read
