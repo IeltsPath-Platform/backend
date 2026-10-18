@@ -40,7 +40,8 @@ IELTSPath/
 │   ├── content-service/        # Topic, knowledge point, câu hỏi, gói nội dung và asset
 │   ├── library-service/        # Catalog từ vựng/video và thư viện học cá nhân
 │   ├── game-service/           # Phòng game, phiên chơi và WebSocket
-│   └── community-service/      # Bài viết, bình luận, reaction và moderation
+│   ├── community-service/      # Bài viết, bình luận, reaction và moderation
+│   └── notification-service/   # Thông báo bền vững, RabbitMQ và WebSocket STOMP
 ├── docker-compose.yml          # Một file Compose cho database, broker và các service đã triển khai
 ├── pom.xml                     # Root POM quản lý phiên bản và danh sách module
 └── README.md                   # Tài liệu hướng dẫn dự án
@@ -209,7 +210,11 @@ docker compose up -d --build
 ```
 
 PostgreSQL được publish ở host port `5440` và chứa database riêng cho user, content, assessment, access, learning,
-library, game và community. `docker compose down` giữ dữ liệu; thêm `-v` để xóa database và khởi tạo lại toàn bộ seed.
+library, game, community và notification. `docker compose down` giữ dữ liệu; thêm `-v` để xóa database và khởi tạo lại toàn bộ seed.
+
+**Cạm bẫy khi dùng volume PostgreSQL cũ:** `infra/postgres/init-databases.sql` chỉ chạy khi volume `postgres-data` được khởi tạo lần đầu. Nếu đã có volume trước khi thêm Notification Service, cần tạo database một lần thủ công nếu chưa có: `docker compose exec postgres psql -U postgres -d postgres -c "CREATE DATABASE notification_db;"`. Không chạy lệnh nếu database đã tồn tại.
+
+Sau khi tạo lại container Gateway, chờ khoảng 1–2 phút để Eureka cập nhật định tuyến trước khi kiểm tra các route qua Gateway.
 
 ### 5. Quản Lý Schema Bằng Flyway
 
@@ -305,7 +310,8 @@ Bằng chứng E2E của lần kiểm chứng gần nhất:
 
 **Chạy backend bằng Docker** (không cần IDE, không cần Postgres local): file `docker-compose.yml` dựng config-server,
 Eureka, Gateway, user, content, library, access, assessment, learning, game, community, một PostgreSQL có database riêng
-cho từng service, và RabbitMQ. `notification-service` chưa triển khai nên không nằm trong stack.
+cho từng service, và RabbitMQ. Community ghi transactional outbox; Notification lưu event vào `notification_db` và push qua
+`/ws/notifications` sau commit. Gateway xác thực JWT trong WebSocket subprotocol.
 
 ```bash
 docker compose up -d --build  # lần đầu build lâu; sau đó bỏ --build
