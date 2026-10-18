@@ -1,5 +1,6 @@
 package com.ieltspath.assessment.api.dto.request;
 
+import com.ieltspath.assessment.application.command.CompleteHumanReviewCommand;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -19,4 +20,11 @@ public record CompleteHumanReviewRequest(
     public record Criterion(@NotBlank String criterion,
                             @NotNull @DecimalMin("0.0") @DecimalMax("9.0") BigDecimal band,
                             @NotBlank String comment) {}
+
+    public CompleteHumanReviewCommand toCommand() {
+        return new CompleteHumanReviewCommand(band,
+                criteria.stream().map(c -> new CompleteHumanReviewCommand.Criterion(c.criterion(), c.band(), c.comment()))
+                        .toList(),
+                errorCodes, feedback);
+    }
 }

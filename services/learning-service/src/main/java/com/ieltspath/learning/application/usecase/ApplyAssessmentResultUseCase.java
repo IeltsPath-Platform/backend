@@ -59,8 +59,7 @@ public class ApplyAssessmentResultUseCase {
     private final LearnerPlacementRepository placements;
     private final CourseProgressRepository courseProgress;
     private final CourseTestAssignmentRepository courseAssignments;
-    @org.springframework.beans.factory.annotation.Autowired
-    private com.ieltspath.learning.domain.repository.PracticeTestAssignmentRepository practiceAssignments;
+    private final com.ieltspath.learning.domain.repository.PracticeTestAssignmentRepository practiceAssignments;
     private final QuestionEventLog questionEvents;
     private final MasteryProfileUpdater masteryProfiles;
     private final CourseOutcomeService outcomes;
@@ -71,8 +70,10 @@ public class ApplyAssessmentResultUseCase {
                                         TopicTestAssignmentRepository assignments, ReviewReevaluation reviews,
                                         LearnerPlacementRepository placements, CourseProgressRepository courseProgress,
                                         CourseTestAssignmentRepository courseAssignments,
+                                        com.ieltspath.learning.domain.repository.PracticeTestAssignmentRepository practiceAssignments,
                                         QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
                                         CourseOutcomeService outcomes) {
+        this.practiceAssignments = practiceAssignments;
         this.outcomes = outcomes;
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;

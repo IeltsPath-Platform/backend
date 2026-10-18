@@ -3,7 +3,7 @@ package com.ieltspath.assessment.application.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.application.port.HumanReviewStore;
-import com.ieltspath.assessment.api.dto.request.CompleteHumanReviewRequest;
+import com.ieltspath.assessment.application.command.CompleteHumanReviewCommand;
 import com.ieltspath.assessment.domain.exception.AssessmentNotFoundException;
 import com.ieltspath.assessment.domain.exception.InvalidAssessmentStateException;
 import org.springframework.stereotype.Service;
@@ -36,7 +36,7 @@ public class HumanReviewService {
     }
 
     @Transactional
-    public void complete(UUID jobId, UUID examinerId, CompleteHumanReviewRequest request) {
+    public void complete(UUID jobId, UUID examinerId, CompleteHumanReviewCommand request) {
         requireHalfBand(request.band(), "band");
         for (var criterion : request.criteria()) requireHalfBand(criterion.band(), "criterion band");
         JsonNode criteria = json.valueToTree(request.criteria());

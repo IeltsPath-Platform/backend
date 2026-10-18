@@ -31,6 +31,6 @@ public class HumanReviewGradingController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void complete(@PathVariable("jobId") UUID jobId,
                          @Valid @RequestBody CompleteHumanReviewRequest request) {
-        reviews.complete(jobId, currentUser.requireUserId(), request);
+        reviews.complete(jobId, currentUser.requireUserId(), request.toCommand());
     }
 }

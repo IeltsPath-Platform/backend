@@ -129,7 +129,7 @@ class InternalHumanReviewControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isNoContent());
         verify(service).complete(org.mockito.ArgumentMatchers.eq(jobId), org.mockito.ArgumentMatchers.eq(examinerId),
-                org.mockito.ArgumentMatchers.any(CompleteHumanReviewRequest.class));
+                org.mockito.ArgumentMatchers.any(com.ieltspath.assessment.application.command.CompleteHumanReviewCommand.class));
     }
 
     @Test
