@@ -88,6 +88,7 @@ Người dùng chọn gửi qua RabbitMQ (hợp đồng C6 trong `work-split.md`
 - **Lệch lý do thưởng:** `LearningPointsGrantListener.parse()` (0ad9d31) chỉ nhận `reason = STREAK_MILESTONE`, trong khi
   learning gửi thêm `DAILY_QUEST`, `BADGE`, `KP_MASTERED`; các lý do đó bị trả `FAILED INVALID_PAYLOAD` và relay không gửi
   lại. Codex đã sửa trong working tree ngày 2026-10-18 (`LearningRewardReason.valueOf`, test cho ba lý do còn lại); đã đọc
-  diff, đúng; **chưa commit** và chưa chạy đầu-cuối cùng learning. Đã ghi vào C6.
+  diff, đúng. Phía learning đã chạy với RabbitMQ thật (`PointsGrantBrokerRoundTripTest`, Access được mô phỏng); chưa chạy
+  consumer Access thật cùng learning. Đã ghi vào C6.
 - Chính sách hoàn điểm đã chốt: không thêm route (xem trên). Phase này chỉ còn chờ Codex commit consumer Access và chạy thử
   đầu-cuối learning ↔ Access qua RabbitMQ (tiêu chí "access tắt thì grant nằm `PENDING`, bật lại thì được cộng").
