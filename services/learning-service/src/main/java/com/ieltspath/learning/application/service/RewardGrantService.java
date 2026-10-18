@@ -52,7 +52,8 @@ public class RewardGrantService {
         for (PendingGrant grant : due) {
             if (grant.attempts() >= maxSends) {
                 grants.markFailed(grant.id(), NO_ANSWER, now);
-                log.warn("Reward grant given up without an answer: grantId={}", grant.id());
+                log.warn("Reward grant given up without an answer: grantId={}, reason={}, sends={}", grant.id(), NO_ANSWER,
+                        grant.attempts());
                 continue;
             }
             try {
@@ -60,7 +61,8 @@ public class RewardGrantService {
                 grants.markSent(grant.id(), now);
                 sent++;
             } catch (RuntimeException failure) {
-                // The broker is not reachable: the grant stays due and is tried again on the next run.
+                // The broker did not take the grant (unreachable, refused, or no queue bound): it was not sent, so the
+                // grant stays due and its send count does not grow.
                 log.warn("Reward grant not sent: grantId={}, errorType={}", grant.id(),
                         failure.getClass().getSimpleName());
             }

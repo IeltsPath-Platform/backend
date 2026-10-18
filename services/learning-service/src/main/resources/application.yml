@@ -4,6 +4,12 @@ server:
 spring:
   application:
     name: learning-service
+  rabbitmq:
+    # A points grant counts as sent only when the broker confirms it and no queue returned it as unroutable.
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
   config:
     import:
       - optional:configserver:${SPRING_CLOUD_CONFIG_URI:http://localhost:8888}
