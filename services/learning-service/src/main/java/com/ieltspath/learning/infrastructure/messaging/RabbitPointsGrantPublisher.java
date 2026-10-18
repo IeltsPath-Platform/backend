@@ -1,5 +1,7 @@
 package com.ieltspath.learning.infrastructure.messaging;
 
+import com.ieltspath.events.points.PointsGrantMessaging;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.learning.application.port.PointsGrantPublisher;
@@ -66,7 +68,7 @@ public class RabbitPointsGrantPublisher implements PointsGrantPublisher {
             throw new IllegalStateException("Points grant cannot be written", failure);
         }
         CorrelationData correlation = new CorrelationData(grant.id().toString());
-        rabbit.send(RewardGrantMessagingConfig.EXCHANGE, RewardGrantMessagingConfig.REQUESTED_ROUTING_KEY, message,
+        rabbit.send(PointsGrantMessaging.EXCHANGE, PointsGrantMessaging.REQUESTED_ROUTING_KEY, message,
                 correlation);
         awaitConfirm(correlation);
         if (correlation.getReturned() != null) {

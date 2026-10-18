@@ -1,5 +1,7 @@
 package com.ieltspath.learning.infrastructure.messaging;
 
+import com.ieltspath.events.points.PointsGrantMessaging;
+
 import com.ieltspath.learning.application.service.RewardGrantService;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
@@ -72,7 +74,7 @@ class PointsGrantSettledDeadLetterBrokerTest {
     @MockitoBean RewardGrantService grants;
 
     private void send(String body) {
-        rabbitTemplate.send(RewardGrantMessagingConfig.EXCHANGE, RewardGrantMessagingConfig.SETTLED_ROUTING_KEY,
+        rabbitTemplate.send(PointsGrantMessaging.EXCHANGE, PointsGrantMessaging.SETTLED_ROUTING_KEY,
                 MessageBuilder.withBody(body.getBytes(StandardCharsets.UTF_8)).setContentType("application/json").build());
     }
 

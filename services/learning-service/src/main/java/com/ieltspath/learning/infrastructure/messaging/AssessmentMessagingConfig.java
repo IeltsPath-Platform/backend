@@ -1,5 +1,7 @@
 package com.ieltspath.learning.infrastructure.messaging;
 
+import com.ieltspath.events.assessment.AssessmentMessaging;
+
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Declarables;
@@ -17,8 +19,6 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class AssessmentMessagingConfig {
-    public static final String EXCHANGE = "assessment.events";
-    public static final String ROUTING_KEY = "assessment.completed.v2";
     public static final String QUEUE = "learning.assessment-completed.v2";
     public static final String RETRY_EXCHANGE = "learning.assessment-completed.retry";
     public static final String RETRY_QUEUE = "learning.assessment-completed.v2.retry";
@@ -28,7 +28,7 @@ public class AssessmentMessagingConfig {
     @Bean
     Declarables assessmentCompletedTopology(@Value("${learning.messaging.retry-delay-ms:30000}") long retryDelayMs) {
         // Same attributes as Assessment's own declaration (durable, not auto-deleted).
-        TopicExchange events = new TopicExchange(EXCHANGE, true, false);
+        TopicExchange events = new TopicExchange(AssessmentMessaging.EXCHANGE, true, false);
         DirectExchange retry = new DirectExchange(RETRY_EXCHANGE, true, false);
         DirectExchange deadLetter = new DirectExchange(DEAD_LETTER_EXCHANGE, true, false);
         Queue main = QueueBuilder.durable(QUEUE)
@@ -36,7 +36,7 @@ public class AssessmentMessagingConfig {
         Queue retryQueue = QueueBuilder.durable(RETRY_QUEUE).ttl((int) retryDelayMs)
                 .deadLetterExchange("").deadLetterRoutingKey(QUEUE).build();
         Queue parked = QueueBuilder.durable(DEAD_LETTER_QUEUE).build();
-        Binding mainBinding = BindingBuilder.bind(main).to(events).with(ROUTING_KEY);
+        Binding mainBinding = BindingBuilder.bind(main).to(events).with(AssessmentMessaging.COMPLETED_ROUTING_KEY);
         Binding retryBinding = BindingBuilder.bind(retryQueue).to(retry).with(RETRY_QUEUE);
         Binding parkedBinding = BindingBuilder.bind(parked).to(deadLetter).with(DEAD_LETTER_QUEUE);
         return new Declarables(events, retry, deadLetter, main, retryQueue, parked, mainBinding, retryBinding,

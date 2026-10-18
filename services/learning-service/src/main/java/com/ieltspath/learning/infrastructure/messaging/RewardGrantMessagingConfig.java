@@ -1,5 +1,7 @@
 package com.ieltspath.learning.infrastructure.messaging;
 
+import com.ieltspath.events.points.PointsGrantMessaging;
+
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Declarables;
@@ -20,32 +22,27 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p>An answer the consumer refuses (unreadable, or a failure that kept coming back) is dead-lettered to
  * {@link #SETTLED_DLQ}; a failure that may pass is parked on {@link #SETTLED_RETRY_QUEUE} and returns to
- * {@link #SETTLED_QUEUE} after {@link #RETRY_DELAY_MS}. Queue arguments cannot change once a queue exists: a broker that
+ * {@link #SETTLED_QUEUE} after {@link PointsGrantMessaging#RETRY_DELAY_MS}. Queue arguments cannot change once a queue exists: a broker that
  * already holds {@code learning.points-grant-settled} declared without the dead-letter arguments answers
  * {@code PRECONDITION_FAILED} until that queue is deleted.
  */
 @Configuration
 public class RewardGrantMessagingConfig {
-    public static final String EXCHANGE = "learning.points";
-    public static final String REQUESTED_ROUTING_KEY = "points.grant.requested";
-    public static final String SETTLED_ROUTING_KEY = "points.grant.settled";
     public static final String SETTLED_QUEUE = "learning.points-grant-settled";
     public static final String SETTLED_RETRY_QUEUE = "learning.points-grant-settled.retry";
     public static final String SETTLED_DLQ = "learning.points-grant-settled.dlq";
     public static final String DEAD_LETTER_EXCHANGE = "learning.points-grant-settled.dlx";
     public static final String CONTAINER_FACTORY = "pointsGrantSettledListenerContainerFactory";
-    public static final long RETRY_DELAY_MS = 30_000;
-    public static final int MAX_RETRIES = 5;
 
     @Bean
     Declarables pointsGrantTopology() {
         // Same attributes as Access's own declaration (durable, not auto-deleted).
-        TopicExchange exchange = new TopicExchange(EXCHANGE, true, false);
+        TopicExchange exchange = new TopicExchange(PointsGrantMessaging.EXCHANGE, true, false);
         Queue settled = QueueBuilder.durable(SETTLED_QUEUE)
                 .deadLetterExchange(DEAD_LETTER_EXCHANGE)
                 .deadLetterRoutingKey(SETTLED_DLQ)
                 .build();
-        Binding binding = BindingBuilder.bind(settled).to(exchange).with(SETTLED_ROUTING_KEY);
+        Binding binding = BindingBuilder.bind(settled).to(exchange).with(PointsGrantMessaging.SETTLED_ROUTING_KEY);
 
         DirectExchange deadLetterExchange = new DirectExchange(DEAD_LETTER_EXCHANGE, true, false);
         Queue deadLetters = QueueBuilder.durable(SETTLED_DLQ).build();
@@ -53,7 +50,7 @@ public class RewardGrantMessagingConfig {
 
         // Holds a message for the retry delay, then hands it back to the settled queue through the default exchange.
         Queue retry = QueueBuilder.durable(SETTLED_RETRY_QUEUE)
-                .ttl((int) RETRY_DELAY_MS)
+                .ttl((int) PointsGrantMessaging.RETRY_DELAY_MS)
                 .deadLetterExchange("")
                 .deadLetterRoutingKey(SETTLED_QUEUE)
                 .build();
@@ -72,6 +69,6 @@ public class RewardGrantMessagingConfig {
 
     @Bean
     MessageRetry pointsGrantSettledRetry(RabbitTemplate rabbitTemplate) {
-        return new MessageRetry(rabbitTemplate, SETTLED_RETRY_QUEUE, MAX_RETRIES);
+        return new MessageRetry(rabbitTemplate, SETTLED_RETRY_QUEUE, PointsGrantMessaging.MAX_RETRIES);
     }
 }
