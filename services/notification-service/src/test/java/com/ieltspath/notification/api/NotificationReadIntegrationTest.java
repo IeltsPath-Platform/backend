@@ -4,7 +4,10 @@ import com.ieltspath.commonsecurity.currentuser.CurrentUser;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.commonsecurity.role.CanonicalRoles;
 import com.ieltspath.notification.api.exception.GlobalExceptionHandler;
+import com.ieltspath.notification.application.NotificationInboxUseCase;
 import com.ieltspath.notification.application.NotificationPreferenceService;
+import com.ieltspath.notification.infrastructure.persistence.NotificationPreferenceRepositoryAdapter;
+import com.ieltspath.notification.infrastructure.persistence.NotificationRepositoryAdapter;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,8 +59,9 @@ class NotificationReadIntegrationTest {
     private MockMvc createMockMvc(UUID callerId) {
         CurrentUserProvider users = mock(CurrentUserProvider.class);
         when(users.requireCurrentUser()).thenReturn(new CurrentUser(callerId, Set.of(CanonicalRoles.CUSTOMER)));
-        NotificationPreferenceService prefs = new NotificationPreferenceService(jdbc);
-        NotificationController controller = new NotificationController(jdbc, users, prefs);
+        NotificationPreferenceService prefs = new NotificationPreferenceService(new NotificationPreferenceRepositoryAdapter(jdbc));
+        NotificationController controller = new NotificationController(
+                new NotificationInboxUseCase(new NotificationRepositoryAdapter(jdbc)), users, prefs);
         return MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

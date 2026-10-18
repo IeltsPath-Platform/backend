@@ -3,16 +3,17 @@ package com.ieltspath.notification.infrastructure;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.notification.application.NotificationEventTypes;
 import com.ieltspath.notification.application.NotificationPreferenceService;
+import com.ieltspath.notification.application.RecordCommunityEventUseCase;
+import com.ieltspath.notification.infrastructure.persistence.NotificationPreferenceRepositoryAdapter;
+import com.ieltspath.notification.infrastructure.persistence.NotificationRepositoryAdapter;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -38,9 +39,7 @@ class CommunityEventConsumerIntegrationTest {
         var jdbc = new JdbcTemplate(source);
         var socket = mock(SimpMessagingTemplate.class);
         var mapper = new ObjectMapper();
-        var consumer = new CommunityEventConsumer(mapper, jdbc,
-                new TransactionTemplate(new DataSourceTransactionManager(source)), socket, mock(RabbitTemplate.class),
-                new NotificationPreferenceService(jdbc));
+        var consumer = new CommunityEventConsumer(mapper, recordEvent(jdbc), socket, mock(RabbitTemplate.class));
         UUID event=UUID.randomUUID(), actor=UUID.randomUUID(), recipient=UUID.randomUUID(), post=UUID.randomUUID(), comment=UUID.randomUUID();
         byte[] body=eventJson(event,NotificationEventTypes.COMMENT_MENTIONED,actor,recipient,post,comment)
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -60,10 +59,9 @@ class CommunityEventConsumerIntegrationTest {
         org.flywaydb.core.Flyway.configure().dataSource(source).locations("filesystem:src/main/resources/db/migration").load().migrate();
         var jdbc = new JdbcTemplate(source);
         var socket = mock(SimpMessagingTemplate.class);
-        var preferences = new NotificationPreferenceService(jdbc);
+        var preferences = new NotificationPreferenceService(new NotificationPreferenceRepositoryAdapter(jdbc));
         var mapper = new ObjectMapper();
-        var consumer = new CommunityEventConsumer(mapper, jdbc,
-                new TransactionTemplate(new DataSourceTransactionManager(source)), socket, mock(RabbitTemplate.class), preferences);
+        var consumer = new CommunityEventConsumer(mapper, recordEvent(jdbc), socket, mock(RabbitTemplate.class));
         UUID actor=UUID.randomUUID(), recipient=UUID.randomUUID(), post=UUID.randomUUID(), comment=UUID.randomUUID();
         preferences.update(recipient, NotificationEventTypes.COMMENT_MENTIONED, false);
         Channel channel=mock(Channel.class);
@@ -87,6 +85,11 @@ class CommunityEventConsumerIntegrationTest {
         verify(socket,times(NotificationEventTypes.ORDERED.size()-1))
                 .convertAndSendToUser(eq(recipient.toString()),eq("/queue/notifications"),any());
         verify(channel,times(NotificationEventTypes.ORDERED.size())).basicAck(anyLong(),eq(false));
+    }
+
+    private static RecordCommunityEventUseCase recordEvent(JdbcTemplate jdbc) {
+        return new RecordCommunityEventUseCase(new NotificationRepositoryAdapter(jdbc),
+                new NotificationPreferenceService(new NotificationPreferenceRepositoryAdapter(jdbc)));
     }
 
     private static String eventJson(UUID event, String eventType, UUID actor, UUID recipient, UUID post, UUID comment) {

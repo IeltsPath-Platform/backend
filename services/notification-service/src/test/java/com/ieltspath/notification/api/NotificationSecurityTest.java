@@ -8,7 +8,8 @@ import com.ieltspath.notification.application.NotificationPreferenceService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.ieltspath.notification.application.NotificationInboxUseCase;
+import com.ieltspath.notification.domain.exception.NotificationNotFoundException;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -29,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class NotificationSecurityTest {
     @Autowired MockMvc mvc;
     @MockitoBean CurrentUserProvider users;
-    @MockitoBean JdbcTemplate jdbc;
+    @MockitoBean NotificationInboxUseCase inbox;
     @MockitoBean NotificationPreferenceService preferences;
 
     @Test void unauthenticatedListAndPreferencesAreRejected() throws Exception {
@@ -66,16 +67,15 @@ class NotificationSecurityTest {
     @Test void readMutationIsScopedToCurrentOwner() throws Exception {
         UUID owner=UUID.randomUUID(), notification=UUID.randomUUID();
         when(users.requireCurrentUser()).thenReturn(new CurrentUser(owner, Set.of(CanonicalRoles.CUSTOMER)));
-        when(jdbc.update(anyString(), any(), eq(notification), eq(owner))).thenReturn(1);
         mvc.perform(put("/api/notifications/{id}/read",notification).with(jwt().jwt(token->token.subject(owner.toString()).claim("roles",List.of("CUSTOMER")))))
                 .andExpect(status().isOk());
-        verify(jdbc).update(contains("WHERE id=? AND recipient_id=?"), any(), eq(notification), eq(owner));
+        verify(inbox).markRead(owner, notification);
     }
 
     @Test void readMutationReturnsNotFoundWhenNotificationMissingOrBelongsToAnother() throws Exception {
         UUID owner=UUID.randomUUID(), notification=UUID.randomUUID();
         when(users.requireCurrentUser()).thenReturn(new CurrentUser(owner, Set.of(CanonicalRoles.CUSTOMER)));
-        when(jdbc.update(anyString(), any(), eq(notification), eq(owner))).thenReturn(0);
+        doThrow(new NotificationNotFoundException()).when(inbox).markRead(owner, notification);
         mvc.perform(put("/api/notifications/{id}/read",notification).with(jwt().jwt(token->token.subject(owner.toString()).claim("roles",List.of("CUSTOMER")))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))

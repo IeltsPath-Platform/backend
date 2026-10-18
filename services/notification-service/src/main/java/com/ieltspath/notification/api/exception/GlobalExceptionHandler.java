@@ -27,6 +27,11 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.NOT_FOUND, message, r, null);
     }
 
+    @ExceptionHandler(com.ieltspath.notification.domain.exception.NotificationNotFoundException.class)
+    ResponseEntity<ErrorResponse> notificationNotFound(Exception e, HttpServletRequest r) {
+        return error(HttpStatus.NOT_FOUND, e.getMessage(), r, null);
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<ErrorResponse> responseStatus(ResponseStatusException e, HttpServletRequest r) {
         HttpStatus status = HttpStatus.resolve(e.getStatusCode().value());
