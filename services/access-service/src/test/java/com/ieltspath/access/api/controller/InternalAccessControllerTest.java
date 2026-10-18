@@ -121,6 +121,19 @@ class InternalAccessControllerTest {
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
+    void creditRejectsUnknownLearningRewardReasonAsBadRequest() throws Exception {
+        String body = "{\"userId\":\"" + userId + "\",\"amount\":5,\"reason\":\"UNKNOWN\","
+                + "\"referenceId\":\"kp-123\",\"idempotencyKey\":\"credit-unknown\"}";
+
+        mockMvc.perform(post("/internal/access/points/credit")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(creditPointsUseCase);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
     void humanGradingCreditConsumeAndRefundUseTheAuthenticatedLearner() throws Exception {
         when(currentUserProvider.requireUserId()).thenReturn(userId);
         when(consumeHumanGradingCreditUseCase.execute(any())).thenReturn(2);
