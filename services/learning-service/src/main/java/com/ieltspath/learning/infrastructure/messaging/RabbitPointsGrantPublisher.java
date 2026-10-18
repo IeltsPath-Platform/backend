@@ -1,5 +1,7 @@
 package com.ieltspath.learning.infrastructure.messaging;
 
+import com.ieltspath.events.points.PointsGrantRequested;
+
 import com.ieltspath.events.points.PointsGrantMessaging;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -19,8 +21,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -52,12 +52,8 @@ public class RabbitPointsGrantPublisher implements PointsGrantPublisher {
 
     @Override
     public void publish(PendingGrant grant) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("grantId", grant.id());
-        body.put("userId", grant.userId());
-        body.put("amount", grant.amount());
-        body.put("reason", grant.reason());
-        body.put("referenceId", grant.referenceId());
+        PointsGrantRequested body = new PointsGrantRequested(grant.id(), grant.userId(), grant.amount(),
+                grant.reason(), grant.referenceId());
         Message message;
         try {
             message = MessageBuilder.withBody(json.writeValueAsBytes(body))
