@@ -132,7 +132,7 @@ class CommunityOutboxUseCaseIntegrationTest {
     @Test
     void createPostUseCasePersistsPostWithoutInventingAnOutboxRecipient() {
         var result = posts.execute(new CommunityActor(ACTOR, false),
-                new CreatePostCommand(PostCategory.GENERAL, "title", "body", java.util.List.of(), null, null));
+                new CreatePostCommand(PostCategory.GENERAL, "title", "body", java.util.List.of(), null, null, null));
 
         assertNotNull(postRepository.findById(result.id()).orElseThrow());
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM outbox_events", Integer.class));

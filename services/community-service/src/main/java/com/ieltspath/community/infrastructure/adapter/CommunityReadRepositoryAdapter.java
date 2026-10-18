@@ -84,7 +84,8 @@ public class CommunityReadRepositoryAdapter implements CommunityReadRepository {
  }
  private Post post(ResultSet rs)throws SQLException {
  var post=new Post(rs.getObject("id",UUID.class),rs.getObject("author_id",UUID.class),PostCategory.valueOf(rs.getString("category")),rs.getString("title"),rs.getString("body"),ContentStatus.valueOf(rs.getString("status")),rs.getTimestamp("created_at").toInstant(),rs.getTimestamp("updated_at").toInstant(),rs.getLong("version"));
- try {post.setMedia(json.readValue(rs.getString("image_urls"),new TypeReference<List<String>>(){}),rs.getString("video_url"),rs.getBigDecimal("target_band"));}
+ try {post.setMedia(json.readValue(rs.getString("image_urls"),new TypeReference<List<String>>(){}),rs.getString("video_url"),rs.getBigDecimal("target_band"));
+ post.setBackground(rs.getString("background_style")==null?null:com.ieltspath.community.domain.vo.PostBackground.valueOf(rs.getString("background_style")));}
  catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException("Invalid stored post media",e);}return post;
  }
  private Comment comment(ResultSet rs)throws SQLException {

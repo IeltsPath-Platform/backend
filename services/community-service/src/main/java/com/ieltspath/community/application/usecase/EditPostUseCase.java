@@ -24,6 +24,7 @@ public class EditPostUseCase {
                 .orElseThrow(() -> new CommunityNotFoundException("Post not found"));
         post.edit(actor.userId(), command.category(), command.title(), command.body());
         post.setMedia(command.imageUrls(), command.videoUrl(), command.targetBand());
+        post.setBackground(command.background());
         var saved = posts.save(post);
         return PostResult.from(saved, reactions.counts(saved.getId()));
     }

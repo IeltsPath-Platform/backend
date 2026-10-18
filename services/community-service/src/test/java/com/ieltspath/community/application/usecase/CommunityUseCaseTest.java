@@ -223,7 +223,7 @@ class CommunityUseCaseTest {
         assertThrows(CommunityForbiddenException.class, () -> new EditPostUseCase(posts, reactions, (imgs, vid) -> {}).execute(
                 new CommunityActor(UUID.randomUUID(), true),
                 new com.ieltspath.community.application.command.EditPostCommand(
-                        post.getId(), PostCategory.QUESTION, "new title", "new body", java.util.List.of(), null, null
+                        post.getId(), PostCategory.QUESTION, "new title", "new body", java.util.List.of(), null, null, null
                 )
         ));
         verify(posts, never()).save(any());

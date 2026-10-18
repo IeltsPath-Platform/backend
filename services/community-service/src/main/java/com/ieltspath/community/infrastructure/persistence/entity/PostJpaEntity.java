@@ -32,6 +32,9 @@ public class PostJpaEntity {
     public java.util.List<String> imageUrls = java.util.List.of();
     @Column(name = "video_url") public String videoUrl;
     @Column(name = "target_band", precision = 2, scale = 1) public java.math.BigDecimal targetBand;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "background_style")
+    public com.ieltspath.community.domain.vo.PostBackground background;
     @Version
     public Long version;
 

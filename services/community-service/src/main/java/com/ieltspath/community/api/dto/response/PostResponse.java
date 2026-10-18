@@ -20,6 +20,7 @@ public record PostResponse(
         Instant createdAt,
         Instant updatedAt,
         java.util.List<String> imageUrls,String videoUrl,java.math.BigDecimal targetBand,
+        com.ieltspath.community.domain.vo.PostBackground background,
         com.ieltspath.community.application.result.PublicProfile author,Map<ReactionType,Long> reactionCounts,
         ReactionType myReaction,long commentCount,boolean bookmarkedByMe,boolean followingAuthor
 ) {
@@ -27,7 +28,7 @@ public record PostResponse(
         return new PostResponse(
                 result.id(), result.authorId(), result.category(), result.title(), result.body(),
                 result.status(), result.reactions(), result.createdAt(), result.updatedAt(),
-                result.imageUrls(),result.videoUrl(),result.targetBand(),result.author(),result.reactionCounts(),
+                result.imageUrls(),result.videoUrl(),result.targetBand(),result.background(),result.author(),result.reactionCounts(),
                 result.myReaction(),result.commentCount(),result.bookmarkedByMe(),result.followingAuthor()
         );
     }

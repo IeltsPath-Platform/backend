@@ -22,6 +22,7 @@ public class CreatePostUseCase {
         mediaPolicy.validate(command.imageUrls(), command.videoUrl());
         Post post = Post.create(actor.userId(), command.category(), command.title(), command.body());
         post.setMedia(command.imageUrls(), command.videoUrl(), command.targetBand());
+        post.setBackground(command.background());
         Post saved = posts.save(post);
         return PostResult.from(saved, reactions.counts(saved.getId()));
     }
