@@ -1,7 +1,7 @@
 ---
 phase: 9
 title: "Contract, tài liệu, nghiệm thu"
-status: in_progress
+status: completed
 priority: P1
 dependencies: [1, 2, 3, 4, 5, 6, 7, 8]
 ---
@@ -35,7 +35,8 @@ dependencies: [1, 2, 3, 4, 5, 6, 7, 8]
 ## Success Criteria
 
 - [x] Không contract nào lệch controller. (đối chiếu code 2026-10-18, xem Tiến độ; `knowledge-tree-v1.md` do Codex đối chiếu)
-- [ ] Demo 1–7 chạy trên Compose sạch.
+- [x] Demo 1–7 chạy trên Compose. (2026-10-18, qua Gateway; xem `reports/acceptance.md`. Không `down -v`. Chưa chạy trên Compose:
+  nhánh lỗi của xuất bản hẹn giờ, gói có câu hỏi thật, và so sánh tuần này với tuần trước vì chỉ có một tuần snapshot)
 - [x] `mvn -B -ntp verify` xanh, không skip. (cả reactor, 0 bỏ qua, 2026-10-18; xem `reports/acceptance.md`)
 
 ## Tiến độ (2026-10-18)
@@ -54,5 +55,9 @@ dependencies: [1, 2, 3, 4, 5, 6, 7, 8]
   "bỏ qua lần xem lại cùng `requestId`" và "thẻ của người khác trả `404`" (chỉ đọc contract, tin test của Codex).
 - Đã chạy (2026-10-18): `docker compose config --quiet` (exit 0); `mvn -B -ntp -o verify` cả reactor xanh, 0 bỏ qua (chi tiết
   trong `reports/acceptance.md`). `reports/acceptance.md` đã có.
-- Chưa làm: 7 kịch bản demo trên Compose sạch. `docs/system-architecture.md` không tồn tại trong repo.
+- Đã chạy (2026-10-18): 7 kịch bản demo trên Compose thật. Chạy ra ba lỗi mà test không bắt được, đã sửa: Access thiếu cấu hình
+  RabbitMQ; learning thiếu `USER_SERVICE_URL` (mục tiêu band và tên league không đọc được); job snapshot lỗi mọi lần vì cần JWT
+  người dùng để gọi Content (nay đọc skill và band từ `knowledge_point_catalog`, thêm cột `band`, V31). Chi tiết ở
+  `reports/acceptance.md`.
+- Không còn việc trong phase. `docs/system-architecture.md` không tồn tại trong repo; không tạo mới vì ngoài phạm vi.
 - Không ghi "đã chạy" cho các mục chưa chạy.

@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Streak phía server, đóng băng, thưởng points"
-status: in_progress
+status: completed
 priority: P1
 dependencies: [1, 2]
 ---
@@ -52,10 +52,10 @@ thật, thêm đóng băng trả bằng points (03 §E.3), và đường cộng 
 
 ## Success Criteria
 
-- [ ] 7 ngày liên tiếp có nộp bài → streak 7, +100 XP, access nhận +10 points đúng một lần.
-- [x] Bỏ 1 ngày có đóng băng → chuỗi giữ; không đóng băng → về 1 khi nộp bài lại. (StreakRulesTest)
-- [ ] Đóng băng lần thứ 3 liên tiếp giá 30 points.
-- [ ] access tắt: grant nằm `PENDING`, bật lại thì được cộng.
+- [x] 7 ngày liên tiếp có nộp bài → streak 7, +100 XP, access nhận +10 points đúng một lần. (Compose 2026-10-18: dựng dòng streak 6 ngày, một câu trả lời → 7, ví 25 → 40 gồm +5 huy hiệu)
+- [x] Bỏ 1 ngày có đóng băng → chuỗi giữ; không đóng băng → về 1 khi nộp bài lại. (StreakRulesTest; Compose cho ca có đóng băng)
+- [x] Đóng băng lần thứ 3 liên tiếp giá 30 points. (`StreakRulesTest.theThirdConsecutiveFreezeCostsThirtyAndTheFifthFifty`; Compose thấy giá 10 rồi 20)
+- [x] access tắt: grant nằm `PENDING`, bật lại thì được cộng. (Compose: tắt Access, grant dựng sẵn gửi một lần và nằm `PENDING`, ví giữ nguyên; bật Access, grant thành `GRANTED` không cần gửi lại, ví +5)
 
 ## Tiến độ (2026-10-17)
 
@@ -90,5 +90,13 @@ Người dùng chọn gửi qua RabbitMQ (hợp đồng C6 trong `work-split.md`
   lại. Codex đã sửa trong working tree ngày 2026-10-18 (`LearningRewardReason.valueOf`, test cho ba lý do còn lại); đã đọc
   diff, đúng. Phía learning đã chạy với RabbitMQ thật (`PointsGrantBrokerRoundTripTest`, Access được mô phỏng); chưa chạy
   consumer Access thật cùng learning. Đã ghi vào C6.
-- Chính sách hoàn điểm đã chốt: không thêm route (xem trên). Phase này chỉ còn chờ Codex commit consumer Access và chạy thử
-  đầu-cuối learning ↔ Access qua RabbitMQ (tiêu chí "access tắt thì grant nằm `PENDING`, bật lại thì được cộng").
+- Chính sách hoàn điểm đã chốt: không thêm route (xem trên).
+
+### Chạy đầu-cuối (2026-10-18)
+
+- Compose thật (Access và Learning cùng RabbitMQ): hai grant `STREAK_MILESTONE` 10 điểm và `BADGE` 5 điểm đi từ `PENDING` sang
+  `GRANTED` sau một lần gửi trong khoảng 14 giây. Lần chạy đầu thấy Access `unhealthy` vì thiếu cấu hình RabbitMQ trong
+  `access-service.yaml` và `docker-compose.yml` (test dùng broker Testcontainers tự cấp địa chỉ nên không bắt được); đã thêm.
+- Đã thử khi Access tắt: khoản thưởng đã gửi một lần, nằm `PENDING`, ví không đổi; bật Access thì hàng đợi giao tin, grant
+  thành `GRANTED`. Khoản thưởng dùng cho phép thử là một dòng `reward_grants` dựng tay (nhiệm vụ trong ngày đã trả hết), không
+  phải thưởng phát sinh tự nhiên.

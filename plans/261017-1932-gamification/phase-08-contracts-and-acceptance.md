@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: "Contract, tài liệu, nghiệm thu"
-status: in_progress
+status: completed
 priority: P1
 dependencies: [1, 2, 3, 4, 5, 6, 7]
 ---
@@ -31,9 +31,12 @@ dependencies: [1, 2, 3, 4, 5, 6, 7]
 
 ## Success Criteria
 
-- [ ] Không contract nào lệch controller. (phần learning đã viết và đối chiếu code; còn access và user-service của Codex)
-- [ ] Demo 1–6 chạy trên Compose sạch.
-- [x] `mvn -B -ntp verify` xanh. (cả reactor, 2026-10-18; xem `reports/acceptance.md`)
+- [x] Không contract nào lệch controller. (learning, access và user-service đều đã đối chiếu với code)
+- [x] Demo 1–6 chạy trên Compose. (2026-10-18, qua Gateway; xem `reports/acceptance.md`. Ghi chú: Compose dựng lại image từ code hiện tại nhưng
+  không `down -v`; học viên demo chưa có dữ liệu học trước đó. Hai chỗ chưa chạy trên Compose: nộp bài ôn khi hết tim, và mọi thứ cần
+  câu HARD vì nội dung seed không có câu HARD nên phải gán tạm trong DB cục bộ)
+- [x] `mvn -B -ntp verify` xanh. (cả reactor, 2026-10-18; xem `reports/acceptance.md`; sau đó learning-service đổi (catalog có `band`,
+  V31) và chạy lại riêng module: 714 test, 0 lỗi)
 
 ## Tiến độ (2026-10-18)
 
@@ -45,6 +48,9 @@ dependencies: [1, 2, 3, 4, 5, 6, 7]
   (display-names). Tôi đã đối chiếu cả hai với `InternalUserController`, client của learning và listener Access.
 - Đã chạy (2026-10-18): `docker compose config --quiet` (exit 0); `mvn -B -ntp -o verify` cả reactor xanh, 0 bỏ qua; vòng
   khứ hồi điểm thưởng với RabbitMQ thật (`PointsGrantBrokerRoundTripTest`, Access được mô phỏng). Xem `reports/acceptance.md`.
-- Chưa làm: 6 kịch bản demo trên Compose sạch và một grant chạy qua consumer Access thật. `docs/system-architecture.md` không
-  tồn tại trong repo (chỉ có `.sdd/global/system-architecture.md`, không nói về nội bộ learning).
+- Đã chạy (2026-10-18, sau khi chuyển ổ đĩa Docker sang E:): 6 kịch bản demo trên Compose thật và grant qua consumer Access thật,
+  kể cả Access tắt rồi bật lại. Chạy ra hai lỗi cấu hình mà test không bắt được (Access thiếu RabbitMQ, learning thiếu
+  `USER_SERVICE_URL`), đã sửa; chi tiết ở `reports/acceptance.md`.
+- Không còn việc trong phase. `docs/system-architecture.md` không tồn tại trong repo (chỉ có `.sdd/global/system-architecture.md`,
+  không nói về nội bộ learning); không tạo mới vì ngoài phạm vi.
 - Không ghi "đã chạy" cho các mục chưa chạy.

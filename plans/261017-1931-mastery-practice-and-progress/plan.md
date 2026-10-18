@@ -1,7 +1,7 @@
 ﻿---
 title: "Mastery MP-1.0, luyện tự do theo KP, báo cáo tiến độ, ôn từ vựng và quản trị"
 description: "Đưa phần lõi của bộ tài liệu mentor (01-architecture-overview, 02-dev-integration-spec, 03-ba-spec) vào IELTSPath: metadata KP, mastery MP-1.0, luyện tự do theo KP, báo cáo theo kỹ năng và band mục tiêu, bản chụp tuần/tháng, flashcard 5 hộp, cờ vắng học, thống kê và xuất bản hẹn giờ"
-status: pending
+status: completed
 priority: P1
 branch: "feat/knowledge-tree-assessment-journey"
 tags: [content-service, learning-service, library-service, user-service, mastery, practice, report, srs, admin]
@@ -61,12 +61,12 @@ Mastery MP-1.0 ──> tier INSUFFICIENT │ PRIORITY │ CONSOLIDATE │ MAINTA
 | 1 | [Metadata KP và cây đủ 6 miền](phase-01-kp-metadata-and-domains.md) | content | completed (CEFR, can-do, phạm vi `316f763`; seed 13 KP Grammar/Vocab `INACTIVE` + 13 cạnh, không vòng, V45 `649f623`) | – |
 | 2 | [Mastery MP-1.0](phase-02-mastery-mp1.md) | learning | completed (công thức sau cờ `DEEPTUTOR`; chờ xác nhận bật `MP1`) | – |
 | 3 | [Luyện tự do theo KP và cây của học viên](phase-03-free-practice-and-learner-tree.md) | learning, content | completed (luyện tự do, cây, lọc band/gói, CEFR; `practiceAvailable` của cây chỉ gần đúng, xem phase) | 2 |
-| 4 | [Báo cáo theo kỹ năng và band mục tiêu](phase-04-skill-report-and-target-band.md) | learning, user | completed (còn: docs kiến trúc, test adapter HTTP) | 2 |
-| 5 | [Bản chụp tuần, xu hướng, bản tháng](phase-05-weekly-monthly-snapshots.md) | learning | completed (V27, job, 3 endpoint, dự báo ngày đạt mục tiêu; còn: test cron thật, contract) | 4 |
+| 4 | [Báo cáo theo kỹ năng và band mục tiêu](phase-04-skill-report-and-target-band.md) | learning, user | completed (adapter HTTP có test `RestUserServiceClientsTest`; `docs/system-architecture.md` không tồn tại trong repo) | 2 |
+| 5 | [Bản chụp tuần, xu hướng, bản tháng](phase-05-weekly-monthly-snapshots.md) | learning | completed (V27, job, 3 endpoint, dự báo ngày đạt mục tiêu; job cron đã chạy thật trên Compose và sửa lỗi thiếu JWT bằng V31; contract có) | 4 |
 | 6 | [Flashcard 5 hộp](phase-06-flashcard-leitner.md) | library | completed (commit `fec4c19`, test library xanh) | – |
 | 7 | [Cờ vắng học và thống kê hoạt động](phase-07-inactivity-flag-and-activity-stats.md) | learning | completed (cờ INACTIVE, tự đóng, hàng việc EXAMINER, DAU/WAU/MAU và giữ chân có test) | – |
 | 8 | [Xem trước và xuất bản hẹn giờ](phase-08-preview-and-scheduled-publish.md) | content | completed (commit `66351e9`, 22 test; còn: chạy lại scheduler test sau thay đổi annotation cuối) | – |
-| 9 | [Contract, tài liệu, nghiệm thu](phase-09-contracts-and-acceptance.md) | docs | in_progress (contract learning, AGENTS.md, DATABASE_V5 xong; còn contract của Codex, verify, demo) | tất cả |
+| 9 | [Contract, tài liệu, nghiệm thu](phase-09-contracts-and-acceptance.md) | docs | completed (contract, AGENTS.md, DATABASE_V5, verify cả reactor, demo 1–7 chạy trên Compose thật; xem `reports/acceptance.md`) | tất cả |
 
 Song song được: 1, 2, 6, 7, 8. Sau 2 thì 3 và 4; 5 sau 4.
 
