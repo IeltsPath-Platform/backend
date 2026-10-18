@@ -294,7 +294,7 @@ original examples. Each criterion is `{code,name,description,sortOrder,bandDescr
 example is `{band,prompt,essay,commentary}`. Bands are numeric half-band values from 0 through 9. The schema allows
 only one `ACTIVE` rubric per task. Seed descriptors for bands 4–9 are original paraphrases of the public IELTS Writing
 band descriptors with the source recorded; seed essays and prompts are original material.
-Migration `V39__rubrics.sql` seeds both `TASK_1` and `TASK_2` as `ACTIVE` for bootstrap. Their `sourceNote` explicitly
+Migration `V50__rubrics.sql` seeds both `TASK_1` and `TASK_2` as `ACTIVE` for bootstrap. Their `sourceNote` explicitly
 identifies the material as an AI draft that has not been reviewed by an IELTS expert; `ACTIVE` is a runtime status.
 
 The authoring routes require `ADMIN` or `CONTENT_AUTHOR`:
