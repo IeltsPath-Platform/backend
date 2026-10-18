@@ -9,6 +9,7 @@ import com.ieltspath.access.domain.exception.DuplicateIdempotencyException;
 import com.ieltspath.access.domain.repository.PointCreditRequestRepository;
 import com.ieltspath.access.domain.repository.PointLedgerRepository;
 import com.ieltspath.access.domain.repository.PointWalletRepository;
+import com.ieltspath.access.domain.vo.LearningRewardReason;
 import com.ieltspath.access.domain.vo.PointTransactionType;
 import org.springframework.beans.factory.annotation.Value;
 import jakarta.persistence.EntityManager;
@@ -56,7 +57,9 @@ public class CreditPointsWriter {
 
         Instant startOfDayUtc = todayUtc.atStartOfDay().toInstant(ZoneOffset.UTC);
         long earnedToday = creditRequestRepository.sumGrantedSince(command.userId(), startOfDayUtc);
-        int granted = (int) Math.min(command.amount(), Math.max(0L, (long) dailyLimit - earnedToday));
+        int granted = command.reason() == LearningRewardReason.BADGE
+                ? command.amount()
+                : (int) Math.min(command.amount(), Math.max(0L, (long) dailyLimit - earnedToday));
         boolean capped = granted < command.amount();
 
         PointWallet wallet = walletRepository.findByUserId(command.userId())

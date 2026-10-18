@@ -33,7 +33,8 @@ Response `200`:
 }
 ```
 
-The daily learning-reward limit is shared by all four reasons, uses the UTC day, and defaults to 20 points. Configure it
+The daily learning-reward limit is shared by `STREAK_MILESTONE`, `KP_MASTERED`, and `DAILY_QUEST`, uses the UTC day, and
+defaults to 20 points. `BADGE` grants are exempt from the limit and do not count toward the daily total. Configure the limit
 with `access.points.daily-earn-limit` or `ACCESS_POINTS_DAILY_EARN_LIMIT`. A partially granted request returns
 `capped: true`; when no points remain, `granted` is `0` and `transactionId` is `null`. Replaying the same idempotency key
 with the same user, amount, reason, and reference returns the original result without crediting again. Reusing the key
@@ -56,6 +57,8 @@ Access consumes `points.grant.requested` on durable queue `access.points-grant`,
 ```
 
 The reason set and amount/reference limits match the HTTP credit operation. Access uses `grantId` as the idempotency key.
+The daily limit applies to the three non-badge reasons; `BADGE` grants are always full (within normal request validation)
+and are excluded from the amount counted for that UTC day.
 It publishes a result to `learning.points` with routing key `points.grant.settled`:
 
 ```json

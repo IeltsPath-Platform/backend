@@ -53,7 +53,8 @@ public class JdbcPointCreditRequestRepository implements PointCreditRequestRepos
         Long total = jdbc.queryForObject("""
                 SELECT COALESCE(SUM(delta), 0)
                 FROM point_ledger_entries
-                WHERE user_id = ? AND transaction_type = 'LEARNING_REWARD' AND created_at >= ?
+                WHERE user_id = ? AND transaction_type = 'LEARNING_REWARD' AND reference_type <> 'BADGE'
+                  AND created_at >= ?
                 """, Long.class, userId, Timestamp.from(startInclusive));
         return total == null ? 0 : total;
     }

@@ -76,6 +76,37 @@ class PointCreditIntegrationTest {
     }
 
     @Test
+    void badgeCreditsBypassAndDoNotConsumeTheDailyLimitWhileDailyQuestStillUsesIt() throws Exception {
+        UUID userId = UUID.randomUUID();
+        seedDailyEarnings(userId, 18, "STREAK_MILESTONE");
+        String token = signedInternalToken(userId);
+
+        JsonNode firstBadge = postCredit(userId, 50, "badge-before-cap", "badge:STREAK_7", "BADGE", token);
+        assertEquals(50, firstBadge.path("granted").asInt());
+        assertEquals(false, firstBadge.path("capped").asBoolean());
+        assertEquals(68, firstBadge.path("balance").asLong());
+
+        JsonNode dailyQuestWithRoom = postCredit(userId, 5, "quest-with-room", "quest:daily:1", "DAILY_QUEST", token);
+        assertEquals(2, dailyQuestWithRoom.path("granted").asInt());
+        assertEquals(true, dailyQuestWithRoom.path("capped").asBoolean());
+        assertEquals(70, dailyQuestWithRoom.path("balance").asLong());
+
+        JsonNode badgeAfterCap = postCredit(userId, 50, "badge-after-cap", "badge:QUEST_COMPLETE", "BADGE", token);
+        assertEquals(50, badgeAfterCap.path("granted").asInt());
+        assertEquals(false, badgeAfterCap.path("capped").asBoolean());
+        assertEquals(120, badgeAfterCap.path("balance").asLong());
+
+        JsonNode dailyQuestAfterCap = postCredit(userId, 1, "quest-after-cap", "quest:daily:2", "DAILY_QUEST", token);
+        assertEquals(0, dailyQuestAfterCap.path("granted").asInt());
+        assertEquals(true, dailyQuestAfterCap.path("capped").asBoolean());
+        assertEquals(120, dailyQuestAfterCap.path("balance").asLong());
+        assertEquals(true, dailyQuestAfterCap.path("transactionId").isNull());
+
+        assertEquals(100L, sumGrantedForReason(userId, "BADGE"));
+        assertEquals(20L, sumDailyLimitEligibleRewards(userId));
+    }
+
+    @Test
     void creditRejectsRequestsWithoutInternalJwt() {
         ResponseEntity<String> response = rest.postForEntity("/internal/access/points/credit",
                 request("{}", null), String.class);
@@ -177,9 +208,48 @@ class PointCreditIntegrationTest {
     }
 
     private static String creditBody(UUID userId, int amount, String idempotencyKey, String referenceId) {
+        return creditBody(userId, amount, idempotencyKey, referenceId, "KP_MASTERED");
+    }
+
+    private JsonNode postCredit(UUID userId, int amount, String idempotencyKey, String referenceId,
+                                String reason, String token) throws Exception {
+        ResponseEntity<String> response = rest.postForEntity("/internal/access/points/credit",
+                request(creditBody(userId, amount, idempotencyKey, referenceId, reason), token), String.class);
+        assertEquals(200, response.getStatusCode().value());
+        return objectMapper.readTree(response.getBody());
+    }
+
+    private static String creditBody(UUID userId, int amount, String idempotencyKey, String referenceId, String reason) {
         return "{\"userId\":\"" + userId + "\",\"amount\":" + amount
-                + ",\"reason\":\"KP_MASTERED\",\"referenceId\":\"" + referenceId
+                + ",\"reason\":\"" + reason + "\",\"referenceId\":\"" + referenceId
                 + "\",\"idempotencyKey\":\"" + idempotencyKey + "\"}";
+    }
+
+    private void seedDailyEarnings(UUID userId, int amount, String reason) {
+        jdbc.update("INSERT INTO point_wallets(user_id, balance, total_credited, total_debited) VALUES (?, ?, ?, 0)",
+                userId, amount, amount);
+        Instant today = LocalDate.now(ZoneOffset.UTC).atStartOfDay().plusSeconds(1).toInstant(ZoneOffset.UTC);
+        jdbc.update("""
+                INSERT INTO point_ledger_entries
+                    (id, user_id, delta, balance_after, transaction_type, reference_type, reference_id,
+                     idempotency_key, created_at)
+                VALUES (?, ?, ?, ?, 'LEARNING_REWARD', ?, 'prior-reward', ?, ?)
+                """, UUID.randomUUID(), userId, amount, amount, reason, "prior-" + userId,
+                java.sql.Timestamp.from(today));
+    }
+
+    private long sumGrantedForReason(UUID userId, String reason) {
+        return jdbc.queryForObject("""
+                SELECT COALESCE(SUM(delta), 0) FROM point_ledger_entries
+                WHERE user_id = ? AND transaction_type = 'LEARNING_REWARD' AND reference_type = ?
+                """, Long.class, userId, reason);
+    }
+
+    private long sumDailyLimitEligibleRewards(UUID userId) {
+        return jdbc.queryForObject("""
+                SELECT COALESCE(SUM(delta), 0) FROM point_ledger_entries
+                WHERE user_id = ? AND transaction_type = 'LEARNING_REWARD' AND reference_type <> 'BADGE'
+                """, Long.class, userId);
     }
 
     private static String signedInternalToken(UUID subject) {

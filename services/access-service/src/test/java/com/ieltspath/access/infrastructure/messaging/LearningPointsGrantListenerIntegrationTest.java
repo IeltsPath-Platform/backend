@@ -99,7 +99,7 @@ class LearningPointsGrantListenerIntegrationTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = LearningRewardReason.class, names = {"KP_MASTERED", "DAILY_QUEST", "BADGE"})
+    @EnumSource(value = LearningRewardReason.class, names = {"KP_MASTERED", "DAILY_QUEST"})
     void reportsEachAdditionalLearningRewardReasonCappedAtTheDailyCreditLimit(LearningRewardReason reason) {
         UUID grantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -114,6 +114,42 @@ class LearningPointsGrantListenerIntegrationTest {
         assertEquals(reason.name(), jdbc.queryForObject(
                 "SELECT reason FROM point_credit_requests WHERE idempotency_key = ?", String.class, grantId.toString()));
         assertSettlements(grantId, "CAPPED", 1);
+    }
+
+    @Test
+    void badgeGrantsAreExemptFromDailyLimitAndDailyQuestsOnlyUseTheRemainingAllowance() {
+        UUID userId = UUID.randomUUID();
+        seedDailyEarnings(userId, 18, "STREAK_MILESTONE");
+
+        UUID firstBadgeGrant = UUID.randomUUID();
+        listener.onPointsGrantRequested(grantMessage(firstBadgeGrant, userId, 50,
+                "BADGE", "badge:STREAK_7"));
+        assertSettlements(firstBadgeGrant, "GRANTED", 1);
+        assertEquals(68L, balance(userId));
+        reset(rabbitTemplate);
+
+        UUID partlyCappedQuestGrant = UUID.randomUUID();
+        listener.onPointsGrantRequested(grantMessage(partlyCappedQuestGrant, userId, 5,
+                "DAILY_QUEST", "quest:daily:1"));
+        assertSettlements(partlyCappedQuestGrant, "CAPPED", 1);
+        assertEquals(70L, balance(userId));
+        reset(rabbitTemplate);
+
+        UUID badgeAfterCapGrant = UUID.randomUUID();
+        listener.onPointsGrantRequested(grantMessage(badgeAfterCapGrant, userId, 50,
+                "BADGE", "badge:QUEST_COMPLETE"));
+        assertSettlements(badgeAfterCapGrant, "GRANTED", 1);
+        assertEquals(120L, balance(userId));
+        reset(rabbitTemplate);
+
+        UUID cappedQuestGrant = UUID.randomUUID();
+        listener.onPointsGrantRequested(grantMessage(cappedQuestGrant, userId, 1,
+                "DAILY_QUEST", "quest:daily:2"));
+        assertSettlements(cappedQuestGrant, "CAPPED", 1);
+        assertEquals(120L, balance(userId));
+
+        assertEquals(100L, sumGrantedForReason(userId, "BADGE"));
+        assertEquals(20L, sumDailyLimitEligibleRewards(userId));
     }
 
     @Test
@@ -143,6 +179,34 @@ class LearningPointsGrantListenerIntegrationTest {
     private long balance(UUID userId) {
         return jdbc.queryForObject("SELECT COALESCE(MAX(balance), 0) FROM point_wallets WHERE user_id = ?",
                 Long.class, userId);
+    }
+
+    private void seedDailyEarnings(UUID userId, int amount, String reason) {
+        jdbc.update("INSERT INTO point_wallets(user_id, balance, total_credited, total_debited) VALUES (?, ?, ?, 0)",
+                userId, amount, amount);
+        java.time.Instant today = java.time.LocalDate.now(java.time.ZoneOffset.UTC).atStartOfDay()
+                .plusSeconds(1).toInstant(java.time.ZoneOffset.UTC);
+        jdbc.update("""
+                INSERT INTO point_ledger_entries
+                    (id, user_id, delta, balance_after, transaction_type, reference_type, reference_id,
+                     idempotency_key, created_at)
+                VALUES (?, ?, ?, ?, 'LEARNING_REWARD', ?, 'prior-reward', ?, ?)
+                """, UUID.randomUUID(), userId, amount, amount, reason, "prior-" + userId,
+                java.sql.Timestamp.from(today));
+    }
+
+    private long sumGrantedForReason(UUID userId, String reason) {
+        return jdbc.queryForObject("""
+                SELECT COALESCE(SUM(delta), 0) FROM point_ledger_entries
+                WHERE user_id = ? AND transaction_type = 'LEARNING_REWARD' AND reference_type = ?
+                """, Long.class, userId, reason);
+    }
+
+    private long sumDailyLimitEligibleRewards(UUID userId) {
+        return jdbc.queryForObject("""
+                SELECT COALESCE(SUM(delta), 0) FROM point_ledger_entries
+                WHERE user_id = ? AND transaction_type = 'LEARNING_REWARD' AND reference_type <> 'BADGE'
+                """, Long.class, userId);
     }
 
     private void assertSettlements(UUID grantId, String status, int count) {

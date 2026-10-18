@@ -22,8 +22,9 @@ Gói học, subscription, activation key và ví point. Cổng 8084, DB `access_
 - Thiếu point → 402.
 - Credit nhận `userId`, `amount` (1–100), `reason` (`STREAK_MILESTONE`, `KP_MASTERED`, `DAILY_QUEST`, `BADGE`),
   `referenceId` và `idempotencyKey`. Credit chỉ được cho subject của internal JWT. Gửi lại cùng key và nội dung trả lại
-  kết quả ban đầu; dùng lại key với nội dung khác trả 409. Mức kiếm tối đa theo UTC là `access.points.daily-earn-limit`
-  (mặc định 20); vượt mức chỉ cộng phần còn lại và trả `capped: true`, hết mức trả `granted: 0`.
+  kết quả ban đầu; dùng lại key với nội dung khác trả 409. `STREAK_MILESTONE`, `KP_MASTERED` và `DAILY_QUEST` dùng chung
+  mức kiếm tối đa theo UTC là `access.points.daily-earn-limit` (mặc định 20); vượt mức chỉ cộng phần còn lại và trả
+  `capped: true`, hết mức trả `granted: 0`. `BADGE` không dùng và không làm tăng mức trần ngày.
 - Debit với `referenceType` `HEART_REFILL` hoặc `STREAK_FREEZE` được ghi lần lượt là `HEART_REFILL_DEBIT` và
   `STREAK_FREEZE_DEBIT`; các reference hiện có vẫn được ghi `AI_GRADING_DEBIT`.
 
