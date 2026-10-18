@@ -1,5 +1,7 @@
 package com.ieltspath.access.infrastructure.messaging;
 
+import com.ieltspath.events.points.PointsGrantSettled;
+
 import com.ieltspath.events.points.PointsGrantMessaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -80,7 +82,14 @@ public class LearningPointsMessagingConfig {
 
     @Bean
     MessageConverter pointsMessageConverter(ObjectMapper objectMapper) {
-        return new Jackson2JsonMessageConverter(objectMapper);
+        var converter = new Jackson2JsonMessageConverter(objectMapper);
+        var classMapper = new org.springframework.amqp.support.converter.DefaultClassMapper();
+        // Preserve the wire type id used before the payload moved to the shared module.
+        classMapper.setIdClassMapping(java.util.Map.of(
+                "com.ieltspath.access.infrastructure.messaging.PointsGrantSettled", PointsGrantSettled.class));
+        classMapper.afterPropertiesSet();
+        converter.setClassMapper(classMapper);
+        return converter;
     }
 
     /** A refused message is dead-lettered, never put back on the queue where it would be redelivered at once. */
