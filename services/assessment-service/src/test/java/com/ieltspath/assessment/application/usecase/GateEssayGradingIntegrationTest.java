@@ -172,8 +172,8 @@ class GateEssayGradingIntegrationTest {
                 "Essay explanation", BigDecimal.ONE, List.of(new KnowledgePointWeight(knowledgePointId, BigDecimal.ONE)));
         Section section = new Section(UUID.randomUUID(), "Writing", "WRITING", "Write an essay", 1, null, null,
                 List.of(essay));
-        when(content.findPackageVersion(versionId)).thenReturn(Optional.of(new PackageVersion(versionId, packageType,
-                List.of(section))));
+        when(content.findPackageVersion(versionId)).thenReturn(Optional.of(new PackageVersion(versionId,
+                UUID.randomUUID(), packageType, List.of(section))));
         return start.execute(new StartAssessmentAttemptCommand(userId, versionId, AttemptMode.STANDARD,
                 AttemptChannel.WEB)).id();
     }

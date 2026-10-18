@@ -89,8 +89,9 @@ abstract class ExaminerIntegrationSupport {
     UUID item(UUID attempt) {
         return jdbc.queryForObject("SELECT i.id FROM attempt_items i JOIN attempt_sections s ON s.id=i.attempt_section_id WHERE s.attempt_id=?", UUID.class, attempt);
     }
+    /** The examiner job of the attempt. A finalised result is sampled for QA at random, which adds a second HUMAN job. */
     UUID humanJob(UUID attempt) {
-        return jdbc.queryForObject("SELECT j.id FROM grading_jobs j JOIN learner_submissions l ON l.id=j.submission_id JOIN attempt_items i ON i.id=l.attempt_item_id JOIN attempt_sections s ON s.id=i.attempt_section_id WHERE s.attempt_id=? AND j.grading_mode='HUMAN'", UUID.class, attempt);
+        return jdbc.queryForObject("SELECT j.id FROM grading_jobs j JOIN learner_submissions l ON l.id=j.submission_id JOIN attempt_items i ON i.id=l.attempt_item_id JOIN attempt_sections s ON s.id=i.attempt_section_id WHERE s.attempt_id=? AND j.grading_mode='HUMAN' AND COALESCE(j.reason,'') <> 'QA_SAMPLE'", UUID.class, attempt);
     }
     int count(String sql, Object... args) { return jdbc.queryForObject(sql, Integer.class, args); }
 }

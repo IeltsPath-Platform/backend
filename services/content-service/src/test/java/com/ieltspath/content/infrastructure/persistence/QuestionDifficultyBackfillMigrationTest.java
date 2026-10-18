@@ -47,7 +47,17 @@ class QuestionDifficultyBackfillMigrationTest {
     void migrationSucceedsAndLeavesOnlyTheUnclassifiableVersionNull() {
         assertThat(nullBefore).isGreaterThan(1);
         assertThat(count("SELECT count(*) FROM question_versions")).isEqualTo(totalBefore);
-        var stillNull = jdbc.queryForList("SELECT id FROM question_versions WHERE difficulty IS NULL", Map.of());
+        // Questions of library practice tests (those with a source) belong to no course, so they stay untagged too.
+        var stillNull = jdbc.queryForList("""
+                SELECT qv.id FROM question_versions qv
+                WHERE qv.difficulty IS NULL AND NOT EXISTS (
+                    SELECT 1 FROM section_questions sq
+                    JOIN content_sections cs ON cs.id = sq.section_id
+                    JOIN content_package_versions v ON v.id = cs.package_version_id
+                    JOIN content_packages p ON p.id = v.package_id
+                    WHERE sq.question_version_id = qv.id AND p.package_type = 'PRACTICE_TEST'
+                      AND p.source_code IS NOT NULL)
+                """, Map.of());
         assertThat(stillNull).extracting(row -> row.get("id")).containsExactly(ORPHAN_VERSION);
     }
 

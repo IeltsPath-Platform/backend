@@ -35,6 +35,7 @@ class CourseSequenceIntegrationTest {
         dataSource.setPassword(POSTGRES.getPassword());
         Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").target("52").load().migrate();
         try (Connection connection = dataSource.getConnection(); var statement = connection.createStatement()) {
+            statement.executeUpdate("DELETE FROM course_practice_test_milestones");
             statement.executeUpdate("DELETE FROM content_packages WHERE course_id IN (SELECT id FROM courses)");
             statement.executeUpdate("UPDATE topics SET course_id = NULL WHERE course_id IN (SELECT id FROM courses)");
             statement.executeUpdate("DELETE FROM courses");
