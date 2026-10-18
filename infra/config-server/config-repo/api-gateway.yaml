@@ -92,6 +92,11 @@ spring:
               predicates:
                 - Path=/api/notifications/**
 
+            - id: notification-service-websocket
+              uri: lb:ws://NOTIFICATION-SERVICE
+              predicates:
+                - Path=/ws/notifications
+
             - id: community-service
               uri: lb://COMMUNITY-SERVICE
               predicates:
@@ -169,6 +174,7 @@ app:
       - /api/learning-support
       - /api/games
       - /api/notifications
+      - /ws/notifications
       - /api/community
       - /api/learning
 
