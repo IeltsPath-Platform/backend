@@ -1,5 +1,7 @@
 package com.ieltspath.access.infrastructure.messaging;
 
+import com.ieltspath.events.messaging.MessageHeaders;
+
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -11,7 +13,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
  * over when a client republishes a message.
  */
 public class MessageRetry {
-    static final String ATTEMPTS_HEADER = "x-retry-count";
+    static final String ATTEMPTS_HEADER = MessageHeaders.RETRY_COUNT;
 
     private final RabbitTemplate rabbit;
     private final String retryQueue;

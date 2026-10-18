@@ -1,5 +1,7 @@
 package com.ieltspath.access.infrastructure.messaging;
 
+import com.ieltspath.events.points.PointsGrantMessaging;
+
 import com.ieltspath.access.application.result.PointCreditResult;
 import com.ieltspath.access.application.usecase.CreditPointsUseCase;
 import com.ieltspath.access.domain.vo.LearningRewardReason;
@@ -76,7 +78,7 @@ class PointsGrantDeadLetterBrokerTest {
     private void send(UUID grantId, String messageId) {
         String body = "{\"grantId\":\"" + grantId + "\",\"userId\":\"" + UUID.randomUUID()
                 + "\",\"amount\":3,\"reason\":\"DAILY_QUEST\",\"referenceId\":\"quest:1\"}";
-        rabbit.send(LearningPointsMessagingConfig.EXCHANGE, LearningPointsMessagingConfig.GRANT_ROUTING_KEY,
+        rabbit.send(PointsGrantMessaging.EXCHANGE, PointsGrantMessaging.REQUESTED_ROUTING_KEY,
                 MessageBuilder.withBody(body.getBytes(StandardCharsets.UTF_8)).setContentType("application/json")
                         .setMessageId(messageId).build());
     }

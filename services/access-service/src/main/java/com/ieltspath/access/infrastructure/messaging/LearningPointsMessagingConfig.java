@@ -1,5 +1,7 @@
 package com.ieltspath.access.infrastructure.messaging;
 
+import com.ieltspath.events.points.PointsGrantMessaging;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
@@ -19,27 +21,22 @@ import org.springframework.context.annotation.Configuration;
 /**
  * Topology of the points grant queue. A message the consumer refuses (bad payload, constraint violation, or a failure
  * that kept coming back) is dead-lettered to {@link #GRANT_DLQ}; a failure that may pass is parked on
- * {@link #GRANT_RETRY_QUEUE} and returns to {@link #GRANT_QUEUE} after {@link #RETRY_DELAY_MS}.
+ * {@link #GRANT_RETRY_QUEUE} and returns to {@link #GRANT_QUEUE} after {@link PointsGrantMessaging#RETRY_DELAY_MS}.
  *
  * <p>Queue arguments cannot change once a queue exists: a broker that already holds {@code access.points-grant} declared
  * without the dead-letter arguments answers {@code PRECONDITION_FAILED} until that queue is deleted.
  */
 @Configuration
 public class LearningPointsMessagingConfig {
-    public static final String EXCHANGE = "learning.points";
     public static final String GRANT_QUEUE = "access.points-grant";
     public static final String GRANT_RETRY_QUEUE = "access.points-grant.retry";
     public static final String GRANT_DLQ = "access.points-grant.dlq";
     public static final String DEAD_LETTER_EXCHANGE = "access.points-grant.dlx";
-    public static final String GRANT_ROUTING_KEY = "points.grant.requested";
-    public static final String SETTLED_ROUTING_KEY = "points.grant.settled";
     public static final String CONTAINER_FACTORY = "pointsGrantListenerContainerFactory";
-    public static final long RETRY_DELAY_MS = 30_000;
-    public static final int MAX_RETRIES = 5;
 
     @Bean
     TopicExchange learningPointsExchange() {
-        return new TopicExchange(EXCHANGE, true, false);
+        return new TopicExchange(PointsGrantMessaging.EXCHANGE, true, false);
     }
 
     @Bean
@@ -64,7 +61,7 @@ public class LearningPointsMessagingConfig {
     @Bean
     Queue accessPointsGrantRetryQueue() {
         return QueueBuilder.durable(GRANT_RETRY_QUEUE)
-                .ttl((int) RETRY_DELAY_MS)
+                .ttl((int) PointsGrantMessaging.RETRY_DELAY_MS)
                 .deadLetterExchange("")
                 .deadLetterRoutingKey(GRANT_QUEUE)
                 .build();
@@ -72,7 +69,7 @@ public class LearningPointsMessagingConfig {
 
     @Bean
     Binding accessPointsGrantBinding() {
-        return BindingBuilder.bind(accessPointsGrantQueue()).to(learningPointsExchange()).with(GRANT_ROUTING_KEY);
+        return BindingBuilder.bind(accessPointsGrantQueue()).to(learningPointsExchange()).with(PointsGrantMessaging.REQUESTED_ROUTING_KEY);
     }
 
     @Bean
@@ -98,6 +95,6 @@ public class LearningPointsMessagingConfig {
 
     @Bean
     MessageRetry pointsGrantRetry(RabbitTemplate rabbitTemplate) {
-        return new MessageRetry(rabbitTemplate, GRANT_RETRY_QUEUE, MAX_RETRIES);
+        return new MessageRetry(rabbitTemplate, GRANT_RETRY_QUEUE, PointsGrantMessaging.MAX_RETRIES);
     }
 }
