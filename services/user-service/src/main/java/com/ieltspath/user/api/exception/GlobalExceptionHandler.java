@@ -99,6 +99,8 @@ public class GlobalExceptionHandler {
     ResponseEntity<ErrorResponse> handleMalformedActivityRequest(Exception exception, HttpServletRequest request) {
         return isLearningSupportPath(request) || request.getRequestURI().startsWith("/api/users/me/study-sessions")
                 || request.getRequestURI().startsWith("/api/users/me/statistics/")
+                || request.getRequestURI().equals("/internal/users/public-profiles")
+                || request.getRequestURI().matches("/api/users/[^/]+/public-profile")
                 ? error(HttpStatus.BAD_REQUEST, "Dữ liệu không hợp lệ", request, null)
                 : error(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi hệ thống không xác định", request, null);
     }

@@ -167,6 +167,25 @@ Health: /actuator/health
 
 Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho frontend. Frontend đi qua API Gateway.
 
+## Community public profiles
+
+- `GET /api/users/{userId}/public-profile` requires authentication and returns
+  `{id, displayName, avatarUrl, bio, targetBand, streak}`.
+- `POST /internal/users/public-profiles` accepts `{userIds: UUID[]}` (at most 100 entries; empty is allowed)
+  and returns `{profiles: [...]}`. It uses the forwarded internal JWT's viewer identity and is blocked at Gateway.
+  IDs are deduplicated in input order. Missing or hidden profiles are omitted.
+- `GET /internal/users/public-profiles/search?q=...&limit=8` is an authenticated internal lookup for community mention suggestions. It returns at most 10 active public/community-visible profiles; private profiles are omitted except the viewer's own profile.
+- `PUBLIC` and `COMMUNITY` profiles are visible to authenticated members. A `PRIVATE` profile is visible only
+  to its owner; other viewers receive 404 from the single-profile endpoint. Neither endpoint grants an admin bypass.
+- Existing users without a learner profile follow the current default profile policy: account full name (or
+  `Learner`) and public visibility, without creating a profile on read. No email, phone, roles, timezone,
+  self-reported band, exam date, or schedule are returned.
+- `targetBand` is the current active learning goal's target, otherwise null. `streak` is the stored current-day
+  streak, otherwise zero. `avatarUrl` contains the existing avatar reference only if it is an absolute HTTP(S)
+  URL with a host and no user credentials; opaque references return null. Bio/avatar are edited through the
+  existing `PUT /api/users/me/profile` API (`avatarReference`, `bio`). No schema change is required.
+- The bounded batch uses a single query joining profile, active goal, and streak in `user_db`.
+
 ## Recorded study time
 
 Authenticated personal APIs use `CurrentUserProvider`; existing activity CRUD does not contribute to these totals.
