@@ -8,3 +8,4 @@ CREATE DATABASE learning_db;
 CREATE DATABASE library_db;
 CREATE DATABASE game_db;
 CREATE DATABASE community_db;
+CREATE DATABASE notification_db;

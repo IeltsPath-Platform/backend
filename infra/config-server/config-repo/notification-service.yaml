@@ -9,11 +9,21 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
 
 app:
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
     internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}
+  frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
   security:
     public-endpoints:
       - method: GET
