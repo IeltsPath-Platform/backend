@@ -61,7 +61,7 @@ class HumanReviewIntegrationTest {
         reset(client, content);
         when(content.getActiveRubric(any())).thenReturn(new LearningContentClient.Rubric("IELTS_WRITING", "TASK_2", 1,
                 "source", List.of(), List.of()));
-        when(client.consumeCredit(any())).thenReturn(2);
+        when(client.consumeCredit(any())).thenReturn(new HumanReviewClient.CreditCharge(2, true));
     }
 
     private UUID essay(UUID owner, String status, boolean practice) {
@@ -122,28 +122,67 @@ class HumanReviewIntegrationTest {
     }
 
     @Test
-    void aFailedReviewCreationGivesTheCreditBackAndTheLearnerCanAskAgain() {
+    void aReviewAssessmentRefusedGivesTheCreditBackAndTheLearnerCanAskAgain() {
         UUID essay = essay(user, "GRADED", false);
-        when(client.createReview(any())).thenThrow(new LearningRequestException(503, "HUMAN_REVIEW_UNAVAILABLE", "x"));
+        when(client.createReview(any())).thenThrow(new LearningRequestException(409, "HUMAN_GRADING_CONFLICT", "x"));
 
-        assertEquals(503, assertThrows(LearningRequestException.class, () -> reviews.request(user, essay)).getStatus());
+        assertEquals(409, assertThrows(LearningRequestException.class, () -> reviews.request(user, essay)).getStatus());
+        verify(client, times(1)).createReview(any());
         verify(client).refundCredit(essay);
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM human_review_requests", Integer.class));
 
         reset(client);
-        when(client.consumeCredit(any())).thenReturn(1);
+        when(client.consumeCredit(any())).thenReturn(new HumanReviewClient.CreditCharge(1, true));
         UUID review = UUID.randomUUID();
         when(client.createReview(any())).thenReturn(review);
         assertEquals(review, reviews.request(user, essay));
     }
 
     @Test
-    void aFailedRefundDoesNotHideTheOriginalFailure() {
+    void aTimeoutKeepsTheCreditBecauseTheReviewMayExistAndTheRepeatReusesTheRequestId() {
+        UUID essay = essay(user, "GRADED", false);
+        UUID review = UUID.randomUUID();
+        when(client.createReview(any())).thenThrow(new LearningRequestException(503, "HUMAN_REVIEW_UNAVAILABLE", "x"))
+                .thenReturn(review);
+
+        assertEquals(review, reviews.request(user, essay), "the repeat found the review the first call had made");
+
+        var sent = org.mockito.ArgumentCaptor.forClass(HumanReviewClient.CreateReview.class);
+        verify(client, times(2)).createReview(sent.capture());
+        assertEquals(sent.getAllValues().get(0).requestId(), sent.getAllValues().get(1).requestId());
+        verify(client, never()).refundCredit(any());
+    }
+
+    @Test
+    void aLearnerWhoStillGetsNoAnswerKeepsTheCreditOnTheEssayAndPaysNothingMoreNextTime() {
         UUID essay = essay(user, "GRADED", false);
         when(client.createReview(any())).thenThrow(new LearningRequestException(503, "HUMAN_REVIEW_UNAVAILABLE", "x"));
+
+        assertEquals(503, assertThrows(LearningRequestException.class, () -> reviews.request(user, essay)).getStatus());
+
+        verify(client, times(2)).createReview(any());
+        verify(client, never()).refundCredit(any());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM human_review_requests", Integer.class));
+    }
+
+    @Test
+    void aRequestThatDidNotSpendTheCreditNeverGivesItBack() {
+        UUID essay = essay(user, "GRADED", false);
+        when(client.consumeCredit(any())).thenReturn(new HumanReviewClient.CreditCharge(2, false));
+        when(client.createReview(any())).thenThrow(new LearningRequestException(409, "HUMAN_GRADING_CONFLICT", "x"));
+
+        assertThrows(LearningRequestException.class, () -> reviews.request(user, essay));
+
+        verify(client, never()).refundCredit(any());
+    }
+
+    @Test
+    void aFailedRefundDoesNotHideTheOriginalFailure() {
+        UUID essay = essay(user, "GRADED", false);
+        when(client.createReview(any())).thenThrow(new LearningRequestException(409, "HUMAN_GRADING_CONFLICT", "x"));
         doThrow(new LearningRequestException(503, "HUMAN_REVIEW_UNAVAILABLE", "refund")).when(client).refundCredit(any());
 
-        assertEquals("HUMAN_REVIEW_UNAVAILABLE",
+        assertEquals("HUMAN_GRADING_CONFLICT",
                 assertThrows(LearningRequestException.class, () -> reviews.request(user, essay)).getCode());
     }
 

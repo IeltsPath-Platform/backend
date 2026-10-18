@@ -67,7 +67,11 @@ fraction of reviews whose difference is greater than one band.
 
 Role: `CUSTOMER`. Only an essay submitted by the caller as part of a submitted `TOPIC_GATE` attempt can be requested.
 Assessment consumes one Access human-grading credit, then creates an idempotent `HUMAN` job with reason
-`HUMAN_CREDIT`. If job creation fails after consumption, Assessment requests a credit refund.
+`HUMAN_CREDIT`. No database transaction is open while Access is called; the job is written in its own short
+transaction. A request whose job already exists neither spends nor refunds anything. If job creation fails, Assessment
+refunds the credit only when this call spent it (the consume response says `charged: true`) and the job is known not to
+exist; if the refund also fails, the credit stays with the submission and asking again queues the job without spending a
+second credit.
 
 Response: `202 Accepted`.
 
@@ -89,8 +93,11 @@ Assessment forwards the learner bearer token so Access identifies the learner. B
 `POST /internal/access/human-grading/refund` takes the same request body. Both return:
 
 ```json
-{"submissionId":"c26f2b10-d777-4888-ad68-6a51def59e01","remainingCredits":2}
+{"submissionId":"c26f2b10-d777-4888-ad68-6a51def59e01","remainingCredits":2,"charged":true}
 ```
+
+`charged` is `true` when the call spent a credit and `false` when the credit of the submission had already been spent
+(a repeat) or when the call was a refund. Only a caller that received `charged: true` may refund.
 
 The Access endpoints return Access's standard `ErrorResponse` (`timestamp`, `status`,
 `error`, `message`, `path`, `details`); they do not include a named `code` field.

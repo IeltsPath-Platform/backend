@@ -32,34 +32,41 @@ public class ConsumeHumanGradingCreditUseCase {
     }
 
     public int execute(ConsumeHumanGradingCreditCommand command) {
+        return consume(command).remainingCredits();
+    }
+
+    /** What a consume call did: the credits left, and whether this call spent one (false when it was already spent). */
+    public record Consumption(int remainingCredits, boolean charged) {}
+
+    public Consumption consume(ConsumeHumanGradingCreditCommand command) {
         if (command.submissionId() != null) {
             return consumeOnce(command);
         }
-        return consume(command.userId(), null);
+        return new Consumption(consumeUntracked(command.userId()), true);
     }
 
-    private int consumeOnce(ConsumeHumanGradingCreditCommand command) {
+    private Consumption consumeOnce(ConsumeHumanGradingCreditCommand command) {
         consumptionRepository.lockSubmission(command.submissionId());
         var existing = consumptionRepository.findBySubmissionId(command.submissionId());
         if (existing.isPresent()) {
             var consumption = existing.get();
             requireSameUser(command.userId(), consumption.userId());
             if (consumption.refundedAt() == null) {
-                return consumption.remainingCredits();
+                return new Consumption(consumption.remainingCredits(), false);
             }
             // The earlier credit was refunded, so this attempt is a new request and costs a credit again.
             Subscription subscription = debit(command.userId());
             int remaining = subscription.getRemainingCredits();
             consumptionRepository.markReconsumed(command.submissionId(), subscription.getId(), remaining);
             recordConsumed(subscription, command, remaining);
-            return remaining;
+            return new Consumption(remaining, true);
         }
         Subscription subscription = debit(command.userId());
         int remaining = subscription.getRemainingCredits();
         consumptionRepository.save(new HumanGradingCreditConsumption(command.submissionId(), command.userId(),
                 subscription.getId(), remaining, null));
         recordConsumed(subscription, command, remaining);
-        return remaining;
+        return new Consumption(remaining, true);
     }
 
     private Subscription debit(java.util.UUID userId) {
@@ -78,19 +85,14 @@ public class ConsumeHumanGradingCreditUseCase {
         ));
     }
 
-    private int consume(java.util.UUID userId, java.util.UUID submissionId) {
-        Subscription subscription = subscriptionRepository.findActiveByUserId(userId)
-                .orElseThrow(() -> new InsufficientCreditsException(null, 0));
-
-        subscription.consumeHumanGradingCredit();
-        subscriptionRepository.save(subscription);
-
+    /** A credit that is not tied to a submission: spent every time, with nothing to make a repeat idempotent. */
+    private int consumeUntracked(java.util.UUID userId) {
+        Subscription subscription = debit(userId);
         outboxEventRepository.save(OutboxEvent.create(
                 "Subscription", subscription.getId(), "HumanGradingCreditConsumed",
                 String.format("{\"userId\":\"%s\",\"subscriptionId\":\"%s\",\"remainingCredits\":%d}",
                         userId, subscription.getId(), subscription.getRemainingCredits())
         ));
-
         return subscription.getRemainingCredits();
     }
 

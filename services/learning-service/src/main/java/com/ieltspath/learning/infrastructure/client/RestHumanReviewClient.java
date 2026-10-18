@@ -44,22 +44,22 @@ public class RestHumanReviewClient implements HumanReviewClient {
     }
 
     @Override
-    public int consumeCredit(UUID submissionId) {
+    public CreditCharge consumeCredit(UUID submissionId) {
         Credits credits = call(() -> access.post().uri("/internal/access/human-grading/consume")
-                .headers(this::forward).body(Map.of("submissionId", submissionId)).retrieve().body(Credits.class));
-        return credits.remainingCredits();
+                .headers(this::forward).body(Map.of("submissionId", submissionId)).retrieve().body(Credits.class), false);
+        return new CreditCharge(credits.remainingCredits(), Boolean.TRUE.equals(credits.charged()));
     }
 
     @Override
     public void refundCredit(UUID submissionId) {
         call(() -> access.post().uri("/internal/access/human-grading/refund")
-                .headers(this::forward).body(Map.of("submissionId", submissionId)).retrieve().body(Credits.class));
+                .headers(this::forward).body(Map.of("submissionId", submissionId)).retrieve().body(Credits.class), false);
     }
 
     @Override
     public UUID createReview(CreateReview request) {
         Created created = call(() -> assessment.post().uri("/internal/assessments/human-reviews")
-                .headers(this::forward).body(body(request)).retrieve().body(Created.class));
+                .headers(this::forward).body(body(request)).retrieve().body(Created.class), true);
         if (created.reviewSubmissionId() == null) throw unavailable();
         return created.reviewSubmissionId();
     }
@@ -67,7 +67,7 @@ public class RestHumanReviewClient implements HumanReviewClient {
     @Override
     public Review fetchReview(UUID reviewSubmissionId, UUID learnerId) {
         return call(() -> assessment.get().uri("/internal/assessments/human-reviews/{id}", reviewSubmissionId)
-                .headers(this::forward).retrieve().body(Review.class));
+                .headers(this::forward).retrieve().body(Review.class), false);
     }
 
     private static Map<String, Object> body(CreateReview request) {
@@ -81,7 +81,8 @@ public class RestHumanReviewClient implements HumanReviewClient {
                 "essay", request.essay(), "rubric", rubric);
     }
 
-    private <T> T call(Supplier<T> request) {
+    /** {@code refusalIsDefinite}: a 4xx answer to a create call means nothing was created, unlike a timeout or a 5xx. */
+    private <T> T call(Supplier<T> request, boolean refusalIsDefinite) {
         try {
             T body = request.get();
             if (body == null) throw unavailable();
@@ -94,6 +95,9 @@ public class RestHumanReviewClient implements HumanReviewClient {
             }
             if (status == 409) {
                 throw new LearningRequestException(409, "HUMAN_GRADING_CONFLICT", "The review request conflicts");
+            }
+            if (refusalIsDefinite && status >= 400 && status < 500 && status != 401) {
+                throw new LearningRequestException(502, "HUMAN_REVIEW_REJECTED", "The Mentor review was refused");
             }
             throw unavailable();
         } catch (RestClientException exception) {
@@ -111,6 +115,6 @@ public class RestHumanReviewClient implements HumanReviewClient {
         return new LearningRequestException(503, "HUMAN_REVIEW_UNAVAILABLE", "Mentor review is unavailable");
     }
 
-    private record Credits(int remainingCredits) {}
+    private record Credits(int remainingCredits, Boolean charged) {}
     private record Created(UUID reviewSubmissionId) {}
 }

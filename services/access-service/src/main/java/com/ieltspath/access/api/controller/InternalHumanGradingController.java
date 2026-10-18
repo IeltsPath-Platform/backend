@@ -27,15 +27,16 @@ public class InternalHumanGradingController {
 
     @PostMapping("/consume")
     public HumanGradingCreditResponse consume(@Valid @RequestBody HumanGradingCreditRequest request) {
-        int remaining = credits.execute(new ConsumeHumanGradingCreditCommand(
+        var consumption = credits.consume(new ConsumeHumanGradingCreditCommand(
                 currentUser.requireUserId(), request.submissionId()));
-        return new HumanGradingCreditResponse(request.submissionId(), remaining);
+        return new HumanGradingCreditResponse(request.submissionId(), consumption.remainingCredits(),
+                consumption.charged());
     }
 
     @PostMapping("/refund")
     public HumanGradingCreditResponse refund(@Valid @RequestBody HumanGradingCreditRequest request) {
         int remaining = credits.refund(new RefundHumanGradingCreditCommand(
                 currentUser.requireUserId(), request.submissionId()));
-        return new HumanGradingCreditResponse(request.submissionId(), remaining);
+        return new HumanGradingCreditResponse(request.submissionId(), remaining, false);
     }
 }

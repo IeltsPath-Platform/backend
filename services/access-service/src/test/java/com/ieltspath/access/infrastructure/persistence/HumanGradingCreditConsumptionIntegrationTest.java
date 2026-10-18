@@ -51,8 +51,9 @@ class HumanGradingCreditConsumptionIntegrationTest {
         UUID subscription = activeSubscription(user, 2);
         UUID submission = UUID.randomUUID();
 
-        assertEquals(1, credits.execute(new ConsumeHumanGradingCreditCommand(user, submission)));
-        assertEquals(1, credits.execute(new ConsumeHumanGradingCreditCommand(user, submission)));
+        assertTrue(credits.consume(new ConsumeHumanGradingCreditCommand(user, submission)).charged());
+        assertFalse(credits.consume(new ConsumeHumanGradingCreditCommand(user, submission)).charged(),
+                "a repeat finds the credit already spent");
         entityManager.flush();
         assertEquals(1, usedCredits(subscription));
         assertEquals(1, count("SELECT count(*) FROM outbox_events WHERE event_type='HumanGradingCreditConsumed'"));
@@ -75,8 +76,9 @@ class HumanGradingCreditConsumptionIntegrationTest {
         entityManager.flush();
         assertEquals(0, usedCredits(subscription));
 
-        assertEquals(1, credits.execute(new ConsumeHumanGradingCreditCommand(user, submission)));
-        assertEquals(1, credits.execute(new ConsumeHumanGradingCreditCommand(user, submission)));
+        assertTrue(credits.consume(new ConsumeHumanGradingCreditCommand(user, submission)).charged(),
+                "after a refund the next request spends a credit again");
+        assertFalse(credits.consume(new ConsumeHumanGradingCreditCommand(user, submission)).charged());
         entityManager.flush();
         assertEquals(1, usedCredits(subscription));
         assertEquals(2, count("SELECT count(*) FROM outbox_events WHERE event_type='HumanGradingCreditConsumed'"));

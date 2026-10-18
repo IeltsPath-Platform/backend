@@ -1,5 +1,6 @@
 package com.ieltspath.assessment.infrastructure.client;
 
+import com.ieltspath.assessment.application.port.HumanGradingCreditPort;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -17,7 +18,7 @@ import java.util.UUID;
 import java.time.Duration;
 
 @Component
-public class AccessHumanGradingCreditClient {
+public class AccessHumanGradingCreditClient implements HumanGradingCreditPort {
     private final RestClient client;
 
     @Autowired
@@ -33,23 +34,26 @@ public class AccessHumanGradingCreditClient {
         this.client = client;
     }
 
-    public void consume(UUID submissionId) {
-        post("/consume", submissionId);
+    @Override
+    public boolean consume(UUID submissionId) {
+        CreditResponse response = post("/consume", submissionId);
+        return response != null && Boolean.TRUE.equals(response.charged());
     }
 
+    @Override
     public void refund(UUID submissionId) {
         post("/refund", submissionId);
     }
 
-    private void post(String path, UUID submissionId) {
+    private CreditResponse post(String path, UUID submissionId) {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (!(authentication instanceof JwtAuthenticationToken jwt)) {
             throw new IllegalStateException("A learner bearer token is required for human grading credits");
         }
         try {
-            client.post().uri("/internal/access/human-grading" + path)
+            return client.post().uri("/internal/access/human-grading" + path)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt.getToken().getTokenValue())
-                    .body(new CreditRequest(submissionId)).retrieve().toBodilessEntity();
+                    .body(new CreditRequest(submissionId)).retrieve().body(CreditResponse.class);
         } catch (HttpClientErrorException exception) {
             if (exception.getStatusCode() == HttpStatus.PAYMENT_REQUIRED) {
                 throw new HumanGradingCreditInsufficientException();
@@ -62,4 +66,6 @@ public class AccessHumanGradingCreditClient {
     }
 
     private record CreditRequest(UUID submissionId) {}
+
+    private record CreditResponse(UUID submissionId, Integer remainingCredits, Boolean charged) {}
 }

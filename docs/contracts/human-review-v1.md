@@ -10,8 +10,11 @@ Role `CUSTOMER`, own essays only. Both calls forward the learner's bearer token.
 
 `POST /api/learning/writing-submissions/{id}/human-review` — `202`, `{ "reviewSubmissionId": "…", "status": "REQUESTED" }`.
 The essay (lesson block or Practice) must be `GRADED`. Learning spends one human-grading credit for the essay (Access is
-idempotent by essay id), then asks Assessment for the review below. If Assessment cannot create it the credit is given
-back. One request per essay: asking again returns the same review and spends nothing. The request id sent to Assessment
+idempotent by essay id), then asks Assessment for the review below. The credit is given back only when this call spent
+it (`charged: true` in the Access answer) and Assessment refused the review outright (a 4xx answer: nothing was created).
+A timeout, a server error or a lost connection may have left the review behind, so Learning asks once more with the same
+request id and, if that fails too, keeps the credit with the essay and answers `503`; asking again reuses it and spends
+nothing more. One request per essay: asking again returns the same review and spends nothing. The request id sent to Assessment
 is derived from the essay id, so Assessment creates the review once.
 
 `GET /api/learning/writing-submissions/{id}/human-review` — the review as returned by Assessment (below): `status`

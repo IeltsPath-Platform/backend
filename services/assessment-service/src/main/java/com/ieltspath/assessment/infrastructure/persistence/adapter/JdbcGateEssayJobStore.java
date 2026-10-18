@@ -94,6 +94,13 @@ public class JdbcGateEssayJobStore implements GateEssayJobStore {
     }
 
     @Override
+    public boolean jobExists(String idempotencyKey) {
+        Integer found = jdbc.queryForObject("SELECT count(*) FROM grading_jobs WHERE idempotency_key = :key",
+                Map.of("key", idempotencyKey), Integer.class);
+        return found != null && found > 0;
+    }
+
+    @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void enqueueCourseHuman(Collection<UUID> essayItemIds, UUID userId, Map<UUID, UUID> submitted) {
         if (essayItemIds.isEmpty()) return;

@@ -47,6 +47,31 @@ class AccessHumanGradingCreditClientTest {
     }
 
     @Test
+    void tellsWhetherThisCallSpentTheCredit() {
+        authenticate("learner-bearer-token");
+        server.expect(requestTo("http://localhost:8084/internal/access/human-grading/consume"))
+                .andRespond(withSuccess("{\"submissionId\":\"" + submission + "\",\"remainingCredits\":2,\"charged\":true}",
+                        org.springframework.http.MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://localhost:8084/internal/access/human-grading/consume"))
+                .andRespond(withSuccess("{\"submissionId\":\"" + submission + "\",\"remainingCredits\":2,\"charged\":false}",
+                        org.springframework.http.MediaType.APPLICATION_JSON));
+
+        org.junit.jupiter.api.Assertions.assertTrue(client.consume(submission));
+        org.junit.jupiter.api.Assertions.assertFalse(client.consume(submission));
+        server.verify();
+    }
+
+    @Test
+    void anAnswerWithoutTheFlagIsNeverTreatedAsASpentCredit() {
+        authenticate("learner-bearer-token");
+        server.expect(requestTo("http://localhost:8084/internal/access/human-grading/consume"))
+                .andRespond(withSuccess("{\"submissionId\":\"" + submission + "\",\"remainingCredits\":2}",
+                        org.springframework.http.MediaType.APPLICATION_JSON));
+
+        org.junit.jupiter.api.Assertions.assertFalse(client.consume(submission));
+    }
+
+    @Test
     void mapsAccessCreditErrorsToAssessmentStatuses() {
         authenticate("learner-bearer-token");
         server.expect(requestTo("http://localhost:8084/internal/access/human-grading/consume"))

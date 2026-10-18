@@ -23,6 +23,9 @@ public interface GateEssayJobStore {
 
     void enqueueHuman(UUID submissionId, UUID userId, String idempotencyKey, String reason);
 
+    /** True when a job with {@code idempotencyKey} exists, whatever its status. */
+    boolean jobExists(String idempotencyKey);
+
     /** Includes explicit blank submissions for omitted course essays so every essay is discoverable. */
     void enqueueCourseHuman(Collection<UUID> essayItemIds, UUID userId, Map<UUID, UUID> submitted);
 

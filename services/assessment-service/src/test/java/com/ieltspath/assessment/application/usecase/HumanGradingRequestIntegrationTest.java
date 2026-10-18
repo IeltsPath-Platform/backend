@@ -50,7 +50,7 @@ class HumanGradingRequestIntegrationTest extends ExaminerIntegrationSupport {
                     .andExpect(status().isAccepted())
                     .andExpect(jsonPath("$.submissionId").value(submission.toString()));
         }
-        verify(credits, times(2)).consume(submission);
+        verify(credits, times(1)).consume(submission);
         assertEquals(1, count("SELECT count(*) FROM grading_jobs WHERE submission_id=? AND grading_mode='HUMAN' AND reason='HUMAN_CREDIT'", submission));
         assertEquals(1, count("SELECT count(*) FROM human_reviews h JOIN grading_jobs j ON j.id=h.grading_job_id WHERE j.submission_id=? AND j.reason='HUMAN_CREDIT'", submission));
     }

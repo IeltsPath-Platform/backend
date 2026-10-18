@@ -16,8 +16,10 @@ import java.util.UUID;
 /**
  * A learner with a human-grading credit asks a Mentor to review a graded lesson or Practice essay. The review is feedback
  * only: it writes no evidence, makes no review and changes no gate. The credit is spent once per essay (Access is
- * idempotent by essay id); if the review cannot be created the credit is given back. No call holds a database
- * transaction, and repeating the request returns the review already asked for.
+ * idempotent by essay id). It is given back only when this call spent it and Assessment refused the review outright; a
+ * timeout or server error may have left the review behind, so the request is repeated (Assessment creates a review once
+ * per request id) and, if it still fails, the credit stays with the essay and asking again reuses it. No call holds a
+ * database transaction, and repeating the request returns the review already asked for.
  */
 @Service
 public class HumanReviewUseCase {
@@ -44,14 +46,14 @@ public class HumanReviewUseCase {
         }
         var rubric = content.getActiveRubric(essay.prompt().task());
 
-        client.consumeCredit(submissionId);
+        boolean charged = client.consumeCredit(submissionId).charged();
         UUID reviewId;
         try {
-            reviewId = client.createReview(new CreateReview(requestId(submissionId), userId, submissionId,
+            reviewId = createReview(new CreateReview(requestId(submissionId), userId, submissionId,
                     essay.blockId() != null ? "LESSON" : "PRACTICE", essay.prompt().task(), essay.prompt().stem(),
                     essay.essayText(), rubric.code(), rubric.version()));
-        } catch (RuntimeException failure) {
-            refund(submissionId);
+        } catch (LearningRequestException failure) {
+            if (charged && refused(failure)) refund(submissionId);
             throw failure;
         }
         if (!requests.insert(submissionId, userId, reviewId)) {
@@ -67,6 +69,21 @@ public class HumanReviewUseCase {
         UUID reviewId = requests.findReviewId(submissionId).orElseThrow(() -> new LearningRequestException(404,
                 "NO_HUMAN_REVIEW", "No Mentor review was asked for this essay"));
         return client.fetchReview(reviewId, userId);
+    }
+
+    /** Asks once more after a failure that may have left the review behind; the request id makes the repeat safe. */
+    private UUID createReview(CreateReview request) {
+        try {
+            return client.createReview(request);
+        } catch (LearningRequestException failure) {
+            if (refused(failure) || failure.getStatus() == 401) throw failure;
+            return client.createReview(request);
+        }
+    }
+
+    /** Assessment answered that it did not create the review. */
+    private static boolean refused(LearningRequestException failure) {
+        return "HUMAN_GRADING_CONFLICT".equals(failure.getCode()) || "HUMAN_REVIEW_REJECTED".equals(failure.getCode());
     }
 
     private WritingSubmission owned(UUID userId, UUID submissionId) {
