@@ -15,7 +15,10 @@ configuration screen.
   last course test are finished).
 - **Total** = `processWeight` Process + `midWeight` mid + `finalWeight` final (defaults 0.2 / 0.3 / 0.5).
   - Process = `practiceShare` Practice (mean of first counted Practice submissions of the course's lessons) +
-    `practiceTestShare` milestone practice tests (defaults 0.64 / 0.36); free practice tests do not count.
+    `practiceTestShare` milestone practice tests (defaults 0.64 / 0.36); free practice tests do not count. The number of
+    milestones comes from Content. A request reads it live; applying a course-test result runs outside a request, where
+    Content refuses the call for lack of a learner token, so it uses the count kept when the course test was assigned
+    (`course_milestone_counts`).
   - mid = mean first-test percent of the course's topics that have a topic test.
   - final = the newest course test.
   - A component the learner has not done is 0. A component the course does not have is left out and its weight shared out

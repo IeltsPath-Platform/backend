@@ -1,7 +1,6 @@
 package com.ieltspath.learning.application.service;
 
 import com.ieltspath.learning.application.port.CourseScoreData;
-import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.domain.entity.TopicProgress;
 import com.ieltspath.learning.domain.repository.LearnerCurriculumRepository;
 import com.ieltspath.learning.domain.service.CourseScoreCalculator;
@@ -30,24 +29,24 @@ public class CourseScoreService {
 
     private final CourseScoreData data;
     private final LearnerCurriculumRepository curricula;
-    private final LearningContentClient content;
+    private final CourseMilestones milestones;
     private final CourseScoreCalculator calculator = new CourseScoreCalculator();
 
     public CourseScoreService(CourseScoreData data, LearnerCurriculumRepository curricula,
-                              LearningContentClient content) {
+                              CourseMilestones milestones) {
         this.data = data;
         this.curricula = curricula;
-        this.content = content;
+        this.milestones = milestones;
     }
 
     public Evaluation evaluate(UUID userId, UUID courseId, CourseScoreConfig config) {
         // Practice and the course test exist in every course; a missing result is a 0, not a missing component.
         Double practice = data.practiceAverage(userId, courseId).orElse(0.0);
 
-        var milestones = content.getPracticeTestMilestones(courseId);
+        int milestoneCount = milestones.count(courseId);
         List<Double> finished = data.practiceTestPercents(userId, courseId);
-        Double practiceTest = milestones.isEmpty() ? null
-                : finished.stream().mapToDouble(Double::doubleValue).sum() / Math.max(milestones.size(), finished.size());
+        Double practiceTest = milestoneCount == 0 ? null
+                : finished.stream().mapToDouble(Double::doubleValue).sum() / Math.max(milestoneCount, finished.size());
 
         List<TopicProgress> tested = curricula.find(userId).topics().stream()
                 .filter(topic -> courseId.equals(topic.courseId()) && topic.sequenceOrder() != null

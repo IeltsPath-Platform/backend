@@ -3,6 +3,7 @@ package com.ieltspath.learning.application.usecase;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.service.CourseMilestones;
 import com.ieltspath.learning.application.port.LearningContentClient.TestPackage;
 import com.ieltspath.learning.application.result.TestAssignmentResult;
 import com.ieltspath.learning.domain.aggregate.CourseTestAssignment;
@@ -26,11 +27,14 @@ public class AssignCourseTestUseCase {
     private final CourseTestAssignmentRepository assignments;
     private final LearningContentClient content;
     private final CourseOutcomeRepository outcomes;
+    private final CourseMilestones milestones;
 
     public AssignCourseTestUseCase(LearnerLock lock, RefreshLearningTopicsUseCase refreshTopics,
                                    CourseProgressRepository progress, CourseTestAssignmentRepository assignments,
-                                   LearningContentClient content, CourseOutcomeRepository outcomes) {
+                                   LearningContentClient content, CourseOutcomeRepository outcomes,
+                                   CourseMilestones milestones) {
         this.outcomes = outcomes;
+        this.milestones = milestones;
         this.lock = lock;
         this.refreshTopics = refreshTopics;
         this.progress = progress;
@@ -66,6 +70,8 @@ public class AssignCourseTestUseCase {
             throw new LearningRequestException(409, "REMEDIATION_REQUIRED",
                     "Finish the reviews from the course test before taking it again");
         }
+        // The result of this test is applied by an event that cannot ask Content for the milestones itself.
+        milestones.keep(courseId);
         var open = assignments.findOpen(userId, courseId);
         if (open.isPresent()) return result(open.get());
         List<TestPackage> packages = content.getCourseTestPackages(courseId);

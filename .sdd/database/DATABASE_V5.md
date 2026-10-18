@@ -1425,6 +1425,17 @@ Bảng dùng chung mọi học viên, ghi lại từ Content `topic-sequence` m�
 | `band` | numeric(3,1) | NULL | V31. Band của khóa chứa topic; job snapshot đọc skill và band ở đây vì job không có JWT để gọi Content. NULL tới lần học viên mở danh sách khóa sau migration |
 | `refreshed_at` | timestamptz | NOT NULL | |
 
+## 7.1a `course_milestone_counts`
+
+Số milestone practice test của từng khóa, ghi khi học viên được giao đề cuối khóa. Consumer áp kết quả đề cuối không có
+JWT để hỏi Content nên dùng số này khi tính điểm khóa. Lúc đọc điểm trong request vẫn hỏi Content trực tiếp.
+
+| Cột | Kiểu | Ràng buộc | Ghi chú |
+| --- | --- | --- | --- |
+| `course_id` | uuid | PK | Khóa của Content |
+| `milestone_count` | integer | NOT NULL, `>= 0` | V34 |
+| `refreshed_at` | timestamptz | NOT NULL | |
+
 ## 7.2 `topic_progress`
 
 | Cột | Kiểu | Ràng buộc | Ghi chú |

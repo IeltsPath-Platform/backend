@@ -194,6 +194,25 @@ class CourseOutcomeIntegrationTest {
     }
 
     @Test
+    void aCourseTestIsDecidedWhenTheEventCarriesNoLearnerToken() {
+        refresh.execute(user);
+        topicTest(TOPIC_ONE, TOPIC_ONE_PACKAGE, TOPIC_ONE_VERSION, 4, 4);
+        topicTest(TOPIC_TWO, TOPIC_TWO_PACKAGE, TOPIC_TWO_VERSION, 4, 4);
+        assignCourseTest.execute(user, COURSE);
+
+        // Applying the event runs outside a request, so Content refuses the milestones call; the count kept at
+        // assignment stands in for it and the course is decided instead of the event failing and being retried.
+        when(content.getPracticeTestMilestones(COURSE))
+                .thenThrow(new LearningRequestException(401, "UNAUTHORIZED", "Authenticated gateway JWT required"));
+        courseTest(VERSION_A, 5, 5);
+
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM course_progress WHERE user_id = ? "
+                + "AND course_id = ? AND passed_at IS NOT NULL", Integer.class, user, COURSE));
+        assertEquals("PASSED", jdbc.queryForObject("SELECT status FROM course_outcomes WHERE user_id = ? "
+                + "AND course_id = ?", String.class, user, COURSE));
+    }
+
+    @Test
     void aCourseCanHaveItsOwnConfigurationAndInvalidOnesAreRefused() {
         var inherited = config.get(COURSE);
         assertTrue(inherited.inherited());
