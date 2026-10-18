@@ -22,6 +22,12 @@ versions, and packages of another type return `400`. A package can belong to onl
 Learning's single first-score assignment per learner/package. Reads for management also show configured packages that
 have since been archived; their `packageVersionId` may be null. Learners cannot call the management routes.
 
+A practice test without a `sourceCode` is internal: it is reached through its course (a checkpoint) and is never listed
+in the practice library. The library catalog lists only tests that have a supported `sourceCode` and are not a course
+milestone. `POST /api/content/packages` therefore accepts a `PRACTICE_TEST` with no `sourceCode`, and publishing
+checks the source only when one is present (an unknown one is refused). A `sourceCode` on any other package type is
+refused with `400`.
+
 The seed supplies one midpoint checkpoint per course 5.5 and 6.5. Both contain original short Reading/Writing material;
 they are not full-length IELTS mocks. Practice-test questions are reserved against reuse in lessons or review sets.
 Publishing a `PRACTICE_TEST` locks its question rows, checks ownership and `EXAM` purpose, and requires gradable
@@ -274,7 +280,11 @@ Response:
 {"difficulties":{"20000000-0000-4000-8000-000000000201":"EASY","20000000-0000-4000-8000-000000000202":"HARD"}}
 ```
 
-Difficulty values are `EASY`, `MEDIUM`, or `HARD`. Unknown IDs and versions whose difficulty is still `NULL` are omitted from `difficulties`. Invalid or oversized input returns `400`.
+Difficulty values are `EASY`, `MEDIUM`, or `HARD`. Unknown IDs and versions whose difficulty is still `NULL` are omitted from `difficulties`. Difficulty is required for
+questions that belong to a course: the authoring API refuses a new version without it (`400 DIFFICULTY_REQUIRED`) and the
+backfill sets it from the course. Questions used only in library practice tests belong to no course, so they may stay
+`NULL`, and nothing guesses a value for them. Learning treats a missing tag as untagged: an untagged correct answer earns
+the unknown-difficulty XP, the too-easy/too-hard check uses the general limits, and staff statistics leave the field out. Invalid or oversized input returns `400`.
 
 ## `POST /suggestions/candidates`
 

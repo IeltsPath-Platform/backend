@@ -47,7 +47,8 @@ with `PUT .../schedule` and `{ "publishAt": "<future ISO-8601 instant>" }`, canc
 read pending or failed schedules at `GET /api/content/admin/packages/{packageId}/publication-schedules`. All routes
 require `ADMIN` or `CONTENT_AUTHOR`. Scheduling runs the same checks as an immediate publish. V43 stores the due
 instant and a safe error code; a once-per-minute job uses a PostgreSQL advisory lock and the existing publish use case.
-See the [preview and scheduled publication contract](../../docs/contracts/content-scheduled-publish-v1.md) for response
+A `PRACTICE_TEST` created without `sourceCode` is an internal course checkpoint: the practice library lists only
+tests with a supported source that are not course milestones. See the [preview and scheduled publication contract](../../docs/contracts/content-scheduled-publish-v1.md) for response
 shapes and retry behavior.
 
 V22 is mock demo content so each Academic course covers Reading, Listening and Writing and can rotate final tests.

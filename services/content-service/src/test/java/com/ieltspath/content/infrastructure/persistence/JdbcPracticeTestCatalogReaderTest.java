@@ -59,6 +59,49 @@ class JdbcPracticeTestCatalogReaderTest {
     }
 
     @Test
+    void courseCheckpointsAreNotListedInTheLibrary() {
+        List<UUID> checkpoints = sql.queryForList("SELECT package_id FROM course_practice_test_milestones", UUID.class);
+        assertThat(checkpoints).as("the seeded checkpoints of both courses").hasSizeGreaterThanOrEqualTo(2);
+        Fixture library = publishedTest("LIBRARY_ONLY", "Library test");
+
+        for (Skill skill : List.of(Skill.READING, Skill.WRITING)) {
+            for (String scope : List.of("FULL", "PART")) {
+                var page = reader.search(new PracticeTestCatalogReader.Search(skill, scope, null,
+                        List.of(), null, null, null, 0, 100));
+                assertThat(page.items()).extracting(PracticeTestCardResult::packageId).doesNotContainAnyElementsOf(checkpoints);
+            }
+        }
+        var reading = reader.search(new PracticeTestCatalogReader.Search(Skill.READING, "FULL", null,
+                List.of(), null, null, null, 0, 100));
+        assertThat(reading.items()).extracting(PracticeTestCardResult::packageId).contains(library.packageId());
+    }
+
+    @Test
+    void aPublishedPracticeTestWithoutASourceIsInternalAndNotListed() {
+        Fixture internal = publishedTest("NO_SOURCE", "Internal test");
+        sql.update("UPDATE content_packages SET source_code = NULL WHERE id = ?", internal.packageId());
+
+        var page = reader.search(new PracticeTestCatalogReader.Search(Skill.READING, "FULL", null,
+                List.of(), null, null, null, 0, 100));
+
+        assertThat(page.items()).extracting(PracticeTestCardResult::packageId).doesNotContain(internal.packageId());
+
+    }
+
+    @Test
+    void aCheckpointThatIsGivenASourceStaysOutOfTheLibrary() {
+        Fixture checkpoint = publishedTest("MILESTONE_WITH_SOURCE", "Checkpoint with a source");
+        UUID course = sql.queryForObject("SELECT id FROM courses ORDER BY code LIMIT 1", UUID.class);
+        sql.update("INSERT INTO course_practice_test_milestones(course_id, package_id, after_topic_sequence) VALUES (?, ?, 1)",
+                course, checkpoint.packageId());
+
+        var page = reader.search(new PracticeTestCatalogReader.Search(Skill.READING, "FULL", null,
+                List.of(), null, null, null, 0, 100));
+
+        assertThat(page.items()).extracting(PracticeTestCardResult::packageId).doesNotContain(checkpoint.packageId());
+    }
+
+    @Test
     void nullQueryAndPartNumberAreAcceptedForUnrestrictedPartSearch() {
         Fixture fixture = publishedTest("NULLS", "A section without a query title");
 

@@ -15,6 +15,14 @@ import java.util.*;
 
 @Component
 public class JdbcPracticeTestCatalogReader implements PracticeTestCatalogReader {
+    /**
+     * The library lists only tests that name a source and are not a course checkpoint. A practice test without a source is
+     * internal: it is reached through its course, never browsed, and the milestone check backs that up for a checkpoint
+     * that is given a source.
+     */
+    private static final String LIBRARY_ONLY = "p.source_code IS NOT NULL AND NOT EXISTS ("
+            + "SELECT 1 FROM course_practice_test_milestones milestone WHERE milestone.package_id = p.id)";
+
     private final NamedParameterJdbcTemplate jdbc;
 
     public JdbcPracticeTestCatalogReader(NamedParameterJdbcTemplate jdbc) { this.jdbc = jdbc; }
@@ -26,7 +34,7 @@ public class JdbcPracticeTestCatalogReader implements PracticeTestCatalogReader 
                 .addValue("query", query.query() == null || query.query().isBlank() ? null : "%" + escape(query.query()) + "%")
                 .addValue("limit", query.size()).addValue("offset", Math.multiplyExact(query.page(), query.size()));
         StringBuilder where = new StringBuilder("p.package_type = 'PRACTICE_TEST' AND p.status = 'PUBLISHED' "
-                + "AND v.status = 'PUBLISHED' AND p.current_published_version_id = v.id AND s.skill = :skill ");
+                + "AND " + LIBRARY_ONLY + " AND v.status = 'PUBLISHED' AND p.current_published_version_id = v.id AND s.skill = :skill ");
         if ("PART".equals(query.scope())) where.append("AND s.part_no IS NOT NULL AND (CAST(:partNo AS integer) IS NULL OR s.part_no = :partNo) ");
         if (!query.sources().isEmpty()) where.append("AND p.source_code IN (:sources) ");
         if ("FULL".equals(query.scope())) {
@@ -113,10 +121,11 @@ public class JdbcPracticeTestCatalogReader implements PracticeTestCatalogReader 
                 JOIN content_sections s ON s.package_version_id = v.id
                 JOIN section_question_groups g ON g.section_id = s.id
                 WHERE p.package_type = 'PRACTICE_TEST' AND p.status = 'PUBLISHED' AND v.status = 'PUBLISHED'
+                  AND %s
                   AND s.skill = :skill
                 GROUP BY g.format_code
                 ORDER BY section_count DESC, g.format_code
-                """, Map.of("skill", skill.name()),
+                """.formatted(LIBRARY_ONLY), Map.of("skill", skill.name()),
                 (rs, row) -> new FormatCount(rs.getString("format_code"), rs.getLong("section_count")));
     }
 

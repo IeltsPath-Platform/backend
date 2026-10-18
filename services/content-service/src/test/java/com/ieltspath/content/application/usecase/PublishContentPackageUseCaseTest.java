@@ -141,7 +141,7 @@ class PublishContentPackageUseCaseTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"PRACTICE_SET,LEARNING", "TOPIC_TEST,LEARNING", "MOCK_TEST,EXAM", "PLACEMENT_TEST,PLACEMENT", "PRACTICE_TEST,EXAM"})
+    @CsvSource({"PRACTICE_SET,LEARNING", "TOPIC_TEST,LEARNING", "MOCK_TEST,EXAM", "PLACEMENT_TEST,PLACEMENT"})
     void questionsMustMatchThePackagesPurposeBeforePublishing(PackageType type, QuestionPurpose requiredPurpose) {
         ContentPackage pkg = ContentPackage.create("PURPOSE-CHECK", "Purpose", type, null);
         ContentPackageVersion draft = ContentPackageVersion.create(pkg.getId(), 1, "{}");
@@ -188,10 +188,9 @@ class PublishContentPackageUseCaseTest {
         verify(contentPackageRepository).save(practice);
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"", "UNKNOWN_SOURCE"})
-    void practiceTestsRequireASupportedSource(String sourceCode) {
-        ContentPackage practice = practiceTest(sourceCode.isBlank() ? null : sourceCode);
+    @Test
+    void aPracticeTestWithAnUnknownSourceCannotBePublished() {
+        ContentPackage practice = practiceTest("UNKNOWN_SOURCE");
         when(contentPackageRepository.findById(practice.getId())).thenReturn(Optional.of(practice));
 
         assertThatThrownBy(() -> publishContentPackageUseCase.execute(new PublishContentPackageCommand(
@@ -199,6 +198,25 @@ class PublishContentPackageUseCaseTest {
                 .isInstanceOf(InvalidContentStateException.class)
                 .hasMessageContaining("supported test source");
         verify(contentPackageRepository, never()).save(any());
+    }
+
+    @Test
+    void aPracticeTestWithoutASourceIsAnInternalCheckpointAndCanBePublished() {
+        ContentPackage checkpoint = practiceTest(null);
+        ContentPackageVersion draft = checkpoint.getVersions().getFirst();
+        when(contentPackageRepository.findById(checkpoint.getId())).thenReturn(Optional.of(checkpoint));
+        when(lessons.practiceTestPublishIssues(draft.getId())).thenReturn(List.of());
+        when(lessons.questionsUsedElsewhere(draft.getId())).thenReturn(List.of());
+        when(lessons.questionsWithWrongPurpose(draft.getId(), QuestionPurpose.EXAM)).thenReturn(List.of());
+        when(lessons.packageQuestionSpecs(draft.getId())).thenReturn(List.of(new PackageQuestionSpec(
+                UUID.randomUUID(), QuestionType.MULTIPLE_CHOICE, com.ieltspath.content.domain.vo.Skill.READING,
+                "{\"type\":\"CHOICE\",\"correct\":\"A\"}")));
+        when(contentPackageRepository.save(any(ContentPackage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = publishContentPackageUseCase.execute(
+                new PublishContentPackageCommand(checkpoint.getId(), draft.getId(), userId));
+
+        assertThat(result.status()).isEqualTo(PublicationStatus.PUBLISHED);
     }
 
     @Test

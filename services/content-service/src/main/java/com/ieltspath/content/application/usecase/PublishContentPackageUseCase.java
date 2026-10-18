@@ -85,10 +85,13 @@ public class PublishContentPackageUseCase {
         }
 
         if (pkg.getPackageType() == PackageType.PRACTICE_TEST) {
-            try {
-                TestSource.valueOf(pkg.getSourceCode());
-            } catch (RuntimeException invalidSource) {
-                throw new InvalidContentStateException("Practice tests require a supported test source");
+            // No source means an internal test (a course checkpoint); a source that is present must be a supported one.
+            if (pkg.getSourceCode() != null) {
+                try {
+                    TestSource.valueOf(pkg.getSourceCode());
+                } catch (RuntimeException invalidSource) {
+                    throw new InvalidContentStateException("Practice tests require a supported test source");
+                }
             }
             List<String> issues = lessons.practiceTestPublishIssues(targetVersion.getId());
             if (!issues.isEmpty()) throw new InvalidContentStateException(String.join("; ", issues));
@@ -115,7 +118,7 @@ public class PublishContentPackageUseCase {
         }
 
         if (pkg.getPackageType() == PackageType.PRACTICE_SET || pkg.getPackageType() == PackageType.TOPIC_TEST
-                || pkg.getPackageType() == PackageType.COURSE_TEST || pkg.getPackageType() == PackageType.PRACTICE_TEST) {
+                || pkg.getPackageType() == PackageType.COURSE_TEST) {
             var questions = lessons.packageQuestionSpecs(targetVersion.getId());
             for (var question : questions) {
                 JsonNode spec = parseSpec(question.answerSpecJson());
