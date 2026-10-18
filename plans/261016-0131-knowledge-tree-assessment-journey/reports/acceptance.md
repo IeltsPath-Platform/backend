@@ -51,7 +51,7 @@ The following responses were observed through Gateway on the clean stack:
 
 ## Acceptance status
 
-Closed with open items; not a full acceptance. Verification of every module except `library-service` is green (1,419
+Closed with open items; not a full acceptance. The 2026-10-18 rerun below supersedes the step 4, 5 and 8 results above. Verification of every module except `library-service` is green (1,419
 tests, 0 failures, 0 skipped), and the clean stack is healthy. Demo steps 1-3, 6 and the step 7 activation guard passed;
 the V40 sets enabled the intended review-and-diagnosis flow.
 
@@ -80,3 +80,38 @@ The step-4 assignment row has packageId `20000000-0000-4000-8000-080000000001` a
 Gateway assignment response matched both values. No current Learning/Content version mismatch was found.
 
 The read-only Content database check returned **12** rows in `question_versions` where `difficulty IS NULL`.
+
+## Rerun on 2026-10-18 (separate Compose project)
+
+Run after the review fixes were merged with `main`. The stack was a separate Compose project (`docker compose -p ieltspath-demo`), so
+the development stack and its volumes were not touched; the project was removed with `down -v` when the run ended.
+Images were built from the JARs of the verified reactor build (the in-Docker Maven build is rate-limited by Maven Central).
+Demo accounts: `learner3@ielts.demo` (CUSTOMER, registered for the run), `examiner@ielts.demo` (EXAMINER) and
+`author@ielts.demo` (CONTENT_AUTHOR), roles granted by `admin@ielts.demo` through `PUT /api/users/{id}/roles`. Two settings differ
+from the defaults, both only on this demo stack: `mastery.priority-below` was raised from 0.6 to 0.79 through the Admin rule-config
+route, and `assessment.qa.sample-rate` was set to 1.0 so that the single essay of the run was sampled.
+
+| Step | Result |
+| --- | --- |
+| 4. Topic test of 50% | Topic 1 became `COMPLETED` and topic 2 `IN_PROGRESS`. A `MID_COURSE_REMEDIATION` item appeared in the Examiner queue; the Examiner took it (`IN_PROGRESS`), finished it (`DONE`) with a note shown to the learner, and the learner read the note at `GET /api/learning/notes`. The earlier 404 `Package version not found` did not occur. |
+| 5. Course test, remediation, retest | All seven topics of IELTS 5.5 were taken, then the course test: 3 of 6 correct gave `REMEDIATION` (total 0.6367 below 0.7), a `POST_COURSE` flag, and assigning again answered `409 REMEDIATION_REQUIRED`. After the two reviews were finished the status was `RETEST_READY`; the retest gave another package code and 6 of 6 correct gave `PASSED` with total 0.8867 and a `passedAt`. The seeded course tests contain no essay, so the part where the essay waits for the Examiner was not exercised on a course test. |
+| 8. QA re-grade and Examiner quality | The Examiner graded a topic-test essay (band 6.5) bought with a human-grading credit; the finalized result produced a QA sample. R&D claimed it, the essay response carried no Examiner band, and R&D's blind band 5.5 was accepted (`204`). `GET /api/assessments/admin/examiner-quality` then returned one Examiner with 1 reviewed essay, mean absolute difference 1.0 and over-one-band rate 0.0. |
+
+Problems found by the run and fixed in the same branch:
+
+- **Applying a course test failed with 401.** Learning asked Content for the course's practice-test milestones while applying the
+  assessment event; that call needs a learner token and an event has none, so the event was retried and then parked, and the course
+  was never decided. Unit and integration tests stubbed Content, which hid it. The count is now kept when the course test is
+  assigned (`course_milestone_counts`, V34) and used when the call is refused; a test applies a course result with Content refusing the call.
+- **Paid human grading answered 503 on Compose.** `docker-compose.yml` gave Assessment no address for Access. It now sets
+  `ACCESS_SERVICE_URL`.
+
+Observations, not changed:
+
+- A first topic test below 60% only produces an Examiner work item when the learner has a pending blocking review for a wrong
+  knowledge point. A learner whose lesson and Practice answers were all correct has mastery above `priorityBelow`, so the weak
+  topic test creates the `MID_COURSE` flag but no review and no work item. Raising `priorityBelow` for the run was the way to
+  show the item; the rule itself is unchanged.
+- An unreadable enum value in the request body of `POST /api/assessments/attempts` (for example `mode: "EXAM"`) answers a plain `500`
+  instead of `400`.
+- Gold-set accuracy evidence (Phase 11) is still missing, and the Reading and Writing question sets are still unreviewed drafts.
