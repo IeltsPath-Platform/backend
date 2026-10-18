@@ -60,7 +60,7 @@ Mastery MP-1.0 ──> tier INSUFFICIENT │ PRIORITY │ CONSOLIDATE │ MAINTA
 |---|---|---|---|---|
 | 1 | [Metadata KP và cây đủ 6 miền](phase-01-kp-metadata-and-domains.md) | content | in_progress (CEFR, can-do, phạm vi đã commit `316f763`; còn seed Grammar/Vocab chờ duyệt và kiểm vòng cạnh) | – |
 | 2 | [Mastery MP-1.0](phase-02-mastery-mp1.md) | learning | completed (công thức sau cờ `DEEPTUTOR`; chờ xác nhận bật `MP1`) | – |
-| 3 | [Luyện tự do theo KP và cây của học viên](phase-03-free-practice-and-learner-tree.md) | learning, content | in_progress (luyện tự do và cây đã commit; còn lọc band/PREMIUM và cefr) | 2 |
+| 3 | [Luyện tự do theo KP và cây của học viên](phase-03-free-practice-and-learner-tree.md) | learning, content | completed (luyện tự do, cây, lọc band/gói, CEFR; `practiceAvailable` của cây chỉ gần đúng, xem phase) | 2 |
 | 4 | [Báo cáo theo kỹ năng và band mục tiêu](phase-04-skill-report-and-target-band.md) | learning, user | completed (còn: docs kiến trúc, test adapter HTTP) | 2 |
 | 5 | [Bản chụp tuần, xu hướng, bản tháng](phase-05-weekly-monthly-snapshots.md) | learning | completed (V27, job, 3 endpoint, dự báo ngày đạt mục tiêu; còn: test cron thật, contract) | 4 |
 | 6 | [Flashcard 5 hộp](phase-06-flashcard-leitner.md) | library | completed (commit `fec4c19`, test library xanh) | – |

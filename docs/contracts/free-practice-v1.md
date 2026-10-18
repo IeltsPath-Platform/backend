@@ -24,6 +24,9 @@ is open on it.
 - `tier` is `PRIORITY`, `CONSOLIDATE`, `MAINTAIN` or `INSUFFICIENT` ("not enough data").
 - `practiceAvailable` is true when more unseen practice sets remain than the sets kept in reserve for reviews (see below).
   It does not look at pending reviews: starting on a point with a blocking review is still `403 REVIEW_REQUIRED`.
+  It is also an upper bound: it does not subtract sets the start route will skip (above the course band, needing a plan the
+  learner lacks, or holding an essay). Treat `practiceAvailable: true` as "may be possible" and handle
+  `409 FREE_PRACTICE_EXHAUSTED` from the start route.
 - The tree costs a fixed number of calls to Content (the tree and the prerequisites) and one query for the profiles, however
   many points it has.
 - `404 NOT_FOUND` for an unknown course, `403 COURSE_NOT_OPEN` for a closed course, `403 COURSE_NOT_JOINED` when the learner is

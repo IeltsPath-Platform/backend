@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Luyện tự do theo KP và cây của học viên"
-status: in_progress
+status: completed
 priority: P1
 dependencies: [2]
 ---
@@ -71,11 +71,15 @@ US-010 (03 §C.1): học viên bấm "Practice" trên một KID bất kỳ để
 - Cây có `cefrLevel` và `canDo` (test: `theTreeCarriesTheCefrLevelAndCanDoContentGives`).
 - Contract và AGENTS.md cho luyện tự do và cây: `docs/contracts/free-practice-v1.md`, AGENTS.md §3.8.
 
-Còn mở:
-- `practiceAvailable` và số gói chưa xem của cây chưa trừ các gói bị lọc theo band hoặc gói; cây có thể báo còn gói trong khi
-  `POST free-practice` trả `FREE_PRACTICE_EXHAUSTED`.
-- Chỉ lấy tối đa 10 gói ứng viên từ Content (giới hạn của Content) rồi mới lọc band/gói; nếu 10 gói đầu đều bị loại thì báo hết gói dù còn gói khác. Muốn hết hẳn cần Content lọc theo band/tính năng ở phía họ (việc của Codex).
-- Gói có essay bị loại lúc nộp (409 `FREE_PRACTICE_ESSAY_UNSUPPORTED`), không loại lúc chọn gói.
+Giới hạn đã chấp nhận (người dùng chốt đóng phase 2026-10-18):
+- `practiceAvailable` của cây chỉ gần đúng: đếm gói chưa xem trừ phần dự trữ, chưa trừ các gói bị lọc theo band, gói hoặc
+  essay. Cây có thể báo còn gói trong khi `POST free-practice` trả `409 FREE_PRACTICE_EXHAUSTED`. FE xử lý mã này (ẩn hoặc
+  vô hiệu nút "Luyện"); không hỏng luồng học. Cách làm đúng hẳn: Content lọc theo band và tính năng ở phía họ, rồi cây dùng
+  số đó (việc sau, thuộc Content).
+- Chỉ lấy tối đa 10 gói ứng viên từ Content (giới hạn của Content) rồi mới lọc band/gói/essay; nếu 10 gói đầu đều bị loại thì
+  báo hết gói dù còn gói khác.
+- Gói có essay bị bỏ ngay lúc chọn gói (cũng làm giảm số ứng viên ở trên). `409 FREE_PRACTICE_ESSAY_UNSUPPORTED` chỉ còn khi
+  gọi nộp essay cho một attempt luyện tự do.
 
 ## Risk Assessment
 
