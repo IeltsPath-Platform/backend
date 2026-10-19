@@ -17,6 +17,7 @@ import com.ieltspath.community.domain.repository.ReactionRepository;
 import com.ieltspath.community.domain.vo.CommunityPage;
 import com.ieltspath.community.domain.vo.ContentStatus;
 import com.ieltspath.community.domain.vo.PostCategory;
+import com.ieltspath.community.domain.vo.PostBackground;
 import com.ieltspath.community.domain.vo.ReactionType;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +35,43 @@ class CommunityUseCaseTest {
     private final ReactionRepository reactions = mock(ReactionRepository.class);
     private final com.ieltspath.community.application.port.CommunityEventOutbox outbox = mock(com.ieltspath.community.application.port.CommunityEventOutbox.class);
     private final com.ieltspath.community.application.port.PublicProfileClient profiles = mock(com.ieltspath.community.application.port.PublicProfileClient.class);
+
+    @Test
+    void createPostPassesBackgroundThroughAggregateAndResult() {
+        UUID authorId = UUID.randomUUID();
+        when(posts.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reactions.counts(any(UUID.class))).thenReturn(Map.of());
+        var useCase = new CreatePostUseCase(posts, reactions, (images, video) -> {});
+
+        var result = useCase.execute(new CommunityActor(authorId, false),
+                new com.ieltspath.community.application.command.CreatePostCommand(
+                        PostCategory.GENERAL, null, "Short post", List.of(), null, null, PostBackground.AURORA));
+
+        assertEquals(PostBackground.AURORA, result.background());
+        verify(posts).save(argThat(post -> post.getBackground() == PostBackground.AURORA));
+    }
+
+    @Test
+    void editPostCanChangeAndRemoveBackground() {
+        UUID authorId = UUID.randomUUID();
+        Post post = Post.create(authorId, PostCategory.GENERAL, null, "Short post");
+        post.setBackground(PostBackground.AURORA);
+        when(posts.findById(post.getId())).thenReturn(Optional.of(post));
+        when(posts.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reactions.counts(post.getId())).thenReturn(Map.of());
+        var useCase = new EditPostUseCase(posts, reactions, (images, video) -> {});
+
+        var changed = useCase.execute(new CommunityActor(authorId, false),
+                new com.ieltspath.community.application.command.EditPostCommand(
+                        post.getId(), PostCategory.GENERAL, null, "Short post", List.of(), null, null, PostBackground.ROSE));
+        assertEquals(PostBackground.ROSE, changed.background());
+
+        var removed = useCase.execute(new CommunityActor(authorId, false),
+                new com.ieltspath.community.application.command.EditPostCommand(
+                        post.getId(), PostCategory.GENERAL, null, "Short post", List.of(), null, null, null));
+        assertEquals(null, removed.background());
+        verify(posts, times(2)).save(post);
+    }
 
     @Test
     void createsMentionEventsOncePerExistingUserAndNeverForSelf() {
