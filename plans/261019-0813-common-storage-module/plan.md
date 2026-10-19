@@ -79,12 +79,14 @@ Nguồn: `supabase.com/docs/reference/self-hosting-storage`, `docs/guides/storag
 | Thao tác | Request | Kết quả dùng |
 | --- | --- | --- |
 | Ghi object | `POST /object/{bucket}/{key}`, body là byte thô, header `Content-Type`, `x-upsert: false` | `200 {"Id","Key"}`. Object đã tồn tại mà không `x-upsert`: **400** |
-| Xóa object | `DELETE /object/{bucket}` body JSON `{"prefixes":["{key}"]}` (cách SDK dùng). Có thêm dạng `DELETE /object/{bucket}/{key}` trong reference | `200`, idempotent (key không tồn tại không gây lỗi) |
-| Kiểm tra tồn tại | **Chưa xác minh.** Ứng viên: `HEAD /object/{bucket}/{key}` hoặc `GET /object/info/{bucket}/{key}` | 200 có, 404 không. Smoke chốt endpoint và mã |
+| Xóa object | **Đã xác minh:** `DELETE /object/{bucket}` body `{"prefixes":["{key}"]}`. Key có → 200 và object biến mất. Key không có → 200 `[]` (idempotent). Dạng `DELETE /object/{bucket}/{key}` không idempotent: key không có → 400 body 404, nên **không dùng** | `2xx` = xong |
+| Kiểm tra tồn tại | **Đã xác minh (smoke 2026-10-19):** `GET /object/info/{bucket}/{key}`. Có → 200. Không → HTTP 400 với body `statusCode` 404. **Không dùng `HEAD`**: không có body, không phân biệt được với lỗi khác | chi tiết trong `reports/smoke-261019-0908-…` |
 | URL công khai | Không gọi mạng: `{SUPABASE_URL}/storage/v1/object/public/{bucket}/{key}` | chuỗi URL |
 | Signed URL tải xuống | `POST /object/sign/{bucket}/{key}` body `{"expiresIn": <giây>}` | `{"signedURL":"/object/sign/{bucket}/{key}?token=…"}`. URL đầy đủ = `{SUPABASE_URL}/storage/v1` + `signedURL` (SDK ghép như vậy) |
 | Signed URL upload | `POST /object/upload/sign/{bucket}/{key}` body `{}`, tùy chọn `x-upsert: true` | `{"url":"/object/upload/sign/{bucket}/{key}?token=…"}`; client sau đó `PUT` file tới URL đầy đủ, kèm header `x-upsert`, `content-type`. **Không có tham số TTL** trong API (SDK không truyền) |
 | Xác thực | Khóa mới `sb_secret_…`: gửi ở header **`apikey`**, **không** gửi ở `Authorization: Bearer` (không phải JWT). Khóa legacy `service_role` là JWT: dùng `Authorization: Bearer` (+ `apikey`) | Khóa server **bỏ qua RLS** |
+
+Kết quả smoke bổ sung: ghi trùng trả HTTP 400 với body `statusCode` 409, nên phân loại theo body. Token signed upload sống 7200 giây. Upload 10 MB mất khoảng 7 giây. Bucket API trả `allowed_mime_types` và `file_size_limit`. Chi tiết trong báo cáo smoke.
 
 Ghi chú: khóa secret bị chặn nếu gọi từ trình duyệt (so `User-Agent`, trả 401), nên chỉ dùng ở backend. Upload chuẩn khuyến nghị file
 ≤ 6 MB; lớn hơn nên dùng TUS resumable. Ghi đè object (`x-upsert`) có thể trả bản cũ do CDN; module **không** hỗ trợ ghi đè, luôn sinh key mới.
