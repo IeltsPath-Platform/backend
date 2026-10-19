@@ -9,6 +9,8 @@ import com.ieltspath.community.application.result.PublicProfile;
 import com.ieltspath.community.application.usecase.AddReactionUseCase;
 import com.ieltspath.community.application.usecase.CreateCommentUseCase;
 import com.ieltspath.community.application.usecase.CreatePostUseCase;
+import com.ieltspath.community.application.usecase.CommunityQueriesUseCase;
+import com.ieltspath.community.domain.vo.PostBackground;
 import com.ieltspath.community.application.usecase.ManageSocialUseCase;
 import com.ieltspath.community.domain.aggregate.Post;
 import com.ieltspath.community.domain.aggregate.Comment;
@@ -71,6 +73,7 @@ class CommunityOutboxUseCaseIntegrationTest {
     @Autowired CreateCommentUseCase comments;
     @Autowired AddReactionUseCase reactions;
     @Autowired CreatePostUseCase posts;
+    @Autowired CommunityQueriesUseCase queries;
     @Autowired PostRepository postRepository;
     @Autowired CommentRepository commentRepository;
 
@@ -132,10 +135,38 @@ class CommunityOutboxUseCaseIntegrationTest {
     @Test
     void createPostUseCasePersistsPostWithoutInventingAnOutboxRecipient() {
         var result = posts.execute(new CommunityActor(ACTOR, false),
-                new CreatePostCommand(PostCategory.GENERAL, "title", "body", java.util.List.of(), null, null));
+                new CreatePostCommand(PostCategory.GENERAL, "title", "body", java.util.List.of(), null, null, null));
 
         assertNotNull(postRepository.findById(result.id()).orElseThrow());
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM outbox_events", Integer.class));
+    }
+
+    @Test
+    void createPostWithBackgroundCanBeReadAgainThroughFeed() {
+        var created = posts.execute(new CommunityActor(AUTHOR, false),
+                new CreatePostCommand(PostCategory.GENERAL, "Background post", "Short body",
+                        java.util.List.of(), null, null, PostBackground.AURORA));
+
+        var viewer = new CommunityActor(ACTOR, false);
+        var feed = queries.feed(viewer, null, false, false,
+                PostCategory.GENERAL, null, 10);
+
+        var returned = feed.content().stream().filter(post -> post.id().equals(created.id())).findFirst().orElseThrow();
+        assertEquals(PostBackground.AURORA, returned.background());
+
+        jdbc.update("INSERT INTO user_follows(follower_id,followee_id,created_at) VALUES (?,?,now())", ACTOR, AUTHOR);
+        var following = queries.feed(viewer, null, false, true, PostCategory.GENERAL, null, 10);
+        assertEquals(PostBackground.AURORA, following.content().stream()
+                .filter(post -> post.id().equals(created.id())).findFirst().orElseThrow().background());
+
+        jdbc.update("INSERT INTO post_bookmarks(user_id,post_id) VALUES (?,?)", ACTOR, created.id());
+        var bookmarked = queries.feed(viewer, null, true, false, PostCategory.GENERAL, null, 10);
+        assertEquals(PostBackground.AURORA, bookmarked.content().stream()
+                .filter(post -> post.id().equals(created.id())).findFirst().orElseThrow().background());
+
+        var search = queries.searchFeed(viewer, "Background post", true, PostCategory.GENERAL, null, 10);
+        assertEquals(PostBackground.AURORA, search.content().stream()
+                .filter(post -> post.id().equals(created.id())).findFirst().orElseThrow().background());
     }
 
     @Test

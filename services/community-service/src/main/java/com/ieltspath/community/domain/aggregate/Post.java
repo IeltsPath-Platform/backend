@@ -3,6 +3,7 @@ package com.ieltspath.community.domain.aggregate;
 import com.ieltspath.community.domain.exception.CommunityException;
 import com.ieltspath.community.domain.exception.CommunityForbiddenException;
 import com.ieltspath.community.domain.vo.ContentStatus;
+import com.ieltspath.community.domain.vo.PostBackground;
 import com.ieltspath.community.domain.vo.PostCategory;
 
 import java.time.Instant;
@@ -21,6 +22,20 @@ public class Post {
     private java.util.List<String> imageUrls = java.util.List.of();
     private String videoUrl;
     private java.math.BigDecimal targetBand;
+    private PostBackground background;
+    public PostBackground getBackground() { return background; }
+    /**
+     * A background is only allowed on short text-only posts. Call it after the body and media are final,
+     * because it validates the post as it will be stored.
+     */
+    public void setBackground(PostBackground value) {
+        if (value != null) {
+            if (!imageUrls.isEmpty() || videoUrl != null) throw new CommunityException("A background cannot be combined with images or video");
+            if (body.length() > PostBackground.MAX_BODY_LENGTH)
+                throw new CommunityException("A post with a background may contain at most " + PostBackground.MAX_BODY_LENGTH + " characters");
+        }
+        background = value;
+    }
     public java.util.List<String> getImageUrls() { return imageUrls; }
     public String getVideoUrl() { return videoUrl; }
     public java.math.BigDecimal getTargetBand() { return targetBand; }

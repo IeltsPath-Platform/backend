@@ -88,7 +88,7 @@ public class CommunityController {
     public PostResponse create(@Valid @RequestBody PostRequest request) {
         var currentActor = actor();
         PostResult result = createPostUseCase.execute(currentActor, new CreatePostCommand(
-                request.category(), request.title(), request.body(), request.imageUrls(), request.videoUrl(), request.targetBand()
+                request.category(), request.title(), request.body(), request.imageUrls(), request.videoUrl(), request.targetBand(), request.background()
         ));
         return PostResponse.from(queries.enrichPosts(currentActor, java.util.List.of(result)).getFirst());
     }
@@ -139,7 +139,7 @@ public class CommunityController {
     public PostResponse edit(@PathVariable("id") UUID id, @Valid @RequestBody PostRequest request) {
         var currentActor = actor();
         PostResult result = editPostUseCase.execute(currentActor, new EditPostCommand(
-                id, request.category(), request.title(), request.body(), request.imageUrls(), request.videoUrl(), request.targetBand()
+                id, request.category(), request.title(), request.body(), request.imageUrls(), request.videoUrl(), request.targetBand(), request.background()
         ));
         return PostResponse.from(queries.enrichPosts(currentActor, java.util.List.of(result)).getFirst());
     }

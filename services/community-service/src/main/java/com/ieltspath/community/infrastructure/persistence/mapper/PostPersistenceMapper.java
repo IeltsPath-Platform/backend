@@ -18,6 +18,7 @@ public class PostPersistenceMapper {
         entity.updatedAt = post.getUpdatedAt();
         entity.version = post.getVersion();
         entity.imageUrls = post.getImageUrls(); entity.videoUrl = post.getVideoUrl(); entity.targetBand = post.getTargetBand();
+        entity.background = post.getBackground();
         return entity;
     }
 
@@ -27,6 +28,7 @@ public class PostPersistenceMapper {
                 entity.createdAt, entity.updatedAt, entity.version
         );
         post.setMedia(entity.imageUrls, entity.videoUrl, entity.targetBand);
+        post.setBackground(entity.background);
         return post;
     }
 }

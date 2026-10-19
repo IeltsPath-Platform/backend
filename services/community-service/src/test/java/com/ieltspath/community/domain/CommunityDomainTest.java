@@ -17,6 +17,27 @@ class CommunityDomainTest {
     @Test void postAuthorCanEditAndDelete(){UUID author=UUID.randomUUID();Post p=Post.create(author,PostCategory.GENERAL,"Title","Body");p.edit(author,PostCategory.QUESTION,null,"Updated");assertEquals("Updated",p.getBody());p.delete(author);assertEquals(ContentStatus.DELETED,p.getStatus());}
     @Test void nonAuthorCannotEditPost(){Post p=Post.create(UUID.randomUUID(),PostCategory.GENERAL,null,"Body");assertThrows(CommunityForbiddenException.class,()->p.edit(UUID.randomUUID(),PostCategory.GENERAL,null,"Other"));}
 
+    @Test void shortTextPostAcceptsBackgroundAndItCanBeCleared() {
+        Post p=Post.create(UUID.randomUUID(),PostCategory.GENERAL,null,"Short text");
+        p.setBackground(com.ieltspath.community.domain.vo.PostBackground.SUNSET);
+        assertEquals(com.ieltspath.community.domain.vo.PostBackground.SUNSET,p.getBackground());
+        p.setBackground(null);
+        assertEquals(null,p.getBackground());
+    }
+    @Test void backgroundIsRejectedWhenPostHasMediaOrLongBody() {
+        var background=com.ieltspath.community.domain.vo.PostBackground.OCEAN;
+        Post withImage=Post.create(UUID.randomUUID(),PostCategory.GENERAL,null,"Short");
+        withImage.setMedia(java.util.List.of("https://images.unsplash.com/a.png"),null,null);
+        assertThrows(CommunityException.class,()->withImage.setBackground(background));
+        Post withVideo=Post.create(UUID.randomUUID(),PostCategory.GENERAL,null,"Short");
+        withVideo.setMedia(java.util.List.of(),"https://www.youtube.com/watch?v=abc",null);
+        assertThrows(CommunityException.class,()->withVideo.setBackground(background));
+        Post longText=Post.create(UUID.randomUUID(),PostCategory.GENERAL,null,"x".repeat(com.ieltspath.community.domain.vo.PostBackground.MAX_BODY_LENGTH+1));
+        assertThrows(CommunityException.class,()->longText.setBackground(background));
+        Post limit=Post.create(UUID.randomUUID(),PostCategory.GENERAL,null,"x".repeat(com.ieltspath.community.domain.vo.PostBackground.MAX_BODY_LENGTH));
+        limit.setBackground(background);
+    }
+
     @Test
     void commentAuthorCanEditAndDelete() {
         UUID author = UUID.randomUUID();

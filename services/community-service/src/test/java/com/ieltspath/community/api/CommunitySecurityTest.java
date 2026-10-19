@@ -117,6 +117,22 @@ class CommunitySecurityTest {
     }
 
     @Test
+    void unknownPostBackgroundReturnsBadRequestWithoutCallingUseCase() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(currentUserProvider.requireCurrentUser())
+                .thenReturn(new CurrentUser(userId, Set.of(CanonicalRoles.CUSTOMER)));
+
+        mvc.perform(post("/api/community/posts")
+                        .with(jwt().jwt(token -> token.subject(userId.toString()).claim("roles", List.of("CUSTOMER"))))
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"category\":\"GENERAL\",\"body\":\"Short post\",\"background\":\"NEON\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(createPostUseCase);
+    }
+
+    @Test
     void createsReportWithCreatedStatus() throws Exception {
         UUID userId=UUID.randomUUID(), contentId=UUID.randomUUID();
         when(currentUserProvider.requireCurrentUser()).thenReturn(new CurrentUser(userId,Set.of(CanonicalRoles.CUSTOMER)));

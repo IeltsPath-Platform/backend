@@ -37,7 +37,7 @@ Tất cả cần đăng nhập. "ADMIN" nghĩa là bắt buộc role ADMIN.
 | Method | Đường dẫn | Mục đích | Ghi chú |
 | --- | --- | --- | --- |
 | GET | `/posts` | Feed | Tham số: `pagination=cursor` (bắt buộc cho tìm kiếm và feed theo dõi), `size` (mặc định 10), `cursor`, `category`, `scope=ALL\|FOLLOWING`, `q` (tối đa 120 ký tự). Trả `content`, `nextCursor`, `hasNext`, `size` |
-| POST | `/posts` | Tạo bài | Body: `category`, `title`, `body`, `imageUrls[]`, `videoUrl`, `targetBand` |
+| POST | `/posts` | Tạo bài | Body: `category`, `title`, `body`, `imageUrls[]`, `videoUrl`, `targetBand`, `background` (tùy chọn: `VIOLET`, `CRIMSON`, `MIDNIGHT`, `SUNSET`, `OCEAN`, `FOREST`, `ROSE`, `AURORA`; chỉ cho bài chỉ có chữ, tối đa 280 ký tự, không kèm ảnh/video; client tự vẽ màu theo khóa; giá trị khác trả 400). Cùng trường này có ở `PUT /posts/{id}` và trong phản hồi bài viết (`null` nếu không có nền). Cột `background_style`, migration V8 |
 | GET | `/posts/{id}` | Chi tiết | Bài đã ẩn trả 404 |
 | PUT | `/posts/{id}` | Sửa | Chỉ tác giả (người khác kể cả ADMIN nhận 403) |
 | DELETE | `/posts/{id}` | Xóa | Tác giả hoặc ADMIN |
