@@ -26,6 +26,7 @@ Reactor gồm 14 module: 3 infra, 2 shared, 9 business. Hai module shared là th
 | `infra/api-gateway` | Java (WebFlux) | 8080 | — | — |
 | `shared/common-security` | Java lib | — | — | — |
 | `shared/common-events` | Java lib (tên/hình dạng event, `MessageRetry`, `RetryTopology`) | — | — | — |
+| `shared/common-storage` | Java lib | — | — | — |
 | `services/user-service` | Java | 8085 | `user_db` (Compose PostgreSQL host 5440) | `/auth/**`, `/api/users/**`, `/api/learning-support/{activities,streak}/**` |
 | `services/content-service` | Java | 8082 | `content_db` (Compose PostgreSQL host 5440) | `/api/content/**` trừ ba nhóm catalog chuyển tới library |
 | `services/library-service` | Java | 8081 | `library_db` (Compose PostgreSQL host 5440) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
@@ -76,6 +77,7 @@ Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/c
 mvn -q -pl services/<name>-service -am test     # test một service (Testcontainers cần Docker)
 mvn -q -pl shared/common-security test
 mvn -q -pl shared/common-events test
+mvn -q -pl shared/common-storage test
 mvn -q -pl infra/api-gateway test
 mvn -q compile -DskipTests                       # cả reactor; tránh `clean` khi service đang chạy từ IDE
 docker compose config --quiet                    # kiểm compose + .env

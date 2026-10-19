@@ -20,6 +20,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `infra/api-gateway` | Ingress WebFlux: xác thực external JWT, ký internal JWT, routing, CORS. |
 | `shared/common-security` | Thư viện security servlet dùng chung (internal JWT, `CanonicalRoles`, `CurrentUserProvider`); không deploy độc lập. |
 | `shared/common-events` | Thư viện tên exchange/routing key/header, record payload và helper `MessageRetry`/`RetryTopology` dùng chung; không deploy độc lập. |
+| `shared/common-storage` | Thư viện lưu object dùng chung (`ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy`); không deploy độc lập; service tự cấu hình bucket. |
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity và streak tại `/api/learning-support/{activities,streak}`. |
 | `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset; kiểm topic cho library. |
 | `services/library-service` | Cổng 8081, `library_db` (Compose PostgreSQL host 5440): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
@@ -41,7 +42,7 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 
 | Khu vực | Công nghệ đã được xác minh |
 | --- | --- |
-| Java build | Java 21; Maven multi-module (14 module trong reactor: 3 infra, 2 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
+| Java build | Java 21; Maven multi-module (15 module trong reactor: 3 infra, 3 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
 | Java framework | Spring Boot 3.5.14; Spring Cloud 2025.0.0 (Config, Netflix Eureka, Gateway Server WebFlux + Reactor). |
 | Persistence (Java) | Spring Data JPA, Hibernate, PostgreSQL JDBC, Flyway (chạy khi service khởi động). |
 | Bảo mật | Spring Security, OAuth2 Resource Server, Nimbus JWT, HMAC-SHA256 JWT, BCrypt. |
@@ -114,6 +115,7 @@ src/main/java/com/ieltspath/<service>
 - Service servlet dùng `CommonSecurityAutoConfiguration` để xác thực internal token (issuer đúng, subject UUID, có expiry,
   role thuộc `CanonicalRoles.ALL`: `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF`). Claim và role
   constant quản lý tập trung trong `common-security`.
+- Khóa Supabase (`SUPABASE_SECRET_KEY`) bỏ qua RLS: chỉ nằm trong `.env` (gitignored), chỉ service bật `app.storage.enabled` mới nhận biến này qua config-repo. Đây là quy ước và cấu hình, **không** phải kiểm soát kỹ thuật: mọi service import `.env` gốc. Xoay khóa: tạo khóa mới → cập nhật `.env` → khởi động lại các service dùng storage (khóa gắn vào `RestClient` khi tạo bean, `refresh` không áp lại) → thu hồi khóa cũ.
 - `EXTERNAL_JWT_SECRET` và `GATEWAY_INTERNAL_JWT_SECRET` tách biệt, Base64, ≥ 32 byte. Không bao giờ chép giá trị thật vào
   code, tài liệu, test, log hoặc commit.
 
@@ -243,6 +245,7 @@ src/main/java/com/ieltspath/<service>
 ```text
 shared/common-security/                 thư viện security dùng chung
 shared/common-events/                   tên/hình dạng event và helper retry AMQP dùng chung; không deploy độc lập
+shared/common-storage/                  thư viện lưu object dùng chung (Supabase Storage)
 infra/{api-gateway,config-server,eureka-server}/
 infra/config-server/config-repo/        YAML runtime tập trung
 services/<name>-service/                service Java: src/main/java/com/ieltspath/<package>/{api,application,domain,infrastructure}
@@ -333,6 +336,7 @@ graphify update .                       # sau khi sửa code; thêm --force khi 
 ```powershell
 mvn -q -pl shared/common-security test
 mvn -q -pl shared/common-events test
+mvn -q -pl shared/common-storage test                # contract test với Supabase thật chỉ chạy khi có STORAGE_CONTRACT_*
 mvn -q -pl infra/api-gateway test
 mvn -q -pl services/<name>-service -am test      # -am build kèm các module shared cần thiết
 mvn -q compile -DskipTests                        # cả reactor; không dùng clean khi service đang chạy từ IDE

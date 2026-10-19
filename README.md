@@ -15,6 +15,7 @@ IELTSPath là backend microservices gồm các dịch vụ **Java 21 / Spring Cl
 | **Service Discovery** | Spring Cloud Netflix Eureka             | 2025.0.0             | Đăng ký và phát hiện dịch vụ tự động                                                                                           |
 | **Config Management** | Spring Cloud Config Server              | 2025.0.0             | Quản lý cấu hình tập trung cho toàn bộ microservices                                                                               |
 | **Security & Auth**   | Spring Security & OAuth2 (Reactive)     | 3.5.14               | Xử lý token JWT và Context người dùng bất đồng bộ                                                                               |
+| **Shared Storage**    | Custom`common-storage`                | 1.0-SNAPSHOT         | Module dùng chung: `ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy` |
 | **Shared Common**     | `common-security`, `common-events` | 1.0-SNAPSHOT | Security servlet; tên exchange/routing key/header, record payload và helper retry AMQP dùng chung |
 | **Database**          | PostgreSQL                              | 15-alpine            | Hệ quản trị cơ sở dữ liệu quan hệ                                                                                                 |
 | **Containerization**  | Docker & Docker Compose                 | Latest               | Đóng gói và chạy môi trường hạ tầng nhanh chóng                                                                                |
@@ -34,7 +35,8 @@ IELTSPath/
 │   └── eureka-server/          # [Port 8761] Eureka Service Discovery Registry Server
 ├── shared/                     # Chứa các module dùng chung giữa các microservices
 │   ├── common-security/        # CanonicalRoles, InternalJwtClaims, InternalJwtAuthorities, InternalJwtValidators
-│   └── common-events/          # Tên/hình dạng event, MessageRetry và RetryTopology; thư viện không deploy độc lập
+│   ├── common-events/          # Tên/hình dạng event, MessageRetry và RetryTopology; thư viện không deploy độc lập
+│   └── common-storage/         # ObjectStorage, client Supabase Storage, ObjectKeys, UploadPolicy
 ├── services/                   # Chứa các microservice nghiệp vụ
 │   ├── learning-service/       # [Port 8086] Thứ tự topic, bài học, mastery, bài ôn, mã đề, consumer kết quả thi
 │   ├── user-service/           # Identity, auth, learning goals, activity và streak
