@@ -30,7 +30,6 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `services/community-service` | Bài viết, bình luận, reaction, kiểm duyệt. |
 | `services/notification-service` | Chưa triển khai (khung package). |
 | `services/learning-service` | Cổng 8086, `learning_db` (Compose PostgreSQL host 5440): thứ tự topic, bài học, nộp bài, cổng mở bài, mastery theo KP, bài ôn, giao mã đề cuối, consumer `AssessmentCompleted.v2`. Route `/api/learning/**`. |
-| `third_party/deeptutor` | Bản clone chỉ để đọc (nguồn của công thức mastery đã port). **Không phải dependency.** |
 
 Mỗi business service sở hữu một database PostgreSQL riêng. Gateway chuyển hai nhóm activity/streak tới user-service;
 không còn route tổng quát `/api/learning-support/**`.

@@ -36,7 +36,6 @@ Reactor gồm 14 module: 3 infra, 2 shared, 9 business. Hai module shared là th
 | `services/notification-service` | Java (khung) | 8088 | Chưa có DB runtime | Chưa triển khai |
 | `services/community-service` | Java | 8089 | `community_db` (Compose PostgreSQL host 5440) | `/api/community/**` |
 | `services/learning-service` | Java | 8086 | `learning_db` (Compose PostgreSQL host 5440) | `/api/learning/**` |
-| `third_party/deeptutor` | Python (chỉ đọc) | — | — | Nguồn của công thức mastery đã port; không build, không import |
 
 `common-events` mã hóa exchange/routing key/header và record payload cho points, assessment, community. Đổi tên hoặc
 hình dạng event phải đổi module và contract tương ứng cùng lúc. Service giữ quyền sở hữu queue, kể cả retry và DLQ của
