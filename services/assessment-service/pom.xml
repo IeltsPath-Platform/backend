@@ -19,6 +19,11 @@
     <dependencies>
         <dependency>
             <groupId>com.ieltspath</groupId>
+            <artifactId>common-events</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ieltspath</groupId>
             <artifactId>common-security</artifactId>
             <version>${project.version}</version>
         </dependency>

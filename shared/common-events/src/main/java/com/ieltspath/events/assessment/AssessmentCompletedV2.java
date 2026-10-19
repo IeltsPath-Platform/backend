@@ -1,4 +1,4 @@
-package com.ieltspath.assessment.application.event;
+package com.ieltspath.events.assessment;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;

@@ -1,5 +1,7 @@
 package com.ieltspath.assessment.application.event;
 
+import com.ieltspath.events.assessment.AssessmentCompletedV2;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;

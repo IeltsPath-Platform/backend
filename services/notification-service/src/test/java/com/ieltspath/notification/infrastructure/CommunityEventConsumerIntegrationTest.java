@@ -1,7 +1,9 @@
 package com.ieltspath.notification.infrastructure;
 
+import com.ieltspath.events.community.CommunityEvent;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ieltspath.notification.application.NotificationEventTypes;
+import com.ieltspath.events.community.CommunityEventTypes;
 import com.ieltspath.notification.application.NotificationPreferenceService;
 import com.ieltspath.notification.application.RecordCommunityEventUseCase;
 import com.ieltspath.notification.infrastructure.persistence.NotificationPreferenceRepositoryAdapter;
@@ -32,6 +34,57 @@ import static org.mockito.Mockito.verify;
 @Testcontainers(disabledWithoutDocker = true)
 class CommunityEventConsumerIntegrationTest {
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:15-alpine");
+    @Container static final org.testcontainers.containers.GenericContainer<?> RABBIT =
+            new org.testcontainers.containers.GenericContainer<>("rabbitmq:3.13-management-alpine")
+                    .withExposedPorts(5672)
+                    .waitingFor(org.testcontainers.containers.wait.strategy.Wait.forLogMessage(".*Server startup complete.*", 1));
+
+    @Test
+    void consumesTheSharedRecordDeliveredByRabbitAndAcknowledgesTheOriginalDelivery() throws Exception {
+        var source = new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        org.flywaydb.core.Flyway.configure().dataSource(source).locations("filesystem:src/main/resources/db/migration").load().migrate();
+        var jdbc = new JdbcTemplate(source);
+        var socket = mock(SimpMessagingTemplate.class);
+        var mapper = new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        var connection = new org.springframework.amqp.rabbit.connection.CachingConnectionFactory(
+                RABBIT.getHost(), RABBIT.getMappedPort(5672));
+        try {
+            var rabbit = new RabbitTemplate(connection);
+            var admin = new org.springframework.amqp.rabbit.core.RabbitAdmin(connection);
+            var topology = new NotificationMessagingConfig(new org.springframework.core.env.StandardEnvironment());
+            admin.declareExchange(topology.communityExchange());
+            admin.declareQueue(topology.notificationQueue());
+            admin.declareBinding(topology.notificationBinding());
+            var event = new CommunityEvent(UUID.randomUUID(), CommunityEventTypes.USER_FOLLOWED,
+                    Instant.parse("2026-10-01T09:10:00Z"), UUID.randomUUID(), UUID.randomUUID(), null, null);
+            var properties = new MessageProperties();
+            properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+            properties.setMessageId(event.eventId().toString());
+            rabbit.send(com.ieltspath.events.community.CommunityMessaging.EXCHANGE, event.eventType(),
+                    new Message(mapper.writeValueAsBytes(event), properties));
+            var consumer = new CommunityEventConsumer(mapper, recordEvent(jdbc), socket, rabbit);
+            rabbit.execute(channel -> {
+                var delivery = channel.basicGet(topology.notificationQueue().getName(), false);
+                org.junit.jupiter.api.Assertions.assertNotNull(delivery);
+                var deliveredProperties = new org.springframework.amqp.rabbit.support.DefaultMessagePropertiesConverter()
+                        .toMessageProperties(delivery.getProps(), delivery.getEnvelope(), "UTF-8");
+                try {
+                    consumer.receive(new Message(delivery.getBody(), deliveredProperties), channel);
+                } catch (Exception failure) {
+                    throw new IllegalStateException(failure);
+                }
+                // Acknowledged deliveries cannot be requeued by recovery on the same channel.
+                channel.basicRecover(true);
+                org.junit.jupiter.api.Assertions.assertNull(channel.basicGet(topology.notificationQueue().getName(), true));
+                return null;
+            });
+            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM notifications WHERE id=?", Integer.class, event.eventId()));
+            verify(socket).convertAndSendToUser(eq(event.recipientId().toString()), eq("/queue/notifications"), any(Object.class));
+        } finally {
+            connection.destroy();
+        }
+    }
 
     @Test void duplicateDeliveryCreatesOneMentionNotificationAndOnePush() throws Exception {
         var source = new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
@@ -41,11 +94,11 @@ class CommunityEventConsumerIntegrationTest {
         var mapper = new ObjectMapper();
         var consumer = new CommunityEventConsumer(mapper, recordEvent(jdbc), socket, mock(RabbitTemplate.class));
         UUID event=UUID.randomUUID(), actor=UUID.randomUUID(), recipient=UUID.randomUUID(), post=UUID.randomUUID(), comment=UUID.randomUUID();
-        byte[] body=eventJson(event,NotificationEventTypes.COMMENT_MENTIONED,actor,recipient,post,comment)
+        byte[] body=eventJson(event,CommunityEventTypes.COMMENT_MENTIONED,actor,recipient,post,comment)
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8);
         Channel channel=mock(Channel.class);
         for (int i=0;i<2;i++) {
-            var properties=new MessageProperties(); properties.setReceivedRoutingKey(NotificationEventTypes.COMMENT_MENTIONED);
+            var properties=new MessageProperties(); properties.setReceivedRoutingKey(CommunityEventTypes.COMMENT_MENTIONED);
             properties.setMessageId(event.toString()); properties.setDeliveryTag(i+1);
             consumer.receive(new Message(body, properties), channel);
         }
@@ -63,28 +116,28 @@ class CommunityEventConsumerIntegrationTest {
         var mapper = new ObjectMapper();
         var consumer = new CommunityEventConsumer(mapper, recordEvent(jdbc), socket, mock(RabbitTemplate.class));
         UUID actor=UUID.randomUUID(), recipient=UUID.randomUUID(), post=UUID.randomUUID(), comment=UUID.randomUUID();
-        preferences.update(recipient, NotificationEventTypes.COMMENT_MENTIONED, false);
+        preferences.update(recipient, CommunityEventTypes.COMMENT_MENTIONED, false);
         Channel channel=mock(Channel.class);
         int deliveryTag=0;
-        for (String eventType : NotificationEventTypes.ORDERED) {
+        for (String eventType : CommunityEventTypes.ORDERED) {
             UUID event=UUID.randomUUID();
-            UUID eventPost=NotificationEventTypes.USER_FOLLOWED.equals(eventType)?null:post;
-            UUID eventComment=eventType.equals(NotificationEventTypes.POST_COMMENTED)
-                    || eventType.equals(NotificationEventTypes.COMMENT_REPLIED)
-                    || eventType.equals(NotificationEventTypes.COMMENT_MENTIONED) ? comment : null;
+            UUID eventPost=CommunityEventTypes.USER_FOLLOWED.equals(eventType)?null:post;
+            UUID eventComment=eventType.equals(CommunityEventTypes.POST_COMMENTED)
+                    || eventType.equals(CommunityEventTypes.COMMENT_REPLIED)
+                    || eventType.equals(CommunityEventTypes.COMMENT_MENTIONED) ? comment : null;
             var properties=new MessageProperties(); properties.setReceivedRoutingKey(eventType);
             properties.setMessageId(event.toString()); properties.setDeliveryTag(++deliveryTag);
             byte[] body=eventJson(event,eventType,actor,recipient,eventPost,eventComment)
                     .getBytes(java.nio.charset.StandardCharsets.UTF_8);
             consumer.receive(new Message(body,properties),channel);
         }
-        assertEquals(NotificationEventTypes.ORDERED.size()-1,
+        assertEquals(CommunityEventTypes.ORDERED.size()-1,
                 jdbc.queryForObject("SELECT count(*) FROM notifications WHERE recipient_id=?",Integer.class,recipient));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM notifications WHERE recipient_id=? AND event_type=?",
-                Integer.class,recipient,NotificationEventTypes.COMMENT_MENTIONED));
-        verify(socket,times(NotificationEventTypes.ORDERED.size()-1))
+                Integer.class,recipient,CommunityEventTypes.COMMENT_MENTIONED));
+        verify(socket,times(CommunityEventTypes.ORDERED.size()-1))
                 .convertAndSendToUser(eq(recipient.toString()),eq("/queue/notifications"),any());
-        verify(channel,times(NotificationEventTypes.ORDERED.size())).basicAck(anyLong(),eq(false));
+        verify(channel,times(CommunityEventTypes.ORDERED.size())).basicAck(anyLong(),eq(false));
     }
 
     private static RecordCommunityEventUseCase recordEvent(JdbcTemplate jdbc) {

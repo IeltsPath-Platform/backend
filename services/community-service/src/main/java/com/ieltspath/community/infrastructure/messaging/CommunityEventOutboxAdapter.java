@@ -1,9 +1,11 @@
 package com.ieltspath.community.infrastructure.messaging;
 
+import com.ieltspath.events.community.CommunityEvent;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.community.application.port.CommunityEventOutbox;
-import com.ieltspath.community.application.port.CommunityEventTypes;
+import com.ieltspath.events.community.CommunityEventTypes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -55,6 +57,4 @@ public class CommunityEventOutboxAdapter implements CommunityEventOutbox {
         return found != null;
     }
 
-    public record CommunityEvent(UUID eventId, String eventType, Instant occurredAt, UUID actorId,
-                                UUID recipientId, UUID postId, UUID commentId) { }
 }

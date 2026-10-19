@@ -1,5 +1,9 @@
 package com.ieltspath.access.infrastructure.messaging;
 
+import com.ieltspath.events.messaging.MessageRetry;
+
+import com.ieltspath.events.points.PointsGrantMessaging;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.access.application.result.PointCreditResult;
 import com.ieltspath.access.application.usecase.CreditPointsUseCase;
@@ -73,8 +77,8 @@ class LearningPointsGrantListenerFailureTest {
 
         verify(credits, org.mockito.Mockito.times(2)).executeLearningReward(eq(grantId), any(), anyInt(),
                 any(LearningRewardReason.class), anyString());
-        verify(rabbit).convertAndSend(eq(LearningPointsMessagingConfig.EXCHANGE),
-                eq(LearningPointsMessagingConfig.SETTLED_ROUTING_KEY), any(Object.class));
+        verify(rabbit).convertAndSend(eq(PointsGrantMessaging.EXCHANGE),
+                eq(PointsGrantMessaging.SETTLED_ROUTING_KEY), any(Object.class));
     }
 
     @Test

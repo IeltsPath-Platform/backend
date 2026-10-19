@@ -1,5 +1,7 @@
 package com.ieltspath.assessment.infrastructure.messaging;
 
+import com.ieltspath.events.assessment.AssessmentMessaging;
+
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -15,7 +17,7 @@ public class AssessmentMessagingConfiguration {
 
     @Bean
     TopicExchange assessmentEventsExchange(
-            @Value("${assessment.messaging.exchange:assessment.events}") String exchangeName) {
+            @Value("${assessment.messaging.exchange:" + AssessmentMessaging.EXCHANGE + "}") String exchangeName) {
         return new TopicExchange(exchangeName, true, false);
     }
 }

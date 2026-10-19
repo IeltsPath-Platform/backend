@@ -1,0 +1,5 @@
+{
+  "event_id":"20000000-0000-4000-8000-000000000991","event_type":"AssessmentCompleted.v2","occurred_at":"2026-10-01T09:10:00Z","source":"assessment-service",
+  "data":{"user_id":"20000000-0000-4000-8000-000000000981","learning_goal_id":null,"package_version_id":"20000000-0000-4000-8000-000000000401","attempt_id":"20000000-0000-4000-8000-000000000971","result_id":"20000000-0000-4000-8000-000000000975","result_version":1,"assessment_type":"TOPIC_GATE","status":"COMPLETED","completed_at":"2026-10-01T09:10:00Z","overall_band":null,
+    "item_results":[{"item_result_id":"20000000-0000-4000-8000-000000000998","question_version_id":"20000000-0000-4000-8000-000000000015","is_correct":false,"score":0,"max_score":1,"knowledge_point_mappings":[{"knowledge_point_id":"20000000-0000-4000-8000-000000000006","weight":1.0,"qualitative_judgment":null,"error_type":null}]}]}
+}

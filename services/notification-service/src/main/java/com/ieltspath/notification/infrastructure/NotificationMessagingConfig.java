@@ -1,5 +1,9 @@
 package com.ieltspath.notification.infrastructure;
 
+import com.ieltspath.events.community.CommunityEventTypes;
+
+import com.ieltspath.events.community.CommunityMessaging;
+
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -20,7 +24,7 @@ import org.springframework.messaging.support.MessageHeaderAccessor;
 public class NotificationMessagingConfig implements WebSocketMessageBrokerConfigurer {
     private final Environment environment;
     public NotificationMessagingConfig(Environment environment){this.environment=environment;}
-    @Bean TopicExchange communityExchange(){return new TopicExchange("community.events",true,false);}
+    @Bean TopicExchange communityExchange(){return new TopicExchange(CommunityMessaging.EXCHANGE,true,false);}
     @Bean DirectExchange retryExchange(){return new DirectExchange("community.events.retry",true,false);}
     @Bean DirectExchange deadLetterExchange(){return new DirectExchange("community.events.dlx",true,false);}
     @Bean Queue notificationQueue(){return QueueBuilder.durable("community.notifications.v1").build();}
@@ -28,12 +32,12 @@ public class NotificationMessagingConfig implements WebSocketMessageBrokerConfig
     @Bean Binding notificationBinding(){return BindingBuilder.bind(notificationQueue()).to(communityExchange()).with("community.#");}
     @Bean Binding notificationDlqBinding(){return BindingBuilder.bind(notificationDlq()).to(deadLetterExchange()).with("community.notifications.v1.dlq");}
     @Bean Declarables retryQueues(){
-        String[] routes={"community.post-commented.v1","community.comment-replied.v1","community.comment-mentioned.v1","community.post-reacted.v1","community.user-followed.v1"};
+        var routes=CommunityEventTypes.ORDERED;
         var declarations=new java.util.ArrayList<Declarable>();
         for(String route:routes){
             String retryRoute="retry."+route;
             Queue queue=QueueBuilder.durable("community.notifications.retry."+route)
-                    .ttl(5000).deadLetterExchange("community.events").deadLetterRoutingKey(route).build();
+                    .ttl(5000).deadLetterExchange(CommunityMessaging.EXCHANGE).deadLetterRoutingKey(route).build();
             declarations.add(queue);
             declarations.add(BindingBuilder.bind(queue).to(retryExchange()).with(retryRoute));
         }

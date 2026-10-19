@@ -1,5 +1,11 @@
 package com.ieltspath.access.infrastructure.messaging;
 
+import com.ieltspath.events.messaging.MessageRetry;
+
+import com.ieltspath.events.points.PointsGrantSettled;
+
+import com.ieltspath.events.points.PointsGrantMessaging;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.access.application.result.PointCreditResult;
@@ -125,8 +131,8 @@ public class LearningPointsGrantListener {
     }
 
     private void settle(PointsGrantSettled settled) {
-        rabbitTemplate.convertAndSend(LearningPointsMessagingConfig.EXCHANGE,
-                LearningPointsMessagingConfig.SETTLED_ROUTING_KEY, settled);
+        rabbitTemplate.convertAndSend(PointsGrantMessaging.EXCHANGE,
+                PointsGrantMessaging.SETTLED_ROUTING_KEY, settled);
     }
 
     private record GrantRequest(UUID grantId, UUID userId, int amount,

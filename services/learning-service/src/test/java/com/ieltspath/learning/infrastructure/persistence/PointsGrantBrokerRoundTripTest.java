@@ -1,5 +1,7 @@
 package com.ieltspath.learning.infrastructure.persistence;
 
+import com.ieltspath.events.points.PointsGrantMessaging;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.learning.domain.repository.RewardGrantRepository;
@@ -85,13 +87,13 @@ class PointsGrantBrokerRoundTripTest {
     @BeforeEach
     void setUp() {
         jdbc.execute("TRUNCATE reward_grants");
-        TopicExchange exchange = new TopicExchange(RewardGrantMessagingConfig.EXCHANGE, true, false);
+        TopicExchange exchange = new TopicExchange(PointsGrantMessaging.EXCHANGE, true, false);
         Queue access = new Queue(ACCESS_QUEUE, false);
         admin.declareExchange(exchange);
         admin.declareQueue(access);
         admin.purgeQueue(ACCESS_QUEUE, false);
         admin.declareBinding(BindingBuilder.bind(access).to(exchange)
-                .with(RewardGrantMessagingConfig.REQUESTED_ROUTING_KEY));
+                .with(PointsGrantMessaging.REQUESTED_ROUTING_KEY));
     }
 
     @Test
@@ -125,7 +127,7 @@ class PointsGrantBrokerRoundTripTest {
         UUID grantId = UUID.fromString(json.readTree(sent.getBody()).path("grantId").asText());
 
         // Garbage first: it is dropped, and the real answer behind it is still read.
-        rabbitTemplate.send(RewardGrantMessagingConfig.EXCHANGE, RewardGrantMessagingConfig.SETTLED_ROUTING_KEY,
+        rabbitTemplate.send(PointsGrantMessaging.EXCHANGE, PointsGrantMessaging.SETTLED_ROUTING_KEY,
                 MessageBuilder.withBody("not json".getBytes(StandardCharsets.UTF_8)).build());
         answer(grantId, "FAILED", "INVALID_PAYLOAD");
 
@@ -144,7 +146,7 @@ class PointsGrantBrokerRoundTripTest {
         Message answer = MessageBuilder.withBody(payload.getBytes(StandardCharsets.UTF_8))
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON)
                 .setHeader("__TypeId__", "com.ieltspath.access.infrastructure.messaging.PointsGrantSettled").build();
-        rabbitTemplate.send(RewardGrantMessagingConfig.EXCHANGE, RewardGrantMessagingConfig.SETTLED_ROUTING_KEY, answer);
+        rabbitTemplate.send(PointsGrantMessaging.EXCHANGE, PointsGrantMessaging.SETTLED_ROUTING_KEY, answer);
     }
 
     private void awaitStatus(UUID grantId, String expected) throws InterruptedException {

@@ -1,8 +1,10 @@
 package com.ieltspath.notification.infrastructure;
 
+import com.ieltspath.events.community.CommunityEvent;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.notification.application.RecordCommunityEventUseCase;
-import com.ieltspath.notification.application.RecordCommunityEventUseCase.CommunityEvent;
+
 import com.rabbitmq.client.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

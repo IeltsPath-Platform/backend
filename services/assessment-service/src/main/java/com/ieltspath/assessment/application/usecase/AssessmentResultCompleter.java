@@ -1,7 +1,9 @@
 package com.ieltspath.assessment.application.usecase;
 
+import com.ieltspath.events.assessment.AssessmentCompletedV2;
+
 import com.ieltspath.assessment.application.event.AssessmentCompletedEventFactory;
-import com.ieltspath.assessment.application.event.AssessmentCompletedV2;
+
 import com.ieltspath.assessment.domain.aggregate.AssessmentAttempt;
 import com.ieltspath.assessment.domain.entity.AssessmentResult;
 import com.ieltspath.assessment.domain.entity.AttemptItem;

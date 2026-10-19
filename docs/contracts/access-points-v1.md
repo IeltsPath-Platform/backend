@@ -1,5 +1,7 @@
 # Access points contract v1
 
+`shared/common-events` mã hóa tên exchange, routing key và payload của grant điểm (`PointsGrantMessaging`, `PointsGrantRequested`, `PointsGrantSettled`). Đổi tên hoặc hình dạng phải đổi module và file này cùng lúc.
+
 Access owns point balances and enforces the daily earning limit. All `/internal/**` routes require a verified internal
 service JWT; the Gateway blocks them from public clients.
 

@@ -1,4 +1,4 @@
-package com.ieltspath.access.infrastructure.messaging;
+package com.ieltspath.events.messaging;
 
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.Message;
@@ -11,8 +11,6 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
  * over when a client republishes a message.
  */
 public class MessageRetry {
-    static final String ATTEMPTS_HEADER = "x-retry-count";
-
     private final RabbitTemplate rabbit;
     private final String retryQueue;
     private final int maxRetries;
@@ -33,12 +31,12 @@ public class MessageRetry {
         if (retries >= maxRetries) {
             throw new AmqpRejectAndDontRequeueException("Gave up after " + retries + " retries", cause);
         }
-        message.getMessageProperties().setHeader(ATTEMPTS_HEADER, retries + 1);
+        message.getMessageProperties().setHeader(MessageHeaders.RETRY_COUNT, retries + 1);
         rabbit.send("", retryQueue, message);
     }
 
-    static int retries(Message message) {
-        Object count = message.getMessageProperties().getHeader(ATTEMPTS_HEADER);
+    public static int retries(Message message) {
+        Object count = message.getMessageProperties().getHeader(MessageHeaders.RETRY_COUNT);
         return count instanceof Number number ? number.intValue() : 0;
     }
 }

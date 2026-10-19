@@ -1,5 +1,7 @@
 # AssessmentCompleted.v2
 
+`shared/common-events` mã hóa exchange, routing key và payload v2 (`AssessmentMessaging`, `AssessmentCompletedV2`). Đổi tên hoặc hình dạng phải đổi module và file này cùng lúc.
+
 Integration contract between Assessment Service (producer) and the Java Learning
 Service (consumer). Assessment Service owns formal grading; Learning Service stores
 per-user mastery evidence, reviews and topic progress. **The nullable-goal and

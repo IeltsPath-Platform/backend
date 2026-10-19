@@ -1,5 +1,7 @@
 package com.ieltspath.learning.application.service;
 
+import com.ieltspath.events.points.PointsGrantSettled;
+
 import com.ieltspath.learning.application.port.PointsGrantPublisher;
 import com.ieltspath.learning.domain.repository.RewardGrantRepository;
 import com.ieltspath.learning.domain.repository.RewardGrantRepository.PendingGrant;
@@ -23,7 +25,7 @@ import java.util.UUID;
 @Component
 public class RewardGrantService {
     private static final Logger log = LoggerFactory.getLogger(RewardGrantService.class);
-    static final Set<String> ANSWERS = Set.of("GRANTED", "CAPPED", "FAILED");
+    static final Set<String> ANSWERS = PointsGrantSettled.STATUSES;
     static final String NO_ANSWER = "NO_SETTLEMENT";
 
     private final RewardGrantRepository grants;

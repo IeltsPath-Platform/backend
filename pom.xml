@@ -20,6 +20,7 @@
     </properties>
 
     <modules>
+        <module>shared/common-events</module>
         <module>shared/common-security</module>
         <module>infra/api-gateway</module>
         <module>infra/config-server</module>

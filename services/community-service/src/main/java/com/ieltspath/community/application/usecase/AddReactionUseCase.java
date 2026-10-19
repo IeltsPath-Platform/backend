@@ -5,7 +5,7 @@ import com.ieltspath.community.application.command.AddReactionCommand;
 import com.ieltspath.community.domain.repository.PostRepository;
 import com.ieltspath.community.domain.repository.ReactionRepository;
 import com.ieltspath.community.application.port.CommunityEventOutbox;
-import com.ieltspath.community.application.port.CommunityEventTypes;
+import com.ieltspath.events.community.CommunityEventTypes;
 import com.ieltspath.community.domain.exception.CommunityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

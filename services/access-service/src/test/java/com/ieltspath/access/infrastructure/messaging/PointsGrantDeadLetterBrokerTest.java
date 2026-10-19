@@ -1,5 +1,9 @@
 package com.ieltspath.access.infrastructure.messaging;
 
+import com.ieltspath.events.messaging.MessageHeaders;
+
+import com.ieltspath.events.points.PointsGrantMessaging;
+
 import com.ieltspath.access.application.result.PointCreditResult;
 import com.ieltspath.access.application.usecase.CreditPointsUseCase;
 import com.ieltspath.access.domain.vo.LearningRewardReason;
@@ -76,7 +80,7 @@ class PointsGrantDeadLetterBrokerTest {
     private void send(UUID grantId, String messageId) {
         String body = "{\"grantId\":\"" + grantId + "\",\"userId\":\"" + UUID.randomUUID()
                 + "\",\"amount\":3,\"reason\":\"DAILY_QUEST\",\"referenceId\":\"quest:1\"}";
-        rabbit.send(LearningPointsMessagingConfig.EXCHANGE, LearningPointsMessagingConfig.GRANT_ROUTING_KEY,
+        rabbit.send(PointsGrantMessaging.EXCHANGE, PointsGrantMessaging.REQUESTED_ROUTING_KEY,
                 MessageBuilder.withBody(body.getBytes(StandardCharsets.UTF_8)).setContentType("application/json")
                         .setMessageId(messageId).build());
     }
@@ -114,7 +118,7 @@ class PointsGrantDeadLetterBrokerTest {
 
         Message parked = rabbit.receive(LearningPointsMessagingConfig.GRANT_RETRY_QUEUE, WAIT.toMillis());
         assertNotNull(parked, "the failing message waits on the retry queue");
-        assertEquals(1, ((Number) parked.getMessageProperties().getHeader(MessageRetry.ATTEMPTS_HEADER)).intValue());
+        assertEquals(1, ((Number) parked.getMessageProperties().getHeader(MessageHeaders.RETRY_COUNT)).intValue());
         assertEquals("message-" + flaky, parked.getMessageProperties().getMessageId(), "same message, same grant id");
         assertEquals(true, new String(parked.getBody(), StandardCharsets.UTF_8).contains(flaky.toString()));
         verify(credits, timeout(WAIT.toMillis())).executeLearningReward(eq(healthy), any(), anyInt(),

@@ -1,5 +1,7 @@
 package com.ieltspath.assessment.application.event;
 
+import com.ieltspath.events.assessment.AssessmentCompletedV2;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.domain.aggregate.AssessmentAttempt;

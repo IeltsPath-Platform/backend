@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.2
-- Cập nhật lần cuối: 2026-10-07; dữ kiện đã kiểm với code sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-10-19 (bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -19,6 +19,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `infra/config-server`, `infra/eureka-server` | Cấu hình tập trung (`config-repo/`), service registry. |
 | `infra/api-gateway` | Ingress WebFlux: xác thực external JWT, ký internal JWT, routing, CORS. |
 | `shared/common-security` | Thư viện security servlet dùng chung (internal JWT, `CanonicalRoles`, `CurrentUserProvider`); không deploy độc lập. |
+| `shared/common-events` | Thư viện tên exchange/routing key/header, record payload và helper `MessageRetry`/`RetryTopology` dùng chung; không deploy độc lập. |
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity và streak tại `/api/learning-support/{activities,streak}`. |
 | `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset; kiểm topic cho library. |
 | `services/library-service` | Cổng 8081, `library_db` (Compose PostgreSQL host 5440): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
@@ -40,13 +41,13 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 
 | Khu vực | Công nghệ đã được xác minh |
 | --- | --- |
-| Java build | Java 21; Maven multi-module (13 module trong reactor: 3 infra, 1 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
+| Java build | Java 21; Maven multi-module (14 module trong reactor: 3 infra, 2 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
 | Java framework | Spring Boot 3.5.14; Spring Cloud 2025.0.0 (Config, Netflix Eureka, Gateway Server WebFlux + Reactor). |
 | Persistence (Java) | Spring Data JPA, Hibernate, PostgreSQL JDBC, Flyway (chạy khi service khởi động). |
 | Bảo mật | Spring Security, OAuth2 Resource Server, Nimbus JWT, HMAC-SHA256 JWT, BCrypt. |
 | Messaging | RabbitMQ 3.13; Spring AMQP (`spring-boot-starter-amqp`): assessment phát, learning-service nhận. |
 | Realtime | Spring WebSocket (game-service). |
-| Shared code | `common-security` auto-configuration; MapStruct 1.6.3; Lombok 1.18.46. |
+| Shared code | `common-security` auto-configuration; `common-events` (tên/hình dạng event, helper retry AMQP); MapStruct 1.6.3; Lombok 1.18.46. |
 | API docs | springdoc-openapi 2.8.17 (duyệt 2026-10-02): `webmvc-api` ở user/access/assessment/learning, `webflux-ui` ở Gateway gom Swagger UI; chỉ route luồng chính, không `/internal/**`. |
 | Kiểm thử | JUnit Jupiter, Spring Boot Test, Mockito, Spring Security Test, Testcontainers PostgreSQL. |
 | Container | Docker Compose, `postgres:15-alpine`, `rabbitmq:3.13-management-alpine`, Eclipse Temurin 21. |
@@ -127,7 +128,14 @@ src/main/java/com/ieltspath/<service>
   phải idempotent và có retry/dead-letter (xem consumer của learning-service). Điểm thưởng của learning (streak, nhiệm vụ,
   huy hiệu) đi qua bảng `reward_grants` (outbox) rồi exchange `learning.points` sang access, không gọi HTTP cộng điểm
   (contract C6 trong `plans/261017-1931-mastery-practice-and-progress/reports/work-split.md`, `gamification-v1.md`).
-- `shared/` chỉ chứa technical concern dùng chung; không chuyển entity hay use case nghiệp vụ vào đó.
+- `shared/` chỉ chứa technical concern dùng chung; không chuyển entity hay use case nghiệp vụ vào đó. `common-events`
+  chỉ chứa tên và hình dạng event dùng chung cùng helper AMQP, không có logic nghiệp vụ. Đổi tên exchange/routing key
+  hoặc hình dạng payload phải sửa module và contract tương ứng trong `docs/contracts/` cùng lúc.
+- Service consumer sở hữu và khai báo queue, retry queue và DLQ, kể cả tên của chúng (ví dụ `community.events.retry`,
+  `community.events.dlx`, `community.notifications.v1.dlq` của Notification). `common-events` không chứa các tên này.
+- `MessageRetry` và `RetryTopology` chỉ dùng cho hai queue grant `access.points-grant` và
+  `learning.points-grant-settled`; tên queue và cấu hình bean nằm ở service sở hữu. Consumer assessment của Learning
+  và consumer Community của Notification giữ retry/topology riêng; không dùng hai helper này.
 - Chưa có API version prefix. Giữ path tương thích; đánh giá mọi consumer trước khi đổi API, event hoặc JWT claim contract.
 - Gateway chỉ chứa routing, security, CORS, filter, observability; KHÔNG chứa business logic.
 
@@ -234,6 +242,7 @@ src/main/java/com/ieltspath/<service>
 
 ```text
 shared/common-security/                 thư viện security dùng chung
+shared/common-events/                   tên/hình dạng event và helper retry AMQP dùng chung; không deploy độc lập
 infra/{api-gateway,config-server,eureka-server}/
 infra/config-server/config-repo/        YAML runtime tập trung
 services/<name>-service/                service Java: src/main/java/com/ieltspath/<package>/{api,application,domain,infrastructure}
@@ -323,8 +332,9 @@ graphify update .                       # sau khi sửa code; thêm --force khi 
 
 ```powershell
 mvn -q -pl shared/common-security test
+mvn -q -pl shared/common-events test
 mvn -q -pl infra/api-gateway test
-mvn -q -pl services/<name>-service -am test      # -am build kèm common-security
+mvn -q -pl services/<name>-service -am test      # -am build kèm các module shared cần thiết
 mvn -q compile -DskipTests                        # cả reactor; không dùng clean khi service đang chạy từ IDE
 docker compose config --quiet
 ```

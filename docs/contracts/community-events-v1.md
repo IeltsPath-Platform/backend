@@ -1,5 +1,7 @@
 # Community events v1
 
+`shared/common-events` mã hóa exchange, routing key và payload (`CommunityMessaging`, `CommunityEvent`, `CommunityEventTypes`). Đổi tên hoặc hình dạng phải đổi module và file này cùng lúc.
+
 Approved 2026-10-16. Community Service owns these events and writes an outbox row in the same transaction as the interaction. Notification Service consumes them into its own database. No consumer reads Community's database.
 
 ## Envelope and routing

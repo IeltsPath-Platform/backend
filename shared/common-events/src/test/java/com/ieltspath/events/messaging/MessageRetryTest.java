@@ -1,4 +1,4 @@
-package com.ieltspath.access.infrastructure.messaging;
+package com.ieltspath.events.messaging;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -37,6 +37,7 @@ class MessageRetryTest {
         verify(rabbit).send(eq(""), eq("grant.retry"), sent.capture());
         assertSame(message, sent.getValue());
         assertEquals(1, MessageRetry.retries(sent.getValue()));
+        assertEquals(1, (Integer) sent.getValue().getMessageProperties().getHeader("x-retry-count"));
     }
 
     @Test

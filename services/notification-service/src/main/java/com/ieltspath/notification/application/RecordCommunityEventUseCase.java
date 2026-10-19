@@ -1,11 +1,14 @@
 package com.ieltspath.notification.application;
 
+import com.ieltspath.events.community.CommunityEvent;
+
+import com.ieltspath.events.community.CommunityEventTypes;
+
 import com.ieltspath.notification.domain.repository.NotificationRepository;
 import com.ieltspath.notification.domain.vo.Notification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,8 +26,6 @@ public class RecordCommunityEventUseCase {
         this.preferences = preferences;
     }
 
-    public record CommunityEvent(UUID eventId, String eventType, Instant occurredAt, UUID actorId, UUID recipientId,
-                                 UUID postId, UUID commentId) { }
 
     /**
      * @param routingKey the routing key the message arrived with; must equal the event type
@@ -35,7 +36,7 @@ public class RecordCommunityEventUseCase {
     @Transactional
     public Optional<Notification> execute(CommunityEvent event, String routingKey, String messageId) {
         String type = event.eventType();
-        if (!NotificationEventTypes.ALL.contains(type) || !type.equals(routingKey)
+        if (!CommunityEventTypes.ALL.contains(type) || !type.equals(routingKey)
                 || !event.eventId().toString().equals(messageId) || event.actorId().equals(event.recipientId()))
             throw new IllegalArgumentException("Unsupported community event");
         boolean postEvent = type.contains("commented") || type.contains("replied") || type.contains("mentioned") || type.contains("reacted");

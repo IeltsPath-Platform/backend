@@ -1,5 +1,7 @@
 package com.ieltspath.learning.infrastructure.messaging;
 
+import com.ieltspath.events.points.PointsGrantMessaging;
+
 import com.ieltspath.learning.domain.repository.RewardGrantRepository;
 import com.ieltspath.learning.infrastructure.scheduler.RewardGrantRelayJob;
 import org.junit.jupiter.api.BeforeEach;
@@ -91,8 +93,8 @@ class PointsGrantUnroutedBrokerTest {
         Queue queue = new Queue(GRANT_QUEUE, true);
         admin.declareQueue(queue);
         admin.declareBinding(BindingBuilder.bind(queue)
-                .to(new TopicExchange(RewardGrantMessagingConfig.EXCHANGE, true, false))
-                .with(RewardGrantMessagingConfig.REQUESTED_ROUTING_KEY));
+                .to(new TopicExchange(PointsGrantMessaging.EXCHANGE, true, false))
+                .with(PointsGrantMessaging.REQUESTED_ROUTING_KEY));
 
         assertEquals(1, relay.runOnce());
         assertEquals(1, attempts());

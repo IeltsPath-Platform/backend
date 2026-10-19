@@ -1,5 +1,11 @@
 package com.ieltspath.access.infrastructure.messaging;
 
+import com.ieltspath.events.points.PointsGrantRequested;
+
+import com.ieltspath.events.points.PointsGrantSettled;
+
+import com.ieltspath.events.points.PointsGrantMessaging;
+
 import com.ieltspath.access.domain.vo.LearningRewardReason;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -46,9 +52,33 @@ class LearningPointsGrantListenerIntegrationTest {
         registry.add("app.auth.internal-jwt-secret", () -> INTERNAL_SECRET);
     }
 
+    @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
+    @Autowired org.springframework.amqp.support.converter.MessageConverter pointsMessageConverter;
     @Autowired LearningPointsGrantListener listener;
     @Autowired JdbcTemplate jdbc;
     @MockitoBean RabbitTemplate rabbitTemplate;
+
+    @Test
+    void consumesTheSharedRequestAndKeepsTheSettlementJsonAndLegacyTypeHeader() throws Exception {
+        UUID grantId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        var request = new PointsGrantRequested(grantId, userId, 5, "DAILY_QUEST", "quest:1");
+        var message = org.springframework.amqp.core.MessageBuilder.withBody(json.writeValueAsBytes(request))
+                .setMessageId(grantId.toString()).build();
+
+        listener.onPointsGrantRequested(message);
+
+        assertEquals(5L, balance(userId));
+        var settled = ArgumentCaptor.forClass(PointsGrantSettled.class);
+        verify(rabbitTemplate).convertAndSend(eq(PointsGrantMessaging.EXCHANGE),
+                eq(PointsGrantMessaging.SETTLED_ROUTING_KEY), settled.capture());
+        Message reply = pointsMessageConverter.toMessage(settled.getValue(),
+                new org.springframework.amqp.core.MessageProperties());
+        assertEquals("com.ieltspath.access.infrastructure.messaging.PointsGrantSettled",
+                reply.getMessageProperties().getHeader("__TypeId__"));
+        assertEquals(json.readTree("{\"grantId\":\"" + grantId
+                + "\",\"status\":\"GRANTED\",\"error\":null}"), json.readTree(reply.getBody()));
+    }
 
     @Test
     void grantsOnceWhenTheSameGrantIsDeliveredAgain() {
@@ -216,8 +246,8 @@ class LearningPointsGrantListenerIntegrationTest {
     private void assertSettlements(UUID grantId, String status, int count, String error) {
         ArgumentCaptor<PointsGrantSettled> settlement = ArgumentCaptor.forClass(PointsGrantSettled.class);
         verify(rabbitTemplate, times(count)).convertAndSend(
-                eq(LearningPointsMessagingConfig.EXCHANGE),
-                eq(LearningPointsMessagingConfig.SETTLED_ROUTING_KEY), settlement.capture());
+                eq(PointsGrantMessaging.EXCHANGE),
+                eq(PointsGrantMessaging.SETTLED_ROUTING_KEY), settlement.capture());
         settlement.getAllValues().forEach(value -> {
             assertEquals(grantId, value.grantId());
             assertEquals(status, value.status());

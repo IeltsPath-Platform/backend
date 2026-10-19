@@ -1,6 +1,10 @@
 package com.ieltspath.assessment.infrastructure.messaging;
 
-import com.ieltspath.assessment.application.event.AssessmentCompletedV2;
+import com.ieltspath.events.assessment.AssessmentCompletedV2;
+
+import com.ieltspath.events.assessment.AssessmentMessaging;
+
+
 import com.ieltspath.assessment.domain.entity.OutboxEvent;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
@@ -26,14 +30,14 @@ import java.util.concurrent.TimeoutException;
 @Component
 public class RabbitOutboxEventPublisher implements OutboxEventPublisher {
     static final Map<String, String> ROUTING_KEYS = Map.of(
-            AssessmentCompletedV2.EVENT_TYPE, "assessment.completed.v2");
+            AssessmentCompletedV2.EVENT_TYPE, AssessmentMessaging.COMPLETED_ROUTING_KEY);
 
     private final RabbitTemplate rabbitTemplate;
     private final String exchange;
     private final Duration confirmTimeout;
 
     public RabbitOutboxEventPublisher(RabbitTemplate rabbitTemplate,
-                                      @Value("${assessment.messaging.exchange:assessment.events}") String exchange,
+                                      @Value("${assessment.messaging.exchange:" + AssessmentMessaging.EXCHANGE + "}") String exchange,
                                       @Value("${assessment.outbox.relay.confirm-timeout:PT5S}") Duration confirmTimeout) {
         this.rabbitTemplate = rabbitTemplate;
         this.exchange = exchange;
