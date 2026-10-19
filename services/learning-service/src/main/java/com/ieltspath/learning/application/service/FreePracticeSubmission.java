@@ -7,6 +7,7 @@ import com.ieltspath.learning.application.port.QuestionEventLog;
 import com.ieltspath.learning.domain.aggregate.PracticeAttempt;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
+import com.ieltspath.learning.domain.service.LessonHintPolicy;
 import com.ieltspath.learning.domain.vo.EvidenceSource;
 import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
@@ -35,6 +36,7 @@ public class FreePracticeSubmission {
     private final MasteryProfileUpdater masteryProfiles;
     private final LearningContentClient content;
     private final ItemGrading grading = new ItemGrading();
+    private final LessonHintPolicy hints = new LessonHintPolicy();
     private final Clock clock = Clock.systemUTC();
 
     private final GamificationRecorder gamificationRecorder;
@@ -80,7 +82,8 @@ public class FreePracticeSubmission {
                     durations.get(item.questionVersionId()), graded.errorCodes().get(index),
                     QuestionEventSource.FREE_PRACTICE, command.requestId(), counted));
             results.add(new PracticeSubmission.Answer(item.questionVersionId(), grade.correct(),
-                    grade.correctAnswer(), item.explanation()));
+                    grade.correctAnswer(), item.explanation(),
+                    hints.afterAnswer(grade.correct(), item.answerSpec(), item.options(), item.hint())));
         }
         GamificationSummary xp = counted
                 ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), graded.correctQuestionIds())

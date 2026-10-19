@@ -198,6 +198,30 @@ class PracticeGatedLessonUnlockIntegrationTest {
     }
 
     @Test
+    void aPendingReviewLocksTheNextLessonInTheListWhileTheLessonThatOwnsItStaysReadable() {
+        UUID user = UUID.randomUUID();
+        topics.execute(user);
+        exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
+        assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
+        UUID reviewId = UUID.randomUUID();
+        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status) "
+                + "VALUES (?, ?, ?, ?, 'PENDING')", reviewId, user, kpA, lesson1);
+
+        TopicLessonsResult listed = topicLessons.execute(user, topic);
+
+        assertEquals(List.of("COMPLETED", "LOCKED"),
+                listed.lessons().stream().map(TopicLessonsResult.LessonSummary::status).toList());
+        assertNull(listed.lessons().get(0).blockingReviewId());
+        assertEquals(reviewId, listed.lessons().get(1).blockingReviewId());
+        assertDoesNotThrow(() -> getLesson.execute(user, lesson1));
+        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
+                () -> getLesson.execute(user, lesson2)).getCode());
+        // Reading is open, doing new work is not.
+        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
+                () -> complete.execute(user, lesson1)).getCode());
+    }
+
+    @Test
     void openingTheFirstLessonDoesNotAskContentForPractice() {
         UUID user = UUID.randomUUID();
         topics.execute(user);

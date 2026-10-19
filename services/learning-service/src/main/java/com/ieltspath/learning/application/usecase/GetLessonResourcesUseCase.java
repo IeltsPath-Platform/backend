@@ -28,7 +28,7 @@ public class GetLessonResourcesUseCase {
     @Transactional
     public LessonResources execute(UUID userId, UUID lessonId) {
         lock.lock(userId);
-        access.authorize(userId, lessonId);
+        access.authorizeToRead(userId, lessonId);
         return content.getLessonResources(lessonId);
     }
 }

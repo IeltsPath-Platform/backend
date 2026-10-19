@@ -32,4 +32,16 @@ class LessonHintPolicyTest {
         assertFalse(policy.eligible(Map.of("type", "FILL", "accepted", List.of("word", " ")), 0));
         assertFalse(policy.eligible(Map.of("type", "ESSAY", "correct", "A"), 3));
     }
+
+    @Test
+    void aHintIsRevealedOnlyAfterAWrongAnswerToAnEligibleQuestion() {
+        Map<String, Object> fill = Map.of("type", "FILL", "accepted", List.of("word"));
+        List<Object> none = null;
+
+        assertEquals("Look again", policy.afterAnswer(false, fill, none, "Look again"));
+        assertNull(policy.afterAnswer(true, fill, none, "Look again"), "a right answer shows no hint");
+        assertNull(policy.afterAnswer(false, fill, none, null));
+        assertNull(policy.afterAnswer(false, fill, none, "  "));
+        assertNull(policy.afterAnswer(false, Map.of("type", "ESSAY"), none, "Look again"));
+    }
 }

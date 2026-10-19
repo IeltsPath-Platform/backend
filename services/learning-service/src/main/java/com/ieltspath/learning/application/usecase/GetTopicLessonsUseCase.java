@@ -7,6 +7,7 @@ import com.ieltspath.learning.application.service.PracticeProgress;
 import com.ieltspath.learning.domain.exception.LearningGateException;
 import com.ieltspath.learning.domain.repository.LessonProgressRepository;
 import com.ieltspath.learning.domain.service.LessonAccessGate;
+import com.ieltspath.learning.domain.vo.PendingReview;
 import com.ieltspath.learning.domain.vo.PracticeStatus;
 import com.ieltspath.learning.domain.vo.TopicStatus;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /** A topic's lessons in order with their status, and whether its final test can be taken. */
@@ -51,13 +53,21 @@ public class GetTopicLessonsUseCase {
         // the lessons completed here; its own Practice and review checks follow below.
         boolean previousComplete = true;
         boolean previousOpen = true;
+        List<UUID> previousIds = new ArrayList<>();
         List<TopicLessonsResult.LessonSummary> summaries = new ArrayList<>();
         for (var lesson : ordered) {
             boolean completed = LessonAccess.completed(progress.get(lesson.lessonId()));
             var clearance = practiceStates.get(lesson.lessonId());
+            // A pending review that blocks this lesson keeps it locked in the list as well, so the list never offers
+            // a lesson that opening would refuse. A completed lesson stays open for reading.
+            var blockedBy = completed ? List.<PendingReview>of()
+                    : LessonAccessGate.blocking(topicPractice.pendingReviews(), topic.skills(), Set.copyOf(previousIds));
+            UUID blockingReviewId = blockedBy.isEmpty() ? null : blockedBy.get(0).reviewId();
+            String status = completed ? "COMPLETED" : previousOpen && blockedBy.isEmpty() ? "AVAILABLE" : "LOCKED";
             summaries.add(new TopicLessonsResult.LessonSummary(lesson.lessonId(), lesson.code(), lesson.title(),
-                    lesson.sortOrder(), completed ? "COMPLETED" : previousOpen ? "AVAILABLE" : "LOCKED",
-                    clearance.status(), clearance.reason(), lesson.estimatedMinutes()));
+                    lesson.sortOrder(), status, clearance.status(), clearance.reason(), lesson.estimatedMinutes(),
+                    blockingReviewId));
+            previousIds.add(lesson.lessonId());
             previousComplete &= completed;
             previousOpen &= completed && clearance.status() == PracticeStatus.PASSED;
         }

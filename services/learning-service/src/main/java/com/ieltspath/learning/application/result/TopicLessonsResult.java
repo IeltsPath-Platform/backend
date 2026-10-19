@@ -20,16 +20,24 @@ public record TopicLessonsResult(UUID topicId, List<LessonSummary> lessons, Stri
     public TopicLessonsResult(UUID topicId, List<LessonSummary> lessons, String testStatus) {
         this(topicId, lessons, testStatus, null, true);
     }
-    /** {@code estimatedMinutes} is null when Content has no duration for the lesson. */
+    /**
+     * {@code estimatedMinutes} is null when Content has no duration for the lesson. {@code blockingReviewId} is the
+     * pending review that keeps the lesson locked, null when no review does.
+     */
     public record LessonSummary(UUID lessonId, String code, String title, int sortOrder, String status,
                                 PracticeStatus practiceStatus, PracticePassReason practicePassReason,
-                                Integer estimatedMinutes) {
+                                Integer estimatedMinutes, UUID blockingReviewId) {
+        public LessonSummary(UUID lessonId, String code, String title, int sortOrder, String status,
+                             PracticeStatus practiceStatus, PracticePassReason practicePassReason,
+                             Integer estimatedMinutes) {
+            this(lessonId, code, title, sortOrder, status, practiceStatus, practicePassReason, estimatedMinutes, null);
+        }
         public LessonSummary(UUID lessonId, String code, String title, int sortOrder, String status,
                              PracticeStatus practiceStatus, PracticePassReason practicePassReason) {
-            this(lessonId, code, title, sortOrder, status, practiceStatus, practicePassReason, null);
+            this(lessonId, code, title, sortOrder, status, practiceStatus, practicePassReason, null, null);
         }
         public LessonSummary(UUID lessonId, String code, String title, int sortOrder, String status) {
-            this(lessonId, code, title, sortOrder, status, null, null, null);
+            this(lessonId, code, title, sortOrder, status, null, null, null, null);
         }
     }
 }

@@ -35,7 +35,7 @@ public class GetLessonUseCase {
     @Transactional
     public LessonResult execute(UUID userId, UUID lessonId) {
         lock.lock(userId);
-        LessonAccess.Context context = access.authorize(userId, lessonId);
+        LessonAccess.Context context = access.authorizeToRead(userId, lessonId);
         access.refresh(userId, context.lesson(), context.progress());
         boolean completed = LessonAccess.completed(context.progress());
         Set<UUID> passed = context.progress() == null ? Set.of() : context.progress().passedBlockIds();

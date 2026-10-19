@@ -57,6 +57,19 @@ public class LessonAccess {
     }
 
     public Context authorize(UUID userId, Lesson lesson) {
+        return authorize(userId, lesson, false);
+    }
+
+    /**
+     * The gate for reading. A pending review does not shut a lesson the learner has completed, or the lesson that owns
+     * the review: they stay readable (slides, summary, documents) so the learner can go back over it while doing the
+     * review. The review still blocks submitting work and opening a lesson not yet reached.
+     */
+    public Context authorizeToRead(UUID userId, UUID lessonId) {
+        return authorize(userId, content.getLesson(lessonId), true);
+    }
+
+    private Context authorize(UUID userId, Lesson lesson, boolean reading) {
         var summaries = orderedLessons(content.getTopicLessons(lesson.topicId()));
         var progress = lessons.findByTopic(userId, lesson.topicId());
         boolean previousComplete = true;
@@ -71,7 +84,12 @@ public class LessonAccess {
         List<UUID> needPractice = found && previousComplete
                 ? lessonsNeedingPractice(userId, lesson.topicId(), previousIds, progress) : List.of();
         Set<UUID> previous = Set.copyOf(previousIds);
-        gate.authorize(reviews.findPending(userId), null, skillsOf(lesson, topic), previous,
+        var pending = reviews.findPending(userId);
+        if (reading && (completed(progress.get(lesson.lessonId()))
+                || pending.stream().anyMatch(review -> lesson.lessonId().equals(review.lessonId())))) {
+            pending = List.of();
+        }
+        gate.authorize(pending, null, skillsOf(lesson, topic), previous,
                 status(userId, lesson.topicId()), previousComplete, needPractice);
         if (!found) throw new LearningRequestException(404, "NOT_FOUND", "Lesson was not found");
         return new Context(lesson, progress.get(lesson.lessonId()), previousComplete, previous, needPractice);

@@ -51,10 +51,14 @@ public class PracticeAttemptViewAssembler {
                 : new PracticeAttemptView.Audio(section.audio().mediaUrl(), section.audio().durationSeconds());
     }
 
+    /**
+     * A question before its answer carries no hint: the hint is revealed on the submission result, after a wrong answer
+     * (see {@link com.ieltspath.learning.domain.service.LessonHintPolicy}).
+     */
     private static LessonResult.Question question(Item item) {
         return new LessonResult.Question(item.questionVersionId(), item.sortOrder(), item.stem(),
                 item.options() == null ? null : item.options().stream().map(option -> new LessonResult.Option(
-                        option.optionKey(), option.content(), option.sortOrder())).toList(), item.hint());
+                        option.optionKey(), option.content(), option.sortOrder())).toList(), null);
     }
 
     /** The newest submission's grade appears only once it is GRADED, as for lesson essays. */
