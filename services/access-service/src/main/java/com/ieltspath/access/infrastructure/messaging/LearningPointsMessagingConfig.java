@@ -3,13 +3,11 @@ package com.ieltspath.access.infrastructure.messaging;
 import com.ieltspath.events.points.PointsGrantSettled;
 
 import com.ieltspath.events.points.PointsGrantMessaging;
+import com.ieltspath.events.messaging.RetryTopology;
+import com.ieltspath.events.messaging.MessageRetry;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.DirectExchange;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.core.Declarables;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -37,47 +35,10 @@ public class LearningPointsMessagingConfig {
     public static final String CONTAINER_FACTORY = "pointsGrantListenerContainerFactory";
 
     @Bean
-    TopicExchange learningPointsExchange() {
-        return new TopicExchange(PointsGrantMessaging.EXCHANGE, true, false);
-    }
-
-    @Bean
-    DirectExchange accessPointsGrantDeadLetterExchange() {
-        return new DirectExchange(DEAD_LETTER_EXCHANGE, true, false);
-    }
-
-    @Bean
-    Queue accessPointsGrantQueue() {
-        return QueueBuilder.durable(GRANT_QUEUE)
-                .deadLetterExchange(DEAD_LETTER_EXCHANGE)
-                .deadLetterRoutingKey(GRANT_DLQ)
-                .build();
-    }
-
-    @Bean
-    Queue accessPointsGrantDeadLetterQueue() {
-        return QueueBuilder.durable(GRANT_DLQ).build();
-    }
-
-    /** Holds a message for the retry delay, then hands it back to the grant queue through the default exchange. */
-    @Bean
-    Queue accessPointsGrantRetryQueue() {
-        return QueueBuilder.durable(GRANT_RETRY_QUEUE)
-                .ttl((int) PointsGrantMessaging.RETRY_DELAY_MS)
-                .deadLetterExchange("")
-                .deadLetterRoutingKey(GRANT_QUEUE)
-                .build();
-    }
-
-    @Bean
-    Binding accessPointsGrantBinding() {
-        return BindingBuilder.bind(accessPointsGrantQueue()).to(learningPointsExchange()).with(PointsGrantMessaging.REQUESTED_ROUTING_KEY);
-    }
-
-    @Bean
-    Binding accessPointsGrantDeadLetterBinding() {
-        return BindingBuilder.bind(accessPointsGrantDeadLetterQueue()).to(accessPointsGrantDeadLetterExchange())
-                .with(GRANT_DLQ);
+    Declarables pointsGrantTopology() {
+        TopicExchange exchange = new TopicExchange(PointsGrantMessaging.EXCHANGE, true, false);
+        return RetryTopology.of(new RetryTopology.Names(GRANT_QUEUE, GRANT_RETRY_QUEUE, GRANT_DLQ, DEAD_LETTER_EXCHANGE),
+                PointsGrantMessaging.RETRY_DELAY_MS, exchange, PointsGrantMessaging.REQUESTED_ROUTING_KEY);
     }
 
     @Bean

@@ -1,5 +1,7 @@
 package com.ieltspath.access.infrastructure.messaging;
 
+import com.ieltspath.events.messaging.MessageRetry;
+
 import com.ieltspath.events.points.PointsGrantSettled;
 
 import com.ieltspath.events.points.PointsGrantMessaging;

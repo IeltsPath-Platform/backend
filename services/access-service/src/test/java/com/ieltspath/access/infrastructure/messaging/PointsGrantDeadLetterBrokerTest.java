@@ -1,5 +1,7 @@
 package com.ieltspath.access.infrastructure.messaging;
 
+import com.ieltspath.events.messaging.MessageHeaders;
+
 import com.ieltspath.events.points.PointsGrantMessaging;
 
 import com.ieltspath.access.application.result.PointCreditResult;
@@ -116,7 +118,7 @@ class PointsGrantDeadLetterBrokerTest {
 
         Message parked = rabbit.receive(LearningPointsMessagingConfig.GRANT_RETRY_QUEUE, WAIT.toMillis());
         assertNotNull(parked, "the failing message waits on the retry queue");
-        assertEquals(1, ((Number) parked.getMessageProperties().getHeader(MessageRetry.ATTEMPTS_HEADER)).intValue());
+        assertEquals(1, ((Number) parked.getMessageProperties().getHeader(MessageHeaders.RETRY_COUNT)).intValue());
         assertEquals("message-" + flaky, parked.getMessageProperties().getMessageId(), "same message, same grant id");
         assertEquals(true, new String(parked.getBody(), StandardCharsets.UTF_8).contains(flaky.toString()));
         verify(credits, timeout(WAIT.toMillis())).executeLearningReward(eq(healthy), any(), anyInt(),
