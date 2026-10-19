@@ -2,6 +2,7 @@ package com.ieltspath.commonstorage.config;
 
 import com.ieltspath.commonstorage.ObjectStorage;
 import com.ieltspath.commonstorage.UnavailableObjectStorage;
+import com.ieltspath.commonstorage.supabase.SupabaseObjectStorage;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -13,8 +14,8 @@ import org.springframework.web.client.RestClient;
 /**
  * Đăng ký {@link ObjectStorage}. Tắt mặc định: service phải bật {@code app.storage.enabled=true}.
  *
- * <p>Phase hiện tại chỉ đăng ký bản {@link UnavailableObjectStorage}. Client Supabase được thêm sau khi smoke
- * test với Supabase thật hoàn tất.
+ * <p>Khi đã cấu hình đủ {@code url} và khóa thì đăng ký {@link SupabaseObjectStorage}. Khi chưa, đăng ký
+ * {@link UnavailableObjectStorage}.
  */
 @AutoConfiguration
 @ConditionalOnClass(RestClient.class)
@@ -24,7 +25,9 @@ public class CommonStorageAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(ObjectStorage.class)
-    ObjectStorage objectStorage() {
-        return new UnavailableObjectStorage();
+    ObjectStorage objectStorage(SupabaseStorageProperties properties) {
+        return properties.isConfigured()
+                ? SupabaseObjectStorage.create(properties)
+                : new UnavailableObjectStorage();
     }
 }
