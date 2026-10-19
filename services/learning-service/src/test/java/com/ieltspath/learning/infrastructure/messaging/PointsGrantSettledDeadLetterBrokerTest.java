@@ -1,5 +1,7 @@
 package com.ieltspath.learning.infrastructure.messaging;
 
+import com.ieltspath.events.messaging.MessageHeaders;
+
 import com.ieltspath.events.points.PointsGrantMessaging;
 
 import com.ieltspath.learning.application.service.RewardGrantService;
@@ -106,6 +108,6 @@ class PointsGrantSettledDeadLetterBrokerTest {
 
         Message parked = rabbitTemplate.receive(RewardGrantMessagingConfig.SETTLED_RETRY_QUEUE, WAIT.toMillis());
         assertNotNull(parked, "the answer waits on the retry queue");
-        assertEquals(1, ((Number) parked.getMessageProperties().getHeader(MessageRetry.ATTEMPTS_HEADER)).intValue());
+        assertEquals(1, ((Number) parked.getMessageProperties().getHeader(MessageHeaders.RETRY_COUNT)).intValue());
     }
 }

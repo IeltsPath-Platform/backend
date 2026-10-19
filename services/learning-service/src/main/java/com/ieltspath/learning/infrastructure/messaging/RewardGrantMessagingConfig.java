@@ -1,13 +1,10 @@
 package com.ieltspath.learning.infrastructure.messaging;
 
 import com.ieltspath.events.points.PointsGrantMessaging;
+import com.ieltspath.events.messaging.RetryTopology;
+import com.ieltspath.events.messaging.MessageRetry;
 
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Declarables;
-import org.springframework.amqp.core.DirectExchange;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -36,25 +33,9 @@ public class RewardGrantMessagingConfig {
 
     @Bean
     Declarables pointsGrantTopology() {
-        // Same attributes as Access's own declaration (durable, not auto-deleted).
         TopicExchange exchange = new TopicExchange(PointsGrantMessaging.EXCHANGE, true, false);
-        Queue settled = QueueBuilder.durable(SETTLED_QUEUE)
-                .deadLetterExchange(DEAD_LETTER_EXCHANGE)
-                .deadLetterRoutingKey(SETTLED_DLQ)
-                .build();
-        Binding binding = BindingBuilder.bind(settled).to(exchange).with(PointsGrantMessaging.SETTLED_ROUTING_KEY);
-
-        DirectExchange deadLetterExchange = new DirectExchange(DEAD_LETTER_EXCHANGE, true, false);
-        Queue deadLetters = QueueBuilder.durable(SETTLED_DLQ).build();
-        Binding deadLetterBinding = BindingBuilder.bind(deadLetters).to(deadLetterExchange).with(SETTLED_DLQ);
-
-        // Holds a message for the retry delay, then hands it back to the settled queue through the default exchange.
-        Queue retry = QueueBuilder.durable(SETTLED_RETRY_QUEUE)
-                .ttl((int) PointsGrantMessaging.RETRY_DELAY_MS)
-                .deadLetterExchange("")
-                .deadLetterRoutingKey(SETTLED_QUEUE)
-                .build();
-        return new Declarables(exchange, settled, binding, deadLetterExchange, deadLetters, deadLetterBinding, retry);
+        return RetryTopology.of(new RetryTopology.Names(SETTLED_QUEUE, SETTLED_RETRY_QUEUE, SETTLED_DLQ, DEAD_LETTER_EXCHANGE),
+                PointsGrantMessaging.RETRY_DELAY_MS, exchange, PointsGrantMessaging.SETTLED_ROUTING_KEY);
     }
 
     /** A refused message is dead-lettered, never put back on the queue where it would be redelivered at once. */
