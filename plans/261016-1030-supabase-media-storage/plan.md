@@ -5,7 +5,7 @@ status: pending
 priority: P2
 branch: "feat/main-follow"
 tags: [content, media, supabase, storage, listening, writing]
-blockedBy: []
+blockedBy: [261019-0813-common-storage-module]
 blocks: []
 created: "2026-10-16T03:30:00.000Z"
 createdBy: "claude"
@@ -13,6 +13,17 @@ source: conversation
 ---
 
 # Lưu mp3 và ảnh bài học trên Supabase Storage
+
+## Cập nhật 2026-10-19 (thay các mục "upload tay" và "sau MVP" bên dưới)
+
+Người dùng chốt **không upload tay nữa: mọi file phải đi qua API**. Phạm vi mở rộng và cách làm thay đổi:
+
+- **Ba bucket** thay vì một: `media` (public, chỉ backend ghi), `avatars` (public, học viên upload), `speaking-recordings` (**private**, ghi âm Speaking của học viên).
+- **Phần dùng chung** nằm ở `shared/common-storage` (plan `261019-0813-common-storage-module`): client Supabase, key an toàn, kiểm tra nội dung file. Adapter riêng trong content-service ở phase 2 bên dưới **không còn cần viết**; content-service dùng `ObjectStorage` của module đó.
+- **Biến cấu hình:** `CONTENT_MEDIA_UPLOAD_TTL_SECONDS` **bỏ** cho luồng signed upload, vì Supabase không cho truyền TTL khi tạo signed upload URL (chỉ `signedDownloadUrl` có TTL, dùng cho bucket private). `SUPABASE_STORAGE_BUCKET` (một biến) thay bằng tên bucket **theo từng service**. `SUPABASE_URL` và `SUPABASE_SECRET_KEY` ánh xạ vào `app.storage.supabase.*`.
+- **Cách upload:** avatar và Speaking đi **qua backend** (file nhỏ, cần kiểm tra nội dung); mp3/ảnh nội dung của admin dùng **signed upload URL** (file lớn).
+- Phase 2 vẫn **cần plan riêng cho từng endpoint** (user-service avatar, assessment-service Speaking, content-service nội dung), chưa có.
+- Phase 1 (bucket và `CONTENT_MEDIA_BASE_URL`) vẫn làm được độc lập, không chờ module.
 
 ## Overview
 
