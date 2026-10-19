@@ -7,7 +7,8 @@ priority: P3
 
 # Phase 2: API upload ở content-service (sau MVP)
 
-**Cần người dùng duyệt trước khi làm** (thêm tích hợp dịch vụ ngoài và biến bí mật mới; AGENTS.md §2, §5).
+**Hướng đi đã được chốt ngày 2026-10-19: không upload tay nữa, mọi file phải qua API** (xem mục "Cập nhật" trong `plan.md`).
+Phần client Supabase dùng chung nằm ở `shared/common-storage`. Endpoint của content-service vẫn cần plan riêng và người dùng duyệt (AGENTS.md §2, §5).
 
 ## Mục tiêu
 
@@ -26,14 +27,14 @@ Khuyến nghị: A cho file nhỏ do admin tải; B khi file lớn hoặc nhiề
 ## Thiết kế (theo layer của AGENTS.md)
 
 - `application/port`: `MediaStoragePort` (ví dụ `store(key, contentType, stream)`, hoặc `createUploadTarget(key, contentType)` cho cách B).
-- `infrastructure/client`: adapter gọi Supabase Storage bằng `RestClient` sẵn có (không thêm SDK), header khóa lấy từ `SUPABASE_SECRET_KEY`.
+- Không viết adapter Supabase riêng: dùng `ObjectStorage` của `shared/common-storage` (bật `app.storage.enabled`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`). Content-service chỉ giữ `MediaStoragePort` mỏng nếu cần tách domain khỏi thư viện.
 - `application/usecase`: `UploadMediaAssetUseCase`: kiểm quyền (`ADMIN`, `CONTENT_AUTHOR`), kiểm MIME và kích thước theo `CONTENT_MEDIA_ALLOWED_TYPES`, `CONTENT_MEDIA_MAX_BYTES`, sinh key an toàn (không dùng tên file do client gửi), rồi lưu key vào `content_assets.media_reference`.
 - `api`: controller gọi use case; lỗi qua `GlobalExceptionHandler`/`ErrorResponse`. Forward `X-Correlation-Id`, không log khóa hay nội dung file.
 - Route mới ở Gateway chỉ khi cần; không đổi route hiện có.
 
 ## Biến
 
-Xem bảng trong `plan.md`: `SUPABASE_URL`, `SUPABASE_STORAGE_BUCKET`, `SUPABASE_SECRET_KEY` (chỉ `.env`), `CONTENT_MEDIA_MAX_BYTES`, `CONTENT_MEDIA_ALLOWED_TYPES`, và `CONTENT_MEDIA_UPLOAD_TTL_SECONDS` nếu chọn cách B.
+Xem bảng trong `plan.md` và mục "Cập nhật 2026-10-19": `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (chỉ `.env`), tên bucket theo từng service (thay cho `SUPABASE_STORAGE_BUCKET`), `CONTENT_MEDIA_MAX_BYTES`, `CONTENT_MEDIA_ALLOWED_TYPES`. Không có `CONTENT_MEDIA_UPLOAD_TTL_SECONDS` (Supabase không cho đặt TTL cho signed upload URL).
 
 ## Kiểm tra
 
