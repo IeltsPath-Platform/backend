@@ -19,7 +19,7 @@ public class CreatePostUseCase {
 
     @Transactional
     public PostResult execute(CommunityActor actor, CreatePostCommand command) {
-        mediaPolicy.validate(command.imageUrls(), command.videoUrl());
+        mediaPolicy.validate(actor.userId(), command.imageUrls(), command.videoUrl());
         Post post = Post.create(actor.userId(), command.category(), command.title(), command.body());
         post.setMedia(command.imageUrls(), command.videoUrl(), command.targetBand());
         post.setBackground(command.background());

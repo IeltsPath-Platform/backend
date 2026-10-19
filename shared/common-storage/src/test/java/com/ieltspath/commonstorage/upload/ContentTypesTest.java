@@ -33,6 +33,7 @@ class ContentTypesTest {
         assertThat(ContentTypes.extensionFor("image/png")).isEqualTo("png");
         assertThat(ContentTypes.extensionFor("image/jpeg")).isEqualTo("jpg");
         assertThat(ContentTypes.extensionFor("image/webp")).isEqualTo("webp");
+        assertThat(ContentTypes.extensionFor("image/gif")).isEqualTo("gif");
         assertThat(ContentTypes.extensionFor("audio/webm")).isEqualTo("webm");
         assertThat(ContentTypes.extensionFor("audio/mp4")).isEqualTo("m4a");
         assertThat(ContentTypes.extensionFor("audio/ogg")).isEqualTo("ogg");

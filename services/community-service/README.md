@@ -8,7 +8,10 @@ Community Service owns posts, threaded comments, reactions, follows, bookmarks, 
 - Post status: `ACTIVE`, `HIDDEN`, or `DELETED`. Authors can edit and soft-delete their own active content; an `ADMIN` can hide or restore non-deleted content.
 - A post body is required. Titles are optional (up to 200 characters); body is up to 20,000 characters. Target band is optional and ranges from 0 to 9 in half-band increments.
 - `background` is an optional fixed key (`VIOLET`, `CRIMSON`, `MIDNIGHT`, `SUNSET`, `OCEAN`, `FOREST`, `ROSE`, or `AURORA`) accepted on create and edit. It is only valid for text-only posts with bodies up to 280 characters. Omit or send `null` to clear it when editing; responses include the key or `null`, including post details and feeds. Invalid keys return `400`. Flyway V8 adds the nullable `background_style` column and database constraints.
-- Up to four image URLs are accepted (each up to 500 characters). Video URL is optional (up to 500 characters). Media must use HTTPS, have no user information or non-standard port, and match the configured image/video host allowlist (`AllowedMediaPolicy`).
+- Up to four image URLs are accepted (each up to 500 characters). Video URL is optional (up to 500 characters). Media must use HTTPS, have no user information or non-standard port, and match the configured image/video host allowlist (`AllowedMediaPolicy`); images may also come from the managed Supabase storage bucket (`community.media.bucket`). Videos are never uploaded: only HTTPS links to an allowed video host are accepted.
+- For Supabase storage URLs:
+  - Images (`community/post/{userId}/{uuid}.{ext}`) must be owned by the author (`ObjectKeys.isOwnedBy`).
+- Image upload endpoint: `POST /api/community/media/images` accepts multipart image files (`image/jpeg`, `image/png`, `image/webp`, `image/gif`, max 5 MB). Validates magic bytes, enforces rate limiting (30 uploads/hour per user), stores via `common-storage`, and returns `{ url, key, contentType, size }`.
 - Standard feeds are zero-based, default to 20 and cap at 100. Cursor feeds default to 10 and use `(created_at, id)` ordering to avoid repeated or skipped posts across pages.
 - Cursor feed search uses PostgreSQL `simple` full-text search over title and body. Search input is plain text and limited to 120 characters; category and `scope=FOLLOWING` can be combined with search and cursor pagination.
 - `scope=FOLLOWING` requires authentication. A user can view another user's posts, followers, following list, and relationship state through the profile endpoints.
@@ -54,6 +57,7 @@ Community writes versioned events to its transactional outbox; the relay publish
 | `POST` | `/api/community/reports` | Submit a report |
 | `GET` | `/api/community/admin/reports?page=0&size=20` | ADMIN-only pending report queue, oldest first; display profiles are batch-enriched |
 | `PUT` | `/api/community/admin/reports/{reportId}/decision` | ADMIN dismisses (`DISMISS`) or hides (`HIDE_CONTENT`) |
+| `POST` | `/api/community/media/images` | Upload image file (multipart, max 5 MB); returns public URL and key |
 
 ## Local runtime and tests
 

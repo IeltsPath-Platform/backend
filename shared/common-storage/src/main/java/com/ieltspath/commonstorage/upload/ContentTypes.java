@@ -15,15 +15,16 @@ public final class ContentTypes {
             "audio/m4a", "audio/mp4",
             "image/jpg", "image/jpeg");
 
-    private static final Map<String, String> EXTENSIONS = Map.of(
-            "image/png", "png",
-            "image/jpeg", "jpg",
-            "image/webp", "webp",
-            "audio/webm", "webm",
-            "audio/mp4", "m4a",
-            "audio/ogg", "ogg",
-            "audio/mpeg", "mp3",
-            "audio/wav", "wav");
+    private static final Map<String, String> EXTENSIONS = Map.ofEntries(
+            Map.entry("image/png", "png"),
+            Map.entry("image/jpeg", "jpg"),
+            Map.entry("image/webp", "webp"),
+            Map.entry("image/gif", "gif"),
+            Map.entry("audio/webm", "webm"),
+            Map.entry("audio/mp4", "m4a"),
+            Map.entry("audio/ogg", "ogg"),
+            Map.entry("audio/mpeg", "mp3"),
+            Map.entry("audio/wav", "wav"));
 
     private ContentTypes() {
     }

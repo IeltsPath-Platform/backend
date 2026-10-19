@@ -38,6 +38,8 @@ class ContentSnifferTest {
         assertThat(ContentSniffer.detect(bytes(0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0)))
                 .contains("image/png");
         assertThat(ContentSniffer.detect(bytes(0xFF, 0xD8, 0xFF, 0xE0))).contains("image/jpeg");
+        assertThat(ContentSniffer.detect(concat(new byte[0], "GIF87a"))).contains("image/gif");
+        assertThat(ContentSniffer.detect(concat(new byte[0], "GIF89a"))).contains("image/gif");
         assertThat(ContentSniffer.detect(riff("WEBP"))).contains("image/webp");
         assertThat(ContentSniffer.detect(riff("WAVE"))).contains("audio/wav");
         assertThat(ContentSniffer.detect(bytes(0x1A, 0x45, 0xDF, 0xA3, 0x9F, 0x42, 0x82, 0x84)))
@@ -76,7 +78,7 @@ class ContentSnifferTest {
     @Test
     void plainTextAndSvgAreNotRecognised() {
         assertThat(ContentSniffer.detect(concat(new byte[0], "<svg xmlns=\"http://www.w3.org/2000/svg\"/>"))).isEmpty();
-        assertThat(ContentSniffer.detect(concat(new byte[0], "GIF89a"))).isEmpty();
+        assertThat(ContentSniffer.detect(concat(new byte[0], "plain text not media"))).isEmpty();
         assertThat(ContentSniffer.detect(concat(new byte[0], "%PDF-1.4"))).isEmpty();
     }
 }

@@ -19,10 +19,16 @@ spring:
     template:
       mandatory: true
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
 community:
   user-service:
     base-url: ${USER_SERVICE_URL:http://localhost:8085}
   media:
+    bucket: ${COMMUNITY_MEDIA_BUCKET:community}
     image-hosts: ${COMMUNITY_IMAGE_HOSTS:images.unsplash.com,i.imgur.com}
     video-hosts: ${COMMUNITY_VIDEO_HOSTS:youtube.com,www.youtube.com,youtu.be,loom.com,www.loom.com,drive.google.com}
   messaging:
@@ -34,6 +40,11 @@ community:
       batch-size: 50
       confirm-timeout: PT5S
 app:
+  storage:
+    enabled: true
+    supabase:
+      url: ${SUPABASE_URL:}
+      secret-key: ${SUPABASE_SECRET_KEY:}
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
     internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}
