@@ -29,6 +29,9 @@ public final class ContentSniffer {
         if (startsWith(content, 0, 0xFF, 0xD8, 0xFF)) {
             return Optional.of("image/jpeg");
         }
+        if (ascii(content, 0, "GIF87a") || ascii(content, 0, "GIF89a")) {
+            return Optional.of("image/gif");
+        }
         if (ascii(content, 0, "OggS")) {
             return Optional.of("audio/ogg");
         }
