@@ -80,6 +80,12 @@ khi kết quả ≥ 70%.
 
 ### Bất đồng bộ (RabbitMQ)
 
+Tên exchange, routing key, header và hình dạng payload của event dùng chung nằm ở `shared/common-events`
+(`PointsGrantMessaging`, `AssessmentMessaging`, `CommunityMessaging`, cùng record payload và helper `MessageRetry`,
+`RetryTopology` cho hai queue grant). Đổi chúng phải đổi module và file trong `docs/contracts/` cùng lúc.
+Service consumer sở hữu queue, retry queue và DLQ của mình, kể cả tên của chúng: topology retry của Learning
+(assessment), Access (grant) và Notification (community, dùng header `community-retry-count`) giữ ở service.
+
 ```text
 assessment: SubmitAssessmentAttemptUseCase -> AutoGradeAttemptService (mọi câu tự chấm được)
             hoặc FinalizeAssessmentResultUseCase (người chấm)

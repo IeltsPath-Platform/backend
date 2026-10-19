@@ -1,6 +1,6 @@
 # CLAUDE.md — IELTSPath backend
 
-- Cập nhật lần cuối: 2026-10-15 (bổ sung URL service khi user-service chạy trên host); dữ kiện kiến trúc đã kiểm ngày 2026-10-07 sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
+- Cập nhật lần cuối: 2026-10-19 (bổ sung `common-events`); thay đổi URL service giữ mốc 2026-10-15; dữ kiện kiến trúc khác đã kiểm ngày 2026-10-07 sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
 - Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
@@ -17,12 +17,15 @@ và DLQ). Mỗi service sở hữu một PostgreSQL DB.
 
 ## 2. Module
 
+Reactor gồm 14 module: 3 infra, 2 shared, 9 business. Hai module shared là thư viện, không deploy độc lập.
+
 | Module | Ngôn ngữ | Cổng | DB (nơi chạy) | Route Gateway |
 | --- | --- | --- | --- | --- |
 | `infra/config-server` | Java | 8888 | — | — |
 | `infra/eureka-server` | Java | 8761 | — | — |
 | `infra/api-gateway` | Java (WebFlux) | 8080 | — | — |
 | `shared/common-security` | Java lib | — | — | — |
+| `shared/common-events` | Java lib (tên/hình dạng event, `MessageRetry`, `RetryTopology`) | — | — | — |
 | `services/user-service` | Java | 8085 | `user_db` (Compose PostgreSQL host 5440) | `/auth/**`, `/api/users/**`, `/api/learning-support/{activities,streak}/**` |
 | `services/content-service` | Java | 8082 | `content_db` (Compose PostgreSQL host 5440) | `/api/content/**` trừ ba nhóm catalog chuyển tới library |
 | `services/library-service` | Java | 8081 | `library_db` (Compose PostgreSQL host 5440) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
@@ -33,6 +36,11 @@ và DLQ). Mỗi service sở hữu một PostgreSQL DB.
 | `services/community-service` | Java | 8089 | `community_db` (Compose PostgreSQL host 5440) | `/api/community/**` |
 | `services/learning-service` | Java | 8086 | `learning_db` (Compose PostgreSQL host 5440) | `/api/learning/**` |
 | `third_party/deeptutor` | Python (chỉ đọc) | — | — | Nguồn của công thức mastery đã port; không build, không import |
+
+`common-events` mã hóa exchange/routing key/header và record payload cho points, assessment, community. Đổi tên hoặc
+hình dạng event phải đổi module và contract tương ứng cùng lúc. Service giữ quyền sở hữu queue, kể cả retry và DLQ của
+Notification; các tên đó không nằm trong thư viện. Chỉ hai queue grant dùng `MessageRetry`/`RetryTopology`; Learning assessment
+và Notification giữ cơ chế retry riêng.
 
 Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/config-repo/*.yaml`, `docker-compose.yml`.
 
@@ -67,6 +75,7 @@ Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/c
 ```powershell
 mvn -q -pl services/<name>-service -am test     # test một service (Testcontainers cần Docker)
 mvn -q -pl shared/common-security test
+mvn -q -pl shared/common-events test
 mvn -q -pl infra/api-gateway test
 mvn -q compile -DskipTests                       # cả reactor; tránh `clean` khi service đang chạy từ IDE
 docker compose config --quiet                    # kiểm compose + .env

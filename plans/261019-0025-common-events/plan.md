@@ -1,6 +1,6 @@
 # Module shared `common-events`
 
-Trạng thái: **đã duyệt toàn bộ (2026-10-19), sẵn sàng giao cho Codex làm.** Chưa có code.
+Trạng thái: **hoàn tất (2026-10-19).** Giai đoạn 1–4 đã commit trên `feat/common-events`; kiểm tra cuối đạt, xem mục "Kết quả".
 Người duyệt đã chọn làm cả 3 giai đoạn, có cả community và notification, và cho phép `shared/` chứa record payload và
 `MessageRetry` (phụ thuộc `spring-amqp`). Nền: PR 79 đã merge vào `main` (commit `15057e74`), làm từ `main` mới nhất.
 
@@ -90,3 +90,17 @@ docker compose config --quiet
 | Module phình to | Quy tắc số 2 và 3 ở trên; review từng PR theo quy tắc này |
 | Ghép chặt phiên bản (mọi service cùng reactor) | Chấp nhận, repo đã làm vậy với `common-security`; hợp đồng `*-vN` vẫn là lan can tương thích |
 | `spring-amqp` kéo vào `shared/` | Chỉ `spring-amqp` (scope `compile` trong `common-events`), không `spring-boot-starter-amqp` |
+
+## Kết quả
+
+- Giai đoạn 1–3: commit `8d5f91bb` … `8a7121e8` (module, payload, `MessageRetry`/`RetryTopology` cho access và learning). Giai đoạn 3 còn commit `0eb2dc07` (learning) và `6e090d71`.
+- Giai đoạn 4: tài liệu cập nhật (`AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/system-architecture.md`, ba file `docs/contracts/`), grep 4.2 sạch.
+- Quy tắc 2 được giữ đúng: tên retry exchange, DLX và DLQ của Notification **ở lại service** (không đưa vào `CommunityMessaging`). Một lần Codex đưa chúng vào module đã được revert.
+- Kiểm tra cuối: `mvn -B -ntp verify` cả reactor trên bản sao sạch của HEAD (`git worktree` ngoài thư mục IDE), tất cả module xanh, không có test fail hoặc skip. Các test broker thật (`PointsGrantDeadLetterBrokerTest`, `PointsGrantSettledDeadLetterBrokerTest`, `PointsGrantUnroutedBrokerTest`, `PointsGrantBrokerRoundTripTest`, `CommunityOutboxRelayIntegrationTest`, `CommunityEventConsumerIntegrationTest`) chạy với Docker thật.
+- `docker compose config --quiet` đạt.
+- Lưu ý: chạy trực tiếp trong thư mục đang mở bằng IDE làm lỗi `ClassFormatError` và `Flexible Constructor Bodies` (ECJ ghi class vào `target/`). Kiểm tra cuối phải chạy ở bản sao sạch.
+
+## Chưa làm
+
+- Chưa push `feat/common-events` lên remote.
+
