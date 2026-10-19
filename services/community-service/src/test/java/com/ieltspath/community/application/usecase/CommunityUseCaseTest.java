@@ -41,7 +41,7 @@ class CommunityUseCaseTest {
         UUID authorId = UUID.randomUUID();
         when(posts.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(reactions.counts(any(UUID.class))).thenReturn(Map.of());
-        var useCase = new CreatePostUseCase(posts, reactions, (images, video) -> {});
+        var useCase = new CreatePostUseCase(posts, reactions, (authorIdArg, images, video) -> {});
 
         var result = useCase.execute(new CommunityActor(authorId, false),
                 new com.ieltspath.community.application.command.CreatePostCommand(
@@ -59,7 +59,7 @@ class CommunityUseCaseTest {
         when(posts.findById(post.getId())).thenReturn(Optional.of(post));
         when(posts.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(reactions.counts(post.getId())).thenReturn(Map.of());
-        var useCase = new EditPostUseCase(posts, reactions, (images, video) -> {});
+        var useCase = new EditPostUseCase(posts, reactions, (authorIdArg, images, video) -> {});
 
         var changed = useCase.execute(new CommunityActor(authorId, false),
                 new com.ieltspath.community.application.command.EditPostCommand(
@@ -258,7 +258,7 @@ class CommunityUseCaseTest {
         Post post = Post.create(authorId, PostCategory.GENERAL, "title", "body");
         when(posts.findById(post.getId())).thenReturn(Optional.of(post));
 
-        assertThrows(CommunityForbiddenException.class, () -> new EditPostUseCase(posts, reactions, (imgs, vid) -> {}).execute(
+        assertThrows(CommunityForbiddenException.class, () -> new EditPostUseCase(posts, reactions, (authorIdArg, imgs, vid) -> {}).execute(
                 new CommunityActor(UUID.randomUUID(), true),
                 new com.ieltspath.community.application.command.EditPostCommand(
                         post.getId(), PostCategory.QUESTION, "new title", "new body", java.util.List.of(), null, null, null

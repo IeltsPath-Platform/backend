@@ -291,6 +291,9 @@ services:
       RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"
       RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
       USER_SERVICE_URL: http://user-service:8085
+      SUPABASE_URL: "${SUPABASE_URL:-}"
+      SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY:-}"
+      COMMUNITY_MEDIA_BUCKET: "${COMMUNITY_MEDIA_BUCKET:-community}"
     depends_on:
       <<: *after-infra
       rabbitmq:

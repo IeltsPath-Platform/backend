@@ -19,7 +19,7 @@ public class EditPostUseCase {
 
     @Transactional
     public PostResult execute(CommunityActor actor, EditPostCommand command) {
-        mediaPolicy.validate(command.imageUrls(), command.videoUrl());
+        mediaPolicy.validate(actor.userId(), command.imageUrls(), command.videoUrl());
         var post = posts.findById(command.postId())
                 .orElseThrow(() -> new CommunityNotFoundException("Post not found"));
         post.edit(actor.userId(), command.category(), command.title(), command.body());

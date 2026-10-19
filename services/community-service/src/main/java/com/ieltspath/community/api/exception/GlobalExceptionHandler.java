@@ -55,6 +55,35 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, "Constraint violation", r, null);
     }
 
+    @ExceptionHandler(com.ieltspath.commonstorage.UploadRejectedException.class)
+    ResponseEntity<ErrorResponse> uploadRejected(com.ieltspath.commonstorage.UploadRejectedException e, HttpServletRequest r) {
+        HttpStatus status = switch (e.reason()) {
+            case TOO_LARGE -> HttpStatus.PAYLOAD_TOO_LARGE;
+            case TYPE_NOT_ALLOWED -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;
+            default -> HttpStatus.BAD_REQUEST;
+        };
+        return error(status, e.getMessage(), r, null);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ErrorResponse> maxUploadSize(org.springframework.web.multipart.MaxUploadSizeExceededException e, HttpServletRequest r) {
+        return error(HttpStatus.PAYLOAD_TOO_LARGE, "File size exceeds configured limit", r, null);
+    }
+
+    @ExceptionHandler(CommunityRateLimitExceededException.class)
+    ResponseEntity<ErrorResponse> rateLimited(CommunityRateLimitExceededException e, HttpServletRequest r) {
+        return error(HttpStatus.TOO_MANY_REQUESTS, e.getMessage(), r, null);
+    }
+
+    @ExceptionHandler(com.ieltspath.commonstorage.StorageException.class)
+    ResponseEntity<ErrorResponse> storage(com.ieltspath.commonstorage.StorageException e, HttpServletRequest r) {
+        if (e.reason() == com.ieltspath.commonstorage.StorageException.Reason.UNAVAILABLE) {
+            return error(HttpStatus.SERVICE_UNAVAILABLE, "Storage service is currently unavailable", r, null);
+        }
+        LOG.error("Storage operation failed operation={} reason={} ref={}", e.operation(), e.reason(), e.ref());
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "Storage operation failed", r, null);
+    }
+
     @ExceptionHandler({CommunityException.class, IllegalArgumentException.class})
     ResponseEntity<ErrorResponse> badRequest(Exception e, HttpServletRequest r) {
         return error(HttpStatus.BAD_REQUEST, e.getMessage(), r, null);
