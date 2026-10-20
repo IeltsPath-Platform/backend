@@ -39,7 +39,7 @@ public class GetStudyContextUseCase {
         lock.lock(userId);
         LearningContentClient.Lesson lesson;
         switch (sourceType) {
-            case "LESSON" -> lesson = lessons.authorize(userId, sourceId).lesson();
+            case "LESSON" -> lesson = lessons.authorizeToRead(userId, sourceId).lesson();
             case "PRACTICE" -> {
                 var attempt = attempts.findOwned(userId, sourceId).orElseThrow(GetStudyContextUseCase::notFound);
                 if (attempt.submitted()) throw inactive();

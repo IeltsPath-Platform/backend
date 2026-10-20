@@ -73,6 +73,8 @@ class CourseSequenceIntegrationTest {
                 .filter(candidate -> Set.of(low, high, inactive).contains(candidate.course().courseId()))
                 .toList();
         assertThat(topics).extracting(t -> t.topicId()).containsExactly(lowerTopic, higherTopic);
+        // Each topic holds one published lesson; the count is what the learner's course screen divides by.
+        assertThat(topics).extracting(t -> t.lessonCount()).containsExactly(1, 1);
         assertThat(topics.getFirst().course().courseId()).isEqualTo(low);
         assertThat(topics.getFirst().course().bandLevel()).isEqualByComparingTo("0.5");
         assertThat(topics.getFirst().course().hasCourseTest()).isFalse();

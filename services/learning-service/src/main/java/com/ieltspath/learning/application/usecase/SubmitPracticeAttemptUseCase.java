@@ -25,6 +25,7 @@ import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
+import com.ieltspath.learning.domain.service.LessonHintPolicy;
 import com.ieltspath.learning.domain.service.PracticeReviewRule;
 import com.ieltspath.learning.domain.service.ReviewRule;
 import com.ieltspath.learning.domain.vo.EvidenceSource;
@@ -62,6 +63,7 @@ public class SubmitPracticeAttemptUseCase {
     private final GamificationRecorder gamificationRecorder;
     private final HeartsService hearts;
     private final ItemGrading grading = new ItemGrading();
+    private final LessonHintPolicy hints = new LessonHintPolicy();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final Clock clock = Clock.systemUTC();
 
@@ -138,7 +140,8 @@ public class SubmitPracticeAttemptUseCase {
                     durations.get(item.questionVersionId()), graded.errorCodes().get(index),
                     QuestionEventSource.PRACTICE_SET, command.requestId(), counted));
             results.add(new PracticeSubmission.Answer(item.questionVersionId(), grade.correct(),
-                    grade.correctAnswer(), item.explanation()));
+                    grade.correctAnswer(), item.explanation(),
+                    hints.afterAnswer(grade.correct(), item.answerSpec(), item.options(), item.hint())));
         }
         List<PracticeReviewCandidate> candidates = List.of();
         if (counted && !graded.passed()) {

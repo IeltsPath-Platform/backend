@@ -33,7 +33,7 @@ class GetLessonResourcesUseCaseTest {
 
         InOrder order = inOrder(lock, access, content);
         order.verify(lock).lock(user);
-        order.verify(access).authorize(user, lesson);
+        order.verify(access).authorizeToRead(user, lesson);
         order.verify(content).getLessonResources(lesson);
         verify(access, never()).refresh(any(), any(), any());
     }
@@ -41,7 +41,7 @@ class GetLessonResourcesUseCaseTest {
     @Test
     void aLockedLessonNeverFetchesItsResources() {
         var gate = new LearningGateException("LESSON_LOCKED", List.of());
-        when(access.authorize(user, lesson)).thenThrow(gate);
+        when(access.authorizeToRead(user, lesson)).thenThrow(gate);
 
         assertSame(gate, assertThrows(LearningGateException.class, () -> useCase.execute(user, lesson)));
         verify(content, never()).getLessonResources(any());

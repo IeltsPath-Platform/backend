@@ -201,18 +201,21 @@ class MultiSkillLessonIntegrationTest {
     }
 
     @Test
-    void aReadingReviewOfTheFirstLessonLocksItsLessonTheNextLessonWhateverItsSkillAndTheTopicTest() {
+    void aReadingReviewOfTheFirstLessonLeavesThatLessonReadableAndLocksTheNextLessonWhateverItsSkillAndTheTopicTest() {
         completeMixedLesson("A");
         jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill) "
                 + "VALUES (?, ?, ?, ?, 'PENDING', 'READING')", UUID.randomUUID(), USER, KP_READING, MIXED);
 
-        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
-                () -> getLesson.execute(USER, MIXED)).getCode());
+        // The lesson that owns the review is finished, so the learner can still go back over it.
+        assertDoesNotThrow(() -> getLesson.execute(USER, MIXED));
         // The review belongs to an earlier lesson of the topic, so it also stops the Listening-only lesson after it.
         assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
                 () -> getLesson.execute(USER, LISTENING_ONLY)).getCode());
         assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
                 () -> assignTopicTest.execute(USER, TOPIC)).getCode());
+        // Doing new work in the lesson stays behind the review.
+        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
+                () -> answer(MIXED, LISTENING_BLOCK, LISTENING_QUESTION, "A")).getCode());
     }
 
     @Test

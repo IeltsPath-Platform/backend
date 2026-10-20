@@ -180,8 +180,11 @@ class RemediationLadderIntegrationTest {
         assertEquals(second.packageId(), setOne.set().packageId());
         assertEquals("THEORY", submitReview.execute(user, reviewId, new SubmitReviewCommand(setOne.set().reviewSetId(),
                 UUID.randomUUID(), answers(items(second), "B", "B").answers())).stage());
-        theoryCheck.execute(user, reviewId, new SubmitExerciseCommand(UUID.randomUUID(),
-                List.of(new SubmitExerciseCommand.Answer(lessonQuestionA, "A"))));
+        // The page opens the questions at once without answering the quick check; that still moves on to practice.
+        var skipped = theoryCheck.execute(user, reviewId, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
+        assertEquals("PRACTICE", skipped.stage());
+        assertEquals(0, skipped.total());
+        assertTrue(skipped.results().isEmpty());
 
         var setTwo = getReview.execute(user, reviewId);
         assertEquals(third.packageId(), setTwo.set().packageId());

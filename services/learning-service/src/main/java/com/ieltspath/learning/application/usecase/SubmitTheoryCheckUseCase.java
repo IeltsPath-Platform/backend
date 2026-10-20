@@ -26,6 +26,7 @@ import java.util.UUID;
 /**
  * Grades the quick check of a review at the theory stage and returns the review to practice, right or wrong. The
  * answers are shown; no mastery evidence is written, because the questions come from the lesson the learner has done.
+ * Sending no answers skips the quick check and returns the review to practice all the same.
  */
 @Service
 public class SubmitTheoryCheckUseCase {
@@ -68,6 +69,9 @@ public class SubmitTheoryCheckUseCase {
             if (!command.answers().isEmpty()) {
                 throw new LearningRequestException(422, "INVALID_ANSWERS", "This review has no quick-check questions");
             }
+        } else if (command.answers().isEmpty()) {
+            // The quick check is optional: a learner who goes on to the practice set without answering it has read the
+            // theory, which is all this step asks. Nothing is graded and no result is shown.
         } else {
             Map<UUID, Object> answers = AnswerSheet.require(ids, command.answers());
             for (Question question : questions) {
@@ -83,7 +87,7 @@ public class SubmitTheoryCheckUseCase {
         }
         review.completeTheory();
         reviews.save(review);
-        TheoryCheckResult response = new TheoryCheckResult(reviewId, correct, questions.size(), List.copyOf(results),
+        TheoryCheckResult response = new TheoryCheckResult(reviewId, correct, results.size(), List.copyOf(results),
                 review.stage().name());
         checks.save(userId, reviewId, ids, command, response);
         return response;

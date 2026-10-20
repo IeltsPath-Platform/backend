@@ -198,7 +198,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
         return topics.stream()
                 .map(t -> new TopicSequenceResult(t.id(), t.code(), t.name(), t.sortOrder(), t.requiredFeatureKey(),
-                        pointsByTopic.getOrDefault(t.id(), List.of()), t.skill(), t.hasTopicTest(), t.course(), t.skills()))
+                        pointsByTopic.getOrDefault(t.id(), List.of()), t.skill(), t.hasTopicTest(), t.course(), t.skills(),
+                        true, t.lessonCount()))
                 .toList();
     }
 
