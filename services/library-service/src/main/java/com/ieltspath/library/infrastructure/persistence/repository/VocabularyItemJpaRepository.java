@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,8 +26,21 @@ public interface VocabularyItemJpaRepository extends JpaRepository<VocabularyIte
     List<VocabularyItemJpaEntity> findAllByIdIn(List<UUID> ids);
 
     @EntityGraph(attributePaths = {"senses"})
-    @Query("SELECT v FROM VocabularyItemJpaEntity v WHERE LOWER(v.lemma) LIKE LOWER(CONCAT('%', :query, '%')) ORDER BY v.lemma ASC")
+    // INACTIVE items stay out of the search: the pronunciation rows of the dictation words ("the", "going"...) are such items.
+    @Query("SELECT v FROM VocabularyItemJpaEntity v WHERE v.status = com.ieltspath.library.domain.vo.ContentStatus.ACTIVE "
+            + "AND LOWER(v.lemma) LIKE LOWER(CONCAT('%', :query, '%')) ORDER BY v.lemma ASC")
     List<VocabularyItemJpaEntity> searchByLemma(@Param("query") String query);
 
     boolean existsByNormalizedLemma(String normalizedLemma);
+
+    /** Pronunciations by word, for the dictation hints: any status, only items that have an IPA. */
+    @Query("SELECT v.normalizedLemma AS word, v.ipa AS ipa FROM VocabularyItemJpaEntity v "
+            + "WHERE v.normalizedLemma IN :words AND v.ipa IS NOT NULL")
+    List<WordIpa> findIpaByNormalizedLemmaIn(@Param("words") Collection<String> words);
+
+    interface WordIpa {
+        String getWord();
+
+        String getIpa();
+    }
 }

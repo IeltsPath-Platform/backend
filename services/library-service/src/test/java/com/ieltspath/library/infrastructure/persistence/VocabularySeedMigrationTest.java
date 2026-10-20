@@ -24,15 +24,26 @@ class VocabularySeedMigrationTest {
                 .locations("classpath:db/migration").load().migrate();
     }
 
+    // The INACTIVE items are the pronunciations of the dictation words (V11), not part of the IELTS seed.
+    private static final String IELTS_ITEMS = "vocabulary_items WHERE status = 'ACTIVE'";
+
     @Test
     void seedAddsThreeHundredItemsAndThreeHundredTwoSenses() throws Exception {
-        assertEquals(300, count("vocabulary_items"));
+        assertEquals(300, count(IELTS_ITEMS));
         assertEquals(302, count("vocabulary_senses"));
     }
 
     @Test
+    void dictationWordPronunciationsAreInactiveItemsWithoutSenses() throws Exception {
+        assertEquals(0, count("vocabulary_items v WHERE v.status = 'INACTIVE' AND v.ipa IS NULL"));
+        assertEquals(0, count("vocabulary_senses s JOIN vocabulary_items v ON v.id = s.vocabulary_item_id WHERE v.status = 'INACTIVE'"));
+        assertEquals(1, count("vocabulary_items WHERE normalized_lemma = 'weekend' AND ipa = '/ˈwiˌkɛnd/' AND status = 'INACTIVE'"));
+        assertEquals(1, count("vocabulary_items WHERE normalized_lemma = 'going'"), "one row per word");
+    }
+
+    @Test
     void rerunningSeedDoesNotDuplicateItemsOrSenses() throws Exception {
-        assertEquals(300, count("vocabulary_items"));
+        assertEquals(300, count(IELTS_ITEMS));
         assertEquals(302, count("vocabulary_senses"));
 
         try (var connection = DriverManager.getConnection(
@@ -41,7 +52,7 @@ class VocabularySeedMigrationTest {
                     new ClassPathResource("db/migration/V4__seed_mock_vocabulary.sql"));
         }
 
-        assertEquals(300, count("vocabulary_items"));
+        assertEquals(300, count(IELTS_ITEMS));
         assertEquals(302, count("vocabulary_senses"));
     }
 

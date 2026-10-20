@@ -72,6 +72,11 @@ spring:
               predicates:
                 - Path=/api/learning-support/flashcards/**,/api/learning-support/decks/**,/api/learning-support/notes/**,/api/learning-support/video-progress/**,/api/learning-support/saved-segments/**
 
+            - id: library-video-dictation-service
+              uri: lb://LIBRARY-SERVICE
+              predicates:
+                - Path=/api/learning-support/video-dictation/**
+
             - id: user-activity-streak-service
               uri: lb://USER-SERVICE
               predicates:
