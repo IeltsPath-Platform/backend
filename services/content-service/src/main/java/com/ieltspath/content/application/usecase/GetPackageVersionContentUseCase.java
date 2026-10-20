@@ -27,6 +27,10 @@ public class GetPackageVersionContentUseCase {
         return version.withSections(version.sections().stream()
                 .map(s -> s.audio() == null ? s : s.withAudio(s.audio().withMediaUrl(
                         mediaPolicy.resolve(AssetType.AUDIO, s.audio().mediaReference()))))
+                .map(s -> s.withItems(s.items().stream().map(item -> item.withImages(item.images().stream()
+                        .map(image -> new PackageVersionContentResult.Image(image.mediaReference(),
+                                mediaPolicy.resolve(AssetType.IMAGE, image.mediaReference()), image.altText()))
+                        .toList())).toList()))
                 .toList());
     }
 }

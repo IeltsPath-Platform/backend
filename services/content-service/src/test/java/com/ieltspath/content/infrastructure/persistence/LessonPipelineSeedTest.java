@@ -377,10 +377,10 @@ class LessonPipelineSeedTest {
         assertThat(sequence).extracting(TopicSequenceResult::skill)
                 .containsExactly(Skill.LISTENING, Skill.LISTENING, Skill.READING, Skill.READING, Skill.READING, Skill.READING,
                         Skill.READING, Skill.WRITING, Skill.WRITING, null);
-        // Writing topics have no final test; a learner passes them by completing their lessons. The multi-skill topic
+        // The Writing 6.5 topic has no final test; a learner passes it by completing its lessons. The multi-skill topic
         // has no single skill and comes last.
         assertThat(sequence).extracting(TopicSequenceResult::hasTopicTest)
-                .containsExactly(true, true, true, true, true, true, true, false, false, true);
+                .containsExactly(true, true, true, true, true, true, true, true, false, true);
         // The lower-band Reading course keeps its paid topics after its free topics.
         assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
                 .containsExactly(null, null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT", null, null, null, null);
@@ -392,10 +392,12 @@ class LessonPipelineSeedTest {
                 .containsExactly("DEMO_READING_MAIN_IDEA", "DR_IDEA_OR_DETAIL", "DR_TOPIC_SENTENCE",
                         "DR_MATCHING_HEADINGS");
         assertThat(reading.knowledgePoints()).allMatch(TopicSequenceResult.KnowledgePointEntry::hasPracticeSet);
-        // The Writing knowledge points moved with their essays and have no practice set.
+        // The Writing knowledge points moved with their essays, the three added later have practice sets.
         assertThat(topic(sequence, "DEMO_WRITING").knowledgePoints())
                 .extracting(TopicSequenceResult.KnowledgePointEntry::code, TopicSequenceResult.KnowledgePointEntry::hasPracticeSet)
-                .containsExactly(tuple("DEMO_READING_W2_OPINION", false), tuple("DEMO_READING_W1_CHART", false));
+                .containsExactly(tuple("DEMO_READING_W2_OPINION", true), tuple("DEMO_READING_W1_CHART", true),
+                        tuple("DEMO_WRITING_TOPIC_SENTENCE", true), tuple("DEMO_WRITING_LINKING", true),
+                        tuple("DEMO_WRITING_TREND_LANGUAGE", true));
         assertThat(topic(sequence, "TFNG_SKILLS").knowledgePoints()).singleElement()
                 .satisfies(kp -> {
                     assertThat(kp.code()).isEqualTo("TFNG_FALSE_VS_NOT_GIVEN");
@@ -408,10 +410,13 @@ class LessonPipelineSeedTest {
     void writingEssaysMovedToTheirOwnTopicKeepingTheirBlockIds() {
         UUID w1 = lessonId("W1");
         UUID w2 = lessonId("W2");
+        // The essay blocks keep their ids; each lesson later gained an auto-graded exercise block after its essay.
         assertThat(blockIds(w1)).containsExactly(UUID.fromString("22000000-0000-4000-8000-040000000001"),
-                UUID.fromString("22000000-0000-4000-8000-040000000002"));
+                UUID.fromString("22000000-0000-4000-8000-040000000002"),
+                UUID.fromString("35000000-0000-4000-8000-040000000001"));
         assertThat(blockIds(w2)).containsExactly(UUID.fromString("21000000-0000-4000-8000-040000000001"),
-                UUID.fromString("21000000-0000-4000-8000-040000000002"));
+                UUID.fromString("21000000-0000-4000-8000-040000000002"),
+                UUID.fromString("35000000-0000-4000-8000-040000000002"));
         assertThat(reader.publishedLesson(w1).orElseThrow().knowledgePointIds())
                 .containsExactly(kpId("DEMO_READING_W1_CHART"));
         assertThat(reader.publishedLesson(w2).orElseThrow().knowledgePointIds())
@@ -555,7 +560,12 @@ class LessonPipelineSeedTest {
                 Map.entry("R65-PS-INFERENCE", "R65-I1"), Map.entry("R65-PS-PARAPHRASE", "R65-I1"),
                 Map.entry("L65-PS-CORRECTION", "L65-1"), Map.entry("L65-PS-PURPOSE", "L65-1"),
                 Map.entry("TR-PS-READING", "T1"), Map.entry("TR-PS-LISTENING", "T1"), Map.entry("TR-PS-WRITING", "T1"),
-                Map.entry("TR-PS-MIXED", "T1"), Map.entry("TR-PS-T2-READING", "T2"))));
+                Map.entry("TR-PS-MIXED", "T1"), Map.entry("TR-PS-T2-READING", "T2"),
+                Map.entry("PS-W1-WR-1", "W1"), Map.entry("PS-W1-WR-2", "W1"),
+                Map.entry("PS-W2-WR-1", "W2"), Map.entry("PS-W2-WR-2", "W2"),
+                Map.entry("PS-W3-WR-1", "W3"), Map.entry("PS-W3-WR-2", "W3"),
+                Map.entry("PS-W4-WR-1", "W4"), Map.entry("PS-W4-WR-2", "W4"),
+                Map.entry("PS-W5-WR-1", "W5"), Map.entry("PS-W5-WR-2", "W5"))));
         // The one-question V4 demo package is too small to be anyone's Practice.
         assertThat(jdbc.queryForObject("SELECT lesson_id FROM content_packages WHERE code = 'DEMO_MAIN_FLOW_READING'",
                 Map.of(), UUID.class)).isNull();
@@ -572,8 +582,9 @@ class LessonPipelineSeedTest {
                   AND NOT EXISTS (SELECT 1 FROM content_packages p WHERE p.lesson_id = l.id AND p.status = 'PUBLISHED')
                 """, Map.of(), String.class);
         assertThat(withoutPractice).isEmpty();
-        // Writing lessons belong to a topic without a final test and need no Practice.
-        assertThat(reader.lessonPracticeSets(lessonId("W1"))).isEmpty();
+        // The Writing chapter has a final test and two essay practice sets for each of its lessons.
+        assertThat(reader.lessonPracticeSets(lessonId("W1"))).extracting(LessonPracticeSetResult::code)
+                .containsExactly("PS-W1-WR-1", "PS-W1-WR-2");
     }
 
     @Test

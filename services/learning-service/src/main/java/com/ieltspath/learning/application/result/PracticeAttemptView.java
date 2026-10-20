@@ -22,5 +22,11 @@ public record PracticeAttemptView(UUID attemptId, UUID packageId, UUID packageVe
                           List<LessonResult.Question> questions, List<Essay> essays) {}
 
     public record Essay(UUID questionVersionId, int sortOrder, String stem, String task, Integer minWords,
-                        BigDecimal passBand, LessonResult.LatestSubmission latestSubmission) {}
+                        BigDecimal passBand, LessonResult.LatestSubmission latestSubmission,
+                        String guide, List<LessonResult.Image> images) {
+        public Essay(UUID questionVersionId, int sortOrder, String stem, String task, Integer minWords,
+                     BigDecimal passBand, LessonResult.LatestSubmission latestSubmission) {
+            this(questionVersionId, sortOrder, stem, task, minWords, passBand, latestSubmission, null, List.of());
+        }
+    }
 }

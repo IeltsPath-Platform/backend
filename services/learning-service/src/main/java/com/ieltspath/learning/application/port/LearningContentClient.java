@@ -320,7 +320,18 @@ public interface LearningContentClient {
 
     record Item(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
                 Map<String, Object> answerSpec, String explanation, String hint, BigDecimal maxScore,
-                List<KnowledgePointMapping> knowledgePointMappings) {
+                List<KnowledgePointMapping> knowledgePointMappings, String guide, List<WritingImage> images) {
+        public Item {
+            images = images == null ? List.of() : List.copyOf(images);
+        }
+
+        public Item(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
+                    Map<String, Object> answerSpec, String explanation, String hint, BigDecimal maxScore,
+                    List<KnowledgePointMapping> knowledgePointMappings) {
+            this(questionVersionId, sortOrder, stem, options, answerSpec, explanation, hint, maxScore,
+                    knowledgePointMappings, null, List.of());
+        }
+
         public Item(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
                     Map<String, Object> answerSpec, String explanation, BigDecimal maxScore,
                     List<KnowledgePointMapping> knowledgePointMappings) {
@@ -328,6 +339,8 @@ public interface LearningContentClient {
                     knowledgePointMappings);
         }
     }
+
+    record WritingImage(String mediaUrl, String altText) {}
 
     record KnowledgePointMapping(UUID knowledgePointId, BigDecimal weight) {
     }

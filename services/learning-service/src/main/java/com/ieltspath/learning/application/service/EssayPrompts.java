@@ -23,9 +23,11 @@ public final class EssayPrompts {
                 List.copyOf(question.knowledgePointIds()));
     }
 
-    /** From an essay item of a practice set; package items carry no images. */
+    /** The same chart images the learner sees are frozen with the practice essay submission. */
     public static EssayPrompt of(LearningContentClient.Item item) {
-        return of(item.questionVersionId(), item.stem(), item.answerSpec(), item.explanation(), List.of(),
+        List<EssayPrompt.Image> images = item.images().stream()
+                .map(image -> new EssayPrompt.Image(image.mediaUrl(), image.altText())).toList();
+        return of(item.questionVersionId(), item.stem(), item.answerSpec(), item.explanation(), images,
                 item.knowledgePointMappings().stream().map(LearningContentClient.KnowledgePointMapping::knowledgePointId)
                         .distinct().toList());
     }

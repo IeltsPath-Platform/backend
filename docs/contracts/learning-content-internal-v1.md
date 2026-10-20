@@ -320,6 +320,13 @@ content, and builds learner-facing paths; this internal endpoint makes no learne
 
 Returns one PUBLISHED version with `{packageVersionId, packageId, packageType, topicId, rules, sections}`. `topicId` is required for `TOPIC_TEST` and nullable for other types. `rules` is the parsed version rules object; the V9 seed versions use `{}`. MVP final tests have no time limit: when `rules` has no time key, Assessment sets `expiresAt=null`. Defining a timed package rule is deferred beyond MVP. Sections have `{sectionId, title, skill, instructions, sortOrder, passage, audio?, items}`; `passage` is the full text of the attached `PASSAGE` asset or `null`. `audio` (added 2026-10-01, absent when the section has no `AUDIO` asset) is `{assetId, mediaUrl, durationSeconds, transcript}`, resolved like a lesson audio block; the transcript must not reach a learner before the result allows it. Items have `{questionVersionId, sortOrder, stem, options, answerSpec, explanation, maxScore, knowledgePointMappings}`. Each mapping has `{knowledgePointId, weight}`; weight does not affect grading or mastery.
 
+Essay package items additionally carry `guide` (learner-facing Markdown or null) and
+`images: [{mediaUrl, altText}]` (added 2026-10-20). Images come from validated `IMAGE` assets linked to the question or
+its section, ordered by asset-link `sortOrder` and asset ID. Content resolves every image reference through the same
+media policy as lesson images; the stored reference is not included in the internal response. Both images and guides
+are read in bulk for a package version. Auto-graded items have `guide: null` and `images: []`. Learning forwards only
+these teaching fields for course practice essays; answer specs, grading explanations and chart facts remain internal.
+
 X1 example (one representative item shown; the actual version contains Q2, Q14, Q15, Q16):
 
 ```json

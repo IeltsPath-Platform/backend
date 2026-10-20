@@ -29,6 +29,25 @@ Content marks an `EXERCISE` block that holds exactly one `ESSAY` question with `
 - `POST /lessons/{id}/exercises/{blockId}/submissions` on an essay block → 409 `ESSAY_BLOCK`.
 - Lesson gates (`REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`) apply to essay submissions exactly as to exercises.
 
+## Course practice essays (2026-10-20)
+
+The open attempt returned by `POST /api/learning/lessons/{lessonId}/practice-attempts` and
+`GET /api/learning/practice-attempts/{attemptId}` contains essays in `sections[].essays`, alongside the section's
+auto-graded questions. Each essay has `{questionVersionId, sortOrder, stem, task, minWords, passBand,
+latestSubmission, guide, images}`. `guide` is learner-facing Markdown or null, separate from the grading explanation;
+`images` is an ordered array of `{mediaUrl, altText}`, empty for a prompt with no attached image. URLs are validated
+by Content and rendered as image sources. The response does not expose `chartFacts`, `answerSpec` or `explanation`.
+
+Course Writing uses Introduction/Overview/Body 1/Body 2 for Task 1 and Introduction/Body 1/Body 2/Conclusion for Task 2.
+The frontend joins non-empty parts with paragraph breaks and submits the same `{requestId, essayText}` payload to
+`POST /api/learning/practice-attempts/{attemptId}/essays/{questionVersionId}/submissions`. Grading, charging and the
+requirement to grade every essay before finishing the set are unchanged. The chart URLs are also frozen in the
+submission's existing prompt snapshot. No timer is introduced; dictionary lookup remains available beside the editor.
+
+Content V64 seeds guides for the ten V63 course Writing tasks and public Supabase chart references for its four Task 1
+prompts. Image upload is performed by the content owner; files and exact URLs are in
+[course-writing-charts](../assets/course-writing-charts/README.md).
+
 ## `POST /lessons/{lessonId}/essays/{blockId}/submissions`
 
 Request: `{"requestId":"<UUID>","essayText":"..."}`. The essay is graded **within the request** (typically 20–45 s).

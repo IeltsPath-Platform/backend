@@ -71,6 +71,8 @@ public class PracticeAttemptViewAssembler {
         return new PracticeAttemptView.Essay(item.questionVersionId(), item.sortOrder(), item.stem(),
                 spec.get("task") instanceof String task ? task : null,
                 spec.get("minWords") instanceof Number words ? words.intValue() : null,
-                spec.get("passBand") instanceof Number band ? new BigDecimal(band.toString()) : null, latest);
+                spec.get("passBand") instanceof Number band ? new BigDecimal(band.toString()) : null, latest,
+                item.guide(), item.images().stream()
+                        .map(image -> new LessonResult.Image(image.mediaUrl(), image.altText())).toList());
     }
 }
