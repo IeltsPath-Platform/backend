@@ -88,6 +88,16 @@
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring-boot.version}</version>
                 </plugin>
+                <!-- Keep parameter names in the class files: Spring MVC binds an unnamed @PathVariable / @RequestParam by
+                     name and fails at runtime (a 400 here) when they are missing. Every module's own compiler
+                     configuration inherits this. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
             </plugins>
         </pluginManagement>
     </build>
