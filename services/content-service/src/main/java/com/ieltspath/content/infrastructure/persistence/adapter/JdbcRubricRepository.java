@@ -93,17 +93,23 @@ public class JdbcRubricRepository implements RubricRepository {
     private Rubric load(UUID id) {
         var p = new MapSqlParameterSource("id", id);
         var parent = jdbc.queryForMap("SELECT code, task, rubric_version, source_note, status FROM rubrics WHERE id=:id", p);
-        List<CriterionRow> criterionRows = jdbc.query("SELECT id, code, name, description, sort_order FROM rubric_criteria "
-                        + "WHERE rubric_id=:id ORDER BY sort_order", p,
+        List<CriterionRow> criterionRows = jdbc.query("""
+                        SELECT c.id, c.code, c.name, c.description, c.sort_order, m.knowledge_point_id
+                        FROM rubric_criteria c
+                        JOIN rubrics r ON r.id = c.rubric_id
+                        LEFT JOIN writing_criterion_knowledge_points m ON m.task = r.task AND m.criterion_code = c.code
+                        WHERE c.rubric_id = :id ORDER BY c.sort_order
+                        """, p,
                 (rs, row) -> new CriterionRow(rs.getObject("id", UUID.class), rs.getString("code"),
-                        rs.getString("name"), rs.getString("description"), rs.getInt("sort_order")));
+                        rs.getString("name"), rs.getString("description"), rs.getInt("sort_order"),
+                        rs.getObject("knowledge_point_id", UUID.class)));
         List<Rubric.Criterion> criteria = criterionRows.stream().map(criterion -> {
             List<Rubric.BandDescriptor> descriptors = jdbc.query("SELECT band, descriptor FROM rubric_band_descriptors "
                             + "WHERE criterion_id=:criterionId ORDER BY band",
                     new MapSqlParameterSource("criterionId", criterion.id()),
                     (d, i) -> new Rubric.BandDescriptor(d.getBigDecimal("band").doubleValue(), d.getString("descriptor")));
             return new Rubric.Criterion(criterion.code(), criterion.name(), criterion.description(),
-                    criterion.sortOrder(), descriptors);
+                    criterion.sortOrder(), descriptors, criterion.knowledgePointId());
         }).toList();
         List<Rubric.Example> examples = jdbc.query("SELECT band, prompt, essay, commentary FROM rubric_examples "
                         + "WHERE rubric_id=:id ORDER BY band, id", p,
@@ -168,5 +174,6 @@ public class JdbcRubricRepository implements RubricRepository {
                 .addValue("version", rubric.version()).addValue("sourceNote", rubric.sourceNote());
     }
 
-    private record CriterionRow(UUID id, String code, String name, String description, int sortOrder) {}
+    private record CriterionRow(UUID id, String code, String name, String description, int sortOrder,
+                                UUID knowledgePointId) {}
 }

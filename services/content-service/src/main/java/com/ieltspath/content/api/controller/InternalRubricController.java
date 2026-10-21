@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.UUID;
 
 /** Internal snapshot endpoints used by Learning and Assessment essay graders. */
 @RestController
@@ -39,10 +40,11 @@ public class InternalRubricController {
     }
 
     public record CriterionResponse(String code, String name, String description, int sortOrder,
-                                    List<BandDescriptorResponse> bandDescriptors) {
+                                    List<BandDescriptorResponse> bandDescriptors, UUID knowledgePointId) {
         static CriterionResponse from(Rubric.Criterion criterion) {
             return new CriterionResponse(criterion.code(), criterion.name(), criterion.description(), criterion.sortOrder(),
-                    criterion.bandDescriptors().stream().map(BandDescriptorResponse::from).toList());
+                    criterion.bandDescriptors().stream().map(BandDescriptorResponse::from).toList(),
+                    criterion.knowledgePointId());
         }
     }
 

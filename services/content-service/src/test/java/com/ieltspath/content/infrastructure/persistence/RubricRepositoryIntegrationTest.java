@@ -18,6 +18,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -64,6 +65,29 @@ class RubricRepositoryIntegrationTest {
                 .isEqualTo(2);
     }
 
+    @Test
+    void seededRubricsGiveEveryCriterionItsOwnKnowledgePointPerTask() {
+        Rubric task1 = rubrics.findActive("TASK_1").getFirst();
+        Rubric task2 = rubrics.findActive("TASK_2").getFirst();
+
+        assertThat(task1.criteria()).extracting(Rubric.Criterion::knowledgePointId)
+                .doesNotContainNull().doesNotHaveDuplicates();
+        assertThat(task2.criteria()).extracting(Rubric.Criterion::knowledgePointId)
+                .doesNotContainNull().doesNotHaveDuplicates();
+        assertCriterionMapping(task1, Map.of(
+                "TA", "DEMO_WRITING_CRITERION_TA",
+                "CC", "DEMO_WRITING_CRITERION_CC",
+                "LR", "DEMO_WRITING_CRITERION_LR",
+                "GRA", "DEMO_WRITING_CRITERION_GRA"));
+        assertCriterionMapping(task2, Map.of(
+                "TR", "DEMO_WRITING_CRITERION_TR",
+                "CC", "DEMO_WRITING_CRITERION_CC",
+                "LR", "DEMO_WRITING_CRITERION_LR",
+                "GRA", "DEMO_WRITING_CRITERION_GRA"));
+        assertThat(criterion(task1, "CC").knowledgePointId())
+                .isEqualTo(criterion(task2, "CC").knowledgePointId());
+    }
+
     @BeforeEach
     void restoreSeedRubrics() {
         jdbc.getJdbcTemplate().update("DELETE FROM rubrics WHERE id NOT IN "
@@ -88,6 +112,7 @@ class RubricRepositoryIntegrationTest {
         Rubric previous = manageRubrics.byVersion("IELTS_WRITING_TASK_2", 1);
         assertThat(previous.status()).isEqualTo("RETIRED");
         assertThat(previous.criteria()).hasSize(4);
+        assertThat(previous.criteria()).allSatisfy(criterion -> assertThat(criterion.knowledgePointId()).isNotNull());
         assertThat(rubrics.findActive("TASK_2")).extracting(Rubric::code).containsExactly(draft.code());
         assertThatThrownBy(() -> transactions.execute(status -> rubrics.updateDraft(draft.code(), draft.version(), draft)))
                 .isInstanceOf(RubricNotEditableException.class);
@@ -131,5 +156,19 @@ class RubricRepositoryIntegrationTest {
                 .mapToObj(step -> new Rubric.BandDescriptor(4.0 + step * 0.5, descriptor)).toList();
         return new Rubric.Criterion(code, code, "Criterion description", order,
                 bands);
+    }
+
+    private static void assertCriterionMapping(Rubric rubric, Map<String, String> expected) {
+        assertThat(rubric.criteria()).hasSize(expected.size());
+        expected.forEach((criterionCode, knowledgePointCode) -> {
+            Rubric.Criterion criterion = criterion(rubric, criterionCode);
+            assertThat(jdbc.getJdbcTemplate().queryForObject(
+                    "SELECT code FROM knowledge_points WHERE id = ?", String.class, criterion.knowledgePointId()))
+                    .isEqualTo(knowledgePointCode);
+        });
+    }
+
+    private static Rubric.Criterion criterion(Rubric rubric, String code) {
+        return rubric.criteria().stream().filter(criterion -> criterion.code().equals(code)).findFirst().orElseThrow();
     }
 }

@@ -392,12 +392,15 @@ class LessonPipelineSeedTest {
                 .containsExactly("DEMO_READING_MAIN_IDEA", "DR_IDEA_OR_DETAIL", "DR_TOPIC_SENTENCE",
                         "DR_MATCHING_HEADINGS");
         assertThat(reading.knowledgePoints()).allMatch(TopicSequenceResult.KnowledgePointEntry::hasPracticeSet);
-        // The Writing knowledge points moved with their essays, the three added later have practice sets.
+        // The Writing knowledge points moved with their essays, the three added later have practice sets; the five
+        // rubric-criterion points have none.
         assertThat(topic(sequence, "DEMO_WRITING").knowledgePoints())
                 .extracting(TopicSequenceResult.KnowledgePointEntry::code, TopicSequenceResult.KnowledgePointEntry::hasPracticeSet)
                 .containsExactly(tuple("DEMO_READING_W2_OPINION", true), tuple("DEMO_READING_W1_CHART", true),
                         tuple("DEMO_WRITING_TOPIC_SENTENCE", true), tuple("DEMO_WRITING_LINKING", true),
-                        tuple("DEMO_WRITING_TREND_LANGUAGE", true));
+                        tuple("DEMO_WRITING_TREND_LANGUAGE", true), tuple("DEMO_WRITING_CRITERION_TA", false),
+                        tuple("DEMO_WRITING_CRITERION_TR", false), tuple("DEMO_WRITING_CRITERION_CC", false),
+                        tuple("DEMO_WRITING_CRITERION_LR", false), tuple("DEMO_WRITING_CRITERION_GRA", false));
         assertThat(topic(sequence, "TFNG_SKILLS").knowledgePoints()).singleElement()
                 .satisfies(kp -> {
                     assertThat(kp.code()).isEqualTo("TFNG_FALSE_VS_NOT_GIVEN");

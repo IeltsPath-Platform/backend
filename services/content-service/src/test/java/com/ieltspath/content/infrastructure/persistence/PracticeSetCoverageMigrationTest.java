@@ -29,6 +29,10 @@ class PracticeSetCoverageMigrationTest {
     /** Listening sets need new audio files, so these knowledge points are still short of three sets. */
     private static final Set<String> KNOWN_LISTENING_GAP = Set.of(
             "LS_NUM", "LS_SPELL", "LS_PARA", "LS_TRAP", "TR_L_DETAIL", "L65_CORRECTION", "L65_SPEAKER_PURPOSE");
+    /** Rubric-criterion knowledge points receive evidence only from essays and have no practice sets by design. */
+    private static final Set<String> KNOWN_WRITING_CRITERION_GAP = Set.of(
+            "DEMO_WRITING_CRITERION_TA", "DEMO_WRITING_CRITERION_TR", "DEMO_WRITING_CRITERION_CC",
+            "DEMO_WRITING_CRITERION_LR", "DEMO_WRITING_CRITERION_GRA");
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @Container
@@ -53,17 +57,18 @@ class PracticeSetCoverageMigrationTest {
         var short_ = counts.entrySet().stream().filter(e -> e.getValue() < 3).map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
         short_.removeAll(KNOWN_LISTENING_GAP);
-        assertThat(short_).as("non-listening knowledge points with fewer than 3 eligible practice sets").isEmpty();
+        short_.removeAll(KNOWN_WRITING_CRITERION_GAP);
+        assertThat(short_).as("knowledge points without an expected practice-set gap").isEmpty();
     }
 
     @Test
-    void onlyTheListeningKnowledgePointsAreStillShort() {
-        // Fails once Listening sets with new audio are added: then delete KNOWN_LISTENING_GAP and the test above
-        // already enforces three sets for every knowledge point.
+    void theListeningAndCriterionPointsAreTheOnlyShortOnes() {
+        // When Listening sets with new audio are added, remove KNOWN_LISTENING_GAP from the expected set; the first
+        // test then enforces three sets for every remaining knowledge point.
         var counts = eligibleSetCountsByCode();
         var short_ = counts.entrySet().stream().filter(e -> e.getValue() < 3).map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
-        assertThat(short_).isEqualTo(KNOWN_LISTENING_GAP);
+        assertThat(short_).isEqualTo(union(KNOWN_LISTENING_GAP, KNOWN_WRITING_CRITERION_GAP));
     }
 
     @Test
@@ -134,5 +139,9 @@ class PracticeSetCoverageMigrationTest {
 
     private static long count(String sql) {
         return jdbc.queryForObject(sql, Collections.emptyMap(), Long.class);
+    }
+
+    private static Set<String> union(Set<String> first, Set<String> second) {
+        return java.util.stream.Stream.concat(first.stream(), second.stream()).collect(Collectors.toSet());
     }
 }

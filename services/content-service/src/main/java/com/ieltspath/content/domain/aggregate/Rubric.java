@@ -1,6 +1,7 @@
 package com.ieltspath.content.domain.aggregate;
 
 import java.util.List;
+import java.util.UUID;
 
 /** Immutable rubric snapshot consumed by both essay graders. */
 public record Rubric(String code, String task, int version, String sourceNote, String status,
@@ -18,11 +19,16 @@ public record Rubric(String code, String task, int version, String sourceNote, S
     }
 
     public record Criterion(String code, String name, String description, int sortOrder,
-                            List<BandDescriptor> bandDescriptors) {
+                            List<BandDescriptor> bandDescriptors, UUID knowledgePointId) {
         public Criterion {
             if (code == null || code.isBlank() || name == null || name.isBlank() || description == null
                     || description.isBlank() || sortOrder < 1) throw new IllegalArgumentException("Invalid rubric criterion");
             bandDescriptors = bandDescriptors == null ? List.of() : List.copyOf(bandDescriptors);
+        }
+
+        /** A criterion as authored; its knowledge point comes from the task mapping when the rubric is read. */
+        public Criterion(String code, String name, String description, int sortOrder, List<BandDescriptor> bandDescriptors) {
+            this(code, name, description, sortOrder, bandDescriptors, null);
         }
     }
 

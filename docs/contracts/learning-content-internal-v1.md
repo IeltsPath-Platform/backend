@@ -376,6 +376,11 @@ The internal prompt projection is available to service callers using their forwa
 | GET | `/internal/learning-content/rubrics/active?task=TASK_1\|TASK_2` | Return the active rubric as one object with `code`, `task`, `version`, `sourceNote`, `criteria`, and `examples`. |
 | GET | `/internal/learning-content/rubrics/{code}/{version}` | Return that saved active or retired version, never a draft. Used by both Learning and Assessment to keep grading on the activated prompt version. |
 
+Each internal criterion also carries `knowledgePointId` (UUID, nullable, added 2026-10-21): the knowledge point that the
+criterion is evidence for, from `writing_criterion_knowledge_points` keyed by task and criterion code
+(`V69__writing_criterion_knowledge_points.sql`). It does not depend on the rubric version. Admin and public rubric
+responses do not include it.
+
 These projections are internal only. Gateway denies browser/client access to `/internal/**`; Learning and Assessment must
 not read Content's database directly. Rubric data is input to the grader and does not include answer keys.
 
