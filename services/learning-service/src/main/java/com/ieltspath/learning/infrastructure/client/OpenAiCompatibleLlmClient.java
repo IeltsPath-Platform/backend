@@ -75,10 +75,10 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     @Override
-    public String completeJson(String systemPrompt, String userPrompt, boolean lowReasoning) {
+    public String completeJson(String systemPrompt, String userPrompt) {
         if (!configured()) throw new LlmUnavailableException(null);
         try {
-            return requestContent(request(systemPrompt, userPrompt, lowReasoning));
+            return requestContent(request(systemPrompt, userPrompt));
         } catch (RestClientResponseException exception) {
             int status = exception.getStatusCode().value();
             log.warn("LLM request failed: status={}", status);
@@ -89,11 +89,10 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         }
     }
 
-    private Request request(String systemPrompt, String userPrompt, boolean lowReasoning) {
-        String requested = lowReasoning ? "low" : reasoningEffort;
+    private Request request(String systemPrompt, String userPrompt) {
         return new Request(model, List.of(new Message("system", systemPrompt), new Message("user", userPrompt)),
-                MAX_TOKENS, supportsTemperature(model, requested) ? 0.0 : null, new ResponseFormat("json_object"),
-                resolveReasoningEffort(model, requested));
+                MAX_TOKENS, supportsTemperature(model, reasoningEffort) ? 0.0 : null, new ResponseFormat("json_object"),
+                resolveReasoningEffort(model, reasoningEffort));
     }
 
     private String requestContent(Request body) {

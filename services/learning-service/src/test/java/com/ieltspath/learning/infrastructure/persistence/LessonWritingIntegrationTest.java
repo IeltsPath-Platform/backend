@@ -190,7 +190,7 @@ class LessonWritingIntegrationTest {
         assertCode(402, "INSUFFICIENT_POINTS", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
 
         assertEquals(0, count("lesson_writing_submissions"));
-        verify(llm, never()).completeJson(any(), any(), anyBoolean());
+        verify(llm, never()).completeJson(any(), any());
         verify(access, never()).debit(any(), anyInt(), any(), any(), any());
     }
 
@@ -204,13 +204,13 @@ class LessonWritingIntegrationTest {
         assertEquals("FAILED", status());
         assertEquals("INVALID_GRADE", jdbc.queryForObject("SELECT failure_code FROM lesson_writing_submissions",
                 String.class));
-        verify(llm, times(1)).completeJson(any(), any(), anyBoolean());
+        verify(llm, times(1)).completeJson(any(), any());
         verify(access, never()).debit(any(), anyInt(), any(), any(), any());
     }
 
     @Test
     void llmFailureChargesNothingAndAResendGradesTheSameSubmission() {
-        when(llm.completeJson(any(), any(), anyBoolean())).thenThrow(new LlmUnavailableException(500));
+        when(llm.completeJson(any(), any())).thenThrow(new LlmUnavailableException(500));
         UUID request = UUID.randomUUID();
 
         assertCode(503, "GRADING_UNAVAILABLE", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, request, ESSAY));
@@ -287,7 +287,7 @@ class LessonWritingIntegrationTest {
                 USER, LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")));
 
         assertCode(429, "DAILY_LIMIT_REACHED", () -> submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
-        verify(llm, never()).completeJson(any(), any(), anyBoolean());
+        verify(llm, never()).completeJson(any(), any());
         assertEquals("FAILED", status());
     }
 
@@ -333,7 +333,7 @@ class LessonWritingIntegrationTest {
     void whileOneEssayIsGradingAnotherOfTheSameBlockIsRefused() throws Exception {
         var grading = new java.util.concurrent.CountDownLatch(1);
         var release = new java.util.concurrent.CountDownLatch(1);
-        when(llm.completeJson(any(), any(), anyBoolean())).thenAnswer(invocation -> {
+        when(llm.completeJson(any(), any())).thenAnswer(invocation -> {
             grading.countDown();
             assertTrue(release.await(20, java.util.concurrent.TimeUnit.SECONDS));
             return grade("6");
@@ -452,7 +452,7 @@ class LessonWritingIntegrationTest {
         assertCode(404, "NOT_FOUND", () -> submitEssayRevisionUseCase.execute(OTHER_USER, first.submissionId(),
                 UUID.randomUUID(), ESSAY));
 
-        when(llm.completeJson(any(), any(), anyBoolean())).thenThrow(new LlmUnavailableException(500));
+        when(llm.completeJson(any(), any())).thenThrow(new LlmUnavailableException(500));
         UUID failedRequest = UUID.randomUUID();
         assertCode(503, "GRADING_UNAVAILABLE", () -> submitEssayRevisionUseCase.execute(USER, first.submissionId(),
                 failedRequest, ESSAY));
@@ -515,7 +515,7 @@ class LessonWritingIntegrationTest {
         var restored = getWritingSubmissionUseCase.execute(USER, result.submissionId());
         assertEquals(result.grade().criteria().get(1).knowledgePointJudgments(),
                 restored.grade().criteria().get(1).knowledgePointJudgments());
-        verify(llm, times(1)).completeJson(any(), any(), anyBoolean());
+        verify(llm, times(1)).completeJson(any(), any());
     }
 
     @Test
@@ -593,7 +593,7 @@ class LessonWritingIntegrationTest {
     }
 
     private void llmReplies(String first, String... rest) {
-        when(llm.completeJson(any(), any(), anyBoolean())).thenReturn(first, rest);
+        when(llm.completeJson(any(), any())).thenReturn(first, rest);
     }
 
     private static String grade(String band) {

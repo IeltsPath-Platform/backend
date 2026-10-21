@@ -163,7 +163,7 @@ class PracticeEssayIntegrationTest {
                 () -> submitPractice.execute(USER, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of())))
                 .getCode());
 
-        when(llm.completeJson(any(), any(), anyBoolean())).thenReturn(grade("5.0"));
+        when(llm.completeJson(any(), any())).thenReturn(grade("5.0"));
         UUID request = UUID.randomUUID();
         var essay = submitEssay.execute(USER, attempt, ESSAY, request, TEXT);
         assertEquals("GRADED", essay.status());
@@ -209,13 +209,13 @@ class PracticeEssayIntegrationTest {
                 USER, LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")));
         assertEquals("DAILY_LIMIT_REACHED", assertThrows(LearningRequestException.class,
                 () -> submitEssay.execute(USER, attempt, ESSAY, UUID.randomUUID(), TEXT)).getCode());
-        verify(llm, never()).completeJson(any(), any(), anyBoolean());
+        verify(llm, never()).completeJson(any(), any());
     }
 
     @Test
     void aPassedEssayReleasesItsPointsOnlyWhenTheDebitSucceeds() {
         var attempt = startPractice.execute(USER, LESSON, WRITING_SET).attemptId();
-        when(llm.completeJson(any(), any(), anyBoolean())).thenReturn(grade("6.5"));
+        when(llm.completeJson(any(), any())).thenReturn(grade("6.5"));
         when(access.debit(any(), anyInt(), any(), anyString(), any())).thenThrow(new InsufficientPointsException());
         UUID request = UUID.randomUUID();
         assertEquals("INSUFFICIENT_POINTS", assertThrows(LearningRequestException.class,
@@ -227,7 +227,7 @@ class PracticeEssayIntegrationTest {
         assertTrue(essay.passed());
         assertEquals("IELTS_WRITING@1+tplv1", jdbc.queryForObject(
                 "SELECT prompt_version FROM lesson_writing_submissions", String.class));
-        verify(llm, times(1)).completeJson(any(), any(), anyBoolean());
+        verify(llm, times(1)).completeJson(any(), any());
         var result = submitPractice.execute(USER, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
         assertTrue(result.passed());
     }
@@ -238,7 +238,7 @@ class PracticeEssayIntegrationTest {
         jdbc.update("DELETE FROM kp_evidence WHERE user_id = ?", USER);
         when(content.getActiveRubric(anyString())).thenReturn(rubricWithCriterionPoints());
         var attempt = startPractice.execute(USER, LESSON, WRITING_SET).attemptId();
-        when(llm.completeJson(any(), any(), anyBoolean())).thenReturn(gradeWithBands("7.0", "5.5", "6.5", "6.0"));
+        when(llm.completeJson(any(), any())).thenReturn(gradeWithBands("7.0", "5.5", "6.5", "6.0"));
         var essay = submitEssay.execute(USER, attempt, ESSAY, UUID.randomUUID(), TEXT);
         assertEquals("GRADED", essay.status());
 
@@ -267,7 +267,7 @@ class PracticeEssayIntegrationTest {
                         "WRITING", "State the main idea", true)), null, true, null, Set.of(LearningSkill.READING,
                 LearningSkill.WRITING))));
         var attempt = startPractice.execute(USER, LESSON, WRITING_SET).attemptId();
-        when(llm.completeJson(any(), any(), anyBoolean())).thenReturn(gradeWithBands("7.0", "5.5", "6.5", "6.0")
+        when(llm.completeJson(any(), any())).thenReturn(gradeWithBands("7.0", "5.5", "6.5", "6.0")
                 .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"criterion\":\"CC\","
                 + "\"code\":\"DEMO_WRITING_LINKING\",\"judgment\":\"FAIL\","
                 + "\"excerpt\":\"because real examples make lessons memorable\",\"reason\":\"Use a linker clearly.\"}]"));
@@ -284,7 +284,7 @@ class PracticeEssayIntegrationTest {
         assertTrue(essay.grade().studyPoints().stream().anyMatch(point ->
                 WritingGrade.StudyPoint.KNOWLEDGE_POINT.equals(point.kind())
                         && SUB_LINK_KP.equals(point.practiceKnowledgePointId())));
-        verify(llm, times(1)).completeJson(any(), any(), anyBoolean());
+        verify(llm, times(1)).completeJson(any(), any());
     }
 
     private static String gradeWithBands(String tr, String cc, String lr, String gra) {

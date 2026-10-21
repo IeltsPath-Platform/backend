@@ -6,9 +6,8 @@ public interface LlmClient {
     boolean configured();
 
     /**
-     * @param lowReasoning ask the model to think less and spend its output budget on the JSON
      * @return the raw message text, which may still not be valid JSON
      * @throws com.ieltspath.learning.application.exception.LlmUnavailableException on any provider or network failure
      */
-    String completeJson(String systemPrompt, String userPrompt, boolean lowReasoning);
+    String completeJson(String systemPrompt, String userPrompt);
 }

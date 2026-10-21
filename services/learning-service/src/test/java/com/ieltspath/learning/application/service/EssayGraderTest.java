@@ -26,11 +26,10 @@ import static org.junit.jupiter.api.Assertions.*;
 class EssayGraderTest {
     private static final String ESSAY = "Some people say cities should plant more trees. Peoples can save energy.";
 
-    /** Replies in order; records each prompt pair and whether low reasoning was asked for. */
+    /** Replies in order and records each prompt pair. */
     static final class ScriptedLlm implements LlmClient {
         final Deque<Object> replies = new ArrayDeque<>();
         final List<String[]> prompts = new ArrayList<>();
-        final List<Boolean> lowReasoning = new ArrayList<>();
 
         ScriptedLlm reply(Object... values) {
             replies.addAll(List.of(values));
@@ -40,9 +39,8 @@ class EssayGraderTest {
         @Override public boolean configured() { return true; }
 
         @Override
-        public String completeJson(String systemPrompt, String userPrompt, boolean low) {
+        public String completeJson(String systemPrompt, String userPrompt) {
             prompts.add(new String[]{systemPrompt, userPrompt});
-            lowReasoning.add(low);
             Object next = replies.removeFirst();
             if (next instanceof RuntimeException exception) throw exception;
             return (String) next;
@@ -288,7 +286,7 @@ class EssayGraderTest {
 
         assertEquals("INVALID_GRADE", assertThrows(WritingGradingException.class,
                 () -> grader.grade(task2(), ESSAY)).getCode());
-        assertEquals(List.of(false), llm.lowReasoning);
+        assertEquals(1, llm.prompts.size());
     }
 
     @Test

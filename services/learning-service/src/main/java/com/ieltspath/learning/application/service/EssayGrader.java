@@ -101,7 +101,7 @@ public class EssayGrader {
         Supplier<Map<UUID, LearningContentClient.KnowledgePoint>> catalog = memoized(this::knowledgePointCatalog);
         JsonNode root;
         try {
-            root = readObject(llm.completeJson(system, user, false));
+            root = readObject(llm.completeJson(system, user));
         } catch (LlmUnavailableException exception) {
             throw new WritingGradingException("LLM_UNAVAILABLE");
         }
