@@ -33,6 +33,7 @@ import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -80,6 +81,10 @@ class LessonWritingIntegrationTest {
     private static final UUID ESSAY_BLOCK = UUID.randomUUID();
     private static final UUID KP = UUID.randomUUID();
     private static final UUID ESSAY_KP = UUID.randomUUID();
+    private static final UUID TR_KP = UUID.randomUUID();
+    private static final UUID CC_KP = UUID.randomUUID();
+    private static final UUID LR_KP = UUID.randomUUID();
+    private static final UUID GRA_KP = UUID.randomUUID();
     private static final String ESSAY = ("Cities should plant more trees because trees cool streets, clean the air "
             + "and make people calmer. ").repeat(4);
 
@@ -441,6 +446,47 @@ class LessonWritingIntegrationTest {
         assertEquals("GRADED", submitEssayRevisionUseCase.execute(USER, first.submissionId(), UUID.randomUUID(), ESSAY)
                 .status());
         assertEquals(1, count("lesson_writing_submissions WHERE status = 'FAILED'"));
+    }
+
+    @Test
+    void anEssayRecordsEachCriterionOnItsOwnKnowledgePointAndDropsPointsOutsideTheCatalog() {
+        when(content.getActiveRubric(anyString())).thenReturn(rubricWithCriterionPoints("TASK_2"));
+        when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
+                "Writing", 900, null, List.of(kp(KP), kp(ESSAY_KP), kp(TR_KP), kp(CC_KP), kp(LR_KP)),
+                LearningSkill.WRITING, true)));
+        topics.execute(USER);
+        llmReplies(gradeWithBands("7.0", "5.5", "6.5", "6.0"));
+
+        WritingSubmissionResult result = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(),
+                ESSAY);
+
+        boolean passed = Boolean.TRUE.equals(result.passed());
+        Map<UUID, Boolean> recorded = new HashMap<>();
+        jdbc.queryForList("SELECT kp_id, correct FROM kp_evidence WHERE source = 'lesson_writing'")
+                .forEach(row -> recorded.put((UUID) row.get("kp_id"), (Boolean) row.get("correct")));
+        // GRA_KP is not in the learner's catalog, so its evidence is dropped as any unknown point is.
+        assertEquals(Map.of(ESSAY_KP, passed, TR_KP, true, CC_KP, false, LR_KP, true), recorded);
+        assertEquals("GRAMMAR", jdbc.queryForObject("SELECT error_code FROM question_attempt_events "
+                + "WHERE source_reference_id = ?", String.class, result.submissionId()));
+    }
+
+    private static String gradeWithBands(String tr, String cc, String lr, String gra) {
+        return "{\"criteria\":[" + bandJson("TR", tr) + "," + bandJson("CC", cc) + "," + bandJson("LR", lr) + ","
+                + bandJson("GRA", gra) + "],\"corrections\":[{\"excerpt\":\"Cities should plant more trees\","
+                + "\"suggestion\":\"fix\",\"errorCode\":\"GRAMMAR\"}],\"summary\":\"ok\",\"focus\":[]}";
+    }
+
+    private static String bandJson(String code, String band) {
+        return "{\"code\":\"%s\",\"band\":%s,\"comment\":\"i\"}".formatted(code, band);
+    }
+
+    private static LearningContentClient.Rubric rubricWithCriterionPoints(String task) {
+        var descriptor = new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Band six.");
+        Map<String, UUID> points = Map.of("TR", TR_KP, "CC", CC_KP, "LR", LR_KP, "GRA", GRA_KP);
+        var criteria = (task.equals("TASK_1") ? List.of("TA", "CC", "LR", "GRA") : List.of("TR", "CC", "LR", "GRA"))
+                .stream().map(code -> new LearningContentClient.RubricCriterion(code, code, "Description", 1,
+                        List.of(descriptor), points.get(code))).toList();
+        return new LearningContentClient.Rubric("IELTS_WRITING", task, 1, "source", criteria, List.of());
     }
 
     private static String gradeWithError(String band, String excerpt) {

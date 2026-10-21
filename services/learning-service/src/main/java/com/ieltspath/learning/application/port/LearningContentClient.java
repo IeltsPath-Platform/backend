@@ -107,8 +107,14 @@ public interface LearningContentClient {
 
     record Rubric(String code, String task, int version, String sourceNote, List<RubricCriterion> criteria,
                   List<RubricExample> examples) {}
+    /** {@code knowledgePointId} is the point the criterion is evidence for; null when Content does not map it. */
     record RubricCriterion(String code, String name, String description, int sortOrder,
-                           List<RubricBandDescriptor> bandDescriptors) {}
+                           List<RubricBandDescriptor> bandDescriptors, UUID knowledgePointId) {
+        public RubricCriterion(String code, String name, String description, int sortOrder,
+                               List<RubricBandDescriptor> bandDescriptors) {
+            this(code, name, description, sortOrder, bandDescriptors, null);
+        }
+    }
     record RubricBandDescriptor(java.math.BigDecimal band, String descriptor) {}
     record RubricExample(java.math.BigDecimal band, String prompt, String essay, String commentary) {}
     record ErrorType(String code, String name, String category, int severity, String fixHint) {}

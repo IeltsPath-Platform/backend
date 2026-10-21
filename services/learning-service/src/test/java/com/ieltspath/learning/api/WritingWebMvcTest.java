@@ -93,7 +93,7 @@ class WritingWebMvcTest {
     @Test
     void gradedEssayHasTheContractKeysAndNothingServerSide() throws Exception {
         var grade = new WritingGrade(List.of(new WritingGrade.Criterion("TR", new BigDecimal("6.5"), List.of("s"),
-                List.of("i"))), List.of(new WritingGrade.Correction("peoples", "people", "GRAMMAR")), "ok",
+                List.of("i"), UUID.randomUUID())), List.of(new WritingGrade.Correction("peoples", "people", "GRAMMAR")), "ok",
                 new BigDecimal("6.5"));
         when(submitLessonEssayUseCase.execute(eq(USER), eq(LESSON), eq(BLOCK), any(), eq("essay"))).thenReturn(new WritingSubmissionResult(
                 SUBMISSION, "GRADED", "TASK_2", 260, new BigDecimal("6.5"), true, grade, 3, "Model", null, null));

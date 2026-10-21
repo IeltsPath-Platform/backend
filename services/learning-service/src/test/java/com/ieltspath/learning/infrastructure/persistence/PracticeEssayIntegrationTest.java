@@ -34,6 +34,7 @@ import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -78,6 +79,10 @@ class PracticeEssayIntegrationTest {
     private static final UUID BLOCK_QUESTION = UUID.randomUUID();
     private static final UUID KP_READING = UUID.randomUUID();
     private static final UUID KP_WRITING = UUID.randomUUID();
+    private static final UUID TR_KP = UUID.randomUUID();
+    private static final UUID CC_KP = UUID.randomUUID();
+    private static final UUID LR_KP = UUID.randomUUID();
+    private static final UUID GRA_KP = UUID.randomUUID();
     private static final UUID READING_SET = UUID.randomUUID();
     private static final UUID READING_VERSION = UUID.randomUUID();
     private static final UUID WRITING_SET = UUID.randomUUID();
@@ -222,6 +227,48 @@ class PracticeEssayIntegrationTest {
         verify(llm, times(1)).completeJson(any(), any(), anyBoolean());
         var result = submitPractice.execute(USER, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
         assertTrue(result.passed());
+    }
+
+    @Test
+    void aCountedPracticeEssayRecordsEachCriterionOnItsOwnKnowledgePoint() {
+        jdbc.update("DELETE FROM question_attempt_events WHERE user_id = ?", USER);
+        jdbc.update("DELETE FROM kp_evidence WHERE user_id = ?", USER);
+        when(content.getActiveRubric(anyString())).thenReturn(rubricWithCriterionPoints());
+        var attempt = startPractice.execute(USER, LESSON, WRITING_SET).attemptId();
+        when(llm.completeJson(any(), any(), anyBoolean())).thenReturn(gradeWithBands("7.0", "5.5", "6.5", "6.0"));
+        var essay = submitEssay.execute(USER, attempt, ESSAY, UUID.randomUUID(), TEXT);
+        assertEquals("GRADED", essay.status());
+
+        var result = submitPractice.execute(USER, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of()));
+
+        assertTrue(result.countedAsEvidence());
+        Map<UUID, Boolean> recorded = new HashMap<>();
+        jdbc.queryForList("SELECT kp_id, correct FROM kp_evidence WHERE source = 'practice_set' "
+                + "AND question_version_id = ?", ESSAY)
+                .forEach(row -> recorded.put((UUID) row.get("kp_id"), (Boolean) row.get("correct")));
+        assertEquals(Map.of(KP_WRITING, Boolean.TRUE.equals(essay.passed()), TR_KP, true, CC_KP, false, LR_KP, true,
+                GRA_KP, true), recorded);
+        assertEquals("GRAMMAR", jdbc.queryForObject("SELECT error_code FROM question_attempt_events "
+                + "WHERE user_id = ? AND question_version_id = ? AND source = 'practice_set'", String.class, USER, ESSAY));
+    }
+
+    private static String gradeWithBands(String tr, String cc, String lr, String gra) {
+        return "{\"criteria\":[" + bandJson("TR", tr) + "," + bandJson("CC", cc) + "," + bandJson("LR", lr) + ","
+                + bandJson("GRA", gra) + "],\"corrections\":[{\"excerpt\":\"Children learn better outdoors\","
+                + "\"suggestion\":\"fix\",\"errorCode\":\"GRAMMAR\"}],\"summary\":\"ok\",\"focus\":[]}";
+    }
+
+    private static String bandJson(String code, String band) {
+        return "{\"code\":\"%s\",\"band\":%s,\"comment\":\"i\"}".formatted(code, band);
+    }
+
+    private static Rubric rubricWithCriterionPoints() {
+        var descriptor = new RubricBandDescriptor(new BigDecimal("6.0"), "Band six.");
+        Map<String, UUID> points = Map.of("TR", TR_KP, "CC", CC_KP, "LR", LR_KP, "GRA", GRA_KP);
+        var criteria = List.of("TR", "CC", "LR", "GRA").stream()
+                .map(code -> new RubricCriterion(code, code, "Description", 1, List.of(descriptor), points.get(code)))
+                .toList();
+        return new Rubric("IELTS_WRITING", "TASK_2", 1, "source", criteria, List.of());
     }
 
     private static String grade(String band) {

@@ -75,10 +75,19 @@ public class MasteryProfileUpdater {
 
     /** Call right after {@code evidence.append}; the streak moves by the newest outcome of each point. */
     public void recordEvidence(UUID userId, List<KnowledgeEvidence> appended) {
+        recordEvidence(userId, appended, Set.of());
+    }
+
+    /**
+     * As above; points in {@code withoutMilestone} still move their profile but earn no milestone XP. Essay criterion
+     * points use this, since their evidence is written from a graded essay.
+     */
+    public void recordEvidence(UUID userId, List<KnowledgeEvidence> appended, Set<UUID> withoutMilestone) {
         Set<UUID> touched = appended.stream().map(KnowledgeEvidence::knowledgePointId).collect(Collectors.toSet());
         // Milestone XP is paid only for practice evidence: tests and essays do not earn it.
         Set<UUID> practiced = appended.stream().filter(item -> PRACTICE_SOURCES.contains(item.source()))
-                .map(KnowledgeEvidence::knowledgePointId).collect(Collectors.toSet());
+                .map(KnowledgeEvidence::knowledgePointId).filter(kp -> !withoutMilestone.contains(kp))
+                .collect(Collectors.toSet());
         update(userId, touched, Mode.RECORD, practiced);
     }
 

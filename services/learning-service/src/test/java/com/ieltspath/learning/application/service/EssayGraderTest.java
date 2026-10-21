@@ -152,6 +152,35 @@ class EssayGraderTest {
     }
 
     @Test
+    void eachCriterionCarriesTheKnowledgePointOfItsRubricCriterion() {
+        var points = new java.util.LinkedHashMap<String, UUID>();
+        for (String code : List.of("TR", "CC", "LR", "GRA")) points.put(code, UUID.randomUUID());
+        var descriptor = new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Descriptor");
+        when(content.getActiveRubric("TASK_2")).thenReturn(new LearningContentClient.Rubric("IELTS_ESSAY", "TASK_2", 2,
+                "source", points.entrySet().stream().map(point -> new LearningContentClient.RubricCriterion(
+                        point.getKey(), point.getKey(), "Criterion description", 1, List.of(descriptor),
+                        point.getValue())).toList(), List.of()));
+        llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6")));
+
+        WritingGrade grade = grader.grade(task2(), ESSAY).grade();
+
+        assertEquals(List.copyOf(points.values()),
+                grade.criteria().stream().map(WritingGrade.Criterion::knowledgePointId).toList());
+        assertFalse(llm.prompts.getFirst()[0].contains(points.get("TR").toString()),
+                "the model never sees knowledge point ids");
+    }
+
+    @Test
+    void aRubricWithoutKnowledgePointsStillGrades() {
+        llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6")));
+
+        var graded = grader.grade(task2(), ESSAY);
+
+        assertEquals("IELTS_ESSAY@2+tplv1", graded.promptVersion());
+        assertTrue(graded.grade().criteria().stream().allMatch(item -> item.knowledgePointId() == null));
+    }
+
+    @Test
     void task1UsesTaskAchievementAndRejectsTheTask2Code() {
         llm.reply(reply(criterion("TA", "7"), criterion("CC", "7"), criterion("LR", "7"), criterion("GRA", "7")));
         assertEquals("TA", grader.grade(task1("Sales rose from 10 to 40."), ESSAY).grade().criteria().getFirst().code());

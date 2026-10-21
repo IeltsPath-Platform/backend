@@ -77,13 +77,20 @@ public class EssayGrader {
         Map<String, ErrorType> allowedCodes = errorTypes.stream().filter(Objects::nonNull)
                 .filter(error -> error.code() != null).collect(Collectors.toMap(ErrorType::code, error -> error,
                         (first, ignored) -> first));
+        Map<String, UUID> criterionPoints = new HashMap<>();
+        for (RubricCriterion criterion : rubric.criteria()) {
+            if (criterion != null && criterion.code() != null && criterion.knowledgePointId() != null) {
+                criterionPoints.putIfAbsent(criterion.code(), criterion.knowledgePointId());
+            }
+        }
         String system = systemPrompt(task, rubric, errorTypes);
         String user = userPrompt(task, prompt, essay);
         try {
-            Optional<WritingGrade> first = parse(task, essay, allowedCodes, llm.completeJson(system, user, false));
+            Optional<WritingGrade> first = parse(task, essay, allowedCodes, criterionPoints,
+                    llm.completeJson(system, user, false));
             WritingGrade grade = first.orElseGet(() -> {
                 try {
-                    return parse(task, essay, allowedCodes, llm.completeJson(system, user, true))
+                    return parse(task, essay, allowedCodes, criterionPoints, llm.completeJson(system, user, true))
                             .orElseThrow(() -> new WritingGradingException("INVALID_GRADE"));
                 } catch (LlmUnavailableException exception) {
                     throw new WritingGradingException("LLM_UNAVAILABLE");
@@ -149,7 +156,7 @@ public class EssayGrader {
     }
 
     private Optional<WritingGrade> parse(WritingTask task, String essay, Map<String, ErrorType> allowedCodes,
-                                         String reply) {
+                                         Map<String, UUID> criterionPoints, String reply) {
         JsonNode root = readObject(reply);
         if (root == null || !root.path("criteria").isArray()) return Optional.empty();
         Map<String, WritingGrade.Criterion> byCode = new LinkedHashMap<>();
@@ -163,7 +170,7 @@ public class EssayGrader {
             if (!WritingScore.isBand(value)) return Optional.empty();
             String comment = truncate(node.path("comment").asText(""), MAX_ITEM_CHARS);
             byCode.put(code, new WritingGrade.Criterion(code, value.setScale(1), List.of(),
-                    comment.isBlank() ? List.of() : List.of(comment)));
+                    comment.isBlank() ? List.of() : List.of(comment), criterionPoints.get(code)));
         }
         if (byCode.size() != task.criteria().size()) return Optional.empty();
         List<WritingGrade.Criterion> criteria = task.criteria().stream().map(byCode::get).toList();
