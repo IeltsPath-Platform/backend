@@ -110,8 +110,11 @@ can ask a Mentor to review a graded essay (`POST`/`GET /writing-submissions/{id}
 - At most one `GRADING` submission per learner and block.
 - Daily limit: at most 10 gradings per learner per day (`Asia/Ho_Chi_Minh`), counted when the LLM is called. Exceeding
   it → 429 `DAILY_LIMIT_REACHED`, no LLM call, no charge.
-- Mastery evidence (`source = lesson_writing`, `correct = passed`, one row per knowledge point of the question) is
-  recorded on every graded submission until the block is first passed, and never after. No review is inserted.
+- Mastery evidence (`source = lesson_writing`) is recorded on every graded submission until the block is first passed,
+  and never after. It has one row per knowledge point of the question with `correct = passed`, and one row per rubric
+  criterion whose knowledge point is mapped, with `correct = criterion band >= passBand`. Criterion knowledge points
+  are not part of the response. The question's event carries the most frequent correction `errorCode`. No review is
+  inserted.
 
 ## Errors
 
