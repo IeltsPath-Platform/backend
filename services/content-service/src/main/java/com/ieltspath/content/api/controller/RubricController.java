@@ -89,10 +89,20 @@ public class RubricController {
     }
 
     public record RubricResponse(String code, String task, int version, String status, String sourceNote,
-                                  List<Rubric.Criterion> criteria, List<Rubric.Example> examples) {
+                                  List<CriterionResponse> criteria, List<Rubric.Example> examples) {
         static RubricResponse from(Rubric rubric) {
             return new RubricResponse(rubric.code(), rubric.task(), rubric.version(), rubric.status(),
-                    rubric.sourceNote(), rubric.criteria(), rubric.examples());
+                    rubric.sourceNote(), rubric.criteria().stream().map(CriterionResponse::from).toList(),
+                    rubric.examples());
+        }
+    }
+
+    /** Public and authoring rubrics keep the domain fields they exposed before internal sub-KP mapping. */
+    public record CriterionResponse(String code, String name, String description, int sortOrder,
+                                    List<Rubric.BandDescriptor> bandDescriptors, java.util.UUID knowledgePointId) {
+        static CriterionResponse from(Rubric.Criterion criterion) {
+            return new CriterionResponse(criterion.code(), criterion.name(), criterion.description(),
+                    criterion.sortOrder(), criterion.bandDescriptors(), criterion.knowledgePointId());
         }
     }
 }

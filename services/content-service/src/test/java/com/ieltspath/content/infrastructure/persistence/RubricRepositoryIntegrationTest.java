@@ -88,6 +88,88 @@ class RubricRepositoryIntegrationTest {
                 .isEqualTo(criterion(task2, "CC").knowledgePointId());
     }
 
+    @Test
+    void rubricCriteriaListTheirSubKnowledgePointsInOrder() {
+        Rubric task1 = rubrics.findActive("TASK_1").getFirst();
+        Rubric task2 = rubrics.findActive("TASK_2").getFirst();
+
+        assertThat(criterion(task1, "CC").subKnowledgePoints()).extracting(Rubric.SubKnowledgePoint::code)
+                .containsExactly("DEMO_WRITING_LINKING");
+        assertThat(criterion(task2, "CC").subKnowledgePoints()).extracting(Rubric.SubKnowledgePoint::code)
+                .containsExactly("DEMO_WRITING_TOPIC_SENTENCE", "DEMO_WRITING_LINKING");
+        task1.criteria().stream().filter(value -> !value.code().equals("CC"))
+                .forEach(value -> assertThat(value.subKnowledgePoints()).isEmpty());
+        task2.criteria().stream().filter(value -> !value.code().equals("CC"))
+                .forEach(value -> assertThat(value.subKnowledgePoints()).isEmpty());
+        assertThat(java.util.stream.Stream.concat(task1.criteria().stream(), task2.criteria().stream())
+                .flatMap(value -> value.subKnowledgePoints().stream()).toList())
+                .allSatisfy(point -> {
+                    assertThat(point.id()).isNotNull();
+                    assertThat(point.name()).isNotBlank();
+                    assertThat(point.description()).isNotBlank();
+                });
+    }
+
+    @Test
+    void subKnowledgePointsAreActiveWritingPointsOfActiveCourses() {
+        assertThat(jdbc.getJdbcTemplate().queryForList("""
+                SELECT count(*)
+                FROM writing_criterion_sub_knowledge_points s
+                JOIN knowledge_points kp ON kp.id = s.knowledge_point_id
+                JOIN topics t ON t.id = kp.topic_id
+                JOIN courses c ON c.id = t.course_id
+                WHERE kp.status = 'ACTIVE' AND kp.skill = 'WRITING'
+                  AND t.status = 'ACTIVE' AND c.status = 'ACTIVE'
+                """, Integer.class)).containsExactly(3);
+    }
+
+    @Test
+    void rubricOmitsSubKnowledgePointsWhenTheirTopicBecomesInactive() {
+        jdbc.getJdbcTemplate().update("""
+                UPDATE topics SET status = 'INACTIVE'
+                WHERE id = (SELECT topic_id FROM knowledge_points WHERE code = 'DEMO_WRITING_LINKING')
+                """);
+        try {
+            Rubric task1 = rubrics.findActive("TASK_1").getFirst();
+            Rubric task2 = rubrics.findActive("TASK_2").getFirst();
+
+            assertThat(criterion(task1, "CC").subKnowledgePoints()).isEmpty();
+            assertThat(criterion(task2, "CC").subKnowledgePoints()).isEmpty();
+        } finally {
+            jdbc.getJdbcTemplate().update("""
+                    UPDATE topics SET status = 'ACTIVE'
+                    WHERE id = (SELECT topic_id FROM knowledge_points WHERE code = 'DEMO_WRITING_LINKING')
+                    """);
+        }
+    }
+
+    @Test
+    void subKnowledgePointMappingRejectsDuplicatesInvalidOrderAndMissingCriterion() {
+        assertThatThrownBy(() -> jdbc.getJdbcTemplate().update("""
+                INSERT INTO writing_criterion_sub_knowledge_points (task, criterion_code, knowledge_point_id, sort_order)
+                SELECT 'TASK_1', 'CC', id, 1 FROM knowledge_points WHERE code = 'DEMO_WRITING_LINKING'
+                """ )).isInstanceOf(DuplicateKeyException.class);
+
+        assertThatThrownBy(() -> jdbc.getJdbcTemplate().update("""
+                INSERT INTO writing_criterion_sub_knowledge_points (task, criterion_code, knowledge_point_id, sort_order)
+                SELECT 'TASK_1', 'CC', id, 5 FROM knowledge_points WHERE code = 'DEMO_WRITING_TOPIC_SENTENCE'
+                """ )).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+
+        assertThatThrownBy(() -> jdbc.getJdbcTemplate().update("""
+                INSERT INTO writing_criterion_sub_knowledge_points (task, criterion_code, knowledge_point_id, sort_order)
+                SELECT 'TASK_1', 'TR', id, 1 FROM knowledge_points WHERE code = 'DEMO_WRITING_TOPIC_SENTENCE'
+                """ )).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void linkerMisuseIsLinkedToTheLinkingKnowledgePoint() {
+        assertThat(jdbc.getJdbcTemplate().queryForObject("""
+                SELECT e.knowledge_point_id = kp.id
+                FROM error_types e CROSS JOIN knowledge_points kp
+                WHERE e.code = 'LINKER_MISUSE' AND kp.code = 'DEMO_WRITING_LINKING'
+                """, Boolean.class)).isTrue();
+    }
+
     @BeforeEach
     void restoreSeedRubrics() {
         jdbc.getJdbcTemplate().update("DELETE FROM rubrics WHERE id NOT IN "

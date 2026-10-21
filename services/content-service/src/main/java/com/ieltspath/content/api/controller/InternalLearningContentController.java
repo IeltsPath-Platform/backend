@@ -81,10 +81,12 @@ public class InternalLearningContentController {
         return listErrorTypes.executeApprovedActive().stream().map(ActiveErrorTypeResponse::from).toList();
     }
 
-    public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint) {
+    public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint,
+                                          UUID knowledgePointId) {
         static ActiveErrorTypeResponse from(com.ieltspath.content.domain.aggregate.ErrorType errorType) {
             return new ActiveErrorTypeResponse(errorType.getCode(), errorType.getName(),
-                    errorType.getCategory().name(), errorType.getSeverity(), errorType.getFixHint());
+                    errorType.getCategory().name(), errorType.getSeverity(), errorType.getFixHint(),
+                    errorType.getKnowledgePointId());
         }
     }
 

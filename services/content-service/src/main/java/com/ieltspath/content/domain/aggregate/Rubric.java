@@ -19,18 +19,27 @@ public record Rubric(String code, String task, int version, String sourceNote, S
     }
 
     public record Criterion(String code, String name, String description, int sortOrder,
-                            List<BandDescriptor> bandDescriptors, UUID knowledgePointId) {
+                            List<BandDescriptor> bandDescriptors, UUID knowledgePointId,
+                            List<SubKnowledgePoint> subKnowledgePoints) {
         public Criterion {
             if (code == null || code.isBlank() || name == null || name.isBlank() || description == null
                     || description.isBlank() || sortOrder < 1) throw new IllegalArgumentException("Invalid rubric criterion");
             bandDescriptors = bandDescriptors == null ? List.of() : List.copyOf(bandDescriptors);
+            subKnowledgePoints = subKnowledgePoints == null ? List.of() : List.copyOf(subKnowledgePoints);
+        }
+
+        public Criterion(String code, String name, String description, int sortOrder,
+                         List<BandDescriptor> bandDescriptors, UUID knowledgePointId) {
+            this(code, name, description, sortOrder, bandDescriptors, knowledgePointId, List.of());
         }
 
         /** A criterion as authored; its knowledge point comes from the task mapping when the rubric is read. */
         public Criterion(String code, String name, String description, int sortOrder, List<BandDescriptor> bandDescriptors) {
-            this(code, name, description, sortOrder, bandDescriptors, null);
+            this(code, name, description, sortOrder, bandDescriptors, null, List.of());
         }
     }
+
+    public record SubKnowledgePoint(UUID id, String code, String name, String description) {}
 
     public record BandDescriptor(double band, String descriptor) {
         public BandDescriptor {

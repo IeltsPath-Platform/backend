@@ -342,7 +342,7 @@ Package publishing enforces one owner per `question_id` across its versions: any
 
 ## Error types (phase 3a)
 
-`GET /internal/learning-content/error-types` returns error types with both `status=ACTIVE` and `review_status=APPROVED` as a JSON array of `{"code","name","category","severity","fixHint"}`, ordered by code. Assessment reads it to refuse any error analysis code that is not in the reviewed catalogue (`422`, `details.code = UNKNOWN_ERROR_CODE`). `category` is one of `GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK`, `READING_STRATEGY`, `LISTENING_STRATEGY`, `SPELLING_NUMBER`. `severity` is 1 to 3. The public management endpoints are `GET`, `POST` and `PUT` under `/api/content/error-types`; the code cannot change after creation.
+`GET /internal/learning-content/error-types` returns error types with both `status=ACTIVE` and `review_status=APPROVED` as a JSON array of `{"code","name","category","severity","fixHint","knowledgePointId"}`, ordered by code. `knowledgePointId` is nullable and identifies the knowledge point linked to the error type when one is configured. Assessment reads it to refuse any error analysis code that is not in the reviewed catalogue (`422`, `details.code = UNKNOWN_ERROR_CODE`). `category` is one of `GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK`, `READING_STRATEGY`, `LISTENING_STRATEGY`, `SPELLING_NUMBER`. `severity` is 1 to 3. The public management endpoints are `GET`, `POST` and `PUT` under `/api/content/error-types`; the code cannot change after creation.
 
 ## Essay rubrics (phase 11)
 
@@ -378,8 +378,12 @@ The internal prompt projection is available to service callers using their forwa
 
 Each internal criterion also carries `knowledgePointId` (UUID, nullable, added 2026-10-21): the knowledge point that the
 criterion is evidence for, from `writing_criterion_knowledge_points` keyed by task and criterion code
-(`V69__writing_criterion_knowledge_points.sql`). It does not depend on the rubric version. Admin and public rubric
-responses do not include it.
+(`V69__writing_criterion_knowledge_points.sql`). It does not depend on the rubric version. The additive
+`subKnowledgePoints` field is an ordered array of `{id,code,name,description}` entries from
+`writing_criterion_sub_knowledge_points` (`V71__writing_criterion_sub_knowledge_points.sql`), filtered to active
+knowledge points; it is `[]` when the criterion has none. For example, Task 2's CC criterion returns
+`[{"id":"…","code":"DEMO_WRITING_TOPIC_SENTENCE","name":"…","description":"…"},{"id":"…","code":"DEMO_WRITING_LINKING","name":"…","description":"…"}]`.
+Admin and public rubric responses do not include criterion knowledge point mappings or sub-knowledge points.
 
 These projections are internal only. Gateway denies browser/client access to `/internal/**`; Learning and Assessment must
 not read Content's database directly. Rubric data is input to the grader and does not include answer keys.

@@ -29,7 +29,7 @@ public class InternalRubricController {
         return RubricPromptResponse.from(rubrics.byVersion(code, version));
     }
 
-    /** This shape is shared with the Learning and Assessment grading clients. */
+    /** This additive shape is shared with the Learning and Assessment grading clients. */
     public record RubricPromptResponse(String code, String task, int version, String sourceNote,
                                        List<CriterionResponse> criteria, List<ExampleResponse> examples) {
         static RubricPromptResponse from(Rubric rubric) {
@@ -40,11 +40,19 @@ public class InternalRubricController {
     }
 
     public record CriterionResponse(String code, String name, String description, int sortOrder,
-                                    List<BandDescriptorResponse> bandDescriptors, UUID knowledgePointId) {
+                                    List<BandDescriptorResponse> bandDescriptors, UUID knowledgePointId,
+                                    List<SubKnowledgePointResponse> subKnowledgePoints) {
         static CriterionResponse from(Rubric.Criterion criterion) {
             return new CriterionResponse(criterion.code(), criterion.name(), criterion.description(), criterion.sortOrder(),
                     criterion.bandDescriptors().stream().map(BandDescriptorResponse::from).toList(),
-                    criterion.knowledgePointId());
+                    criterion.knowledgePointId(), criterion.subKnowledgePoints().stream()
+                    .map(SubKnowledgePointResponse::from).toList());
+        }
+    }
+
+    public record SubKnowledgePointResponse(UUID id, String code, String name, String description) {
+        static SubKnowledgePointResponse from(Rubric.SubKnowledgePoint point) {
+            return new SubKnowledgePointResponse(point.id(), point.code(), point.name(), point.description());
         }
     }
 

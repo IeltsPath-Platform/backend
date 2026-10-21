@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -65,7 +66,8 @@ class RubricControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("IELTS_WRITING_TASK_1"))
                 .andExpect(jsonPath("$[0].status").value("ACTIVE"))
-                .andExpect(jsonPath("$[0].criteria[0].bandDescriptors[0].band").value(6.5));
+                .andExpect(jsonPath("$[0].criteria[0].bandDescriptors[0].band").value(6.5))
+                .andExpect(jsonPath("$[0].criteria[0].subKnowledgePoints").doesNotExist());
         mockMvc.perform(get("/api/content/admin/rubrics?task=TASK_1")).andExpect(status().isForbidden());
     }
 
@@ -86,6 +88,10 @@ class RubricControllerTest {
                 .andExpect(jsonPath("$.sourceNote").exists())
                 .andExpect(jsonPath("$.criteria[0].sortOrder").value(1))
                 .andExpect(jsonPath("$.criteria[0].bandDescriptors[0].descriptor").value("Descriptor"))
+                .andExpect(jsonPath("$.criteria[0].subKnowledgePoints[0].id").value("50000000-0000-4000-8000-000000000001"))
+                .andExpect(jsonPath("$.criteria[0].subKnowledgePoints[0].code").value("DEMO_WRITING_LINKING"))
+                .andExpect(jsonPath("$.criteria[0].subKnowledgePoints[0].name").value("Linking"))
+                .andExpect(jsonPath("$.criteria[0].subKnowledgePoints[0].description").value("Connect ideas"))
                 .andExpect(jsonPath("$.examples[0].essay").value("Example essay"))
                 .andExpect(jsonPath("$.status").doesNotExist());
 
@@ -105,7 +111,9 @@ class RubricControllerTest {
     private static Rubric activeRubric() {
         return new Rubric("IELTS_WRITING_TASK_1", "TASK_1", 1, "Source note", "ACTIVE",
                 List.of(new Rubric.Criterion("TA", "Task Achievement", "Description", 1,
-                        List.of(new Rubric.BandDescriptor(6.5, "Descriptor")))),
+                        List.of(new Rubric.BandDescriptor(6.5, "Descriptor")), null,
+                        List.of(new Rubric.SubKnowledgePoint(UUID.fromString("50000000-0000-4000-8000-000000000001"),
+                                "DEMO_WRITING_LINKING", "Linking", "Connect ideas")))),
                 List.of(new Rubric.Example(6.5, "Prompt", "Example essay", "Commentary")));
     }
 
