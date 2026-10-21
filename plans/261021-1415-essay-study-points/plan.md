@@ -7,7 +7,7 @@ effort: "2.5d"
 branch: "fix/learn-writing-skill"
 tags: [learning-service, frontend, writing, essay-feedback]
 blockedBy: []
-blocks: []
+blocks: [261021-2016-writing-criterion-sub-kp-judgments]
 created: "2026-10-21T07:15:00.000Z"
 revised: "2026-10-21"
 createdBy: "ck:plan"

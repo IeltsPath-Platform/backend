@@ -7,7 +7,7 @@ effort: "2.25d"
 branch: "fix/learn-writing-skill"
 tags: [content-service, learning-service, mastery, writing]
 blockedBy: []
-blocks: []
+blocks: [261021-2016-writing-criterion-sub-kp-judgments]
 created: "2026-10-20T18:07:41.859Z"
 revised: "2026-10-21"
 createdBy: "ck:plan"
