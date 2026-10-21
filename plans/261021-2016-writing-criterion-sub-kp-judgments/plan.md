@@ -1,6 +1,6 @@
 ---
 title: "Writing: KP con theo tiêu chí và đánh giá từng KP có dẫn chứng"
-description: "Tiêu chí CC có KP con; lần gọi LLM thứ hai đánh giá PASS/FAIL/NOT_ASSESSED từng KP con kèm đoạn trích có thật; evidence, study point và UI theo KP con."
+description: "Tiêu chí CC có KP con; LLM đánh giá PASS/FAIL/NOT_ASSESSED từng KP con kèm đoạn trích có thật trong cùng request chấm band; evidence, study point và UI theo KP con."
 status: in_progress
 priority: P2
 branch: "fix/learn-writing-skill"
@@ -14,17 +14,14 @@ source: skill
 
 # Writing: KP con theo tiêu chí và đánh giá từng KP có dẫn chứng
 
-> **Cập nhật 2026-10-22 — triển khai đã đi theo thiết kế khác.** Code thực tế đánh giá KP con trong **cùng một request LLM**
-> với band (`judgmentVersion = kpj2`, template `essay-kp-judgment-v2.txt` nối vào template band `v1`), không còn lần gọi thứ
-> hai, không có `judgment-timeout-seconds` / `judgment-skip-after-seconds`, và client LLM **không còn** retry sửa JSON hay retry
-> 429/503 (JSON hoặc band sai là `INVALID_GRADE`, không thu points). Các đoạn dưới đây mô tả lần gọi thứ hai, `kpj1`, ngân sách
-> 12 s / 25 s và `completeJsonQuick` là **thiết kế ban đầu, không còn đúng**; nguồn đúng là code và `AGENTS.md` mục 3.8.
-> Phần dữ kiện đã kiểm chứng, mapping KP, hợp đồng JSON và luật kiểm tra judgment vẫn đúng.
+> **Lịch sử thiết kế.** Thiết kế ban đầu dùng một lần gọi LLM thứ hai cho KP con. Ngày 2026-10-22 đổi sang **một request**
+> duy nhất (đánh giá KP con trong cùng request chấm band, `judgmentVersion = kpj2`) theo yêu cầu "gọi một lần thôi". Plan này
+> mô tả thiết kế cuối; không còn lần gọi thứ hai, `kpj1`, `completeJsonQuick` hay cấu hình `judgment-*`.
 
 ## Overview
 
 Band CC thấp hiện chỉ sinh 1 evidence sai cho KP tiêu chí và 1 study point chung. Plan này thêm KP con cho tiêu chí **CC**,
-một lần gọi LLM thứ hai đánh giá từng KP con (`PASS` / `FAIL` / `NOT_ASSESSED`, bắt buộc kèm đoạn trích có thật trong bài),
+LLM đánh giá từng KP con (`PASS` / `FAIL` / `NOT_ASSESSED`, bắt buộc kèm đoạn trích có thật trong bài) ngay trong request chấm band,
 kiểm tra chéo với correction, rồi ghi evidence và study point theo KP con. KP tiêu chí (`DEMO_WRITING_CRITERION_*`) giữ
 nguyên cách ghi theo band. Thiết kế tổng quát cho mọi tiêu chí (bảng + code không riêng CC); đợt này chỉ seed CC vì chỉ CC
 có KP con thật dùng được (xem "Dữ kiện đã kiểm chứng").
@@ -39,7 +36,7 @@ Chế độ `--tdd`: mỗi phase viết test trước, chạy thấy đỏ đún
 | Phase | Name | Repo | Status |
 |-------|------|------|--------|
 | 1 | [Content: bảng KP con, API rubric/error type, hợp đồng](./phase-01-content-sub-kp-mapping-and-api.md) | backend | Complete |
-| 2 | [Learning: lần gọi đánh giá KP, luật kiểm tra, evidence, response, tài liệu](./phase-02-learning-kp-judgment-and-evidence.md) | backend | Complete |
+| 2 | [Learning: một request chấm band và KP con, luật kiểm tra, evidence, response, tài liệu](./phase-02-learning-kp-judgment-and-evidence.md) | backend | Complete |
 | 3 | [Frontend: hiển thị đánh giá KP con và nút Luyện tập](./phase-03-frontend-sub-kp-display.md) | frontend | Complete |
 
 Thứ tự bắt buộc 1 → 2 → 3. Phase 3 có thể bắt đầu khi phase 2 đã chốt hợp đồng JSON (mục dưới, không đổi nữa).
@@ -77,11 +74,12 @@ trong `JdbcLearningContentReader`).
    - TASK_2 / CC → `DEMO_WRITING_TOPIC_SENTENCE` (sort 1), `DEMO_WRITING_LINKING` (sort 2)
    Không tạo KP mới, không viết bộ luyện mới, không dùng KP của course INACTIVE.
 4. Phạm vi: Learning backend + UI study points. Grader Assessment ngoài phạm vi.
-5. Lần gọi LLM thứ hai riêng, lỗi thì bỏ qua; prompt chấm band (`tplv1`), `promptVersion`, `ai_prompt_activations` không đổi.
-6. Ngân sách thời gian: internal JWT sống 60 s và được dùng cả cho bước trừ điểm (xem `WritingSettings`). Lần 2 timeout
-   `judgment-timeout-seconds = 12`, và **không gọi** nếu đã quá `judgment-skip-after-seconds = 25` kể từ lúc bắt đầu
-   `EssayGrader.grade` (trễ nhất kết thúc sau 37 s). Cập nhật so với 35 s đã hỏi ở validation: 35 + 12 = 47 s cộng thời gian
-   trước/sau chấm và trừ điểm sát giới hạn 60 s; 25 s giữ nguyên ý định "luôn dưới 60 s".
+5. **Một request LLM duy nhất** mỗi lần chấm: hướng dẫn KP con (`kpj2`) nối vào system prompt band `v1`, JSON trả thêm mảng
+   `judgments`. `promptVersion` (`+tplv1`), `ai_prompt_activations` và grader Assessment không đổi.
+6. **Không retry**: client không còn retry sửa JSON hay retry 429/503 (người dùng chọn giữ đúng một lần, ngày 2026-10-22).
+   JSON hoặc band sai là `INVALID_GRADE`, lỗi provider là `LLM_UNAVAILABLE`; không thu points. Timeout chung
+   `grading-timeout-seconds` (20 s). `judgmentVersion = kpj2` ghi bất cứ khi nào rubric có KP con (prompt đã nối),
+   kể cả khi mô hình không trả `judgments`.
 7. `LINKER_MISUSE.knowledge_point_id` đổi sang `DEMO_WRITING_LINKING` (đang trỏ `W60_PARAGRAPH_COHESION` thuộc topic INACTIVE).
 
 ## Hợp đồng JSON (chốt; phase 2 tạo, phase 3 dùng)
@@ -174,7 +172,7 @@ Mọi test khác ở các module Content, Learning, Assessment và frontend ph�
 - [ ] `mvn -q compile -DskipTests` toàn reactor.
 - [ ] Frontend: `npx vitest run` các file đã sửa, `npm run typecheck`, `npm run lint`.
 - [ ] Mỗi mục "Tiêu chí nghiệm thu" dưới đây có test hoặc ghi rõ chưa kiểm.
-- [ ] Đo thời gian: với `LlmClient` giả trễ 20 s cho lần 1 thì lần 2 vẫn được gọi; trễ 26 s thì không gọi (test bằng Clock giả, không sleep thật).
+- [ ] Chấm có KP con chỉ gửi đúng một request tới LLM (`EssayGraderTest`); JSON/band sai và lỗi provider không gọi lại.
 - [ ] Kiểm thủ công nếu có LLM cấu hình (`LEARNING_LLM_*`): 1 essay Task 2 có từ nối sai → có `KNOWLEDGE_POINT` cho `DEMO_WRITING_LINKING`. Nếu không chạy được, ghi "chưa kiểm thủ công".
 - [ ] `docker compose config --quiet` không bị ảnh hưởng (không đổi compose).
 
@@ -185,7 +183,7 @@ Mọi test khác ở các module Content, Learning, Assessment và frontend ph�
 2. `PASS` không có excerpt, hoặc excerpt không có nguyên văn trong essay → `NOT_ASSESSED`, không có dòng evidence.
 3. KP con không được LLM nhắc → `NOT_ASSESSED`, không evidence, mastery không đổi.
 4. Có correction hợp lệ mà error type của nó trỏ tới KP con: LLM nói `PASS` → hạ `NOT_ASSESSED`; LLM nói `NOT_ASSESSED` hoặc im lặng → `FAIL` kèm excerpt của correction (chỉ kiểm bằng fixture error type APPROVED).
-5. Lần gọi 2 lỗi / hết hạn / JSON hỏng / `completeJsonQuick` trả null / đã quá 25 s → bài vẫn `GRADED`, band và `promptVersion` y như không có tính năng, chỉ còn judgment suy từ correction.
+5. Judgments thiếu hoặc sai kiểu → band và `promptVersion` giữ nguyên, KP `NOT_ASSESSED` (cộng `FAIL` từ correction hợp lệ). JSON/band sai hoặc lỗi provider → không gọi lại, mã lỗi an toàn, không thu points.
 6. KP tiêu chí vẫn nhận evidence theo band; mọi test hiện có của `WritingEvidenceRuleTest`, `EssayGraderTest`, `LessonWritingIntegrationTest`, `PracticeEssayIntegrationTest` vẫn xanh.
 7. Grade cũ trong DB đọc lại không lỗi: `knowledgePointJudgments = []`, không study point `KNOWLEDGE_POINT`.
 8. KP con không có evidence `NOT_ASSESSED` không bị đánh dấu yếu ở UI: nhãn trung tính "Chưa đủ bằng chứng".
@@ -196,7 +194,8 @@ Mọi test khác ở các module Content, Learning, Assessment và frontend ph�
 - KP con cho TA/TR/LR/GRA: cần KP ACTIVE trong course ACTIVE **và** có bộ luyện. Hiện có sẵn `DEMO_READING_W1_CHART` (TA), `DEMO_READING_W2_OPINION` (TR), `DEMO_WRITING_TREND_LANGUAGE` (LR Task 1); chưa có cho GRA. Thêm chỉ cần migration dữ liệu vào bảng V71.
 - KP "Từ tham chiếu" + 3 bộ luyện (cần giám khảo IELTS duyệt nội dung).
 - Chuyên gia duyệt error type (`review_status = APPROVED`) để kiểm tra chéo chạy thật.
-- Gold set do giám khảo chấm để đo độ chính xác của `kpj1`.
+- Gold set do giám khảo chấm để đo độ chính xác của `kpj2` và chất lượng band với prompt mở rộng.
+- Khôi phục retry JSON band (chỉ gọi thêm khi bản đầu hỏng) nếu tỷ lệ `INVALID_GRADE`/`LLM_UNAVAILABLE` cao khi chạy thật.
 - Trang kết quả standalone chưa render study points.
 
 ## Dependencies
@@ -220,3 +219,11 @@ Kiểm lại bằng cách áp thật migration V1–V70 lên Postgres tạm. Hai
 - Course 5.5 đã có sẵn `DEMO_WRITING_LINKING` và `DEMO_WRITING_TOPIC_SENTENCE` với 5 bộ luyện mỗi KP, nên **không cần tạo KP mới hay viết bộ luyện**.
 Thay đổi: gộp 7 phase còn 3; bỏ KP mới `WRITING_CC_*` và phase bộ luyện; mapping đợt này chỉ CC (3 dòng); `judgment-skip-after-seconds` hạ từ 35 xuống 25 (JWT 60 s dùng chung với bước trừ điểm).
 Whole-plan consistency sweep: đã đọc lại plan.md và 3 phase; không còn tham chiếu `G55_*`, `V55_*`, `W70_*`, `WRITING_CC_*`, "phase 4 bộ luyện" ngoài các câu giải thích lý do loại bỏ. Unresolved contradictions: 0.
+
+### Session 3 — 2026-10-22 (đổi sang một request)
+
+- Người dùng yêu cầu gọi LLM một lần: đánh giá KP con nằm trong request chấm band (`kpj2`); bỏ lần gọi thứ hai, `completeJsonQuick`,
+  cấu hình `judgment-*`. Người dùng chọn giữ không retry (kể cả retry JSON band và 429/503 có từ trước).
+- Review code: đúng một chỗ gọi `llm.completeJson` trong luồng chấm; test xác nhận một request khi có KP con.
+- Sửa sau review: `judgmentVersion = kpj2` ghi khi rubric có KP con dù mô hình không trả `judgments`; bỏ tham số `lowReasoning`
+  không còn dùng; bỏ nhắc `kpj1` (chưa từng phát hành); viết lại phase 2 theo thiết kế cuối, gộp và xóa phase 4.
