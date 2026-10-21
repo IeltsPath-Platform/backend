@@ -21,8 +21,11 @@ public class CreateWordlyRoomUseCase {
     private final GameRoomRepository rooms;
     private final CurrentPlayerProfile profile;
     private final OutboxWriter outbox;
+    private final WordlyRoomAdmission admission;
 
-    public CreateWordlyRoomUseCase(GameRoomRepository rooms, OutboxWriter outbox, CurrentPlayerProfile profile) {
+    public CreateWordlyRoomUseCase(GameRoomRepository rooms, OutboxWriter outbox, CurrentPlayerProfile profile,
+                                   WordlyRoomAdmission admission) {
+        this.admission = admission;
         this.profile = profile;
         this.rooms = rooms;
         this.outbox = outbox;
@@ -30,6 +33,7 @@ public class CreateWordlyRoomUseCase {
 
     @Transactional
     public GameRoomResult execute(CreateWordlyRoomCommand command) {
+        admission.requireNoActiveGame(command.hostUserId());
         String code = availableCode();
         var room = GameRoom.wordly(UUID.randomUUID(), code, command.hostUserId(), command.settings(), Instant.now());
         room.setMemberDisplayName(command.hostUserId(), profile.displayName());
