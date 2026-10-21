@@ -39,10 +39,10 @@ public class EssayKnowledgeJudge {
                 .toList();
         if (candidates.isEmpty()) return grade;
 
+        // The prompt carried the extension for these points, so the version is recorded even when the model
+        // returned no judgments.
         List<KnowledgeJudgmentRule.Raw> raws = List.of();
-        String version = null;
         if (entries != null && entries.isArray()) {
-            version = VERSION;
             List<KnowledgeJudgmentRule.Raw> parsed = new ArrayList<>();
             for (JsonNode entry : entries) {
                 if (!entry.isObject()) continue;
@@ -87,7 +87,7 @@ public class EssayKnowledgeJudge {
             return parentPoints.get(judgmentCriterion(candidates, judgment));
         });
         return new WritingGrade(gradeCriteria, grade.corrections(), grade.summary(), grade.overallBand(), studyPoints,
-                version);
+                VERSION);
     }
 
     static String prompt(WritingTask task, List<RubricCriterion> criteria) {

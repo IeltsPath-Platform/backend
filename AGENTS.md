@@ -227,8 +227,8 @@ src/main/java/com/ieltspath/<service>
   lấy khi cần qua supplier do grader cung cấp, tối đa một lần. Không có call
   sửa JSON hay HTTP retry tự động cho 429/503; JSON/band sai là `INVALID_GRADE`, không thu points. Timeout chung
   `learning.writing.grading-timeout-seconds` mặc định 20 giây, không còn timeout/skip riêng cho judgment; quota một lượt.
-  `promptVersion` vẫn `+tplv1` cho activation band; `judgmentVersion=kpj2` chỉ ở JSON lưu khi có KP con và nhận mảng judgments,
-  còn lại null; `kpj1` chỉ còn trong bài lịch sử. Không có KP con thì không cần mảng judgments.
+  `promptVersion` vẫn `+tplv1` cho activation band; `judgmentVersion=kpj2` ở JSON lưu bất cứ khi nào rubric có KP con (prompt đã nối hướng dẫn),
+  kể cả khi mô hình không trả mảng judgments; không có KP con thì null và không cần mảng judgments.
   API không phát `judgmentVersion`. KP tiêu chí / KP con lưu trong JSON grade; bài cũ chưa có judgments đọc thành `[]`.
   Event essay vẫn một dòng cho KP của đề, `error_code` là mã lỗi gặp nhiều nhất. Bằng chứng tiêu chí và KP con của essay
   Practice không được XP mốc; Writing vẫn không sinh bài ôn. Mỗi KP tiêu chí có 3 bộ luyện tự do demo (`PS-WCR-*`, V70;

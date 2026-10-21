@@ -134,12 +134,12 @@ class EssayKnowledgeJudgeTest {
             entries = json.readTree(payload);
             var result = apply(rubric, base, Map.of(), Map::of);
             assertEquals(base.overallBand(), result.overallBand());
-            assertNull(result.judgmentVersion());
+            assertEquals("kpj2", result.judgmentVersion());
             assertEquals(WritingGrade.Judgment.NOT_ASSESSED, result.criteria().getFirst().knowledgePointJudgments().getFirst().judgment());
             assertTrue(result.studyPoints().isEmpty());
         }
         entries = null;
-        assertNull(apply(rubric, base, Map.of(), Map::of).judgmentVersion());
+        assertEquals("kpj2", apply(rubric, base, Map.of(), Map::of).judgmentVersion());
     }
 
     @Test
@@ -157,7 +157,7 @@ class EssayKnowledgeJudgeTest {
         var result = apply(List.of(criterion(List.of(new LearningContentClient.SubKnowledgePoint(LINKING, "LINKING", "Linking", null)))), base,
                 Map.of("LINKER", new LearningContentClient.ErrorType("LINKER", "Linker error", "COHERENCE", 2, "Use a clear linker", LINKING)), Map::of);
         assertEquals(WritingGrade.Judgment.FAIL, result.criteria().getFirst().knowledgePointJudgments().getFirst().judgment());
-        assertNull(result.judgmentVersion());
+        assertEquals("kpj2", result.judgmentVersion());
     }
 
     @Test

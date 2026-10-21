@@ -47,8 +47,8 @@ do mô hình tự tạo làm bằng chứng lỗi.
 Learning gửi đúng một request LLM cho mỗi lần thực thi chấm: giữ nguyên template band `v1`, nối hướng dẫn
 `essay-kp-judgment-v2` (`kpj2`) để cùng JSON trả `criteria`, `corrections`, `summary`, `focus` và `judgments` cho các KP
 con trong rubric; rubric không có KP con thì không cần `judgments`. `prompt_version` (`+tplv1`) và activation vẫn nhận
-diện template band; `judgmentVersion=kpj2` chỉ lưu trong JSON grade khi có KP con và nhận mảng `judgments`, không phát
-qua API. Thiếu/sai kiểu mảng thì version để null; `kpj1` chỉ còn trong grade lịch sử. Mỗi lần chấm dùng một lượt quota ngày và
+diện template band; `judgmentVersion=kpj2` lưu trong JSON grade bất cứ khi nào rubric có KP con (prompt đã nối hướng dẫn), kể cả khi
+mô hình không trả mảng `judgments`; không có KP con thì version null. Không phát qua API. Mỗi lần chấm dùng một lượt quota ngày và
 timeout chung `learning.writing.grading-timeout-seconds` (mặc định 20 giây); không có timeout/skip riêng cho KP.
 Không gọi AI sửa JSON hoặc tự gửi lại HTTP khi provider trả 429/503. JSON hoặc band không hợp lệ gây `INVALID_GRADE`,
 không thu points. Khi band hợp lệ nhưng `judgments` thiếu/sai, giữ band và để KP `NOT_ASSESSED`, trừ `FAIL` có thể suy ra

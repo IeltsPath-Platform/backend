@@ -100,9 +100,9 @@ Each judgment has `knowledgePointId`, `code`, `name`, and `judgment` (`PASS`, `F
 when no evidence is available. When the rubric lists sub-points, Learning appends `essay-kp-judgment-v2` instructions to
 the unchanged band template `v1`; one response supplies `criteria`, `corrections`, `summary`, `focus` and `judgments`.
 Rubrics without sub-points do not require `judgments`. `promptVersion` remains
-`<rubricCode>@<rubricVersion>+tplv1` for band activation; internal grade JSON stores `judgmentVersion=kpj2` when sub-points
-exist and the response contains a judgments array, otherwise null. This version is not exposed by the API.
-Historical `kpj1` grades remain readable. `EssayKnowledgeJudge` validates the received data without LLM or clock
+`<rubricCode>@<rubricVersion>+tplv1` for band activation; internal grade JSON stores `judgmentVersion=kpj2` whenever the rubric has
+sub-points (the prompt was extended), even if the response has no judgments array, otherwise null. This version is not
+exposed by the API. `EssayKnowledgeJudge` validates the received data without LLM or clock
 dependencies; the grader supplies a lazy Content catalog, loaded at most once when needed for practice targets.
 Missing or malformed judgments preserve a valid band and leave the affected model
 judgments `NOT_ASSESSED`; validated corrections whose active error type maps to a knowledge point can still produce
