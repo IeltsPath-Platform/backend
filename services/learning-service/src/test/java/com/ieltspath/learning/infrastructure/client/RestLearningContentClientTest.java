@@ -59,13 +59,16 @@ class RestLearningContentClientTest {
                 .andRespond(withSuccess("""
                         {"code":"IELTS_WRITING","task":"TASK_2","version":2,"sourceNote":"Public descriptors",
                          "criteria":[{"code":"TR","name":"Task Response","description":"Evaluate the response",
-                           "sortOrder":1,"bandDescriptors":[{"band":6.0,"descriptor":"Addresses the task."}]}],
+                           "sortOrder":1,"bandDescriptors":[{"band":6.0,"descriptor":"Addresses the task."}],
+                           "subKnowledgePoints":[{"id":"20000000-0000-4000-8000-000000000003",
+                             "code":"TOPIC_SENTENCE","name":"Topic sentence","description":"Clear opening"}]}],
                          "examples":[{"band":6.0,"prompt":"Question","essay":"Original essay","commentary":"Reason"}]}
                         """, MediaType.APPLICATION_JSON));
         server.expect(requestTo(INTERNAL_PATH + "/error-types"))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("""
-                        [{"code":"GRAMMAR","name":"Grammar","category":"GRAMMAR","severity":1,"fixHint":"Check tense."}]
+                        [{"code":"GRAMMAR","name":"Grammar","category":"GRAMMAR","severity":1,"fixHint":"Check tense.",
+                          "knowledgePointId":"20000000-0000-4000-8000-000000000003"}]
                         """, MediaType.APPLICATION_JSON));
 
         var rubric = client.getActiveRubric("TASK_2");
@@ -74,7 +77,19 @@ class RestLearningContentClientTest {
         assertEquals("IELTS_WRITING", rubric.code());
         assertEquals(2, rubric.version());
         assertEquals(new BigDecimal("6.0"), rubric.criteria().getFirst().bandDescriptors().getFirst().band());
+        assertEquals("TOPIC_SENTENCE", rubric.criteria().getFirst().subKnowledgePoints().getFirst().code());
         assertEquals("GRAMMAR", errors.getFirst().code());
+        assertEquals(UUID.fromString("20000000-0000-4000-8000-000000000003"), errors.getFirst().knowledgePointId());
+    }
+
+    @Test
+    void oldRubricJsonWithoutSubKnowledgePointsReadsAsEmpty() {
+        server.expect(requestTo(INTERNAL_PATH + "/rubrics/IELTS_WRITING/1"))
+                .andRespond(withSuccess("""
+                        {"code":"IELTS_WRITING","task":"TASK_2","version":1,"sourceNote":"source",
+                         "criteria":[{"code":"CC","name":"CC","description":"","sortOrder":1}],"examples":[]}
+                        """, MediaType.APPLICATION_JSON));
+        assertEquals(List.of(), client.getRubricVersion("IELTS_WRITING", 1).criteria().getFirst().subKnowledgePoints());
     }
 
     @Test

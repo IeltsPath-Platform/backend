@@ -377,10 +377,10 @@ class LessonPipelineSeedTest {
         assertThat(sequence).extracting(TopicSequenceResult::skill)
                 .containsExactly(Skill.LISTENING, Skill.LISTENING, Skill.READING, Skill.READING, Skill.READING, Skill.READING,
                         Skill.READING, Skill.WRITING, Skill.WRITING, null);
-        // Writing topics have no final test; a learner passes them by completing their lessons. The multi-skill topic
+        // The Writing 6.5 topic has no final test; a learner passes it by completing its lessons. The multi-skill topic
         // has no single skill and comes last.
         assertThat(sequence).extracting(TopicSequenceResult::hasTopicTest)
-                .containsExactly(true, true, true, true, true, true, true, false, false, true);
+                .containsExactly(true, true, true, true, true, true, true, true, false, true);
         // The lower-band Reading course keeps its paid topics after its free topics.
         assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
                 .containsExactly(null, null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT", null, null, null, null);
@@ -392,10 +392,15 @@ class LessonPipelineSeedTest {
                 .containsExactly("DEMO_READING_MAIN_IDEA", "DR_IDEA_OR_DETAIL", "DR_TOPIC_SENTENCE",
                         "DR_MATCHING_HEADINGS");
         assertThat(reading.knowledgePoints()).allMatch(TopicSequenceResult.KnowledgePointEntry::hasPracticeSet);
-        // The Writing knowledge points moved with their essays and have no practice set.
+        // The Writing knowledge points moved with their essays; the three added later and the five rubric-criterion
+        // points have practice sets.
         assertThat(topic(sequence, "DEMO_WRITING").knowledgePoints())
                 .extracting(TopicSequenceResult.KnowledgePointEntry::code, TopicSequenceResult.KnowledgePointEntry::hasPracticeSet)
-                .containsExactly(tuple("DEMO_READING_W2_OPINION", false), tuple("DEMO_READING_W1_CHART", false));
+                .containsExactly(tuple("DEMO_READING_W2_OPINION", true), tuple("DEMO_READING_W1_CHART", true),
+                        tuple("DEMO_WRITING_TOPIC_SENTENCE", true), tuple("DEMO_WRITING_LINKING", true),
+                        tuple("DEMO_WRITING_TREND_LANGUAGE", true), tuple("DEMO_WRITING_CRITERION_TA", true),
+                        tuple("DEMO_WRITING_CRITERION_TR", true), tuple("DEMO_WRITING_CRITERION_CC", true),
+                        tuple("DEMO_WRITING_CRITERION_LR", true), tuple("DEMO_WRITING_CRITERION_GRA", true));
         assertThat(topic(sequence, "TFNG_SKILLS").knowledgePoints()).singleElement()
                 .satisfies(kp -> {
                     assertThat(kp.code()).isEqualTo("TFNG_FALSE_VS_NOT_GIVEN");
@@ -408,10 +413,13 @@ class LessonPipelineSeedTest {
     void writingEssaysMovedToTheirOwnTopicKeepingTheirBlockIds() {
         UUID w1 = lessonId("W1");
         UUID w2 = lessonId("W2");
+        // The essay blocks keep their ids; each lesson later gained an auto-graded exercise block after its essay.
         assertThat(blockIds(w1)).containsExactly(UUID.fromString("22000000-0000-4000-8000-040000000001"),
-                UUID.fromString("22000000-0000-4000-8000-040000000002"));
+                UUID.fromString("22000000-0000-4000-8000-040000000002"),
+                UUID.fromString("35000000-0000-4000-8000-040000000001"));
         assertThat(blockIds(w2)).containsExactly(UUID.fromString("21000000-0000-4000-8000-040000000001"),
-                UUID.fromString("21000000-0000-4000-8000-040000000002"));
+                UUID.fromString("21000000-0000-4000-8000-040000000002"),
+                UUID.fromString("35000000-0000-4000-8000-040000000002"));
         assertThat(reader.publishedLesson(w1).orElseThrow().knowledgePointIds())
                 .containsExactly(kpId("DEMO_READING_W1_CHART"));
         assertThat(reader.publishedLesson(w2).orElseThrow().knowledgePointIds())
@@ -555,7 +563,12 @@ class LessonPipelineSeedTest {
                 Map.entry("R65-PS-INFERENCE", "R65-I1"), Map.entry("R65-PS-PARAPHRASE", "R65-I1"),
                 Map.entry("L65-PS-CORRECTION", "L65-1"), Map.entry("L65-PS-PURPOSE", "L65-1"),
                 Map.entry("TR-PS-READING", "T1"), Map.entry("TR-PS-LISTENING", "T1"), Map.entry("TR-PS-WRITING", "T1"),
-                Map.entry("TR-PS-MIXED", "T1"), Map.entry("TR-PS-T2-READING", "T2"))));
+                Map.entry("TR-PS-MIXED", "T1"), Map.entry("TR-PS-T2-READING", "T2"),
+                Map.entry("PS-W1-WR-1", "W1"), Map.entry("PS-W1-WR-2", "W1"), Map.entry("PS-W1-WR-3", "W1"),
+                Map.entry("PS-W2-WR-1", "W2"), Map.entry("PS-W2-WR-2", "W2"),
+                Map.entry("PS-W3-WR-1", "W3"), Map.entry("PS-W3-WR-2", "W3"),
+                Map.entry("PS-W4-WR-1", "W4"), Map.entry("PS-W4-WR-2", "W4"),
+                Map.entry("PS-W5-WR-1", "W5"), Map.entry("PS-W5-WR-2", "W5"))));
         // The one-question V4 demo package is too small to be anyone's Practice.
         assertThat(jdbc.queryForObject("SELECT lesson_id FROM content_packages WHERE code = 'DEMO_MAIN_FLOW_READING'",
                 Map.of(), UUID.class)).isNull();
@@ -572,8 +585,75 @@ class LessonPipelineSeedTest {
                   AND NOT EXISTS (SELECT 1 FROM content_packages p WHERE p.lesson_id = l.id AND p.status = 'PUBLISHED')
                 """, Map.of(), String.class);
         assertThat(withoutPractice).isEmpty();
-        // Writing lessons belong to a topic without a final test and need no Practice.
-        assertThat(reader.lessonPracticeSets(lessonId("W1"))).isEmpty();
+        // The Writing chapter has a final test and course essay practice sets for each of its lessons.
+        assertThat(reader.lessonPracticeSets(lessonId("W1"))).extracting(LessonPracticeSetResult::code)
+                .containsExactly("PS-W1-WR-1", "PS-W1-WR-2", "PS-W1-WR-3");
+    }
+
+    @Test
+    void courseWritingGuidesHaveVocabularyAndTheNewTablePromptHasAValidChartReference() {
+        List<Map<String, Object>> guides = jdbc.queryForList("""
+                SELECT p.code, qv.guide
+                FROM content_packages p
+                JOIN content_sections s ON s.package_version_id = p.current_published_version_id
+                JOIN section_questions sq ON sq.section_id = s.id
+                JOIN question_versions qv ON qv.id = sq.question_version_id
+                WHERE p.code LIKE 'PS-W%-WR-%'
+                ORDER BY p.code
+                """, Map.of());
+        assertThat(guides).hasSize(11).allSatisfy(row -> {
+            String guide = (String) row.get("guide");
+            assertThat(guide).contains("## 6.", "## 7.");
+        });
+
+        String newGuide = (String) guides.stream().filter(row -> row.get("code").equals("PS-W1-WR-3"))
+                .findFirst().orElseThrow().get("guide");
+        assertThat(newGuide.lines()).allSatisfy(line -> {
+            assertThat(line).doesNotStartWith("###");
+            assertThat(line.chars().filter(character -> character == '*').count() % 2).isZero();
+            assertThat(line.replace("**", "")).doesNotContain("*");
+        });
+        List<String> taskOneGuides = List.of("PS-W1-WR-1", "PS-W1-WR-2", "PS-W5-WR-1", "PS-W5-WR-2");
+        for (String code : taskOneGuides) {
+            String guide = (String) guides.stream().filter(row -> row.get("code").equals(code))
+                    .findFirst().orElseThrow().get("guide");
+            assertThat(guide).contains("- **Body 1, câu 1:**");
+        }
+
+        List<Map<String, Object>> chart = jdbc.queryForList("""
+                SELECT a.asset_type, a.media_reference
+                FROM content_packages p
+                JOIN content_sections s ON s.package_version_id = p.current_published_version_id
+                JOIN section_questions sq ON sq.section_id = s.id
+                JOIN content_asset_links al ON al.question_version_id = sq.question_version_id
+                JOIN content_assets a ON a.id = al.asset_id
+                WHERE p.code = 'PS-W1-WR-3'
+                """, Map.of());
+        assertThat(chart).singleElement().satisfies(row -> {
+            assertThat(row.get("asset_type")).isEqualTo("IMAGE");
+            String mediaReference = (String) row.get("media_reference");
+            assertThat(mediaReference).isEqualTo("https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W1-WR-3/ps-w1-wr-3-marriage-age.png");
+            assertThat(MEDIA.resolve(AssetType.IMAGE, mediaReference)).isEqualTo(mediaReference);
+        });
+    }
+
+    @Test
+    void existingCourseWritingChartReferencesRemainOnTheirV65Paths() {
+        Map<String, String> chartUrls = new java.util.TreeMap<>();
+        jdbc.queryForList("""
+                SELECT p.code, a.media_reference
+                FROM content_packages p
+                JOIN content_sections s ON s.package_version_id = p.current_published_version_id
+                JOIN section_questions sq ON sq.section_id = s.id
+                JOIN content_asset_links al ON al.question_version_id = sq.question_version_id
+                JOIN content_assets a ON a.id = al.asset_id
+                WHERE p.code IN ('PS-W1-WR-1', 'PS-W1-WR-2', 'PS-W5-WR-1', 'PS-W5-WR-2')
+                """, Map.of()).forEach(row -> chartUrls.put((String) row.get("code"), (String) row.get("media_reference")));
+        assertThat(chartUrls).isEqualTo(Map.of(
+                "PS-W1-WR-1", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W1-WR-1/ps-w1-wr-1-car-ownership.png",
+                "PS-W1-WR-2", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W1-WR-2/ps-w1-wr-2-family-spending.png",
+                "PS-W5-WR-1", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W5-WR-1/ps-w5-wr-1-park-visitors.png",
+                "PS-W5-WR-2", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W5-WR-2/ps-w5-wr-2-fuel-prices.png"));
     }
 
     @Test

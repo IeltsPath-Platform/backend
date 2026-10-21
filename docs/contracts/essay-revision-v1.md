@@ -6,7 +6,10 @@ essay result, side-by-side comparison, band per version chart.
 ## `POST /api/learning/writing-submissions/{id}/revisions`
 
 Role `CUSTOMER`, own essays only. Body as the lesson essay submission: `{ "requestId": "…", "essayText": "…" }`. The
-response is the usual essay result (`lesson-writing-v1`) of the new version.
+response is the usual [essay result](lesson-writing-v1.md) of the new version, including `studyPoints` for a graded
+revision. Criterion points describe mapped criteria below the prompt's pass band, weakest first; AI points follow
+from the model's focus. Details are captured once at grading time and stored with each version; older grades return
+an empty array. The fields and null-omission rules are defined in that essay contract. History below remains unchanged.
 
 - The revision goes through the existing essay flow: validation, balance check, daily limit, LLM grading, point charge and
   `requestId` idempotency. The grader gets the same prompt and rubric; it is **not** told about the earlier version or its

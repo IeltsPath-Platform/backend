@@ -82,6 +82,33 @@ class PracticeSetCoverageMigrationTest {
     }
 
     @Test
+    void eachCriterionKnowledgePointHasThreeFreeStandingSetsOfThreeQuestions() {
+        var sets = jdbc.queryForList("SELECT kp.code, p.code AS package_code, p.topic_id, p.lesson_id, "
+                + "count(sq.id) AS questions, "
+                + "count(sq.id) FILTER (WHERE qv.status = 'PUBLISHED' AND qv.difficulty IS NOT NULL "
+                + "AND qkp.knowledge_point_id = kp.id) AS valid "
+                + "FROM content_packages p JOIN content_sections s ON s.package_version_id = p.current_published_version_id "
+                + "JOIN section_questions sq ON sq.section_id = s.id "
+                + "JOIN question_versions qv ON qv.id = sq.question_version_id "
+                + "JOIN question_knowledge_points qkp ON qkp.question_version_id = qv.id "
+                + "JOIN knowledge_points kp ON kp.code LIKE 'DEMO_WRITING_CRITERION_%' AND kp.id = qkp.knowledge_point_id "
+                + "WHERE p.code LIKE 'PS-WCR-%' GROUP BY kp.code, p.code, p.topic_id, p.lesson_id",
+                Collections.emptyMap());
+
+        assertThat(sets).hasSize(15);
+        assertThat(sets).allSatisfy(set -> {
+            assertThat(set.get("topic_id")).isNull();
+            assertThat(set.get("lesson_id")).isNull();
+            assertThat(set.get("questions")).isEqualTo(3L);
+            assertThat(set.get("valid")).isEqualTo(3L);
+        });
+        assertThat(sets.stream().collect(Collectors.groupingBy(set -> (String) set.get("code"), Collectors.counting())))
+                .containsOnlyKeys("DEMO_WRITING_CRITERION_TA", "DEMO_WRITING_CRITERION_TR", "DEMO_WRITING_CRITERION_CC",
+                        "DEMO_WRITING_CRITERION_LR", "DEMO_WRITING_CRITERION_GRA")
+                .allSatisfy((code, total) -> assertThat(total).isEqualTo(3L));
+    }
+
+    @Test
     void answerSpecsMatchTheirQuestionType() throws Exception {
         var rows = jdbc.queryForList("SELECT q.question_type, qv.options::text AS options, qv.answer_spec::text AS spec "
                 + "FROM question_versions qv JOIN questions q ON q.id = qv.question_id "

@@ -9,9 +9,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * {@code learning.writing.*}. Each LLM call may take {@code gradingTimeoutSeconds}; two calls plus the debit must
- * finish within the 60 s life of the forwarded internal JWT, hence the 25 s ceiling. The daily limit counts LLM
- * gradings per learner and calendar day in {@code quotaTimezone}.
+ * {@code learning.writing.*}. Grading uses one LLM request for bands and knowledge-point judgments.
+ * The daily limit counts essays per learner and day.
  */
 @Validated
 @ConfigurationProperties("learning.writing")

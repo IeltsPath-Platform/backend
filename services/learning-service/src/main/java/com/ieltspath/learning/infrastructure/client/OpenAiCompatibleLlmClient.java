@@ -5,6 +5,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ieltspath.learning.application.exception.LlmUnavailableException;
 import com.ieltspath.learning.application.port.LlmClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -25,7 +27,7 @@ import java.util.Locale;
  */
 @Component
 public class OpenAiCompatibleLlmClient implements LlmClient {
-    static final String RETRY_REASONING_EFFORT = "low";
+    private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmClient.class);
     private static final int MAX_TOKENS = 4096;
     /** Families that think by default and may spend the whole budget on it unless told not to. */
     private static final List<String> THINKING_DEFAULT_OFF = List.of("gemini-2.5", "gemini-3");
@@ -44,8 +46,12 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
                                      @Value("${learning.llm.model:}") String model,
                                      @Value("${learning.llm.reasoning-effort:}") String reasoningEffort,
                                      @Value("${learning.writing.grading-timeout-seconds:20}") int timeoutSeconds) {
-        this(baseUrl.isBlank() ? null : builder.requestFactory(requestFactory(timeoutSeconds))
-                .baseUrl(baseUrl.replaceAll("/+$", "")).build(), apiKey, model, reasoningEffort);
+        String normalizedBaseUrl = baseUrl.isBlank() ? null : baseUrl.replaceAll("/+$", "");
+        this.restClient = normalizedBaseUrl == null ? null : builder.clone()
+                .requestFactory(requestFactory(timeoutSeconds)).baseUrl(normalizedBaseUrl).build();
+        this.apiKey = apiKey;
+        this.model = model;
+        this.reasoningEffort = reasoningEffort;
     }
 
     /** {@code restClient} is null when no endpoint is configured. */
@@ -69,25 +75,36 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     @Override
-    public String completeJson(String systemPrompt, String userPrompt, boolean lowReasoning) {
+    public String completeJson(String systemPrompt, String userPrompt) {
         if (!configured()) throw new LlmUnavailableException(null);
-        String requested = lowReasoning ? RETRY_REASONING_EFFORT : reasoningEffort;
-        Request body = new Request(model,
-                List.of(new Message("system", systemPrompt), new Message("user", userPrompt)), MAX_TOKENS,
-                supportsTemperature(model, requested) ? 0.0 : null, new ResponseFormat("json_object"),
-                resolveReasoningEffort(model, requested));
         try {
-            JsonNode response = restClient.post().uri("/chat/completions")
-                    .headers(headers -> headers.setBearerAuth(apiKey))
-                    .body(body).retrieve().body(JsonNode.class);
-            JsonNode content = response == null ? null : response.path("choices").path(0).path("message").path("content");
-            if (content == null || !content.isTextual()) throw new LlmUnavailableException(null);
-            return content.asText();
+            return requestContent(request(systemPrompt, userPrompt));
         } catch (RestClientResponseException exception) {
-            throw new LlmUnavailableException(exception.getStatusCode().value());
+            int status = exception.getStatusCode().value();
+            log.warn("LLM request failed: status={}", status);
+            throw new LlmUnavailableException(status);
         } catch (RestClientException exception) {
+            log.warn("LLM request failed: {}", exception.getClass().getSimpleName());
             throw new LlmUnavailableException(null);
         }
+    }
+
+    private Request request(String systemPrompt, String userPrompt) {
+        return new Request(model, List.of(new Message("system", systemPrompt), new Message("user", userPrompt)),
+                MAX_TOKENS, supportsTemperature(model, reasoningEffort) ? 0.0 : null, new ResponseFormat("json_object"),
+                resolveReasoningEffort(model, reasoningEffort));
+    }
+
+    private String requestContent(Request body) {
+        JsonNode response = restClient.post().uri("/chat/completions")
+                .headers(headers -> headers.setBearerAuth(apiKey))
+                .body(body).retrieve().body(JsonNode.class);
+        JsonNode content = response == null ? null : response.path("choices").path(0).path("message").path("content");
+        if (content == null || !content.isTextual()) {
+            log.warn("LLM reply carried no text content");
+            throw new LlmUnavailableException(null);
+        }
+        return content.asText();
     }
 
     /** The {@code reasoning_effort} to send, or null to leave the field out. */

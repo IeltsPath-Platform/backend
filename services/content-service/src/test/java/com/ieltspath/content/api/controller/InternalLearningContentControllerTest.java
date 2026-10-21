@@ -141,6 +141,19 @@ class InternalLearningContentControllerTest {
     }
 
     @Test
+    void approvedActiveErrorTypesIncludeTheirKnowledgePointId() throws Exception {
+        UUID knowledgePointId = UUID.randomUUID();
+        var errorType = com.ieltspath.content.domain.aggregate.ErrorType.create("LINKER_MISUSE", "Linker misuse",
+                com.ieltspath.content.domain.vo.ErrorCategory.COHERENCE, 2, knowledgePointId, "Use a linker correctly.");
+        when(errorTypes.executeApprovedActive()).thenReturn(List.of(errorType));
+
+        mockMvc.perform(get("/internal/learning-content/error-types"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("LINKER_MISUSE"))
+                .andExpect(jsonPath("$[0].knowledgePointId").value(knowledgePointId.toString()));
+    }
+
+    @Test
     void topicSequenceCarriesEachTopicsSkillAndWhetherItHasAFinalTest() throws Exception {
         UUID writing = UUID.randomUUID();
         when(topicSequence.execute()).thenReturn(List.of(new TopicSequenceResult(writing, "DEMO_WRITING",

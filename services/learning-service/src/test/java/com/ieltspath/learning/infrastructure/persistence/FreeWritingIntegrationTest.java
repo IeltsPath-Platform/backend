@@ -100,7 +100,7 @@ class FreeWritingIntegrationTest {
 
     @Test
     void anEssayIsGradedAndChargedOnceAndOnlyItsOwnerReadsIt() {
-        when(llm.completeJson(any(), any(), anyBoolean())).thenReturn(grade("6.0"));
+        when(llm.completeJson(any(), any())).thenReturn(grade("6.0"));
         UUID request = UUID.randomUUID();
 
         var essay = submitFree.execute(USER, VERSION, ESSAY, request, TEXT);
@@ -116,7 +116,7 @@ class FreeWritingIntegrationTest {
                 essay.submissionId()));
 
         assertEquals(essay.submissionId(), submitFree.execute(USER, VERSION, ESSAY, request, TEXT).submissionId());
-        verify(llm, times(1)).completeJson(any(), any(), anyBoolean());
+        verify(llm, times(1)).completeJson(any(), any());
         verify(access, times(1)).debit(eq(USER), eq(3), eq(essay.submissionId()),
                 eq("free-writing:" + USER + ":" + request), any());
 
@@ -137,7 +137,7 @@ class FreeWritingIntegrationTest {
         when(access.balance()).thenReturn(0L);
         assertEquals("INSUFFICIENT_POINTS", assertThrows(LearningRequestException.class,
                 () -> submitFree.execute(USER, VERSION, ESSAY, UUID.randomUUID(), TEXT)).getCode());
-        verify(llm, never()).completeJson(any(), any(), anyBoolean());
+        verify(llm, never()).completeJson(any(), any());
     }
 
     @Test
@@ -156,12 +156,12 @@ class FreeWritingIntegrationTest {
             assertEquals(422, error.getStatus(), type);
         }
         verify(access, never()).debit(any(), anyInt(), any(), anyString(), any());
-        verify(llm, never()).completeJson(any(), any(), anyBoolean());
+        verify(llm, never()).completeJson(any(), any());
     }
 
     @Test
     void aFailedDebitKeepsTheGradeWithheldUntilAResendIsCharged() {
-        when(llm.completeJson(any(), any(), anyBoolean())).thenReturn(grade("5.0"));
+        when(llm.completeJson(any(), any())).thenReturn(grade("5.0"));
         when(access.debit(any(), anyInt(), any(), anyString(), any())).thenThrow(new InsufficientPointsException());
         UUID request = UUID.randomUUID();
         assertEquals("INSUFFICIENT_POINTS", assertThrows(LearningRequestException.class,
@@ -173,7 +173,7 @@ class FreeWritingIntegrationTest {
 
         assertEquals("GRADED", essay.status());
         assertFalse(essay.passed());
-        verify(llm, times(1)).completeJson(any(), any(), anyBoolean());
+        verify(llm, times(1)).completeJson(any(), any());
     }
 
     private static LearningContentClient.Rubric rubric(String task) {

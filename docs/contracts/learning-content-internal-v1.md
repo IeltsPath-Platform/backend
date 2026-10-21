@@ -320,6 +320,13 @@ content, and builds learner-facing paths; this internal endpoint makes no learne
 
 Returns one PUBLISHED version with `{packageVersionId, packageId, packageType, topicId, rules, sections}`. `topicId` is required for `TOPIC_TEST` and nullable for other types. `rules` is the parsed version rules object; the V9 seed versions use `{}`. MVP final tests have no time limit: when `rules` has no time key, Assessment sets `expiresAt=null`. Defining a timed package rule is deferred beyond MVP. Sections have `{sectionId, title, skill, instructions, sortOrder, passage, audio?, items}`; `passage` is the full text of the attached `PASSAGE` asset or `null`. `audio` (added 2026-10-01, absent when the section has no `AUDIO` asset) is `{assetId, mediaUrl, durationSeconds, transcript}`, resolved like a lesson audio block; the transcript must not reach a learner before the result allows it. Items have `{questionVersionId, sortOrder, stem, options, answerSpec, explanation, maxScore, knowledgePointMappings}`. Each mapping has `{knowledgePointId, weight}`; weight does not affect grading or mastery.
 
+Essay package items additionally carry `guide` (learner-facing Markdown or null) and
+`images: [{mediaUrl, altText}]` (added 2026-10-20). Images come from validated `IMAGE` assets linked to the question or
+its section, ordered by asset-link `sortOrder` and asset ID. Content resolves every image reference through the same
+media policy as lesson images; the stored reference is not included in the internal response. Both images and guides
+are read in bulk for a package version. Auto-graded items have `guide: null` and `images: []`. Learning forwards only
+these teaching fields for course practice essays; answer specs, grading explanations and chart facts remain internal.
+
 X1 example (one representative item shown; the actual version contains Q2, Q14, Q15, Q16):
 
 ```json
@@ -335,7 +342,7 @@ Package publishing enforces one owner per `question_id` across its versions: any
 
 ## Error types (phase 3a)
 
-`GET /internal/learning-content/error-types` returns error types with both `status=ACTIVE` and `review_status=APPROVED` as a JSON array of `{"code","name","category","severity","fixHint"}`, ordered by code. Assessment reads it to refuse any error analysis code that is not in the reviewed catalogue (`422`, `details.code = UNKNOWN_ERROR_CODE`). `category` is one of `GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK`, `READING_STRATEGY`, `LISTENING_STRATEGY`, `SPELLING_NUMBER`. `severity` is 1 to 3. The public management endpoints are `GET`, `POST` and `PUT` under `/api/content/error-types`; the code cannot change after creation.
+`GET /internal/learning-content/error-types` returns error types with both `status=ACTIVE` and `review_status=APPROVED` as a JSON array of `{"code","name","category","severity","fixHint","knowledgePointId"}`, ordered by code. `knowledgePointId` is nullable and identifies the knowledge point linked to the error type when one is configured. Assessment reads it to refuse any error analysis code that is not in the reviewed catalogue (`422`, `details.code = UNKNOWN_ERROR_CODE`). `category` is one of `GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK`, `READING_STRATEGY`, `LISTENING_STRATEGY`, `SPELLING_NUMBER`. `severity` is 1 to 3. The public management endpoints are `GET`, `POST` and `PUT` under `/api/content/error-types`; the code cannot change after creation.
 
 ## Essay rubrics (phase 11)
 
@@ -368,6 +375,15 @@ The internal prompt projection is available to service callers using their forwa
 | --- | --- | --- |
 | GET | `/internal/learning-content/rubrics/active?task=TASK_1\|TASK_2` | Return the active rubric as one object with `code`, `task`, `version`, `sourceNote`, `criteria`, and `examples`. |
 | GET | `/internal/learning-content/rubrics/{code}/{version}` | Return that saved active or retired version, never a draft. Used by both Learning and Assessment to keep grading on the activated prompt version. |
+
+Each internal criterion also carries `knowledgePointId` (UUID, nullable, added 2026-10-21): the knowledge point that the
+criterion is evidence for, from `writing_criterion_knowledge_points` keyed by task and criterion code
+(`V69__writing_criterion_knowledge_points.sql`). It does not depend on the rubric version. The additive
+`subKnowledgePoints` field is an ordered array of `{id,code,name,description}` entries from
+`writing_criterion_sub_knowledge_points` (`V71__writing_criterion_sub_knowledge_points.sql`), filtered to active
+knowledge points; it is `[]` when the criterion has none. For example, Task 2's CC criterion returns
+`[{"id":"…","code":"DEMO_WRITING_TOPIC_SENTENCE","name":"…","description":"…"},{"id":"…","code":"DEMO_WRITING_LINKING","name":"…","description":"…"}]`.
+Admin and public rubric responses do not include criterion knowledge point mappings or sub-knowledge points.
 
 These projections are internal only. Gateway denies browser/client access to `/internal/**`; Learning and Assessment must
 not read Content's database directly. Rubric data is input to the grader and does not include answer keys.

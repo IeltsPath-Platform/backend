@@ -704,10 +704,28 @@ public class JdbcLearningContentReader implements LearningContentReader {
                             rs.getDouble("weight")));
         });
 
+        Map<UUID, List<PackageVersionContentResult.Image>> imagesByQuestion = new LinkedHashMap<>();
+        jdbc.query("""
+                SELECT DISTINCT sq.question_version_id, a.id, a.media_reference, a.text_content, l.sort_order
+                FROM section_questions sq
+                JOIN content_sections s ON s.id = sq.section_id
+                JOIN question_versions qv ON qv.id = sq.question_version_id
+                JOIN content_asset_links l ON l.question_version_id = sq.question_version_id OR l.section_id = s.id
+                JOIN content_assets a ON a.id = l.asset_id
+                WHERE s.package_version_id = :versionId AND qv.answer_spec ->> 'type' = 'ESSAY'
+                  AND a.asset_type = 'IMAGE' AND a.validation_status = 'VALID'
+                ORDER BY sq.question_version_id, l.sort_order, a.id
+                """, byVersion, rs -> {
+            imagesByQuestion.computeIfAbsent(uuid(rs, "question_version_id"), ignored -> new ArrayList<>())
+                    .add(new PackageVersionContentResult.Image(rs.getString("media_reference"), null,
+                            rs.getString("text_content")));
+        });
+
         Map<UUID, List<PackageVersionContentResult.Item>> itemsBySection = new LinkedHashMap<>();
         jdbc.query("""
                 SELECT sq.section_id, sq.sort_order, sq.max_score, sq.group_id, qv.id, qv.stem, qv.options::text AS options,
-                       qv.answer_spec::text AS answer_spec, qv.explanation, qv.hint
+                       qv.answer_spec::text AS answer_spec, qv.explanation, qv.hint,
+                       CASE WHEN qv.answer_spec ->> 'type' = 'ESSAY' THEN qv.guide END AS guide
                 FROM section_questions sq
                 JOIN content_sections s ON s.id = sq.section_id
                 JOIN question_versions qv ON qv.id = sq.question_version_id
@@ -720,7 +738,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
                             rs.getString("stem"), rs.getString("options"), rs.getString("answer_spec"),
                             rs.getString("explanation"), rs.getString("hint"), rs.getDouble("max_score"),
                             rs.getObject("group_id", UUID.class),
-                            mappings.getOrDefault(versionId, List.of())));
+                            mappings.getOrDefault(versionId, List.of()), rs.getString("guide"),
+                            imagesByQuestion.getOrDefault(versionId, List.of())));
         });
 
         Map<UUID, List<PackageVersionContentResult.QuestionGroup>> groupsBySection = new LinkedHashMap<>();

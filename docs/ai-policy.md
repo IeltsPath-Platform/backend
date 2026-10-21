@@ -1,6 +1,6 @@
 # Chính sách AI trong đánh giá
 
-Cập nhật: 2026-10-17. Quyết định D6: essay của course test được giám khảo chấm mù.
+Cập nhật: 2026-10-22 (Learning gộp band và KP con trong một request). Quyết định D6: essay của course test được giám khảo chấm mù.
 Topic test, practice và placement giữ chính sách LLM hiện có. Mở khóa topic, quyết
 định điểm khóa ở Learning và cảnh báo QA không thuộc thay đổi này.
 
@@ -43,6 +43,20 @@ chuyển job cho EXAMINER khi rubric hoặc prompt đã được kích hoạt kh
 LLM chỉ được gắn `errorCode` trong danh mục `ACTIVE` của Content; mã không tồn tại
 hoặc đã bị loại khỏi danh mục sẽ bị bỏ khỏi kết quả của LLM. Không dùng các mã
 do mô hình tự tạo làm bằng chứng lỗi.
+
+Learning gửi đúng một request LLM cho mỗi lần thực thi chấm: giữ nguyên template band `v1`, nối hướng dẫn
+`essay-kp-judgment-v2` (`kpj2`) để cùng JSON trả `criteria`, `corrections`, `summary`, `focus` và `judgments` cho các KP
+con trong rubric; rubric không có KP con thì không cần `judgments`. `prompt_version` (`+tplv1`) và activation vẫn nhận
+diện template band; `judgmentVersion=kpj2` lưu trong JSON grade bất cứ khi nào rubric có KP con (prompt đã nối hướng dẫn), kể cả khi
+mô hình không trả mảng `judgments`; không có KP con thì version null. Không phát qua API. Mỗi lần chấm dùng một lượt quota ngày và
+timeout chung `learning.writing.grading-timeout-seconds` (mặc định 20 giây); không có timeout/skip riêng cho KP.
+Không gọi AI sửa JSON hoặc tự gửi lại HTTP khi provider trả 429/503. JSON hoặc band không hợp lệ gây `INVALID_GRADE`,
+không thu points. Khi band hợp lệ nhưng `judgments` thiếu/sai, giữ band và để KP `NOT_ASSESSED`, trừ `FAIL` có thể suy ra
+từ correction đã kiểm tra và ánh xạ error type sang KP. PASS/FAIL của mô hình chỉ được nhận khi excerpt là chuỗi nguyên
+văn trong essay. Correction và judgment đến từ cùng phản hồi AI; application kiểm tra chéo chúng bằng luật xác định,
+không phải hai đánh giá AI độc lập. `EssayKnowledgeJudge` không gọi LLM hay dùng clock; catalog Content được lấy khi
+cần qua supplier do grader cung cấp, tối đa một lần.
+Không log essay, prompt hay output LLM. `kpj2` chưa có gold set để đo độ chính xác.
 
 Trước khi từng task có dòng đầu tiên trong `ai_prompt_activations`, cả Learning `EssayGrader` và Assessment
 `GradeGateEssayJobUseCase` dùng rubric `ACTIVE` của Content để bootstrap; không báo `PROMPT_NOT_ACTIVATED` chỉ vì

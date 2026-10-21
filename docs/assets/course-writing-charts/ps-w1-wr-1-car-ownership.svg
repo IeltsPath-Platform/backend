@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" font-family="Arial,Helvetica,sans-serif">
+<rect x="0.00" y="0.00" width="1600.00" height="1000.00" rx="0" fill="#ffffff"/>
+<text x="800.00" y="76.00" font-size="40" fill="#1e293b" text-anchor="middle" font-weight="700">Households owning a car</text>
+<text x="800.00" y="125.00" font-size="26" fill="#64748b" text-anchor="middle" font-weight="400">Percentage of households in four countries, 2000 and 2020</text>
+<line x1="125.00" y1="800.00" x2="1490.00" y2="800.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="809.00" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">0%</text>
+<line x1="125.00" y1="684.00" x2="1490.00" y2="684.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="693.00" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">20%</text>
+<line x1="125.00" y1="568.00" x2="1490.00" y2="568.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="577.00" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">40%</text>
+<line x1="125.00" y1="452.00" x2="1490.00" y2="452.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="461.00" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">60%</text>
+<line x1="125.00" y1="336.00" x2="1490.00" y2="336.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="345.00" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">80%</text>
+<line x1="125.00" y1="220.00" x2="1490.00" y2="220.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="229.00" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">100%</text>
+<line x1="125.00" y1="800.00" x2="1490.00" y2="800.00" stroke="#64748b" stroke-width="2" stroke-dasharray=""/>
+<text x="295.62" y="850.00" font-size="27" fill="#1e293b" text-anchor="middle" font-weight="400">Country A</text>
+<rect x="203.62" y="452.00" width="80.00" height="348.00" rx="5" fill="#5261cf"/>
+<text x="243.62" y="434.00" font-size="27" fill="#1e293b" text-anchor="middle" font-weight="700">60%</text>
+<rect x="307.62" y="382.40" width="80.00" height="417.60" rx="5" fill="#edaa32"/>
+<text x="347.62" y="364.40" font-size="27" fill="#1e293b" text-anchor="middle" font-weight="700">72%</text>
+<text x="636.88" y="850.00" font-size="27" fill="#1e293b" text-anchor="middle" font-weight="400">Country B</text>
+<rect x="544.88" y="539.00" width="80.00" height="261.00" rx="5" fill="#5261cf"/>
+<text x="584.88" y="521.00" font-size="27" fill="#1e293b" text-anchor="middle" font-weight="700">45%</text>
+<rect x="648.88" y="463.60" width="80.00" height="336.40" rx="5" fill="#edaa32"/>
+<text x="688.88" y="445.60" font-size="27" fill="#1e293b" text-anchor="middle" font-weight="700">58%</text>
+<text x="978.12" y="850.00" font-size="27" fill="#1e293b" text-anchor="middle" font-weight="400">Country C</text>
+<rect x="886.12" y="626.00" width="80.00" height="174.00" rx="5" fill="#5261cf"/>
+<text x="926.12" y="608.00" font-size="27" fill="#1e293b" text-anchor="middle" font-weight="700">30%</text>
+<rect x="990.12" y="481.00" width="80.00" height="319.00" rx="5" fill="#edaa32"/>
+<text x="1030.12" y="463.00" font-size="27" fill="#1e293b" text-anchor="middle" font-weight="700">55%</text>
+<text x="1319.38" y="850.00" font-size="27" fill="#1e293b" text-anchor="middle" font-weight="400">Country D</text>
+<rect x="1227.38" y="394.00" width="80.00" height="406.00" rx="5" fill="#5261cf"/>
+<text x="1267.38" y="376.00" font-size="27" fill="#1e293b" text-anchor="middle" font-weight="700">70%</text>
+<rect x="1331.38" y="405.60" width="80.00" height="394.40" rx="5" fill="#edaa32"/>
+<text x="1371.38" y="387.60" font-size="27" fill="#1e293b" text-anchor="middle" font-weight="700">68%</text>
+<rect x="500.00" y="912.00" width="30.00" height="24.00" rx="3" fill="#5261cf"/>
+<text x="546.00" y="935.00" font-size="25" fill="#1e293b" text-anchor="start" font-weight="400">2000</text>
+<rect x="800.00" y="912.00" width="30.00" height="24.00" rx="3" fill="#edaa32"/>
+<text x="846.00" y="935.00" font-size="25" fill="#1e293b" text-anchor="start" font-weight="400">2020</text>
+</svg>

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" font-family="Arial,Helvetica,sans-serif">
+<rect x="0.00" y="0.00" width="1600.00" height="1000.00" rx="0" fill="#ffffff"/>
+<text x="800.00" y="76.00" font-size="40" fill="#1e293b" text-anchor="middle" font-weight="700">Visitors to a national park</text>
+<text x="800.00" y="125.00" font-size="26" fill="#64748b" text-anchor="middle" font-weight="400">Monthly visitor numbers, in thousands</text>
+<line x1="125.00" y1="800.00" x2="1490.00" y2="800.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="809.00" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">0</text>
+<line x1="125.00" y1="703.33" x2="1490.00" y2="703.33" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="712.33" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">20</text>
+<line x1="125.00" y1="606.67" x2="1490.00" y2="606.67" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="615.67" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">40</text>
+<line x1="125.00" y1="510.00" x2="1490.00" y2="510.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="519.00" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">60</text>
+<line x1="125.00" y1="413.33" x2="1490.00" y2="413.33" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="422.33" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">80</text>
+<line x1="125.00" y1="316.67" x2="1490.00" y2="316.67" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="325.67" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">100</text>
+<line x1="125.00" y1="220.00" x2="1490.00" y2="220.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="229.00" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">120</text>
+<line x1="125.00" y1="220.00" x2="125.00" y2="800.00" stroke="#64748b" stroke-width="2" stroke-dasharray=""/>
+<line x1="125.00" y1="800.00" x2="1490.00" y2="800.00" stroke="#64748b" stroke-width="2" stroke-dasharray=""/>
+<text x="125.00" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">Jan</text>
+<text x="249.09" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">Feb</text>
+<text x="373.18" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">Mar</text>
+<text x="497.27" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">Apr</text>
+<text x="621.36" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">May</text>
+<text x="745.45" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">Jun</text>
+<text x="869.55" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">Jul</text>
+<text x="993.64" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">Aug</text>
+<text x="1117.73" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">Sep</text>
+<text x="1241.82" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">Oct</text>
+<text x="1365.91" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">Nov</text>
+<text x="1490.00" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">Dec</text>
+<polyline points="125.000,703.333 249.091,693.667 373.182,630.833 497.273,558.333 621.364,461.667 745.455,365.000 869.545,268.333 993.636,292.500 1117.727,510.000 1241.818,606.667 1365.909,679.167 1490.000,655.000" fill="none" stroke="#5261cf" stroke-width="5" stroke-linejoin="round"/>
+<circle cx="125.000" cy="703.333" r="8" fill="#5261cf"/>
+<text x="125.00" y="682.33" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">20</text>
+<circle cx="249.091" cy="693.667" r="8" fill="#5261cf"/>
+<text x="249.09" y="672.67" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">22</text>
+<circle cx="373.182" cy="630.833" r="8" fill="#5261cf"/>
+<text x="373.18" y="609.83" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">35</text>
+<circle cx="497.273" cy="558.333" r="8" fill="#5261cf"/>
+<text x="497.27" y="537.33" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">50</text>
+<circle cx="621.364" cy="461.667" r="8" fill="#5261cf"/>
+<text x="621.36" y="440.67" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">70</text>
+<circle cx="745.455" cy="365.000" r="8" fill="#5261cf"/>
+<text x="745.45" y="344.00" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">90</text>
+<circle cx="869.545" cy="268.333" r="8" fill="#5261cf"/>
+<text x="869.55" y="247.33" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">110</text>
+<circle cx="993.636" cy="292.500" r="8" fill="#5261cf"/>
+<text x="993.64" y="271.50" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">105</text>
+<circle cx="1117.727" cy="510.000" r="8" fill="#5261cf"/>
+<text x="1117.73" y="489.00" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">60</text>
+<circle cx="1241.818" cy="606.667" r="8" fill="#5261cf"/>
+<text x="1241.82" y="585.67" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">40</text>
+<circle cx="1365.909" cy="679.167" r="8" fill="#5261cf"/>
+<text x="1365.91" y="658.17" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">25</text>
+<circle cx="1490.000" cy="655.000" r="8" fill="#5261cf"/>
+<text x="1490.00" y="634.00" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">30</text>
+<text x="800.00" y="935.00" font-size="25" fill="#64748b" text-anchor="middle" font-weight="400">Unit: thousands of visitors</text>
+</svg>

@@ -29,9 +29,30 @@ Content marks an `EXERCISE` block that holds exactly one `ESSAY` question with `
 - `POST /lessons/{id}/exercises/{blockId}/submissions` on an essay block → 409 `ESSAY_BLOCK`.
 - Lesson gates (`REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`) apply to essay submissions exactly as to exercises.
 
+## Course practice essays (2026-10-20)
+
+The open attempt returned by `POST /api/learning/lessons/{lessonId}/practice-attempts` and
+`GET /api/learning/practice-attempts/{attemptId}` contains essays in `sections[].essays`, alongside the section's
+auto-graded questions. Each essay has `{questionVersionId, sortOrder, stem, task, minWords, passBand,
+latestSubmission, guide, images}`. `guide` is learner-facing Markdown or null, separate from the grading explanation;
+`images` is an ordered array of `{mediaUrl, altText}`, empty for a prompt with no attached image. URLs are validated
+by Content and rendered as image sources. The response does not expose `chartFacts`, `answerSpec` or `explanation`.
+
+Course Writing uses Introduction/Overview/Body 1/Body 2 for Task 1 and Introduction/Body 1/Body 2/Conclusion for Task 2.
+The frontend joins non-empty parts with paragraph breaks and submits the same `{requestId, essayText}` payload to
+`POST /api/learning/practice-attempts/{attemptId}/essays/{questionVersionId}/submissions`. Grading, charging and the
+requirement to grade every essay before finishing the set are unchanged. The chart URLs are also frozen in the
+submission's existing prompt snapshot. No timer is introduced; dictionary lookup remains available beside the editor.
+
+Content V64 seeds the initial guides and four public Supabase chart references for the ten V63 course Writing tasks.
+V66 adds paraphrasing and vocabulary guidance to those ten guides and clarifies Task 1 overview choices. V67 adds a
+third W1 Task 1 table prompt and its fifth chart reference. Image upload is performed by the content owner; files and exact URLs are in
+[course-writing-charts](../assets/course-writing-charts/README.md).
+
 ## `POST /lessons/{lessonId}/essays/{blockId}/submissions`
 
-Request: `{"requestId":"<UUID>","essayText":"..."}`. The essay is graded **within the request** (typically 20–45 s).
+Request: `{"requestId":"<UUID>","essayText":"..."}`. The essay is graded **within the request** using one LLM request
+for both criterion bands and sub-point judgments. Its default timeout is 20 s; service and payment work add latency.
 
 Order: validate input → look up `requestId` → load the lesson from Content → check the point balance → gate check and
 record `GRADING` → daily grading limit → LLM grading → debit points → record `GRADED` and mastery evidence.
@@ -44,11 +65,18 @@ Response 200:
   "overallBand":6.5,"passed":true,
   "criteria":[
     {"code":"TR","band":6.5,"strengths":["…"],"improvements":["…"]},
-    {"code":"CC","band":6.0,"strengths":["…"],"improvements":["…"]},
+    {"code":"CC","band":6.0,"strengths":["…"],"improvements":["…"],
+     "knowledgePointJudgments":[{"knowledgePointId":"…","code":"DEMO_WRITING_LINKING",
+       "name":"Từ nối và mạch lạc","judgment":"FAIL","excerpt":"…","reason":"Dùng từ nối phù hợp."}]},
     {"code":"LR","band":6.5,"strengths":["…"],"improvements":["…"]},
     {"code":"GRA","band":6.5,"strengths":["…"],"improvements":["…"]}
   ],
   "corrections":[{"excerpt":"peoples can save","suggestion":"people can save","category":"GRAMMAR","errorCode":"PLURAL_FORM"}],
+  "studyPoints":[
+    {"kind":"CRITERION","criterionCode":"CC","band":5.5,"knowledgePointId":"3c000000-0000-4000-8000-020000000003","code":"DEMO_WRITING_CRITERION_CC","name":"Mạch lạc và liên kết (CC)","title":"Mạch lạc và liên kết (CC)","reason":"Nối câu bằng từ nối đúng chức năng."},
+    {"kind":"KNOWLEDGE_POINT","criterionCode":"CC","band":6.0,"knowledgePointId":"…","code":"DEMO_WRITING_LINKING","name":"Từ nối và mạch lạc","title":"Từ nối và mạch lạc","reason":"Dùng từ nối phù hợp.","excerpt":"…","practiceKnowledgePointId":"…"},
+    {"kind":"AI","title":"Cohesive Devices","reason":"Dùng từ nối tự nhiên để liên kết câu và đoạn mạch lạc."}
+  ],
   "summary":"…","pointsCharged":3,"sampleAnswer":"…"
 }
 ```
@@ -62,6 +90,40 @@ Response 200:
   human-approved Content error type. A correction with an unknown, inactive or unapproved `errorCode` is omitted.
 - `summary` ≤ 600 characters. `passed = overallBand ≥ passBand`. `sampleAnswer` only when `passed` or the block was
   passed before.
+
+`studyPoints` (added 2026-10-21) is always an array for a `GRADED` essay, possibly `[]`. It is computed once during
+grading, outside the submission transaction, and stored in the grade JSON; reads never recalculate it. Older grades
+without this field return `[]`. Null fields inside a point are omitted.
+
+Each criterion also includes `knowledgePointJudgments`, an ordered array that is `[]` for grades without stored judgments.
+Each judgment has `knowledgePointId`, `code`, `name`, and `judgment` (`PASS`, `FAIL` or `NOT_ASSESSED`); `excerpt` and `reason` are omitted
+when no evidence is available. When the rubric lists sub-points, Learning appends `essay-kp-judgment-v2` instructions to
+the unchanged band template `v1`; one response supplies `criteria`, `corrections`, `summary`, `focus` and `judgments`.
+Rubrics without sub-points do not require `judgments`. `promptVersion` remains
+`<rubricCode>@<rubricVersion>+tplv1` for band activation; internal grade JSON stores `judgmentVersion=kpj2` whenever the rubric has
+sub-points (the prompt was extended), even if the response has no judgments array, otherwise null. This version is not
+exposed by the API. `EssayKnowledgeJudge` validates the received data without LLM or clock
+dependencies; the grader supplies a lazy Content catalog, loaded at most once when needed for practice targets.
+Missing or malformed judgments preserve a valid band and leave the affected model
+judgments `NOT_ASSESSED`; validated corrections whose active error type maps to a knowledge point can still produce
+`FAIL`. Corrections and judgments come from the same model response and are checked against application rules.
+
+There is no second request to repair JSON and no automatic HTTP retry for provider 429/503. Invalid JSON or invalid
+criterion bands fail with stored `INVALID_GRADE` (public `GRADING_UNAVAILABLE`), without charging points. A provider
+failure or timeout fails the grading without charging points. The single request uses
+`learning.writing.grading-timeout-seconds` (default 20 s); there is no separate judgment timeout or skip setting.
+
+| Kind | Fields and meaning |
+| --- | --- |
+| `CRITERION` | `criterionCode`, `band` and `knowledgePointId` are required. Only criteria with `band < passBand` and a mapped KP qualify; no criterion points when `passBand` is null. `code`, `name`, `title` and `reason` are optional snapshots of Content's KP details; `title` is its name, and `reason` prefers `canDo` over `description` (maximum 300 characters). If Content is unavailable, grading still succeeds without those details. |
+| `AI` | `kind`, `title` and optional `reason` describe a model `focus` entry. At most four entries, split at the first colon, with title limited to 80 and reason to 300 characters; blank or non-text entries are discarded. |
+| `KNOWLEDGE_POINT` | A sub knowledge point judged `FAIL`. Carries the parent `criterionCode` and `band`, the sub-point fields, exact validated `excerpt` and `reason`; `practiceKnowledgePointId` is the sub-point ID when it has a practice set, otherwise the parent criterion point ID when available. |
+
+Study points keep criterion points in their existing band/rubric order, followed immediately by failed sub-points for that
+criterion; failed sub-points without a criterion study point follow in rubric order, then AI points in model order.
+The same response applies to lesson, course Practice, free-writing and revision submissions. Mentor review and
+Assessment result shapes are unchanged. The learner can use a criterion point's KP ID with the existing
+[free-practice API](free-practice-v1.md); its reserve and exhaustion rules still apply.
 
 ## `GET /writing-submissions/{submissionId}`
 
@@ -90,8 +152,13 @@ can ask a Mentor to review a graded essay (`POST`/`GET /writing-submissions/{id}
 - At most one `GRADING` submission per learner and block.
 - Daily limit: at most 10 gradings per learner per day (`Asia/Ho_Chi_Minh`), counted when the LLM is called. Exceeding
   it → 429 `DAILY_LIMIT_REACHED`, no LLM call, no charge.
-- Mastery evidence (`source = lesson_writing`, `correct = passed`, one row per knowledge point of the question) is
-  recorded on every graded submission until the block is first passed, and never after. No review is inserted.
+- Mastery evidence (`source = lesson_writing`) is recorded on every graded submission until the block is first passed,
+  and never after. It has one row per knowledge point of the question with `correct = passed`, and one row per rubric
+  criterion whose knowledge point is mapped, with `correct = criterion band >= passBand`. A sub-point judgment of
+  `PASS` or `FAIL` adds evidence regardless of the essay pass band; `NOT_ASSESSED` adds none. Criterion band evidence
+  takes priority when the same KP is mapped twice, and sub-point evidence overrides the question's pass result when IDs
+  overlap. Criterion knowledge points appear only in `studyPoints[]`; `criteria[]` exposes sub-point IDs only inside
+  `knowledgePointJudgments[]`. The question's event carries the most frequent correction `errorCode`. No review is inserted.
 
 ## Errors
 
