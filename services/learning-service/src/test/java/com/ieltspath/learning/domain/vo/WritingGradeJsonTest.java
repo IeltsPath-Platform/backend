@@ -35,4 +35,19 @@ class WritingGradeJsonTest {
         assertEquals(criterion, restored);
         assertEquals(point, restored.knowledgePointId());
     }
+
+    @Test
+    void studyPointsSurviveStorage() throws Exception {
+        var points = List.of(new WritingGrade.StudyPoint("CRITERION", "CC", new BigDecimal("5.5"), UUID.randomUUID(),
+                "DEMO_WRITING_CRITERION_CC", "Mạch lạc và liên kết (CC)", "Mạch lạc và liên kết (CC)", "Nối câu"),
+                new WritingGrade.StudyPoint("AI", null, null, null, null, null, "Linking", "Use linkers"));
+        var grade = new WritingGrade(List.of(), List.of(), "Summary", new BigDecimal("6.0"), points);
+        assertEquals(grade, json.readValue(json.writeValueAsString(grade), WritingGrade.class));
+    }
+
+    @Test
+    void aGradeStoredWithoutStudyPointsReadsAsEmpty() throws Exception {
+        var grade = json.readValue("{\"criteria\":[],\"corrections\":[],\"summary\":\"x\",\"overallBand\":6.0}", WritingGrade.class);
+        assertEquals(List.of(), grade.studyPoints());
+    }
 }

@@ -31,6 +31,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HashSet;
@@ -105,9 +108,37 @@ class WritingWebMvcTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
 
         assertEquals(Set.of("submissionId", "status", "task", "wordCount", "overallBand", "passed", "criteria",
-                "corrections", "summary", "pointsCharged", "sampleAnswer"), keys(body));
+                "corrections", "studyPoints", "summary", "pointsCharged", "sampleAnswer"), keys(body));
         assertEquals(Set.of("code", "band", "strengths", "improvements"), keys(body.get("criteria").get(0)));
         assertEquals(6.5, body.get("overallBand").asDouble());
+        assertTrue(body.get("studyPoints").isEmpty());
+    }
+
+    @Test
+    void studyPointsAreExposedWithOnlyTheirOwnFields() throws Exception {
+        UUID pointId = UUID.fromString("3c000000-0000-4000-8000-020000000003");
+        var grade = new WritingGrade(List.of(new WritingGrade.Criterion("CC", new BigDecimal("5.5"), List.of(),
+                List.of("Link ideas"), pointId)), List.of(), "Work on cohesion", new BigDecimal("5.5"), List.of(
+                new WritingGrade.StudyPoint("CRITERION", "CC", new BigDecimal("5.5"), pointId,
+                        "DEMO_WRITING_CRITERION_CC", "Mạch lạc và liên kết (CC)", "Mạch lạc và liên kết (CC)",
+                        "Chia đoạn hợp lý, sắp ý theo trình tự rõ ràng và nối câu bằng từ nối đúng chức năng."),
+                new WritingGrade.StudyPoint("AI", null, null, null, null, null, "Cohesive Devices",
+                        "Dùng từ nối tự nhiên để liên kết câu và đoạn mạch lạc.")));
+        when(getWritingSubmissionUseCase.execute(USER, SUBMISSION)).thenReturn(new WritingSubmissionResult(
+                SUBMISSION, "GRADED", "TASK_2", 260, new BigDecimal("5.5"), false, grade, 3, null, null, null));
+
+        String raw = mvc.perform(authenticated(get("/api/learning/writing-submissions/{id}", SUBMISSION)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode body = json.readTree(raw);
+        assertEquals(Set.of("kind", "criterionCode", "band", "knowledgePointId", "code", "name", "title", "reason"),
+                keys(body.get("studyPoints").get(0)));
+        assertEquals(Set.of("kind", "title", "reason"), keys(body.get("studyPoints").get(1)));
+        assertEquals(pointId.toString(), body.get("studyPoints").get(0).get("knowledgePointId").asText());
+        assertEquals("Mạch lạc và liên kết (CC)", body.get("studyPoints").get(0).get("name").asText());
+        assertEquals(Set.of("code", "band", "strengths", "improvements"), keys(body.get("criteria").get(0)));
+        // The serialized MockMvc response is a reproducible contract artifact for clients.
+        Files.createDirectories(Path.of("target"));
+        Files.writeString(Path.of("target", "writing-study-points-contract.json"), raw, StandardCharsets.UTF_8);
     }
 
     @Test

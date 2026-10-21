@@ -69,6 +69,10 @@ Response 200:
     {"code":"GRA","band":6.5,"strengths":["…"],"improvements":["…"]}
   ],
   "corrections":[{"excerpt":"peoples can save","suggestion":"people can save","category":"GRAMMAR","errorCode":"PLURAL_FORM"}],
+  "studyPoints":[
+    {"kind":"CRITERION","criterionCode":"CC","band":5.5,"knowledgePointId":"3c000000-0000-4000-8000-020000000003","code":"DEMO_WRITING_CRITERION_CC","name":"Mạch lạc và liên kết (CC)","title":"Mạch lạc và liên kết (CC)","reason":"Nối câu bằng từ nối đúng chức năng."},
+    {"kind":"AI","title":"Cohesive Devices","reason":"Dùng từ nối tự nhiên để liên kết câu và đoạn mạch lạc."}
+  ],
   "summary":"…","pointsCharged":3,"sampleAnswer":"…"
 }
 ```
@@ -82,6 +86,20 @@ Response 200:
   human-approved Content error type. A correction with an unknown, inactive or unapproved `errorCode` is omitted.
 - `summary` ≤ 600 characters. `passed = overallBand ≥ passBand`. `sampleAnswer` only when `passed` or the block was
   passed before.
+
+`studyPoints` (added 2026-10-21) is always an array for a `GRADED` essay, possibly `[]`. It is computed once during
+grading, outside the submission transaction, and stored in the grade JSON; reads never recalculate it. Older grades
+without this field return `[]`. Null fields inside a point are omitted.
+
+| Kind | Fields and meaning |
+| --- | --- |
+| `CRITERION` | `criterionCode`, `band` and `knowledgePointId` are required. Only criteria with `band < passBand` and a mapped KP qualify; no criterion points when `passBand` is null. `code`, `name`, `title` and `reason` are optional snapshots of Content's KP details; `title` is its name, and `reason` prefers `canDo` over `description` (maximum 300 characters). If Content is unavailable, grading still succeeds without those details. |
+| `AI` | `kind`, `title` and optional `reason` describe a model `focus` entry. At most four entries, split at the first colon, with title limited to 80 and reason to 300 characters; blank or non-text entries are discarded. |
+
+Criterion points come first, ordered by band ascending and rubric order for ties, then AI points in model order.
+The same response applies to lesson, course Practice, free-writing and revision submissions. Mentor review and
+Assessment result shapes are unchanged. The learner can use a criterion point's KP ID with the existing
+[free-practice API](free-practice-v1.md); its reserve and exhaustion rules still apply.
 
 ## `GET /writing-submissions/{submissionId}`
 
@@ -113,7 +131,7 @@ can ask a Mentor to review a graded essay (`POST`/`GET /writing-submissions/{id}
 - Mastery evidence (`source = lesson_writing`) is recorded on every graded submission until the block is first passed,
   and never after. It has one row per knowledge point of the question with `correct = passed`, and one row per rubric
   criterion whose knowledge point is mapped, with `correct = criterion band >= passBand`. Criterion knowledge points
-  are not part of the response. The question's event carries the most frequent correction `errorCode`. No review is
+  appear only in `studyPoints[]`; `criteria[]` still omits KP IDs. The question's event carries the most frequent correction `errorCode`. No review is
   inserted.
 
 ## Errors

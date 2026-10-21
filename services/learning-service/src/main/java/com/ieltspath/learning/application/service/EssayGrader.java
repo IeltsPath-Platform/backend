@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
 @Component
 public class EssayGrader {
     static final int MAX_ITEM_CHARS = 300;
+    static final int MAX_FOCUS_POINTS = 4;
+    static final int MAX_FOCUS_TITLE_CHARS = 80;
     static final int MAX_CORRECTIONS = 10;
     static final int MAX_SUMMARY_CHARS = 600;
     static final String TEMPLATE_VERSION = "v1";
@@ -96,7 +98,7 @@ public class EssayGrader {
                     throw new WritingGradingException("LLM_UNAVAILABLE");
                 }
             });
-            return new GradedEssay(grade, promptVersion);
+            return new GradedEssay(withCriterionStudyPoints(grade, rubric, prompt.passBand()), promptVersion);
         } catch (LlmUnavailableException exception) {
             throw new WritingGradingException("LLM_UNAVAILABLE");
         }
@@ -176,7 +178,74 @@ public class EssayGrader {
         List<WritingGrade.Criterion> criteria = task.criteria().stream().map(byCode::get).toList();
         String summary = truncate(root.path("summary").asText(""), MAX_SUMMARY_CHARS);
         return Optional.of(new WritingGrade(criteria, corrections(root.path("corrections"), essay, allowedCodes),
-                summary, WritingScore.overallBand(criteria.stream().map(WritingGrade.Criterion::band).toList())));
+                summary, WritingScore.overallBand(criteria.stream().map(WritingGrade.Criterion::band).toList()),
+                focusPoints(root.path("focus"))));
+    }
+
+    /** Focus entries are "<what to study>: <why>"; anything that is not a non-blank string is dropped. */
+    private static List<WritingGrade.StudyPoint> focusPoints(JsonNode node) {
+        if (!node.isArray()) return List.of();
+        List<WritingGrade.StudyPoint> points = new ArrayList<>();
+        for (JsonNode item : node) {
+            if (points.size() == MAX_FOCUS_POINTS) break;
+            if (!item.isTextual()) continue;
+            String text = truncate(item.asText().trim(), MAX_ITEM_CHARS);
+            int colon = text.indexOf(':');
+            String title = (colon < 0 ? text : text.substring(0, colon)).trim();
+            String reason = colon < 0 ? "" : text.substring(colon + 1).trim();
+            if (title.isBlank()) continue;
+            points.add(new WritingGrade.StudyPoint(WritingGrade.StudyPoint.AI, null, null, null, null, null,
+                    truncate(title, MAX_FOCUS_TITLE_CHARS), reason.isBlank() ? null : reason));
+        }
+        return points;
+    }
+
+    /** Weak criteria with knowledge points come first, weakest first, followed by the model's own focus. */
+    private WritingGrade withCriterionStudyPoints(WritingGrade grade, Rubric rubric, BigDecimal passBand) {
+        if (passBand == null) return grade;
+        Map<String, Integer> order = new HashMap<>();
+        for (RubricCriterion criterion : rubric.criteria()) {
+            if (criterion != null && criterion.code() != null) order.putIfAbsent(criterion.code(), criterion.sortOrder());
+        }
+        List<WritingGrade.Criterion> weak = grade.criteria().stream()
+                .filter(item -> item.knowledgePointId() != null && item.band().compareTo(passBand) < 0)
+                .sorted(Comparator.comparing(WritingGrade.Criterion::band)
+                        .thenComparingInt(item -> order.getOrDefault(item.code(), Integer.MAX_VALUE)))
+                .toList();
+        if (weak.isEmpty()) return grade;
+        Map<UUID, LearningContentClient.KnowledgePoint> details = knowledgePointDetails(
+                weak.stream().map(WritingGrade.Criterion::knowledgePointId).collect(Collectors.toSet()));
+        List<WritingGrade.StudyPoint> points = new ArrayList<>();
+        for (WritingGrade.Criterion criterion : weak) {
+            LearningContentClient.KnowledgePoint point = details.get(criterion.knowledgePointId());
+            String reason = point == null ? null : firstText(point.canDo(), point.description());
+            points.add(new WritingGrade.StudyPoint(WritingGrade.StudyPoint.CRITERION, criterion.code(), criterion.band(),
+                    criterion.knowledgePointId(), point == null ? null : point.code(), point == null ? null : point.name(),
+                    point == null ? null : point.name(), reason == null ? null : truncate(reason, MAX_ITEM_CHARS)));
+        }
+        points.addAll(grade.studyPoints());
+        return new WritingGrade(grade.criteria(), grade.corrections(), grade.summary(), grade.overallBand(), points);
+    }
+
+    /** Content's optional details are captured once; an unavailable catalog must not prevent grading. */
+    private Map<UUID, LearningContentClient.KnowledgePoint> knowledgePointDetails(Set<UUID> ids) {
+        try {
+            Map<UUID, LearningContentClient.KnowledgePoint> found = new HashMap<>();
+            for (LearningContentClient.Topic topic : content.getTopicSequence()) {
+                if (topic.knowledgePoints() == null) continue;
+                for (LearningContentClient.KnowledgePoint point : topic.knowledgePoints()) {
+                    if (ids.contains(point.id())) found.putIfAbsent(point.id(), point);
+                }
+            }
+            return found;
+        } catch (LearningRequestException exception) {
+            return Map.of();
+        }
+    }
+
+    private static String firstText(String first, String second) {
+        if (first != null && !first.isBlank()) return first.trim();
+        return second == null || second.isBlank() ? null : second.trim();
     }
 
     private JsonNode readObject(String reply) {

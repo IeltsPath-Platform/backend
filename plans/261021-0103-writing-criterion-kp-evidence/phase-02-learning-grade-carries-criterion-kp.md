@@ -108,6 +108,10 @@ cũ, nên dùng `package`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bài chấm mới lưu `knowledgePointId` cho từng tiêu chí khi Content trả về; `null` khi Content chưa có.
-- [ ] Prompt LLM và `promptVersion` không đổi; response API không có `knowledgePointId`.
-- [ ] Test grader và test web hiện có vẫn xanh.
+- [x] Bài chấm mới lưu `knowledgePointId` cho từng tiêu chí khi Content trả về; `null` khi Content chưa có.
+- [x] Prompt LLM và `promptVersion` không đổi; `criteria[]` không có `knowledgePointId` (KP trong `studyPoints[]` là bổ sung của plan 1415).
+- [x] Test grader và test web hiện có vẫn xanh.
+
+## Đồng bộ trạng thái — 2026-10-21
+
+Báo cáo Surefire hiện có: EssayGraderTest 25 test và WritingWebMvcTest 5 test đều qua. Quy tắc không lộ KP của plan này áp dụng cho `criteria[]`; plan 1415 bổ sung có chủ đích KP trong `studyPoints[]`. Bằng chứng và giới hạn: [báo cáo đồng bộ](../261021-1415-essay-study-points/reports/pm-2026-10-21-writing-plan-status.md).

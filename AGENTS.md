@@ -220,7 +220,8 @@ src/main/java/com/ieltspath/<service>
   riêng cho KP tiêu chí được ánh xạ (`DEMO_WRITING_CRITERION_*`, bảng `writing_criterion_knowledge_points` ở Content), đúng khi
   band tiêu chí >= `passBand`. KP tiêu chí lưu trong JSON bài chấm lúc chấm; bài cũ không có thì ghi như trước. Event essay
   vẫn một dòng cho KP của đề, `error_code` là mã lỗi gặp nhiều nhất. Bằng chứng tiêu chí của essay Practice không được XP
-  mốc; Writing vẫn không sinh bài ôn. KP tiêu chí không có bộ luyện tập (ngoại lệ có chú thích trong test độ phủ).
+  mốc; Writing vẫn không sinh bài ôn. Mỗi KP tiêu chí có 3 bộ luyện tự do demo (`PS-WCR-*`, V70; nội dung AI soạn, cần giám khảo IELTS duyệt).
+  Kết quả chấm trả thêm `studyPoints` (KP tiêu chí yếu và `focus` của LLM), tính một lần lúc chấm và lưu trong JSON bài chấm; bài cũ trả mảng rỗng.
 - Luyện tự do theo KP (`POST /knowledge-points/{id}/free-practice`) không bao giờ chặn đường học: trượt không sinh bài
   ôn chặn và không khóa gì; mỗi KP luôn giữ lại `learning.free-practice.reserve` gói chưa xem cho bài ôn
   (`free-practice-v1.md`). Bằng chứng luyện tự do là bằng chứng luyện tập (trọng số và trần 3 bài luyện của MP-1.0).

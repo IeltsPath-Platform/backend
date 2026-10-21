@@ -14,11 +14,15 @@ import java.util.UUID;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record WritingSubmissionResponse(UUID submissionId, String status, String task, Integer wordCount,
                                         BigDecimal overallBand, Boolean passed, List<Criterion> criteria,
-                                        List<Correction> corrections, String summary, Integer pointsCharged,
+                                        List<Correction> corrections, List<StudyPoint> studyPoints, String summary, Integer pointsCharged,
                                         String sampleAnswer, String code, String failureCode, String essayText) {
     public record Criterion(String code, BigDecimal band, List<String> strengths, List<String> improvements) {}
 
     public record Correction(String excerpt, String suggestion, String category) {}
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record StudyPoint(String kind, String criterionCode, BigDecimal band, UUID knowledgePointId, String code,
+                             String name, String title, String reason) {}
 
     public static WritingSubmissionResponse from(WritingSubmissionResult result) {
         var grade = result.grade();
@@ -29,6 +33,9 @@ public record WritingSubmissionResponse(UUID submissionId, String status, String
                         criterion.band(), criterion.strengths(), criterion.improvements())).toList(),
                 grade == null ? null : grade.corrections().stream().map(correction -> new Correction(
                         correction.excerpt(), correction.suggestion(), correction.category())).toList(),
+                grade == null ? null : grade.studyPoints().stream().map(point -> new StudyPoint(point.kind(),
+                        point.criterionCode(), point.band(), point.knowledgePointId(), point.code(), point.name(),
+                        point.title(), point.reason())).toList(),
                 grade == null ? null : grade.summary(), result.pointsCharged(), result.sampleAnswer(), result.code(),
                 result.failureCode(), result.essayText());
     }

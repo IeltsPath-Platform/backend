@@ -470,6 +470,41 @@ class LessonWritingIntegrationTest {
                 + "WHERE source_reference_id = ?", String.class, result.submissionId()));
     }
 
+    @Test
+    void aGradedEssayCarriesStudyPointsFromWeakCriteriaAndTheModelFocus() {
+        when(content.getActiveRubric(anyString())).thenReturn(rubricWithCriterionPoints("TASK_2"));
+        when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
+                "Writing", 900, null, List.of(kp(KP), kp(ESSAY_KP),
+                new LearningContentClient.KnowledgePoint(CC_KP, "DEMO_WRITING_CRITERION_CC", "Mạch lạc và liên kết (CC)",
+                        "PROCEDURE", "WRITING", "Nối câu bằng từ nối đúng chức năng.", true),
+                new LearningContentClient.KnowledgePoint(GRA_KP, "DEMO_WRITING_CRITERION_GRA", "Ngữ pháp đa dạng và chính xác (GRA)",
+                        "CONCEPT", "WRITING", "Kết hợp câu đơn và câu phức.", true)), LearningSkill.WRITING, true)));
+        topics.execute(USER);
+        llmReplies(gradeWithFocus("7.0", "5.5", "6.5", "5.0"));
+
+        WritingSubmissionResult result = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY);
+        var points = result.grade().studyPoints();
+        assertEquals(List.of("CRITERION", "CRITERION", "AI"), points.stream().map(p -> p.kind()).toList());
+        assertEquals(GRA_KP, points.getFirst().knowledgePointId());
+        assertEquals(new BigDecimal("5.0"), points.getFirst().band());
+        assertEquals("Ngữ pháp đa dạng và chính xác (GRA)", points.getFirst().name());
+        assertEquals(CC_KP, points.get(1).knowledgePointId());
+        assertEquals("Mạch lạc và liên kết (CC)", points.get(1).name());
+        assertEquals("Cohesive Devices", points.get(2).title());
+
+        clearInvocations(content);
+        assertEquals(points, getWritingSubmissionUseCase.execute(USER, result.submissionId()).grade().studyPoints());
+        jdbc.update("UPDATE lesson_writing_submissions SET result = result::jsonb - 'studyPoints' WHERE id = ?",
+                result.submissionId());
+        assertTrue(getWritingSubmissionUseCase.execute(USER, result.submissionId()).grade().studyPoints().isEmpty());
+        verifyNoInteractions(content);
+    }
+
+    private static String gradeWithFocus(String tr, String cc, String lr, String gra) {
+        return gradeWithBands(tr, cc, lr, gra).replace("\"focus\":[]",
+                "\"focus\":[\"Cohesive Devices: Dùng từ nối tự nhiên\"]");
+    }
+
     private static String gradeWithBands(String tr, String cc, String lr, String gra) {
         return "{\"criteria\":[" + bandJson("TR", tr) + "," + bandJson("CC", cc) + "," + bandJson("LR", lr) + ","
                 + bandJson("GRA", gra) + "],\"corrections\":[{\"excerpt\":\"Cities should plant more trees\","

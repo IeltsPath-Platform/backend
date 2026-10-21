@@ -280,4 +280,142 @@ class EssayGraderTest {
     private static int count(String text, String token) {
         return text.split(java.util.regex.Pattern.quote(token), -1).length - 1;
     }
+
+    @Test
+    void focusEntriesBecomeAiStudyPointsSplitAtTheFirstColon() {
+        llm.reply(focusReply("[\"Cohesive Devices: Dùng từ nối: tự nhiên\",\"Counter-argument\"]"));
+        var points = grader.grade(task2(), ESSAY).grade().studyPoints();
+        assertEquals(List.of("AI", "AI"), points.stream().map(WritingGrade.StudyPoint::kind).toList());
+        assertEquals("Cohesive Devices", points.getFirst().title());
+        assertEquals("Dùng từ nối: tự nhiên", points.getFirst().reason());
+        assertEquals("Counter-argument", points.get(1).title());
+        assertNull(points.get(1).reason());
+    }
+
+    @Test
+    void blankNonTextualAndExtraFocusEntriesAreDropped() {
+        llm.reply(focusReply("[\"\",\"  \",5,null,\": chỉ có lý do\",\"A: 1\",\"B: 2\",\"C: 3\",\"D: 4\",\"E: 5\"]"));
+        assertEquals(List.of("A", "B", "C", "D"), grader.grade(task2(), ESSAY).grade().studyPoints()
+                .stream().map(WritingGrade.StudyPoint::title).toList());
+    }
+
+    @Test
+    void aTooLongFocusTitleIsTruncated() throws Exception {
+        String focus = new ObjectMapper().writeValueAsString(List.of("T".repeat(200), "Reason: " + "R".repeat(500)));
+        llm.reply(focusReply(focus));
+        var points = grader.grade(task2(), ESSAY).grade().studyPoints();
+        assertEquals(80, points.getFirst().title().length());
+        assertTrue(points.get(1).reason().length() <= 300);
+    }
+
+    @Test
+    void weakCriteriaBecomeCriterionStudyPointsWeakestFirstWithTheKnowledgePointDetails() {
+        UUID tr = UUID.randomUUID(), cc = UUID.randomUUID();
+        rubricWithPoints(tr, cc, UUID.randomUUID(), UUID.randomUUID());
+        when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(UUID.randomUUID(),
+                "WRITING", "Writing", 900, null, List.of(point(tr, "TR", "Can do TR"), point(cc, "CC", " ")),
+                com.ieltspath.learning.domain.vo.LearningSkill.WRITING, true)));
+        llm.reply(reply(criterion("TR", "5.0"), criterion("CC", "5.5"), criterion("LR", "6.0"), criterion("GRA", "6.5")));
+
+        var points = grader.grade(task2(), ESSAY).grade().studyPoints();
+
+        assertEquals(List.of("TR", "CC"), points.stream().map(WritingGrade.StudyPoint::criterionCode).toList());
+        assertEquals(List.of(tr, cc), points.stream().map(WritingGrade.StudyPoint::knowledgePointId).toList());
+        assertEquals("DEMO_WRITING_CRITERION_TR", points.getFirst().code());
+        assertEquals("Name TR", points.getFirst().name());
+        assertEquals("Name TR", points.getFirst().title());
+        assertEquals("Can do TR", points.getFirst().reason());
+        assertEquals("Description CC", points.get(1).reason());
+        verify(content).getTopicSequence();
+    }
+
+    @Test
+    void criteriaAtOrAboveThePassBandOrWithoutAKnowledgePointAddNoCriterionPoint() {
+        rubricWithPoints(null, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        llm.reply(reply(criterion("TR", "4.0"), criterion("CC", "6.0"), criterion("LR", "6.0"), criterion("GRA", "7.0")));
+        assertTrue(grader.grade(task2(), ESSAY).grade().studyPoints().isEmpty());
+        verify(content, never()).getTopicSequence();
+    }
+
+    @Test
+    void aPromptWithoutAPassBandAddsNoCriterionPoints() {
+        rubricWithPoints(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        EssayPrompt prompt = new EssayPrompt(UUID.randomUUID(), "Question", "TASK_2", 250, null, null, "Sample", List.of(), List.of());
+        llm.reply(focusReply("[\"Linking: Practise linking\"]", "4.0", "4.0", "4.0", "4.0"));
+        assertEquals(List.of("AI"), grader.grade(prompt, ESSAY).grade().studyPoints().stream()
+                .map(WritingGrade.StudyPoint::kind).toList());
+        verify(content, never()).getTopicSequence();
+    }
+
+    @Test
+    void criterionPointsComeBeforeAiPoints() {
+        rubricWithPoints(UUID.randomUUID(), null, null, null);
+        llm.reply(focusReply("[\"Linking: Practise linking\"]", "5.0", "6.0", "6.0", "6.0"));
+        assertEquals(List.of("CRITERION", "AI"), grader.grade(task2(), ESSAY).grade().studyPoints().stream()
+                .map(WritingGrade.StudyPoint::kind).toList());
+    }
+
+    @Test
+    void unavailableContentStillGradesAndLeavesTheKnowledgePointNameEmpty() {
+        UUID tr = UUID.randomUUID();
+        rubricWithPoints(tr, null, null, null);
+        when(content.getTopicSequence()).thenThrow(new com.ieltspath.learning.application.exception.LearningRequestException(
+                503, "CONTENT_UNAVAILABLE", "Unavailable"));
+        llm.reply(focusReply("[]", "5.0", "6.0", "6.0", "6.0"));
+        var point = grader.grade(task2(), ESSAY).grade().studyPoints().getFirst();
+        assertEquals("CRITERION", point.kind());
+        assertEquals(tr, point.knowledgePointId());
+        assertEquals("TR", point.criterionCode());
+        assertEquals(new BigDecimal("5.0"), point.band());
+        assertNull(point.name());
+        assertNull(point.title());
+        assertNull(point.code());
+        assertNull(point.reason());
+    }
+
+    @Test
+    void gradeWithoutFocusHasNoAiPoints() {
+        for (String focus : List.of("[]", "null", "{}")) {
+            llm.reply(focusReply(focus));
+            assertTrue(grader.grade(task2(), ESSAY).grade().studyPoints().isEmpty());
+        }
+        llm.reply(focusReply("[]").replace(",\"focus\":[]", ""));
+        assertTrue(grader.grade(task2(), ESSAY).grade().studyPoints().isEmpty());
+    }
+
+    @Test
+    void equallyWeakCriteriaFollowTheRubricOrder() {
+        rubricWithPoints(UUID.randomUUID(), UUID.randomUUID(), null, null);
+        var rubric = content.getActiveRubric("TASK_2");
+        when(content.getActiveRubric("TASK_2")).thenReturn(new LearningContentClient.Rubric(rubric.code(), rubric.task(),
+                rubric.version(), rubric.sourceNote(), rubric.criteria().stream().map(c ->
+                new LearningContentClient.RubricCriterion(c.code(), c.name(), c.description(),
+                        "CC".equals(c.code()) ? 0 : c.sortOrder(), c.bandDescriptors(), c.knowledgePointId())).toList(), List.of()));
+        llm.reply(focusReply("[]", "5.0", "5.0", "6.0", "6.0"));
+        assertEquals(List.of("CC", "TR"), grader.grade(task2(), ESSAY).grade().studyPoints().stream()
+                .map(WritingGrade.StudyPoint::criterionCode).toList());
+    }
+
+    private static String focusReply(String focus, String... bands) {
+        List<String> codes = List.of("TR", "CC", "LR", "GRA");
+        String[] criteria = java.util.stream.IntStream.range(0, codes.size())
+                .mapToObj(i -> criterion(codes.get(i), bands.length == 0 ? "6.0" : bands[i])).toArray(String[]::new);
+        return reply(criteria).replace("\"focus\":[]", "\"focus\":" + focus);
+    }
+
+    private void rubricWithPoints(UUID tr, UUID cc, UUID lr, UUID gra) {
+        UUID[] points = {tr, cc, lr, gra};
+        List<String> codes = List.of("TR", "CC", "LR", "GRA");
+        var descriptor = new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Descriptor");
+        var criteria = java.util.stream.IntStream.range(0, codes.size()).mapToObj(i ->
+                new LearningContentClient.RubricCriterion(codes.get(i), codes.get(i), "Description", i + 1,
+                        List.of(descriptor), points[i])).toList();
+        when(content.getActiveRubric("TASK_2")).thenReturn(new LearningContentClient.Rubric(
+                "IELTS_ESSAY", "TASK_2", 2, "source", criteria, List.of()));
+    }
+
+    private static LearningContentClient.KnowledgePoint point(UUID id, String code, String canDo) {
+        return new LearningContentClient.KnowledgePoint(id, "DEMO_WRITING_CRITERION_" + code, "Name " + code,
+                "PROCEDURE", "WRITING", "Description " + code, true, null, canDo);
+    }
 }

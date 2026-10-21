@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Tài liệu và kiểm tra toàn bộ"
-status: completed
+status: in-progress
 priority: P1
 effort: "0.25d"
 dependencies: [1, 2, 3]
@@ -55,5 +55,9 @@ Board "IELTSPath – Cây tri thức – đánh giá":
 ## Tiêu chí hoàn thành
 
 - [ ] Ba lệnh `package` xanh (hoặc ghi rõ test bị bỏ qua).
-- [ ] `AGENTS.md`, `lesson-writing-v1.md`, `learning-content-internal-v1.md` mô tả đúng hành vi mới.
-- [ ] Ghi chú Figma đã được gửi cho người dùng trong báo cáo cuối.
+- [x] `AGENTS.md`, `lesson-writing-v1.md`, `learning-content-internal-v1.md` mô tả đúng hành vi mới.
+- [x] Ghi chú Figma đã được gửi cho người dùng trong báo cáo cuối.
+
+## Đồng bộ trạng thái — 2026-10-21
+
+Tài liệu đã đối chiếu; ghi chú bàn giao Figma nằm trong báo cáo, chưa sửa trực tiếp board. Không đánh dấu ba lệnh package xanh: báo cáo Learning hiện có còn hai test lỗi, và không có log để xác nhận lại toàn bộ ba lệnh package trong lần này. Bằng chứng và giới hạn: [báo cáo đồng bộ](../261021-1415-essay-study-points/reports/pm-2026-10-21-writing-plan-status.md).

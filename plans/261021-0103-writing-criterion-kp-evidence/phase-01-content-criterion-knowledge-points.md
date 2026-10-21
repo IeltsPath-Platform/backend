@@ -169,12 +169,12 @@ Spring Boot tắt `FAIL_ON_UNKNOWN_PROPERTIES`, và repo không bật lại (đ�
    ```java
    .containsExactly(tuple("DEMO_READING_W2_OPINION", true), tuple("DEMO_READING_W1_CHART", true),
            tuple("DEMO_WRITING_TOPIC_SENTENCE", true), tuple("DEMO_WRITING_LINKING", true),
-           tuple("DEMO_WRITING_TREND_LANGUAGE", true), tuple("DEMO_WRITING_CRITERION_TA", false),
-           tuple("DEMO_WRITING_CRITERION_TR", false), tuple("DEMO_WRITING_CRITERION_CC", false),
-           tuple("DEMO_WRITING_CRITERION_LR", false), tuple("DEMO_WRITING_CRITERION_GRA", false));
+           tuple("DEMO_WRITING_TREND_LANGUAGE", true), tuple("DEMO_WRITING_CRITERION_TA", true),
+           tuple("DEMO_WRITING_CRITERION_TR", true), tuple("DEMO_WRITING_CRITERION_CC", true),
+           tuple("DEMO_WRITING_CRITERION_LR", true), tuple("DEMO_WRITING_CRITERION_GRA", true));
    ```
-   Sửa comment dòng 395 cho khớp, ví dụ: "...the three added later have practice sets; the five rubric-criterion points
-   have none."
+   (`hasPracticeSet` của 5 KP mới là `true` sau khi V70 thêm bộ luyện; trước V70 là `false`.) Sửa comment dòng 395 cho
+   khớp.
 3. Nếu có test WebMvc/serialization cho `InternalRubricController`, thêm assert `criteria[0].knowledgePointId`. Nếu
    không có thì không tạo mới; test repository ở trên là đủ.
 
@@ -191,7 +191,11 @@ Trong `docs/contracts/learning-content-internal-v1.md`, mục "Essay rubrics", t
 
 ## Tiêu chí hoàn thành
 
-- [ ] V69 chạy được trên DB đã có V68; có 5 KP mới (ACTIVE, topic `DEMO_WRITING`) và 8 dòng ánh xạ.
-- [ ] Internal rubric active và theo phiên bản (kể cả `RETIRED`) trả `knowledgePointId` cho mọi tiêu chí.
-- [ ] `RubricResponse` admin/public không đổi.
-- [ ] content-service `package` xanh (ghi rõ test Testcontainers nào bị bỏ qua nếu không có Docker).
+- [x] V69 chạy được trên DB đã có V68; có 5 KP mới (ACTIVE, topic `DEMO_WRITING`) và 8 dòng ánh xạ.
+- [x] Internal rubric active và theo phiên bản (kể cả `RETIRED`) trả `knowledgePointId` cho mọi tiêu chí.
+- [x] `RubricResponse` admin/public không đổi.
+- [x] content-service `package` xanh (ghi rõ test Testcontainers nào bị bỏ qua nếu không có Docker).
+
+## Đồng bộ trạng thái — 2026-10-21
+
+Đã đối chiếu migration V69, test ánh xạ Task 1/Task 2 và rubric cũ. Artifact hiện có của Content: 526 test, không lỗi, không bỏ qua; có jar tạo ngày 2026-10-21. Không chạy lại Maven trong lần cập nhật này. Bằng chứng và giới hạn: [báo cáo đồng bộ](../261021-1415-essay-study-points/reports/pm-2026-10-21-writing-plan-status.md).

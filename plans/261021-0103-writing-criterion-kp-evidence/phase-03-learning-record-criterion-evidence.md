@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Learning: ghi bằng chứng tiêu chí và mã lỗi cho essay lesson và Practice"
-status: completed
+status: in-progress
 priority: P1
 effort: "1d"
 dependencies: [2]
@@ -263,9 +263,13 @@ Chạy: `mvn -q -pl services/learning-service -am package`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] `WritingEvidenceRuleTest` xanh, đủ 9 case.
-- [ ] Essay lesson và essay Practice ghi bằng chứng tiêu chí đúng theo `band >= passBand`; bài không có KP tiêu chí ghi như cũ.
-- [ ] Event essay: 1 dòng, KP như cũ, có `error_code`.
-- [ ] Không có XP mốc cho KP chỉ đến từ tiêu chí essay Practice.
+- [x] `WritingEvidenceRuleTest` xanh, đủ 9 case.
+- [x] Essay lesson và essay Practice ghi bằng chứng tiêu chí đúng theo `band >= passBand`; bài không có KP tiêu chí ghi như cũ.
+- [x] Event essay: 1 dòng, KP như cũ, có `error_code`.
+- [x] Không có XP mốc cho KP chỉ đến từ tiêu chí essay Practice.
 - [ ] Mọi test hiện có của learning-service xanh, đặc biệt `LessonWritingIntegrationTest` dòng 149, 228, 244, 255, 368
       và `PracticeEssayIntegrationTest` dòng 175, 178 (không phải sửa assert).
+
+## Đồng bộ trạng thái — 2026-10-21
+
+Phần triển khai đã xong. WritingEvidenceRuleTest hiện có 10 test qua; LessonWritingIntegrationTest 16 và PracticeEssayIntegrationTest 4 test qua, không bỏ qua. Chặn XP mốc đã đối chiếu `criterionOnly` → `recordEvidence(..., withoutMilestone)` theo phương án review code mà phase cho phép; vẫn thiếu test riêng cho tình huống vượt mốc. Gate toàn Learning chưa xanh: 826 test, 1 failure và 1 error (hai lỗi đã ghi trong plan 1415). Bằng chứng và giới hạn: [báo cáo đồng bộ](../261021-1415-essay-study-points/reports/pm-2026-10-21-writing-plan-status.md).
