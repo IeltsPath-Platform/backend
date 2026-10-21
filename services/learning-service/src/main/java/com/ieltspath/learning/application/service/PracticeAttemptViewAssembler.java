@@ -73,6 +73,7 @@ public class PracticeAttemptViewAssembler {
                 spec.get("minWords") instanceof Number words ? words.intValue() : null,
                 spec.get("passBand") instanceof Number band ? new BigDecimal(band.toString()) : null, latest,
                 item.guide(), item.images().stream()
-                        .map(image -> new LessonResult.Image(image.mediaUrl(), image.altText())).toList());
+                        .map(image -> new LessonResult.Image(image.mediaUrl(), image.altText())).toList(),
+                item.explanation());
     }
 }

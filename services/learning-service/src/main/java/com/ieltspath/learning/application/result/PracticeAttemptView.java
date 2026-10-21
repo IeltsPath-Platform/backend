@@ -21,12 +21,16 @@ public record PracticeAttemptView(UUID attemptId, UUID packageId, UUID packageVe
     public record Section(UUID sectionId, String title, String skill, String passage, Audio audio,
                           List<LessonResult.Question> questions, List<Essay> essays) {}
 
+    /**
+     * {@code sampleAnswer} is the model answer the learner may open while writing; null when Content has none.
+     * {@code answerSpec} and {@code chartFacts} are never part of the view.
+     */
     public record Essay(UUID questionVersionId, int sortOrder, String stem, String task, Integer minWords,
                         BigDecimal passBand, LessonResult.LatestSubmission latestSubmission,
-                        String guide, List<LessonResult.Image> images) {
+                        String guide, List<LessonResult.Image> images, String sampleAnswer) {
         public Essay(UUID questionVersionId, int sortOrder, String stem, String task, Integer minWords,
                      BigDecimal passBand, LessonResult.LatestSubmission latestSubmission) {
-            this(questionVersionId, sortOrder, stem, task, minWords, passBand, latestSubmission, null, List.of());
+            this(questionVersionId, sortOrder, stem, task, minWords, passBand, latestSubmission, null, List.of(), null);
         }
     }
 }

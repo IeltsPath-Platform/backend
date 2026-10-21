@@ -1,4 +1,4 @@
-"""Export the four course Task 1 charts as SVG and PNG. Requires ImageMagick on PATH.
+"""Export course Task 1 charts as SVG and PNG. PNG export uses ImageMagick when available.
 
 Run: python backend/scripts/generate-course-writing-charts.py
 Data matches content-service's V63 course Writing prompts. No API or credentials are used.
@@ -139,26 +139,97 @@ def fuel_chart():
     return parts
 
 
+def marriage_age_chart():
+    parts = canvas('Situation of marriage and age from 1960 to 2000 in Australia',
+                   'Number of marriages and average age at marriage')
+    x0, y0 = 100, 220
+    widths = [160, 270, 270, 350, 350]
+    headers = [
+        ['Year'],
+        ['Religious', 'marriage'],
+        ['Civil', 'marriage'],
+        ['Average age', 'of bride'],
+        ['Average age', 'of groom'],
+    ]
+    rows = [
+        ['1960', '25,000', '8,000', '21', '24'],
+        ['1970', '28,000', '12,000', '23', '25'],
+        ['1980', '50,000', '16,000', '25', '27'],
+        ['1990', '32,000', '23,000', '27', '30'],
+        ['2000', '34,000', '40,000', '30', '32'],
+    ]
+    header_height, row_height = 150, 112
+    total_width = sum(widths)
+    parts.append(rect(x0, y0, total_width, header_height, BLUE))
+    x = x0
+    for width, lines in zip(widths, headers):
+        start_y = y0 + (header_height - (len(lines) - 1) * 35) / 2 + 9
+        for line_index, value in enumerate(lines):
+            parts.append(text(x + width / 2, start_y + line_index * 35, value, 26, '#ffffff', weight='700'))
+        x += width
+    for row_index, row in enumerate(rows):
+        y = y0 + header_height + row_index * row_height
+        if row_index % 2 == 1:
+            parts.append(rect(x0, y, total_width, row_height, '#f8fafc'))
+        x = x0
+        for width, value in zip(widths, row):
+            parts.append(text(x + width / 2, y + row_height / 2 + 11, value, 30,
+                              INK, weight='700' if row_index == 0 else '400'))
+            x += width
+    parts.extend([line(x0, y0, x0, y0 + header_height + row_height * len(rows)),
+                  line(x0 + total_width, y0, x0 + total_width,
+                       y0 + header_height + row_height * len(rows))])
+    x = x0
+    for width in widths[:-1]:
+        x += width
+        parts.append(line(x, y0, x, y0 + header_height + row_height * len(rows)))
+    parts.append(line(x0, y0 + header_height, x0 + total_width, y0 + header_height))
+    for row_index in range(1, len(rows)):
+        y = y0 + header_height + row_index * row_height
+        parts.append(line(x0, y, x0 + total_width, y))
+    parts.append(line(x0, y0 + header_height + row_height * len(rows),
+                      x0 + total_width, y0 + header_height + row_height * len(rows)))
+    return parts
+
+
 def main():
     magick = shutil.which('magick')
-    if not magick:
-        raise SystemExit('ImageMagick (magick) must be installed and available on PATH to export PNGs.')
     OUTPUT.mkdir(parents=True, exist_ok=True)
     charts = {
         'ps-w1-wr-1-car-ownership': car_chart,
         'ps-w1-wr-2-family-spending': spending_chart,
         'ps-w5-wr-1-park-visitors': park_chart,
         'ps-w5-wr-2-fuel-prices': fuel_chart,
+        'ps-w1-wr-3-marriage-age': marriage_age_chart,
+    }
+    task_codes = {
+        'ps-w1-wr-1-car-ownership': 'PS-W1-WR-1',
+        'ps-w1-wr-2-family-spending': 'PS-W1-WR-2',
+        'ps-w5-wr-1-park-visitors': 'PS-W5-WR-1',
+        'ps-w5-wr-2-fuel-prices': 'PS-W5-WR-2',
+        'ps-w1-wr-3-marriage-age': 'PS-W1-WR-3',
     }
     for filename, render in charts.items():
         svg = OUTPUT / f'{filename}.svg'
-        png = OUTPUT / f'{filename}.png'
         svg.write_text('\n'.join([*render(), '</svg>']), encoding='utf-8')
-        subprocess.run([magick, '-background', 'white', str(svg), str(png)], check=True)
-        print(png)
+        print(svg)
+
+    if magick:
+        for filename in charts:
+            svg = OUTPUT / f'{filename}.svg'
+            png = OUTPUT / f'{filename}.png'
+            subprocess.run([magick, '-background', 'white', str(svg), str(png)], check=True)
+            print(png)
+    else:
+        print('ImageMagick (magick) is not on PATH; SVGs were written and PNG export was skipped.')
 
     with ZipFile(OUTPUT / 'course-writing-charts.zip', 'w', ZIP_DEFLATED) as archive:
-        for filename in [*(f'{name}.png' for name in charts), 'README.md', 'upload-urls.csv']:
+        for name in charts:
+            path = OUTPUT / f'{name}.png'
+            if path.exists():
+                task_code = task_codes[name]
+                archive.write(path, arcname=f'writtings/leassons/{task_code}/{path.name}')
+        for filename in ['README.md', 'upload-urls.csv']:
             path = OUTPUT / filename
             if path.exists():
                 archive.write(path, arcname=filename)

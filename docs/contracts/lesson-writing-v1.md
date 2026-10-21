@@ -44,8 +44,9 @@ The frontend joins non-empty parts with paragraph breaks and submits the same `{
 requirement to grade every essay before finishing the set are unchanged. The chart URLs are also frozen in the
 submission's existing prompt snapshot. No timer is introduced; dictionary lookup remains available beside the editor.
 
-Content V64 seeds guides for the ten V63 course Writing tasks and public Supabase chart references for its four Task 1
-prompts. Image upload is performed by the content owner; files and exact URLs are in
+Content V64 seeds the initial guides and four public Supabase chart references for the ten V63 course Writing tasks.
+V66 adds paraphrasing and vocabulary guidance to those ten guides and clarifies Task 1 overview choices. V67 adds a
+third W1 Task 1 table prompt and its fifth chart reference. Image upload is performed by the content owner; files and exact URLs are in
 [course-writing-charts](../assets/course-writing-charts/README.md).
 
 ## `POST /lessons/{lessonId}/essays/{blockId}/submissions`

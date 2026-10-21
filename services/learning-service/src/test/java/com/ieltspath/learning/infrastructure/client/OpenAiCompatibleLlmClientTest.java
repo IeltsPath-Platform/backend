@@ -2,6 +2,8 @@ package com.ieltspath.learning.infrastructure.client;
 
 import com.ieltspath.learning.application.exception.LlmUnavailableException;
 import org.junit.jupiter.api.Test;
+import java.io.IOException;
+import java.time.Duration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -19,9 +21,15 @@ class OpenAiCompatibleLlmClientTest {
     private record Setup(OpenAiCompatibleLlmClient client, MockRestServiceServer server) {}
 
     private static Setup client(String model, String effort) {
+        return client(model, effort, Duration.ofMinutes(1));
+    }
+
+    /** {@code retryWindow}: a busy answer slower than this is not asked again; the pause before a repeat is zero. */
+    private static Setup client(String model, String effort, Duration retryWindow) {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        return new Setup(new OpenAiCompatibleLlmClient(builder.build(), "test-key", model, effort), server);
+        return new Setup(new OpenAiCompatibleLlmClient(builder.build(), "test-key", model, effort, Duration.ZERO,
+                retryWindow), server);
     }
 
     private static String reply(String content) {
@@ -65,11 +73,84 @@ class OpenAiCompatibleLlmClientTest {
     void providerErrorsAndUnusableRepliesAreUnavailable() {
         Setup setup = client("gpt-4o-mini", "");
         setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
-                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
         setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
                 .andRespond(withSuccess("{\"choices\":[]}", MediaType.APPLICATION_JSON));
         assertThrows(LlmUnavailableException.class, () -> setup.client().completeJson("s", "u", false));
         assertThrows(LlmUnavailableException.class, () -> setup.client().completeJson("s", "u", false));
+        setup.server().verify();
+    }
+
+    @Test
+    void aBusyProviderIsAskedAgainOnceAndTheSecondReplyIsUsed() {
+        Setup setup = client("gpt-4o-mini", "");
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withSuccess(reply("\"graded\""), MediaType.APPLICATION_JSON));
+
+        assertEquals("graded", setup.client().completeJson("s", "u", false));
+        setup.server().verify();
+    }
+
+    @Test
+    void aRateLimitedRequestIsAskedAgainOnce() {
+        Setup setup = client("gpt-4o-mini", "");
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withSuccess(reply("\"graded\""), MediaType.APPLICATION_JSON));
+
+        assertEquals("graded", setup.client().completeJson("s", "u", false));
+        setup.server().verify();
+    }
+
+    @Test
+    void aProviderThatStaysBusyIsGivenUpOnAfterTheSecondAttempt() {
+        Setup setup = client("gpt-4o-mini", "");
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+
+        LlmUnavailableException failure = assertThrows(LlmUnavailableException.class,
+                () -> setup.client().completeJson("s", "u", false));
+        assertTrue(failure.getMessage().contains("503"));
+        setup.server().verify();
+    }
+
+    @Test
+    void aBusyAnswerThatCameTooLateLeavesNoRoomToAskAgain() {
+        Setup setup = client("gpt-4o-mini", "", Duration.ZERO);
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+
+        LlmUnavailableException failure = assertThrows(LlmUnavailableException.class,
+                () -> setup.client().completeJson("s", "u", false));
+        assertTrue(failure.getMessage().contains("503"));
+        setup.server().verify();
+    }
+
+    @Test
+    void errorsOtherThanBusyAreNotAskedAgain() {
+        Setup setup = client("gemini-3.8-flash", "");
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+
+        LlmUnavailableException failure = assertThrows(LlmUnavailableException.class,
+                () -> setup.client().completeJson("s", "u", false));
+        assertTrue(failure.getMessage().contains("400"));
+        setup.server().verify();
+    }
+
+    @Test
+    void aBrokenConnectionIsNotAskedAgain() {
+        Setup setup = client("gpt-4o-mini", "");
+        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withException(new IOException("connection reset")));
+
+        assertThrows(LlmUnavailableException.class, () -> setup.client().completeJson("s", "u", false));
+        setup.server().verify();
     }
 
     @Test

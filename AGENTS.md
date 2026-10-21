@@ -235,7 +235,9 @@ src/main/java/com/ieltspath/<service>
 - Bằng chứng bài học chỉ ghi ở lần nộp đầu của mỗi khối; bài ôn ghi mỗi set (nộp một lần); kết quả thi ghi theo
   `(attempt_id, result_version)`, chấm lại thì thay bằng chứng của version cũ.
 - Học viên không bao giờ nhận `answerSpec` hay `chartFacts`. `explanation` và transcript chỉ có sau khi đạt, **trừ**
-  practice attempt, set ôn và quick-check của bài ôn: có ngay sau khi nộp. Package đã nộp ở Practice hoặc đã giao trong
+  practice attempt, set ôn và quick-check của bài ôn: có ngay sau khi nộp. Essay trong practice attempt còn mang
+  `sampleAnswer` (lấy từ `explanation`) ngay khi mở bài, để học viên bật xem bài mẫu trong lúc viết; essay của lesson thì
+  vẫn chỉ có sau khi block đạt. Package đã nộp ở Practice hoặc đã giao trong
   bài ôn không bao giờ được giao lại làm set ôn cho chính học viên đó (hết package thì bài ôn `SKIPPED`).
 - Consumer không gọi HTTP; ACK sau khi transaction commit; vi phạm contract hoặc hết lượt thử → DLQ.
 - Tác vụ LLM mới cho học viên (chấm Writing) phải có hạn mức theo ngày (plan 0737).

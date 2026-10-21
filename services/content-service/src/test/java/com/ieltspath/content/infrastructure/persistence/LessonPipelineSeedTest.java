@@ -561,7 +561,7 @@ class LessonPipelineSeedTest {
                 Map.entry("L65-PS-CORRECTION", "L65-1"), Map.entry("L65-PS-PURPOSE", "L65-1"),
                 Map.entry("TR-PS-READING", "T1"), Map.entry("TR-PS-LISTENING", "T1"), Map.entry("TR-PS-WRITING", "T1"),
                 Map.entry("TR-PS-MIXED", "T1"), Map.entry("TR-PS-T2-READING", "T2"),
-                Map.entry("PS-W1-WR-1", "W1"), Map.entry("PS-W1-WR-2", "W1"),
+                Map.entry("PS-W1-WR-1", "W1"), Map.entry("PS-W1-WR-2", "W1"), Map.entry("PS-W1-WR-3", "W1"),
                 Map.entry("PS-W2-WR-1", "W2"), Map.entry("PS-W2-WR-2", "W2"),
                 Map.entry("PS-W3-WR-1", "W3"), Map.entry("PS-W3-WR-2", "W3"),
                 Map.entry("PS-W4-WR-1", "W4"), Map.entry("PS-W4-WR-2", "W4"),
@@ -582,9 +582,75 @@ class LessonPipelineSeedTest {
                   AND NOT EXISTS (SELECT 1 FROM content_packages p WHERE p.lesson_id = l.id AND p.status = 'PUBLISHED')
                 """, Map.of(), String.class);
         assertThat(withoutPractice).isEmpty();
-        // The Writing chapter has a final test and two essay practice sets for each of its lessons.
+        // The Writing chapter has a final test and course essay practice sets for each of its lessons.
         assertThat(reader.lessonPracticeSets(lessonId("W1"))).extracting(LessonPracticeSetResult::code)
-                .containsExactly("PS-W1-WR-1", "PS-W1-WR-2");
+                .containsExactly("PS-W1-WR-1", "PS-W1-WR-2", "PS-W1-WR-3");
+    }
+
+    @Test
+    void courseWritingGuidesHaveVocabularyAndTheNewTablePromptHasAValidChartReference() {
+        List<Map<String, Object>> guides = jdbc.queryForList("""
+                SELECT p.code, qv.guide
+                FROM content_packages p
+                JOIN content_sections s ON s.package_version_id = p.current_published_version_id
+                JOIN section_questions sq ON sq.section_id = s.id
+                JOIN question_versions qv ON qv.id = sq.question_version_id
+                WHERE p.code LIKE 'PS-W%-WR-%'
+                ORDER BY p.code
+                """, Map.of());
+        assertThat(guides).hasSize(11).allSatisfy(row -> {
+            String guide = (String) row.get("guide");
+            assertThat(guide).contains("## 6.", "## 7.");
+        });
+
+        String newGuide = (String) guides.stream().filter(row -> row.get("code").equals("PS-W1-WR-3"))
+                .findFirst().orElseThrow().get("guide");
+        assertThat(newGuide.lines()).allSatisfy(line -> {
+            assertThat(line).doesNotStartWith("###");
+            assertThat(line.chars().filter(character -> character == '*').count() % 2).isZero();
+            assertThat(line.replace("**", "")).doesNotContain("*");
+        });
+        List<String> taskOneGuides = List.of("PS-W1-WR-1", "PS-W1-WR-2", "PS-W5-WR-1", "PS-W5-WR-2");
+        for (String code : taskOneGuides) {
+            String guide = (String) guides.stream().filter(row -> row.get("code").equals(code))
+                    .findFirst().orElseThrow().get("guide");
+            assertThat(guide).contains("- **Body 1, câu 1:**");
+        }
+
+        List<Map<String, Object>> chart = jdbc.queryForList("""
+                SELECT a.asset_type, a.media_reference
+                FROM content_packages p
+                JOIN content_sections s ON s.package_version_id = p.current_published_version_id
+                JOIN section_questions sq ON sq.section_id = s.id
+                JOIN content_asset_links al ON al.question_version_id = sq.question_version_id
+                JOIN content_assets a ON a.id = al.asset_id
+                WHERE p.code = 'PS-W1-WR-3'
+                """, Map.of());
+        assertThat(chart).singleElement().satisfies(row -> {
+            assertThat(row.get("asset_type")).isEqualTo("IMAGE");
+            String mediaReference = (String) row.get("media_reference");
+            assertThat(mediaReference).isEqualTo("https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W1-WR-3/ps-w1-wr-3-marriage-age.png");
+            assertThat(MEDIA.resolve(AssetType.IMAGE, mediaReference)).isEqualTo(mediaReference);
+        });
+    }
+
+    @Test
+    void existingCourseWritingChartReferencesRemainOnTheirV65Paths() {
+        Map<String, String> chartUrls = new java.util.TreeMap<>();
+        jdbc.queryForList("""
+                SELECT p.code, a.media_reference
+                FROM content_packages p
+                JOIN content_sections s ON s.package_version_id = p.current_published_version_id
+                JOIN section_questions sq ON sq.section_id = s.id
+                JOIN content_asset_links al ON al.question_version_id = sq.question_version_id
+                JOIN content_assets a ON a.id = al.asset_id
+                WHERE p.code IN ('PS-W1-WR-1', 'PS-W1-WR-2', 'PS-W5-WR-1', 'PS-W5-WR-2')
+                """, Map.of()).forEach(row -> chartUrls.put((String) row.get("code"), (String) row.get("media_reference")));
+        assertThat(chartUrls).isEqualTo(Map.of(
+                "PS-W1-WR-1", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W1-WR-1/ps-w1-wr-1-car-ownership.png",
+                "PS-W1-WR-2", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W1-WR-2/ps-w1-wr-2-family-spending.png",
+                "PS-W5-WR-1", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W5-WR-1/ps-w5-wr-1-park-visitors.png",
+                "PS-W5-WR-2", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W5-WR-2/ps-w5-wr-2-fuel-prices.png"));
     }
 
     @Test
