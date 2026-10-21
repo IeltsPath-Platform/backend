@@ -51,7 +51,8 @@ third W1 Task 1 table prompt and its fifth chart reference. Image upload is perf
 
 ## `POST /lessons/{lessonId}/essays/{blockId}/submissions`
 
-Request: `{"requestId":"<UUID>","essayText":"..."}`. The essay is graded **within the request** (typically 20–45 s).
+Request: `{"requestId":"<UUID>","essayText":"..."}`. The essay is graded **within the request** using one LLM request
+for both criterion bands and sub-point judgments. Its default timeout is 20 s; service and payment work add latency.
 
 Order: validate input → look up `requestId` → load the lesson from Content → check the point balance → gate check and
 record `GRADING` → daily grading limit → LLM grading → debit points → record `GRADED` and mastery evidence.
@@ -64,13 +65,16 @@ Response 200:
   "overallBand":6.5,"passed":true,
   "criteria":[
     {"code":"TR","band":6.5,"strengths":["…"],"improvements":["…"]},
-    {"code":"CC","band":6.0,"strengths":["…"],"improvements":["…"]},
+    {"code":"CC","band":6.0,"strengths":["…"],"improvements":["…"],
+     "knowledgePointJudgments":[{"knowledgePointId":"…","code":"DEMO_WRITING_LINKING",
+       "name":"Từ nối và mạch lạc","judgment":"FAIL","excerpt":"…","reason":"Dùng từ nối phù hợp."}]},
     {"code":"LR","band":6.5,"strengths":["…"],"improvements":["…"]},
     {"code":"GRA","band":6.5,"strengths":["…"],"improvements":["…"]}
   ],
   "corrections":[{"excerpt":"peoples can save","suggestion":"people can save","category":"GRAMMAR","errorCode":"PLURAL_FORM"}],
   "studyPoints":[
     {"kind":"CRITERION","criterionCode":"CC","band":5.5,"knowledgePointId":"3c000000-0000-4000-8000-020000000003","code":"DEMO_WRITING_CRITERION_CC","name":"Mạch lạc và liên kết (CC)","title":"Mạch lạc và liên kết (CC)","reason":"Nối câu bằng từ nối đúng chức năng."},
+    {"kind":"KNOWLEDGE_POINT","criterionCode":"CC","band":6.0,"knowledgePointId":"…","code":"DEMO_WRITING_LINKING","name":"Từ nối và mạch lạc","title":"Từ nối và mạch lạc","reason":"Dùng từ nối phù hợp.","excerpt":"…","practiceKnowledgePointId":"…"},
     {"kind":"AI","title":"Cohesive Devices","reason":"Dùng từ nối tự nhiên để liên kết câu và đoạn mạch lạc."}
   ],
   "summary":"…","pointsCharged":3,"sampleAnswer":"…"
@@ -91,12 +95,32 @@ Response 200:
 grading, outside the submission transaction, and stored in the grade JSON; reads never recalculate it. Older grades
 without this field return `[]`. Null fields inside a point are omitted.
 
+Each criterion also includes `knowledgePointJudgments`, an ordered array that is `[]` for grades without stored judgments.
+Each judgment has `knowledgePointId`, `code`, `name`, and `judgment` (`PASS`, `FAIL` or `NOT_ASSESSED`); `excerpt` and `reason` are omitted
+when no evidence is available. When the rubric lists sub-points, Learning appends `essay-kp-judgment-v2` instructions to
+the unchanged band template `v1`; one response supplies `criteria`, `corrections`, `summary`, `focus` and `judgments`.
+Rubrics without sub-points do not require `judgments`. `promptVersion` remains
+`<rubricCode>@<rubricVersion>+tplv1` for band activation; internal grade JSON stores `judgmentVersion=kpj2` when sub-points
+exist and the response contains a judgments array, otherwise null. This version is not exposed by the API.
+Historical `kpj1` grades remain readable. `EssayKnowledgeJudge` validates the received data without LLM or clock
+dependencies; the grader supplies a lazy Content catalog, loaded at most once when needed for practice targets.
+Missing or malformed judgments preserve a valid band and leave the affected model
+judgments `NOT_ASSESSED`; validated corrections whose active error type maps to a knowledge point can still produce
+`FAIL`. Corrections and judgments come from the same model response and are checked against application rules.
+
+There is no second request to repair JSON and no automatic HTTP retry for provider 429/503. Invalid JSON or invalid
+criterion bands fail with stored `INVALID_GRADE` (public `GRADING_UNAVAILABLE`), without charging points. A provider
+failure or timeout fails the grading without charging points. The single request uses
+`learning.writing.grading-timeout-seconds` (default 20 s); there is no separate judgment timeout or skip setting.
+
 | Kind | Fields and meaning |
 | --- | --- |
 | `CRITERION` | `criterionCode`, `band` and `knowledgePointId` are required. Only criteria with `band < passBand` and a mapped KP qualify; no criterion points when `passBand` is null. `code`, `name`, `title` and `reason` are optional snapshots of Content's KP details; `title` is its name, and `reason` prefers `canDo` over `description` (maximum 300 characters). If Content is unavailable, grading still succeeds without those details. |
 | `AI` | `kind`, `title` and optional `reason` describe a model `focus` entry. At most four entries, split at the first colon, with title limited to 80 and reason to 300 characters; blank or non-text entries are discarded. |
+| `KNOWLEDGE_POINT` | A sub knowledge point judged `FAIL`. Carries the parent `criterionCode` and `band`, the sub-point fields, exact validated `excerpt` and `reason`; `practiceKnowledgePointId` is the sub-point ID when it has a practice set, otherwise the parent criterion point ID when available. |
 
-Criterion points come first, ordered by band ascending and rubric order for ties, then AI points in model order.
+Study points keep criterion points in their existing band/rubric order, followed immediately by failed sub-points for that
+criterion; failed sub-points without a criterion study point follow in rubric order, then AI points in model order.
 The same response applies to lesson, course Practice, free-writing and revision submissions. Mentor review and
 Assessment result shapes are unchanged. The learner can use a criterion point's KP ID with the existing
 [free-practice API](free-practice-v1.md); its reserve and exhaustion rules still apply.
@@ -130,9 +154,11 @@ can ask a Mentor to review a graded essay (`POST`/`GET /writing-submissions/{id}
   it → 429 `DAILY_LIMIT_REACHED`, no LLM call, no charge.
 - Mastery evidence (`source = lesson_writing`) is recorded on every graded submission until the block is first passed,
   and never after. It has one row per knowledge point of the question with `correct = passed`, and one row per rubric
-  criterion whose knowledge point is mapped, with `correct = criterion band >= passBand`. Criterion knowledge points
-  appear only in `studyPoints[]`; `criteria[]` still omits KP IDs. The question's event carries the most frequent correction `errorCode`. No review is
-  inserted.
+  criterion whose knowledge point is mapped, with `correct = criterion band >= passBand`. A sub-point judgment of
+  `PASS` or `FAIL` adds evidence regardless of the essay pass band; `NOT_ASSESSED` adds none. Criterion band evidence
+  takes priority when the same KP is mapped twice, and sub-point evidence overrides the question's pass result when IDs
+  overlap. Criterion knowledge points appear only in `studyPoints[]`; `criteria[]` exposes sub-point IDs only inside
+  `knowledgePointJudgments[]`. The question's event carries the most frequent correction `errorCode`. No review is inserted.
 
 ## Errors
 

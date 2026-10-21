@@ -16,6 +16,7 @@ import com.ieltspath.learning.application.usecase.GetWritingSubmissionUseCase;
 import com.ieltspath.learning.application.usecase.SubmitLessonEssayUseCase;
 import com.ieltspath.learning.application.usecase.RefreshLearningTopicsUseCase;
 import com.ieltspath.learning.domain.exception.LearningGateException;
+import com.ieltspath.learning.domain.vo.WritingGrade;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -85,6 +86,8 @@ class LessonWritingIntegrationTest {
     private static final UUID CC_KP = UUID.randomUUID();
     private static final UUID LR_KP = UUID.randomUUID();
     private static final UUID GRA_KP = UUID.randomUUID();
+    private static final UUID SUB_LINK_KP = UUID.randomUUID();
+    private static final UUID SUB_TOPIC_KP = UUID.randomUUID();
     private static final String ESSAY = ("Cities should plant more trees because trees cool streets, clean the air "
             + "and make people calmer. ").repeat(4);
 
@@ -188,6 +191,20 @@ class LessonWritingIntegrationTest {
 
         assertEquals(0, count("lesson_writing_submissions"));
         verify(llm, never()).completeJson(any(), any(), anyBoolean());
+        verify(access, never()).debit(any(), anyInt(), any(), any(), any());
+    }
+
+    @Test
+    void anInvalidModelReplyFailsWithoutRetryingOrCharging() {
+        llmReplies("not valid json");
+
+        assertCode(503, "GRADING_UNAVAILABLE", () -> submitLessonEssayUseCase.execute(
+                USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY));
+
+        assertEquals("FAILED", status());
+        assertEquals("INVALID_GRADE", jdbc.queryForObject("SELECT failure_code FROM lesson_writing_submissions",
+                String.class));
+        verify(llm, times(1)).completeJson(any(), any(), anyBoolean());
         verify(access, never()).debit(any(), anyInt(), any(), any(), any());
     }
 
@@ -471,6 +488,37 @@ class LessonWritingIntegrationTest {
     }
 
     @Test
+    void aFailedSubKnowledgePointIsRecordedOnItsOwnAndAnUnassessedOneIsNot() {
+        when(content.getActiveRubric(anyString())).thenReturn(rubricWithSubKnowledgePoints("TASK_2"));
+        when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
+                "Writing", 900, null, List.of(kp(KP), kp(ESSAY_KP), kp(TR_KP), kp(CC_KP), kp(LR_KP),
+                new LearningContentClient.KnowledgePoint(SUB_LINK_KP, "DEMO_WRITING_LINKING", "Linking",
+                        "PROCEDURE", "WRITING", "Connect ideas", true),
+                new LearningContentClient.KnowledgePoint(SUB_TOPIC_KP, "DEMO_WRITING_TOPIC_SENTENCE", "Topic sentence",
+                        "PROCEDURE", "WRITING", "State the main idea", true)), LearningSkill.WRITING, true)));
+        topics.execute(USER);
+        llmReplies(gradeWithBands("7.0", "5.5", "6.5", "6.0")
+                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"criterion\":\"CC\","
+                + "\"code\":\"DEMO_WRITING_LINKING\",\"judgment\":\"FAIL\","
+                + "\"excerpt\":\"because trees cool streets\",\"reason\":\"Use a linker clearly.\"}]"));
+
+        WritingSubmissionResult result = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, UUID.randomUUID(), ESSAY);
+
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'lesson_writing' "
+                + "AND kp_id = ? AND correct = false", Integer.class, SUB_LINK_KP));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE source = 'lesson_writing' "
+                + "AND kp_id = ?", Integer.class, SUB_TOPIC_KP));
+        var subPoint = result.grade().studyPoints().stream()
+                .filter(point -> WritingGrade.StudyPoint.KNOWLEDGE_POINT.equals(point.kind())).findFirst().orElseThrow();
+        assertEquals("because trees cool streets", subPoint.excerpt());
+        assertEquals(SUB_LINK_KP, subPoint.practiceKnowledgePointId());
+        var restored = getWritingSubmissionUseCase.execute(USER, result.submissionId());
+        assertEquals(result.grade().criteria().get(1).knowledgePointJudgments(),
+                restored.grade().criteria().get(1).knowledgePointJudgments());
+        verify(llm, times(1)).completeJson(any(), any(), anyBoolean());
+    }
+
+    @Test
     void aGradedEssayCarriesStudyPointsFromWeakCriteriaAndTheModelFocus() {
         when(content.getActiveRubric(anyString())).thenReturn(rubricWithCriterionPoints("TASK_2"));
         when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
@@ -521,6 +569,19 @@ class LessonWritingIntegrationTest {
         var criteria = (task.equals("TASK_1") ? List.of("TA", "CC", "LR", "GRA") : List.of("TR", "CC", "LR", "GRA"))
                 .stream().map(code -> new LearningContentClient.RubricCriterion(code, code, "Description", 1,
                         List.of(descriptor), points.get(code))).toList();
+        return new LearningContentClient.Rubric("IELTS_WRITING", task, 1, "source", criteria, List.of());
+    }
+
+    private static LearningContentClient.Rubric rubricWithSubKnowledgePoints(String task) {
+        var descriptor = new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Band six.");
+        Map<String, UUID> points = Map.of("TR", TR_KP, "CC", CC_KP, "LR", LR_KP, "GRA", GRA_KP);
+        var criteria = (task.equals("TASK_1") ? List.of("TA", "CC", "LR", "GRA") : List.of("TR", "CC", "LR", "GRA"))
+                .stream().map(code -> new LearningContentClient.RubricCriterion(code, code, "Description", 1,
+                        List.of(descriptor), points.get(code), code.equals("CC") ? List.of(
+                        new LearningContentClient.SubKnowledgePoint(SUB_TOPIC_KP, "DEMO_WRITING_TOPIC_SENTENCE",
+                                "Topic sentence", "State the main idea"),
+                        new LearningContentClient.SubKnowledgePoint(SUB_LINK_KP, "DEMO_WRITING_LINKING", "Linking",
+                                "Connect ideas")) : List.of())).toList();
         return new LearningContentClient.Rubric("IELTS_WRITING", task, 1, "source", criteria, List.of());
     }
 

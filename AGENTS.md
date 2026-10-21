@@ -218,10 +218,22 @@ src/main/java/com/ieltspath/<service>
   nhờ Mentor chữa essay lesson/Practice đã chấm (`human-review-v1.md`), chỉ là phản hồi: không đổi bằng chứng, cổng hay bài ôn.
 - Bằng chứng essay (lesson và Practice): KP của đề nhận `passed`; mỗi tiêu chí rubric (TA/TR, CC, LR, GRA) là một bằng chứng
   riêng cho KP tiêu chí được ánh xạ (`DEMO_WRITING_CRITERION_*`, bảng `writing_criterion_knowledge_points` ở Content), đúng khi
-  band tiêu chí >= `passBand`. KP tiêu chí lưu trong JSON bài chấm lúc chấm; bài cũ không có thì ghi như trước. Event essay
-  vẫn một dòng cho KP của đề, `error_code` là mã lỗi gặp nhiều nhất. Bằng chứng tiêu chí của essay Practice không được XP
-  mốc; Writing vẫn không sinh bài ôn. Mỗi KP tiêu chí có 3 bộ luyện tự do demo (`PS-WCR-*`, V70; nội dung AI soạn, cần giám khảo IELTS duyệt).
-  Kết quả chấm trả thêm `studyPoints` (KP tiêu chí yếu và `focus` của LLM), tính một lần lúc chấm và lưu trong JSON bài chấm; bài cũ trả mảng rỗng.
+  band tiêu chí >= `passBand`. Các KP con trong `subKnowledgePoints` được đánh giá cùng band trong đúng một request LLM
+  (`kpj2`, nối hướng dẫn vào template band `v1` nguyên vẹn): chỉ `PASS`/
+  `FAIL` có excerpt nguyên văn mới ghi evidence, không phụ thuộc passBand; `NOT_ASSESSED` không ghi. Correction có error type
+  gắn KP con có thể hạ `PASS` hoặc nâng `NOT_ASSESSED` thành `FAIL`. KP tiêu chí thắng nếu cùng ID; KP con thắng KP của đề.
+  `judgments` thiếu/sai thì giữ band hợp lệ, KP `NOT_ASSESSED` trừ `FAIL` từ correction đã kiểm tra. Hai phần đến từ cùng
+  output AI; đối chiếu correction là luật application. `EssayKnowledgeJudge` không dùng LLM/clock; catalog Content được
+  lấy khi cần qua supplier do grader cung cấp, tối đa một lần. Không có call
+  sửa JSON hay HTTP retry tự động cho 429/503; JSON/band sai là `INVALID_GRADE`, không thu points. Timeout chung
+  `learning.writing.grading-timeout-seconds` mặc định 20 giây, không còn timeout/skip riêng cho judgment; quota một lượt.
+  `promptVersion` vẫn `+tplv1` cho activation band; `judgmentVersion=kpj2` chỉ ở JSON lưu khi có KP con và nhận mảng judgments,
+  còn lại null; `kpj1` chỉ còn trong bài lịch sử. Không có KP con thì không cần mảng judgments.
+  API không phát `judgmentVersion`. KP tiêu chí / KP con lưu trong JSON grade; bài cũ chưa có judgments đọc thành `[]`.
+  Event essay vẫn một dòng cho KP của đề, `error_code` là mã lỗi gặp nhiều nhất. Bằng chứng tiêu chí và KP con của essay
+  Practice không được XP mốc; Writing vẫn không sinh bài ôn. Mỗi KP tiêu chí có 3 bộ luyện tự do demo (`PS-WCR-*`, V70;
+  nội dung AI soạn, cần giám khảo IELTS duyệt). Kết quả chấm trả thêm `studyPoints` (KP tiêu chí yếu, KP con `FAIL` và `focus`
+  của LLM), tính một lần lúc chấm và lưu trong JSON bài chấm; bài cũ trả mảng rỗng.
 - Luyện tự do theo KP (`POST /knowledge-points/{id}/free-practice`) không bao giờ chặn đường học: trượt không sinh bài
   ôn chặn và không khóa gì; mỗi KP luôn giữ lại `learning.free-practice.reserve` gói chưa xem cho bài ôn
   (`free-practice-v1.md`). Bằng chứng luyện tự do là bằng chứng luyện tập (trọng số và trần 3 bài luyện của MP-1.0).

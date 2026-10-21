@@ -2,8 +2,11 @@ package com.ieltspath.learning.infrastructure.client;
 
 import com.ieltspath.learning.application.exception.LlmUnavailableException;
 import org.junit.jupiter.api.Test;
-import java.io.IOException;
-import java.time.Duration;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -11,25 +14,24 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.io.IOException;
+import java.net.SocketTimeoutException;
+
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
+@ExtendWith(OutputCaptureExtension.class)
 class OpenAiCompatibleLlmClientTest {
     private static final String BASE_URL = "http://llm.test/v1";
 
     private record Setup(OpenAiCompatibleLlmClient client, MockRestServiceServer server) {}
 
     private static Setup client(String model, String effort) {
-        return client(model, effort, Duration.ofMinutes(1));
-    }
-
-    /** {@code retryWindow}: a busy answer slower than this is not asked again; the pause before a repeat is zero. */
-    private static Setup client(String model, String effort, Duration retryWindow) {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        return new Setup(new OpenAiCompatibleLlmClient(builder.build(), "test-key", model, effort, Duration.ZERO,
-                retryWindow), server);
+        return new Setup(new OpenAiCompatibleLlmClient(builder.build(), "test-key", model, effort), server);
     }
 
     private static String reply(String content) {
@@ -54,7 +56,7 @@ class OpenAiCompatibleLlmClientTest {
     }
 
     @Test
-    void anExplicitReasoningEffortDropsTemperatureAndARetryAsksForLowEffort() {
+    void anExplicitReasoningEffortDropsTemperatureAndLowReasoningOverridesIt() {
         Setup setup = client("gemini-2.5-flash", "medium");
         setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
                 .andExpect(jsonPath("$.reasoning_effort").value("medium"))
@@ -81,53 +83,23 @@ class OpenAiCompatibleLlmClientTest {
         setup.server().verify();
     }
 
-    @Test
-    void aBusyProviderIsAskedAgainOnceAndTheSecondReplyIsUsed() {
+    @ParameterizedTest
+    @ValueSource(ints = {429, 503})
+    void aBusyProviderFailsAfterExactlyOneRequestWithoutLeakingText(int status, CapturedOutput output) {
         Setup setup = client("gpt-4o-mini", "");
-        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
-                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
-        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
-                .andRespond(withSuccess(reply("\"graded\""), MediaType.APPLICATION_JSON));
-
-        assertEquals("graded", setup.client().completeJson("s", "u", false));
-        setup.server().verify();
-    }
-
-    @Test
-    void aRateLimitedRequestIsAskedAgainOnce() {
-        Setup setup = client("gpt-4o-mini", "");
-        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
-                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
-        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
-                .andRespond(withSuccess(reply("\"graded\""), MediaType.APPLICATION_JSON));
-
-        assertEquals("graded", setup.client().completeJson("s", "u", false));
-        setup.server().verify();
-    }
-
-    @Test
-    void aProviderThatStaysBusyIsGivenUpOnAfterTheSecondAttempt() {
-        Setup setup = client("gpt-4o-mini", "");
-        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
-                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
-        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
-                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        setup.server().expect(once(), requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.valueOf(status)).body("private provider body")
+                        .contentType(MediaType.TEXT_PLAIN));
 
         LlmUnavailableException failure = assertThrows(LlmUnavailableException.class,
-                () -> setup.client().completeJson("s", "u", false));
-        assertTrue(failure.getMessage().contains("503"));
-        setup.server().verify();
-    }
-
-    @Test
-    void aBusyAnswerThatCameTooLateLeavesNoRoomToAskAgain() {
-        Setup setup = client("gpt-4o-mini", "", Duration.ZERO);
-        setup.server().expect(requestTo(BASE_URL + "/chat/completions"))
-                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
-
-        LlmUnavailableException failure = assertThrows(LlmUnavailableException.class,
-                () -> setup.client().completeJson("s", "u", false));
-        assertTrue(failure.getMessage().contains("503"));
+                () -> setup.client().completeJson("private system prompt", "private learner essay", false));
+        assertEquals("LLM provider request failed (status " + status + ")", failure.getMessage());
+        assertNull(failure.getCause());
+        assertTrue(output.getAll().contains("status=" + status));
+        assertFalse(output.getAll().contains("private provider body"));
+        assertFalse(output.getAll().contains("private system prompt"));
+        assertFalse(output.getAll().contains("private learner essay"));
+        assertFalse(output.getAll().contains("test-key"));
         setup.server().verify();
     }
 
@@ -150,6 +122,23 @@ class OpenAiCompatibleLlmClientTest {
                 .andRespond(withException(new IOException("connection reset")));
 
         assertThrows(LlmUnavailableException.class, () -> setup.client().completeJson("s", "u", false));
+        setup.server().verify();
+    }
+
+    @Test
+    void aNetworkTimeoutFailsAfterExactlyOneRequestWithoutLeakingText(CapturedOutput output) {
+        Setup setup = client("gpt-4o-mini", "");
+        setup.server().expect(once(), requestTo(BASE_URL + "/chat/completions"))
+                .andRespond(withException(new SocketTimeoutException("private network failure details")));
+
+        LlmUnavailableException failure = assertThrows(LlmUnavailableException.class,
+                () -> setup.client().completeJson("private system prompt", "private learner essay", false));
+        assertEquals("LLM provider request failed (status null)", failure.getMessage());
+        assertNull(failure.getCause());
+        assertFalse(output.getAll().contains("private network failure details"));
+        assertFalse(output.getAll().contains("private system prompt"));
+        assertFalse(output.getAll().contains("private learner essay"));
+        assertFalse(output.getAll().contains("test-key"));
         setup.server().verify();
     }
 

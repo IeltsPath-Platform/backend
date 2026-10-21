@@ -109,15 +109,30 @@ public interface LearningContentClient {
                   List<RubricExample> examples) {}
     /** {@code knowledgePointId} is the point the criterion is evidence for; null when Content does not map it. */
     record RubricCriterion(String code, String name, String description, int sortOrder,
-                           List<RubricBandDescriptor> bandDescriptors, UUID knowledgePointId) {
+                           List<RubricBandDescriptor> bandDescriptors, UUID knowledgePointId,
+                           List<SubKnowledgePoint> subKnowledgePoints) {
+        public RubricCriterion {
+            subKnowledgePoints = subKnowledgePoints == null ? List.of() : List.copyOf(subKnowledgePoints);
+        }
+
         public RubricCriterion(String code, String name, String description, int sortOrder,
                                List<RubricBandDescriptor> bandDescriptors) {
-            this(code, name, description, sortOrder, bandDescriptors, null);
+            this(code, name, description, sortOrder, bandDescriptors, null, List.of());
+        }
+
+        public RubricCriterion(String code, String name, String description, int sortOrder,
+                               List<RubricBandDescriptor> bandDescriptors, UUID knowledgePointId) {
+            this(code, name, description, sortOrder, bandDescriptors, knowledgePointId, List.of());
         }
     }
+    record SubKnowledgePoint(UUID id, String code, String name, String description) {}
     record RubricBandDescriptor(java.math.BigDecimal band, String descriptor) {}
     record RubricExample(java.math.BigDecimal band, String prompt, String essay, String commentary) {}
-    record ErrorType(String code, String name, String category, int severity, String fixHint) {}
+    record ErrorType(String code, String name, String category, int severity, String fixHint, UUID knowledgePointId) {
+        public ErrorType(String code, String name, String category, int severity, String fixHint) {
+            this(code, name, category, severity, fixHint, null);
+        }
+    }
 
     /** The given skills in enum order, or the single legacy skill when Content did not send any. */
     static Set<LearningSkill> skillsOrSingle(Collection<LearningSkill> skills, LearningSkill single) {

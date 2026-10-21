@@ -178,6 +178,98 @@ class EssayGraderTest {
 
         assertEquals("IELTS_ESSAY@2+tplv1", graded.promptVersion());
         assertTrue(graded.grade().criteria().stream().allMatch(item -> item.knowledgePointId() == null));
+        assertEquals(1, llm.prompts.size(), "bands require only one request without sub knowledge points");
+    }
+
+    @Test
+    void oneReplyGradesBandsAndSubPointsWithoutFetchingContentTwice() {
+        UUID subPointId = UUID.randomUUID();
+        UUID criterionPointId = UUID.randomUUID();
+        var points = List.of("TR", "CC", "LR", "GRA").stream().map(code -> new LearningContentClient.RubricCriterion(
+                code, code, "Criterion description", code.equals("CC") ? 2 : 1, List.of(),
+                code.equals("CC") ? criterionPointId : null,
+                code.equals("CC") ? List.of(new LearningContentClient.SubKnowledgePoint(subPointId,
+                        "DEMO_WRITING_LINKING", "Linking", "Use linkers to connect ideas")) : List.of())).toList();
+        when(content.getActiveRubric("TASK_2")).thenReturn(new LearningContentClient.Rubric("IELTS_ESSAY", "TASK_2",
+                2, "source", points, List.of()));
+        when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(UUID.randomUUID(), "WRITING",
+                "Writing", 1, null, List.of(new LearningContentClient.KnowledgePoint(subPointId,
+                "DEMO_WRITING_LINKING", "Linking", "PROCEDURE", "WRITING", "Use linkers", true)), null,
+                false, null, null)));
+        llm.reply(reply(criterion("TR", "6"), criterion("CC", "4"), criterion("LR", "6"), criterion("GRA", "6"))
+                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"criterion\":\"CC\",\"code\":\"DEMO_WRITING_LINKING\","
+                        + "\"judgment\":\"FAIL\",\"excerpt\":\"Peoples can save energy.\",\"reason\":\"Use a linker.\"}]"));
+
+        var result = grader.grade(task2(), ESSAY);
+
+        assertEquals("IELTS_ESSAY@2+tplv1", result.promptVersion());
+        assertEquals(new BigDecimal("5.5"), result.grade().overallBand());
+        assertEquals("kpj2", result.grade().judgmentVersion());
+        assertEquals(WritingGrade.Judgment.FAIL,
+                result.grade().criteria().stream().filter(item -> item.code().equals("CC")).findFirst().orElseThrow()
+                        .knowledgePointJudgments().getFirst().judgment());
+        assertEquals(1, llm.prompts.size());
+        assertTrue(llm.prompts.getFirst()[0].contains("DEMO_WRITING_LINKING"));
+        assertTrue(llm.prompts.getFirst()[0].contains("Use linkers to connect ideas"));
+        assertFalse(llm.prompts.getFirst()[0].contains(subPointId.toString()));
+        verify(content, times(1)).getTopicSequence();
+    }
+
+    @Test
+    void optionalJudgmentsCannotInvalidateValidBandsOrTriggerAnotherCall() {
+        UUID subPointId = UUID.randomUUID();
+        var base = content.getActiveRubric("TASK_2");
+        var criteria = base.criteria().stream().map(c -> new LearningContentClient.RubricCriterion(
+                c.code(), c.name(), c.description(), c.sortOrder(), c.bandDescriptors(), c.knowledgePointId(),
+                "CC".equals(c.code()) ? List.of(new LearningContentClient.SubKnowledgePoint(subPointId,
+                        "LINKING", "Linking", "Connect ideas")) : List.of())).toList();
+        when(content.getActiveRubric("TASK_2")).thenReturn(new LearningContentClient.Rubric(
+                base.code(), base.task(), base.version(), base.sourceNote(), criteria, base.examples()));
+
+        int expectedCalls = 0;
+        for (String field : List.of("", ",\"judgments\":null", ",\"judgments\":{}",
+                ",\"judgments\":\"invalid\"", ",\"judgments\":[]",
+                ",\"judgments\":[{\"criterion\":\"CC\",\"code\":\"LINKING\",\"judgment\":\"FAIL\","
+                        + "\"excerpt\":\"not present in the essay\"}]")) {
+            llm.reply(reply(criterion("TR", "6"), criterion("CC", "6"), criterion("LR", "6"), criterion("GRA", "6"))
+                    .replace("\"focus\":[]", "\"focus\":[]" + field));
+
+            var result = grader.grade(task2(), ESSAY).grade();
+
+            assertEquals(new BigDecimal("6.0"), result.overallBand());
+            assertEquals(WritingGrade.Judgment.NOT_ASSESSED, result.criteria().get(1)
+                    .knowledgePointJudgments().getFirst().judgment());
+            assertTrue(result.studyPoints().isEmpty());
+            assertEquals(++expectedCalls, llm.prompts.size());
+        }
+        verify(content, never()).getTopicSequence();
+    }
+
+    @Test
+    void catalogOutageFallsBackToTheCriterionKnowledgePointForPractice() {
+        UUID parentId = UUID.randomUUID();
+        UUID subPointId = UUID.randomUUID();
+        var descriptor = new LearningContentClient.RubricBandDescriptor(new BigDecimal("6.0"), "Descriptor");
+        var criteria = List.of("TR", "CC", "LR", "GRA").stream()
+                .map(code -> new LearningContentClient.RubricCriterion(code, code, "Description", 1, List.of(descriptor),
+                        code.equals("CC") ? parentId : null, code.equals("CC") ? List.of(
+                        new LearningContentClient.SubKnowledgePoint(subPointId, "DEMO_WRITING_LINKING", "Linking",
+                                "Connect ideas")) : List.of())).toList();
+        when(content.getActiveRubric("TASK_2")).thenReturn(new LearningContentClient.Rubric("IELTS_ESSAY", "TASK_2",
+                2, "source", criteria, List.of()));
+        when(content.getTopicSequence()).thenThrow(new com.ieltspath.learning.application.exception.LearningRequestException(
+                503, "CONTENT_UNAVAILABLE", "Content unavailable"));
+        llm.reply(reply(criterion("TR", "6.5"), criterion("CC", "5.5"), criterion("LR", "6"), criterion("GRA", "6"))
+                .replace("\"focus\":[]", "\"focus\":[],\"judgments\":[{\"criterion\":\"CC\",\"code\":\"DEMO_WRITING_LINKING\","
+                        + "\"judgment\":\"FAIL\",\"excerpt\":\"Peoples can save energy.\","
+                        + "\"reason\":\"Use a linker.\"}]"));
+
+        var result = grader.grade(task2(), ESSAY);
+
+        var studyPoint = result.grade().studyPoints().stream()
+                .filter(point -> WritingGrade.StudyPoint.KNOWLEDGE_POINT.equals(point.kind())).findFirst().orElseThrow();
+        assertEquals(parentId, studyPoint.practiceKnowledgePointId());
+        verify(content, times(1)).getTopicSequence();
     }
 
     @Test
@@ -185,19 +277,18 @@ class EssayGraderTest {
         llm.reply(reply(criterion("TA", "7"), criterion("CC", "7"), criterion("LR", "7"), criterion("GRA", "7")));
         assertEquals("TA", grader.grade(task1("Sales rose from 10 to 40."), ESSAY).grade().criteria().getFirst().code());
 
-        llm.reply(reply(criterion("TR", "7"), criterion("CC", "7"), criterion("LR", "7"), criterion("GRA", "7")),
-                reply(criterion("TR", "7"), criterion("CC", "7"), criterion("LR", "7"), criterion("GRA", "7")));
+        llm.reply(reply(criterion("TR", "7"), criterion("CC", "7"), criterion("LR", "7"), criterion("GRA", "7")));
         assertEquals("INVALID_GRADE", assertThrows(WritingGradingException.class,
                 () -> grader.grade(task1("Facts"), ESSAY)).getCode());
     }
 
     @Test
-    void anInvalidReplyIsRetriedOnceWithLowReasoning() {
-        String valid = reply(criterion("TR", "5"), criterion("CC", "5"), criterion("LR", "5"), criterion("GRA", "5.5"));
-        llm.reply("not json at all", valid);
+    void anInvalidReplyIsRejectedWithoutAnotherModelCall() {
+        llm.reply("not json at all");
 
-        assertEquals(new BigDecimal("5.0"), grader.grade(task2(), ESSAY).grade().overallBand());
-        assertEquals(List.of(false, true), llm.lowReasoning);
+        assertEquals("INVALID_GRADE", assertThrows(WritingGradingException.class,
+                () -> grader.grade(task2(), ESSAY)).getCode());
+        assertEquals(List.of(false), llm.lowReasoning);
     }
 
     @Test
@@ -211,7 +302,7 @@ class EssayGraderTest {
                         criterion("XX", "6")),
                 "{\"criteria\": [");
         for (String reply : invalid) {
-            llm.reply(reply, reply);
+            llm.reply(reply);
             assertEquals("INVALID_GRADE", assertThrows(WritingGradingException.class,
                     () -> grader.grade(task2(), ESSAY)).getCode(), reply);
         }

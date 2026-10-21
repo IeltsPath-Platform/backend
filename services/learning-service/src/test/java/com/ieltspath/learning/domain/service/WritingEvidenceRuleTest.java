@@ -28,6 +28,10 @@ class WritingEvidenceRuleTest {
         return new WritingGrade.Criterion(code, new BigDecimal(band), List.of(), List.of(), point);
     }
 
+    private static WritingGrade.KnowledgeJudgment judgment(UUID point, WritingGrade.Judgment judgment) {
+        return new WritingGrade.KnowledgeJudgment(point, "SUB", "Sub point", judgment, "excerpt", "reason");
+    }
+
     private static WritingGrade grade(List<WritingGrade.Criterion> criteria, List<WritingGrade.Correction> corrections) {
         return new WritingGrade(criteria, corrections, "ok", new BigDecimal("6.0"));
     }
@@ -98,6 +102,59 @@ class WritingEvidenceRuleTest {
 
         assertEquals(Map.of(QUESTION_KP, true), outcome.correctByKnowledgePoint());
         assertTrue(outcome.criterionKnowledgePoints().isEmpty());
+    }
+
+    @Test
+    void aFailedSubPointIsWrongAndAPassedOneIsRight() {
+        var cc = new WritingGrade.Criterion("CC", new BigDecimal("6.0"), List.of(), List.of(), CC, List.of(
+                judgment(TR, WritingGrade.Judgment.FAIL), judgment(LR, WritingGrade.Judgment.PASS)));
+        var outcome = rule.derive(List.of(), PASS, true, grade(List.of(cc), List.of()));
+
+        assertEquals(Map.of(CC, true, TR, false, LR, true), outcome.correctByKnowledgePoint());
+        assertEquals(Set.of(CC, TR, LR), outcome.criterionKnowledgePoints());
+    }
+
+    @Test
+    void aNotAssessedSubPointIsAbsent() {
+        var cc = new WritingGrade.Criterion("CC", new BigDecimal("6.0"), List.of(), List.of(), CC,
+                List.of(judgment(TR, WritingGrade.Judgment.NOT_ASSESSED)));
+        var outcome = rule.derive(List.of(), PASS, true, grade(List.of(cc), List.of()));
+        assertFalse(outcome.correctByKnowledgePoint().containsKey(TR));
+        assertEquals(Set.of(CC), outcome.criterionKnowledgePoints());
+    }
+
+    @Test
+    void aSubPointOverridesTheQuestionPoint() {
+        var cc = new WritingGrade.Criterion("CC", new BigDecimal("6.0"), List.of(), List.of(), CC,
+                List.of(judgment(QUESTION_KP, WritingGrade.Judgment.FAIL)));
+        var outcome = rule.derive(List.of(QUESTION_KP), PASS, true, grade(List.of(cc), List.of()));
+        assertEquals(Map.of(QUESTION_KP, false, CC, true), outcome.correctByKnowledgePoint());
+        assertEquals(List.of(QUESTION_KP, CC), List.copyOf(outcome.correctByKnowledgePoint().keySet()));
+    }
+
+    @Test
+    void aCriterionBandWinsOverASubPointJudgment() {
+        var cc = new WritingGrade.Criterion("CC", new BigDecimal("6.5"), List.of(), List.of(), CC,
+                List.of(judgment(CC, WritingGrade.Judgment.FAIL)));
+        var outcome = rule.derive(List.of(), PASS, true, grade(List.of(cc), List.of()));
+        assertTrue(outcome.correctByKnowledgePoint().get(CC));
+    }
+
+    @Test
+    void subPointsAreCriterionKnowledgePointsSoTheyEarnNoMilestone() {
+        var cc = new WritingGrade.Criterion("CC", new BigDecimal("6.0"), List.of(), List.of(), CC,
+                List.of(judgment(TR, WritingGrade.Judgment.PASS)));
+        var outcome = rule.derive(List.of(), PASS, true, grade(List.of(cc), List.of()));
+        assertEquals(Set.of(CC, TR), outcome.criterionKnowledgePoints());
+    }
+
+    @Test
+    void judgmentsCountEvenWithoutAPassBand() {
+        var cc = new WritingGrade.Criterion("CC", new BigDecimal("6.0"), List.of(), List.of(), CC,
+                List.of(judgment(TR, WritingGrade.Judgment.FAIL)));
+        var outcome = rule.derive(List.of(), null, false, grade(List.of(cc), List.of()));
+        assertEquals(Map.of(TR, false), outcome.correctByKnowledgePoint());
+        assertEquals(Set.of(TR), outcome.criterionKnowledgePoints());
     }
 
     @Test

@@ -50,4 +50,36 @@ class WritingGradeJsonTest {
         var grade = json.readValue("{\"criteria\":[],\"corrections\":[],\"summary\":\"x\",\"overallBand\":6.0}", WritingGrade.class);
         assertEquals(List.of(), grade.studyPoints());
     }
+
+    @Test
+    void criterionJudgmentsSurviveStorage() throws Exception {
+        var point = UUID.randomUUID();
+        var criterion = new WritingGrade.Criterion("CC", new BigDecimal("6.0"), List.of(), List.of(), null,
+                List.of(new WritingGrade.KnowledgeJudgment(point, "LINKING", "Linking",
+                        WritingGrade.Judgment.FAIL, "use a linker", "reason")));
+
+        assertEquals(criterion, json.readValue(json.writeValueAsString(criterion), WritingGrade.Criterion.class));
+    }
+
+    @Test
+    void aCriterionStoredWithoutJudgmentsReadsAsEmpty() throws Exception {
+        var stored = "{\"code\":\"CC\",\"band\":6.0,\"strengths\":[],\"improvements\":[]}";
+        var criterion = json.readValue(stored, WritingGrade.Criterion.class);
+        assertEquals(List.of(), criterion.knowledgePointJudgments());
+    }
+
+    @Test
+    void knowledgePointStudyPointSurvivesStorage() throws Exception {
+        var point = new WritingGrade.StudyPoint(WritingGrade.StudyPoint.KNOWLEDGE_POINT, "CC",
+                new BigDecimal("5.5"), UUID.randomUUID(), "LINKING", "Linking", "Linking", "reason", "excerpt",
+                UUID.randomUUID());
+        assertEquals(point, json.readValue(json.writeValueAsString(point), WritingGrade.StudyPoint.class));
+    }
+
+    @Test
+    void aGradeStoredWithoutJudgmentVersionReadsAsNull() throws Exception {
+        var grade = json.readValue("{\"criteria\":[],\"corrections\":[],\"summary\":\"x\",\"overallBand\":6.0}",
+                WritingGrade.class);
+        assertNull(grade.judgmentVersion());
+    }
 }

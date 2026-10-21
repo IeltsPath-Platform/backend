@@ -15,14 +15,14 @@ import java.util.UUID;
 /**
  * Turns one graded essay into mastery outcomes. The question's knowledge points take the essay's pass. Each rubric
  * criterion that names a knowledge point is evidence for that point on its own, correct when its band reaches the
- * pass band. A point that is both a question point and a criterion point takes the criterion's result; two criteria
- * on one point must both reach the pass band.
+ * pass band. Judged sub knowledge points add evidence independently of the essay pass mark. A point that is both a
+ * question point and a criterion point takes the criterion's result; two criteria on one point must both pass.
  */
 public final class WritingEvidenceRule {
 
     /**
-     * {@code correctByKnowledgePoint} lists the question's points first, then the criterion points; a point appears
-     * once. {@code criterionKnowledgePoints} are the points that a criterion decided.
+     * {@code correctByKnowledgePoint} lists question points first, then criterion points, then judged sub points;
+     * a point appears once. {@code criterionKnowledgePoints} are points decided by a criterion band or sub judgment.
      */
     public record Outcome(Map<UUID, Boolean> correctByKnowledgePoint, Set<UUID> criterionKnowledgePoints,
                           String dominantErrorCode) {
@@ -48,7 +48,24 @@ public final class WritingEvidenceRule {
                 else correct.put(kp, correct.get(kp) && reached);
             }
         }
-        return new Outcome(correct, decidedByCriteria, dominantErrorCode(grade));
+        Set<UUID> decidedByJudgments = new LinkedHashSet<>();
+        if (grade != null && grade.criteria() != null) {
+            for (WritingGrade.Criterion criterion : grade.criteria()) {
+                if (criterion == null || criterion.knowledgePointJudgments() == null) continue;
+                for (WritingGrade.KnowledgeJudgment judgment : criterion.knowledgePointJudgments()) {
+                    if (judgment == null || judgment.knowledgePointId() == null
+                            || judgment.judgment() == WritingGrade.Judgment.NOT_ASSESSED) continue;
+                    UUID kp = judgment.knowledgePointId();
+                    if (decidedByCriteria.contains(kp)) continue;
+                    boolean right = judgment.judgment() == WritingGrade.Judgment.PASS;
+                    if (decidedByJudgments.add(kp)) correct.put(kp, right);
+                    else correct.put(kp, correct.get(kp) && right);
+                }
+            }
+        }
+        Set<UUID> decidedPoints = new LinkedHashSet<>(decidedByCriteria);
+        decidedPoints.addAll(decidedByJudgments);
+        return new Outcome(correct, decidedPoints, dominantErrorCode(grade));
     }
 
     /** The most frequent error code of the corrections; a tie goes to the alphabetically first code. */

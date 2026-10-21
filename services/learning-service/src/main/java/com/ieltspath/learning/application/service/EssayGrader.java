@@ -15,6 +15,7 @@ import com.ieltspath.learning.domain.service.WritingScore;
 import com.ieltspath.learning.domain.vo.EssayPrompt;
 import com.ieltspath.learning.domain.vo.WritingGrade;
 import com.ieltspath.learning.domain.vo.WritingTask;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -22,6 +23,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /** Uses Content's active rubric during bootstrap, then the task's activated immutable rubric version. */
@@ -39,13 +41,22 @@ public class EssayGrader {
     private final ObjectMapper json;
     private final LearningContentClient content;
     private final EssayPromptActivationProvider activations;
+    private final EssayKnowledgeJudge knowledgeJudge;
 
+    @Autowired
     public EssayGrader(LlmClient llm, ObjectMapper json, LearningContentClient content,
-                       EssayPromptActivationProvider activations) {
+                       EssayPromptActivationProvider activations, EssayKnowledgeJudge knowledgeJudge) {
         this.llm = llm;
         this.json = json;
         this.content = content;
         this.activations = activations;
+        this.knowledgeJudge = knowledgeJudge;
+    }
+
+    /** Kept for unit tests that construct the original grader directly. */
+    public EssayGrader(LlmClient llm, ObjectMapper json, LearningContentClient content,
+                       EssayPromptActivationProvider activations) {
+        this(llm, json, content, activations, new EssayKnowledgeJudge());
     }
 
     public boolean available() { return llm.configured(); }
@@ -87,21 +98,19 @@ public class EssayGrader {
         }
         String system = systemPrompt(task, rubric, errorTypes);
         String user = userPrompt(task, prompt, essay);
+        Supplier<Map<UUID, LearningContentClient.KnowledgePoint>> catalog = memoized(this::knowledgePointCatalog);
+        JsonNode root;
         try {
-            Optional<WritingGrade> first = parse(task, essay, allowedCodes, criterionPoints,
-                    llm.completeJson(system, user, false));
-            WritingGrade grade = first.orElseGet(() -> {
-                try {
-                    return parse(task, essay, allowedCodes, criterionPoints, llm.completeJson(system, user, true))
-                            .orElseThrow(() -> new WritingGradingException("INVALID_GRADE"));
-                } catch (LlmUnavailableException exception) {
-                    throw new WritingGradingException("LLM_UNAVAILABLE");
-                }
-            });
-            return new GradedEssay(withCriterionStudyPoints(grade, rubric, prompt.passBand()), promptVersion);
+            root = readObject(llm.completeJson(system, user, false));
         } catch (LlmUnavailableException exception) {
             throw new WritingGradingException("LLM_UNAVAILABLE");
         }
+        WritingGrade grade = parse(task, essay, allowedCodes, criterionPoints, root)
+                .orElseThrow(() -> new WritingGradingException("INVALID_GRADE"));
+        WritingGrade withCriteria = withCriterionStudyPoints(grade, rubric, prompt.passBand(), catalog);
+        WritingGrade judged = knowledgeJudge.judge(task, essay, withCriteria, rubric.criteria(), allowedCodes,
+                root.path("judgments"), catalog);
+        return new GradedEssay(judged, promptVersion);
     }
 
     private Rubric resolveRubric(WritingTask task, String expectedVersion) {
@@ -129,7 +138,8 @@ public class EssayGrader {
         String taskName = task == WritingTask.TASK_1 ? "Academic Writing Task 1" : "Writing Task 2";
         return PROMPT_TEMPLATE.replace("{{task}}", taskName)
                 .replace("{{criteria}}", criterionText)
-                .replace("{{error_codes}}", errorCodes.isBlank() ? "(none)" : errorCodes);
+                .replace("{{error_codes}}", errorCodes.isBlank() ? "(none)" : errorCodes)
+                + EssayKnowledgeJudge.prompt(task, rubric.criteria());
     }
 
     private static String renderCriterion(RubricCriterion criterion) {
@@ -153,13 +163,12 @@ public class EssayGrader {
         return text.append("<essay>\n").append(neutralize(essay, "essay")).append("\n</essay>").toString();
     }
 
-    private static String neutralize(String value, String tag) {
+    static String neutralize(String value, String tag) {
         return value.replaceAll("(?i)</\\s*" + tag + "\\s*>", "[/" + tag + "]");
     }
 
     private Optional<WritingGrade> parse(WritingTask task, String essay, Map<String, ErrorType> allowedCodes,
-                                         Map<String, UUID> criterionPoints, String reply) {
-        JsonNode root = readObject(reply);
+                                         Map<String, UUID> criterionPoints, JsonNode root) {
         if (root == null || !root.path("criteria").isArray()) return Optional.empty();
         Map<String, WritingGrade.Criterion> byCode = new LinkedHashMap<>();
         for (JsonNode node : root.get("criteria")) {
@@ -201,7 +210,8 @@ public class EssayGrader {
     }
 
     /** Weak criteria with knowledge points come first, weakest first, followed by the model's own focus. */
-    private WritingGrade withCriterionStudyPoints(WritingGrade grade, Rubric rubric, BigDecimal passBand) {
+    private WritingGrade withCriterionStudyPoints(WritingGrade grade, Rubric rubric, BigDecimal passBand,
+                                                  Supplier<Map<UUID, LearningContentClient.KnowledgePoint>> catalog) {
         if (passBand == null) return grade;
         Map<String, Integer> order = new HashMap<>();
         for (RubricCriterion criterion : rubric.criteria()) {
@@ -213,8 +223,7 @@ public class EssayGrader {
                         .thenComparingInt(item -> order.getOrDefault(item.code(), Integer.MAX_VALUE)))
                 .toList();
         if (weak.isEmpty()) return grade;
-        Map<UUID, LearningContentClient.KnowledgePoint> details = knowledgePointDetails(
-                weak.stream().map(WritingGrade.Criterion::knowledgePointId).collect(Collectors.toSet()));
+        Map<UUID, LearningContentClient.KnowledgePoint> details = catalog.get();
         List<WritingGrade.StudyPoint> points = new ArrayList<>();
         for (WritingGrade.Criterion criterion : weak) {
             LearningContentClient.KnowledgePoint point = details.get(criterion.knowledgePointId());
@@ -228,13 +237,13 @@ public class EssayGrader {
     }
 
     /** Content's optional details are captured once; an unavailable catalog must not prevent grading. */
-    private Map<UUID, LearningContentClient.KnowledgePoint> knowledgePointDetails(Set<UUID> ids) {
+    private Map<UUID, LearningContentClient.KnowledgePoint> knowledgePointCatalog() {
         try {
             Map<UUID, LearningContentClient.KnowledgePoint> found = new HashMap<>();
             for (LearningContentClient.Topic topic : content.getTopicSequence()) {
                 if (topic.knowledgePoints() == null) continue;
                 for (LearningContentClient.KnowledgePoint point : topic.knowledgePoints()) {
-                    if (ids.contains(point.id())) found.putIfAbsent(point.id(), point);
+                    if (point != null && point.id() != null) found.putIfAbsent(point.id(), point);
                 }
             }
             return found;
@@ -249,6 +258,10 @@ public class EssayGrader {
     }
 
     private JsonNode readObject(String reply) {
+        return readObject(json, reply);
+    }
+
+    static JsonNode readObject(ObjectMapper json, String reply) {
         if (reply == null) return null;
         int start = reply.indexOf('{'), end = reply.lastIndexOf('}');
         if (start < 0 || end <= start) return null;
@@ -256,6 +269,22 @@ public class EssayGrader {
             JsonNode node = json.readTree(reply.substring(start, end + 1));
             return node != null && node.isObject() ? node : null;
         } catch (Exception exception) { return null; }
+    }
+
+    private static <T> Supplier<T> memoized(Supplier<T> source) {
+        return new Supplier<>() {
+            private boolean loaded;
+            private T value;
+
+            @Override
+            public synchronized T get() {
+                if (!loaded) {
+                    value = source.get();
+                    loaded = true;
+                }
+                return value;
+            }
+        };
     }
 
     private static List<WritingGrade.Correction> corrections(JsonNode node, String essay,
