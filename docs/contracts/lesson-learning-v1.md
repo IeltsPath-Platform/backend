@@ -8,6 +8,8 @@
 
 **Reading hints (2026-10-02):** lesson exercise questions and submission results add an always-present nullable `hint` field, with the policy below. Review set and quick-check questions carry the question's `hint` (2026-10-03); review results keep `hint: null`; final assessments are unchanged.
 
+**Vocabulary blocks (2026-10-21):** `GET /lessons/{id}` exposes ordered vocabulary sense IDs; Library resolves their display metadata. Vocabulary is supplemental and does not gate lesson completion or write mastery evidence.
+
 The MVP app displays course, topic and lesson status. The Java Learning Service owns learner placements, course/topic progress, mastery evidence, reviews and test assignments. The placement test is optional: every course is open with or without it, and a placement only recommends a course without changing topic state. Topics form one sequence per course, shared across skills. Reviews still gate work by skill. A course-final-test assignment uses a package code once before rotating; since 2026-10-17 the course is passed by the weighted total score, not by the course test alone ([course-score-v1](course-score-v1.md)), and neither the course test nor a topic test below 70% blocks the next topic. Topic order, course id and skill are stored in `topic_progress`; topic and course pass timestamps are one-way. Tutor, practice notebook, learner memory, learning goals and LLM ordering are removed.
 
 ## Learner routes
@@ -99,6 +101,30 @@ Lesson metadata adds `skill` from Content. A pending review blocks only lessons 
 The same lesson gate applies to this GET, submissions, and completion. Error precedence: blocking pending review (`REVIEW_REQUIRED`), topic not current (`TOPIC_LOCKED`), earlier lesson incomplete (`LESSON_LOCKED`), then an earlier lesson whose Practice is not passed (`PRACTICE_REQUIRED`, `403`, with `lessonIds` in lesson order). A pending review blocks a lesson when it has the lesson's skill or no skill, **or** when it belongs to an earlier lesson of the same topic, whatever its skill; `reviews` lists them so the client can lead the learner into the review. `PRACTICE_REQUIRED` is only returned when no review is pending. The first lesson of a topic has no earlier lesson and needs no Practice. Returns metadata and ordered `blocks`. A question object has **only** `questionVersionId`, `sortOrder`, `stem`, `options`, `hint`; an asset can provide passage text alongside it. Exercise blocks carry `blockKind`: `EXERCISE` for auto-graded questions, `ESSAY` for a Writing essay block shaped as in [`lesson-writing-v1`](lesson-writing-v1.md) (an essay block never counts toward lesson completion, and exercise submissions to it return `409 ESSAY_BLOCK`). An `ASSET` block gives `{id, assetType, textContent?, mediaUrl?, durationSeconds?, transcript?}`: a `PASSAGE` has `textContent`; media has `mediaUrl` (never the stored reference); an `AUDIO` asset gains `transcript` only once the lesson is completed, and before that the key is absent because the transcript gives the answers away. Do not pass through Content's `answerSpec`, `explanation`, KP mappings, or solution fields. `options=null` means a fill response; a non-null array means choose an `optionKey`, including the three TFNG keys. A passed exercise block gains a separate `solutions` array of `{questionVersionId, correctAnswer, explanation}`; an unpassed block omits the `solutions` key entirely.
 
 `hint` is always present, including when `null`, so the key does not disclose which questions have author-written hints. Learning Service reveals Content's hint only for a gradable `FILL`, or a gradable `CHOICE` with at least three options (including TFNG). Empty/absent CHOICE options are treated as the fixed three-choice TFNG fallback; one or two options and unsupported/ungradable specs are ineligible. Legacy gradable specs without `type` follow the grader's CHOICE default. A question must have been answered incorrectly in **any** saved submission for the same verified user, lesson and block, and the block must not have passed. Once opened, its hint remains even after a later correct answer while the block still fails. Before the first wrong answer, without a Content hint, or after the block has passed, `hint=null`. The runtime rule does not filter by skill; current Content seed supplies Reading hints and leaves Listening hints null. Essay prompts do not use this field.
+
+A `VOCABULARY` block contains `blockId`, `blockType`, `sortOrder`, and the ordered `vocabularySenseIds`. It has no completion state: `passed` is null and omitted by the response DTO's null-field policy. In the L1 seed, the block is first (`sortOrder: 0`) and carries these eight sense IDs:
+
+```json
+{
+  "blockId":"7c000000-0000-4000-8000-000000000001",
+  "blockType":"VOCABULARY",
+  "sortOrder":0,
+  "vocabularySenseIds":[
+    "7a000000-0000-4000-8000-000000000001",
+    "7a000000-0000-4000-8000-000000000002",
+    "7a000000-0000-4000-8000-000000000003",
+    "7a000000-0000-4000-8000-000000000004",
+    "7a000000-0000-4000-8000-000000000005",
+    "7a000000-0000-4000-8000-000000000006",
+    "7a000000-0000-4000-8000-000000000007",
+    "7a000000-0000-4000-8000-000000000008"
+  ]
+}
+```
+
+Resolve metadata with Library `GET /api/content/vocabulary/senses?ids=<comma-separated-UUIDs>`. The `ids` parameter must contain 1–100 valid UUIDs; an empty value, malformed UUID, or more than 100 IDs returns `400`. The response is an array in requested-ID order; missing or inactive senses are omitted. Each response object has exactly `senseId`, `vocabularyItemId`, `lemma`, `ipa`, `pronunciationAudioReference`, `partOfSpeech`, `englishDefinition`, `vietnameseMeaning`, `exampleSentence`, and `imageUrl`.
+
+For flashcards, each sense ID can identify a `VOCABULARY_SENSE` card by `vocabularySenseId` through the existing flashcard module. Card creation, deck UX, and any vocabulary completion policy remain deferred; this adds no review endpoint. Vocabulary SRS does not write `kp_evidence`; `VOCABULARY` mastery continues to come from scored exercises.
 
 The following is the L1-B5 portion of L1. The full response also contains L1's text, roof passage, and L1-B2 exercise; it contains all Q1, Q11, Q12 in L1-B5.
 

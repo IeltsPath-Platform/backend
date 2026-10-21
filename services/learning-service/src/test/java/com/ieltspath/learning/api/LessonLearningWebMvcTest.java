@@ -219,6 +219,24 @@ class LessonLearningWebMvcTest {
     }
 
     @Test
+    void vocabularySenseIdsAreReturnedByTheLearnerLessonEndpoint() throws Exception {
+        List<UUID> senseIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+        var vocabulary = new LessonResult.Block(UUID.randomUUID(), "VOCABULARY", null, 0, null, null,
+                senseIds, null, null, null, null);
+        when(getLessonUseCase.execute(USER, LESSON)).thenReturn(new LessonResult(LESSON, TOPIC, "L1", "Lesson", null,
+                1, "AVAILABLE", List.of(vocabulary)));
+
+        JsonNode response = body(mvc.perform(authenticated(get("/api/learning/lessons/{id}", LESSON)))
+                .andExpect(status().isOk()).andReturn());
+        JsonNode block = response.path("blocks").get(0);
+
+        assertEquals("VOCABULARY", block.path("blockType").asText());
+        assertEquals(json.valueToTree(senseIds.stream().map(UUID::toString).toList()),
+                block.path("vocabularySenseIds"));
+        assertEquals(Set.of("blockId", "blockType", "sortOrder", "vocabularySenseIds"), keys(block));
+    }
+
+    @Test
     void unpassedQuestionsHaveExactAllowlistAndPreserveNullFillOptions() throws Exception {
         when(getLessonUseCase.execute(USER, LESSON)).thenReturn(lesson(false));
         JsonNode response = body(mvc.perform(authenticated(get("/api/learning/lessons/{id}", LESSON)))

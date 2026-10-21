@@ -4,6 +4,7 @@ import com.ieltspath.library.api.dto.request.AddVocabularySenseRequest;
 import com.ieltspath.library.api.dto.request.CreateVocabularyItemRequest;
 import com.ieltspath.library.api.dto.response.VocabularyItemResponse;
 import com.ieltspath.library.api.dto.response.VocabularySenseResponse;
+import com.ieltspath.library.api.dto.response.VocabularySenseCardResponse;
 import com.ieltspath.library.application.command.AddVocabularySenseCommand;
 import com.ieltspath.library.application.command.CreateVocabularyItemCommand;
 import com.ieltspath.library.application.result.VocabularyItemResult;
@@ -11,6 +12,7 @@ import com.ieltspath.library.application.result.VocabularySenseResult;
 import com.ieltspath.library.application.usecase.AddVocabularySenseUseCase;
 import com.ieltspath.library.application.usecase.CreateVocabularyItemUseCase;
 import com.ieltspath.library.application.usecase.GetVocabularyDetailUseCase;
+import com.ieltspath.library.application.usecase.GetVocabularySensesUseCase;
 import com.ieltspath.library.application.usecase.SearchVocabularyUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.UUID;
 
 @RestController
@@ -33,8 +36,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VocabularyController {
 
+    private static final Pattern UUID_PATTERN = Pattern.compile("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+
     private final SearchVocabularyUseCase searchVocabularyUseCase;
     private final GetVocabularyDetailUseCase getVocabularyDetailUseCase;
+    private final GetVocabularySensesUseCase getVocabularySensesUseCase;
     private final CreateVocabularyItemUseCase createVocabularyItemUseCase;
     private final AddVocabularySenseUseCase addVocabularySenseUseCase;
 
@@ -43,6 +49,34 @@ public class VocabularyController {
     public List<VocabularyItemResponse> search(@RequestParam(value = "query", defaultValue = "") String query) {
         return searchVocabularyUseCase.execute(query).stream()
                 .map(VocabularyItemResponse::from)
+                .toList();
+    }
+
+    @GetMapping("/senses")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    public List<VocabularySenseCardResponse> getSenses(@RequestParam("ids") String ids) {
+        return getVocabularySensesUseCase.execute(parseSenseIds(ids)).stream()
+                .map(VocabularySenseCardResponse::from)
+                .toList();
+    }
+
+    private List<UUID> parseSenseIds(String ids) {
+        if (ids == null || ids.isBlank()) {
+            throw new IllegalArgumentException("ids must contain between 1 and 100 UUIDs");
+        }
+
+        String[] values = ids.split(",", -1);
+        if (values.length == 0 || values.length > 100) {
+            throw new IllegalArgumentException("ids must contain between 1 and 100 UUIDs");
+        }
+
+        return java.util.Arrays.stream(values)
+                .map(value -> {
+                    if (!UUID_PATTERN.matcher(value).matches()) {
+                        throw new IllegalArgumentException("ids must contain valid UUIDs");
+                    }
+                    return UUID.fromString(value);
+                })
                 .toList();
     }
 

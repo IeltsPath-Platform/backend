@@ -31,6 +31,34 @@ public interface VocabularyItemJpaRepository extends JpaRepository<VocabularyIte
             + "AND LOWER(v.lemma) LIKE LOWER(CONCAT('%', :query, '%')) ORDER BY v.lemma ASC")
     List<VocabularyItemJpaEntity> searchByLemma(@Param("query") String query);
 
+
+    @Query("""
+            SELECT sense.id AS senseId, item.id AS vocabularyItemId, item.lemma AS lemma,
+                   item.ipa AS ipa, item.pronunciationAudioReference AS pronunciationAudioReference,
+                   sense.partOfSpeech AS partOfSpeech, sense.englishDefinition AS englishDefinition,
+                   sense.vietnameseMeaning AS vietnameseMeaning, sense.exampleSentence AS exampleSentence,
+                   sense.imageUrl AS imageUrl
+            FROM VocabularySenseJpaEntity sense, VocabularyItemJpaEntity item
+            WHERE sense.vocabularyItemId = item.id
+              AND sense.id IN :senseIds
+              AND sense.status = com.ieltspath.library.domain.vo.ContentStatus.ACTIVE
+              AND item.status = com.ieltspath.library.domain.vo.ContentStatus.ACTIVE
+            """)
+    List<VocabularySenseCardProjection> findActiveSenseCardsByIds(@Param("senseIds") Collection<UUID> senseIds);
+
+    interface VocabularySenseCardProjection {
+        UUID getSenseId();
+        UUID getVocabularyItemId();
+        String getLemma();
+        String getIpa();
+        String getPronunciationAudioReference();
+        com.ieltspath.library.domain.vo.PartOfSpeech getPartOfSpeech();
+        String getEnglishDefinition();
+        String getVietnameseMeaning();
+        String getExampleSentence();
+        String getImageUrl();
+    }
+
     boolean existsByNormalizedLemma(String normalizedLemma);
 
     /** Pronunciations by word, for the dictation hints: any status, only items that have an IPA. */
