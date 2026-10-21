@@ -1,6 +1,6 @@
 # Kiến trúc hệ thống IELTSPath (backend)
 
-- Cập nhật lần cuối: 2026-10-07; dữ kiện đã kiểm với code sau khi có course theo band, placement recommendation và thi cuối course
+- Cập nhật lần cuối: 2026-10-21; dữ kiện đã kiểm với code sau khi có course theo band, placement recommendation, thi cuối course và block từ vựng trong bài học
 - Đọc khi cần hiểu toàn hệ thống. Quy tắc bắt buộc nằm ở [`AGENTS.md`](../AGENTS.md); hướng dẫn chạy chi tiết ở
   [`README.md`](../README.md). Code là nguồn đúng khi tài liệu này lệch.
 
@@ -161,6 +161,8 @@ GET /api/learning/courses -> refresh từ Content topic-sequence + course_progre
 GET /api/learning/topics -> một lần gọi Content topic-sequence -> knowledge_point_catalog + topic_progress (course_id,
   skill, has_topic_test, sequence_order) -> trạng thái theo từng course: PASSED / IN_PROGRESS (topic đầu chưa đạt
   trong course) / LOCKED; mọi course đều mở và chuỗi không tách skill
+GET /api/learning/lessons/{id} -> Content trả block VOCABULARY cùng danh sách vocabularySenseIds theo thứ tự;
+  client có thể lấy chi tiết qua Library GET /api/content/vocabulary/senses?ids=...; block không chặn hoàn thành bài
 POST /api/learning/lessons/{id}/exercises/{blockId}/submissions -> khóa theo user -> cổng (REVIEW_REQUIRED cùng skill,
   TOPIC_LOCKED, LESSON_LOCKED) -> chấm answer-spec-v1 -> bằng chứng lần nộp đầu; xong bài không tạo bài ôn;
   topic không có thi cuối thì PASSED khi xong mọi bài
@@ -242,6 +244,7 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | `Dockerfile.spring-service` theo `MODULE_PATH`; Config Server có Dockerfile riêng | Config Server cần đóng gói `config-repo` | Hai kiểu Dockerfile |
 | Thay AI Learning Python bằng `learning-service` Java, chỉ giữ tính năng MVP (2026-10-01) | Một stack, dùng chung `common-security`, Eureka, Spring AMQP | Bỏ tutor, practice notebook, learner memory, sắp path bằng LLM |
 | Bằng chứng theo user (`kp_evidence`), mastery tính khi đọc bằng `compute_mastery` port từ DeepTutor | Không cần aggregate path; consumer áp dụng được khi chưa có trạng thái học | Thứ tự bằng chứng dựa vào cột `ordinal` |
+| Block từ vựng trong bài học (2026-10-21) chỉ cung cấp sense IDs; flashcard SRS dùng `VOCABULARY_SENSE`/`vocabularySenseId` riêng | Nội dung từ vựng bổ trợ, không chặn hoàn thành; SRS không ghi `kp_evidence`, mastery `VOCABULARY` đến từ bài tập được chấm | Tạo card/deck UX và chính sách hoàn thành từ vựng chưa thuộc phạm vi |
 | Outbox + RabbitMQ cho assessment → learning; consumer có retry/DLQ | Không mất kết quả thi khi learning tạm lỗi | Thêm broker; outbox các service khác chưa có relay |
 | Tách catalog/thư viện cá nhân sang library, activity/streak sang user | Mỗi nhóm dữ liệu có service và DB sở hữu rõ ràng, giữ public path | Gateway cần route theo nhóm; game chọn hai nguồn snapshot |
 

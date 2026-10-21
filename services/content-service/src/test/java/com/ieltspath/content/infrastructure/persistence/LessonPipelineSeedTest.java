@@ -417,10 +417,10 @@ class LessonPipelineSeedTest {
         assertThat(reader.publishedLesson(w2).orElseThrow().knowledgePointIds())
                 .containsExactly(kpId("DEMO_READING_W2_OPINION"));
 
-        // The Reading lessons L3 and L4 keep only Reading blocks and knowledge points.
+        // Reading lessons keep their three original blocks plus the supplemental vocabulary block.
         for (String code : List.of("L3", "L4")) {
             UUID lessonId = lessonId(code);
-            assertThat(blockIds(lessonId)).as(code).hasSize(3);
+            assertThat(blockIds(lessonId)).as(code).hasSize(4);
             assertThat(reader.publishedLesson(lessonId).orElseThrow().knowledgePointIds()).as(code)
                     .doesNotContain(kpId("DEMO_READING_W1_CHART"), kpId("DEMO_READING_W2_OPINION"));
         }
@@ -640,7 +640,8 @@ class LessonPipelineSeedTest {
         LessonContentResult l1 = reader.publishedLesson(lessonId("L1")).orElseThrow();
         assertThat(l1.skill()).isEqualTo(Skill.READING);
         assertThat(l1.blocks()).extracting(LessonContentResult.Block::blockType, LessonContentResult.Block::knowledgePointIds)
-                .containsExactly(tuple(BlockType.TEXT, List.of(kpId("DR_TOPIC_SENTENCE"))),
+                .containsExactly(tuple(BlockType.VOCABULARY, List.of()),
+                        tuple(BlockType.TEXT, List.of(kpId("DR_TOPIC_SENTENCE"))),
                         tuple(BlockType.ASSET, List.of()),
                         tuple(BlockType.EXERCISE, List.of(kpId("DR_TOPIC_SENTENCE"))),
                         // "Luyện thêm với đoạn C và D." only leads into the next exercise and teaches nothing.
@@ -683,10 +684,10 @@ class LessonPipelineSeedTest {
         LessonContentResult lesson = reader.publishedLesson(l1).orElseThrow();
 
         assertThat(lesson.blocks()).extracting(LessonContentResult.Block::blockType)
-                .containsExactly(BlockType.TEXT, BlockType.ASSET, BlockType.EXERCISE, BlockType.TEXT,
-                        BlockType.EXERCISE);
-        assertThat(lesson.blocks().get(1).asset().textContent()).startsWith("A. Across Europe and North America");
-        LessonContentResult.Block lastExercise = lesson.blocks().get(4);
+                .containsExactly(BlockType.VOCABULARY, BlockType.TEXT, BlockType.ASSET, BlockType.EXERCISE,
+                        BlockType.TEXT, BlockType.EXERCISE);
+        assertThat(lesson.blocks().get(2).asset().textContent()).startsWith("A. Across Europe and North America");
+        LessonContentResult.Block lastExercise = lesson.blocks().get(5);
         assertThat(lastExercise.questions()).extracting(LessonContentResult.Question::sortOrder)
                 .containsExactly(1, 2, 3);
         LessonContentResult.Question fill = lastExercise.questions().get(2);

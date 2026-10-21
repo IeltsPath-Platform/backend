@@ -1,6 +1,7 @@
 package com.ieltspath.library.domain.repository;
 
 import com.ieltspath.library.domain.aggregate.VocabularyItem;
+import com.ieltspath.library.domain.vo.VocabularySenseCard;
 
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +11,7 @@ public interface VocabularyRepository {
     VocabularyItem save(VocabularyItem item);
     Optional<VocabularyItem> findById(UUID id);
     List<VocabularyItem> findByIds(List<UUID> ids);
+    List<VocabularySenseCard> findActiveSensesByIds(List<UUID> senseIds);
     Optional<VocabularyItem> findByNormalizedLemma(String normalizedLemma);
     List<VocabularyItem> searchByLemma(String query);
     boolean existsByNormalizedLemma(String normalizedLemma);

@@ -112,6 +112,52 @@ class PracticeGatedLessonUnlockIntegrationTest {
     }
 
     @Test
+    void vocabularyBlocksAreReturnedButDoNotBlockExerciseCompletionOrTheNextLesson() {
+        UUID user = UUID.randomUUID();
+        UUID vocabularyBlockId = UUID.randomUUID();
+        List<UUID> senseIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+        var vocabulary = new Block(vocabularyBlockId, "VOCABULARY", 1, null, null, senseIds, List.of(), null, List.of());
+        var exerciseBlock = new Block(block1, "EXERCISE", 2, null, null, List.of(), List.of(
+                lessonQuestion(question1a, 1, kpA), lessonQuestion(question1b, 2, kpB)), "EXERCISE", List.of(kpA, kpB));
+        when(content.getLesson(lesson1)).thenReturn(new Lesson(lesson1, topic, "L1", "Lesson one", null, 1,
+                List.of(kpA, kpB), List.of(vocabulary, exerciseBlock), LearningSkill.READING));
+        topics.execute(user);
+
+        var lesson = getLesson.execute(user, lesson1);
+        assertEquals(senseIds, lesson.blocks().getFirst().vocabularySenseIds());
+        assertEquals("VOCABULARY", lesson.blocks().getFirst().blockType());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ?", Integer.class, user));
+
+        var submitted = exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
+        assertTrue(submitted.lessonCompleted());
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ?", Integer.class, user));
+        assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
+        assertDoesNotThrow(() -> getLesson.execute(user, lesson2));
+    }
+
+    @Test
+    void aTextAndVocabularyOnlyLessonCanBeCompletedWithoutCreatingEvidence() {
+        UUID user = UUID.randomUUID();
+        UUID textBlockId = UUID.randomUUID();
+        UUID vocabularyBlockId = UUID.randomUUID();
+        List<UUID> senseIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+        var text = new Block(textBlockId, "TEXT", 1, "Read the introduction.", null, null, null, null, List.of(kpA));
+        var vocabulary = new Block(vocabularyBlockId, "VOCABULARY", 2, null, null, senseIds, List.of(), null, List.of());
+        when(content.getTopicLessons(topic)).thenReturn(List.of(
+                new LessonSummary(lesson1, topic, "L1", "First lesson", null, 1, List.of(kpA), List.of())));
+        when(content.getLesson(lesson1)).thenReturn(new Lesson(lesson1, topic, "L1", "First lesson", null, 1,
+                List.of(kpA), List.of(text, vocabulary), LearningSkill.READING));
+        topics.execute(user);
+
+        var displayed = getLesson.execute(user, lesson1);
+        assertEquals(senseIds, displayed.blocks().get(1).vocabularySenseIds());
+        assertDoesNotThrow(() -> complete.execute(user, lesson1));
+        assertNotNull(jdbc.queryForObject("SELECT completed_at FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
+                java.sql.Timestamp.class, user, lesson1));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ?", Integer.class, user));
+    }
+
+    @Test
     void theSecondLessonStaysClosedUntilThePracticeOfTheFirstIsPassed() {
         UUID user = UUID.randomUUID();
         PackageVersion first = practiceSet(kpA, kpA);
