@@ -55,6 +55,20 @@ class WordlyRoomControllerTest {
     @MockBean com.ieltspath.game.application.port.CurrentPlayerProfile profile;
     @MockBean GameRoomRepository rooms;
     @MockBean OutboxWriter outbox;
+    @MockBean com.ieltspath.game.application.usecase.WordlyRoomAdmission admission;
+
+    @Test
+    void rejectsCreatingAnotherRoomWhileTheUserStillBelongsToOne() throws Exception {
+        doThrow(new com.ieltspath.game.domain.exception.SoloGameplayException(409, "ACTIVE_GAME_EXISTS",
+                "You are already in a Wordly room")).when(admission).requireNoActiveGame(any());
+        mvc.perform(post("/api/games/wordly/rooms")
+                .header("Authorization", "Bearer " + token("urn:code-base:api-gateway", Instant.now().plusSeconds(300)))
+                .contentType("application/json")
+                .content("{\"playerMode\":\"SOLO\",\"initialLives\":4,\"playMode\":\"FINITE\",\"wordLimit\":10}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("ACTIVE_GAME_EXISTS"));
+        verify(rooms, never()).save(any());
+    }
 
     @Test
     void createsSoloAndMultiplayerRoomsWithVerifiedHostAndSettings() throws Exception {

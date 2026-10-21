@@ -22,7 +22,7 @@ class RoomLobbyKickTest {
         var repository = mock(GameRoomRepository.class);
         var outbox = mock(OutboxWriter.class);
         var events = mock(ApplicationEventPublisher.class);
-        var useCase = new ChangeGameRoomMembershipUseCase(repository, outbox, mock(CurrentPlayerProfile.class), events);
+        var useCase = new ChangeGameRoomMembershipUseCase(repository, outbox, mock(CurrentPlayerProfile.class), events, mock(WordlyRoomAdmission.class));
         var host = UUID.randomUUID();
         var guest = UUID.randomUUID();
         var room = new GameRoom(UUID.randomUUID(), "AB7K2Q", host, 4, Instant.EPOCH);
@@ -43,7 +43,7 @@ class RoomLobbyKickTest {
         var repository = mock(GameRoomRepository.class);
         var outbox = mock(OutboxWriter.class);
         var events = mock(ApplicationEventPublisher.class);
-        var useCase = new ChangeGameRoomMembershipUseCase(repository, outbox, mock(CurrentPlayerProfile.class), events);
+        var useCase = new ChangeGameRoomMembershipUseCase(repository, outbox, mock(CurrentPlayerProfile.class), events, mock(WordlyRoomAdmission.class));
         var room = new GameRoom(UUID.randomUUID(), "AB7K2Q", UUID.randomUUID(), 4, Instant.EPOCH);
         when(repository.findForUpdate(room.id())).thenReturn(Optional.of(room));
         assertThrows(GameRoomForbiddenException.class, () -> useCase.kick(room.id(), UUID.randomUUID(), UUID.randomUUID()));

@@ -22,6 +22,8 @@ public class WordlyRankingRepositoryAdapter implements WordlyRankingRepository {
                        p.user_id, p.player_display_name, p.player_slot_number, p.status,
                        p.lives_remaining, p.score, p.total_solve_time_ms,
                        p.words_processed, p.words_solved, p.current_streak,
+                       CASE WHEN m.status = 'IN_PROGRESS' AND p.status = 'DISCONNECTED'
+                           THEN p.reconnect_deadline_at END AS reconnect_deadline_at,
                        CASE WHEN m.status = 'COMPLETED' THEN p.rank ELSE
                            CAST(ROW_NUMBER() OVER (ORDER BY p.score DESC,
                                p.total_solve_time_ms ASC, p.score_reached_at ASC NULLS LAST,
@@ -38,12 +40,17 @@ public class WordlyRankingRepositoryAdapter implements WordlyRankingRepository {
                     r.getObject("player_slot_number", Integer.class), r.getObject("standing", Integer.class),
                     r.getString("status"), r.getInt("lives_remaining"), r.getLong("score"),
                     r.getLong("total_solve_time_ms"), r.getInt("words_processed"),
-                    r.getInt("words_solved"), r.getInt("current_streak"))), matchId, userId);
+                    r.getInt("words_solved"), r.getInt("current_streak"),
+                    instant(r.getTimestamp("reconnect_deadline_at")))), matchId, userId);
         if (rows.isEmpty()) return Optional.empty();
         var first = rows.getFirst();
         return Optional.of(new WordlyRankingResult(matchId, first.status(), first.playerMode(),
                 "COMPLETED".equals(first.status()), first.serverTime(),
                 rows.stream().map(Row::player).toList()));
+    }
+
+    private static java.time.Instant instant(java.sql.Timestamp value) {
+        return value == null ? null : value.toInstant();
     }
 
     private record Row(String status, String playerMode, java.time.Instant serverTime,

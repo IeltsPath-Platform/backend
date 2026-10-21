@@ -1,6 +1,6 @@
 # Wordly Game API and WebSocket v1
 
-Updated: 2026-10-17. Source of truth: Game controllers, response DTOs and GameWebSocketHandler.
+Updated: 2026-10-20. Source of truth: Game controllers, response DTOs and GameWebSocketHandler.
 Client routes use the Gateway; `/internal/**` is never a browser route. UUIDs and timestamps
 below are schematic; timestamps use ISO-8601 UTC. REST requires `Authorization: Bearer <access-token>`.
 Gateway validates it and forwards an internal JWT. Identity always comes from the verified token.
@@ -10,10 +10,12 @@ Gateway validates it and forwards an internal JWT. Identity always comes from th
 | Method and route | Request | Response / access |
 | --- | --- | --- |
 | GET /api/games/catalog | none | 200 `{games:[{gameType,name,description,status}]}`; WORDLY AVAILABLE, ROCKET COMING_SOON |
-| POST /api/games/wordly/rooms | `{playerMode,initialLives,playMode,wordLimit,timeEnabled}` | 201 Room; caller becomes host |
+| GET /api/games/wordly/me/active-game | none | 200 ActiveGame, or 204 when the caller belongs to no Wordly room |
+| POST /api/games/wordly/me/active-game/leave | none | 204; leaves the caller's active room (see One room per user) |
+| POST /api/games/wordly/rooms | `{playerMode,initialLives,playMode,wordLimit,timeEnabled}` | 201 Room; caller becomes host; 409 ACTIVE_GAME_EXISTS while in another room |
 | GET /api/games/rooms/{roomId} | none | 200 Room; active member |
 | GET /api/games/rooms/code/{roomCode} | none | 200 Room; active member, not a public lobby lookup |
-| POST /api/games/rooms/{roomId}/join | none | 200 Room; MULTIPLAYER WAITING with free slot |
+| POST /api/games/rooms/{roomId}/join | none | 200 Room; MULTIPLAYER WAITING with free slot; 409 ACTIVE_GAME_EXISTS for Wordly while in another room |
 | POST /api/games/rooms/code/{roomCode}/join | none | same join behavior |
 | PUT /api/games/rooms/{roomId}/settings | `{initialLives,wordLimit,timeEnabled}` | 200 Room; WAITING host only; resets readiness, preserves members |
 | POST /api/games/rooms/{roomId}/ready | `{ready:true}` | 200 Room; active member in WAITING |
@@ -33,6 +35,19 @@ Gateway validates it and forwards an internal JWT. Identity always comes from th
 Legacy `/api/games/rooms` creation and `/api/games/sessions/**` remain unchanged; they are not
 Wordly entry points. Swagger selection already includes `/api/games/**` in
 `infra/config-server/config-repo/game-service.yaml`; `/v3/api-docs` is the runtime schema.
+
+## One room per user
+
+A user belongs to at most one Wordly room. ActiveGame fields: roomId, roomCode, playerMode,
+roomStatus (WAITING or IN_MATCH), matchId (running match or null), playerStatus (caller's match
+status or null). Active means an active room member (JOINED, READY, DISCONNECTED) of a MULTIPLAYER
+room that is WAITING or IN_MATCH, or of a SOLO room with an IN_PROGRESS match; a running match is
+preferred. Unstarted or finished SOLO rooms are not active: creating or joining closes them.
+Wordly create and join take a per-user transaction lock, then return 409 ACTIVE_GAME_EXISTS when
+an active room remains. Clients offer to rejoin (match play page when matchId is set, otherwise
+the lobby) or to leave and continue. Leave uses the waiting-room lifecycle while WAITING, forfeits
+an ACTIVE or DISCONNECTED player like match leave, and only removes FINISHED or ELIMINATED
+spectators from the room without changing their match status. Leaving without a room is a no-op.
 
 ## Settings, lobby and match models
 
@@ -92,7 +107,9 @@ Column indexes are zero-based.
 
 Ranking fields: matchId, status, playerMode, isFinal, serverTime, players.
 Each player: userId, displayName, slotNumber, rank, status, livesRemaining, totalScore,
-totalSolveTimeMs, wordsProcessed, wordsSolved, currentStreak.
+totalSolveTimeMs, wordsProcessed, wordsSolved, currentStreak, reconnectDeadlineAt.
+reconnectDeadlineAt is set only for a DISCONNECTED player of an IN_PROGRESS match; clients show
+the remaining grace as a countdown. Match result players never carry it.
 Ordering: totalScore DESC, totalSolveTimeMs ASC, score_reached_at ASC, joined_at ASC, player ID.
 Ranks are unique. Status: ACTIVE, DISCONNECTED, FINISHED, ELIMINATED, FORFEITED.
 Leaving preserves points and ranking entry, marks FORFEITED, cancels the caller's current word.
@@ -152,7 +169,8 @@ expired grace forfeits the player. Detection and worker scheduling add delay to 
 Error body uses service ErrorResponse: timestamp, status, error, code when provided, message,
 path, details. Common cases: 400 invalid settings/full room/invalid word, 401 missing or invalid
 identity, 403 forbidden host operation, 404 inaccessible/missing room or match, 409 wrong state,
-MATCH_NOT_FINISHED, WORD_NOT_CURRENT, WORD_EXPIRED, REQUEST_ID_CONFLICT, PLAYER_NOT_ACTIVE.
+MATCH_NOT_FINISHED, WORD_NOT_CURRENT, WORD_EXPIRED, REQUEST_ID_CONFLICT, PLAYER_NOT_ACTIVE,
+ACTIVE_GAME_EXISTS.
 202 REQUEST_PENDING means retry the same requestId. Do not depend on English message strings.
 
 Library random endpoint enforces count 1-100 in DTO and use case. Catalog pages enforce limit
