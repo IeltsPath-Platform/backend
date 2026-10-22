@@ -9,7 +9,7 @@ Flyway V1 creates the five catalog tables: `vocabulary_items`, `vocabulary_sense
 `video_segments`, `video_segment_lexical_entries`. V2 creates six personal-library tables: `flashcard_decks`,
 `flashcards`, `flashcard_deck_items`, `notes`, `video_learning_progress`, `saved_video_segments`. V3 adds the
 five-box flashcard review schedule. V4 seeds 300 mock vocabulary items and 302 senses for local demos, using stable
-UUIDv5 identifiers and idempotent inserts. V15 adds `image_key` and `example_sentence` to `flashcards`, and `cover_image_key` to `flashcard_decks`. Four V2 foreign keys to catalog tables use `ON DELETE RESTRICT`; there is no
+UUIDv5 identifiers and idempotent inserts. V17 adds `image_key` and `example_sentence` to `flashcards`, and `cover_image_key` to `flashcard_decks`. Four V2 foreign keys to catalog tables use `ON DELETE RESTRICT`; there is no
 `outbox_events` table. Data is not copied from the former service/database.
 
 Gateway routes `/api/content/videos/**`, `/api/content/vocabulary/**` and `/api/content/admin/vocabulary/**` here.
