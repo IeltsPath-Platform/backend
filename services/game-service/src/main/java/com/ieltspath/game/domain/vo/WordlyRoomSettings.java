@@ -1,6 +1,7 @@
 package com.ieltspath.game.domain.vo;
 
-public record WordlyRoomSettings(PlayerMode playerMode, int initialLives, PlayMode playMode, Integer wordLimit, boolean timeEnabled) {
+public record WordlyRoomSettings(PlayerMode playerMode, int initialLives, PlayMode playMode, Integer wordLimit, boolean timeEnabled)
+        implements RoomSettings {
     public WordlyRoomSettings(PlayerMode playerMode, int initialLives, PlayMode playMode, Integer wordLimit) {
         this(playerMode, initialLives, playMode, wordLimit, true);
     }
@@ -19,6 +20,8 @@ public record WordlyRoomSettings(PlayerMode playerMode, int initialLives, PlayMo
         }
     }
 
-    public int maxPlayers() { return playerMode == PlayerMode.SOLO ? 1 : 4; }
+    @Override public RoomGame game() { return RoomGame.WORDLY; }
+    @Override public boolean solo() { return playerMode == PlayerMode.SOLO; }
+    @Override public int maxPlayers() { return playerMode == PlayerMode.SOLO ? 1 : 4; }
     public Integer wordTimeLimitSeconds() { return timeEnabled ? 180 : null; }
 }

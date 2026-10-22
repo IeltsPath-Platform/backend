@@ -17,7 +17,7 @@ public class GameRoomPersistenceMapper {
         return GameRoom.reconstitute(entity.getId(), entity.getRoomCode(), entity.getHostUserId(),
                 entity.getMaxPlayers(), entity.getGameType(), entity.getLearningDomain(), entity.getMode(),
                 entity.getConfigSnapshot(), entity.getCreatedAt(), entity.getUpdatedAt(), entity.getExpiresAt(),
-                GameRoom.GameRoomStatus.valueOf(entity.getStatus()), members, entity.wordlySettings());
+                GameRoom.GameRoomStatus.valueOf(entity.getStatus()), members, entity.settings());
     }
 
     public GameRoomJpaEntity toNewEntity(GameRoom room) {

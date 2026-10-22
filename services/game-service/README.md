@@ -20,6 +20,31 @@ Other users cannot join solo rooms. V3 adds room player_mode for solo/multiplaye
 Room creation prepares the lobby; ready/start APIs initialize the Wordly match.
 Spring WebSocket is already included for subsequent realtime updates.
 
+## Room games and one room per user
+
+WORDLY and ROCKET are room games (`domain/vo/RoomGame`): they share the room lifecycle and each keeps its own
+`RoomSettings`. A user is in at most one room across all room games; `GET /api/games/me/active-game` reports it with
+`gameType` (`/api/games/wordly/me/active-game` is an alias). Starting a non-Wordly match is rejected until that game's
+match flow exists.
+
+## Rocket schema (V10)
+
+`V10__add_rocket_rounds.sql` adds `question_count` and `seconds_per_question` to `game_rooms` and `game_matches`
+(lives reuse `initial_lives`), with `ck_rocket_room`/`ck_rocket_match` requiring them on ROCKET rows. Wordly columns
+are left as they are on Rocket rows, so a room keeps both games' settings. `game_rocket_rounds` holds every question of
+a match (at most one OPEN per match; indexes for the deadline and opening workers) and `game_rocket_answers` one row
+per player per round, a miss included; composite foreign keys keep answers inside their own match and request ids are
+unique per player. Player totals reuse `game_match_players` (lives, score, rounds played, correct count and time).
+
+## Rocket solo play
+
+Contract: [Rocket Game v1](../../docs/contracts/rocket-game-v1.md). `POST /api/games/rocket/rooms` creates a SOLO room;
+the shared ready/start routes start it (`StartGameMatchUseCase` hands ROCKET rooms to `StartRocketMatchUseCase`, which
+creates every round and opens the first). `RocketGameplayUseCase` serves `rounds/current` and `answers`; every call and
+`RocketRoundScheduler` (`game.rocket.round-scan-ms`, default 500) settle due rounds under the match lock. The shared
+`/api/games/matches/{id}/leave` and `/result` routes and active-game leave hand Rocket matches to the same use case.
+Rocket matches do not publish WebSocket events yet.
+
 ## Game catalog (P-60)
 
 `GET /api/games/catalog` through Gateway requires `Authorization: Bearer <access-token>`.
@@ -28,7 +53,7 @@ It returns HTTP 200 with the cards in display order:
 ```json
 {
   "games": [
-    {"gameType": "ROCKET", "name": "Tên lửa", "description": "Chọn từ tiếng Anh phù hợp với nghĩa được cho.", "status": "COMING_SOON"},
+    {"gameType": "ROCKET", "name": "Tên lửa", "description": "Chọn từ tiếng Anh phù hợp với nghĩa được cho.", "status": "AVAILABLE"},
     {"gameType": "WORDLY", "name": "Wordly", "description": "Đoán từ tiếng Anh dựa trên nghĩa và gợi ý từng chữ cái.", "status": "AVAILABLE"}
   ]
 }

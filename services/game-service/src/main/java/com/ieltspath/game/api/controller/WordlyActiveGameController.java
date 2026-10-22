@@ -7,7 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/games/wordly/me/active-game")
+/** One room per user across every room game; the Wordly path predates Rocket and stays as an alias. */
+@RequestMapping({"/api/games/me/active-game", "/api/games/wordly/me/active-game"})
 public class WordlyActiveGameController {
     private final CurrentUserProvider currentUser;
     private final ActiveWordlyGameUseCase activeGame;

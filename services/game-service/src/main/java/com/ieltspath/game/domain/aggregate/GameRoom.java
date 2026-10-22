@@ -1,6 +1,8 @@
 package com.ieltspath.game.domain.aggregate;
 
 import com.ieltspath.game.domain.exception.InvalidGameRoomStateException;
+import com.ieltspath.game.domain.vo.RoomGame;
+import com.ieltspath.game.domain.vo.RoomSettings;
 import com.ieltspath.game.domain.vo.WordlyRoomSettings;
 
 import java.time.Instant;
@@ -22,15 +24,20 @@ public class GameRoom {
     private Instant updatedAt;
     private final Map<UUID, Member> members = new LinkedHashMap<>();
     private GameRoomStatus status = GameRoomStatus.WAITING;
-    private WordlyRoomSettings wordlySettings;
+    private RoomSettings settings;
 
     public static GameRoom wordly(UUID id, String code, UUID host, WordlyRoomSettings settings, Instant now) {
+        return open(id, code, host, settings, now);
+    }
+
+    /** A room for one of the {@link RoomGame}s; the settings decide the game, player mode and capacity. */
+    public static GameRoom open(UUID id, String code, UUID host, RoomSettings settings, Instant now) {
         if (code == null || !code.matches("[A-Z0-9]{6}")) throw new IllegalArgumentException("Room code must have 6 characters");
         java.util.Objects.requireNonNull(host, "Host is required");
         java.util.Objects.requireNonNull(settings, "Settings are required");
-        GameRoom room = new GameRoom(id, code, host, settings.maxPlayers(), "WORDLY", "VOCABULARY",
+        GameRoom room = new GameRoom(id, code, host, settings.maxPlayers(), settings.game().name(), "VOCABULARY",
                 "PRACTICE", Map.of(), now, null, UUID.randomUUID());
-        room.wordlySettings = settings;
+        room.settings = settings;
         Member member = room.members.get(host);
         room.members.put(host, new Member(member.id(), host, MemberRole.HOST, MemberStatus.JOINED, now, 1));
         return room;
@@ -63,7 +70,9 @@ public class GameRoom {
                                         String gameType, String learningDomain, String mode,
                                         Map<String, Object> configSnapshot, Instant createdAt, Instant updatedAt,
                                         Instant expiresAt, GameRoomStatus status, java.util.List<Member> members,
-                                        WordlyRoomSettings settings) {
+                                        RoomSettings settings) {
+        if (settings != null && !settings.game().name().equals(gameType))
+            throw new IllegalArgumentException("Settings do not belong to " + gameType);
         UUID hostMemberId = members.stream().filter(member -> member.role() == MemberRole.HOST)
                 .map(Member::id).findFirst().orElseThrow();
         GameRoom room = new GameRoom(id, roomCode, hostUserId, maxPlayers, gameType, learningDomain, mode,
@@ -72,7 +81,7 @@ public class GameRoom {
         members.forEach(member -> room.members.put(member.userId(), member));
         room.status = status;
         room.updatedAt = updatedAt;
-        room.wordlySettings = settings;
+        room.settings = settings;
         return room;
     }
 
@@ -109,11 +118,11 @@ public class GameRoom {
     public void updateSettings(UUID actorId, int initialLives, Integer wordLimit, Boolean timeEnabled, Instant at) {
         if (!hostUserId.equals(actorId)) throw new com.ieltspath.game.domain.exception.GameRoomForbiddenException("Only the host can edit room settings");
         requireWaiting();
-        if (wordlySettings == null) throw new InvalidGameRoomStateException("Room is not a Wordly room");
-        WordlyRoomSettings next = new WordlyRoomSettings(wordlySettings.playerMode(), initialLives,
-                wordlySettings.playMode(), wordLimit, timeEnabled == null ? wordlySettings.timeEnabled() : timeEnabled);
-        if (next.equals(wordlySettings)) return;
-        wordlySettings = next;
+        if (!(settings instanceof WordlyRoomSettings wordly)) throw new InvalidGameRoomStateException("Room is not a Wordly room");
+        WordlyRoomSettings next = new WordlyRoomSettings(wordly.playerMode(), initialLives,
+                wordly.playMode(), wordLimit, timeEnabled == null ? wordly.timeEnabled() : timeEnabled);
+        if (next.equals(wordly)) return;
+        settings = next;
         members.replaceAll((id, member) -> member.status() == MemberStatus.READY
                 ? member.withStatus(MemberStatus.JOINED) : member);
         updatedAt = at;
@@ -177,7 +186,7 @@ public class GameRoom {
     }
 
     private Integer nextSlot() {
-        if (wordlySettings == null) return null;
+        if (settings == null) return null;
         for (int slot = 1; slot <= maxPlayers; slot++) {
             final int candidate = slot;
             if (members.values().stream().noneMatch(m -> m.active() && Integer.valueOf(candidate).equals(m.slotNumber()))) return slot;
@@ -196,8 +205,11 @@ public class GameRoom {
     public String gameType() { return gameType; }
     public String learningDomain() { return learningDomain; }
     public String mode() { return mode; }
-    public String playerMode() { return wordlySettings == null ? "MULTIPLAYER" : wordlySettings.playerMode().name(); }
-    public WordlyRoomSettings wordlySettings() { return wordlySettings; }
+    public String playerMode() { return settings != null && settings.solo() ? "SOLO" : "MULTIPLAYER"; }
+    /** Null for legacy session rooms, which predate room settings. */
+    public RoomSettings settings() { return settings; }
+    public java.util.Optional<RoomGame> roomGame() { return RoomGame.of(gameType); }
+    public WordlyRoomSettings wordlySettings() { return settings instanceof WordlyRoomSettings wordly ? wordly : null; }
     public Map<String, Object> configSnapshot() { return configSnapshot; }
     public Instant createdAt() { return createdAt; }
     public Instant updatedAt() { return updatedAt; }

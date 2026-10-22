@@ -20,7 +20,7 @@ public class GetGameMatchStateUseCase {
     public GameMatchResult execute(UUID matchId,UUID userId){
         var match=matchRepository.findById(matchId).orElseThrow(()->new GameMatchNotFoundException(matchId));
         var player=playerRepository.findByMatchIdAndUserId(matchId,userId).orElseThrow(()->new GameMatchNotFoundException(matchId));
-        UUID sessionId = "WORDLY".equals(match.gameType()) ? null : sessionRepository.findByMatchPlayerId(player.id()).orElseThrow(()->new GameMatchNotFoundException(matchId)).id();
+        UUID sessionId = com.ieltspath.game.domain.vo.RoomGame.isRoomGame(match.gameType()) ? null : sessionRepository.findByMatchPlayerId(player.id()).orElseThrow(()->new GameMatchNotFoundException(matchId)).id();
         var ranking="WORDLY".equals(match.gameType()) ? rankings.find(matchId,userId).orElseThrow(()->new GameMatchNotFoundException(matchId)) : null;
         return new GameMatchResult(match.id(),match.roomId(),sessionId,match.status().name(),match.startedAt(),GameMatchResult.players(playerRepository.findByMatchId(matchId)),
             ranking==null?null:ranking.playerMode(),ranking==null?null:match.configSnapshot(),
