@@ -4,6 +4,7 @@ import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.request.StartPracticeAttemptRequest;
 import com.ieltspath.learning.api.dto.request.SubmitEssayRequest;
 import com.ieltspath.learning.api.dto.request.SubmitExerciseRequest;
+import com.ieltspath.learning.api.dto.response.PracticeAttemptReviewResponse;
 import com.ieltspath.learning.api.dto.response.PracticeSubmissionResponse;
 import com.ieltspath.learning.api.dto.response.WritingSubmissionResponse;
 import com.ieltspath.learning.application.exception.LearningRequestException;
@@ -11,6 +12,7 @@ import com.ieltspath.learning.application.result.LessonPracticeSetsResult;
 import com.ieltspath.learning.application.result.PracticeAttemptView;
 import com.ieltspath.learning.application.usecase.GetLessonPracticeSetsUseCase;
 import com.ieltspath.learning.application.usecase.GetPracticeAttemptUseCase;
+import com.ieltspath.learning.application.usecase.ReviewPracticeAttemptUseCase;
 import com.ieltspath.learning.application.usecase.StartPracticeAttemptUseCase;
 import com.ieltspath.learning.application.usecase.SubmitPracticeAttemptUseCase;
 import com.ieltspath.learning.application.usecase.SubmitPracticeEssayUseCase;
@@ -33,6 +35,7 @@ public class PracticeController {
     private final GetLessonPracticeSetsUseCase catalog;
     private final StartPracticeAttemptUseCase start;
     private final GetPracticeAttemptUseCase get;
+    private final ReviewPracticeAttemptUseCase review;
     private final SubmitPracticeAttemptUseCase submit;
     private final SubmitPracticeEssayUseCase submitEssay;
 
@@ -63,6 +66,11 @@ public class PracticeController {
     public Object get(@PathVariable("id") UUID attemptId) {
         var result = get.execute(currentUser.requireUserId(), attemptId);
         return result.submission() == null ? result.view() : PracticeSubmissionResponse.from(result.submission());
+    }
+
+    @GetMapping("/practice-attempts/{id}/review")
+    public PracticeAttemptReviewResponse review(@PathVariable("id") UUID attemptId) {
+        return PracticeAttemptReviewResponse.from(review.execute(currentUser.requireUserId(), attemptId));
     }
 
     @PostMapping("/practice-attempts/{id}/essays/{questionVersionId}/submissions")
