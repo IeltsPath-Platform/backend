@@ -2,6 +2,7 @@ package com.ieltspath.game.application.usecase;
 
 import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.port.WordlyWordProvider;
+import com.ieltspath.game.application.result.MatchStartedEvent;
 import com.ieltspath.game.application.result.GameMatchResult;
 import com.ieltspath.game.domain.aggregate.GameMatch;
 import com.ieltspath.game.domain.aggregate.GameMatchPlayer;
@@ -26,13 +27,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Starts a Rocket match from a ready room: picks the questions from the vocabulary catalog, creates every round with
- * its options, and opens the first round. The catalog is read before the room lock, as Wordly does.
+ * its options, and opens the first round. The catalog is read before the room lock, as Wordly does. MATCH_STARTED goes to
+ * the room after commit, which moves every player from the lobby into the match.
  */
 @Service
 public class StartRocketMatchUseCase {
@@ -42,18 +45,20 @@ public class StartRocketMatchUseCase {
     private final RocketRoundRepository rounds;
     private final WordlyWordProvider words;
     private final OutboxWriter outbox;
+    private final ApplicationEventPublisher events;
     private final TransactionTemplate tx;
     private final Clock clock;
 
     public StartRocketMatchUseCase(GameRoomRepository rooms, GameMatchRepository matches,
             GameMatchPlayerRepository players, RocketRoundRepository rounds, WordlyWordProvider words,
-            OutboxWriter outbox, PlatformTransactionManager manager, Clock clock) {
+            OutboxWriter outbox, ApplicationEventPublisher events, PlatformTransactionManager manager, Clock clock) {
         this.rooms = rooms;
         this.matches = matches;
         this.players = players;
         this.rounds = rounds;
         this.words = words;
         this.outbox = outbox;
+        this.events = events;
         this.tx = new TransactionTemplate(manager);
         this.clock = clock;
     }
@@ -89,6 +94,7 @@ public class StartRocketMatchUseCase {
             rounds.save(first);
             outbox.append("GameMatch", matchId.toString(), "GameMatchStarted",
                     Map.of("matchId", matchId.toString(), "roomId", room.id().toString(), "gameType", room.gameType()));
+            events.publishEvent(new MatchStartedEvent(room.id(), matchId));
             return new GameMatchResult(match.id(), match.roomId(), null, match.status().name(), match.startedAt(),
                     GameMatchResult.players(players.findByMatchId(matchId)));
         });

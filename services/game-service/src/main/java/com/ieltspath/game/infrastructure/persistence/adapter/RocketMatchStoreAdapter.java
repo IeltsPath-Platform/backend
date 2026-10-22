@@ -87,6 +87,7 @@ public class RocketMatchStoreAdapter implements RocketMatchStore {
         var time = Timestamp.from(at);
         sql.update("UPDATE game_matches SET status='COMPLETED', end_reason=?, ended_at=? WHERE id=? AND status='IN_PROGRESS'",
                 reason.name(), time, matchId);
+        rank(matchId);
         if (roomId == null) return;
         sql.update("UPDATE game_rooms SET status='WAITING', updated_at=? WHERE id=? AND status='IN_MATCH' AND NOT is_delete",
                 time, roomId);
@@ -101,6 +102,7 @@ public class RocketMatchStoreAdapter implements RocketMatchStore {
         var time = Timestamp.from(at);
         sql.update("UPDATE game_matches SET status='COMPLETED', end_reason=?, ended_at=? WHERE id=? AND status='IN_PROGRESS'",
                 reason.name(), time, matchId);
+        rank(matchId);
         if (roomId == null) return;
         sql.update("UPDATE game_rooms SET status='CLOSED', is_delete=true, deleted_at=?, updated_at=? WHERE id=? AND NOT is_delete",
                 time, time, roomId);
@@ -108,6 +110,16 @@ public class RocketMatchStoreAdapter implements RocketMatchStore {
             UPDATE game_room_members SET status='LEFT', left_at=?, ready_at=NULL
             WHERE room_id=? AND NOT is_delete AND status IN ('JOINED','READY','DISCONNECTED')
             """, time, roomId);
+    }
+
+    /** Final standings, by the ranking rule: score, then less time spent on correct answers, then who joined first. */
+    private void rank(UUID matchId) {
+        sql.update("""
+            WITH ranked AS (SELECT id, row_number() OVER (
+                ORDER BY score DESC, total_solve_time_ms ASC, joined_at ASC, id ASC) AS position
+                FROM game_match_players WHERE match_id=? AND NOT is_delete)
+            UPDATE game_match_players p SET rank=ranked.position FROM ranked WHERE p.id=ranked.id
+            """, matchId);
     }
 
     @Override

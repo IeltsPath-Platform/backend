@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.game.application.port.CurrentPlayerProfile;
 import com.ieltspath.game.application.port.WordlyWordProvider;
+import com.ieltspath.game.application.result.MatchStartedEvent;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.OctetSequenceKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -30,6 +31,8 @@ import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -44,6 +47,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 })
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
+@RecordApplicationEvents
 class RocketSoloFlowIntegrationTest {
     private static final byte[] KEY = new byte[32];
     static { new SecureRandom().nextBytes(KEY); }
@@ -61,6 +65,7 @@ class RocketSoloFlowIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired JdbcTemplate sql;
+    @Autowired ApplicationEvents events;
     @MockBean WordlyWordProvider words;
     @MockBean CurrentPlayerProfile profile;
 
@@ -86,6 +91,15 @@ class RocketSoloFlowIntegrationTest {
         assertEquals("IN_PROGRESS", match.get("status").asText());
         assertEquals(3, sql.queryForObject("SELECT count(*) FROM game_rocket_rounds WHERE match_id=?::uuid", Integer.class, matchId));
         assertEquals(3, sql.queryForObject("SELECT question_count FROM game_matches WHERE id=?::uuid", Integer.class, matchId));
+        assertEquals(List.of(new MatchStartedEvent(UUID.fromString(roomId), UUID.fromString(matchId))),
+                events.stream(MatchStartedEvent.class).toList(), "the lobby is told to move into the match");
+
+        JsonNode standing = call(get("/api/games/matches/" + matchId + "/ranking"), token, 200);
+        assertFalse(standing.get("isFinal").asBoolean());
+        assertEquals(1, standing.get("players").size());
+        assertEquals("Rocket Tester", standing.get("players").get(0).get("displayName").asText());
+        assertEquals(1, standing.get("players").get(0).get("rank").asInt());
+        call(get("/api/games/matches/" + matchId + "/ranking"), token(UUID.randomUUID()), 404);
 
         JsonNode active = call(get("/api/games/me/active-game"), token, 200);
         assertEquals("ROCKET", active.get("gameType").asText());
@@ -117,7 +131,16 @@ class RocketSoloFlowIntegrationTest {
         assertEquals("WAITING", sql.queryForObject("SELECT status FROM game_rooms WHERE id=?::uuid", String.class, roomId));
         assertEquals(204, mvc.perform(get("/api/games/me/active-game").header("Authorization", token))
                 .andReturn().getResponse().getStatus());
-        call(get("/api/games/matches/" + matchId), token, 200);
+        JsonNode state = call(get("/api/games/matches/" + matchId), token, 200);
+        assertEquals("SOLO", state.get("playerMode").asText());
+        assertEquals(1, state.get("ownPlayer").get("rank").asInt());
+
+        JsonNode ranking = call(get("/api/games/matches/" + matchId + "/ranking"), token, 200);
+        assertTrue(ranking.get("isFinal").asBoolean());
+        JsonNode me = ranking.get("players").get(0);
+        assertEquals(1, me.get("rank").asInt());
+        assertEquals(3, me.get("wordsSolved").asInt());
+        assertEquals(finished.get("lastRoundResult").get("totalScore").asLong(), me.get("totalScore").asLong());
         call(get("/api/games/rocket/matches/" + matchId + "/rounds/current"), token(UUID.randomUUID()), 404);
     }
 

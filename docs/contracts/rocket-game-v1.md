@@ -19,6 +19,14 @@ identity always comes from the verified token. Only SOLO play is available; mult
 6. `GET /api/games/matches/{matchId}/result` → 200 Result once the match has ended; 409 `MATCH_NOT_FINISHED` before.
 7. To quit early: `POST /api/games/matches/{matchId}/leave` → 200 Left, or `POST /api/games/me/active-game/leave` → 204.
    The shared match routes hand Rocket matches to the Rocket flow; Wordly matches keep their own behaviour.
+8. `GET /api/games/matches/{matchId}/ranking` → 200 Ranking, the same shape as Wordly's (see the Wordly contract);
+   404 for a match the caller is not in. `GET /api/games/matches/{matchId}` also carries `playerMode`, `settings`,
+   `ownPlayer` and `ranking` for Rocket matches.
+
+## WebSocket
+
+Players connected to the room socket receive `MATCH_STARTED` (shape as in the Wordly contract) after the start
+commits, so a lobby can move into `/rounds/current`. Rocket round events are not sent yet; poll Current.
 
 ## Models
 
@@ -47,6 +55,10 @@ identity always comes from the verified token. Only SOLO play is available; mult
 - Leaving forfeits the player (FORFEITED) and keeps points already won; the open round closes as `MATCH_ENDED` without
   costing a life. A solo match ends with `PLAYER_LEFT` and its room is closed. Leaving again, or after the match has
   ended, returns the stored outcome without changing the end reason.
+- Ranking: higher `totalScore` first, then less time spent on correct answers, then who joined the match first. In
+  the Ranking model `wordsProcessed` is rounds played (misses included), `wordsSolved` is correct answers,
+  `totalSolveTimeMs` is the time spent on correct answers and `currentStreak` is always 0. `rank` is live while the
+  match runs and fixed when it ends (`isFinal: true`).
 - Wrong options never share the answer's word or meaning and favour words of similar length.
 
 ## Errors
@@ -59,5 +71,5 @@ Retrying with the same `requestId` and option returns the stored answer instead 
 
 ## Not yet available
 
-Multiplayer (rooms, rounds, leaving) and WebSocket events. Room responses carry `settings: null` for Rocket rooms;
+Multiplayer (rooms, rounds, leaving) and Rocket round events over WebSocket. Room responses carry `settings: null` for Rocket rooms;
 read the settings from Current or Result.

@@ -269,6 +269,31 @@ class RocketGameplayPostgresTest {
         assertFalse(gameplay.isRocket(UUID.randomUUID()));
     }
 
+    @Test void finishingRanksByScoreThenCorrectTimeThenJoinOrder() {
+        UUID match = start(3);
+        UUID room = sql.queryForObject("SELECT room_id FROM game_matches WHERE id=?", UUID.class, match);
+        // user (joined first): 300 in 5 s; b: 300 in 4 s; c: 300 in 5 s, joined later; d: 100.
+        sql.update("UPDATE game_match_players SET score=300, total_solve_time_ms=5000, joined_at=? WHERE match_id=?",
+                java.sql.Timestamp.from(now), match);
+        for (String[] p : new String[][]{{"b", "300", "4000", "2"}, {"c", "300", "5000", "3"}, {"d", "100", "1000", "4"}}) {
+            UUID member = UUID.randomUUID();
+            sql.update("""
+                INSERT INTO game_room_members(id,room_id,user_id,member_role,status,joined_at,slot_number,display_name)
+                VALUES (?,?,?,'PLAYER','READY',now(),?,?)
+                """, member, room, UUID.randomUUID(), Integer.parseInt(p[3]), p[0]);
+            sql.update("""
+                INSERT INTO game_match_players(id,match_id,room_member_id,user_id,status,joined_at,lives_remaining,score,total_solve_time_ms)
+                SELECT gen_random_uuid(),?,id,user_id,'ACTIVE',?,4,?,? FROM game_room_members WHERE id=?
+                """, match, java.sql.Timestamp.from(now.plusSeconds(Integer.parseInt(p[3]))), Long.parseLong(p[1]),
+                    Long.parseLong(p[2]), member);
+        }
+        store.finish(match, room, RocketEndReason.ALL_ROUNDS_COMPLETED, now);
+        assertEquals(List.of("b", "Player", "c", "d"), sql.queryForList("""
+            SELECT rm.display_name FROM game_match_players p JOIN game_room_members rm ON rm.id=p.room_member_id
+            WHERE p.match_id=? ORDER BY p.rank
+            """, String.class, match));
+    }
+
     @Test void outsidersCannotSeeOrAnswer() {
         UUID match = start(3);
         var round = gameplay.current(match, user).round();
