@@ -45,6 +45,9 @@ public class StartGameMatchUseCase {
         GameRoom preview=roomRepository.findById(roomId).orElseThrow(()->new GameRoomNotFoundException(roomId));
         // Validate before remote work; repeat under the lock because readiness/settings may change.
         preview.startMatch(hostUserId,clock.instant());
+        // Only Wordly knows how to set up a match so far; other room games must not fall into the legacy session path.
+        if(preview.roomGame().filter(game->game!=com.ieltspath.game.domain.vo.RoomGame.WORDLY).isPresent())
+            throw new com.ieltspath.game.domain.exception.InvalidGameRoomStateException(preview.gameType()+" matches cannot start yet");
         var settings=preview.wordlySettings();
         List<com.ieltspath.game.application.port.WordlyWordProvider.Word> words=List.of();
         String dictionary=null;

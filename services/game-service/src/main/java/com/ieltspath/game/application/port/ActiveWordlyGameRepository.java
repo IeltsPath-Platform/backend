@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+/** Room membership across every room game, for the one-room-per-user rule. */
 public interface ActiveWordlyGameRepository {
     /** Serializes room admission for one user until the surrounding transaction ends. */
     void lockUser(UUID userId);

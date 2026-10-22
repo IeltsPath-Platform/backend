@@ -8,7 +8,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** A user belongs to at most one Wordly room; creating or joining another requires leaving it first. */
+/**
+ * A user belongs to at most one room across every {@link com.ieltspath.game.domain.vo.RoomGame}; creating or joining
+ * another room, of the same game or not, requires leaving it first.
+ */
 @Service
 public class WordlyRoomAdmission {
     public static final String ACTIVE_GAME_EXISTS = "ACTIVE_GAME_EXISTS";
@@ -27,6 +30,6 @@ public class WordlyRoomAdmission {
         games.lockUser(userId);
         games.closeIdleSoloRooms(userId, clock.instant());
         if (games.find(userId).isPresent())
-            throw new SoloGameplayException(409, ACTIVE_GAME_EXISTS, "You are already in a Wordly room");
+            throw new SoloGameplayException(409, ACTIVE_GAME_EXISTS, "You are already in a game room");
     }
 }

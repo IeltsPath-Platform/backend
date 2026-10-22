@@ -1,6 +1,6 @@
 # Wordly Game API and WebSocket v1
 
-Updated: 2026-10-20. Source of truth: Game controllers, response DTOs and GameWebSocketHandler.
+Updated: 2026-10-22. Source of truth: Game controllers, response DTOs and GameWebSocketHandler.
 Client routes use the Gateway; `/internal/**` is never a browser route. UUIDs and timestamps
 below are schematic; timestamps use ISO-8601 UTC. REST requires `Authorization: Bearer <access-token>`.
 Gateway validates it and forwards an internal JWT. Identity always comes from the verified token.
@@ -10,12 +10,13 @@ Gateway validates it and forwards an internal JWT. Identity always comes from th
 | Method and route | Request | Response / access |
 | --- | --- | --- |
 | GET /api/games/catalog | none | 200 `{games:[{gameType,name,description,status}]}`; WORDLY AVAILABLE, ROCKET COMING_SOON |
-| GET /api/games/wordly/me/active-game | none | 200 ActiveGame, or 204 when the caller belongs to no Wordly room |
-| POST /api/games/wordly/me/active-game/leave | none | 204; leaves the caller's active room (see One room per user) |
+| GET /api/games/me/active-game | none | 200 ActiveGame, or 204 when the caller belongs to no room in any room game |
+| POST /api/games/me/active-game/leave | none | 204; leaves the caller's active room (see One room per user) |
+| GET /api/games/wordly/me/active-game, POST …/leave | none | Aliases of the two routes above, kept for existing clients; same cross-game result |
 | POST /api/games/wordly/rooms | `{playerMode,initialLives,playMode,wordLimit,timeEnabled}` | 201 Room; caller becomes host; 409 ACTIVE_GAME_EXISTS while in another room |
 | GET /api/games/rooms/{roomId} | none | 200 Room; active member |
 | GET /api/games/rooms/code/{roomCode} | none | 200 Room; active member, not a public lobby lookup |
-| POST /api/games/rooms/{roomId}/join | none | 200 Room; MULTIPLAYER WAITING with free slot; 409 ACTIVE_GAME_EXISTS for Wordly while in another room |
+| POST /api/games/rooms/{roomId}/join | none | 200 Room; MULTIPLAYER WAITING with free slot; 409 ACTIVE_GAME_EXISTS for a room game while in another room |
 | POST /api/games/rooms/code/{roomCode}/join | none | same join behavior |
 | PUT /api/games/rooms/{roomId}/settings | `{initialLives,wordLimit,timeEnabled}` | 200 Room; WAITING host only; resets readiness, preserves members |
 | POST /api/games/rooms/{roomId}/ready | `{ready:true}` | 200 Room; active member in WAITING |
@@ -38,16 +39,18 @@ Wordly entry points. Swagger selection already includes `/api/games/**` in
 
 ## One room per user
 
-A user belongs to at most one Wordly room. ActiveGame fields: roomId, roomCode, playerMode,
-roomStatus (WAITING or IN_MATCH), matchId (running match or null), playerStatus (caller's match
-status or null). Active means an active room member (JOINED, READY, DISCONNECTED) of a MULTIPLAYER
-room that is WAITING or IN_MATCH, or of a SOLO room with an IN_PROGRESS match; a running match is
-preferred. Unstarted or finished SOLO rooms are not active: creating or joining closes them.
-Wordly create and join take a per-user transaction lock, then return 409 ACTIVE_GAME_EXISTS when
-an active room remains. Clients offer to rejoin (match play page when matchId is set, otherwise
-the lobby) or to leave and continue. Leave uses the waiting-room lifecycle while WAITING, forfeits
-an ACTIVE or DISCONNECTED player like match leave, and only removes FINISHED or ELIMINATED
-spectators from the room without changing their match status. Leaving without a room is a no-op.
+A user belongs to at most one room across every room game (WORDLY and ROCKET; legacy session games such as
+WORD_MEANING_MATCH do not count). Being in a Wordly room blocks creating or joining a Rocket room and the reverse.
+ActiveGame fields: roomId, roomCode, playerMode, roomStatus (WAITING or IN_MATCH), matchId (running match or null),
+playerStatus (caller's match status or null), gameType (WORDLY or ROCKET; clients route to that game's lobby or play
+page). Active means an active room member (JOINED, READY, DISCONNECTED) of a MULTIPLAYER room that is WAITING or
+IN_MATCH, or of a SOLO room with an IN_PROGRESS match; a running match is preferred. Unstarted or finished SOLO rooms of
+any room game are not active: creating or joining closes them. Room create and join take a per-user transaction lock,
+then return 409 ACTIVE_GAME_EXISTS when an active room remains. Clients offer to rejoin (match play page when matchId is
+set, otherwise the lobby) or to leave and continue. Leave uses the waiting-room lifecycle while WAITING, forfeits an
+ACTIVE or DISCONNECTED player like match leave, and only removes FINISHED or ELIMINATED spectators from the room without
+changing their match status. Forfeiting a running match is implemented for Wordly; other games answer 409
+GAME_NOT_SUPPORTED until their match flow ships. Leaving without a room is a no-op.
 
 ## Settings, lobby and match models
 

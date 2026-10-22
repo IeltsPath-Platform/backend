@@ -20,6 +20,13 @@ Other users cannot join solo rooms. V3 adds room player_mode for solo/multiplaye
 Room creation prepares the lobby; ready/start APIs initialize the Wordly match.
 Spring WebSocket is already included for subsequent realtime updates.
 
+## Room games and one room per user
+
+WORDLY and ROCKET are room games (`domain/vo/RoomGame`): they share the room lifecycle and each keeps its own
+`RoomSettings`. A user is in at most one room across all room games; `GET /api/games/me/active-game` reports it with
+`gameType` (`/api/games/wordly/me/active-game` is an alias). Starting a non-Wordly match is rejected until that game's
+match flow exists.
+
 ## Game catalog (P-60)
 
 `GET /api/games/catalog` through Gateway requires `Authorization: Bearer <access-token>`.

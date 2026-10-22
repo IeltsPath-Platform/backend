@@ -37,11 +37,15 @@ class ActiveWordlyGamePostgresTest {
     }
 
     UUID room(String playerMode, String status, UUID host) {
+        return room("WORDLY", playerMode, status, host);
+    }
+
+    UUID room(String gameType, String playerMode, String status, UUID host) {
         UUID room = UUID.randomUUID();
         sql.update("""
             INSERT INTO game_rooms(id,room_code,host_user_id,game_type,learning_domain,mode,max_players,config_snapshot,status,created_at,updated_at,player_mode)
-            VALUES (?,upper(substring(md5(?::text),1,6)),?,'WORDLY','VOCABULARY','PRACTICE',?,'{}',?,now(),now(),?)
-            """, room, room, host, "SOLO".equals(playerMode) ? 1 : 4, status, playerMode);
+            VALUES (?,upper(substring(md5(?::text),1,6)),?,?,'VOCABULARY','PRACTICE',?,'{}',?,now(),now(),?)
+            """, room, room, host, gameType, "SOLO".equals(playerMode) ? 1 : 4, status, playerMode);
         return room;
     }
 
@@ -112,6 +116,32 @@ class ActiveWordlyGamePostgresTest {
         games.leaveRunningMatchRoom(running, user, Instant.now());
         assertTrue(games.find(user).isEmpty());
         assertEquals("ELIMINATED", sql.queryForObject("SELECT status FROM game_match_players WHERE user_id=?", String.class, user));
+    }
+
+    @Test void oneRoomPerUserSpansEveryRoomGame() {
+        UUID rocket = room("ROCKET", "MULTIPLAYER", "WAITING", UUID.randomUUID());
+        member(rocket, user, "PLAYER", "JOINED", 2);
+        var found = games.find(user).orElseThrow();
+        assertEquals(rocket, found.roomId());
+        assertEquals("ROCKET", found.gameType());
+        UUID wordly = room("MULTIPLAYER", "WAITING", user);
+        member(wordly, user, "HOST", "JOINED", 1);
+        assertTrue(java.util.Set.of("WORDLY", "ROCKET").contains(games.find(user).orElseThrow().gameType()));
+    }
+
+    @Test void legacySessionRoomsDoNotCountAsActive() {
+        UUID legacy = room("WORD_MEANING_MATCH", "MULTIPLAYER", "WAITING", user);
+        member(legacy, user, "HOST", "JOINED", 1);
+        assertTrue(games.find(user).isEmpty());
+    }
+
+    @Test void idleSoloRoomsOfAnyRoomGameAreClosed() {
+        UUID rocketSolo = room("ROCKET", "SOLO", "WAITING", user);
+        member(rocketSolo, user, "HOST", "JOINED", 1);
+        games.closeIdleSoloRooms(user, Instant.now());
+        assertEquals("CLOSED", sql.queryForObject("SELECT status FROM game_rooms WHERE id=?", String.class, rocketSolo));
+        assertEquals("WORDLY", new com.ieltspath.game.application.result.ActiveWordlyGameResult(
+                rocketSolo, "ABC123", "SOLO", "WAITING", null, null).gameType());
     }
 
     @Test void userLockIsTransactionScoped() {
