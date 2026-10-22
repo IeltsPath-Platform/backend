@@ -24,13 +24,15 @@ class VocabularySeedMigrationTest {
                 .locations("classpath:db/migration").load().migrate();
     }
 
-    // The INACTIVE items are the pronunciations of the dictation words (V11), not part of the IELTS seed.
+    // V4 seeds 300 mock items; V15 adds 30 lesson items and their 32 senses. V11 pronunciations are inactive.
     private static final String IELTS_ITEMS = "vocabulary_items WHERE status = 'ACTIVE'";
+    private static final int ACTIVE_ITEM_COUNT = 330;
+    private static final int SENSE_COUNT = 334;
 
     @Test
-    void seedAddsThreeHundredItemsAndThreeHundredTwoSenses() throws Exception {
-        assertEquals(300, count(IELTS_ITEMS));
-        assertEquals(302, count("vocabulary_senses"));
+    void vocabularySeedsIncludeMockAndLessonContent() throws Exception {
+        assertEquals(ACTIVE_ITEM_COUNT, count(IELTS_ITEMS));
+        assertEquals(SENSE_COUNT, count("vocabulary_senses"));
     }
 
     @Test
@@ -43,8 +45,8 @@ class VocabularySeedMigrationTest {
 
     @Test
     void rerunningSeedDoesNotDuplicateItemsOrSenses() throws Exception {
-        assertEquals(300, count(IELTS_ITEMS));
-        assertEquals(302, count("vocabulary_senses"));
+        assertEquals(ACTIVE_ITEM_COUNT, count(IELTS_ITEMS));
+        assertEquals(SENSE_COUNT, count("vocabulary_senses"));
 
         try (var connection = DriverManager.getConnection(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
@@ -52,8 +54,8 @@ class VocabularySeedMigrationTest {
                     new ClassPathResource("db/migration/V4__seed_mock_vocabulary.sql"));
         }
 
-        assertEquals(300, count(IELTS_ITEMS));
-        assertEquals(302, count("vocabulary_senses"));
+        assertEquals(ACTIVE_ITEM_COUNT, count(IELTS_ITEMS));
+        assertEquals(SENSE_COUNT, count("vocabulary_senses"));
     }
 
     private int count(String table) throws Exception {

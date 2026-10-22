@@ -69,7 +69,7 @@ class ExaminerQaIntegrationTest extends ExaminerIntegrationSupport {
                 .andExpect(status().isNoContent());
         assertEquals(1, count("SELECT count(*) FROM examiner_qa_reviews WHERE submission_id=(SELECT submission_id FROM grading_jobs WHERE id=?) AND reviewer_id=? AND examiner_band=6.5 AND reviewer_band=6.0",
                 qaJob, reviewer));
-        mvc.perform(get("/api/assessments/admin/examiner-quality").with(user(UUID.randomUUID().toString()).roles("ADMIN")))
+        mvc.perform(get("/api/assessments/admin/examiner-quality").with(user(UUID.randomUUID().toString()).roles("CONTENT_AUTHOR")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].reviewedEssays").value(1));
     }
 }

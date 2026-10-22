@@ -64,8 +64,8 @@ class PracticeTestMilestoneControllerTest {
     @MockitoBean ReplacePracticeTestMilestonesUseCase replaceMilestones;
 
     @ParameterizedTest
-    @ValueSource(strings = {"ADMIN", "CONTENT_AUTHOR"})
-    void adminAndAuthorCanReadAllConfiguredMilestones(String role) throws Exception {
+    @ValueSource(strings = {"CONTENT_AUTHOR"})
+    void contentAuthorCanReadAllConfiguredMilestones(String role) throws Exception {
         when(getMilestones.execute(COURSE_ID, false)).thenReturn(List.of(MILESTONE));
         mockMvc.perform(get(ADMIN_PATH, COURSE_ID).with(user("author").roles(role)))
                 .andExpect(status().isOk())
@@ -80,8 +80,8 @@ class PracticeTestMilestoneControllerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"ADMIN", "CONTENT_AUTHOR"})
-    void adminAndAuthorCanReplaceMilestonesUsingOnlyPackageAndPosition(String role) throws Exception {
+    @ValueSource(strings = {"CONTENT_AUTHOR"})
+    void contentAuthorCanReplaceMilestonesUsingOnlyPackageAndPosition(String role) throws Exception {
         when(replaceMilestones.execute(COURSE_ID, COMMAND)).thenReturn(List.of(MILESTONE));
         mockMvc.perform(put(ADMIN_PATH, COURSE_ID).with(user("author").roles(role))
                         .contentType(MediaType.APPLICATION_JSON).content(validRequest()))
@@ -97,8 +97,8 @@ class PracticeTestMilestoneControllerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"ADMIN", "CONTENT_AUTHOR"})
-    void adminAndAuthorCanClearMilestonesWithAnEmptyArray(String role) throws Exception {
+    @ValueSource(strings = {"CONTENT_AUTHOR"})
+    void contentAuthorCanClearMilestonesWithAnEmptyArray(String role) throws Exception {
         when(replaceMilestones.execute(COURSE_ID, List.of())).thenReturn(List.of());
         mockMvc.perform(put(ADMIN_PATH, COURSE_ID).with(user("author").roles(role))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"milestones\":[]}"))
@@ -112,6 +112,16 @@ class PracticeTestMilestoneControllerTest {
         mockMvc.perform(get(ADMIN_PATH, COURSE_ID).with(user("learner").roles(role)))
                 .andExpect(status().isForbidden());
         mockMvc.perform(put(ADMIN_PATH, COURSE_ID).with(user("learner").roles(role))
+                        .contentType(MediaType.APPLICATION_JSON).content(validRequest()))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(getMilestones, replaceMilestones);
+    }
+
+    @Test
+    void adminCannotReadOrReplaceMilestones() throws Exception {
+        mockMvc.perform(get(ADMIN_PATH, COURSE_ID).with(user("admin").roles("ADMIN")))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put(ADMIN_PATH, COURSE_ID).with(user("admin").roles("ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON).content(validRequest()))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(getMilestones, replaceMilestones);
@@ -147,7 +157,7 @@ class PracticeTestMilestoneControllerTest {
     void requestsWithMoreThanOneHundredMilestonesAreRejectedBeforeCallingTheUseCase() throws Exception {
         String entry = "{\"packageId\":\"" + PACKAGE_ID + "\",\"afterTopicSequence\":1}";
         String body = "{\"milestones\":[" + String.join(",", Collections.nCopies(101, entry)) + "]}";
-        mockMvc.perform(put(ADMIN_PATH, COURSE_ID).with(user("admin").roles("ADMIN"))
+        mockMvc.perform(put(ADMIN_PATH, COURSE_ID).with(user("author").roles("CONTENT_AUTHOR"))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(getMilestones, replaceMilestones);
@@ -157,7 +167,7 @@ class PracticeTestMilestoneControllerTest {
     void invalidPackageOrPositionFromTheUseCaseReturnsBadRequest() throws Exception {
         when(replaceMilestones.execute(COURSE_ID, COMMAND))
                 .thenThrow(new InvalidContentStateException("A published practice test and reachable position are required"));
-        mockMvc.perform(put(ADMIN_PATH, COURSE_ID).with(user("admin").roles("ADMIN"))
+        mockMvc.perform(put(ADMIN_PATH, COURSE_ID).with(user("author").roles("CONTENT_AUTHOR"))
                         .contentType(MediaType.APPLICATION_JSON).content(validRequest()))
                 .andExpect(status().isBadRequest());
         verify(replaceMilestones).execute(COURSE_ID, COMMAND);
@@ -167,9 +177,9 @@ class PracticeTestMilestoneControllerTest {
     void unknownCoursesReturnNotFoundForAdminReadsAndReplacement() throws Exception {
         when(getMilestones.execute(COURSE_ID, false)).thenThrow(new CourseNotFoundException(COURSE_ID));
         when(replaceMilestones.execute(COURSE_ID, COMMAND)).thenThrow(new CourseNotFoundException(COURSE_ID));
-        mockMvc.perform(get(ADMIN_PATH, COURSE_ID).with(user("admin").roles("ADMIN")))
+        mockMvc.perform(get(ADMIN_PATH, COURSE_ID).with(user("author").roles("CONTENT_AUTHOR")))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(put(ADMIN_PATH, COURSE_ID).with(user("admin").roles("ADMIN"))
+        mockMvc.perform(put(ADMIN_PATH, COURSE_ID).with(user("author").roles("CONTENT_AUTHOR"))
                         .contentType(MediaType.APPLICATION_JSON).content(validRequest()))
                 .andExpect(status().isNotFound());
     }

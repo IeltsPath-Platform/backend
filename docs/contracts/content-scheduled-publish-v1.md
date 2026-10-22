@@ -1,6 +1,6 @@
 # Content package preview and scheduled publication v1
 
-The author routes require `ADMIN` or `CONTENT_AUTHOR`.
+The author routes require `CONTENT_AUTHOR`.
 
 ## Preview a package version
 

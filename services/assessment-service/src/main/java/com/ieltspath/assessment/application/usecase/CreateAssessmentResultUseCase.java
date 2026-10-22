@@ -20,7 +20,7 @@ public class CreateAssessmentResultUseCase {
     private final ExaminerGradingPolicy examinerPolicy;
     public CreateAssessmentResultUseCase(AssessmentAttemptRepository attempts, AssessmentResultRepository results,
                                           ExaminerGradingPolicy examinerPolicy){this.attempts=attempts;this.results=results;this.examinerPolicy=examinerPolicy;}
-    /** Grader entry (EXAMINER/ADMIN, enforced by the controller): any learner's attempt. */
+    /** Grader entry (EXAMINER, enforced by the controller): any learner's attempt. */
     @Transactional
     public AssessmentResultResult executeForGrader(UUID attemptId, Double overallBand){
         var attempt=attempts.findById(attemptId).orElseThrow(()->new AssessmentNotFoundException("Assessment attempt not found"));

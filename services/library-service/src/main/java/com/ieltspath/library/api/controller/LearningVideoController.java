@@ -39,7 +39,7 @@ public class LearningVideoController {
     private final PublishLearningVideoUseCase publishLearningVideoUseCase;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public List<LearningVideoResponse> listVideos(
             @RequestParam(value = "accessLevel", required = false) AccessLevel accessLevel,
             @RequestParam(value = "status", required = false) PublicationStatus status
@@ -52,7 +52,7 @@ public class LearningVideoController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public VideoDetailResponse getVideoDetail(@PathVariable("id") UUID id) {
         VideoDetailResult result = getLearningVideoDetailUseCase.execute(id);
         return VideoDetailResponse.from(result);
@@ -60,7 +60,7 @@ public class LearningVideoController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public LearningVideoResponse createVideo(@Valid @RequestBody CreateLearningVideoRequest request) {
         LearningVideoResult result = createLearningVideoUseCase.execute(new CreateLearningVideoCommand(
                 request.youtubeVideoId(),
@@ -79,7 +79,7 @@ public class LearningVideoController {
 
     @PostMapping("/{id}/segments")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public VideoSegmentResponse addSegment(
             @PathVariable("id") UUID id,
             @Valid @RequestBody AddVideoSegmentRequest request
@@ -97,7 +97,7 @@ public class LearningVideoController {
 
     @PostMapping("/segments/{segmentId}/lexical-entries")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public void addSegmentLexicalEntry(
             @PathVariable("segmentId") UUID segmentId,
             @Valid @RequestBody AddSegmentLexicalEntryRequest request
@@ -113,7 +113,7 @@ public class LearningVideoController {
     }
 
     @PostMapping("/{id}/publish")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public LearningVideoResponse publishVideo(@PathVariable("id") UUID id) {
         LearningVideoResult result = publishLearningVideoUseCase.execute(new PublishLearningVideoCommand(id));
         return LearningVideoResponse.from(result);

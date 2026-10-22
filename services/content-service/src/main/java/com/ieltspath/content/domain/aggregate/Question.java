@@ -5,6 +5,7 @@ import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.domain.vo.QuestionType;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.domain.exception.QuestionVersionNotFoundException;
 
 import java.time.Instant;
 import java.util.*;
@@ -50,13 +51,30 @@ public class Question {
 
     public void publishVersion(UUID versionId) {
         Objects.requireNonNull(versionId, "versionId must not be null");
-        boolean exists = versions.stream().anyMatch(v -> v.getId().equals(versionId));
-        if (!exists) {
-            throw new IllegalArgumentException("Version does not belong to question: " + versionId);
-        }
+        QuestionVersion version = version(versionId);
+        version.publish();
         this.currentPublishedVersionId = versionId;
         this.status = PublicationStatus.PUBLISHED;
         this.updatedAt = Instant.now();
+    }
+
+    public void archiveVersion(UUID versionId) {
+        QuestionVersion target = version(versionId);
+        target.archive();
+        if (Objects.equals(currentPublishedVersionId, versionId)) {
+            currentPublishedVersionId = versions.stream()
+                    .filter(v -> v.getStatus() == PublicationStatus.PUBLISHED)
+                    .max(Comparator.comparing(QuestionVersion::getUpdatedAt))
+                    .map(QuestionVersion::getId)
+                    .orElse(null);
+        }
+        status = currentPublishedVersionId == null ? PublicationStatus.DRAFT : PublicationStatus.PUBLISHED;
+        updatedAt = Instant.now();
+    }
+
+    private QuestionVersion version(UUID versionId) {
+        return versions.stream().filter(v -> v.getId().equals(versionId)).findFirst()
+                .orElseThrow(() -> new QuestionVersionNotFoundException(versionId));
     }
 
     public void addVersion(QuestionVersion version) {

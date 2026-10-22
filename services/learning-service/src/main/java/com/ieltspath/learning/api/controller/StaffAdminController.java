@@ -27,7 +27,7 @@ import java.util.UUID;
 
 /**
  * The staff area of Learning: learner overview, anomaly flags, work queues, and statistics for content authors. An
- * Examiner works the Examiner queue, a content author the content queue, an Admin both.
+ * Examiners work the examiner queue, and content authors work the content queue.
  */
 @RestController
 @RequestMapping("/api/learning")
@@ -43,13 +43,13 @@ public class StaffAdminController {
     }
 
     @GetMapping("/admin/learners/{userId}/overview")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EXAMINER')")
+    @PreAuthorize("hasRole('EXAMINER')")
     public StaffInsightResults.Overview overview(@PathVariable("userId") UUID userId) {
         return insight.overview(userId);
     }
 
     @GetMapping("/admin/work-items")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EXAMINER', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasAnyRole('EXAMINER', 'CONTENT_AUTHOR')")
     public List<WorkItem> workItems(@RequestParam(name = "queue", required = false) Queue queue,
                                     @RequestParam(name = "status", required = false) WorkStatus status,
                                     Authentication authentication) {
@@ -57,7 +57,7 @@ public class StaffAdminController {
     }
 
     @PatchMapping("/admin/work-items/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EXAMINER', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasAnyRole('EXAMINER', 'CONTENT_AUTHOR')")
     public WorkItem updateWorkItem(@PathVariable("id") UUID id, @RequestBody UpdateWorkItemRequest request,
                                    Authentication authentication) {
         return work.update(queues(authentication), currentUser.requireUserId(), id,
@@ -66,20 +66,20 @@ public class StaffAdminController {
     }
 
     @PatchMapping("/admin/flags/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EXAMINER')")
+    @PreAuthorize("hasRole('EXAMINER')")
     public LearnerFlag reviewFlag(@PathVariable("id") UUID id, @RequestBody ReviewFlagRequest request) {
         return work.reviewFlag(currentUser.requireUserId(), id, request.status(), request.note());
     }
 
     @GetMapping("/admin/question-stats")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public StaffInsightResults.QuestionStats questionStats(
             @RequestParam(name = "minAttempts", defaultValue = "20") int minAttempts) {
         return insight.questionStats(minAttempts);
     }
 
     @GetMapping("/admin/tree-quality")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public StaffInsightResults.TreeQuality treeQuality(@RequestParam(name = "courseId", required = false) UUID courseId) {
         return insight.treeQuality(courseId);
     }
@@ -97,7 +97,6 @@ public class StaffAdminController {
         Set<Queue> queues = EnumSet.noneOf(Queue.class);
         for (var authority : authentication.getAuthorities()) {
             switch (authority.getAuthority()) {
-                case "ROLE_ADMIN" -> queues.addAll(EnumSet.allOf(Queue.class));
                 case "ROLE_EXAMINER" -> queues.add(Queue.EXAMINER);
                 case "ROLE_CONTENT_AUTHOR" -> queues.add(Queue.CONTENT_AUTHOR);
                 default -> { }

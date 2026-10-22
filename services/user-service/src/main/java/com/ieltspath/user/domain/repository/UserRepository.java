@@ -13,5 +13,6 @@ public interface UserRepository {
     boolean existsByEmail(String email);
     boolean existsByPhoneNumber(String phoneNumber);
     boolean existsByPhoneNumberAndIdNot(String phoneNumber, UUID id);
+    List<UUID> lockActiveAdminUserIds();
     List<User> findAll();
 }

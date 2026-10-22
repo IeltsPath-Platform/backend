@@ -74,7 +74,7 @@ public class SaveAssessmentResultDetailsUseCase {
     }
 
     /**
-     * Grader entry (EXAMINER/ADMIN, enforced by the controller): any learner's result, which must be the latest
+     * Grader entry (EXAMINER, enforced by the controller): any learner's result, which must be the latest
      * version and still being graded. The grader's band always replaces the version's band, even when null, so a
      * finalized result never carries a band the learner declared when opening it.
      */

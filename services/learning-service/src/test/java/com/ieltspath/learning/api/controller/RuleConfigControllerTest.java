@@ -58,7 +58,7 @@ class RuleConfigControllerTest {
     void anAdminReadsTheRulesInForce() throws Exception {
         when(rules.get()).thenReturn(current);
 
-        mvc.perform(get(PATH).with(user("admin").roles("ADMIN")))
+        mvc.perform(get(PATH).with(user("author").roles("CONTENT_AUTHOR")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.priorityBelow").value(0.6))
                 .andExpect(jsonPath("$.reviewIntervalsDays[2]").value(30))
@@ -71,7 +71,7 @@ class RuleConfigControllerTest {
         var command = new UpdateRuleConfigCommand(0.7, null, null, 4);
         when(rules.update(admin, command)).thenReturn(current);
 
-        mvc.perform(put(PATH).with(user("admin").roles("ADMIN")).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(put(PATH).with(user("author").roles("CONTENT_AUTHOR")).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"priorityBelow\":0.7,\"consolidateDays\":4}"))
                 .andExpect(status().isOk());
         verify(rules).update(admin, command);
@@ -83,7 +83,7 @@ class RuleConfigControllerTest {
         when(rules.update(admin, new UpdateRuleConfigCommand(0.9, null, null, null))).thenThrow(
                 new LearningRequestException(422, "INVALID_RULE_CONFIG", "Thresholds must satisfy 0 < priorityBelow"));
 
-        mvc.perform(put(PATH).with(user("admin").roles("ADMIN")).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(put(PATH).with(user("author").roles("CONTENT_AUTHOR")).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"priorityBelow\":0.9}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("INVALID_RULE_CONFIG"));
@@ -93,14 +93,14 @@ class RuleConfigControllerTest {
     void recomputeAnswers202WhenStartedAnd409WhenAJobIsAlreadyRunning() throws Exception {
         when(rules.recompute()).thenReturn(true, false);
 
-        mvc.perform(post(PATH + "/recompute").with(user("admin").roles("ADMIN")))
+        mvc.perform(post(PATH + "/recompute").with(user("author").roles("CONTENT_AUTHOR")))
                 .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("STARTED"));
-        mvc.perform(post(PATH + "/recompute").with(user("admin").roles("ADMIN")))
+        mvc.perform(post(PATH + "/recompute").with(user("author").roles("CONTENT_AUTHOR")))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.status").value("ALREADY_RUNNING"));
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"CUSTOMER", "EXAMINER", "CONTENT_AUTHOR", "SALES_STAFF"})
+    @ValueSource(strings = {"ADMIN", "CUSTOMER", "EXAMINER", "SALES_STAFF"})
     void onlyAnAdminCanReadOrChangeTheRules(String role) throws Exception {
         mvc.perform(get(PATH).with(user("other").roles(role))).andExpect(status().isForbidden());
         mvc.perform(put(PATH).with(user("other").roles(role)).contentType(MediaType.APPLICATION_JSON).content("{}"))

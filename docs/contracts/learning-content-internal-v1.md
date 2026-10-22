@@ -14,7 +14,7 @@ PUBLISHED and belongs to that package are included. Results are ordered by `afte
 then topic `sortOrder`, then id). Only ACTIVE topics with a PUBLISHED lesson count. The current package version is
 resolved on each read, so republishing does not require replacing the milestone.
 
-ADMIN and CONTENT_AUTHOR manage the same projection through `GET` and `PUT
+CONTENT_AUTHOR manages the projection through `GET` and `PUT
 /api/content/admin/courses/{id}/practice-test-milestones`. PUT atomically replaces the course's milestones and takes
 `{"milestones":[{"packageId":"6b2bf327-9455-4be7-942c-f24c5669f422","afterTopicSequence":2}]}`. An empty array clears them.
 Unknown courses return `404`; duplicate packages, nonpositive or unreachable positions, more than 100 entries, unpublished
@@ -355,7 +355,7 @@ band descriptors with the source recorded; seed essays and prompts are original 
 Migration `V50__rubrics.sql` seeds both `TASK_1` and `TASK_2` as `ACTIVE` for bootstrap. Their `sourceNote` explicitly
 identifies the material as an AI draft that has not been reviewed by an IELTS expert; `ACTIVE` is a runtime status.
 
-The authoring routes require `ADMIN` or `CONTENT_AUTHOR`:
+The authoring routes require `CONTENT_AUTHOR`:
 
 | Method | Path | Behavior |
 | --- | --- | --- |
@@ -364,7 +364,7 @@ The authoring routes require `ADMIN` or `CONTENT_AUTHOR`:
 | PUT | `/api/content/admin/rubrics/{code}/{version}` | Replace a draft's task, source note, criteria and examples. Active or retired versions cannot be edited. |
 | POST | `/api/content/admin/rubrics/{code}/{version}/activate` | Activate a complete draft and retire the existing active rubric for that task. |
 
-`GET /api/content/rubrics?task=TASK_1|TASK_2` is readable by `ADMIN`, `CONTENT_AUTHOR` and `EXAMINER` and returns a
+`GET /api/content/rubrics?task=TASK_1|TASK_2` is readable by `CONTENT_AUTHOR` and `EXAMINER` and returns a
 zero-or-one-element array containing the active rubric for that task. Invalid task or rubric data returns `400`;
 attempting to edit an active or retired version returns `409 RUBRIC_NOT_EDITABLE`. A missing active rubric has no
 public list entry; internal active and historical lookups return `404` when no rubric is available.

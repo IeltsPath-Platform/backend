@@ -19,7 +19,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/assessments/practice")
-@PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
+@PreAuthorize("hasRole('CUSTOMER')")
 @RequiredArgsConstructor
 public class PracticeLibraryController {
     private final CurrentUserProvider currentUser;

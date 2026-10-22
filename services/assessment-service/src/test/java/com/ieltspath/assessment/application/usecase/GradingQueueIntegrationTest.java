@@ -27,12 +27,12 @@ class GradingQueueIntegrationTest extends ExaminerIntegrationSupport {
     }
     @Test void queueFiltersPaginationAndMissingJobsAreValidated() throws Exception {
         courseEssay();
-        mvc.perform(get("/api/assessments/grading-jobs").param("size","1").with(user(examiner.toString()).roles("ADMIN")))
+        mvc.perform(get("/api/assessments/grading-jobs").param("size","1").with(user(examiner.toString()).roles("EXAMINER")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1)).andExpect(jsonPath("$.size").value(1));
         for (String query:java.util.List.of("?mode=AI","?page=-1","?size=101","?status=OTHER"))
             mvc.perform(get("/api/assessments/grading-jobs"+query).with(user(examiner.toString()).roles("EXAMINER")))
                     .andExpect(status().isBadRequest());
-        mvc.perform(post("/api/assessments/grading-jobs/{id}/claim",UUID.randomUUID()).with(user(examiner.toString()).roles("ADMIN")))
+        mvc.perform(post("/api/assessments/grading-jobs/{id}/claim",UUID.randomUUID()).with(user(examiner.toString()).roles("EXAMINER")))
                 .andExpect(status().isNotFound());
     }
     @Test void queueClaimConflictAndExpiredReclaimAreBlind() throws Exception {

@@ -39,7 +39,7 @@ public class TopicController {
     private final UpdateTopicUseCase updateTopicUseCase;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public List<TopicTreeResponse> getTopicTree() {
         return getTopicTreeUseCase.execute().stream()
                 .map(TopicTreeResponse::from)
@@ -47,14 +47,14 @@ public class TopicController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public TopicResponse getTopic(@PathVariable("id") UUID id) {
         return TopicResponse.from(getTopicUseCase.execute(id));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public TopicResponse createTopic(@Valid @RequestBody CreateTopicRequest request) {
         TopicResult result = createTopicUseCase.execute(new CreateTopicCommand(
                 request.parentTopicId(),
@@ -69,7 +69,7 @@ public class TopicController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public TopicResponse updateTopic(
             @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateTopicRequest request

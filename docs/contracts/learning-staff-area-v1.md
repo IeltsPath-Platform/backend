@@ -5,11 +5,11 @@ Assessment and Access side (examiner quality review, paid human grading) is in [
 Learning keeps ids only; names of courses, knowledge points and users come from Content, User and Access, and the
 frontend joins them.
 
-Roles: `ADMIN` sees everything. `EXAMINER` works the `EXAMINER` queue, `CONTENT_AUTHOR` (R&D) the `CONTENT_AUTHOR` queue.
+Roles: `EXAMINER` works the `EXAMINER` queue, `CONTENT_AUTHOR` (R&D) the `CONTENT_AUTHOR` queue.
 
 ## `GET /api/learning/admin/learners/{userId}/overview`
 
-Roles `ADMIN`, `EXAMINER`. Read-only; it never refreshes the learner's data.
+Role `EXAMINER`. Read-only; it never refreshes the learner's data.
 
 ```json
 {
@@ -48,7 +48,7 @@ submission). A kind already flagged for the learner in the last 24 hours is not 
 An open `INACTIVE` flag is dismissed automatically, in the transaction of the answer, when the learner answers again. It then
 appears in the `EXAMINER` queue as a `LEARNER_FLAG` work item like any other flag while it is open.
 
-`PATCH /api/learning/admin/flags/{id}` (`ADMIN`, `EXAMINER`): `{ "status": "CONFIRMED" | "DISMISSED", "note": "…" }`;
+`PATCH /api/learning/admin/flags/{id}` (`EXAMINER`): `{ "status": "CONFIRMED" | "DISMISSED", "note": "…" }`;
 records the reviewer. `422 INVALID_FLAG_STATUS` for `OPEN`, `404` when unknown.
 
 ## Work queues
@@ -73,7 +73,7 @@ learner (`422 NOTE_REQUIRED`, `422 NO_LEARNER`). `404` when the item is not in a
 
 `GET /api/learning/notes` (`CUSTOMER`): the notes staff chose to show the caller, newest first.
 
-## Statistics for R&D (`ADMIN`, `CONTENT_AUTHOR`)
+## Statistics for R&D (`CONTENT_AUTHOR`)
 
 - `GET /api/learning/admin/question-stats?minAttempts=20`: per question with at least `minAttempts` first submissions:
   attempts, correct, correct rate, median duration, most frequent error codes and the `difficulty` tag Content gives the

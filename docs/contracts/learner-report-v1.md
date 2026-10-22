@@ -28,7 +28,7 @@ older than this feature are built once, in the background, at startup.
 
 Role `CUSTOMER`. Always the verified caller's own report; there is no user parameter.
 
-`GET /api/learning/admin/learners/{userId}/report` — role `ADMIN` or `EXAMINER`; the same body for any learner.
+`GET /api/learning/admin/learners/{userId}/report` — role `EXAMINER`; the same body for any learner.
 
 ```json
 {
@@ -98,13 +98,13 @@ The report body also carries four blocks added after `knowledgePoints`; the fiel
   report is otherwise complete (a slow or failing User Service never fails the report). `gap` is the target minus `estimatedBand.value` (`null` if either is unknown).
   `projection` is described in [progress-snapshots-v1](progress-snapshots-v1.md) and is `null` without a target band.
 
-## Mastery rules (Admin)
+## Mastery rules (Content Author)
 
-Role `ADMIN` for all three routes.
+Role `CONTENT_AUTHOR` for all three routes.
 
 | Route | Effect |
 | --- | --- |
-| `GET /api/learning/admin/rule-configs` | The rules in force and the keys Admin has overridden. |
+| `GET /api/learning/admin/rule-configs` | The rules in force and the keys the content author has overridden. |
 | `PUT /api/learning/admin/rule-configs` | Changes any subset. A missing field keeps its value. |
 | `POST /api/learning/admin/rule-configs/recompute` | Re-tiers every stored profile in the background. `202 {"status":"STARTED"}`, or `409 {"status":"ALREADY_RUNNING"}`. |
 

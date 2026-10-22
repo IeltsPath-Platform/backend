@@ -62,6 +62,28 @@ class CreateKnowledgePointUseCaseTest {
     }
 
     @Test
+    void speakingPrefixRequiresSpeakingSkill() {
+        var command = new CreateKnowledgePointCommand(UUID.randomUUID(), "S60_PART2_LONG_TURN",
+                "Long turn", KnowledgePointKind.STRATEGY, LearningType.PROCEDURE, Skill.READING, null);
+
+        assertThatThrownBy(() -> useCase.execute(command))
+                .isInstanceOf(InvalidKnowledgePointCodeException.class);
+    }
+
+    @Test
+    void rejectsAnActivePointWhenNoCefrLevelCanBeDerivedFromACourse() {
+        UUID topicId = UUID.randomUUID();
+        Topic topic = new Topic(topicId, null, "FOUNDATION", "Foundation", 1, ContentStatus.ACTIVE,
+                null, Skill.SPEAKING, Instant.now(), Instant.now(), null);
+        when(topicRepository.findById(topicId)).thenReturn(Optional.of(topic));
+
+        assertThatThrownBy(() -> useCase.execute(new CreateKnowledgePointCommand(topicId, "S60_PART2_LONG_TURN",
+                "Long turn", KnowledgePointKind.STRATEGY, LearningType.PROCEDURE, Skill.SPEAKING, null,
+                null, "Deliver a long turn.", null, null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("cefrLevel");
+    }
+
+    @Test
     void grammarAndVocabularyPrefixesRequireMatchingKindAndAllSkill() {
         var command = new CreateKnowledgePointCommand(UUID.randomUUID(), "G55_COMPLEX_SENTENCES",
                 "Complex sentences", KnowledgePointKind.GRAMMAR, LearningType.CONCEPT, Skill.WRITING, null);

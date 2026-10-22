@@ -24,20 +24,20 @@ public class RubricController {
 
     /** Examiner read surface exposes only the currently active public rubric. */
     @GetMapping("/rubrics")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'EXAMINER')")
     public List<RubricResponse> active(@RequestParam("task") String task) {
         return rubrics.active(task).stream().map(RubricResponse::from).toList();
     }
 
     @GetMapping("/admin/rubrics")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public List<RubricResponse> drafts(@RequestParam("task") String task) {
         return rubrics.drafts(task).stream().map(RubricResponse::from).toList();
     }
 
     @PostMapping("/admin/rubrics")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public RubricResponse create(@Valid @RequestBody RubricRequest request) {
         return RubricResponse.from(rubrics.create(request.code(), request.task(), request.version(), request.sourceNote(),
                 request.criteria().stream().map(CriterionRequest::toDomain).toList(),
@@ -45,7 +45,7 @@ public class RubricController {
     }
 
     @PutMapping("/admin/rubrics/{code}/{version}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public RubricResponse update(@PathVariable("code") String code, @PathVariable("version") int version,
                                  @Valid @RequestBody RubricRequest request) {
         if (!code.equals(request.code()) || version != request.version()) {
@@ -57,7 +57,7 @@ public class RubricController {
     }
 
     @PostMapping("/admin/rubrics/{code}/{version}/activate")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public RubricResponse activate(@PathVariable("code") String code, @PathVariable("version") int version) {
         return RubricResponse.from(rubrics.activate(code, version));
     }

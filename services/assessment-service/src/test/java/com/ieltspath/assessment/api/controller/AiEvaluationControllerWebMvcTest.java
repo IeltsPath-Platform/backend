@@ -51,7 +51,7 @@ class AiEvaluationControllerWebMvcTest {
     @MockitoBean CurrentUserProvider currentUser;
     @MockitoBean PromptActivationProvider activations;
 
-    @Test @WithMockUser(roles = "ADMIN") void adminCanReadEvaluationRun() throws Exception {
+    @Test @WithMockUser(roles = "CONTENT_AUTHOR") void contentAuthorCanReadEvaluationRun() throws Exception {
         UUID run = UUID.randomUUID();
         when(service.getRun(run)).thenReturn(Map.of("id", run, "status", "DONE"));
         mvc.perform(get("/api/assessments/admin/ai-evaluations/{id}", run))
@@ -72,7 +72,7 @@ class AiEvaluationControllerWebMvcTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.promptVersion").value("IELTS_WRITING_TASK_2@1+tplv1"));
     }
 
-    @Test @WithMockUser(roles = "ADMIN") void activationOfUnpassedRunReturnsConflictWithStableCode() throws Exception {
+    @Test @WithMockUser(roles = "CONTENT_AUTHOR") void activationOfUnpassedRunReturnsConflictWithStableCode() throws Exception {
         UUID run = UUID.randomUUID();
         UUID actor = UUID.randomUUID();
         when(currentUser.requireUserId()).thenReturn(actor);

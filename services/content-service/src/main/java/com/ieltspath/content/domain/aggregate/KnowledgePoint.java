@@ -60,23 +60,13 @@ public class KnowledgePoint {
     }
 
     public static KnowledgePoint create(UUID topicId, String code, String name,
-                                        KnowledgePointKind kind, LearningType learningType,
-                                        Skill skill, String description) {
-        return create(topicId, code, name, kind, learningType, skill, description, null, null, null, null);
-    }
-
-    public static KnowledgePoint create(UUID topicId, String code, String name,
                                         KnowledgePointKind kind, LearningType learningType, Skill skill,
                                         String description, CefrLevel cefrLevel, String canDo,
                                         String scopeIn, String scopeOut) {
+        requireCefrAndCanDo(cefrLevel, canDo);
         Instant now = Instant.now();
         return new KnowledgePoint(UUID.randomUUID(), topicId, code, name, kind, learningType, skill, description,
                 cefrLevel, canDo, scopeIn, scopeOut, ContentStatus.ACTIVE, now, now);
-    }
-
-    public void update(UUID topicId, String code, String name, KnowledgePointKind kind, LearningType learningType,
-                       Skill skill, String description) {
-        update(topicId, code, name, kind, learningType, skill, description, null, null, null, null);
     }
 
     public void update(UUID topicId, String code, String name, KnowledgePointKind kind, LearningType learningType,
@@ -88,6 +78,9 @@ public class KnowledgePoint {
         Objects.requireNonNull(kind, "kind must not be null");
         if (this.status == ContentStatus.ACTIVE && learningType == null) {
             throw new IllegalArgumentException("learningType is required for an active knowledge point");
+        }
+        if (this.status == ContentStatus.ACTIVE) {
+            requireCefrAndCanDo(cefrLevel, canDo);
         }
         this.topicId = topicId;
         this.code = code;
@@ -114,9 +107,17 @@ public class KnowledgePoint {
         if (this.learningType == null) {
             throw new IllegalArgumentException("learningType is required for an active knowledge point");
         }
+        requireCefrAndCanDo(this.cefrLevel, this.canDo);
         if (this.status != ContentStatus.ACTIVE) {
             this.status = ContentStatus.ACTIVE;
             this.updatedAt = Instant.now();
+        }
+    }
+
+    /** An active point is placed on the graph by its CEFR level and described by a can-do statement. */
+    private static void requireCefrAndCanDo(CefrLevel cefrLevel, String canDo) {
+        if (cefrLevel == null || canDo == null || canDo.isBlank()) {
+            throw new IllegalArgumentException("cefrLevel and canDo are required for an active knowledge point");
         }
     }
 

@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import com.ieltspath.content.domain.exception.QuestionVersionStateException;
 
 public class QuestionVersion {
     private final UUID id;
@@ -74,6 +75,14 @@ public class QuestionVersion {
 
     public void publish() {
         this.status = PublicationStatus.PUBLISHED;
+        this.updatedAt = Instant.now();
+    }
+
+    public void archive() {
+        if (status != PublicationStatus.PUBLISHED) {
+            throw new QuestionVersionStateException("Only published question versions can be archived");
+        }
+        this.status = PublicationStatus.ARCHIVED;
         this.updatedAt = Instant.now();
     }
 

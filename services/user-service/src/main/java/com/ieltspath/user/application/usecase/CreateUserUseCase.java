@@ -8,6 +8,7 @@ import com.ieltspath.user.domain.exception.PhoneAlreadyExistsException;
 import com.ieltspath.user.domain.exception.RoleNotFoundException;
 import com.ieltspath.user.domain.repository.RoleRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
+import com.ieltspath.user.domain.service.RoleAssignmentPolicy;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.PhoneNumber;
 import com.ieltspath.user.domain.vo.RoleName;
@@ -58,6 +59,7 @@ public class CreateUserUseCase {
         Set<String> roleNames = requestedRoles == null || requestedRoles.isEmpty()
                 ? Set.of(RoleName.CUSTOMER.name())
                 : requestedRoles.stream().map(role -> RoleName.from(role).name()).collect(Collectors.toSet());
+        RoleAssignmentPolicy.validate(roleNames.stream().map(RoleName::valueOf).collect(Collectors.toSet()));
         Set<Role> roles = new HashSet<>(roleRepository.findByNames(roleNames));
         if (roles.size() != roleNames.size()) {
             throw new RoleNotFoundException("Một hoặc nhiều vai trò không tồn tại");

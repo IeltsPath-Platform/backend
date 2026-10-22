@@ -11,6 +11,7 @@ import java.util.UUID;
 public interface QuestionRepository {
     Question save(Question question);
     Optional<Question> findById(UUID id);
+    Optional<Question> findByIdForUpdate(UUID id);
     List<Question> findByIds(List<UUID> ids);
     List<Question> findBySkill(Skill skill);
     /** Catalog metadata filtered in the database; versions are not needed by the list response. */

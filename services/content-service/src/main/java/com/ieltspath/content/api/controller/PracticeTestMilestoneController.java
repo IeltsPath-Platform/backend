@@ -12,7 +12,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/content/admin/courses/{id}/practice-test-milestones")
-@PreAuthorize("hasAnyRole('ADMIN','CONTENT_AUTHOR')")
+@PreAuthorize("hasRole('CONTENT_AUTHOR')")
 public class PracticeTestMilestoneController {
     private final GetPracticeTestMilestonesUseCase get;
     private final ReplacePracticeTestMilestonesUseCase replace;

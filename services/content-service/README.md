@@ -79,8 +79,9 @@ Assessment reads package snapshots when it creates an attempt.
 Each topic that teaches lessons has one `skill` (`LISTENING`, `READING`, `WRITING`, `SPEAKING`; V15, never `ALL`),
 and its lessons inherit it. Topic create/update accept an optional `skill`; update keeps the current skill when it is
 omitted and returns `409` (`details.code = TOPIC_SKILL_LOCKED`) when a topic with published lessons would change
-skill. There is no lesson authoring API, so seed migrations must keep every lesson question and lesson KP on its
-topic's skill: `LessonPipelineSeedTest.everyLessonTeachesOnlyItsTopicsSkill` enforces it. V15 moved the demo Writing
+skill. Lesson authoring is available through the admin API described in
+[`lesson-authoring-v1.md`](../../docs/contracts/lesson-authoring-v1.md); publication keeps lesson content aligned with
+the topic's skill. V15 moved the demo Writing
 essays from Reading lessons L3/L4 into topic `DEMO_WRITING` (lessons W1, W2; no final test), keeping their block ids.
 
 V16 adds `lesson_block_knowledge_points` (the KPs each TEXT block teaches) and `content_packages.lesson_id`, which makes a `PRACTICE_SET` part of a lesson's Practice. Package creation accepts an optional `lessonId` (practice sets only, the lesson must exist, else `422` with `details.code = INVALID_PACKAGE_LESSON`); publishing such a package fails the same way when a question's skill differs from the lesson's topic. V16 seeds `PS-KP1-C`, `PS-KP1-D` and one set for each of TF1, PM1, PM2, PS1 and PS2, and refuses a published lesson of a topic with a final test that has no Practice.

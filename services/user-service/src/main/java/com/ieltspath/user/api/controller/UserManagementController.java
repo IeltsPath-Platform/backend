@@ -1,5 +1,6 @@
 package com.ieltspath.user.api.controller;
 
+import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.user.api.dto.request.AssignRoleRequest;
 import com.ieltspath.user.api.dto.request.ChangeLearningGoalStatusRequest;
 import com.ieltspath.user.api.dto.request.ChangeUserStatusRequest;
@@ -67,6 +68,7 @@ import java.util.stream.Collectors;
 public class UserManagementController {
 
     private final GetAllUsersUseCase getAllUsersUseCase;
+    private final CurrentUserProvider currentUserProvider;
     private final GetUserByIdUseCase getUserByIdUseCase;
     private final CreateUserUseCase createUserUseCase;
     private final UpdateUserUseCase updateUserUseCase;
@@ -117,17 +119,17 @@ public class UserManagementController {
 
     @PutMapping("/{id}/roles")
     public UserResponse assignRoles(@PathVariable("id") UUID id, @Valid @RequestBody AssignRoleRequest request) {
-        return toUserResponse(assignRoleUseCase.execute(new AssignRoleCommand(id, request.roles())));
+        return toUserResponse(assignRoleUseCase.execute(new AssignRoleCommand(id, request.roles(), currentUserProvider.requireUserId())));
     }
 
     @PutMapping("/{id}/status")
     public UserResponse changeStatus(@PathVariable("id") UUID id, @Valid @RequestBody ChangeUserStatusRequest request) {
-        return toUserResponse(changeUserStatusUseCase.execute(new ChangeUserStatusCommand(id, request.status())));
+        return toUserResponse(changeUserStatusUseCase.execute(new ChangeUserStatusCommand(id, request.status(), currentUserProvider.requireUserId())));
     }
 
     @DeleteMapping("/{id}")
     public UserResponse deleteUser(@PathVariable("id") UUID id) {
-        return toUserResponse(deleteUserUseCase.execute(id));
+        return toUserResponse(deleteUserUseCase.execute(id, currentUserProvider.requireUserId()));
     }
 
     // --- Learner Profile Management ---

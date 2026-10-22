@@ -19,7 +19,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/learning/admin/rule-configs")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('CONTENT_AUTHOR')")
 public class RuleConfigController {
     private final CurrentUserProvider currentUser;
     private final ManageRuleConfigUseCase rules;

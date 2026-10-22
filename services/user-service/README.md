@@ -64,6 +64,24 @@ ADMIN
 
 Registration public mặc định tạo user với role `CUSTOMER`. Các API quản trị yêu cầu `ADMIN`.
 
+`ADMIN` không thể kết hợp với `CONTENT_AUTHOR` hoặc `EXAMINER`, nhưng có thể kết hợp với `CUSTOMER` và `SALES_STAFF`.
+Quy tắc áp dụng khi tạo user hoặc thay vai trò; tài khoản cũ vẫn đăng nhập được và không bị tự động sửa.
+Administrator không thể tự gỡ `ADMIN`, tự khóa/tắt hoặc tự xóa tài khoản. Tài khoản `ADMIN` đang `ACTIVE` cuối cùng
+không thể mất vai trò này, chuyển sang `LOCKED`/`INACTIVE`, hoặc bị xóa. `GET /api/users` trả toàn bộ danh sách, chưa
+phân trang; giao diện có thể lọc danh sách phía client.
+
+Để kiểm tra các tài khoản cũ có tổ hợp vai trò xung đột:
+
+```sql
+SELECT u.email, string_agg(r.name, ',')
+FROM users u
+JOIN user_roles ur ON ur.user_id = u.id
+JOIN roles r ON r.id = ur.role_id
+GROUP BY u.email
+HAVING bool_or(r.name = 'ADMIN')
+   AND bool_or(r.name IN ('CONTENT_AUTHOR', 'EXAMINER'));
+```
+
 ## Các package chính
 
 ```text

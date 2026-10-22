@@ -29,21 +29,21 @@ public class ErrorTypeController {
     private final UpdateErrorTypeUseCase updateErrorType;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'EXAMINER')")
     public List<ErrorTypeResponse> list(@RequestParam(value = "activeOnly", defaultValue = "false") boolean activeOnly) {
         return listErrorTypes.execute(activeOnly).stream().map(ErrorTypeResponse::from).toList();
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public ErrorTypeResponse create(@Valid @RequestBody CreateErrorTypeRequest request) {
         return ErrorTypeResponse.from(createErrorType.execute(request.code(), request.name(), request.category(),
                 request.severity(), request.knowledgePointId(), request.fixHint()));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public ErrorTypeResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateErrorTypeRequest request) {
         return ErrorTypeResponse.from(updateErrorType.execute(id, request.name(), request.category(),
                 request.severity(), request.knowledgePointId(), request.fixHint(), request.status(),

@@ -100,8 +100,8 @@ class LessonResourceAuthorizationWebMvcTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void adminCanReadLessonResources() throws Exception {
-        when(listResources.execute(lessonId)).thenReturn(new LessonResourcesResult(lessonId, null, List.of()));
-        mockMvc.perform(get("/api/content/admin/lessons/{id}/resources", lessonId)).andExpect(status().isOk());
+    void adminCannotReadLessonResources() throws Exception {
+        mockMvc.perform(get("/api/content/admin/lessons/{id}/resources", lessonId)).andExpect(status().isForbidden());
+        verifyNoInteractions(listResources);
     }
 }

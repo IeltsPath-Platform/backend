@@ -101,11 +101,11 @@ class GamificationBoardsControllerTest {
     }
 
     @Test
-    void anAdminSwitchesABadgeOffAndOnlyAnAdminCan() throws Exception {
+    void aContentAuthorSwitchesABadgeOffAndCustomersCannot() throws Exception {
         when(badges.setActive("STREAK_7", false))
                 .thenReturn(new Badge("STREAK_7", "Seven days", "Seven days in a row", 15, false));
 
-        mvc.perform(patch("/api/learning/admin/badges/STREAK_7").with(user("admin").roles("ADMIN"))
+        mvc.perform(patch("/api/learning/admin/badges/STREAK_7").with(user("author").roles("CONTENT_AUTHOR"))
                         .contentType("application/json").content("{\"active\":false}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("STREAK_7"))
@@ -119,7 +119,7 @@ class GamificationBoardsControllerTest {
 
     @Test
     void switchingABadgeWithoutAnActiveFlagIsRefused() throws Exception {
-        mvc.perform(patch("/api/learning/admin/badges/STREAK_7").with(user("admin").roles("ADMIN"))
+        mvc.perform(patch("/api/learning/admin/badges/STREAK_7").with(user("author").roles("CONTENT_AUTHOR"))
                         .contentType("application/json").content("{}"))
                 .andExpect(status().is4xxClientError());
     }
@@ -129,7 +129,7 @@ class GamificationBoardsControllerTest {
         when(badges.setActive("NOPE", true))
                 .thenThrow(new LearningRequestException(404, "BADGE_NOT_FOUND", "No badge with this code"));
 
-        mvc.perform(patch("/api/learning/admin/badges/NOPE").with(user("admin").roles("ADMIN"))
+        mvc.perform(patch("/api/learning/admin/badges/NOPE").with(user("author").roles("CONTENT_AUTHOR"))
                         .contentType("application/json").content("{\"active\":true}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("BADGE_NOT_FOUND"));
