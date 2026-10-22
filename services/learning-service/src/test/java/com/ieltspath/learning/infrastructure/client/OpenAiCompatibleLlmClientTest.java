@@ -56,6 +56,17 @@ class OpenAiCompatibleLlmClientTest {
     }
 
     @Test
+    void requestStringDoesNotRenderMessageContent() {
+        var request = new OpenAiCompatibleLlmClient.Request("model", java.util.List.of(
+                new OpenAiCompatibleLlmClient.Message("system", "private system prompt"),
+                new OpenAiCompatibleLlmClient.Message("user", "private learner essay")),
+                4096, 0.0, new OpenAiCompatibleLlmClient.ResponseFormat("json_object"), null);
+
+        assertFalse(request.toString().contains("private system prompt"));
+        assertFalse(request.toString().contains("private learner essay"));
+    }
+
+    @Test
     void anExplicitReasoningEffortDropsTemperature() {
         Setup setup = client("gemini-2.5-flash", "medium");
         setup.server().expect(requestTo(BASE_URL + "/chat/completions"))

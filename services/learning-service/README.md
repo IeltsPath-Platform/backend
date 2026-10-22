@@ -182,6 +182,13 @@ The stored `EssayPrompt` snapshot contains `questionVersionId`, `stem`, `task`, 
 `chartFacts`, `sampleAnswer`, `images` and `knowledgePointIds`, so retries keep the original prompt.
 Writing in final topic tests remains outside the MVP pending the fee policy; essay blocks do not block lesson completion.
 
+Counted lesson and lesson Practice essays can create optional reviews for failed rubric criterion KPs. The default
+maximum is two per submission (`learning.writing.criterion-review-limit`), choosing the lowest bands first and requiring
+an unrevealed eligible set. These `WRITING_CRITERION` reviews never block lessons, Practice or topic tests and never
+affect Practice clearance. They appear in the additive `weak` review-basket group while outside the existing groups.
+Free writing, revisions and judged sub knowledge points do not create these reviews. See
+[lesson-writing-v1](../../docs/contracts/lesson-writing-v1.md#optional-criterion-reviews) for the rules and limits.
+
 ## Assessment results
 
 The consumer reads queue `learning.assessment-completed.v2` (bound to `assessment.events` /

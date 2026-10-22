@@ -53,10 +53,14 @@ public class GetReviewBasketUseCase {
         Instant now = clock.instant();
         List<PendingReview> pending = reviews.findPending(userId);
         Map<UUID, UUID> optionalReviewByPoint = new HashMap<>();
+        Map<UUID, PendingReview> optionalByPoint = new HashMap<>();
         List<PendingReview> blocking = new ArrayList<>();
         for (PendingReview review : pending) {
             if (review.blocking()) blocking.add(review);
-            else optionalReviewByPoint.put(review.knowledgePointId(), review.reviewId());
+            else {
+                optionalReviewByPoint.put(review.knowledgePointId(), review.reviewId());
+                optionalByPoint.put(review.knowledgePointId(), review);
+            }
         }
 
         // A point with a blocking review is listed as required, not offered again as an optional one.
@@ -64,7 +68,8 @@ public class GetReviewBasketUseCase {
         blocking.forEach(review -> blockedPoints.add(review.knowledgePointId()));
         List<MasteryProfile> candidates = profiles.findAll(userId).stream()
                 .filter(profile -> !blockedPoints.contains(profile.knowledgePointId()))
-                .filter(profile -> profile.tier() == MasteryTier.CONSOLIDATE || isDue(profile, now)).toList();
+                .filter(profile -> profile.tier() == MasteryTier.CONSOLIDATE || isDue(profile, now)
+                        || optionalByPoint.containsKey(profile.knowledgePointId())).toList();
         if (blocking.isEmpty() && candidates.isEmpty()) return new ReviewBasketResult(List.of(), List.of(), List.of());
 
         Map<UUID, KnowledgePointDirectory.Entry> described = directory.describe();
@@ -77,21 +82,28 @@ public class GetReviewBasketUseCase {
         }).toList();
         List<OptionalItem> consolidate = new ArrayList<>();
         List<OptionalItem> due = new ArrayList<>();
+        List<OptionalItem> weak = new ArrayList<>();
         for (MasteryProfile profile : candidates) {
             var meta = described.getOrDefault(profile.knowledgePointId(), KnowledgePointDirectory.Entry.UNKNOWN);
             boolean isDue = profile.tier() == MasteryTier.MAINTAIN;
-            var item = new OptionalItem(profile.knowledgePointId(), meta.code(), meta.name(), meta.skill(),
-                    profile.tier().name(), profile.mastery(), profile.nextReviewAt(), isDue ? "DUE" : "CONSOLIDATE",
+            boolean isWeak = profile.tier() != MasteryTier.CONSOLIDATE && !isDue(profile, now);
+            PendingReview optional = optionalByPoint.get(profile.knowledgePointId());
+            String reason = isWeak && optional != null ? optional.triggerKind() : isDue ? "DUE" : "CONSOLIDATE";
+            String skill = meta.skill() != null ? meta.skill()
+                    : optional != null && optional.skill() != null ? optional.skill().name() : null;
+            var item = new OptionalItem(profile.knowledgePointId(), meta.code(), meta.name(), skill,
+                    profile.tier().name(), profile.mastery(), profile.nextReviewAt(), reason,
                     availability.getOrDefault(profile.knowledgePointId(), 0) > 0
                             || optionalReviewByPoint.containsKey(profile.knowledgePointId()),
                     optionalReviewByPoint.get(profile.knowledgePointId()));
-            (isDue ? due : consolidate).add(item);
+            (isWeak ? weak : isDue ? due : consolidate).add(item);
         }
         Comparator<OptionalItem> weakestFirst = Comparator.comparingDouble(OptionalItem::mastery)
                 .thenComparing(item -> item.code() == null ? "" : item.code());
         consolidate.sort(weakestFirst);
+        weak.sort(weakestFirst);
         due.sort(Comparator.comparing(OptionalItem::dueAt));
-        return new ReviewBasketResult(required, List.copyOf(consolidate), List.copyOf(due));
+        return new ReviewBasketResult(required, List.copyOf(consolidate), List.copyOf(due), List.copyOf(weak));
     }
 
     static boolean isDue(MasteryProfile profile, Instant now) {

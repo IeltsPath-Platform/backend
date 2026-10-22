@@ -53,12 +53,12 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
     @Override
     public List<PendingReview> findPending(UUID userId) {
         return jdbc.query("""
-                SELECT id, lesson_id, knowledge_point_id, skill, blocking FROM review_items
+                SELECT id, lesson_id, knowledge_point_id, skill, blocking, trigger_kind FROM review_items
                 WHERE user_id = :userId AND status = 'PENDING' ORDER BY created_at, id
                 """, Map.of("userId", userId), (row, index) -> new PendingReview(row.getObject("id", UUID.class),
                 row.getObject("lesson_id", UUID.class), row.getObject("knowledge_point_id", UUID.class),
                 row.getString("skill") == null ? null : LearningSkill.valueOf(row.getString("skill")),
-                row.getBoolean("blocking")));
+                row.getBoolean("blocking"), row.getString("trigger_kind")));
     }
 
     @Override
@@ -90,7 +90,7 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
             ReviewStatus status = ReviewStatus.valueOf(row.getString("status"));
             LearningSkill skill = skill(row.getString("skill"));
             if (status == ReviewStatus.PENDING) pending.add(new PendingReview(row.getObject("id", UUID.class),
-                    lessonId, kpId, skill, row.getBoolean("blocking")));
+                    lessonId, kpId, skill, row.getBoolean("blocking"), row.getString("trigger_kind")));
             if ("PRACTICE".equals(row.getString("trigger_kind")) && lessonIds.contains(lessonId)) {
                 practice.add(new PracticeReviewState(lessonId, kpId, status, skill));
             }

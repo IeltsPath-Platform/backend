@@ -11,6 +11,7 @@ import com.ieltspath.learning.application.service.EssaySubmissionFlow;
 import com.ieltspath.learning.application.service.LessonAccess;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.WritingSubmissionViewAssembler;
+import com.ieltspath.learning.application.service.WritingCriterionReviews;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.service.WritingEvidenceRule;
@@ -58,6 +59,7 @@ public class SubmitLessonEssayUseCase {
     private final WritingSubmissionViewAssembler view;
     private final QuestionEventLog questionEvents;
     private final MasteryProfileUpdater masteryProfiles;
+    private final WritingCriterionReviews criterionReviews;
     private final WritingEvidenceRule writingEvidence = new WritingEvidenceRule();
     private final Clock clock = Clock.systemUTC();
 
@@ -65,9 +67,10 @@ public class SubmitLessonEssayUseCase {
                                     KnowledgeEvidenceRepository evidence, WritingSubmissionRepository essays,
                                     EssaySubmissionFlow flow, PlatformTransactionManager transactionManager,
                                     WritingSubmissionViewAssembler view, QuestionEventLog questionEvents,
-                                    MasteryProfileUpdater masteryProfiles) {
+                                    MasteryProfileUpdater masteryProfiles, WritingCriterionReviews criterionReviews) {
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
+        this.criterionReviews = criterionReviews;
         this.content = content;
         this.access = access;
         this.lock = lock;
@@ -191,6 +194,10 @@ public class SubmitLessonEssayUseCase {
             }
             evidence.append(submission.userId(), essayEvidence);
             masteryProfiles.recordEvidence(submission.userId(), essayEvidence, outcome.criterionKnowledgePoints());
+            if (submission.previousSubmissionId() == null) {
+                criterionReviews.create(submission.userId(), submission.lessonId(), outcome.failedCriteria().stream()
+                        .filter(criterion -> known.contains(criterion.knowledgePointId())).toList());
+            }
         }
         submission.markGraded(ledgerEntryId);
         essays.save(submission);
