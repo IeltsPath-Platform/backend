@@ -98,7 +98,7 @@ The topic must be `IN_PROGRESS` or `PASSED`; otherwise `403 TOPIC_LOCKED`. Retur
 
 Lesson metadata adds `skill` from Content. A pending review blocks only lessons of the same skill; a legacy review with `skill: null` blocks every skill. The existing gate error precedence and HTTP 403 remain unchanged.
 
-The same lesson gate applies to this GET, submissions, and completion. Error precedence: blocking pending review (`REVIEW_REQUIRED`), topic not current (`TOPIC_LOCKED`), earlier lesson incomplete (`LESSON_LOCKED`), then an earlier lesson whose Practice is not passed (`PRACTICE_REQUIRED`, `403`, with `lessonIds` in lesson order). A pending review blocks a lesson when it has the lesson's skill or no skill, **or** when it belongs to an earlier lesson of the same topic, whatever its skill; `reviews` lists them so the client can lead the learner into the review. `PRACTICE_REQUIRED` is only returned when no review is pending. The first lesson of a topic has no earlier lesson and needs no Practice. Returns metadata and ordered `blocks`. A question object has **only** `questionVersionId`, `sortOrder`, `stem`, `options`, `hint`; an asset can provide passage text alongside it. Exercise blocks carry `blockKind`: `EXERCISE` for auto-graded questions, `ESSAY` for a Writing essay block shaped as in [`lesson-writing-v1`](lesson-writing-v1.md) (an essay block never counts toward lesson completion, and exercise submissions to it return `409 ESSAY_BLOCK`). An `ASSET` block gives `{id, assetType, textContent?, mediaUrl?, durationSeconds?, transcript?}`: a `PASSAGE` has `textContent`; media has `mediaUrl` (never the stored reference); an `AUDIO` asset gains `transcript` only once the lesson is completed, and before that the key is absent because the transcript gives the answers away. Do not pass through Content's `answerSpec`, `explanation`, KP mappings, or solution fields. `options=null` means a fill response; a non-null array means choose an `optionKey`, including the three TFNG keys. A passed exercise block gains a separate `solutions` array of `{questionVersionId, correctAnswer, explanation}`; an unpassed block omits the `solutions` key entirely.
+This GET, submissions, and completion share the lesson gate. For reading, a completed lesson or the lesson owning a pending review stays readable for revision; submissions and completion still enforce blocking reviews. Error precedence: blocking pending review (`REVIEW_REQUIRED`), topic not current (`TOPIC_LOCKED`), earlier lesson incomplete (`LESSON_LOCKED`), then an earlier lesson whose Practice is not passed (`PRACTICE_REQUIRED`, `403`, with `lessonIds` in lesson order). A blocking pending review blocks a lesson when it has the lesson's skill or no skill, **or** when it belongs to an earlier lesson of the same topic, whatever its skill; `reviews` lists them so the client can lead the learner into the review. `PRACTICE_REQUIRED` is only returned when no blocking review is pending. The first lesson of a topic has no earlier lesson and needs no Practice. Returns metadata and ordered `blocks`. A question object has **only** `questionVersionId`, `sortOrder`, `stem`, `options`, `hint`; an asset can provide passage text alongside it. Exercise blocks carry `blockKind`: `EXERCISE` for auto-graded questions, `ESSAY` for a Writing essay block shaped as in [`lesson-writing-v1`](lesson-writing-v1.md) (an essay block never counts toward lesson completion, and exercise submissions to it return `409 ESSAY_BLOCK`). An `ASSET` block gives `{id, assetType, textContent?, mediaUrl?, durationSeconds?, transcript?}`: a `PASSAGE` has `textContent`; media has `mediaUrl` (never the stored reference); an `AUDIO` asset gains `transcript` only once the lesson is completed, and before that the key is absent because the transcript gives the answers away. Do not pass through Content's `answerSpec`, `explanation`, KP mappings, or solution fields. `options=null` means a fill response; a non-null array means choose an `optionKey`, including the three TFNG keys. A passed exercise block gains a separate `solutions` array of `{questionVersionId, correctAnswer, explanation}`; an unpassed block omits the `solutions` key entirely.
 
 `hint` is always present, including when `null`, so the key does not disclose which questions have author-written hints. Learning Service reveals Content's hint only for a gradable `FILL`, or a gradable `CHOICE` with at least three options (including TFNG). Empty/absent CHOICE options are treated as the fixed three-choice TFNG fallback; one or two options and unsupported/ungradable specs are ineligible. Legacy gradable specs without `type` follow the grader's CHOICE default. A question must have been answered incorrectly in **any** saved submission for the same verified user, lesson and block, and the block must not have passed. Once opened, its hint remains even after a later correct answer while the block still fails. Before the first wrong answer, without a Content hint, or after the block has passed, `hint=null`. The runtime rule does not filter by skill; current Content seed supplies Reading hints and leaves Listening hints null. Essay prompts do not use this field.
 
@@ -179,7 +179,7 @@ Only a lesson with **no** `EXERCISE` block can be completed this way; a lesson w
 
 `POST /practice-attempts/{id}/submissions` takes `{requestId, answers:[{questionVersionId, answer}]}` with exactly one answer per question. It returns `{attemptId, correct, total, percent, passed, countedAsEvidence, results, transcript?, reviewsCreated}`; each result contains `questionVersionId`, `correct`, `correctAnswer`, `explanation`, and `hint:null`. A Listening transcript appears after submission. A repeated `requestId` returns the saved result; another request for a submitted attempt returns `409 ATTEMPT_ALREADY_SUBMITTED`. Passing is at least 70%. Only the first submission of an unrevealed package writes `practice_set` evidence and can give `FIRST_SUBMISSION`; subsequent practice of that package, including after a submitted review set, is graded and revealed but writes no evidence or review. A counted submission below 70% can create a `PRACTICE` review for each KP below 70% if that KP has no pending review and an unrevealed eligible set remains. Lesson completion itself creates no review.
 
-Practice clearance is one-way: after the lesson completes, it passes with the first applicable reason in this order: counted first practice submission at 70% or above; at least one practice-triggered review of the skill (or of the lesson, for sets without skills) with none still pending, where completed and skipped reviews both count as finished; all currently published lesson packages submitted in practice or review with no pending practice review; or no practice packages. The first passing reason is stored and later content changes do not revoke it. Reads calculate status without writing a pass row. A pending same-skill review (or legacy null-skill review) blocks practice; `REVIEW_REQUIRED` remains HTTP 403. An incomplete lesson gives `409 PRACTICE_LOCKED` on start.
+Practice clearance is one-way: after the lesson completes, it passes with the first applicable reason in this order: counted first practice submission at 70% or above; at least one practice-triggered review of the skill (or of the lesson, for sets without skills) with none still pending, where completed and skipped reviews both count as finished; all currently published lesson packages submitted in practice or review with no pending practice review; or no practice packages. The first passing reason is stored and later content changes do not revoke it. Reads calculate status without writing a pass row. A blocking pending same-skill review (or legacy null-skill review) blocks practice; `REVIEW_REQUIRED` remains HTTP 403. An incomplete lesson gives `409 PRACTICE_LOCKED` on start.
 
 ### `GET /reviews`
 
@@ -187,7 +187,7 @@ Lists the verified learner's reviews oldest first, without a Content request. Qu
 
 ### `GET /review-basket`
 
-Role `CUSTOMER`. The review basket groups what the learner can review. Nothing in `consolidate` or `due` is mandatory,
+Role `CUSTOMER`. The review basket groups what the learner can review. Nothing in `consolidate`, `due` or `weak` is mandatory,
 none of it blocks a lesson, Practice or topic test, and none of it counts toward the Process Score; a result only
 updates the mastery profile.
 
@@ -197,7 +197,10 @@ updates the mastery profile.
   "consolidate": [{"knowledgePointId":"…","code":"…","name":"…","skill":"READING","tier":"CONSOLIDATE","mastery":0.65,
                    "dueAt":"…","reason":"CONSOLIDATE","hasUnrevealedSet":true,"reviewId":null}],
   "due":         [{"knowledgePointId":"…","code":"…","name":"…","skill":"READING","tier":"MAINTAIN","mastery":0.85,
-                   "dueAt":"…","reason":"DUE","hasUnrevealedSet":true,"reviewId":null}]
+                   "dueAt":"…","reason":"DUE","hasUnrevealedSet":true,"reviewId":null}],
+  "weak":        [{"knowledgePointId":"…","code":"DEMO_WRITING_CRITERION_LR","name":"Lexical Resource",
+                   "skill":"WRITING","tier":"PRIORITY","mastery":0.0,"dueAt":null,
+                   "reason":"WRITING_CRITERION","hasUnrevealedSet":true,"reviewId":"…"}]
 }
 ```
 
@@ -206,12 +209,26 @@ updates the mastery profile.
   (`next_review_at`) has passed. A point with a blocking review is only listed under `required`.
 - `hasUnrevealedSet` is true when Content still has a set the learner has not seen, or the point already has an optional
   review in progress (`reviewId`).
+- `weak` is an additive array of points with an optional `PENDING` review that appear in none of the other groups,
+  sorted by mastery ascending, then KP code. It includes weak Writing criterion points even when their tier is
+  `PRIORITY` or they have no review date. `reason` is the review's trigger kind; Writing criterion reviews use
+  `WRITING_CRITERION`. Existing groups keep their shapes and rules.
+
+A counted lesson Practice essay can create an optional review for a mapped rubric criterion whose band is strictly
+below the prompt's pass band. These reviews have `blocking = false`, `skill = WRITING`, and
+`trigger_kind = WRITING_CRITERION`; the submission response keeps `reviewsCreated` scoped to blocking `PRACTICE` reviews. Optional criterion reviews appear in `GET /reviews` (the lesson Practice tab can filter by skill) and the
+basket. They never affect lesson gates, Practice clearance or topic test gates. Only `PRACTICE` reviews affect
+`PracticeClearance`. They use the normal review endpoints; a set may be a `PS-WCR-*` package that belongs to no lesson.
+The associated lesson is a preference when selecting a set, not an eligibility requirement. Passing a set marks the
+review `DONE`, writes `review_set` evidence and updates mastery. Optional reviews end `SKIPPED` on a failed set.
+Creation limits and excluded Writing sources are described in [lesson-writing-v1](lesson-writing-v1.md).
 
 ### `POST /review-basket/{knowledgePointId}/start`
 
 Role `CUSTOMER`. Starts an optional review of the point and returns it like `GET /reviews/{reviewId}`, with the first set.
 
 - The point already has a `PENDING` review (blocking or optional): that review is returned and nothing is created.
+  This includes a `WRITING_CRITERION` review at `PRIORITY`; it does not require a lesson teaching that criterion.
 - Otherwise the point must be at the consolidate tier, or at the maintain tier and due; any other point answers
   `409 NOT_IN_REVIEW_BASKET`. A point no completed lesson teaches answers `409 NO_LESSON_FOR_KNOWLEDGE_POINT`. When
   Content has no set the learner has not seen, `409 NO_UNREVEALED_SET` is returned and nothing is created.
@@ -278,7 +295,7 @@ Request: `{reviewSetId, requestId, answers}` with the same answer array shape as
 
 ### `POST /topics/{id}/test-assignments`
 
-Only pending reviews of the topic's skill or a legacy null skill block assignment. A topic with `hasTopicTest=false` returns `409 NO_TOPIC_TEST` and passes when all its published lessons are completed.
+Only blocking pending reviews of the topic's skill or a legacy null skill block assignment. A topic with `hasTopicTest=false` returns `409 NO_TOPIC_TEST` and passes when all its published lessons are completed.
 
 Requires the topic to be `IN_PROGRESS`, all lessons completed, all lessons practice-cleared, and no pending review of its skill or a legacy null skill. A pending review returns `403 REVIEW_REQUIRED` first; incomplete practice returns `409 PRACTICE_REQUIRED` with `lessonIds`; other locked conditions return `403 TEST_LOCKED`. Empty body. Repeated POSTs return the same unconsumed assignment. After consumption, choose a `packageId` not yet used by this learner/topic; when exhausted, reuse the least recently consumed package with its currently PUBLISHED version. With no available code, return `409 TEST_UNAVAILABLE`. Assignment alone does not submit an assessment or pass the topic.
 

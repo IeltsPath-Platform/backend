@@ -52,6 +52,30 @@ class ReviewBasketControllerTest {
     final UUID point = UUID.randomUUID();
 
     @Test
+    void weakWritingCriteriaAreAnAdditiveBasketGroup() throws Exception {
+        UUID reviewId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(learner);
+        when(basket.execute(learner)).thenReturn(new ReviewBasketResult(List.of(), List.of(), List.of(), List.of(
+                new ReviewBasketResult.OptionalItem(point, "DEMO_WRITING_CRITERION_LR", "Lexical Resource",
+                        "WRITING", "PRIORITY", 0.0, null, "WRITING_CRITERION", true, reviewId))));
+
+        mvc.perform(get("/api/learning/review-basket").with(user("customer").roles("CUSTOMER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.required").isEmpty())
+                .andExpect(jsonPath("$.consolidate").isEmpty())
+                .andExpect(jsonPath("$.due").isEmpty())
+                .andExpect(jsonPath("$.weak[0].knowledgePointId").value(point.toString()))
+                .andExpect(jsonPath("$.weak[0].skill").value("WRITING"))
+                .andExpect(jsonPath("$.weak[0].tier").value("PRIORITY"))
+                .andExpect(jsonPath("$.weak[0].mastery").value(0.0))
+                .andExpect(jsonPath("$.weak[0]").value(org.hamcrest.Matchers.hasKey("dueAt")))
+                .andExpect(jsonPath("$.weak[0].dueAt").isEmpty())
+                .andExpect(jsonPath("$.weak[0].reason").value("WRITING_CRITERION"))
+                .andExpect(jsonPath("$.weak[0].hasUnrevealedSet").value(true))
+                .andExpect(jsonPath("$.weak[0].reviewId").value(reviewId.toString()));
+    }
+
+    @Test
     void theBasketUsesTheVerifiedIdentityAndShowsThreeGroups() throws Exception {
         when(currentUser.requireUserId()).thenReturn(learner);
         when(basket.execute(learner)).thenReturn(new ReviewBasketResult(List.of(),

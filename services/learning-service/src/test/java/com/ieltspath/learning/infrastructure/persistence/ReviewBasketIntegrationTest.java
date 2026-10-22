@@ -65,6 +65,7 @@ class ReviewBasketIntegrationTest {
     @Autowired GetReviewUseCase getReview;
     @Autowired SubmitReviewUseCase submitReview;
     @Autowired GetLessonUseCase getLesson;
+    @Autowired CompleteLessonUseCase completeLesson;
     @Autowired ReviewReevaluation reevaluation;
     @Autowired ApplyAssessmentResultUseCase apply;
     @MockitoBean LearningContentClient content;
@@ -161,6 +162,29 @@ class ReviewBasketIntegrationTest {
         assertFalse(result.due().getFirst().hasUnrevealedSet(), "Content has no unseen set for this point");
         assertFalse(result.consolidate().stream().anyMatch(item -> item.knowledgePointId().equals(kpLater)),
                 "a maintained point that is not due yet is not in the basket");
+    }
+
+    @Test
+    void optionalPendingPointsAppearExactlyOnceAcrossTheExistingAndWeakGroups() {
+        UUID user = learner();
+        for (UUID point : List.of(kpConsolidate, kpDue, kpLater, kpPriority)) {
+            jdbc.update("""
+                    INSERT INTO review_items(id, user_id, knowledge_point_id, lesson_id, status, skill,
+                                             trigger_kind, blocking)
+                    VALUES (?, ?, ?, ?, 'PENDING', 'WRITING', 'WRITING_CRITERION', FALSE)
+                    """, UUID.randomUUID(), user, point, lesson);
+        }
+        ReviewBasketResult result = basket.execute(user);
+        assertTrue(result.required().isEmpty());
+        assertEquals(List.of(kpConsolidate), result.consolidate().stream().map(item -> item.knowledgePointId()).toList());
+        assertEquals(List.of(kpDue), result.due().stream().map(item -> item.knowledgePointId()).toList());
+        assertEquals(List.of(kpPriority, kpLater), result.weak().stream().map(item -> item.knowledgePointId()).toList());
+        assertTrue(result.weak().stream().allMatch(item -> item.reviewId() != null
+                && item.reason().equals("WRITING_CRITERION") && item.hasUnrevealedSet()));
+
+        jdbc.update("UPDATE kp_mastery_profiles SET tier='INSUFFICIENT' WHERE user_id=? AND knowledge_point_id=?",
+                user, kpPriority);
+        assertEquals("INSUFFICIENT", basket.execute(user).weak().getFirst().tier());
     }
 
     @Test
@@ -270,8 +294,9 @@ class ReviewBasketIntegrationTest {
                 String.class, optional.reviewId()));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND status = 'PENDING'",
                 Integer.class, user));
+        assertDoesNotThrow(() -> getLesson.execute(user, lesson), "completed lessons stay readable for revision");
         assertEquals("REVIEW_REQUIRED", assertThrows(com.ieltspath.learning.domain.exception.LearningGateException.class,
-                () -> getLesson.execute(user, lesson)).getCode());
+                () -> completeLesson.execute(user, lesson)).getCode());
     }
 
     @Test

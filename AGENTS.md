@@ -231,7 +231,9 @@ src/main/java/com/ieltspath/<service>
   kể cả khi mô hình không trả mảng judgments; không có KP con thì null và không cần mảng judgments.
   API không phát `judgmentVersion`. KP tiêu chí / KP con lưu trong JSON grade; bài cũ chưa có judgments đọc thành `[]`.
   Event essay vẫn một dòng cho KP của đề, `error_code` là mã lỗi gặp nhiều nhất. Bằng chứng tiêu chí và KP con của essay
-  Practice không được XP mốc; Writing vẫn không sinh bài ôn. Mỗi KP tiêu chí có 3 bộ luyện tự do demo (`PS-WCR-*`, V70;
+  Practice không được XP mốc. Essay lesson/Practice tính evidence có thể tạo bài ôn tùy chọn `WRITING_CRITERION` cho KP
+  tiêu chí rớt (mặc định tối đa 2, `learning.writing.criterion-review-limit`); không tạo cho bài viết tự do, revision hay KP con.
+  Mỗi KP tiêu chí có 3 bộ luyện tự do demo (`PS-WCR-*`, V70;
   nội dung AI soạn, cần giám khảo IELTS duyệt). Kết quả chấm trả thêm `studyPoints` (KP tiêu chí yếu, KP con `FAIL` và `focus`
   của LLM), tính một lần lúc chấm và lưu trong JSON bài chấm; bài cũ trả mảng rỗng.
 - Luyện tự do theo KP (`POST /knowledge-points/{id}/free-practice`) không bao giờ chặn đường học: trượt không sinh bài

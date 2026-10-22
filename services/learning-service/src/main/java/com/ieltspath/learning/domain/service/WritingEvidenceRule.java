@@ -1,6 +1,7 @@
 package com.ieltspath.learning.domain.service;
 
 import com.ieltspath.learning.domain.vo.WritingGrade;
+import com.ieltspath.learning.domain.vo.FailedWritingCriterion;
 
 import java.math.BigDecimal;
 import java.util.Collection;
@@ -11,6 +12,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Turns one graded essay into mastery outcomes. The question's knowledge points take the essay's pass. Each rubric
@@ -23,12 +26,14 @@ public final class WritingEvidenceRule {
     /**
      * {@code correctByKnowledgePoint} lists question points first, then criterion points, then judged sub points;
      * a point appears once. {@code criterionKnowledgePoints} are points decided by a criterion band or sub judgment.
+     * {@code failedCriteria} contains only mapped rubric criteria below the pass band, never judged sub points.
      */
     public record Outcome(Map<UUID, Boolean> correctByKnowledgePoint, Set<UUID> criterionKnowledgePoints,
-                          String dominantErrorCode) {
+                          String dominantErrorCode, List<FailedWritingCriterion> failedCriteria) {
         public Outcome {
             correctByKnowledgePoint = Collections.unmodifiableMap(new LinkedHashMap<>(correctByKnowledgePoint));
             criterionKnowledgePoints = Set.copyOf(criterionKnowledgePoints);
+            failedCriteria = List.copyOf(failedCriteria);
         }
     }
 
@@ -39,11 +44,16 @@ public final class WritingEvidenceRule {
             if (kp != null) correct.putIfAbsent(kp, passed);
         }
         Set<UUID> decidedByCriteria = new LinkedHashSet<>();
+        List<FailedWritingCriterion> failedCriteria = new ArrayList<>();
         if (passBand != null && grade != null && grade.criteria() != null) {
             for (WritingGrade.Criterion criterion : grade.criteria()) {
                 if (criterion == null || criterion.knowledgePointId() == null || criterion.band() == null) continue;
                 boolean reached = criterion.band().compareTo(passBand) >= 0;
                 UUID kp = criterion.knowledgePointId();
+                if (!reached && criterion.code() != null) {
+                    failedCriteria.add(new FailedWritingCriterion(kp,
+                            "DEMO_WRITING_CRITERION_" + criterion.code(), criterion.band()));
+                }
                 if (decidedByCriteria.add(kp)) correct.put(kp, reached);
                 else correct.put(kp, correct.get(kp) && reached);
             }
@@ -65,7 +75,7 @@ public final class WritingEvidenceRule {
         }
         Set<UUID> decidedPoints = new LinkedHashSet<>(decidedByCriteria);
         decidedPoints.addAll(decidedByJudgments);
-        return new Outcome(correct, decidedPoints, dominantErrorCode(grade));
+        return new Outcome(correct, decidedPoints, dominantErrorCode(grade), failedCriteria);
     }
 
     /** The most frequent error code of the corrections; a tie goes to the alphabetically first code. */

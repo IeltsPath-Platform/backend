@@ -133,7 +133,13 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     record Request(String model, List<Message> messages, @JsonProperty("max_tokens") int maxTokens,
                    Double temperature, @JsonProperty("response_format") ResponseFormat responseFormat,
-                   @JsonProperty("reasoning_effort") String reasoningEffort) {}
+                   @JsonProperty("reasoning_effort") String reasoningEffort) {
+        /** Spring's HTTP debug log renders the body with toString; message content must stay private. */
+        @Override
+        public String toString() {
+            return "LLM request[model=" + model + ", maxTokens=" + maxTokens + "]";
+        }
+    }
 
     record Message(String role, String content) {}
 

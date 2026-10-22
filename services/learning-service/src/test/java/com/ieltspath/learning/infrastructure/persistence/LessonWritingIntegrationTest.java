@@ -548,6 +548,35 @@ class LessonWritingIntegrationTest {
         verifyNoInteractions(content);
     }
 
+    @Test
+    void lessonEvidenceCreatesOptionalCriterionReviewsWhileRevisionsDoNot() {
+        when(content.getActiveRubric(anyString())).thenReturn(rubricWithCriterionPoints("TASK_2"));
+        when(content.getTopicSequence()).thenReturn(List.of(new LearningContentClient.Topic(TOPIC, "WRITING",
+                "Writing", 900, null, List.of(kp(KP), kp(ESSAY_KP), kp(TR_KP), kp(CC_KP), kp(LR_KP), kp(GRA_KP)),
+                LearningSkill.WRITING, true)));
+        when(content.practiceSetAvailability(anyList(), anyList(), eq(3))).thenReturn(Map.of(LR_KP, 3, GRA_KP, 3));
+        topics.execute(USER);
+        llmReplies(gradeWithBands("6.0", "6.0", "5.0", "4.5"));
+        UUID requestId = UUID.randomUUID();
+
+        var original = submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, requestId, ESSAY);
+        var rows = jdbc.queryForList("SELECT knowledge_point_id, blocking, trigger_kind, skill, lesson_id FROM review_items WHERE user_id=?", USER);
+        assertEquals(2, rows.size());
+        assertEquals(java.util.Set.of(LR_KP, GRA_KP), rows.stream().map(row -> row.get("knowledge_point_id")).collect(java.util.stream.Collectors.toSet()));
+        assertTrue(rows.stream().allMatch(row -> Boolean.FALSE.equals(row.get("blocking"))
+                && "WRITING_CRITERION".equals(row.get("trigger_kind")) && "WRITING".equals(row.get("skill"))
+                && LESSON.equals(row.get("lesson_id"))));
+        submitLessonEssayUseCase.execute(USER, LESSON, ESSAY_BLOCK, requestId, ESSAY);
+        assertEquals(2, count("review_items"));
+
+        jdbc.update("DELETE FROM review_items WHERE user_id=?", USER);
+        clearInvocations(content);
+        var revision = submitEssayRevisionUseCase.execute(USER, original.submissionId(), UUID.randomUUID(), ESSAY);
+        assertEquals("GRADED", revision.status());
+        assertEquals(0, count("review_items"));
+        verify(content, never()).practiceSetAvailability(anyList(), anyList(), anyInt());
+    }
+
     private static String gradeWithFocus(String tr, String cc, String lr, String gra) {
         return gradeWithBands(tr, cc, lr, gra).replace("\"focus\":[]",
                 "\"focus\":[\"Cohesive Devices: Dùng từ nối tự nhiên\"]");

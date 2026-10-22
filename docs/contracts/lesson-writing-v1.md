@@ -158,7 +158,31 @@ can ask a Mentor to review a graded essay (`POST`/`GET /writing-submissions/{id}
   `PASS` or `FAIL` adds evidence regardless of the essay pass band; `NOT_ASSESSED` adds none. Criterion band evidence
   takes priority when the same KP is mapped twice, and sub-point evidence overrides the question's pass result when IDs
   overlap. Criterion knowledge points appear only in `studyPoints[]`; `criteria[]` exposes sub-point IDs only inside
-  `knowledgePointJudgments[]`. The question's event carries the most frequent correction `errorCode`. No review is inserted.
+  `knowledgePointJudgments[]`. The question's event carries the most frequent correction `errorCode`.
+
+## Optional criterion reviews
+
+When a lesson essay records evidence, or a lesson Practice package is submitted with `countedAsEvidence = true`,
+failed rubric criterion KPs may receive optional reviews in the same transaction as their evidence. A criterion fails
+only when its band is strictly below the prompt's pass band (5.5 against 5.5 passes). Judged sub knowledge points do
+not create these reviews. Existing evidence, including sub-point judgments, is unchanged.
+
+The service selects the lowest criterion bands first, breaking ties by KP code, and creates at most
+`learning.writing.criterion-review-limit` reviews per submission (default `2`, pending user/mentor confirmation).
+A KP with any existing `PENDING` review is skipped. Content must have an eligible unrevealed set with at least three
+questions; packages already revealed in Practice/review or assigned in any review are excluded. Availability is
+checked once for all candidate KPs. This uses the published `PS-WCR-*` criterion practice sets.
+
+Each new review stores the essay's lesson ID, `skill = WRITING`, `blocking = false`, and
+`trigger_kind = WRITING_CRITERION`. These reviews never block lessons, Practice or topic tests and do not change
+Practice clearance. They are accessible through `GET /reviews`, `GET /review-basket` (in `weak` when absent from
+`required`, `consolidate` and `due`), and the existing review start/submission routes. A successful review set writes `review_set` evidence and updates mastery.
+Replaying an existing submission or resubmitting a revealed Practice package creates no additional reviews.
+
+Free writing and essay revisions do not create criterion reviews in this version. Free writing has no lesson,
+while `review_items.lesson_id` remains required. Revisions retain their existing evidence behavior but do not trigger
+these optional reviews. Learners cannot start a new `PRIORITY` review themselves; basket start only reopens an
+existing pending review for that tier.
 
 ## Errors
 

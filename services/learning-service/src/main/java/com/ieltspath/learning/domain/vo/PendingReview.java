@@ -8,12 +8,15 @@ import java.util.UUID;
  * optional one (picked from the review basket, or from a free practice test) never does.
  */
 public record PendingReview(UUID reviewId, UUID lessonId, UUID knowledgePointId, LearningSkill skill,
-                            boolean blocking) {
+                            boolean blocking, String triggerKind) {
+    public PendingReview(UUID reviewId, UUID lessonId, UUID knowledgePointId, LearningSkill skill, boolean blocking) {
+        this(reviewId, lessonId, knowledgePointId, skill, blocking, null);
+    }
     public PendingReview(UUID reviewId, UUID lessonId, UUID knowledgePointId, LearningSkill skill) {
-        this(reviewId, lessonId, knowledgePointId, skill, true);
+        this(reviewId, lessonId, knowledgePointId, skill, true, null);
     }
     public PendingReview(UUID reviewId, UUID lessonId, UUID knowledgePointId) {
-        this(reviewId, lessonId, knowledgePointId, null, true);
+        this(reviewId, lessonId, knowledgePointId, null, true, null);
     }
     public PendingReview {
         Objects.requireNonNull(reviewId, "reviewId");

@@ -24,6 +24,30 @@ class WritingEvidenceRuleTest {
 
     private final WritingEvidenceRule rule = new WritingEvidenceRule();
 
+    @Test
+    void failedCriteriaKeepBandsWithoutIncludingFailedSubPoints() {
+        UUID subPoint = UUID.randomUUID();
+        var lr = criterion("LR", "5.0", LR).withKnowledgePointJudgments(
+                List.of(judgment(subPoint, WritingGrade.Judgment.FAIL)));
+        var outcome = rule.derive(List.of(LR), new BigDecimal("5.5"), true,
+                grade(List.of(criterion("TA", "5.5", TR), criterion("CC", "6.0", CC), lr,
+                        criterion("GRA", "4.5", GRA)), List.of()));
+
+        assertEquals(List.of(LR, GRA), outcome.failedCriteria().stream().map(c -> c.knowledgePointId()).toList());
+        assertEquals(List.of(new BigDecimal("5.0"), new BigDecimal("4.5")),
+                outcome.failedCriteria().stream().map(c -> c.band()).toList());
+        assertFalse(outcome.correctByKnowledgePoint().get(LR));
+        assertFalse(outcome.correctByKnowledgePoint().get(subPoint));
+        assertTrue(outcome.correctByKnowledgePoint().get(TR));
+    }
+
+    @Test
+    void noPassBandOrNoFailedCriterionGivesNoCriterionReviewCandidate() {
+        var grade = grade(List.of(criterion("LR", "5.5", LR)), List.of());
+        assertTrue(rule.derive(List.of(), new BigDecimal("5.5"), true, grade).failedCriteria().isEmpty());
+        assertTrue(rule.derive(List.of(), null, false, grade).failedCriteria().isEmpty());
+    }
+
     private static WritingGrade.Criterion criterion(String code, String band, UUID point) {
         return new WritingGrade.Criterion(code, new BigDecimal(band), List.of(), List.of(), point);
     }

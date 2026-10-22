@@ -14,6 +14,8 @@ import com.ieltspath.learning.application.service.FirstAttemptMistakes;
 import com.ieltspath.learning.application.service.FreePracticeSubmission;
 import com.ieltspath.learning.application.service.GamificationRecorder;
 import com.ieltspath.learning.application.service.HeartsService;
+import com.ieltspath.learning.application.service.WritingCriterionReviews;
+import com.ieltspath.learning.domain.vo.FailedWritingCriterion;
 import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.domain.vo.PracticeOrigin;
 import com.ieltspath.learning.application.service.ItemGrading;
@@ -64,6 +66,7 @@ public class SubmitPracticeAttemptUseCase {
     private final FreePracticeSubmission freePractice;
     private final GamificationRecorder gamificationRecorder;
     private final HeartsService hearts;
+    private final WritingCriterionReviews criterionReviews;
     private final ItemGrading grading = new ItemGrading();
     private final LessonHintPolicy hints = new LessonHintPolicy();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
@@ -76,7 +79,7 @@ public class SubmitPracticeAttemptUseCase {
                                         FirstAttemptMistakes mistakes, WritingSubmissionRepository essays,
                                         QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
                                         FreePracticeSubmission freePractice, GamificationRecorder gamificationRecorder,
-                                        HeartsService hearts) {
+                                        HeartsService hearts, WritingCriterionReviews criterionReviews) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -91,6 +94,7 @@ public class SubmitPracticeAttemptUseCase {
         this.freePractice = freePractice;
         this.gamificationRecorder = gamificationRecorder;
         this.hearts = hearts;
+        this.criterionReviews = criterionReviews;
     }
 
     /** Wrong objective answers; essay items are graded by a tutor and never cost a heart. */
@@ -131,6 +135,7 @@ public class SubmitPracticeAttemptUseCase {
         // Essay criterion points earn no milestone XP unless an item of this set also tests them.
         Set<UUID> itemKps = new HashSet<>();
         Set<UUID> criterionOnly = new HashSet<>();
+        List<FailedWritingCriterion> failedCriteria = new ArrayList<>();
         Map<LearningSkill, List<PracticeReviewRule.ItemOutcome>> outcomesBySkill = new EnumMap<>(LearningSkill.class);
         for (int index = 0; index < graded.items().size(); index++) {
             var item = graded.items().get(index);
@@ -149,6 +154,7 @@ public class SubmitPracticeAttemptUseCase {
                 var essayOutcome = writingEvidence.derive(kps, essay.prompt().passBand(), grade.correct(), essay.grade());
                 evidenceByKp.putAll(essayOutcome.correctByKnowledgePoint());
                 criterionOnly.addAll(essayOutcome.criterionKnowledgePoints());
+                if (counted) failedCriteria.addAll(essayOutcome.failedCriteria());
                 errorCode = essayOutcome.dominantErrorCode();
             } else {
                 for (UUID kp : kps) evidenceByKp.put(kp, grade.correct());
@@ -212,6 +218,7 @@ public class SubmitPracticeAttemptUseCase {
         reviews.insertPracticePending(userId, candidates);
         reviews.promoteToBlocking(userId, candidates.stream().map(PracticeReviewCandidate::knowledgePointId).toList(),
                 "PRACTICE");
+        if (counted) criterionReviews.create(userId, attempt.lessonId(), failedCriteria);
         progress.refreshPassForLesson(userId, attempt.lessonId());
         return response;
     }
@@ -237,7 +244,7 @@ public class SubmitPracticeAttemptUseCase {
 
     /**
      * Each objective skill below the pass mark is judged on its own items, so a weak Listening part of a mixed set
-     * does not send its Reading knowledge points to review. Writing never creates reviews. A set whose sections name
+     * does not send its Reading knowledge points to review. Writing criteria use optional reviews separately. A set whose sections name
      * no skill is judged as a whole.
      */
     private List<PracticeReviewRule.Need> reviewNeeds(ItemGrading.Graded graded,

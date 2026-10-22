@@ -2,7 +2,7 @@ package com.ieltspath.learning.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.response.ReviewResponse;
-import com.ieltspath.learning.application.result.ReviewBasketResult;
+import com.ieltspath.learning.api.dto.response.ReviewBasketResponse;
 import com.ieltspath.learning.application.usecase.GetReviewBasketUseCase;
 import com.ieltspath.learning.application.usecase.StartBasketReviewUseCase;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,8 +30,8 @@ public class ReviewBasketController {
     }
 
     @GetMapping
-    public ReviewBasketResult basket() {
-        return basket.execute(currentUser.requireUserId());
+    public ReviewBasketResponse basket() {
+        return ReviewBasketResponse.from(basket.execute(currentUser.requireUserId()));
     }
 
     /** Starts (or returns) an optional review of the point and gives its first set. */
