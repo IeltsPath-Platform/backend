@@ -1,7 +1,7 @@
 package com.ieltspath.game.domain.vo;
 
 /** Settings a room keeps for its game; each room game validates its own values. */
-public sealed interface RoomSettings permits WordlyRoomSettings {
+public sealed interface RoomSettings permits WordlyRoomSettings, RocketRoomSettings {
     RoomGame game();
 
     boolean solo();
