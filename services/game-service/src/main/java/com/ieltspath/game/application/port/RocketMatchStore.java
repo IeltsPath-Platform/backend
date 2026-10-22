@@ -23,6 +23,9 @@ public interface RocketMatchStore {
     /** Completes the match and returns its room to WAITING with readiness cleared. */
     void finish(UUID matchId, UUID roomId, RocketEndReason reason, Instant at);
 
+    /** Completes the match and closes its room for good, as when a solo player leaves. */
+    void finishAndCloseRoom(UUID matchId, UUID roomId, RocketEndReason reason, Instant at);
+
     /** Matches with an expired open round or a round due to open, for the round worker. */
     List<UUID> dueMatches(Instant now, int limit);
 

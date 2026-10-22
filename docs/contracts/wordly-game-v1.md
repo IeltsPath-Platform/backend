@@ -9,7 +9,7 @@ Gateway validates it and forwards an internal JWT. Identity always comes from th
 
 | Method and route | Request | Response / access |
 | --- | --- | --- |
-| GET /api/games/catalog | none | 200 `{games:[{gameType,name,description,status}]}`; WORDLY AVAILABLE, ROCKET COMING_SOON |
+| GET /api/games/catalog | none | 200 `{games:[{gameType,name,description,status}]}`; WORDLY and ROCKET AVAILABLE |
 | GET /api/games/me/active-game | none | 200 ActiveGame, or 204 when the caller belongs to no room in any room game |
 | POST /api/games/me/active-game/leave | none | 204; leaves the caller's active room (see One room per user) |
 | GET /api/games/wordly/me/active-game, POST …/leave | none | Aliases of the two routes above, kept for existing clients; same cross-game result |
@@ -49,8 +49,8 @@ any room game are not active: creating or joining closes them. Room create and j
 then return 409 ACTIVE_GAME_EXISTS when an active room remains. Clients offer to rejoin (match play page when matchId is
 set, otherwise the lobby) or to leave and continue. Leave uses the waiting-room lifecycle while WAITING, forfeits an
 ACTIVE or DISCONNECTED player like match leave, and only removes FINISHED or ELIMINATED spectators from the room without
-changing their match status. Forfeiting a running match is implemented for Wordly; other games answer 409
-GAME_NOT_SUPPORTED until their match flow ships. Leaving without a room is a no-op.
+changing their match status. A running Rocket match is forfeited as in the Rocket contract; a game without a match
+flow would answer 409 GAME_NOT_SUPPORTED. Leaving without a room is a no-op.
 
 ## Settings, lobby and match models
 

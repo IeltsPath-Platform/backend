@@ -97,6 +97,20 @@ public class RocketMatchStoreAdapter implements RocketMatchStore {
     }
 
     @Override
+    public void finishAndCloseRoom(UUID matchId, UUID roomId, RocketEndReason reason, Instant at) {
+        var time = Timestamp.from(at);
+        sql.update("UPDATE game_matches SET status='COMPLETED', end_reason=?, ended_at=? WHERE id=? AND status='IN_PROGRESS'",
+                reason.name(), time, matchId);
+        if (roomId == null) return;
+        sql.update("UPDATE game_rooms SET status='CLOSED', is_delete=true, deleted_at=?, updated_at=? WHERE id=? AND NOT is_delete",
+                time, time, roomId);
+        sql.update("""
+            UPDATE game_room_members SET status='LEFT', left_at=?, ready_at=NULL
+            WHERE room_id=? AND NOT is_delete AND status IN ('JOINED','READY','DISCONNECTED')
+            """, time, roomId);
+    }
+
+    @Override
     public List<UUID> dueMatches(Instant now, int limit) {
         var at = Timestamp.from(now);
         return sql.queryForList("""

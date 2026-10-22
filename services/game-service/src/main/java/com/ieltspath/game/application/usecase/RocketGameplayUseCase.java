@@ -5,6 +5,8 @@ import com.ieltspath.game.application.port.RocketMatchStore.Player;
 import com.ieltspath.game.application.port.RocketMatchStore.State;
 import com.ieltspath.game.application.result.RocketGameplayResults.AnswerAck;
 import com.ieltspath.game.application.result.RocketGameplayResults.Current;
+import com.ieltspath.game.application.result.RocketGameplayResults.Left;
+import com.ieltspath.game.application.result.RocketGameplayResults.Result;
 import com.ieltspath.game.application.result.RocketGameplayResults.Me;
 import com.ieltspath.game.application.result.RocketGameplayResults.Option;
 import com.ieltspath.game.application.result.RocketGameplayResults.PlayerSummary;
@@ -18,6 +20,7 @@ import com.ieltspath.game.domain.repository.RocketRoundRepository;
 import com.ieltspath.game.domain.vo.RocketEndReason;
 import com.ieltspath.game.domain.vo.RocketPlayerProgress;
 import com.ieltspath.game.domain.vo.RocketRules;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -98,6 +101,54 @@ public class RocketGameplayUseCase {
             Player updated = after.player(userId).orElse(player);
             RoundResult result = round.status() == RocketRound.Status.CLOSED ? roundResult(after, all, round, updated) : null;
             return new AnswerAck(requestId, roundId, optionId, answer.receivedAt(), result);
+        });
+    }
+
+    /** Whether this match is a Rocket match, so shared match routes can hand it over. */
+    public boolean isRocket(UUID matchId) {
+        return matches.find(matchId).isPresent();
+    }
+
+    /**
+     * Forfeits the caller. Points already won stay; the open round closes without costing a life. A solo match then
+     * ends with PLAYER_LEFT and its room is closed. Leaving again, or after the match ended, changes nothing.
+     */
+    public Left leave(UUID matchId, UUID userId) {
+        advance(matchId);
+        return tx.execute(status -> {
+            State state = matches.lock(matchId).orElseThrow(() -> new GameMatchNotFoundException(matchId));
+            Player player = state.player(userId).orElseThrow(() -> new GameMatchNotFoundException(matchId));
+            if (!state.finished() && player.playing()) {
+                if (!state.settings().solo())
+                    throw new SoloGameplayException(409, "GAME_NOT_SUPPORTED", "Leaving a multiplayer Rocket match is not available yet");
+                Instant at = matches.now();
+                for (RocketRound round : rounds.findByMatch(matchId)) {
+                    if (round.status() != RocketRound.Status.OPEN) continue;
+                    round.close(at, RocketRound.CloseReason.MATCH_ENDED, Set.of());
+                    rounds.save(round);
+                }
+                player = player.with("FORFEITED", player.progress(), at);
+                matches.savePlayers(List.of(player));
+                matches.finishAndCloseRoom(matchId, state.roomId(), RocketEndReason.PLAYER_LEFT, at);
+                state = state.with(List.of(player), RocketEndReason.PLAYER_LEFT, at);
+            }
+            return new Left(matchId, state.status(), state.endReason(), player.status(), player.progress().totalScore(),
+                    state.finished());
+        });
+    }
+
+    /** Final numbers of a finished match; 409 MATCH_NOT_FINISHED while it runs. */
+    public Result result(UUID matchId, UUID userId) {
+        advance(matchId);
+        return tx.execute(status -> {
+            State state = matches.find(matchId).orElseThrow(() -> new GameMatchNotFoundException(matchId));
+            Player player = state.player(userId).orElseThrow(() -> new GameMatchNotFoundException(matchId));
+            if (!state.finished()) throw new SoloGameplayException(409, "MATCH_NOT_FINISHED", "This match is still running");
+            var progress = player.progress();
+            Instant ended = state.endedAt() == null ? state.startedAt() : state.endedAt();
+            return new Result(matchId, state.endReason(), settings(state), state.settings().questionCount(),
+                    progress.roundsPlayed(), progress.correctCount(), progress.livesRemaining(), progress.totalScore(),
+                    player.status(), Duration.between(state.startedAt(), ended).toMillis(), state.startedAt(), ended);
         });
     }
 

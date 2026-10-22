@@ -121,6 +121,46 @@ class RocketSoloFlowIntegrationTest {
         call(get("/api/games/rocket/matches/" + matchId + "/rounds/current"), token(UUID.randomUUID()), 404);
     }
 
+    @Test
+    void resultLeaveRoutesAndCatalog() throws Exception {
+        when(profile.displayName()).thenReturn("Rocket Tester");
+        when(words.catalog()).thenReturn(meanings.entrySet().stream()
+                .map(e -> new WordlyWordProvider.Word(UUID.nameUUIDFromBytes(e.getKey().getBytes()), e.getKey(), e.getValue()))
+                .toList());
+        String token = token(UUID.randomUUID());
+        JsonNode catalog = call(get("/api/games/catalog"), token, 200);
+        assertEquals("AVAILABLE", catalog.get("games").get(0).get("status").asText());
+        assertEquals("ROCKET", catalog.get("games").get(0).get("gameType").asText());
+
+        // Leave through the shared match route.
+        String first = startSolo(token);
+        assertEquals(409, mvc.perform(get("/api/games/matches/" + first + "/result").header("Authorization", token))
+                .andReturn().getResponse().getStatus());
+        JsonNode left = call(post("/api/games/matches/" + first + "/leave"), token, 200);
+        assertEquals("PLAYER_LEFT", left.get("endReason").asText());
+        assertEquals("FORFEITED", left.get("playerStatus").asText());
+        JsonNode result = call(get("/api/games/matches/" + first + "/result"), token, 200);
+        assertEquals("PLAYER_LEFT", result.get("endReason").asText());
+        assertEquals(3, result.get("totalRounds").asInt());
+        assertEquals(0, result.get("answered").asInt());
+
+        // Leave through active-game, which a client uses when it finds the user still in a match.
+        String second = startSolo(token);
+        assertEquals(second, call(get("/api/games/me/active-game"), token, 200).get("matchId").asText());
+        call(post("/api/games/me/active-game/leave"), token, 204);
+        assertEquals(204, mvc.perform(get("/api/games/me/active-game").header("Authorization", token))
+                .andReturn().getResponse().getStatus());
+        assertEquals("PLAYER_LEFT", call(get("/api/games/matches/" + second + "/result"), token, 200).get("endReason").asText());
+        call(get("/api/games/matches/" + second + "/result"), token(UUID.randomUUID()), 404);
+    }
+
+    private String startSolo(String token) throws Exception {
+        String roomId = call(post("/api/games/rocket/rooms").content("{\"playerMode\":\"SOLO\",\"questionCount\":3}"), token, 201)
+                .get("id").asText();
+        call(post("/api/games/rooms/" + roomId + "/ready").content("{\"ready\":true}"), token, 200);
+        return call(post("/api/games/rooms/" + roomId + "/start"), token, 200).get("matchId").asText();
+    }
+
     private JsonNode call(MockHttpServletRequestBuilder request, String token, int expected) throws Exception {
         var response = mvc.perform(request.header("Authorization", token).contentType("application/json"))
                 .andReturn().getResponse();

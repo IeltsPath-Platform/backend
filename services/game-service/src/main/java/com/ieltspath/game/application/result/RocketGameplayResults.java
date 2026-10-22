@@ -29,6 +29,14 @@ public final class RocketGameplayResults {
     public record Current(UUID matchId, Settings settings, Round round, RoundResult lastRoundResult,
             boolean matchFinished, Instant serverTime) {}
 
+    public record Left(UUID matchId, String status, RocketEndReason endReason, String playerStatus, long totalScore,
+            boolean resultAvailable) {}
+
+    /** The caller's final numbers; {@code answered} counts rounds they took part in, misses included. */
+    public record Result(UUID matchId, RocketEndReason endReason, Settings settings, int totalRounds, int answered,
+            int correctCount, int livesRemaining, long totalScore, String playerStatus, long durationMs,
+            Instant startedAt, Instant endedAt) {}
+
     /** {@code roundResult} is present when this answer closed the round, which is always the case in solo play. */
     public record AnswerAck(String requestId, UUID roundId, UUID optionId, Instant receivedAt, RoundResult roundResult) {}
 }

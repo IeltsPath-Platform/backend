@@ -208,6 +208,67 @@ class RocketGameplayPostgresTest {
                 "SELECT count(*) FROM game_rocket_rounds WHERE match_id=? AND status='PENDING'", Long.class, match));
     }
 
+    @Test void leavingForfeitsKeepsPointsAndClosesTheSoloRoom() {
+        UUID match = start(6);
+        var first = gameplay.current(match, user).round();
+        now = now.plusSeconds(5);
+        gameplay.answer(match, first.roundId(), user, "c1", correct(match, first));
+        now = now.plusSeconds(3);
+        var open = gameplay.current(match, user).round();
+        assertCode("MATCH_NOT_FINISHED", () -> gameplay.result(match, user));
+
+        now = now.plusSeconds(1);
+        var left = gameplay.leave(match, user);
+        assertEquals("COMPLETED", left.status());
+        assertEquals(RocketEndReason.PLAYER_LEFT, left.endReason());
+        assertEquals("FORFEITED", left.playerStatus());
+        assertEquals(166, left.totalScore());
+        assertTrue(left.resultAvailable());
+        assertEquals(left, gameplay.leave(match, user), "leaving again changes nothing");
+
+        assertEquals("MATCH_ENDED", sql.queryForObject("SELECT close_reason FROM game_rocket_rounds WHERE id=?", String.class,
+                open.roundId()));
+        assertEquals(0, sql.queryForObject("SELECT count(*) FROM game_rocket_answers WHERE round_id=?", Integer.class,
+                open.roundId()));
+        assertEquals(true, sql.queryForObject("SELECT r.is_delete FROM game_rooms r JOIN game_matches m ON m.room_id=r.id WHERE m.id=?",
+                Boolean.class, match));
+        assertFalse(store.dueMatches(now.plusSeconds(60), 100).contains(match));
+
+        var result = gameplay.result(match, user);
+        assertEquals(RocketEndReason.PLAYER_LEFT, result.endReason());
+        assertEquals(6, result.totalRounds());
+        assertEquals(1, result.answered());
+        assertEquals(1, result.correctCount());
+        assertEquals(4, result.livesRemaining());
+        assertEquals(166, result.totalScore());
+        assertEquals("FORFEITED", result.playerStatus());
+        assertEquals(9000, result.durationMs());
+        assertCode("MATCH_FINISHED", () -> gameplay.answer(match, open.roundId(), user, "late", correct(match, open)));
+    }
+
+    @Test void resultOfACompletedMatchAndLeavingAfterwardsKeepsTheReason() {
+        UUID match = start(3);
+        for (int i = 0; i < 3; i++) {
+            var round = gameplay.current(match, user).round();
+            now = now.plusSeconds(1);
+            gameplay.answer(match, round.roundId(), user, "x" + i, i == 1 ? wrong(match, round) : correct(match, round));
+            now = now.plusSeconds(3);
+        }
+        var left = gameplay.leave(match, user);
+        assertEquals(RocketEndReason.ALL_ROUNDS_COMPLETED, left.endReason());
+        assertEquals("FINISHED", left.playerStatus());
+        var result = gameplay.result(match, user);
+        assertEquals(3, result.answered());
+        assertEquals(2, result.correctCount());
+        assertEquals(3, result.livesRemaining());
+        assertEquals(2 * 193, result.totalScore());
+        assertEquals(false, sql.queryForObject("SELECT r.is_delete FROM game_rooms r JOIN game_matches m ON m.room_id=r.id WHERE m.id=?",
+                Boolean.class, match));
+        assertThrows(GameMatchNotFoundException.class, () -> gameplay.result(match, UUID.randomUUID()));
+        assertTrue(gameplay.isRocket(match));
+        assertFalse(gameplay.isRocket(UUID.randomUUID()));
+    }
+
     @Test void outsidersCannotSeeOrAnswer() {
         UUID match = start(3);
         var round = gameplay.current(match, user).round();

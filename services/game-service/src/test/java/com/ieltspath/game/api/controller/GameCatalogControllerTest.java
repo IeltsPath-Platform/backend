@@ -55,7 +55,7 @@ class GameCatalogControllerTest {
                 .andExpect(jsonPath("$.games.length()").value(2))
                 .andExpect(jsonPath("$.games[0].gameType").value("ROCKET"))
                 .andExpect(jsonPath("$.games[0].name").value("Tên lửa"))
-                .andExpect(jsonPath("$.games[0].status").value("COMING_SOON"))
+                .andExpect(jsonPath("$.games[0].status").value("AVAILABLE"))
                 .andExpect(jsonPath("$.games[1].gameType").value("WORDLY"))
                 .andExpect(jsonPath("$.games[1].name").value("Wordly"))
                 .andExpect(jsonPath("$.games[1].status").value("AVAILABLE"));

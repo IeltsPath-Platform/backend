@@ -41,8 +41,9 @@ unique per player. Player totals reuse `game_match_players` (lives, score, round
 Contract: [Rocket Game v1](../../docs/contracts/rocket-game-v1.md). `POST /api/games/rocket/rooms` creates a SOLO room;
 the shared ready/start routes start it (`StartGameMatchUseCase` hands ROCKET rooms to `StartRocketMatchUseCase`, which
 creates every round and opens the first). `RocketGameplayUseCase` serves `rounds/current` and `answers`; every call and
-`RocketRoundScheduler` (`game.rocket.round-scan-ms`, default 500) settle due rounds under the match lock. Rocket matches
-do not publish WebSocket events yet.
+`RocketRoundScheduler` (`game.rocket.round-scan-ms`, default 500) settle due rounds under the match lock. The shared
+`/api/games/matches/{id}/leave` and `/result` routes and active-game leave hand Rocket matches to the same use case.
+Rocket matches do not publish WebSocket events yet.
 
 ## Game catalog (P-60)
 
@@ -52,7 +53,7 @@ It returns HTTP 200 with the cards in display order:
 ```json
 {
   "games": [
-    {"gameType": "ROCKET", "name": "Tên lửa", "description": "Chọn từ tiếng Anh phù hợp với nghĩa được cho.", "status": "COMING_SOON"},
+    {"gameType": "ROCKET", "name": "Tên lửa", "description": "Chọn từ tiếng Anh phù hợp với nghĩa được cho.", "status": "AVAILABLE"},
     {"gameType": "WORDLY", "name": "Wordly", "description": "Đoán từ tiếng Anh dựa trên nghĩa và gợi ý từng chữ cái.", "status": "AVAILABLE"}
   ]
 }

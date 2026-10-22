@@ -16,6 +16,9 @@ identity always comes from the verified token. Only SOLO play is available; mult
 3. `GET /api/games/rocket/matches/{matchId}/rounds/current` → 200 Current.
 4. `POST /api/games/rocket/matches/{matchId}/rounds/{roundId}/answers` `{requestId, optionId}` → 200 AnswerAck.
 5. Repeat 3–4 until `matchFinished`. `GET /api/games/me/active-game` reports the running match with `gameType: ROCKET`.
+6. `GET /api/games/matches/{matchId}/result` → 200 Result once the match has ended; 409 `MATCH_NOT_FINISHED` before.
+7. To quit early: `POST /api/games/matches/{matchId}/leave` → 200 Left, or `POST /api/games/me/active-game/leave` → 204.
+   The shared match routes hand Rocket matches to the Rocket flow; Wordly matches keep their own behaviour.
 
 ## Models
 
@@ -29,6 +32,9 @@ identity always comes from the verified token. Only SOLO play is available; mult
   out), `correct`, `points`, `livesRemaining`, `totalScore`, `status`, `nextRoundAt`, `matchFinished`, `endReason`.
 - AnswerAck: `requestId`, `roundId`, `optionId`, `receivedAt`, `roundResult` (present when the answer closed the round,
   which is always the case in solo play).
+- Result: `matchId`, `endReason`, `settings`, `totalRounds`, `answered` (rounds the caller took part in, misses
+  included), `correctCount`, `livesRemaining`, `totalScore`, `playerStatus`, `durationMs`, `startedAt`, `endedAt`.
+- Left: `matchId`, `status`, `endReason`, `playerStatus`, `totalScore`, `resultAvailable`.
 
 ## Rules
 
@@ -38,18 +44,20 @@ identity always comes from the verified token. Only SOLO play is available; mult
   nobody asks; a background worker (`game.rocket.round-scan-ms`, default 500 ms) and every request settle due rounds.
 - The match ends with `ALL_ROUNDS_COMPLETED` after the last round or `NO_LIVES_LEFT` when lives reach zero (checked
   first). Player status becomes FINISHED or ELIMINATED; the room returns to WAITING.
+- Leaving forfeits the player (FORFEITED) and keeps points already won; the open round closes as `MATCH_ENDED` without
+  costing a life. A solo match ends with `PLAYER_LEFT` and its room is closed. Leaving again, or after the match has
+  ended, returns the stored outcome without changing the end reason.
 - Wrong options never share the answer's word or meaning and favour words of similar length.
 
 ## Errors
 
 ErrorResponse with `code`: 400 `INVALID_OPTION`, validation errors, `MULTIPLAYER_NOT_AVAILABLE`; 401 without identity;
 404 for a match the caller is not in, or `ROUND_NOT_FOUND`; 409 `ROUND_CLOSED` (at or after the deadline, or the round
-is not open), `ALREADY_ANSWERED`, `REQUEST_ID_CONFLICT`, `MATCH_FINISHED`, `PLAYER_NOT_ACTIVE`, `ACTIVE_GAME_EXISTS`.
+is not open), `ALREADY_ANSWERED`, `REQUEST_ID_CONFLICT`, `MATCH_FINISHED`, `MATCH_NOT_FINISHED`, `PLAYER_NOT_ACTIVE`,
+`ACTIVE_GAME_EXISTS`.
 Retrying with the same `requestId` and option returns the stored answer instead of answering twice.
 
 ## Not yet available
 
-Leaving a running Rocket match (the Wordly-only `POST /api/games/matches/{id}/leave` answers 404 for Rocket and
-active-game leave answers 409 `GAME_NOT_SUPPORTED`), the result endpoint (`GET /api/games/matches/{id}/result` is
-Wordly-only), multiplayer and WebSocket events. Room responses carry `settings: null`
-for Rocket rooms; read the settings from Current.
+Multiplayer (rooms, rounds, leaving) and WebSocket events. Room responses carry `settings: null` for Rocket rooms;
+read the settings from Current or Result.
