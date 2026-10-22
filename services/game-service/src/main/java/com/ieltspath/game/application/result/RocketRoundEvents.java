@@ -39,6 +39,12 @@ public final class RocketRoundEvents {
         }
     }
 
+    /** Standings changed outside a round close: someone left, dropped their connection or came back. */
+    public record RankingChanged(UUID roomId, UUID matchId) {}
+
+    /** The match ended between rounds, e.g. when the last opponent left during a reveal pause. */
+    public record Finished(UUID roomId, UUID matchId, RocketEndReason endReason) {}
+
     /** {@code optionId} is null for a player who did not answer in time. */
     public record PlayerOutcome(UUID userId, UUID optionId, boolean correct, int points, int livesRemaining,
             long totalScore, String status) {}

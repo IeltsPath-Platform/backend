@@ -3,8 +3,7 @@
 Updated: 2026-10-22. Source of truth: `RocketGameController`, `RocketGameplayResults` and the shared room routes in
 [Wordly Game v1](./wordly-game-v1.md). Client routes use the Gateway with `Authorization: Bearer <access-token>`;
 identity always comes from the verified token. SOLO play is complete. MULTIPLAYER rooms can be created, joined,
-edited and started, and their rounds are played through the same REST routes; round events over WebSocket and leaving a
-multiplayer match are not available yet (see the end of this document).
+edited, started, played (rounds over REST, events over WebSocket) and left; see the sections below.
 
 ## Flow
 
@@ -89,7 +88,15 @@ Retrying with the same `requestId` and option returns the stored answer instead 
 A `requestId` belongs to one answer for the whole match: reusing it on another round, or with another option, is
 409 `REQUEST_ID_CONFLICT`.
 
-## Not yet available
+## Leaving and connection loss (multiplayer)
 
-Leaving a running multiplayer match (409
-`GAME_NOT_SUPPORTED`; the match still ends once everyone runs out of lives or rounds) and reconnect grace.
+- `POST /api/games/matches/{matchId}/leave` (or the active-game leave) forfeits the caller (FORFEITED, points kept) and
+  marks them LEFT in the room, so they can join another game. The others play on: the open round closes as soon as
+  everyone left in it has answered (answers already given still count), and the match ends with `LAST_PLAYER_STANDING`
+  when one player is left standing or `ALL_PLAYERS_LEFT` when nobody is. A player already eliminated who leaves only
+  leaves the room. Others receive `MEMBER_LEFT` and `RANKING_UPDATED`, or the round result and `MATCH_FINISHED`.
+- If the host has left when the match ends, the room closes (`ROOM_CLOSED`) instead of returning to the lobby.
+- When a player's last socket to the room closes, they become DISCONNECTED for 30 s (`reconnectDeadlineAt` in the
+  ranking, pushed as `RANKING_UPDATED`); they stay in the rounds and miss them. Connecting again in time makes them
+  ACTIVE; after the deadline the worker forfeits them as if they had left. A game-service restart grants every
+  playing multiplayer player the same 30 s.

@@ -45,6 +45,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Service
 public class RocketGameplayUseCase {
+    /** How long a multiplayer player who lost their connection keeps their place, as in Wordly. */
+    public static final Duration RECONNECT_GRACE = Duration.ofSeconds(30);
+
     private final RocketMatchStore matches;
     private final RocketRoundRepository rounds;
     private final TransactionTemplate tx;
@@ -132,17 +135,22 @@ public class RocketGameplayUseCase {
     }
 
     /**
-     * Forfeits the caller. Points already won stay; the open round closes without costing a life. A solo match then
-     * ends with PLAYER_LEFT and its room is closed. Leaving again, or after the match ended, changes nothing.
+     * Forfeits the caller. Points already won stay. A solo match then ends with PLAYER_LEFT, its open round closes
+     * without costing a life and its room is closed. In multiplayer the others play on: the open round closes as soon
+     * as everyone left in it has answered, and the match ends when nobody or one player is left standing. Leaving again,
+     * or after the match ended, changes nothing.
      */
     public Left leave(UUID matchId, UUID userId) {
         advance(matchId);
         return tx.execute(status -> {
             State state = matches.lock(matchId).orElseThrow(() -> new GameMatchNotFoundException(matchId));
             Player player = state.player(userId).orElseThrow(() -> new GameMatchNotFoundException(matchId));
-            if (!state.finished() && player.playing()) {
-                if (!state.settings().solo())
-                    throw new SoloGameplayException(409, "GAME_NOT_SUPPORTED", "Leaving a multiplayer Rocket match is not available yet");
+            if (!state.finished() && player.playing() && !state.settings().solo()) {
+                state = depart(state, rounds.findByMatch(matchId), player, matches.now());
+                player = state.player(userId).orElseThrow();
+            } else if (!state.finished() && !state.settings().solo()) {
+                matches.leaveRoom(state.roomId(), userId, matches.now());
+            } else if (!state.finished() && player.playing()) {
                 Instant at = matches.now();
                 for (RocketRound round : rounds.findByMatch(matchId)) {
                     if (round.status() != RocketRound.Status.OPEN) continue;
@@ -174,8 +182,78 @@ public class RocketGameplayUseCase {
         });
     }
 
+    /** Called when the user's last socket to the room closes. */
+    public void disconnected(UUID matchId, UUID userId) {
+        tx.executeWithoutResult(status -> matches.lock(matchId).ifPresent(state -> {
+            if (state.finished() || state.settings().solo()) return;
+            Instant at = matches.now();
+            if (matches.disconnect(matchId, userId, at, at.plus(RECONNECT_GRACE)))
+                events.publishEvent(new RocketRoundEvents.RankingChanged(state.roomId(), matchId));
+        }));
+    }
+
+    /** Called when the user connects to the room again; after the grace period they have already forfeited. */
+    public void reconnected(UUID matchId, UUID userId) {
+        advance(matchId);
+        tx.executeWithoutResult(status -> matches.lock(matchId).ifPresent(state -> {
+            if (state.finished() || state.settings().solo()) return;
+            if (matches.reconnect(matchId, userId, matches.now()))
+                events.publishEvent(new RocketRoundEvents.RankingChanged(state.roomId(), matchId));
+        }));
+    }
+
+    /**
+     * Forfeits a multiplayer player and settles what that changes: the match ends if nobody or one player is left
+     * standing, otherwise an open round closes once everyone left in it has answered.
+     */
+    private State depart(State state, List<RocketRound> all, Player player, Instant at) {
+        Player gone = player.with("FORFEITED", player.progress(), at);
+        List<Player> players = state.players().stream().map(p -> p.id().equals(gone.id()) ? gone : p).toList();
+        matches.savePlayers(List.of(gone));
+        matches.leaveRoom(state.roomId(), gone.userId(), at);
+        State after = state.with(players, null, null);
+        events.publishEvent(new com.ieltspath.game.application.result.WordlyPlayerLeftEvent(state.roomId(), state.matchId(),
+                gone.userId(), matches.displayName(state.roomId(), gone.userId())));
+        Optional<RocketRound> open = all.stream().filter(round -> round.status() == RocketRound.Status.OPEN).findFirst();
+        int closed = (int) all.stream().filter(round -> round.status() == RocketRound.Status.CLOSED).count();
+        List<RocketPlayerProgress> standing = players.stream().filter(p -> !p.forfeited()).map(Player::progress).toList();
+        Optional<RocketEndReason> end = RocketRules.endReason(false, players.size(), standing, closed,
+                state.settings().questionCount());
+        // Answers already given still count: if everyone left in the round has answered, close it normally first.
+        if (open.isPresent() && !contenders(after).isEmpty() && open.get().answeredBy(contenders(after)))
+            return closeRound(after, all, open.get(), RocketRound.CloseReason.ALL_ANSWERED, at);
+        if (end.isPresent()) {
+            List<Player> finished = players.stream()
+                    .map(p -> p.playing() ? p.with("FINISHED", p.progress(), at) : p).toList();
+            open.ifPresent(round -> {
+                round.close(at, RocketRound.CloseReason.MATCH_ENDED, Set.of());
+                rounds.save(round);
+            });
+            matches.savePlayers(finished);
+            matches.finish(state.matchId(), state.roomId(), end.get(), at);
+            if (open.isPresent()) announceClose(after, open.get(), Map.of(), finished, null, end.get());
+            else events.publishEvent(new RocketRoundEvents.Finished(state.roomId(), state.matchId(), end.get()));
+            closeRoomIfHostLeft(state, at);
+            return after.with(finished, end.get(), at);
+        }
+        events.publishEvent(new RocketRoundEvents.RankingChanged(state.roomId(), state.matchId()));
+        return after;
+    }
+
+    private void closeRoomIfHostLeft(State state, Instant at) {
+        matches.closeIfHostLeft(state.roomId(), at).ifPresent(message -> events.publishEvent(
+                new com.ieltspath.game.application.result.RoomClosedEvent(state.roomId(), message)));
+    }
+
     private void settle(State state, List<RocketRound> all, Instant now) {
         if (state.finished()) return;
+        if (!state.settings().solo()) {
+            for (UUID userId : matches.expiredDisconnects(state.matchId(), now)) {
+                Optional<Player> player = state.player(userId).filter(Player::playing);
+                if (player.isPresent()) state = depart(state, all, player.get(), now);
+                if (state.finished()) return;
+            }
+        }
         var limit = state.settings().timeLimit();
         Optional<RocketRound> open = all.stream().filter(round -> round.status() == RocketRound.Status.OPEN).findFirst();
         if (open.isPresent() && open.get().expired(now)) {
@@ -226,6 +304,7 @@ public class RocketGameplayUseCase {
             matches.savePlayers(players);
             matches.finish(state.matchId(), state.roomId(), end.get(), at);
             announceClose(state, round, results, players, null, end.get());
+            if (!state.settings().solo()) closeRoomIfHostLeft(state, at);
             return state.with(players, end.get(), at);
         }
         Instant next = all.stream().filter(candidate -> candidate.sequence() == round.sequence() + 1).findFirst().map(candidate -> {

@@ -326,8 +326,9 @@ class RocketGameplayPostgresTest {
         UUID other = UUID.randomUUID();
         sql.update("""
             INSERT INTO game_room_members(id,room_id,user_id,member_role,status,joined_at,slot_number,display_name)
-            VALUES (?,?,?,'PLAYER','READY',now(),2,'Guest')
-            """, member, room, other);
+            VALUES (?,?,?,'PLAYER','READY',now(),
+                (SELECT COALESCE(max(slot_number),0)+1 FROM game_room_members WHERE room_id=?),'Guest')
+            """, member, room, other, room);
         sql.update("""
             INSERT INTO game_match_players(id,match_id,room_member_id,user_id,status,joined_at,lives_remaining)
             VALUES (gen_random_uuid(),?,?,?,'ACTIVE',now(),4)
@@ -399,6 +400,120 @@ class RocketGameplayPostgresTest {
         assertEquals(RocketEndReason.ALL_ROUNDS_COMPLETED, last.endReason());
         assertNull(last.nextRoundAt());
         assertEquals("FINISHED", last.answers().getFirst().status());
+    }
+
+    /** A started multiplayer match: the host ({@link #user}) plus the given number of guests, round 1 open. */
+    UUID startMultiplayer(List<UUID> guests) {
+        UUID match = start(5);
+        sql.update("UPDATE game_matches SET player_mode='MULTIPLAYER' WHERE id=?", match);
+        sql.update("UPDATE game_rooms SET player_mode='MULTIPLAYER', max_players=4 WHERE id=(SELECT room_id FROM game_matches WHERE id=?)", match);
+        for (int i = 0; i < guests.size(); i++) guests.set(i, addPlayer(match));
+        return match;
+    }
+
+    List<Object> recordEvents() {
+        List<Object> published = new java.util.ArrayList<>();
+        gameplay = new RocketGameplayUseCase(store, rounds, new DataSourceTransactionManager(
+                new DriverManagerDataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword())), published::add);
+        return published;
+    }
+
+    String memberStatus(UUID match, UUID userId) {
+        return sql.queryForObject("""
+            SELECT rm.status FROM game_room_members rm JOIN game_matches m ON m.room_id=rm.room_id WHERE m.id=? AND rm.user_id=?
+            """, String.class, match, userId);
+    }
+
+    @Test void leavingAMultiplayerMatchLetsTheOthersPlayOn() {
+        var published = recordEvents();
+        List<UUID> guests = new java.util.ArrayList<>(java.util.Arrays.asList(null, null));
+        UUID match = startMultiplayer(guests);
+        var round = gameplay.current(match, user).round();
+        now = now.plusSeconds(2);
+        gameplay.answer(match, round.roundId(), user, "h1", correct(match, round));
+
+        var left = gameplay.leave(match, guests.get(0));
+        assertEquals("FORFEITED", left.playerStatus());
+        assertFalse(left.resultAvailable());
+        assertEquals("LEFT", memberStatus(match, guests.get(0)));
+        assertTrue(published.stream().anyMatch(e -> e instanceof com.ieltspath.game.application.result.WordlyPlayerLeftEvent));
+        assertEquals("OPEN", sql.queryForObject("SELECT status FROM game_rocket_rounds WHERE id=?", String.class, round.roundId()),
+                "the round still waits for the other guest");
+
+        now = now.plusSeconds(1);
+        var ack = gameplay.answer(match, round.roundId(), guests.get(1), "g1", wrong(match, round));
+        assertNotNull(ack.roundResult(), "the last player still in the round closes it");
+        assertFalse(ack.roundResult().matchFinished());
+        assertEquals("IN_PROGRESS", sql.queryForObject("SELECT status FROM game_matches WHERE id=?", String.class, match));
+    }
+
+    @Test void whenTheLastOpponentLeavesTheAnswerAlreadyGivenStillCounts() {
+        var published = recordEvents();
+        List<UUID> guests = new java.util.ArrayList<>(java.util.Arrays.asList((UUID) null));
+        UUID match = startMultiplayer(guests);
+        var round = gameplay.current(match, user).round();
+        now = now.plusSeconds(2);
+        gameplay.answer(match, round.roundId(), user, "h1", correct(match, round));
+        gameplay.leave(match, guests.get(0));
+
+        var current = gameplay.current(match, user);
+        assertTrue(current.matchFinished());
+        assertEquals(RocketEndReason.LAST_PLAYER_STANDING, current.lastRoundResult().endReason());
+        assertTrue(current.lastRoundResult().correct());
+        assertTrue(current.lastRoundResult().totalScore() > 0);
+        var closed = assertInstanceOf(com.ieltspath.game.application.result.RocketRoundEvents.Closed.class,
+                published.stream().filter(e -> e instanceof com.ieltspath.game.application.result.RocketRoundEvents.Closed).reduce((a, b) -> b).orElseThrow());
+        assertTrue(closed.matchFinished());
+        assertEquals("WAITING", sql.queryForObject("SELECT r.status FROM game_rooms r JOIN game_matches m ON m.room_id=r.id WHERE m.id=?",
+                String.class, match), "the host stayed, so the room goes back to the lobby");
+    }
+
+    @Test void theHostLeavingEndsAndClosesTheRoom() {
+        var published = recordEvents();
+        List<UUID> guests = new java.util.ArrayList<>(java.util.Arrays.asList((UUID) null));
+        UUID match = startMultiplayer(guests);
+        gameplay.current(match, user);
+        gameplay.leave(match, user);
+        var current = gameplay.current(match, guests.get(0));
+        assertTrue(current.matchFinished());
+        assertEquals("CLOSED", sql.queryForObject("SELECT r.status FROM game_rooms r JOIN game_matches m ON m.room_id=r.id WHERE m.id=?",
+                String.class, match));
+        assertTrue(published.stream().anyMatch(e -> e instanceof com.ieltspath.game.application.result.RoomClosedEvent));
+        assertEquals("MATCH_ENDED", sql.queryForObject(
+                "SELECT close_reason FROM game_rocket_rounds WHERE match_id=? AND sequence=1", String.class, match),
+                "nobody answered, so the open round just ends");
+    }
+
+    @Test void aDroppedPlayerKeepsTheirPlaceForThirtySeconds() {
+        var published = recordEvents();
+        List<UUID> guests = new java.util.ArrayList<>(java.util.Arrays.asList((UUID) null));
+        UUID match = startMultiplayer(guests);
+        UUID guest = guests.get(0);
+        gameplay.current(match, user);
+        gameplay.disconnected(match, guest);
+        assertEquals("DISCONNECTED", sql.queryForObject("SELECT status FROM game_match_players WHERE match_id=? AND user_id=?",
+                String.class, match, guest));
+        assertTrue(published.getLast() instanceof com.ieltspath.game.application.result.RocketRoundEvents.RankingChanged);
+
+        now = now.plusSeconds(10);
+        gameplay.reconnected(match, guest);
+        assertEquals("ACTIVE", sql.queryForObject("SELECT status FROM game_match_players WHERE match_id=? AND user_id=?",
+                String.class, match, guest));
+
+        gameplay.disconnected(match, guest);
+        assertTrue(store.dueMatches(now.plusSeconds(31), 100).contains(match), "the worker picks up an expired grace");
+        now = now.plusSeconds(31);
+        gameplay.advance(match);
+        assertEquals("FORFEITED", sql.queryForObject("SELECT status FROM game_match_players WHERE match_id=? AND user_id=?",
+                String.class, match, guest));
+        assertEquals("LEFT", memberStatus(match, guest));
+        assertTrue(gameplay.current(match, user).matchFinished());
+    }
+
+    @Test void soloMatchesIgnoreConnectionChanges() {
+        UUID match = start(3);
+        gameplay.disconnected(match, user);
+        assertEquals("ACTIVE", sql.queryForObject("SELECT status FROM game_match_players WHERE match_id=?", String.class, match));
     }
 
     @Test void outsidersCannotSeeOrAnswer() {

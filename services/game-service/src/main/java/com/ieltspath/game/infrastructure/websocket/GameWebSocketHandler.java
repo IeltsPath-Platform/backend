@@ -36,6 +36,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
     private final GetWordlyRankingUseCase ranking;
     private final com.ieltspath.game.domain.repository.GameMatchRepository matches;
     private com.ieltspath.game.domain.repository.GameMatchPlayerRepository matchPlayers;
+    private RocketGameplayUseCase rocket;
     private final Map<UUID, Set<WebSocketSession>> sessionsByRoom = new ConcurrentHashMap<>();
     private final Map<String,org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator> writers=new ConcurrentHashMap<>();
     private final Map<String,Long> lastPong=new ConcurrentHashMap<>();
@@ -134,6 +135,15 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
         this.matchPlayers = matchPlayers;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    void setRocket(RocketGameplayUseCase rocket) {
+        this.rocket = rocket;
+    }
+
+    private boolean isRocket(UUID matchId) {
+        return rocket != null && rocket.isRocket(matchId);
+    }
+
     private Set<UUID> playerIds(UUID matchId) {
         if (matchPlayers == null) return Set.of();
         return matchPlayers.findByMatchId(matchId).stream().map(com.ieltspath.game.domain.aggregate.GameMatchPlayer::userId)
@@ -162,11 +172,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
     /** The round result with the ranking after it; a finished match also gets MATCH_FINISHED and the lobby back. */
     @org.springframework.transaction.event.TransactionalEventListener
     public void rocketRoundClosed(com.ieltspath.game.application.result.RocketRoundEvents.Closed event) {
-        var anyPlayer = event.answers().stream().map(com.ieltspath.game.application.result.RocketRoundEvents.PlayerOutcome::userId)
-                .findFirst();
-        com.ieltspath.game.application.result.WordlyRankingResult standing = null;
-        try { standing = anyPlayer.map(user -> ranking.execute(event.matchId(), user)).orElse(null); }
-        catch (RuntimeException e) { org.slf4j.LoggerFactory.getLogger(getClass()).warn("Rocket ranking failed for {}", event.matchId()); }
+        // Not from the answers: a round ended by the last opponent leaving has none.
+        var standing = rocketRanking(event.matchId());
         var message = new java.util.LinkedHashMap<String, Object>();
         message.put("type", "ROCKET_ROUND_RESULT");
         message.put("matchId", event.matchId());
@@ -178,14 +185,40 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
         message.put("matchFinished", event.matchFinished());
         message.put("endReason", event.endReason());
         sendToMatchPlayers(event.roomId(), event.matchId(), message);
-        if (!event.matchFinished() || standing == null) return;
+        if (event.matchFinished() && standing != null) finishRocket(event.roomId(), event.matchId(), standing);
+    }
+
+    @org.springframework.transaction.event.TransactionalEventListener
+    public void rocketRankingChanged(com.ieltspath.game.application.result.RocketRoundEvents.RankingChanged event) {
+        var standing = rocketRanking(event.matchId());
+        if (standing == null) return;
+        try { broadcastRanking(event.roomId(), standing, "RANKING_UPDATED"); }
+        catch (IOException e) { org.slf4j.LoggerFactory.getLogger(getClass()).warn("Rocket ranking delivery failed for {}", event.matchId()); }
+    }
+
+    @org.springframework.transaction.event.TransactionalEventListener
+    public void rocketFinished(com.ieltspath.game.application.result.RocketRoundEvents.Finished event) {
+        var standing = rocketRanking(event.matchId());
+        if (standing != null) finishRocket(event.roomId(), event.matchId(), standing);
+    }
+
+    private com.ieltspath.game.application.result.WordlyRankingResult rocketRanking(UUID matchId) {
+        try { return playerIds(matchId).stream().findFirst().map(user -> ranking.execute(matchId, user)).orElse(null); }
+        catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(getClass()).warn("Rocket ranking failed for {}", matchId);
+            return null;
+        }
+    }
+
+    /** MATCH_FINISHED with the final ranking, then the lobby, as Wordly does. */
+    private void finishRocket(UUID roomId, UUID matchId, com.ieltspath.game.application.result.WordlyRankingResult standing) {
         try {
-            broadcastRanking(event.roomId(), standing, "MATCH_FINISHED");
-            for (var session : sessionsByRoom.getOrDefault(event.roomId(), Set.of())) {
-                try { broadcastRoomState(event.roomId(), attribute(session, USER_ID_ATTRIBUTE)); break; }
+            broadcastRanking(roomId, standing, "MATCH_FINISHED");
+            for (var session : sessionsByRoom.getOrDefault(roomId, Set.of())) {
+                try { broadcastRoomState(roomId, attribute(session, USER_ID_ATTRIBUTE)); break; }
                 catch (RuntimeException ignored) { /* A player who left cannot read the lobby. */ }
             }
-        } catch (IOException e) { org.slf4j.LoggerFactory.getLogger(getClass()).warn("Rocket finish delivery failed for {}", event.matchId()); }
+        } catch (IOException e) { org.slf4j.LoggerFactory.getLogger(getClass()).warn("Rocket finish delivery failed for {}", matchId); }
     }
 
     /** Only players of the match: a room member who joined after the start must not see its rounds. */
@@ -236,7 +269,10 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
             sessions.add(session);
             try {
                 getRoom.byId(roomId,userId);
-                matches.findActiveIdByRoomId(roomId).ifPresent(id -> gameplay.reconnect(id,userId));
+                matches.findActiveIdByRoomId(roomId).ifPresent(id -> {
+                    if (isRocket(id)) rocket.reconnected(id, userId);
+                    else gameplay.reconnect(id,userId);
+                });
             } catch (RuntimeException denied) {
                 sessions.remove(session);
                 closeQuietly(session,CloseStatus.POLICY_VIOLATION);
@@ -298,7 +334,10 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
                     members.remove(session);
                     UUID userId=attribute(session,USER_ID_ATTRIBUTE);
                     if(members.stream().noneMatch(s -> s.isOpen() && userId.equals(attribute(s,USER_ID_ATTRIBUTE))))
-                        matches.findActiveIdByRoomId(roomId).ifPresent(id -> gameplay.disconnected(id,userId));
+                        matches.findActiveIdByRoomId(roomId).ifPresent(id -> {
+                            if (isRocket(id)) rocket.disconnected(id, userId);
+                            else gameplay.disconnected(id,userId);
+                        });
                 }
             }
         }
