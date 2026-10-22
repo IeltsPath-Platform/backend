@@ -12,6 +12,7 @@ import com.ieltspath.library.application.usecase.ListFlashcardsUseCase;
 import com.ieltspath.library.application.usecase.ReviewFlashcardUseCase;
 import com.ieltspath.library.application.usecase.SavePracticeQuestionFlashcardUseCase;
 import com.ieltspath.library.application.usecase.UpdateFlashcardUseCase;
+import com.ieltspath.library.application.usecase.UploadFlashcardImageUseCase;
 import com.ieltspath.library.domain.aggregate.Flashcard;
 import com.ieltspath.library.domain.vo.FlashcardSourceType;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -80,6 +81,8 @@ class FlashcardLeitnerControllerTest {
     private GetDueFlashcardsUseCase getDueFlashcardsUseCase;
     @MockBean
     private ReviewFlashcardUseCase reviewFlashcardUseCase;
+    @MockBean
+    private UploadFlashcardImageUseCase uploadFlashcardImageUseCase;
 
     @DynamicPropertySource
     static void hmacProperties(DynamicPropertyRegistry registry) {

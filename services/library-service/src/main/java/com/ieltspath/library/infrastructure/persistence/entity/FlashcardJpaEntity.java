@@ -60,6 +60,10 @@ public class FlashcardJpaEntity {
     private int reviewCount;
     @Column(name = "last_review_request_id")
     private UUID lastReviewRequestId;
+    @Column(name = "image_key", length = 300)
+    private String imageKey;
+    @Column(name = "example_sentence", length = 1000)
+    private String exampleSentence;
 
     @PrePersist
     void onCreate() {

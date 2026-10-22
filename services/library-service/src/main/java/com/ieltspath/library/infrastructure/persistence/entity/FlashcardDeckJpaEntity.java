@@ -40,6 +40,8 @@ public class FlashcardDeckJpaEntity {
     private Instant createdAt;
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+    @Column(name = "cover_image_key", length = 300)
+    private String coverImageKey;
 
     @PrePersist
     void onCreate() {

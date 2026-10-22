@@ -3,6 +3,7 @@ package com.ieltspath.library.infrastructure.adapter;
 import com.ieltspath.library.domain.aggregate.DeckItem;
 import com.ieltspath.library.domain.exception.ConflictException;
 import com.ieltspath.library.domain.repository.FlashcardDeckItemRepository;
+import com.ieltspath.library.domain.vo.DeckCardCounts;
 import com.ieltspath.library.domain.vo.OwnedPage;
 import com.ieltspath.library.infrastructure.persistence.PersistenceExceptions;
 import com.ieltspath.library.infrastructure.persistence.entity.FlashcardDeckItemJpaEntity;
@@ -13,6 +14,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Repository
@@ -58,5 +63,18 @@ public class FlashcardDeckItemRepositoryAdapter implements FlashcardDeckItemRepo
     public OwnedPage<DeckItem> findActive(UUID deckId, UUID userId, int page, int size) {
         var result = repository.findActive(deckId, userId, PageRequest.of(page, size));
         return new OwnedPage<>(result.getContent(), result.getTotalElements());
+    }
+
+    @Override
+    public Map<UUID, DeckCardCounts> countCardsAndDueByDeckIds(Collection<UUID> deckIds, UUID userId, Instant now) {
+        if (deckIds == null || deckIds.isEmpty()) {
+            return Map.of();
+        }
+        var list = repository.countCardsAndDueByDeckIds(deckIds, userId, now);
+        Map<UUID, DeckCardCounts> map = new HashMap<>();
+        for (var p : list) {
+            map.put(p.getDeckId(), new DeckCardCounts(p.getCardCount(), p.getDueCount()));
+        }
+        return map;
     }
 }

@@ -21,4 +21,12 @@ public interface FlashcardRepository {
 
     /** The learner's not-deleted flashcard saved from this practice question, if any. */
     Optional<Flashcard> findLivePracticeQuestionCard(UUID userId, UUID practiceQuestionId);
+
+    default long countByImageKeyAndStatusNot(String imageKey, LibraryStatus status) {
+        return 0L;
+    }
+
+    default boolean existsByImageKeyAndIdNotAndStatusNot(String imageKey, UUID id, LibraryStatus status) {
+        return false;
+    }
 }

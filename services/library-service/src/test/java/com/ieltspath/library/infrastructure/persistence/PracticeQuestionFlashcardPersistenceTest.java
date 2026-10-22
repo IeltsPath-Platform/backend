@@ -1,5 +1,6 @@
 package com.ieltspath.library.infrastructure.persistence;
 
+import com.ieltspath.library.application.port.FlashcardImageStorage;
 import com.ieltspath.library.application.result.SavedFlashcard;
 import com.ieltspath.library.application.usecase.SavePracticeQuestionFlashcardUseCase;
 import com.ieltspath.library.application.usecase.ReviewFlashcardUseCase;
@@ -19,6 +20,7 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -62,6 +64,8 @@ class PracticeQuestionFlashcardPersistenceTest {
     private SavePracticeQuestionFlashcardUseCase savePracticeQuestion;
     @Autowired
     private ReviewFlashcardUseCase reviewFlashcard;
+    @MockBean
+    private FlashcardImageStorage storage;
 
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {

@@ -41,4 +41,14 @@ public class FlashcardDeckRepositoryAdapter implements FlashcardDeckRepository {
                 mapper::toDomain
         );
     }
+
+    @Override
+    public long countByCoverImageKeyAndStatusNot(String coverImageKey, LibraryStatus status) {
+        return repository.countByCoverImageKeyAndStatusNot(coverImageKey, status);
+    }
+
+    @Override
+    public boolean existsByCoverImageKeyAndIdNotAndStatusNot(String coverImageKey, UUID id, LibraryStatus status) {
+        return repository.existsByCoverImageKeyAndIdNotAndStatusNot(coverImageKey, id, status);
+    }
 }

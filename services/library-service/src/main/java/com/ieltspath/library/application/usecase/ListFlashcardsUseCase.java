@@ -1,6 +1,7 @@
 package com.ieltspath.library.application.usecase;
 
 import com.ieltspath.library.application.ApplicationSupport;
+import com.ieltspath.library.application.port.FlashcardImageStorage;
 import com.ieltspath.library.application.query.PageQuery;
 import com.ieltspath.library.application.result.FlashcardResult;
 import com.ieltspath.library.application.result.PageResult;
@@ -16,12 +17,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ListFlashcardsUseCase {
     private final FlashcardRepository repository;
+    private final FlashcardImageStorage storage;
 
     @Transactional(readOnly = true)
     public PageResult<FlashcardResult> execute(UUID userId, LibraryStatus status, PageQuery query) {
         return ApplicationSupport.page(
                 repository.findByUserIdAndStatus(userId, status, query.page(), query.size()),
                 query
-        ).map(FlashcardResult::from);
+        ).map(card -> FlashcardResult.from(card, storage.publicUrl(card.getImageKey())));
     }
 }
