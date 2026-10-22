@@ -122,6 +122,24 @@ public class GameRoom {
         WordlyRoomSettings next = new WordlyRoomSettings(wordly.playerMode(), initialLives,
                 wordly.playMode(), wordLimit, timeEnabled == null ? wordly.timeEnabled() : timeEnabled);
         if (next.equals(wordly)) return;
+        replaceSettings(next, at);
+    }
+
+    /** Host-only, while waiting. A null question count or time keeps the current value. */
+    public void updateRocketSettings(UUID actorId, int initialLives, Integer questionCount, Integer secondsPerQuestion, Instant at) {
+        if (!hostUserId.equals(actorId)) throw new com.ieltspath.game.domain.exception.GameRoomForbiddenException("Only the host can edit room settings");
+        requireWaiting();
+        if (!(settings instanceof com.ieltspath.game.domain.vo.RocketRoomSettings rocket))
+            throw new InvalidGameRoomStateException("Room is not a Rocket room");
+        var next = new com.ieltspath.game.domain.vo.RocketRoomSettings(rocket.solo(),
+                questionCount == null ? rocket.questionCount() : questionCount, initialLives,
+                secondsPerQuestion == null ? rocket.secondsPerQuestion() : secondsPerQuestion);
+        if (next.equals(rocket)) return;
+        replaceSettings(next, at);
+    }
+
+    /** New settings un-ready everyone, so nobody starts on terms they did not see. */
+    private void replaceSettings(RoomSettings next, Instant at) {
         settings = next;
         members.replaceAll((id, member) -> member.status() == MemberStatus.READY
                 ? member.withStatus(MemberStatus.JOINED) : member);

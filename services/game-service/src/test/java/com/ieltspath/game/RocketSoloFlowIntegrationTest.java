@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -175,6 +176,52 @@ class RocketSoloFlowIntegrationTest {
                 .andReturn().getResponse().getStatus());
         assertEquals("PLAYER_LEFT", call(get("/api/games/matches/" + second + "/result"), token, 200).get("endReason").asText());
         call(get("/api/games/matches/" + second + "/result"), token(UUID.randomUUID()), 404);
+    }
+
+    @Test
+    void multiplayerRoomCreateJoinEditAndStart() throws Exception {
+        when(profile.displayName()).thenReturn("Rocket Tester");
+        when(words.catalog()).thenReturn(meanings.entrySet().stream()
+                .map(e -> new WordlyWordProvider.Word(UUID.nameUUIDFromBytes(e.getKey().getBytes()), e.getKey(), e.getValue()))
+                .toList());
+        String host = token(UUID.randomUUID());
+        String guest = token(UUID.randomUUID());
+        call(post("/api/games/rocket/rooms").content("{\"playerMode\":\"MULTIPLAYER\",\"questionCount\":3}"), host, 400);
+        call(post("/api/games/rocket/rooms").content(
+                "{\"playerMode\":\"MULTIPLAYER\",\"questionCount\":5,\"secondsPerQuestion\":12}"), host, 400);
+
+        JsonNode room = call(post("/api/games/rocket/rooms").content("{\"playerMode\":\"MULTIPLAYER\",\"questionCount\":5}"), host, 201);
+        assertEquals("MULTIPLAYER", room.get("playerMode").asText());
+        assertEquals(4, room.get("maxPlayers").asInt());
+        assertEquals(5, room.get("settings").get("questionCount").asInt());
+        assertEquals(4, room.get("settings").get("initialLives").asInt());
+        assertEquals(15, room.get("settings").get("secondsPerQuestion").asInt());
+        assertTrue(room.get("settings").get("wordLimit").isNull());
+        String roomId = room.get("id").asText();
+
+        call(post("/api/games/rooms/code/" + room.get("roomCode").asText() + "/join"), guest, 200);
+        call(post("/api/games/rooms/" + roomId + "/ready").content("{\"ready\":true}"), guest, 200);
+        call(put("/api/games/rooms/" + roomId + "/settings").content("{\"initialLives\":3,\"questionCount\":6}"), guest, 403);
+        JsonNode edited = call(put("/api/games/rooms/" + roomId + "/settings")
+                .content("{\"initialLives\":3,\"questionCount\":6,\"secondsPerQuestion\":10}"), host, 200);
+        assertEquals(6, edited.get("settings").get("questionCount").asInt());
+        assertEquals(3, edited.get("settings").get("initialLives").asInt());
+        assertEquals(10, edited.get("settings").get("secondsPerQuestion").asInt());
+        assertTrue(edited.toString().contains("\"status\":\"JOINED\""), "a settings change un-readies the guest");
+        call(put("/api/games/rooms/" + roomId + "/settings").content("{\"initialLives\":3,\"questionCount\":4}"), host, 400);
+
+        call(post("/api/games/rooms/" + roomId + "/ready").content("{\"ready\":true}"), guest, 200);
+        call(post("/api/games/rooms/" + roomId + "/ready").content("{\"ready\":true}"), host, 200);
+        String matchId = call(post("/api/games/rooms/" + roomId + "/start"), host, 200).get("matchId").asText();
+        assertTrue(events.stream(MatchStartedEvent.class).anyMatch(e -> e.matchId().toString().equals(matchId)));
+
+        for (String player : List.of(host, guest)) {
+            JsonNode current = call(get("/api/games/rocket/matches/" + matchId + "/rounds/current"), player, 200);
+            assertEquals(10, current.get("settings").get("secondsPerQuestion").asInt());
+            assertEquals(3, current.get("round").get("player").get("livesRemaining").asInt());
+        }
+        assertEquals(2, call(get("/api/games/matches/" + matchId + "/ranking"), guest, 200).get("players").size());
+        assertEquals(6, sql.queryForObject("SELECT count(*) FROM game_rocket_rounds WHERE match_id=?::uuid", Integer.class, matchId));
     }
 
     private String startSolo(String token) throws Exception {

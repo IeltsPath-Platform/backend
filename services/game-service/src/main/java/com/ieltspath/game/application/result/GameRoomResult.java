@@ -31,9 +31,28 @@ public record GameRoomResult(UUID id, String roomCode, UUID hostUserId, String g
                 .toList();
         return new GameRoomResult(room.id(), room.roomCode(), room.hostUserId(), room.gameType(), room.learningDomain(),
                 room.mode(), room.maxPlayers(), room.status().name(), room.createdAt(), members, items, room.playerMode(),
-                room.wordlySettings() == null ? null : new SettingsResult(room.wordlySettings().initialLives(), room.wordlySettings().wordTimeLimitSeconds(), room.wordlySettings().playMode().name(), room.wordlySettings().wordLimit(), room.wordlySettings().timeEnabled()));
+                SettingsResult.of(room.settings()));
     }
-    public record SettingsResult(int initialLives, Integer wordTimeLimitSeconds, String playMode, Integer wordLimit, boolean timeEnabled) {}
+    /**
+     * Wordly fills the first five fields; Rocket fills initialLives, questionCount and secondsPerQuestion, with
+     * timeEnabled always true and the Wordly-only fields null.
+     */
+    public record SettingsResult(int initialLives, Integer wordTimeLimitSeconds, String playMode, Integer wordLimit,
+            boolean timeEnabled, Integer questionCount, Integer secondsPerQuestion) {
+        public SettingsResult(int initialLives, Integer wordTimeLimitSeconds, String playMode, Integer wordLimit, boolean timeEnabled) {
+            this(initialLives, wordTimeLimitSeconds, playMode, wordLimit, timeEnabled, null, null);
+        }
+
+        static SettingsResult of(com.ieltspath.game.domain.vo.RoomSettings settings) {
+            return switch (settings) {
+                case com.ieltspath.game.domain.vo.WordlyRoomSettings w -> new SettingsResult(w.initialLives(),
+                        w.wordTimeLimitSeconds(), w.playMode().name(), w.wordLimit(), w.timeEnabled());
+                case com.ieltspath.game.domain.vo.RocketRoomSettings r -> new SettingsResult(r.initialLives(), null, null,
+                        null, true, r.questionCount(), r.secondsPerQuestion());
+                case null, default -> null;
+            };
+        }
+    }
     public record MemberResult(UUID userId, String role, String status, Instant joinedAt, Integer slotNumber, String displayName) {
         public MemberResult(UUID userId, String role, String status, Instant joinedAt) { this(userId, role, status, joinedAt, null, null); }
     }

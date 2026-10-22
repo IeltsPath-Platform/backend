@@ -4,8 +4,11 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
+/** Wordly rooms use wordLimit and timeEnabled; Rocket rooms use questionCount and secondsPerQuestion (null keeps them). */
 public record UpdateRoomSettingsRequest(
         @NotNull @Min(3) @Max(6) Integer initialLives,
         @Min(5) Integer wordLimit,
-        Boolean timeEnabled
+        Boolean timeEnabled,
+        @Min(3) @Max(20) Integer questionCount,
+        Integer secondsPerQuestion
 ) {}

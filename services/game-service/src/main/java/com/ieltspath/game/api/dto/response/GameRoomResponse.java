@@ -10,7 +10,8 @@ public record GameRoomResponse(UUID id, String roomCode, UUID hostUserId, String
                                String learningDomain, String mode, int maxPlayers, String status,
                                Instant createdAt, List<GameRoomMemberResponse> members,
                                List<GameItemResponse> items, String playerMode, SettingsResponse settings, UUID activeMatchId) {
-    public record SettingsResponse(int initialLives, Integer wordTimeLimitSeconds, String playMode, Integer wordLimit, boolean timeEnabled) {}
+    public record SettingsResponse(int initialLives, Integer wordTimeLimitSeconds, String playMode, Integer wordLimit, boolean timeEnabled,
+            Integer questionCount, Integer secondsPerQuestion) {}
     public GameRoomResponse {
         members = List.copyOf(members);
         items = List.copyOf(items);
@@ -37,6 +38,7 @@ public record GameRoomResponse(UUID id, String roomCode, UUID hostUserId, String
                 result.members().stream().map(GameRoomMemberResponse::from).toList(),
                 result.items().stream().map(GameItemResponse::from).toList(), result.playerMode(),
                 result.settings() == null ? null : new SettingsResponse(result.settings().initialLives(),
-                        result.settings().wordTimeLimitSeconds(), result.settings().playMode(), result.settings().wordLimit(), result.settings().timeEnabled()),result.activeMatchId());
+                        result.settings().wordTimeLimitSeconds(), result.settings().playMode(), result.settings().wordLimit(), result.settings().timeEnabled(),
+                        result.settings().questionCount(), result.settings().secondsPerQuestion()),result.activeMatchId());
     }
 }

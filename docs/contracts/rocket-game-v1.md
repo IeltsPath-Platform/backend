@@ -2,13 +2,16 @@
 
 Updated: 2026-10-22. Source of truth: `RocketGameController`, `RocketGameplayResults` and the shared room routes in
 [Wordly Game v1](./wordly-game-v1.md). Client routes use the Gateway with `Authorization: Bearer <access-token>`;
-identity always comes from the verified token. Only SOLO play is available; multiplayer rooms answer 400
-`MULTIPLAYER_NOT_AVAILABLE` until their realtime flow ships.
+identity always comes from the verified token. SOLO play is complete. MULTIPLAYER rooms can be created, joined,
+edited and started, and their rounds are played through the same REST routes; round events over WebSocket and leaving a
+multiplayer match are not available yet (see the end of this document).
 
 ## Flow
 
-1. `POST /api/games/rocket/rooms` `{playerMode:"SOLO", questionCount}` → 201 Room (`gameType: ROCKET`). `questionCount`
-   is 3–20; solo uses 4 lives and 15 seconds per question. 409 `ACTIVE_GAME_EXISTS` while the user is in any other room
+1. `POST /api/games/rocket/rooms` `{playerMode, questionCount, initialLives?, secondsPerQuestion?}` → 201 Room
+   (`gameType: ROCKET`). SOLO: `questionCount` 3–20, always 4 lives and 15 seconds (the other two fields are ignored).
+   MULTIPLAYER: `questionCount` 5–20, `initialLives` 3–6 (default 4), `secondsPerQuestion` 10, 15 or 20 (default 15),
+   up to 4 players; anything else is 400. Others join with the shared room routes (`/rooms/code/{code}/join`, …). 409 `ACTIVE_GAME_EXISTS` while the user is in any other room
    (Wordly or Rocket, see "One room per user" in the Wordly contract).
 2. `POST /api/games/rooms/{roomId}/ready` `{ready:true}` then `POST /api/games/rooms/{roomId}/start` → 200 Match
    (`matchId`, `status`, `players`; `sessionId` is null). Starting reads the vocabulary catalog from Library, creates
@@ -29,6 +32,12 @@ Players connected to the room socket receive `MATCH_STARTED` (shape as in the Wo
 commits, so a lobby can move into `/rounds/current`. Rocket round events are not sent yet; poll Current.
 
 ## Models
+
+- Room `settings` for a Rocket room: `initialLives`, `questionCount`, `secondsPerQuestion`, `timeEnabled: true`;
+  `wordTimeLimitSeconds`, `playMode` and `wordLimit` are null (they belong to Wordly, whose rooms carry
+  `questionCount: null` and `secondsPerQuestion: null`). The host edits them while waiting with
+  `PUT /api/games/rooms/{roomId}/settings` `{initialLives, questionCount?, secondsPerQuestion?}` (null keeps a value);
+  a change sets every READY member back to JOINED and is pushed as ROOM_STATE.
 
 - Current: `matchId`, `settings {questionCount, initialLives, secondsPerQuestion}`, `round` (null once the match ends),
   `lastRoundResult` (latest closed round, or null), `matchFinished`, `serverTime`.
@@ -71,5 +80,5 @@ Retrying with the same `requestId` and option returns the stored answer instead 
 
 ## Not yet available
 
-Multiplayer (rooms, rounds, leaving) and Rocket round events over WebSocket. Room responses carry `settings: null` for Rocket rooms;
-read the settings from Current or Result.
+Rocket round events over WebSocket (clients poll Current), leaving a running multiplayer match (409
+`GAME_NOT_SUPPORTED`; the match still ends once everyone runs out of lives or rounds) and reconnect grace.

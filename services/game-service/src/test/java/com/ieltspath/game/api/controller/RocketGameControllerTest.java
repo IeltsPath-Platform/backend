@@ -70,15 +70,33 @@ class RocketGameControllerTest {
     }
 
     @Test
-    void rejectsMultiplayerInvalidCountsAndMissingAuthentication() throws Exception {
+    void createsAMultiplayerRoomWithTheHostsSettings() throws Exception {
+        var settings = RocketRoomSettings.multiplayer(12, 5, 20);
+        var room = GameRoom.open(UUID.randomUUID(), "ABC123", UUID.randomUUID(), settings, Instant.now());
+        when(rooms.open(any(), any())).thenReturn(GameRoomResult.from(room));
+        mvc.perform(post("/api/games/rocket/rooms").header("Authorization", bearer()).contentType("application/json")
+                        .content("{\"playerMode\":\"MULTIPLAYER\",\"questionCount\":12,\"initialLives\":5,\"secondsPerQuestion\":20}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.playerMode").value("MULTIPLAYER"))
+                .andExpect(jsonPath("$.maxPlayers").value(4))
+                .andExpect(jsonPath("$.settings.questionCount").value(12))
+                .andExpect(jsonPath("$.settings.initialLives").value(5))
+                .andExpect(jsonPath("$.settings.secondsPerQuestion").value(20));
+        verify(rooms).open(any(), eq(settings));
+        mvc.perform(post("/api/games/rocket/rooms").header("Authorization", bearer()).contentType("application/json")
+                .content("{\"playerMode\":\"MULTIPLAYER\",\"questionCount\":10}")).andExpect(status().isCreated());
+        verify(rooms).open(any(), eq(RocketRoomSettings.multiplayer(10, 4, 15)));
+    }
+
+    @Test
+    void rejectsInvalidSettingsAndMissingAuthentication() throws Exception {
         mvc.perform(post("/api/games/rocket/rooms").contentType("application/json").content("{}"))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/games/rocket/rooms").header("Authorization", bearer()).contentType("application/json")
-                        .content("{\"playerMode\":\"MULTIPLAYER\",\"questionCount\":10}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("MULTIPLAYER_NOT_AVAILABLE"));
         for (String body : List.of("{\"playerMode\":\"SOLO\",\"questionCount\":2}",
-                "{\"playerMode\":\"SOLO\",\"questionCount\":21}", "{\"playerMode\":\"SOLO\"}")) {
+                "{\"playerMode\":\"SOLO\",\"questionCount\":21}", "{\"playerMode\":\"SOLO\"}",
+                "{\"playerMode\":\"MULTIPLAYER\",\"questionCount\":4}",
+                "{\"playerMode\":\"MULTIPLAYER\",\"questionCount\":10,\"initialLives\":7}",
+                "{\"playerMode\":\"MULTIPLAYER\",\"questionCount\":10,\"secondsPerQuestion\":12}")) {
             mvc.perform(post("/api/games/rocket/rooms").header("Authorization", bearer()).contentType("application/json")
                     .content(body)).andExpect(status().isBadRequest());
         }

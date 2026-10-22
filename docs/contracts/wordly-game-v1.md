@@ -58,6 +58,8 @@ Settings: initialLives integer 3-6; playMode FINITE or ENDLESS. FINITE requires 
 ENDLESS requires null wordLimit. playerMode SOLO or MULTIPLAYER is fixed at creation.
 MULTIPLAYER always has timeEnabled=true and wordTimeLimitSeconds=180. SOLO can disable time;
 then wordTimeLimitSeconds and word deadlines are null. Updates cannot change playMode/playerMode.
+Room `settings` also carries `questionCount` and `secondsPerQuestion`, which are null for Wordly rooms and set for
+Rocket rooms (see the Rocket contract).
 Room codes contain six uppercase alphanumeric characters, capacity 1 SOLO / 4 MULTIPLAYER.
 
 Room fields: id, roomCode, hostUserId, gameType, learningDomain, mode, maxPlayers, status,
