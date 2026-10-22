@@ -54,6 +54,8 @@ Current stays the way to resync after a reconnect.
   Clients compute the countdown from `deadlineAt` corrected by `serverTime`. A round never carries its answer.
 - RoundResult (the caller's view of a closed round): `roundId`, `correctOptionId`, `chosenOptionId` (null when time ran
   out), `correct`, `points`, `livesRemaining`, `totalScore`, `status`, `nextRoundAt`, `matchFinished`, `endReason`.
+  `nextRoundAt` is when the next round is scheduled (close time plus the reveal pause), null when none follows; it stays
+  the same after that round opens, even if it opened a little later.
 - AnswerAck: `requestId`, `roundId`, `optionId`, `receivedAt`, `roundResult` (present when the answer closed the round,
   which is always the case in solo play).
 - Result: `matchId`, `endReason`, `settings`, `totalRounds`, `answered` (rounds the caller took part in, misses
@@ -84,6 +86,8 @@ ErrorResponse with `code`: 400 `INVALID_OPTION`, validation errors, `MULTIPLAYER
 is not open), `ALREADY_ANSWERED`, `REQUEST_ID_CONFLICT`, `MATCH_FINISHED`, `MATCH_NOT_FINISHED`, `PLAYER_NOT_ACTIVE`,
 `ACTIVE_GAME_EXISTS`.
 Retrying with the same `requestId` and option returns the stored answer instead of answering twice.
+A `requestId` belongs to one answer for the whole match: reusing it on another round, or with another option, is
+409 `REQUEST_ID_CONFLICT`.
 
 ## Not yet available
 

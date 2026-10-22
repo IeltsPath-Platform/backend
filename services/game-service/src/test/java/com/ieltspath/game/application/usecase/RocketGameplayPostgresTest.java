@@ -148,6 +148,31 @@ class RocketGameplayPostgresTest {
                 round.roundId()));
     }
 
+    @Test void aRetryAfterTheNextRoundOpenedGetsTheSameResult() {
+        UUID match = start(3);
+        var round = gameplay.current(match, user).round();
+        now = now.plusSeconds(2);
+        var first = gameplay.answer(match, round.roundId(), user, "r1", correct(match, round));
+        now = now.plusSeconds(4);
+        var next = gameplay.current(match, user).round();
+        assertEquals(now, next.opensAt(), "opened later than scheduled");
+        var retry = gameplay.answer(match, round.roundId(), user, "r1", correct(match, round));
+        assertEquals(first.roundResult(), retry.roundResult());
+        assertEquals(first.roundResult(), gameplay.current(match, user).lastRoundResult());
+    }
+
+    @Test void reusingARequestIdOnAnotherRoundIsAConflict() {
+        UUID match = start(3);
+        var round = gameplay.current(match, user).round();
+        now = now.plusSeconds(1);
+        gameplay.answer(match, round.roundId(), user, "r1", wrong(match, round));
+        now = now.plusSeconds(3);
+        var next = gameplay.current(match, user).round();
+        assertCode("REQUEST_ID_CONFLICT", () -> gameplay.answer(match, next.roundId(), user, "r1", wrong(match, next)));
+        assertFalse(gameplay.current(match, user).round().me().answered());
+        assertNotNull(gameplay.answer(match, next.roundId(), user, "r2", wrong(match, next)).roundResult());
+    }
+
     @Test void theDeadlineCostsALifeEvenIfTheLateAnswerIsRejected() {
         UUID match = start(3);
         var round = gameplay.current(match, user).round();

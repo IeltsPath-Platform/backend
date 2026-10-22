@@ -101,6 +101,9 @@ public class RocketGameplayUseCase {
                     .orElseThrow(() -> new SoloGameplayException(404, "ROUND_NOT_FOUND", "Round not found"));
             boolean replay = round.answerOf(player.id()).map(RocketRound.Answer::requestId)
                     .filter(requestId::equals).isPresent();
+            if (!replay && all.stream().anyMatch(other -> other != round && other.answerOf(player.id())
+                    .map(RocketRound.Answer::requestId).filter(requestId::equals).isPresent()))
+                throw new SoloGameplayException(409, "REQUEST_ID_CONFLICT", "Request id was used for another answer");
             if (!replay && state.finished()) throw new SoloGameplayException(409, "MATCH_FINISHED", "This match has finished");
             if (!replay && !player.playing())
                 throw new SoloGameplayException(409, "PLAYER_NOT_ACTIVE", "You are no longer playing this match");
@@ -249,11 +252,14 @@ public class RocketGameplayUseCase {
                 round.revealedCorrectOptionId().orElseThrow(), outcomes, nextRoundAt, end != null, end));
     }
 
+    /**
+     * The next round is due a reveal pause after this one closed. That schedule is derived from the close rather than
+     * read from the next round, whose opensAt moves to the actual opening time, so a replayed answer gets the same value.
+     */
     private RoundResult roundResult(State state, List<RocketRound> all, RocketRound round, Player player) {
         Optional<RocketRound.Answer> answer = round.answerOf(player.id());
-        Instant next = state.finished() ? null : all.stream()
-                .filter(candidate -> candidate.sequence() == round.sequence() + 1).findFirst()
-                .map(RocketRound::opensAt).orElse(null);
+        boolean hasNext = all.stream().anyMatch(candidate -> candidate.sequence() == round.sequence() + 1);
+        Instant next = state.finished() || !hasNext ? null : round.closedAt().plus(state.settings().revealPause());
         return new RoundResult(round.id(), round.revealedCorrectOptionId().orElseThrow(),
                 answer.map(RocketRound.Answer::optionId).orElse(null), answer.map(RocketRound.Answer::correct).orElse(false),
                 answer.map(RocketRound.Answer::points).orElse(0), player.progress().livesRemaining(),
