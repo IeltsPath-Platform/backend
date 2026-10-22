@@ -62,7 +62,7 @@ public class ReportController {
     }
 
     @GetMapping("/admin/learners/{userId}/report")
-    @PreAuthorize("hasAnyRole('ADMIN', 'EXAMINER')")
+    @PreAuthorize("hasRole('EXAMINER')")
     public LearnerReportResult learner(@PathVariable("userId") UUID userId) {
         return report.execute(userId);
     }

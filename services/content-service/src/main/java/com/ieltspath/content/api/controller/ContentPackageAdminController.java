@@ -33,14 +33,14 @@ public class ContentPackageAdminController {
     private final ListPackagePublicationSchedulesUseCase listSchedules;
 
     @GetMapping("/{id}/versions/{versionId}/preview")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public PackageVersionPreviewResponse preview(@PathVariable("id") UUID packageId,
                                                  @PathVariable("versionId") UUID versionId) {
         return PackageVersionPreviewResponse.from(preview.execute(packageId, versionId));
     }
 
     @PutMapping("/{id}/versions/{versionId}/schedule")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public ScheduledPackagePublicationResult schedule(@PathVariable("id") UUID packageId,
                                                        @PathVariable("versionId") UUID versionId,
                                                        @Valid @RequestBody SchedulePackagePublicationRequest request) {
@@ -49,13 +49,13 @@ public class ContentPackageAdminController {
 
     @DeleteMapping("/{id}/versions/{versionId}/schedule")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public void cancel(@PathVariable("id") UUID packageId, @PathVariable("versionId") UUID versionId) {
         cancel.execute(packageId, versionId);
     }
 
     @GetMapping("/{id}/publication-schedules")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public List<ScheduledPackagePublicationResult> listSchedules(@PathVariable("id") UUID packageId) {
         return listSchedules.execute(packageId);
     }

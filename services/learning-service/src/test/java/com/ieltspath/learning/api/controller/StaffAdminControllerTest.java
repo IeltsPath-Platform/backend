@@ -54,13 +54,20 @@ class StaffAdminControllerTest {
     final UUID id = UUID.randomUUID();
 
     @ParameterizedTest
-    @CsvSource({"EXAMINER,EXAMINER", "CONTENT_AUTHOR,CONTENT_AUTHOR", "ADMIN,EXAMINER+CONTENT_AUTHOR"})
+    @CsvSource({"EXAMINER,EXAMINER", "CONTENT_AUTHOR,CONTENT_AUTHOR"})
     void eachRoleListsOnlyTheQueuesItMayWork(String role, String queues) throws Exception {
         when(work.list(any(), any(), any())).thenReturn(List.of());
         mvc.perform(get("/api/learning/admin/work-items").with(user("staff").roles(role))).andExpect(status().isOk());
         Set<Queue> expected = new java.util.HashSet<>();
         for (String queue : queues.split("\\+")) expected.add(Queue.valueOf(queue));
         verify(work).list(eq(expected), eq(null), eq(null));
+    }
+
+    @Test
+    void administratorsCannotAccessStaffQueues() throws Exception {
+        mvc.perform(get("/api/learning/admin/work-items").with(user("admin").roles("ADMIN")))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(work, insight);
     }
 
     @ParameterizedTest

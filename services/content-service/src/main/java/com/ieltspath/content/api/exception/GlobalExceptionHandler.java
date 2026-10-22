@@ -1,6 +1,7 @@
 package com.ieltspath.content.api.exception;
 
 import com.ieltspath.content.domain.exception.*;
+import com.ieltspath.content.application.exception.VocabularyServiceUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +31,7 @@ public class GlobalExceptionHandler {
             ErrorTypeNotFoundException.class,
             ContentPackageNotFoundException.class,
             QuestionNotFoundException.class,
+            QuestionVersionNotFoundException.class,
             AssetNotFoundException.class,
             ReadingPassageNotFoundException.class,
             LessonNotFoundException.class,
@@ -121,6 +123,34 @@ public class GlobalExceptionHandler {
                 Map.of("code", "DIFFICULTY_REQUIRED"));
     }
 
+    @ExceptionHandler(QuestionDifficultyRequiredForPublicationException.class)
+    public ResponseEntity<ErrorResponse> handleQuestionDifficultyRequiredForPublication(
+            QuestionDifficultyRequiredForPublicationException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "DIFFICULTY_REQUIRED"));
+    }
+
+    @ExceptionHandler(QuestionVersionNotPublishableException.class)
+    public ResponseEntity<ErrorResponse> handleQuestionVersionNotPublishable(QuestionVersionNotPublishableException ex,
+                                                                              HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "QUESTION_VERSION_NOT_PUBLISHABLE"));
+    }
+
+    @ExceptionHandler(QuestionVersionStateException.class)
+    public ResponseEntity<ErrorResponse> handleQuestionVersionState(QuestionVersionStateException ex,
+                                                                     HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "QUESTION_VERSION_STATE_INVALID"));
+    }
+
+    @ExceptionHandler(QuestionVersionInUseException.class)
+    public ResponseEntity<ErrorResponse> handleQuestionVersionInUse(QuestionVersionInUseException ex,
+                                                                     HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "QUESTION_VERSION_IN_USE"));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, Object> details = new HashMap<>();
@@ -142,6 +172,13 @@ public class GlobalExceptionHandler {
                                                                      HttpServletRequest request) {
         return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
                 Map.of("code", "PREREQUISITE_INVALID", "invalidIds", ex.getInvalidIds()));
+    }
+
+    @ExceptionHandler(PrerequisiteLevelException.class)
+    public ResponseEntity<ErrorResponse> handlePrerequisiteLevel(PrerequisiteLevelException ex,
+                                                                 HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "PREREQUISITE_LEVEL_INVALID", "invalidIds", ex.getInvalidIds()));
     }
 
     @ExceptionHandler(KnowledgePointInUseException.class)
@@ -183,6 +220,36 @@ public class GlobalExceptionHandler {
         log.error("Lesson data breaks a block rule at {}: {}", request.getRequestURI(), ex.getMessage());
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), request.getRequestURI(),
                 Map.of("code", "INVALID_LESSON_BLOCK"));
+    }
+
+    @ExceptionHandler(LessonBlockInvalidException.class)
+    public ResponseEntity<ErrorResponse> handleLessonBlockInvalid(LessonBlockInvalidException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "LESSON_BLOCK_INVALID"));
+    }
+
+    @ExceptionHandler(LessonExerciseLockedException.class)
+    public ResponseEntity<ErrorResponse> handleLessonExerciseLocked(LessonExerciseLockedException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "LESSON_EXERCISE_LOCKED"));
+    }
+
+    @ExceptionHandler(LessonSortConflictException.class)
+    public ResponseEntity<ErrorResponse> handleLessonSortConflict(LessonSortConflictException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "LESSON_SORT_CONFLICT"));
+    }
+
+    @ExceptionHandler(LessonNotPublishableException.class)
+    public ResponseEntity<ErrorResponse> handleLessonNotPublishable(LessonNotPublishableException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "LESSON_NOT_PUBLISHABLE", "issues", ex.getIssues()));
+    }
+
+    @ExceptionHandler(VocabularyServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleVocabularyUnavailable(VocabularyServiceUnavailableException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "VOCABULARY_SERVICE_UNAVAILABLE"));
     }
 
     @ExceptionHandler(InvalidMediaReferenceException.class)

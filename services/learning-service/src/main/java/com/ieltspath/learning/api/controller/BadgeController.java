@@ -32,7 +32,7 @@ public class BadgeController {
 
     /** Switches a badge on or off. A switched-off badge is no longer awarded; held badges are kept. */
     @PatchMapping("/admin/badges/{code}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public Badge setActive(@PathVariable("code") String code, @Valid @RequestBody ActiveRequest request) {
         return badges.setActive(code, request.active());
     }

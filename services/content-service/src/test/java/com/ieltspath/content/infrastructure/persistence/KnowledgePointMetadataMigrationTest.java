@@ -24,6 +24,7 @@ class KnowledgePointMetadataMigrationTest {
         Flyway.configure()
                 .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
                 .locations("classpath:db/migration")
+                .target("52")
                 .load()
                 .migrate();
     }

@@ -9,7 +9,7 @@ All endpoints require an internal JWT.
 
 ### `GET /api/assessments/qa-reviews/queue`
 
-Roles: `CONTENT_AUTHOR`, `ADMIN`. Returns queued `HUMAN` jobs with reason `QA_SAMPLE`. Essay projections are blind: they
+Role: `CONTENT_AUTHOR`. Returns queued `HUMAN` jobs with reason `QA_SAMPLE`. Essay projections are blind: they
 do not contain the original examiner or band. Jobs older than 48 hours include `overdue: true`.
 
 ```json
@@ -43,7 +43,7 @@ not be the examiner who graded the original submission.
 
 ### `POST /api/assessments/qa-reviews`
 
-Roles: `CONTENT_AUTHOR`, `ADMIN`. Submit a blind re-review. Reviewer band must be an IELTS half-band from 0 through 9.
+Role: `CONTENT_AUTHOR`. Submit a blind re-review. Reviewer band must be an IELTS half-band from 0 through 9.
 
 ```json
 {
@@ -58,7 +58,7 @@ Response: `204 No Content`.
 
 ### `GET /api/assessments/admin/examiner-quality`
 
-Role: `ADMIN`. Returns one aggregate per original examiner with sample count, mean absolute band difference, and the
+Role: `CONTENT_AUTHOR`. Returns one aggregate per original examiner with sample count, mean absolute band difference, and the
 fraction of reviews whose difference is greater than one band.
 
 ## Paid human grading for topic essays

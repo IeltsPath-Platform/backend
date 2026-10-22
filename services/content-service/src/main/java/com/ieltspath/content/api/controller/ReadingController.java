@@ -21,7 +21,7 @@ public class ReadingController {
     }
 
     @GetMapping("/sections/{sectionId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public ReadingPassageResponse getReadingPassage(@PathVariable("sectionId") UUID sectionId) {
         return ReadingPassageResponse.from(getReadingPassageUseCase.execute(sectionId));
     }

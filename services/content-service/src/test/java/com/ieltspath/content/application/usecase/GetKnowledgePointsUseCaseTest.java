@@ -3,6 +3,7 @@ package com.ieltspath.content.application.usecase;
 import com.ieltspath.content.application.result.KnowledgePointResult;
 import com.ieltspath.content.domain.aggregate.KnowledgePoint;
 import com.ieltspath.content.domain.repository.KnowledgePointRepository;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.KnowledgePointKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,6 @@ class GetKnowledgePointsUseCaseTest {
 
     private static KnowledgePoint kp(String code) {
         return KnowledgePoint.create(UUID.randomUUID(), code, code, KnowledgePointKind.GRAMMAR,
-                LearningType.PROCEDURE, null, null);
+                LearningType.PROCEDURE, null, null, CefrLevel.B1, "Do something.", null, null);
     }
 }

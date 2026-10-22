@@ -24,20 +24,20 @@ public class CourseController {
     private final ListCoursesUseCase listCourses;
 
     @GetMapping("/api/content/courses")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public List<CourseResponse> list() {
         return listCourses.execute().stream().map(CourseResponse::from).toList();
     }
 
     @PostMapping("/api/content/admin/courses")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public CourseResponse create(@Valid @RequestBody CreateCourseRequest request) {
         return CourseResponse.from(createCourse.execute(new CreateCourseCommand(request.code(), request.name(), request.bandLevel())));
     }
 
     @PutMapping("/api/content/admin/courses/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public CourseResponse update(@PathVariable("id") UUID id, @Valid @RequestBody UpdateCourseRequest request) {
         return CourseResponse.from(updateCourse.execute(new UpdateCourseCommand(id, request.name(), request.bandLevel(), request.status())));
     }

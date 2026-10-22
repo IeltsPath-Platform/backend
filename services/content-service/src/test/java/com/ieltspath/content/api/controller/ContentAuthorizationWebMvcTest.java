@@ -38,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = {
         QuestionController.class, ContentPackageController.class, ContentPackageAdminController.class, ContentAssetController.class,
+        QuestionPublicationAdminController.class, LessonAuthoringAdminController.class,
         KnowledgePointController.class, TopicController.class, ReadingController.class, CourseController.class
 }, properties = {
         "spring.cloud.config.enabled=false",
@@ -103,6 +104,9 @@ class ContentAuthorizationWebMvcTest {
     @MockitoBean CreateQuestionUseCase createQuestion;
     @MockitoBean AddQuestionVersionUseCase addQuestionVersion;
     @MockitoBean ArchiveQuestionUseCase archiveQuestion;
+    @MockitoBean PublishQuestionVersionUseCase publishQuestionVersion;
+    @MockitoBean ArchiveQuestionVersionUseCase archiveQuestionVersion;
+    @MockitoBean LessonAuthoringUseCase lessonAuthoring;
     @MockitoBean ListContentPackagesUseCase listPackages;
     @MockitoBean GetContentPackageDetailUseCase getPackageDetail;
     @MockitoBean CreateContentPackageUseCase createPackage;
@@ -193,7 +197,7 @@ class ContentAuthorizationWebMvcTest {
                 .content("{\"assetType\":\"PASSAGE\",\"textContent\":\"Paragraph\"}"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/content/knowledge-points").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"topicId\":\"" + id + "\",\"code\":\"R55_EXAMPLE\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\"}"))
+                .content("{\"topicId\":\"" + id + "\",\"code\":\"R55_EXAMPLE\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\",\"cefrLevel\":\"B1\",\"canDo\":\"Form simple sentences.\"}"))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(createQuestion, createPackage, createAsset, linkAsset, createKnowledgePoint);
     }
@@ -210,6 +214,39 @@ class ContentAuthorizationWebMvcTest {
                         "/api/content/admin/packages/{id}/versions/{versionId}/schedule", id, versionId))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(schedulePackagePublication, cancelPackagePublicationSchedule);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void learnerCannotPublishOrArchiveQuestionVersions() throws Exception {
+        UUID versionId = UUID.randomUUID();
+        mockMvc.perform(post("/api/content/admin/questions/{questionId}/versions/{versionId}/publish", id, versionId))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/content/admin/questions/{questionId}/versions/{versionId}/archive", id, versionId))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(publishQuestionVersion, archiveQuestionVersion);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void learnerCannotAuthorLessons() throws Exception {
+        mockMvc.perform(post("/api/content/admin/topics/{topicId}/lessons", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"AUTHOR_TEST\",\"title\":\"Lesson\"}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(lessonAuthoring);
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void contentAuthorCanPublishQuestionVersion() throws Exception {
+        UUID versionId = UUID.randomUUID();
+        when(publishQuestionVersion.execute(id, versionId)).thenReturn(new QuestionDetailResult(id,
+                QuestionType.MULTIPLE_CHOICE, Skill.READING, null, PublicationStatus.PUBLISHED, versionId,
+                Instant.now(), Instant.now(), List.of(), QuestionPurpose.LEARNING));
+        mockMvc.perform(post("/api/content/admin/questions/{questionId}/versions/{versionId}/publish", id, versionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentPublishedVersionId").value(versionId.toString()));
     }
 
     @Test
@@ -237,32 +274,23 @@ class ContentAuthorizationWebMvcTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void adminCanWriteContent() throws Exception {
-        when(createQuestion.execute(any())).thenReturn(new QuestionResult(id, QuestionType.MULTIPLE_CHOICE,
-                Skill.READING, null, PublicationStatus.DRAFT, null, Instant.now(), Instant.now()));
-        when(createPackage.execute(any())).thenReturn(new ContentPackageResult(id, "PS-KP1-A", "Practice",
-                PackageType.PRACTICE_SET, null, PublicationStatus.DRAFT, null, Instant.now(), Instant.now(), null));
-        when(createKnowledgePoint.execute(any())).thenReturn(new KnowledgePointResult(id, id, "R55_EXAMPLE", "KP1",
-                KnowledgePointKind.GRAMMAR, LearningType.CONCEPT, null, null, ContentStatus.ACTIVE,
-                Instant.now(), Instant.now()));
-        when(createAsset.execute(any())).thenReturn(new ContentAssetResult(
-                id, AssetType.PASSAGE, "Paragraph", null, null, null, AssetValidationStatus.VALID, Instant.now()));
-
+    void adminCannotWriteContent() throws Exception {
         mockMvc.perform(post("/api/content/questions").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"questionType\":\"MULTIPLE_CHOICE\",\"skill\":\"READING\"}"))
-                .andExpect(status().isCreated());
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/content/packages").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"code\":\"PS-KP1-A\",\"title\":\"Practice\",\"packageType\":\"PRACTICE_SET\"}"))
-                .andExpect(status().isCreated());
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/content/assets/links").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"assetId\":\"" + id + "\",\"sortOrder\":1}"))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/content/assets").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"assetType\":\"PASSAGE\",\"textContent\":\"Paragraph\"}"))
-                .andExpect(status().isCreated());
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/content/knowledge-points").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"topicId\":\"" + id + "\",\"code\":\"R55_EXAMPLE\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\"}"))
-                .andExpect(status().isCreated());
+                .content("{\"topicId\":\"" + id + "\",\"code\":\"R55_EXAMPLE\",\"name\":\"KP1\",\"kind\":\"GRAMMAR\",\"learningType\":\"CONCEPT\",\"cefrLevel\":\"B1\",\"canDo\":\"Form simple sentences.\"}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(createQuestion, createPackage, createKnowledgePoint, createAsset);
     }
 
     @Test

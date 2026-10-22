@@ -4,9 +4,11 @@ import com.ieltspath.content.application.result.KnowledgePointResult;
 import com.ieltspath.content.domain.aggregate.KnowledgePoint;
 import com.ieltspath.content.domain.exception.InvalidPrerequisiteException;
 import com.ieltspath.content.domain.exception.KnowledgePointNotFoundException;
+import com.ieltspath.content.domain.exception.PrerequisiteLevelException;
 import com.ieltspath.content.domain.repository.KnowledgePointRepository;
 import com.ieltspath.content.domain.repository.KnowledgePrerequisiteRepository;
 import com.ieltspath.content.domain.service.KnowledgeGraph;
+import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.ContentStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +35,8 @@ public class ReplaceKnowledgePointPrerequisitesUseCase {
 
     public List<KnowledgePointResult> execute(UUID id, List<UUID> requestedIds) {
         prerequisiteRepository.lockTree();
-        knowledgePointRepository.findById(id).orElseThrow(() -> new KnowledgePointNotFoundException(id));
+        KnowledgePoint dependent = knowledgePointRepository.findById(id)
+                .orElseThrow(() -> new KnowledgePointNotFoundException(id));
 
         List<UUID> prerequisiteIds = List.copyOf(new LinkedHashSet<>(requestedIds));
         Map<UUID, KnowledgePoint> prerequisitesById = new HashMap<>();
@@ -51,13 +54,23 @@ public class ReplaceKnowledgePointPrerequisitesUseCase {
             throw new InvalidPrerequisiteException(invalidIds);
         }
 
+        List<KnowledgeGraph.Edge> requestedEdges = prerequisiteIds.stream()
+                .map(prerequisiteId -> new KnowledgeGraph.Edge(prerequisiteId, id))
+                .toList();
+        Map<UUID, CefrLevel> levels = new HashMap<>();
+        prerequisitesById.forEach((prerequisiteId, prerequisite) -> levels.put(prerequisiteId, prerequisite.getCefrLevel()));
+        List<UUID> levelConflicts = knowledgeGraph.levelConflicts(id, dependent.getCefrLevel(), requestedEdges, levels);
+        if (!levelConflicts.isEmpty()) {
+            throw new PrerequisiteLevelException(levelConflicts);
+        }
+
         List<KnowledgeGraph.Edge> candidateEdges = new ArrayList<>();
         for (KnowledgePrerequisiteRepository.Edge edge : prerequisiteRepository.findAll()) {
             if (!edge.knowledgePointId().equals(id)) {
                 candidateEdges.add(new KnowledgeGraph.Edge(edge.prerequisiteId(), edge.knowledgePointId()));
             }
         }
-        prerequisiteIds.forEach(prerequisiteId -> candidateEdges.add(new KnowledgeGraph.Edge(prerequisiteId, id)));
+        candidateEdges.addAll(requestedEdges);
         knowledgeGraph.ensureAcyclic(candidateEdges);
         prerequisiteRepository.replace(id, prerequisiteIds);
         return prerequisiteIds.stream()

@@ -18,7 +18,7 @@ import java.util.UUID;
 /** Score weights and thresholds per course; without {@code courseId} the default every other course follows. */
 @RestController
 @RequestMapping("/api/learning/admin/score-config")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('CONTENT_AUTHOR')")
 public class ScoreConfigAdminController {
     private final CurrentUserProvider currentUser;
     private final ManageScoreConfigUseCase config;

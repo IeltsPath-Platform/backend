@@ -15,6 +15,7 @@ import com.ieltspath.content.domain.exception.InvalidPrerequisiteException;
 import com.ieltspath.content.domain.exception.KnowledgePointInUseException;
 import com.ieltspath.content.domain.exception.KnowledgePointNotFoundException;
 import com.ieltspath.content.domain.exception.PrerequisiteCycleException;
+import com.ieltspath.content.domain.exception.PrerequisiteLevelException;
 import com.ieltspath.content.domain.vo.ContentStatus;
 import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.KnowledgePointKind;
@@ -135,11 +136,40 @@ class KnowledgePointControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"topicId":"%s","code":"G55_COMPLEX_SENTENCES","name":"Complex sentences",
-                                 "kind":"GRAMMAR","learningType":"CONCEPT","skill":"ALL"}
+                                 "kind":"GRAMMAR","learningType":"CONCEPT","skill":"ALL",
+                                 "canDo":"Combine clauses to link ideas."}
                                 """.formatted(UUID.randomUUID())))
                 .andExpect(status().isCreated());
 
         verify(createKnowledgePointUseCase).execute(any());
+    }
+
+    @Test
+    void acceptsSpeakingKnowledgePointCode() throws Exception {
+        when(createKnowledgePointUseCase.execute(any())).thenReturn(result(UUID.randomUUID(), LearningType.PROCEDURE));
+
+        mockMvc.perform(post("/api/content/knowledge-points")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"topicId":"%s","code":"S60_PART2_LONG_TURN","name":"Long turn",
+                                 "kind":"STRATEGY","learningType":"PROCEDURE","skill":"SPEAKING",
+                                 "cefrLevel":"B2","canDo":"Deliver a talk of one to two minutes."}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void rejectsMissingCanDoOnKnowledgePointCreation() throws Exception {
+        mockMvc.perform(post("/api/content/knowledge-points")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"topicId":"%s","code":"R55_EXAMPLE","name":"Example","kind":"STRATEGY",
+                                 "learningType":"PROCEDURE","skill":"READING","cefrLevel":"B1"}
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.canDo").value("canDo is required"));
+
+        verify(createKnowledgePointUseCase, never()).execute(any());
     }
 
     @Test
@@ -195,7 +225,7 @@ class KnowledgePointControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"topicId":"%s","code":"R55_EXAMPLE","name":"Example","kind":"GRAMMAR","learningType":"MEMORY",
-                                 "bandMin":6.0,"bandMax":5.0}
+                                 "canDo":"Recall the rule.","bandMin":6.0,"bandMax":5.0}
                                 """.formatted(UUID.randomUUID())))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.bandMin").doesNotExist());
@@ -318,6 +348,16 @@ class KnowledgePointControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.details.code").value("PREREQUISITE_INVALID"))
                 .andExpect(jsonPath("$.details.invalidIds[0]").value(invalidId.toString()));
+
+        UUID tooHighId = UUID.randomUUID();
+        when(replaceKnowledgePointPrerequisitesUseCase.execute(id, List.of(tooHighId)))
+                .thenThrow(new PrerequisiteLevelException(List.of(tooHighId)));
+        mockMvc.perform(put("/api/content/knowledge-points/{id}/prerequisites", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"prerequisiteIds\":[\"%s\"]}".formatted(tooHighId)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.details.code").value("PREREQUISITE_LEVEL_INVALID"))
+                .andExpect(jsonPath("$.details.invalidIds[0]").value(tooHighId.toString()));
 
         when(getKnowledgePointPrerequisitesUseCase.execute(id)).thenThrow(new KnowledgePointNotFoundException(id));
         mockMvc.perform(get("/api/content/knowledge-points/{id}/prerequisites", id))

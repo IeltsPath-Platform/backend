@@ -1,7 +1,7 @@
 # Assessment grading v1
 
 Updated: 2026-10-17. Base path `/api/assessments`. Identity comes from the verified
-internal JWT. All queue and grading endpoints require `EXAMINER` or `ADMIN`.
+internal JWT. All queue and grading endpoints require `EXAMINER`.
 Customer submission/job creation and owner-only job lookup keep their existing contracts.
 
 ## Blind examiner queue
@@ -29,7 +29,7 @@ reclaims it. Claims and result writes lock the same job rows.
 Because result finalization covers the whole attempt, claiming an essay also claims
 the other unassigned/expired HUMAN jobs of that attempt. A live claim held by another
 examiner blocks the claim. This keeps one examiner responsible for the attempt.
-Standalone jobs are claimed individually. ADMIN follows the same claim rules.
+Standalone jobs are claimed individually.
 
 Essay response: `{jobId, attemptId, attemptItemId, prompt, essay, task, rubric, source}`.
 `prompt` is the snapshotted Content stem (standalone: submission stem). `source` is
@@ -122,7 +122,7 @@ The normal learner result endpoint continues to return only completed results.
 
 ## AI rubric evaluation and activation (phase 11)
 
-The admin-only routes below require `ADMIN`. Gold essays and comparisons remain internal; the examiner queue never
+The AI evaluation routes below require `CONTENT_AUTHOR`. Gold essays and comparisons remain internal; the examiner queue never
 exposes AI grades or comparison data.
 
 | Method | Path | Behavior |

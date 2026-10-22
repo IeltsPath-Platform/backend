@@ -103,6 +103,9 @@ public class SecurityConfig {
                     // Cho phep doc actuator health/info.
                     exchange.pathMatchers(HttpMethod.GET, "/actuator/**").permitAll();
 
+                    // System monitoring is reserved for administrators.
+                    exchange.pathMatchers("/api/admin/system/**").hasRole("ADMIN");
+
                     // Cho phep cac endpoint public lay tu config, vi du login/register.
                     publicEndpointProperties.publicEndpoints().forEach(path ->
                             exchange.pathMatchers(path).permitAll());

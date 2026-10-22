@@ -31,7 +31,7 @@ configuration screen.
 
 ## `GET /api/learning/courses/{courseId}/score`
 
-Role `CUSTOMER`, own score only. `GET /api/learning/admin/learners/{userId}/courses/{courseId}/score`: `ADMIN`, `EXAMINER`.
+Role `CUSTOMER`, own score only. `GET /api/learning/admin/learners/{userId}/courses/{courseId}/score`: `EXAMINER`.
 
 ```json
 {
@@ -50,7 +50,7 @@ Role `CUSTOMER`, own score only. `GET /api/learning/admin/learners/{userId}/cour
 
 ## `GET` / `PUT /api/learning/admin/score-config?courseId=`
 
-Role `ADMIN`. Without `courseId` it is the default every course without its own configuration follows. `GET` adds
+Role `CONTENT_AUTHOR`. Without `courseId` it is the default every course without its own configuration follows. `GET` adds
 `inherited` (true when the course has none of its own). `PUT` replaces the whole configuration; values are fractions of 1:
 
 ```json

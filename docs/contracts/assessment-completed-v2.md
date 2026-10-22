@@ -16,7 +16,7 @@ The event is emitted when a result version is finalized:
 ```text
 POST /api/assessments/attempts                                  capture Content package, item and KP snapshots; no goal lookup
 POST /api/assessments/attempts/{id}/submit                       objective items: auto-grade -> COMPLETED + outbox in one transaction
-POST /api/assessments/grading/attempts/{attemptId}/results      EXAMINER/ADMIN opens a DRAFT version
+POST /api/assessments/grading/attempts/{attemptId}/results      EXAMINER opens a DRAFT version
 PUT  /api/assessments/grading/results/{resultId}/details        item results, max scores, judgments, band (still DRAFT)
 POST /api/assessments/grading/results/{resultId}/finalize       FinalizeAssessmentResultUseCase: DRAFT/PROCESSING -> COMPLETED
                                                                 + outbox_events row, same DB transaction

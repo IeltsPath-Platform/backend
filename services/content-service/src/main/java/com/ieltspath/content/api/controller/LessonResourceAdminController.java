@@ -23,7 +23,7 @@ import java.util.UUID;
 /** Authoring of a lesson's Markdown summary and its slide and document links. */
 @RestController
 @RequestMapping("/api/content/admin/lessons/{lessonId}")
-@PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+@PreAuthorize("hasRole('CONTENT_AUTHOR')")
 @RequiredArgsConstructor
 public class LessonResourceAdminController {
     private final ListLessonResourcesUseCase listResources;

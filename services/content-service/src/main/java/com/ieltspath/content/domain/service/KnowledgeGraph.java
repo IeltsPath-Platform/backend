@@ -1,6 +1,7 @@
 package com.ieltspath.content.domain.service;
 
 import com.ieltspath.content.domain.exception.PrerequisiteCycleException;
+import com.ieltspath.content.domain.vo.CefrLevel;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -65,5 +66,56 @@ public class KnowledgeGraph {
                 }
             }
         }
+    }
+
+    /**
+     * Neighbours of {@code pointId} whose CEFR level contradicts an edge touching it: a prerequisite above the point,
+     * or a dependent below it. A prerequisite may sit at the same level. A neighbour with no level never conflicts.
+     */
+    public List<UUID> levelConflicts(UUID pointId, CefrLevel pointLevel, Collection<Edge> edges,
+                                     Map<UUID, CefrLevel> levels) {
+        if (pointLevel == null) {
+            return List.of();
+        }
+        Set<UUID> conflicts = new LinkedHashSet<>();
+        for (Edge edge : edges) {
+            if (edge.to().equals(pointId)) {
+                CefrLevel level = levels.get(edge.from());
+                if (level != null && level.compareTo(pointLevel) > 0) {
+                    conflicts.add(edge.from());
+                }
+            } else if (edge.from().equals(pointId)) {
+                CefrLevel level = levels.get(edge.to());
+                if (level != null && level.compareTo(pointLevel) < 0) {
+                    conflicts.add(edge.to());
+                }
+            }
+        }
+        return List.copyOf(conflicts);
+    }
+
+    /** Edges whose prerequisite has a higher CEFR level than the point that depends on it. */
+    public List<Edge> levelViolations(Collection<Edge> edges, Map<UUID, CefrLevel> levels) {
+        List<Edge> violations = new ArrayList<>();
+        for (Edge edge : edges) {
+            CefrLevel from = levels.get(edge.from());
+            CefrLevel to = levels.get(edge.to());
+            if (from != null && to != null && from.compareTo(to) > 0) {
+                violations.add(edge);
+            }
+        }
+        return List.copyOf(violations);
+    }
+
+    /** Nodes that are neither a prerequisite nor a dependent in any edge. */
+    public Set<UUID> isolated(Collection<UUID> nodeIds, Collection<Edge> edges) {
+        Set<UUID> connected = new HashSet<>();
+        for (Edge edge : edges) {
+            connected.add(edge.from());
+            connected.add(edge.to());
+        }
+        Set<UUID> isolated = new LinkedHashSet<>(nodeIds);
+        isolated.removeAll(connected);
+        return isolated;
     }
 }

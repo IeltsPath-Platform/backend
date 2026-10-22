@@ -27,7 +27,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/assessments/grading")
-@PreAuthorize("hasAnyRole('EXAMINER','ADMIN')")
+@PreAuthorize("hasRole('EXAMINER')")
 @RequiredArgsConstructor
 public class GradingController {
 

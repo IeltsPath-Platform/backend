@@ -79,7 +79,7 @@ class ReportControllerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"ADMIN", "EXAMINER"})
+    @ValueSource(strings = {"EXAMINER"})
     void staffReadAnyLearnersReport(String role) throws Exception {
         when(report.execute(other)).thenReturn(sample(other));
 

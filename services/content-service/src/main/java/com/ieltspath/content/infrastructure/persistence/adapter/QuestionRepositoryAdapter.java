@@ -7,6 +7,7 @@ import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.infrastructure.persistence.mapper.QuestionPersistenceMapper;
 import com.ieltspath.content.infrastructure.persistence.repository.QuestionJpaRepository;
 import org.springframework.stereotype.Component;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 import java.util.Optional;
@@ -17,11 +18,14 @@ public class QuestionRepositoryAdapter implements QuestionRepository {
 
     private final QuestionJpaRepository questionJpaRepository;
     private final QuestionPersistenceMapper mapper;
+    private final JdbcTemplate jdbcTemplate;
 
     public QuestionRepositoryAdapter(QuestionJpaRepository questionJpaRepository,
-                                     QuestionPersistenceMapper mapper) {
+                                     QuestionPersistenceMapper mapper,
+                                     JdbcTemplate jdbcTemplate) {
         this.questionJpaRepository = questionJpaRepository;
         this.mapper = mapper;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
@@ -34,6 +38,13 @@ public class QuestionRepositoryAdapter implements QuestionRepository {
     @Override
     public Optional<Question> findById(UUID id) {
         return questionJpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<Question> findByIdForUpdate(UUID id) {
+        var rows = jdbcTemplate.query("SELECT id FROM questions WHERE id = ? FOR UPDATE",
+                (rs, row) -> rs.getObject("id", UUID.class), id);
+        return rows.isEmpty() ? Optional.empty() : findById(id);
     }
 
     @Override

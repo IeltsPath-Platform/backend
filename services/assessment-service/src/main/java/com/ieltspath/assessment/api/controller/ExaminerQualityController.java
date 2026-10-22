@@ -11,7 +11,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/assessments/admin/examiner-quality")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('CONTENT_AUTHOR')")
 public class ExaminerQualityController {
     private final ExaminerQaService qa;
 

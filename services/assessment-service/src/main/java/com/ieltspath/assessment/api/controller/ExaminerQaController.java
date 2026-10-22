@@ -16,7 +16,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/assessments/qa-reviews")
-@PreAuthorize("hasAnyRole('CONTENT_AUTHOR','ADMIN')")
+@PreAuthorize("hasRole('CONTENT_AUTHOR')")
 public class ExaminerQaController {
     private final CurrentUserProvider currentUser;
     private final ListGradingQueueUseCase queue;

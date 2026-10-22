@@ -17,8 +17,8 @@ public record CreateKnowledgePointRequest(
 
         @NotBlank(message = "code is required")
         @Size(max = 100, message = "code must not exceed 100 characters")
-        @Pattern(regexp = "^[RLWGV](55|60|65|70)_[A-Z0-9_]{2,60}$",
-                message = "code must use the format R55_EXAMPLE, G55_EXAMPLE, or V60_EXAMPLE")
+        @Pattern(regexp = "^[RLWGVS](55|60|65|70)_[A-Z0-9_]{2,60}$",
+                message = "code must use the format R55_EXAMPLE, G55_EXAMPLE, V60_EXAMPLE, or S60_EXAMPLE")
         String code,
 
         @NotBlank(message = "name is required")
@@ -34,6 +34,8 @@ public record CreateKnowledgePointRequest(
         Skill skill,
         String description,
         CefrLevel cefrLevel,
+
+        @NotBlank(message = "canDo is required")
         String canDo,
         String scopeIn,
         String scopeOut

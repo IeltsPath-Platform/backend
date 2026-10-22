@@ -17,7 +17,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/assessments/grading-jobs")
-@PreAuthorize("hasAnyRole('EXAMINER','ADMIN')")
+@PreAuthorize("hasRole('EXAMINER')")
 public class HumanReviewGradingController {
     private final CurrentUserProvider currentUser;
     private final HumanReviewService reviews;

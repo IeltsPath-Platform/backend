@@ -45,7 +45,7 @@ public class VocabularyController {
     private final AddVocabularySenseUseCase addVocabularySenseUseCase;
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public List<VocabularyItemResponse> search(@RequestParam(value = "query", defaultValue = "") String query) {
         return searchVocabularyUseCase.execute(query).stream()
                 .map(VocabularyItemResponse::from)
@@ -53,7 +53,7 @@ public class VocabularyController {
     }
 
     @GetMapping("/senses")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public List<VocabularySenseCardResponse> getSenses(@RequestParam("ids") String ids) {
         return getVocabularySensesUseCase.execute(parseSenseIds(ids)).stream()
                 .map(VocabularySenseCardResponse::from)
@@ -81,14 +81,14 @@ public class VocabularyController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public VocabularyItemResponse getById(@PathVariable("id") UUID id) {
         return VocabularyItemResponse.from(getVocabularyDetailUseCase.execute(id));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public VocabularyItemResponse create(@Valid @RequestBody CreateVocabularyItemRequest request) {
         VocabularyItemResult result = createVocabularyItemUseCase.execute(new CreateVocabularyItemCommand(
                 request.lemma(),
@@ -100,7 +100,7 @@ public class VocabularyController {
 
     @PostMapping("/{id}/senses")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public VocabularyItemResponse addSense(
             @PathVariable("id") UUID id,
             @Valid @RequestBody AddVocabularySenseRequest request

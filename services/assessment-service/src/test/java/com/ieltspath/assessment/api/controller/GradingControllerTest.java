@@ -120,7 +120,7 @@ class GradingControllerTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
+    @WithMockUser(roles = "EXAMINER")
     void openingAVersionAcceptsAnEmptyBody() throws Exception {
         when(createResult.executeForGrader(eq(attemptId), isNull())).thenReturn(draft(1, null));
 
@@ -153,7 +153,7 @@ class GradingControllerTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
+    @WithMockUser(roles = "EXAMINER")
     void adminFinalizesAResult() throws Exception {
         when(finalizeResult.execute(new FinalizeAssessmentResultCommand(resultId))).thenReturn(
                 new AssessmentResultResult(resultId, attemptId, 1, AssessmentResult.COMPLETED, 6.5, Instant.now()));
