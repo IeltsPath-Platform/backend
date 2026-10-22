@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+/** Ranking of a Wordly or Rocket match; both keep score, correct count and solve time in the same player columns. */
 @Repository
 public class WordlyRankingRepositoryAdapter implements WordlyRankingRepository {
     private final JdbcTemplate sql;
@@ -19,7 +20,8 @@ public class WordlyRankingRepositoryAdapter implements WordlyRankingRepository {
     public Optional<WordlyRankingResult> find(UUID matchId, UUID userId) {
         var rows = sql.query("""
                 SELECT m.status AS match_status, m.player_mode, CURRENT_TIMESTAMP AS server_time,
-                       p.user_id, p.player_display_name, p.player_slot_number, p.status,
+                       p.user_id, COALESCE(p.player_display_name, rm.display_name) AS player_display_name,
+                       COALESCE(p.player_slot_number, rm.slot_number) AS player_slot_number, p.status,
                        p.lives_remaining, p.score, p.total_solve_time_ms,
                        p.words_processed, p.words_solved, p.current_streak,
                        CASE WHEN m.status = 'IN_PROGRESS' AND p.status = 'DISCONNECTED'
@@ -29,7 +31,8 @@ public class WordlyRankingRepositoryAdapter implements WordlyRankingRepository {
                                p.total_solve_time_ms ASC, p.score_reached_at ASC NULLS LAST,
                                p.joined_at ASC, p.id ASC) AS INTEGER) END AS standing
                 FROM game_matches m JOIN game_match_players p ON p.match_id = m.id
-                WHERE m.id = ? AND m.game_type = 'WORDLY' AND NOT m.is_delete AND NOT p.is_delete
+                LEFT JOIN game_room_members rm ON rm.id = p.room_member_id
+                WHERE m.id = ? AND m.game_type IN ('WORDLY', 'ROCKET') AND NOT m.is_delete AND NOT p.is_delete
                   AND EXISTS (SELECT 1 FROM game_match_players caller
                               WHERE caller.match_id = m.id AND caller.user_id = ?
                                 AND NOT caller.is_delete)

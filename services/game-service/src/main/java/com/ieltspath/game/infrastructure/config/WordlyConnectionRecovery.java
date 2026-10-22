@@ -19,7 +19,7 @@ public class WordlyConnectionRecovery {
         sql.update("""
             UPDATE game_match_players p SET status='DISCONNECTED',disconnected_at=statement_timestamp(),
                 reconnect_deadline_at=statement_timestamp()+interval '30 seconds'
-            FROM game_matches m WHERE p.match_id=m.id AND m.game_type='WORDLY'
+            FROM game_matches m WHERE p.match_id=m.id AND m.game_type IN ('WORDLY','ROCKET')
                 AND m.player_mode='MULTIPLAYER' AND m.status='IN_PROGRESS' AND p.status='ACTIVE'
                 AND NOT m.is_delete AND NOT p.is_delete
             """);

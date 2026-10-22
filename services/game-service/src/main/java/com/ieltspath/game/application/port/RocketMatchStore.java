@@ -26,8 +26,32 @@ public interface RocketMatchStore {
     /** Completes the match and closes its room for good, as when a solo player leaves. */
     void finishAndCloseRoom(UUID matchId, UUID roomId, RocketEndReason reason, Instant at);
 
-    /** Matches with an expired open round or a round due to open, for the round worker. */
+    /**
+     * Matches with an expired open round, a round due to open or a player whose reconnect deadline passed, for the
+     * round worker.
+     */
     List<UUID> dueMatches(Instant now, int limit);
+
+    /** Marks the member as gone from the room, so they can join another game. */
+    void leaveRoom(UUID roomId, UUID userId, Instant at);
+
+    /** The host's display name (or id) when the host is no longer a member of the room; empty while they are. */
+    Optional<String> departedHostName(UUID roomId);
+
+    /** Closes the room for good and marks every member as gone. */
+    void closeRoom(UUID roomId, Instant at);
+
+    /** The name the user has in the room, or their id when unknown. */
+    String displayName(UUID roomId, UUID userId);
+
+    /** ACTIVE to DISCONNECTED until {@code deadline}; false when the player was not ACTIVE. */
+    boolean disconnect(UUID matchId, UUID userId, Instant at, Instant deadline);
+
+    /** DISCONNECTED back to ACTIVE before the deadline; false otherwise. */
+    boolean reconnect(UUID matchId, UUID userId, Instant at);
+
+    /** Users of the match still DISCONNECTED after their reconnect deadline. */
+    List<UUID> expiredDisconnects(UUID matchId, Instant at);
 
     record State(UUID matchId, UUID roomId, RocketRoomSettings settings, String status, RocketEndReason endReason,
             Instant startedAt, Instant endedAt, List<Player> players) {

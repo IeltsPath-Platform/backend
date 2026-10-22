@@ -67,7 +67,9 @@ public class RocketMatchStoreAdapter implements RocketMatchStore {
     public void savePlayers(List<Player> players) {
         sql.batchUpdate("""
             UPDATE game_match_players SET status=?, lives_remaining=?, score=?, words_processed=?, words_solved=?,
-                total_solve_time_ms=?, finished_at=?
+                total_solve_time_ms=?, finished_at=?,
+                disconnected_at=CASE WHEN status='DISCONNECTED' AND ?='DISCONNECTED' THEN disconnected_at END,
+                reconnect_deadline_at=CASE WHEN status='DISCONNECTED' AND ?='DISCONNECTED' THEN reconnect_deadline_at END
             WHERE id=?
             """, players, players.size(), (ps, player) -> {
                 var progress = player.progress();
@@ -78,7 +80,9 @@ public class RocketMatchStoreAdapter implements RocketMatchStore {
                 ps.setInt(5, progress.correctCount());
                 ps.setLong(6, progress.correctTimeMs());
                 ps.setTimestamp(7, player.finishedAt() == null ? null : Timestamp.from(player.finishedAt()));
-                ps.setObject(8, player.id());
+                ps.setString(8, player.status());
+                ps.setString(9, player.status());
+                ps.setObject(10, player.id());
             });
     }
 
@@ -87,6 +91,7 @@ public class RocketMatchStoreAdapter implements RocketMatchStore {
         var time = Timestamp.from(at);
         sql.update("UPDATE game_matches SET status='COMPLETED', end_reason=?, ended_at=? WHERE id=? AND status='IN_PROGRESS'",
                 reason.name(), time, matchId);
+        rank(matchId);
         if (roomId == null) return;
         sql.update("UPDATE game_rooms SET status='WAITING', updated_at=? WHERE id=? AND status='IN_MATCH' AND NOT is_delete",
                 time, roomId);
@@ -101,6 +106,7 @@ public class RocketMatchStoreAdapter implements RocketMatchStore {
         var time = Timestamp.from(at);
         sql.update("UPDATE game_matches SET status='COMPLETED', end_reason=?, ended_at=? WHERE id=? AND status='IN_PROGRESS'",
                 reason.name(), time, matchId);
+        rank(matchId);
         if (roomId == null) return;
         sql.update("UPDATE game_rooms SET status='CLOSED', is_delete=true, deleted_at=?, updated_at=? WHERE id=? AND NOT is_delete",
                 time, time, roomId);
@@ -110,15 +116,82 @@ public class RocketMatchStoreAdapter implements RocketMatchStore {
             """, time, roomId);
     }
 
+    /** Final standings, by the ranking rule: score, then less time spent on correct answers, then who joined first. */
+    private void rank(UUID matchId) {
+        sql.update("""
+            WITH ranked AS (SELECT id, row_number() OVER (
+                ORDER BY score DESC, total_solve_time_ms ASC, joined_at ASC, id ASC) AS position
+                FROM game_match_players WHERE match_id=? AND NOT is_delete)
+            UPDATE game_match_players p SET rank=ranked.position FROM ranked WHERE p.id=ranked.id
+            """, matchId);
+    }
+
     @Override
     public List<UUID> dueMatches(Instant now, int limit) {
         var at = Timestamp.from(now);
         return sql.queryForList("""
-            SELECT DISTINCT r.match_id FROM game_rocket_rounds r
+            SELECT r.match_id FROM game_rocket_rounds r
             JOIN game_matches m ON m.id=r.match_id AND m.status='IN_PROGRESS' AND NOT m.is_delete
             WHERE NOT r.is_delete AND ((r.status='OPEN' AND r.deadline_at<=?) OR (r.status='PENDING' AND r.opens_at<=?))
+            UNION
+            SELECT p.match_id FROM game_match_players p
+            JOIN game_matches m ON m.id=p.match_id AND m.status='IN_PROGRESS' AND m.game_type='ROCKET' AND NOT m.is_delete
+            WHERE NOT p.is_delete AND p.status='DISCONNECTED' AND p.reconnect_deadline_at<=?
             LIMIT ?
-            """, UUID.class, at, at, limit);
+            """, UUID.class, at, at, at, limit);
+    }
+
+    @Override
+    public void leaveRoom(UUID roomId, UUID userId, Instant at) {
+        sql.update("UPDATE game_room_members SET status='LEFT', left_at=?, ready_at=NULL WHERE room_id=? AND user_id=? AND NOT is_delete",
+                Timestamp.from(at), roomId, userId);
+    }
+
+    @Override
+    public Optional<String> departedHostName(UUID roomId) {
+        return sql.query("""
+            SELECT COALESCE(rm.display_name, r.host_user_id::text) AS name FROM game_rooms r
+            JOIN game_room_members rm ON rm.room_id=r.id AND rm.user_id=r.host_user_id
+            WHERE r.id=? AND rm.status='LEFT' AND NOT r.is_delete
+            """, (rs, n) -> rs.getString("name"), roomId).stream().findFirst();
+    }
+
+    @Override
+    public void closeRoom(UUID roomId, Instant at) {
+        var time = Timestamp.from(at);
+        sql.update("UPDATE game_rooms SET status='CLOSED', is_delete=true, deleted_at=?, updated_at=? WHERE id=?", time, time, roomId);
+        sql.update("UPDATE game_room_members SET status='LEFT', left_at=COALESCE(left_at,?), ready_at=NULL WHERE room_id=? AND NOT is_delete",
+                time, roomId);
+    }
+
+    @Override
+    public String displayName(UUID roomId, UUID userId) {
+        return sql.query("SELECT display_name FROM game_room_members WHERE room_id=? AND user_id=? AND display_name IS NOT NULL",
+                (rs, n) -> rs.getString(1), roomId, userId).stream().findFirst().orElse(userId.toString());
+    }
+
+    @Override
+    public boolean disconnect(UUID matchId, UUID userId, Instant at, Instant deadline) {
+        return sql.update("""
+            UPDATE game_match_players SET status='DISCONNECTED', disconnected_at=?, reconnect_deadline_at=?
+            WHERE match_id=? AND user_id=? AND status='ACTIVE' AND NOT is_delete
+            """, Timestamp.from(at), Timestamp.from(deadline), matchId, userId) > 0;
+    }
+
+    @Override
+    public boolean reconnect(UUID matchId, UUID userId, Instant at) {
+        return sql.update("""
+            UPDATE game_match_players SET status='ACTIVE', disconnected_at=NULL, reconnect_deadline_at=NULL
+            WHERE match_id=? AND user_id=? AND status='DISCONNECTED' AND reconnect_deadline_at>? AND NOT is_delete
+            """, matchId, userId, Timestamp.from(at)) > 0;
+    }
+
+    @Override
+    public List<UUID> expiredDisconnects(UUID matchId, Instant at) {
+        return sql.queryForList("""
+            SELECT user_id FROM game_match_players
+            WHERE match_id=? AND status='DISCONNECTED' AND reconnect_deadline_at<=? AND NOT is_delete ORDER BY joined_at, id
+            """, UUID.class, matchId, Timestamp.from(at));
     }
 
     private static Instant instant(ResultSet rs, String column) throws SQLException {

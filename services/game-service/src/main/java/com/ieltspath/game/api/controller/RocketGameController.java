@@ -8,7 +8,6 @@ import com.ieltspath.game.application.result.RocketGameplayResults.AnswerAck;
 import com.ieltspath.game.application.result.RocketGameplayResults.Current;
 import com.ieltspath.game.application.usecase.CreateWordlyRoomUseCase;
 import com.ieltspath.game.application.usecase.RocketGameplayUseCase;
-import com.ieltspath.game.domain.exception.SoloGameplayException;
 import com.ieltspath.game.domain.vo.RocketRoomSettings;
 import com.ieltspath.game.domain.vo.WordlyRoomSettings;
 import jakarta.validation.Valid;
@@ -33,9 +32,12 @@ public class RocketGameController {
     @PostMapping("/rooms")
     @ResponseStatus(HttpStatus.CREATED)
     public GameRoomResponse createRoom(@Valid @RequestBody CreateRocketRoomRequest request) {
-        if (request.playerMode() != WordlyRoomSettings.PlayerMode.SOLO)
-            throw new SoloGameplayException(400, "MULTIPLAYER_NOT_AVAILABLE", "Rocket multiplayer is not available yet");
-        return GameRoomResponse.from(rooms.open(currentUser.requireUserId(), RocketRoomSettings.solo(request.questionCount())));
+        RocketRoomSettings settings = request.playerMode() == WordlyRoomSettings.PlayerMode.SOLO
+                ? RocketRoomSettings.solo(request.questionCount())
+                : RocketRoomSettings.multiplayer(request.questionCount(),
+                        request.initialLives() == null ? RocketRoomSettings.DEFAULT_LIVES : request.initialLives(),
+                        request.secondsPerQuestion() == null ? RocketRoomSettings.DEFAULT_SECONDS : request.secondsPerQuestion());
+        return GameRoomResponse.from(rooms.open(currentUser.requireUserId(), settings));
     }
 
     @GetMapping("/matches/{matchId}/rounds/current")

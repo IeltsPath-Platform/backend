@@ -2,13 +2,15 @@
 
 Updated: 2026-10-22. Source of truth: `RocketGameController`, `RocketGameplayResults` and the shared room routes in
 [Wordly Game v1](./wordly-game-v1.md). Client routes use the Gateway with `Authorization: Bearer <access-token>`;
-identity always comes from the verified token. Only SOLO play is available; multiplayer rooms answer 400
-`MULTIPLAYER_NOT_AVAILABLE` until their realtime flow ships.
+identity always comes from the verified token. SOLO play is complete. MULTIPLAYER rooms can be created, joined,
+edited, started, played (rounds over REST, events over WebSocket) and left; see the sections below.
 
 ## Flow
 
-1. `POST /api/games/rocket/rooms` `{playerMode:"SOLO", questionCount}` → 201 Room (`gameType: ROCKET`). `questionCount`
-   is 3–20; solo uses 4 lives and 15 seconds per question. 409 `ACTIVE_GAME_EXISTS` while the user is in any other room
+1. `POST /api/games/rocket/rooms` `{playerMode, questionCount, initialLives?, secondsPerQuestion?}` → 201 Room
+   (`gameType: ROCKET`). SOLO: `questionCount` 3–20, always 4 lives and 15 seconds (the other two fields are ignored).
+   MULTIPLAYER: `questionCount` 5–20, `initialLives` 3–6 (default 4), `secondsPerQuestion` 10, 15 or 20 (default 15),
+   up to 4 players; anything else is 400. Others join with the shared room routes (`/rooms/code/{code}/join`, …). 409 `ACTIVE_GAME_EXISTS` while the user is in any other room
    (Wordly or Rocket, see "One room per user" in the Wordly contract).
 2. `POST /api/games/rooms/{roomId}/ready` `{ready:true}` then `POST /api/games/rooms/{roomId}/start` → 200 Match
    (`matchId`, `status`, `players`; `sessionId` is null). Starting reads the vocabulary catalog from Library, creates
@@ -19,8 +21,29 @@ identity always comes from the verified token. Only SOLO play is available; mult
 6. `GET /api/games/matches/{matchId}/result` → 200 Result once the match has ended; 409 `MATCH_NOT_FINISHED` before.
 7. To quit early: `POST /api/games/matches/{matchId}/leave` → 200 Left, or `POST /api/games/me/active-game/leave` → 204.
    The shared match routes hand Rocket matches to the Rocket flow; Wordly matches keep their own behaviour.
+8. `GET /api/games/matches/{matchId}/ranking` → 200 Ranking, the same shape as Wordly's (see the Wordly contract);
+   404 for a match the caller is not in. `GET /api/games/matches/{matchId}` also carries `playerMode`, `settings`,
+   `ownPlayer` and `ranking` for Rocket matches.
+
+## WebSocket
+
+Players connected to the room socket receive `MATCH_STARTED` (shape as in the Wordly contract) after the start
+commits, so a lobby can move into the match. Then, to match players only, after each commit:
+- `ROCKET_ROUND_STARTED` `{matchId, round {roundId, number, total, meaning, options, opensAt, deadlineAt}, serverTime}`;
+  never the answer.
+- `ROCKET_PLAYER_ANSWERED` `{matchId, roundId, userId, answeredCount, aliveCount}` while the round stays open; not the choice.
+- `ROCKET_ROUND_RESULT` `{matchId, roundId, correctOptionId, answers [{userId, optionId|null, correct, points,
+  livesRemaining, totalScore, status}], ranking, nextRoundAt, matchFinished, endReason}`, also when the worker closes a
+  round at its deadline. The last one is followed by `MATCH_FINISHED` (final ranking) and `ROOM_STATE`.
+Current stays the way to resync after a reconnect.
 
 ## Models
+
+- Room `settings` for a Rocket room: `initialLives`, `questionCount`, `secondsPerQuestion`, `timeEnabled: true`;
+  `wordTimeLimitSeconds`, `playMode` and `wordLimit` are null (they belong to Wordly, whose rooms carry
+  `questionCount: null` and `secondsPerQuestion: null`). The host edits them while waiting with
+  `PUT /api/games/rooms/{roomId}/settings` `{initialLives, questionCount?, secondsPerQuestion?}` (null keeps a value);
+  a change sets every READY member back to JOINED and is pushed as ROOM_STATE.
 
 - Current: `matchId`, `settings {questionCount, initialLives, secondsPerQuestion}`, `round` (null once the match ends),
   `lastRoundResult` (latest closed round, or null), `matchFinished`, `serverTime`.
@@ -30,6 +53,8 @@ identity always comes from the verified token. Only SOLO play is available; mult
   Clients compute the countdown from `deadlineAt` corrected by `serverTime`. A round never carries its answer.
 - RoundResult (the caller's view of a closed round): `roundId`, `correctOptionId`, `chosenOptionId` (null when time ran
   out), `correct`, `points`, `livesRemaining`, `totalScore`, `status`, `nextRoundAt`, `matchFinished`, `endReason`.
+  `nextRoundAt` is when the next round is scheduled (close time plus the reveal pause), null when none follows; it stays
+  the same after that round opens, even if it opened a little later.
 - AnswerAck: `requestId`, `roundId`, `optionId`, `receivedAt`, `roundResult` (present when the answer closed the round,
   which is always the case in solo play).
 - Result: `matchId`, `endReason`, `settings`, `totalRounds`, `answered` (rounds the caller took part in, misses
@@ -47,6 +72,10 @@ identity always comes from the verified token. Only SOLO play is available; mult
 - Leaving forfeits the player (FORFEITED) and keeps points already won; the open round closes as `MATCH_ENDED` without
   costing a life. A solo match ends with `PLAYER_LEFT` and its room is closed. Leaving again, or after the match has
   ended, returns the stored outcome without changing the end reason.
+- Ranking: higher `totalScore` first, then less time spent on correct answers, then who joined the match first. In
+  the Ranking model `wordsProcessed` is rounds played (misses included), `wordsSolved` is correct answers,
+  `totalSolveTimeMs` is the time spent on correct answers and `currentStreak` is always 0. `rank` is live while the
+  match runs and fixed when it ends (`isFinal: true`).
 - Wrong options never share the answer's word or meaning and favour words of similar length.
 
 ## Errors
@@ -56,8 +85,18 @@ ErrorResponse with `code`: 400 `INVALID_OPTION`, validation errors, `MULTIPLAYER
 is not open), `ALREADY_ANSWERED`, `REQUEST_ID_CONFLICT`, `MATCH_FINISHED`, `MATCH_NOT_FINISHED`, `PLAYER_NOT_ACTIVE`,
 `ACTIVE_GAME_EXISTS`.
 Retrying with the same `requestId` and option returns the stored answer instead of answering twice.
+A `requestId` belongs to one answer for the whole match: reusing it on another round, or with another option, is
+409 `REQUEST_ID_CONFLICT`.
 
-## Not yet available
+## Leaving and connection loss (multiplayer)
 
-Multiplayer (rooms, rounds, leaving) and WebSocket events. Room responses carry `settings: null` for Rocket rooms;
-read the settings from Current or Result.
+- `POST /api/games/matches/{matchId}/leave` (or the active-game leave) forfeits the caller (FORFEITED, points kept) and
+  marks them LEFT in the room, so they can join another game. The others play on: the open round closes as soon as
+  everyone left in it has answered (answers already given still count), and the match ends with `LAST_PLAYER_STANDING`
+  when one player is left standing or `ALL_PLAYERS_LEFT` when nobody is. A player already eliminated who leaves only
+  leaves the room. Others receive `MEMBER_LEFT` and `RANKING_UPDATED`, or the round result and `MATCH_FINISHED`.
+- If the host has left when the match ends, the room closes (`ROOM_CLOSED`) instead of returning to the lobby.
+- When a player's last socket to the room closes, they become DISCONNECTED for 30 s (`reconnectDeadlineAt` in the
+  ranking, pushed as `RANKING_UPDATED`); they stay in the rounds and miss them. Connecting again in time makes them
+  ACTIVE; after the deadline the worker forfeits them as if they had left. A game-service restart grants every
+  playing multiplayer player the same 30 s.
