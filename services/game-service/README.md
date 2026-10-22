@@ -36,6 +36,14 @@ a match (at most one OPEN per match; indexes for the deadline and opening worker
 per player per round, a miss included; composite foreign keys keep answers inside their own match and request ids are
 unique per player. Player totals reuse `game_match_players` (lives, score, rounds played, correct count and time).
 
+## Rocket solo play
+
+Contract: [Rocket Game v1](../../docs/contracts/rocket-game-v1.md). `POST /api/games/rocket/rooms` creates a SOLO room;
+the shared ready/start routes start it (`StartGameMatchUseCase` hands ROCKET rooms to `StartRocketMatchUseCase`, which
+creates every round and opens the first). `RocketGameplayUseCase` serves `rounds/current` and `answers`; every call and
+`RocketRoundScheduler` (`game.rocket.round-scan-ms`, default 500) settle due rounds under the match lock. Rocket matches
+do not publish WebSocket events yet.
+
 ## Game catalog (P-60)
 
 `GET /api/games/catalog` through Gateway requires `Authorization: Bearer <access-token>`.

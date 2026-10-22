@@ -7,8 +7,6 @@ import com.ieltspath.game.domain.aggregate.RocketRound;
 import com.ieltspath.game.domain.vo.RocketDistractorPicker;
 import com.ieltspath.game.domain.vo.RocketWord;
 import com.ieltspath.game.infrastructure.persistence.adapter.RocketRoundRepositoryAdapter;
-import java.sql.Connection;
-import java.sql.DriverManager;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -114,29 +112,31 @@ class RocketRoundPostgresTest {
         assertEquals(RocketRound.Status.PENDING, rounds.findByMatch(match).get(1).status());
     }
 
-    @Test void workersFindDueRoundsAndSkipRowsLockedElsewhere() throws Exception {
+    @Test void dueMatchesListsExpiredAndScheduledRoundsOfRunningMatches() {
+        var store = new com.ieltspath.game.infrastructure.persistence.adapter.RocketMatchStoreAdapter(sql);
         UUID match = match("SOLO", 3);
         var first = round(match, 1);
         var second = round(match, 2);
         rounds.createAll(List.of(first, second));
         first.open(start, Duration.ofSeconds(15));
         rounds.save(first);
+
+        assertEquals(List.of(), store.dueMatches(start.plusSeconds(14), 10));
+        assertEquals(List.of(match), store.dueMatches(start.plusSeconds(15), 10));
+
+        tx.executeWithoutResult(t -> {
+            var locked = rounds.findForUpdate(first.id()).orElseThrow();
+            locked.close(start.plusSeconds(15), RocketRound.CloseReason.DEADLINE, Set.of());
+            rounds.save(locked);
+        });
         second.schedule(start.plusSeconds(18));
         rounds.save(second);
-
-        assertEquals(List.of(), tx.execute(t -> rounds.lockExpiredOpen(start.plusSeconds(14), 10)));
-        assertEquals(List.of(first.id()), tx.execute(t -> rounds.lockExpiredOpen(start.plusSeconds(15), 10)));
-        assertEquals(List.of(), tx.execute(t -> rounds.lockDueToOpen(start.plusSeconds(17), 10)));
-        assertEquals(List.of(second.id()), tx.execute(t -> rounds.lockDueToOpen(start.plusSeconds(18), 10)));
+        assertEquals(List.of(), store.dueMatches(start.plusSeconds(17), 10));
+        assertEquals(List.of(match), store.dueMatches(start.plusSeconds(18), 10));
         assertEquals(start.plusSeconds(18), rounds.findByMatch(match).get(1).opensAt());
 
-        try (Connection other = DriverManager.getConnection(db.getJdbcUrl(), db.getUsername(), db.getPassword())) {
-            other.setAutoCommit(false);
-            other.createStatement().executeQuery("SELECT id FROM game_rocket_rounds WHERE id='" + first.id() + "' FOR UPDATE");
-            assertEquals(List.of(), tx.execute(t -> rounds.lockExpiredOpen(start.plusSeconds(60), 10)));
-            other.rollback();
-        }
-        assertEquals(List.of(first.id()), tx.execute(t -> rounds.lockExpiredOpen(start.plusSeconds(60), 10)));
+        sql.update("UPDATE game_matches SET status='COMPLETED', end_reason='PLAYER_LEFT', ended_at=now() WHERE id=?", match);
+        assertEquals(List.of(), store.dueMatches(start.plusSeconds(60), 10));
     }
 
     @Test void schemaGuardsRoundAndAnswerIntegrity() {

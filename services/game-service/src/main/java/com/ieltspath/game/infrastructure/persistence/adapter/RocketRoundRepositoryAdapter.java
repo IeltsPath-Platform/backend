@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import jakarta.persistence.EntityManager;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -28,16 +30,30 @@ public class RocketRoundRepositoryAdapter implements RocketRoundRepository {
 
     private final JdbcTemplate sql;
     private final ObjectMapper json;
+    private final EntityManager entities;
 
+    /** Without JPA, for tests that only use JDBC. */
     public RocketRoundRepositoryAdapter(JdbcTemplate sql, ObjectMapper json) {
+        this(sql, json, null);
+    }
+
+    @Autowired
+    public RocketRoundRepositoryAdapter(JdbcTemplate sql, ObjectMapper json, EntityManager entities) {
         this.sql = sql;
         this.json = json;
+        this.entities = entities;
+    }
+
+    /** Rounds reference the match and players saved through JPA in the same transaction; write those first. */
+    private void flushPendingJpaWrites() {
+        if (entities != null && entities.isJoinedToTransaction()) entities.flush();
     }
 
     private record StoredOption(UUID optionId, UUID sourceWordId, String word) {}
 
     @Override
     public void createAll(List<RocketRound> rounds) {
+        flushPendingJpaWrites();
         sql.batchUpdate("""
             INSERT INTO game_rocket_rounds(id,match_id,sequence,source_word_id,meaning,options,correct_option_id,status,opens_at)
             VALUES (?,?,?,?,?,?::jsonb,?,?,?)
@@ -99,24 +115,6 @@ public class RocketRoundRepositoryAdapter implements RocketRoundRepository {
                 (rs, n) -> answer(rs), roundId);
         return sql.query("SELECT " + ROUND_COLUMNS + " FROM game_rocket_rounds WHERE id=? AND NOT is_delete FOR UPDATE",
                 (rs, n) -> round(rs, answers), roundId).stream().findFirst();
-    }
-
-    @Override
-    public List<UUID> lockExpiredOpen(Instant now, int limit) {
-        return sql.queryForList("""
-            SELECT id FROM game_rocket_rounds
-            WHERE status='OPEN' AND deadline_at <= ? AND NOT is_delete
-            ORDER BY deadline_at LIMIT ? FOR UPDATE SKIP LOCKED
-            """, UUID.class, Timestamp.from(now), limit);
-    }
-
-    @Override
-    public List<UUID> lockDueToOpen(Instant now, int limit) {
-        return sql.queryForList("""
-            SELECT id FROM game_rocket_rounds
-            WHERE status='PENDING' AND opens_at <= ? AND NOT is_delete
-            ORDER BY opens_at LIMIT ? FOR UPDATE SKIP LOCKED
-            """, UUID.class, Timestamp.from(now), limit);
     }
 
     private RocketRound round(ResultSet rs, List<RocketRound.Answer> answers) throws SQLException {
