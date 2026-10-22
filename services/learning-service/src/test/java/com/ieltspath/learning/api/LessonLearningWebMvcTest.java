@@ -18,6 +18,7 @@ import com.ieltspath.learning.application.usecase.GetLessonPracticeSetsUseCase;
 import com.ieltspath.learning.application.usecase.GetLessonUseCase;
 import com.ieltspath.learning.application.usecase.GetMasteryUseCase;
 import com.ieltspath.learning.application.usecase.GetPracticeAttemptUseCase;
+import com.ieltspath.learning.application.usecase.ReviewPracticeAttemptUseCase;
 import com.ieltspath.learning.application.usecase.GetReviewUseCase;
 import com.ieltspath.learning.application.usecase.GetTopicLessonsUseCase;
 import com.ieltspath.learning.application.usecase.ListReviewsUseCase;
@@ -117,6 +118,7 @@ class LessonLearningWebMvcTest {
     @MockitoBean GetLessonPracticeSetsUseCase practiceCatalog;
     @MockitoBean StartPracticeAttemptUseCase startPractice;
     @MockitoBean GetPracticeAttemptUseCase getPractice;
+    @MockitoBean ReviewPracticeAttemptUseCase reviewPractice;
     @MockitoBean SubmitPracticeAttemptUseCase submitPractice;
     @MockitoBean SubmitPracticeEssayUseCase submitPracticeEssay;
 
@@ -143,6 +145,35 @@ class LessonLearningWebMvcTest {
         assertFalse(started.toString().contains("explanation"));
         assertFalse(fetched.toString().contains("answerSpec"));
         assertFalse(fetched.toString().contains("explanation"));
+    }
+
+    @Test
+    void aSubmittedPracticeAttemptCanBeReviewedWithItsResult() throws Exception {
+        UUID attemptId = UUID.randomUUID();
+        var view = new PracticeAttemptView(attemptId, UUID.randomUUID(), UUID.randomUUID(), null, null,
+                List.of(new LessonResult.Question(QUESTION, 1, "Question", null, null)));
+        var saved = new com.ieltspath.learning.domain.vo.PracticeSubmission(attemptId, 1, 1, 1.0, true, true,
+                List.of(new com.ieltspath.learning.domain.vo.PracticeSubmission.Answer(QUESTION, true, "B", "Because.")),
+                null, List.of());
+        when(reviewPractice.execute(USER, attemptId)).thenReturn(new ReviewPracticeAttemptUseCase.Result(view, saved));
+
+        var review = body(mvc.perform(authenticated(get("/api/learning/practice-attempts/{id}/review", attemptId)))
+                .andExpect(status().isOk()).andReturn());
+
+        assertEquals("Question", review.path("attempt").path("questions").get(0).path("stem").asText());
+        assertTrue(review.path("result").path("passed").asBoolean());
+        assertEquals("B", review.path("result").path("results").get(0).path("correctAnswer").asText());
+        assertFalse(review.toString().contains("answerSpec"));
+    }
+
+    @Test
+    void anOpenPracticeAttemptCannotBeReviewed() throws Exception {
+        UUID attemptId = UUID.randomUUID();
+        when(reviewPractice.execute(USER, attemptId)).thenThrow(
+                new LearningRequestException(409, "ATTEMPT_NOT_SUBMITTED", "Practice attempt is still open"));
+
+        mvc.perform(authenticated(get("/api/learning/practice-attempts/{id}/review", attemptId)))
+                .andExpect(status().isConflict());
     }
 
     @Test
