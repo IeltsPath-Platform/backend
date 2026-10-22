@@ -8,6 +8,10 @@ import jakarta.validation.constraints.Size;
 public record UpdateDeckRequest(
         @NotBlank @Size(max = 150) String name,
         @Size(max = 2000) String description,
-        @NotNull LibraryStatus status
+        @NotNull LibraryStatus status,
+        @Size(max = 300) String coverImageKey
 ) {
+    public UpdateDeckRequest(String name, String description, LibraryStatus status) {
+        this(name, description, status, null);
+    }
 }

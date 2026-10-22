@@ -1,5 +1,6 @@
 package com.ieltspath.library.application.usecase;
 
+import com.ieltspath.library.application.port.FlashcardImageStorage;
 import com.ieltspath.library.application.port.FlashcardVocabularyMetadataReader;
 import com.ieltspath.library.application.query.DueFlashcardsQuery;
 import com.ieltspath.library.application.result.FlashcardResult;
@@ -19,6 +20,7 @@ import java.util.UUID;
 public class GetDueFlashcardsUseCase {
     private final FlashcardRepository repository;
     private final FlashcardVocabularyMetadataReader vocabularyMetadataReader;
+    private final FlashcardImageStorage storage;
 
     @Transactional(readOnly = true)
     public PageResult<FlashcardResult> execute(UUID userId, DueFlashcardsQuery query) {
@@ -27,7 +29,7 @@ public class GetDueFlashcardsUseCase {
                 .filter(id -> id != null).distinct().toList();
         var metadataBySense = vocabularyMetadataReader.findBySenseIds(senseIds);
         List<FlashcardResult> cards = duePage.items().stream()
-                .map(FlashcardResult::from)
+                .map(card -> FlashcardResult.from(card, storage.publicUrl(card.getImageKey())))
                 .map(result -> result.withVocabularyMetadata(result.vocabularySenseId() == null ? null
                         : metadataBySense.get(result.vocabularySenseId())))
                 .toList();

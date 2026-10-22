@@ -1,5 +1,6 @@
 package com.ieltspath.library.application.usecase;
 
+import com.ieltspath.library.application.port.FlashcardImageStorage;
 import com.ieltspath.library.domain.exception.InvalidDataException;
 import com.ieltspath.library.domain.aggregate.Flashcard;
 import com.ieltspath.library.domain.aggregate.FlashcardDeck;
@@ -76,7 +77,8 @@ class PersonalLibraryUseCaseTest {
         FlashcardDeckRepository decks = mock(FlashcardDeckRepository.class);
         FlashcardDeckItemRepository items = mock(FlashcardDeckItemRepository.class);
         FlashcardRepository cards = mock(FlashcardRepository.class);
-        DeleteFlashcardDeckUseCase useCase = new DeleteFlashcardDeckUseCase(decks, items);
+        FlashcardImageStorage storage = mock(FlashcardImageStorage.class);
+        DeleteFlashcardDeckUseCase useCase = new DeleteFlashcardDeckUseCase(decks, items, storage);
         UUID userId = UUID.randomUUID();
         FlashcardDeck deck = FlashcardDeck.create(userId, "Deck", null);
         when(decks.findByIdAndUserId(deck.getId(), userId)).thenReturn(Optional.of(deck));
@@ -92,7 +94,8 @@ class PersonalLibraryUseCaseTest {
     @Test
     void duplicateActiveDeckNameSurfacesConflict() {
         FlashcardDeckRepository decks = mock(FlashcardDeckRepository.class);
-        CreateFlashcardDeckUseCase useCase = new CreateFlashcardDeckUseCase(decks);
+        FlashcardImageStorage storage = mock(FlashcardImageStorage.class);
+        CreateFlashcardDeckUseCase useCase = new CreateFlashcardDeckUseCase(decks, storage);
         when(decks.save(any())).thenThrow(new ConflictException());
 
         assertThrows(ConflictException.class, () -> useCase.execute(UUID.randomUUID(), "Academic Vocabulary", null));

@@ -9,7 +9,7 @@ Flyway V1 creates the five catalog tables: `vocabulary_items`, `vocabulary_sense
 `video_segments`, `video_segment_lexical_entries`. V2 creates six personal-library tables: `flashcard_decks`,
 `flashcards`, `flashcard_deck_items`, `notes`, `video_learning_progress`, `saved_video_segments`. V3 adds the
 five-box flashcard review schedule. V4 seeds 300 mock vocabulary items and 302 senses for local demos, using stable
-UUIDv5 identifiers and idempotent inserts. Four V2 foreign keys to catalog tables use `ON DELETE RESTRICT`; there is no
+UUIDv5 identifiers and idempotent inserts. V15 adds `image_key` and `example_sentence` to `flashcards`, and `cover_image_key` to `flashcard_decks`. Four V2 foreign keys to catalog tables use `ON DELETE RESTRICT`; there is no
 `outbox_events` table. Data is not copied from the former service/database.
 
 Gateway routes `/api/content/videos/**`, `/api/content/vocabulary/**` and `/api/content/admin/vocabulary/**` here.
@@ -17,13 +17,19 @@ It also routes `/api/learning-support/{flashcards,decks,notes,video-progress,sav
 paths and request/response shapes remain the same. Catalog writes require `ADMIN` or `CONTENT_AUTHOR`; personal
 library writes are owner-scoped.
 
-## Flashcard review schedule
+## Flashcard images and review schedule
+
+- Bucket: `flashcards`, **Public**, max 2 MB, MIME `image/png, image/jpeg, image/webp`.
+- Images are uploaded through `POST /api/learning-support/flashcards/images` (multipart field `file`), returning `{key, url, contentType, size}`.
+- Object keys follow `images/{userId}/{uuid}.{ext}`. Database stores only keys; URLs are generated dynamically in responses via `ObjectStorage.publicUrl`.
+- Image keys on create/update must belong to the authenticated user and exist in storage.
+- Updating or clearing an image, or deleting a card/deck, deletes the old object after transaction commit (best-effort).
 
 `GET /api/learning-support/flashcards/due?deckId=<uuid>&page=0&limit=20` returns the authenticated learner's active
 due cards, ordered with never-reviewed cards first and then by their next review time. The query filters to an active
 deck owned by that learner when `deckId` is provided. Results are paged in PostgreSQL; `limit` defaults to 20 and
 cannot exceed 50. Card responses include the Leitner box and schedule; cards linked to a vocabulary sense also include
-the item's `ipa`, `pronunciationAudioReference`, and the sense's `exampleSentence`.
+the item's `ipa`, `pronunciationAudioReference`, and the sense's `exampleSentence`. Custom card `exampleSentence` takes precedence over sense metadata.
 
 `POST /api/learning-support/flashcards/{id}/reviews` accepts
 `{"correct":true,"requestId":"<uuid>"}` and returns the updated card. A correct answer advances one box up to 5;
@@ -50,6 +56,9 @@ For the full container stack, run `docker compose up -d --build`. To run Library
 | `LIBRARY_DB_PASSWORD` | Required database password; no fallback in service config |
 | `CONTENT_SERVICE_URL` | `http://localhost:8082` for topic lookup |
 | `GATEWAY_INTERNAL_JWT_SECRET` | Verifies Gateway's internal JWT; use the same value as Gateway |
+| `SUPABASE_URL` | Supabase API URL for object storage |
+| `SUPABASE_SECRET_KEY` | Supabase secret key for storage access |
+| `LIBRARY_FLASHCARD_BUCKET` | Bucket name for flashcard illustrations (`flashcards` by default) |
 
 Verify with `mvn -q -pl services/library-service -am test`. Migration tests use Testcontainers and require Docker.
 
@@ -72,3 +81,7 @@ It returns the same words shape, ordered by uppercase answer, strictly after the
 It uses the same ACTIVE/meaning/alphabetic filters as random and the same internal JWT.
 Game stores these pages as a shared immutable dictionary version for guess validation and endless progression.
 This endpoint is internal; it must not be exposed as a browser/Gateway route.
+
+## Chưa làm / Known gaps
+
+- **Dọn ảnh mồ côi (Orphaned images cleanup)**: Ảnh đã upload lên bucket nhưng người dùng hủy không tạo thẻ hoặc không lưu deck sẽ tồn tại trong bucket như rác. Cần một background job định kỳ (hoặc lifecycle rule trên bucket) để dọn dẹp các object không được tham chiếu trong DB.

@@ -1,5 +1,6 @@
 package com.ieltspath.library.application.usecase;
 
+import com.ieltspath.library.application.port.FlashcardImageStorage;
 import com.ieltspath.library.application.port.FlashcardVocabularyMetadataReader;
 import com.ieltspath.library.application.result.FlashcardResult;
 import com.ieltspath.library.config.FlashcardSrsProperties;
@@ -21,6 +22,7 @@ public class ReviewFlashcardUseCase {
     private final FlashcardRepository repository;
     private final FlashcardSrsProperties srsProperties;
     private final FlashcardVocabularyMetadataReader vocabularyMetadataReader;
+    private final FlashcardImageStorage storage;
 
     @Transactional
     public FlashcardResult execute(UUID userId, UUID flashcardId, boolean correct, UUID requestId) {
@@ -36,6 +38,6 @@ public class ReviewFlashcardUseCase {
                 ? null
                 : vocabularyMetadataReader.findBySenseIds(List.of(card.getVocabularySenseId()))
                         .get(card.getVocabularySenseId());
-        return FlashcardResult.from(card).withVocabularyMetadata(metadata);
+        return FlashcardResult.from(card, storage.publicUrl(card.getImageKey())).withVocabularyMetadata(metadata);
     }
 }

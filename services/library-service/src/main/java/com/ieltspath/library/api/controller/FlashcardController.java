@@ -1,14 +1,17 @@
 package com.ieltspath.library.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
+import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.library.api.dto.request.CreateFlashcardRequest;
 import com.ieltspath.library.api.dto.request.ReviewFlashcardRequest;
 import com.ieltspath.library.api.dto.request.UpdateFlashcardRequest;
+import com.ieltspath.library.api.dto.response.FlashcardImageResponse;
 import com.ieltspath.library.api.dto.response.FlashcardResponse;
 import com.ieltspath.library.api.dto.response.PageResponse;
-import com.ieltspath.library.application.query.PageQuery;
 import com.ieltspath.library.application.query.DueFlashcardsQuery;
+import com.ieltspath.library.application.query.PageQuery;
 import com.ieltspath.library.application.result.SavedFlashcard;
+import com.ieltspath.library.application.result.StoredImageResult;
 import com.ieltspath.library.application.usecase.*;
 import com.ieltspath.library.domain.exception.InvalidDataException;
 import com.ieltspath.library.domain.vo.FlashcardSourceType;
@@ -16,9 +19,12 @@ import com.ieltspath.library.domain.vo.LibraryStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.UUID;
 
 @RestController
@@ -34,6 +40,24 @@ public class FlashcardController {
     private final SavePracticeQuestionFlashcardUseCase savePracticeQuestionFlashcardUseCase;
     private final GetDueFlashcardsUseCase getDueFlashcardsUseCase;
     private final ReviewFlashcardUseCase reviewFlashcardUseCase;
+    private final UploadFlashcardImageUseCase uploadFlashcardImageUseCase;
+
+    @PostMapping(value = "/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public FlashcardImageResponse uploadImage(@RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
+        }
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException e) {
+            throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
+        }
+        UUID userId = currentUserProvider.requireUserId();
+        StoredImageResult result = uploadFlashcardImageUseCase.execute(userId, file.getContentType(), bytes);
+        return FlashcardImageResponse.from(result);
+    }
 
     @PostMapping
     public ResponseEntity<FlashcardResponse> create(@Valid @RequestBody CreateFlashcardRequest request) {
@@ -56,7 +80,9 @@ public class FlashcardController {
                 request.sourceReferenceId(),
                 request.highlightedText(),
                 request.front(),
-                request.back()
+                request.back(),
+                request.imageKey(),
+                request.exampleSentence()
         )));
     }
 
@@ -105,7 +131,9 @@ public class FlashcardController {
                 request.highlightedText(),
                 request.front(),
                 request.back(),
-                request.status()
+                request.status(),
+                request.imageKey(),
+                request.exampleSentence()
         ));
     }
 

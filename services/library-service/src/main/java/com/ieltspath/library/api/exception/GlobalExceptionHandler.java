@@ -1,20 +1,30 @@
 package com.ieltspath.library.api.exception;
 
-import com.ieltspath.library.domain.exception.*;
+import com.ieltspath.commonstorage.StorageException;
+import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.library.application.exception.TopicServiceUnavailableException;
+import com.ieltspath.library.domain.exception.ConflictException;
+import com.ieltspath.library.domain.exception.ContentDomainException;
+import com.ieltspath.library.domain.exception.DuplicateCodeException;
+import com.ieltspath.library.domain.exception.InvalidContentStateException;
+import com.ieltspath.library.domain.exception.InvalidDataException;
+import com.ieltspath.library.domain.exception.ResourceNotFoundException;
+import com.ieltspath.library.domain.exception.VideoNotFoundException;
+import com.ieltspath.library.domain.exception.VocabularyNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -46,7 +56,14 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.CONFLICT, "Dữ liệu đã tồn tại", request.getRequestURI(), null);
     }
 
-    @ExceptionHandler({InvalidDataException.class, IllegalStateException.class,
+    @ExceptionHandler(InvalidDataException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidDataException(InvalidDataException ex,
+                                                                   HttpServletRequest request) {
+        String message = ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "Dữ liệu không hợp lệ";
+        return buildResponse(HttpStatus.BAD_REQUEST, message, request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler({IllegalStateException.class,
             MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
     public ResponseEntity<ErrorResponse> handlePersonalLibraryBadRequest(Exception ex,
                                                                            HttpServletRequest request) {
@@ -67,6 +84,33 @@ public class GlobalExceptionHandler {
                                                                           HttpServletRequest request) {
         return buildResponse(HttpStatus.BAD_REQUEST,
                 messageForPath(request, "Dữ liệu không hợp lệ", ex.getMessage()), request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(UploadRejectedException.class)
+    public ResponseEntity<ErrorResponse> handleUploadRejected(UploadRejectedException ex,
+                                                               HttpServletRequest request) {
+        HttpStatus status = ex.reason() == UploadRejectedException.Reason.TOO_LARGE
+                ? HttpStatus.PAYLOAD_TOO_LARGE
+                : HttpStatus.BAD_REQUEST;
+        String message = switch (ex.reason()) {
+            case EMPTY -> "Tệp tải lên không được để trống";
+            case TOO_LARGE -> "Kích thước tệp vượt quá giới hạn cho phép";
+            case TYPE_NOT_ALLOWED, CONTENT_MISMATCH -> "Định dạng tệp không được hỗ trợ";
+        };
+        return buildResponse(status, message, request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex,
+                                                                     HttpServletRequest request) {
+        return buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "Kích thước tệp vượt quá giới hạn cho phép", request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<ErrorResponse> handleStorageException(StorageException ex,
+                                                                HttpServletRequest request) {
+        log.error("Lỗi thao tác lưu trữ: operation={} reason={}", ex.operation(), ex.reason());
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "Dịch vụ lưu trữ hiện không khả dụng", request.getRequestURI(), null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

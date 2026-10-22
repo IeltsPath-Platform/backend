@@ -35,7 +35,7 @@ public class FlashcardDeckController {
     @ResponseStatus(HttpStatus.CREATED)
     public FlashcardDeckResponse create(@Valid @RequestBody CreateDeckRequest request) {
         return FlashcardDeckResponse.from(createFlashcardDeckUseCase.execute(
-                currentUserProvider.requireUserId(), request.name(), request.description()
+                currentUserProvider.requireUserId(), request.name(), request.description(), request.coverImageKey()
         ));
     }
 
@@ -59,7 +59,7 @@ public class FlashcardDeckController {
     @PutMapping("/{id}")
     public FlashcardDeckResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateDeckRequest request) {
         return FlashcardDeckResponse.from(updateFlashcardDeckUseCase.execute(
-                currentUserProvider.requireUserId(), id, request.name(), request.description(), request.status()
+                currentUserProvider.requireUserId(), id, request.name(), request.description(), request.status(), request.coverImageKey()
         ));
     }
 

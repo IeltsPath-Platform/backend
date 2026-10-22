@@ -15,6 +15,19 @@ public record UpdateFlashcardRequest(
         @Size(max = 2000) String highlightedText,
         @NotBlank @Size(max = 4000) String front,
         @NotBlank @Size(max = 4000) String back,
-        @NotNull LibraryStatus status
+        @NotNull LibraryStatus status,
+        @Size(max = 300) String imageKey,
+        @Size(max = 1000) String exampleSentence
 ) {
+    public UpdateFlashcardRequest(
+            FlashcardSourceType sourceType,
+            UUID vocabularySenseId,
+            UUID sourceReferenceId,
+            String highlightedText,
+            String front,
+            String back,
+            LibraryStatus status
+    ) {
+        this(sourceType, vocabularySenseId, sourceReferenceId, highlightedText, front, back, status, null, null);
+    }
 }
