@@ -148,18 +148,20 @@ public class RocketMatchStoreAdapter implements RocketMatchStore {
     }
 
     @Override
-    public Optional<String> closeIfHostLeft(UUID roomId, Instant at) {
-        Optional<String> host = sql.query("""
+    public Optional<String> departedHostName(UUID roomId) {
+        return sql.query("""
             SELECT COALESCE(rm.display_name, r.host_user_id::text) AS name FROM game_rooms r
             JOIN game_room_members rm ON rm.room_id=r.id AND rm.user_id=r.host_user_id
             WHERE r.id=? AND rm.status='LEFT' AND NOT r.is_delete
             """, (rs, n) -> rs.getString("name"), roomId).stream().findFirst();
-        if (host.isEmpty()) return Optional.empty();
+    }
+
+    @Override
+    public void closeRoom(UUID roomId, Instant at) {
         var time = Timestamp.from(at);
         sql.update("UPDATE game_rooms SET status='CLOSED', is_delete=true, deleted_at=?, updated_at=? WHERE id=?", time, time, roomId);
         sql.update("UPDATE game_room_members SET status='LEFT', left_at=COALESCE(left_at,?), ready_at=NULL WHERE room_id=? AND NOT is_delete",
                 time, roomId);
-        return Optional.of("Chủ phòng " + host.get() + " đã đóng phòng");
     }
 
     @Override

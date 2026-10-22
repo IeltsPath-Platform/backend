@@ -14,6 +14,8 @@ import com.ieltspath.game.application.result.RocketGameplayResults.Round;
 import com.ieltspath.game.application.result.RocketGameplayResults.RoundResult;
 import com.ieltspath.game.application.result.RocketGameplayResults.Settings;
 import com.ieltspath.game.application.result.RocketRoundEvents;
+import com.ieltspath.game.application.result.RoomClosedEvent;
+import com.ieltspath.game.application.result.WordlyPlayerLeftEvent;
 import com.ieltspath.game.domain.aggregate.RocketRound;
 import com.ieltspath.game.domain.exception.GameMatchNotFoundException;
 import com.ieltspath.game.domain.exception.SoloGameplayException;
@@ -31,7 +33,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -53,12 +54,6 @@ public class RocketGameplayUseCase {
     private final TransactionTemplate tx;
     private final ApplicationEventPublisher events;
 
-    /** Without event delivery; for callers that only need the gameplay rules. */
-    public RocketGameplayUseCase(RocketMatchStore matches, RocketRoundRepository rounds, PlatformTransactionManager manager) {
-        this(matches, rounds, manager, event -> {});
-    }
-
-    @Autowired
     public RocketGameplayUseCase(RocketMatchStore matches, RocketRoundRepository rounds, PlatformTransactionManager manager,
             ApplicationEventPublisher events) {
         this.matches = matches;
@@ -212,7 +207,7 @@ public class RocketGameplayUseCase {
         matches.savePlayers(List.of(gone));
         matches.leaveRoom(state.roomId(), gone.userId(), at);
         State after = state.with(players, null, null);
-        events.publishEvent(new com.ieltspath.game.application.result.WordlyPlayerLeftEvent(state.roomId(), state.matchId(),
+        events.publishEvent(new WordlyPlayerLeftEvent(state.roomId(), state.matchId(),
                 gone.userId(), matches.displayName(state.roomId(), gone.userId())));
         Optional<RocketRound> open = all.stream().filter(round -> round.status() == RocketRound.Status.OPEN).findFirst();
         int closed = (int) all.stream().filter(round -> round.status() == RocketRound.Status.CLOSED).count();
@@ -240,9 +235,15 @@ public class RocketGameplayUseCase {
         return after;
     }
 
+    /**
+     * A room whose host has gone, by leaving the match or after being eliminated, closes when its match ends, as in
+     * Wordly, instead of going back to a lobby nobody can start.
+     */
     private void closeRoomIfHostLeft(State state, Instant at) {
-        matches.closeIfHostLeft(state.roomId(), at).ifPresent(message -> events.publishEvent(
-                new com.ieltspath.game.application.result.RoomClosedEvent(state.roomId(), message)));
+        matches.departedHostName(state.roomId()).ifPresent(host -> {
+            matches.closeRoom(state.roomId(), at);
+            events.publishEvent(new RoomClosedEvent(state.roomId(), "Chủ phòng " + host + " đã đóng phòng"));
+        });
     }
 
     private void settle(State state, List<RocketRound> all, Instant now) {

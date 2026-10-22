@@ -3,6 +3,9 @@ package com.ieltspath.game.infrastructure.websocket;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.game.application.result.GameMatchResult;
+import com.ieltspath.game.application.result.RocketRoundEvents;
+import com.ieltspath.game.domain.aggregate.GameMatchPlayer;
+import com.ieltspath.game.domain.repository.GameMatchPlayerRepository;
 import com.ieltspath.game.application.usecase.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -35,8 +38,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
     private final SoloGameplayUseCase gameplay;
     private final GetWordlyRankingUseCase ranking;
     private final com.ieltspath.game.domain.repository.GameMatchRepository matches;
-    private com.ieltspath.game.domain.repository.GameMatchPlayerRepository matchPlayers;
-    private RocketGameplayUseCase rocket;
+    private final GameMatchPlayerRepository matchPlayers;
+    private final RocketGameplayUseCase rocket;
     private final Map<UUID, Set<WebSocketSession>> sessionsByRoom = new ConcurrentHashMap<>();
     private final Map<String,org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator> writers=new ConcurrentHashMap<>();
     private final Map<String,Long> lastPong=new ConcurrentHashMap<>();
@@ -45,7 +48,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
                                 ChangeGameRoomMembershipUseCase membership, StartGameMatchUseCase startMatch,
                                 GetGameMatchStateUseCase getMatch, SubmitGameAnswerUseCase submitAnswer,
                                 SoloGameplayUseCase gameplay, GetWordlyRankingUseCase ranking,
-                                com.ieltspath.game.domain.repository.GameMatchRepository matches) {
+                                com.ieltspath.game.domain.repository.GameMatchRepository matches,
+                                GameMatchPlayerRepository matchPlayers, RocketGameplayUseCase rocket) {
         this.objectMapper = objectMapper;
         this.getRoom = getRoom;
         this.membership = membership;
@@ -55,6 +59,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
         this.gameplay=gameplay;
         this.ranking=ranking;
         this.matches=matches;
+        this.matchPlayers=matchPlayers;
+        this.rocket=rocket;
     }
 
     @org.springframework.transaction.event.TransactionalEventListener
@@ -130,28 +136,17 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
         catch (IOException e) { org.slf4j.LoggerFactory.getLogger(getClass()).warn("Match update failed for {}", event.matchId()); }
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
-    void setMatchPlayers(com.ieltspath.game.domain.repository.GameMatchPlayerRepository matchPlayers) {
-        this.matchPlayers = matchPlayers;
-    }
-
-    @org.springframework.beans.factory.annotation.Autowired
-    void setRocket(RocketGameplayUseCase rocket) {
-        this.rocket = rocket;
-    }
-
     private boolean isRocket(UUID matchId) {
-        return rocket != null && rocket.isRocket(matchId);
+        return rocket.isRocket(matchId);
     }
 
     private Set<UUID> playerIds(UUID matchId) {
-        if (matchPlayers == null) return Set.of();
-        return matchPlayers.findByMatchId(matchId).stream().map(com.ieltspath.game.domain.aggregate.GameMatchPlayer::userId)
+        return matchPlayers.findByMatchId(matchId).stream().map(GameMatchPlayer::userId)
                 .collect(java.util.stream.Collectors.toSet());
     }
 
     @org.springframework.transaction.event.TransactionalEventListener
-    public void rocketRoundStarted(com.ieltspath.game.application.result.RocketRoundEvents.Started event) {
+    public void rocketRoundStarted(RocketRoundEvents.Started event) {
         var message = new java.util.LinkedHashMap<String, Object>();
         message.put("type", "ROCKET_ROUND_STARTED");
         message.put("matchId", event.matchId());
@@ -163,7 +158,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
     }
 
     @org.springframework.transaction.event.TransactionalEventListener
-    public void rocketPlayerAnswered(com.ieltspath.game.application.result.RocketRoundEvents.Answered event) {
+    public void rocketPlayerAnswered(RocketRoundEvents.Answered event) {
         sendToMatchPlayers(event.roomId(), event.matchId(), Map.of("type", "ROCKET_PLAYER_ANSWERED",
                 "matchId", event.matchId(), "roundId", event.roundId(), "userId", event.userId(),
                 "answeredCount", event.answeredCount(), "aliveCount", event.aliveCount()));
@@ -171,7 +166,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
 
     /** The round result with the ranking after it; a finished match also gets MATCH_FINISHED and the lobby back. */
     @org.springframework.transaction.event.TransactionalEventListener
-    public void rocketRoundClosed(com.ieltspath.game.application.result.RocketRoundEvents.Closed event) {
+    public void rocketRoundClosed(RocketRoundEvents.Closed event) {
         // Not from the answers: a round ended by the last opponent leaving has none.
         var standing = rocketRanking(event.matchId());
         var message = new java.util.LinkedHashMap<String, Object>();
@@ -189,7 +184,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
     }
 
     @org.springframework.transaction.event.TransactionalEventListener
-    public void rocketRankingChanged(com.ieltspath.game.application.result.RocketRoundEvents.RankingChanged event) {
+    public void rocketRankingChanged(RocketRoundEvents.RankingChanged event) {
         var standing = rocketRanking(event.matchId());
         if (standing == null) return;
         try { broadcastRanking(event.roomId(), standing, "RANKING_UPDATED"); }
@@ -197,7 +192,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
     }
 
     @org.springframework.transaction.event.TransactionalEventListener
-    public void rocketFinished(com.ieltspath.game.application.result.RocketRoundEvents.Finished event) {
+    public void rocketFinished(RocketRoundEvents.Finished event) {
         var standing = rocketRanking(event.matchId());
         if (standing != null) finishRocket(event.roomId(), event.matchId(), standing);
     }

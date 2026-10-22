@@ -3,6 +3,7 @@ package com.ieltspath.game.application.usecase;
 import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.port.WordlyWordProvider;
 import com.ieltspath.game.application.result.MatchStartedEvent;
+import com.ieltspath.game.application.result.RocketRoundEvents;
 import com.ieltspath.game.application.result.GameMatchResult;
 import com.ieltspath.game.domain.aggregate.GameMatch;
 import com.ieltspath.game.domain.aggregate.GameMatchPlayer;
@@ -96,7 +97,7 @@ public class StartRocketMatchUseCase {
                     Map.of("matchId", matchId.toString(), "roomId", room.id().toString(), "gameType", room.gameType()));
             events.publishEvent(new MatchStartedEvent(room.id(), matchId));
             // After MATCH_STARTED, so a lobby has moved into the match before the first round arrives.
-            events.publishEvent(com.ieltspath.game.application.result.RocketRoundEvents.Started.of(room.id(), matchId,
+            events.publishEvent(RocketRoundEvents.Started.of(room.id(), matchId,
                     settings.questionCount(), first, now));
             return new GameMatchResult(match.id(), match.roomId(), null, match.status().name(), match.startedAt(),
                     GameMatchResult.players(players.findByMatchId(matchId)));

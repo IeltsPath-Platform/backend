@@ -53,7 +53,7 @@ class RocketGameplayPostgresTest {
         store = new RocketMatchStoreAdapter(sql) {
             @Override public Instant now() { return now; }
         };
-        gameplay = new RocketGameplayUseCase(store, rounds, new DataSourceTransactionManager(ds));
+        gameplay = new RocketGameplayUseCase(store, rounds, new DataSourceTransactionManager(ds), event -> {});
     }
 
     /** A started solo match as StartRocketMatchUseCase leaves it: room IN_MATCH, one player, round 1 open. */
@@ -482,6 +482,27 @@ class RocketGameplayPostgresTest {
         assertEquals("MATCH_ENDED", sql.queryForObject(
                 "SELECT close_reason FROM game_rocket_rounds WHERE match_id=? AND sequence=1", String.class, match),
                 "nobody answered, so the open round just ends");
+    }
+
+    @Test void anEliminatedHostWhoLeavesClosesTheRoomWhenTheMatchEnds() {
+        var published = recordEvents();
+        List<UUID> guests = new java.util.ArrayList<>(java.util.Arrays.asList(null, null));
+        UUID match = startMultiplayer(guests);
+        gameplay.current(match, user);
+        sql.update("UPDATE game_match_players SET status='ELIMINATED', lives_remaining=0 WHERE match_id=? AND user_id=?", match, user);
+
+        var left = gameplay.leave(match, user);
+        assertEquals("ELIMINATED", left.playerStatus(), "already out, so not counted as a forfeit");
+        assertEquals("LEFT", memberStatus(match, user));
+        assertEquals("IN_PROGRESS", sql.queryForObject("SELECT status FROM game_matches WHERE id=?", String.class, match),
+                "the guests play on");
+
+        gameplay.leave(match, guests.get(0));
+        assertTrue(gameplay.current(match, guests.get(1)).matchFinished());
+        assertEquals("CLOSED", sql.queryForObject("SELECT r.status FROM game_rooms r JOIN game_matches m ON m.room_id=r.id WHERE m.id=?",
+                String.class, match), "the host is gone, so the room closes instead of going back to the lobby");
+        assertTrue(published.stream().anyMatch(e -> e instanceof com.ieltspath.game.application.result.RoomClosedEvent closed
+                && closed.message().contains("Player")));
     }
 
     @Test void aDroppedPlayerKeepsTheirPlaceForThirtySeconds() {

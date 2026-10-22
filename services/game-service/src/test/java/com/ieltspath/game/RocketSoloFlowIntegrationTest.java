@@ -208,7 +208,14 @@ class RocketSoloFlowIntegrationTest {
         assertEquals(3, edited.get("settings").get("initialLives").asInt());
         assertEquals(10, edited.get("settings").get("secondsPerQuestion").asInt());
         assertTrue(edited.toString().contains("\"status\":\"JOINED\""), "a settings change un-readies the guest");
-        call(put("/api/games/rooms/" + roomId + "/settings").content("{\"initialLives\":3,\"questionCount\":4}"), host, 400);
+        // Out-of-range values are 400 (DTO bounds or the domain's IllegalArgumentException), never 500, and change nothing.
+        for (String bad : List.of("{\"initialLives\":3,\"questionCount\":4}", "{\"initialLives\":3,\"questionCount\":21}",
+                "{\"initialLives\":7,\"questionCount\":6}", "{\"initialLives\":3,\"secondsPerQuestion\":12}",
+                "{\"initialLives\":3,\"secondsPerQuestion\":0}"))
+            call(put("/api/games/rooms/" + roomId + "/settings").content(bad), host, 400);
+        JsonNode unchanged = call(get("/api/games/rooms/" + roomId), host, 200).get("settings");
+        assertEquals(6, unchanged.get("questionCount").asInt());
+        assertEquals(10, unchanged.get("secondsPerQuestion").asInt());
 
         call(post("/api/games/rooms/" + roomId + "/ready").content("{\"ready\":true}"), guest, 200);
         call(post("/api/games/rooms/" + roomId + "/ready").content("{\"ready\":true}"), host, 200);

@@ -35,8 +35,11 @@ public interface RocketMatchStore {
     /** Marks the member as gone from the room, so they can join another game. */
     void leaveRoom(UUID roomId, UUID userId, Instant at);
 
-    /** Closes the room for good when its host has left; returns the notice for the other members, if it closed. */
-    Optional<String> closeIfHostLeft(UUID roomId, Instant at);
+    /** The host's display name (or id) when the host is no longer a member of the room; empty while they are. */
+    Optional<String> departedHostName(UUID roomId);
+
+    /** Closes the room for good and marks every member as gone. */
+    void closeRoom(UUID roomId, Instant at);
 
     /** The name the user has in the room, or their id when unknown. */
     String displayName(UUID roomId, UUID userId);

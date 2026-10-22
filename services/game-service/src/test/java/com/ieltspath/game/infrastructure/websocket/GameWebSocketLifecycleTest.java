@@ -29,7 +29,8 @@ class GameWebSocketLifecycleTest {
     @BeforeEach void setup() {
         handler=new GameWebSocketHandler(json,rooms,mock(ChangeGameRoomMembershipUseCase.class),
             mock(StartGameMatchUseCase.class),mock(GetGameMatchStateUseCase.class),mock(SubmitGameAnswerUseCase.class),
-            gameplay,ranking,matches);
+            gameplay,ranking,matches,mock(com.ieltspath.game.domain.repository.GameMatchPlayerRepository.class),
+            mock(RocketGameplayUseCase.class));
         when(matches.findActiveIdByRoomId(room)).thenReturn(Optional.empty());
         when(rooms.byId(eq(room),any())).thenReturn(new GameRoomResult(room,"ABC123",host,"WORDLY","VOCABULARY",
             "PRACTICE",4,"WAITING",Instant.now(),List.of(),List.of()));
