@@ -27,9 +27,13 @@ Errors:
 ## Create / Update Flashcard
 
 `POST /api/learning-support/flashcards` and `PUT /api/learning-support/flashcards/{id}`:
-- `imageKey`: optional string (max 300 chars, e.g. `images/{userId}/{uuid}.png`). When provided and changed, verified to be owned by the user and existing in storage; fails with `400 INVALID_IMAGE_KEY` otherwise. On PUT, passing `null` clears the image.
+- `imageKey`: optional string (max 300 chars, e.g. `images/{userId}/{uuid}.png`).
+  - When provided and non-blank: verified to be owned by the user (`images/{userId}/...`), existing in storage, and **not already linked to another active card or deck**; fails with `400 INVALID_IMAGE_KEY` otherwise.
+  - **PUT semantics**:
+    - If `imageKey` is **omitted** from the JSON payload, the existing image is **preserved**.
+    - If `imageKey` is explicitly passed as `null` or `""`, the image is **removed**.
 - `exampleSentence`: optional string (max 1000 chars, trimmed).
-- Replacing or removing an image (or deleting the flashcard) cleans up the old storage object after transaction commit (best-effort).
+- Replacing or removing an image (or deleting the flashcard) cleans up the old storage object after transaction commit (best-effort) **only if no other active card or deck references that key**. Storage existence checks run outside database transactions to prevent connection holding.
 
 ## Due cards and Flashcard Response
 
@@ -96,6 +100,11 @@ Cards not owned by the learner or not active return `404`; a missing `correct` o
 
 `POST /api/learning-support/decks` and `PUT /api/learning-support/decks/{id}`:
 - Accept `name` (1-150 chars), `description` (optional, max 2000 chars), `coverImageKey` (optional, max 300 chars).
+  - `coverImageKey` follows the same user ownership, storage existence, and cross-entity uniqueness checks as flashcard images.
+  - **PUT semantics**:
+    - If `coverImageKey` is **omitted** from the JSON payload, the existing cover image is **preserved**.
+    - If `coverImageKey` is explicitly passed as `null` or `""`, the cover image is **removed**.
+    - Replacing or removing a cover image deletes the old storage object after transaction commit only if no other active deck or card references that key.
 - Response shape:
 
 ```json

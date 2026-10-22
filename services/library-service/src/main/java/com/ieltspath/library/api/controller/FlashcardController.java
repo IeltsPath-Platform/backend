@@ -132,6 +132,7 @@ public class FlashcardController {
                 request.front(),
                 request.back(),
                 request.status(),
+                request.isImageKeySpecified(),
                 request.imageKey(),
                 request.exampleSentence()
         ));

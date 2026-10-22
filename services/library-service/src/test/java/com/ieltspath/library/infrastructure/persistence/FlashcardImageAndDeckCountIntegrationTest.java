@@ -172,6 +172,55 @@ class FlashcardImageAndDeckCountIntegrationTest {
         assertFalse(byDeck.containsKey(deck3Id));
     }
 
+    @Test
+    void verifiesImageKeyExistenceAndCountsExcludingDeleted() {
+        UUID userId = UUID.randomUUID();
+        String sharedKey = "images/" + userId + "/shared.png";
+
+        UUID card1Id = UUID.randomUUID();
+        FlashcardJpaEntity card1 = new FlashcardJpaEntity();
+        card1.setId(card1Id);
+        card1.setUserId(userId);
+        card1.setSourceType(FlashcardSourceType.MANUAL);
+        card1.setFront("c1");
+        card1.setBack("c1");
+        card1.setStatus(LibraryStatus.ACTIVE);
+        card1.setLeitnerBox((short) 1);
+        card1.setImageKey(sharedKey);
+        cardRepository.save(card1);
+
+        UUID card2Id = UUID.randomUUID();
+        FlashcardJpaEntity card2 = new FlashcardJpaEntity();
+        card2.setId(card2Id);
+        card2.setUserId(userId);
+        card2.setSourceType(FlashcardSourceType.MANUAL);
+        card2.setFront("c2");
+        card2.setBack("c2");
+        card2.setStatus(LibraryStatus.DELETED);
+        card2.setLeitnerBox((short) 1);
+        card2.setImageKey(sharedKey);
+        cardRepository.save(card2);
+
+        UUID deck1Id = UUID.randomUUID();
+        FlashcardDeckJpaEntity deck1 = new FlashcardDeckJpaEntity(deck1Id, userId, "Deck 1", "Desc",
+                LibraryStatus.ACTIVE, Instant.now(), Instant.now(), sharedKey);
+        deckRepository.save(deck1);
+
+        cardRepository.flush();
+        deckRepository.flush();
+
+        // Count active references
+        assertEquals(1, cardRepository.countByImageKeyAndStatusNot(sharedKey, LibraryStatus.DELETED));
+        assertEquals(1, deckRepository.countByCoverImageKeyAndStatusNot(sharedKey, LibraryStatus.DELETED));
+
+        // Existence checks for other entities
+        assertTrue(cardRepository.existsByImageKeyAndIdNotAndStatusNot(sharedKey, UUID.randomUUID(), LibraryStatus.DELETED));
+        assertFalse(cardRepository.existsByImageKeyAndIdNotAndStatusNot(sharedKey, card1Id, LibraryStatus.DELETED));
+
+        assertTrue(deckRepository.existsByCoverImageKeyAndIdNotAndStatusNot(sharedKey, UUID.randomUUID(), LibraryStatus.DELETED));
+        assertFalse(deckRepository.existsByCoverImageKeyAndIdNotAndStatusNot(sharedKey, deck1Id, LibraryStatus.DELETED));
+    }
+
     private UUID createCard(UUID userId, LibraryStatus status, Instant nextReviewAt) {
         UUID id = UUID.randomUUID();
         FlashcardJpaEntity card = new FlashcardJpaEntity();

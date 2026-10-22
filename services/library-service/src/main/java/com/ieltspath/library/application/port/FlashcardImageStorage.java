@@ -10,4 +10,6 @@ public interface FlashcardImageStorage {
     boolean exists(String key);
 
     void delete(String key);
+
+    void deleteAfterCommit(String key);
 }

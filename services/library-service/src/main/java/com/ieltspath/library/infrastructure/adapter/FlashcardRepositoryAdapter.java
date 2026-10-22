@@ -14,9 +14,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import java.time.Instant;
 
 @Repository
 @RequiredArgsConstructor
@@ -60,5 +60,15 @@ public class FlashcardRepositoryAdapter implements FlashcardRepository {
         return repository.findFirstByUserIdAndSourceTypeAndSourceReferenceIdAndStatusNot(
                 userId, FlashcardSourceType.PRACTICE_QUESTION, practiceQuestionId, LibraryStatus.DELETED
         ).map(mapper::toDomain);
+    }
+
+    @Override
+    public long countByImageKeyAndStatusNot(String imageKey, LibraryStatus status) {
+        return repository.countByImageKeyAndStatusNot(imageKey, status);
+    }
+
+    @Override
+    public boolean existsByImageKeyAndIdNotAndStatusNot(String imageKey, UUID id, LibraryStatus status) {
+        return repository.existsByImageKeyAndIdNotAndStatusNot(imageKey, id, status);
     }
 }

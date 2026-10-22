@@ -59,7 +59,8 @@ public class FlashcardDeckController {
     @PutMapping("/{id}")
     public FlashcardDeckResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateDeckRequest request) {
         return FlashcardDeckResponse.from(updateFlashcardDeckUseCase.execute(
-                currentUserProvider.requireUserId(), id, request.name(), request.description(), request.status(), request.coverImageKey()
+                currentUserProvider.requireUserId(), id, request.name(), request.description(), request.status(),
+                request.isCoverImageKeySpecified(), request.coverImageKey()
         ));
     }
 

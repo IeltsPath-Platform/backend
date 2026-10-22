@@ -78,7 +78,20 @@ class PersonalLibraryUseCaseTest {
         FlashcardDeckItemRepository items = mock(FlashcardDeckItemRepository.class);
         FlashcardRepository cards = mock(FlashcardRepository.class);
         FlashcardImageStorage storage = mock(FlashcardImageStorage.class);
-        DeleteFlashcardDeckUseCase useCase = new DeleteFlashcardDeckUseCase(decks, items, storage);
+        com.ieltspath.library.application.service.FlashcardImageUsageService imageUsage =
+                mock(com.ieltspath.library.application.service.FlashcardImageUsageService.class);
+        org.springframework.transaction.support.TransactionTemplate txTemplate =
+                new org.springframework.transaction.support.TransactionTemplate(new org.springframework.transaction.PlatformTransactionManager() {
+                    @Override
+                    public org.springframework.transaction.TransactionStatus getTransaction(org.springframework.transaction.TransactionDefinition def) {
+                        return new org.springframework.transaction.support.SimpleTransactionStatus();
+                    }
+                    @Override
+                    public void commit(org.springframework.transaction.TransactionStatus status) {}
+                    @Override
+                    public void rollback(org.springframework.transaction.TransactionStatus status) {}
+                });
+        DeleteFlashcardDeckUseCase useCase = new DeleteFlashcardDeckUseCase(decks, items, storage, imageUsage, txTemplate);
         UUID userId = UUID.randomUUID();
         FlashcardDeck deck = FlashcardDeck.create(userId, "Deck", null);
         when(decks.findByIdAndUserId(deck.getId(), userId)).thenReturn(Optional.of(deck));
@@ -95,7 +108,20 @@ class PersonalLibraryUseCaseTest {
     void duplicateActiveDeckNameSurfacesConflict() {
         FlashcardDeckRepository decks = mock(FlashcardDeckRepository.class);
         FlashcardImageStorage storage = mock(FlashcardImageStorage.class);
-        CreateFlashcardDeckUseCase useCase = new CreateFlashcardDeckUseCase(decks, storage);
+        com.ieltspath.library.application.service.FlashcardImageUsageService imageUsage =
+                mock(com.ieltspath.library.application.service.FlashcardImageUsageService.class);
+        org.springframework.transaction.support.TransactionTemplate txTemplate =
+                new org.springframework.transaction.support.TransactionTemplate(new org.springframework.transaction.PlatformTransactionManager() {
+                    @Override
+                    public org.springframework.transaction.TransactionStatus getTransaction(org.springframework.transaction.TransactionDefinition def) {
+                        return new org.springframework.transaction.support.SimpleTransactionStatus();
+                    }
+                    @Override
+                    public void commit(org.springframework.transaction.TransactionStatus status) {}
+                    @Override
+                    public void rollback(org.springframework.transaction.TransactionStatus status) {}
+                });
+        CreateFlashcardDeckUseCase useCase = new CreateFlashcardDeckUseCase(decks, storage, imageUsage, txTemplate);
         when(decks.save(any())).thenThrow(new ConflictException());
 
         assertThrows(ConflictException.class, () -> useCase.execute(UUID.randomUUID(), "Academic Vocabulary", null));

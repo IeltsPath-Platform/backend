@@ -19,11 +19,16 @@ library writes are owner-scoped.
 
 ## Flashcard images and review schedule
 
-- Bucket: `flashcards`, **Public**, max 2 MB, MIME `image/png, image/jpeg, image/webp`.
+- Bucket: `flashcards` (configurable via `LIBRARY_FLASHCARD_BUCKET`), **Public**, max 2 MB, MIME `image/png, image/jpeg, image/webp`.
+  - **Bucket creation in Supabase**: Create bucket `flashcards` in Supabase Storage with "Public bucket" enabled.
+  - **Public access & security**: Public bucket allows direct image delivery via CDN/public URL without presigned overhead. Images are stored with path `images/{userId}/{uuid}.{ext}` where `{uuid}` is a cryptographically strong UUIDv4, making URL enumeration infeasible.
+  - **Behavior when Supabase is missing**: When `SUPABASE_URL` is empty or `app.storage.enabled: false`, `UnavailableObjectStorage` is used. `library-service` starts cleanly and all core endpoints (catalog, videos, text flashcards) work normally. Card image URLs resolve to `null`. Only storage write/upload requests fail with 503 Service Unavailable.
 - Images are uploaded through `POST /api/learning-support/flashcards/images` (multipart field `file`), returning `{key, url, contentType, size}`.
 - Object keys follow `images/{userId}/{uuid}.{ext}`. Database stores only keys; URLs are generated dynamically in responses via `ObjectStorage.publicUrl`.
-- Image keys on create/update must belong to the authenticated user and exist in storage.
-- Updating or clearing an image, or deleting a card/deck, deletes the old object after transaction commit (best-effort).
+- Image keys on create/update must belong to the authenticated user, exist in storage, and **not already be in use** by another active flashcard or deck.
+- Storage checks (`storage.exists`) run **outside database transactions** to prevent connection holding.
+- **PUT semantics**: Omitting `imageKey` / `coverImageKey` in update requests preserves existing images; passing `null` or `""` explicitly deletes the image.
+- Deletion of storage objects is reference-counted: an image is deleted after commit **only if no other active flashcard or deck references it**.
 
 `GET /api/learning-support/flashcards/due?deckId=<uuid>&page=0&limit=20` returns the authenticated learner's active
 due cards, ordered with never-reviewed cards first and then by their next review time. The query filters to an active
@@ -85,3 +90,4 @@ This endpoint is internal; it must not be exposed as a browser/Gateway route.
 ## Chưa làm / Known gaps
 
 - **Dọn ảnh mồ côi (Orphaned images cleanup)**: Ảnh đã upload lên bucket nhưng người dùng hủy không tạo thẻ hoặc không lưu deck sẽ tồn tại trong bucket như rác. Cần một background job định kỳ (hoặc lifecycle rule trên bucket) để dọn dẹp các object không được tham chiếu trong DB.
+- **Hạn mức tải ảnh theo người dùng (Per-user upload rate limit / quota)**: Hiện tại người dùng có thể tải lên ảnh 2MB mà chưa có hạn mức theo ngày (daily upload count / bandwidth quota). Cần bổ sung rate limit hoặc kiểm tra hạn mức lưu trữ theo tài khoản để tránh lạm dụng dung lượng storage.

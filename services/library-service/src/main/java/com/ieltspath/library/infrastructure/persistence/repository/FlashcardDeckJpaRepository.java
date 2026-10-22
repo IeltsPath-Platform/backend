@@ -13,4 +13,8 @@ public interface FlashcardDeckJpaRepository extends JpaRepository<FlashcardDeckJ
     Optional<FlashcardDeckJpaEntity> findByIdAndUserId(UUID id, UUID userId);
 
     Page<FlashcardDeckJpaEntity> findByUserIdAndStatus(UUID userId, LibraryStatus status, Pageable pageable);
+
+    long countByCoverImageKeyAndStatusNot(String coverImageKey, LibraryStatus status);
+
+    boolean existsByCoverImageKeyAndIdNotAndStatusNot(String coverImageKey, UUID id, LibraryStatus status);
 }

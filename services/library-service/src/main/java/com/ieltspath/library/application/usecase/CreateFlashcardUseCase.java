@@ -3,13 +3,14 @@ package com.ieltspath.library.application.usecase;
 import com.ieltspath.commonstorage.key.ObjectKeys;
 import com.ieltspath.library.application.port.FlashcardImageStorage;
 import com.ieltspath.library.application.result.FlashcardResult;
+import com.ieltspath.library.application.service.FlashcardImageUsageService;
 import com.ieltspath.library.domain.aggregate.Flashcard;
 import com.ieltspath.library.domain.exception.InvalidDataException;
 import com.ieltspath.library.domain.repository.FlashcardRepository;
 import com.ieltspath.library.domain.vo.FlashcardSourceType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.UUID;
 
@@ -18,8 +19,9 @@ import java.util.UUID;
 public class CreateFlashcardUseCase {
     private final FlashcardRepository repository;
     private final FlashcardImageStorage storage;
+    private final FlashcardImageUsageService imageUsage;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
     public FlashcardResult execute(
             UUID userId,
             FlashcardSourceType sourceType,
@@ -41,14 +43,18 @@ public class CreateFlashcardUseCase {
             if (!storage.exists(key)) {
                 throw new InvalidDataException("INVALID_IMAGE_KEY");
             }
+            if (imageUsage.isImageKeyInUseByOther(key, null, null)) {
+                throw new InvalidDataException("INVALID_IMAGE_KEY");
+            }
         }
-        Flashcard card = repository.save(Flashcard.create(
+
+        Flashcard card = transactionTemplate.execute(status -> repository.save(Flashcard.create(
                 userId, sourceType, vocabularySenseId, sourceReferenceId, highlightedText, front, back, key, exampleSentence
-        ));
+        )));
+
         return FlashcardResult.from(card, storage.publicUrl(card.getImageKey()));
     }
 
-    @Transactional
     public FlashcardResult execute(
             UUID userId,
             FlashcardSourceType sourceType,

@@ -3,6 +3,7 @@ package com.ieltspath.library.infrastructure.adapter;
 import com.ieltspath.commonstorage.ObjectStorage;
 import com.ieltspath.commonstorage.StorageException;
 import com.ieltspath.commonstorage.StoredObject;
+import com.ieltspath.commonstorage.UnavailableObjectStorage;
 import com.ieltspath.library.application.result.StoredImageResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,19 @@ class FlashcardImageStorageAdapterTest {
     }
 
     @Test
+    void publicUrlCatchesExceptionGracefully() {
+        when(objectStorage.publicUrl(BUCKET, "key1")).thenThrow(new RuntimeException("Storage unavailable"));
+        assertNull(adapter.publicUrl("key1"));
+    }
+
+    @Test
+    void unavailableStorageBehavior() {
+        FlashcardImageStorageAdapter unavailableAdapter = new FlashcardImageStorageAdapter(new UnavailableObjectStorage(), BUCKET);
+        assertNull(unavailableAdapter.publicUrl("some-key"));
+        assertThrows(StorageException.class, () -> unavailableAdapter.store("key", new byte[]{1}, "image/png"));
+    }
+
+    @Test
     void existsDelegatesToObjectStorage() {
         when(objectStorage.exists(BUCKET, "key1")).thenReturn(true);
         assertTrue(adapter.exists("key1"));
@@ -73,5 +87,11 @@ class FlashcardImageStorageAdapterTest {
         verify(objectStorage).delete(BUCKET, "key1");
         adapter.delete(null);
         verifyNoMoreInteractions(objectStorage);
+    }
+
+    @Test
+    void deleteAfterCommitDeletesDirectlyWhenNoTransactionActive() {
+        adapter.deleteAfterCommit("key1");
+        verify(objectStorage).delete(BUCKET, "key1");
     }
 }

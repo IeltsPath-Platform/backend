@@ -13,4 +13,12 @@ public interface FlashcardDeckRepository {
     Optional<FlashcardDeck> findByIdAndUserId(UUID id, UUID userId);
 
     OwnedPage<FlashcardDeck> findByUserIdAndStatus(UUID userId, LibraryStatus status, int page, int size);
+
+    default long countByCoverImageKeyAndStatusNot(String coverImageKey, LibraryStatus status) {
+        return 0L;
+    }
+
+    default boolean existsByCoverImageKeyAndIdNotAndStatusNot(String coverImageKey, UUID id, LibraryStatus status) {
+        return false;
+    }
 }

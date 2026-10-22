@@ -54,4 +54,8 @@ public interface FlashcardJpaRepository extends JpaRepository<FlashcardJpaEntity
 
     Optional<FlashcardJpaEntity> findFirstByUserIdAndSourceTypeAndSourceReferenceIdAndStatusNot(
             UUID userId, FlashcardSourceType sourceType, UUID sourceReferenceId, LibraryStatus status);
+
+    long countByImageKeyAndStatusNot(String imageKey, LibraryStatus status);
+
+    boolean existsByImageKeyAndIdNotAndStatusNot(String imageKey, UUID id, LibraryStatus status);
 }
