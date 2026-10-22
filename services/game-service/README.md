@@ -27,6 +27,15 @@ WORDLY and ROCKET are room games (`domain/vo/RoomGame`): they share the room lif
 `gameType` (`/api/games/wordly/me/active-game` is an alias). Starting a non-Wordly match is rejected until that game's
 match flow exists.
 
+## Rocket schema (V10)
+
+`V10__add_rocket_rounds.sql` adds `question_count` and `seconds_per_question` to `game_rooms` and `game_matches`
+(lives reuse `initial_lives`), with `ck_rocket_room`/`ck_rocket_match` requiring them on ROCKET rows. Wordly columns
+are left as they are on Rocket rows, so a room keeps both games' settings. `game_rocket_rounds` holds every question of
+a match (at most one OPEN per match; indexes for the deadline and opening workers) and `game_rocket_answers` one row
+per player per round, a miss included; composite foreign keys keep answers inside their own match and request ids are
+unique per player. Player totals reuse `game_match_players` (lives, score, rounds played, correct count and time).
+
 ## Game catalog (P-60)
 
 `GET /api/games/catalog` through Gateway requires `Authorization: Bearer <access-token>`.

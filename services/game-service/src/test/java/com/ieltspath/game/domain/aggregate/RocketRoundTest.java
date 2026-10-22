@@ -86,6 +86,20 @@ class RocketRoundTest {
     }
 
     @Test
+    void aPendingRoundCanBeScheduledThenOpens() {
+        var round = new RocketRound(UUID.randomUUID(), UUID.randomUUID(), 2, actor.sourceWordId(), "Diễn viên (nam)",
+                List.of(driver, actor, career), actor.optionId());
+        assertFalse(round.dueToOpen(opens));
+        round.schedule(opens.plusSeconds(3));
+        assertFalse(round.dueToOpen(opens.plusSeconds(2)));
+        assertTrue(round.dueToOpen(opens.plusSeconds(3)));
+        round.open(opens.plusSeconds(4), Duration.ofSeconds(15));
+        assertEquals(opens.plusSeconds(4), round.opensAt());
+        assertFalse(round.dueToOpen(opens.plusSeconds(10)));
+        assertThrows(IllegalStateException.class, () -> round.schedule(opens));
+    }
+
+    @Test
     void lifecycleAndShapeAreGuarded() {
         var round = new RocketRound(UUID.randomUUID(), UUID.randomUUID(), 2, actor.sourceWordId(), "Diễn viên (nam)",
                 List.of(driver, actor, career), actor.optionId());

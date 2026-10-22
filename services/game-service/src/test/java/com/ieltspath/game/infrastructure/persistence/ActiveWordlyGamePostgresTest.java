@@ -43,9 +43,11 @@ class ActiveWordlyGamePostgresTest {
     UUID room(String gameType, String playerMode, String status, UUID host) {
         UUID room = UUID.randomUUID();
         sql.update("""
-            INSERT INTO game_rooms(id,room_code,host_user_id,game_type,learning_domain,mode,max_players,config_snapshot,status,created_at,updated_at,player_mode)
-            VALUES (?,upper(substring(md5(?::text),1,6)),?,?,'VOCABULARY','PRACTICE',?,'{}',?,now(),now(),?)
-            """, room, room, host, gameType, "SOLO".equals(playerMode) ? 1 : 4, status, playerMode);
+            INSERT INTO game_rooms(id,room_code,host_user_id,game_type,learning_domain,mode,max_players,config_snapshot,status,created_at,updated_at,player_mode,
+                question_count,seconds_per_question)
+            VALUES (?,upper(substring(md5(?::text),1,6)),?,?,'VOCABULARY','PRACTICE',?,'{}',?,now(),now(),?,?,?)
+            """, room, room, host, gameType, "SOLO".equals(playerMode) ? 1 : 4, status, playerMode,
+                "ROCKET".equals(gameType) ? 6 : null, "ROCKET".equals(gameType) ? 15 : null);
         return room;
     }
 

@@ -76,6 +76,16 @@ public class RocketRound {
         return round;
     }
 
+    /** Sets when a pending round opens, e.g. after the previous round's reveal pause. */
+    public void schedule(Instant opensAt) {
+        if (status != Status.PENDING) throw new IllegalStateException("Only a pending round can be scheduled");
+        this.opensAt = Objects.requireNonNull(opensAt);
+    }
+
+    public boolean dueToOpen(Instant now) {
+        return status == Status.PENDING && opensAt != null && !now.isBefore(opensAt);
+    }
+
     public void open(Instant at, Duration timeLimit) {
         if (status != Status.PENDING) throw new IllegalStateException("Only a pending round can open");
         if (timeLimit == null || timeLimit.isNegative() || timeLimit.isZero())
