@@ -13,6 +13,7 @@ import com.ieltspath.game.application.result.RocketGameplayResults.PlayerSummary
 import com.ieltspath.game.application.result.RocketGameplayResults.Round;
 import com.ieltspath.game.application.result.RocketGameplayResults.RoundResult;
 import com.ieltspath.game.application.result.RocketGameplayResults.Settings;
+import com.ieltspath.game.application.result.RocketRoundEvents;
 import com.ieltspath.game.domain.aggregate.RocketRound;
 import com.ieltspath.game.domain.exception.GameMatchNotFoundException;
 import com.ieltspath.game.domain.exception.SoloGameplayException;
@@ -30,6 +31,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -37,18 +40,28 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Rocket rounds as players see them. Every path first settles time-based changes ({@link #advance}): an open round
  * past its deadline closes, and the next round opens once its reveal pause is over. The worker calls the same method,
- * and the match lock makes a request and the worker settle a round only once between them.
+ * and the match lock makes a request and the worker settle a round only once between them. Each change is announced
+ * as a {@link RocketRoundEvents} event from the same transaction.
  */
 @Service
 public class RocketGameplayUseCase {
     private final RocketMatchStore matches;
     private final RocketRoundRepository rounds;
     private final TransactionTemplate tx;
+    private final ApplicationEventPublisher events;
 
+    /** Without event delivery; for callers that only need the gameplay rules. */
     public RocketGameplayUseCase(RocketMatchStore matches, RocketRoundRepository rounds, PlatformTransactionManager manager) {
+        this(matches, rounds, manager, event -> {});
+    }
+
+    @Autowired
+    public RocketGameplayUseCase(RocketMatchStore matches, RocketRoundRepository rounds, PlatformTransactionManager manager,
+            ApplicationEventPublisher events) {
         this.matches = matches;
         this.rounds = rounds;
         this.tx = new TransactionTemplate(manager);
+        this.events = events;
     }
 
     /** Closes an expired round and opens a due one. Safe to repeat; does nothing for a finished match. */
@@ -95,8 +108,14 @@ public class RocketGameplayUseCase {
             RocketRound.Answer answer = round.accept(player.id(), optionId, requestId, at);
             State after = state;
             if (!replay) {
-                if (round.answeredBy(contenders(state))) after = closeRound(state, all, round, RocketRound.CloseReason.ALL_ANSWERED, at);
-                else rounds.save(round);
+                Set<UUID> contenders = contenders(state);
+                if (round.answeredBy(contenders)) after = closeRound(state, all, round, RocketRound.CloseReason.ALL_ANSWERED, at);
+                else {
+                    rounds.save(round);
+                    int answered = (int) contenders.stream().filter(id -> round.answerOf(id).isPresent()).count();
+                    events.publishEvent(new RocketRoundEvents.Answered(state.roomId(), matchId, roundId, userId, answered,
+                            contenders.size()));
+                }
             }
             Player updated = after.player(userId).orElse(player);
             RoundResult result = round.status() == RocketRound.Status.CLOSED ? roundResult(after, all, round, updated) : null;
@@ -162,9 +181,12 @@ public class RocketGameplayUseCase {
         } else if (open.isPresent()) {
             return;
         }
+        State current = state;
         all.stream().filter(round -> round.dueToOpen(now)).findFirst().ifPresent(next -> {
             next.open(now, limit);
             rounds.save(next);
+            events.publishEvent(RocketRoundEvents.Started.of(current.roomId(), current.matchId(),
+                    current.settings().questionCount(), next, now));
         });
     }
 
@@ -200,14 +222,31 @@ public class RocketGameplayUseCase {
                     .toList();
             matches.savePlayers(players);
             matches.finish(state.matchId(), state.roomId(), end.get(), at);
+            announceClose(state, round, results, players, null, end.get());
             return state.with(players, end.get(), at);
         }
-        all.stream().filter(candidate -> candidate.sequence() == round.sequence() + 1).findFirst().ifPresent(next -> {
-            next.schedule(at.plus(state.settings().revealPause()));
-            rounds.save(next);
-        });
+        Instant next = all.stream().filter(candidate -> candidate.sequence() == round.sequence() + 1).findFirst().map(candidate -> {
+            candidate.schedule(at.plus(state.settings().revealPause()));
+            rounds.save(candidate);
+            return candidate.opensAt();
+        }).orElse(null);
         matches.savePlayers(players);
+        announceClose(state, round, results, players, next, null);
         return state.with(players, null, null);
+    }
+
+    /** Tells everyone the answer and each expected player's outcome, with their lives and score after the round. */
+    private void announceClose(State state, RocketRound round, Map<UUID, RocketRound.Answer> results, List<Player> players,
+            Instant nextRoundAt, RocketEndReason end) {
+        List<RocketRoundEvents.PlayerOutcome> outcomes = players.stream().filter(player -> results.containsKey(player.id()))
+                .map(player -> {
+                    RocketRound.Answer answer = results.get(player.id());
+                    return new RocketRoundEvents.PlayerOutcome(player.userId(), answer.optionId(), answer.correct(),
+                            answer.points(), player.progress().livesRemaining(), player.progress().totalScore(),
+                            player.status());
+                }).toList();
+        events.publishEvent(new RocketRoundEvents.Closed(state.roomId(), state.matchId(), round.id(),
+                round.revealedCorrectOptionId().orElseThrow(), outcomes, nextRoundAt, end != null, end));
     }
 
     private RoundResult roundResult(State state, List<RocketRound> all, RocketRound round, Player player) {

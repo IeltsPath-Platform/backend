@@ -214,6 +214,10 @@ class RocketSoloFlowIntegrationTest {
         call(post("/api/games/rooms/" + roomId + "/ready").content("{\"ready\":true}"), host, 200);
         String matchId = call(post("/api/games/rooms/" + roomId + "/start"), host, 200).get("matchId").asText();
         assertTrue(events.stream(MatchStartedEvent.class).anyMatch(e -> e.matchId().toString().equals(matchId)));
+        var order = events.stream(Object.class).filter(e -> e instanceof MatchStartedEvent
+                || e instanceof com.ieltspath.game.application.result.RocketRoundEvents.Started).map(e -> e.getClass().getSimpleName()).toList();
+        assertEquals(List.of("MatchStartedEvent", "Started"), order.subList(order.size() - 2, order.size()),
+                "the lobby hears MATCH_STARTED before the first round");
 
         for (String player : List.of(host, guest)) {
             JsonNode current = call(get("/api/games/rocket/matches/" + matchId + "/rounds/current"), player, 200);

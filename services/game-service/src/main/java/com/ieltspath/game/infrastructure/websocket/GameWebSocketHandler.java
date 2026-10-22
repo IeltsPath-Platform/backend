@@ -35,6 +35,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
     private final SoloGameplayUseCase gameplay;
     private final GetWordlyRankingUseCase ranking;
     private final com.ieltspath.game.domain.repository.GameMatchRepository matches;
+    private com.ieltspath.game.domain.repository.GameMatchPlayerRepository matchPlayers;
     private final Map<UUID, Set<WebSocketSession>> sessionsByRoom = new ConcurrentHashMap<>();
     private final Map<String,org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator> writers=new ConcurrentHashMap<>();
     private final Map<String,Long> lastPong=new ConcurrentHashMap<>();
@@ -126,6 +127,81 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
     public void matchStarted(com.ieltspath.game.application.result.MatchStartedEvent event) {
         try { broadcastPersonalizedMatchState(event.roomId(), event.matchId(), "MATCH_STARTED"); }
         catch (IOException e) { org.slf4j.LoggerFactory.getLogger(getClass()).warn("Match update failed for {}", event.matchId()); }
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setMatchPlayers(com.ieltspath.game.domain.repository.GameMatchPlayerRepository matchPlayers) {
+        this.matchPlayers = matchPlayers;
+    }
+
+    private Set<UUID> playerIds(UUID matchId) {
+        if (matchPlayers == null) return Set.of();
+        return matchPlayers.findByMatchId(matchId).stream().map(com.ieltspath.game.domain.aggregate.GameMatchPlayer::userId)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    @org.springframework.transaction.event.TransactionalEventListener
+    public void rocketRoundStarted(com.ieltspath.game.application.result.RocketRoundEvents.Started event) {
+        var message = new java.util.LinkedHashMap<String, Object>();
+        message.put("type", "ROCKET_ROUND_STARTED");
+        message.put("matchId", event.matchId());
+        message.put("round", Map.of("roundId", event.roundId(), "number", event.number(), "total", event.total(),
+                "meaning", event.meaning(), "options", event.options(), "opensAt", event.opensAt(),
+                "deadlineAt", event.deadlineAt()));
+        message.put("serverTime", event.serverTime());
+        sendToMatchPlayers(event.roomId(), event.matchId(), message);
+    }
+
+    @org.springframework.transaction.event.TransactionalEventListener
+    public void rocketPlayerAnswered(com.ieltspath.game.application.result.RocketRoundEvents.Answered event) {
+        sendToMatchPlayers(event.roomId(), event.matchId(), Map.of("type", "ROCKET_PLAYER_ANSWERED",
+                "matchId", event.matchId(), "roundId", event.roundId(), "userId", event.userId(),
+                "answeredCount", event.answeredCount(), "aliveCount", event.aliveCount()));
+    }
+
+    /** The round result with the ranking after it; a finished match also gets MATCH_FINISHED and the lobby back. */
+    @org.springframework.transaction.event.TransactionalEventListener
+    public void rocketRoundClosed(com.ieltspath.game.application.result.RocketRoundEvents.Closed event) {
+        var anyPlayer = event.answers().stream().map(com.ieltspath.game.application.result.RocketRoundEvents.PlayerOutcome::userId)
+                .findFirst();
+        com.ieltspath.game.application.result.WordlyRankingResult standing = null;
+        try { standing = anyPlayer.map(user -> ranking.execute(event.matchId(), user)).orElse(null); }
+        catch (RuntimeException e) { org.slf4j.LoggerFactory.getLogger(getClass()).warn("Rocket ranking failed for {}", event.matchId()); }
+        var message = new java.util.LinkedHashMap<String, Object>();
+        message.put("type", "ROCKET_ROUND_RESULT");
+        message.put("matchId", event.matchId());
+        message.put("roundId", event.roundId());
+        message.put("correctOptionId", event.correctOptionId());
+        message.put("answers", event.answers());
+        message.put("ranking", standing);
+        message.put("nextRoundAt", event.nextRoundAt());
+        message.put("matchFinished", event.matchFinished());
+        message.put("endReason", event.endReason());
+        sendToMatchPlayers(event.roomId(), event.matchId(), message);
+        if (!event.matchFinished() || standing == null) return;
+        try {
+            broadcastRanking(event.roomId(), standing, "MATCH_FINISHED");
+            for (var session : sessionsByRoom.getOrDefault(event.roomId(), Set.of())) {
+                try { broadcastRoomState(event.roomId(), attribute(session, USER_ID_ATTRIBUTE)); break; }
+                catch (RuntimeException ignored) { /* A player who left cannot read the lobby. */ }
+            }
+        } catch (IOException e) { org.slf4j.LoggerFactory.getLogger(getClass()).warn("Rocket finish delivery failed for {}", event.matchId()); }
+    }
+
+    /** Only players of the match: a room member who joined after the start must not see its rounds. */
+    private void sendToMatchPlayers(UUID roomId, UUID matchId, Map<String, Object> message) {
+        Set<UUID> players;
+        try {
+            players = playerIds(matchId);
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(getClass()).warn("Rocket players lookup failed for {}", matchId);
+            return;
+        }
+        for (var session : sessionsByRoom.getOrDefault(roomId, Set.of())) {
+            if (!players.contains(attribute(session, USER_ID_ATTRIBUTE))) continue;
+            try { send(session, message); }
+            catch (IOException e) { org.slf4j.LoggerFactory.getLogger(getClass()).warn("Rocket update failed for {}", matchId); }
+        }
     }
 
     @org.springframework.transaction.event.TransactionalEventListener

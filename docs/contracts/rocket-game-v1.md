@@ -29,7 +29,14 @@ multiplayer match are not available yet (see the end of this document).
 ## WebSocket
 
 Players connected to the room socket receive `MATCH_STARTED` (shape as in the Wordly contract) after the start
-commits, so a lobby can move into `/rounds/current`. Rocket round events are not sent yet; poll Current.
+commits, so a lobby can move into the match. Then, to match players only, after each commit:
+- `ROCKET_ROUND_STARTED` `{matchId, round {roundId, number, total, meaning, options, opensAt, deadlineAt}, serverTime}`;
+  never the answer.
+- `ROCKET_PLAYER_ANSWERED` `{matchId, roundId, userId, answeredCount, aliveCount}` while the round stays open; not the choice.
+- `ROCKET_ROUND_RESULT` `{matchId, roundId, correctOptionId, answers [{userId, optionId|null, correct, points,
+  livesRemaining, totalScore, status}], ranking, nextRoundAt, matchFinished, endReason}`, also when the worker closes a
+  round at its deadline. The last one is followed by `MATCH_FINISHED` (final ranking) and `ROOM_STATE`.
+Current stays the way to resync after a reconnect.
 
 ## Models
 
@@ -80,5 +87,5 @@ Retrying with the same `requestId` and option returns the stored answer instead 
 
 ## Not yet available
 
-Rocket round events over WebSocket (clients poll Current), leaving a running multiplayer match (409
+Leaving a running multiplayer match (409
 `GAME_NOT_SUPPORTED`; the match still ends once everyone runs out of lives or rounds) and reconnect grace.

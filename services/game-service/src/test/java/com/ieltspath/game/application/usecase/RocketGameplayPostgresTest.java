@@ -294,6 +294,88 @@ class RocketGameplayPostgresTest {
             """, String.class, match));
     }
 
+    /** Adds a second ACTIVE player to a started match and returns their user id. */
+    UUID addPlayer(UUID match) {
+        UUID room = sql.queryForObject("SELECT room_id FROM game_matches WHERE id=?", UUID.class, match);
+        UUID member = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        sql.update("""
+            INSERT INTO game_room_members(id,room_id,user_id,member_role,status,joined_at,slot_number,display_name)
+            VALUES (?,?,?,'PLAYER','READY',now(),2,'Guest')
+            """, member, room, other);
+        sql.update("""
+            INSERT INTO game_match_players(id,match_id,room_member_id,user_id,status,joined_at,lives_remaining)
+            VALUES (gen_random_uuid(),?,?,?,'ACTIVE',now(),4)
+            """, match, member, other);
+        return other;
+    }
+
+    @Test void roundChangesAreAnnouncedToTheMatch() {
+        List<Object> published = new java.util.ArrayList<>();
+        gameplay = new RocketGameplayUseCase(store, rounds, new DataSourceTransactionManager(
+                new DriverManagerDataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword())), published::add);
+        UUID match = start(3);
+        UUID guest = addPlayer(match);
+        var round = gameplay.current(match, user).round();
+
+        now = now.plusSeconds(2);
+        gameplay.answer(match, round.roundId(), user, "h1", correct(match, round));
+        var answered = assertInstanceOf(com.ieltspath.game.application.result.RocketRoundEvents.Answered.class, published.getLast());
+        assertEquals(user, answered.userId());
+        assertEquals(1, answered.answeredCount());
+        assertEquals(2, answered.aliveCount());
+
+        now = now.plusSeconds(1);
+        gameplay.answer(match, round.roundId(), guest, "g1", wrong(match, round));
+        var closed = assertInstanceOf(com.ieltspath.game.application.result.RocketRoundEvents.Closed.class, published.getLast());
+        assertEquals(round.roundId(), closed.roundId());
+        assertEquals(correct(match, round), closed.correctOptionId());
+        assertEquals(now.plusMillis(2500), closed.nextRoundAt(), "start() makes a solo-mode match");
+        assertFalse(closed.matchFinished());
+        var byUser = closed.answers().stream().collect(java.util.stream.Collectors.toMap(
+                com.ieltspath.game.application.result.RocketRoundEvents.PlayerOutcome::userId, o -> o));
+        assertTrue(byUser.get(user).correct());
+        assertEquals(4, byUser.get(user).livesRemaining());
+        assertFalse(byUser.get(guest).correct());
+        assertEquals(3, byUser.get(guest).livesRemaining());
+
+        int before = published.size();
+        gameplay.current(match, user);
+        assertEquals(before, published.size(), "nothing opens during the reveal pause");
+        now = now.plusSeconds(3);
+        gameplay.advance(match);
+        var started = assertInstanceOf(com.ieltspath.game.application.result.RocketRoundEvents.Started.class, published.getLast());
+        assertEquals(2, started.number());
+        assertEquals(now.plusSeconds(15), started.deadlineAt());
+        assertTrue(java.util.Arrays.stream(started.getClass().getRecordComponents())
+                .noneMatch(c -> c.getName().toLowerCase().contains("correct")), "a started round never names its answer");
+        gameplay.advance(match);
+        assertEquals(before + 1, published.size(), "settling again announces nothing new");
+
+        now = now.plusSeconds(16);
+        gameplay.advance(match);
+        var missed = assertInstanceOf(com.ieltspath.game.application.result.RocketRoundEvents.Closed.class, published.getLast());
+        assertTrue(missed.answers().stream().allMatch(o -> o.optionId() == null && !o.correct()));
+    }
+
+    @Test void theLastRoundAnnouncesTheEnd() {
+        List<Object> published = new java.util.ArrayList<>();
+        gameplay = new RocketGameplayUseCase(store, rounds, new DataSourceTransactionManager(
+                new DriverManagerDataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword())), published::add);
+        UUID match = start(3);
+        for (int i = 0; i < 3; i++) {
+            var round = gameplay.current(match, user).round();
+            now = now.plusSeconds(1);
+            gameplay.answer(match, round.roundId(), user, "e" + i, correct(match, round));
+            now = now.plusSeconds(3);
+        }
+        var last = assertInstanceOf(com.ieltspath.game.application.result.RocketRoundEvents.Closed.class, published.getLast());
+        assertTrue(last.matchFinished());
+        assertEquals(RocketEndReason.ALL_ROUNDS_COMPLETED, last.endReason());
+        assertNull(last.nextRoundAt());
+        assertEquals("FINISHED", last.answers().getFirst().status());
+    }
+
     @Test void outsidersCannotSeeOrAnswer() {
         UUID match = start(3);
         var round = gameplay.current(match, user).round();

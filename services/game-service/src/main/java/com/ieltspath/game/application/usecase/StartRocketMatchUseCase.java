@@ -95,6 +95,9 @@ public class StartRocketMatchUseCase {
             outbox.append("GameMatch", matchId.toString(), "GameMatchStarted",
                     Map.of("matchId", matchId.toString(), "roomId", room.id().toString(), "gameType", room.gameType()));
             events.publishEvent(new MatchStartedEvent(room.id(), matchId));
+            // After MATCH_STARTED, so a lobby has moved into the match before the first round arrives.
+            events.publishEvent(com.ieltspath.game.application.result.RocketRoundEvents.Started.of(room.id(), matchId,
+                    settings.questionCount(), first, now));
             return new GameMatchResult(match.id(), match.roomId(), null, match.status().name(), match.startedAt(),
                     GameMatchResult.players(players.findByMatchId(matchId)));
         });
