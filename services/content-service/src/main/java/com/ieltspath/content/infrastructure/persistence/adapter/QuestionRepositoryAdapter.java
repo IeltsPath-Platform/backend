@@ -2,10 +2,12 @@ package com.ieltspath.content.infrastructure.persistence.adapter;
 
 import com.ieltspath.content.domain.aggregate.Question;
 import com.ieltspath.content.domain.repository.QuestionRepository;
+import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.domain.vo.Skill;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
 import com.ieltspath.content.infrastructure.persistence.mapper.QuestionPersistenceMapper;
 import com.ieltspath.content.infrastructure.persistence.repository.QuestionJpaRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -53,18 +55,9 @@ public class QuestionRepositoryAdapter implements QuestionRepository {
     }
 
     @Override
-    public List<Question> findBySkill(Skill skill) {
-        return questionJpaRepository.findBySkill(skill).stream().map(mapper::toDomain).toList();
-    }
-
-    @Override
-    public List<Question> findAll() {
-        return questionJpaRepository.findAll().stream().map(mapper::toDomain).toList();
-    }
-
-    @Override
-    public List<Question> findByPurpose(QuestionPurpose purpose, Skill skill) {
-        return questionJpaRepository.findByPurpose(purpose, skill).stream().map(mapper::toDomainSummary).toList();
+    public Page findPage(Skill skill, QuestionPurpose purpose, PublicationStatus status, int page, int size) {
+        var result = questionJpaRepository.findPage(skill, purpose, status, PageRequest.of(page, size));
+        return new Page(result.getTotalElements(), result.getContent().stream().map(mapper::toDomainSummary).toList());
     }
 
     @Override
