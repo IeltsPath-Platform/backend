@@ -39,10 +39,36 @@ instructions. It contains no learner data and no existing question text.
 | `BAD_OPTIONS` | Choice item with fewer than 2 or more than 6 options, or repeated/blank keys. |
 | `CORRECT_NOT_AN_OPTION` | The correct key is not one of the options. |
 | `DISTRACTOR_NOT_A_WRONG_OPTION` | A distractor names the correct key or an unknown key. |
-| `UNKNOWN_ERROR_CODE` | A distractor code is not an active error type. |
+| `UNKNOWN_ERROR_CODE` | A distractor code is not an active, approved error type. |
 | `NO_ACCEPTED_ANSWER` | Typed item without a non-blank accepted answer. |
+| `DUPLICATE_STEM` | The stem equals, ignoring case and spacing, a stem the knowledge point already has or one kept earlier in the same reply. |
 
 If no item is usable, the draft fails with `INVALID_REPLY`.
+
+## Edit and remove
+
+Only a `READY` question draft of its author can change; otherwise `400` (not ready) or `404` (not found or not theirs).
+Items are addressed by their position in `result.items`, counted from 0. A position that does not exist returns `404`.
+
+`PATCH /api/content/admin/ai-drafts/{id}/items/{index}` changes one item. Every field is optional and a field left out
+stays as it is:
+
+```json
+{ "stem": "…", "explanation": "…",
+  "options": [{ "optionKey": "A", "content": "…" }, { "optionKey": "B", "content": "…" }],
+  "correct": "B", "distractors": { "A": "PARAPHRASE_TRAP" }, "accepted": ["colour", "color"] }
+```
+
+`options` and `distractors` replace the whole list or map (`"distractors": {}` clears the error codes); sort orders are
+numbered again from 1. `difficulty` and the question type stay those of the request. The edited item must pass the
+same rules as a generated one, with the reasons above (`DUPLICATE_STEM` also counts the other items of the draft, but
+not the edited item's own stem). A broken edit returns `422` with `details.code = INVALID_DRAFT_ITEM` and
+`details.reason`, and the draft is unchanged. Oversize text (a stem or explanation over 4000 characters, more than 6
+options) returns `400`. Returns `200` with the draft.
+
+`DELETE /api/content/admin/ai-drafts/{id}/items/{index}` drops one item and returns `200` with the draft. The items
+behind it move up by one position, so a client uses the returned `result.items` for the next call. `result.rejected` is
+left as it was, because its `index` refers to the model's original reply.
 
 ## Approve
 
@@ -53,7 +79,3 @@ If no item is usable, the draft fails with `INVALID_REPLY`.
   as every other question. The answer spec is checked again there, so a rule that changed since generation still applies.
 - All or nothing: if one item fails, nothing is created and the draft stays `READY`.
 - The draft becomes `APPROVED` and records the reviewer. Returns `200` with the draft.
-
-## Not yet available
-
-Editing or removing a single item before approval is not part of this version. Authors choose which items to keep.

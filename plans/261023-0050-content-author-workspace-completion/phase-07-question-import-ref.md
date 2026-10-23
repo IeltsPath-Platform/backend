@@ -1,7 +1,7 @@
 # Phase 07: Mã tham chiếu câu hỏi `import_ref`
 
 Người làm: **Claude Code**. Nhánh: `feat/content-question-import-ref` (backend), tạo từ `origin/main` sau khi phase 14 đã merge.
-Trạng thái: Pending
+Trạng thái: Done (2026-10-23, commit `1f46f64e`, chưa merge; xem mục "Kết quả")
 
 Repo: `backend`, service `content-service`. Phụ thuộc: phase 01 đã merge (để lấy đúng số migration).
 
@@ -44,4 +44,8 @@ API soạn lesson mà plan 0804 từng định làm ở đây **đã có** từ 
 
 ## Kết quả
 
-(Người làm điền.)
+Đã làm (Claude Code, commit `1f46f64e`):
+- Migration V76: cột `questions.import_ref` (VARCHAR 100) và unique index partial; câu cũ để null.
+- Tạo câu hỏi admin nhận `importRef` tùy chọn; trùng trả `409 IMPORT_REF_CONFLICT`; response câu hỏi trả `importRef`; lọc `?importRef=` khớp chính xác.
+- Test: `QuestionImportRefMigrationTest`, `CreateQuestionImportRefUseCaseTest`; contract `question-publication-v1.md` cập nhật.
+- Phase 09 (`ai-<draftId>-<index>`) và phase 12 (Excel) dùng cột này để trỏ câu theo mã ổn định.

@@ -32,7 +32,7 @@ version, including drafts. Learner-facing section data is separated from answers
           "questionVersionId": "<question-version-id>",
           "sortOrder": 1,
           "stem": "<question stem>",
-          "options": { "A": "<option>" },
+          "options": [{ "optionKey": "A", "content": "<option>", "sortOrder": 1 }],
           "hint": null,
           "maxScore": 1.0,
           "knowledgePointMappings": [

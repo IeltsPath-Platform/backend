@@ -46,6 +46,21 @@ public class ContentPackageRepositoryAdapter implements ContentPackageRepository
     }
 
     @Override
+    public void deferQuestionOrderCheck() {
+        contentPackageJpaRepository.deferQuestionOrderCheck();
+    }
+
+    @Override
+    public boolean questionVersionExists(UUID questionVersionId) {
+        return contentPackageJpaRepository.questionVersionExists(questionVersionId);
+    }
+
+    @Override
+    public boolean attachPracticeSetToLesson(UUID packageId, UUID lessonId) {
+        return contentPackageJpaRepository.attachPracticeSetToLesson(packageId, lessonId) == 1;
+    }
+
+    @Override
     public Optional<ContentPackage> findByVersionId(UUID versionId) {
         return contentPackageJpaRepository.findDistinctByVersions_Id(versionId).map(mapper::toDomain);
     }

@@ -40,6 +40,13 @@ public class ExaminerQaController {
         return queue.execute("HUMAN", "QUEUED", page, size, "QA_SAMPLE");
     }
 
+    /** Essays the caller claimed and has not reviewed yet, so they can be found again after leaving the page. */
+    @GetMapping("/mine")
+    public ExaminerQueueStore.QueuePage mine(@RequestParam(name = "page", defaultValue = "0") int page,
+                                              @RequestParam(name = "size", defaultValue = "20") int size) {
+        return queue.claimedQaBy(currentUser.requireUserId(), page, size);
+    }
+
     @PostMapping("/{jobId}/claim")
     public ExaminerQueueStore.QueueEntry claim(@PathVariable("jobId") UUID jobId) {
         return claim.execute(currentUser.requireUserId(), jobId);

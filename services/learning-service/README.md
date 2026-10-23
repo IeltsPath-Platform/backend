@@ -210,6 +210,16 @@ Learning errors use `{detail, code}`; `REVIEW_REQUIRED` additionally includes
 missing content maps to `404 NOT_FOUND`, transport/unavailability errors to
 `503 CONTENT_UNAVAILABLE`, and other Content failures to `502 CONTENT_FAILURE`.
 
+## Staff reads
+
+`GET /api/learning/admin/work-items` (R&D work queue; optional `kind` filter) returns each item with the knowledge point,
+question or lesson it is about: names come from one batched call to Content's internal
+`POST /internal/learning-content/work-item-subjects`, and an item whose subject cannot be resolved (unknown to Content,
+or Content unavailable) is returned without a name. `question-stats` and `tree-quality` are the other staff reads. Roles, filters and shapes:
+[learning-staff-area-v1](../../docs/contracts/learning-staff-area-v1.md); the internal call:
+[learning-content-internal-v1](../../docs/contracts/learning-content-internal-v1.md). No new environment variable
+(`CONTENT_SERVICE_URL` as above).
+
 ## Structure and references
 
 Layers follow `api → application → domain`, with HTTP, RabbitMQ and JDBC adapters under

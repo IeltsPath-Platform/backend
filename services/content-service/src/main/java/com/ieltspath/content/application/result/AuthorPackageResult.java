@@ -18,6 +18,7 @@ public record AuthorPackageResult(
         PublicationStatus status,
         UUID currentPublishedVersionId,
         UUID lessonId,
+        UUID topicId,
         UUID courseId,
         String sourceCode,
         Instant createdAt,
@@ -31,6 +32,7 @@ public record AuthorPackageResult(
                 .toList();
         return new AuthorPackageResult(pkg.getId(), pkg.getCode(), pkg.getTitle(), pkg.getPackageType(),
                 pkg.getRequiredFeatureKey(), pkg.getStatus(), pkg.getCurrentPublishedVersionId(), pkg.getLessonId(),
-                pkg.getCourseId(), pkg.getSourceCode(), pkg.getCreatedAt(), pkg.getUpdatedAt(), versions);
+                pkg.getTopicId(), pkg.getCourseId(), pkg.getSourceCode(), pkg.getCreatedAt(), pkg.getUpdatedAt(),
+                versions);
     }
 }

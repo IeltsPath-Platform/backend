@@ -34,6 +34,18 @@ public interface ContentPackageJpaRepository extends JpaRepository<ContentPackag
     @Query(value = "SET CONSTRAINTS uq_content_sections_sort_order DEFERRED", nativeQuery = true)
     int deferSectionOrderCheck();
 
+    @Modifying
+    @Query(value = "SET CONSTRAINTS uq_section_questions_sort_order DEFERRED", nativeQuery = true)
+    int deferQuestionOrderCheck();
+
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM question_versions WHERE id = :id)", nativeQuery = true)
+    boolean questionVersionExists(@Param("id") UUID id);
+
+    @Modifying
+    @Query(value = "UPDATE content_packages SET lesson_id = :lessonId, updated_at = CURRENT_TIMESTAMP "
+            + "WHERE id = :packageId AND package_type = 'PRACTICE_SET' AND lesson_id IS NULL", nativeQuery = true)
+    int attachPracticeSetToLesson(@Param("packageId") UUID packageId, @Param("lessonId") UUID lessonId);
+
     @EntityGraph(attributePaths = {"versions"})
     Optional<ContentPackageJpaEntity> findDistinctByVersions_Id(UUID versionId);
 

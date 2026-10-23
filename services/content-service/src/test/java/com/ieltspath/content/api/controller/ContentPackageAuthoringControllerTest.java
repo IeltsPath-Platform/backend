@@ -55,6 +55,10 @@ class ContentPackageAuthoringControllerTest {
     @MockitoBean UpdateContentSectionUseCase updateSection;
     @MockitoBean DeleteContentSectionUseCase deleteSection;
     @MockitoBean ReorderContentSectionsUseCase reorderSections;
+    @MockitoBean com.ieltspath.content.application.usecase.AddSectionQuestionUseCase addSectionQuestion;
+    @MockitoBean com.ieltspath.content.application.usecase.RemoveAndReorderSectionQuestionsUseCase removeAndReorderQuestions;
+    @MockitoBean com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase listPackages;
+    @MockitoBean com.ieltspath.content.application.usecase.CreateContentPackageUseCase createPackage;
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
@@ -81,6 +85,15 @@ class ContentPackageAuthoringControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content(ORDER_BODY))
                 .andExpect(status().isForbidden());
 
-        verifyNoInteractions(getPackage, createDraft, createSection, updateSection, deleteSection, reorderSections);
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/content/admin/packages"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/content/admin/packages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"X\",\"title\":\"T\",\"packageType\":\"PRACTICE_SET\"}"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(getPackage, createDraft, createSection, updateSection, deleteSection, reorderSections,
+                listPackages, createPackage);
     }
 }

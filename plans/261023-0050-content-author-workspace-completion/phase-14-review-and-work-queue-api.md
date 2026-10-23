@@ -1,7 +1,7 @@
 # Phase 14: API đọc bổ sung cho hàng việc R&D, đánh giá giám khảo, đánh giá AI
 
 Người làm: **Claude Code**. Nhánh: `feat/review-work-queue-api` (backend), tạo từ `origin/main` sau khi phase 01 đã merge.
-Trạng thái: Pending
+Trạng thái: Done (2026-10-23, chưa commit/merge; xem mục "Kết quả")
 
 Repo: `backend`, service `assessment-service`, `learning-service` (và `content-service` nếu cần endpoint internal tra cứu theo lô). Phụ thuộc: không về mặt chức năng; làm sau 01 để không chạy song song hai nhánh backend.
 
@@ -64,4 +64,11 @@ Mọi route mới chỉ `CONTENT_AUTHOR`. Cập nhật contract tương ứng tr
 
 ## Kết quả
 
-(Người làm điền.)
+**2026-10-23 (Claude Code), chưa commit.** Trạng thái: Done (chờ merge).
+
+- A (learning): `GET /admin/work-items` thêm `subject` và lọc `kind`. Tên KP/câu hỏi lấy bằng đúng một call tới endpoint internal mới của content `POST /internal/learning-content/work-item-subjects` (tối đa 500 id mỗi loại); content lỗi → `subject` null, vẫn 200. `occurrences` đọc từ `content_gap_signals`. `PATCH` giữ nguyên (không có `subject`).
+- B (assessment): `GET /qa-reviews/mine` (bài đã nhận, chưa nộp đánh giá; phân trang). `examiner-quality` thêm `examinerName` qua port `UserDirectory` + `RestUserDirectory` (gọi user-service theo lô 50, bearer của người gọi; lỗi → null). Cấu hình `assessment.user.base-url` (`USER_SERVICE_URL`), compose đặt `http://user-service:8085`.
+- C (assessment): `GET /admin/ai-gold-essays`, `/ai-evaluations`, `/ai-prompt-activations`; `GET …/ai-evaluations/{id}` thêm `thresholds`. Controller riêng `AiEvaluationReadController` để không đổi controller ghi.
+- Contract cập nhật: `admin-area-v1`, `assessment-grading-v1`, `learning-staff-area-v1`, `learning-content-internal-v1`.
+- Test: learning 902, content 725, assessment 381+ (mới: `ReviewReadsIntegrationTest`, `ReviewReadsAuthorizationTest`, `RestUserDirectoryTest`, `ExaminerQualityNamesTest`, `WorkItemSubjectResolverTest`, `JdbcWorkItemSubjectsTest`, mở rộng `ExaminerQaIntegrationTest` và `StaffAdminControllerTest`). Mọi suite xanh.
+- Không làm: phân trang cho `work-items` (route cũ không phân trang, giữ nguyên để không đổi hợp đồng); ghi tên giám khảo vào `QueueEntry`.

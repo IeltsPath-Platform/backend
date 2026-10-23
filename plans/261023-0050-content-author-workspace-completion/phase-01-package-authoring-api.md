@@ -3,7 +3,7 @@
 Người làm: **Claude Code** (tiếp quản từ Codex ngày 2026-10-23). Nhánh: `feat/content-package-authoring` (backend, nhánh Codex đã tạo).
 
 Tiếp quản: Codex đã tạo nhánh từ `origin/main` `c600b3f3`, viết dở `docs/contracts/content-package-authoring-v1.md` và tạo `application/port/ContentAudioStorage.java`, chưa commit (xem mục "Kết quả" cuối file). Đọc hai file đó, bổ sung contract mục 7, rồi làm tiếp; không viết lại từ đầu.
-Trạng thái: Pending (đã gỡ chặn 2026-10-23, xem mục "Quyết định gỡ chặn" cuối file)
+Trạng thái: Done về phía backend (2026-10-23, chưa commit/merge; xem mục "Kết quả")
 
 Repo: `backend`, service `content-service`. Phụ thuộc: không.
 
@@ -186,6 +186,16 @@ Hai mâu thuẫn nêu ở mục "Kết quả" bên dưới đã được chốt:
 Plan đã gộp phần AI/Excel thành phase 07–12. Cùng ngày người dùng đổi phân công: Claude Code làm toàn bộ backend (phase này, 07–12, 14), Codex làm toàn bộ giao diện (xem `plan.md`). Phase 01 tiếp tục từ chỗ đã dừng; contract `content-package-authoring-v1.md` đang viết dở cần bổ sung mục 7.
 
 ## Kết quả
+
+**Lát 3 (2026-10-23, Claude Code), chưa commit — phase 01 xong về phía backend.**
+- Mục 1: danh sách `GET /admin/packages?type=&status=&lessonId=&topicId=&courseId=&q=` (tối đa 500, `latestVersionNumber` null khi chưa có version, `hasDraft`); chi tiết đủ `topicId`, `questionId`, `stem` (cắt 200), `status`, `purpose`, `passage`, `audio` (có `mediaUrl`, null nếu key không resolve được). Đọc theo lô qua port `AuthorPackageReader` (`JdbcAuthorPackageReader`), không N+1.
+- Mục 4: thêm/xóa/sắp xếp câu trong section (V78 deferrable), chặn trùng trong version.
+- Mục 5: `PUT/DELETE …/passage` và `…/audio` (`SectionMediaUseCases`, `JdbcSectionMediaWriter`): tạo asset mới, gỡ link cũ, giữ asset cũ; `mediaReference` kiểm bằng `ObjectKeys.requireSafe`, thời lượng 1..7200.
+- Mục 6: `POST /admin/media/audio` (25 MB, magic bytes, key `content-audio/{userId}/…`); `common-storage` thêm vào content-service; cấu hình `app.storage`, multipart 25/26 MB, `content.media.bucket`; compose thêm `SUPABASE_URL`/`SUPABASE_SECRET_KEY` (cả hai mặc định rỗng → thiếu thì upload 503, service vẫn chạy). Mã lỗi: `EMPTY_FILE`, `UNSUPPORTED_AUDIO`, `AUDIO_TOO_LARGE` (413), `STORAGE_UNAVAILABLE`.
+- Mục 7: `POST /admin/packages` tạo gói kể cả `TOPIC_TEST`/`COURSE_TEST` (`INVALID_PACKAGE_TOPIC`, `INVALID_PACKAGE_COURSE`); `topicId` map vào `ContentPackage`/`ContentPackageJpaEntity`. Luật tạo ở một chỗ (`CreateContentPackageUseCase`): route cũ vẫn cấm hai loại này.
+- Aggregate chỉ ép "TOPIC_TEST phải có topic" khi tạo mới (`createFinalTest`); dữ liệu cũ đọc lên không bị chặn, ràng buộc DB `chk_content_packages_topic_test_topic` vẫn là chốt cuối.
+- Test mới: `JdbcAuthorPackageReaderTest`, `JdbcSectionMediaWriterTest`, `SectionMediaUseCasesTest`, `UploadContentAudioUseCaseTest`, `ContentMediaControllerTest`, `ContentMediaAuthorizationTest`, mở rộng `CreateContentPackageUseCaseTest`, `ContentPackageAuthoring*Test`. Toàn bộ content-service xanh (725).
+- Chưa làm: test "luồng trọn" qua HTTP với Supabase thật (không gọi dịch vụ ngoài); kiểm `has_topic_test` đổi sau khi publish đề cuối (đã có luật publish và đọc `PUBLISHED` ở Learning, không đổi trong phase này).
 
 **Lát 2 (2026-10-23, Claude Code), chưa commit:**
 - Mục 1 (một phần): `GET /api/content/admin/packages/{id}` trả mọi version kèm section và câu (id, questionVersionId, sortOrder, maxScore). Chưa có: `questionId`, `stem`, `status`, `purpose`, `passage`, `audio`.

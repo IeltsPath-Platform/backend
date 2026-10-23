@@ -115,6 +115,16 @@ public class ContentPackageVersion {
         }
     }
 
+    /** A question version may appear once in this version, in any of its sections. */
+    public void requireQuestionNotInVersion(UUID questionVersionId) {
+        boolean used = sections.stream()
+                .flatMap(section -> section.getQuestions().stream())
+                .anyMatch(question -> question.getQuestionVersionId().equals(questionVersionId));
+        if (used) {
+            throw new com.ieltspath.content.domain.exception.QuestionAlreadyInVersionException(questionVersionId);
+        }
+    }
+
     public void addSection(ContentSection section) {
         requireDraft();
         requireFreeSortOrder(section.getSortOrder(), null);

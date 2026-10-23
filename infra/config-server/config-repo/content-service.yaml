@@ -9,11 +9,18 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      # Audio upload for authors: 25 MB file, a little headroom for the multipart envelope.
+      max-file-size: 25MB
+      max-request-size: 26MB
 
 content:
   media:
     # Public https prefix of the bucket holding audio keys such as listening/demo/ls1.mp3; blank = keys cannot resolve.
     base-url: ${CONTENT_MEDIA_BASE_URL:}
+    # Bucket that author uploads go to; new files live under content-audio/ so seeded files are never overwritten.
+    bucket: ${CONTENT_MEDIA_BUCKET:media}
   # Language model for AI drafts (OpenAI-compatible). Blank values mean drafts fail with NOT_CONFIGURED; the rest of the
   # service still starts. Keys live only in the gitignored .env file.
   llm:
@@ -25,9 +32,16 @@ content:
     stale-after: PT10M
     daily-limit: 20
     max-items-per-request: 20
+    max-course-candidates: 40
     quota-zone: Asia/Ho_Chi_Minh
 
 app:
+  storage:
+    # Missing SUPABASE_URL and SUPABASE_SECRET_KEY: the service still starts and audio upload answers 503.
+    enabled: true
+    supabase:
+      url: ${SUPABASE_URL:}
+      secret-key: ${SUPABASE_SECRET_KEY:}
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
     internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}

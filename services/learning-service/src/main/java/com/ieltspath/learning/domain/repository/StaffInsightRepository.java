@@ -57,7 +57,12 @@ public interface StaffInsightRepository {
 
     Optional<WorkItem> findWorkItem(UUID id);
 
-    List<WorkItem> workItems(Collection<Queue> queues, WorkStatus status);
+    default List<WorkItem> workItems(Collection<Queue> queues, WorkStatus status) {
+        return workItems(queues, status, null);
+    }
+
+    /** {@code status} and {@code kind} are optional filters; the oldest items come first. */
+    List<WorkItem> workItems(Collection<Queue> queues, WorkStatus status, WorkKind kind);
 
     List<WorkItem> openWorkItemsOf(UUID userId);
 
@@ -71,6 +76,9 @@ public interface StaffInsightRepository {
     List<OpenRemediation> openRemediation();
 
     List<UUID> contentGapKnowledgePoints();
+
+    /** How many diagnoses found each knowledge point without a practice set; points without a signal are absent. */
+    java.util.Map<UUID, Integer> contentGapOccurrences(Collection<UUID> knowledgePointIds);
 
     List<QuestionStat> questionStats(int minAttempts, int limit);
 

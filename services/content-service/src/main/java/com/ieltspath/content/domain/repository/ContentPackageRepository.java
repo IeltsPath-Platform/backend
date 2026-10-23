@@ -17,6 +17,18 @@ public interface ContentPackageRepository {
     /** Checks the section sort-order uniqueness at commit instead of per row, so one whole reordering can be saved. */
     void deferSectionOrderCheck();
 
+    /** Checks the question order uniqueness within a section at commit, for removals and reorderings. */
+    void deferQuestionOrderCheck();
+
+    /** Whether a question version exists; the author may only attach versions that do. */
+    boolean questionVersionExists(UUID questionVersionId);
+
+    /**
+     * Makes an existing, unattached practice set part of a lesson's Practice without rewriting the package or its
+     * versions. Returns false when the package is not a practice set or already belongs to a lesson.
+     */
+    boolean attachPracticeSetToLesson(UUID packageId, UUID lessonId);
+
     Optional<ContentPackage> findByVersionId(UUID versionId);
 
     Optional<ContentPackage> findBySectionId(UUID sectionId);

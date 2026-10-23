@@ -49,6 +49,16 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
         Long total = jdbc.queryForObject("SELECT count(*) FROM grading_jobs WHERE grading_mode=:mode AND status=:status AND (CAST(:reason AS VARCHAR) IS NULL OR reason=CAST(:reason AS VARCHAR))", args, Long.class);
         return new QueuePage(rows, page, size, total == null ? 0 : total);
     }
+    @Override public QueuePage claimedQaBy(UUID reviewerId, int page, int size) {
+        var args = new org.springframework.jdbc.core.namedparam.MapSqlParameterSource().addValue("reviewer", reviewerId)
+                .addValue("limit", size).addValue("offset", (long) page * size);
+        String open = " WHERE j.grading_mode='HUMAN' AND j.reason='QA_SAMPLE' AND j.assigned_examiner_id=:reviewer"
+                + " AND j.status IN ('QUEUED','PROCESSING')";
+        var rows = jdbc.query(SELECT + FROM + open + " ORDER BY j.claimed_at,j.id LIMIT :limit OFFSET :offset", args,
+                JdbcExaminerQueueStore::entry);
+        Long total = jdbc.queryForObject("SELECT count(*) FROM grading_jobs j" + open, args, Long.class);
+        return new QueuePage(rows, page, size, total == null ? 0 : total);
+    }
     @Override public Optional<QueueEntry> find(UUID jobId) {
         return jdbc.query(SELECT+FROM+" WHERE j.id=:id AND j.grading_mode='HUMAN'", Map.of("id",jobId), JdbcExaminerQueueStore::entry).stream().findFirst();
     }

@@ -129,6 +129,18 @@ All assessment routes require an authenticated internal JWT. The authenticated s
 - Finalize is idempotent: finalizing a COMPLETED result returns it and writes no second outbox row.
 - Any EXAMINER can grade any result. There is no assignment model (`human_reviews`) yet.
 
+### Reads for the Mentor and R&D screens
+
+| Method | Path | Roles | Purpose |
+|---|---|---|---|
+| `GET` | `/api/assessments/qa-reviews/queue`, `/mine` | `EXAMINER` (Mentor) | QA review queue and the reviews the caller claimed |
+| `GET` | `/api/assessments/admin/examiner-quality` | `ADMIN` | Quality per examiner, with the examiner's name |
+| `GET` | `/api/assessments/admin/ai-gold-essays`, `/ai-evaluations`, `/ai-prompt-activations` | `ADMIN` | Gold essays, AI evaluation runs (with the pass thresholds) and prompt activations |
+
+Names come from user-service in batches of 50, with the caller's own bearer token; when user-service cannot answer, the
+rows are returned without names. Shapes and errors: [assessment-grading-v1](../../docs/contracts/assessment-grading-v1.md).
+Set `USER_SERVICE_URL` (config key `assessment.user.base-url`, default `http://localhost:8085`) when running outside Compose.
+
 Validation and domain errors use the module's `ErrorResponse` handler. Response saves use optimistic revision checks and return a conflict when the expected revision is stale.
 
 ## Persistence and configuration

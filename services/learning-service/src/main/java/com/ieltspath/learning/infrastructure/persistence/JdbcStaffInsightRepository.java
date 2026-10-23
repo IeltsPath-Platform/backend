@@ -184,12 +184,14 @@ public class JdbcStaffInsightRepository implements StaffInsightRepository {
     }
 
     @Override
-    public List<WorkItem> workItems(Collection<Queue> queues, WorkStatus status) {
+    public List<WorkItem> workItems(Collection<Queue> queues, WorkStatus status, WorkKind kind) {
         if (queues.isEmpty()) return List.of();
         return jdbc.query("SELECT " + ITEM_COLUMNS + " FROM work_items WHERE queue IN (:queues) "
-                        + "AND (CAST(:status AS varchar) IS NULL OR status = :status) ORDER BY created_at, id",
+                        + "AND (CAST(:status AS varchar) IS NULL OR status = :status) "
+                        + "AND (CAST(:kind AS varchar) IS NULL OR kind = :kind) ORDER BY created_at, id",
                 params("queues", queues.stream().map(Enum::name).toList())
-                        .addValue("status", status == null ? null : status.name()), ITEM);
+                        .addValue("status", status == null ? null : status.name())
+                        .addValue("kind", kind == null ? null : kind.name()), ITEM);
     }
 
     @Override
@@ -230,6 +232,18 @@ public class JdbcStaffInsightRepository implements StaffInsightRepository {
     public List<UUID> contentGapKnowledgePoints() {
         return jdbc.queryForList("SELECT kp_id FROM content_gap_signals ORDER BY last_detected_at DESC",
                 new MapSqlParameterSource(), UUID.class);
+    }
+
+    @Override
+    public java.util.Map<UUID, Integer> contentGapOccurrences(Collection<UUID> knowledgePointIds) {
+        java.util.Map<UUID, Integer> occurrences = new java.util.LinkedHashMap<>();
+        if (knowledgePointIds.isEmpty()) return occurrences;
+        jdbc.query("SELECT kp_id, occurrences FROM content_gap_signals WHERE kp_id IN (:ids)",
+                params("ids", List.copyOf(knowledgePointIds)),
+                row -> {
+                    occurrences.put(row.getObject("kp_id", UUID.class), row.getInt("occurrences"));
+                });
+        return occurrences;
     }
 
     @Override

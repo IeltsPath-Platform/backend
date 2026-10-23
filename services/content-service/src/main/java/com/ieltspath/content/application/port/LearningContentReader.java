@@ -49,6 +49,10 @@ public interface LearningContentReader {
 
     boolean lessonExists(UUID lessonId);
 
+    boolean topicExists(UUID topicId);
+
+    boolean courseExists(UUID courseId);
+
     /** Published practice sets of the lesson, by code. */
     List<LessonPracticeSetResult> lessonPracticeSets(UUID lessonId);
 
@@ -115,4 +119,8 @@ public interface LearningContentReader {
 
     /** Question versions with a classified difficulty; unknown and unclassified ids are omitted. */
     Map<UUID, QuestionDifficulty> questionDifficulties(Collection<UUID> questionVersionIds);
+
+    /** Names of knowledge points and the start of question stems, for the staff work queue; unknown ids are omitted. */
+    com.ieltspath.content.application.result.WorkItemSubjectsResult workItemSubjects(
+            Collection<UUID> knowledgePointIds, Collection<UUID> questionVersionIds);
 }

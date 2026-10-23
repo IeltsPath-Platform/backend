@@ -1,11 +1,11 @@
 # Phase 02: Màn "Đề & gói câu hỏi"
 
 Người làm: **Codex**. Nhánh hiện tại: `feat/content-author-screens` (frontend, worktree `../frontend-claude`, theo chỉ dẫn mới nhất của người dùng).
-Trạng thái: In progress — phần detail/draft/section đã triển khai local theo contract nhánh backend; toàn bộ phase và rollout còn chờ merge, API còn thiếu, checklist thật và toàn bộ suite xanh.
+Trạng thái: In progress — toàn bộ màn soạn gói đã triển khai local theo contract backend hiện tại; chờ backend merge và checklist thật trước rollout. Typecheck/lint/build qua; full suite còn lỗi ngoài phạm vi, test gói đã kiểm lại qua.
 
 Repo: `frontend`. Phụ thuộc rollout: code và contract backend tương ứng đã merge, môi trường thật sẵn sàng. Người dùng đã cho phép triển khai local phần contract nhánh trước khi merge.
 
-## Phạm vi hiện tại theo chỉ dẫn mới nhất 2026-10-23
+## Phạm vi partial trước đó (được thay thế bởi cập nhật đầy đủ trong Kết quả)
 
 - Chỉ triển khai trên nhánh `feat/content-author-screens` hiện tại: mở gói bằng UUID đã biết, detail, chọn version, tạo bản nháp rỗng, CRUD section và đổi thứ tự section bằng một PUT toàn bộ danh sách nguyên tử. Chỉ commit local; không push hoặc merge.
 - Dùng mục **Implementation status (2026-10-23)** trong `backend/docs/contracts/content-package-authoring-v1.md` làm giới hạn thực tế. Detail câu hỏi hiện chỉ có `{id, questionVersionId, sortOrder, maxScore}`; không giả định có stem, trạng thái, purpose, passage hoặc audio.
@@ -121,7 +121,15 @@ Sau mỗi thao tác ghi thành công: tải lại `getPackage` (gọi `reload` c
 - Build Vite qua, còn cảnh báo kích thước chunk sẵn có. Không tuyên bố tất cả cổng kiểm chứng xanh hoặc phase hoàn thành. Commit local: `e8fc46a feat(packages): edit package versions and sections`.
 - Gateway 8080/18080 timeout trong lượt này; checklist với backend thật và màn 390px chưa chạy. Không tuyên bố partial đã rollout hoặc toàn bộ phase hoàn thành. [PR #29](https://github.com/IeltsPath-Platform/frontend/pull/29) đang nháp; thay đổi mới chỉ được phép commit local.
 
+### Cập nhật đầy đủ 2026-10-23 — thay phạm vi partial
+
+- Theo yêu cầu mới, đã đọc contract local `content-package-authoring-v1.md`, `content-scheduled-publish-v1.md` và DTO/use case liên quan. Hoàn thiện catalog với sáu bộ lọc; form tạo gói, gồm TOPIC_TEST/COURSE_TEST gắn đúng chủ đề/khóa; chọn version, metadata/section CRUD, câu hỏi với mục đích phù hợp, đổi thứ tự nguyên tử; passage, audio upload 25 MiB và nhập key có sẵn; preview, xuất bản, lịch xuất bản và hủy lịch. Ghi thành công tải lại dữ liệu server; khóa thao tác khi gửi và bản không còn DRAFT.
+- Preview hỗ trợ cả map lựa chọn trong contract và mảng `{optionKey,content,sortOrder}` đã xác minh từ backend, theo quyết định người dùng. Có test fetch/UI cho cả hai dạng và đáp án/giải thích. Upload lỗi storage 503 không tạo link audio giả; lỗi giữ lựa chọn nhập.
+- Kiểm chứng: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build` qua (3049 module, cảnh báo chunk lớn sẵn có). Lần full `npm.cmd test`: 114/116 file, 882/884 test qua; lỗi flashcard tired ngẫu nhiên ngoài phạm vi và một assertion URL gói chạy trước khi điều hướng xong. Đã sửa assertion gói dùng waitFor; chạy riêng 17/17 test qua. Nhóm kiểm gói sau sửa preview: 9 file/169 test qua; nhóm component riêng trước đó 4 file/21 test qua. Không sửa/bỏ test flashcard, không tuyên bố full suite xanh.
+- Review cuối không còn phát hiện lỗi cụ thể trong preview, publication, state lock hoặc QuestionChooser. Chưa chạy checklist backend thật (tạo/xuất bản/lên lịch/nghe audio/file sai định dạng) hoặc đo trình duyệt 390px: backend còn local chưa merge, người dùng yêu cầu chỉ mock fetch trong lượt này. CSS mobile và kiểm tương tác đã viết, chưa thay thế kiểm trình duyệt thật.
+- Chỉ commit local trên `feat/content-author-screens`; không push/merge [PR #29](https://github.com/IeltsPath-Platform/frontend/pull/29). Các cờ resource/rubric/question drafts vẫn false. Ghi chú lịch sử partial ở trên không phản ánh giới hạn implementation hiện tại.
+- Commit local: `19fbdfe feat(packages): complete package authoring workflows`.
+
 ## Việc cho bên kia
 
-- Merge phần backend/contract detail, tạo draft, CRUD section và đổi thứ tự nguyên tử đã có trên nhánh, rồi kiểm live trước rollout; không yêu cầu triển khai lại các API này.
-- Phần đầy đủ còn thiếu theo Implementation status: catalog `GET /api/content/admin/packages`, section questions, passage/audio, audio upload và tạo `TOPIC_TEST`/`COURSE_TEST`. Chỉ mở tiếp UI khi API tương ứng có contract triển khai được xác nhận và được phép mở rộng phạm vi.
+- Merge backend và contract local tương ứng rồi báo để chạy checklist thật; các API đã có trong contract không còn là yêu cầu viết mới. Không sửa code hoặc contract backend trong lượt này.

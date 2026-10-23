@@ -130,8 +130,31 @@ exposes AI grades or comparison data.
 | POST | `/api/assessments/admin/ai-gold-essays` | Add a manually rated gold essay; returns `201 {id}`. |
 | POST | `/api/assessments/admin/ai-gold-essays/import-comparisons` | Import comparison rows with an examiner band; returns `{imported}` and skips submissions already imported. |
 | POST | `/api/assessments/admin/ai-evaluations` | Start an asynchronous evaluation, optionally scoped to `{task:"TASK_1"}` or `{task:"TASK_2"}`; returns `202 {id}`. If task is omitted, Assessment chooses the task with the largest gold set. |
-| GET | `/api/assessments/admin/ai-evaluations/{id}` | Read run metrics and per-essay comparisons. |
+| GET | `/api/assessments/admin/ai-evaluations/{id}` | Read run metrics and per-essay comparisons, plus `thresholds` (below). |
 | POST | `/api/assessments/admin/ai-prompt-activations` | Activate a passed evaluation with `{runId}`; returns `204`. Otherwise returns `409 EVALUATION_NOT_PASSED`. |
+| GET | `/api/assessments/admin/ai-gold-essays?task=&page=&size=` | List the gold set (below). |
+| GET | `/api/assessments/admin/ai-evaluations?task=&page=&size=` | List evaluation runs, newest first (below). |
+| GET | `/api/assessments/admin/ai-prompt-activations` | The prompt version each task currently uses (below). |
+
+### Read routes
+
+All three lists are `CONTENT_AUTHOR` only, filtered and ordered in the database. `task` is optional (`TASK_1` or `TASK_2`,
+otherwise `400`); `page` defaults to 0 and `size` to 20 (1 to 100, otherwise `400`). Pages are `{content, page, size,
+totalElements}`.
+
+- Gold essays, newest first: `{id, task, examinerBand, source, essayPreview, createdAt}`. `source` is `MANUAL` or
+  `COMPARISON` (imported from a comparison row). `essayPreview` is the first 200 characters; the prompt, chart facts and
+  criteria are not listed.
+- Runs, newest first: `{id, task, model, promptVersion, status, n, withinHalfBand, mae, qwk, passed, startedAt,
+  finishedAt}`. `status` is `RUNNING`, `DONE` or `FAILED`; metrics and `passed` are `null` until the run is done. The detail
+  stays at `GET …/ai-evaluations/{id}`.
+- Activations: always two entries, `TASK_1` then `TASK_2`: `{task, promptVersion, runId, activatedAt}`. A task never
+  activated has `null` in the last three fields: it is still graded by Content's `ACTIVE` rubric, which no evaluation has
+  approved (see "bootstrap" below).
+- `GET …/ai-evaluations/{id}` also returns `thresholds: {withinHalfBand, qwk}`, the values in force
+  (`assessment.ai-eval.min-within-half-band`, `assessment.ai-eval.min-qwk`).
+
+Nothing here logs essay or prompt text.
 
 Manual gold request fields are `task`, `prompt`, optional `chartFacts`, `essay`, `examinerBand`, optional
 `examinerCriteria`, and optional `examinerErrorCodes`. Task 1 requires chart facts when sent to the grader. The examiner

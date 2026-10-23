@@ -1,7 +1,7 @@
 # Phase 03: Slide và tài liệu trong trình soạn bài học
 
 Người làm: **Codex** (đổi từ Claude Code ngày 2026-10-23). Nhánh: `feat/content-author-screens` (frontend, worktree `../frontend-claude`, nhánh đã có commit tiền đề tách khu `/content-author`).
-Trạng thái: In progress — client/UI đổi thứ tự đã triển khai sau cờ false; rollout còn Blocked đến khi backend/contract merge main và kiểm live, toàn bộ suite còn 2 lỗi flashcard ngoài phạm vi.
+Trạng thái: In progress — client/UI đổi thứ tự vẫn sau cờ false; rollout còn Blocked chờ xác minh backend/contract merge main rồi bật cờ và kiểm lại; suite lượt mới còn 2 lỗi ngoài phạm vi thay đổi form chủ đề.
 
 Repo: `frontend`. CRUD dùng API đã có; bật đổi thứ tự sau khi xác minh backend/contract merge main, rồi chạy lại focused tests/các cổng kiểm và checklist live.
 
@@ -68,7 +68,7 @@ Mở một bài, thêm slide Google Slides embed, mở trang học viên `/learn
 - Thông báo API mới 2026-10-23: đã kiểm tra trực tiếp GitHub backend main `c600b3f399dddcbef060cdea6e7438bbf9a5f42d` và contract/controller tại đúng commit đó. Chưa có mục **Reorder slides or documents** hoặc `/resources/order`; API chưa được xác nhận merge. Giữ nguyên source frontend và chú thích chờ API, chưa gọi endpoint mới.
 - Lượt kiểm tra điều kiện merge này chỉ cập nhật file phase và mô tả PR #29; không có commit/frontend source mới, không chạy lại test/build hoặc checklist backend thật, không thay kết quả kiểm chứng code ở lượt trước bằng claim mới.
 
-### Cập nhật hiện tại 2026-10-23 — implementation sau cờ, chưa rollout
+### Lịch sử lượt trước 2026-10-23 — implementation sau cờ, chưa rollout
 
 - Đã thêm `reorderLessonResources` với Zod kiểm request và response rỗng `204`, cùng test mock fetch. Khi cờ bật, UI gửi đúng một PUT toàn bộ ID của loại SLIDE hoặc DOCUMENT theo thứ tự mới rồi tải lại; không dùng chuỗi PUT từng tài nguyên.
 - `RESOURCE_REORDER_ENABLED = false` tại `lessons/lib/resource-reorder.ts`; ở cấu hình hiện tại nút vẫn disabled **Chờ API đổi thứ tự** và không gọi endpoint mới. CRUD và bảo toàn bản nhập tiếp tục giữ nguyên.
@@ -76,6 +76,14 @@ Mở một bài, thêm slide Google Slides embed, mở trang học viên `/learn
 - Kiểm chứng cuối lượt: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build` qua (exit 0); 2 file / 12 test mới cho API lesson và UI khi bật cờ qua. Toàn bộ `npm.cmd test` exit 1: 102/103 file qua, 670/672 test qua; 2 lỗi ngẫu nhiên đã biết ở `flashcards/lib/owl-reactions.test.ts:87` (confused) và `:109` (tired), ngoài phạm vi. Không sửa/bỏ test, không chạy lại để đổi kết quả. Build còn cảnh báo kích thước chunk sẵn có.
 - Không tuyên bố tất cả cổng xanh hoặc phase hoàn thành. Commit local: `8aeeab2 feat(lessons): prepare atomic resource ordering`. Không push thêm hoặc merge; [PR #29](https://github.com/IeltsPath-Platform/frontend/pull/29) vẫn nháp, không cập nhật remote trong lượt này.
 - Gateway 8080/18080 timeout trong lượt này. Thêm slide thật, xem ở trang học viên, đổi thứ tự/tải lại và kiểm 390px vẫn chưa chạy.
+
+### Cập nhật mới nhất 2026-10-23 — xác minh lại cờ, chưa bật endpoint
+
+- Đã đọc lại `lessons/lib/resource-reorder.ts`: `RESOURCE_REORDER_ENABLED = false`. Lượt này không thay cờ và không gọi API `/resources/order` mới từ UI; phần CRUD hiện tại tiếp tục dùng API đã có.
+- Endpoint và mục **Reorder slides or documents** đã có trong contract nhánh `lesson-authoring-v1.md`; không yêu cầu backend triển khai lại. Thứ tự tiếp theo: xác minh backend code/contract merge main → bật true → chạy focused tests, đủ 4 cổng typecheck/lint/test/build và checklist live.
+- Kiểm chứng lượt mới: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build` qua (exit 0), build còn cảnh báo kích thước chunk sẵn có. Focused TopicForm/CoursesPage: 2 file / 21 test qua. Toàn bộ `npm.cmd test` exit 1: 102/104 file qua, 677/679 test qua; lỗi ở `flashcards/lib/owl-reactions.test.ts:87` và timeout 5000ms tại `UsersPage.test.tsx:69`, ngoài phạm vi thay đổi form chủ đề. Một lần chạy chẩn đoán riêng UsersPage qua 1 file / 10 test; không thay kết quả thất bại của full suite hoặc kết luận nguyên nhân từ lần chạy riêng này.
+- Gateway 8080/18080 tiếp tục timeout; checklist backend thật và 390px chưa chạy. Không tuyên bố mọi cổng xanh hoặc rollout/phase hoàn thành. Không sửa/bỏ test ngoài phạm vi.
+- Source lesson và cờ không đổi trong lượt này; commit frontend mới chỉ chứa phạm vi khóa học/chủ đề. Không push thêm, merge hoặc commit các ghi chú backend phase.
 
 ## Việc cho bên kia
 

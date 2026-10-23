@@ -1,7 +1,7 @@
 # Phase 10: Dựng course từ cây tri thức
 
 Người làm: **Claude Code**. Nhánh: `feat/content-course-drafts` (backend), tạo từ `origin/main` sau khi phase 09 đã merge.
-Trạng thái: Pending
+Trạng thái: Done (2026-10-23, chưa commit/merge; xem mục "Kết quả")
 
 Repo: `backend`, service `content-service`. Phụ thuộc: phase 01 (tạo gói, đề cuối, gắn câu), phase 07 (`import_ref`), phase 08 (bảng bản nháp).
 
@@ -75,4 +75,18 @@ Mentor: "course bám theo cây tri thức để tạo ra", không phải "có đ
 
 ## Kết quả
 
-(Người làm điền.)
+**2026-10-23 (Claude Code), chưa commit.** Trạng thái: Done (chờ merge).
+
+- Contract `course-drafts-v1.md` viết trước khi code; có phần "AI course drafts" để phase 11 bổ sung.
+- Domain thuần: `CourseDraftStructure`, `CourseCatalogFacts`, `CourseDraftAnalysis`, `CourseCoverageAnalyzer` (không đọc DB). Kho dữ kiện đọc theo lô qua port `CourseCatalogReader` (`JdbcCourseCatalogReader`, khoảng 12 truy vấn cố định).
+- Use case: `CourseDraftUseCases` (tạo thẳng `READY`, `model` null, không trừ hạn mức AI; sửa; phân tích), `ApproveCourseDraftUseCase` (một transaction, dùng lại `CreateCourseUseCase`, `UpdateCourseUseCase`, `CreateTopicUseCase`, `UpdateTopicUseCase`, `LessonAuthoringUseCase`, `CreateContentPackageUseCase.executeAsAuthor`, `CreateDraftPackageVersionUseCase`). Route `CourseDraftController` dưới `/api/content/admin/course-drafts`; danh sách và từ chối dùng route chung `ai-drafts?kind=COURSE`.
+- Quyết định phải ghi lại:
+  - **"KP thuộc band của course"** hiểu là KP `ACTIVE` có `cefr_level` bằng mức CEFR của band course (tới 4.5 B1, 6.0 B2, 7.5 C1, còn lại C2) và kỹ năng thuộc kỹ năng các topic của bản nháp hoặc `ALL`/rỗng. KP không có `cefr_level` không được mong đợi. Lý do: KP gắn với topic hiện có, còn topic của course mới chưa tồn tại nên không suy band từ cây được.
+  - **Mốc practice test** ghi thẳng bằng `PracticeTestMilestoneRepository` chứ không qua `ReplacePracticeTestMilestonesUseCase`: use case đó chỉ nhận vị trí của topic `ACTIVE` có lesson `PUBLISHED`, mà topic mới là `INACTIVE` và lesson là `DRAFT`, nên luôn bị từ chối. Test và vị trí đã được kiểm bằng phân tích và kiểm cú pháp.
+  - **Gắn practice set vào lesson** bằng câu `UPDATE` có điều kiện (`lesson_id IS NULL`, đúng loại) qua `ContentPackageRepository.attachPracticeSetToLesson`, không ghi lại cả gói và các version.
+  - **Ràng buộc "một gói chỉ thuộc một chỗ"**: `content_packages` có `lesson_id`, `topic_id`, `course_id` riêng; gói `PRACTICE_SET` chỉ cho vào lesson khi cả ba đều null. `course_practice_test_milestones.package_id` là `UNIQUE`. Không phải đổi mô hình gói.
+  - Mã trùng, band đã có course, `sort_order` topic gốc trùng đều là xung đột `409 CODE_CONFLICT`; mọi lỗi khác là `422 COURSE_DRAFT_INVALID`; lỗi cú pháp là `400 INVALID_COURSE_DRAFT` kèm đường dẫn.
+  - `TopicRepositoryAdapter.save` đổi sang `saveAndFlush` để các ghi JDBC cùng transaction (lesson của topic mới, đề cuối) thấy topic.
+  - Khối `EXERCISE` không mang KP (KP lấy từ câu); khối `TEXT` có thể trống.
+- Test: `CourseCoverageAnalyzerTest` (19 tình huống), `CourseDraftCodecTest`, `CourseDraftUseCasesTest`, `CourseDraftControllerTest`, `CourseDraftAuthorizationTest`, `ApproveCourseDraftIntegrationTest` (Testcontainers: duyệt tạo đúng course/topic/lesson/block, gắn practice set, đề cuối `DRAFT` kèm version rỗng, mốc, course/topic `INACTIVE` không có trong `topicSequence`, đề cuối không có trong `publishedTestPackages`/`courseTestPackages`; lỗi giữa chừng không còn bản ghi nào; mã trùng là xung đột; tiên quyết sai thứ tự là lỗi; bản nháp của người khác là 404).
+- Chưa làm: kiểm "course đã duyệt kích hoạt được" (kích hoạt vẫn là bước thủ công ở màn Khóa học, và đòi lesson/đề cuối đã xuất bản); sửa từng phần của bản nháp (chỉ thay cả cấu trúc bằng `PUT`).

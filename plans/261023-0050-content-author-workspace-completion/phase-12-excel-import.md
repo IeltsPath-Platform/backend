@@ -1,7 +1,7 @@
 # Phase 12: Import Excel theo template
 
 Người làm: **Claude Code**. Nhánh: `feat/content-course-import` (backend), tạo từ `origin/main` sau khi phase 11 đã merge.
-Trạng thái: Pending
+Trạng thái: Done (2026-10-23, chưa commit/merge; xem mục "Kết quả")
 
 Repo: `backend`, service `content-service`. Phụ thuộc: phase 01 (tạo gói, đề cuối, gắn câu vào section), phase 07 (`import_ref`), phase 10 (`CourseCoverageAnalyzer`, đường duyệt course). Không cần hạ tầng LLM.
 
@@ -74,4 +74,15 @@ Luật kiểm tra ở domain; POI chỉ ở infrastructure sau port.
 
 ## Kết quả
 
-(Người làm điền.)
+Đã làm đủ ba route, contract `docs/contracts/course-import-v1.md` và file template `src/main/resources/import/course-import-template-v1.xlsx`.
+
+- **Cấu trúc code:** một `CourseImportUseCases` (validate và execute) và `DownloadImportTemplateUseCase`, thay cho ba use case trong thiết kế. Đọc file qua port `CourseWorkbookReader` (`PoiCourseWorkbookReader`), luật kiểm tra thuần domain ở `CourseImportValidator`, đọc danh mục hàng loạt qua `ImportCatalogReader`. Phần dựng course dùng chung `CourseMaterializer` với đường duyệt course draft; câu hỏi, gói, section dùng use case có sẵn.
+- **Kiểm tra cây:** `PREREQUISITE_ORDER` và trùng mã/band/sortOrder chặn; `KP_NOT_COVERED` và `gaps` là cảnh báo. Cảnh báo thiếu bài luyện được tính lại có cộng câu hỏi và practice set của chính file, vì phân tích gốc chưa thấy chúng (chưa lưu).
+- **An toàn file:** `.xlsx` theo tên và chữ ký ZIP, 5 MiB, 2000 dòng tổng, ô tối đa 20000 ký tự, công thức, macro (`vbaProject`) và zip bomb (tỉ lệ + kích thước giải nén) bị từ chối; thông báo lỗi không chứa nội dung ô. Hạn mức `IMPORT` chỉ tính ở bước ghi.
+- **Không làm:** "cảnh báo sớm câu không tự chấm / essay thiếu passBand" của đề cuối không cần, vì file chỉ nhận bốn kiểu câu tự chấm được (`MULTIPLE_CHOICE`, `TRUE_FALSE_NOT_GIVEN`, `FILL_IN_BLANK`, `SHORT_ANSWER`). Gói tạo ra vẫn phải qua kiểm tra khi xuất bản như thường.
+- **Lỗi thật tìm ra khi viết test tích hợp, đã sửa:**
+  - `distractorErrorCodes` chỉ kiểm mã `ACTIVE`, trong khi use case câu hỏi đòi thêm `APPROVED` (toàn bộ mã seed còn `DRAFT`): file qua bước kiểm tra rồi hỏng ở bước ghi. Import và bộ sinh câu hỏi (phase 09) nay dùng `findApprovedActive`.
+  - `findByImportRef` trả bản tóm tắt không có version; import đọc lại câu đầy đủ bằng `findById` trước khi gắn vào block/section.
+  - Thiếu part `file` trả 500; nay `400 MISSING_PART`. Quá giới hạn multipart 25 MiB ở route import nay trả `FILE_TOO_LARGE` thay vì `AUDIO_TOO_LARGE`.
+- **Test:** `CourseImportValidatorTest` (14), `PoiCourseWorkbookReaderTest` (14), `ImportTemplateFileTest`, `CourseImportIntegrationTest` (8, Testcontainers: validate không ghi, import tạo course `INACTIVE`/lesson, câu hỏi, gói `DRAFT` và mốc đúng chỗ, file lỗi không tạo gì, mã đã có là xung đột, hết hạn mức không tạo gì, lỗi giữa chừng rollback sạch), `CourseImportControllerTest` (9), `CourseImportAuthorizationTest`. Ghi lại file template khi định nghĩa cột đổi: chạy `ImportTemplateFileTest` với `-DwriteImportTemplate=true`.
+- **Chưa chạy lại toàn bộ suite sau phase này** (chạy một lượt cuối khi cả plan xong).

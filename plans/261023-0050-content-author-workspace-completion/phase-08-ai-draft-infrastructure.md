@@ -1,7 +1,7 @@
 # Phase 08: Hạ tầng bản nháp, job nền, hạn mức và LLM
 
 Người làm: **Claude Code**. Nhánh: `feat/content-ai-drafts` (backend), tạo từ `origin/main` sau khi phase 07 đã merge.
-Trạng thái: Pending
+Trạng thái: Done (2026-10-23, commit `587d8d32`, chưa merge; xem mục "Kết quả")
 
 Repo: `backend`, service `content-service`. Phụ thuộc: phase 01 đã merge (cùng sửa `content-service.yaml`, `docker-compose.yml`, `pom.xml`).
 

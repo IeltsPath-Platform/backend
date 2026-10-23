@@ -87,6 +87,25 @@ public interface LearningContentClient {
         return Map.of();
     }
 
+    /**
+     * Names of the knowledge points and the start of the question stems (at most 500 of each) that staff work items are
+     * about. Unknown ids are absent. Used only to label the work queue.
+     */
+    default WorkItemSubjects workItemSubjects(Collection<UUID> knowledgePointIds, Collection<UUID> questionVersionIds) {
+        return new WorkItemSubjects(Map.of(), Map.of());
+    }
+
+    record WorkItemSubjects(Map<UUID, KnowledgePointLabel> knowledgePoints, Map<UUID, QuestionLabel> questions) {
+        public WorkItemSubjects {
+            knowledgePoints = knowledgePoints == null ? Map.of() : knowledgePoints;
+            questions = questions == null ? Map.of() : questions;
+        }
+    }
+
+    record KnowledgePointLabel(String code, String name) {}
+
+    record QuestionLabel(UUID questionId, String stemPreview) {}
+
     /** Published practice sets, practice tests and lessons for these points (at most 50), none above {@code maxBand}. */
     SuggestionCandidates suggestionCandidates(List<UUID> knowledgePointIds, BigDecimal maxBand);
 

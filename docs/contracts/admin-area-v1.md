@@ -41,6 +41,14 @@ do not contain the original examiner or band. Jobs older than 48 hours include `
 `GET /api/assessments/qa-reviews/{jobId}/essay` returns the essay and task without the original grade. The reviewer must
 not be the examiner who graded the original submission.
 
+### `GET /api/assessments/qa-reviews/mine?page=&size=`
+
+Role: `CONTENT_AUTHOR`. The quality-review essays the caller has claimed and not yet reviewed, oldest claim first, so a
+reviewer who left the page can find them again. Same page shape and entries as the queue (`overdue` included), with
+`assignedExaminerId` and `claimedAt` set. `page` defaults to 0 and `size` to 20 (1 to 100, otherwise `400`). An essay
+leaves this list as soon as its review is submitted (`POST /api/assessments/qa-reviews`), and it never lists essays that
+are only queued or claimed by someone else.
+
 ### `POST /api/assessments/qa-reviews`
 
 Role: `CONTENT_AUTHOR`. Submit a blind re-review. Reviewer band must be an IELTS half-band from 0 through 9.
@@ -60,6 +68,17 @@ Response: `204 No Content`.
 
 Role: `CONTENT_AUTHOR`. Returns one aggregate per original examiner with sample count, mean absolute band difference, and the
 fraction of reviews whose difference is greater than one band.
+
+```json
+[{"examinerId": "…", "examinerName": "Linh Tran", "reviewedEssays": 4,
+  "averageAbsoluteBandDifference": 0.50, "overOneBandRate": 0.2500}]
+```
+
+`examinerName` is the display name from the User Service and is `null` when it cannot be read. Assessment asks
+`POST /internal/users/display-names` (see [user-internal-v1](user-internal-v1.md)) once for the whole table, in batches of
+50 ids, with the caller's bearer token and `X-Correlation-Id`. A User Service error or timeout (2 s connect, 3 s read)
+still returns the table, with every name `null`. The base URL is `assessment.user.base-url`
+(`USER_SERVICE_URL`, default `http://localhost:8085`).
 
 ## Paid human grading for topic essays
 

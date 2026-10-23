@@ -45,7 +45,8 @@ Stored in `errorCode`, safe to show. They never include the prompt or the model'
 | --- | --- |
 | `NOT_CONFIGURED` | `CONTENT_LLM_BASE_URL` or `CONTENT_LLM_MODEL` is empty. |
 | `FAILED` | The model call failed or timed out. |
-| `INVALID_REPLY` | The model answered without text. |
+| `INVALID_REPLY` | The model answered without usable text: none, not JSON, or (for a course plan, after a second try) nothing that fits the candidate set. |
+| `NO_CANDIDATES` | A course request matched no knowledge point, so there was nothing to plan from. |
 | `UNSUPPORTED_KIND` | No generator is registered for the draft's kind. |
 | `INTERNAL` | An unexpected error in the job. |
 

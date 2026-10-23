@@ -55,6 +55,19 @@ public class AiDraft {
                 null, now, null, null, null, null, null);
     }
 
+    /** A draft the author wrote by hand. There is nothing to generate, so it is ready to review at once. */
+    public static AiDraft manual(DraftKind kind, UUID author, String resultJson, Instant now) {
+        return new AiDraft(UUID.randomUUID(), kind, DraftStatus.READY, author, "{}",
+                Objects.requireNonNull(resultJson, "resultJson must not be null"), null, null, null, now, null, now,
+                null, null, null);
+    }
+
+    /** The author edits a draft that is still waiting for review. */
+    public void replaceResult(String resultJson) {
+        requireStatus(DraftStatus.READY);
+        this.resultJson = Objects.requireNonNull(resultJson, "resultJson must not be null");
+    }
+
     /** Called by the job after it claims the draft; the claim itself already moved it to GENERATING. */
     public void complete(String resultJson, String model, String promptVersion, Instant now) {
         requireStatus(DraftStatus.GENERATING);

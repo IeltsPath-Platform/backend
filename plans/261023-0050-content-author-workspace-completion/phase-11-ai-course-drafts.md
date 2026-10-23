@@ -1,7 +1,7 @@
 # Phase 11: AI sinh course từ yêu cầu
 
 Người làm: **Claude Code**. Nhánh: `feat/content-ai-course-drafts` (backend), tạo từ `origin/main` sau khi phase 10 đã merge.
-Trạng thái: Pending
+Trạng thái: Done (2026-10-23, chưa commit/merge; xem mục "Kết quả")
 
 Repo: `backend`, service `content-service`. Phụ thuộc: phase 08 (hạ tầng), phase 09 (sinh câu, để bù KP thiếu), phase 10 (cấu trúc, kiểm phủ, duyệt).
 
@@ -60,4 +60,14 @@ Tạo: `C/application/service/{CourseCandidateSelector, CoursePromptBuilder, Cou
 
 ## Kết quả
 
-(Người làm điền.)
+**2026-10-23 (Claude Code), chưa commit.** Trạng thái: Done (chờ merge).
+
+- Contract: phần "AI course drafts" trong `course-drafts-v1.md`; mã lỗi `NO_CANDIDATES` thêm vào `ai-drafts-v1.md`.
+- `POST /api/content/admin/ai-drafts/courses` (`AiCourseDraftController`, `RequestCourseDraftUseCase`): kiểm yêu cầu, trừ hạn mức `AI`, lưu `QUEUED`, `202`.
+- `CourseCandidateSelector` (luật, không LLM): KP theo id hoặc khớp cụm chủ đề (chuẩn hóa chữ thường, bỏ dấu, mọi từ phải có trong tên/mã/mô tả), thêm tiên quyết ở mức CEFR thấp hơn làm "nền", xếp tô-pô (Kahn, hòa thì giữ thứ tự chọn), tối đa `content.ai.max-course-candidates` (40), kèm gói `PRACTICE_SET` chưa gắn và câu `LEARNING` đã xuất bản.
+- `CoursePromptBuilder` (`COURSE-v1`): chỉ mã, tên, mô tả ngắn, mã gói, nhãn câu `Q1…`; không có id câu hỏi, nội dung câu, dữ liệu học viên.
+- `CourseDraftValidator`: mã KP/gói/nhãn câu ngoài tập ứng viên bị loại kèm `HALLUCINATED_REFERENCE`; dùng hai chỗ → `DUPLICATE_REFERENCE`; lesson hết KP bị bỏ (`EMPTY_LESSON_DROPPED`), topic hết lesson bị bỏ (`EMPTY_TOPIC_DROPPED`); mã do model đặt được làm sạch và đảm bảo duy nhất; `sortOrder` topic nối tiếp sau topic gốc cao nhất đang có.
+- `CourseDraftGenerator`: hai lần thử, vẫn hỏng → `INVALID_REPLY` (job hoàn hạn mức); không ứng viên → `NO_CANDIDATES` (không gọi model); kết quả = cấu trúc + `unmatchedTopics`, `warnings`, `analysis`, `gapHints` (`REQUEST_QUESTION_DRAFT`). Không sinh thêm câu nào để bù thiếu.
+- Duyệt/sửa/phân tích dùng route của phase 10; trường phụ bị bỏ khi tác giả `PUT` cấu trúc.
+- Test: `CourseCandidateSelectorTest`, `CourseDraftValidatorTest`, `CourseDraftGeneratorTest`, `RequestCourseDraftUseCaseTest`, `AiCourseDraftControllerTest`, `CourseDraftAuthorizationTest`, `AiCourseDraftIntegrationTest` (Testcontainers, model giả trả cấu trúc có một mã bịa: bản nháp sạch, gaps đúng, duyệt tạo course `INACTIVE`, lượt dùng được giữ khi thành công và hoàn khi lỗi, không có câu hỏi nào được tạo).
+- Lưu ý: mã CEFR của band 6.5 là `C1` (tới 4.5 B1, 6.0 B2, 7.5 C1), nên KP của course 6.5 phải có `cefr_level = C1` mới vào tập ứng viên theo cụm chủ đề.

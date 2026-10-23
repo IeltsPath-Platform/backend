@@ -2,6 +2,8 @@ package com.ieltspath.learning.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.result.StaffInsightResults;
+import com.ieltspath.learning.application.result.WorkItemView;
+import com.ieltspath.learning.domain.vo.StaffRecords.WorkKind;
 import com.ieltspath.learning.application.usecase.StaffInsightUseCase;
 import com.ieltspath.learning.application.usecase.StaffWorkUseCase;
 import com.ieltspath.learning.domain.vo.StaffRecords.FlagStatus;
@@ -50,10 +52,12 @@ public class StaffAdminController {
 
     @GetMapping("/admin/work-items")
     @PreAuthorize("hasAnyRole('EXAMINER', 'CONTENT_AUTHOR')")
-    public List<WorkItem> workItems(@RequestParam(name = "queue", required = false) Queue queue,
-                                    @RequestParam(name = "status", required = false) WorkStatus status,
-                                    Authentication authentication) {
-        return work.list(queues(authentication), queue, status);
+    public List<WorkItemResponse> workItems(@RequestParam(name = "queue", required = false) Queue queue,
+                                            @RequestParam(name = "status", required = false) WorkStatus status,
+                                            @RequestParam(name = "kind", required = false) WorkKind kind,
+                                            Authentication authentication) {
+        return work.listWithSubjects(queues(authentication), queue, status, kind).stream()
+                .map(WorkItemResponse::from).toList();
     }
 
     @PatchMapping("/admin/work-items/{id}")
@@ -103,6 +107,19 @@ public class StaffAdminController {
             }
         }
         return queues;
+    }
+
+    /** A work item as before, plus {@code subject}: what a content item is about, or null. */
+    public record WorkItemResponse(UUID id, Queue queue, WorkKind kind, UUID subjectUserId, UUID subjectRef,
+                                   String detail, WorkStatus status, UUID assigneeId, String action, String result,
+                                   String note, boolean noteVisibleToLearner, java.time.Instant createdAt,
+                                   java.time.Instant updatedAt, java.util.Map<String, Object> subject) {
+        static WorkItemResponse from(WorkItemView view) {
+            WorkItem item = view.item();
+            return new WorkItemResponse(item.id(), item.queue(), item.kind(), item.subjectUserId(),
+                    item.subjectRef(), item.detail(), item.status(), item.assigneeId(), item.action(), item.result(),
+                    item.note(), item.noteVisibleToLearner(), item.createdAt(), item.updatedAt(), view.subject());
+        }
     }
 
     public record UpdateWorkItemRequest(WorkStatus status, String action, String result, String note,

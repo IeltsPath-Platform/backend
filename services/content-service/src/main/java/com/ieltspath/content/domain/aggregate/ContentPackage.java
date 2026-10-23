@@ -26,6 +26,7 @@ public class ContentPackage {
     private final List<ContentPackageVersion> versions;
     private final UUID lessonId;
     private final UUID courseId;
+    private final UUID topicId;
 
     /** {@code lessonId} makes a practice set part of that lesson's Practice; other package types have none. */
     public ContentPackage(UUID id, String code, String title, PackageType packageType,
@@ -48,6 +49,15 @@ public class ContentPackage {
                           String requiredFeatureKey, PublicationStatus status,
                           UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
                           List<ContentPackageVersion> versions, UUID lessonId, UUID courseId, String sourceCode) {
+        this(id, code, title, packageType, requiredFeatureKey, status, currentPublishedVersionId, createdAt, updatedAt,
+                versions, lessonId, courseId, sourceCode, null);
+    }
+
+    public ContentPackage(UUID id, String code, String title, PackageType packageType,
+                          String requiredFeatureKey, PublicationStatus status,
+                          UUID currentPublishedVersionId, Instant createdAt, Instant updatedAt,
+                          List<ContentPackageVersion> versions, UUID lessonId, UUID courseId, String sourceCode,
+                          UUID topicId) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.code = Objects.requireNonNull(code, "code must not be null");
         this.title = Objects.requireNonNull(title, "title must not be null");
@@ -67,6 +77,7 @@ public class ContentPackage {
             throw new IllegalArgumentException("A COURSE_TEST package must belong to a course");
         }
         this.courseId = courseId;
+        this.topicId = topicId;
     }
 
     public static ContentPackage create(String code, String title, PackageType packageType, String requiredFeatureKey) {
@@ -83,6 +94,17 @@ public class ContentPackage {
         Instant now = Instant.now();
         return new ContentPackage(UUID.randomUUID(), code, title, packageType, requiredFeatureKey,
                 PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), lessonId, null, sourceCode);
+    }
+
+    /** A final test is bound to its topic or course when created and stays bound. */
+    public static ContentPackage createFinalTest(String code, String title, PackageType packageType,
+                                                 String requiredFeatureKey, UUID topicId, UUID courseId) {
+        if (packageType == PackageType.TOPIC_TEST && topicId == null) {
+            throw new IllegalArgumentException("A TOPIC_TEST package must belong to a topic");
+        }
+        Instant now = Instant.now();
+        return new ContentPackage(UUID.randomUUID(), code, title, packageType, requiredFeatureKey,
+                PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), null, courseId, null, topicId);
     }
 
     public void publishVersion(UUID versionId) {
@@ -139,6 +161,7 @@ public class ContentPackage {
     public UUID getId() { return id; }
     public UUID getLessonId() { return lessonId; }
     public UUID getCourseId() { return courseId; }
+    public UUID getTopicId() { return topicId; }
     public String getCode() { return code; }
     public String getTitle() { return title; }
     public PackageType getPackageType() { return packageType; }

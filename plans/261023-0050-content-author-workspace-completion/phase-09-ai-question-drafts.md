@@ -1,7 +1,7 @@
 # Phase 09: AI sinh câu hỏi
 
 Người làm: **Claude Code**. Nhánh: `feat/content-ai-question-drafts` (backend), tạo từ `origin/main` sau khi phase 08 đã merge.
-Trạng thái: Pending
+Trạng thái: Done (2026-10-23, chưa commit/merge; xem mục "Kết quả")
 
 Repo: `backend`, service `content-service`. Phụ thuộc: phase 07 (`import_ref`), phase 08 (hạ tầng nháp).
 
@@ -72,4 +72,16 @@ Tạo: `C/application/usecase/{RequestQuestionDraftUseCase, EditDraftItemUseCase
 
 ## Kết quả
 
-(Người làm điền.)
+Đã làm (2026-10-23, Claude Code, chưa commit):
+- Yêu cầu sinh: `POST /api/content/admin/ai-drafts/questions` (kiểm KP đang hoạt động, dạng câu được hỗ trợ, số câu, độ khó, độ dài hướng dẫn); hạn mức dùng hạ tầng phase 08.
+- Generator: prompt chỉ từ mô tả KP và yêu cầu; kiểm từng câu (`QuestionDraftValidator`); giữ câu hợp lệ, ghi lý do câu bị loại; không câu nào hợp lệ thì `INVALID_REPLY`. `answer_spec` do server dựng, không lấy nguyên từ model.
+- Duyệt: `POST …/{id}/approve` tạo câu `DRAFT` qua `CreateQuestionUseCase` và `AddQuestionVersionUseCase` (tái dùng, không viết đường ghi mới), `importRef = ai-<draftId>-<index>`; lỗi một câu thì không tạo gì.
+- Kiểm: `QuestionDraftValidatorTest` (7), `QuestionDraftGeneratorTest` (3), `ApproveQuestionDraftUseCaseTest` (3); toàn bộ content-service xanh.
+- Phần còn lại đã làm (2026-10-23):
+  - Sửa và xóa từng câu: `PATCH` và `DELETE /api/content/admin/ai-drafts/{id}/items/{index}` (`EditDraftItemUseCase`). Sửa dựng lại thành dạng ứng viên rồi kiểm bằng đúng bộ luật của bộ sinh (`QuestionDraftValidator`), nên một câu sửa xong vẫn không thể sai schema hay mã lỗi lạ; vi phạm trả `422 INVALID_DRAFT_ITEM` kèm `reason`, bản nháp không đổi. Sau khi xóa, các câu phía sau dồn lên một vị trí; `rejected` giữ nguyên vì `index` của nó là của lần trả lời gốc.
+  - Kiểm trùng nguyên văn: `DUPLICATE_STEM` so stem đã chuẩn hóa (chữ thường, gộp khoảng trắng) với mọi version câu của KP (`QuestionStemReader`/`JdbcQuestionStemReader`, một truy vấn) và với các câu đã giữ trong cùng bản nháp.
+  - Route duyệt và các route còn lại của `QuestionDraftController` có `QuestionDraftAuthorizationTest`.
+  - Lỗi tìm ra: mã lỗi phân phối chỉ được kiểm `ACTIVE` ở bộ sinh nhưng bước duyệt đòi thêm `APPROVED`, nên câu qua được bản nháp rồi hỏng khi duyệt; bộ sinh nay dùng `findApprovedActive`.
+  - Test thêm: `EditDraftItemUseCaseTest` (9), `QuestionDraftControllerTest` (7), `QuestionDraftAuthorizationTest`, `JdbcQuestionStemReaderTest`, ca trùng trong `QuestionDraftValidatorTest` và `QuestionDraftGeneratorTest`.
+- Không làm: loại `MATCHING` (không có spec chấm tự động trong phạm vi này; contract chỉ liệt kê bốn loại hỗ trợ).
+- Contract: `docs/contracts/question-drafts-v1.md`.

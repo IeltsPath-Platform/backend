@@ -286,6 +286,27 @@ backfill sets it from the course. Questions used only in library practice tests 
 `NULL`, and nothing guesses a value for them. Learning treats a missing tag as untagged: an untagged correct answer earns
 the unknown-difficulty XP, the too-easy/too-hard check uses the general limits, and staff statistics leave the field out. Invalid or oversized input returns `400`.
 
+## `POST /work-item-subjects`
+
+Names the knowledge points and questions that Learning's staff work items are about, in two database queries. Like the
+other `/internal/learning-content/**` routes it needs an authenticated internal JWT.
+
+Request: `knowledgePointIds` and `questionVersionIds`, each 0–500 UUIDs without `null` (either may be omitted).
+
+```json
+{"knowledgePointIds":["10000000-0000-4000-8000-000000000002"],"questionVersionIds":["20000000-0000-4000-8000-000000000201"]}
+```
+
+Response:
+
+```json
+{"knowledgePoints":{"10000000-0000-4000-8000-000000000002":{"code":"R-PARA","name":"Paraphrase"}},
+ "questions":{"20000000-0000-4000-8000-000000000201":{"questionId":"20000000-0000-4000-8000-000000000101","stemPreview":"Which sentence best…"}}}
+```
+
+Unknown ids are absent from the maps. `stemPreview` is the first 120 characters of the stem. More than 500 ids in a list
+returns `400`.
+
 ## `POST /suggestions/candidates`
 
 Returns published content candidates for Learning's optional suggestions in one batched request. Like the other

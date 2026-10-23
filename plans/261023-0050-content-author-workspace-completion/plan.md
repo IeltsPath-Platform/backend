@@ -1,7 +1,7 @@
 ---
 title: "Khu soạn nội dung (CONTENT_AUTHOR): soạn tay đề/gói và đề cuối, slide, khóa học, rubric, mã lỗi; AI sinh câu hỏi/course; import Excel"
 description: "Lượt hai sau rd-admin-area, gộp cả plan 261016-0804: API và màn soạn gói đề (kể cả đề cuối topic/course), màn cho các API author đã có, rồi AI sinh câu hỏi/course, dựng course từ cây tri thức và import Excel"
-status: pending
+status: in-progress
 priority: P1
 branch: "claude (backend): feat/content-package-authoring (01), feat/review-work-queue-api (14), mỗi phase 07–12 một nhánh feat/content-*; codex (frontend): feat/content-author-screens (03–06), feat/content-package-screens (02), feat/content-review-screens (15), feat/content-ai-screens (13)"
 tags: [content-service, frontend, admin, content-package, rubric, course, ai, llm, course-builder, excel-import]

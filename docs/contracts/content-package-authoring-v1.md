@@ -19,17 +19,16 @@ Errors use the existing Content `ErrorResponse` envelope (`timestamp`, `status`,
 
 ## Implementation status (2026-10-23)
 
-Implemented: author detail (section 1, partial), create draft (section 2), section create/update/delete and
-ordering (section 3). Not yet implemented: the list route `GET /api/content/admin/packages`, section questions
-(section 4), passage and audio (section 5), audio upload (section 6), and package creation for
-`TOPIC_TEST`/`COURSE_TEST` (plan phase 01, section 7). Until those land, the author detail response omits
-`questionId`, `stem`, `status`, `purpose`, `passage` and `audio`; questions appear only as
-`{id, questionVersionId, sortOrder, maxScore}`.
+Everything in sections 1 to 7 below is implemented. The detail response has the shape `{id, code, title,
+packageType, accessLevel, status, currentPublishedVersionId, lessonId, topicId, courseId, sourceCode, createdAt,
+updatedAt, versions[]}`. Each version has `id, versionNumber, status, rulesJson, publishedAt, publishAt,
+lastPublishError, sections[]`, and each section has `id, title, skill, sortOrder, timeLimitSeconds, partNo,
+coverAssetId, instructions, passage, audio, questions[]`. Each question has `id, questionVersionId, questionId,
+sortOrder, maxScore, stem, status, purpose`.
 
-The detail response has the shape `{id, code, title, packageType, accessLevel, status,
-currentPublishedVersionId, lessonId, courseId, sourceCode, createdAt, updatedAt, versions[]}`. Each version
-has `id, versionNumber, status, rulesJson, publishedAt, publishAt, lastPublishError, sections[]`, and each
-section has `id, title, skill, sortOrder, timeLimitSeconds, partNo, coverAssetId, instructions, questions[]`.
+Two responses carry less than the detail: the response of `POST /versions` (a version with `sections: []`) and the
+responses of the section routes, which return a section without `passage`, `audio` and question details (they are
+`null`). Read the detail again to get them.
 
 Section sort order is unique within a version. Creating or updating a section with a sort order that another
 section of the same version holds returns `400`. Reordering is one transaction: the sort-order uniqueness check
@@ -48,6 +47,7 @@ a published version returns `400 VERSION_NOT_DRAFT` regardless of section IDs.
   "id": "<uuid>", "code": "READING-PRACTICE-1", "title": "Reading practice",
   "packageType": "PRACTICE_SET", "accessLevel": "FREE", "status": "PUBLISHED",
   "currentPublishedVersionId": "<uuid>", "lessonId": "<uuid or null>",
+  "topicId": null, "courseId": null,
   "sourceCode": null, "createdAt": "2026-10-23T00:00:00Z", "updatedAt": "2026-10-23T00:00:00Z",
   "versions": [{
     "id": "<uuid>", "versionNumber": 2, "status": "DRAFT", "rulesJson": "{}",
@@ -78,11 +78,12 @@ Audio URLs use the same `MediaReferencePolicy` as preview; raw audio keys and op
 remain author-only. Asset selection uses the first link by `sort_order` and ID for each asset type.
 The reader loads relations in bounded bulk queries, never one query per version/section/question.
 
-`GET /api/content/admin/packages?type=&status=&lessonId=&q=` returns an array of existing
-`ContentPackageResponse` fields plus `latestVersionNumber` (null if no version) and `hasDraft`
-(boolean). Optional `type` is a `PackageType`; `status` is a publication status; `lessonId` is a UUID.
-`q` matches code or title case-insensitively as a literal substring. Results are limited to 500,
-ordered by decreasing `updatedAt` then ID. There is no pagination in v1.
+`GET /api/content/admin/packages?type=&status=&lessonId=&topicId=&courseId=&q=` returns an array of the
+`ContentPackageResponse` fields plus `topicId`, `courseId`, `latestVersionNumber` (null if no version) and
+`hasDraft` (boolean). Optional `type` is a `PackageType`; `status` is a publication status; `lessonId`,
+`topicId` and `courseId` are UUIDs. `q` matches code or title case-insensitively as a literal substring (`%`
+and `_` are not wildcards). Results are limited to 500, ordered by decreasing `updatedAt` then ID. There is no
+pagination in v1. An unknown `type` or `status` value returns `400`.
 
 ## 2. Create a draft version
 
@@ -172,9 +173,9 @@ Audio binaries, secrets and user filenames are never committed or logged.
 
 | Failure | HTTP | `details.code` |
 | --- | --- | --- |
-| Empty file | 400 | optional |
+| Empty file | 400 | `EMPTY_FILE` |
 | Disallowed MIME or mismatched magic bytes | 400 | `UNSUPPORTED_AUDIO` |
-| Larger than 25 MiB, including multipart rejection | 413 | optional |
+| Larger than 25 MiB, including multipart rejection | 413 | `AUDIO_TOO_LARGE` |
 | Unconfigured or failed storage | 503 | `STORAGE_UNAVAILABLE` |
 
 Storage logs contain only operation and reason, never a filename, object key or storage credential.
@@ -188,6 +189,35 @@ Both Compose variables default to empty (`${SUPABASE_URL:-}`, `${SUPABASE_SECRET
 both are missing, `UnavailableObjectStorage` lets the service start and uploads return `503`.
 Providing only one is an invalid storage configuration. Multipart limits are `25MB` per file,
 `26MB` per request. Reads still use the configured `CONTENT_MEDIA_BASE_URL` public prefix.
+
+## 7. Create a package, including topic and course final tests
+
+`POST /api/content/admin/packages`, body:
+
+```json
+{ "code": "X5", "title": "Final test", "packageType": "TOPIC_TEST", "accessLevel": "FREE",
+  "lessonId": null, "sourceCode": null, "topicId": "<uuid>", "courseId": null }
+```
+
+Returns `201` with the detail shape of section 1 and `versions: []`. The package is created as `DRAFT` and has no
+version; call `POST /versions` next. `code` (up to 100 characters) and `title` (up to 255) are required.
+
+- `packageType` is any of `PRACTICE_SET`, `PRACTICE_TEST`, `MOCK_TEST`, `PLACEMENT_TEST`, `QUIZ`, `TOPIC_TEST`,
+  `COURSE_TEST`. `LESSON` returns `400`.
+- `TOPIC_TEST`: `topicId` is required and the topic must exist; `lessonId`, `courseId` and `sourceCode` must be
+  null. Otherwise `400 INVALID_PACKAGE_TOPIC`.
+- `COURSE_TEST`: `courseId` is required and the course must exist; `lessonId`, `topicId` and `sourceCode` must be
+  null. Otherwise `400 INVALID_PACKAGE_COURSE`.
+- Every other type: `topicId` and `courseId` must be null (`400`). `lessonId` is only for `PRACTICE_SET`
+  (`422 INVALID_PACKAGE_LESSON` when the lesson does not exist). `sourceCode` is only for `PRACTICE_TEST`, is
+  optional (none means an internal course checkpoint, not listed in the library) and must be a supported test
+  source.
+- A duplicate `code` returns `400` like the original route.
+- The topic or course of a final test cannot be changed after creation.
+- A `DRAFT` final test is invisible to learners: learning reads only `PUBLISHED` packages with a published
+  version. Publishing keeps its existing rules.
+
+The original `POST /api/content/packages` still refuses `TOPIC_TEST` and `COURSE_TEST`.
 
 Backlog: unreferenced upload cleanup, section-question-group editing, bulk import, package
 deletion and cloning old versions. None is implemented by this contract.
