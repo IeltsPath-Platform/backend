@@ -1,13 +1,18 @@
 package com.ieltspath.content.domain.entity;
 
+import com.ieltspath.content.domain.exception.ContentSectionNotFoundException;
+import com.ieltspath.content.domain.exception.VersionNotDraftException;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class ContentPackageVersion {
     private final UUID id;
@@ -94,8 +99,57 @@ public class ContentPackageVersion {
         this.updatedAt = Instant.now();
     }
 
+    /** Every change to a version's content goes through here: a published version is what learners are served. */
+    public void requireDraft() {
+        if (status != PublicationStatus.DRAFT) {
+            throw new VersionNotDraftException();
+        }
+    }
+
+    /** A sort order is used by one section at a time in a version; the section being changed may keep its own. */
+    public void requireFreeSortOrder(int sortOrder, UUID exceptSectionId) {
+        boolean taken = sections.stream()
+                .anyMatch(s -> s.getSortOrder() == sortOrder && !s.getId().equals(exceptSectionId));
+        if (taken) {
+            throw new IllegalArgumentException("sortOrder " + sortOrder + " is already used in this version");
+        }
+    }
+
     public void addSection(ContentSection section) {
+        requireDraft();
+        requireFreeSortOrder(section.getSortOrder(), null);
         this.sections.add(Objects.requireNonNull(section, "section must not be null"));
+        this.updatedAt = Instant.now();
+    }
+
+    public ContentSection requireSection(UUID sectionId) {
+        return sections.stream()
+                .filter(section -> section.getId().equals(sectionId))
+                .findFirst()
+                .orElseThrow(() -> new ContentSectionNotFoundException(sectionId));
+    }
+
+    /** Removes a section of this draft; its questions go with it, since the aggregate owns them. */
+    public void removeSection(UUID sectionId) {
+        requireDraft();
+        sections.remove(requireSection(sectionId));
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * Gives the sections the contiguous orders 1..n in the given sequence. The ids must be exactly this version's
+     * sections, each once, so no section is left out or counted twice.
+     */
+    public void reorderSections(List<UUID> orderedIds) {
+        requireDraft();
+        Set<UUID> current = sections.stream().map(ContentSection::getId).collect(Collectors.toSet());
+        if (orderedIds == null || orderedIds.size() != current.size() || !current.equals(new HashSet<>(orderedIds))) {
+            throw new IllegalArgumentException("sectionIds must list every section of the version exactly once");
+        }
+        int order = 1;
+        for (UUID id : orderedIds) {
+            requireSection(id).changeSortOrder(order++);
+        }
         this.updatedAt = Instant.now();
     }
 

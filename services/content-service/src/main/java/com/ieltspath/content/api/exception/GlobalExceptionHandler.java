@@ -37,6 +37,7 @@ public class GlobalExceptionHandler {
             LessonNotFoundException.class,
             LessonResourceNotFoundException.class,
             PackageVersionNotFoundException.class,
+            ContentSectionNotFoundException.class,
             RubricNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFoundException(ContentDomainException ex, HttpServletRequest request) {
@@ -53,6 +54,21 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleBadRequestException(Exception ex, HttpServletRequest request) {
         log.warn("Bad request: {}", ex.getMessage());
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(DraftVersionExistsException.class)
+    public ResponseEntity<ErrorResponse> handleDraftVersionExists(DraftVersionExistsException ex,
+                                                                  HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "DRAFT_EXISTS"));
+    }
+
+    @ExceptionHandler(VersionNotDraftException.class)
+    public ResponseEntity<ErrorResponse> handleVersionNotDraft(VersionNotDraftException ex,
+                                                               HttpServletRequest request) {
+        log.warn("Version change refused: version is not a draft");
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "VERSION_NOT_DRAFT"));
     }
 
     @ExceptionHandler(UnknownErrorCodeException.class)

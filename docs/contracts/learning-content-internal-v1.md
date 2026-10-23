@@ -360,6 +360,7 @@ The authoring routes require `CONTENT_AUTHOR`:
 | Method | Path | Behavior |
 | --- | --- | --- |
 | GET | `/api/content/admin/rubrics?task=TASK_1\|TASK_2` | List draft versions for the task. |
+| GET | `/api/content/admin/rubrics/versions?code=` | Every version of one rubric code, retired included, oldest first: `[{code, task, version, status}]`. Use it to pick the next draft number (highest existing + 1). |
 | POST | `/api/content/admin/rubrics` | Create a `DRAFT` (`201`). Body contains `code`, `task`, `version`, `sourceNote`, `criteria`, and optional `examples`. |
 | PUT | `/api/content/admin/rubrics/{code}/{version}` | Replace a draft's task, source note, criteria and examples. Active or retired versions cannot be edited. |
 | POST | `/api/content/admin/rubrics/{code}/{version}/activate` | Activate a complete draft and retire the existing active rubric for that task. |

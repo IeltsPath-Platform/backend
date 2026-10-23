@@ -81,4 +81,10 @@ returns `503`.
 `POST /api/content/admin/lessons/{lessonId}/archive` archives the lesson and returns its updated detail. Learning
 then omits the lesson from learner-facing reads.
 
+## Reorder slides or documents
+
+`PUT /api/content/admin/lessons/{lessonId}/resources/order` with body `{ "type": "SLIDE" | "DOCUMENT", "resourceIds": ["<uuid>"] }`
+returns `204`. `resourceIds` must be exactly the lesson's resources of that type, each once; anything else returns `400`.
+The resources of that type get orders `0..n-1` in one transaction. Resources of the other type are not touched.
+
 All mutations serialize on the lesson row using `SELECT ... FOR UPDATE`. Replacing lesson or block order is atomic.

@@ -11,6 +11,12 @@ public interface ContentPackageRepository {
     ContentPackage save(ContentPackage pkg);
     Optional<ContentPackage> findById(UUID id);
 
+    /** Locks the package row until the transaction ends, so writes to one package's versions run one at a time. */
+    Optional<ContentPackage> findByIdForUpdate(UUID id);
+
+    /** Checks the section sort-order uniqueness at commit instead of per row, so one whole reordering can be saved. */
+    void deferSectionOrderCheck();
+
     Optional<ContentPackage> findByVersionId(UUID versionId);
 
     Optional<ContentPackage> findBySectionId(UUID sectionId);

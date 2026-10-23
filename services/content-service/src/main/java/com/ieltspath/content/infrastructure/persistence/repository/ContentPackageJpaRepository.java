@@ -2,8 +2,11 @@ package com.ieltspath.content.infrastructure.persistence.repository;
 
 import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.infrastructure.persistence.entity.ContentPackageJpaEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -21,6 +24,15 @@ public interface ContentPackageJpaRepository extends JpaRepository<ContentPackag
     @Override
     @EntityGraph(attributePaths = {"versions"})
     Optional<ContentPackageJpaEntity> findById(UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"versions"})
+    @Query("SELECT p FROM ContentPackageJpaEntity p WHERE p.id = :id")
+    Optional<ContentPackageJpaEntity> findByIdForUpdate(@Param("id") UUID id);
+
+    @Modifying
+    @Query(value = "SET CONSTRAINTS uq_content_sections_sort_order DEFERRED", nativeQuery = true)
+    int deferSectionOrderCheck();
 
     @EntityGraph(attributePaths = {"versions"})
     Optional<ContentPackageJpaEntity> findDistinctByVersions_Id(UUID versionId);

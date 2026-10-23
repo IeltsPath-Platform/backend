@@ -1,7 +1,11 @@
 package com.ieltspath.content.domain.aggregate;
 
 import com.ieltspath.content.domain.entity.ContentPackageVersion;
+import com.ieltspath.content.domain.entity.ContentSection;
+import com.ieltspath.content.domain.exception.ContentSectionNotFoundException;
+import com.ieltspath.content.domain.exception.DraftVersionExistsException;
 import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
+import com.ieltspath.content.domain.exception.PackageVersionNotFoundException;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PublicationStatus;
 
@@ -95,6 +99,41 @@ public class ContentPackage {
     public void addVersion(ContentPackageVersion version) {
         this.versions.add(Objects.requireNonNull(version, "version must not be null"));
         this.updatedAt = Instant.now();
+    }
+
+    /** Starts the next draft. A package has at most one draft; the number follows the highest existing version. */
+    public ContentPackageVersion createDraftVersion(String rulesJson) {
+        if (versions.stream().anyMatch(v -> v.getStatus() == PublicationStatus.DRAFT)) {
+            throw new DraftVersionExistsException();
+        }
+        int next = versions.stream().mapToInt(ContentPackageVersion::getVersionNumber).max().orElse(0) + 1;
+        ContentPackageVersion draft = ContentPackageVersion.create(id, next, rulesJson);
+        addVersion(draft);
+        return draft;
+    }
+
+    /**
+     * A section named in a version's path must belong to that version. A section of another version of this package is
+     * a bad request, while one that exists nowhere is not found.
+     */
+    public ContentSection requireSectionInVersion(UUID versionId, UUID sectionId) {
+        ContentPackageVersion version = requireVersion(versionId);
+        if (version.getSections().stream().anyMatch(s -> s.getId().equals(sectionId))) {
+            return version.requireSection(sectionId);
+        }
+        boolean elsewhere = versions.stream()
+                .anyMatch(v -> v.getSections().stream().anyMatch(s -> s.getId().equals(sectionId)));
+        if (elsewhere) {
+            throw new IllegalArgumentException("section " + sectionId + " does not belong to version " + versionId);
+        }
+        throw new ContentSectionNotFoundException(sectionId);
+    }
+
+    public ContentPackageVersion requireVersion(UUID versionId) {
+        return versions.stream()
+                .filter(version -> version.getId().equals(versionId))
+                .findFirst()
+                .orElseThrow(() -> new PackageVersionNotFoundException(versionId));
     }
 
     public UUID getId() { return id; }

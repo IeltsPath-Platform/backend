@@ -61,6 +61,25 @@ public class ContentSection {
                 sortOrder, timeLimitSeconds, instructions, now, now, new ArrayList<>(), partNo, coverAssetId);
     }
 
+    /** Used by the version when it reorders its sections. */
+    public void changeSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Replaces the author-editable fields. */
+    public void update(String title, Skill skill, int sortOrder, Integer timeLimitSeconds, String instructions,
+                       Integer partNo, UUID coverAssetId) {
+        this.title = Objects.requireNonNull(title, "title must not be null");
+        this.skill = skill;
+        this.sortOrder = sortOrder;
+        this.timeLimitSeconds = timeLimitSeconds;
+        this.instructions = instructions;
+        this.partNo = partNo;
+        this.coverAssetId = coverAssetId;
+        this.updatedAt = Instant.now();
+    }
+
     public void addQuestion(SectionQuestion sectionQuestion) {
         this.questions.add(Objects.requireNonNull(sectionQuestion, "sectionQuestion must not be null"));
         this.updatedAt = Instant.now();
