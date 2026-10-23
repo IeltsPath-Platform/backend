@@ -59,9 +59,9 @@ Stored in `errorCode`, safe to show. They never include the prompt or the model'
 | `content.ai.daily-limit` | 20 | Uses per author per day. |
 | `content.ai.max-items-per-request` | 20 | Upper bound on items in one request. |
 | `content.ai.quota-zone` | Asia/Ho_Chi_Minh | Day boundary for allowances. |
-| `content.llm.base-url` | (empty) | OpenAI-compatible base URL. Read from `CONTENT_LLM_BASE_URL`. |
-| `content.llm.api-key` | (empty) | Read from `CONTENT_LLM_API_KEY`. Keep it in `.env` only. |
-| `content.llm.model` | (empty) | Read from `CONTENT_LLM_MODEL`. |
+| `content.llm.base-url` | (empty) | OpenAI-compatible base URL. Read from `CONTENT_LLM_BASE_URL`, else `LEARNING_LLM_BASE_URL`. |
+| `content.llm.api-key` | (empty) | Read from `CONTENT_LLM_API_KEY`, else `LEARNING_LLM_API_KEY`. Keep it in `.env` only. |
+| `content.llm.model` | (empty) | Read from `CONTENT_LLM_MODEL`, else `LEARNING_LLM_MODEL`. |
 | `content.llm.timeout` | PT60S | Connect and read timeout for the model call. |
 
 Several instances may run the job. Claiming uses row locks that skip rows another instance holds, so no draft is
