@@ -51,6 +51,7 @@ class LessonResourceAuthorizationWebMvcTest {
     @MockitoBean UpdateLessonResourceUseCase updateResource;
     @MockitoBean DeleteLessonResourceUseCase deleteResource;
     @MockitoBean UpdateLessonSummaryUseCase updateSummary;
+    @MockitoBean ReorderLessonResourcesUseCase reorderResources;
 
     private final UUID lessonId = UUID.randomUUID();
     private final UUID resourceId = UUID.randomUUID();
