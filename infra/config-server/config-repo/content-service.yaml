@@ -14,6 +14,18 @@ content:
   media:
     # Public https prefix of the bucket holding audio keys such as listening/demo/ls1.mp3; blank = keys cannot resolve.
     base-url: ${CONTENT_MEDIA_BASE_URL:}
+  # Language model for AI drafts (OpenAI-compatible). Blank values mean drafts fail with NOT_CONFIGURED; the rest of the
+  # service still starts. Keys live only in the gitignored .env file.
+  llm:
+    base-url: ${CONTENT_LLM_BASE_URL:}
+    api-key: ${CONTENT_LLM_API_KEY:}
+    model: ${CONTENT_LLM_MODEL:}
+  ai:
+    batch-size: 2
+    stale-after: PT10M
+    daily-limit: 20
+    max-items-per-request: 20
+    quota-zone: Asia/Ho_Chi_Minh
 
 app:
   auth:

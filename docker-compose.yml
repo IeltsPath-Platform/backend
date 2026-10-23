@@ -151,6 +151,9 @@ services:
       CONTENT_DB_URL: jdbc:postgresql://postgres:5432/content_db
       CONTENT_DB_PASSWORD: "${POSTGRES_PASSWORD}"
       CONTENT_MEDIA_BASE_URL: "${CONTENT_MEDIA_BASE_URL:-https://media.example.invalid/}"
+      CONTENT_LLM_BASE_URL: "${CONTENT_LLM_BASE_URL:-}"
+      CONTENT_LLM_API_KEY: "${CONTENT_LLM_API_KEY:-}"
+      CONTENT_LLM_MODEL: "${CONTENT_LLM_MODEL:-}"
     depends_on: *after-infra
 
   library-service:

@@ -38,6 +38,7 @@ public class GlobalExceptionHandler {
             LessonResourceNotFoundException.class,
             PackageVersionNotFoundException.class,
             ContentSectionNotFoundException.class,
+            AiDraftNotFoundException.class,
             RubricNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFoundException(ContentDomainException ex, HttpServletRequest request) {
@@ -54,6 +55,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleBadRequestException(Exception ex, HttpServletRequest request) {
         log.warn("Bad request: {}", ex.getMessage());
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(AiQuotaExceededException.class)
+    public ResponseEntity<ErrorResponse> handleAiQuotaExceeded(AiQuotaExceededException ex,
+                                                               HttpServletRequest request) {
+        return buildResponse(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "AI_QUOTA_EXCEEDED"));
     }
 
     @ExceptionHandler(DuplicateImportRefException.class)
