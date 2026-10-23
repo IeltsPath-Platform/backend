@@ -81,4 +81,38 @@ returns `503`.
 `POST /api/content/admin/lessons/{lessonId}/archive` archives the lesson and returns its updated detail. Learning
 then omits the lesson from learner-facing reads.
 
+## Reorder slides or documents
+
+`PUT /api/content/admin/lessons/{lessonId}/resources/order` with body `{ "type": "SLIDE" | "DOCUMENT", "resourceIds": ["<uuid>"] }`
+returns `204`. `resourceIds` must be exactly the lesson's resources of that type, each once; anything else returns `400`.
+The resources of that type get orders `0..n-1` in one transaction. Resources of the other type are not touched.
+
 All mutations serialize on the lesson row using `SELECT ... FOR UPDATE`. Replacing lesson or block order is atomic.
+
+## Topic sort order
+
+A topic's `sortOrder` is its position among siblings: topics with the same parent (roots share one group) must have
+different orders. Creating a topic, or changing its parent or order, to a value another sibling already holds returns
+`409` with `details.code = "SORT_ORDER_TAKEN"`. The other topic is never moved. Saving a topic without changing its parent
+or order is not checked, so existing data is not blocked by this rule.
+
+### Reordering topics
+
+`PUT /api/content/admin/topics/order` (also under `/api/content/topics/order`), `CONTENT_AUTHOR` only, puts all topics
+of one parent in a new order in a single transaction. A swap done with two single saves would be refused by the rule
+above, so a client moves a topic with this call.
+
+```json
+{ "parentTopicId": null, "topicIds": ["<uuid>", "<uuid>", "<uuid>"] }
+```
+
+- `parentTopicId` is the parent whose children are ordered; `null` (or left out) means the top-level topics, which are
+  one group across all courses.
+- `topicIds` must name **every** topic of that group exactly once and nothing else, in the wanted order. A missing,
+  extra, repeated or foreign id, or an empty list, returns `400` and changes nothing. An unknown parent returns `404`.
+- The group keeps the sort orders it already uses and hands them out in the new sequence, so other groups and the gaps
+  between numbers stay as they were. A group whose sort orders are not all distinct (older data has ties, mostly among
+  top-level topics) is numbered one after another from its smallest order, which also removes the tie.
+- Returns `204`. Read the tree again for the stored orders. Topics whose position did not change are not written.
+- It does not change a topic's parent. Moving a topic to another parent is still a `PUT /{id}` with the new
+  `parentTopicId` and a free `sortOrder`.

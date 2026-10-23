@@ -1,6 +1,7 @@
 package com.ieltspath.content.api.controller;
 
 import com.ieltspath.content.application.usecase.ManageRubricsUseCase;
+import com.ieltspath.content.api.dto.response.RubricVersionResponse;
 import com.ieltspath.content.domain.aggregate.Rubric;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -33,6 +34,13 @@ public class RubricController {
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public List<RubricResponse> drafts(@RequestParam("task") String task) {
         return rubrics.drafts(task).stream().map(RubricResponse::from).toList();
+    }
+
+    /** All versions of one rubric code, retired included, so the next draft number is never a reused one. */
+    @GetMapping("/admin/rubrics/versions")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
+    public List<RubricVersionResponse> versions(@RequestParam("code") String code) {
+        return rubrics.versions(code).stream().map(RubricVersionResponse::from).toList();
     }
 
     @PostMapping("/admin/rubrics")

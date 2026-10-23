@@ -42,7 +42,8 @@ public class QuestionPersistenceMapper {
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
                 versions,
-                entity.getPurpose()
+                entity.getPurpose(),
+                entity.getImportRef()
         );
     }
 
@@ -60,6 +61,7 @@ public class QuestionPersistenceMapper {
                 .purpose(domain.getPurpose())
                 .skill(domain.getSkill())
                 .requiredFeatureKey(domain.getRequiredFeatureKey())
+                .importRef(domain.getImportRef())
                 .status(domain.getStatus())
                 .currentPublishedVersionId(domain.getCurrentPublishedVersionId())
                 .createdAt(domain.getCreatedAt())
@@ -72,7 +74,7 @@ public class QuestionPersistenceMapper {
     public Question toDomainSummary(QuestionJpaEntity entity) {
         return new Question(entity.getId(), entity.getQuestionType(), entity.getSkill(), entity.getRequiredFeatureKey(),
                 entity.getStatus(), entity.getCurrentPublishedVersionId(), entity.getCreatedAt(), entity.getUpdatedAt(),
-                List.of(), entity.getPurpose());
+                List.of(), entity.getPurpose(), entity.getImportRef());
     }
 
     public QuestionVersion toVersionDomain(QuestionVersionJpaEntity entity) {

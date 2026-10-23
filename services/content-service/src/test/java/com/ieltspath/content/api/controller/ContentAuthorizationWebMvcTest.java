@@ -29,10 +29,12 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -131,6 +133,7 @@ class ContentAuthorizationWebMvcTest {
     @MockitoBean GetTopicUseCase getTopic;
     @MockitoBean CreateTopicUseCase createTopic;
     @MockitoBean UpdateTopicUseCase updateTopic;
+    @MockitoBean ReorderTopicsUseCase reorderTopics;
     @MockitoBean GetReadingPassageUseCase getReadingPassage;
 
     private final UUID id = UUID.randomUUID();
@@ -235,6 +238,26 @@ class ContentAuthorizationWebMvcTest {
                         .content("{\"code\":\"AUTHOR_TEST\",\"title\":\"Lesson\"}"))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(lessonAuthoring);
+    }
+
+    @Test
+    @WithMockUser(roles = {"CUSTOMER", "EXAMINER", "ADMIN"})
+    void onlyAContentAuthorCanReorderTopics() throws Exception {
+        mockMvc.perform(put("/api/content/admin/topics/order")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicIds\":[\"" + id + "\"]}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(reorderTopics);
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void contentAuthorCanReorderTopics() throws Exception {
+        mockMvc.perform(put("/api/content/admin/topics/order")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicIds\":[\"" + id + "\"]}"))
+                .andExpect(status().isNoContent());
+        verify(reorderTopics).execute(null, List.of(id));
     }
 
     @Test

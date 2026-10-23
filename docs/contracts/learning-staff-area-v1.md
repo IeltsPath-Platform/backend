@@ -53,8 +53,9 @@ records the reviewer. `422 INVALID_FLAG_STATUS` for `OPEN`, `404` when unknown.
 
 ## Work queues
 
-`GET /api/learning/admin/work-items?queue=&status=`: the queues the caller may see, optionally one queue
-(`403 QUEUE_NOT_ALLOWED` for another) and one status (`OPEN`, `IN_PROGRESS`, `DONE`). Listing first adds items for new
+`GET /api/learning/admin/work-items?queue=&status=&kind=`: the queues the caller may see, optionally one queue
+(`403 QUEUE_NOT_ALLOWED` for another), one status (`OPEN`, `IN_PROGRESS`, `DONE`) and one kind (a value of the table below,
+otherwise `400`). Listing first adds items for new
 work, and a scheduled round does the same every 3 hours (`learning.work-items.sync-interval`, first run after
 `sync-initial-delay`, off with `sync-enabled=false`); only one service instance runs a round at a time. Each source becomes
 at most one item (`UNIQUE (kind, subject)`) and finished work is never reopened.
@@ -66,6 +67,20 @@ at most one item (`UNIQUE (kind, subject)`) and finished work is never reopened.
 | `CONTENT_GAP` | CONTENT_AUTHOR | knowledge points whose reviews ran out of unseen sets |
 | `QUESTION_TOO_EASY`, `QUESTION_TOO_HARD` | CONTENT_AUTHOR | questions with enough first submissions and a correct rate above / below the limits |
 | `EDGE_SUSPECT` | CONTENT_AUTHOR | prerequisite edges that do not explain failures (below) |
+
+Each listed item keeps its fields (`subjectRef`, `detail`, …) and gains `subject`, which names what a content item is
+about. It is `null` for Examiner items, for an id Content does not know, and for every item when Content cannot be reached
+(the list is still `200`).
+
+| Kind | `subject` |
+| --- | --- |
+| `CONTENT_GAP` | `{"type":"KNOWLEDGE_POINT","id","code","name","occurrences"}`; `occurrences` is how many diagnoses found the point without an unseen set |
+| `QUESTION_TOO_EASY`, `QUESTION_TOO_HARD` | `{"type":"QUESTION","questionId","questionVersionId","stemPreview"}`; the preview is at most 120 characters |
+| `EDGE_SUSPECT` | `{"type":"EDGE","from":{"id","code","name"},"to":{"id","code","name"}}` |
+
+Names are read with one Content call per list (`POST /internal/learning-content/work-item-subjects`, see
+[learning-content-internal-v1](learning-content-internal-v1.md#post-work-item-subjects)), never one call per item.
+`PATCH` still returns the item without `subject`.
 
 `PATCH /api/learning/admin/work-items/{id}`: `{ "status", "action", "result", "note", "noteVisibleToLearner" }`, all
 optional. Taking an item sets the assignee; `OPEN` clears it. A note shown to the learner needs text and an item about a

@@ -53,9 +53,18 @@ class ExaminerQaIntegrationTest extends ExaminerIntegrationSupport {
                 .andExpect(status().isForbidden()).andReturn();
         mvc.perform(get("/api/assessments/qa-reviews/queue").with(user(reviewer.toString()).roles("CONTENT_AUTHOR")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].reason").value("QA_SAMPLE"));
+        mvc.perform(get("/api/assessments/qa-reviews/mine").with(user(reviewer.toString()).roles("CONTENT_AUTHOR")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
         mvc.perform(post("/api/assessments/qa-reviews/{id}/claim", qaJob)
                         .with(user(reviewer.toString()).roles("CONTENT_AUTHOR")))
                 .andExpect(status().isOk());
+        mvc.perform(get("/api/assessments/qa-reviews/mine").with(user(reviewer.toString()).roles("CONTENT_AUTHOR")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(qaJob.toString()))
+                .andExpect(jsonPath("$.content[0].reason").value("QA_SAMPLE"));
+        mvc.perform(get("/api/assessments/qa-reviews/mine")
+                        .with(user(UUID.randomUUID().toString()).roles("CONTENT_AUTHOR")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
         essay = mvc.perform(get("/api/assessments/qa-reviews/{id}/essay", qaJob)
                         .with(user(reviewer.toString()).roles("CONTENT_AUTHOR")))
                 .andExpect(status().isOk()).andReturn();
@@ -69,7 +78,12 @@ class ExaminerQaIntegrationTest extends ExaminerIntegrationSupport {
                 .andExpect(status().isNoContent());
         assertEquals(1, count("SELECT count(*) FROM examiner_qa_reviews WHERE submission_id=(SELECT submission_id FROM grading_jobs WHERE id=?) AND reviewer_id=? AND examiner_band=6.5 AND reviewer_band=6.0",
                 qaJob, reviewer));
+        mvc.perform(get("/api/assessments/qa-reviews/mine").with(user(reviewer.toString()).roles("CONTENT_AUTHOR")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        // The User Service is not reachable here, so the table comes back without names.
         mvc.perform(get("/api/assessments/admin/examiner-quality").with(user(UUID.randomUUID().toString()).roles("CONTENT_AUTHOR")))
-                .andExpect(status().isOk()).andExpect(jsonPath("$[0].reviewedEssays").value(1));
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].reviewedEssays").value(1))
+                .andExpect(jsonPath("$[0].examinerId").value(examiner.toString()))
+                .andExpect(jsonPath("$[0].examinerName").isEmpty());
     }
 }

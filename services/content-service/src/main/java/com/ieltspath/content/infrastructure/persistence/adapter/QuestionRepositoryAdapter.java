@@ -66,5 +66,10 @@ public class QuestionRepositoryAdapter implements QuestionRepository {
     public List<Question> findByPurpose(QuestionPurpose purpose, Skill skill) {
         return questionJpaRepository.findByPurpose(purpose, skill).stream().map(mapper::toDomainSummary).toList();
     }
+
+    @Override
+    public Optional<Question> findByImportRef(String importRef) {
+        return questionJpaRepository.findFirstByImportRef(importRef).map(mapper::toDomainSummary);
+    }
 }
 

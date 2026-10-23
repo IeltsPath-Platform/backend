@@ -22,7 +22,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-events` | Thư viện tên exchange/routing key/header, record payload và helper `MessageRetry`/`RetryTopology` dùng chung; không deploy độc lập. |
 | `shared/common-storage` | Thư viện lưu object dùng chung (`ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy`); không deploy độc lập; service tự cấu hình bucket. |
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity và streak tại `/api/learning-support/{activities,streak}`. |
-| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset; kiểm topic cho library. |
+| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset; kiểm topic cho library. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
 | `services/library-service` | Cổng 8081, `library_db` (Compose PostgreSQL host 5440): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
 | `services/assessment-service` | Làm bài, chấm objective/LLM cho essay gate và EXAMINER, kết quả; phát `AssessmentCompleted.v2`. |
 | `services/access-service` | Gói, subscription, activation key, điểm. |
@@ -153,6 +153,14 @@ src/main/java/com/ieltspath/<service>
 - Assessment gate essay dùng OpenAI-compatible LLM qua `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`,
   `ASSESSMENT_LLM_MODEL`; quota theo ngày cấu hình bằng `ASSESSMENT_LLM_DAILY_LIMIT` (mặc định 20). Thiếu cấu hình,
   lỗi chấm hoặc hết quota thì essay được chuyển sang hàng chờ EXAMINER; không ghi essay/prompt vào log.
+- Content sinh bản nháp bằng OpenAI-compatible LLM qua `CONTENT_LLM_BASE_URL`, `CONTENT_LLM_API_KEY`,
+  `CONTENT_LLM_MODEL` (khóa chỉ ở `.env` không commit). Thiếu cấu hình thì bản nháp `FAILED` với `NOT_CONFIGURED`, service
+  vẫn chạy. Nhóm `content.ai.*` (số bản nháp mỗi lượt, thời gian coi là treo, `daily-limit`, `max-items-per-request`,
+  `max-course-candidates`, `quota-zone`); import Excel dùng chung `daily-limit` nhưng đếm riêng (`kind = IMPORT`). Tải
+  audio của author cần `SUPABASE_URL`/`SUPABASE_SECRET_KEY` và `CONTENT_MEDIA_BUCKET`, thiếu thì trả 503. Assessment đọc
+  tên giám khảo từ user-service qua `assessment.user.base-url` (`USER_SERVICE_URL`).
+- Mọi nội dung AI sinh ra (câu hỏi, course) chỉ là bản nháp: người duyệt chọn rồi mới tạo nội dung `DRAFT` thường, còn phải
+  xuất bản như mọi nội dung khác; không có đường nào từ bản nháp tới học viên. Nội dung nhập từ Excel đi qua cùng luật.
 - Chạy local bằng container: `docker compose up -d --build` khởi chạy PostgreSQL, RabbitMQ, Config Server, Eureka,
   Gateway và các service đã triển khai; Flyway của từng service tạo schema/seed trong database riêng. Để chạy Java từ
   IDE, dùng `docker compose up -d postgres rabbitmq` rồi trỏ các `*_DB_URL` tới `localhost:${MVP_POSTGRES_PORT:-5440}/<service>_db`; thứ tự service trên host là Config Server → Eureka → Gateway → business service.
@@ -161,7 +169,7 @@ src/main/java/com/ieltspath/<service>
   Chi tiết: `README.md` §6, `docs/system-architecture.md` §7.
 - Nhóm cấu hình nghiệp vụ: `learning.mastery.*` (ngưỡng mastery, lịch ôn; Admin ghi đè ở `learning_rule_configs`),
   `learning.flags.*` (ngưỡng cờ bất thường), `learning.tree-quality.*` (ngưỡng cạnh đáng ngờ, câu quá dễ/khó),
-  `learning.work-items.*` (chu kỳ đồng bộ hàng việc), `learning.writing.*` (hạn mức chấm essay), `learning.free-practice.*`
+  `content.ai.*` (bản nháp AI và hạn mức của khu author), `learning.work-items.*` (chu kỳ đồng bộ hàng việc), `learning.writing.*` (hạn mức chấm essay), `learning.free-practice.*`
   (số gói dự trữ cho bài ôn), `learning.gamification.*` (múi giờ mặc định, XP, tim, nhiệm vụ), `learning.rewards.*` (gửi
   điểm thưởng sang access), `learning.snapshots.*` (bản chụp tuần/tháng, giữ 12 tuần/36 tháng), `learning.league.*` (chốt
   tuần), `learning.user.base-url` (gọi user-service), `assessment.ai-eval.*` (đánh giá AI), `assessment.qa.*` (tỷ lệ lấy mẫu QA

@@ -4,6 +4,7 @@ import com.ieltspath.content.domain.aggregate.Rubric;
 import com.ieltspath.content.domain.exception.RubricNotEditableException;
 import com.ieltspath.content.domain.exception.RubricNotFoundException;
 import com.ieltspath.content.domain.repository.RubricRepository;
+import com.ieltspath.content.domain.vo.RubricVersionRef;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -68,6 +69,14 @@ public class JdbcRubricRepository implements RubricRepository {
                 new MapSqlParameterSource("task", task));
         jdbc.update("UPDATE rubrics SET status='ACTIVE', updated_at=CURRENT_TIMESTAMP WHERE code=:code AND rubric_version=:version", key);
         return findByCodeAndVersion(code, version).orElseThrow();
+    }
+
+    @Override
+    public List<RubricVersionRef> findVersions(String code) {
+        return jdbc.query("SELECT code, task, rubric_version, status FROM rubrics WHERE code = :code ORDER BY rubric_version",
+                new MapSqlParameterSource("code", code),
+                (row, n) -> new RubricVersionRef(row.getString("code"), row.getString("task"),
+                        row.getInt("rubric_version"), row.getString("status")));
     }
 
     @Override

@@ -34,6 +34,11 @@ public class SectionQuestion {
         return new SectionQuestion(UUID.randomUUID(), sectionId, questionVersionId, sortOrder, maxScore, Instant.now());
     }
 
+    /** Used by the section when it renumbers after a removal or a reordering. */
+    public void changeSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
     public UUID getId() { return id; }
     public UUID getSectionId() { return sectionId; }
     public UUID getQuestionVersionId() { return questionVersionId; }

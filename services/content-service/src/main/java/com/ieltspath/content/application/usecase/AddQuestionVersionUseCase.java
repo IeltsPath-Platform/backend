@@ -70,17 +70,7 @@ public class AddQuestionVersionUseCase {
         question.addVersion(version);
         Question saved = questionRepository.save(question);
 
-        return new QuestionResult(
-                saved.getId(),
-                saved.getQuestionType(),
-                saved.getSkill(),
-                saved.getRequiredFeatureKey(),
-                saved.getStatus(),
-                saved.getCurrentPublishedVersionId(),
-                saved.getCreatedAt(),
-                saved.getUpdatedAt(),
-                saved.getPurpose()
-        );
+        return QuestionResult.of(saved);
     }
 
     /**

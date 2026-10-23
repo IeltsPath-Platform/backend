@@ -1,6 +1,7 @@
 package com.ieltspath.assessment.application.service;
 
 import com.ieltspath.assessment.application.port.ExaminerQaRepository;
+import com.ieltspath.assessment.application.port.UserDirectory;
 import com.ieltspath.assessment.domain.exception.InvalidAssessmentStateException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -14,14 +15,16 @@ import java.util.concurrent.ThreadLocalRandom;
 @Service
 public class ExaminerQaService {
     private final ExaminerQaRepository repository;
+    private final UserDirectory users;
     private final double sampleRate;
 
-    public ExaminerQaService(ExaminerQaRepository repository,
+    public ExaminerQaService(ExaminerQaRepository repository, UserDirectory users,
                              @Value("${assessment.qa.sample-rate:0.10}") double sampleRate) {
         if (sampleRate < 0 || sampleRate > 1 || Double.isNaN(sampleRate)) {
             throw new IllegalArgumentException("assessment.qa.sample-rate must be between 0 and 1");
         }
         this.repository = repository;
+        this.users = users;
         this.sampleRate = sampleRate;
     }
 
@@ -51,4 +54,20 @@ public class ExaminerQaService {
     public java.util.List<ExaminerQaRepository.ExaminerQuality> quality() {
         return repository.quality();
     }
+
+    /**
+     * The quality table with each examiner's name. Names come from one lookup for the whole table; when it fails the
+     * table is still returned and the names are null.
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<NamedExaminerQuality> qualityWithNames() {
+        java.util.List<ExaminerQaRepository.ExaminerQuality> rows = repository.quality();
+        java.util.Map<UUID, String> names = users.displayNames(
+                rows.stream().map(ExaminerQaRepository.ExaminerQuality::examinerId).toList());
+        return rows.stream().map(row -> new NamedExaminerQuality(row.examinerId(), names.get(row.examinerId()),
+                row.reviewedEssays(), row.averageAbsoluteBandDifference(), row.overOneBandRate())).toList();
+    }
+
+    public record NamedExaminerQuality(UUID examinerId, String examinerName, long reviewedEssays,
+                                       BigDecimal averageAbsoluteBandDifference, BigDecimal overOneBandRate) {}
 }

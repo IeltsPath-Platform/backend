@@ -35,17 +35,16 @@ public class ListQuestionsUseCase {
         }
 
         return questions.stream()
-                .map(q -> new QuestionResult(
-                        q.getId(),
-                        q.getQuestionType(),
-                        q.getSkill(),
-                        q.getRequiredFeatureKey(),
-                        q.getStatus(),
-                        q.getCurrentPublishedVersionId(),
-                        q.getCreatedAt(),
-                        q.getUpdatedAt(),
-                        q.getPurpose()
-                ))
+                .map(QuestionResult::of)
                 .toList();
+    }
+
+    /** The question carrying this exact import reference, as a list of at most one. */
+    public List<QuestionResult> findByImportRef(String importRef) {
+        String normalized = com.ieltspath.content.domain.aggregate.Question.normalizeImportRef(importRef);
+        if (normalized == null) {
+            return List.of();
+        }
+        return questionRepository.findByImportRef(normalized).map(QuestionResult::of).stream().toList();
     }
 }

@@ -5,6 +5,11 @@ import com.ieltspath.content.domain.vo.Skill;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
+import com.ieltspath.content.domain.exception.SectionQuestionNotFoundException;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -61,9 +66,69 @@ public class ContentSection {
                 sortOrder, timeLimitSeconds, instructions, now, now, new ArrayList<>(), partNo, coverAssetId);
     }
 
+    /** Used by the version when it reorders its sections. */
+    public void changeSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
+        this.updatedAt = Instant.now();
+    }
+
+    /** Replaces the author-editable fields. */
+    public void update(String title, Skill skill, int sortOrder, Integer timeLimitSeconds, String instructions,
+                       Integer partNo, UUID coverAssetId) {
+        this.title = Objects.requireNonNull(title, "title must not be null");
+        this.skill = skill;
+        this.sortOrder = sortOrder;
+        this.timeLimitSeconds = timeLimitSeconds;
+        this.instructions = instructions;
+        this.partNo = partNo;
+        this.coverAssetId = coverAssetId;
+        this.updatedAt = Instant.now();
+    }
+
     public void addQuestion(SectionQuestion sectionQuestion) {
         this.questions.add(Objects.requireNonNull(sectionQuestion, "sectionQuestion must not be null"));
         this.updatedAt = Instant.now();
+    }
+
+    /** New questions go after the last one. */
+    public int nextQuestionSortOrder() {
+        return questions.stream().mapToInt(SectionQuestion::getSortOrder).max().orElse(0) + 1;
+    }
+
+    public SectionQuestion requireQuestion(UUID sectionQuestionId) {
+        return questions.stream()
+                .filter(question -> question.getId().equals(sectionQuestionId))
+                .findFirst()
+                .orElseThrow(() -> new SectionQuestionNotFoundException(sectionQuestionId));
+    }
+
+    /** Removes a question and renumbers the rest 1..n, keeping their relative order. */
+    public void removeQuestion(UUID sectionQuestionId) {
+        questions.remove(requireQuestion(sectionQuestionId));
+        renumberQuestions(questions);
+        this.updatedAt = Instant.now();
+    }
+
+    /** Gives the questions the orders 1..n in the given sequence; the ids must be exactly this section's questions. */
+    public void reorderQuestions(List<UUID> orderedIds) {
+        Set<UUID> current = questions.stream().map(SectionQuestion::getId).collect(Collectors.toSet());
+        if (orderedIds == null || orderedIds.size() != current.size() || !current.equals(new HashSet<>(orderedIds))) {
+            throw new IllegalArgumentException("sectionQuestionIds must list every question of the section exactly once");
+        }
+        int order = 1;
+        for (UUID id : orderedIds) {
+            requireQuestion(id).changeSortOrder(order++);
+        }
+        this.updatedAt = Instant.now();
+    }
+
+    private static void renumberQuestions(List<SectionQuestion> remaining) {
+        List<SectionQuestion> ordered = new ArrayList<>(remaining);
+        ordered.sort(Comparator.comparingInt(SectionQuestion::getSortOrder));
+        int order = 1;
+        for (SectionQuestion question : ordered) {
+            question.changeSortOrder(order++);
+        }
     }
 
     public UUID getId() { return id; }

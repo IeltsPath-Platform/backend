@@ -15,6 +15,9 @@ public interface LessonResourceRepository {
     /** The lesson's resources by type, then order. */
     List<LessonResource> findByLessonId(UUID lessonId);
 
+    /** Checks the per-lesson order uniqueness at commit, so one whole reordering of a type can be saved. */
+    void deferSortOrderCheck();
+
     void delete(LessonResource resource);
 
     /** The stored summary, or {@code null} when the lesson has none. The lesson must exist. */

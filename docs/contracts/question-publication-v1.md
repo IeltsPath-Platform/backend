@@ -8,6 +8,19 @@ The existing `GET /api/content/admin/questions` route supports optional `skill` 
 array of question catalog records. The equivalent `/api/content/questions` alias remains available. Both require
 `CONTENT_AUTHOR`.
 
+### Import reference
+
+Questions may carry an optional `importRef`: a stable key used by spreadsheet imports and AI drafts to refer to a
+question. It is trimmed; blank means none. Allowed characters are letters, digits, dot, underscore and dash, up to 100
+characters; anything else returns `400`. It is unique across questions (`409` with `details.code = "IMPORT_REF_CONFLICT"`
+when another question has it). Learners never see it.
+
+- `POST /api/content/admin/questions` accepts `importRef` and returns it.
+- The list, create, new-version and archive responses include `importRef`, `null` when unset. The detail response
+  (`GET /api/content/admin/questions/{id}`) does not include it yet.
+- `GET /api/content/admin/questions?importRef=<ref>` returns the question with exactly that reference as a list of at
+  most one item. When this parameter is present, `skill` and `purpose` are ignored.
+
 ## Publish a question version
 
 `POST /api/content/admin/questions/{questionId}/versions/{versionId}/publish` publishes a `DRAFT` version and sets it

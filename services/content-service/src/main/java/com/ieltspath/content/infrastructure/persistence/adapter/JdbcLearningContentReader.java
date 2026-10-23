@@ -387,6 +387,18 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     @Override
+    public boolean topicExists(UUID topicId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM topics WHERE id = :id)",
+                Map.of("id", topicId), Boolean.class));
+    }
+
+    @Override
+    public boolean courseExists(UUID courseId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM courses WHERE id = :id)",
+                Map.of("id", courseId), Boolean.class));
+    }
+
+    @Override
     public List<LessonPracticeSetResult> lessonPracticeSets(UUID lessonId) {
         return lessonPracticeSets(lessonId, Optional.empty());
     }
@@ -918,6 +930,33 @@ public class JdbcLearningContentReader implements LearningContentReader {
             difficulties.put(uuid(rs, "id"), QuestionDifficulty.valueOf(rs.getString("difficulty")));
         });
         return difficulties;
+    }
+
+    @Override
+    public com.ieltspath.content.application.result.WorkItemSubjectsResult workItemSubjects(
+            Collection<UUID> knowledgePointIds, Collection<UUID> questionVersionIds) {
+        Map<UUID, com.ieltspath.content.application.result.WorkItemSubjectsResult.KnowledgePointLabel> points =
+                new LinkedHashMap<>();
+        if (!knowledgePointIds.isEmpty()) {
+            jdbc.query("SELECT id, code, name FROM knowledge_points WHERE id IN (:ids) ORDER BY id",
+                    Map.of("ids", knowledgePointIds.stream().distinct().toList()), rs -> {
+                        points.put(uuid(rs, "id"),
+                                new com.ieltspath.content.application.result.WorkItemSubjectsResult
+                                        .KnowledgePointLabel(rs.getString("code"), rs.getString("name")));
+                    });
+        }
+        Map<UUID, com.ieltspath.content.application.result.WorkItemSubjectsResult.QuestionLabel> questions =
+                new LinkedHashMap<>();
+        if (!questionVersionIds.isEmpty()) {
+            jdbc.query("SELECT id, question_id, left(stem, 120) AS stem_preview FROM question_versions "
+                            + "WHERE id IN (:ids) ORDER BY id",
+                    Map.of("ids", questionVersionIds.stream().distinct().toList()), rs -> {
+                        questions.put(uuid(rs, "id"),
+                                new com.ieltspath.content.application.result.WorkItemSubjectsResult
+                                        .QuestionLabel(uuid(rs, "question_id"), rs.getString("stem_preview")));
+                    });
+        }
+        return new com.ieltspath.content.application.result.WorkItemSubjectsResult(points, questions);
     }
 
     private Map<UUID, List<UUID>> lessonKnowledgePoints(List<UUID> lessonIds) {

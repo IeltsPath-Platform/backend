@@ -20,7 +20,8 @@ public record QuestionResponse(
         UUID currentPublishedVersionId,
         Instant createdAt,
         Instant updatedAt,
-        QuestionPurpose purpose
+        QuestionPurpose purpose,
+        String importRef
 ) {
     public static QuestionResponse from(QuestionResult result) {
         return new QuestionResponse(
@@ -32,7 +33,8 @@ public record QuestionResponse(
                 result.currentPublishedVersionId(),
                 result.createdAt(),
                 result.updatedAt(),
-                result.purpose()
+                result.purpose(),
+                result.importRef()
         );
     }
 }

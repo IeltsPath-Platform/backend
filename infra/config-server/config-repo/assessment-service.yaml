@@ -38,6 +38,9 @@ assessment:
     quota-timezone: Asia/Ho_Chi_Minh
   content:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
+  user:
+    # Display names of examiners in the quality table; the table is still returned when this service is down.
+    base-url: ${USER_SERVICE_URL:http://localhost:8085}
   messaging:
     exchange: ${ASSESSMENT_EVENTS_EXCHANGE:assessment.events}
   outbox:

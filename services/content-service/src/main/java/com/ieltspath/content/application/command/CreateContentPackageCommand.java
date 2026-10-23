@@ -10,10 +10,17 @@ public record CreateContentPackageCommand(
         PackageType packageType,
         String requiredFeatureKey,
         UUID lessonId,
-        String sourceCode
+        String sourceCode,
+        UUID topicId,
+        UUID courseId
 ) {
     public CreateContentPackageCommand(String code, String title, PackageType packageType,
+                                       String requiredFeatureKey, UUID lessonId, String sourceCode) {
+        this(code, title, packageType, requiredFeatureKey, lessonId, sourceCode, null, null);
+    }
+
+    public CreateContentPackageCommand(String code, String title, PackageType packageType,
                                        String requiredFeatureKey, UUID lessonId) {
-        this(code, title, packageType, requiredFeatureKey, lessonId, null);
+        this(code, title, packageType, requiredFeatureKey, lessonId, null, null, null);
     }
 }

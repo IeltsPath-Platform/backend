@@ -2,6 +2,7 @@ package com.ieltspath.content.api.controller;
 
 import com.ieltspath.content.domain.vo.BandRange;
 import com.ieltspath.content.api.dto.request.CreateTopicRequest;
+import com.ieltspath.content.api.dto.request.ReorderTopicsRequest;
 import com.ieltspath.content.api.dto.request.UpdateTopicRequest;
 import com.ieltspath.content.api.dto.response.TopicResponse;
 import com.ieltspath.content.api.dto.response.TopicTreeResponse;
@@ -11,6 +12,7 @@ import com.ieltspath.content.application.result.TopicResult;
 import com.ieltspath.content.application.usecase.CreateTopicUseCase;
 import com.ieltspath.content.application.usecase.GetTopicTreeUseCase;
 import com.ieltspath.content.application.usecase.GetTopicUseCase;
+import com.ieltspath.content.application.usecase.ReorderTopicsUseCase;
 import com.ieltspath.content.application.usecase.UpdateTopicUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,7 @@ public class TopicController {
     private final GetTopicUseCase getTopicUseCase;
     private final CreateTopicUseCase createTopicUseCase;
     private final UpdateTopicUseCase updateTopicUseCase;
+    private final ReorderTopicsUseCase reorderTopicsUseCase;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
@@ -66,6 +69,14 @@ public class TopicController {
                 request.courseId()
         ));
         return TopicResponse.from(result);
+    }
+
+    /** Reorders all topics of one parent in one transaction; see lesson-authoring-v1 for the rules. */
+    @PutMapping("/order")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
+    public void reorderTopics(@Valid @RequestBody ReorderTopicsRequest request) {
+        reorderTopicsUseCase.execute(request.parentTopicId(), request.topicIds());
     }
 
     @PutMapping("/{id}")

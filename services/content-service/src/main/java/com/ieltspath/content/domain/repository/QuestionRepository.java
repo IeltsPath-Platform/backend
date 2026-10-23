@@ -17,5 +17,7 @@ public interface QuestionRepository {
     /** Catalog metadata filtered in the database; versions are not needed by the list response. */
     List<Question> findByPurpose(QuestionPurpose purpose, Skill skill);
     List<Question> findAll();
+    /** The question carrying this import reference, if any. Matched exactly. */
+    Optional<Question> findByImportRef(String importRef);
 }
 

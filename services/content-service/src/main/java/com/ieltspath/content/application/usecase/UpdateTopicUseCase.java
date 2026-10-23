@@ -42,6 +42,12 @@ public class UpdateTopicUseCase {
                     .orElseThrow(() -> new CourseNotFoundException(command.courseId()));
         }
 
+        boolean moved = !java.util.Objects.equals(command.parentTopicId(), topic.getParentTopicId())
+                || command.sortOrder() != topic.getSortOrder();
+        if (moved) {
+            TopicSortOrders.requireFree(topicRepository, command.parentTopicId(), command.sortOrder(), topic.getId());
+        }
+
         topic.update(command.parentTopicId(), command.name(), command.sortOrder(), command.status(),
                 command.band());
         if (command.skill() != null && command.skill() != topic.getSkill()) {

@@ -25,7 +25,8 @@ public class TopicRepositoryAdapter implements TopicRepository {
     @Override
     public Topic save(Topic topic) {
         var entity = mapper.toEntity(topic);
-        var saved = topicJpaRepository.save(entity);
+        // Flushed so rows written by JDBC in the same transaction (lessons of a new topic) can see it.
+        var saved = topicJpaRepository.saveAndFlush(entity);
         return mapper.toDomain(saved);
     }
 

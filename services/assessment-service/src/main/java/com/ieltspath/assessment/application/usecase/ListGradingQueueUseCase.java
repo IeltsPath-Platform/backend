@@ -19,4 +19,10 @@ public class ListGradingQueueUseCase {
             throw new IllegalArgumentException("Invalid queue filters or pagination (size 1..100)");
         return reason == null ? store.list(mode,status,page,size) : store.listByReason(mode,status,page,size,reason);
     }
+    /** The quality-review essays this reviewer claimed and has not yet reviewed. */
+    @Transactional(readOnly=true)
+    public ExaminerQueueStore.QueuePage claimedQaBy(java.util.UUID reviewerId,int page,int size) {
+        if (page<0 || size<1 || size>100) throw new IllegalArgumentException("Invalid pagination (size 1..100)");
+        return store.claimedQaBy(reviewerId,page,size);
+    }
 }

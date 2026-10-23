@@ -1,5 +1,7 @@
 package com.ieltspath.content.api.exception;
 
+import com.ieltspath.commonstorage.StorageException;
+import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.content.domain.exception.*;
 import com.ieltspath.content.application.exception.VocabularyServiceUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,6 +16,8 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -37,6 +41,10 @@ public class GlobalExceptionHandler {
             LessonNotFoundException.class,
             LessonResourceNotFoundException.class,
             PackageVersionNotFoundException.class,
+            ContentSectionNotFoundException.class,
+            SectionQuestionNotFoundException.class,
+            AiDraftNotFoundException.class,
+            DraftItemNotFoundException.class,
             RubricNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFoundException(ContentDomainException ex, HttpServletRequest request) {
@@ -53,6 +61,112 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleBadRequestException(Exception ex, HttpServletRequest request) {
         log.warn("Bad request: {}", ex.getMessage());
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(QuestionAlreadyInVersionException.class)
+    public ResponseEntity<ErrorResponse> handleQuestionAlreadyInVersion(QuestionAlreadyInVersionException ex,
+                                                                        HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "QUESTION_ALREADY_IN_VERSION"));
+    }
+
+    @ExceptionHandler(TopicSortOrderTakenException.class)
+    public ResponseEntity<ErrorResponse> handleTopicSortOrderTaken(TopicSortOrderTakenException ex,
+                                                                   HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "SORT_ORDER_TAKEN"));
+    }
+
+    @ExceptionHandler(AiQuotaExceededException.class)
+    public ResponseEntity<ErrorResponse> handleAiQuotaExceeded(AiQuotaExceededException ex,
+                                                               HttpServletRequest request) {
+        return buildResponse(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "AI_QUOTA_EXCEEDED"));
+    }
+
+    @ExceptionHandler(DuplicateImportRefException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateImportRef(DuplicateImportRefException ex,
+                                                                  HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "IMPORT_REF_CONFLICT"));
+    }
+
+    @ExceptionHandler(DraftVersionExistsException.class)
+    public ResponseEntity<ErrorResponse> handleDraftVersionExists(DraftVersionExistsException ex,
+                                                                  HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "DRAFT_EXISTS"));
+    }
+
+    @ExceptionHandler(VersionNotDraftException.class)
+    public ResponseEntity<ErrorResponse> handleVersionNotDraft(VersionNotDraftException ex,
+                                                               HttpServletRequest request) {
+        log.warn("Version change refused: version is not a draft");
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "VERSION_NOT_DRAFT"));
+    }
+
+    @ExceptionHandler(InvalidPackageTopicException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPackageTopic(InvalidPackageTopicException ex,
+                                                                   HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "INVALID_PACKAGE_TOPIC"));
+    }
+
+    @ExceptionHandler(InvalidPackageCourseException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPackageCourse(InvalidPackageCourseException ex,
+                                                                    HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "INVALID_PACKAGE_COURSE"));
+    }
+
+    @ExceptionHandler(InvalidCourseDraftException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidCourseDraft(InvalidCourseDraftException ex,
+                                                                  HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "INVALID_COURSE_DRAFT", "issues", ex.getIssues()));
+    }
+
+    @ExceptionHandler(CourseDraftErrorsException.class)
+    public ResponseEntity<ErrorResponse> handleCourseDraftErrors(CourseDraftErrorsException ex,
+                                                                 HttpServletRequest request) {
+        return ex.isConflict()
+                ? buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                        Map.of("code", "CODE_CONFLICT", "conflicts", ex.getIssues()))
+                : buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                        Map.of("code", "COURSE_DRAFT_INVALID", "errors", ex.getIssues()));
+    }
+
+    @ExceptionHandler(ImportFileRejectedException.class)
+    public ResponseEntity<ErrorResponse> handleImportFileRejected(ImportFileRejectedException ex,
+                                                                  HttpServletRequest request) {
+        HttpStatus status = ImportFileRejectedException.FILE_TOO_LARGE.equals(ex.getCode())
+                ? HttpStatus.PAYLOAD_TOO_LARGE : HttpStatus.BAD_REQUEST;
+        return buildResponse(status, ex.getMessage(), request.getRequestURI(), Map.of("code", ex.getCode()));
+    }
+
+    @ExceptionHandler(CourseImportInvalidException.class)
+    public ResponseEntity<ErrorResponse> handleCourseImportInvalid(CourseImportInvalidException ex,
+                                                                   HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "COURSE_IMPORT_INVALID", "valid", false,
+                        "errors", ex.getErrors().stream()
+                                .map(com.ieltspath.content.api.dto.response.CourseImportResponses.IssueResponse::from).toList(),
+                        "warnings", ex.getWarnings().stream()
+                                .map(com.ieltspath.content.api.dto.response.CourseImportResponses.IssueResponse::from).toList()));
+    }
+
+    @ExceptionHandler(ImportQuotaExceededException.class)
+    public ResponseEntity<ErrorResponse> handleImportQuota(ImportQuotaExceededException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "IMPORT_QUOTA_EXCEEDED"));
+    }
+
+    @ExceptionHandler(InvalidDraftItemException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidDraftItem(InvalidDraftItemException ex,
+                                                                HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "INVALID_DRAFT_ITEM", "reason", ex.getReason()));
     }
 
     @ExceptionHandler(UnknownErrorCodeException.class)
@@ -250,6 +364,42 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleVocabularyUnavailable(VocabularyServiceUnavailableException ex, HttpServletRequest request) {
         return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request.getRequestURI(),
                 Map.of("code", "VOCABULARY_SERVICE_UNAVAILABLE"));
+    }
+
+    @ExceptionHandler(UploadRejectedException.class)
+    public ResponseEntity<ErrorResponse> handleUploadRejected(UploadRejectedException ex, HttpServletRequest request) {
+        return switch (ex.reason()) {
+            case TOO_LARGE -> buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "The file is larger than the limit",
+                    request.getRequestURI(), Map.of("code", "AUDIO_TOO_LARGE"));
+            case EMPTY -> buildResponse(HttpStatus.BAD_REQUEST, "The file is empty", request.getRequestURI(),
+                    Map.of("code", "EMPTY_FILE"));
+            case TYPE_NOT_ALLOWED, CONTENT_MISMATCH -> buildResponse(HttpStatus.BAD_REQUEST,
+                    "The file is not a supported audio format", request.getRequestURI(),
+                    Map.of("code", "UNSUPPORTED_AUDIO"));
+        };
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex,
+                                                             HttpServletRequest request) {
+        String code = request.getRequestURI().contains("/course-import")
+                ? ImportFileRejectedException.FILE_TOO_LARGE : "AUDIO_TOO_LARGE";
+        return buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "The file is larger than the limit",
+                request.getRequestURI(), Map.of("code", code));
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingPart(MissingServletRequestPartException ex,
+                                                           HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, "The request part " + ex.getRequestPartName() + " is missing",
+                request.getRequestURI(), Map.of("code", "MISSING_PART"));
+    }
+
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<ErrorResponse> handleStorage(StorageException ex, HttpServletRequest request) {
+        log.error("Storage operation failed: operation={} reason={}", ex.operation(), ex.reason());
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "File storage is unavailable", request.getRequestURI(),
+                Map.of("code", "STORAGE_UNAVAILABLE"));
     }
 
     @ExceptionHandler(InvalidMediaReferenceException.class)
