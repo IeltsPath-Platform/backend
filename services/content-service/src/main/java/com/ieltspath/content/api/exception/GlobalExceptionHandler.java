@@ -56,6 +56,13 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
     }
 
+    @ExceptionHandler(DuplicateImportRefException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateImportRef(DuplicateImportRefException ex,
+                                                                  HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "IMPORT_REF_CONFLICT"));
+    }
+
     @ExceptionHandler(DraftVersionExistsException.class)
     public ResponseEntity<ErrorResponse> handleDraftVersionExists(DraftVersionExistsException ex,
                                                                   HttpServletRequest request) {

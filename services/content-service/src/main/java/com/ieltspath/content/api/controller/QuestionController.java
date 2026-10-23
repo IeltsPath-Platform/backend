@@ -36,8 +36,14 @@ public class QuestionController {
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public List<QuestionResponse> listQuestions(
             @RequestParam(value = "skill", required = false) Skill skill,
-            @RequestParam(value = "purpose", required = false) QuestionPurpose purpose
+            @RequestParam(value = "purpose", required = false) QuestionPurpose purpose,
+            @RequestParam(value = "importRef", required = false) String importRef
     ) {
+        if (importRef != null) {
+            return listQuestionsUseCase.findByImportRef(importRef).stream()
+                    .map(QuestionResponse::from)
+                    .toList();
+        }
         return listQuestionsUseCase.execute(skill, purpose).stream()
                 .map(QuestionResponse::from)
                 .toList();
@@ -58,7 +64,8 @@ public class QuestionController {
                 request.questionType(),
                 request.skill(),
                 AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT"),
-                request.purpose()
+                request.purpose(),
+                request.importRef()
         ));
         return QuestionResponse.from(result);
     }

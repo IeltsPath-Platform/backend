@@ -22,10 +22,23 @@ public class Question {
     private final Instant createdAt;
     private Instant updatedAt;
     private final List<QuestionVersion> versions;
+    /** Stable key that Excel rows and drafts use to refer to this question; never shown to learners. */
+    private final String importRef;
+
+    private static final java.util.regex.Pattern IMPORT_REF = java.util.regex.Pattern.compile("[A-Za-z0-9._-]{1,100}");
 
     public Question(UUID id, QuestionType questionType, Skill skill, String requiredFeatureKey,
             PublicationStatus status, UUID currentPublishedVersionId,
             Instant createdAt, Instant updatedAt, List<QuestionVersion> versions, QuestionPurpose purpose) {
+        this(id, questionType, skill, requiredFeatureKey, status, currentPublishedVersionId, createdAt, updatedAt,
+                versions, purpose, null);
+    }
+
+    public Question(UUID id, QuestionType questionType, Skill skill, String requiredFeatureKey,
+            PublicationStatus status, UUID currentPublishedVersionId,
+            Instant createdAt, Instant updatedAt, List<QuestionVersion> versions, QuestionPurpose purpose,
+            String importRef) {
+        this.importRef = importRef;
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.purpose = purpose != null ? purpose : QuestionPurpose.LEARNING;
         this.questionType = Objects.requireNonNull(questionType, "questionType must not be null");
@@ -44,10 +57,33 @@ public class Question {
 
     public static Question create(QuestionType questionType, Skill skill, String requiredFeatureKey,
                                   QuestionPurpose purpose) {
+        return create(questionType, skill, requiredFeatureKey, purpose, null);
+    }
+
+    public static Question create(QuestionType questionType, Skill skill, String requiredFeatureKey,
+                                  QuestionPurpose purpose, String importRef) {
         Instant now = Instant.now();
         return new Question(UUID.randomUUID(), questionType, skill, requiredFeatureKey,
-                PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), purpose);
+                PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), purpose, normalizeImportRef(importRef));
     }
+
+    /**
+     * Trims an import reference and checks its shape. Blank means none. Only letters, digits, dot, underscore and dash
+     * are allowed, up to 100 characters, so references can be typed in a spreadsheet and used in URLs safely.
+     */
+    public static String normalizeImportRef(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        if (!IMPORT_REF.matcher(trimmed).matches()) {
+            throw new IllegalArgumentException(
+                    "importRef may use letters, digits, dot, underscore and dash, up to 100 characters");
+        }
+        return trimmed;
+    }
+
+    public String getImportRef() { return importRef; }
 
     public void publishVersion(UUID versionId) {
         Objects.requireNonNull(versionId, "versionId must not be null");

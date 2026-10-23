@@ -16,6 +16,8 @@ import java.util.UUID;
 @Repository
 public interface QuestionJpaRepository extends JpaRepository<QuestionJpaEntity, UUID> {
 
+    Optional<QuestionJpaEntity> findFirstByImportRef(String importRef);
+
     @Override
     @EntityGraph(attributePaths = {"versions"})
     Optional<QuestionJpaEntity> findById(UUID id);

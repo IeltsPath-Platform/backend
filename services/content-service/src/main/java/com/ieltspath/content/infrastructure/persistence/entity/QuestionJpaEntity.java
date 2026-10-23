@@ -43,6 +43,9 @@ public class QuestionJpaEntity {
     @Column(name = "required_feature_key", length = 100)
     private String requiredFeatureKey;
 
+    @Column(name = "import_ref", length = 100)
+    private String importRef;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     private PublicationStatus status;
