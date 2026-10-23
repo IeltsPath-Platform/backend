@@ -5,6 +5,7 @@ import com.ieltspath.content.application.port.ContentGenerationException;
 import com.ieltspath.content.application.port.ContentGenerationPort;
 import com.ieltspath.content.application.result.GenerationReply;
 import com.ieltspath.content.infrastructure.config.ContentAiProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,7 @@ public class OpenAiCompatibleContentGenerator implements ContentGenerationPort {
     private final RestClient restClient;
     private final ContentAiProperties.Llm llm;
 
+    @Autowired
     public OpenAiCompatibleContentGenerator(RestClient.Builder builder, ContentAiProperties properties) {
         this.llm = properties.getLlm();
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
