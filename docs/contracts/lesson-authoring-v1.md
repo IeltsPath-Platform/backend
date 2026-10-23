@@ -88,3 +88,10 @@ returns `204`. `resourceIds` must be exactly the lesson's resources of that type
 The resources of that type get orders `0..n-1` in one transaction. Resources of the other type are not touched.
 
 All mutations serialize on the lesson row using `SELECT ... FOR UPDATE`. Replacing lesson or block order is atomic.
+
+## Topic sort order
+
+A topic's `sortOrder` is its position among siblings: topics with the same parent (roots share one group) must have
+different orders. Creating a topic, or changing its parent or order, to a value another sibling already holds returns
+`409` with `details.code = "SORT_ORDER_TAKEN"`. The other topic is never moved. Saving a topic without changing its parent
+or order is not checked, so existing data is not blocked by this rule.

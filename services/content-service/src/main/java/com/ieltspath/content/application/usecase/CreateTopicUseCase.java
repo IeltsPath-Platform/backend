@@ -36,6 +36,7 @@ public class CreateTopicUseCase {
             courseRepository.findById(command.courseId())
                     .orElseThrow(() -> new CourseNotFoundException(command.courseId()));
         }
+        TopicSortOrders.requireFree(topicRepository, command.parentTopicId(), command.sortOrder(), null);
 
         Topic topic = Topic.create(
                 command.parentTopicId(),

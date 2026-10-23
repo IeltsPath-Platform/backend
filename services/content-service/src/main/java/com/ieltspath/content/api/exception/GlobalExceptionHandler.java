@@ -57,6 +57,13 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
     }
 
+    @ExceptionHandler(TopicSortOrderTakenException.class)
+    public ResponseEntity<ErrorResponse> handleTopicSortOrderTaken(TopicSortOrderTakenException ex,
+                                                                   HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "SORT_ORDER_TAKEN"));
+    }
+
     @ExceptionHandler(AiQuotaExceededException.class)
     public ResponseEntity<ErrorResponse> handleAiQuotaExceeded(AiQuotaExceededException ex,
                                                                HttpServletRequest request) {
