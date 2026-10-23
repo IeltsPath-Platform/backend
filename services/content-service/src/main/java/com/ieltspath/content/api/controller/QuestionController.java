@@ -4,12 +4,14 @@ import com.ieltspath.content.api.AccessLevelCompatibility;
 import com.ieltspath.content.api.dto.request.AddQuestionVersionRequest;
 import com.ieltspath.content.api.dto.request.CreateQuestionRequest;
 import com.ieltspath.content.api.dto.response.QuestionDetailResponse;
+import com.ieltspath.content.api.dto.response.QuestionPageResponse;
 import com.ieltspath.content.api.dto.response.QuestionResponse;
 import com.ieltspath.content.application.command.AddQuestionVersionCommand;
 import com.ieltspath.content.application.command.CreateQuestionCommand;
 import com.ieltspath.content.application.result.QuestionDetailResult;
 import com.ieltspath.content.application.result.QuestionResult;
 import com.ieltspath.content.application.usecase.*;
+import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.domain.vo.Skill;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
 import jakarta.validation.Valid;
@@ -34,19 +36,18 @@ public class QuestionController {
 
     @GetMapping
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
-    public List<QuestionResponse> listQuestions(
+    public QuestionPageResponse listQuestions(
             @RequestParam(value = "skill", required = false) Skill skill,
             @RequestParam(value = "purpose", required = false) QuestionPurpose purpose,
-            @RequestParam(value = "importRef", required = false) String importRef
+            @RequestParam(value = "status", required = false) PublicationStatus status,
+            @RequestParam(value = "importRef", required = false) String importRef,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "25") int size
     ) {
         if (importRef != null) {
-            return listQuestionsUseCase.findByImportRef(importRef).stream()
-                    .map(QuestionResponse::from)
-                    .toList();
+            return QuestionPageResponse.from(listQuestionsUseCase.findByImportRef(importRef));
         }
-        return listQuestionsUseCase.execute(skill, purpose).stream()
-                .map(QuestionResponse::from)
-                .toList();
+        return QuestionPageResponse.from(listQuestionsUseCase.execute(skill, purpose, status, page, size));
     }
 
     @GetMapping("/{id}")

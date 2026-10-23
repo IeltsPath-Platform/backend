@@ -169,7 +169,8 @@ class ContentAuthorizationWebMvcTest {
     @Test
     @WithMockUser(roles = "CONTENT_AUTHOR")
     void contentAuthorCanReadQuestionAndPackageListsAndDetails() throws Exception {
-        when(listQuestions.execute(null)).thenReturn(List.of());
+        when(listQuestions.execute(null, null, null, 0, 25))
+                .thenReturn(new ListQuestionsUseCase.Page(0, 0, 25, List.of()));
         when(listPackages.execute(null, null)).thenReturn(List.of());
         when(getQuestionDetail.execute(id)).thenReturn(new QuestionDetailResult(
                 id, QuestionType.MULTIPLE_CHOICE, Skill.READING, null, PublicationStatus.PUBLISHED,

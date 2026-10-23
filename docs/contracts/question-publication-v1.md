@@ -4,9 +4,36 @@ Question authoring routes require `CONTENT_AUTHOR`.
 
 ## List questions
 
-The existing `GET /api/content/admin/questions` route supports optional `skill` and `purpose` filters and returns an
-array of question catalog records. The equivalent `/api/content/questions` alias remains available. Both require
-`CONTENT_AUTHOR`.
+`GET /api/content/admin/questions` returns one page of question catalog records, newest first (`createdAt` descending,
+then `id`). The equivalent `/api/content/questions` alias behaves the same. Both require `CONTENT_AUTHOR`.
+
+| Query parameter | Meaning |
+| --- | --- |
+| `skill` | Optional. `LISTENING`, `READING`, `WRITING`, `SPEAKING` or `ALL`. |
+| `purpose` | Optional. `LEARNING`, `EXAM` or `PLACEMENT`. |
+| `status` | Optional. `DRAFT`, `PUBLISHED` or `ARCHIVED` (the question's own status). |
+| `page` | Zero-based page index. Default `0`. |
+| `size` | Page size, `1` to `100`. Default `25`. |
+
+Filters combine with AND and run in the database. An unknown enum value, a negative `page` or a `size` outside `1..100`
+returns `400`.
+
+```json
+{
+  "content": [ { "id": "…", "questionType": "MULTIPLE_CHOICE", "skill": "READING", "status": "PUBLISHED", "…": "…" } ],
+  "page": 0,
+  "size": 25,
+  "totalElements": 57,
+  "totalPages": 3
+}
+```
+
+Each item has the same fields the route returned before (`id`, `questionType`, `skill`, `accessLevel`, `status`,
+`currentPublishedVersionId`, `createdAt`, `updatedAt`, `purpose`, `importRef`). `totalPages` is `0` when nothing
+matches. A page beyond the end returns an empty `content` with the real `totalElements`.
+
+**Changed from the earlier version of this route:** the response was a bare JSON array and ignored `page`, `size` and
+`status`. Clients must read `content`. The only caller in this repository is the `/content-author` question bank.
 
 ### Import reference
 
@@ -18,8 +45,9 @@ when another question has it). Learners never see it.
 - `POST /api/content/admin/questions` accepts `importRef` and returns it.
 - The list, create, new-version and archive responses include `importRef`, `null` when unset. The detail response
   (`GET /api/content/admin/questions/{id}`) does not include it yet.
-- `GET /api/content/admin/questions?importRef=<ref>` returns the question with exactly that reference as a list of at
-  most one item. When this parameter is present, `skill` and `purpose` are ignored.
+- `GET /api/content/admin/questions?importRef=<ref>` returns the question with exactly that reference in the same page
+  shape, with at most one item in `content` (`page` `0`, `size` `100`). When this parameter is present, `skill`,
+  `purpose`, `status`, `page` and `size` are ignored.
 
 ## Publish a question version
 

@@ -1,6 +1,7 @@
 package com.ieltspath.content.domain.repository;
 
 import com.ieltspath.content.domain.aggregate.Question;
+import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.domain.vo.Skill;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
 
@@ -13,11 +14,14 @@ public interface QuestionRepository {
     Optional<Question> findById(UUID id);
     Optional<Question> findByIdForUpdate(UUID id);
     List<Question> findByIds(List<UUID> ids);
-    List<Question> findBySkill(Skill skill);
-    /** Catalog metadata filtered in the database; versions are not needed by the list response. */
-    List<Question> findByPurpose(QuestionPurpose purpose, Skill skill);
-    List<Question> findAll();
+    /**
+     * One page of catalog metadata, newest first. Every filter is optional and applied in the database; versions are
+     * not needed by the list response. {@code page} is zero-based.
+     */
+    Page findPage(Skill skill, QuestionPurpose purpose, PublicationStatus status, int page, int size);
     /** The question carrying this import reference, if any. Matched exactly. */
     Optional<Question> findByImportRef(String importRef);
+
+    record Page(long totalElements, List<Question> items) {}
 }
 
