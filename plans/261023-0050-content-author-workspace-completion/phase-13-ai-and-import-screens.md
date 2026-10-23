@@ -1,7 +1,7 @@
 # Phase 13: Màn AI sinh nội dung, dựng khóa học, import Excel
 
 Người làm: **Codex**. Nhánh hiện tại: `feat/content-author-screens` (frontend, worktree `../frontend-claude`, theo chỉ dẫn mới nhất của người dùng).
-Trạng thái: In progress phần A — frontend nháp câu hỏi đã triển khai và commit local sau cờ false; typecheck/lint/build qua, full suite còn lỗi ngoài phần sửa; chờ backend merge để bật và kiểm live. Phần B/C giữ nguyên Blocked.
+Trạng thái: Done về code (2026-10-23): A, B, C đã triển khai; menu "Sinh nội dung bằng AI" vẫn sau cờ `QUESTION_DRAFTS_ENABLED = false` — chờ backend merge, bật cờ và checklist thật
 
 Repo: `frontend`. Phần A được phép triển khai local theo contract nhánh backend trước khi merge; bật tính năng phụ thuộc phase 08 + 09 đã merge và xác minh contract. Phần B cần phase 10 (+ 11 cho nút sinh bằng AI), phần C cần phase 12; B/C chưa được mở trong lượt này. Chỉ commit frontend local, không push/merge hoặc commit backend phase.
 
@@ -104,3 +104,11 @@ Checklist B/C dành cho sau này: Sinh course bằng AI, xem `gaps`, bấm "Sinh
 
 - Phần A chờ backend phase 08/09 công bố/merge code cùng hai contract rồi xác minh merge để bật cờ và kiểm live. Contract đã có ở nhánh; không yêu cầu viết lại các route đã mô tả hoặc dùng code phase 09 chưa công bố làm bằng chứng đã sẵn sàng rollout.
 - B/C tiếp tục chờ backend và contract theo phụ thuộc ban đầu; không thuộc phạm vi implementation hiện tại.
+
+### Cập nhật 2026-10-23 — B, C và sửa/xóa câu (A)
+
+- Lượt 2026-10-23 (Claude Code tiếp quản vì Codex hết token), nhánh `feat/content-author-screens`, đã push vào [PR #29](https://github.com/IeltsPath-Platform/frontend/pull/29). Phần A thêm sửa và xóa từng câu (`PATCH`/`DELETE …/items/{index}`, lý do `DUPLICATE_STEM`, `422 INVALID_DRAFT_ITEM`). Phần B: danh sách và trình soạn bản nháp course, sinh bằng AI, phân tích, duyệt. Phần C: tải template bằng `apiDownload`, kiểm tra, bảng lỗi theo sheet/dòng/cột, import.
+- Sửa lỗi của lượt trước: báo cáo `422` của import nằm trong `details` của phản hồi lỗi (không ở gốc), trang cũ đọc sai chỗ nên không hiện bảng lỗi.
+- Test thêm: `httpClient.download.test.ts`, `CourseImportPage.test.tsx` (8), sửa hai lỗi kiểu trong test của B.
+- Các mục menu "Dựng khóa học" và "Nhập Excel" hiện cho CONTENT_AUTHOR; nếu backend chưa merge thì gọi API sẽ lỗi, đặt cờ nếu cần ẩn.
+- typecheck, lint, build qua; `npm test` 1047/1049 qua, lỗi còn lại là flashcard `owl-reactions.test.ts` (nội dung chọn ngẫu nhiên, ngoài phạm vi, không sửa). Chưa chạy checklist thủ công với backend thật.

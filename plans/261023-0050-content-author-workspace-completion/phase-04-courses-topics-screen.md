@@ -1,7 +1,7 @@
 # Phase 04: Màn "Khóa học & chủ đề"
 
 Người làm: **Codex** (đổi từ Claude Code ngày 2026-10-23). Nhánh: `feat/content-author-screens` (frontend, worktree `../frontend-claude`).
-Trạng thái: In progress — quyết định từ chối lưu thứ tự trùng đã chốt, lỗi form theo trường đã triển khai và focused tests qua; mũi tên còn Blocked chờ reorder nguyên tử, checklist thật chưa chạy và full suite còn 2 lỗi ngoài phạm vi thay đổi.
+Trạng thái: Done về code (2026-10-23) — mũi tên dùng API reorder nguyên tử; chờ backend merge và checklist thật
 
 Repo: `frontend`. API khóa học/chủ đề và lỗi `SORT_ORDER_TAKEN` đã có; đổi vị trí bằng mũi tên cần API/contract reorder nguyên tử.
 
@@ -94,3 +94,9 @@ Tạo khóa "Intensive 7.0" band 7.0, tạo chủ đề Writing con của nó, m
 - Cần API và contract đổi thứ tự topic nguyên tử cho mũi tên theo quy tắc duy nhất trong cùng parent; thao tác phải đổi toàn bộ thứ tự cần thiết trong một transaction. Luồng 2 PUT từng topic không dùng được khi vị trí đích đang có, và frontend không được tự chọn số tạm hoặc chuẩn hóa để vượt ràng buộc.
 - **Đã có (backend, 2026-10-23, chưa merge):** `PUT /api/content/admin/topics/order` với `{ parentTopicId?, topicIds }` — `topicIds` là toàn bộ topic cùng parent theo thứ tự mới (parent null = nhóm gốc), một transaction, `204`; sai tập id → `400`, parent lạ → `404`. Nhóm có thứ tự trùng được đánh số lại liên tiếp nên cũng gỡ được nhóm đang bị khóa mũi tên. Contract: `lesson-authoring-v1.md` mục "Reordering topics". Frontend gửi lại cả nhóm anh em đã đổi chỗ, không tự chọn số.
 - `SORT_ORDER_TAKEN` và quy tắc từ chối lưu trùng đã được backend triển khai/công bố trong `lesson-authoring-v1.md`; không yêu cầu triển khai lại lỗi này. Không còn quyết định xử lý trùng nào chờ người dùng.
+
+### Cập nhật 2026-10-23 — mũi tên đổi thứ tự dùng API nguyên tử
+
+- Lượt 2026-10-23 (Claude Code tiếp quản vì Codex hết token), nhánh `feat/content-author-screens`, đã push vào [PR #29](https://github.com/IeltsPath-Platform/frontend/pull/29). Backend đã có `PUT /api/content/admin/topics/order` (`lesson-authoring-v1.md`, mục "Reordering topics"). Mũi tên đổi chỗ hai chủ đề liền kề rồi gửi **cả nhóm cùng parent** (lấy từ toàn bộ chủ đề, vì màn chỉ hiện một khóa); server đánh số lại trong một transaction. Không còn luồng 2 PUT, không còn khóa mũi tên cho nhóm trùng thứ tự: server gỡ trùng khi đánh số lại.
+- Test: gọi đúng một lần với đủ nhóm, nhóm gốc gồm chủ đề của khóa khác, nhóm trùng vẫn đổi được, lỗi server giữ thông báo và tải lại.
+- typecheck, lint, build qua; `npm test` 1047/1049 qua, lỗi còn lại là flashcard `owl-reactions.test.ts` (nội dung chọn ngẫu nhiên, ngoài phạm vi, không sửa). Chưa chạy checklist thủ công với backend thật.

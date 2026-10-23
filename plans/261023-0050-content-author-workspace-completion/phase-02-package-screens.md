@@ -1,7 +1,7 @@
 # Phase 02: Màn "Đề & gói câu hỏi"
 
 Người làm: **Codex**. Nhánh hiện tại: `feat/content-author-screens` (frontend, worktree `../frontend-claude`, theo chỉ dẫn mới nhất của người dùng).
-Trạng thái: In progress — toàn bộ màn soạn gói đã triển khai local theo contract backend hiện tại; chờ backend merge và checklist thật trước rollout. Typecheck/lint/build qua; full suite còn lỗi ngoài phạm vi, test gói đã kiểm lại qua.
+Trạng thái: Done về code (2026-10-23) — chờ backend merge và checklist thật
 
 Repo: `frontend`. Phụ thuộc rollout: code và contract backend tương ứng đã merge, môi trường thật sẵn sàng. Người dùng đã cho phép triển khai local phần contract nhánh trước khi merge.
 

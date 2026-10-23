@@ -1,7 +1,7 @@
 # Phase 15: Màn "Việc cần làm của R&D", "Đánh giá giám khảo", "Đánh giá AI chấm Writing"
 
 Người làm: **Codex**. Nhánh: `feat/content-review-screens` (frontend, worktree `../frontend-claude`, tạo nhánh từ `origin/main` mới nhất).
-Trạng thái: Blocked — phase 14 còn Pending, chưa đủ điều kiện dùng contract cập nhật trên backend main.
+Trạng thái: Done về code (2026-10-23): A, B, C — chờ backend merge và checklist thật
 
 Repo: `frontend`. Phụ thuộc: phase 14 đã merge và contract cập nhật có trên `main`. Thứ tự trong phase: A → B → C (C làm sau cùng, xem lý do ở mục C). Có thể mở một PR cho mỗi phần.
 
@@ -95,3 +95,11 @@ Mục đích: trước khi tin AI chấm học viên, cho AI chấm lại một 
 
 - 2026-10-23: đã fetch backend origin/main (`c600b3f3`); phase 14 còn Pending. Chưa có xác nhận merge thay đổi API/contract `admin-area-v1`, `assessment-grading-v1`, `learning-staff-area-v1` mà phase này yêu cầu.
 - Chưa tạo nhánh `feat/content-review-screens`, chưa viết hoặc đoán API/schema/UI, chưa chạy test/checklist. Chờ phase 14 hoàn tất và contract cập nhật trên main.
+
+### Cập nhật 2026-10-23 — A, B, C đã triển khai
+
+- Lượt 2026-10-23 (Claude Code tiếp quản vì Codex hết token), nhánh `feat/content-author-screens`, đã push vào [PR #29](https://github.com/IeltsPath-Platform/frontend/pull/29). A `work-queue/` (lọc loại/trạng thái, tên đối tượng và số liệu thành chữ, Nhận/Trả lại/Xong, nút Xử lý theo loại; `KnowledgeGraphPage` đọc `?kp=`; Tổng quan hiện tên đối tượng và link "Xem tất cả"). B `examiner-review/` (ba tab, màn chấm lại mù, band tổng tự điền làm tròn 0.5, bảng chất lượng sắp theo lệch). C `ai-evaluation/` (Codex đã viết trang, lượt này thêm test và hiển thị điểm hai chữ số).
+- Quyền: các route đánh giá giám khảo và đánh giá AI ở backend là **CONTENT_AUTHOR**, không phải ADMIN (đã đối chiếu `@PreAuthorize`); menu theo đó.
+- Nút "Sinh câu cho KP này" ở `CONTENT_GAP` chỉ hiện khi `QUESTION_DRAFTS_ENABLED` bật.
+- Test: `WorkQueuePage.test.tsx` (9), `ExaminerReviewPages.test.tsx` (11), `AiEvaluationPages.test.tsx` (11), menu, tổng quan, đồ thị tri thức.
+- typecheck, lint, build qua; `npm test` 1047/1049 qua, lỗi còn lại là flashcard `owl-reactions.test.ts` (nội dung chọn ngẫu nhiên, ngoài phạm vi, không sửa). Chưa chạy checklist thủ công với backend thật.
