@@ -22,6 +22,8 @@ import com.ieltspath.learning.domain.entity.ReviewSet;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.application.port.QuestionEventLog;
 import com.ieltspath.learning.application.service.MasteryProfileUpdater;
+import com.ieltspath.learning.application.service.ErrorTrapEvidence;
+import com.ieltspath.learning.application.service.ErrorTrapCatalog;
 import com.ieltspath.learning.application.service.AnswerDurations;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
 import com.ieltspath.learning.domain.vo.QuestionEventSource;
@@ -41,6 +43,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -62,6 +65,7 @@ public class SubmitReviewUseCase {
     private final QuestionEventLog questionEvents;
     private final MasteryProfileUpdater masteryProfiles;
     private final GamificationRecorder gamificationRecorder;
+    private final ErrorTrapEvidence errorTrapEvidence;
     private final ItemGrading grading = new ItemGrading();
 
     public SubmitReviewUseCase(LearningContentClient content, LearnerLock lock, KnowledgeEvidenceRepository evidence,
@@ -69,8 +73,9 @@ public class SubmitReviewUseCase {
                                ReviewSubmissionLog submissions,
                                PracticeProgress practice, QuestionEventLog questionEvents,
                                MasteryProfileUpdater masteryProfiles, DiagnosticFlow diagnosticFlow,
-                               GamificationRecorder gamificationRecorder) {
+                               GamificationRecorder gamificationRecorder, ErrorTrapEvidence errorTrapEvidence) {
         this.gamificationRecorder = gamificationRecorder;
+        this.errorTrapEvidence = errorTrapEvidence;
         this.diagnosticFlow = diagnosticFlow;
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
@@ -117,6 +122,11 @@ public class SubmitReviewUseCase {
         List<QuestionAttemptEvent> setEvents = new ArrayList<>();
         Map<UUID, Long> durations = AnswerDurations.of(command.answers());
         List<SubmissionResult.AnswerResult> results = new ArrayList<>();
+        ErrorTrapCatalog.ErrorTraps trapCatalog = errorTrapEvidence.loadIfNeeded(
+                items.stream().anyMatch(item -> item.answerSpec().get("distractors") instanceof Map<?, ?>));
+        Map<String, com.ieltspath.learning.application.service.ErrorTypeTexts.Text> errorTexts =
+                errorTrapEvidence.errorTexts(graded.errorCodes());
+        Set<UUID> withoutMilestone = new java.util.HashSet<>();
         for (int index = 0; index < items.size(); index++) {
             Item item = items.get(index);
             AnswerSpecGrader.Grade grade = grades.get(index);
@@ -126,17 +136,23 @@ public class SubmitReviewUseCase {
                         LessonEvidenceReference.forReviewSet(command.requestId(), item.questionVersionId(), kpId))
                         .forQuestion(item.questionVersionId()));
             }
+            errorTrapEvidence.append(setAnswers, withoutMilestone,
+                    item.answerSpec(), grade.correct(), graded.errorCodes().get(index), item.questionVersionId(),
+                    kp -> LessonEvidenceReference.forReviewSet(command.requestId(), item.questionVersionId(), kp),
+                    trapCatalog);
             setEvents.add(QuestionAttemptEvent.of(userId, item.questionVersionId(),
                     item.knowledgePointMappings().stream().map(LearningContentClient.KnowledgePointMapping::knowledgePointId)
                             .distinct().toList(),
                     grade.correct(), durations.get(item.questionVersionId()), graded.errorCodes().get(index),
                     QuestionEventSource.REVIEW_SET, command.requestId(), true));
             results.add(new SubmissionResult.AnswerResult(item.questionVersionId(), grade.correct(),
-                    grade.correctAnswer(), item.explanation()));
+                    grade.correctAnswer(), item.explanation(), null,
+                    errorTrapEvidence.feedback(graded.errorCodes().get(index), errorTexts)));
         }
         questionEvents.append(setEvents);
         evidence.append(userId, setAnswers);
-        masteryProfiles.recordEvidence(userId, setAnswers);
+        masteryProfiles.recordEvidence(userId, setAnswers, withoutMilestone);
+        errorTrapEvidence.createReviews(userId, review.lessonId(), setAnswers);
 
         ReviewStatus status = review.recordSetResult(set.id(), command.requestId(), graded.correct(), graded.total());
         Section first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);

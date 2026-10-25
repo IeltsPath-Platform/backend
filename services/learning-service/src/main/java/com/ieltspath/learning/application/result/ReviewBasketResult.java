@@ -1,6 +1,7 @@
 package com.ieltspath.learning.application.result;
 
 import com.ieltspath.learning.domain.vo.LearningSkill;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.Instant;
 import java.util.List;
@@ -33,5 +34,11 @@ public record ReviewBasketResult(List<RequiredItem> required, List<OptionalItem>
      * not seen; without one the point cannot be started.
      */
     public record OptionalItem(UUID knowledgePointId, String code, String name, String skill, String tier,
-                               double mastery, Instant dueAt, String reason, boolean hasUnrevealedSet, UUID reviewId) {}
+                               double mastery, Instant dueAt, String reason, boolean hasUnrevealedSet, UUID reviewId,
+                               @JsonInclude(JsonInclude.Include.NON_NULL) ErrorTrapResult errorTrap) {
+        public OptionalItem(UUID knowledgePointId, String code, String name, String skill, String tier,
+                            double mastery, Instant dueAt, String reason, boolean hasUnrevealedSet, UUID reviewId) {
+            this(knowledgePointId, code, name, skill, tier, mastery, dueAt, reason, hasUnrevealedSet, reviewId, null);
+        }
+    }
 }

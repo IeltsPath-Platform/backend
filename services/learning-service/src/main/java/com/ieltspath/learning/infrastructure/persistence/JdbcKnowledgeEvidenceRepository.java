@@ -116,7 +116,7 @@ public class JdbcKnowledgeEvidenceRepository implements KnowledgeEvidenceReposit
                 history.correct, history.ordinal, COALESCE(history.evidence_count, 0) AS evidence_count
                 FROM knowledge_point_catalog catalog LEFT JOIN history
                 ON history.kp_id = catalog.kp_id AND history.recency <= 5
-                """ + (filtered ? "WHERE catalog.kp_id = ANY (?)\n" : "") + """
+                """ + (filtered ? "WHERE catalog.kp_id = ANY (?)\n" : "WHERE catalog.parent_kp_id IS NULL\n") + """
                 ORDER BY catalog.topic_id, catalog.kp_id, history.ordinal
                 """, statement -> {
             statement.setObject(1, userId);

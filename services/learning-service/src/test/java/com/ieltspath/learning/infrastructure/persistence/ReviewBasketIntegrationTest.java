@@ -10,10 +10,13 @@ import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.*;
 import com.ieltspath.learning.application.result.ReviewBasketResult;
 import com.ieltspath.learning.application.service.ReviewReevaluation;
+import com.ieltspath.learning.application.service.ErrorTrapReviews;
 import com.ieltspath.learning.application.usecase.*;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -67,6 +70,7 @@ class ReviewBasketIntegrationTest {
     @Autowired GetLessonUseCase getLesson;
     @Autowired CompleteLessonUseCase completeLesson;
     @Autowired ReviewReevaluation reevaluation;
+    @Autowired ErrorTrapReviews errorTrapReviews;
     @Autowired ApplyAssessmentResultUseCase apply;
     @MockitoBean LearningContentClient content;
 
@@ -103,6 +107,13 @@ class ReviewBasketIntegrationTest {
             List<UUID> excluded = invocation.getArgument(1);
             return versions.values().stream().filter(version -> !excluded.contains(version.packageId())).limit(1)
                     .map(version -> new PracticeSet(version.packageId(), version.packageVersionId(), "PS", 2, 2))
+                    .toList();
+        });
+        when(content.searchPracticeSets(any(), anyList(), eq(3), eq(1), any(), any())).thenAnswer(invocation -> {
+            List<UUID> excluded = invocation.getArgument(1);
+            return versions.values().stream().filter(version -> !excluded.contains(version.packageId())).limit(1)
+                    .map(version -> new PracticeSet(version.packageId(), version.packageVersionId(), "PS", 3, 3,
+                            null, null, 2))
                     .toList();
         });
     }
@@ -195,6 +206,7 @@ class ReviewBasketIntegrationTest {
         var review = start.execute(user, kpConsolidate);
 
         assertEquals("PENDING", review.reviewStatus());
+        assertFalse(review.blocking());
         assertEquals(only.packageId(), review.set().packageId());
         assertEquals("PRACTICE", review.stage());
         assertEquals(false, jdbc.queryForObject("SELECT blocking FROM review_items WHERE id = ?", Boolean.class,
@@ -248,6 +260,7 @@ class ReviewBasketIntegrationTest {
         var review = start.execute(user, kpPriority);
 
         assertEquals(blockingId, review.reviewId());
+        assertTrue(review.blocking());
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?", Integer.class, user));
     }
 
@@ -273,6 +286,109 @@ class ReviewBasketIntegrationTest {
                 () -> start.execute(user, kpPriority)).getCode());
         assertEquals("NOT_IN_REVIEW_BASKET", assertThrows(LearningRequestException.class,
                 () -> start.execute(user, UUID.randomUUID())).getCode());
+    }
+
+    @Test
+    void anErrorPatternReviewUsesTheCurrentMainTrapAndReturnsItsFixHint() {
+        UUID user = learner();
+        UUID trap = UUID.randomUUID();
+        jdbc.update("INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set, parent_kp_id, error_code) "
+                + "VALUES (?, ?, FALSE, ?, ?)", trap, topic, kpConsolidate, "TFNG_NG_AS_FALSE");
+        profile(user, trap, "0.200", "PRIORITY", null);
+        PackageVersion set = practiceSet(kpConsolidate, kpConsolidate, kpConsolidate);
+        when(content.learnerErrorTypes()).thenReturn(List.of(new ErrorType("TFNG_NG_AS_FALSE", "Wrong distinction",
+                "COMPREHENSION", 1, "Separate false from not stated")));
+
+        var review = start.execute(user, kpConsolidate);
+
+        assertEquals("TFNG_NG_AS_FALSE", review.errorTrap().code());
+        assertEquals("Wrong distinction", review.errorTrap().name());
+        assertEquals("Separate false from not stated", review.errorTrap().fixHint());
+        assertEquals(set.packageId(), review.set().packageId());
+        assertFalse(review.blocking(), "ERROR_PATTERN reviews are optional and detail carries that state");
+        org.mockito.Mockito.verify(content, org.mockito.Mockito.times(2)).searchPracticeSets(eq(kpConsolidate), anyList(), eq(3), eq(1),
+                eq(lesson), eq("TFNG_NG_AS_FALSE"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"DONE", "SKIPPED"})
+    void completedOrSkippedReviewDoesNotLookUpTrapText(String status) {
+        UUID user = learner();
+        UUID reviewId = UUID.randomUUID();
+        UUID trap = UUID.randomUUID();
+        jdbc.update("INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set, parent_kp_id, error_code) "
+                + "VALUES (?, ?, FALSE, ?, 'TFNG_NG_AS_FALSE')", trap, topic, kpConsolidate);
+        profile(user, trap, "0.200", "PRIORITY", null);
+        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, "
+                + "trigger_kind, blocking) VALUES (?, ?, ?, ?, ?, 'READING', 'ERROR_PATTERN', FALSE)",
+                reviewId, user, kpConsolidate, lesson, status);
+
+        assertDoesNotThrow(() -> getReview.execute(user, reviewId));
+
+        org.mockito.Mockito.verify(content, org.mockito.Mockito.never()).learnerErrorTypes();
+    }
+
+    @Test
+    void aTrapKnowledgePointCannotBeStartedFromTheReviewBasket() {
+        UUID user = learner();
+        UUID trap = UUID.randomUUID();
+        jdbc.update("INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set, parent_kp_id, error_code) "
+                + "VALUES (?, ?, FALSE, ?, ?)", trap, topic, kpConsolidate, "TFNG_NG_AS_FALSE");
+        profile(user, trap, "0.200", "PRIORITY", null);
+
+        var error = assertThrows(LearningRequestException.class, () -> start.execute(user, trap));
+        assertEquals(409, error.getStatus());
+        assertEquals("NOT_IN_REVIEW_BASKET", error.getCode());
+    }
+
+    @Test
+    void aPriorityTrapCreatesOneOptionalReviewForItsParent() {
+        UUID user = learner();
+        UUID trap = UUID.randomUUID();
+        jdbc.update("INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set, parent_kp_id, error_code) "
+                + "VALUES (?, ?, FALSE, ?, ?)", trap, topic, kpConsolidate, "TFNG_NG_AS_FALSE");
+        profile(user, trap, "0.200", "PRIORITY", null);
+        practiceSet(kpConsolidate, kpConsolidate, kpConsolidate);
+
+        errorTrapReviews.create(user, lesson, List.of(trap));
+        errorTrapReviews.create(user, lesson, List.of(trap));
+
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND "
+                + "knowledge_point_id = ? AND status = 'PENDING'", Integer.class, user, kpConsolidate));
+        assertEquals("ERROR_PATTERN", jdbc.queryForObject("SELECT trigger_kind FROM review_items WHERE user_id = ? "
+                + "AND knowledge_point_id = ?", String.class, user, kpConsolidate));
+        assertEquals(false, jdbc.queryForObject("SELECT blocking FROM review_items WHERE user_id = ? "
+                + "AND knowledge_point_id = ?", Boolean.class, user, kpConsolidate));
+
+        jdbc.update("UPDATE review_items SET status = 'DONE', done_at = now() WHERE user_id = ? "
+                + "AND knowledge_point_id = ?", user, kpConsolidate);
+        errorTrapReviews.create(user, lesson, List.of(trap));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ? AND "
+                + "knowledge_point_id = ?", Integer.class, user, kpConsolidate));
+    }
+
+    @Test
+    void anErrorPatternBasketItemShowsTheCurrentMainError() {
+        UUID user = learner();
+        UUID trap = UUID.randomUUID();
+        jdbc.update("INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set, parent_kp_id, error_code) "
+                + "VALUES (?, ?, FALSE, ?, ?)", trap, topic, kpConsolidate, "TFNG_NG_AS_FALSE");
+        profile(user, trap, "0.200", "PRIORITY", null);
+        jdbc.update("UPDATE kp_mastery_profiles SET tier = 'MAINTAIN', next_review_at = now() + interval '10 days' "
+                + "WHERE user_id = ? AND knowledge_point_id = ?", user, kpConsolidate);
+        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind, "
+                + "blocking) VALUES (?, ?, ?, ?, 'PENDING', 'READING', 'ERROR_PATTERN', FALSE)",
+                UUID.randomUUID(), user, kpConsolidate, lesson);
+        when(content.learnerErrorTypes()).thenReturn(List.of(new ErrorType("TFNG_NG_AS_FALSE", "Wrong distinction",
+                "COMPREHENSION", 1, "Separate false from not stated")));
+
+        var item = basket.execute(user).weak().stream().filter(point -> point.knowledgePointId().equals(kpConsolidate))
+                .findFirst().orElseThrow();
+
+        assertEquals("ERROR_PATTERN", item.reason());
+        assertEquals("TFNG_NG_AS_FALSE", item.errorTrap().code());
+        assertEquals("Wrong distinction", item.errorTrap().name());
+        assertEquals("Separate false from not stated", item.errorTrap().fixHint());
     }
 
     @Test
@@ -312,6 +428,9 @@ class ReviewBasketIntegrationTest {
         apply.execute(new AssessmentResult(UUID.randomUUID(), user, UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), 1, "OFFICIAL_PRACTICE", Instant.now(), items));
 
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ? "
+                + "AND source = 'error_trap'", Integer.class, user),
+                "official assessments do not record child trap evidence");
         assertEquals("FREE_PRACTICE_TEST", jdbc.queryForObject(
                 "SELECT trigger_kind FROM review_items WHERE user_id = ? AND knowledge_point_id = ?", String.class,
                 user, kpConsolidate));

@@ -39,9 +39,10 @@ class SubmitPracticeAttemptUseCaseTest {
     private final GamificationRecorder gamification = mock(GamificationRecorder.class);
     private final HeartsService hearts = mock(HeartsService.class);
     private final WritingCriterionReviews criterionReviews = spy(new WritingCriterionReviews(reviews, attempts, content, 2));
+    private final ErrorTrapEvidence errorTrapEvidence = mock(ErrorTrapEvidence.class);
     private final SubmitPracticeAttemptUseCase useCase = new SubmitPracticeAttemptUseCase(lock, access, content,
             attempts, reviews, evidence, progress, mistakes, essays, events, mastery, freePractice, gamification,
-            hearts, criterionReviews);
+            hearts, criterionReviews, errorTrapEvidence);
     private final UUID userId = UUID.randomUUID(), lessonId = UUID.randomUUID(), attemptId = UUID.randomUUID();
     private final UUID packageId = UUID.randomUUID(), versionId = UUID.randomUUID(), essayId = UUID.randomUUID();
     private final UUID ta = UUID.randomUUID(), cc = UUID.randomUUID(), lr = UUID.randomUUID(), gra = UUID.randomUUID();
@@ -81,6 +82,7 @@ class SubmitPracticeAttemptUseCaseTest {
         assertTrue(result.countedAsEvidence());
         verify(reviews).insertPending(userId, List.of(new ReviewCandidate(gra, lessonId, LearningSkill.WRITING),
                 new ReviewCandidate(lr, lessonId, LearningSkill.WRITING)), false, "WRITING_CRITERION");
+        verify(errorTrapEvidence, never()).errorTexts(anyCollection());
     }
 
     @Test void revealedPackageWritesNoNewCriterionReviews() {

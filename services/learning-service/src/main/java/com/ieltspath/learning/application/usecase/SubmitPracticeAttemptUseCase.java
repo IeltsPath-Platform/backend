@@ -15,6 +15,8 @@ import com.ieltspath.learning.application.service.FreePracticeSubmission;
 import com.ieltspath.learning.application.service.GamificationRecorder;
 import com.ieltspath.learning.application.service.HeartsService;
 import com.ieltspath.learning.application.service.WritingCriterionReviews;
+import com.ieltspath.learning.application.service.ErrorTrapEvidence;
+import com.ieltspath.learning.application.service.ErrorTrapCatalog;
 import com.ieltspath.learning.domain.vo.FailedWritingCriterion;
 import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.domain.vo.PracticeOrigin;
@@ -39,6 +41,7 @@ import com.ieltspath.learning.domain.vo.PracticeReviewCandidate;
 import com.ieltspath.learning.domain.vo.PracticeSubmission;
 import com.ieltspath.learning.domain.vo.WritingSubmissionStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -67,19 +70,22 @@ public class SubmitPracticeAttemptUseCase {
     private final GamificationRecorder gamificationRecorder;
     private final HeartsService hearts;
     private final WritingCriterionReviews criterionReviews;
+    private final ErrorTrapEvidence errorTrapEvidence;
     private final ItemGrading grading = new ItemGrading();
     private final LessonHintPolicy hints = new LessonHintPolicy();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final WritingEvidenceRule writingEvidence = new WritingEvidenceRule();
     private final Clock clock = Clock.systemUTC();
 
+    @Autowired
     public SubmitPracticeAttemptUseCase(LearnerLock lock, PracticeAccess access, LearningContentClient content,
                                         PracticeAttemptRepository attempts, ReviewItemRepository reviews,
                                         KnowledgeEvidenceRepository evidence, PracticeProgress progress,
                                         FirstAttemptMistakes mistakes, WritingSubmissionRepository essays,
                                         QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
                                         FreePracticeSubmission freePractice, GamificationRecorder gamificationRecorder,
-                                        HeartsService hearts, WritingCriterionReviews criterionReviews) {
+                                        HeartsService hearts, WritingCriterionReviews criterionReviews,
+                                        ErrorTrapEvidence errorTrapEvidence) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -95,6 +101,7 @@ public class SubmitPracticeAttemptUseCase {
         this.gamificationRecorder = gamificationRecorder;
         this.hearts = hearts;
         this.criterionReviews = criterionReviews;
+        this.errorTrapEvidence = errorTrapEvidence;
     }
 
     /** Wrong objective answers; essay items are graded by a tutor and never cost a heart. */
@@ -136,6 +143,11 @@ public class SubmitPracticeAttemptUseCase {
         Set<UUID> itemKps = new HashSet<>();
         Set<UUID> criterionOnly = new HashSet<>();
         List<FailedWritingCriterion> failedCriteria = new ArrayList<>();
+        ErrorTrapCatalog.ErrorTraps trapCatalog = errorTrapEvidence.loadIfNeeded(
+                graded.items().stream().anyMatch(item -> item.answerSpec().get("distractors") instanceof Map<?, ?>));
+        List<String> feedbackCodes = graded.errorCodes().stream().filter(Objects::nonNull).toList();
+        Map<String, com.ieltspath.learning.application.service.ErrorTypeTexts.Text> errorTexts =
+                feedbackCodes.isEmpty() ? Map.of() : errorTrapEvidence.errorTexts(feedbackCodes);
         Map<LearningSkill, List<PracticeReviewRule.ItemOutcome>> outcomesBySkill = new EnumMap<>(LearningSkill.class);
         for (int index = 0; index < graded.items().size(); index++) {
             var item = graded.items().get(index);
@@ -163,12 +175,17 @@ public class SubmitPracticeAttemptUseCase {
                     entry.getValue(), EvidenceSource.PRACTICE_SET,
                     LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), entry.getKey()))
                     .forQuestion(item.questionVersionId()));
+            if (counted) errorTrapEvidence.append(firstAnswers, criterionOnly,
+                    item.answerSpec(), grade.correct(), errorCode, item.questionVersionId(),
+                    kp -> LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), kp),
+                    trapCatalog);
             events.add(QuestionAttemptEvent.of(userId, item.questionVersionId(), List.copyOf(kps), grade.correct(),
                     durations.get(item.questionVersionId()), errorCode,
                     QuestionEventSource.PRACTICE_SET, command.requestId(), counted));
             results.add(new PracticeSubmission.Answer(item.questionVersionId(), grade.correct(),
                     grade.correctAnswer(), item.explanation(),
-                    hints.afterAnswer(grade.correct(), item.answerSpec(), item.options(), item.hint())));
+                    hints.afterAnswer(grade.correct(), item.answerSpec(), item.options(), item.hint()),
+                    errorTrapEvidence.practiceFeedback(errorCode, errorTexts)));
         }
         criterionOnly.removeAll(itemKps);
         List<PracticeReviewCandidate> candidates = List.of();
@@ -215,6 +232,7 @@ public class SubmitPracticeAttemptUseCase {
         questionEvents.append(events);
         evidence.append(userId, firstAnswers);
         masteryProfiles.recordEvidence(userId, firstAnswers, criterionOnly);
+        if (counted) errorTrapEvidence.createReviews(userId, attempt.lessonId(), firstAnswers);
         reviews.insertPracticePending(userId, candidates);
         reviews.promoteToBlocking(userId, candidates.stream().map(PracticeReviewCandidate::knowledgePointId).toList(),
                 "PRACTICE");

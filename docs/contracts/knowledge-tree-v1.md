@@ -91,3 +91,10 @@ both endpoint nodes are present in the response.
 It returns an object keyed by active requested knowledge point IDs. Each value lists active direct prerequisite IDs. An
 active point with no prerequisites maps to an empty array. Unknown or inactive requested IDs are omitted. Inactive
 prerequisites are filtered out. The gateway blocks `/internal/**` from public clients.
+
+## Learner tree trap children (Learning API)
+
+The learner-facing tree contract is in [free-practice-v1](free-practice-v1.md#free-practice-and-the-learner-tree-v1).
+Learning reads Content's topic sequence with `includeErrorTraps=true` and nests a child's mastery under its parent only
+after the learner has evidence for that child. Trap children are not independent prerequisite nodes and are not offered
+free-practice routes.

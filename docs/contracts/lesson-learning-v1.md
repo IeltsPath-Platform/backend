@@ -236,6 +236,14 @@ Role `CUSTOMER`. Starts an optional review of the point and returns it like `GET
   Content has no set the learner has not seen, `409 NO_UNREVEALED_SET` is returned and nothing is created.
 - The review has `trigger_kind` `CONSOLIDATE` or `MAINTAIN` and is not blocking.
 
+An error-trap child at `PRIORITY` can create an optional parent review with `trigger_kind: ERROR_PATTERN` after a
+lesson, counted Practice, review, counted free-practice or diagnostic submission records its evidence and refreshes mastery.
+There is at most one new such review per submission (configurable with `learning.error-trap.review-limit`, default 1).
+The child selects the parent review and its practice set; the review always belongs to the parent. A pending review of
+that parent suppresses another. The child must have a completed teaching lesson and Content must offer an unseen set
+with at least two questions tagged for the child's error code. Content lookup failure does not fail the submission.
+Starting a child point from the review basket returns `409 NOT_IN_REVIEW_BASKET`.
+
 An **optional review** is one set with no theory step: passing it ends the review `DONE`, failing it ends it `SKIPPED`.
 Both write `review_set` evidence and update the mastery profile. A point can hold only one `PENDING` review, so when a
 wrong answer in a graded test or Practice would create a blocking review for a point that has an optional one, that
@@ -252,6 +260,7 @@ can create an optional review with `trigger_kind` `FREE_PRACTICE_TEST`. A milest
 - At `PRACTICE`, the response has the one open review set, preferring its lesson and excluding every package the learner was given in a review or whose answers were seen in submitted practice. Repeated GETs return the same open set. If no such package remains, the review becomes `SKIPPED` with no set. Set questions use the lesson allowlist with their `hint`; a Listening set adds `audio: {mediaUrl, durationSeconds}` next to `passage` (no transcript). `quickCheck` is empty.
 - At `THEORY`, `set` is null and `quickCheck` lists up to 3 auto-graded questions of that lesson tagged with the knowledge point (lesson order, same allowlist with `hint`, no answers). The learner answers them through `theory-check`.
 - A review starts at `THEORY` when the knowledge point scored below 40% in the practice attempt that created it (`LOW_SCORE`), or when the learner answered it wrong on the first submission of the lesson's exercises (`WRONG_IN_LESSON`). Practice reviews decide this when created; reviews from assessment results decide it the first time they are opened.
+- A review of a parent with a profiled trap child adds optional `errorTrap: {code, name, fixHint}` for the current main error. The main error is the non-`INSUFFICIENT` trap profile with the lowest mastery; ties use error code order. `name` and `fixHint` come from active error types. Missing text or a Content error omits `errorTrap`. The current main error is also sent when searching for the next set, including when the review returns to theory after its first failed set.
 
 After Lan misses L2 Q5, she can receive `PS-KP1-A` and L2 theory:
 
@@ -479,3 +488,14 @@ Role `CUSTOMER`. Up to five optional suggestions from published content; they ne
   practice set of a weak point; `null` for a practice test (opened from its course list) and for a practice set of a
   `NEXT_IN_TREE` point.
 - A point with a blocking review is not suggested; it is already required.
+
+## Error-trap feedback and review detail fields (2026-10-25)
+
+When an incorrect lesson, Practice, review-set, free-practice, or diagnostic answer has a recognized error code, its
+result includes optional `error: {code, name, fixHint}`. The text is looked up from active Content error types; an
+unknown code or a failed lookup omits `error` without failing the submission. Correct answers and untagged wrong answers
+omit the field. `answerSpec` is never returned. Essay results are not tagged by this answer-level field.
+
+`GET /reviews/{reviewId}` and responses from review-basket start include `blocking`, copied from the stored review item.
+The review detail uses the stored value for both required and optional reviews. A review triggered as `ERROR_PATTERN`
+also has optional `errorTrap: {code, name, fixHint}` for the parent's current main error; ordinary reviews omit it.

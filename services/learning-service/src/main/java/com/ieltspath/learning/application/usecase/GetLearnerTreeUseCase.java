@@ -1,6 +1,7 @@
 package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.exception.LearningRequestException;
+import com.ieltspath.learning.application.result.LearnerReportResult.ErrorTrapPoint;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.KnowledgePoint;
 import com.ieltspath.learning.application.port.LearningContentClient.Topic;
@@ -51,8 +52,17 @@ public class GetLearnerTreeUseCase {
 
     @Transactional(readOnly = true)
     public Result execute(UUID userId, UUID courseId) {
-        List<Topic> topics = content.getTopicSequence().stream()
+        List<Topic> topicSequence = content.getTopicSequence(true);
+        if (topicSequence == null) topicSequence = List.of();
+        List<Topic> selectedTopics = topicSequence.stream()
                 .filter(topic -> topic.course() != null && courseId.equals(topic.course().courseId())).toList();
+        if (selectedTopics.isEmpty()) {
+            topicSequence = content.getTopicSequence();
+            if (topicSequence == null) topicSequence = List.of();
+            selectedTopics = topicSequence.stream().filter(topic -> topic.course() != null
+                    && courseId.equals(topic.course().courseId())).toList();
+        }
+        final List<Topic> topics = selectedTopics;
         if (topics.isEmpty()) throw new LearningRequestException(404, "NOT_FOUND", "Course was not found");
         if (!topics.get(0).course().active()) {
             throw new LearningRequestException(403, "COURSE_NOT_OPEN", "The course is closed");
@@ -66,14 +76,25 @@ public class GetLearnerTreeUseCase {
             for (KnowledgePoint point : topic.knowledgePoints()) points.putIfAbsent(point.id(), point);
         }
         List<UUID> ids = points.keySet().stream().sorted(Comparator.comparing(UUID::toString)).toList();
+        List<UUID> parentIds = points.values().stream().filter(point -> point.parentKnowledgePointId() == null)
+                .map(KnowledgePoint::id).sorted(Comparator.comparing(UUID::toString)).toList();
         Map<UUID, MasteryProfile> standing = profiles.find(userId, ids);
-        Map<UUID, List<UUID>> prerequisites = content.prerequisites(ids);
+        Map<UUID, List<ErrorTrapPoint>> trapsByParent = new LinkedHashMap<>();
+        for (KnowledgePoint point : points.values()) {
+            MasteryProfile profile = standing.get(point.id());
+            if (point.parentKnowledgePointId() == null || profile == null || profile.evidenceCount() == 0) continue;
+            trapsByParent.computeIfAbsent(point.parentKnowledgePointId(), ignored -> new ArrayList<>())
+                    .add(new ErrorTrapPoint(point.id(), point.errorCode() == null ? point.code() : point.errorCode(),
+                            point.name(), profile.tier().name(),
+                            profile.mastery(), profile.evidenceCount()));
+        }
+        Map<UUID, List<UUID>> prerequisites = content.prerequisites(parentIds);
         if (prerequisites == null) prerequisites = Map.of();
-        Map<UUID, Integer> unseen = ids.isEmpty() ? Map.of() : content.practiceSetAvailability(ids, excluded(userId),
+        Map<UUID, Integer> unseen = parentIds.isEmpty() ? Map.of() : content.practiceSetAvailability(parentIds, excluded(userId),
                 GetReviewBasketUseCase.MIN_SET_QUESTIONS);
 
         List<Node> nodes = new ArrayList<>();
-        for (UUID id : ids) {
+        for (UUID id : parentIds) {
             KnowledgePoint point = points.get(id);
             MasteryProfile profile = standing.get(id);
             nodes.add(new Node(id, point.code(), point.name(), point.skill(), point.learningType(),
@@ -83,7 +104,7 @@ public class GetLearnerTreeUseCase {
                     profile == null ? 0 : profile.evidenceCount(),
                     profile == null ? null : profile.nextReviewAt(),
                     prerequisites.getOrDefault(id, List.of()),
-                    unseen.getOrDefault(id, 0) > reserve));
+                    unseen.getOrDefault(id, 0) > reserve, trapsByParent.getOrDefault(id, List.of())));
         }
         return new Result(courseId, nodes);
     }
@@ -102,7 +123,17 @@ public class GetLearnerTreeUseCase {
     public record Node(UUID knowledgePointId, String code, String name, String skill, String kind, String cefrLevel,
                        String canDo, Double mastery,
                        String tier, int evidenceCount, Instant nextReviewAt, List<UUID> prerequisiteIds,
-                       boolean practiceAvailable) {}
+                       boolean practiceAvailable, List<ErrorTrapPoint> errorTraps) {
+        public Node {
+            errorTraps = errorTraps == null ? List.of() : List.copyOf(errorTraps);
+        }
+        public Node(UUID knowledgePointId, String code, String name, String skill, String kind, String cefrLevel,
+                    String canDo, Double mastery, String tier, int evidenceCount, Instant nextReviewAt,
+                    List<UUID> prerequisiteIds, boolean practiceAvailable) {
+            this(knowledgePointId, code, name, skill, kind, cefrLevel, canDo, mastery, tier, evidenceCount,
+                    nextReviewAt, prerequisiteIds, practiceAvailable, List.of());
+        }
+    }
 
     public record Result(UUID courseId, List<Node> knowledgePoints) {}
 }

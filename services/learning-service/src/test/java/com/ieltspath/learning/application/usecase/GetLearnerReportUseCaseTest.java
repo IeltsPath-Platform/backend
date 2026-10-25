@@ -78,7 +78,7 @@ class GetLearnerReportUseCaseTest {
         when(snapshotService.lastWeekStart()).thenReturn(LocalDate.of(2026, 10, 12));
         when(snapshots.range(any(), any(), any(), any())).thenReturn(List.of());
         useCase = new GetLearnerReportUseCase(profiles, events, reviews, directory, diagnostics, placements, goals,
-                snapshots, snapshotService);
+                snapshots, snapshotService, mock(com.ieltspath.learning.application.service.ErrorTrapCatalog.class));
     }
 
     private MasteryProfile profile(UUID kp, double mastery, MasteryTier tier, int evidence) {

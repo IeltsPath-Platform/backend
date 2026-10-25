@@ -94,6 +94,8 @@ class LessonSubmissionIntegrationTest {
     private static final UUID QUESTION = UUID.randomUUID();
     private static final UUID KP = UUID.randomUUID();
     private static final UUID OTHER_KP = UUID.randomUUID();
+    private static final UUID TRAP_KP = UUID.randomUUID();
+    private static final UUID TRAP_KP_Y = UUID.randomUUID();
 
     @Autowired JdbcTemplate jdbc;
     @Autowired GetLessonUseCase getLessonUseCase;
@@ -402,6 +404,103 @@ class LessonSubmissionIntegrationTest {
         assertEquals(1, jdbc.queryForObject("SELECT cardinality(knowledge_point_ids) FROM lesson_progress", Integer.class));
         assertEquals(0, count("review_items"));
         verify(content, times(1)).getLesson(LESSON);
+    }
+
+    @Test
+    void taggedLessonAnswerWritesChildEvidenceToPostgres() {
+        topicsWithTrapCatalog();
+        when(content.learnerErrorTypes()).thenReturn(List.of(new LearningContentClient.ErrorType(
+                "TFNG_NG_AS_FALSE", "False is not Not Given", "COMPREHENSION", 1, "Check whether the text states it.")));
+        topics.execute(USER);
+        jdbc.update("""
+                INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, knowledge_point_ids)
+                VALUES (?, ?, ?, 1, ARRAY[CAST(? AS uuid)])
+                """, USER, LESSON, TOPIC, KP.toString());
+
+        var result = submitLessonExerciseUseCase.execute(USER, LESSON, BLOCK,
+                new SubmitExerciseCommand(UUID.randomUUID(), List.of(new SubmitExerciseCommand.Answer(QUESTION, "B"))));
+
+        assertFalse(result.results().getFirst().correct());
+        assertEquals("TFNG_NG_AS_FALSE", result.results().getFirst().error().code());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_mastery_profiles WHERE user_id = ? "
+                + "AND knowledge_point_id = ?", Integer.class, USER, TRAP_KP));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id = ? "
+                + "AND source = 'error_trap' AND correct = false", Integer.class, USER, TRAP_KP));
+    }
+
+    @Test
+    void fiveLessonAnswersPersistTheExpectedTrapXHistory() {
+        topicsWithTrapCatalog();
+        UUID[] questions = {UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()};
+        List<LearningContentClient.Question> lessonQuestions = new ArrayList<>();
+        for (int index = 0; index < questions.length; index++) {
+            String code = index == 3 ? "TFNG_FALSE_AS_NG" : "TFNG_NG_AS_FALSE";
+            lessonQuestions.add(new LearningContentClient.Question(questions[index], index + 1, "Choose",
+                    List.of(new LearningContentClient.Option("A", "Correct", 1),
+                            new LearningContentClient.Option("B", "Wrong", 2)),
+                    Map.of("type", "CHOICE", "correct", "A", "distractors", Map.of("B", code)), "Explain",
+                    List.of(KP)));
+        }
+        when(content.getLesson(LESSON)).thenReturn(new LearningContentClient.Lesson(LESSON, TOPIC, "L1",
+                "First lesson", null, 1, List.of(KP), List.of(new LearningContentClient.Block(BLOCK, "EXERCISE", 1,
+                null, null, null, lessonQuestions))));
+        topics.execute(USER);
+        jdbc.update("""
+                INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, knowledge_point_ids)
+                VALUES (?, ?, ?, 1, ARRAY[CAST(? AS uuid)])
+                """, USER, LESSON, TOPIC, KP.toString());
+        String[] selected = {"B", "A", "B", "B", "A"};
+        List<SubmitExerciseCommand.Answer> answers = new ArrayList<>();
+        for (int index = 0; index < selected.length; index++) {
+            answers.add(new SubmitExerciseCommand.Answer(questions[index], selected[index]));
+        }
+
+        submitLessonExerciseUseCase.execute(USER, LESSON, BLOCK, new SubmitExerciseCommand(UUID.randomUUID(), answers));
+
+        assertEquals(List.of(false, true, false, true), jdbc.query("SELECT correct FROM kp_evidence WHERE user_id = ? "
+                        + "AND kp_id = ? AND source = 'error_trap' ORDER BY ordinal",
+                (rows, index) -> rows.getBoolean(1), USER, TRAP_KP));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id = ? "
+                + "AND source = 'error_trap'", Integer.class, USER, TRAP_KP_Y));
+    }
+
+    @Test
+    void contentErrorTextLookupFailureDoesNotFailLessonSubmission() {
+        topicsWithTrapCatalog();
+        when(content.learnerErrorTypes()).thenThrow(new IllegalStateException("Content unavailable"));
+        topics.execute(USER);
+        jdbc.update("""
+                INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, knowledge_point_ids)
+                VALUES (?, ?, ?, 1, ARRAY[CAST(? AS uuid)])
+                """, USER, LESSON, TOPIC, KP.toString());
+
+        var result = assertDoesNotThrow(() -> submitLessonExerciseUseCase.execute(USER, LESSON, BLOCK,
+                new SubmitExerciseCommand(UUID.randomUUID(), List.of(new SubmitExerciseCommand.Answer(QUESTION, "B")))));
+
+        assertFalse(result.results().getFirst().correct());
+        assertNull(result.results().getFirst().error());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id = ? "
+                + "AND source = 'error_trap'", Integer.class, USER, TRAP_KP));
+    }
+
+    private void topicsWithTrapCatalog() {
+        when(content.getTopicSequence()).thenReturn(List.of(
+                new LearningContentClient.Topic(TOPIC, "FIRST", "First topic", 900, null,
+                        List.of(knowledgePoint(KP, true), new LearningContentClient.KnowledgePoint(TRAP_KP,
+                                "TRAP_X", "Trap X", "PROCEDURE", "READING", "", false, null, null, KP,
+                                "TFNG_NG_AS_FALSE"), new LearningContentClient.KnowledgePoint(TRAP_KP_Y,
+                                "TRAP_Y", "Trap Y", "PROCEDURE", "READING", "", false, null, null, KP,
+                                "TFNG_FALSE_AS_NG")), LearningSkill.READING, true),
+                new LearningContentClient.Topic(OTHER_TOPIC, "SECOND", "Second topic", 910, null,
+                        List.of(knowledgePoint(OTHER_KP, false)), LearningSkill.READING, true)));
+        var question = new LearningContentClient.Question(QUESTION, 1, "Choose the topic sentence",
+                List.of(new LearningContentClient.Option("A", "Main idea", 1),
+                        new LearningContentClient.Option("B", "Supporting detail", 2)),
+                Map.of("type", "CHOICE", "correct", "A", "distractors", Map.of("B", "TFNG_NG_AS_FALSE")),
+                "A gives the main idea", List.of(KP));
+        var block = new LearningContentClient.Block(BLOCK, "EXERCISE", 1, null, null, null, List.of(question));
+        when(content.getLesson(LESSON)).thenReturn(new LearningContentClient.Lesson(
+                LESSON, TOPIC, "L1", "First lesson", null, 1, List.of(KP), List.of(block)));
     }
 
     @Test

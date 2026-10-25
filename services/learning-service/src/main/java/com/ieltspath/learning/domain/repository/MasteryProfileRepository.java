@@ -14,6 +14,9 @@ public interface MasteryProfileRepository {
 
     List<MasteryProfile> findAll(UUID userId);
 
+    /** Stored profiles for error-trap knowledge points, kept separate from learner aggregates. */
+    List<MasteryProfile> findErrorTrapProfiles(UUID userId);
+
     /** Inserts or replaces by learner and knowledge point. */
     void upsert(List<MasteryProfile> profiles);
 

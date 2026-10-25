@@ -15,6 +15,7 @@ import com.ieltspath.learning.domain.vo.PracticeSubmission;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
 import com.ieltspath.learning.domain.vo.QuestionEventSource;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -41,12 +42,15 @@ public class FreePracticeSubmission {
 
     private final GamificationRecorder gamificationRecorder;
     private final HeartsService hearts;
+    private final ErrorTrapEvidence errorTrapEvidence;
 
+    @Autowired
     public FreePracticeSubmission(KnowledgeEvidenceRepository evidence, PracticeAttemptRepository attempts,
                                   QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
                                   LearningContentClient content, GamificationRecorder gamificationRecorder,
-                                  HeartsService hearts) {
+                                  HeartsService hearts, ErrorTrapEvidence errorTrapEvidence) {
         this.hearts = hearts;
+        this.errorTrapEvidence = errorTrapEvidence;
         this.evidence = evidence;
         this.attempts = attempts;
         this.questionEvents = questionEvents;
@@ -69,6 +73,10 @@ public class FreePracticeSubmission {
         List<KnowledgeEvidence> firstAnswers = new ArrayList<>();
         List<QuestionAttemptEvent> events = new ArrayList<>();
         List<PracticeSubmission.Answer> results = new ArrayList<>();
+        ErrorTrapCatalog.ErrorTraps trapCatalog = errorTrapEvidence.loadIfNeeded(
+                graded.items().stream().anyMatch(item -> item.answerSpec().get("distractors") instanceof Map<?, ?>));
+        Map<String, ErrorTypeTexts.Text> errorTexts = errorTrapEvidence.errorTexts(graded.errorCodes());
+        Set<UUID> withoutMilestone = new java.util.HashSet<>();
         for (int index = 0; index < graded.items().size(); index++) {
             var item = graded.items().get(index);
             var grade = graded.grades().get(index);
@@ -78,12 +86,17 @@ public class FreePracticeSubmission {
                     EvidenceSource.FREE_PRACTICE,
                     LessonEvidenceReference.forFreePractice(command.requestId(), item.questionVersionId(), kp))
                     .forQuestion(item.questionVersionId()));
+            if (counted) errorTrapEvidence.append(firstAnswers, withoutMilestone,
+                    item.answerSpec(), grade.correct(), graded.errorCodes().get(index), item.questionVersionId(),
+                    kp -> LessonEvidenceReference.forFreePractice(command.requestId(), item.questionVersionId(), kp),
+                    trapCatalog);
             events.add(QuestionAttemptEvent.of(userId, item.questionVersionId(), List.copyOf(kps), grade.correct(),
                     durations.get(item.questionVersionId()), graded.errorCodes().get(index),
                     QuestionEventSource.FREE_PRACTICE, command.requestId(), counted));
             results.add(new PracticeSubmission.Answer(item.questionVersionId(), grade.correct(),
                     grade.correctAnswer(), item.explanation(),
-                    hints.afterAnswer(grade.correct(), item.answerSpec(), item.options(), item.hint())));
+                    hints.afterAnswer(grade.correct(), item.answerSpec(), item.options(), item.hint()),
+                    errorTrapEvidence.practiceFeedback(graded.errorCodes().get(index), errorTexts)));
         }
         GamificationSummary xp = counted
                 ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), graded.correctQuestionIds())
@@ -101,7 +114,8 @@ public class FreePracticeSubmission {
         attempts.saveResult(attempt);
         questionEvents.append(events);
         evidence.append(userId, firstAnswers);
-        masteryProfiles.recordEvidence(userId, firstAnswers);
+        masteryProfiles.recordEvidence(userId, firstAnswers, withoutMilestone);
+        errorTrapEvidence.createReviews(userId, null, firstAnswers);
         return response;
     }
 }

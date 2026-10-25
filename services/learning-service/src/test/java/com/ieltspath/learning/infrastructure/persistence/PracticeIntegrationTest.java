@@ -37,6 +37,7 @@ class PracticeIntegrationTest {
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
             .withDatabaseName("learning_db").withPassword(UUID.randomUUID().toString());
     private static final byte[] KEY = new byte[32];
+    private static final String TRAP_CODE = "TFNG_NG_AS_FALSE";
     static { new SecureRandom().nextBytes(KEY); }
 
     @DynamicPropertySource
@@ -169,6 +170,44 @@ class PracticeIntegrationTest {
         jdbc.update("UPDATE review_items SET status='DONE' WHERE id=?",
                 failedResult.reviewsCreated().getFirst().reviewId());
         assertNotNull(tests.execute(user, topic).assignmentId());
+    }
+
+    @Test
+    void practiceWritesTaggedChildEvidenceOnlyForTheCountedPackageSubmission() {
+        UUID user = UUID.randomUUID(), topic = UUID.randomUUID(), lesson = UUID.randomUUID();
+        UUID parent = UUID.randomUUID(), child = UUID.randomUUID(), packageId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID(), q1 = UUID.randomUUID(), q2 = UUID.randomUUID();
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(topic, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(parent, "READ_PARENT", "Parent", "PROCEDURE", "READING", "", true),
+                        new KnowledgePoint(child, "READ_TRAP", "Trap", "PROCEDURE", "READING", "", false,
+                                null, null, parent, TRAP_CODE)), LearningSkill.READING, true)));
+        when(content.getTopicLessons(topic)).thenReturn(List.of(new LessonSummary(lesson, topic, "L1", "Lesson",
+                null, 1, List.of(parent), List.of())));
+        when(content.getLesson(lesson)).thenReturn(new Lesson(lesson, topic, "L1", "Lesson", null, 1,
+                List.of(parent), List.of(), LearningSkill.READING));
+        when(content.lessonPracticeSets(lesson)).thenReturn(List.of(set(packageId, versionId)));
+        when(content.topicPracticeSets(topic)).thenReturn(new TopicPracticeSets(List.of(
+                new TopicPracticeSets.LessonSets(lesson, List.of(set(packageId, versionId))))));
+        var items = List.of(q1, q2).stream().map(id -> new Item(id, 1, "Choose",
+                List.of(new Option("A", "Correct", 1), new Option("B", "Wrong", 2)),
+                Map.of("type", "CHOICE", "correct", "A", "distractors", Map.of("B", TRAP_CODE)),
+                "Because A", BigDecimal.ONE, List.of(new KnowledgePointMapping(parent, BigDecimal.ONE)))).toList();
+        when(content.getPackageVersion(versionId)).thenReturn(new PackageVersion(versionId, packageId,
+                "PRACTICE_SET", null, Map.of(), List.of(new Section(UUID.randomUUID(), "Practice", "READING", null,
+                1, "Passage", items))));
+        when(content.practiceSetAvailability(anyList(), anyList(), eq(3))).thenReturn(Map.of(parent, 5));
+
+        topics.execute(user);
+        complete.execute(user, lesson);
+        var firstAttempt = start.execute(user, lesson, packageId);
+        assertTrue(submit.execute(user, firstAttempt.attemptId(), answers(q1, q2, "A", "A")).countedAsEvidence());
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id = ? "
+                + "AND source = 'error_trap' AND correct = true", Integer.class, user, child));
+
+        var repeatAttempt = start.execute(user, lesson, packageId);
+        assertFalse(submit.execute(user, repeatAttempt.attemptId(), answers(q1, q2, "A", "A")).countedAsEvidence());
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id = ? "
+                + "AND source = 'error_trap'", Integer.class, user, child));
     }
 
     private static LessonPracticeSet set(UUID packageId, UUID versionId) {
