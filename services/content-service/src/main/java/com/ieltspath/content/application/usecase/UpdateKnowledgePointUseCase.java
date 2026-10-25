@@ -13,6 +13,7 @@ import com.ieltspath.content.domain.repository.KnowledgePointRepository;
 import com.ieltspath.content.domain.repository.KnowledgePrerequisiteRepository;
 import com.ieltspath.content.domain.repository.TopicRepository;
 import com.ieltspath.content.domain.service.KnowledgeGraph;
+import com.ieltspath.content.application.service.TrapKnowledgePointSync;
 import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.KnowledgePointCodeRules;
 import org.springframework.stereotype.Service;
@@ -31,14 +32,17 @@ public class UpdateKnowledgePointUseCase {
     private final KnowledgePointRepository knowledgePointRepository;
     private final TopicRepository topicRepository;
     private final KnowledgePrerequisiteRepository prerequisiteRepository;
+    private final TrapKnowledgePointSync trapKnowledgePointSync;
     private final KnowledgeGraph knowledgeGraph = new KnowledgeGraph();
 
     public UpdateKnowledgePointUseCase(KnowledgePointRepository knowledgePointRepository,
                                        TopicRepository topicRepository,
-                                       KnowledgePrerequisiteRepository prerequisiteRepository) {
+                                       KnowledgePrerequisiteRepository prerequisiteRepository,
+                                       TrapKnowledgePointSync trapKnowledgePointSync) {
         this.knowledgePointRepository = knowledgePointRepository;
         this.topicRepository = topicRepository;
         this.prerequisiteRepository = prerequisiteRepository;
+        this.trapKnowledgePointSync = trapKnowledgePointSync;
     }
 
     public KnowledgePointResult execute(UUID id, UpdateKnowledgePointCommand command) {
@@ -69,7 +73,9 @@ public class UpdateKnowledgePointUseCase {
         knowledgePoint.update(command.topicId(), command.code(), command.name(), command.kind(),
                 command.learningType(), command.skill(), command.description(), command.cefrLevel(), command.canDo(),
                 command.scopeIn(), command.scopeOut());
-        return KnowledgePointResult.from(knowledgePointRepository.save(knowledgePoint));
+        KnowledgePoint saved = knowledgePointRepository.save(knowledgePoint);
+        trapKnowledgePointSync.syncForKnowledgePoint(id);
+        return KnowledgePointResult.from(saved);
     }
 
     /** A new level must keep every prerequisite at or below it and every dependent at or above it. */

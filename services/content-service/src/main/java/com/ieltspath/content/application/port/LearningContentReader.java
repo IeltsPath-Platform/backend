@@ -39,6 +39,10 @@ public interface LearningContentReader {
     /** Active topics in active courses, with a skill and published lesson, by skill, course band, topic order and id. */
     List<TopicSequenceResult> topicSequence(int minPracticeQuestions);
 
+    default List<TopicSequenceResult> topicSequence(int minPracticeQuestions, boolean includeErrorTraps) {
+        return topicSequence(minPracticeQuestions);
+    }
+
     boolean activeTopicExists(UUID topicId);
 
     List<LessonSummaryResult> publishedLessons(UUID topicId);
@@ -101,6 +105,12 @@ public interface LearningContentReader {
      */
     List<PracticeSetResult> searchPracticeSets(UUID knowledgePointId, Collection<UUID> excludePackageIds,
                                                int minQuestions, int limit, UUID preferredLessonId);
+
+    default List<PracticeSetResult> searchPracticeSets(UUID knowledgePointId, Collection<UUID> excludePackageIds,
+                                                       int minQuestions, int limit, UUID preferredLessonId,
+                                                       String trapErrorCode) {
+        return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId);
+    }
 
     Optional<PackageVersionContentResult> publishedPackageVersion(UUID packageVersionId);
 

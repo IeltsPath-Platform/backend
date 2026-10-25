@@ -6,6 +6,7 @@ import com.ieltspath.content.application.usecase.GetKnowledgeTreeHealthUseCase;
 import com.ieltspath.content.application.usecase.GetKnowledgeTreeUseCase;
 import com.ieltspath.content.application.usecase.ReplaceKnowledgePointPrerequisitesUseCase;
 import com.ieltspath.content.application.usecase.UpdateKnowledgePointUseCase;
+import com.ieltspath.content.application.service.TrapKnowledgePointSync;
 import com.ieltspath.content.domain.aggregate.KnowledgePoint;
 import com.ieltspath.content.domain.aggregate.Topic;
 import com.ieltspath.content.domain.exception.KnowledgePointInUseException;
@@ -19,6 +20,7 @@ import com.ieltspath.content.domain.vo.KnowledgePointKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.Skill;
 import com.ieltspath.content.infrastructure.persistence.adapter.KnowledgePointRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.adapter.JdbcErrorTypeRepository;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcKnowledgePrerequisiteRepository;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import com.ieltspath.content.infrastructure.persistence.mapper.KnowledgePointPersistenceMapper;
@@ -127,12 +129,14 @@ class KnowledgeTreeIntegrationTest {
                 .getRepository(KnowledgePointJpaRepository.class);
         productionKnowledgePointRepository = new KnowledgePointRepositoryAdapter(
                 jpaKnowledgePointRepository, new KnowledgePointPersistenceMapper());
+        var errorTypeRepository = new JdbcErrorTypeRepository(namedJdbc);
+        var trapKnowledgePointSync = new TrapKnowledgePointSync(productionKnowledgePointRepository, errorTypeRepository);
         getKnowledgeTree = new GetKnowledgeTreeUseCase(reader, prerequisiteRepository);
         getActivePrerequisites = new GetActiveKnowledgePrerequisitesUseCase(reader);
         replacePrerequisites = new ReplaceKnowledgePointPrerequisitesUseCase(
-                knowledgePointRepository, prerequisiteRepository);
+                knowledgePointRepository, prerequisiteRepository, errorTypeRepository);
         updateKnowledgePoint = new UpdateKnowledgePointUseCase(productionKnowledgePointRepository, topicRepository,
-                prerequisiteRepository);
+                prerequisiteRepository, trapKnowledgePointSync);
         transactions = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
     }
 

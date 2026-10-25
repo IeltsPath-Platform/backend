@@ -183,6 +183,15 @@ The Excel template ships as `src/main/resources/import/course-import-template-v1
 definition in `CourseImportTemplate`, rewrite it with
 `mvn -pl services/content-service -am test -Dtest=ImportTemplateFileTest -DwriteImportTemplate=true`.
 
+## Error trap knowledge points
+
+Active error types with a parent knowledge point receive one synchronized child trap KP. The existing
+`error_types.knowledge_point_id` remains the parent mapping used by Writing; `trap_knowledge_point_id` is the child.
+Distractor codes on question answer specs are the source used to tag trap answers and count trap questions in practice
+sets. Child KPs are returned only on the internal topic-sequence read when Learning requests `includeErrorTraps=true`;
+the default sequence omits them so parent-only curriculum rollups keep their existing shape. Content owns the child
+catalog and trap metadata synchronization.
+
 ## Verification
 
 ```powershell

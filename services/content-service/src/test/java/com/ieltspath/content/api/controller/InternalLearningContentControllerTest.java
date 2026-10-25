@@ -81,7 +81,7 @@ class InternalLearningContentControllerTest {
         var knowledgePoint = new TopicSequenceResult.KnowledgePointEntry(knowledgePointId, UUID.randomUUID(),
                 "G55_COMPLEX_SENTENCES", "Complex sentences", com.ieltspath.content.domain.vo.LearningType.CONCEPT,
                 Skill.ALL, null, true, CefrLevel.B1, "Can use a subordinate clause.", "Basic clauses", "Reduced clauses");
-        when(topicSequence.execute()).thenReturn(List.of(new TopicSequenceResult(UUID.randomUUID(), "TOPIC", "Topic",
+        when(topicSequence.execute(false)).thenReturn(List.of(new TopicSequenceResult(UUID.randomUUID(), "TOPIC", "Topic",
                 1, null, List.of(knowledgePoint), Skill.READING, false,
                 new TopicSequenceResult.CourseEntry(course, "IELTS_5_5", "IELTS 5.5", new java.math.BigDecimal("5.5"), true))));
         when(courseTests.execute(course)).thenReturn(List.of(
@@ -154,9 +154,25 @@ class InternalLearningContentControllerTest {
     }
 
     @Test
+    void includeDraftListsUnreviewedActiveErrorTypesAndTheDefaultStaysApprovedOnly() throws Exception {
+        var draft = com.ieltspath.content.domain.aggregate.ErrorType.create("TFNG_NG_AS_FALSE", "Wrong distinction",
+                com.ieltspath.content.domain.vo.ErrorCategory.COHERENCE, 2, UUID.randomUUID(), "Separate False from Not Given.");
+        when(errorTypes.execute(true)).thenReturn(List.of(draft));
+        when(errorTypes.executeApprovedActive()).thenReturn(List.of());
+
+        mockMvc.perform(get("/internal/learning-content/error-types").param("includeDraft", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("TFNG_NG_AS_FALSE"))
+                .andExpect(jsonPath("$[0].fixHint").value("Separate False from Not Given."));
+        mockMvc.perform(get("/internal/learning-content/error-types"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
     void topicSequenceCarriesEachTopicsSkillAndWhetherItHasAFinalTest() throws Exception {
         UUID writing = UUID.randomUUID();
-        when(topicSequence.execute()).thenReturn(List.of(new TopicSequenceResult(writing, "DEMO_WRITING",
+        when(topicSequence.execute(false)).thenReturn(List.of(new TopicSequenceResult(writing, "DEMO_WRITING",
                 "Writing cơ bản", 950, null, List.of(), Skill.WRITING, false)));
 
         mockMvc.perform(get("/internal/learning-content/topic-sequence"))
@@ -166,6 +182,25 @@ class InternalLearningContentControllerTest {
                 .andExpect(jsonPath("$[0].skill").value("WRITING"))
                 .andExpect(jsonPath("$[0].hasTopicTest").value(false))
                 .andExpect(jsonPath("$[0].knowledgePoints").isEmpty());
+        verify(topicSequence).execute(false);
+    }
+
+    @Test
+    void topicSequenceCanIncludeTrapMetadataOnRequest() throws Exception {
+        UUID parentId = UUID.randomUUID();
+        UUID trapId = UUID.randomUUID();
+        var trap = new TopicSequenceResult.KnowledgePointEntry(trapId, UUID.randomUUID(), "TRAP_TEST_CODE",
+                "Avoid this trap", com.ieltspath.content.domain.vo.LearningType.PROCEDURE, Skill.READING,
+                "Fix hint", false, null, null, null, null, parentId, "TEST_CODE");
+        when(topicSequence.execute(true)).thenReturn(List.of(new TopicSequenceResult(UUID.randomUUID(), "TOPIC",
+                "Topic", 1, null, List.of(trap), Skill.READING, false)));
+
+        mockMvc.perform(get("/internal/learning-content/topic-sequence").param("includeErrorTraps", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].knowledgePoints[0].parentKnowledgePointId").value(parentId.toString()))
+                .andExpect(jsonPath("$[0].knowledgePoints[0].errorCode").value("TEST_CODE"))
+                .andExpect(jsonPath("$[0].knowledgePoints[0].hasPracticeSet").value(false));
+        verify(topicSequence).execute(true);
     }
 
     @Test
@@ -354,13 +389,29 @@ class InternalLearningContentControllerTest {
         UUID versionId = UUID.randomUUID();
         UUID knowledgePointId = UUID.randomUUID();
         when(search.execute(any())).thenReturn(List.of(new PracticeSetResult(packageId, versionId, "PREMIUM-SET",
-                4, 3, new BigDecimal("6.5"), "PREMIUM_CONTENT")));
+                4, 3, new BigDecimal("6.5"), "PREMIUM_CONTENT", 2)));
 
         mockMvc.perform(post("/internal/learning-content/practice-sets/search")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"knowledgePointId\":\"" + knowledgePointId + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].band").value(6.5))
-                .andExpect(jsonPath("$[0].requiredFeatureKey").value("PREMIUM_CONTENT"));
+                .andExpect(jsonPath("$[0].requiredFeatureKey").value("PREMIUM_CONTENT"))
+                .andExpect(jsonPath("$[0].trapQuestionCount").value(2));
+    }
+
+    @Test
+    void practiceSetSearchForwardsAnOptionalTrapCode() throws Exception {
+        UUID knowledgePointId = UUID.randomUUID();
+        mockMvc.perform(post("/internal/learning-content/practice-sets/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"knowledgePointId\":\"" + knowledgePointId
+                                + "\",\"trapErrorCode\":\"TFNG_NG_AS_FALSE\"}"))
+                .andExpect(status().isOk());
+        org.mockito.ArgumentCaptor<com.ieltspath.content.application.command.SearchPracticeSetsCommand> command =
+                org.mockito.ArgumentCaptor.forClass(
+                        com.ieltspath.content.application.command.SearchPracticeSetsCommand.class);
+        verify(search).execute(command.capture());
+        org.assertj.core.api.Assertions.assertThat(command.getValue().trapErrorCode()).isEqualTo("TFNG_NG_AS_FALSE");
     }
 }

@@ -75,10 +75,15 @@ public class InternalLearningContentController {
         return getPlacementTestPackages.execute().stream().map(TopicTestPackageResponse::from).toList();
     }
 
-    /** Active error types only; grading and error analysis record codes from this list. */
+    /**
+     * Active, approved error types: grading and error analysis record codes from this list. With
+     * {@code includeDraft=true} the unreviewed codes are listed too, which is what a learner's feedback text needs.
+     */
     @GetMapping("/error-types")
-    public List<ActiveErrorTypeResponse> errorTypes() {
-        return listErrorTypes.executeApprovedActive().stream().map(ActiveErrorTypeResponse::from).toList();
+    public List<ActiveErrorTypeResponse> errorTypes(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "false") boolean includeDraft) {
+        var types = includeDraft ? listErrorTypes.execute(true) : listErrorTypes.executeApprovedActive();
+        return types.stream().map(ActiveErrorTypeResponse::from).toList();
     }
 
     public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint,
@@ -96,8 +101,9 @@ public class InternalLearningContentController {
     }
 
     @GetMapping("/topic-sequence")
-    public List<TopicSequenceResponse> topicSequence() {
-        return getTopicSequence.execute().stream().map(TopicSequenceResponse::from).toList();
+    public List<TopicSequenceResponse> topicSequence(
+            @RequestParam(value = "includeErrorTraps", defaultValue = "false") boolean includeErrorTraps) {
+        return getTopicSequence.execute(includeErrorTraps).stream().map(TopicSequenceResponse::from).toList();
     }
 
     @GetMapping("/topics/{id}/lessons")
@@ -119,7 +125,7 @@ public class InternalLearningContentController {
     public List<PracticeSetResponse> searchPracticeSets(@Valid @RequestBody PracticeSetSearchRequest request) {
         return searchPracticeSets.execute(new SearchPracticeSetsCommand(request.knowledgePointId(),
                         request.excludePackageIds(), request.minQuestions(), request.limit(),
-                        request.preferredLessonId()))
+                        request.preferredLessonId(), request.trapErrorCode()))
                 .stream().map(PracticeSetResponse::from).toList();
     }
 
