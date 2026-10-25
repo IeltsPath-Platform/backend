@@ -20,7 +20,7 @@ public class ErrorTypeTexts {
 
     public Map<String, Text> byCode() {
         try {
-            var errorTypes = content.learnerErrorTypes();
+            var errorTypes = content.activeErrorTypes();
             if (errorTypes == null) return Map.of();
             return errorTypes.stream().filter(type -> type != null && type.code() != null)
                     .collect(Collectors.toMap(LearningContentClient.ErrorType::code,

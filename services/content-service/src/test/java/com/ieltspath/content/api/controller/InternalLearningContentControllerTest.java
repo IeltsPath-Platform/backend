@@ -154,22 +154,6 @@ class InternalLearningContentControllerTest {
     }
 
     @Test
-    void includeDraftListsUnreviewedActiveErrorTypesAndTheDefaultStaysApprovedOnly() throws Exception {
-        var draft = com.ieltspath.content.domain.aggregate.ErrorType.create("TFNG_NG_AS_FALSE", "Wrong distinction",
-                com.ieltspath.content.domain.vo.ErrorCategory.COHERENCE, 2, UUID.randomUUID(), "Separate False from Not Given.");
-        when(errorTypes.execute(true)).thenReturn(List.of(draft));
-        when(errorTypes.executeApprovedActive()).thenReturn(List.of());
-
-        mockMvc.perform(get("/internal/learning-content/error-types").param("includeDraft", "true"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].code").value("TFNG_NG_AS_FALSE"))
-                .andExpect(jsonPath("$[0].fixHint").value("Separate False from Not Given."));
-        mockMvc.perform(get("/internal/learning-content/error-types"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isEmpty());
-    }
-
-    @Test
     void topicSequenceCarriesEachTopicsSkillAndWhetherItHasAFinalTest() throws Exception {
         UUID writing = UUID.randomUUID();
         when(topicSequence.execute(false)).thenReturn(List.of(new TopicSequenceResult(writing, "DEMO_WRITING",

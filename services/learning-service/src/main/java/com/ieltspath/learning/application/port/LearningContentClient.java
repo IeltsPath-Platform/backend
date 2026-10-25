@@ -134,9 +134,6 @@ public interface LearningContentClient {
     /** Error codes currently accepted by Content. */
     List<ErrorType> activeErrorTypes();
 
-    /** Active error types including ones not yet reviewed; only for the wording shown to a learner, never for grading. */
-    List<ErrorType> learnerErrorTypes();
-
     record Rubric(String code, String task, int version, String sourceNote, List<RubricCriterion> criteria,
                   List<RubricExample> examples) {}
     /** {@code knowledgePointId} is the point the criterion is evidence for; null when Content does not map it. */

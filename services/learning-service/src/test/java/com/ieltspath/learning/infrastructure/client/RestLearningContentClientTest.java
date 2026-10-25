@@ -83,22 +83,6 @@ class RestLearningContentClientTest {
     }
 
     @Test
-    void learnerErrorTypesAskContentToIncludeUnreviewedCodes() {
-        server.expect(requestTo(INTERNAL_PATH + "/error-types?includeDraft=true"))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("""
-                        [{"code":"TFNG_NG_AS_FALSE","name":"Chọn False khi thông tin không được nêu","category":"COMPREHENSION",
-                          "severity":2,"fixHint":"Phân biệt False với Not Given.",
-                          "knowledgePointId":"20000000-0000-4000-8000-020000000005"}]
-                        """, MediaType.APPLICATION_JSON));
-
-        var errors = client.learnerErrorTypes();
-
-        assertEquals("TFNG_NG_AS_FALSE", errors.getFirst().code());
-        assertEquals("Phân biệt False với Not Given.", errors.getFirst().fixHint());
-    }
-
-    @Test
     void oldRubricJsonWithoutSubKnowledgePointsReadsAsEmpty() {
         server.expect(requestTo(INTERNAL_PATH + "/rubrics/IELTS_WRITING/1"))
                 .andRespond(withSuccess("""

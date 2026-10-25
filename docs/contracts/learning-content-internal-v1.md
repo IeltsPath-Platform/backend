@@ -365,8 +365,6 @@ Package publishing enforces one owner per `question_id` across its versions: any
 
 `GET /internal/learning-content/error-types` returns error types with both `status=ACTIVE` and `review_status=APPROVED` as a JSON array of `{"code","name","category","severity","fixHint","knowledgePointId"}`, ordered by code. `knowledgePointId` is nullable and identifies the knowledge point linked to the error type when one is configured. Assessment reads it to refuse any error analysis code that is not in the reviewed catalogue (`422`, `details.code = UNKNOWN_ERROR_CODE`). `category` is one of `GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK`, `READING_STRATEGY`, `LISTENING_STRATEGY`, `SPELLING_NUMBER`. `severity` is 1 to 3. The public management endpoints are `GET`, `POST` and `PUT` under `/api/content/error-types`; the code cannot change after creation.
 
-With `?includeDraft=true` the list holds every `status=ACTIVE` error type whatever its `review_status`, in the same shape. Learning uses it only to word the feedback a learner sees (`error`, `errorTrap`); grading and error analysis keep the approved-only list. The default is unchanged.
-
 ## Essay rubrics (phase 11)
 
 Content owns versioned IELTS Writing rubrics. Each rubric has a `code`, `task` (`TASK_1` or `TASK_2`), positive

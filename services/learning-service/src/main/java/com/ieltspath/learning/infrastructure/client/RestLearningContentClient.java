@@ -208,11 +208,6 @@ public class RestLearningContentClient implements LearningContentClient {
         return get("/error-types", new ParameterizedTypeReference<>() { });
     }
 
-    @Override
-    public List<ErrorType> learnerErrorTypes() {
-        return get("/error-types?includeDraft=true", new ParameterizedTypeReference<>() { });
-    }
-
     private <T> T get(String path, ParameterizedTypeReference<T> type, Object... uriVariables) {
         return response(() -> restClient.get()
                 .uri(INTERNAL_PATH + path, uriVariables)

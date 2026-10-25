@@ -75,15 +75,10 @@ public class InternalLearningContentController {
         return getPlacementTestPackages.execute().stream().map(TopicTestPackageResponse::from).toList();
     }
 
-    /**
-     * Active, approved error types: grading and error analysis record codes from this list. With
-     * {@code includeDraft=true} the unreviewed codes are listed too, which is what a learner's feedback text needs.
-     */
+    /** Active error types only; grading and error analysis record codes from this list. */
     @GetMapping("/error-types")
-    public List<ActiveErrorTypeResponse> errorTypes(
-            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "false") boolean includeDraft) {
-        var types = includeDraft ? listErrorTypes.execute(true) : listErrorTypes.executeApprovedActive();
-        return types.stream().map(ActiveErrorTypeResponse::from).toList();
+    public List<ActiveErrorTypeResponse> errorTypes() {
+        return listErrorTypes.executeApprovedActive().stream().map(ActiveErrorTypeResponse::from).toList();
     }
 
     public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint,

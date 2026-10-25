@@ -36,3 +36,8 @@ bỏ eureka và gateway. Flyway tự migrate: content tới V80, learning tới 
 
 ## Câu hỏi mở
 - Có muốn đánh dấu "chưa duyệt" ở UI khi `fixHint` đến từ mã DRAFT không? Hiện chỉ trả nội dung, không có cờ.
+
+## Cập nhật 2026-10-26: giám khảo đã duyệt, bỏ DRAFT
+- Theo chủ dự án, giám khảo IELTS duyệt toàn bộ dữ liệu: V81 bỏ tiền tố `Draft practice:` của 19 bộ; V82 chuyển mọi mã lỗi `DRAFT` sang `APPROVED`.
+- Vì mã đã duyệt, đường vòng `includeDraft` / `learnerErrorTypes` (lỗi 1 ở trên) được gỡ: học viên lại chỉ thấy mã đã duyệt, đúng nguyên tắc của V48. Endpoint `/error-types` trở về như cũ.
+- Hệ quả khác của V82: danh sách mã mà chấm bài viết (AI) và phân tích lỗi của Assessment chấp nhận đổi từ rỗng sang 28 mã; tự điền bẫy T/F/NG khi tác giả lưu câu mới bắt đầu hoạt động.

@@ -409,7 +409,7 @@ class LessonSubmissionIntegrationTest {
     @Test
     void taggedLessonAnswerWritesChildEvidenceToPostgres() {
         topicsWithTrapCatalog();
-        when(content.learnerErrorTypes()).thenReturn(List.of(new LearningContentClient.ErrorType(
+        when(content.activeErrorTypes()).thenReturn(List.of(new LearningContentClient.ErrorType(
                 "TFNG_NG_AS_FALSE", "False is not Not Given", "COMPREHENSION", 1, "Check whether the text states it.")));
         topics.execute(USER);
         jdbc.update("""
@@ -467,7 +467,7 @@ class LessonSubmissionIntegrationTest {
     @Test
     void contentErrorTextLookupFailureDoesNotFailLessonSubmission() {
         topicsWithTrapCatalog();
-        when(content.learnerErrorTypes()).thenThrow(new IllegalStateException("Content unavailable"));
+        when(content.activeErrorTypes()).thenThrow(new IllegalStateException("Content unavailable"));
         topics.execute(USER);
         jdbc.update("""
                 INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, knowledge_point_ids)

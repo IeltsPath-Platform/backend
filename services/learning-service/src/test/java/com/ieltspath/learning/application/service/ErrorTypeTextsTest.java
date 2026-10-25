@@ -14,12 +14,12 @@ class ErrorTypeTextsTest {
     @Test
     void mapsNameAndFixHintAndDegradesToAnEmptyMapWhenContentFails() {
         LearningContentClient content = mock(LearningContentClient.class);
-        when(content.learnerErrorTypes()).thenReturn(List.of(
+        when(content.activeErrorTypes()).thenReturn(List.of(
                 new LearningContentClient.ErrorType("SPELLING", "Spelling", "LANGUAGE", 1, "Check spelling")));
         var subject = new ErrorTypeTexts(content);
         assertThat(subject.byCode()).containsEntry("SPELLING", new ErrorTypeTexts.Text("Spelling", "Check spelling"));
 
-        when(content.learnerErrorTypes()).thenThrow(new IllegalStateException("unavailable"));
+        when(content.activeErrorTypes()).thenThrow(new IllegalStateException("unavailable"));
         assertThat(subject.byCode()).isEqualTo(Map.of());
     }
 }

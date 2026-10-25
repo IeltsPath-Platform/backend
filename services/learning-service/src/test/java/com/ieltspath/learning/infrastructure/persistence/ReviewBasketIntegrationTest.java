@@ -296,7 +296,7 @@ class ReviewBasketIntegrationTest {
                 + "VALUES (?, ?, FALSE, ?, ?)", trap, topic, kpConsolidate, "TFNG_NG_AS_FALSE");
         profile(user, trap, "0.200", "PRIORITY", null);
         PackageVersion set = practiceSet(kpConsolidate, kpConsolidate, kpConsolidate);
-        when(content.learnerErrorTypes()).thenReturn(List.of(new ErrorType("TFNG_NG_AS_FALSE", "Wrong distinction",
+        when(content.activeErrorTypes()).thenReturn(List.of(new ErrorType("TFNG_NG_AS_FALSE", "Wrong distinction",
                 "COMPREHENSION", 1, "Separate false from not stated")));
 
         var review = start.execute(user, kpConsolidate);
@@ -325,7 +325,7 @@ class ReviewBasketIntegrationTest {
 
         assertDoesNotThrow(() -> getReview.execute(user, reviewId));
 
-        org.mockito.Mockito.verify(content, org.mockito.Mockito.never()).learnerErrorTypes();
+        org.mockito.Mockito.verify(content, org.mockito.Mockito.never()).activeErrorTypes();
     }
 
     @Test
@@ -379,7 +379,7 @@ class ReviewBasketIntegrationTest {
         jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind, "
                 + "blocking) VALUES (?, ?, ?, ?, 'PENDING', 'READING', 'ERROR_PATTERN', FALSE)",
                 UUID.randomUUID(), user, kpConsolidate, lesson);
-        when(content.learnerErrorTypes()).thenReturn(List.of(new ErrorType("TFNG_NG_AS_FALSE", "Wrong distinction",
+        when(content.activeErrorTypes()).thenReturn(List.of(new ErrorType("TFNG_NG_AS_FALSE", "Wrong distinction",
                 "COMPREHENSION", 1, "Separate false from not stated")));
 
         var item = basket.execute(user).weak().stream().filter(point -> point.knowledgePointId().equals(kpConsolidate))

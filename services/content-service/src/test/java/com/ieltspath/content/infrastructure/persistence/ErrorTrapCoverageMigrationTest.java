@@ -115,6 +115,16 @@ class ErrorTrapCoverageMigrationTest {
     }
 
     @Test
+    void noErrorTypeIsLeftUnreviewed() {
+        Integer draft = jdbc.queryForObject("SELECT count(*) FROM error_types WHERE review_status = 'DRAFT'", Integer.class);
+        Integer approved = jdbc.queryForObject(
+                "SELECT count(*) FROM error_types WHERE status = 'ACTIVE' AND review_status = 'APPROVED'", Integer.class);
+
+        org.junit.jupiter.api.Assertions.assertEquals(0, draft);
+        org.junit.jupiter.api.Assertions.assertTrue(approved > 0);
+    }
+
+    @Test
     void trapPracticeSetTitlesCarryNoDraftPrefix() {
         Integer prefixed = jdbc.queryForObject(
                 "SELECT count(*) FROM content_packages WHERE code LIKE 'PS-TRAP-%' AND title ILIKE 'draft%'",
