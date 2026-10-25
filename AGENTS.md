@@ -175,6 +175,10 @@ src/main/java/com/ieltspath/<service>
   tuần), `learning.user.base-url` (gọi user-service), `assessment.ai-eval.*` (đánh giá AI), `assessment.qa.*` (tỷ lệ lấy mẫu QA
   Mentor). Trọng số và ngưỡng điểm khóa nằm trong DB (`course_score_configs`), không trong yaml. Chính sách dùng AI:
   `docs/ai-policy.md`.
+- `learning.error-trap.*` configures the optional parent review generated when a trap child enters `PRIORITY` and its
+  response limit. Trap evidence uses source `error_trap` at weight 0.3; it does not consume the MP-1.0 practice-answer
+  limit. Evidence writes resolve error-code-to-child mappings from Learning's local catalog and must not make an HTTP
+  request to Content. Content lookup for learner-facing `name` and `fixHint` happens after grading and is best-effort.
 - `Dockerfile.spring-service` build module Maven theo `MODULE_PATH`; Config Server có Dockerfile riêng.
 
 ### 3.7 Hiệu năng persistence, N+1 và độ phức tạp
@@ -199,6 +203,9 @@ src/main/java/com/ieltspath/<service>
   (`Mp1MasteryCalculator`, `learning.mastery.policy=MP1`): cửa sổ 8 bằng chứng, tối đa 3 bài luyện, trọng số nguồn, giảm theo tuổi (half-life 30
   ngày), cùng câu trong 7 ngày tính một lần, tier `INSUFFICIENT` khi chưa đủ dữ liệu, biên đệm 0.03 khi đổi tier. Điểm
   MP-1.0 giảm theo thời gian qua `MasteryDecayJob`. Đổi công thức phải chạy rebuild cho mọi hồ sơ.
+- Error trap evidence is a separate `error_trap` source with weight 0.3 and a profile per child KP. Main parent error is
+  the weakest child with enough MP-1.0 data (stable error-code tie-break). Trap children are nested under parents in the
+  learner report/tree only after evidence; exclude child KPs from parent-only rollups, availability, and progression.
 - Skill của lesson suy ra từ câu hỏi trong các block; lesson có thể chứa nhiều skill. Khóa lesson, review và Practice
   được áp theo từng skill; bài học hoàn thành theo các block bắt buộc, Practice phải đạt riêng cho từng skill có yêu cầu.
 - Thứ tự topic theo user từ Content `topic-sequence`, không LLM/goal; mỗi course là một chuỗi chung mọi skill. Placement

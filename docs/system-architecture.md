@@ -1,6 +1,6 @@
 # Kiến trúc hệ thống IELTSPath (backend)
 
-- Cập nhật lần cuối: 2026-10-21; dữ kiện đã kiểm với code sau khi có course theo band, placement recommendation, thi cuối course và block từ vựng trong bài học
+- Cập nhật lần cuối: 2026-10-25; thêm KP con theo mã lỗi, bằng chứng `error_trap`, chọn bộ theo bẫy, phản hồi `fixHint` và `ERROR_PATTERN` cho Learning
 - Đọc khi cần hiểu toàn hệ thống. Quy tắc bắt buộc nằm ở [`AGENTS.md`](../AGENTS.md); hướng dẫn chạy chi tiết ở
   [`README.md`](../README.md). Code là nguồn đúng khi tài liệu này lệch.
 
@@ -45,7 +45,13 @@ library --HTTP--> content                 learning --HTTP--> content (/internal/
 | `game-service` | Phòng game, trận, phiên chơi, WebSocket realtime | `game_db` (Compose PostgreSQL host 5440) | `/api/games/**`, `/ws/games/**` |
 | `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (Compose PostgreSQL host 5440) | `/api/community/**` |
 | `notification-service` | Thông báo bền vững từ Community events, REST unread/read và STOMP push | `notification_db` (Compose PostgreSQL host 5440) | `/api/notifications/**`, `/ws/notifications` |
-| `learning-service` | Placement recommendation; topic path theo course (một chuỗi cho mọi skill), bài học, Practice theo bài, mastery theo KP, thang ôn tập, course/topic progress và giao mã đề cuối; nhận kết quả thi chính thức | `learning_db` (Compose PostgreSQL host 5440; `learner_placements`, `course_progress`, `course_test_assignments`) | `/api/learning/**` |
+| `learning-service` | Placement recommendation; topic path theo course (một chuỗi cho mọi skill), bài học, Practice theo bài, mastery theo KP và KP con mã lỗi, phản hồi fix hint, thang ôn tập, course/topic progress và giao mã đề cuối; nhận kết quả thi chính thức | `learning_db` (Compose PostgreSQL host 5440; `learner_placements`, `course_progress`, `course_test_assignments`) | `/api/learning/**` |
+
+Content creates a child trap KP for each active error type with a parent KP. Its internal topic sequence includes children
+only when Learning requests `includeErrorTraps=true`; normal curriculum reads exclude them. Learning maps tagged wrong
+answers to those child IDs using its local catalog, stores weighted `error_trap` evidence without a Content request, and
+uses the weakest eligible child to select parent practice sets. Result feedback resolves active error names and `fixHint`
+after grading as a best-effort read. Report and tree responses nest children with learner evidence under their parent.
 
 Chi tiết schema: [`.sdd/database/DATABASE_V5.md`](../.sdd/database/DATABASE_V5.md). Service Java tự chạy Flyway khi khởi
 động (`src/main/resources/db/migration`).
