@@ -169,8 +169,9 @@ its topics); publishing goes through the usual checks.
 
 Configuration (`infra/config-server/config-repo/content-service.yaml`, keys in the gitignored root `.env`):
 
-- `CONTENT_LLM_BASE_URL`, `CONTENT_LLM_API_KEY`, `CONTENT_LLM_MODEL`: an OpenAI-compatible model for drafts. Blank means a
-  draft fails with `NOT_CONFIGURED`; the service still starts and everything else works.
+- `CONTENT_LLM_BASE_URL`, `CONTENT_LLM_API_KEY`, `CONTENT_LLM_MODEL`: an OpenAI-compatible model for drafts. When one is not set the
+  matching `LEARNING_LLM_*` value is used, so the model the learning service already uses also serves drafts. Blank on
+  both sides means a draft fails with `NOT_CONFIGURED`; the service still starts and everything else works.
 - `content.ai.*`: `batch-size`, `stale-after`, `daily-limit` (shared by AI requests and imports, counted separately per
   author and day in `ai_usage_daily`), `max-items-per-request`, `max-course-candidates`, `quota-zone`.
 - `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `CONTENT_MEDIA_BUCKET`: author audio upload; without them the upload answers

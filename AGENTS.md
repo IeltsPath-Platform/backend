@@ -154,7 +154,8 @@ src/main/java/com/ieltspath/<service>
   `ASSESSMENT_LLM_MODEL`; quota theo ngày cấu hình bằng `ASSESSMENT_LLM_DAILY_LIMIT` (mặc định 20). Thiếu cấu hình,
   lỗi chấm hoặc hết quota thì essay được chuyển sang hàng chờ EXAMINER; không ghi essay/prompt vào log.
 - Content sinh bản nháp bằng OpenAI-compatible LLM qua `CONTENT_LLM_BASE_URL`, `CONTENT_LLM_API_KEY`,
-  `CONTENT_LLM_MODEL` (khóa chỉ ở `.env` không commit). Thiếu cấu hình thì bản nháp `FAILED` với `NOT_CONFIGURED`, service
+  `CONTENT_LLM_MODEL` (khóa chỉ ở `.env` không commit; biến nào không đặt thì dùng giá trị `LEARNING_LLM_*` tương ứng,
+  nên một cấu hình mô hình đủ cho cả hai service). Thiếu cấu hình thì bản nháp `FAILED` với `NOT_CONFIGURED`, service
   vẫn chạy. Nhóm `content.ai.*` (số bản nháp mỗi lượt, thời gian coi là treo, `daily-limit`, `max-items-per-request`,
   `max-course-candidates`, `quota-zone`); import Excel dùng chung `daily-limit` nhưng đếm riêng (`kind = IMPORT`). Tải
   audio của author cần `SUPABASE_URL`/`SUPABASE_SECRET_KEY` và `CONTENT_MEDIA_BUCKET`, thiếu thì trả 503. Assessment đọc
