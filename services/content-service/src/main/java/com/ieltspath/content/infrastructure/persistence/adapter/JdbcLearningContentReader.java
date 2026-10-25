@@ -137,6 +137,11 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
     @Override
     public List<TopicSequenceResult> topicSequence(int minPracticeQuestions) {
+        return topicSequence(minPracticeQuestions, false);
+    }
+
+    @Override
+    public List<TopicSequenceResult> topicSequence(int minPracticeQuestions, boolean includeErrorTraps) {
         record TopicRow(UUID id, String code, String name, int sortOrder, String requiredFeatureKey, Skill skill,
                         boolean hasTopicTest, TopicSequenceResult.CourseEntry course, List<Skill> skills,
                         int lessonCount) {}
@@ -173,14 +178,26 @@ public class JdbcLearningContentReader implements LearningContentReader {
         }
 
         Map<UUID, List<TopicSequenceResult.KnowledgePointEntry>> pointsByTopic = new LinkedHashMap<>();
-        jdbc.query("""
+        String trapJoin = includeErrorTraps
+                ? "LEFT JOIN error_types trap ON trap.trap_knowledge_point_id = kp.id" : "";
+        String trapColumns = includeErrorTraps
+                ? ", trap.knowledge_point_id AS parent_knowledge_point_id, trap.code AS error_code," : ",";
+        String trapFilter = includeErrorTraps || !hasTrapKnowledgePointColumn() ? ""
+                : "AND NOT EXISTS (SELECT 1 FROM error_types trap_filter WHERE trap_filter.trap_knowledge_point_id = kp.id)";
+        String practiceSetProjection = includeErrorTraps
+                ? "CASE WHEN trap.id IS NOT NULL THEN FALSE ELSE EXISTS (SELECT 1 FROM content_packages p WHERE %s) END"
+                    .formatted(eligiblePracticeSet("kp.id"))
+                : "EXISTS (SELECT 1 FROM content_packages p WHERE %s)".formatted(eligiblePracticeSet("kp.id"));
+        jdbc.query(("""
                 SELECT kp.id, kp.topic_id, kp.code, kp.name, kp.learning_type, kp.skill, kp.description,
-                       kp.cefr_level, kp.can_do, kp.scope_in, kp.scope_out,
-                       EXISTS (SELECT 1 FROM content_packages p WHERE %s) AS has_practice_set
+                       kp.cefr_level, kp.can_do, kp.scope_in, kp.scope_out %s
+                       %s AS has_practice_set
                 FROM knowledge_points kp
+                %s
                 WHERE kp.status = 'ACTIVE' AND kp.topic_id IN (:topicIds)
+                  %s
                 ORDER BY kp.created_at, kp.id
-                """.formatted(eligiblePracticeSet("kp.id")),
+                """).formatted(trapColumns, practiceSetProjection, trapJoin, trapFilter),
                 new MapSqlParameterSource()
                         .addValue("topicIds", topics.stream().map(TopicRow::id).toList())
                         .addValue("minQuestions", minPracticeQuestions),
@@ -193,7 +210,9 @@ public class JdbcLearningContentReader implements LearningContentReader {
                                     enumOrNull(Skill.class, rs.getString("skill")),
                                     rs.getString("description"), rs.getBoolean("has_practice_set"),
                                     enumOrNull(CefrLevel.class, rs.getString("cefr_level")),
-                                    rs.getString("can_do"), rs.getString("scope_in"), rs.getString("scope_out")));
+                                    rs.getString("can_do"), rs.getString("scope_in"), rs.getString("scope_out"),
+                                    includeErrorTraps ? uuid(rs, "parent_knowledge_point_id") : null,
+                                    includeErrorTraps ? rs.getString("error_code") : null));
                 });
 
         return topics.stream()
@@ -201,6 +220,17 @@ public class JdbcLearningContentReader implements LearningContentReader {
                         pointsByTopic.getOrDefault(t.id(), List.of()), t.skill(), t.hasTopicTest(), t.course(), t.skills(),
                         true, t.lessonCount()))
                 .toList();
+    }
+
+    private boolean hasTrapKnowledgePointColumn() {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'error_types'
+                      AND column_name = 'trap_knowledge_point_id'
+                )
+                """, Map.of(), Boolean.class));
     }
 
     @Override
@@ -639,6 +669,13 @@ public class JdbcLearningContentReader implements LearningContentReader {
     @Override
     public List<PracticeSetResult> searchPracticeSets(UUID knowledgePointId, Collection<UUID> excludePackageIds,
                                                       int minQuestions, int limit, UUID preferredLessonId) {
+        return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId, null);
+    }
+
+    @Override
+    public List<PracticeSetResult> searchPracticeSets(UUID knowledgePointId, Collection<UUID> excludePackageIds,
+                                                      int minQuestions, int limit, UUID preferredLessonId,
+                                                      String trapErrorCode) {
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("knowledgePointId", knowledgePointId)
                 .addValue("minQuestions", minQuestions)
@@ -650,30 +687,50 @@ public class JdbcLearningContentReader implements LearningContentReader {
         }
         String preferred = "";
         if (preferredLessonId != null) {
-            preferred = "COALESCE(p.lesson_id = :preferredLessonId, FALSE) DESC,";
+            preferred = "COALESCE(ranked.lesson_id = :preferredLessonId, FALSE) DESC,";
             params.addValue("preferredLessonId", preferredLessonId);
         }
+        String trapCount = trapErrorCode == null ? "0" : """
+                (SELECT count(DISTINCT sq.question_version_id) FROM content_sections s
+                 JOIN section_questions sq ON sq.section_id = s.id
+                 JOIN question_versions qv ON qv.id = sq.question_version_id
+                 WHERE s.package_version_id = p.current_published_version_id
+                   AND jsonb_typeof(qv.answer_spec->'distractors') = 'object'
+                   AND EXISTS (SELECT 1 FROM jsonb_each_text(qv.answer_spec->'distractors') d
+                               WHERE d.value = :trapErrorCode))
+                """;
+        if (trapErrorCode != null) params.addValue("trapErrorCode", trapErrorCode);
         return jdbc.query("""
-                SELECT p.id, p.current_published_version_id, p.code, p.required_feature_key,
-                       COALESCE(c.band_level, t.band_max, t.band_min) AS band,
-                       (SELECT count(*) FROM content_sections s JOIN section_questions sq ON sq.section_id = s.id
-                        WHERE s.package_version_id = p.current_published_version_id) AS question_count,
-                       (SELECT count(DISTINCT sq.question_version_id) FROM content_sections s
-                        JOIN section_questions sq ON sq.section_id = s.id
-                        JOIN question_knowledge_points qkp ON qkp.question_version_id = sq.question_version_id
-                        WHERE s.package_version_id = p.current_published_version_id
-                          AND qkp.knowledge_point_id = :knowledgePointId) AS matched_question_count
-                FROM content_packages p
-                LEFT JOIN lessons package_lesson ON package_lesson.id = p.lesson_id
-                LEFT JOIN topics t ON t.id = COALESCE(p.topic_id, package_lesson.topic_id)
-                LEFT JOIN courses c ON c.id = COALESCE(p.course_id, t.course_id)
-                WHERE %s %s
-                ORDER BY %s matched_question_count DESC, p.id
+                SELECT ranked.id, ranked.current_published_version_id, ranked.code, ranked.required_feature_key,
+                       ranked.band, ranked.question_count, ranked.matched_question_count, ranked.trap_question_count
+                FROM (
+                    SELECT p.id, p.current_published_version_id, p.code, p.required_feature_key, p.lesson_id,
+                           COALESCE(c.band_level, t.band_max, t.band_min) AS band,
+                           (SELECT count(*) FROM content_sections s JOIN section_questions sq ON sq.section_id = s.id
+                            WHERE s.package_version_id = p.current_published_version_id) AS question_count,
+                           (SELECT count(DISTINCT sq.question_version_id) FROM content_sections s
+                            JOIN section_questions sq ON sq.section_id = s.id
+                            JOIN question_knowledge_points qkp ON qkp.question_version_id = sq.question_version_id
+                            WHERE s.package_version_id = p.current_published_version_id
+                              AND qkp.knowledge_point_id = :knowledgePointId) AS matched_question_count,
+                           %s AS trap_question_count
+                    FROM content_packages p
+                    LEFT JOIN lessons package_lesson ON package_lesson.id = p.lesson_id
+                    LEFT JOIN topics t ON t.id = COALESCE(p.topic_id, package_lesson.topic_id)
+                    LEFT JOIN courses c ON c.id = COALESCE(p.course_id, t.course_id)
+                    WHERE %s %s
+                ) ranked
+                ORDER BY CASE WHEN ranked.trap_question_count >= 2 THEN ranked.trap_question_count ELSE 0 END DESC,
+                         CASE WHEN ranked.trap_question_count >= 2
+                              THEN ranked.trap_question_count::numeric / NULLIF(ranked.question_count, 0)
+                              ELSE 0 END DESC,
+                         %s ranked.matched_question_count DESC, ranked.id
                 LIMIT :limit
-                """.formatted(eligiblePracticeSet(":knowledgePointId"), exclusion, preferred), params,
+                """.formatted(trapCount, eligiblePracticeSet(":knowledgePointId"), exclusion, preferred), params,
                 (rs, i) -> new PracticeSetResult(uuid(rs, "id"), uuid(rs, "current_published_version_id"),
                         rs.getString("code"), rs.getInt("question_count"), rs.getInt("matched_question_count"),
-                        rs.getBigDecimal("band"), rs.getString("required_feature_key")));
+                        rs.getBigDecimal("band"), rs.getString("required_feature_key"),
+                        rs.getInt("trap_question_count")));
     }
 
     @Override

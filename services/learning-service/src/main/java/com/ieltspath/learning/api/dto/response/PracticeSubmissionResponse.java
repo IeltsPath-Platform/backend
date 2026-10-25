@@ -18,7 +18,9 @@ public record PracticeSubmissionResponse(UUID attemptId, int correct, int total,
         return new PracticeSubmissionResponse(result.attemptId(), result.correct(), result.total(), result.percent(),
                 result.passed(), result.countedAsEvidence(), result.results().stream().map(answer ->
                 new SubmissionResponse.SolvedAnswer(answer.questionVersionId(), answer.correct(),
-                        answer.correctAnswer(), answer.explanation(), answer.hint())).toList(), result.transcript(),
+                        answer.correctAnswer(), answer.explanation(), answer.hint(), answer.error() == null ? null
+                        : new com.ieltspath.learning.application.result.ErrorTrapResult(answer.error().code(),
+                                answer.error().name(), answer.error().fixHint()))).toList(), result.transcript(),
                 result.reviewsCreated().stream().map(review -> new ReviewCreated(review.reviewId(),
                         review.knowledgePointId(), review.stage())).toList(),
                 result.skillScores().stream().map(score -> new SkillScore(score.skill(), score.correct(),

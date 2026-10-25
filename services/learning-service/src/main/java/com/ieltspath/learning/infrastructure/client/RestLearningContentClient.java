@@ -46,6 +46,13 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public List<Topic> getTopicSequence(boolean includeErrorTraps) {
+        if (!includeErrorTraps) return getTopicSequence();
+        return get("/topic-sequence?includeErrorTraps={includeErrorTraps}",
+                new ParameterizedTypeReference<>() { }, includeErrorTraps);
+    }
+
+    @Override
     public ProgressMetadata progressMetadata(List<UUID> courseIds) {
         return response(() -> restClient.post().uri(INTERNAL_PATH + "/progress-metadata")
                 .headers(this::forwardRequestHeaders).body(Map.of("courseIds", courseIds))
@@ -124,10 +131,18 @@ public class RestLearningContentClient implements LearningContentClient {
     @Override
     public List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
                                                int minQuestions, int limit, UUID preferredLessonId) {
+        return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId, null);
+    }
+
+    @Override
+    public List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
+                                               int minQuestions, int limit, UUID preferredLessonId,
+                                               String trapErrorCode) {
         return response(() -> restClient.post()
                 .uri(INTERNAL_PATH + "/practice-sets/search")
                 .headers(this::forwardRequestHeaders)
-                .body(new PracticeSearch(knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId))
+                .body(new PracticeSearch(knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId,
+                        trapErrorCode))
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<PracticeSet>>() { }));
     }
@@ -234,7 +249,7 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     private record PracticeSearch(UUID knowledgePointId, List<UUID> excludePackageIds,
-                                  int minQuestions, int limit, UUID preferredLessonId) {}
+                                  int minQuestions, int limit, UUID preferredLessonId, String trapErrorCode) {}
     private record AvailabilityRequest(List<UUID> knowledgePointIds, List<UUID> excludePackageIds,
                                        int minQuestions) {}
     private record DifficultyRequest(List<UUID> questionVersionIds) {}

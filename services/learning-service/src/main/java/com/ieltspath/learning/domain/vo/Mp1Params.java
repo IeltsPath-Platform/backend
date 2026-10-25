@@ -11,8 +11,12 @@ import java.util.Objects;
  */
 public record Mp1Params(int window, int maxPracticeInWindow, double halfLifeDays, int minEvidence, int minDistinctDays,
                         double minConfidence, double hysteresis, int sameItemDays, SourceWeights weights) {
-    /** Weight of one answer by where it came from: exams, reviews, diagnostic probes, practice and AI-graded essays. */
-    public record SourceWeights(double exam, double review, double probe, double practice, double essay) {
+    /** Weight of one answer by where it came from. */
+    public record SourceWeights(double exam, double review, double probe, double practice, double essay,
+                                double errorTrap) {
+        public SourceWeights(double exam, double review, double probe, double practice, double essay) {
+            this(exam, review, probe, practice, essay, 0.3);
+        }
         public double of(EvidenceSource source) {
             return switch (source) {
                 case ASSESSMENT -> exam;
@@ -20,6 +24,7 @@ public record Mp1Params(int window, int maxPracticeInWindow, double halfLifeDays
                 case DIAGNOSTIC_PROBE -> probe;
                 case LESSON_EXERCISE, PRACTICE_SET, FREE_PRACTICE -> practice;
                 case LESSON_WRITING -> essay;
+                case ERROR_TRAP -> errorTrap;
             };
         }
     }
@@ -33,7 +38,8 @@ public record Mp1Params(int window, int maxPracticeInWindow, double halfLifeDays
     }
 
     public static Mp1Params defaults() {
-        return new Mp1Params(8, 3, 30, 3, 2, 1.0, 0.03, 7, new SourceWeights(1.0, 1.0, 1.0, 0.6, 0.5));
+        return new Mp1Params(8, 3, 30, 3, 2, 1.0, 0.03, 7,
+                new SourceWeights(1.0, 1.0, 1.0, 0.6, 0.5, 0.3));
     }
 
     /** True for evidence that counts against {@code maxPracticeInWindow}. */

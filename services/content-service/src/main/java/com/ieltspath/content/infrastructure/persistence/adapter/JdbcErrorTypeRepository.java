@@ -21,7 +21,8 @@ import java.util.stream.Collectors;
 
 @Repository
 public class JdbcErrorTypeRepository implements ErrorTypeRepository {
-    private static final String COLUMNS = "id, code, name, category, severity, knowledge_point_id, fix_hint, status, "
+    private static final String COLUMNS = "id, code, name, category, severity, knowledge_point_id, "
+            + "trap_knowledge_point_id, fix_hint, status, "
             + "review_status, created_at, updated_at";
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -33,12 +34,14 @@ public class JdbcErrorTypeRepository implements ErrorTypeRepository {
     @Override
     public ErrorType save(ErrorType errorType) {
         jdbc.update("""
-                INSERT INTO error_types (id, code, name, category, severity, knowledge_point_id, fix_hint, status,
+                INSERT INTO error_types (id, code, name, category, severity, knowledge_point_id, trap_knowledge_point_id,
+                                         fix_hint, status,
                                          review_status, created_at, updated_at)
-                VALUES (:id, :code, :name, :category, :severity, :knowledgePointId, :fixHint, :status,
+                VALUES (:id, :code, :name, :category, :severity, :knowledgePointId, :trapKnowledgePointId, :fixHint, :status,
                         :reviewStatus, :createdAt, :updatedAt)
                 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, category = EXCLUDED.category,
                     severity = EXCLUDED.severity, knowledge_point_id = EXCLUDED.knowledge_point_id,
+                    trap_knowledge_point_id = EXCLUDED.trap_knowledge_point_id,
                     fix_hint = EXCLUDED.fix_hint, status = EXCLUDED.status, review_status = EXCLUDED.review_status,
                     updated_at = EXCLUDED.updated_at
                 """, new MapSqlParameterSource()
@@ -48,6 +51,7 @@ public class JdbcErrorTypeRepository implements ErrorTypeRepository {
                 .addValue("category", errorType.getCategory().name())
                 .addValue("severity", errorType.getSeverity())
                 .addValue("knowledgePointId", errorType.getKnowledgePointId())
+                .addValue("trapKnowledgePointId", errorType.getTrapKnowledgePointId())
                 .addValue("fixHint", errorType.getFixHint())
                 .addValue("status", errorType.getStatus().name())
                 .addValue("reviewStatus", errorType.getReviewStatus().name())
@@ -60,6 +64,12 @@ public class JdbcErrorTypeRepository implements ErrorTypeRepository {
     public Optional<ErrorType> findById(UUID id) {
         return jdbc.query("SELECT " + COLUMNS + " FROM error_types WHERE id = :id",
                 new MapSqlParameterSource("id", id), JdbcErrorTypeRepository::map).stream().findFirst();
+    }
+
+    @Override
+    public List<ErrorType> findByKnowledgePointId(UUID knowledgePointId) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM error_types WHERE knowledge_point_id = :knowledgePointId ORDER BY code",
+                new MapSqlParameterSource("knowledgePointId", knowledgePointId), JdbcErrorTypeRepository::map);
     }
 
     @Override
@@ -87,6 +97,27 @@ public class JdbcErrorTypeRepository implements ErrorTypeRepository {
     }
 
     @Override
+    public Set<UUID> findTrapKnowledgePointIds(Collection<UUID> knowledgePointIds) {
+        if (knowledgePointIds.isEmpty()) {
+            return Set.of();
+        }
+        return Set.copyOf(jdbc.queryForList("SELECT trap_knowledge_point_id FROM error_types "
+                        + "WHERE trap_knowledge_point_id IN (:ids)",
+                new MapSqlParameterSource("ids", knowledgePointIds), UUID.class));
+    }
+
+    @Override
+    public boolean containsTrapKnowledgePoints(Collection<UUID> knowledgePointIds) {
+        if (knowledgePointIds.isEmpty()) {
+            return false;
+        }
+        Boolean found = jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM error_types "
+                        + "WHERE trap_knowledge_point_id IN (:ids))",
+                new MapSqlParameterSource("ids", knowledgePointIds), Boolean.class);
+        return Boolean.TRUE.equals(found);
+    }
+
+    @Override
     public Set<String> findActiveCodes(Collection<String> codes) {
         if (codes.isEmpty()) {
             return Set.of();
@@ -100,6 +131,7 @@ public class JdbcErrorTypeRepository implements ErrorTypeRepository {
         UUID knowledgePointId = rs.getObject("knowledge_point_id", UUID.class);
         return new ErrorType(rs.getObject("id", UUID.class), rs.getString("code"), rs.getString("name"),
                 ErrorCategory.valueOf(rs.getString("category")), rs.getInt("severity"), knowledgePointId,
+                rs.getObject("trap_knowledge_point_id", UUID.class),
                 rs.getString("fix_hint"), ContentStatus.valueOf(rs.getString("status")),
                 ErrorReviewStatus.valueOf(rs.getString("review_status")),
                 rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant());

@@ -96,6 +96,10 @@ Solutions and the audio transcript are shown whatever the result. Sending the sa
 and writes nothing. Errors: `404 NOT_FOUND`; `409 PROBE_CLOSED` (already answered with another `requestId`, `NO_SET`, or its
 set was seen elsewhere); `422 UNGRADABLE_EXERCISE`.
 
+An incorrect probe answer with a recognized active error code may include `error: {code, name, fixHint}` in its result.
+Unknown codes or a failed Content lookup omit the field; the diagnostic submission still succeeds. Correct and untagged
+answers omit `error`.
+
 ## Content gap signals
 
 `content_gap_signals` counts, per KP, the reviews that ran out of unseen sets. It is an internal table for the content team;

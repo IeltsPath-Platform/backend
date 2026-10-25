@@ -31,7 +31,7 @@ public record TopicSequenceResponse(
     }
     public record KnowledgePoint(UUID id, String code, String name, LearningType learningType, Skill skill,
                                  String description, boolean hasPracticeSet, CefrLevel cefrLevel, String canDo,
-                                 String scopeIn, String scopeOut) {}
+                                 String scopeIn, String scopeOut, UUID parentKnowledgePointId, String errorCode) {}
 
     public static TopicSequenceResponse from(TopicSequenceResult result) {
         return new TopicSequenceResponse(result.topicId(), result.code(), result.name(), result.sortOrder(),
@@ -39,7 +39,7 @@ public record TopicSequenceResponse(
                 result.knowledgePoints().stream()
                         .map(kp -> new KnowledgePoint(kp.id(), kp.code(), kp.name(), kp.learningType(), kp.skill(),
                                 kp.description(), kp.hasPracticeSet(), kp.cefrLevel(), kp.canDo(), kp.scopeIn(),
-                                kp.scopeOut()))
+                                kp.scopeOut(), kp.parentKnowledgePointId(), kp.errorCode()))
                         .toList(),
                 result.skill(), result.hasTopicTest(), Course.from(result.course()), result.skills(), result.active(),
                 result.lessonCount());

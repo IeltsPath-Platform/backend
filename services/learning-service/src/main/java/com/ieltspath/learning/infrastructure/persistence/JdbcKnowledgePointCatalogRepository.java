@@ -25,9 +25,11 @@ public class JdbcKnowledgePointCatalogRepository implements KnowledgePointCatalo
         // Shared catalog rows need the same lock order even when Content reorders topics.
         var ordered = entries.stream().sorted(Comparator.comparing(kp -> kp.knowledgePointId().toString())).toList();
         jdbc.batchUpdate("""
-                INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set, skill, band) VALUES (?, ?, ?, ?, ?)
+                INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set, skill, band, parent_kp_id,
+                error_code) VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (kp_id) DO UPDATE SET topic_id = EXCLUDED.topic_id,
                 has_practice_set = EXCLUDED.has_practice_set, skill = EXCLUDED.skill, band = EXCLUDED.band,
+                parent_kp_id = EXCLUDED.parent_kp_id, error_code = EXCLUDED.error_code,
                 refreshed_at = clock_timestamp()
                 """, ordered, ordered.size(), (statement, kp) -> {
             statement.setObject(1, kp.knowledgePointId());
@@ -35,15 +37,19 @@ public class JdbcKnowledgePointCatalogRepository implements KnowledgePointCatalo
             statement.setBoolean(3, kp.hasPracticeSet());
             statement.setString(4, kp.skill() == null ? null : kp.skill().name());
             statement.setObject(5, kp.band(), Types.NUMERIC);
+            statement.setObject(6, kp.parentKnowledgePointId());
+            statement.setString(7, kp.errorCode());
         });
     }
 
     @Override
     public List<KnowledgePointCatalogEntry> findAll() {
-        return jdbc.query("SELECT kp_id, topic_id, has_practice_set, skill, band FROM knowledge_point_catalog",
+        return jdbc.query("SELECT kp_id, topic_id, has_practice_set, skill, band, parent_kp_id, error_code " +
+                        "FROM knowledge_point_catalog",
                 (rows, index) -> new KnowledgePointCatalogEntry(rows.getObject("kp_id", UUID.class),
                         rows.getObject("topic_id", UUID.class), rows.getBoolean("has_practice_set"),
                         rows.getString("skill") == null ? null : LearningSkill.valueOf(rows.getString("skill")),
-                        rows.getBigDecimal("band")));
+                        rows.getBigDecimal("band"), rows.getObject("parent_kp_id", UUID.class),
+                        rows.getString("error_code")));
     }
 }

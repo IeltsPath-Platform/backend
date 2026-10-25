@@ -18,7 +18,11 @@ public class GetTopicSequenceUseCase {
     }
 
     public List<TopicSequenceResult> execute() {
+        return execute(false);
+    }
+
+    public List<TopicSequenceResult> execute(boolean includeErrorTraps) {
         // Same threshold as a default practice-set search, so hasPracticeSet and search never disagree.
-        return reader.topicSequence(SearchPracticeSetsUseCase.DEFAULT_MIN_QUESTIONS);
+        return reader.topicSequence(SearchPracticeSetsUseCase.DEFAULT_MIN_QUESTIONS, includeErrorTraps);
     }
 }

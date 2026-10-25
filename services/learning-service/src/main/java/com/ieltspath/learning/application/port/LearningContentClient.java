@@ -22,6 +22,10 @@ public interface LearningContentClient {
 
     List<Topic> getTopicSequence();
 
+    default List<Topic> getTopicSequence(boolean includeErrorTraps) {
+        return getTopicSequence();
+    }
+
     List<LessonSummary> getTopicLessons(UUID topicId);
 
     Lesson getLesson(UUID lessonId);
@@ -72,6 +76,12 @@ public interface LearningContentClient {
     default List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
                                                  int minQuestions, int limit, UUID preferredLessonId) {
         return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit);
+    }
+
+    default List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
+                                                 int minQuestions, int limit, UUID preferredLessonId,
+                                                 String trapErrorCode) {
+        return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId);
     }
 
     PackageVersion getPackageVersion(UUID versionId);
@@ -215,10 +225,15 @@ public interface LearningContentClient {
 
     /** {@code cefrLevel} ({@code A1} to {@code C2}) and {@code canDo} are null when Content has not set them. */
     record KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
-                          String description, boolean hasPracticeSet, String cefrLevel, String canDo) {
+                          String description, boolean hasPracticeSet, String cefrLevel, String canDo,
+                          UUID parentKnowledgePointId, String errorCode) {
+        public KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
+                              String description, boolean hasPracticeSet, String cefrLevel, String canDo) {
+            this(id, code, name, learningType, skill, description, hasPracticeSet, cefrLevel, canDo, null, null);
+        }
         public KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
                               String description, boolean hasPracticeSet) {
-            this(id, code, name, learningType, skill, description, hasPracticeSet, null, null);
+            this(id, code, name, learningType, skill, description, hasPracticeSet, null, null, null, null);
         }
     }
 
@@ -318,10 +333,14 @@ public interface LearningContentClient {
      * needs; both are null when Content does not say, which means no limit.
      */
     record PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
-                       int matchedQuestionCount, BigDecimal band, String requiredFeatureKey) {
+                       int matchedQuestionCount, BigDecimal band, String requiredFeatureKey, int trapQuestionCount) {
+        public PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
+                           int matchedQuestionCount, BigDecimal band, String requiredFeatureKey) {
+            this(packageId, packageVersionId, code, questionCount, matchedQuestionCount, band, requiredFeatureKey, 0);
+        }
         public PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
                            int matchedQuestionCount) {
-            this(packageId, packageVersionId, code, questionCount, matchedQuestionCount, null, null);
+            this(packageId, packageVersionId, code, questionCount, matchedQuestionCount, null, null, 0);
         }
     }
 

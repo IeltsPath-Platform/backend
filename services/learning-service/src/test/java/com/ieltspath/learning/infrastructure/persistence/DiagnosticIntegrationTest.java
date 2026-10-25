@@ -166,6 +166,43 @@ class DiagnosticIntegrationTest {
     }
 
     @Test
+    void reviewSubmissionPersistsErrorTrapEvidenceInPostgres() {
+        UUID reviewUser = UUID.randomUUID();
+        topics.execute(reviewUser);
+        UUID reviewTrap = UUID.randomUUID();
+        jdbc.update("INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set, parent_kp_id, error_code) "
+                + "VALUES (?, ?, FALSE, ?, 'TFNG_NG_AS_FALSE')", reviewTrap, topic, kpB);
+        PackageVersion reviewFirst = practiceSet(kpB, true), reviewSecond = practiceSet(kpB, true);
+
+        failTwice(reviewUser, reviewFirst, reviewSecond);
+
+        assertEquals(6, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id = ? "
+                + "AND source = 'error_trap'", Integer.class, reviewUser, reviewTrap));
+    }
+
+    @Test
+    void diagnosticSubmissionPersistsErrorTrapEvidenceInPostgres() {
+        UUID diagnosticUser = UUID.randomUUID();
+        versions.clear();
+        versionKnowledgePoint.clear();
+        prerequisites.clear();
+        prerequisites.put(kpB, List.of(kpA));
+        PackageVersion first = practiceSet(kpB), second = practiceSet(kpB), probeSet = practiceSet(kpA, true);
+        UUID diagnosticTrap = UUID.randomUUID();
+        failTwice(diagnosticUser, first, second);
+        jdbc.update("INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set, parent_kp_id, error_code) "
+                + "VALUES (?, ?, FALSE, ?, 'TFNG_NG_AS_FALSE')", diagnosticTrap, topic, kpA);
+        UUID sessionId = jdbc.queryForObject("SELECT id FROM diagnostic_sessions WHERE user_id = ?", UUID.class,
+                diagnosticUser);
+        UUID probeId = getDiagnostic.execute(diagnosticUser, sessionId).probes().getFirst().probeId();
+
+        submitProbe.execute(diagnosticUser, sessionId, probeId, answers(probeSet, "B", "B", "B"));
+
+        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id = ? "
+                + "AND source = 'error_trap'", Integer.class, diagnosticUser, diagnosticTrap));
+    }
+
+    @Test
     void passedProbesPutTheBlameOnTheReviewedPointItself() {
         UUID user = UUID.randomUUID();
         prerequisites.put(kpB, List.of(kpA));
@@ -316,12 +353,18 @@ class DiagnosticIntegrationTest {
     }
 
     private PackageVersion practiceSet(UUID kp) {
+        return practiceSet(kp, false);
+    }
+
+    private PackageVersion practiceSet(UUID kp, boolean tagged) {
         UUID packageId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
         List<Item> items = new ArrayList<>();
         for (int index = 0; index < 3; index++) {
-            items.add(new Item(UUID.randomUUID(), index + 1, "Choose", options(), Map.of("type", "CHOICE",
-                    "correct", "A"), "Because A", "Look again", BigDecimal.ONE,
+            Map<String, Object> answerSpec = tagged ? Map.of("type", "CHOICE", "correct", "A",
+                    "distractors", Map.of("B", "TFNG_NG_AS_FALSE")) : Map.of("type", "CHOICE", "correct", "A");
+            items.add(new Item(UUID.randomUUID(), index + 1, "Choose", options(), answerSpec,
+                    "Because A", "Look again", BigDecimal.ONE,
                     List.of(new KnowledgePointMapping(kp, BigDecimal.ONE))));
         }
         PackageVersion version = new PackageVersion(versionId, packageId, "PRACTICE_SET", null, Map.of(),

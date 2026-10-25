@@ -60,7 +60,10 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ErrorResponse> handleBadRequestException(Exception ex, HttpServletRequest request) {
         log.warn("Bad request: {}", ex.getMessage());
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
+        Map<String, Object> details = ex instanceof InvalidErrorTypeException
+                && "TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE".equals(ex.getMessage())
+                ? Map.of("code", "TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE") : null;
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), details);
     }
 
     @ExceptionHandler(QuestionAlreadyInVersionException.class)

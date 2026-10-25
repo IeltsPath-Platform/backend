@@ -96,8 +96,9 @@ public class InternalLearningContentController {
     }
 
     @GetMapping("/topic-sequence")
-    public List<TopicSequenceResponse> topicSequence() {
-        return getTopicSequence.execute().stream().map(TopicSequenceResponse::from).toList();
+    public List<TopicSequenceResponse> topicSequence(
+            @RequestParam(value = "includeErrorTraps", defaultValue = "false") boolean includeErrorTraps) {
+        return getTopicSequence.execute(includeErrorTraps).stream().map(TopicSequenceResponse::from).toList();
     }
 
     @GetMapping("/topics/{id}/lessons")
@@ -119,7 +120,7 @@ public class InternalLearningContentController {
     public List<PracticeSetResponse> searchPracticeSets(@Valid @RequestBody PracticeSetSearchRequest request) {
         return searchPracticeSets.execute(new SearchPracticeSetsCommand(request.knowledgePointId(),
                         request.excludePackageIds(), request.minQuestions(), request.limit(),
-                        request.preferredLessonId()))
+                        request.preferredLessonId(), request.trapErrorCode()))
                 .stream().map(PracticeSetResponse::from).toList();
     }
 

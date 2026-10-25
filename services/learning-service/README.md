@@ -224,7 +224,7 @@ or Content unavailable) is returned without a name. `question-stats` and `tree-q
 
 Layers follow `api → application → domain`, with HTTP, RabbitMQ and JDBC adapters under
 `infrastructure`. The domain has no Spring or persistence imports.
-The service owns its eleven tables (Flyway V1–V2) and does not read other services' databases.
+The service owns its PostgreSQL schema (Flyway migrations through V36) and does not read other services' databases.
 
 | Layer | Contents |
 | --- | --- |
@@ -241,3 +241,12 @@ the row still has the status it was loaded with and returns false otherwise.
 - [Internal Content contract](../../docs/contracts/learning-content-internal-v1.md)
 - [Answer grading contract](../../docs/contracts/answer-spec-v1.md)
 - [Assessment event contract](../../docs/contracts/assessment-completed-v2.md)
+
+## Error trap evidence and feedback
+
+Learning stores trap-child mastery as `error_trap` evidence with weight 0.3; it does not count toward the MP-1.0 practice
+limit. Child IDs and error-code mappings come from the local knowledge-point catalog, so grading and evidence writes do
+not call Content. After grading, learner-facing results may include the active error type's name and `fixHint` when the
+lookup succeeds. Review selection uses the weakest eligible child to choose parent-KP sets and may create one optional
+`ERROR_PATTERN` review for that parent. Learner reports and trees nest only trap children with evidence under parents;
+child KPs are excluded from parent rollups and practice availability.

@@ -73,11 +73,21 @@ public record TopicSequenceResult(
             String canDo,
             String scopeIn,
             String scopeOut
+    ,
+            UUID parentKnowledgePointId,
+            String errorCode
     ) {
+        public KnowledgePointEntry(UUID id, UUID topicId, String code, String name, LearningType learningType,
+                                   Skill skill, String description, boolean hasPracticeSet, CefrLevel cefrLevel,
+                                   String canDo, String scopeIn, String scopeOut) {
+            this(id, topicId, code, name, learningType, skill, description, hasPracticeSet, cefrLevel, canDo,
+                    scopeIn, scopeOut, null, null);
+        }
+
         public KnowledgePointEntry(UUID id, UUID topicId, String code, String name, LearningType learningType,
                                    Skill skill, String description, boolean hasPracticeSet) {
             this(id, topicId, code, name, learningType, skill, description, hasPracticeSet,
-                    null, null, null, null);
+                    null, null, null, null, null, null);
         }
     }
 }

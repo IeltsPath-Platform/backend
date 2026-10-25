@@ -38,6 +38,6 @@ public class SearchPracticeSetsUseCase {
         }
         List<UUID> exclude = command.excludePackageIds() == null ? List.of() : command.excludePackageIds();
         return reader.searchPracticeSets(command.knowledgePointId(), exclude, minQuestions, limit,
-                command.preferredLessonId());
+                command.preferredLessonId(), command.trapErrorCode());
     }
 }

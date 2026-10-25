@@ -51,7 +51,18 @@ public class JdbcMasteryProfileRepository implements MasteryProfileRepository {
 
     @Override
     public List<MasteryProfile> findAll(UUID userId) {
-        return jdbc.query("SELECT " + COLUMNS + " FROM kp_mastery_profiles WHERE user_id = ? ORDER BY knowledge_point_id",
+        return jdbc.query("SELECT " + COLUMNS + " FROM kp_mastery_profiles p WHERE user_id = ? " +
+                        "AND NOT EXISTS (SELECT 1 FROM knowledge_point_catalog c " +
+                        "WHERE c.kp_id = p.knowledge_point_id AND c.parent_kp_id IS NOT NULL) " +
+                        "ORDER BY knowledge_point_id",
+                MAPPER, userId);
+    }
+
+    @Override
+    public List<MasteryProfile> findErrorTrapProfiles(UUID userId) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM kp_mastery_profiles p "
+                        + "JOIN knowledge_point_catalog c ON c.kp_id = p.knowledge_point_id "
+                        + "WHERE p.user_id = ? AND c.parent_kp_id IS NOT NULL ORDER BY p.knowledge_point_id",
                 MAPPER, userId);
     }
 

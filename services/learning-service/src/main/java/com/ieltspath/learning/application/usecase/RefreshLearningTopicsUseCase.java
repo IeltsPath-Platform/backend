@@ -43,7 +43,10 @@ public class RefreshLearningTopicsUseCase {
     @Transactional
     public List<TopicResult> execute(UUID userId) {
         lock.lock(userId);
-        var topics = content.getTopicSequence()
+        var sequence = content.getTopicSequence(true);
+        // Clients that predate the error-trap flag and test doubles still provide the legacy sequence.
+        if (sequence == null || sequence.isEmpty()) sequence = content.getTopicSequence();
+        var topics = sequence
                 .stream()
                 .filter(topic -> Boolean.TRUE.equals(topic.active()))
                 .filter(topic -> topic.course() == null || Boolean.TRUE.equals(topic.course().active()))
@@ -59,7 +62,8 @@ public class RefreshLearningTopicsUseCase {
             for (var kp : topic.knowledgePoints()) {
                 LearningSkill skill = kp.skill() == null ? topic.skill() : LearningSkill.valueOf(kp.skill());
                 entries.add(new KnowledgePointCatalogEntry(kp.id(), topic.topicId(), kp.hasPracticeSet(), skill,
-                        topic.course() == null ? null : topic.course().bandLevel()));
+                        topic.course() == null ? null : topic.course().bandLevel(), kp.parentKnowledgePointId(),
+                        kp.errorCode()));
             }
         }
         LearnerCurriculum curriculum = curricula.find(userId);

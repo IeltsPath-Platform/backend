@@ -127,6 +127,7 @@ public class SnapshotService {
     private Map<UUID, KnowledgePointDirectory.Entry> describe() {
         Map<UUID, KnowledgePointDirectory.Entry> described = new java.util.HashMap<>();
         for (KnowledgePointCatalogEntry entry : catalog.findAll()) {
+            if (entry.parentKnowledgePointId() != null) continue;
             described.put(entry.knowledgePointId(), new KnowledgePointDirectory.Entry(null, null,
                     entry.skill() == null ? null : entry.skill().name(), entry.band()));
         }

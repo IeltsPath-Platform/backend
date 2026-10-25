@@ -68,7 +68,7 @@ class LessonPipelineSeedTest {
         dataSource.setUrl(POSTGRES.getJdbcUrl());
         dataSource.setUser(POSTGRES.getUsername());
         dataSource.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
+        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").target("79").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(dataSource);
         reader = new JdbcLearningContentReader(jdbc);
     }
