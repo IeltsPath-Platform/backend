@@ -115,6 +115,18 @@ class ErrorTrapCoverageMigrationTest {
     }
 
     @Test
+    void trapPracticeSetTitlesCarryNoDraftPrefix() {
+        Integer prefixed = jdbc.queryForObject(
+                "SELECT count(*) FROM content_packages WHERE code LIKE 'PS-TRAP-%' AND title ILIKE 'draft%'",
+                Integer.class);
+        Integer sets = jdbc.queryForObject(
+                "SELECT count(*) FROM content_packages WHERE code LIKE 'PS-TRAP-%'", Integer.class);
+
+        org.junit.jupiter.api.Assertions.assertEquals(0, prefixed);
+        org.junit.jupiter.api.Assertions.assertEquals(19, sets);
+    }
+
+    @Test
     void twoSetsForOneErrorCodeDoNotRepeatQuestionStems() {
         var duplicateStems = jdbc.queryForList("""
                 SELECT regexp_replace(p.code, '-[0-9]+$', '') AS error_package,
