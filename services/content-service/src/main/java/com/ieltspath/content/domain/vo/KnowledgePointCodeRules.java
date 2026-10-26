@@ -3,7 +3,7 @@ package com.ieltspath.content.domain.vo;
 import java.util.regex.Pattern;
 
 public final class KnowledgePointCodeRules {
-    private static final Pattern CODE = Pattern.compile("^[RLWGV](55|60|65|70)_[A-Z0-9_]{2,60}$");
+    private static final Pattern CODE = Pattern.compile("^[RLWGVS](55|60|65|70)_[A-Z0-9_]{2,60}$");
 
     private KnowledgePointCodeRules() {}
 
@@ -19,6 +19,9 @@ public final class KnowledgePointCodeRules {
         }
         if (prefix == 'V') {
             return kind == KnowledgePointKind.VOCABULARY && skill == Skill.ALL;
+        }
+        if (prefix == 'S') {
+            return skill == Skill.SPEAKING;
         }
         return true;
     }

@@ -4,6 +4,8 @@ import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.result.ReviewBasketResult;
+import com.ieltspath.learning.application.result.ReviewBasketSummaryResult;
+import com.ieltspath.learning.application.usecase.GetReviewBasketSummaryUseCase;
 import com.ieltspath.learning.application.usecase.GetReviewBasketUseCase;
 import com.ieltspath.learning.application.usecase.StartBasketReviewUseCase;
 import org.junit.jupiter.api.Test;
@@ -47,9 +49,34 @@ class ReviewBasketControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean CurrentUserProvider currentUser;
     @MockitoBean GetReviewBasketUseCase basket;
+    @MockitoBean GetReviewBasketSummaryUseCase summary;
     @MockitoBean StartBasketReviewUseCase start;
     final UUID learner = UUID.randomUUID();
     final UUID point = UUID.randomUUID();
+
+    @Test
+    void weakWritingCriteriaAreAnAdditiveBasketGroup() throws Exception {
+        UUID reviewId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(learner);
+        when(basket.execute(learner)).thenReturn(new ReviewBasketResult(List.of(), List.of(), List.of(), List.of(
+                new ReviewBasketResult.OptionalItem(point, "DEMO_WRITING_CRITERION_LR", "Lexical Resource",
+                        "WRITING", "PRIORITY", 0.0, null, "WRITING_CRITERION", true, reviewId))));
+
+        mvc.perform(get("/api/learning/review-basket").with(user("customer").roles("CUSTOMER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.required").isEmpty())
+                .andExpect(jsonPath("$.consolidate").isEmpty())
+                .andExpect(jsonPath("$.due").isEmpty())
+                .andExpect(jsonPath("$.weak[0].knowledgePointId").value(point.toString()))
+                .andExpect(jsonPath("$.weak[0].skill").value("WRITING"))
+                .andExpect(jsonPath("$.weak[0].tier").value("PRIORITY"))
+                .andExpect(jsonPath("$.weak[0].mastery").value(0.0))
+                .andExpect(jsonPath("$.weak[0]").value(org.hamcrest.Matchers.hasKey("dueAt")))
+                .andExpect(jsonPath("$.weak[0].dueAt").isEmpty())
+                .andExpect(jsonPath("$.weak[0].reason").value("WRITING_CRITERION"))
+                .andExpect(jsonPath("$.weak[0].hasUnrevealedSet").value(true))
+                .andExpect(jsonPath("$.weak[0].reviewId").value(reviewId.toString()));
+    }
 
     @Test
     void theBasketUsesTheVerifiedIdentityAndShowsThreeGroups() throws Exception {
@@ -69,6 +96,20 @@ class ReviewBasketControllerTest {
     }
 
     @Test
+    void theSummaryGivesTheRequiredAndDueCountsOfTheVerifiedLearnerOnly() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(learner);
+        when(summary.execute(learner)).thenReturn(new ReviewBasketSummaryResult(2, 5));
+
+        mvc.perform(get("/api/learning/review-basket/summary").with(user("customer").roles("CUSTOMER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.required").value(2))
+                .andExpect(jsonPath("$.due").value(5))
+                .andExpect(jsonPath("$.length()").value(2));
+        verify(summary).execute(learner);
+        verifyNoInteractions(basket);
+    }
+
+    @Test
     void startMapsAMissingSetTo409() throws Exception {
         when(currentUser.requireUserId()).thenReturn(learner);
         when(start.execute(learner, point)).thenThrow(
@@ -83,13 +124,16 @@ class ReviewBasketControllerTest {
     @ValueSource(strings = {"ADMIN", "EXAMINER", "CONTENT_AUTHOR"})
     void onlyACustomerUsesTheBasket(String role) throws Exception {
         mvc.perform(get("/api/learning/review-basket").with(user("staff").roles(role))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/learning/review-basket/summary").with(user("staff").roles(role)))
+                .andExpect(status().isForbidden());
         mvc.perform(post("/api/learning/review-basket/" + point + "/start").with(user("staff").roles(role)))
                 .andExpect(status().isForbidden());
-        verifyNoInteractions(basket, start);
+        verifyNoInteractions(basket, summary, start);
     }
 
     @Test
     void unauthenticatedCallersAreRejected() throws Exception {
         mvc.perform(get("/api/learning/review-basket")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/learning/review-basket/summary")).andExpect(status().isUnauthorized());
     }
 }

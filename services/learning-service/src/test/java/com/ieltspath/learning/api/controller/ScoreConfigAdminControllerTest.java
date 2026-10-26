@@ -68,10 +68,10 @@ class ScoreConfigAdminControllerTest {
         when(config.get(course)).thenReturn(result(course));
         when(config.get(null)).thenReturn(result(null));
 
-        mvc.perform(get(PATH).param("courseId", course.toString()).with(user("admin").roles("ADMIN")))
+        mvc.perform(get(PATH).param("courseId", course.toString()).with(user("author").roles("CONTENT_AUTHOR")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.passThreshold").value(0.7))
                 .andExpect(jsonPath("$.courseId").value(course.toString()));
-        mvc.perform(get(PATH).with(user("admin").roles("ADMIN")))
+        mvc.perform(get(PATH).with(user("author").roles("CONTENT_AUTHOR")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.courseId").doesNotExist());
     }
 
@@ -81,7 +81,7 @@ class ScoreConfigAdminControllerTest {
         when(config.update(eq(admin), eq(course), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(result(course));
 
-        mvc.perform(put(PATH).param("courseId", course.toString()).with(user("admin").roles("ADMIN"))
+        mvc.perform(put(PATH).param("courseId", course.toString()).with(user("author").roles("CONTENT_AUTHOR"))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk());
         verify(config).update(eq(admin), eq(course), any(), any(), any(), any(), any(), any(), any());
@@ -93,21 +93,21 @@ class ScoreConfigAdminControllerTest {
         when(config.update(eq(admin), eq(null), any(), any(), any(), any(), any(), any(), any())).thenThrow(
                 new LearningRequestException(400, "INVALID_SCORE_CONFIG", "weights must add up to 1"));
 
-        mvc.perform(put(PATH).with(user("admin").roles("ADMIN")).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(put(PATH).with(user("author").roles("CONTENT_AUTHOR")).contentType(MediaType.APPLICATION_JSON)
                         .content(BODY.replace("0.5,", "0.6,")))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_SCORE_CONFIG"));
     }
 
     @Test
     void aRequestWithAMissingValueIsRejectedBeforeTheUseCase() throws Exception {
-        mvc.perform(put(PATH).with(user("admin").roles("ADMIN")).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(put(PATH).with(user("author").roles("CONTENT_AUTHOR")).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"processWeight\":0.2}"))
                 .andExpect(status().isUnprocessableEntity());
         verifyNoInteractions(config);
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"CUSTOMER", "EXAMINER", "CONTENT_AUTHOR", "SALES_STAFF"})
+    @ValueSource(strings = {"ADMIN", "CUSTOMER", "EXAMINER", "SALES_STAFF"})
     void onlyAnAdminCanReadOrChangeTheConfiguration(String role) throws Exception {
         mvc.perform(get(PATH).with(user("other").roles(role))).andExpect(status().isForbidden());
         mvc.perform(put(PATH).with(user("other").roles(role)).contentType(MediaType.APPLICATION_JSON).content(BODY))

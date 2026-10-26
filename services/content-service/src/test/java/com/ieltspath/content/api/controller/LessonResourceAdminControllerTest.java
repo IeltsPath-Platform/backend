@@ -39,7 +39,8 @@ class LessonResourceAdminControllerTest {
                         new CreateLessonResourceUseCase(repository, lessons),
                         new UpdateLessonResourceUseCase(repository),
                         new DeleteLessonResourceUseCase(repository),
-                        new UpdateLessonSummaryUseCase(repository, lessons)))
+                        new UpdateLessonSummaryUseCase(repository, lessons),
+                        new ReorderLessonResourcesUseCase(repository)))
                 .setControllerAdvice(new GlobalExceptionHandler()).setValidator(validator).build();
         when(lessons.lessonExists(lessonId)).thenReturn(true);
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));

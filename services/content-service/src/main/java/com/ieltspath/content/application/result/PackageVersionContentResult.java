@@ -46,6 +46,11 @@ public record PackageVersionContentResult(
             return new Section(sectionId, title, skill, instructions, sortOrder, partNo, timeLimitSeconds,
                     passage, newAudio, groups, items);
         }
+
+        public Section withItems(List<Item> newItems) {
+            return new Section(sectionId, title, skill, instructions, sortOrder, partNo, timeLimitSeconds,
+                    passage, audio, groups, newItems);
+        }
     }
 
     public record QuestionGroup(UUID groupId, int sortOrder, String formatCode, String instructions) {}
@@ -68,14 +73,30 @@ public record PackageVersionContentResult(
             String hint,
             double maxScore,
             UUID groupId,
-            List<KnowledgePointMapping> knowledgePointMappings
+            List<KnowledgePointMapping> knowledgePointMappings,
+            String guide,
+            List<Image> images
     ) {
+        public Item(UUID questionVersionId, int sortOrder, String stem, String optionsJson, String answerSpecJson,
+                    String explanation, String hint, double maxScore, UUID groupId,
+                    List<KnowledgePointMapping> knowledgePointMappings) {
+            this(questionVersionId, sortOrder, stem, optionsJson, answerSpecJson, explanation, hint, maxScore,
+                    groupId, knowledgePointMappings, null, List.of());
+        }
+
         public Item(UUID questionVersionId, int sortOrder, String stem, String optionsJson, String answerSpecJson,
                     String explanation, String hint, double maxScore, List<KnowledgePointMapping> knowledgePointMappings) {
             this(questionVersionId, sortOrder, stem, optionsJson, answerSpecJson, explanation, hint, maxScore, null,
                     knowledgePointMappings);
         }
+
+        public Item withImages(List<Image> newImages) {
+            return new Item(questionVersionId, sortOrder, stem, optionsJson, answerSpecJson, explanation, hint,
+                    maxScore, groupId, knowledgePointMappings, guide, newImages);
+        }
     }
+
+    public record Image(String mediaReference, String mediaUrl, String altText) {}
 
     public record KnowledgePointMapping(UUID knowledgePointId, double weight) {}
 }

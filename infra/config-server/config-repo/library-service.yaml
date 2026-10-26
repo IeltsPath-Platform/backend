@@ -9,8 +9,17 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
 
 app:
+  storage:
+    enabled: true
+    supabase:
+      url: ${SUPABASE_URL:}
+      secret-key: ${SUPABASE_SECRET_KEY:}
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
     internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
@@ -22,10 +31,24 @@ app:
           - /actuator/info
           - /v3/api-docs
           - /v3/api-docs/**
+      - method: GET
+        patterns:
+          - /api/content/vocabulary
+          - "/api/content/vocabulary/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
+          - /api/content/vocabulary/suggestions
+          - /api/content/vocabulary/topics
+          - /api/content/vocabulary/sets
+          - /api/content/vocabulary/mindmap
+          - "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
+          - "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/words"
 
 library:
+  vocabulary:
+    weekly-goal-default: 120
   content:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
+  flashcard-images:
+    bucket: ${LIBRARY_FLASHCARD_BUCKET:flashcards}
 
 springdoc:
   # OpenAPI for the Gateway Swagger UI; set API_DOCS_ENABLED=false outside local development.

@@ -21,10 +21,18 @@ public class UpdateRoomSettingsUseCase {
         this.events = events;
     }
 
-    @Transactional
     public GameRoomResult execute(UUID roomId, UUID actorId, int initialLives, Integer wordLimit, Boolean timeEnabled) {
+        return execute(roomId, actorId, initialLives, wordLimit, timeEnabled, null, null);
+    }
+
+    /** Edits the settings of the room's current game; the Wordly or the Rocket fields apply, the others are ignored. */
+    @Transactional
+    public GameRoomResult execute(UUID roomId, UUID actorId, int initialLives, Integer wordLimit, Boolean timeEnabled,
+            Integer questionCount, Integer secondsPerQuestion) {
         var room = rooms.findForUpdate(roomId).orElseThrow(() -> new GameRoomNotFoundException(roomId));
-        room.updateSettings(actorId, initialLives, wordLimit, timeEnabled, Instant.now());
+        if (room.settings() instanceof com.ieltspath.game.domain.vo.RocketRoomSettings)
+            room.updateRocketSettings(actorId, initialLives, questionCount, secondsPerQuestion, Instant.now());
+        else room.updateSettings(actorId, initialLives, wordLimit, timeEnabled, Instant.now());
         var result = GameRoomResult.from(rooms.save(room));
         events.publishEvent(new RoomUpdatedEvent(result));
         return result;

@@ -42,7 +42,7 @@ class PracticeSetCoverageMigrationTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("79").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
         reader = new JdbcLearningContentReader(jdbc);
     }
@@ -79,6 +79,33 @@ class PracticeSetCoverageMigrationTest {
         assertThat(count("SELECT count(*) FROM (SELECT sq.question_version_id FROM section_questions sq "
                 + "JOIN content_sections s ON s.id = sq.section_id JOIN content_packages p ON p.current_published_version_id = s.package_version_id "
                 + "WHERE " + SEEDED_PACKAGES + " GROUP BY 1 HAVING count(*) > 1) reused")).isZero();
+    }
+
+    @Test
+    void eachCriterionKnowledgePointHasThreeFreeStandingSetsOfThreeQuestions() {
+        var sets = jdbc.queryForList("SELECT kp.code, p.code AS package_code, p.topic_id, p.lesson_id, "
+                + "count(sq.id) AS questions, "
+                + "count(sq.id) FILTER (WHERE qv.status = 'PUBLISHED' AND qv.difficulty IS NOT NULL "
+                + "AND qkp.knowledge_point_id = kp.id) AS valid "
+                + "FROM content_packages p JOIN content_sections s ON s.package_version_id = p.current_published_version_id "
+                + "JOIN section_questions sq ON sq.section_id = s.id "
+                + "JOIN question_versions qv ON qv.id = sq.question_version_id "
+                + "JOIN question_knowledge_points qkp ON qkp.question_version_id = qv.id "
+                + "JOIN knowledge_points kp ON kp.code LIKE 'DEMO_WRITING_CRITERION_%' AND kp.id = qkp.knowledge_point_id "
+                + "WHERE p.code LIKE 'PS-WCR-%' GROUP BY kp.code, p.code, p.topic_id, p.lesson_id",
+                Collections.emptyMap());
+
+        assertThat(sets).hasSize(15);
+        assertThat(sets).allSatisfy(set -> {
+            assertThat(set.get("topic_id")).isNull();
+            assertThat(set.get("lesson_id")).isNull();
+            assertThat(set.get("questions")).isEqualTo(3L);
+            assertThat(set.get("valid")).isEqualTo(3L);
+        });
+        assertThat(sets.stream().collect(Collectors.groupingBy(set -> (String) set.get("code"), Collectors.counting())))
+                .containsOnlyKeys("DEMO_WRITING_CRITERION_TA", "DEMO_WRITING_CRITERION_TR", "DEMO_WRITING_CRITERION_CC",
+                        "DEMO_WRITING_CRITERION_LR", "DEMO_WRITING_CRITERION_GRA")
+                .allSatisfy((code, total) -> assertThat(total).isEqualTo(3L));
     }
 
     @Test
@@ -124,7 +151,8 @@ class PracticeSetCoverageMigrationTest {
 
     private Map<String, Integer> eligibleSetCountsByCode() {
         var knowledgePoints = jdbc.queryForList("SELECT kp.id, kp.code FROM knowledge_points kp JOIN topics t ON t.id = kp.topic_id "
-                + "JOIN courses c ON c.id = t.course_id WHERE kp.status = 'ACTIVE' AND c.band_level IN (5.5, 6.5)",
+                        + "JOIN courses c ON c.id = t.course_id WHERE kp.status = 'ACTIVE' AND c.band_level IN (5.5, 6.5) "
+                        + "AND kp.id NOT IN (SELECT trap_knowledge_point_id FROM error_types WHERE trap_knowledge_point_id IS NOT NULL)",
                 Collections.emptyMap());
         List<UUID> ids = knowledgePoints.stream().map(row -> (UUID) row.get("id")).toList();
         var counts = reader.countEligiblePracticeSets(ids, List.of(), 1);

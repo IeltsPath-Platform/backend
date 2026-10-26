@@ -1,6 +1,6 @@
 # Chính sách AI trong đánh giá
 
-Cập nhật: 2026-10-17. Quyết định D6: essay của course test được giám khảo chấm mù.
+Cập nhật: 2026-10-22 (Learning gộp band và KP con trong một request). Quyết định D6: essay của course test được giám khảo chấm mù.
 Topic test, practice và placement giữ chính sách LLM hiện có. Mở khóa topic, quyết
 định điểm khóa ở Learning và cảnh báo QA không thuộc thay đổi này.
 
@@ -44,6 +44,20 @@ LLM chỉ được gắn `errorCode` trong danh mục `ACTIVE` của Content; m�
 hoặc đã bị loại khỏi danh mục sẽ bị bỏ khỏi kết quả của LLM. Không dùng các mã
 do mô hình tự tạo làm bằng chứng lỗi.
 
+Learning gửi đúng một request LLM cho mỗi lần thực thi chấm: giữ nguyên template band `v1`, nối hướng dẫn
+`essay-kp-judgment-v2` (`kpj2`) để cùng JSON trả `criteria`, `corrections`, `summary`, `focus` và `judgments` cho các KP
+con trong rubric; rubric không có KP con thì không cần `judgments`. `prompt_version` (`+tplv1`) và activation vẫn nhận
+diện template band; `judgmentVersion=kpj2` lưu trong JSON grade bất cứ khi nào rubric có KP con (prompt đã nối hướng dẫn), kể cả khi
+mô hình không trả mảng `judgments`; không có KP con thì version null. Không phát qua API. Mỗi lần chấm dùng một lượt quota ngày và
+timeout chung `learning.writing.grading-timeout-seconds` (mặc định 20 giây); không có timeout/skip riêng cho KP.
+Không gọi AI sửa JSON hoặc tự gửi lại HTTP khi provider trả 429/503. JSON hoặc band không hợp lệ gây `INVALID_GRADE`,
+không thu points. Khi band hợp lệ nhưng `judgments` thiếu/sai, giữ band và để KP `NOT_ASSESSED`, trừ `FAIL` có thể suy ra
+từ correction đã kiểm tra và ánh xạ error type sang KP. PASS/FAIL của mô hình chỉ được nhận khi excerpt là chuỗi nguyên
+văn trong essay. Correction và judgment đến từ cùng phản hồi AI; application kiểm tra chéo chúng bằng luật xác định,
+không phải hai đánh giá AI độc lập. `EssayKnowledgeJudge` không gọi LLM hay dùng clock; catalog Content được lấy khi
+cần qua supplier do grader cung cấp, tối đa một lần.
+Không log essay, prompt hay output LLM. `kpj2` chưa có gold set để đo độ chính xác.
+
 Trước khi từng task có dòng đầu tiên trong `ai_prompt_activations`, cả Learning `EssayGrader` và Assessment
 `GradeGateEssayJobUseCase` dùng rubric `ACTIVE` của Content để bootstrap; không báo `PROMPT_NOT_ACTIVATED` chỉ vì
 chưa có dòng. Migration `V50__rubrics.sql` seed cả `TASK_1` và `TASK_2` ở trạng thái `ACTIVE`, nhưng `source_note`
@@ -65,3 +79,35 @@ chỉ dành cho ADMIN; gold set có thể nhập thủ công hoặc lấy từ c
 
 Phase 11 còn `in_progress`: cần gold set do chuyên gia chấm và lần đánh giá thật có chỉ số lưu lại. Seed bootstrap
 và test tự động không hoàn thành tiêu chí nghiệm thu này.
+
+## AI sinh nội dung (khu author của Content)
+
+Phần này nói về content-service. Đường dẫn Java tính từ
+`services/content-service/src/main/java/com/ieltspath/content/`, test từ `services/content-service/src/test/java/com/ieltspath/content/`.
+Chi tiết route: [ai-drafts-v1](contracts/ai-drafts-v1.md), [question-drafts-v1](contracts/question-drafts-v1.md),
+[course-drafts-v1](contracts/course-drafts-v1.md), [course-import-v1](contracts/course-import-v1.md).
+
+- **Mọi thứ AI sinh là bản nháp.** Câu hỏi và course AI viết nằm trong `ai_drafts` ở trạng thái `READY`; không có đường nào
+  từ bản nháp tới học viên. Người duyệt (CONTENT_AUTHOR sở hữu bản nháp) chọn câu hoặc duyệt course rồi mới có nội dung
+  thật: câu hỏi `DRAFT`, course/topic `INACTIVE`, bài `DRAFT`, đề cuối rỗng `DRAFT`. Nội dung đó còn phải xuất bản qua các
+  kiểm tra thường lệ.
+- **Sinh course chỉ chọn từ kho.** Ứng viên là KP, câu, bài và gói đã có, chọn bằng luật xác định. Mô hình chỉ nhóm và sắp
+  xếp trong tập ứng viên; mã nào ngoài tập hoặc lặp bị bỏ. Chỗ thiếu được báo là `gaps`/`unmatchedTopics`, không sinh nội dung
+  để lấp.
+- **Mô hình không quyết định giá trị.** `answer_spec` do server dựng, không lấy từ mô hình; mã lỗi gắn phương án sai phải
+  `ACTIVE` và đã `APPROVED` trong danh mục; câu trùng nguyên văn câu đã có của KP bị loại; độ khó là độ khó đã yêu cầu.
+- **Không dữ liệu học viên trong prompt**, không log prompt hay câu trả lời thô; lỗi gọi mô hình thành mã an toàn, hoàn
+  hạn mức ngày và bản nháp `FAILED`. Thiếu cấu hình (`CONTENT_LLM_*`) là `NOT_CONFIGURED`, service vẫn chạy.
+- **Hạn mức theo author và ngày** (`ai_usage_daily`): yêu cầu sinh và import Excel đếm riêng.
+
+| Quy tắc | Điểm thực thi | Test kiểm tra |
+| --- | --- | --- |
+| Câu AI sai schema, đáp án không thuộc phương án, mã lỗi lạ hoặc trùng câu cũ không vào bản nháp; sửa tay cũng phải qua luật đó. | [application/service/QuestionDraftValidator](../services/content-service/src/main/java/com/ieltspath/content/application/service/QuestionDraftValidator.java), [QuestionDraftGenerator](../services/content-service/src/main/java/com/ieltspath/content/application/service/QuestionDraftGenerator.java), [EditDraftItemUseCase](../services/content-service/src/main/java/com/ieltspath/content/application/usecase/EditDraftItemUseCase.java). | [QuestionDraftValidatorTest](../services/content-service/src/test/java/com/ieltspath/content/application/service/QuestionDraftValidatorTest.java), [QuestionDraftGeneratorTest](../services/content-service/src/test/java/com/ieltspath/content/application/service/QuestionDraftGeneratorTest.java), [EditDraftItemUseCaseTest](../services/content-service/src/test/java/com/ieltspath/content/application/usecase/EditDraftItemUseCaseTest.java). |
+| Duyệt câu hỏi tạo câu `DRAFT` qua use case câu hỏi thường, tất cả hoặc không. | [ApproveQuestionDraftUseCase](../services/content-service/src/main/java/com/ieltspath/content/application/usecase/ApproveQuestionDraftUseCase.java). | [ApproveQuestionDraftUseCaseTest](../services/content-service/src/test/java/com/ieltspath/content/application/usecase/ApproveQuestionDraftUseCaseTest.java). |
+| Course AI chỉ dùng mã trong tập ứng viên; không sinh nội dung bù chỗ thiếu. | [CourseCandidateSelector](../services/content-service/src/main/java/com/ieltspath/content/application/service/CourseCandidateSelector.java), [CourseDraftValidator](../services/content-service/src/main/java/com/ieltspath/content/application/service/CourseDraftValidator.java), [CourseDraftGenerator](../services/content-service/src/main/java/com/ieltspath/content/application/service/CourseDraftGenerator.java). | [CourseDraftValidatorTest](../services/content-service/src/test/java/com/ieltspath/content/application/service/CourseDraftValidatorTest.java), [CourseDraftGeneratorTest.noQuestionIsGeneratedToFillAShortage](../services/content-service/src/test/java/com/ieltspath/content/application/service/CourseDraftGeneratorTest.java). |
+| Duyệt course tạo course `INACTIVE` và đề cuối rỗng `DRAFT`; lỗi giữa chừng không để lại gì; tên/mã trùng hoặc tiên quyết sai thứ tự bị chặn. | [ApproveCourseDraftUseCase](../services/content-service/src/main/java/com/ieltspath/content/application/usecase/ApproveCourseDraftUseCase.java), [CourseMaterializer](../services/content-service/src/main/java/com/ieltspath/content/application/service/CourseMaterializer.java). | [ApproveCourseDraftIntegrationTest](../services/content-service/src/test/java/com/ieltspath/content/application/usecase/ApproveCourseDraftIntegrationTest.java). |
+| Hạn mức ngày được hoàn khi sinh thất bại; việc treo trở lại hàng đợi. | [RunAiDraftJobUseCase](../services/content-service/src/main/java/com/ieltspath/content/application/usecase/RunAiDraftJobUseCase.java). | [RunAiDraftJobUseCaseTest](../services/content-service/src/test/java/com/ieltspath/content/application/usecase/RunAiDraftJobUseCaseTest.java). |
+| Import Excel không phải AI nhưng đi qua cùng luật: kiểm trước không ghi gì, ghi tất cả hoặc không, mọi thứ tạo ra là bản nháp/`INACTIVE`, ô công thức và macro bị từ chối. | [CourseImportUseCases](../services/content-service/src/main/java/com/ieltspath/content/application/usecase/CourseImportUseCases.java), [PoiCourseWorkbookReader](../services/content-service/src/main/java/com/ieltspath/content/infrastructure/excel/PoiCourseWorkbookReader.java). | [CourseImportIntegrationTest](../services/content-service/src/test/java/com/ieltspath/content/application/usecase/CourseImportIntegrationTest.java), [PoiCourseWorkbookReaderTest](../services/content-service/src/test/java/com/ieltspath/content/infrastructure/excel/PoiCourseWorkbookReaderTest.java). |
+
+Giới hạn: kiểm tra tự động bảo đảm hình dạng, đáp án và mã lỗi, không bảo đảm đúng chuyên môn IELTS của nội dung mô hình
+viết. Đó là việc của người duyệt; chưa có gold set hay chỉ số chất lượng cho phần sinh câu hỏi.

@@ -32,7 +32,7 @@ public class PracticeTestController {
     private final GetSpeakingTaskUseCase speakingTask;
 
     @PostMapping("/search")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public PracticeTestPageResponse search(@Valid @RequestBody SearchPracticeTestsRequest request) {
         Skill skill;
         try { skill = Skill.valueOf(request.skill()); }
@@ -47,11 +47,11 @@ public class PracticeTestController {
     }
 
     @GetMapping("/sources")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public List<ListTestSourcesUseCase.Source> sources() { return sources.execute(); }
 
     @GetMapping("/formats")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public List<PracticeTestCatalogReader.FormatCount> formats(@RequestParam("skill") String skill) {
         Skill parsed;
         try { parsed = Skill.valueOf(skill); }
@@ -61,7 +61,7 @@ public class PracticeTestController {
 
     /** The prompt, chart and writing guide of one Writing task, for the free-writing and step-by-step workspaces. */
     @GetMapping("/{packageVersionId}/sections/{sectionId}/writing-task")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public WritingTaskResponse writingTask(@PathVariable("packageVersionId") UUID packageVersionId,
                                            @PathVariable("sectionId") UUID sectionId) {
         return WritingTaskResponse.from(writingTask.execute(packageVersionId, sectionId));
@@ -69,7 +69,7 @@ public class PracticeTestController {
 
     /** The questions of one Speaking part (Part 1, 2 or 3), for the recording workspace. */
     @GetMapping("/{packageVersionId}/sections/{sectionId}/speaking-task")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public SpeakingTaskResponse speakingTask(@PathVariable("packageVersionId") UUID packageVersionId,
                                              @PathVariable("sectionId") UUID sectionId) {
         return SpeakingTaskResponse.from(speakingTask.execute(packageVersionId, sectionId));

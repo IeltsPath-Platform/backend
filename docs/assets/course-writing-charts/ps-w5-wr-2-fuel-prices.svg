@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" font-family="Arial,Helvetica,sans-serif">
+<rect x="0.00" y="0.00" width="1600.00" height="1000.00" rx="0" fill="#ffffff"/>
+<text x="800.00" y="76.00" font-size="40" fill="#1e293b" text-anchor="middle" font-weight="700">Average fuel prices</text>
+<text x="800.00" y="125.00" font-size="26" fill="#64748b" text-anchor="middle" font-weight="400">Petrol and diesel, 2015–2020 · dollars per litre</text>
+<line x1="125.00" y1="800.00" x2="1490.00" y2="800.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="809.00" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">$0.80</text>
+<line x1="125.00" y1="717.14" x2="1490.00" y2="717.14" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="726.14" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">$0.90</text>
+<line x1="125.00" y1="634.29" x2="1490.00" y2="634.29" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="643.29" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">$1.00</text>
+<line x1="125.00" y1="551.43" x2="1490.00" y2="551.43" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="560.43" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">$1.10</text>
+<line x1="125.00" y1="468.57" x2="1490.00" y2="468.57" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="477.57" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">$1.20</text>
+<line x1="125.00" y1="385.71" x2="1490.00" y2="385.71" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="394.71" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">$1.30</text>
+<line x1="125.00" y1="302.86" x2="1490.00" y2="302.86" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="311.86" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">$1.40</text>
+<line x1="125.00" y1="220.00" x2="1490.00" y2="220.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<text x="103.00" y="229.00" font-size="24" fill="#64748b" text-anchor="end" font-weight="400">$1.50</text>
+<line x1="125.00" y1="220.00" x2="125.00" y2="800.00" stroke="#64748b" stroke-width="2" stroke-dasharray=""/>
+<line x1="125.00" y1="800.00" x2="1490.00" y2="800.00" stroke="#64748b" stroke-width="2" stroke-dasharray=""/>
+<text x="125.00" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">2015</text>
+<text x="398.00" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">2016</text>
+<text x="671.00" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">2017</text>
+<text x="944.00" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">2018</text>
+<text x="1217.00" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">2019</text>
+<text x="1490.00" y="848.00" font-size="24" fill="#64748b" text-anchor="middle" font-weight="400">2020</text>
+<polyline points="125.000,551.429 398.000,592.857 671.000,468.571 944.000,344.286 1217.000,385.714 1490.000,634.286" fill="none" stroke="#5261cf" stroke-width="5" stroke-dasharray=""/>
+<circle cx="125.000" cy="551.429" r="8" fill="#5261cf"/>
+<text x="125.00" y="531.43" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">$1.10</text>
+<circle cx="398.000" cy="592.857" r="8" fill="#5261cf"/>
+<text x="398.00" y="572.86" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">$1.05</text>
+<circle cx="671.000" cy="468.571" r="8" fill="#5261cf"/>
+<text x="671.00" y="448.57" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">$1.20</text>
+<circle cx="944.000" cy="344.286" r="8" fill="#5261cf"/>
+<text x="944.00" y="379.29" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">$1.35</text>
+<circle cx="1217.000" cy="385.714" r="8" fill="#5261cf"/>
+<text x="1217.00" y="420.71" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">$1.30</text>
+<circle cx="1490.000" cy="634.286" r="8" fill="#5261cf"/>
+<text x="1490.00" y="669.29" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">$1.00</text>
+<polyline points="125.000,634.286 398.000,675.714 671.000,510.000 944.000,302.857 1217.000,319.429 1490.000,592.857" fill="none" stroke="#edaa32" stroke-width="5" stroke-dasharray="12 8"/>
+<circle cx="125.000" cy="634.286" r="8" fill="#edaa32"/>
+<text x="125.00" y="669.29" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">$1.00</text>
+<circle cx="398.000" cy="675.714" r="8" fill="#edaa32"/>
+<text x="398.00" y="710.71" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">$0.95</text>
+<circle cx="671.000" cy="510.000" r="8" fill="#edaa32"/>
+<text x="671.00" y="545.00" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">$1.15</text>
+<circle cx="944.000" cy="302.857" r="8" fill="#edaa32"/>
+<text x="944.00" y="282.86" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">$1.40</text>
+<circle cx="1217.000" cy="319.429" r="8" fill="#edaa32"/>
+<text x="1217.00" y="299.43" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">$1.38</text>
+<circle cx="1490.000" cy="592.857" r="8" fill="#edaa32"/>
+<text x="1490.00" y="572.86" font-size="25" fill="#1e293b" text-anchor="middle" font-weight="700">$1.05</text>
+<rect x="500.00" y="912.00" width="30.00" height="24.00" rx="3" fill="#5261cf"/>
+<text x="546.00" y="935.00" font-size="25" fill="#1e293b" text-anchor="start" font-weight="400">Petrol (solid)</text>
+<rect x="800.00" y="912.00" width="30.00" height="24.00" rx="3" fill="#edaa32"/>
+<text x="846.00" y="935.00" font-size="25" fill="#1e293b" text-anchor="start" font-weight="400">Diesel (dashed)</text>
+</svg>

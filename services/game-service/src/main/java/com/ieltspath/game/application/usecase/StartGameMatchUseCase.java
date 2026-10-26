@@ -32,9 +32,16 @@ public class StartGameMatchUseCase {
     private final OutboxWriter outboxWriter;
     private final TransactionTemplate tx;
     private final Clock clock;
+    private final StartRocketMatchUseCase rocket;
+    /** Without Rocket support; kept for callers that only start Wordly or legacy session matches. */
     public StartGameMatchUseCase(GameRoomRepository roomRepository, GameMatchRepository matchRepository,
             GameMatchPlayerRepository playerRepository, GameSessionRepository sessionRepository, OutboxWriter outboxWriter, org.springframework.context.ApplicationEventPublisher events, com.ieltspath.game.application.port.WordlyWordProvider wordProvider, com.ieltspath.game.application.port.WordlyMatchStore wordStore, PlatformTransactionManager manager, Clock clock) {
-        this.tx=new TransactionTemplate(manager); this.clock=clock;
+        this(roomRepository,matchRepository,playerRepository,sessionRepository,outboxWriter,events,wordProvider,wordStore,manager,clock,null);
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public StartGameMatchUseCase(GameRoomRepository roomRepository, GameMatchRepository matchRepository,
+            GameMatchPlayerRepository playerRepository, GameSessionRepository sessionRepository, OutboxWriter outboxWriter, org.springframework.context.ApplicationEventPublisher events, com.ieltspath.game.application.port.WordlyWordProvider wordProvider, com.ieltspath.game.application.port.WordlyMatchStore wordStore, PlatformTransactionManager manager, Clock clock, StartRocketMatchUseCase rocket) {
+        this.tx=new TransactionTemplate(manager); this.clock=clock; this.rocket=rocket;
         this.wordProvider=wordProvider;this.wordStore=wordStore;
         this.events = events;
         this.roomRepository=roomRepository; this.matchRepository=matchRepository; this.playerRepository=playerRepository;
@@ -45,6 +52,9 @@ public class StartGameMatchUseCase {
         GameRoom preview=roomRepository.findById(roomId).orElseThrow(()->new GameRoomNotFoundException(roomId));
         // Validate before remote work; repeat under the lock because readiness/settings may change.
         preview.startMatch(hostUserId,clock.instant());
+        // Each room game sets up its own match; only legacy session games fall through to the code below.
+        if(preview.roomGame().filter(game->game==com.ieltspath.game.domain.vo.RoomGame.ROCKET).isPresent())
+            return java.util.Objects.requireNonNull(rocket,"Rocket matches are not configured").execute(preview,hostUserId);
         var settings=preview.wordlySettings();
         List<com.ieltspath.game.application.port.WordlyWordProvider.Word> words=List.of();
         String dictionary=null;

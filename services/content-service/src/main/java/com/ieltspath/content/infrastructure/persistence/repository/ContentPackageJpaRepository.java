@@ -2,8 +2,11 @@ package com.ieltspath.content.infrastructure.persistence.repository;
 
 import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.infrastructure.persistence.entity.ContentPackageJpaEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -21,6 +24,27 @@ public interface ContentPackageJpaRepository extends JpaRepository<ContentPackag
     @Override
     @EntityGraph(attributePaths = {"versions"})
     Optional<ContentPackageJpaEntity> findById(UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"versions"})
+    @Query("SELECT p FROM ContentPackageJpaEntity p WHERE p.id = :id")
+    Optional<ContentPackageJpaEntity> findByIdForUpdate(@Param("id") UUID id);
+
+    @Modifying
+    @Query(value = "SET CONSTRAINTS uq_content_sections_sort_order DEFERRED", nativeQuery = true)
+    int deferSectionOrderCheck();
+
+    @Modifying
+    @Query(value = "SET CONSTRAINTS uq_section_questions_sort_order DEFERRED", nativeQuery = true)
+    int deferQuestionOrderCheck();
+
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM question_versions WHERE id = :id)", nativeQuery = true)
+    boolean questionVersionExists(@Param("id") UUID id);
+
+    @Modifying
+    @Query(value = "UPDATE content_packages SET lesson_id = :lessonId, updated_at = CURRENT_TIMESTAMP "
+            + "WHERE id = :packageId AND package_type = 'PRACTICE_SET' AND lesson_id IS NULL", nativeQuery = true)
+    int attachPracticeSetToLesson(@Param("packageId") UUID packageId, @Param("lessonId") UUID lessonId);
 
     @EntityGraph(attributePaths = {"versions"})
     Optional<ContentPackageJpaEntity> findDistinctByVersions_Id(UUID versionId);

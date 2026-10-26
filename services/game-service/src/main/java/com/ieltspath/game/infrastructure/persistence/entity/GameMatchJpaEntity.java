@@ -41,6 +41,8 @@ public class GameMatchJpaEntity {
     @Column(name = "initial_lives", nullable = false) private short initialLives = 4;
     @Column(name = "word_time_limit_seconds") private Short wordTimeLimitSeconds = 180;
     @Column(name = "word_limit") private Integer wordLimit = 10;
+    @Column(name = "question_count") private Short questionCount;
+    @Column(name = "seconds_per_question") private Short secondsPerQuestion;
 
     protected GameMatchJpaEntity() {
     }
@@ -57,6 +59,12 @@ public class GameMatchJpaEntity {
             playMode = (String) configSnapshot.get("playMode");
             initialLives = ((Number) configSnapshot.get("initialLives")).shortValue();
             wordLimit = (Integer) configSnapshot.get("wordLimit");
+        }
+        if ("ROCKET".equals(gameType)) {
+            playerMode = (String) configSnapshot.get("playerMode");
+            initialLives = ((Number) configSnapshot.get("initialLives")).shortValue();
+            questionCount = ((Number) configSnapshot.get("questionCount")).shortValue();
+            secondsPerQuestion = ((Number) configSnapshot.get("secondsPerQuestion")).shortValue();
         }
         this.contentSnapshot = contentSnapshot;
         this.status = "IN_PROGRESS";

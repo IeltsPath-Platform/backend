@@ -28,10 +28,15 @@ public record PracticeSubmission(UUID attemptId, int correct, int total, double 
     }
     public record SkillScore(LearningSkill skill, int correct, int total, double percent, boolean passed) {}
     /** {@code hint} is set only for a wrong objective answer whose question type a hint helps with. */
-    public record Answer(UUID questionVersionId, boolean correct, String correctAnswer, String explanation, String hint) {
+    public record Answer(UUID questionVersionId, boolean correct, String correctAnswer, String explanation, String hint,
+                         ErrorTrap error) {
+        public Answer(UUID questionVersionId, boolean correct, String correctAnswer, String explanation, String hint) {
+            this(questionVersionId, correct, correctAnswer, explanation, hint, null);
+        }
         public Answer(UUID questionVersionId, boolean correct, String correctAnswer, String explanation) {
-            this(questionVersionId, correct, correctAnswer, explanation, null);
+            this(questionVersionId, correct, correctAnswer, explanation, null, null);
         }
     }
+    public record ErrorTrap(String code, String name, String fixHint) {}
     public record ReviewCreated(UUID reviewId, UUID knowledgePointId, String stage) {}
 }

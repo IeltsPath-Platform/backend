@@ -1,17 +1,21 @@
 package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.exception.LearningRequestException;
+import com.ieltspath.learning.application.result.WorkItemView;
+import com.ieltspath.learning.application.service.WorkItemSubjectResolver;
 import com.ieltspath.learning.application.service.WorkItemSync;
 import com.ieltspath.learning.domain.repository.StaffInsightRepository;
 import com.ieltspath.learning.domain.vo.StaffRecords.FlagStatus;
 import com.ieltspath.learning.domain.vo.StaffRecords.LearnerFlag;
 import com.ieltspath.learning.domain.vo.StaffRecords.Queue;
 import com.ieltspath.learning.domain.vo.StaffRecords.WorkItem;
+import com.ieltspath.learning.domain.vo.StaffRecords.WorkKind;
 import com.ieltspath.learning.domain.vo.StaffRecords.WorkStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -23,19 +27,33 @@ import java.util.UUID;
 public class StaffWorkUseCase {
     private final StaffInsightRepository insight;
     private final WorkItemSync sync;
+    private final WorkItemSubjectResolver subjects;
 
-    public StaffWorkUseCase(StaffInsightRepository insight, WorkItemSync sync) {
+    public StaffWorkUseCase(StaffInsightRepository insight, WorkItemSync sync, WorkItemSubjectResolver subjects) {
         this.insight = insight;
         this.sync = sync;
+        this.subjects = subjects;
     }
 
     @Transactional
     public List<WorkItem> list(Set<Queue> allowed, Queue requested, WorkStatus status) {
+        return listItems(allowed, requested, status, null);
+    }
+
+    /** The same list with what each content item is about, named by one call to Content. */
+    @Transactional
+    public List<WorkItemView> listWithSubjects(Set<Queue> allowed, Queue requested, WorkStatus status, WorkKind kind) {
+        List<WorkItem> items = listItems(allowed, requested, status, kind);
+        Map<UUID, Map<String, Object>> named = subjects.resolve(items);
+        return items.stream().map(item -> new WorkItemView(item, named.get(item.id()))).toList();
+    }
+
+    private List<WorkItem> listItems(Set<Queue> allowed, Queue requested, WorkStatus status, WorkKind kind) {
         if (requested != null && !allowed.contains(requested)) {
             throw new LearningRequestException(403, "QUEUE_NOT_ALLOWED", "This queue is not yours to see");
         }
         sync.sync();
-        return insight.workItems(requested == null ? allowed : Set.of(requested), status);
+        return insight.workItems(requested == null ? allowed : Set.of(requested), status, kind);
     }
 
     /** Takes the item, records what was done and the result, and moves its status. */

@@ -22,8 +22,9 @@ public class FlashcardDeck {
     private LibraryStatus status;
     private final Instant createdAt;
     private Instant updatedAt;
+    private String coverImageKey;
 
-    public static FlashcardDeck create(UUID userId, String name, String description) {
+    public static FlashcardDeck create(UUID userId, String name, String description, String coverImageKey) {
         return new FlashcardDeck(
                 UUID.randomUUID(),
                 DomainChecks.userId(userId),
@@ -31,18 +32,28 @@ public class FlashcardDeck {
                 DomainChecks.optional(description, DomainChecks.DESCRIPTION_MAX, "description"),
                 LibraryStatus.ACTIVE,
                 null,
-                null
+                null,
+                DomainChecks.optionalTrimmed(coverImageKey, 300, "coverImageKey")
         );
     }
 
-    public boolean update(String name, String description, LibraryStatus status) {
+    public static FlashcardDeck create(UUID userId, String name, String description) {
+        return create(userId, name, description, null);
+    }
+
+    public boolean update(String name, String description, LibraryStatus status, String coverImageKey) {
         if (status == null) {
             throw new InvalidDataException("status không hợp lệ");
         }
         this.name = DomainChecks.required(name, 150, "name");
         this.description = DomainChecks.optional(description, DomainChecks.DESCRIPTION_MAX, "description");
+        this.coverImageKey = DomainChecks.optionalTrimmed(coverImageKey, 300, "coverImageKey");
         boolean dropLinks = this.status == LibraryStatus.ACTIVE && status != LibraryStatus.ACTIVE;
         this.status = status;
         return dropLinks;
+    }
+
+    public boolean update(String name, String description, LibraryStatus status) {
+        return update(name, description, status, this.coverImageKey);
     }
 }

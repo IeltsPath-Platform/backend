@@ -210,7 +210,7 @@ limit). `dailyLimit` comes from User Service and is `null` when it cannot be rea
 
 ### `POST /api/assessments/grading-jobs/{jobId}/human-review`
 
-Roles: `EXAMINER`, `ADMIN`. Overall and criterion bands are IELTS half-bands from 0 through 9.
+Role: `EXAMINER`. Overall and criterion bands are IELTS half-bands from 0 through 9.
 
 ```json
 {

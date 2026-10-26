@@ -54,13 +54,43 @@ class StaffAdminControllerTest {
     final UUID id = UUID.randomUUID();
 
     @ParameterizedTest
-    @CsvSource({"EXAMINER,EXAMINER", "CONTENT_AUTHOR,CONTENT_AUTHOR", "ADMIN,EXAMINER+CONTENT_AUTHOR"})
+    @CsvSource({"EXAMINER,EXAMINER", "CONTENT_AUTHOR,CONTENT_AUTHOR"})
     void eachRoleListsOnlyTheQueuesItMayWork(String role, String queues) throws Exception {
-        when(work.list(any(), any(), any())).thenReturn(List.of());
+        when(work.listWithSubjects(any(), any(), any(), any())).thenReturn(List.of());
         mvc.perform(get("/api/learning/admin/work-items").with(user("staff").roles(role))).andExpect(status().isOk());
         Set<Queue> expected = new java.util.HashSet<>();
         for (String queue : queues.split("\\+")) expected.add(Queue.valueOf(queue));
-        verify(work).list(eq(expected), eq(null), eq(null));
+        verify(work).listWithSubjects(eq(expected), eq(null), eq(null), eq(null));
+    }
+
+    @Test
+    void theKindFilterIsPassedOnAndEachItemCarriesItsSubject() throws Exception {
+        var item = new com.ieltspath.learning.domain.vo.StaffRecords.WorkItem(id, Queue.CONTENT_AUTHOR,
+                com.ieltspath.learning.domain.vo.StaffRecords.WorkKind.CONTENT_GAP, null, id, "{}",
+                com.ieltspath.learning.domain.vo.StaffRecords.WorkStatus.OPEN, null, null, null, null, false,
+                java.time.Instant.parse("2026-10-01T00:00:00Z"), java.time.Instant.parse("2026-10-01T00:00:00Z"));
+        when(work.listWithSubjects(any(), any(), any(), any())).thenReturn(List.of(
+                new com.ieltspath.learning.application.result.WorkItemView(item,
+                        java.util.Map.of("type", "KNOWLEDGE_POINT", "name", "Paraphrase"))));
+
+        mvc.perform(get("/api/learning/admin/work-items?kind=CONTENT_GAP")
+                        .with(user("staff").roles("CONTENT_AUTHOR")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$[0].subject.name").value("Paraphrase"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$[0].subjectRef").value(id.toString()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$[0].detail").value("{}"));
+        verify(work).listWithSubjects(eq(Set.of(Queue.CONTENT_AUTHOR)), eq(null), eq(null),
+                eq(com.ieltspath.learning.domain.vo.StaffRecords.WorkKind.CONTENT_GAP));
+    }
+
+    @Test
+    void administratorsCannotAccessStaffQueues() throws Exception {
+        mvc.perform(get("/api/learning/admin/work-items").with(user("admin").roles("ADMIN")))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(work, insight);
     }
 
     @ParameterizedTest

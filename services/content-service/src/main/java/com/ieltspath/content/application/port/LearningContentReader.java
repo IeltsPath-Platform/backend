@@ -39,6 +39,10 @@ public interface LearningContentReader {
     /** Active topics in active courses, with a skill and published lesson, by skill, course band, topic order and id. */
     List<TopicSequenceResult> topicSequence(int minPracticeQuestions);
 
+    default List<TopicSequenceResult> topicSequence(int minPracticeQuestions, boolean includeErrorTraps) {
+        return topicSequence(minPracticeQuestions);
+    }
+
     boolean activeTopicExists(UUID topicId);
 
     List<LessonSummaryResult> publishedLessons(UUID topicId);
@@ -48,6 +52,10 @@ public interface LearningContentReader {
     boolean publishedLessonExists(UUID lessonId);
 
     boolean lessonExists(UUID lessonId);
+
+    boolean topicExists(UUID topicId);
+
+    boolean courseExists(UUID courseId);
 
     /** Published practice sets of the lesson, by code. */
     List<LessonPracticeSetResult> lessonPracticeSets(UUID lessonId);
@@ -98,6 +106,12 @@ public interface LearningContentReader {
     List<PracticeSetResult> searchPracticeSets(UUID knowledgePointId, Collection<UUID> excludePackageIds,
                                                int minQuestions, int limit, UUID preferredLessonId);
 
+    default List<PracticeSetResult> searchPracticeSets(UUID knowledgePointId, Collection<UUID> excludePackageIds,
+                                                       int minQuestions, int limit, UUID preferredLessonId,
+                                                       String trapErrorCode) {
+        return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId);
+    }
+
     Optional<PackageVersionContentResult> publishedPackageVersion(UUID packageVersionId);
 
     /** Package version content for author preview, including draft versions. */
@@ -115,4 +129,8 @@ public interface LearningContentReader {
 
     /** Question versions with a classified difficulty; unknown and unclassified ids are omitted. */
     Map<UUID, QuestionDifficulty> questionDifficulties(Collection<UUID> questionVersionIds);
+
+    /** Names of knowledge points and the start of question stems, for the staff work queue; unknown ids are omitted. */
+    com.ieltspath.content.application.result.WorkItemSubjectsResult workItemSubjects(
+            Collection<UUID> knowledgePointIds, Collection<UUID> questionVersionIds);
 }

@@ -3,6 +3,7 @@ package com.ieltspath.content.application.usecase;
 import com.ieltspath.content.application.command.CreateQuestionCommand;
 import com.ieltspath.content.application.result.QuestionResult;
 import com.ieltspath.content.domain.aggregate.Question;
+import com.ieltspath.content.domain.exception.DuplicateImportRefException;
 import com.ieltspath.content.domain.repository.QuestionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,24 +19,19 @@ public class CreateQuestionUseCase {
     }
 
     public QuestionResult execute(CreateQuestionCommand command) {
+        String importRef = Question.normalizeImportRef(command.importRef());
+        if (importRef != null && questionRepository.findByImportRef(importRef).isPresent()) {
+            throw new DuplicateImportRefException(importRef);
+        }
+
         Question question = Question.create(
                 command.questionType(),
                 command.skill(),
                 command.requiredFeatureKey(),
-                command.purpose()
+                command.purpose(),
+                importRef
         );
 
-        Question saved = questionRepository.save(question);
-        return new QuestionResult(
-                saved.getId(),
-                saved.getQuestionType(),
-                saved.getSkill(),
-                saved.getRequiredFeatureKey(),
-                saved.getStatus(),
-                saved.getCurrentPublishedVersionId(),
-                saved.getCreatedAt(),
-                saved.getUpdatedAt(),
-                saved.getPurpose()
-        );
+        return QuestionResult.of(questionRepository.save(question));
     }
 }

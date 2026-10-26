@@ -54,6 +54,9 @@ public class ContentPackageJpaEntity {
     @Column(name = "course_id")
     private UUID courseId;
 
+    @Column(name = "topic_id")
+    private UUID topicId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

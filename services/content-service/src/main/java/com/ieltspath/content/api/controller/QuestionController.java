@@ -4,12 +4,14 @@ import com.ieltspath.content.api.AccessLevelCompatibility;
 import com.ieltspath.content.api.dto.request.AddQuestionVersionRequest;
 import com.ieltspath.content.api.dto.request.CreateQuestionRequest;
 import com.ieltspath.content.api.dto.response.QuestionDetailResponse;
+import com.ieltspath.content.api.dto.response.QuestionPageResponse;
 import com.ieltspath.content.api.dto.response.QuestionResponse;
 import com.ieltspath.content.application.command.AddQuestionVersionCommand;
 import com.ieltspath.content.application.command.CreateQuestionCommand;
 import com.ieltspath.content.application.result.QuestionDetailResult;
 import com.ieltspath.content.application.result.QuestionResult;
 import com.ieltspath.content.application.usecase.*;
+import com.ieltspath.content.domain.vo.PublicationStatus;
 import com.ieltspath.content.domain.vo.Skill;
 import com.ieltspath.content.domain.vo.QuestionPurpose;
 import jakarta.validation.Valid;
@@ -33,18 +35,23 @@ public class QuestionController {
     private final ArchiveQuestionUseCase archiveQuestionUseCase;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
-    public List<QuestionResponse> listQuestions(
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
+    public QuestionPageResponse listQuestions(
             @RequestParam(value = "skill", required = false) Skill skill,
-            @RequestParam(value = "purpose", required = false) QuestionPurpose purpose
+            @RequestParam(value = "purpose", required = false) QuestionPurpose purpose,
+            @RequestParam(value = "status", required = false) PublicationStatus status,
+            @RequestParam(value = "importRef", required = false) String importRef,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "25") int size
     ) {
-        return listQuestionsUseCase.execute(skill, purpose).stream()
-                .map(QuestionResponse::from)
-                .toList();
+        if (importRef != null) {
+            return QuestionPageResponse.from(listQuestionsUseCase.findByImportRef(importRef));
+        }
+        return QuestionPageResponse.from(listQuestionsUseCase.execute(skill, purpose, status, page, size));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public QuestionDetailResponse getQuestionDetail(@PathVariable("id") UUID id) {
         QuestionDetailResult result = getQuestionDetailUseCase.execute(id);
         return QuestionDetailResponse.from(result);
@@ -52,20 +59,21 @@ public class QuestionController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public QuestionResponse createQuestion(@Valid @RequestBody CreateQuestionRequest request) {
         QuestionResult result = createQuestionUseCase.execute(new CreateQuestionCommand(
                 request.questionType(),
                 request.skill(),
                 AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT"),
-                request.purpose()
+                request.purpose(),
+                request.importRef()
         ));
         return QuestionResponse.from(result);
     }
 
     @PostMapping("/{id}/versions")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public QuestionResponse addVersion(
             @PathVariable("id") UUID id,
             @Valid @RequestBody AddQuestionVersionRequest request
@@ -88,7 +96,7 @@ public class QuestionController {
     }
 
     @PostMapping("/{id}/archive")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public QuestionResponse archiveQuestion(@PathVariable("id") UUID id) {
         QuestionResult result = archiveQuestionUseCase.execute(id);
         return QuestionResponse.from(result);

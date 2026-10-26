@@ -39,6 +39,20 @@ public final class DomainChecks {
         return value;
     }
 
+    public static String optionalTrimmed(String value, int max, String field) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > max) {
+            throw new InvalidDataException(field + " không hợp lệ");
+        }
+        return trimmed;
+    }
+
     public static int nonNegative(Integer value, String field) {
         if (value == null || value < 0) {
             throw new InvalidDataException(field + " không hợp lệ");

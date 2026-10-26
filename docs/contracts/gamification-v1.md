@@ -164,7 +164,7 @@ never taken back; its points are paid when it is first awarded.
 
 ### `PATCH /admin/badges/{code}`
 
-Role `ADMIN`. Request `{ "active": false }`. A switched-off badge is no longer awarded; those already held are kept. Response
+Role `CONTENT_AUTHOR`. Request `{ "active": false }`. A switched-off badge is no longer awarded; those already held are kept. Response
 `{ code, name, description, rewardPoints, active }`. `404 BADGE_NOT_FOUND` for an unknown code.
 
 ## Weekly league

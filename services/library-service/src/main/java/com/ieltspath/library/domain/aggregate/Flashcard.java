@@ -5,6 +5,7 @@ import com.ieltspath.library.domain.exception.InvalidDataException;
 import com.ieltspath.library.domain.DomainChecks;
 import com.ieltspath.library.domain.vo.FlashcardSourceType;
 import com.ieltspath.library.domain.vo.LibraryStatus;
+import com.ieltspath.library.domain.vo.UnderstandingLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -37,6 +38,8 @@ public class Flashcard {
     @Builder.Default
     private int reviewCount = 0;
     private UUID lastReviewRequestId;
+    private String imageKey;
+    private String exampleSentence;
 
     public static Flashcard create(
             UUID userId,
@@ -45,7 +48,9 @@ public class Flashcard {
             UUID sourceReferenceId,
             String highlightedText,
             String front,
-            String back
+            String back,
+            String imageKey,
+            String exampleSentence
     ) {
         Flashcard card = new Flashcard(
                 UUID.randomUUID(),
@@ -63,10 +68,46 @@ public class Flashcard {
                 null,
                 null,
                 0,
-                null
+                null,
+                DomainChecks.optionalTrimmed(imageKey, 300, "imageKey"),
+                DomainChecks.optionalTrimmed(exampleSentence, 1000, "exampleSentence")
         );
         card.applySource(sourceType, vocabularySenseId, sourceReferenceId, highlightedText, front, back);
         return card;
+    }
+
+    public static Flashcard create(
+            UUID userId,
+            FlashcardSourceType sourceType,
+            UUID vocabularySenseId,
+            UUID sourceReferenceId,
+            String highlightedText,
+            String front,
+            String back
+    ) {
+        return create(userId, sourceType, vocabularySenseId, sourceReferenceId, highlightedText, front, back, null, null);
+    }
+
+    public boolean update(
+            FlashcardSourceType sourceType,
+            UUID vocabularySenseId,
+            UUID sourceReferenceId,
+            String highlightedText,
+            String front,
+            String back,
+            LibraryStatus status,
+            String imageKey,
+            String exampleSentence
+    ) {
+        if (status == null) {
+            throw new InvalidDataException("status không hợp lệ");
+        }
+        applySource(sourceType, vocabularySenseId, sourceReferenceId, highlightedText, front, back);
+        this.imageKey = DomainChecks.optionalTrimmed(imageKey, 300, "imageKey");
+        this.exampleSentence = DomainChecks.optionalTrimmed(exampleSentence, 1000, "exampleSentence");
+        boolean dropLinks = this.status == LibraryStatus.ACTIVE && status != LibraryStatus.ACTIVE;
+        this.status = status;
+        return dropLinks;
     }
 
     public boolean update(
@@ -78,13 +119,7 @@ public class Flashcard {
             String back,
             LibraryStatus status
     ) {
-        if (status == null) {
-            throw new InvalidDataException("status không hợp lệ");
-        }
-        applySource(sourceType, vocabularySenseId, sourceReferenceId, highlightedText, front, back);
-        boolean dropLinks = this.status == LibraryStatus.ACTIVE && status != LibraryStatus.ACTIVE;
-        this.status = status;
-        return dropLinks;
+        return update(sourceType, vocabularySenseId, sourceReferenceId, highlightedText, front, back, status, this.imageKey, this.exampleSentence);
     }
 
     /** Applies one Leitner review; replaying the most recent request ID leaves the card unchanged. */
@@ -105,6 +140,23 @@ public class Flashcard {
         lastReviewedAt = reviewedAt;
         nextReviewAt = reviewedAt.plus(Duration.ofDays(intervalsDays.get(leitnerBox - 1)));
         reviewCount = Math.addExact(reviewCount, 1);
+        lastReviewRequestId = requestId;
+        return true;
+    }
+
+    public boolean setUnderstanding(UnderstandingLevel level, Instant now, List<Integer> intervalsDays, UUID requestId) {
+        if (level == null || requestId == null || now == null) {
+            throw new InvalidDataException("understanding request is incomplete");
+        }
+        if (requestId.equals(lastReviewRequestId)) return false;
+        if (intervalsDays == null || intervalsDays.size() != 5
+                || intervalsDays.stream().anyMatch(days -> days == null || days < 1)) {
+            throw new InvalidDataException("Leitner schedule is invalid");
+        }
+        leitnerBox = level.targetBox();
+        Instant changedAt = now.truncatedTo(ChronoUnit.MICROS);
+        nextReviewAt = level == UnderstandingLevel.UNKNOWN
+                ? changedAt : changedAt.plus(Duration.ofDays(intervalsDays.get(leitnerBox - 1)));
         lastReviewRequestId = requestId;
         return true;
     }

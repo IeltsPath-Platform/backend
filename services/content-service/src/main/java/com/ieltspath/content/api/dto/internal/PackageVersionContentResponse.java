@@ -36,8 +36,12 @@ public record PackageVersionContentResponse(
             String hint,
             double maxScore,
             UUID groupId,
-            List<KnowledgePointMapping> knowledgePointMappings
+            List<KnowledgePointMapping> knowledgePointMappings,
+            String guide,
+            List<Image> images
     ) {}
+
+    public record Image(String mediaUrl, String altText) {}
 
     public record KnowledgePointMapping(UUID knowledgePointId, double weight) {}
 
@@ -55,7 +59,8 @@ public record PackageVersionContentResponse(
                                         i.answerSpecJson(), i.explanation(), i.hint(), i.maxScore(), i.groupId(),
                                         i.knowledgePointMappings().stream()
                                                 .map(m -> new KnowledgePointMapping(m.knowledgePointId(), m.weight()))
-                                                .toList()))
+                                                .toList(), i.guide(), i.images().stream()
+                                                .map(image -> new Image(image.mediaUrl(), image.altText())).toList()))
                                 .toList()))
                         .toList());
     }

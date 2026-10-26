@@ -3,6 +3,7 @@ package com.ieltspath.content.application.usecase;
 import com.ieltspath.content.domain.aggregate.Rubric;
 import com.ieltspath.content.domain.exception.RubricNotFoundException;
 import com.ieltspath.content.domain.repository.RubricRepository;
+import com.ieltspath.content.domain.vo.RubricVersionRef;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,18 @@ public class ManageRubricsUseCase {
 
     @Transactional(readOnly = true)
     public List<Rubric> drafts(String task) { return rubrics.findDrafts(requireTask(task)); }
+
+    /**
+     * Every version of a rubric, including retired ones. Creating a draft needs the highest number ever used, not the
+     * highest one still visible, or a new draft could reuse a retired version's number.
+     */
+    @Transactional(readOnly = true)
+    public List<RubricVersionRef> versions(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code is required");
+        }
+        return rubrics.findVersions(code.trim());
+    }
 
     @Transactional(readOnly = true)
     public Rubric byVersion(String code, int version) {

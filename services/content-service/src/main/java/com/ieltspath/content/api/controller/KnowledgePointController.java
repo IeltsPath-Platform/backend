@@ -47,7 +47,7 @@ public class KnowledgePointController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public KnowledgePointResponse createKnowledgePoint(@Valid @RequestBody CreateKnowledgePointRequest request) {
         KnowledgePointResult result = createKnowledgePointUseCase.execute(new CreateKnowledgePointCommand(
                 request.topicId(),
@@ -66,7 +66,7 @@ public class KnowledgePointController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public KnowledgePointResponse updateKnowledgePoint(@PathVariable("id") UUID id,
                                                        @Valid @RequestBody UpdateKnowledgePointRequest request) {
         KnowledgePointResult result = updateKnowledgePointUseCase.execute(id, new UpdateKnowledgePointCommand(
@@ -78,25 +78,25 @@ public class KnowledgePointController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public void deactivateKnowledgePoint(@PathVariable("id") UUID id) {
         deactivateKnowledgePointUseCase.execute(id);
     }
 
     @PostMapping("/{id}/activate")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public KnowledgePointResponse activateKnowledgePoint(@PathVariable("id") UUID id) {
         return KnowledgePointResponse.from(activateKnowledgePointUseCase.execute(id));
     }
 
     @GetMapping("/{id}/prerequisites")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public List<KnowledgePointResponse> getPrerequisites(@PathVariable("id") UUID id) {
         return getKnowledgePointPrerequisitesUseCase.execute(id).stream().map(KnowledgePointResponse::from).toList();
     }
 
     @PutMapping("/{id}/prerequisites")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public List<KnowledgePointResponse> replacePrerequisites(
             @PathVariable("id") UUID id, @Valid @RequestBody ReplaceKnowledgePointPrerequisitesRequest request) {
         return replaceKnowledgePointPrerequisitesUseCase.execute(id, request.prerequisiteIds()).stream()

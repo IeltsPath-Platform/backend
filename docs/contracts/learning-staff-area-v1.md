@@ -5,11 +5,11 @@ Assessment and Access side (examiner quality review, paid human grading) is in [
 Learning keeps ids only; names of courses, knowledge points and users come from Content, User and Access, and the
 frontend joins them.
 
-Roles: `ADMIN` sees everything. `EXAMINER` works the `EXAMINER` queue, `CONTENT_AUTHOR` (R&D) the `CONTENT_AUTHOR` queue.
+Roles: `EXAMINER` works the `EXAMINER` queue, `CONTENT_AUTHOR` (R&D) the `CONTENT_AUTHOR` queue.
 
 ## `GET /api/learning/admin/learners/{userId}/overview`
 
-Roles `ADMIN`, `EXAMINER`. Read-only; it never refreshes the learner's data.
+Role `EXAMINER`. Read-only; it never refreshes the learner's data.
 
 ```json
 {
@@ -48,13 +48,14 @@ submission). A kind already flagged for the learner in the last 24 hours is not 
 An open `INACTIVE` flag is dismissed automatically, in the transaction of the answer, when the learner answers again. It then
 appears in the `EXAMINER` queue as a `LEARNER_FLAG` work item like any other flag while it is open.
 
-`PATCH /api/learning/admin/flags/{id}` (`ADMIN`, `EXAMINER`): `{ "status": "CONFIRMED" | "DISMISSED", "note": "…" }`;
+`PATCH /api/learning/admin/flags/{id}` (`EXAMINER`): `{ "status": "CONFIRMED" | "DISMISSED", "note": "…" }`;
 records the reviewer. `422 INVALID_FLAG_STATUS` for `OPEN`, `404` when unknown.
 
 ## Work queues
 
-`GET /api/learning/admin/work-items?queue=&status=`: the queues the caller may see, optionally one queue
-(`403 QUEUE_NOT_ALLOWED` for another) and one status (`OPEN`, `IN_PROGRESS`, `DONE`). Listing first adds items for new
+`GET /api/learning/admin/work-items?queue=&status=&kind=`: the queues the caller may see, optionally one queue
+(`403 QUEUE_NOT_ALLOWED` for another), one status (`OPEN`, `IN_PROGRESS`, `DONE`) and one kind (a value of the table below,
+otherwise `400`). Listing first adds items for new
 work, and a scheduled round does the same every 3 hours (`learning.work-items.sync-interval`, first run after
 `sync-initial-delay`, off with `sync-enabled=false`); only one service instance runs a round at a time. Each source becomes
 at most one item (`UNIQUE (kind, subject)`) and finished work is never reopened.
@@ -67,13 +68,27 @@ at most one item (`UNIQUE (kind, subject)`) and finished work is never reopened.
 | `QUESTION_TOO_EASY`, `QUESTION_TOO_HARD` | CONTENT_AUTHOR | questions with enough first submissions and a correct rate above / below the limits |
 | `EDGE_SUSPECT` | CONTENT_AUTHOR | prerequisite edges that do not explain failures (below) |
 
+Each listed item keeps its fields (`subjectRef`, `detail`, …) and gains `subject`, which names what a content item is
+about. It is `null` for Examiner items, for an id Content does not know, and for every item when Content cannot be reached
+(the list is still `200`).
+
+| Kind | `subject` |
+| --- | --- |
+| `CONTENT_GAP` | `{"type":"KNOWLEDGE_POINT","id","code","name","occurrences"}`; `occurrences` is how many diagnoses found the point without an unseen set |
+| `QUESTION_TOO_EASY`, `QUESTION_TOO_HARD` | `{"type":"QUESTION","questionId","questionVersionId","stemPreview"}`; the preview is at most 120 characters |
+| `EDGE_SUSPECT` | `{"type":"EDGE","from":{"id","code","name"},"to":{"id","code","name"}}` |
+
+Names are read with one Content call per list (`POST /internal/learning-content/work-item-subjects`, see
+[learning-content-internal-v1](learning-content-internal-v1.md#post-work-item-subjects)), never one call per item.
+`PATCH` still returns the item without `subject`.
+
 `PATCH /api/learning/admin/work-items/{id}`: `{ "status", "action", "result", "note", "noteVisibleToLearner" }`, all
 optional. Taking an item sets the assignee; `OPEN` clears it. A note shown to the learner needs text and an item about a
 learner (`422 NOTE_REQUIRED`, `422 NO_LEARNER`). `404` when the item is not in a queue the caller may use.
 
 `GET /api/learning/notes` (`CUSTOMER`): the notes staff chose to show the caller, newest first.
 
-## Statistics for R&D (`ADMIN`, `CONTENT_AUTHOR`)
+## Statistics for R&D (`CONTENT_AUTHOR`)
 
 - `GET /api/learning/admin/question-stats?minAttempts=20`: per question with at least `minAttempts` first submissions:
   attempts, correct, correct rate, median duration, most frequent error codes and the `difficulty` tag Content gives the

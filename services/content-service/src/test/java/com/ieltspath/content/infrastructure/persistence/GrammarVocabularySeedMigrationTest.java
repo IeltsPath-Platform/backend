@@ -26,7 +26,7 @@ class GrammarVocabularySeedMigrationTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("55").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
     }
 

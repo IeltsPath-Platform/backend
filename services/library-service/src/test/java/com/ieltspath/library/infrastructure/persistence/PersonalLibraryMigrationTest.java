@@ -131,6 +131,24 @@ class PersonalLibraryMigrationTest {
         }
     }
 
+    @Test
+    void v15MigrationAddsImageKeyExampleSentenceAndCoverImageKey() throws Exception {
+        try (Connection connection = connection(); var statement = connection.createStatement()) {
+            for (String col : List.of("image_key", "example_sentence")) {
+                try (var rows = statement.executeQuery("SELECT column_name FROM information_schema.columns "
+                        + "WHERE table_schema='public' AND table_name='flashcards' AND column_name='" + col + "'")) {
+                    assertTrue(rows.next(), col);
+                    assertEquals(col, rows.getString(1));
+                }
+            }
+            try (var rows = statement.executeQuery("SELECT column_name FROM information_schema.columns "
+                    + "WHERE table_schema='public' AND table_name='flashcard_decks' AND column_name='cover_image_key'")) {
+                assertTrue(rows.next(), "cover_image_key");
+                assertEquals("cover_image_key", rows.getString(1));
+            }
+        }
+    }
+
     private static void assertDeleteRejected(String table, UUID id) throws Exception {
         try (Connection connection = connection(); var statement = connection.createStatement()) {
             assertThrows(SQLException.class, () -> statement.executeUpdate(

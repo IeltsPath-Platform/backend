@@ -137,6 +137,7 @@ public class AiEvaluationService {
             result.put("errorCodeFalsePositive", rs.getBigDecimal("error_code_false_positive"));
             result.put("passed", rs.getObject("passed")); result.put("startedAt", rs.getTimestamp("started_at"));
             result.put("finishedAt", rs.getTimestamp("finished_at")); result.put("failureCode", rs.getString("failure_code"));
+            result.put("thresholds", Map.of("withinHalfBand", minWithin, "qwk", minQwk));
             result.put("items", jdbc.query("SELECT gold_id,llm_band,llm_criteria::text,llm_error_codes,diff::text FROM ai_eval_items WHERE run_id=? ORDER BY gold_id",
                     (items, ix) -> Map.of("goldId", items.getObject(1, UUID.class), "llmBand", items.getBigDecimal(2),
                             "llmCriteria", parseJson(Objects.toString(items.getString(3), "[]")), "llmErrorCodes", Arrays.asList((String[]) items.getArray(4).getArray()),

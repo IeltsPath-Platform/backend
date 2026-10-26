@@ -12,6 +12,7 @@ import com.ieltspath.library.application.usecase.ListFlashcardsUseCase;
 import com.ieltspath.library.application.usecase.ReviewFlashcardUseCase;
 import com.ieltspath.library.application.usecase.SavePracticeQuestionFlashcardUseCase;
 import com.ieltspath.library.application.usecase.UpdateFlashcardUseCase;
+import com.ieltspath.library.application.usecase.UploadFlashcardImageUseCase;
 import com.ieltspath.library.domain.aggregate.Flashcard;
 import com.ieltspath.library.domain.vo.FlashcardSourceType;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -80,6 +82,8 @@ class FlashcardLeitnerControllerTest {
     private GetDueFlashcardsUseCase getDueFlashcardsUseCase;
     @MockBean
     private ReviewFlashcardUseCase reviewFlashcardUseCase;
+    @MockBean
+    private UploadFlashcardImageUseCase uploadFlashcardImageUseCase;
 
     @DynamicPropertySource
     static void hmacProperties(DynamicPropertyRegistry registry) {
@@ -136,7 +140,7 @@ class FlashcardLeitnerControllerTest {
         Flashcard card = Flashcard.create(userId, FlashcardSourceType.MANUAL,
                 null, null, null, "Front", "Back");
         card.review(true, requestId, Instant.parse("2026-10-17T00:00:00Z"), List.of(1, 2, 4, 8, 16));
-        when(reviewFlashcardUseCase.execute(userId, flashcardId, true, requestId))
+        when(reviewFlashcardUseCase.execute(userId, flashcardId, true, requestId, null))
                 .thenReturn(FlashcardResult.from(card));
         String token = "Bearer " + signedToken(userId);
 
@@ -152,8 +156,8 @@ class FlashcardLeitnerControllerTest {
                         .content("{\"correct\":true}"))
                 .andExpect(status().isBadRequest());
 
-        verify(reviewFlashcardUseCase).execute(userId, flashcardId, true, requestId);
-        verify(reviewFlashcardUseCase, never()).execute(eq(userId), eq(flashcardId), eq(true), eq(null));
+        verify(reviewFlashcardUseCase).execute(userId, flashcardId, true, requestId, null);
+        verify(reviewFlashcardUseCase, never()).execute(eq(userId), eq(flashcardId), eq(true), eq(null), isNull());
     }
 
     private static String signedToken(UUID subject) {

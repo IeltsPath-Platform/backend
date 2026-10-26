@@ -15,6 +15,7 @@ import com.ieltspath.learning.domain.service.WritingScore;
 import com.ieltspath.learning.domain.vo.EssayPrompt;
 import com.ieltspath.learning.domain.vo.WritingGrade;
 import com.ieltspath.learning.domain.vo.WritingTask;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -22,12 +23,15 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /** Uses Content's active rubric during bootstrap, then the task's activated immutable rubric version. */
 @Component
 public class EssayGrader {
     static final int MAX_ITEM_CHARS = 300;
+    static final int MAX_FOCUS_POINTS = 4;
+    static final int MAX_FOCUS_TITLE_CHARS = 80;
     static final int MAX_CORRECTIONS = 10;
     static final int MAX_SUMMARY_CHARS = 600;
     static final String TEMPLATE_VERSION = "v1";
@@ -37,13 +41,22 @@ public class EssayGrader {
     private final ObjectMapper json;
     private final LearningContentClient content;
     private final EssayPromptActivationProvider activations;
+    private final EssayKnowledgeJudge knowledgeJudge;
 
+    @Autowired
     public EssayGrader(LlmClient llm, ObjectMapper json, LearningContentClient content,
-                       EssayPromptActivationProvider activations) {
+                       EssayPromptActivationProvider activations, EssayKnowledgeJudge knowledgeJudge) {
         this.llm = llm;
         this.json = json;
         this.content = content;
         this.activations = activations;
+        this.knowledgeJudge = knowledgeJudge;
+    }
+
+    /** Kept for unit tests that construct the original grader directly. */
+    public EssayGrader(LlmClient llm, ObjectMapper json, LearningContentClient content,
+                       EssayPromptActivationProvider activations) {
+        this(llm, json, content, activations, new EssayKnowledgeJudge());
     }
 
     public boolean available() { return llm.configured(); }
@@ -77,22 +90,27 @@ public class EssayGrader {
         Map<String, ErrorType> allowedCodes = errorTypes.stream().filter(Objects::nonNull)
                 .filter(error -> error.code() != null).collect(Collectors.toMap(ErrorType::code, error -> error,
                         (first, ignored) -> first));
+        Map<String, UUID> criterionPoints = new HashMap<>();
+        for (RubricCriterion criterion : rubric.criteria()) {
+            if (criterion != null && criterion.code() != null && criterion.knowledgePointId() != null) {
+                criterionPoints.putIfAbsent(criterion.code(), criterion.knowledgePointId());
+            }
+        }
         String system = systemPrompt(task, rubric, errorTypes);
         String user = userPrompt(task, prompt, essay);
+        Supplier<Map<UUID, LearningContentClient.KnowledgePoint>> catalog = memoized(this::knowledgePointCatalog);
+        JsonNode root;
         try {
-            Optional<WritingGrade> first = parse(task, essay, allowedCodes, llm.completeJson(system, user, false));
-            WritingGrade grade = first.orElseGet(() -> {
-                try {
-                    return parse(task, essay, allowedCodes, llm.completeJson(system, user, true))
-                            .orElseThrow(() -> new WritingGradingException("INVALID_GRADE"));
-                } catch (LlmUnavailableException exception) {
-                    throw new WritingGradingException("LLM_UNAVAILABLE");
-                }
-            });
-            return new GradedEssay(grade, promptVersion);
+            root = readObject(llm.completeJson(system, user));
         } catch (LlmUnavailableException exception) {
             throw new WritingGradingException("LLM_UNAVAILABLE");
         }
+        WritingGrade grade = parse(task, essay, allowedCodes, criterionPoints, root)
+                .orElseThrow(() -> new WritingGradingException("INVALID_GRADE"));
+        WritingGrade withCriteria = withCriterionStudyPoints(grade, rubric, prompt.passBand(), catalog);
+        WritingGrade judged = knowledgeJudge.judge(task, essay, withCriteria, rubric.criteria(), allowedCodes,
+                root.path("judgments"), catalog);
+        return new GradedEssay(judged, promptVersion);
     }
 
     private Rubric resolveRubric(WritingTask task, String expectedVersion) {
@@ -120,7 +138,8 @@ public class EssayGrader {
         String taskName = task == WritingTask.TASK_1 ? "Academic Writing Task 1" : "Writing Task 2";
         return PROMPT_TEMPLATE.replace("{{task}}", taskName)
                 .replace("{{criteria}}", criterionText)
-                .replace("{{error_codes}}", errorCodes.isBlank() ? "(none)" : errorCodes);
+                .replace("{{error_codes}}", errorCodes.isBlank() ? "(none)" : errorCodes)
+                + EssayKnowledgeJudge.prompt(task, rubric.criteria());
     }
 
     private static String renderCriterion(RubricCriterion criterion) {
@@ -144,13 +163,12 @@ public class EssayGrader {
         return text.append("<essay>\n").append(neutralize(essay, "essay")).append("\n</essay>").toString();
     }
 
-    private static String neutralize(String value, String tag) {
+    static String neutralize(String value, String tag) {
         return value.replaceAll("(?i)</\\s*" + tag + "\\s*>", "[/" + tag + "]");
     }
 
     private Optional<WritingGrade> parse(WritingTask task, String essay, Map<String, ErrorType> allowedCodes,
-                                         String reply) {
-        JsonNode root = readObject(reply);
+                                         Map<String, UUID> criterionPoints, JsonNode root) {
         if (root == null || !root.path("criteria").isArray()) return Optional.empty();
         Map<String, WritingGrade.Criterion> byCode = new LinkedHashMap<>();
         for (JsonNode node : root.get("criteria")) {
@@ -163,16 +181,87 @@ public class EssayGrader {
             if (!WritingScore.isBand(value)) return Optional.empty();
             String comment = truncate(node.path("comment").asText(""), MAX_ITEM_CHARS);
             byCode.put(code, new WritingGrade.Criterion(code, value.setScale(1), List.of(),
-                    comment.isBlank() ? List.of() : List.of(comment)));
+                    comment.isBlank() ? List.of() : List.of(comment), criterionPoints.get(code)));
         }
         if (byCode.size() != task.criteria().size()) return Optional.empty();
         List<WritingGrade.Criterion> criteria = task.criteria().stream().map(byCode::get).toList();
         String summary = truncate(root.path("summary").asText(""), MAX_SUMMARY_CHARS);
         return Optional.of(new WritingGrade(criteria, corrections(root.path("corrections"), essay, allowedCodes),
-                summary, WritingScore.overallBand(criteria.stream().map(WritingGrade.Criterion::band).toList())));
+                summary, WritingScore.overallBand(criteria.stream().map(WritingGrade.Criterion::band).toList()),
+                focusPoints(root.path("focus"))));
+    }
+
+    /** Focus entries are "<what to study>: <why>"; anything that is not a non-blank string is dropped. */
+    private static List<WritingGrade.StudyPoint> focusPoints(JsonNode node) {
+        if (!node.isArray()) return List.of();
+        List<WritingGrade.StudyPoint> points = new ArrayList<>();
+        for (JsonNode item : node) {
+            if (points.size() == MAX_FOCUS_POINTS) break;
+            if (!item.isTextual()) continue;
+            String text = truncate(item.asText().trim(), MAX_ITEM_CHARS);
+            int colon = text.indexOf(':');
+            String title = (colon < 0 ? text : text.substring(0, colon)).trim();
+            String reason = colon < 0 ? "" : text.substring(colon + 1).trim();
+            if (title.isBlank()) continue;
+            points.add(new WritingGrade.StudyPoint(WritingGrade.StudyPoint.AI, null, null, null, null, null,
+                    truncate(title, MAX_FOCUS_TITLE_CHARS), reason.isBlank() ? null : reason));
+        }
+        return points;
+    }
+
+    /** Weak criteria with knowledge points come first, weakest first, followed by the model's own focus. */
+    private WritingGrade withCriterionStudyPoints(WritingGrade grade, Rubric rubric, BigDecimal passBand,
+                                                  Supplier<Map<UUID, LearningContentClient.KnowledgePoint>> catalog) {
+        if (passBand == null) return grade;
+        Map<String, Integer> order = new HashMap<>();
+        for (RubricCriterion criterion : rubric.criteria()) {
+            if (criterion != null && criterion.code() != null) order.putIfAbsent(criterion.code(), criterion.sortOrder());
+        }
+        List<WritingGrade.Criterion> weak = grade.criteria().stream()
+                .filter(item -> item.knowledgePointId() != null && item.band().compareTo(passBand) < 0)
+                .sorted(Comparator.comparing(WritingGrade.Criterion::band)
+                        .thenComparingInt(item -> order.getOrDefault(item.code(), Integer.MAX_VALUE)))
+                .toList();
+        if (weak.isEmpty()) return grade;
+        Map<UUID, LearningContentClient.KnowledgePoint> details = catalog.get();
+        List<WritingGrade.StudyPoint> points = new ArrayList<>();
+        for (WritingGrade.Criterion criterion : weak) {
+            LearningContentClient.KnowledgePoint point = details.get(criterion.knowledgePointId());
+            String reason = point == null ? null : firstText(point.canDo(), point.description());
+            points.add(new WritingGrade.StudyPoint(WritingGrade.StudyPoint.CRITERION, criterion.code(), criterion.band(),
+                    criterion.knowledgePointId(), point == null ? null : point.code(), point == null ? null : point.name(),
+                    point == null ? null : point.name(), reason == null ? null : truncate(reason, MAX_ITEM_CHARS)));
+        }
+        points.addAll(grade.studyPoints());
+        return new WritingGrade(grade.criteria(), grade.corrections(), grade.summary(), grade.overallBand(), points);
+    }
+
+    /** Content's optional details are captured once; an unavailable catalog must not prevent grading. */
+    private Map<UUID, LearningContentClient.KnowledgePoint> knowledgePointCatalog() {
+        try {
+            Map<UUID, LearningContentClient.KnowledgePoint> found = new HashMap<>();
+            for (LearningContentClient.Topic topic : content.getTopicSequence()) {
+                if (topic.knowledgePoints() == null) continue;
+                for (LearningContentClient.KnowledgePoint point : topic.knowledgePoints()) {
+                    if (point != null && point.id() != null) found.putIfAbsent(point.id(), point);
+                }
+            }
+            return found;
+        } catch (LearningRequestException exception) {
+            return Map.of();
+        }
+    }
+
+    private static String firstText(String first, String second) {
+        if (first != null && !first.isBlank()) return first.trim();
+        return second == null || second.isBlank() ? null : second.trim();
     }
 
     private JsonNode readObject(String reply) {
+        return readObject(json, reply);
+    }
+
+    static JsonNode readObject(ObjectMapper json, String reply) {
         if (reply == null) return null;
         int start = reply.indexOf('{'), end = reply.lastIndexOf('}');
         if (start < 0 || end <= start) return null;
@@ -180,6 +269,22 @@ public class EssayGrader {
             JsonNode node = json.readTree(reply.substring(start, end + 1));
             return node != null && node.isObject() ? node : null;
         } catch (Exception exception) { return null; }
+    }
+
+    private static <T> Supplier<T> memoized(Supplier<T> source) {
+        return new Supplier<>() {
+            private boolean loaded;
+            private T value;
+
+            @Override
+            public synchronized T get() {
+                if (!loaded) {
+                    value = source.get();
+                    loaded = true;
+                }
+                return value;
+            }
+        };
     }
 
     private static List<WritingGrade.Correction> corrections(JsonNode node, String essay,

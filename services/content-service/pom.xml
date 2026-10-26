@@ -14,12 +14,18 @@
 
     <properties>
         <mapstruct.version>1.6.3</mapstruct.version>
+        <poi.version>5.4.0</poi.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>com.ieltspath</groupId>
             <artifactId>common-security</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ieltspath</groupId>
+            <artifactId>common-storage</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -45,6 +51,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <!-- Reads and writes the .xlsx course import template. Approved for this use; nothing else reads files. -->
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${poi.version}</version>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>

@@ -32,7 +32,7 @@ public class SavePracticeQuestionFlashcardUseCase {
             return new SavedFlashcard(FlashcardResult.from(restoreIfArchived(existing.get())), false);
         }
         Flashcard card = Flashcard.create(userId, FlashcardSourceType.PRACTICE_QUESTION, null, practiceQuestionId,
-                null, front, back);
+                null, front, back, null, null);
         try {
             return new SavedFlashcard(FlashcardResult.from(repository.save(card)), true);
         } catch (ConflictException conflict) {
@@ -48,7 +48,8 @@ public class SavePracticeQuestionFlashcardUseCase {
             return card;
         }
         card.update(card.getSourceType(), card.getVocabularySenseId(), card.getSourceReferenceId(),
-                card.getHighlightedText(), card.getFront(), card.getBack(), LibraryStatus.ACTIVE);
+                card.getHighlightedText(), card.getFront(), card.getBack(), LibraryStatus.ACTIVE,
+                card.getImageKey(), card.getExampleSentence());
         return repository.save(card);
     }
 }

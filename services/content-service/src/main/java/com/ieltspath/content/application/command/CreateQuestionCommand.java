@@ -8,5 +8,11 @@ public record CreateQuestionCommand(
         QuestionType questionType,
         Skill skill,
         String requiredFeatureKey,
-        QuestionPurpose purpose
-) {}
+        QuestionPurpose purpose,
+        String importRef
+) {
+    public CreateQuestionCommand(QuestionType questionType, Skill skill, String requiredFeatureKey,
+                                 QuestionPurpose purpose) {
+        this(questionType, skill, requiredFeatureKey, purpose, null);
+    }
+}

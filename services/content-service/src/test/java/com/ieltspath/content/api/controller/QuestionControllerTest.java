@@ -78,12 +78,52 @@ class QuestionControllerTest {
                 PublicationStatus.PUBLISHED, UUID.randomUUID(), Instant.now(), Instant.now()
         );
 
-        when(listQuestionsUseCase.execute(Skill.READING, null)).thenReturn(List.of(qResult));
+        when(listQuestionsUseCase.execute(Skill.READING, null, null, 0, 25))
+                .thenReturn(new ListQuestionsUseCase.Page(1, 0, 25, List.of(qResult)));
 
         mockMvc.perform(get("/api/content/questions?skill=READING"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(q1.toString()))
-                .andExpect(jsonPath("$[0].status").value("PUBLISHED"));
+                .andExpect(jsonPath("$.content[0].id").value(q1.toString()))
+                .andExpect(jsonPath("$.content[0].status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(25))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
+    }
+
+    @Test
+    @DisplayName("GET /api/content/admin/questions passes status, page and size to the use case")
+    void shouldPassStatusAndPaging() throws Exception {
+        when(listQuestionsUseCase.execute(null, QuestionPurpose.LEARNING, PublicationStatus.PUBLISHED, 2, 10))
+                .thenReturn(new ListQuestionsUseCase.Page(23, 2, 10, List.of()));
+
+        mockMvc.perform(get("/api/content/admin/questions?purpose=LEARNING&status=PUBLISHED&page=2&size=10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.totalElements").value(23))
+                .andExpect(jsonPath("$.totalPages").value(3));
+    }
+
+    @Test
+    void invalidPagingReturns400() throws Exception {
+        when(listQuestionsUseCase.execute(null, null, null, 0, 1000)).thenThrow(new IllegalArgumentException("size"));
+
+        mockMvc.perform(get("/api/content/admin/questions?size=1000")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void importRefLookupReturnsPageOfAtMostOne() throws Exception {
+        UUID id = UUID.randomUUID();
+        QuestionResult found = new QuestionResult(id, QuestionType.MULTIPLE_CHOICE, Skill.READING, null,
+                PublicationStatus.DRAFT, null, Instant.now(), Instant.now(), QuestionPurpose.LEARNING, "ref-1");
+        when(listQuestionsUseCase.findByImportRef("ref-1"))
+                .thenReturn(new ListQuestionsUseCase.Page(1, 0, 100, List.of(found)));
+
+        mockMvc.perform(get("/api/content/admin/questions?importRef=ref-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].importRef").value("ref-1"))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test
@@ -182,7 +222,8 @@ class QuestionControllerTest {
         QuestionResult exam = new QuestionResult(questionId, QuestionType.MULTIPLE_CHOICE, Skill.READING, null,
                 PublicationStatus.DRAFT, null, Instant.now(), Instant.now(), QuestionPurpose.EXAM);
         when(createQuestionUseCase.execute(any())).thenReturn(exam);
-        when(listQuestionsUseCase.execute(Skill.READING, QuestionPurpose.EXAM)).thenReturn(List.of(exam));
+        when(listQuestionsUseCase.execute(Skill.READING, QuestionPurpose.EXAM, null, 0, 25))
+                .thenReturn(new ListQuestionsUseCase.Page(1, 0, 25, List.of(exam)));
 
         mockMvc.perform(post("/api/content/questions").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"questionType\":\"MULTIPLE_CHOICE\",\"skill\":\"READING\",\"purpose\":\"EXAM\"}"))
@@ -191,7 +232,7 @@ class QuestionControllerTest {
         verify(createQuestionUseCase).execute(command.capture());
         assertThat(command.getValue().purpose()).isEqualTo(QuestionPurpose.EXAM);
         mockMvc.perform(get("/api/content/questions?skill=READING&purpose=EXAM"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$[0].purpose").value("EXAM"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].purpose").value("EXAM"));
     }
 
     @Test

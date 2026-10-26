@@ -42,11 +42,12 @@ class AssignRoleUseCaseTest {
                 .status(UserStatus.ACTIVE)
                 .build();
         Role admin = Role.builder().id(UUID.randomUUID()).name(RoleName.ADMIN).build();
+        when(userRepository.lockActiveAdminUserIds()).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(roleRepository.findByNames(Set.of("ADMIN"))).thenReturn(List.of(admin));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        User updated = useCase.execute(new AssignRoleCommand(userId, Set.of("ADMIN")));
+        User updated = useCase.execute(new AssignRoleCommand(userId, Set.of("ADMIN"), UUID.randomUUID()));
 
         assertThat(updated.getRoles()).extracting(role -> role.getName().name()).containsExactly("ADMIN");
     }

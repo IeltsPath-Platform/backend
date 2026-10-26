@@ -53,6 +53,11 @@ public class LessonResourceRepositoryAdapter implements LessonResourceRepository
     }
 
     @Override
+    public void deferSortOrderCheck() {
+        jdbc.getJdbcOperations().execute("SET CONSTRAINTS uq_lesson_resources_order DEFERRED");
+    }
+
+    @Override
     public void delete(LessonResource resource) { repository.deleteById(resource.getId()); }
 
     @Override

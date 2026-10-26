@@ -28,7 +28,7 @@ public class ContentAssetController {
 
     /** Authoring only: asset text can be a transcript, so learners get media through lessons and tests. */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public ContentAssetResponse getAssetById(@PathVariable("id") UUID id) {
         ContentAssetResult result = getContentAssetUseCase.execute(id);
         return ContentAssetResponse.from(result);
@@ -36,7 +36,7 @@ public class ContentAssetController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public ContentAssetResponse createAsset(@Valid @RequestBody CreateContentAssetRequest request) {
         ContentAssetResult result = createContentAssetUseCase.execute(new CreateContentAssetCommand(
                 request.assetType(),
@@ -50,7 +50,7 @@ public class ContentAssetController {
 
     @PostMapping("/links")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public void linkAsset(@Valid @RequestBody LinkAssetRequest request) {
         linkAssetUseCase.execute(new LinkAssetCommand(
                 request.assetId(),

@@ -14,7 +14,7 @@ PUBLISHED and belongs to that package are included. Results are ordered by `afte
 then topic `sortOrder`, then id). Only ACTIVE topics with a PUBLISHED lesson count. The current package version is
 resolved on each read, so republishing does not require replacing the milestone.
 
-ADMIN and CONTENT_AUTHOR manage the same projection through `GET` and `PUT
+CONTENT_AUTHOR manages the projection through `GET` and `PUT
 /api/content/admin/courses/{id}/practice-test-milestones`. PUT atomically replaces the course's milestones and takes
 `{"milestones":[{"packageId":"6b2bf327-9455-4be7-942c-f24c5669f422","afterTopicSequence":2}]}`. An empty array clears them.
 Unknown courses return `404`; duplicate packages, nonpositive or unreachable positions, more than 100 entries, unpublished
@@ -92,7 +92,7 @@ topic `skill` label no longer decides lesson skills and may change after lessons
 
 ## `GET /topic-sequence`
 
-Returns an array of ACTIVE topics that belong to an ACTIVE course and have at least one PUBLISHED lesson (since 2026-10-07 a topic no longer needs a stored `skill`), ordered by the stored topic `skill` label (topics without one last), then `course.bandLevel`, then `sortOrder`, then `topicId` (course filtering/order added 2026-10-07; a PUBLISHED `TOPIC_TEST` has not been required since 2026-10-03). Topics without a course or in an inactive course are excluded. The additive `active` field on each topic and course reports the corresponding status; the current sequence query returns only entries where both are `true`. Learning also filters inactive entries defensively before refreshing a learner's path. Each topic carries `course: {courseId, code, name, bandLevel, hasCourseTest, active}`; `hasCourseTest` is true when that course has a PUBLISHED `COURSE_TEST` package with a non-null current version. Course metadata is joined in the topic query. `skills` is the union of its PUBLISHED lessons' skills and `skill` follows the compatibility rule in *Derived skills*. `hasTopicTest` is true when the topic has a PUBLISHED `TOPIC_TEST` package with a current version; a topic without one (the demo `DEMO_WRITING`) is passed by completing its lessons. This is the single curriculum read used to build and refresh the MVP path. Each topic includes its ACTIVE knowledge points, ordered by `created_at`, then `id`; no topic band range or answer key is returned. `hasPracticeSet` is true exactly when at least one package matches `POST /practice-sets/search` for that KP with `excludePackageIds=[]` and default `minQuestions=3`. Since content V16 every KP of the free and premium Reading and Listening topics has one; the Writing KPs have none.
+Returns an array of ACTIVE topics that belong to an ACTIVE course and have at least one PUBLISHED lesson (since 2026-10-07 a topic no longer needs a stored `skill`), ordered by the stored topic `skill` label (topics without one last), then `course.bandLevel`, then `sortOrder`, then `topicId` (course filtering/order added 2026-10-07; a PUBLISHED `TOPIC_TEST` has not been required since 2026-10-03). Topics without a course or in an inactive course are excluded. The additive `active` field on each topic and course reports the corresponding status; the current sequence query returns only entries where both are `true`. Learning also filters inactive entries defensively before refreshing a learner's path. Each topic carries `course: {courseId, code, name, bandLevel, hasCourseTest, active}`; `hasCourseTest` is true when that course has a PUBLISHED `COURSE_TEST` package with a non-null current version. Course metadata is joined in the topic query. `skills` is the union of its PUBLISHED lessons' skills and `skill` follows the compatibility rule in *Derived skills*. `hasTopicTest` is true when the topic has a PUBLISHED `TOPIC_TEST` package with a current version; a topic without one (the demo `DEMO_WRITING`) is passed by completing its lessons. This is the single curriculum read used to build and refresh the MVP path. Each topic includes its ACTIVE knowledge points, ordered by `created_at`, then `id`; no topic band range or answer key is returned. By default, `includeErrorTraps` is false and trap child points are omitted from the curriculum sequence. Internal learning callers may request `?includeErrorTraps=true`; those points include `parentKnowledgePointId` and `errorCode`, and always have `hasPracticeSet=false` because practice remains attached to the parent. `hasPracticeSet` is true exactly when at least one package matches `POST /practice-sets/search` for that KP with `excludePackageIds=[]` and default `minQuestions=3`. Since content V16 every KP of the free and premium Reading and Listening topics has one; the Writing KPs have none.
 
 ```json
 [
@@ -177,7 +177,7 @@ Returns `{lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds,
 | --- | --- | --- |
 | `TEXT` | `textContent: string` | Lesson prose. |
 | `ASSET` | `asset: {id, assetType, textContent, mediaReference, durationSeconds, mediaUrl}` | `PASSAGE` uses `textContent`; media uses `mediaReference`. Unused values are `null`. For `AUDIO` (added 2026-10-01) `mediaUrl` is the playable URL resolved by Content (an `https://` reference unchanged, or an object key joined to `content.media.base-url`; anything else fails with `INVALID_MEDIA_REFERENCE`) and `textContent` is the transcript, which is an answer: learners see it only after passing. |
-| `VOCABULARY` | `vocabularySenseIds: UUID[]` | Ordered logical IDs in Library Service; MVP seed has no such block. |
+| `VOCABULARY` | `vocabularySenseIds: UUID[]` | Ordered logical IDs in Library Service. Content V72 seeds one leading block with eight senses on each `DEMO_READING` lesson L1–L4, referencing Library V15; Learning does not treat this block as an exercise for completion. |
 | `EXERCISE` | `blockKind: "EXERCISE" \| "ESSAY"`, `questions: Question[]` | Ordered by `sortOrder`. `blockKind` (added 2026-10-01): `ESSAY` when the block holds exactly one question whose `answerSpec.type` is `ESSAY`, otherwise `EXERCISE` (only auto-gradable questions). Content rejects any other mix. Consumers trust `blockKind` and do not classify again. |
 
 `Question` is `{questionVersionId, sortOrder, stem, options, answerSpec, explanation, hint, knowledgePointIds}`. `hint` (added 2026-10-01, string or `null`, at most 500 characters) points the learner back to where to reread; it never states the answer. Learning Service decides when to show it: only for a `FILL` question or a `CHOICE` question with at least three options (True/False/Not Given included), after a wrong answer in a block not yet passed. `GET /package-versions/{id}` items also carry `hint` (added 2026-10-03; the V16 practice questions have one, older items are `null`); it is for practice and review sets, and a final-test consumer must not show it. `options` is the Content option array `{optionKey, content, sortOrder}[]`, or **`null` for a fill answer**. A non-null array represents a choice question, including True/False/Not Given (all three keys appear). `answerSpec` is a JSON object conforming to [answer spec v1](answer-spec-v1.md), not a JSON-encoded string.
@@ -222,7 +222,7 @@ Added 2026-10-07. Returns PUBLISHED `COURSE_TEST` packages belonging to the ACTI
 
 ## `POST /practice-sets/search`
 
-Request is `{knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId}`. Defaults are `[]`, `3`, `1` and none; `limit` must be 1–10. Return PUBLISHED `PRACTICE_SET` packages with at least `minQuestions` total questions and at least one question mapped to the requested KP. Exclude packages in `excludePackageIds` and packages containing any question version also used in a lesson or `TOPIC_TEST` of **any** topic. Sort the packages of `preferredLessonId` (added 2026-10-03, optional) first, then by matching-question count descending, then `packageId`; apply `limit` in the database. Learning passes every package already revealed to the learner in `excludePackageIds`. The `hasPracticeSet` predicate above is this eligibility rule before exclusion/limit.
+Request is `{knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId, trapErrorCode}`. Defaults are `[]`, `3`, `1` and none; `limit` must be 1–10. Return PUBLISHED `PRACTICE_SET` packages with at least `minQuestions` total questions and at least one question mapped to the requested KP. Exclude packages in `excludePackageIds` and packages containing any question version also used in a lesson or `TOPIC_TEST` of **any** topic. When `trapErrorCode` is null or omitted, retain the legacy order: preferred lesson, matching-question count descending, then `packageId`; `trapQuestionCount` is `0`. When supplied, `trapQuestionCount` counts distinct questions whose answer spec maps a wrong option to that code. Sets with at least two such questions rank first by count descending, then by trap-question ratio descending; remaining ties use the legacy order. Counts below two do not outrank the legacy preference. Learning passes every package already revealed to the learner in `excludePackageIds`. The `hasPracticeSet` predicate above is this eligibility rule before exclusion/limit.
 
 ```json
 {"knowledgePointId":"10000000-0000-4000-8000-000000000002","excludePackageIds":[],"minQuestions":3,"limit":1}
@@ -234,7 +234,7 @@ assigned. `requiredFeatureKey` is the package's Access feature, or `null` when f
 must tolerate `null` values.
 
 ```json
-[{"packageId":"20000000-0000-4000-8000-000000000501","packageVersionId":"20000000-0000-4000-8000-000000000601","code":"PS-KP1-A","questionCount":4,"matchedQuestionCount":4,"band":5.5,"requiredFeatureKey":null}]
+[{"packageId":"20000000-0000-4000-8000-000000000501","packageVersionId":"20000000-0000-4000-8000-000000000601","code":"PS-KP1-A","questionCount":4,"matchedQuestionCount":4,"band":5.5,"requiredFeatureKey":null,"trapQuestionCount":0}]
 ```
 
 Practice search eligibility also excludes question versions used by `COURSE_TEST`, `MOCK_TEST` or `PLACEMENT_TEST` packages. The same exclusion applies to availability counts and `hasPracticeSet`. Reservation checks also include `COURSE_TEST` questions, so they cannot be reused as practice material.
@@ -286,6 +286,27 @@ backfill sets it from the course. Questions used only in library practice tests 
 `NULL`, and nothing guesses a value for them. Learning treats a missing tag as untagged: an untagged correct answer earns
 the unknown-difficulty XP, the too-easy/too-hard check uses the general limits, and staff statistics leave the field out. Invalid or oversized input returns `400`.
 
+## `POST /work-item-subjects`
+
+Names the knowledge points and questions that Learning's staff work items are about, in two database queries. Like the
+other `/internal/learning-content/**` routes it needs an authenticated internal JWT.
+
+Request: `knowledgePointIds` and `questionVersionIds`, each 0–500 UUIDs without `null` (either may be omitted).
+
+```json
+{"knowledgePointIds":["10000000-0000-4000-8000-000000000002"],"questionVersionIds":["20000000-0000-4000-8000-000000000201"]}
+```
+
+Response:
+
+```json
+{"knowledgePoints":{"10000000-0000-4000-8000-000000000002":{"code":"R-PARA","name":"Paraphrase"}},
+ "questions":{"20000000-0000-4000-8000-000000000201":{"questionId":"20000000-0000-4000-8000-000000000101","stemPreview":"Which sentence best…"}}}
+```
+
+Unknown ids are absent from the maps. `stemPreview` is the first 120 characters of the stem. More than 500 ids in a list
+returns `400`.
+
 ## `POST /suggestions/candidates`
 
 Returns published content candidates for Learning's optional suggestions in one batched request. Like the other
@@ -320,6 +341,13 @@ content, and builds learner-facing paths; this internal endpoint makes no learne
 
 Returns one PUBLISHED version with `{packageVersionId, packageId, packageType, topicId, rules, sections}`. `topicId` is required for `TOPIC_TEST` and nullable for other types. `rules` is the parsed version rules object; the V9 seed versions use `{}`. MVP final tests have no time limit: when `rules` has no time key, Assessment sets `expiresAt=null`. Defining a timed package rule is deferred beyond MVP. Sections have `{sectionId, title, skill, instructions, sortOrder, passage, audio?, items}`; `passage` is the full text of the attached `PASSAGE` asset or `null`. `audio` (added 2026-10-01, absent when the section has no `AUDIO` asset) is `{assetId, mediaUrl, durationSeconds, transcript}`, resolved like a lesson audio block; the transcript must not reach a learner before the result allows it. Items have `{questionVersionId, sortOrder, stem, options, answerSpec, explanation, maxScore, knowledgePointMappings}`. Each mapping has `{knowledgePointId, weight}`; weight does not affect grading or mastery.
 
+Essay package items additionally carry `guide` (learner-facing Markdown or null) and
+`images: [{mediaUrl, altText}]` (added 2026-10-20). Images come from validated `IMAGE` assets linked to the question or
+its section, ordered by asset-link `sortOrder` and asset ID. Content resolves every image reference through the same
+media policy as lesson images; the stored reference is not included in the internal response. Both images and guides
+are read in bulk for a package version. Auto-graded items have `guide: null` and `images: []`. Learning forwards only
+these teaching fields for course practice essays; answer specs, grading explanations and chart facts remain internal.
+
 X1 example (one representative item shown; the actual version contains Q2, Q14, Q15, Q16):
 
 ```json
@@ -335,7 +363,7 @@ Package publishing enforces one owner per `question_id` across its versions: any
 
 ## Error types (phase 3a)
 
-`GET /internal/learning-content/error-types` returns error types with both `status=ACTIVE` and `review_status=APPROVED` as a JSON array of `{"code","name","category","severity","fixHint"}`, ordered by code. Assessment reads it to refuse any error analysis code that is not in the reviewed catalogue (`422`, `details.code = UNKNOWN_ERROR_CODE`). `category` is one of `GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK`, `READING_STRATEGY`, `LISTENING_STRATEGY`, `SPELLING_NUMBER`. `severity` is 1 to 3. The public management endpoints are `GET`, `POST` and `PUT` under `/api/content/error-types`; the code cannot change after creation.
+`GET /internal/learning-content/error-types` returns error types with both `status=ACTIVE` and `review_status=APPROVED` as a JSON array of `{"code","name","category","severity","fixHint","knowledgePointId"}`, ordered by code. `knowledgePointId` is nullable and identifies the knowledge point linked to the error type when one is configured. Assessment reads it to refuse any error analysis code that is not in the reviewed catalogue (`422`, `details.code = UNKNOWN_ERROR_CODE`). `category` is one of `GRAMMAR`, `VOCABULARY`, `COHERENCE`, `TASK`, `READING_STRATEGY`, `LISTENING_STRATEGY`, `SPELLING_NUMBER`. `severity` is 1 to 3. The public management endpoints are `GET`, `POST` and `PUT` under `/api/content/error-types`; the code cannot change after creation.
 
 `GET /internal/learning-content/error-types/staff` returns every `ACTIVE` error type, whatever its review status, as a JSON array of `{"code","name","category","severity","fixHint","reviewStatus"}` (`reviewStatus` is `DRAFT` or `APPROVED`), ordered by code. A grader may record any of these codes; a learner is shown a code and its fix hint only when it is in the approved list above. Assessment uses it to check the codes of an independent human review.
 
@@ -350,16 +378,17 @@ band descriptors with the source recorded; seed essays and prompts are original 
 Migration `V50__rubrics.sql` seeds both `TASK_1` and `TASK_2` as `ACTIVE` for bootstrap. Their `sourceNote` explicitly
 identifies the material as an AI draft that has not been reviewed by an IELTS expert; `ACTIVE` is a runtime status.
 
-The authoring routes require `ADMIN` or `CONTENT_AUTHOR`:
+The authoring routes require `CONTENT_AUTHOR`:
 
 | Method | Path | Behavior |
 | --- | --- | --- |
 | GET | `/api/content/admin/rubrics?task=TASK_1\|TASK_2` | List draft versions for the task. |
+| GET | `/api/content/admin/rubrics/versions?code=` | Every version of one rubric code, retired included, oldest first: `[{code, task, version, status}]`. Use it to pick the next draft number (highest existing + 1). |
 | POST | `/api/content/admin/rubrics` | Create a `DRAFT` (`201`). Body contains `code`, `task`, `version`, `sourceNote`, `criteria`, and optional `examples`. |
 | PUT | `/api/content/admin/rubrics/{code}/{version}` | Replace a draft's task, source note, criteria and examples. Active or retired versions cannot be edited. |
 | POST | `/api/content/admin/rubrics/{code}/{version}/activate` | Activate a complete draft and retire the existing active rubric for that task. |
 
-`GET /api/content/rubrics?task=TASK_1|TASK_2` is readable by `ADMIN`, `CONTENT_AUTHOR` and `EXAMINER` and returns a
+`GET /api/content/rubrics?task=TASK_1|TASK_2` is readable by `CONTENT_AUTHOR` and `EXAMINER` and returns a
 zero-or-one-element array containing the active rubric for that task. Invalid task or rubric data returns `400`;
 attempting to edit an active or retired version returns `409 RUBRIC_NOT_EDITABLE`. A missing active rubric has no
 public list entry; internal active and historical lookups return `404` when no rubric is available.
@@ -370,6 +399,15 @@ The internal prompt projection is available to service callers using their forwa
 | --- | --- | --- |
 | GET | `/internal/learning-content/rubrics/active?task=TASK_1\|TASK_2` | Return the active rubric as one object with `code`, `task`, `version`, `sourceNote`, `criteria`, and `examples`. |
 | GET | `/internal/learning-content/rubrics/{code}/{version}` | Return that saved active or retired version, never a draft. Used by both Learning and Assessment to keep grading on the activated prompt version. |
+
+Each internal criterion also carries `knowledgePointId` (UUID, nullable, added 2026-10-21): the knowledge point that the
+criterion is evidence for, from `writing_criterion_knowledge_points` keyed by task and criterion code
+(`V69__writing_criterion_knowledge_points.sql`). It does not depend on the rubric version. The additive
+`subKnowledgePoints` field is an ordered array of `{id,code,name,description}` entries from
+`writing_criterion_sub_knowledge_points` (`V71__writing_criterion_sub_knowledge_points.sql`), filtered to active
+knowledge points; it is `[]` when the criterion has none. For example, Task 2's CC criterion returns
+`[{"id":"…","code":"DEMO_WRITING_TOPIC_SENTENCE","name":"…","description":"…"},{"id":"…","code":"DEMO_WRITING_LINKING","name":"…","description":"…"}]`.
+Admin and public rubric responses do not include criterion knowledge point mappings or sub-knowledge points.
 
 These projections are internal only. Gateway denies browser/client access to `/internal/**`; Learning and Assessment must
 not read Content's database directly. Rubric data is input to the grader and does not include answer keys.

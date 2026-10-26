@@ -7,6 +7,8 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.hibernate.annotations.SQLRestriction;
+import com.ieltspath.game.domain.vo.RocketRoomSettings;
+import com.ieltspath.game.domain.vo.RoomSettings;
 import com.ieltspath.game.domain.vo.WordlyRoomSettings;
 
 import java.time.Instant;
@@ -52,6 +54,10 @@ public class GameRoomJpaEntity {
     private String playMode = "FINITE";
     @Column(name = "word_limit")
     private Integer wordLimit = 10;
+    @Column(name = "question_count")
+    private Short questionCount;
+    @Column(name = "seconds_per_question")
+    private Short secondsPerQuestion;
     @Column(name = "is_delete", nullable = false)
     private boolean isDelete;
     @Column(name = "deleted_at")
@@ -61,6 +67,30 @@ public class GameRoomJpaEntity {
         return "WORDLY".equals(gameType) ? new WordlyRoomSettings(
                 WordlyRoomSettings.PlayerMode.valueOf(playerMode), initialLives,
                 WordlyRoomSettings.PlayMode.valueOf(playMode), wordLimit, wordTimeLimitSeconds != null) : null;
+    }
+
+    /** Settings of the room's current game; null for legacy session rooms. */
+    public RoomSettings settings() {
+        return switch (gameType) {
+            case "WORDLY" -> wordlySettings();
+            case "ROCKET" -> new RocketRoomSettings("SOLO".equals(playerMode), questionCount, initialLives,
+                    secondsPerQuestion);
+            default -> null;
+        };
+    }
+
+    /** Writes only the given game's columns, so the other game's last settings stay on the row. */
+    public void setSettings(RoomSettings settings) {
+        switch (settings) {
+            case null -> { }
+            case WordlyRoomSettings wordly -> setWordlySettings(wordly);
+            case RocketRoomSettings rocket -> {
+                playerMode = rocket.solo() ? "SOLO" : "MULTIPLAYER";
+                initialLives = (short) rocket.initialLives();
+                questionCount = (short) rocket.questionCount();
+                secondsPerQuestion = (short) rocket.secondsPerQuestion();
+            }
+        }
     }
 
     public void setWordlySettings(WordlyRoomSettings settings) {

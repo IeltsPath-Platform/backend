@@ -10,7 +10,7 @@ public class GetGameCatalogUseCase {
     public GameCatalogResult execute() {
         return new GameCatalogResult(List.of(
                 new GameCatalogResult.Item("ROCKET", "Tên lửa",
-                        "Chọn từ tiếng Anh phù hợp với nghĩa được cho.", "COMING_SOON"),
+                        "Chọn từ tiếng Anh phù hợp với nghĩa được cho.", "AVAILABLE"),
                 new GameCatalogResult.Item("WORDLY", "Wordly",
                         "Đoán từ tiếng Anh dựa trên nghĩa và gợi ý từng chữ cái.", "AVAILABLE")
         ));

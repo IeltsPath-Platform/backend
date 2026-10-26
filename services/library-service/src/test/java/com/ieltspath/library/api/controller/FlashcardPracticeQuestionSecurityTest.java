@@ -5,12 +5,13 @@ import com.ieltspath.library.application.result.FlashcardResult;
 import com.ieltspath.library.application.result.SavedFlashcard;
 import com.ieltspath.library.application.usecase.CreateFlashcardUseCase;
 import com.ieltspath.library.application.usecase.DeleteFlashcardUseCase;
-import com.ieltspath.library.application.usecase.GetFlashcardUseCase;
 import com.ieltspath.library.application.usecase.GetDueFlashcardsUseCase;
+import com.ieltspath.library.application.usecase.GetFlashcardUseCase;
 import com.ieltspath.library.application.usecase.ListFlashcardsUseCase;
 import com.ieltspath.library.application.usecase.ReviewFlashcardUseCase;
 import com.ieltspath.library.application.usecase.SavePracticeQuestionFlashcardUseCase;
 import com.ieltspath.library.application.usecase.UpdateFlashcardUseCase;
+import com.ieltspath.library.application.usecase.UploadFlashcardImageUseCase;
 import com.ieltspath.library.domain.aggregate.Flashcard;
 import com.ieltspath.library.domain.vo.FlashcardSourceType;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -80,6 +81,8 @@ class FlashcardPracticeQuestionSecurityTest {
     private GetDueFlashcardsUseCase getDueFlashcardsUseCase;
     @MockBean
     private ReviewFlashcardUseCase reviewFlashcardUseCase;
+    @MockBean
+    private UploadFlashcardImageUseCase uploadFlashcardImageUseCase;
 
     @DynamicPropertySource
     static void hmacProperties(DynamicPropertyRegistry registry) {
@@ -95,6 +98,10 @@ class FlashcardPracticeQuestionSecurityTest {
     private static FlashcardResult card(UUID userId, UUID questionId) {
         return FlashcardResult.from(Flashcard.create(
                 userId, FlashcardSourceType.PRACTICE_QUESTION, null, questionId, null, "Front", "Back"));
+    }
+
+    private static String signedToken(UUID subject) {
+        return signedInternalToken(subject, "CUSTOMER");
     }
 
     @Test
@@ -137,7 +144,7 @@ class FlashcardPracticeQuestionSecurityTest {
     @Test
     void otherSourcesStillGoThroughTheExistingCreateWith201() throws Exception {
         UUID userId = UUID.randomUUID();
-        when(createFlashcardUseCase.execute(userId, FlashcardSourceType.MANUAL, null, null, null, "Front", "Back"))
+        when(createFlashcardUseCase.execute(userId, FlashcardSourceType.MANUAL, null, null, null, "Front", "Back", null, null))
                 .thenReturn(FlashcardResult.from(Flashcard.create(
                         userId, FlashcardSourceType.MANUAL, null, null, null, "Front", "Back")));
 
@@ -156,18 +163,98 @@ class FlashcardPracticeQuestionSecurityTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    private static String signedToken(UUID subject) {
+    @Test
+    void rejectsPracticeQuestionSaveWithoutBearerToken() throws Exception {
+        mockMvc.perform(post("/api/learning-support/flashcards")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(practiceQuestionPayload(UUID.randomUUID(), "Prompt", "Answer")))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(savePracticeQuestionFlashcardUseCase);
+    }
+
+    @Test
+    void acceptsInternalBearerWithCustomerRoleAndBindsUserIdFromSubject() throws Exception {
+        UUID authenticatedLearnerId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+        Flashcard card = Flashcard.create(authenticatedLearnerId, FlashcardSourceType.PRACTICE_QUESTION,
+                null, questionId, null, "Question?", "Target answer");
+        when(savePracticeQuestionFlashcardUseCase.execute(authenticatedLearnerId, questionId, "Question?", "Target answer"))
+                .thenReturn(new SavedFlashcard(FlashcardResult.from(card), true));
+
+        mockMvc.perform(post("/api/learning-support/flashcards")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedInternalToken(authenticatedLearnerId, "CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(practiceQuestionPayload(questionId, "Question?", "Target answer")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userId").value(authenticatedLearnerId.toString()))
+                .andExpect(jsonPath("$.sourceType").value("PRACTICE_QUESTION"))
+                .andExpect(jsonPath("$.sourceReferenceId").value(questionId.toString()));
+
+        verify(savePracticeQuestionFlashcardUseCase).execute(authenticatedLearnerId, questionId, "Question?", "Target answer");
+        verify(createFlashcardUseCase, never()).execute(any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void rejectsTokenWithUnknownRoleEvenIfSubjectMatches() throws Exception {
+        UUID learnerId = UUID.randomUUID();
+        mockMvc.perform(post("/api/learning-support/flashcards")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedInternalToken(learnerId, "ANONYMOUS_GUEST"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(practiceQuestionPayload(UUID.randomUUID(), "Q", "A")))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(savePracticeQuestionFlashcardUseCase);
+    }
+
+    @Test
+    void rejectsPracticeQuestionFlashcardWithForbiddenSourceFields() throws Exception {
+        UUID learnerId = UUID.randomUUID();
+        UUID questionId = UUID.randomUUID();
+        UUID extraSenseId = UUID.randomUUID();
+        String body = """
+                {
+                  "sourceType": "PRACTICE_QUESTION",
+                  "sourceReferenceId": "%s",
+                  "vocabularySenseId": "%s",
+                  "front": "Front text",
+                  "back": "Back text"
+                }
+                """.formatted(questionId, extraSenseId);
+
+        mockMvc.perform(post("/api/learning-support/flashcards")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedInternalToken(learnerId, "CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(savePracticeQuestionFlashcardUseCase);
+    }
+
+    private static String practiceQuestionPayload(UUID questionId, String front, String back) {
+        return """
+                {
+                  "sourceType": "PRACTICE_QUESTION",
+                  "sourceReferenceId": "%s",
+                  "front": "%s",
+                  "back": "%s"
+                }
+                """.formatted(questionId, front, back);
+    }
+
+    private static String signedInternalToken(UUID subject, String role) {
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(INTERNAL_ISSUER)
                 .subject(subject.toString())
+                .issuedAt(now)
                 .expiresAt(now.plusSeconds(300))
-                .claim("roles", List.of("CUSTOMER"))
+                .claim("roles", List.of(role))
                 .build();
         OctetSequenceKey key = new OctetSequenceKey.Builder(
-                new SecretKeySpec(Base64.getDecoder().decode(INTERNAL_SECRET), "HmacSHA256"))
-                .build();
+                new SecretKeySpec(Base64.getDecoder().decode(INTERNAL_SECRET), "HmacSHA256")).build();
         JwtEncoder encoder = new NimbusJwtEncoder(new ImmutableJWKSet<SecurityContext>(new JWKSet(key)));
-        return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
+        return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
+                .getTokenValue();
     }
 }

@@ -1,6 +1,7 @@
 package com.ieltspath.content.api.controller;
 
 import com.ieltspath.content.api.dto.request.CreateLessonResourceRequest;
+import com.ieltspath.content.api.dto.request.ReorderLessonResourcesRequest;
 import com.ieltspath.content.api.dto.request.UpdateLessonResourceRequest;
 import com.ieltspath.content.api.dto.request.UpdateLessonSummaryRequest;
 import com.ieltspath.content.api.dto.response.LessonResourceResponse;
@@ -10,6 +11,7 @@ import com.ieltspath.content.application.command.UpdateLessonResourceCommand;
 import com.ieltspath.content.application.usecase.CreateLessonResourceUseCase;
 import com.ieltspath.content.application.usecase.DeleteLessonResourceUseCase;
 import com.ieltspath.content.application.usecase.ListLessonResourcesUseCase;
+import com.ieltspath.content.application.usecase.ReorderLessonResourcesUseCase;
 import com.ieltspath.content.application.usecase.UpdateLessonResourceUseCase;
 import com.ieltspath.content.application.usecase.UpdateLessonSummaryUseCase;
 import jakarta.validation.Valid;
@@ -23,7 +25,7 @@ import java.util.UUID;
 /** Authoring of a lesson's Markdown summary and its slide and document links. */
 @RestController
 @RequestMapping("/api/content/admin/lessons/{lessonId}")
-@PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+@PreAuthorize("hasRole('CONTENT_AUTHOR')")
 @RequiredArgsConstructor
 public class LessonResourceAdminController {
     private final ListLessonResourcesUseCase listResources;
@@ -31,6 +33,7 @@ public class LessonResourceAdminController {
     private final UpdateLessonResourceUseCase updateResource;
     private final DeleteLessonResourceUseCase deleteResource;
     private final UpdateLessonSummaryUseCase updateSummary;
+    private final ReorderLessonResourcesUseCase reorderResources;
 
     @GetMapping("/resources")
     public LessonResourcesResponse list(@PathVariable("lessonId") UUID lessonId) {
@@ -58,6 +61,14 @@ public class LessonResourceAdminController {
                                          @Valid @RequestBody UpdateLessonResourceRequest request) {
         return LessonResourceResponse.from(updateResource.execute(new UpdateLessonResourceCommand(lessonId,
                 resourceId, request.title(), request.url(), request.sortOrder())));
+    }
+
+    /** Reorders one type's resources in a single transaction, so no swap is left half done. */
+    @PutMapping("/resources/order")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void reorder(@PathVariable("lessonId") UUID lessonId,
+                        @Valid @RequestBody ReorderLessonResourcesRequest request) {
+        reorderResources.execute(lessonId, request.type(), request.resourceIds());
     }
 
     @DeleteMapping("/resources/{resourceId}")

@@ -70,6 +70,15 @@ public class Topic {
         this.updatedAt = Instant.now();
     }
 
+    /** Moves the topic to another position among its siblings; the caller keeps the positions of a group distinct. */
+    public void reorder(int newSortOrder) {
+        if (newSortOrder == sortOrder) {
+            return;
+        }
+        this.sortOrder = newSortOrder;
+        this.updatedAt = Instant.now();
+    }
+
     /**
      * Sets the topic's skill label. Learning paths read the skills of a topic's lessons, so the label may change at
      * any time; it must still name exactly one skill.

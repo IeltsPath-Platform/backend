@@ -614,7 +614,7 @@ Gắn một `PRACTICE_TEST` với course và vị trí topic để Learning chè
 
 ## 5.1 `content_packages`
 
-Đại diện cho một bộ nội dung hoàn chỉnh như mock test, placement test, practice set, quiz hoặc đề cuối topic. V5.1 thêm `TOPIC_TEST`. `LESSON` giữ cho gói đọc cũ; bài học dùng bảng riêng §5.13. `PRACTICE_SET` có ≥ 3 câu là đề Practice của một bài (`lesson_id`) và cũng là kho set ôn (§7.6); `TOPIC_TEST` chỉ tạo bằng seed, không qua API. V5.5: mỗi câu hỏi chỉ thuộc một nơi dùng (một bài, hoặc một gói `PRACTICE_SET`/`TOPIC_TEST`/`MOCK_TEST`/`PLACEMENT_TEST`); publish kiểm và trả `422 QUESTION_ALREADY_USED` (không áp cho `QUIZ`, `LESSON`). Content không sở hữu khái niệm plan `FREE/PREMIUM`; nếu package cần entitlement thì chỉ khai báo `required_feature_key`, còn quyết định user có quyền truy cập thuộc `access-service`.
+Đại diện cho một bộ nội dung hoàn chỉnh như mock test, placement test, practice set, quiz hoặc đề cuối topic. V5.1 thêm `TOPIC_TEST`. `LESSON` giữ cho gói đọc cũ; bài học dùng bảng riêng §5.13. `PRACTICE_SET` có ≥ 3 câu là đề Practice của một bài (`lesson_id`) và cũng là kho set ôn (§7.6); `TOPIC_TEST` và `COURSE_TEST` tạo qua API author (`POST /api/content/admin/packages`, gắn `topic_id`/`course_id`) hoặc seed; chúng cũng được tạo rỗng ở `DRAFT` khi duyệt bản nháp course và khi import Excel. V5.5: mỗi câu hỏi chỉ thuộc một nơi dùng (một bài, hoặc một gói `PRACTICE_SET`/`TOPIC_TEST`/`MOCK_TEST`/`PLACEMENT_TEST`); publish kiểm và trả `422 QUESTION_ALREADY_USED` (không áp cho `QUIZ`, `LESSON`). Content không sở hữu khái niệm plan `FREE/PREMIUM`; nếu package cần entitlement thì chỉ khai báo `required_feature_key`, còn quyết định user có quyền truy cập thuộc `access-service`.
 
 Thuộc tính chính:
 
@@ -687,6 +687,7 @@ Thuộc tính chính:
 | `skill?` | — | — | Kỹ năng liên quan. |
 | `purpose` | varchar(20) | NOT NULL DEFAULT `LEARNING`; CHECK `LEARNING`/`EXAM`; INDEX | Content V17. Câu dùng để học (bài, Practice, đề cuối topic) hay để thi (`MOCK_TEST`, `PLACEMENT_TEST`). Publish gói sai loại → `422 QUESTION_PURPOSE_MISMATCH`. Không sửa được sau khi tạo. |
 | `required_feature_key?` | varchar(100) | Logical ref ↗ `Access.plan_features.feature_key` | Feature cần có để truy cập question khi áp dụng; `NULL` nếu không có gate riêng. Không FK xuyên service. |
+| `import_ref?` | varchar(100) | UNIQUE partial (`WHERE import_ref IS NOT NULL`) | Content V76. Mã ổn định để file Excel và bản nháp AI tham chiếu câu hỏi (`ai-<draftId>-<index>` cho câu từ bản nháp). Không đổi sau khi tạo. |
 | `status` | — | — | Trạng thái hiện tại của bản ghi. |
 | `current_published_version_id?` | — | — | Phiên bản đang publish. |
 | `created_at` | — | — | Thời điểm tạo bản ghi. |
@@ -1133,6 +1134,36 @@ Ví dụ bài viết và nhận xét gốc dùng làm dữ liệu hiệu chuẩn
 | `essay` | text | NOT NULL | Bài viết gốc. |
 | `commentary` | text | NOT NULL | Nhận xét chấm. |
 | `created_at` | timestamptz | DEFAULT CURRENT_TIMESTAMP | Thời điểm tạo. |
+
+## 5.24 `ai_drafts` (Content V77)
+
+Bản nháp mà author nhờ AI sinh (câu hỏi hoặc course) hoặc tự dựng tay (course). Không bao giờ tới học viên: duyệt bản nháp
+tạo nội dung `DRAFT` thường qua các use case có sẵn, còn phải xuất bản như mọi nội dung khác.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `id` | uuid | PK | Định danh bản nháp. |
+| `kind` | varchar(20) | CHECK `QUESTIONS`/`COURSE` | Loại nội dung của bản nháp. |
+| `status` | varchar(12) | CHECK `QUEUED`/`GENERATING`/`READY`/`FAILED`/`APPROVED`/`REJECTED` | Vòng đời: xếp hàng, đang sinh, chờ duyệt, lỗi, đã duyệt, đã từ chối. Bản nháp tay tạo thẳng `READY`. |
+| `requested_by` | uuid | NOT NULL; Logical ref ↗ `Identity.users` | Author sở hữu; người khác không đọc hay sửa được. |
+| `request` | jsonb | NOT NULL | Yêu cầu sinh (`{}` với bản nháp tay). |
+| `result` | jsonb | | Kết quả: câu hỏi (`items`, `rejected`) hoặc cấu trúc course kèm phân tích. |
+| `error_code?` | varchar(40) | | Mã lỗi an toàn khi `FAILED` (`NOT_CONFIGURED`, `INVALID_REPLY`, …). |
+| `model?`, `prompt_version?` | varchar | | Mô hình và phiên bản prompt đã dùng; null với bản nháp tay. |
+| `created_at`, `started_at?`, `finished_at?` | timestamptz | | Mốc xếp hàng, nhận việc, hoàn tất. |
+| `reviewed_by?`, `reviewed_at?`, `review_note?` | uuid, timestamptz, text | | Người duyệt và ghi chú. |
+
+INDEX (`status`, `created_at`) cho job nhận việc; INDEX (`requested_by`, `created_at` DESC) cho danh sách của author.
+
+## 5.25 `ai_usage_daily` (Content V77)
+
+Hạn mức theo ngày của từng author. `kind = AI` đếm yêu cầu sinh, `kind = IMPORT` đếm lần import Excel; hai loại không
+trừ chung. Một câu lệnh duy nhất quyết định còn lượt hay không; lượt được hoàn khi sinh thất bại.
+
+| Thuộc tính | Kiểu dữ liệu | Ràng buộc / Quan hệ | Chức năng / Ý nghĩa |
+| :--- | :--- | :--- | :--- |
+| `user_id`, `usage_date`, `kind` | uuid, date, varchar(10) | PK; CHECK `kind` ∈ `AI`/`IMPORT` | Author, ngày theo `content.ai.quota-zone`, loại hạn mức. |
+| `count` | integer | CHECK `>= 0` | Số lượt đã dùng trong ngày. |
 
 # 6. Assessment — Làm bài, nộp bài và kết quả
 

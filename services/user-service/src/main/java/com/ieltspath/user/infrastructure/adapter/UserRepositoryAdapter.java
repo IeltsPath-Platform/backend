@@ -62,6 +62,11 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public List<UUID> lockActiveAdminUserIds() {
+        return userJpaRepository.lockActiveAdminUserIds();
+    }
+
+    @Override
     public List<User> findAll() {
         return userJpaRepository.findAll().stream().map(userMapper::toDomain).toList();
     }

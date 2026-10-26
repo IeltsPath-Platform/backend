@@ -22,6 +22,10 @@ public interface LearningContentClient {
 
     List<Topic> getTopicSequence();
 
+    default List<Topic> getTopicSequence(boolean includeErrorTraps) {
+        return getTopicSequence();
+    }
+
     List<LessonSummary> getTopicLessons(UUID topicId);
 
     Lesson getLesson(UUID lessonId);
@@ -74,6 +78,12 @@ public interface LearningContentClient {
         return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit);
     }
 
+    default List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
+                                                 int minQuestions, int limit, UUID preferredLessonId,
+                                                 String trapErrorCode) {
+        return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId);
+    }
+
     PackageVersion getPackageVersion(UUID versionId);
 
     /** The active prerequisites of each knowledge point; a point without any maps to an empty list. */
@@ -86,6 +96,25 @@ public interface LearningContentClient {
     default Map<UUID, String> questionDifficulties(Collection<UUID> questionVersionIds) {
         return Map.of();
     }
+
+    /**
+     * Names of the knowledge points and the start of the question stems (at most 500 of each) that staff work items are
+     * about. Unknown ids are absent. Used only to label the work queue.
+     */
+    default WorkItemSubjects workItemSubjects(Collection<UUID> knowledgePointIds, Collection<UUID> questionVersionIds) {
+        return new WorkItemSubjects(Map.of(), Map.of());
+    }
+
+    record WorkItemSubjects(Map<UUID, KnowledgePointLabel> knowledgePoints, Map<UUID, QuestionLabel> questions) {
+        public WorkItemSubjects {
+            knowledgePoints = knowledgePoints == null ? Map.of() : knowledgePoints;
+            questions = questions == null ? Map.of() : questions;
+        }
+    }
+
+    record KnowledgePointLabel(String code, String name) {}
+
+    record QuestionLabel(UUID questionId, String stemPreview) {}
 
     /** Published practice sets, practice tests and lessons for these points (at most 50), none above {@code maxBand}. */
     SuggestionCandidates suggestionCandidates(List<UUID> knowledgePointIds, BigDecimal maxBand);
@@ -107,11 +136,32 @@ public interface LearningContentClient {
 
     record Rubric(String code, String task, int version, String sourceNote, List<RubricCriterion> criteria,
                   List<RubricExample> examples) {}
+    /** {@code knowledgePointId} is the point the criterion is evidence for; null when Content does not map it. */
     record RubricCriterion(String code, String name, String description, int sortOrder,
-                           List<RubricBandDescriptor> bandDescriptors) {}
+                           List<RubricBandDescriptor> bandDescriptors, UUID knowledgePointId,
+                           List<SubKnowledgePoint> subKnowledgePoints) {
+        public RubricCriterion {
+            subKnowledgePoints = subKnowledgePoints == null ? List.of() : List.copyOf(subKnowledgePoints);
+        }
+
+        public RubricCriterion(String code, String name, String description, int sortOrder,
+                               List<RubricBandDescriptor> bandDescriptors) {
+            this(code, name, description, sortOrder, bandDescriptors, null, List.of());
+        }
+
+        public RubricCriterion(String code, String name, String description, int sortOrder,
+                               List<RubricBandDescriptor> bandDescriptors, UUID knowledgePointId) {
+            this(code, name, description, sortOrder, bandDescriptors, knowledgePointId, List.of());
+        }
+    }
+    record SubKnowledgePoint(UUID id, String code, String name, String description) {}
     record RubricBandDescriptor(java.math.BigDecimal band, String descriptor) {}
     record RubricExample(java.math.BigDecimal band, String prompt, String essay, String commentary) {}
-    record ErrorType(String code, String name, String category, int severity, String fixHint) {}
+    record ErrorType(String code, String name, String category, int severity, String fixHint, UUID knowledgePointId) {
+        public ErrorType(String code, String name, String category, int severity, String fixHint) {
+            this(code, name, category, severity, fixHint, null);
+        }
+    }
 
     /** The given skills in enum order, or the single legacy skill when Content did not send any. */
     static Set<LearningSkill> skillsOrSingle(Collection<LearningSkill> skills, LearningSkill single) {
@@ -175,10 +225,15 @@ public interface LearningContentClient {
 
     /** {@code cefrLevel} ({@code A1} to {@code C2}) and {@code canDo} are null when Content has not set them. */
     record KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
-                          String description, boolean hasPracticeSet, String cefrLevel, String canDo) {
+                          String description, boolean hasPracticeSet, String cefrLevel, String canDo,
+                          UUID parentKnowledgePointId, String errorCode) {
+        public KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
+                              String description, boolean hasPracticeSet, String cefrLevel, String canDo) {
+            this(id, code, name, learningType, skill, description, hasPracticeSet, cefrLevel, canDo, null, null);
+        }
         public KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
                               String description, boolean hasPracticeSet) {
-            this(id, code, name, learningType, skill, description, hasPracticeSet, null, null);
+            this(id, code, name, learningType, skill, description, hasPracticeSet, null, null, null, null);
         }
     }
 
@@ -278,10 +333,14 @@ public interface LearningContentClient {
      * needs; both are null when Content does not say, which means no limit.
      */
     record PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
-                       int matchedQuestionCount, BigDecimal band, String requiredFeatureKey) {
+                       int matchedQuestionCount, BigDecimal band, String requiredFeatureKey, int trapQuestionCount) {
+        public PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
+                           int matchedQuestionCount, BigDecimal band, String requiredFeatureKey) {
+            this(packageId, packageVersionId, code, questionCount, matchedQuestionCount, band, requiredFeatureKey, 0);
+        }
         public PracticeSet(UUID packageId, UUID packageVersionId, String code, int questionCount,
                            int matchedQuestionCount) {
-            this(packageId, packageVersionId, code, questionCount, matchedQuestionCount, null, null);
+            this(packageId, packageVersionId, code, questionCount, matchedQuestionCount, null, null, 0);
         }
     }
 
@@ -320,7 +379,18 @@ public interface LearningContentClient {
 
     record Item(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
                 Map<String, Object> answerSpec, String explanation, String hint, BigDecimal maxScore,
-                List<KnowledgePointMapping> knowledgePointMappings) {
+                List<KnowledgePointMapping> knowledgePointMappings, String guide, List<WritingImage> images) {
+        public Item {
+            images = images == null ? List.of() : List.copyOf(images);
+        }
+
+        public Item(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
+                    Map<String, Object> answerSpec, String explanation, String hint, BigDecimal maxScore,
+                    List<KnowledgePointMapping> knowledgePointMappings) {
+            this(questionVersionId, sortOrder, stem, options, answerSpec, explanation, hint, maxScore,
+                    knowledgePointMappings, null, List.of());
+        }
+
         public Item(UUID questionVersionId, int sortOrder, String stem, List<Option> options,
                     Map<String, Object> answerSpec, String explanation, BigDecimal maxScore,
                     List<KnowledgePointMapping> knowledgePointMappings) {
@@ -328,6 +398,8 @@ public interface LearningContentClient {
                     knowledgePointMappings);
         }
     }
+
+    record WritingImage(String mediaUrl, String altText) {}
 
     record KnowledgePointMapping(UUID knowledgePointId, BigDecimal weight) {
     }

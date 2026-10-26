@@ -2,13 +2,16 @@ package com.ieltspath.content.infrastructure.persistence;
 
 import com.ieltspath.content.application.command.UpdateKnowledgePointCommand;
 import com.ieltspath.content.application.usecase.GetActiveKnowledgePrerequisitesUseCase;
+import com.ieltspath.content.application.usecase.GetKnowledgeTreeHealthUseCase;
 import com.ieltspath.content.application.usecase.GetKnowledgeTreeUseCase;
 import com.ieltspath.content.application.usecase.ReplaceKnowledgePointPrerequisitesUseCase;
 import com.ieltspath.content.application.usecase.UpdateKnowledgePointUseCase;
+import com.ieltspath.content.application.service.TrapKnowledgePointSync;
 import com.ieltspath.content.domain.aggregate.KnowledgePoint;
 import com.ieltspath.content.domain.aggregate.Topic;
 import com.ieltspath.content.domain.exception.KnowledgePointInUseException;
 import com.ieltspath.content.domain.exception.PrerequisiteCycleException;
+import com.ieltspath.content.domain.exception.PrerequisiteLevelException;
 import com.ieltspath.content.domain.repository.KnowledgePointRepository;
 import com.ieltspath.content.domain.repository.TopicRepository;
 import com.ieltspath.content.domain.vo.ContentStatus;
@@ -17,6 +20,7 @@ import com.ieltspath.content.domain.vo.KnowledgePointKind;
 import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.Skill;
 import com.ieltspath.content.infrastructure.persistence.adapter.KnowledgePointRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.adapter.JdbcErrorTypeRepository;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcKnowledgePrerequisiteRepository;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import com.ieltspath.content.infrastructure.persistence.mapper.KnowledgePointPersistenceMapper;
@@ -125,11 +129,14 @@ class KnowledgeTreeIntegrationTest {
                 .getRepository(KnowledgePointJpaRepository.class);
         productionKnowledgePointRepository = new KnowledgePointRepositoryAdapter(
                 jpaKnowledgePointRepository, new KnowledgePointPersistenceMapper());
+        var errorTypeRepository = new JdbcErrorTypeRepository(namedJdbc);
+        var trapKnowledgePointSync = new TrapKnowledgePointSync(productionKnowledgePointRepository, errorTypeRepository);
         getKnowledgeTree = new GetKnowledgeTreeUseCase(reader, prerequisiteRepository);
         getActivePrerequisites = new GetActiveKnowledgePrerequisitesUseCase(reader);
         replacePrerequisites = new ReplaceKnowledgePointPrerequisitesUseCase(
-                knowledgePointRepository, prerequisiteRepository);
-        updateKnowledgePoint = new UpdateKnowledgePointUseCase(productionKnowledgePointRepository, topicRepository);
+                knowledgePointRepository, prerequisiteRepository, errorTypeRepository);
+        updateKnowledgePoint = new UpdateKnowledgePointUseCase(productionKnowledgePointRepository, topicRepository,
+                prerequisiteRepository, trapKnowledgePointSync);
         transactions = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
     }
 
@@ -283,6 +290,63 @@ class KnowledgeTreeIntegrationTest {
                 .isInstanceOf(KnowledgePointInUseException.class);
     }
 
+    @Test
+    void replacingPrerequisitesRejectsAPrerequisiteWithAHigherCefrLevel() {
+        UUID topic = topic(course(), Skill.READING);
+        UUID dependent = knowledgePoint(topic, "DEPENDENT");
+        UUID sameLevel = knowledgePoint(topic, "SAME");
+        UUID higher = knowledgePoint(topic, "HIGHER");
+        setCefrLevel(dependent, "B1");
+        setCefrLevel(sameLevel, "B1");
+        setCefrLevel(higher, "C1");
+
+        assertThatThrownBy(() -> replace(dependent, List.of(sameLevel, higher)))
+                .isInstanceOfSatisfying(PrerequisiteLevelException.class,
+                        exception -> assertThat(exception.getInvalidIds()).containsExactly(higher));
+        assertThat(prerequisiteRepository.findPrerequisiteIds(dependent)).isEmpty();
+
+        replace(dependent, List.of(sameLevel));
+        assertThat(prerequisiteRepository.findPrerequisiteIds(dependent)).containsExactly(sameLevel);
+    }
+
+    @Test
+    void changingACefrLevelIsRejectedWhenItInvertsAnExistingEdge() {
+        UUID topic = topic(course(), Skill.READING);
+        UUID prerequisite = knowledgePoint(topic, "PRE");
+        UUID dependent = knowledgePoint(topic, "DEP");
+        replace(dependent, List.of(prerequisite));
+
+        assertThatThrownBy(() -> updateCefrLevel(prerequisite, CefrLevel.C1))
+                .isInstanceOfSatisfying(PrerequisiteLevelException.class,
+                        exception -> assertThat(exception.getInvalidIds()).containsExactly(dependent));
+        assertThatThrownBy(() -> updateCefrLevel(dependent, CefrLevel.B1))
+                .isInstanceOfSatisfying(PrerequisiteLevelException.class,
+                        exception -> assertThat(exception.getInvalidIds()).containsExactly(prerequisite));
+
+    }
+
+    @Test
+    void healthReportsIsolatedPointsMissingMetadataAndInvertedEdges() {
+        UUID topic = topic(course(), Skill.READING);
+        UUID alone = knowledgePoint(topic, "ALONE");
+        UUID noMetadata = knowledgePoint(topic, "NOMETA");
+        UUID low = knowledgePoint(topic, "LOW");
+        UUID high = knowledgePoint(topic, "HIGH");
+        jdbc.update("UPDATE knowledge_points SET cefr_level = NULL, can_do = NULL WHERE id = ?", noMetadata);
+        setCefrLevel(low, "B1");
+        setCefrLevel(high, "C1");
+        // The API refuses an inverted edge, so the fixture writes it directly.
+        jdbc.update("INSERT INTO knowledge_point_prerequisites(knowledge_point_id, prerequisite_id) VALUES (?, ?)",
+                low, high);
+
+        var health = new GetKnowledgeTreeHealthUseCase(reader, prerequisiteRepository).execute();
+
+        assertThat(health.isolatedIds()).contains(alone, noMetadata).doesNotContain(low, high);
+        assertThat(health.missingMetadataIds()).contains(noMetadata).doesNotContain(alone, low, high);
+        assertThat(health.levelViolations())
+                .contains(new com.ieltspath.content.application.result.KnowledgeTreeHealthResult.LevelViolation(high, low));
+    }
+
     private void replace(UUID id, List<UUID> prerequisites) {
         transactions.executeWithoutResult(status -> replacePrerequisites.execute(id, prerequisites));
     }
@@ -302,7 +366,20 @@ class KnowledgeTreeIntegrationTest {
     private void updateTopic(UUID id, UUID topicId) {
         KnowledgePoint point = knowledgePointRepository.findById(id).orElseThrow();
         updateKnowledgePoint.execute(id, new UpdateKnowledgePointCommand(topicId, point.getCode(), point.getName(),
-                point.getKind(), point.getLearningType(), point.getSkill(), point.getDescription()));
+                point.getKind(), point.getLearningType(), point.getSkill(), point.getDescription(),
+                point.getCefrLevel(), point.getCanDo(), point.getScopeIn(), point.getScopeOut()));
+    }
+
+    private void updateCefrLevel(UUID id, CefrLevel level) {
+        KnowledgePoint point = knowledgePointRepository.findById(id).orElseThrow();
+        transactions.executeWithoutResult(status -> updateKnowledgePoint.execute(id, new UpdateKnowledgePointCommand(
+                point.getTopicId(), point.getCode(), point.getName(), point.getKind(), point.getLearningType(),
+                point.getSkill(), point.getDescription(), level, point.getCanDo(), point.getScopeIn(),
+                point.getScopeOut())));
+    }
+
+    private void setCefrLevel(UUID id, String level) {
+        jdbc.update("UPDATE knowledge_points SET cefr_level = ? WHERE id = ?", level, id);
     }
 
     private void deactivate(UUID id) {
@@ -350,8 +427,9 @@ class KnowledgeTreeIntegrationTest {
         UUID id = UUID.randomUUID();
         knowledgePointIds.add(id);
         jdbc.update("""
-                INSERT INTO knowledge_points(id, topic_id, code, name, kind, learning_type, skill, status)
-                VALUES (?, ?, ?, ?, 'GRAMMAR', 'CONCEPT', 'READING', 'ACTIVE')
+                INSERT INTO knowledge_points(id, topic_id, code, name, kind, learning_type, skill, status,
+                                             cefr_level, can_do)
+                VALUES (?, ?, ?, ?, 'GRAMMAR', 'CONCEPT', 'READING', 'ACTIVE', 'B2', 'Fixture can-do.')
                 """, id, topicId, "R55_TREE_" + suffix + "_" + id.toString().replace("-", ""), suffix);
         return id;
     }
@@ -382,7 +460,10 @@ class KnowledgeTreeIntegrationTest {
                 rs.getString("code"), rs.getString("name"), KnowledgePointKind.valueOf(rs.getString("kind")),
                 LearningType.valueOf(rs.getString("learning_type")),
                 rs.getString("skill") == null ? null : Skill.valueOf(rs.getString("skill")),
-                rs.getString("description"), ContentStatus.valueOf(rs.getString("status")),
+                rs.getString("description"),
+                rs.getString("cefr_level") == null ? null : CefrLevel.valueOf(rs.getString("cefr_level")),
+                rs.getString("can_do"), rs.getString("scope_in"), rs.getString("scope_out"),
+                ContentStatus.valueOf(rs.getString("status")),
                 rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant());
     }
 
@@ -394,7 +475,8 @@ class KnowledgeTreeIntegrationTest {
     }
 
     private static class JdbcTestKnowledgePointRepository implements KnowledgePointRepository {
-        private static final String COLUMNS = "id, topic_id, code, name, kind, learning_type, skill, description, status, created_at, updated_at";
+        private static final String COLUMNS = "id, topic_id, code, name, kind, learning_type, skill, description, cefr_level, can_do, scope_in, scope_out, "
+                + "status, created_at, updated_at";
         private final JdbcTemplate jdbc;
         private final NamedParameterJdbcTemplate namedJdbc;
 
@@ -407,10 +489,13 @@ class KnowledgeTreeIntegrationTest {
         public KnowledgePoint save(KnowledgePoint point) {
             jdbc.update("""
                     UPDATE knowledge_points SET topic_id = ?, code = ?, name = ?, kind = ?, learning_type = ?,
-                        skill = ?, description = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+                        skill = ?, description = ?, cefr_level = ?, can_do = ?, scope_in = ?, scope_out = ?,
+                        status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
                     """, point.getTopicId(), point.getCode(), point.getName(), point.getKind().name(),
                     point.getLearningType().name(), point.getSkill() == null ? null : point.getSkill().name(),
-                    point.getDescription(), point.getStatus().name(), point.getId());
+                    point.getDescription(), point.getCefrLevel() == null ? null : point.getCefrLevel().name(),
+                    point.getCanDo(), point.getScopeIn(), point.getScopeOut(), point.getStatus().name(),
+                    point.getId());
             return findById(point.getId()).orElseThrow();
         }
 

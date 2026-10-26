@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" font-family="Arial,Helvetica,sans-serif">
+<rect x="0.00" y="0.00" width="1600.00" height="1000.00" rx="0" fill="#ffffff"/>
+<text x="800.00" y="76.00" font-size="40" fill="#1e293b" text-anchor="middle" font-weight="700">Monthly household spending</text>
+<text x="800.00" y="125.00" font-size="26" fill="#64748b" text-anchor="middle" font-weight="400">Share of income by category (%), 1990 and 2020</text>
+<text x="420.00" y="205.00" font-size="34" fill="#1e293b" text-anchor="middle" font-weight="700">1990</text>
+<path d="M 420 455 L 420.000 220.000 A 235 235 0 0 1 655.000 455.000 Z" fill="#5261cf" stroke="white" stroke-width="4"/>
+<text x="531.33" y="354.67" font-size="32" fill="#ffffff" text-anchor="middle" font-weight="700">25%</text>
+<path d="M 420 455 L 655.000 455.000 A 235 235 0 0 1 347.381 678.498 Z" fill="#edaa32" stroke="white" stroke-width="4"/>
+<text x="512.55" y="593.38" font-size="32" fill="#ffffff" text-anchor="middle" font-weight="700">30%</text>
+<path d="M 420 455 L 347.381 678.498 A 235 235 0 0 1 229.881 593.130 Z" fill="#37a89a" stroke="white" stroke-width="4"/>
+<text x="327.45" y="593.38" font-size="32" fill="#ffffff" text-anchor="middle" font-weight="700">10%</text>
+<path d="M 420 455 L 229.881 593.130 A 235 235 0 0 1 196.502 382.381 Z" fill="#dd798b" stroke="white" stroke-width="4"/>
+<text x="264.49" y="490.63" font-size="32" fill="#ffffff" text-anchor="middle" font-weight="700">15%</text>
+<path d="M 420 455 L 196.502 382.381 A 235 235 0 0 1 420.000 220.000 Z" fill="#8291a5" stroke="white" stroke-width="4"/>
+<text x="327.45" y="338.62" font-size="32" fill="#ffffff" text-anchor="middle" font-weight="700">20%</text>
+<text x="1180.00" y="205.00" font-size="34" fill="#1e293b" text-anchor="middle" font-weight="700">2020</text>
+<path d="M 1180 455 L 1180.000 220.000 A 235 235 0 0 1 1370.119 593.130 Z" fill="#5261cf" stroke="white" stroke-width="4"/>
+<text x="1320.29" y="394.52" font-size="32" fill="#ffffff" text-anchor="middle" font-weight="700">35%</text>
+<path d="M 1180 455 L 1370.119 593.130 A 235 235 0 0 1 1135.965 685.838 Z" fill="#edaa32" stroke="white" stroke-width="4"/>
+<text x="1237.96" y="612.39" font-size="32" fill="#ffffff" text-anchor="middle" font-weight="700">18%</text>
+<path d="M 1180 455 L 1135.965 685.838 A 235 235 0 0 1 967.366 555.058 Z" fill="#37a89a" stroke="white" stroke-width="4"/>
+<text x="1083.50" y="590.41" font-size="32" fill="#ffffff" text-anchor="middle" font-weight="700">15%</text>
+<path d="M 1180 455 L 967.366 555.058 A 235 235 0 0 1 1019.131 283.692 Z" fill="#dd798b" stroke="white" stroke-width="4"/>
+<text x="1025.34" y="436.50" font-size="32" fill="#ffffff" text-anchor="middle" font-weight="700">20%</text>
+<path d="M 1180 455 L 1019.131 283.692 A 235 235 0 0 1 1180.000 220.000 Z" fill="#8291a5" stroke="white" stroke-width="4"/>
+<text x="1122.04" y="319.61" font-size="32" fill="#ffffff" text-anchor="middle" font-weight="700">12%</text>
+<rect x="155.00" y="810.00" width="30.00" height="26.00" rx="3" fill="#5261cf"/>
+<text x="200.00" y="834.00" font-size="25" fill="#1e293b" text-anchor="start" font-weight="400">Housing</text>
+<rect x="425.00" y="810.00" width="30.00" height="26.00" rx="3" fill="#edaa32"/>
+<text x="470.00" y="834.00" font-size="25" fill="#1e293b" text-anchor="start" font-weight="400">Food</text>
+<rect x="695.00" y="810.00" width="30.00" height="26.00" rx="3" fill="#37a89a"/>
+<text x="740.00" y="834.00" font-size="25" fill="#1e293b" text-anchor="start" font-weight="400">Transport</text>
+<rect x="965.00" y="810.00" width="30.00" height="26.00" rx="3" fill="#dd798b"/>
+<text x="1010.00" y="834.00" font-size="25" fill="#1e293b" text-anchor="start" font-weight="400">Leisure</text>
+<rect x="1235.00" y="810.00" width="30.00" height="26.00" rx="3" fill="#8291a5"/>
+<text x="1280.00" y="834.00" font-size="25" fill="#1e293b" text-anchor="start" font-weight="400">Other</text>
+<text x="800.00" y="928.00" font-size="25" fill="#64748b" text-anchor="middle" font-weight="400">Each chart represents 100% of monthly income.</text>
+</svg>

@@ -9,11 +9,14 @@ import com.ieltspath.content.domain.exception.DifficultyRequiredException;
 import com.ieltspath.content.domain.exception.InvalidErrorTypeException;
 import com.ieltspath.content.domain.exception.QuestionNotFoundException;
 import com.ieltspath.content.domain.exception.UnknownErrorCodeException;
+import com.ieltspath.content.domain.service.TrueFalseNotGivenTraps;
 import com.ieltspath.content.domain.repository.ErrorTypeRepository;
 import com.ieltspath.content.domain.repository.QuestionRepository;
 import com.ieltspath.content.domain.vo.QuestionOptionPayload;
+import com.ieltspath.content.domain.vo.QuestionType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,14 +45,25 @@ public class AddQuestionVersionUseCase {
         }
         Question question = questionRepository.findById(command.questionId())
                 .orElseThrow(() -> new QuestionNotFoundException(command.questionId()));
-        validateDistractors(command.answerSpecJson(), command.options());
+        String answerSpecJson = addTfngDistractorsIfAvailable(question, command.answerSpecJson(), command.options());
+        validateDistractors(answerSpecJson, command.options());
+
+        if (command.knowledgePoints() != null) {
+            Set<java.util.UUID> mappedPointIds = command.knowledgePoints().stream()
+                    .map(AddQuestionVersionCommand.KnowledgePointInput::knowledgePointId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(Collectors.toSet());
+            if (errorTypeRepository.containsTrapKnowledgePoints(mappedPointIds)) {
+                throw new InvalidErrorTypeException("TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
+            }
+        }
 
         QuestionVersion version = QuestionVersion.create(
                 command.questionId(),
                 command.versionNumber(),
                 command.stem(),
                 command.options(),
-                command.answerSpecJson(),
+                answerSpecJson,
                 command.explanation(),
                 command.hint(),
                 command.difficulty()
@@ -70,17 +84,33 @@ public class AddQuestionVersionUseCase {
         question.addVersion(version);
         Question saved = questionRepository.save(question);
 
-        return new QuestionResult(
-                saved.getId(),
-                saved.getQuestionType(),
-                saved.getSkill(),
-                saved.getRequiredFeatureKey(),
-                saved.getStatus(),
-                saved.getCurrentPublishedVersionId(),
-                saved.getCreatedAt(),
-                saved.getUpdatedAt(),
-                saved.getPurpose()
-        );
+        return QuestionResult.of(saved);
+    }
+
+    private String addTfngDistractorsIfAvailable(Question question, String answerSpecJson,
+                                                  List<QuestionOptionPayload> options) {
+        if (question.getQuestionType() != QuestionType.TRUE_FALSE_NOT_GIVEN) {
+            return answerSpecJson;
+        }
+        JsonNode parsed = parse(answerSpecJson);
+        if (parsed == null || !parsed.isObject() || parsed.has("distractors") || options == null) {
+            return answerSpecJson;
+        }
+        Set<String> requiredCodes = Set.of("TFNG_NG_AS_FALSE", "TFNG_FALSE_AS_NG");
+        if (!errorTypeRepository.findActiveCodes(requiredCodes).containsAll(requiredCodes)) {
+            return answerSpecJson;
+        }
+        Set<String> optionKeys = options.stream().map(QuestionOptionPayload::optionKey).collect(Collectors.toSet());
+        Map<String, String> distractors = TrueFalseNotGivenTraps.distractorsFor(
+                parsed.path("correct").isTextual() ? parsed.path("correct").asText() : null, optionKeys);
+        if (distractors.isEmpty()) {
+            return answerSpecJson;
+        }
+        ObjectNode updated = ((ObjectNode) parsed).deepCopy();
+        ObjectNode mappings = JSON.createObjectNode();
+        distractors.forEach(mappings::put);
+        updated.set("distractors", mappings);
+        return updated.toString();
     }
 
     /**

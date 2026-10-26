@@ -44,6 +44,12 @@ public class LessonResource {
         return new LessonResource(UUID.randomUUID(), lessonId, resourceType, title, url, sortOrder, now, now);
     }
 
+    /** Used by the reorder use case, which assigns each resource of one type its position in the new sequence. */
+    public void changeSortOrder(int sortOrder) {
+        this.sortOrder = requireSortOrder(sortOrder);
+        this.updatedAt = Instant.now();
+    }
+
     public void update(String title, String url, int sortOrder) {
         String checkedTitle = requireTitle(title);
         String checkedUrl = requireUrl(url);

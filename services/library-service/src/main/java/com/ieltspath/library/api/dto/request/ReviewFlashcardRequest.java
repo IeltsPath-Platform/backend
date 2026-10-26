@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public record ReviewFlashcardRequest(
         @NotNull(message = "correct is required") Boolean correct,
-        @NotNull(message = "requestId is required") UUID requestId
+        @NotNull(message = "requestId is required") UUID requestId,
+        UUID sessionId
 ) {
 }

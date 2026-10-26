@@ -1,6 +1,7 @@
 package com.ieltspath.game.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
+import com.ieltspath.game.application.usecase.RocketGameplayUseCase;
 import com.ieltspath.game.application.usecase.SoloGameplayUseCase;
 
 import jakarta.validation.Valid;
@@ -16,10 +17,12 @@ import java.util.*;
 public class SoloGameplayController {
     private final CurrentUserProvider user;
     private final SoloGameplayUseCase gameplay;
+    private final RocketGameplayUseCase rocket;
 
-    public SoloGameplayController(CurrentUserProvider user, SoloGameplayUseCase gameplay) {
+    public SoloGameplayController(CurrentUserProvider user, SoloGameplayUseCase gameplay, RocketGameplayUseCase rocket) {
         this.user = user;
         this.gameplay = gameplay;
+        this.rocket = rocket;
     }
 
     @PostMapping("/{matchId}/guesses")
@@ -36,13 +39,16 @@ public class SoloGameplayController {
     }
 
     @PostMapping("/{matchId}/leave")
-    public ResponseEntity<Map<String, Object>> leave(@PathVariable("matchId") UUID matchId) {
+    public ResponseEntity<?> leave(@PathVariable("matchId") UUID matchId) {
+        // Leave and result are shared match routes; Rocket matches are served by the Rocket use case.
+        if (rocket.isRocket(matchId)) return ResponseEntity.ok(rocket.leave(matchId, user.requireUserId()));
         var reply = gameplay.leave(matchId, user.requireUserId());
         return ResponseEntity.status(reply.status()).body(reply.body());
     }
 
     @GetMapping("/{matchId}/result")
-    public Map<String, Object> result(@PathVariable("matchId") UUID matchId) {
+    public Object result(@PathVariable("matchId") UUID matchId) {
+        if (rocket.isRocket(matchId)) return rocket.result(matchId, user.requireUserId());
         return gameplay.result(matchId, user.requireUserId());
     }
 

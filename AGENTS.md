@@ -22,7 +22,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-events` | Thư viện tên exchange/routing key/header, record payload và helper `MessageRetry`/`RetryTopology` dùng chung; không deploy độc lập. |
 | `shared/common-storage` | Thư viện lưu object dùng chung (`ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy`); không deploy độc lập; service tự cấu hình bucket. |
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity và streak tại `/api/learning-support/{activities,streak}`. |
-| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset; kiểm topic cho library. |
+| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset; kiểm topic cho library. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
 | `services/library-service` | Cổng 8081, `library_db` (Compose PostgreSQL host 5440): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
 | `services/assessment-service` | Làm bài, chấm objective/LLM cho essay gate và EXAMINER, kết quả; phát `AssessmentCompleted.v2`. |
 | `services/access-service` | Gói, subscription, activation key, điểm. |
@@ -153,6 +153,15 @@ src/main/java/com/ieltspath/<service>
 - Assessment gate essay dùng OpenAI-compatible LLM qua `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`,
   `ASSESSMENT_LLM_MODEL`; quota theo ngày cấu hình bằng `ASSESSMENT_LLM_DAILY_LIMIT` (mặc định 20). Thiếu cấu hình,
   lỗi chấm hoặc hết quota thì essay được chuyển sang hàng chờ EXAMINER; không ghi essay/prompt vào log.
+- Content sinh bản nháp bằng OpenAI-compatible LLM qua `CONTENT_LLM_BASE_URL`, `CONTENT_LLM_API_KEY`,
+  `CONTENT_LLM_MODEL` (khóa chỉ ở `.env` không commit; biến nào không đặt thì dùng giá trị `LEARNING_LLM_*` tương ứng,
+  nên một cấu hình mô hình đủ cho cả hai service). Thiếu cấu hình thì bản nháp `FAILED` với `NOT_CONFIGURED`, service
+  vẫn chạy. Nhóm `content.ai.*` (số bản nháp mỗi lượt, thời gian coi là treo, `daily-limit`, `max-items-per-request`,
+  `max-course-candidates`, `quota-zone`); import Excel dùng chung `daily-limit` nhưng đếm riêng (`kind = IMPORT`). Tải
+  audio của author cần `SUPABASE_URL`/`SUPABASE_SECRET_KEY` và `CONTENT_MEDIA_BUCKET`, thiếu thì trả 503. Assessment đọc
+  tên giám khảo từ user-service qua `assessment.user.base-url` (`USER_SERVICE_URL`).
+- Mọi nội dung AI sinh ra (câu hỏi, course) chỉ là bản nháp: người duyệt chọn rồi mới tạo nội dung `DRAFT` thường, còn phải
+  xuất bản như mọi nội dung khác; không có đường nào từ bản nháp tới học viên. Nội dung nhập từ Excel đi qua cùng luật.
 - Chạy local bằng container: `docker compose up -d --build` khởi chạy PostgreSQL, RabbitMQ, Config Server, Eureka,
   Gateway và các service đã triển khai; Flyway của từng service tạo schema/seed trong database riêng. Để chạy Java từ
   IDE, dùng `docker compose up -d postgres rabbitmq` rồi trỏ các `*_DB_URL` tới `localhost:${MVP_POSTGRES_PORT:-5440}/<service>_db`; thứ tự service trên host là Config Server → Eureka → Gateway → business service.
@@ -161,12 +170,16 @@ src/main/java/com/ieltspath/<service>
   Chi tiết: `README.md` §6, `docs/system-architecture.md` §7.
 - Nhóm cấu hình nghiệp vụ: `learning.mastery.*` (ngưỡng mastery, lịch ôn; Admin ghi đè ở `learning_rule_configs`),
   `learning.flags.*` (ngưỡng cờ bất thường), `learning.tree-quality.*` (ngưỡng cạnh đáng ngờ, câu quá dễ/khó),
-  `learning.work-items.*` (chu kỳ đồng bộ hàng việc), `learning.writing.*` (hạn mức chấm essay), `learning.free-practice.*`
+  `content.ai.*` (bản nháp AI và hạn mức của khu author), `learning.work-items.*` (chu kỳ đồng bộ hàng việc), `learning.writing.*` (hạn mức chấm essay), `learning.free-practice.*`
   (số gói dự trữ cho bài ôn), `learning.gamification.*` (múi giờ mặc định, XP, tim, nhiệm vụ), `learning.rewards.*` (gửi
   điểm thưởng sang access), `learning.snapshots.*` (bản chụp tuần/tháng, giữ 12 tuần/36 tháng), `learning.league.*` (chốt
   tuần), `learning.user.base-url` (gọi user-service), `assessment.ai-eval.*` (đánh giá AI), `assessment.qa.*` (tỷ lệ lấy mẫu QA
   Mentor). Trọng số và ngưỡng điểm khóa nằm trong DB (`course_score_configs`), không trong yaml. Chính sách dùng AI:
   `docs/ai-policy.md`.
+- `learning.error-trap.*` configures the optional parent review generated when a trap child enters `PRIORITY` and its
+  response limit. Trap evidence uses source `error_trap` at weight 0.3; it does not consume the MP-1.0 practice-answer
+  limit. Evidence writes resolve error-code-to-child mappings from Learning's local catalog and must not make an HTTP
+  request to Content. Content lookup for learner-facing `name` and `fixHint` happens after grading and is best-effort.
 - `Dockerfile.spring-service` build module Maven theo `MODULE_PATH`; Config Server có Dockerfile riêng.
 
 ### 3.7 Hiệu năng persistence, N+1 và độ phức tạp
@@ -191,6 +204,9 @@ src/main/java/com/ieltspath/<service>
   (`Mp1MasteryCalculator`, `learning.mastery.policy=MP1`): cửa sổ 8 bằng chứng, tối đa 3 bài luyện, trọng số nguồn, giảm theo tuổi (half-life 30
   ngày), cùng câu trong 7 ngày tính một lần, tier `INSUFFICIENT` khi chưa đủ dữ liệu, biên đệm 0.03 khi đổi tier. Điểm
   MP-1.0 giảm theo thời gian qua `MasteryDecayJob`. Đổi công thức phải chạy rebuild cho mọi hồ sơ.
+- Error trap evidence is a separate `error_trap` source with weight 0.3 and a profile per child KP. Main parent error is
+  the weakest child with enough MP-1.0 data (stable error-code tie-break). Trap children are nested under parents in the
+  learner report/tree only after evidence; exclude child KPs from parent-only rollups, availability, and progression.
 - Skill của lesson suy ra từ câu hỏi trong các block; lesson có thể chứa nhiều skill. Khóa lesson, review và Practice
   được áp theo từng skill; bài học hoàn thành theo các block bắt buộc, Practice phải đạt riêng cho từng skill có yêu cầu.
 - Thứ tự topic theo user từ Content `topic-sequence`, không LLM/goal; mỗi course là một chuỗi chung mọi skill. Placement
@@ -216,6 +232,26 @@ src/main/java/com/ieltspath/<service>
   trò (`work_items`, `WorkItemSync` đồng bộ khi mở danh sách và mỗi 3 giờ qua `WorkItemSyncJob`, khóa advisory để chỉ một instance chạy), thống kê câu và chất lượng cây (`learning-staff-area-v1.md`).
 - Essay: sửa và nộp lại essay lesson tối đa 3 lần, chỉ từ bản mới nhất (`essay-revision-v1.md`); học viên có tín dụng
   nhờ Mentor chữa essay lesson/Practice đã chấm (`human-review-v1.md`), chỉ là phản hồi: không đổi bằng chứng, cổng hay bài ôn.
+- Bằng chứng essay (lesson và Practice): KP của đề nhận `passed`; mỗi tiêu chí rubric (TA/TR, CC, LR, GRA) là một bằng chứng
+  riêng cho KP tiêu chí được ánh xạ (`DEMO_WRITING_CRITERION_*`, bảng `writing_criterion_knowledge_points` ở Content), đúng khi
+  band tiêu chí >= `passBand`. Các KP con trong `subKnowledgePoints` được đánh giá cùng band trong đúng một request LLM
+  (`kpj2`, nối hướng dẫn vào template band `v1` nguyên vẹn): chỉ `PASS`/
+  `FAIL` có excerpt nguyên văn mới ghi evidence, không phụ thuộc passBand; `NOT_ASSESSED` không ghi. Correction có error type
+  gắn KP con có thể hạ `PASS` hoặc nâng `NOT_ASSESSED` thành `FAIL`. KP tiêu chí thắng nếu cùng ID; KP con thắng KP của đề.
+  `judgments` thiếu/sai thì giữ band hợp lệ, KP `NOT_ASSESSED` trừ `FAIL` từ correction đã kiểm tra. Hai phần đến từ cùng
+  output AI; đối chiếu correction là luật application. `EssayKnowledgeJudge` không dùng LLM/clock; catalog Content được
+  lấy khi cần qua supplier do grader cung cấp, tối đa một lần. Không có call
+  sửa JSON hay HTTP retry tự động cho 429/503; JSON/band sai là `INVALID_GRADE`, không thu points. Timeout chung
+  `learning.writing.grading-timeout-seconds` mặc định 20 giây, không còn timeout/skip riêng cho judgment; quota một lượt.
+  `promptVersion` vẫn `+tplv1` cho activation band; `judgmentVersion=kpj2` ở JSON lưu bất cứ khi nào rubric có KP con (prompt đã nối hướng dẫn),
+  kể cả khi mô hình không trả mảng judgments; không có KP con thì null và không cần mảng judgments.
+  API không phát `judgmentVersion`. KP tiêu chí / KP con lưu trong JSON grade; bài cũ chưa có judgments đọc thành `[]`.
+  Event essay vẫn một dòng cho KP của đề, `error_code` là mã lỗi gặp nhiều nhất. Bằng chứng tiêu chí và KP con của essay
+  Practice không được XP mốc. Essay lesson/Practice tính evidence có thể tạo bài ôn tùy chọn `WRITING_CRITERION` cho KP
+  tiêu chí rớt (mặc định tối đa 2, `learning.writing.criterion-review-limit`); không tạo cho bài viết tự do, revision hay KP con.
+  Mỗi KP tiêu chí có 3 bộ luyện tự do demo (`PS-WCR-*`, V70;
+  nội dung AI soạn, cần giám khảo IELTS duyệt). Kết quả chấm trả thêm `studyPoints` (KP tiêu chí yếu, KP con `FAIL` và `focus`
+  của LLM), tính một lần lúc chấm và lưu trong JSON bài chấm; bài cũ trả mảng rỗng.
 - Luyện tự do theo KP (`POST /knowledge-points/{id}/free-practice`) không bao giờ chặn đường học: trượt không sinh bài
   ôn chặn và không khóa gì; mỗi KP luôn giữ lại `learning.free-practice.reserve` gói chưa xem cho bài ôn
   (`free-practice-v1.md`). Bằng chứng luyện tự do là bằng chứng luyện tập (trọng số và trần 3 bài luyện của MP-1.0).
@@ -235,7 +271,9 @@ src/main/java/com/ieltspath/<service>
 - Bằng chứng bài học chỉ ghi ở lần nộp đầu của mỗi khối; bài ôn ghi mỗi set (nộp một lần); kết quả thi ghi theo
   `(attempt_id, result_version)`, chấm lại thì thay bằng chứng của version cũ.
 - Học viên không bao giờ nhận `answerSpec` hay `chartFacts`. `explanation` và transcript chỉ có sau khi đạt, **trừ**
-  practice attempt, set ôn và quick-check của bài ôn: có ngay sau khi nộp. Package đã nộp ở Practice hoặc đã giao trong
+  practice attempt, set ôn và quick-check của bài ôn: có ngay sau khi nộp. Essay trong practice attempt còn mang
+  `sampleAnswer` (lấy từ `explanation`) ngay khi mở bài, để học viên bật xem bài mẫu trong lúc viết; essay của lesson thì
+  vẫn chỉ có sau khi block đạt. Package đã nộp ở Practice hoặc đã giao trong
   bài ôn không bao giờ được giao lại làm set ôn cho chính học viên đó (hết package thì bài ôn `SKIPPED`).
 - Consumer không gọi HTTP; ACK sau khi transaction commit; vi phạm contract hoặc hết lượt thử → DLQ.
 - Tác vụ LLM mới cho học viên (chấm Writing) phải có hạn mức theo ngày (plan 0737).

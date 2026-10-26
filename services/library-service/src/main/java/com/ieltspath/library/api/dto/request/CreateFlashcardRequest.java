@@ -13,6 +13,18 @@ public record CreateFlashcardRequest(
         UUID sourceReferenceId,
         @Size(max = 2000) String highlightedText,
         @NotBlank @Size(max = 4000) String front,
-        @NotBlank @Size(max = 4000) String back
+        @NotBlank @Size(max = 4000) String back,
+        @Size(max = 300) String imageKey,
+        @Size(max = 1000) String exampleSentence
 ) {
+    public CreateFlashcardRequest(
+            FlashcardSourceType sourceType,
+            UUID vocabularySenseId,
+            UUID sourceReferenceId,
+            String highlightedText,
+            String front,
+            String back
+    ) {
+        this(sourceType, vocabularySenseId, sourceReferenceId, highlightedText, front, back, null, null);
+    }
 }

@@ -39,7 +39,7 @@ public class GradingJobController {
     private final GetJobEssayUseCase getEssay;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('EXAMINER','ADMIN')")
+    @PreAuthorize("hasRole('EXAMINER')")
     public ExaminerQueueStore.QueuePage list(@RequestParam(name="mode",defaultValue="HUMAN") String mode,
             @RequestParam(name="status",defaultValue="QUEUED") String status,@RequestParam(name="page",defaultValue="0") int page,
             @RequestParam(name="size",defaultValue="20") int size) {
@@ -50,13 +50,13 @@ public class GradingJobController {
     }
 
     @PostMapping("/{id}/claim")
-    @PreAuthorize("hasAnyRole('EXAMINER','ADMIN')")
+    @PreAuthorize("hasRole('EXAMINER')")
     public ExaminerQueueStore.QueueEntry claim(@PathVariable("id") UUID id) {
         return claimJob.execute(currentUser.requireUserId(),id);
     }
 
     @GetMapping("/{id}/essay")
-    @PreAuthorize("hasAnyRole('EXAMINER','ADMIN')")
+    @PreAuthorize("hasRole('EXAMINER')")
     public ExaminerQueueStore.Essay essay(@PathVariable("id") UUID id) {
         return getEssay.execute(currentUser.requireUserId(),id);
     }

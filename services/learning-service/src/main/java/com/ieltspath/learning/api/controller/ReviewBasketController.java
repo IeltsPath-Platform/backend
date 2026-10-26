@@ -2,7 +2,9 @@ package com.ieltspath.learning.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.response.ReviewResponse;
-import com.ieltspath.learning.application.result.ReviewBasketResult;
+import com.ieltspath.learning.api.dto.response.ReviewBasketResponse;
+import com.ieltspath.learning.api.dto.response.ReviewBasketSummaryResponse;
+import com.ieltspath.learning.application.usecase.GetReviewBasketSummaryUseCase;
 import com.ieltspath.learning.application.usecase.GetReviewBasketUseCase;
 import com.ieltspath.learning.application.usecase.StartBasketReviewUseCase;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,18 +22,26 @@ import java.util.UUID;
 public class ReviewBasketController {
     private final CurrentUserProvider currentUser;
     private final GetReviewBasketUseCase basket;
+    private final GetReviewBasketSummaryUseCase summary;
     private final StartBasketReviewUseCase start;
 
     public ReviewBasketController(CurrentUserProvider currentUser, GetReviewBasketUseCase basket,
-                                  StartBasketReviewUseCase start) {
+                                  GetReviewBasketSummaryUseCase summary, StartBasketReviewUseCase start) {
         this.currentUser = currentUser;
         this.basket = basket;
+        this.summary = summary;
         this.start = start;
     }
 
     @GetMapping
-    public ReviewBasketResult basket() {
-        return basket.execute(currentUser.requireUserId());
+    public ReviewBasketResponse basket() {
+        return ReviewBasketResponse.from(basket.execute(currentUser.requireUserId()));
+    }
+
+    /** The counts of the basket without its items, for a badge that is read on every page. */
+    @GetMapping("/summary")
+    public ReviewBasketSummaryResponse summary() {
+        return ReviewBasketSummaryResponse.from(summary.execute(currentUser.requireUserId()));
     }
 
     /** Starts (or returns) an optional review of the point and gives its first set. */

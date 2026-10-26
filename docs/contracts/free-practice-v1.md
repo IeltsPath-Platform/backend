@@ -51,3 +51,14 @@ attempt submission route; that response carries the `gamification` block ([gamif
   FREE_PRACTICE_UNAVAILABLE` for a point with no skill to practise.
 - Its answers count as practice evidence for mastery (under `MP1`, with the practice weight and at most three practice
   answers in the mastery window), and they earn answer XP like any first submission.
+
+## Error-trap fields (2026-10-25)
+
+The learner tree lists only parent knowledge points at the top level. A parent may include `errorTraps`, containing its
+trap child KPs with at least one learner evidence row. Each child has `{knowledgePointId, code, name, tier, mastery,
+evidenceCount}`. Child points do not affect the tree's prerequisites or practice availability. Learner report uses the
+same nested shape. A report parent's `errors` contains only the main error code selected from its trap child mastery;
+the stored `top_error_codes` field remains available for staff statistics.
+
+Practice attempt results may include `error: {code, name, fixHint}` when an incorrect answer has a recognized active
+error type. Missing/unavailable error text omits the field and does not fail submission.

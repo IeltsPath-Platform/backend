@@ -182,6 +182,13 @@ The stored `EssayPrompt` snapshot contains `questionVersionId`, `stem`, `task`, 
 `chartFacts`, `sampleAnswer`, `images` and `knowledgePointIds`, so retries keep the original prompt.
 Writing in final topic tests remains outside the MVP pending the fee policy; essay blocks do not block lesson completion.
 
+Counted lesson and lesson Practice essays can create optional reviews for failed rubric criterion KPs. The default
+maximum is two per submission (`learning.writing.criterion-review-limit`), choosing the lowest bands first and requiring
+an unrevealed eligible set. These `WRITING_CRITERION` reviews never block lessons, Practice or topic tests and never
+affect Practice clearance. They appear in the additive `weak` review-basket group while outside the existing groups.
+Free writing, revisions and judged sub knowledge points do not create these reviews. See
+[lesson-writing-v1](../../docs/contracts/lesson-writing-v1.md#optional-criterion-reviews) for the rules and limits.
+
 ## Assessment results
 
 The consumer reads queue `learning.assessment-completed.v2` (bound to `assessment.events` /
@@ -203,11 +210,21 @@ Learning errors use `{detail, code}`; `REVIEW_REQUIRED` additionally includes
 missing content maps to `404 NOT_FOUND`, transport/unavailability errors to
 `503 CONTENT_UNAVAILABLE`, and other Content failures to `502 CONTENT_FAILURE`.
 
+## Staff reads
+
+`GET /api/learning/admin/work-items` (R&D work queue; optional `kind` filter) returns each item with the knowledge point,
+question or lesson it is about: names come from one batched call to Content's internal
+`POST /internal/learning-content/work-item-subjects`, and an item whose subject cannot be resolved (unknown to Content,
+or Content unavailable) is returned without a name. `question-stats` and `tree-quality` are the other staff reads. Roles, filters and shapes:
+[learning-staff-area-v1](../../docs/contracts/learning-staff-area-v1.md); the internal call:
+[learning-content-internal-v1](../../docs/contracts/learning-content-internal-v1.md). No new environment variable
+(`CONTENT_SERVICE_URL` as above).
+
 ## Structure and references
 
 Layers follow `api → application → domain`, with HTTP, RabbitMQ and JDBC adapters under
 `infrastructure`. The domain has no Spring or persistence imports.
-The service owns its eleven tables (Flyway V1–V2) and does not read other services' databases.
+The service owns its PostgreSQL schema (Flyway migrations through V36) and does not read other services' databases.
 
 | Layer | Contents |
 | --- | --- |
@@ -224,3 +241,12 @@ the row still has the status it was loaded with and returns false otherwise.
 - [Internal Content contract](../../docs/contracts/learning-content-internal-v1.md)
 - [Answer grading contract](../../docs/contracts/answer-spec-v1.md)
 - [Assessment event contract](../../docs/contracts/assessment-completed-v2.md)
+
+## Error trap evidence and feedback
+
+Learning stores trap-child mastery as `error_trap` evidence with weight 0.3; it does not count toward the MP-1.0 practice
+limit. Child IDs and error-code mappings come from the local knowledge-point catalog, so grading and evidence writes do
+not call Content. After grading, learner-facing results may include the active error type's name and `fixHint` when the
+lookup succeeds. Review selection uses the weakest eligible child to choose parent-KP sets and may create one optional
+`ERROR_PATTERN` review for that parent. Learner reports and trees nest only trap children with evidence under parents;
+child KPs are excluded from parent rollups and practice availability.

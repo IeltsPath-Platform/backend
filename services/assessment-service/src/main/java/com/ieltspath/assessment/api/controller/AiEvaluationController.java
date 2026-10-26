@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/assessments/admin")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('CONTENT_AUTHOR')")
 public class AiEvaluationController {
     private final AiEvaluationService service;
     private final CurrentUserProvider currentUser;

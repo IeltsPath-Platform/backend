@@ -13,6 +13,13 @@ public interface ExaminerQueueStore {
     }
     /** The jobs the learners chose this examiner for. */
     QueuePage listFor(UUID examinerId, String mode, String status, int page, int size);
+    /**
+     * Quality-review jobs the reviewer claimed and has not yet submitted a review for, oldest claim first. The default
+     * is empty so stores without this view stay valid.
+     */
+    default QueuePage claimedQaBy(UUID reviewerId, int page, int size) {
+        return new QueuePage(List.of(), page, size, 0);
+    }
     Optional<QueueEntry> find(UUID jobId);
     boolean claim(UUID jobId, UUID examinerId);
     Optional<Essay> essay(UUID jobId);

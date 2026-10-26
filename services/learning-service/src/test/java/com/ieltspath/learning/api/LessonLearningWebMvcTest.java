@@ -18,6 +18,7 @@ import com.ieltspath.learning.application.usecase.GetLessonPracticeSetsUseCase;
 import com.ieltspath.learning.application.usecase.GetLessonUseCase;
 import com.ieltspath.learning.application.usecase.GetMasteryUseCase;
 import com.ieltspath.learning.application.usecase.GetPracticeAttemptUseCase;
+import com.ieltspath.learning.application.usecase.ReviewPracticeAttemptUseCase;
 import com.ieltspath.learning.application.usecase.GetReviewUseCase;
 import com.ieltspath.learning.application.usecase.GetTopicLessonsUseCase;
 import com.ieltspath.learning.application.usecase.ListReviewsUseCase;
@@ -117,6 +118,7 @@ class LessonLearningWebMvcTest {
     @MockitoBean GetLessonPracticeSetsUseCase practiceCatalog;
     @MockitoBean StartPracticeAttemptUseCase startPractice;
     @MockitoBean GetPracticeAttemptUseCase getPractice;
+    @MockitoBean ReviewPracticeAttemptUseCase reviewPractice;
     @MockitoBean SubmitPracticeAttemptUseCase submitPractice;
     @MockitoBean SubmitPracticeEssayUseCase submitPracticeEssay;
 
@@ -143,6 +145,35 @@ class LessonLearningWebMvcTest {
         assertFalse(started.toString().contains("explanation"));
         assertFalse(fetched.toString().contains("answerSpec"));
         assertFalse(fetched.toString().contains("explanation"));
+    }
+
+    @Test
+    void aSubmittedPracticeAttemptCanBeReviewedWithItsResult() throws Exception {
+        UUID attemptId = UUID.randomUUID();
+        var view = new PracticeAttemptView(attemptId, UUID.randomUUID(), UUID.randomUUID(), null, null,
+                List.of(new LessonResult.Question(QUESTION, 1, "Question", null, null)));
+        var saved = new com.ieltspath.learning.domain.vo.PracticeSubmission(attemptId, 1, 1, 1.0, true, true,
+                List.of(new com.ieltspath.learning.domain.vo.PracticeSubmission.Answer(QUESTION, true, "B", "Because.")),
+                null, List.of());
+        when(reviewPractice.execute(USER, attemptId)).thenReturn(new ReviewPracticeAttemptUseCase.Result(view, saved));
+
+        var review = body(mvc.perform(authenticated(get("/api/learning/practice-attempts/{id}/review", attemptId)))
+                .andExpect(status().isOk()).andReturn());
+
+        assertEquals("Question", review.path("attempt").path("questions").get(0).path("stem").asText());
+        assertTrue(review.path("result").path("passed").asBoolean());
+        assertEquals("B", review.path("result").path("results").get(0).path("correctAnswer").asText());
+        assertFalse(review.toString().contains("answerSpec"));
+    }
+
+    @Test
+    void anOpenPracticeAttemptCannotBeReviewed() throws Exception {
+        UUID attemptId = UUID.randomUUID();
+        when(reviewPractice.execute(USER, attemptId)).thenThrow(
+                new LearningRequestException(409, "ATTEMPT_NOT_SUBMITTED", "Practice attempt is still open"));
+
+        mvc.perform(authenticated(get("/api/learning/practice-attempts/{id}/review", attemptId)))
+                .andExpect(status().isConflict());
     }
 
     @Test
@@ -216,6 +247,24 @@ class LessonLearningWebMvcTest {
                 .andExpect(jsonPath("$[0].stage").value("THEORY"));
         mvc.perform(authenticated(get("/api/learning/reviews").param("limit", "101")))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void vocabularySenseIdsAreReturnedByTheLearnerLessonEndpoint() throws Exception {
+        List<UUID> senseIds = List.of(UUID.randomUUID(), UUID.randomUUID());
+        var vocabulary = new LessonResult.Block(UUID.randomUUID(), "VOCABULARY", null, 0, null, null,
+                senseIds, null, null, null, null);
+        when(getLessonUseCase.execute(USER, LESSON)).thenReturn(new LessonResult(LESSON, TOPIC, "L1", "Lesson", null,
+                1, "AVAILABLE", List.of(vocabulary)));
+
+        JsonNode response = body(mvc.perform(authenticated(get("/api/learning/lessons/{id}", LESSON)))
+                .andExpect(status().isOk()).andReturn());
+        JsonNode block = response.path("blocks").get(0);
+
+        assertEquals("VOCABULARY", block.path("blockType").asText());
+        assertEquals(json.valueToTree(senseIds.stream().map(UUID::toString).toList()),
+                block.path("vocabularySenseIds"));
+        assertEquals(Set.of("blockId", "blockType", "sortOrder", "vocabularySenseIds"), keys(block));
     }
 
     @Test

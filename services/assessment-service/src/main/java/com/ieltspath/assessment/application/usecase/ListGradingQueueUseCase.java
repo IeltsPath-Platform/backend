@@ -33,6 +33,13 @@ public class ListGradingQueueUseCase {
         return store.listFor(examiner,mode,status,page,size);
     }
 
+    /** The quality-review essays this reviewer claimed and has not yet reviewed. */
+    @Transactional(readOnly=true)
+    public ExaminerQueueStore.QueuePage claimedQaBy(UUID reviewerId,int page,int size) {
+        if (page<0 || size<1 || size>100) throw new IllegalArgumentException("Invalid pagination (size 1..100)");
+        return store.claimedQaBy(reviewerId,page,size);
+    }
+
     private static void validate(String mode,String status,String reason,int page,int size) {
         if (!"HUMAN".equals(mode) || !STATUSES.contains(status)
                 || (reason != null && !"QA_SAMPLE".equals(reason)) || page<0 || size<1 || size>100)

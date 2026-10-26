@@ -1,7 +1,7 @@
 # Assessment grading v1
 
 Updated: 2026-10-17. Base path `/api/assessments`. Identity comes from the verified
-internal JWT. All queue and grading endpoints require `EXAMINER` or `ADMIN`.
+internal JWT. All queue and grading endpoints require `EXAMINER`.
 Customer submission/job creation and owner-only job lookup keep their existing contracts.
 
 ## Blind examiner queue
@@ -29,7 +29,7 @@ reclaims it. Claims and result writes lock the same job rows.
 Because result finalization covers the whole attempt, claiming an essay also claims
 the other unassigned/expired HUMAN jobs of that attempt. A live claim held by another
 examiner blocks the claim. This keeps one examiner responsible for the attempt.
-Standalone jobs are claimed individually. ADMIN follows the same claim rules.
+Standalone jobs are claimed individually.
 
 Essay response: `{jobId, attemptId, attemptItemId, prompt, essay, task, rubric, source}`.
 `prompt` is the snapshotted Content stem (standalone: submission stem). `source` is
@@ -122,7 +122,7 @@ The normal learner result endpoint continues to return only completed results.
 
 ## AI rubric evaluation and activation (phase 11)
 
-The admin-only routes below require `ADMIN`. Gold essays and comparisons remain internal; the examiner queue never
+The AI evaluation routes below require `CONTENT_AUTHOR`. Gold essays and comparisons remain internal; the examiner queue never
 exposes AI grades or comparison data.
 
 | Method | Path | Behavior |
@@ -130,8 +130,31 @@ exposes AI grades or comparison data.
 | POST | `/api/assessments/admin/ai-gold-essays` | Add a manually rated gold essay; returns `201 {id}`. |
 | POST | `/api/assessments/admin/ai-gold-essays/import-comparisons` | Import comparison rows with an examiner band; returns `{imported}` and skips submissions already imported. |
 | POST | `/api/assessments/admin/ai-evaluations` | Start an asynchronous evaluation, optionally scoped to `{task:"TASK_1"}` or `{task:"TASK_2"}`; returns `202 {id}`. If task is omitted, Assessment chooses the task with the largest gold set. |
-| GET | `/api/assessments/admin/ai-evaluations/{id}` | Read run metrics and per-essay comparisons. |
+| GET | `/api/assessments/admin/ai-evaluations/{id}` | Read run metrics and per-essay comparisons, plus `thresholds` (below). |
 | POST | `/api/assessments/admin/ai-prompt-activations` | Activate a passed evaluation with `{runId}`; returns `204`. Otherwise returns `409 EVALUATION_NOT_PASSED`. |
+| GET | `/api/assessments/admin/ai-gold-essays?task=&page=&size=` | List the gold set (below). |
+| GET | `/api/assessments/admin/ai-evaluations?task=&page=&size=` | List evaluation runs, newest first (below). |
+| GET | `/api/assessments/admin/ai-prompt-activations` | The prompt version each task currently uses (below). |
+
+### Read routes
+
+All three lists are `CONTENT_AUTHOR` only, filtered and ordered in the database. `task` is optional (`TASK_1` or `TASK_2`,
+otherwise `400`); `page` defaults to 0 and `size` to 20 (1 to 100, otherwise `400`). Pages are `{content, page, size,
+totalElements}`.
+
+- Gold essays, newest first: `{id, task, examinerBand, source, essayPreview, createdAt}`. `source` is `MANUAL` or
+  `COMPARISON` (imported from a comparison row). `essayPreview` is the first 200 characters; the prompt, chart facts and
+  criteria are not listed.
+- Runs, newest first: `{id, task, model, promptVersion, status, n, withinHalfBand, mae, qwk, passed, startedAt,
+  finishedAt}`. `status` is `RUNNING`, `DONE` or `FAILED`; metrics and `passed` are `null` until the run is done. The detail
+  stays at `GET …/ai-evaluations/{id}`.
+- Activations: always two entries, `TASK_1` then `TASK_2`: `{task, promptVersion, runId, activatedAt}`. A task never
+  activated has `null` in the last three fields: it is still graded by Content's `ACTIVE` rubric, which no evaluation has
+  approved (see "bootstrap" below).
+- `GET …/ai-evaluations/{id}` also returns `thresholds: {withinHalfBand, qwk}`, the values in force
+  (`assessment.ai-eval.min-within-half-band`, `assessment.ai-eval.min-qwk`).
+
+Nothing here logs essay or prompt text.
 
 Manual gold request fields are `task`, `prompt`, optional `chartFacts`, `essay`, `examinerBand`, optional
 `examinerCriteria`, and optional `examinerErrorCodes`. Task 1 requires chart facts when sent to the grader. The examiner

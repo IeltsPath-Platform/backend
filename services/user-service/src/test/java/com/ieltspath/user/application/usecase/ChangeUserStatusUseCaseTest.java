@@ -34,10 +34,11 @@ class ChangeUserStatusUseCaseTest {
                 .fullName("User One")
                 .status(UserStatus.ACTIVE)
                 .build();
+        when(userRepository.lockActiveAdminUserIds()).thenReturn(java.util.List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        User updated = useCase.execute(new ChangeUserStatusCommand(userId, UserStatus.LOCKED));
+        User updated = useCase.execute(new ChangeUserStatusCommand(userId, UserStatus.LOCKED, UUID.randomUUID()));
 
         assertThat(updated.getStatus()).isEqualTo(UserStatus.LOCKED);
     }

@@ -1,6 +1,7 @@
 package com.ieltspath.content.api.controller;
 
 import com.ieltspath.content.application.usecase.ManageRubricsUseCase;
+import com.ieltspath.content.api.dto.response.RubricVersionResponse;
 import com.ieltspath.content.domain.aggregate.Rubric;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -24,20 +25,27 @@ public class RubricController {
 
     /** Examiner read surface exposes only the currently active public rubric. */
     @GetMapping("/rubrics")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'EXAMINER')")
     public List<RubricResponse> active(@RequestParam("task") String task) {
         return rubrics.active(task).stream().map(RubricResponse::from).toList();
     }
 
     @GetMapping("/admin/rubrics")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public List<RubricResponse> drafts(@RequestParam("task") String task) {
         return rubrics.drafts(task).stream().map(RubricResponse::from).toList();
     }
 
+    /** All versions of one rubric code, retired included, so the next draft number is never a reused one. */
+    @GetMapping("/admin/rubrics/versions")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
+    public List<RubricVersionResponse> versions(@RequestParam("code") String code) {
+        return rubrics.versions(code).stream().map(RubricVersionResponse::from).toList();
+    }
+
     @PostMapping("/admin/rubrics")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public RubricResponse create(@Valid @RequestBody RubricRequest request) {
         return RubricResponse.from(rubrics.create(request.code(), request.task(), request.version(), request.sourceNote(),
                 request.criteria().stream().map(CriterionRequest::toDomain).toList(),
@@ -45,7 +53,7 @@ public class RubricController {
     }
 
     @PutMapping("/admin/rubrics/{code}/{version}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public RubricResponse update(@PathVariable("code") String code, @PathVariable("version") int version,
                                  @Valid @RequestBody RubricRequest request) {
         if (!code.equals(request.code()) || version != request.version()) {
@@ -57,7 +65,7 @@ public class RubricController {
     }
 
     @PostMapping("/admin/rubrics/{code}/{version}/activate")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CONTENT_AUTHOR')")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public RubricResponse activate(@PathVariable("code") String code, @PathVariable("version") int version) {
         return RubricResponse.from(rubrics.activate(code, version));
     }
@@ -89,10 +97,20 @@ public class RubricController {
     }
 
     public record RubricResponse(String code, String task, int version, String status, String sourceNote,
-                                  List<Rubric.Criterion> criteria, List<Rubric.Example> examples) {
+                                  List<CriterionResponse> criteria, List<Rubric.Example> examples) {
         static RubricResponse from(Rubric rubric) {
             return new RubricResponse(rubric.code(), rubric.task(), rubric.version(), rubric.status(),
-                    rubric.sourceNote(), rubric.criteria(), rubric.examples());
+                    rubric.sourceNote(), rubric.criteria().stream().map(CriterionResponse::from).toList(),
+                    rubric.examples());
+        }
+    }
+
+    /** Public and authoring rubrics keep the domain fields they exposed before internal sub-KP mapping. */
+    public record CriterionResponse(String code, String name, String description, int sortOrder,
+                                    List<Rubric.BandDescriptor> bandDescriptors, java.util.UUID knowledgePointId) {
+        static CriterionResponse from(Rubric.Criterion criterion) {
+            return new CriterionResponse(criterion.code(), criterion.name(), criterion.description(),
+                    criterion.sortOrder(), criterion.bandDescriptors(), criterion.knowledgePointId());
         }
     }
 }

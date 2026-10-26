@@ -14,6 +14,7 @@ import com.ieltspath.user.domain.exception.PhoneAlreadyExistsException;
 import com.ieltspath.user.domain.exception.RoleNotFoundException;
 import com.ieltspath.user.domain.exception.ResourceNotFoundException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
+import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -65,6 +66,15 @@ public class GlobalExceptionHandler {
             LearningGoalConflictException.class, ConflictException.class})
     ResponseEntity<ErrorResponse> handleConflict(RuntimeException exception, HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, exception.getMessage(), request, null);
+    }
+
+    @ExceptionHandler(UserManagementRuleViolationException.class)
+    ResponseEntity<ErrorResponse> handleUserManagementRule(UserManagementRuleViolationException exception,
+                                                           HttpServletRequest request) {
+        HttpStatus status = "ROLE_CONFLICT".equals(exception.getCode())
+                ? HttpStatus.UNPROCESSABLE_ENTITY
+                : HttpStatus.CONFLICT;
+        return error(status, exception.getMessage(), request, Map.of("code", exception.getCode()));
     }
 
     @ExceptionHandler(AuthenticationFailedException.class)

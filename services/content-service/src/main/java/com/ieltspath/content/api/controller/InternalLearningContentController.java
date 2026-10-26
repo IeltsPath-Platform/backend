@@ -81,10 +81,12 @@ public class InternalLearningContentController {
         return listErrorTypes.executeApprovedActive().stream().map(ActiveErrorTypeResponse::from).toList();
     }
 
-    public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint) {
+    public record ActiveErrorTypeResponse(String code, String name, String category, int severity, String fixHint,
+                                          UUID knowledgePointId) {
         static ActiveErrorTypeResponse from(com.ieltspath.content.domain.aggregate.ErrorType errorType) {
             return new ActiveErrorTypeResponse(errorType.getCode(), errorType.getName(),
-                    errorType.getCategory().name(), errorType.getSeverity(), errorType.getFixHint());
+                    errorType.getCategory().name(), errorType.getSeverity(), errorType.getFixHint(),
+                    errorType.getKnowledgePointId());
         }
     }
 
@@ -112,8 +114,9 @@ public class InternalLearningContentController {
     }
 
     @GetMapping("/topic-sequence")
-    public List<TopicSequenceResponse> topicSequence() {
-        return getTopicSequence.execute().stream().map(TopicSequenceResponse::from).toList();
+    public List<TopicSequenceResponse> topicSequence(
+            @RequestParam(value = "includeErrorTraps", defaultValue = "false") boolean includeErrorTraps) {
+        return getTopicSequence.execute(includeErrorTraps).stream().map(TopicSequenceResponse::from).toList();
     }
 
     @GetMapping("/topics/{id}/lessons")
@@ -135,7 +138,7 @@ public class InternalLearningContentController {
     public List<PracticeSetResponse> searchPracticeSets(@Valid @RequestBody PracticeSetSearchRequest request) {
         return searchPracticeSets.execute(new SearchPracticeSetsCommand(request.knowledgePointId(),
                         request.excludePackageIds(), request.minQuestions(), request.limit(),
-                        request.preferredLessonId()))
+                        request.preferredLessonId(), request.trapErrorCode()))
                 .stream().map(PracticeSetResponse::from).toList();
     }
 

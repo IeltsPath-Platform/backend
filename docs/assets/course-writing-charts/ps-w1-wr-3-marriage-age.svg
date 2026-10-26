@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" font-family="Arial,Helvetica,sans-serif">
+<rect x="0.00" y="0.00" width="1600.00" height="1000.00" rx="0" fill="#ffffff"/>
+<text x="800.00" y="76.00" font-size="40" fill="#1e293b" text-anchor="middle" font-weight="700">Situation of marriage and age from 1960 to 2000 in Australia</text>
+<text x="800.00" y="125.00" font-size="26" fill="#64748b" text-anchor="middle" font-weight="400">Number of marriages and average age at marriage</text>
+<rect x="100.00" y="220.00" width="1400.00" height="150.00" rx="0" fill="#5261cf"/>
+<text x="180.00" y="304.00" font-size="26" fill="#ffffff" text-anchor="middle" font-weight="700">Year</text>
+<text x="395.00" y="286.50" font-size="26" fill="#ffffff" text-anchor="middle" font-weight="700">Religious</text>
+<text x="395.00" y="321.50" font-size="26" fill="#ffffff" text-anchor="middle" font-weight="700">marriage</text>
+<text x="665.00" y="286.50" font-size="26" fill="#ffffff" text-anchor="middle" font-weight="700">Civil</text>
+<text x="665.00" y="321.50" font-size="26" fill="#ffffff" text-anchor="middle" font-weight="700">marriage</text>
+<text x="975.00" y="286.50" font-size="26" fill="#ffffff" text-anchor="middle" font-weight="700">Average age</text>
+<text x="975.00" y="321.50" font-size="26" fill="#ffffff" text-anchor="middle" font-weight="700">of bride</text>
+<text x="1325.00" y="286.50" font-size="26" fill="#ffffff" text-anchor="middle" font-weight="700">Average age</text>
+<text x="1325.00" y="321.50" font-size="26" fill="#ffffff" text-anchor="middle" font-weight="700">of groom</text>
+<text x="180.00" y="437.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="700">1960</text>
+<text x="395.00" y="437.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="700">25,000</text>
+<text x="665.00" y="437.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="700">8,000</text>
+<text x="975.00" y="437.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="700">21</text>
+<text x="1325.00" y="437.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="700">24</text>
+<rect x="100.00" y="482.00" width="1400.00" height="112.00" rx="0" fill="#f8fafc"/>
+<text x="180.00" y="549.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">1970</text>
+<text x="395.00" y="549.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">28,000</text>
+<text x="665.00" y="549.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">12,000</text>
+<text x="975.00" y="549.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">23</text>
+<text x="1325.00" y="549.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">25</text>
+<text x="180.00" y="661.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">1980</text>
+<text x="395.00" y="661.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">50,000</text>
+<text x="665.00" y="661.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">16,000</text>
+<text x="975.00" y="661.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">25</text>
+<text x="1325.00" y="661.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">27</text>
+<rect x="100.00" y="706.00" width="1400.00" height="112.00" rx="0" fill="#f8fafc"/>
+<text x="180.00" y="773.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">1990</text>
+<text x="395.00" y="773.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">32,000</text>
+<text x="665.00" y="773.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">23,000</text>
+<text x="975.00" y="773.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">27</text>
+<text x="1325.00" y="773.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">30</text>
+<text x="180.00" y="885.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">2000</text>
+<text x="395.00" y="885.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">34,000</text>
+<text x="665.00" y="885.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">40,000</text>
+<text x="975.00" y="885.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">30</text>
+<text x="1325.00" y="885.00" font-size="30" fill="#1e293b" text-anchor="middle" font-weight="400">32</text>
+<line x1="100.00" y1="220.00" x2="100.00" y2="930.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<line x1="1500.00" y1="220.00" x2="1500.00" y2="930.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<line x1="260.00" y1="220.00" x2="260.00" y2="930.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<line x1="530.00" y1="220.00" x2="530.00" y2="930.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<line x1="800.00" y1="220.00" x2="800.00" y2="930.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<line x1="1150.00" y1="220.00" x2="1150.00" y2="930.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<line x1="100.00" y1="370.00" x2="1500.00" y2="370.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<line x1="100.00" y1="482.00" x2="1500.00" y2="482.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<line x1="100.00" y1="594.00" x2="1500.00" y2="594.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<line x1="100.00" y1="706.00" x2="1500.00" y2="706.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<line x1="100.00" y1="818.00" x2="1500.00" y2="818.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+<line x1="100.00" y1="930.00" x2="1500.00" y2="930.00" stroke="#e2e8f0" stroke-width="2" stroke-dasharray=""/>
+</svg>

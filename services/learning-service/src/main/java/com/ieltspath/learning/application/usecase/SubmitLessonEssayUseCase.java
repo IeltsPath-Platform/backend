@@ -11,8 +11,10 @@ import com.ieltspath.learning.application.service.EssaySubmissionFlow;
 import com.ieltspath.learning.application.service.LessonAccess;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.WritingSubmissionViewAssembler;
+import com.ieltspath.learning.application.service.WritingCriterionReviews;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
+import com.ieltspath.learning.domain.service.WritingEvidenceRule;
 import com.ieltspath.learning.application.port.QuestionEventLog;
 import com.ieltspath.learning.application.service.MasteryProfileUpdater;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
@@ -57,15 +59,18 @@ public class SubmitLessonEssayUseCase {
     private final WritingSubmissionViewAssembler view;
     private final QuestionEventLog questionEvents;
     private final MasteryProfileUpdater masteryProfiles;
+    private final WritingCriterionReviews criterionReviews;
+    private final WritingEvidenceRule writingEvidence = new WritingEvidenceRule();
     private final Clock clock = Clock.systemUTC();
 
     public SubmitLessonEssayUseCase(LearningContentClient content, LessonAccess access, LearnerLock lock,
                                     KnowledgeEvidenceRepository evidence, WritingSubmissionRepository essays,
                                     EssaySubmissionFlow flow, PlatformTransactionManager transactionManager,
                                     WritingSubmissionViewAssembler view, QuestionEventLog questionEvents,
-                                    MasteryProfileUpdater masteryProfiles) {
+                                    MasteryProfileUpdater masteryProfiles, WritingCriterionReviews criterionReviews) {
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
+        this.criterionReviews = criterionReviews;
         this.content = content;
         this.access = access;
         this.lock = lock;
@@ -167,18 +172,20 @@ public class SubmitLessonEssayUseCase {
         if (submission.status() == WritingSubmissionStatus.GRADED) return view.assemble(submission);
         // Every essay before the block is first passed is new writing, so each one is evidence; none after.
         boolean firstAttempt = !essays.blockPassed(submission.userId(), submission.blockId(), submission.id());
+        boolean passed = Boolean.TRUE.equals(submission.passed());
+        List<UUID> questionKps = List.copyOf(new LinkedHashSet<>(submission.prompt().knowledgePointIds()));
+        var outcome = writingEvidence.derive(questionKps, submission.prompt().passBand(), passed, submission.grade());
         // Each essay is one event for its prompt; a repeat after the block passed is logged with first_submission=false.
         questionEvents.append(List.of(QuestionAttemptEvent.of(submission.userId(), submission.prompt().questionVersionId(),
-                List.copyOf(new LinkedHashSet<>(submission.prompt().knowledgePointIds())),
-                Boolean.TRUE.equals(submission.passed()), null, null, QuestionEventSource.LESSON_WRITING,
+                questionKps, passed, null, outcome.dominantErrorCode(), QuestionEventSource.LESSON_WRITING,
                 submission.id(), firstAttempt)));
         if (firstAttempt) {
-            List<UUID> kpIds = new ArrayList<>(new LinkedHashSet<>(submission.prompt().knowledgePointIds()));
+            List<UUID> kpIds = new ArrayList<>(outcome.correctByKnowledgePoint().keySet());
             Set<UUID> known = access.knownKnowledgePoints(submission.userId(), kpIds);
             List<KnowledgeEvidence> essayEvidence = new ArrayList<>();
             for (UUID kpId : kpIds) {
                 if (known.contains(kpId)) {
-                    essayEvidence.add(KnowledgeEvidence.of(kpId, Boolean.TRUE.equals(submission.passed()),
+                    essayEvidence.add(KnowledgeEvidence.of(kpId, outcome.correctByKnowledgePoint().get(kpId),
                             EvidenceSource.LESSON_WRITING, LessonEvidenceReference.forWriting(submission.id(), kpId)));
                 } else {
                     log.warn("Unknown writing evidence KP: userId={}, submissionId={}, kpId={}",
@@ -186,7 +193,11 @@ public class SubmitLessonEssayUseCase {
                 }
             }
             evidence.append(submission.userId(), essayEvidence);
-            masteryProfiles.recordEvidence(submission.userId(), essayEvidence);
+            masteryProfiles.recordEvidence(submission.userId(), essayEvidence, outcome.criterionKnowledgePoints());
+            if (submission.previousSubmissionId() == null) {
+                criterionReviews.create(submission.userId(), submission.lessonId(), outcome.failedCriteria().stream()
+                        .filter(criterion -> known.contains(criterion.knowledgePointId())).toList());
+            }
         }
         submission.markGraded(ledgerEntryId);
         essays.save(submission);

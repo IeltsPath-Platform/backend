@@ -16,7 +16,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/assessments/qa-reviews")
-@PreAuthorize("hasAnyRole('CONTENT_AUTHOR','ADMIN')")
+@PreAuthorize("hasRole('CONTENT_AUTHOR')")
 public class ExaminerQaController {
     private final CurrentUserProvider currentUser;
     private final ListGradingQueueUseCase queue;
@@ -38,6 +38,13 @@ public class ExaminerQaController {
     public ExaminerQueueStore.QueuePage queue(@RequestParam(name = "page", defaultValue = "0") int page,
                                                @RequestParam(name = "size", defaultValue = "20") int size) {
         return queue.execute("HUMAN", "QUEUED", page, size, "QA_SAMPLE");
+    }
+
+    /** Essays the caller claimed and has not reviewed yet, so they can be found again after leaving the page. */
+    @GetMapping("/mine")
+    public ExaminerQueueStore.QueuePage mine(@RequestParam(name = "page", defaultValue = "0") int page,
+                                              @RequestParam(name = "size", defaultValue = "20") int size) {
+        return queue.claimedQaBy(currentUser.requireUserId(), page, size);
     }
 
     @PostMapping("/{jobId}/claim")

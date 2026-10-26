@@ -28,6 +28,7 @@ import com.ieltspath.user.application.usecase.UnlinkOAuthIdentityUseCase;
 import com.ieltspath.user.application.usecase.UpdateLearnerProfileUseCase;
 import com.ieltspath.user.application.usecase.UpdateUserUseCase;
 import com.ieltspath.user.domain.aggregate.User;
+import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.UserStatus;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -251,6 +252,38 @@ class UserManagementControllerSecurityTest {
     }
 
     @Test
+    void roleConflictReturnsUnprocessableEntityAndCode() throws Exception {
+        UUID adminId = UUID.randomUUID();
+        when(createUserUseCase.execute(any(CreateUserCommand.class)))
+                .thenThrow(new UserManagementRuleViolationException("ROLE_CONFLICT", "ADMIN cannot be combined with EXAMINER"));
+        String adminToken = signedToken(INTERNAL_SECRET, adminId, INTERNAL_ISSUER, List.of("ADMIN"));
+
+        mockMvc.perform(post("/api/users")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"email":"new@example.com","password":"secret123","fullName":"New User","roles":["ADMIN","EXAMINER"]}
+                        """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.details.code").value("ROLE_CONFLICT"));
+    }
+
+    @Test
+    void selfAdminRemovalReturnsConflictAndCode() throws Exception {
+        UUID adminId = UUID.randomUUID();
+        when(assignRoleUseCase.execute(any(AssignRoleCommand.class)))
+                .thenThrow(new UserManagementRuleViolationException("SELF_ADMIN_REMOVAL", "An administrator cannot remove their own ADMIN role"));
+        String adminToken = signedToken(INTERNAL_SECRET, adminId, INTERNAL_ISSUER, List.of("ADMIN"));
+
+        mockMvc.perform(put("/api/users/{id}/roles", adminId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"roles\":[\"CUSTOMER\"]}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.code").value("SELF_ADMIN_REMOVAL"));
+    }
+
+    @Test
     void adminCanChangeUserStatus() throws Exception {
         UUID targetId = UUID.randomUUID();
         when(changeUserStatusUseCase.execute(any(ChangeUserStatusCommand.class))).thenReturn(user(targetId));
@@ -272,7 +305,7 @@ class UserManagementControllerSecurityTest {
     @Test
     void adminCanDeleteUser() throws Exception {
         UUID targetId = UUID.randomUUID();
-        when(deleteUserUseCase.execute(targetId)).thenReturn(user(targetId));
+        when(deleteUserUseCase.execute(eq(targetId), any(UUID.class))).thenReturn(user(targetId));
         String adminToken = signedToken(INTERNAL_SECRET, UUID.randomUUID(), INTERNAL_ISSUER, List.of("ADMIN"));
 
         mockMvc.perform(delete("/api/users/{id}", targetId)

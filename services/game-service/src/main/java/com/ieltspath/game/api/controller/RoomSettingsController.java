@@ -22,6 +22,7 @@ public class RoomSettingsController {
     @PutMapping("/{roomId}/settings")
     public GameRoomResponse update(@PathVariable("roomId") UUID roomId,
                                    @Valid @RequestBody UpdateRoomSettingsRequest request) {
-        return GameRoomResponse.from(update.execute(roomId, user.requireUserId(), request.initialLives(), request.wordLimit(), request.timeEnabled()));
+        return GameRoomResponse.from(update.execute(roomId, user.requireUserId(), request.initialLives(), request.wordLimit(),
+                request.timeEnabled(), request.questionCount(), request.secondsPerQuestion()));
     }
 }

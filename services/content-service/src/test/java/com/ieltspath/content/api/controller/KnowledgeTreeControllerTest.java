@@ -1,8 +1,10 @@
 package com.ieltspath.content.api.controller;
 
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
+import com.ieltspath.content.application.result.KnowledgeTreeHealthResult;
 import com.ieltspath.content.application.result.KnowledgeTreeNodeResult;
 import com.ieltspath.content.application.result.KnowledgeTreeResult;
+import com.ieltspath.content.application.usecase.GetKnowledgeTreeHealthUseCase;
 import com.ieltspath.content.application.usecase.GetKnowledgeTreeUseCase;
 import com.ieltspath.content.domain.vo.ContentStatus;
 import com.ieltspath.content.domain.vo.CefrLevel;
@@ -26,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -50,20 +53,37 @@ class KnowledgeTreeControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean GetKnowledgeTreeUseCase getKnowledgeTree;
+    @MockitoBean GetKnowledgeTreeHealthUseCase getKnowledgeTreeHealth;
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void contentAuthorCanReadKnowledgeTreeHealth() throws Exception {
+        UUID isolated = UUID.randomUUID();
+        UUID missing = UUID.randomUUID();
+        UUID from = UUID.randomUUID();
+        UUID to = UUID.randomUUID();
+        when(getKnowledgeTreeHealth.execute()).thenReturn(new KnowledgeTreeHealthResult(
+                List.of(isolated), List.of(missing), List.of(new KnowledgeTreeHealthResult.LevelViolation(from, to))));
+
+        mockMvc.perform(get("/api/content/knowledge-tree/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isolatedIds[0]").value(isolated.toString()))
+                .andExpect(jsonPath("$.missingMetadataIds[0]").value(missing.toString()))
+                .andExpect(jsonPath("$.levelViolations[0].from").value(from.toString()))
+                .andExpect(jsonPath("$.levelViolations[0].to").value(to.toString()));
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void customerCannotReadKnowledgeTreeHealth() throws Exception {
+        mockMvc.perform(get("/api/content/knowledge-tree/health")).andExpect(status().isForbidden());
+    }
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void adminCanReadKnowledgeTree() throws Exception {
-        UUID nodeId = UUID.randomUUID();
-        when(getKnowledgeTree.execute(null, null, false)).thenReturn(tree(nodeId, ContentStatus.ACTIVE));
-
-        mockMvc.perform(get("/api/content/knowledge-tree"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.nodes[0].id").value(nodeId.toString()))
-                .andExpect(jsonPath("$.nodes[0].cefrLevel").value("B1"))
-                .andExpect(jsonPath("$.nodes[0].canDo").value("Identify the main idea."))
-                .andExpect(jsonPath("$.nodes[0].scopeIn").value("Short texts"))
-                .andExpect(jsonPath("$.nodes[0].scopeOut").value("Long-form inference"));
+    void adminCannotReadKnowledgeTree() throws Exception {
+        mockMvc.perform(get("/api/content/knowledge-tree")).andExpect(status().isForbidden());
+        verifyNoInteractions(getKnowledgeTree, getKnowledgeTreeHealth);
     }
 
     @Test

@@ -49,6 +49,8 @@ learning:
     daily-grading-limit: ${LEARNING_WRITING_DAILY_GRADING_LIMIT:10}
     quota-timezone: Asia/Ho_Chi_Minh
     grading-timeout-seconds: 20
+  error-trap:
+    review-limit: 1
   # Older name of mastery.priority-below; it is the default for that key.
   review-mastery-threshold: 0.6
   # Default mastery tiers and review schedule. Admin overrides win (PUT /api/learning/admin/rule-configs). The review
@@ -88,6 +90,7 @@ learning:
         probe: 1.0
         practice: 0.6
         essay: 0.5
+        error-trap: 0.3
   gamification:
     # Learner timezone when none is chosen; the daily XP cap resets at its midnight.
     default-timezone: ${LEARNING_DEFAULT_TIMEZONE:Asia/Ho_Chi_Minh}

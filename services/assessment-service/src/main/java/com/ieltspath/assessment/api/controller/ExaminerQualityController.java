@@ -1,6 +1,5 @@
 package com.ieltspath.assessment.api.controller;
 
-import com.ieltspath.assessment.application.port.ExaminerQaRepository;
 import com.ieltspath.assessment.application.service.ExaminerQaService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,7 +10,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/assessments/admin/examiner-quality")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('CONTENT_AUTHOR')")
 public class ExaminerQualityController {
     private final ExaminerQaService qa;
 
@@ -19,8 +18,9 @@ public class ExaminerQualityController {
         this.qa = qa;
     }
 
+    /** One row per examiner; {@code examinerName} is null when the User Service could not name them. */
     @GetMapping
-    public List<ExaminerQaRepository.ExaminerQuality> quality() {
-        return qa.quality();
+    public List<ExaminerQaService.NamedExaminerQuality> quality() {
+        return qa.qualityWithNames();
     }
 }

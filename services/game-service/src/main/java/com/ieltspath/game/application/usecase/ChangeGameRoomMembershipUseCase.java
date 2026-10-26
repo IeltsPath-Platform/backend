@@ -4,6 +4,7 @@ import com.ieltspath.game.application.port.OutboxWriter;
 import com.ieltspath.game.application.result.GameRoomResult;
 import com.ieltspath.game.domain.exception.GameRoomNotFoundException;
 import com.ieltspath.game.domain.repository.GameRoomRepository;
+import com.ieltspath.game.domain.vo.RoomGame;
 import org.springframework.stereotype.Service;
 import com.ieltspath.game.application.port.CurrentPlayerProfile;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,8 +19,10 @@ public class ChangeGameRoomMembershipUseCase {
     private final org.springframework.context.ApplicationEventPublisher events;
     private final CurrentPlayerProfile profile;
     private final OutboxWriter outboxWriter;
+    private final WordlyRoomAdmission admission;
 
-    public ChangeGameRoomMembershipUseCase(GameRoomRepository roomRepository, OutboxWriter outboxWriter, CurrentPlayerProfile profile, org.springframework.context.ApplicationEventPublisher events) {
+    public ChangeGameRoomMembershipUseCase(GameRoomRepository roomRepository, OutboxWriter outboxWriter, CurrentPlayerProfile profile, org.springframework.context.ApplicationEventPublisher events, WordlyRoomAdmission admission) {
+        this.admission = admission;
         this.events = events;
         this.profile = profile;
         this.roomRepository = roomRepository;
@@ -28,6 +31,9 @@ public class ChangeGameRoomMembershipUseCase {
 
     @Transactional
     public GameRoomResult join(UUID roomId, UUID userId) {
+        // Take the user admission lock before the room lock, matching room creation.
+        if (roomRepository.findById(roomId).filter(found -> RoomGame.isRoomGame(found.gameType())).isPresent())
+            admission.requireNoActiveGame(userId);
         var room = roomRepository.findForUpdate(roomId).orElseThrow(() -> new GameRoomNotFoundException(roomId));
         room.join(UUID.randomUUID(), userId, Instant.now());
         room.setMemberDisplayName(userId, profile.displayName());

@@ -2,6 +2,7 @@ package com.ieltspath.library.infrastructure.persistence.adapter;
 
 import com.ieltspath.library.domain.aggregate.VocabularyItem;
 import com.ieltspath.library.domain.repository.VocabularyRepository;
+import com.ieltspath.library.domain.vo.VocabularySenseCard;
 import com.ieltspath.library.infrastructure.persistence.mapper.VocabularyPersistenceMapper;
 import com.ieltspath.library.infrastructure.persistence.repository.VocabularyItemJpaRepository;
 import org.springframework.stereotype.Component;
@@ -37,6 +38,24 @@ public class VocabularyRepositoryAdapter implements VocabularyRepository {
     @Override
     public List<VocabularyItem> findByIds(List<UUID> ids) {
         return vocabularyItemJpaRepository.findAllByIdIn(ids).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<VocabularySenseCard> findActiveSensesByIds(List<UUID> senseIds) {
+        return vocabularyItemJpaRepository.findActiveSenseCardsByIds(senseIds).stream()
+                .map(card -> new VocabularySenseCard(
+                        card.getSenseId(),
+                        card.getVocabularyItemId(),
+                        card.getLemma(),
+                        card.getIpa(),
+                        card.getPronunciationAudioReference(),
+                        card.getPartOfSpeech(),
+                        card.getEnglishDefinition(),
+                        card.getVietnameseMeaning(),
+                        card.getExampleSentence(),
+                        card.getImageUrl()
+                ))
+                .toList();
     }
 
     @Override
