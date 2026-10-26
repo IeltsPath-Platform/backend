@@ -46,6 +46,10 @@ See the [flashcard SRS contract](../../docs/contracts/flashcard-srs-v1.md) for r
 
 `GET /api/content/vocabulary?q=&page=0&size=20` browses active catalog items (maximum page size 50); `GET /api/content/vocabulary/{id}` returns one active item. These two GET routes are public and cacheable for five minutes. `/search`, `/senses`, writes, and `/api/content/admin/vocabulary/**` still require authentication. See the [vocabulary notebook contract](../../docs/contracts/vocabulary-notebook-v1.md).
 
+The public catalog also supports `lang=EN|VI`, CEFR/topic filters, `/suggestions`, `/topics`, `/sets`, set words, and `/mindmap`. V19 adds UK/US pronunciation slots, CEFR and library-owned vocabulary topics, examples/collocations/thesaurus/common-mistake tables, and band/topic sets. IELTS band ranges are derived from CEFR in the domain. V20 adds six demo topics and demo enrichment for existing V4/V15 entries; frequency ranks remain null because no COCA source is loaded. The AWL flag is enabled only for verified Coxhead entries. **Demo content authored by AI; requires review by an IELTS examiner before production.**
+
+Topics and sets are part of the Library dictionary and are independent from Content curriculum topics. Topic/set cover keys reuse the existing `flashcards` storage bucket and `POST /api/learning-support/flashcards/images`; no additional bucket or environment variable is required.
+
 Learners save vocabulary senses with `POST /api/learning-support/flashcards/notebook/entries`, list/filter/sort them at `/entries`, read aggregate counts at `/summary`, and set understanding at `/entries/{flashcardId}/level`. Existing flashcard review and delete routes remain in use. One non-deleted card is allowed per learner and sense; level is derived from Leitner boxes (1 UNKNOWN, 2 FAMILIAR, 3 LEARNING, 4–5 MASTERED). Notes use `sourceType=VOCABULARY_SENSE` and are limited to 300 characters. Migration V18 adds the partial unique index.
 
 When saving a video, Library verifies its topic through Content's `GET /api/content/topics/{id}`, forwarding the

@@ -17,6 +17,7 @@ import com.ieltspath.library.application.usecase.GetVocabularyDetailUseCase;
 import com.ieltspath.library.application.usecase.GetVocabularySensesUseCase;
 import com.ieltspath.library.application.usecase.SearchVocabularyUseCase;
 import com.ieltspath.library.application.usecase.BrowseVocabularyUseCase;
+import com.ieltspath.library.application.usecase.VocabularyCatalogUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -42,6 +43,7 @@ import com.ieltspath.library.application.result.VocabularySenseResult;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.UUID;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/content/vocabulary")
@@ -57,14 +59,17 @@ public class VocabularyController {
     private final CreateVocabularyItemUseCase createVocabularyItemUseCase;
     private final AddVocabularySenseUseCase addVocabularySenseUseCase;
     private final BrowseVocabularyUseCase browseVocabularyUseCase;
+    private final VocabularyCatalogUseCase catalog;
 
     @GetMapping
-    public ResponseEntity<PageResponse<VocabularyItemResponse>> browse(
+    public ResponseEntity<Map<String,Object>> browse(
             @RequestParam(defaultValue = "") @Size(max = 100) String q,
+            @RequestParam(defaultValue = "EN") @jakarta.validation.constraints.Pattern(regexp = "EN|VI", flags = jakarta.validation.constraints.Pattern.Flag.CASE_INSENSITIVE) String lang,
+            @RequestParam(required = false) @jakarta.validation.constraints.Pattern(regexp = "A1|A2|B1|B2|C1|C2", flags = jakarta.validation.constraints.Pattern.Flag.CASE_INSENSITIVE) String cefr,
+            @RequestParam(required = false) UUID topicId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
-        var result = browseVocabularyUseCase.execute(q, page, size);
-        var response = PageResponse.from(result, VocabularyController::toResponse);
+        var response = catalog.browse(q, lang, cefr == null ? null : cefr.toUpperCase(), topicId, page, size);
         return ResponseEntity.ok().cacheControl(CacheControl.maxAge(java.time.Duration.ofMinutes(5)).cachePublic()).body(response);
     }
 
@@ -105,14 +110,10 @@ public class VocabularyController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<VocabularyItemResponse> getById(@PathVariable("id") UUID id) {
-        var item = getVocabularyDetailUseCase.execute(id);
-        if (item.status() != ContentStatus.ACTIVE) throw new ResourceNotFoundException();
-        var active = new VocabularyItemResult(item.id(), item.lemma(), item.normalizedLemma(), item.ipa(),
-                item.pronunciationAudioReference(), item.status(), item.createdAt(), item.updatedAt(),
-                item.senses().stream().filter(sense -> sense.status() == ContentStatus.ACTIVE).toList());
+    public ResponseEntity<Map<String,Object>> getById(@PathVariable("id") UUID id) {
+        var active = catalog.detail(id);
         return ResponseEntity.ok().cacheControl(CacheControl.maxAge(java.time.Duration.ofMinutes(5)).cachePublic())
-                .body(VocabularyItemResponse.from(active));
+                .body(active);
     }
 
     @PostMapping

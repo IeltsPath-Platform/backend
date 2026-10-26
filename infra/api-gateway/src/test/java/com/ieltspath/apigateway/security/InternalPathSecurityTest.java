@@ -83,6 +83,13 @@ class InternalPathSecurityTest {
                 .exchange().expectStatus().isOk();
         client.get().uri("/api/content/vocabulary/10000000-0000-4000-8000-000000000001")
                 .exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/suggestions?q=po").exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/topics").exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/sets").exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/sets/10000000-0000-4000-8000-000000000001").exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/sets/10000000-0000-4000-8000-000000000001/words").exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/mindmap?itemId=10000000-0000-4000-8000-000000000001")
+                .exchange().expectStatus().isOk();
 
         client.post().uri("/api/content/vocabulary").bodyValue("{}")
                 .exchange().expectStatus().isUnauthorized();
@@ -142,7 +149,10 @@ class InternalPathSecurityTest {
         RouteLocator testPublicCatalogRoute(RouteLocatorBuilder builder) {
             return builder.routes()
                     .route("test-public-vocabulary", route -> route
-                            .path("/api/content/vocabulary", "/api/content/vocabulary/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
+                            .path("/api/content/vocabulary", "/api/content/vocabulary/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}",
+                                    "/api/content/vocabulary/suggestions", "/api/content/vocabulary/topics", "/api/content/vocabulary/sets", "/api/content/vocabulary/mindmap",
+                                    "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}",
+                                    "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/words")
                             .and().method(HttpMethod.GET)
                             .filters(filters -> filters.setPath("/__test/catalog"))
                             .uri("forward:///"))
