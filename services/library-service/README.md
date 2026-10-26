@@ -52,6 +52,8 @@ Topics and sets are part of the Library dictionary and are independent from Cont
 
 Learners save vocabulary senses with `POST /api/learning-support/flashcards/notebook/entries`, list/filter/sort them at `/entries`, read aggregate counts at `/summary`, and set understanding at `/entries/{flashcardId}/level`. Existing flashcard review and delete routes remain in use. One non-deleted card is allowed per learner and sense; level is derived from Leitner boxes (1 UNKNOWN, 2 FAMILIAR, 3 LEARNING, 4–5 MASTERED). Notes use `sourceType=VOCABULARY_SENSE` and are limited to 300 characters. Migration V18 adds the partial unique index.
 
+Reviews optionally accept `sessionId` and append `flashcard_review_events` in the review transaction only when the request is applied. Notebook progress includes weekly goals (`library.vocabulary.weekly-goal-default`, default 120), the six-band vocabulary map, topic/set progress, recent session result, and read-time achievements. Summary and entry responses only gain fields; entries accept `topicId` and `setId` filters. These authenticated endpoints scope every learner aggregate to the current user, use SQL aggregates, and do not call learning-service or award XP/points. Migration V21 adds review events and per-user weekly goals.
+
 When saving a video, Library verifies its topic through Content's `GET /api/content/topics/{id}`, forwarding the
 authenticated bearer token and `X-Correlation-Id`. The HTTP client uses a 2-second connection and 5-second read
 timeout; Content failures return 503. `POST /internal/game-content/snapshots` serves `VOCABULARY` using the shared

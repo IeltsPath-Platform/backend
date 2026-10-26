@@ -12,19 +12,45 @@ Returns a `NotebookEntryResponse`: `flashcardId`, `vocabularySenseId`, `vocabula
 
 ### `GET /api/learning-support/flashcards/notebook/entries`
 
-Query: `q` (optional, up to 100 characters; case-insensitive search across lemma and meanings), repeated `level` (`UNKNOWN`, `FAMILIAR`, `LEARNING`, `MASTERED`), `due` (optional boolean), `sort` (`RECENT` default, `DUE`, `ALPHABET`, `WEAKEST`), `page` (default 0), `size` (default 20, 1–50). Returns `{items,page,size,total}` with the entry fields above. Filtering, ordering, and paging run in SQL.
+Query: `q` (optional, up to 100 characters; case-insensitive search across lemma and meanings), repeated `level` (`UNKNOWN`, `FAMILIAR`, `LEARNING`, `MASTERED`), `due` (optional boolean), `topicId` and `setId` (optional UUID filters), `sort` (`RECENT` default, `DUE`, `ALPHABET`, `WEAKEST`), `page` (default 0), `size` (default 20, 1–50). Returns `{items,page,size,total}` with the entry fields above plus `cefrLevel` and `topicName`. Filtering, ordering, and paging run in SQL.
 
 Understanding is derived from Leitner: box 1 = `UNKNOWN`, 2 = `FAMILIAR`, 3 = `LEARNING`, boxes 4–5 = `MASTERED`.
 
 ### `GET /api/learning-support/flashcards/notebook/summary`
 
-Query: `timezone` (IANA zone, default `Asia/Ho_Chi_Minh`). Returns `{total,byLevel:{UNKNOWN,FAMILIAR,LEARNING,MASTERED},dueNow,addedLast7Days,reviewedToday,nextDueAt}`. Summary counts are computed in one SQL aggregate. Invalid timezone returns 400.
+Query: `timezone` (IANA zone, default `Asia/Ho_Chi_Minh`). Returns the existing fields `{total,byLevel:{UNKNOWN,FAMILIAR,LEARNING,MASTERED},dueNow,addedLast7Days,reviewedToday,nextDueAt}` plus `learnedCount`, `catalogTotal`, `learningCount`, and `masteredCount`. A notebook entry is learned when `review_count > 0` or its Leitner box is at least 2; `learningCount` combines FAMILIAR and LEARNING, while `byLevel` keeps their separate counts. `catalogTotal` counts active catalog senses with active items. Summary counts are computed in one SQL aggregate. Invalid timezone returns 400.
 
 ### `PUT /api/learning-support/flashcards/notebook/entries/{flashcardId}/level`
 
 Request: `{"level":"UNKNOWN|FAMILIAR|LEARNING|MASTERED","requestId":"<uuid>"}`. Updates the Leitner box and review deadline, returning 204. `UNKNOWN` is due immediately; other levels use configured interval days. Replaying the most recent request ID is a no-op. A foreign, deleted, or non-notebook card returns 404.
 
-Practice remains `POST /api/learning-support/flashcards/{id}/reviews` with `{"correct":true,"requestId":"<uuid>"}`.
+Practice remains `POST /api/learning-support/flashcards/{id}/reviews` with `{"correct":true,"requestId":"<uuid>","sessionId":"<uuid>"}`. `sessionId` is optional for older clients. Each applied review is recorded in `flashcard_review_events` in the same transaction; replaying the most recent `requestId` does not append an event.
+
+### Weekly goal
+
+`GET /api/learning-support/flashcards/notebook/weekly-goal?timezone=Asia/Ho_Chi_Minh` returns `{target,progress,remaining,days:[{date,weekday,achieved}]}`. `PUT` on the same path accepts `{"targetWords":120}` and the same optional `timezone` query. Target range is 10–1000; users without a saved target receive the configured default (120). The week is Monday through Sunday in the requested IANA timezone. `progress` counts distinct senses added to the notebook or reviewed within the week; `achieved` is true for days with at least one applied review.
+
+### `GET /api/learning-support/flashcards/notebook/vocabulary-map?currentCefr=A2`
+
+`currentCefr` is optional (`A1`–`C2`). Returns `{bands:[{band,cefr,total,learned,learning,needsReview,notLearned}],currentBand,suggestedBand}` with six CEFR rows. `currentBand` is the requested CEFR when supplied, otherwise the band with the most FAMILIAR/LEARNING entries (null when none); `suggestedBand` is the lowest band with due entries (null when none).
+
+### `GET /api/learning-support/flashcards/notebook/topics-progress?setId=<uuid>`
+
+Optional `setId` limits topics to the selected active word set. Returns `{topics:[{topicId,name,total,learned,percent,status}],current}`. `status` is `NOT_STARTED`, `IN_PROGRESS`, or `COMPLETED`; `current` is the topic with the latest review and includes at most five unlearned `nextWords`, or null when there is no reviewed topic.
+
+### `GET /api/learning-support/flashcards/notebook/sets/{setId}/progress`
+
+Returns `{setId,total,learned,learning,needsReview,notLearned,percent}` for active catalog members in the set. Missing/inactive set returns 404.
+
+### `GET /api/learning-support/flashcards/notebook/recent-result`
+
+Returns the latest session with a supplied `sessionId` as `{sessionId,topic,correct,total,percent,finishedAt}`; returns 204 when no session result exists.
+
+### `GET /api/learning-support/flashcards/notebook/achievements?timezone=Asia/Ho_Chi_Minh`
+
+Returns `{items:[{code,achieved,progress,target}]}` for a seven-day review streak, completion of at least one topic, and 300 mastered words. Achievements are calculated on read and are not persisted.
+
+All progress endpoints require authentication and derive ownership from `CurrentUserProvider`. Library does not call Learning for current CEFR; clients may pass `currentCefr` from the Learning report. All user progress queries are scoped by user ID, and aggregate reads use SQL rather than per-entry queries. No XP or points are awarded here.
 
 ### `GET /api/learning-support/flashcards/notebook/saved?senseIds=<uuid>,...`
 

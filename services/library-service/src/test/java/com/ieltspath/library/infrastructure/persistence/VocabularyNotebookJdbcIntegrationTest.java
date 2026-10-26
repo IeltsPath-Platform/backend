@@ -4,6 +4,7 @@ import com.ieltspath.library.application.query.NotebookQuery;
 import com.ieltspath.library.domain.vo.UnderstandingLevel;
 import com.ieltspath.library.infrastructure.adapter.VocabularyNotebookJdbcAdapter;
 import com.ieltspath.library.infrastructure.adapter.VocabularyCatalogJdbcAdapter;
+import com.ieltspath.library.infrastructure.adapter.VocabularyProgressJdbcAdapter;
 import com.ieltspath.library.application.port.FlashcardImageStorage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @JdbcTest
 @Testcontainers(disabledWithoutDocker = true)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({VocabularyNotebookJdbcAdapter.class, VocabularyCatalogJdbcAdapter.class})
+@Import({VocabularyNotebookJdbcAdapter.class, VocabularyCatalogJdbcAdapter.class, VocabularyProgressJdbcAdapter.class})
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @TestPropertySource(properties = {"spring.flyway.enabled=true", "spring.cloud.config.enabled=false", "eureka.client.enabled=false"})
 class VocabularyNotebookJdbcIntegrationTest {
@@ -40,6 +41,7 @@ class VocabularyNotebookJdbcIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired VocabularyNotebookJdbcAdapter adapter;
     @Autowired VocabularyCatalogJdbcAdapter catalog;
+    @Autowired VocabularyProgressJdbcAdapter progress;
     @MockBean FlashcardImageStorage imageStorage;
 
     @DynamicPropertySource static void datasource(DynamicPropertyRegistry registry) {
@@ -71,6 +73,8 @@ class VocabularyNotebookJdbcIntegrationTest {
         assertEquals(1, summary.learning());
         assertEquals(1, summary.dueNow());
         assertEquals(1, summary.reviewedToday());
+        assertEquals(1, summary.learnedCount());
+        assertTrue(summary.catalogTotal() > 0);
         assertEquals(List.of(sense), adapter.findSavedSenseIds(user, List.of(sense)));
         assertThrows(org.springframework.dao.DuplicateKeyException.class, () -> jdbc.update(
                 "insert into flashcards(id,user_id,source_type,vocabulary_sense_id,front,back,status) values(?,?,'VOCABULARY_SENSE',?,?,?,'ACTIVE')",
@@ -136,5 +140,62 @@ class VocabularyNotebookJdbcIntegrationTest {
         assertTrue((Long)catalog.setWords(proficiencySet,null,0,10).get("total")>0);
         assertTrue(((List<?>)catalog.browse("","EN",null,null,Integer.MAX_VALUE,10).get("items")).isEmpty());
         assertTrue(((List<?>)catalog.sets("BAND",Integer.MAX_VALUE,10).get("items")).isEmpty());
+    }
+
+    @Test void progressAggregatesAreScopedToTheCurrentUserAndRespectCatalogFilters() {
+        UUID userA=UUID.randomUUID(),userB=UUID.randomUUID();
+        UUID research= sense("research"), algorithm=sense("algorithm");
+        Instant reviewedAt=Instant.parse("2026-10-27T07:00:00Z");
+        UUID cardA=insertCard(userA,research,2,1,reviewedAt);
+        UUID cardB=insertCard(userB,algorithm,4,1,reviewedAt);
+        UUID session=UUID.randomUUID();
+        jdbc.update("insert into flashcard_review_events(user_id,flashcard_id,vocabulary_sense_id,session_id,correct,reviewed_at) values(?,?,?,?,?,?)",
+                userA,cardA,research,session,true,java.sql.Timestamp.from(reviewedAt));
+        jdbc.update("insert into flashcard_review_events(user_id,flashcard_id,vocabulary_sense_id,session_id,correct,reviewed_at) values(?,?,?,?,?,?)",
+                userB,cardB,algorithm,UUID.randomUUID(),false,java.sql.Timestamp.from(reviewedAt));
+
+        assertEquals(120,progress.weeklyTarget(userA,120));
+        Instant weekStart=Instant.parse("2026-10-25T17:00:00Z"),weekEnd=Instant.parse("2026-11-01T17:00:00Z");
+        assertEquals(1,progress.weeklyProgress(userA,weekStart,weekEnd));
+        assertEquals(List.of(java.time.LocalDate.of(2026,10,27)),progress.reviewDays(userA,
+                java.time.LocalDate.of(2026,10,26),java.time.LocalDate.of(2026,11,2),java.time.ZoneId.of("Asia/Ho_Chi_Minh")));
+        progress.saveWeeklyTarget(userA,80);
+        assertEquals(80,progress.weeklyTarget(userA,120));
+
+        var aMap=progress.vocabularyMap(userA,reviewedAt).stream().collect(java.util.stream.Collectors.toMap(
+                com.ieltspath.library.application.port.VocabularyProgressReader.BandCounts::cefr,x->x));
+        var bMap=progress.vocabularyMap(userB,reviewedAt).stream().collect(java.util.stream.Collectors.toMap(
+                com.ieltspath.library.application.port.VocabularyProgressReader.BandCounts::cefr,x->x));
+        assertEquals(1,aMap.get("B2").learned());
+        assertEquals(0,bMap.get("B2").learned());
+        assertEquals(1,bMap.get("C1").learned());
+
+        var filtered=adapter.findEntries(userA,new NotebookQuery(null,null,null,"RECENT",0,20,
+                UUID.fromString("c1000000-0000-4000-8000-000000000001"),UUID.fromString("c2000000-0000-4000-8000-000000000004")),reviewedAt);
+        assertEquals(1,filtered.total());
+        assertEquals("B2",filtered.items().getFirst().cefrLevel());
+        assertEquals("Education",filtered.items().getFirst().topicName());
+
+        UUID educationSet=UUID.fromString("c2000000-0000-4000-8000-000000000101");
+        var aTopics=progress.topicsProgress(userA,educationSet,reviewedAt);
+        var bTopics=progress.topicsProgress(userB,educationSet,reviewedAt);
+        assertEquals(1,aTopics.stream().filter(t->t.name().equals("Education")).findFirst().orElseThrow().learned());
+        assertTrue(progress.nextWords(userA,aTopics.getFirst().topicId(),educationSet).size()<=5);
+        assertEquals(0,bTopics.stream().filter(t->t.name().equals("Education")).findFirst().orElseThrow().learned());
+        assertTrue(progress.setProgress(userA,UUID.fromString("c2000000-0000-4000-8000-000000000004"),reviewedAt).orElseThrow().learned()>0);
+        assertEquals(session,progress.recentResult(userA).orElseThrow().sessionId());
+        assertTrue(progress.recentResult(userB).isPresent());
+        assertEquals(0,progress.achievementCounts(userA,reviewedAt).masteredWords());
+    }
+
+    private UUID sense(String lemma) {
+        return jdbc.queryForObject("select s.id from vocabulary_senses s join vocabulary_items i on i.id=s.vocabulary_item_id where i.normalized_lemma=? and s.status='ACTIVE' order by s.sort_order limit 1",UUID.class,lemma);
+    }
+
+    private UUID insertCard(UUID user,UUID sense,int box,int reviewCount,Instant reviewedAt) {
+        UUID card=UUID.randomUUID();
+        jdbc.update("insert into flashcards(id,user_id,source_type,vocabulary_sense_id,source_reference_id,front,back,status,leitner_box,created_at,next_review_at,last_reviewed_at,review_count) values(?,?,'VOCABULARY_SENSE',?,?,?,?,'ACTIVE',?,?,?,?,?)",
+                card,user,sense,sense,"front","back",box,java.sql.Timestamp.from(reviewedAt),java.sql.Timestamp.from(reviewedAt),java.sql.Timestamp.from(reviewedAt),reviewCount);
+        return card;
     }
 }

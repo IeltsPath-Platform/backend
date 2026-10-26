@@ -43,6 +43,8 @@ app:
           - "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/words"
 
 library:
+  vocabulary:
+    weekly-goal-default: 120
   content:
     base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
   flashcard-images:

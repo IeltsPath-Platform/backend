@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest({VocabularyController.class, VocabularyCatalogController.class, AdminVocabularyController.class, AdminVocabularyCatalogController.class})
+@WebMvcTest({VocabularyController.class, VocabularyCatalogController.class, AdminVocabularyController.class, AdminVocabularyCatalogController.class, VocabularyProgressController.class})
 @ImportAutoConfiguration(CommonSecurityAutoConfiguration.class)
 @TestPropertySource(properties = {
         "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
@@ -60,6 +60,7 @@ class VocabularyCatalogSecurityTest {
     @MockBean AddVocabularySenseUseCase addSense;
     @MockBean BrowseVocabularyUseCase browse;
     @MockBean VocabularyCatalogUseCase catalog;
+    @MockBean com.ieltspath.library.application.usecase.VocabularyProgressUseCase progress;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
         registry.add("app.auth.internal-jwt-secret", () -> SECRET);
@@ -81,6 +82,7 @@ class VocabularyCatalogSecurityTest {
         mvc.perform(get("/api/content/vocabulary/search")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/content/vocabulary/senses").param("ids", id.toString())).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/content/admin/vocabulary/{id}", id)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/learning-support/flashcards/notebook/weekly-goal")).andExpect(status().isUnauthorized());
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/content/admin/vocabulary/items/{id}",id)
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized());
@@ -106,6 +108,16 @@ class VocabularyCatalogSecurityTest {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/content/admin/vocabulary/senses/{id}",UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION,"Bearer "+signedInternalToken("CONTENT_AUTHOR"))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"cefrLevel\":\"Z9\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test void progressEndpointsRejectInvalidTimezoneAndGoalTarget() throws Exception {
+        String token=signedInternalToken("CUSTOMER");
+        mvc.perform(get("/api/learning-support/flashcards/notebook/weekly-goal").param("timezone","Not/A_Zone")
+                        .header(HttpHeaders.AUTHORIZATION,"Bearer "+token))
+                .andExpect(status().isBadRequest());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/learning-support/flashcards/notebook/weekly-goal")
+                        .header(HttpHeaders.AUTHORIZATION,"Bearer "+token).contentType(MediaType.APPLICATION_JSON).content("{\"targetWords\":9}"))
                 .andExpect(status().isBadRequest());
     }
 
