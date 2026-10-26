@@ -12,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -56,6 +57,22 @@ public class JdbcMasteryProfileRepository implements MasteryProfileRepository {
                         "WHERE c.kp_id = p.knowledge_point_id AND c.parent_kp_id IS NOT NULL) " +
                         "ORDER BY knowledge_point_id",
                 MAPPER, userId);
+    }
+
+    @Override
+    public int countDue(UUID userId, Instant now, Collection<UUID> excludedKnowledgePointIds) {
+        Integer due = jdbc.query("SELECT count(*) FROM kp_mastery_profiles p WHERE p.user_id = ? "
+                        + "AND p.tier = 'MAINTAIN' AND p.next_review_at IS NOT NULL AND p.next_review_at <= ? "
+                        + "AND NOT (p.knowledge_point_id = ANY (?)) "
+                        + "AND NOT EXISTS (SELECT 1 FROM knowledge_point_catalog c "
+                        + "WHERE c.kp_id = p.knowledge_point_id AND c.parent_kp_id IS NOT NULL)",
+                statement -> {
+                    statement.setObject(1, userId);
+                    statement.setTimestamp(2, Timestamp.from(now));
+                    statement.setArray(3, JdbcKnowledgeEvidenceRepository.uuidArray(statement.getConnection(),
+                            excludedKnowledgePointIds));
+                }, rows -> rows.next() ? rows.getInt(1) : 0);
+        return due == null ? 0 : due;
     }
 
     @Override
