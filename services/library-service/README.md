@@ -42,6 +42,12 @@ an incorrect answer resets the card to box 1. Replaying the most recent `request
 resulting box comes from `library.srs.intervals-days`, defaulting to `[1, 2, 4, 8, 16]`.
 See the [flashcard SRS contract](../../docs/contracts/flashcard-srs-v1.md) for request, response, and ownership details.
 
+## Vocabulary notebook and catalog
+
+`GET /api/content/vocabulary?q=&page=0&size=20` browses active catalog items (maximum page size 50); `GET /api/content/vocabulary/{id}` returns one active item. These two GET routes are public and cacheable for five minutes. `/search`, `/senses`, writes, and `/api/content/admin/vocabulary/**` still require authentication. See the [vocabulary notebook contract](../../docs/contracts/vocabulary-notebook-v1.md).
+
+Learners save vocabulary senses with `POST /api/learning-support/flashcards/notebook/entries`, list/filter/sort them at `/entries`, read aggregate counts at `/summary`, and set understanding at `/entries/{flashcardId}/level`. Existing flashcard review and delete routes remain in use. One non-deleted card is allowed per learner and sense; level is derived from Leitner boxes (1 UNKNOWN, 2 FAMILIAR, 3 LEARNING, 4–5 MASTERED). Notes use `sourceType=VOCABULARY_SENSE` and are limited to 300 characters. Migration V18 adds the partial unique index.
+
 When saving a video, Library verifies its topic through Content's `GET /api/content/topics/{id}`, forwarding the
 authenticated bearer token and `X-Correlation-Id`. The HTTP client uses a 2-second connection and 5-second read
 timeout; Content failures return 503. `POST /internal/game-content/snapshots` serves `VOCABULARY` using the shared

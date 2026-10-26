@@ -103,6 +103,11 @@ public class SecurityConfig {
                     // Cho phep doc actuator health/info.
                     exchange.pathMatchers(HttpMethod.GET, "/actuator/**").permitAll();
 
+                    // Public vocabulary catalog reads only; constrain the detail path to UUIDs.
+                    exchange.pathMatchers(HttpMethod.GET, "/api/content/vocabulary",
+                            "/api/content/vocabulary/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
+                            .permitAll();
+
                     // System monitoring is reserved for administrators.
                     exchange.pathMatchers("/api/admin/system/**").hasRole("ADMIN");
 

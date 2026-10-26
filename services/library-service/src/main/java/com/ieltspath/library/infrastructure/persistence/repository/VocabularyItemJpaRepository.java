@@ -4,6 +4,8 @@ import com.ieltspath.library.infrastructure.persistence.entity.VocabularyItemJpa
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -14,6 +16,10 @@ import java.util.UUID;
 
 @Repository
 public interface VocabularyItemJpaRepository extends JpaRepository<VocabularyItemJpaEntity, UUID> {
+
+    @Query("select v.id from VocabularyItemJpaEntity v where v.status = com.ieltspath.library.domain.vo.ContentStatus.ACTIVE "
+            + "and (:query = '' or lower(v.lemma) like lower(concat('%', :query, '%'))) order by v.lemma asc, v.id asc")
+    Page<UUID> findActiveIdsForBrowse(@Param("query") String query, Pageable pageable);
 
     @EntityGraph(attributePaths = {"senses"})
     Optional<VocabularyItemJpaEntity> findByNormalizedLemma(String normalizedLemma);

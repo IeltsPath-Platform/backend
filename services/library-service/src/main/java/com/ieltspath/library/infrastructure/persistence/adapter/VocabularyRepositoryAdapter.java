@@ -72,4 +72,13 @@ public class VocabularyRepositoryAdapter implements VocabularyRepository {
     public boolean existsByNormalizedLemma(String normalizedLemma) {
         return vocabularyItemJpaRepository.existsByNormalizedLemma(normalizedLemma);
     }
+
+    @Override
+    public com.ieltspath.library.domain.vo.OwnedPage<VocabularyItem> browseActive(String query, int page, int size) {
+        var ids = vocabularyItemJpaRepository.findActiveIdsForBrowse(query, org.springframework.data.domain.PageRequest.of(page, size));
+        var byId = vocabularyItemJpaRepository.findAllByIdIn(ids.getContent()).stream()
+                .map(mapper::toDomain).collect(java.util.stream.Collectors.toMap(VocabularyItem::getId, item -> item));
+        var items = ids.getContent().stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
+        return new com.ieltspath.library.domain.vo.OwnedPage<>(items, ids.getTotalElements());
+    }
 }

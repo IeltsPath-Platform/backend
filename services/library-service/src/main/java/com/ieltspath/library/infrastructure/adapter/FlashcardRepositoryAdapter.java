@@ -63,6 +63,13 @@ public class FlashcardRepositoryAdapter implements FlashcardRepository {
     }
 
     @Override
+    public Optional<Flashcard> findLiveVocabularySenseCard(UUID userId, UUID vocabularySenseId) {
+        return repository.findFirstByUserIdAndSourceTypeAndVocabularySenseIdAndStatusNot(
+                userId, FlashcardSourceType.VOCABULARY_SENSE, vocabularySenseId, LibraryStatus.DELETED)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public long countByImageKeyAndStatusNot(String imageKey, LibraryStatus status) {
         return repository.countByImageKeyAndStatusNot(imageKey, status);
     }

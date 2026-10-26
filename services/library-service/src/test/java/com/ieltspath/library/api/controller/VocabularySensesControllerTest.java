@@ -8,6 +8,7 @@ import com.ieltspath.library.application.usecase.CreateVocabularyItemUseCase;
 import com.ieltspath.library.application.usecase.GetVocabularyDetailUseCase;
 import com.ieltspath.library.application.usecase.GetVocabularySensesUseCase;
 import com.ieltspath.library.application.usecase.SearchVocabularyUseCase;
+import com.ieltspath.library.application.usecase.BrowseVocabularyUseCase;
 import com.ieltspath.library.domain.vo.ContentStatus;
 import com.ieltspath.library.domain.vo.PartOfSpeech;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,11 +37,12 @@ class VocabularySensesControllerTest {
     private final CreateVocabularyItemUseCase create = mock(CreateVocabularyItemUseCase.class);
     private final AddVocabularySenseUseCase addSense = mock(AddVocabularySenseUseCase.class);
     private final GetVocabularySensesUseCase getSenses = mock(GetVocabularySensesUseCase.class);
+    private final BrowseVocabularyUseCase browse = mock(BrowseVocabularyUseCase.class);
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new VocabularyController(search, detail, getSenses, create, addSense))
+        mvc = MockMvcBuilders.standaloneSetup(new VocabularyController(search, detail, getSenses, create, addSense, browse))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

@@ -2,6 +2,7 @@ package com.ieltspath.library.domain.repository;
 
 import com.ieltspath.library.domain.aggregate.VocabularyItem;
 import com.ieltspath.library.domain.vo.VocabularySenseCard;
+import com.ieltspath.library.domain.vo.OwnedPage;
 
 import java.util.List;
 import java.util.Optional;
@@ -15,4 +16,5 @@ public interface VocabularyRepository {
     Optional<VocabularyItem> findByNormalizedLemma(String normalizedLemma);
     List<VocabularyItem> searchByLemma(String query);
     boolean existsByNormalizedLemma(String normalizedLemma);
+    OwnedPage<VocabularyItem> browseActive(String query, int page, int size);
 }

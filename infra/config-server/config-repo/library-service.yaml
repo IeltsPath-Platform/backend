@@ -31,6 +31,10 @@ app:
           - /actuator/info
           - /v3/api-docs
           - /v3/api-docs/**
+      - method: GET
+        patterns:
+          - /api/content/vocabulary
+          - "/api/content/vocabulary/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
 
 library:
   content:

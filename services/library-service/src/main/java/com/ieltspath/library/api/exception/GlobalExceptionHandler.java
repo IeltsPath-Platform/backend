@@ -12,6 +12,7 @@ import com.ieltspath.library.domain.exception.ResourceNotFoundException;
 import com.ieltspath.library.domain.exception.VideoNotFoundException;
 import com.ieltspath.library.domain.exception.VocabularyNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.time.LocalDateTime;
@@ -121,6 +123,12 @@ public class GlobalExceptionHandler {
         }
         return buildResponse(HttpStatus.BAD_REQUEST,
                 messageForPath(request, "Dữ liệu không hợp lệ", "Validation failed"), request.getRequestURI(), details);
+    }
+
+    @ExceptionHandler({ConstraintViolationException.class, HandlerMethodValidationException.class})
+    public ResponseEntity<ErrorResponse> handleMethodValidation(Exception ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST,
+                messageForPath(request, "Dữ liệu không hợp lệ", "Validation failed"), request.getRequestURI(), null);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
