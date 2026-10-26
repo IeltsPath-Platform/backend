@@ -16,7 +16,9 @@ public record CreateHumanReviewRequest(
         @NotBlank @Pattern(regexp = "TASK_[12]") String task,
         @NotNull JsonNode promptSnapshot,
         @NotBlank String essay,
-        @NotNull JsonNode rubric
+        @NotNull JsonNode rubric,
+        /** The examiner the learner chose to grade this essay. */
+        @NotNull UUID examinerId
 ) {
     public enum Source { LESSON, PRACTICE }
 }

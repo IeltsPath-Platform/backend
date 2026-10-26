@@ -38,11 +38,21 @@ public class ContentErrorTypeClient implements ErrorTypeCatalog {
     }
 
     @Override
+    public Set<String> staffCodes() {
+        return fetch("/internal/learning-content/error-types/staff").stream().map(ErrorType::code)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
     public List<ErrorType> activeErrorTypes() {
+        return fetch("/internal/learning-content/error-types");
+    }
+
+    private List<ErrorType> fetch(String path) {
         List<ErrorTypeResponse> response;
         try {
             response = restClient.get()
-                    .uri("/internal/learning-content/error-types")
+                    .uri(path)
                     .header(HttpHeaders.AUTHORIZATION, serviceTokens.authorizationHeader())
                     .header("X-Correlation-Id", GatewayRequestContext.correlationId())
                     .retrieve()

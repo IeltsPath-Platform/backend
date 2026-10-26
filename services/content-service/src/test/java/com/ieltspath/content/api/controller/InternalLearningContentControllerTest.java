@@ -111,6 +111,20 @@ class InternalLearningContentControllerTest {
                 .andExpect(jsonPath("$[0].code").value("PLACEMENT"));
     }
 
+    @Test
+    void staffErrorTypesListActiveCodesWithTheirReviewStatus() throws Exception {
+        when(errorTypes.executeActive()).thenReturn(List.of(
+                com.ieltspath.content.domain.aggregate.ErrorType.create("TENSE", "Sai thì",
+                        com.ieltspath.content.domain.vo.ErrorCategory.GRAMMAR, 1, null, "Xác định mốc thời gian.")));
+        mockMvc.perform(get("/internal/learning-content/error-types/staff"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("TENSE"))
+                .andExpect(jsonPath("$[0].category").value("GRAMMAR"))
+                .andExpect(jsonPath("$[0].severity").value(1))
+                .andExpect(jsonPath("$[0].fixHint").value("Xác định mốc thời gian."))
+                .andExpect(jsonPath("$[0].reviewStatus").value("DRAFT"));
+    }
+
     private final GetTopicSequenceUseCase topicSequence = mock(GetTopicSequenceUseCase.class);
     private final GetTopicLessonsUseCase topicLessons = mock(GetTopicLessonsUseCase.class);
     private final GetLessonContentUseCase lessonContent = mock(GetLessonContentUseCase.class);

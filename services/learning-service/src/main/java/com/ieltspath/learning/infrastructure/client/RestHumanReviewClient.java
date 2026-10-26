@@ -78,7 +78,7 @@ public class RestHumanReviewClient implements HumanReviewClient {
         return Map.of("requestId", request.requestId(), "learnerId", request.learnerId(),
                 "sourceSubmissionId", request.sourceSubmissionId(), "source", request.source(),
                 "task", request.task(), "promptSnapshot", Map.of("stem", request.promptStem()),
-                "essay", request.essay(), "rubric", rubric);
+                "essay", request.essay(), "rubric", rubric, "examinerId", request.examinerId());
     }
 
     /** {@code refusalIsDefinite}: a 4xx answer to a create call means nothing was created, unlike a timeout or a 5xx. */
@@ -94,6 +94,10 @@ public class RestHumanReviewClient implements HumanReviewClient {
                         "No human-grading credit is left");
             }
             if (status == 409) {
+                if (refusalIsDefinite && "EXAMINER_UNAVAILABLE".equals(errorCode(exception))) {
+                    throw new LearningRequestException(409, "EXAMINER_UNAVAILABLE",
+                            "The chosen examiner cannot take this essay; choose another examiner");
+                }
                 throw new LearningRequestException(409, "HUMAN_GRADING_CONFLICT", "The review request conflicts");
             }
             if (refusalIsDefinite && status >= 400 && status < 500 && status != 401) {
@@ -102,6 +106,15 @@ public class RestHumanReviewClient implements HumanReviewClient {
             throw unavailable();
         } catch (RestClientException exception) {
             throw unavailable();
+        }
+    }
+
+    private static String errorCode(RestClientResponseException exception) {
+        try {
+            ErrorBody body = exception.getResponseBodyAs(ErrorBody.class);
+            return body == null ? null : body.code();
+        } catch (RuntimeException unreadable) {
+            return null;
         }
     }
 
@@ -117,4 +130,6 @@ public class RestHumanReviewClient implements HumanReviewClient {
 
     private record Credits(int remainingCredits, Boolean charged) {}
     private record Created(UUID reviewSubmissionId) {}
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+    private record ErrorBody(String code) {}
 }

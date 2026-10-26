@@ -27,7 +27,10 @@ class GradingJobControllerTest {
         UUID id=UUID.randomUUID(),examiner=UUID.randomUUID();
         org.mockito.Mockito.when(currentUser.requireUserId()).thenReturn(examiner);
         org.mockito.Mockito.when(getEssay.execute(examiner,id)).thenReturn(new com.ieltspath.assessment.application.port.ExaminerQueueStore.Essay(id,UUID.randomUUID(),UUID.randomUUID(),"Prompt","Essay","TASK_2",null,null));
-        org.mockito.Mockito.when(listQueue.execute("HUMAN","QUEUED",0,20)).thenReturn(new com.ieltspath.assessment.application.port.ExaminerQueueStore.QueuePage(java.util.List.of(),0,20,0));
+        org.mockito.Mockito.when(currentUser.requireCurrentUser()).thenReturn(
+                new com.ieltspath.commonsecurity.currentuser.CurrentUser(examiner,java.util.Set.of("EXAMINER")));
+        // An examiner is given only the queue of the jobs learners chose them for.
+        org.mockito.Mockito.when(listQueue.executeFor(examiner,"HUMAN","QUEUED",0,20)).thenReturn(new com.ieltspath.assessment.application.port.ExaminerQueueStore.QueuePage(java.util.List.of(),0,20,0));
         mvc.perform(get("/api/assessments/grading-jobs/{id}/essay",id)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.essay").value("Essay")).andExpect(jsonPath("$..band").doesNotExist())
                 .andExpect(jsonPath("$..llmBand").doesNotExist()).andExpect(jsonPath("$..llmFeedback").doesNotExist());

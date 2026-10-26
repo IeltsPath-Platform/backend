@@ -45,7 +45,7 @@ public class RecordCommunityEventUseCase {
         if (commentEvent && event.commentId() == null) throw new IllegalArgumentException("Missing comment reference");
         if (!preferences.isEnabled(event.recipientId(), type)) return Optional.empty();
         var notification = new Notification(event.eventId(), event.actorId(), event.recipientId(), type, event.postId(),
-                event.commentId(), event.occurredAt(), null);
+                event.commentId(), null, event.occurredAt(), null);
         return notifications.insertIfAbsent(event.eventId(), notification) ? Optional.of(notification) : Optional.empty();
     }
 }

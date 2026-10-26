@@ -13,7 +13,8 @@ import static com.ieltspath.learning.domain.vo.WritingSubmissionStatus.*;
 
 /**
  * One essay graded for a lesson block. The prompt is frozen with the essay so a resend grades the same question.
- * GRADING → PAYMENT_PENDING (graded) → GRADED (points debited); GRADING → FAILED; FAILED → GRADING (resend).
+ * GRADING → PAYMENT_PENDING (graded) → GRADED (points debited); GRADING → FAILED; FAILED → GRADING (resend). A free
+ * essay sent to an examiner is AWAITING_EXAMINER from the start and stays so: the grade lives in Assessment.
  * The grade stays withheld until GRADED. {@link #persistedStatus()} is the status last read or written, so the
  * repository can refuse a write when another request changed the submission first.
  */
@@ -96,6 +97,16 @@ public final class WritingSubmission {
                                               EssayPrompt prompt, int pointCost, Instant now) {
         return new WritingSubmission(id, userId, null, null, null, requestId, essayText, wordCount, prompt, pointCost,
                 GRADING, null, null, null, null, null, null, Objects.requireNonNull(now, "now"));
+    }
+
+    /**
+     * A free-writing essay the learner sent to an examiner instead of the AI: AWAITING_EXAMINER from {@code now}, nothing
+     * to grade or charge here (the examiner's credit is spent in Access). Not stored yet.
+     */
+    public static WritingSubmission startFreeForExaminer(UUID id, UUID userId, UUID requestId, String essayText,
+                                                         int wordCount, EssayPrompt prompt, Instant now) {
+        return new WritingSubmission(id, userId, null, null, null, requestId, essayText, wordCount, prompt, 0,
+                AWAITING_EXAMINER, null, null, null, null, null, null, Objects.requireNonNull(now, "now"));
     }
 
     public static WritingSubmission restore(UUID id, UUID userId, UUID lessonId, UUID blockId, UUID requestId,

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -61,12 +62,12 @@ class InternalHumanReviewControllerTest {
         when(service.create(org.mockito.ArgumentMatchers.any())).thenReturn(
                 new HumanReviewStore.Review(requestId, reviewId, "PENDING"));
         when(service.get(reviewId, learnerId)).thenReturn(
-                new HumanReviewStore.ReviewResult(reviewId, "PENDING", null, null, null, null));
+                new HumanReviewStore.ReviewResult(reviewId, "PENDING", null, null, null, null, null, UUID.randomUUID()));
         String body = """
                 {"requestId":"%s","learnerId":"%s","sourceSubmissionId":"%s","source":"LESSON",
                  "task":"TASK_1","promptSnapshot":{"stem":"Describe the chart."},"essay":"Essay text.",
-                 "rubric":{"code":"IELTS_WRITING_TASK_1","version":1}}
-                """.formatted(requestId, learnerId, UUID.randomUUID());
+                 "rubric":{"code":"IELTS_WRITING_TASK_1","version":1},"examinerId":"%s"}
+                """.formatted(requestId, learnerId, UUID.randomUUID(), UUID.randomUUID());
 
         mvc.perform(post("/internal/assessments/human-reviews").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isAccepted())
@@ -90,8 +91,8 @@ class InternalHumanReviewControllerTest {
         String body = """
                 {"requestId":"%s","learnerId":"%s","sourceSubmissionId":"%s","source":"LESSON",
                  "task":"TASK_1","promptSnapshot":{"stem":"Describe the chart."},"essay":"Essay text.",
-                 "rubric":{"code":"IELTS_WRITING_TASK_1","version":1}}
-                """.formatted(UUID.randomUUID(), other, UUID.randomUUID());
+                 "rubric":{"code":"IELTS_WRITING_TASK_1","version":1},"examinerId":"%s"}
+                """.formatted(UUID.randomUUID(), other, UUID.randomUUID(), UUID.randomUUID());
 
         mvc.perform(get("/internal/assessments/human-reviews/{id}", reviewId)
                         .param("learnerId", other.toString()))
@@ -142,5 +143,85 @@ class InternalHumanReviewControllerTest {
                                  "errorCodes":[],"feedback":"Try again."}
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "EXAMINER")
+    void passesTheMarkedErrorsToTheService() throws Exception {
+        UUID examinerId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(examinerId);
+        mvc.perform(post("/api/assessments/grading-jobs/{id}/human-review", jobId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"band":6.5,"criteria":[{"criterion":"GRA","band":6.0,"comment":"Tense slips."}],
+                                 "errorCodes":["TENSE"],"feedback":"Check tenses.",
+                                 "annotations":[{"excerpt":"have rose","start":10,"end":19,"errorCode":"TENSE",
+                                                 "suggestion":"have risen"}]}
+                                """))
+                .andExpect(status().isNoContent());
+        var command = org.mockito.ArgumentCaptor.forClass(
+                com.ieltspath.assessment.application.command.CompleteHumanReviewCommand.class);
+        verify(service).complete(org.mockito.ArgumentMatchers.eq(jobId), org.mockito.ArgumentMatchers.eq(examinerId),
+                command.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(
+                new com.ieltspath.assessment.application.command.CompleteHumanReviewCommand.Annotation(
+                        "have rose", 10, 19, "TENSE", "have risen"), command.getValue().annotations().getFirst());
+    }
+
+    @Test
+    @WithMockUser(roles = "EXAMINER")
+    void rejectsAMarkedErrorWithoutAnExcerptOrWithAnEmptyRange() throws Exception {
+        for (String annotation : new String[] {
+                "{\"excerpt\":\"\",\"start\":1,\"end\":2,\"errorCode\":\"TENSE\",\"suggestion\":\"x\"}",
+                "{\"excerpt\":\"a\",\"start\":1,\"end\":0,\"errorCode\":\"TENSE\",\"suggestion\":\"x\"}",
+                "{\"excerpt\":\"a\",\"start\":1,\"end\":2,\"errorCode\":\"\",\"suggestion\":\"x\"}"}) {
+            mvc.perform(post("/api/assessments/grading-jobs/{id}/human-review", UUID.randomUUID())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"band\":6.5,\"criteria\":[{\"criterion\":\"GRA\",\"band\":6.0,\"comment\":\"c\"}],"
+                                    + "\"errorCodes\":[],\"feedback\":\"f\",\"annotations\":[" + annotation + "]}"))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    @WithMockUser(roles = "EXAMINER")
+    void examinerSavesAndReadsTheDraft() throws Exception {
+        UUID examinerId = UUID.randomUUID();
+        UUID jobId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(examinerId);
+        mvc.perform(put("/api/assessments/grading-jobs/{id}/human-review/draft", jobId)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"band\":5.5}"))
+                .andExpect(status().isNoContent());
+        verify(service).saveDraft(org.mockito.ArgumentMatchers.eq(jobId), org.mockito.ArgumentMatchers.eq(examinerId),
+                org.mockito.ArgumentMatchers.any(com.fasterxml.jackson.databind.JsonNode.class));
+
+        when(service.draft(jobId, examinerId)).thenReturn(java.util.Optional.of(new HumanReviewStore.Draft(
+                json.readTree("{\"band\":5.5}"), java.time.Instant.parse("2026-10-22T01:00:00Z"))));
+        mvc.perform(get("/api/assessments/grading-jobs/{id}/human-review/draft", jobId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.payload.band").value(5.5))
+                .andExpect(jsonPath("$.savedAt").exists());
+    }
+
+    @Test
+    @WithMockUser(roles = "EXAMINER")
+    void readingADraftThatWasNeverSavedIsEmpty() throws Exception {
+        UUID examinerId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(examinerId);
+        when(service.draft(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(examinerId)))
+                .thenReturn(java.util.Optional.empty());
+        mvc.perform(get("/api/assessments/grading-jobs/{id}/human-review/draft", UUID.randomUUID()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void learnerCannotSaveOrReadTheDraft() throws Exception {
+        mvc.perform(put("/api/assessments/grading-jobs/{id}/human-review/draft", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/assessments/grading-jobs/{id}/human-review/draft", UUID.randomUUID()))
+                .andExpect(status().isForbidden());
     }
 }

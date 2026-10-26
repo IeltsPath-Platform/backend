@@ -209,6 +209,7 @@ services:
       RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
       CONTENT_SERVICE_URL: http://content-service:8082
       ACCESS_SERVICE_URL: http://access-service:8084
+      USER_SERVICE_URL: http://user-service:8085
       ASSESSMENT_LLM_BASE_URL: "${ASSESSMENT_LLM_BASE_URL:-}"
       ASSESSMENT_LLM_API_KEY: "${ASSESSMENT_LLM_API_KEY:-}"
       ASSESSMENT_LLM_MODEL: "${ASSESSMENT_LLM_MODEL:-}"
@@ -220,6 +221,8 @@ services:
       content-service:
         condition: service_healthy
       access-service:
+        condition: service_healthy
+      user-service:
         condition: service_healthy
 
   learning-service:

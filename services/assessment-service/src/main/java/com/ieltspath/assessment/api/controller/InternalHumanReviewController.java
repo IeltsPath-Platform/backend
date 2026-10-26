@@ -34,7 +34,7 @@ public class InternalHumanReviewController {
         }
         HumanReviewStore.Review review = reviews.create(new HumanReviewStore.CreateReview(request.requestId(),
                 learnerId, request.sourceSubmissionId(), request.source().name(), request.task(),
-                request.promptSnapshot(), request.essay(), request.rubric()));
+                request.promptSnapshot(), request.essay(), request.rubric(), request.examinerId()));
         return HumanReviewResponse.created(review);
     }
 

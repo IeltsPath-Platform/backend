@@ -11,6 +11,8 @@ public interface ExaminerQueueStore {
     default QueuePage listByReason(String mode, String status, int page, int size, String reason) {
         return list(mode, status, page, size);
     }
+    /** The jobs the learners chose this examiner for. */
+    QueuePage listFor(UUID examinerId, String mode, String status, int page, int size);
     Optional<QueueEntry> find(UUID jobId);
     boolean claim(UUID jobId, UUID examinerId);
     Optional<Essay> essay(UUID jobId);
@@ -21,7 +23,8 @@ public interface ExaminerQueueStore {
     record QueuePage(List<QueueEntry> content, int page, int size, long totalElements) {}
     record QueueEntry(UUID id, UUID submissionId, UUID attemptId, UUID attemptItemId, String attemptType,
                       String source, String skill, String task, String status, String reason, UUID assignedExaminerId,
-                      Instant claimedAt, Instant createdAt, long waitSeconds, boolean overdue) {}
+                      Instant claimedAt, Instant createdAt, long waitSeconds, boolean overdue,
+                      UUID requestedExaminerId, boolean hasDraft) {}
     record Essay(UUID jobId, UUID attemptId, UUID attemptItemId, String prompt, String essay, String task,
                  Object rubric, String source) {
         @Override public String toString() { return "Essay[jobId=" + jobId + "]"; }

@@ -88,6 +88,24 @@ public class InternalLearningContentController {
         }
     }
 
+    /**
+     * Every active error type, reviewed or not, with its review status. Graders may record these codes; a learner is
+     * shown a code and its fix hint only once it is approved (see {@code /error-types}).
+     */
+    @GetMapping("/error-types/staff")
+    public List<StaffErrorTypeResponse> staffErrorTypes() {
+        return listErrorTypes.executeActive().stream().map(StaffErrorTypeResponse::from).toList();
+    }
+
+    public record StaffErrorTypeResponse(String code, String name, String category, int severity, String fixHint,
+                                         String reviewStatus) {
+        static StaffErrorTypeResponse from(com.ieltspath.content.domain.aggregate.ErrorType errorType) {
+            return new StaffErrorTypeResponse(errorType.getCode(), errorType.getName(),
+                    errorType.getCategory().name(), errorType.getSeverity(), errorType.getFixHint(),
+                    errorType.getReviewStatus().name());
+        }
+    }
+
     @GetMapping("/courses/{id}/test-packages")
     public List<TopicTestPackageResponse> courseTestPackages(@PathVariable("id") UUID courseId) {
         return getCourseTestPackages.execute(courseId).stream().map(TopicTestPackageResponse::from).toList();

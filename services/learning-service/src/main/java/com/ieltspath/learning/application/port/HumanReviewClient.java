@@ -22,8 +22,8 @@ public interface HumanReviewClient {
 
     /**
      * Idempotent by {@code requestId}; returns the id of the independent review submission. A review that Assessment
-     * refused outright fails with code {@code HUMAN_GRADING_CONFLICT} or {@code HUMAN_REVIEW_REJECTED}: nothing was
-     * created. Any other failure (timeout, server error, no connection) may have left a review behind.
+     * refused outright fails with code {@code HUMAN_GRADING_CONFLICT}, {@code EXAMINER_UNAVAILABLE} (the chosen examiner
+     * is full, not accepting or unknown) or {@code HUMAN_REVIEW_REJECTED}: nothing was created. Any other failure (timeout, server error, no connection) may have left a review behind.
      */
     UUID createReview(CreateReview request);
 
@@ -32,11 +32,20 @@ public interface HumanReviewClient {
 
     record CreditCharge(int remainingCredits, boolean charged) {}
 
+    /** {@code examinerId} is the examiner the learner chose; only that examiner receives the essay. */
     record CreateReview(UUID requestId, UUID learnerId, UUID sourceSubmissionId, String source, String task,
-                        String promptStem, String essay, String rubricCode, Integer rubricVersion) {}
+                        String promptStem, String essay, String rubricCode, Integer rubricVersion, UUID examinerId) {}
 
+    /** {@code examinerId} is who the learner chose; the learner looks the examiner's profile up in User Service. */
     record Review(UUID reviewSubmissionId, String status, BigDecimal band, List<Criterion> criteria,
-                  List<String> errorCodes, String feedback) {}
+                  List<String> errorCodes, String feedback, List<Annotation> annotations, UUID examinerId) {}
 
     record Criterion(String criterion, BigDecimal band, String comment) {}
+
+    /**
+     * An error the examiner marked in the essay: {@code start} and {@code end} are UTF-16 offsets, {@code end}
+     * exclusive. {@code errorCode} is absent while the code is still in review; the excerpt and suggestion remain.
+     */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    record Annotation(String excerpt, Integer start, Integer end, String errorCode, String suggestion) {}
 }

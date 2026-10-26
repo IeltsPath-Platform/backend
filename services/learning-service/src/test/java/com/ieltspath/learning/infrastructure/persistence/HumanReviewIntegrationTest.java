@@ -4,6 +4,7 @@ import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.HumanReviewClient;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.usecase.HumanReviewUseCase;
+import com.ieltspath.learning.application.usecase.ListExaminerReviewsUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,10 +51,12 @@ class HumanReviewIntegrationTest {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired HumanReviewUseCase reviews;
+    @Autowired ListExaminerReviewsUseCase list;
     @MockitoBean HumanReviewClient client;
     @MockitoBean LearningContentClient content;
 
     private final UUID user = UUID.randomUUID();
+    private final UUID examiner = UUID.randomUUID();
 
     @BeforeEach
     void clean() {
@@ -94,12 +97,13 @@ class HumanReviewIntegrationTest {
         UUID review = UUID.randomUUID();
         when(client.createReview(any())).thenReturn(review);
 
-        assertEquals(review, reviews.request(user, essay));
-        assertEquals(review, reviews.request(user, essay));
+        assertEquals(review, reviews.request(user, essay, examiner));
+        assertEquals(review, reviews.request(user, essay, examiner));
 
         verify(client, times(1)).consumeCredit(essay);
         var sent = org.mockito.ArgumentCaptor.forClass(HumanReviewClient.CreateReview.class);
         verify(client, times(1)).createReview(sent.capture());
+        assertEquals(examiner, sent.getValue().examinerId());
         assertEquals("LESSON", sent.getValue().source());
         assertEquals("TASK_2", sent.getValue().task());
         assertEquals("My essay text", sent.getValue().essay());
@@ -110,11 +114,38 @@ class HumanReviewIntegrationTest {
     }
 
     @Test
+    void theLearnerListsTheirOwnRequestsNewestFirstOnePageAtATime() {
+        UUID older = essay(user, "GRADED", false);
+        UUID newer = essay(user, "GRADED", true);
+        UUID someoneElses = essay(UUID.randomUUID(), "GRADED", false);
+        UUID olderReview = UUID.randomUUID(), newerReview = UUID.randomUUID();
+        jdbc.update("INSERT INTO human_review_requests (submission_id, user_id, review_submission_id, requested_at) VALUES (?, ?, ?, now() - interval '2 days')", older, user, olderReview);
+        jdbc.update("INSERT INTO human_review_requests (submission_id, user_id, review_submission_id, requested_at) VALUES (?, ?, ?, now() - interval '1 day')", newer, user, newerReview);
+        jdbc.update("INSERT INTO human_review_requests (submission_id, user_id, review_submission_id) VALUES (?, ?, ?)", someoneElses, UUID.randomUUID(), UUID.randomUUID());
+
+        var first = list.execute(user, 0, 1);
+        assertEquals(1, first.items().size());
+        assertTrue(first.hasNext());
+        var row = first.items().getFirst();
+        assertEquals(newer, row.submissionId());
+        assertEquals(newerReview, row.reviewSubmissionId());
+        assertEquals("PRACTICE_ITEM", row.source());
+        assertEquals("TASK_2", row.task());
+        assertEquals("Should cities plant trees?", row.stem());
+        assertEquals(3, row.wordCount());
+
+        var second = list.execute(user, 1, 1);
+        assertEquals(older, second.items().getFirst().submissionId());
+        assertFalse(second.hasNext());
+        assertEquals(0, list.execute(UUID.randomUUID(), 0, 20).items().size(), "nobody sees another learner's essays");
+    }
+
+    @Test
     void aPracticeEssayIsSentAsPractice() {
         UUID essay = essay(user, "GRADED", true);
         when(client.createReview(any())).thenReturn(UUID.randomUUID());
 
-        reviews.request(user, essay);
+        reviews.request(user, essay, examiner);
 
         var sent = org.mockito.ArgumentCaptor.forClass(HumanReviewClient.CreateReview.class);
         verify(client).createReview(sent.capture());
@@ -126,7 +157,7 @@ class HumanReviewIntegrationTest {
         UUID essay = essay(user, "GRADED", false);
         when(client.createReview(any())).thenThrow(new LearningRequestException(409, "HUMAN_GRADING_CONFLICT", "x"));
 
-        assertEquals(409, assertThrows(LearningRequestException.class, () -> reviews.request(user, essay)).getStatus());
+        assertEquals(409, assertThrows(LearningRequestException.class, () -> reviews.request(user, essay, examiner)).getStatus());
         verify(client, times(1)).createReview(any());
         verify(client).refundCredit(essay);
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM human_review_requests", Integer.class));
@@ -135,7 +166,38 @@ class HumanReviewIntegrationTest {
         when(client.consumeCredit(any())).thenReturn(new HumanReviewClient.CreditCharge(1, true));
         UUID review = UUID.randomUUID();
         when(client.createReview(any())).thenReturn(review);
-        assertEquals(review, reviews.request(user, essay));
+        assertEquals(review, reviews.request(user, essay, examiner));
+    }
+
+    @Test
+    void anExaminerWhoCannotTakeTheEssayGivesTheCreditBackAndTheLearnerChoosesAnother() {
+        UUID essay = essay(user, "GRADED", false);
+        UUID other = UUID.randomUUID();
+        UUID review = UUID.randomUUID();
+        when(client.createReview(any())).thenThrow(new LearningRequestException(409, "EXAMINER_UNAVAILABLE", "full"));
+
+        assertEquals("EXAMINER_UNAVAILABLE", assertThrows(LearningRequestException.class,
+                () -> reviews.request(user, essay, examiner)).getCode());
+        verify(client, times(1)).createReview(any());
+        verify(client).refundCredit(essay);
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM human_review_requests", Integer.class));
+
+        reset(client);
+        when(client.consumeCredit(any())).thenReturn(new HumanReviewClient.CreditCharge(1, true));
+        when(client.createReview(any())).thenReturn(review);
+        assertEquals(review, reviews.request(user, essay, other));
+        var sent = org.mockito.ArgumentCaptor.forClass(HumanReviewClient.CreateReview.class);
+        verify(client).createReview(sent.capture());
+        assertEquals(other, sent.getValue().examinerId());
+    }
+
+    @Test
+    void aRequestWithoutAnExaminerSpendsNothing() {
+        UUID essay = essay(user, "GRADED", false);
+
+        assertEquals("EXAMINER_REQUIRED", assertThrows(LearningRequestException.class,
+                () -> reviews.request(user, essay, null)).getCode());
+        verifyNoInteractions(client);
     }
 
     @Test
@@ -145,7 +207,7 @@ class HumanReviewIntegrationTest {
         when(client.createReview(any())).thenThrow(new LearningRequestException(503, "HUMAN_REVIEW_UNAVAILABLE", "x"))
                 .thenReturn(review);
 
-        assertEquals(review, reviews.request(user, essay), "the repeat found the review the first call had made");
+        assertEquals(review, reviews.request(user, essay, examiner), "the repeat found the review the first call had made");
 
         var sent = org.mockito.ArgumentCaptor.forClass(HumanReviewClient.CreateReview.class);
         verify(client, times(2)).createReview(sent.capture());
@@ -158,7 +220,7 @@ class HumanReviewIntegrationTest {
         UUID essay = essay(user, "GRADED", false);
         when(client.createReview(any())).thenThrow(new LearningRequestException(503, "HUMAN_REVIEW_UNAVAILABLE", "x"));
 
-        assertEquals(503, assertThrows(LearningRequestException.class, () -> reviews.request(user, essay)).getStatus());
+        assertEquals(503, assertThrows(LearningRequestException.class, () -> reviews.request(user, essay, examiner)).getStatus());
 
         verify(client, times(2)).createReview(any());
         verify(client, never()).refundCredit(any());
@@ -171,7 +233,7 @@ class HumanReviewIntegrationTest {
         when(client.consumeCredit(any())).thenReturn(new HumanReviewClient.CreditCharge(2, false));
         when(client.createReview(any())).thenThrow(new LearningRequestException(409, "HUMAN_GRADING_CONFLICT", "x"));
 
-        assertThrows(LearningRequestException.class, () -> reviews.request(user, essay));
+        assertThrows(LearningRequestException.class, () -> reviews.request(user, essay, examiner));
 
         verify(client, never()).refundCredit(any());
     }
@@ -183,7 +245,7 @@ class HumanReviewIntegrationTest {
         doThrow(new LearningRequestException(503, "HUMAN_REVIEW_UNAVAILABLE", "refund")).when(client).refundCredit(any());
 
         assertEquals("HUMAN_GRADING_CONFLICT",
-                assertThrows(LearningRequestException.class, () -> reviews.request(user, essay)).getCode());
+                assertThrows(LearningRequestException.class, () -> reviews.request(user, essay, examiner)).getCode());
     }
 
     @Test
@@ -192,7 +254,7 @@ class HumanReviewIntegrationTest {
         when(client.consumeCredit(any())).thenThrow(new LearningRequestException(402,
                 "HUMAN_GRADING_CREDIT_REQUIRED", "none"));
 
-        var refused = assertThrows(LearningRequestException.class, () -> reviews.request(user, essay));
+        var refused = assertThrows(LearningRequestException.class, () -> reviews.request(user, essay, examiner));
         assertEquals(402, refused.getStatus());
         verify(client, never()).createReview(any());
         verify(client, never()).refundCredit(any());
@@ -204,11 +266,11 @@ class HumanReviewIntegrationTest {
         UUID someoneElses = essay(UUID.randomUUID(), "GRADED", false);
 
         assertEquals("NOT_REVIEWABLE", assertThrows(LearningRequestException.class,
-                () -> reviews.request(user, notGraded)).getCode());
+                () -> reviews.request(user, notGraded, examiner)).getCode());
         assertEquals(404, assertThrows(LearningRequestException.class,
-                () -> reviews.request(user, someoneElses)).getStatus());
+                () -> reviews.request(user, someoneElses, examiner)).getStatus());
         assertEquals(404, assertThrows(LearningRequestException.class,
-                () -> reviews.request(user, UUID.randomUUID())).getStatus());
+                () -> reviews.request(user, UUID.randomUUID(), examiner)).getStatus());
         verifyNoInteractions(client);
     }
 
@@ -219,12 +281,14 @@ class HumanReviewIntegrationTest {
         when(client.createReview(any())).thenReturn(review);
         var done = new HumanReviewClient.Review(review, "DONE", new BigDecimal("6.5"),
                 List.of(new HumanReviewClient.Criterion("coherence", new BigDecimal("6.0"), "clear")),
-                List.of("COHESION"), "Develop it");
+                List.of("COHESION"), "Develop it",
+                List.of(new HumanReviewClient.Annotation("independent practice", 3, 23, null, "practised alone")),
+                examiner);
         when(client.fetchReview(review, user)).thenReturn(done);
 
         assertEquals("NO_HUMAN_REVIEW", assertThrows(LearningRequestException.class,
                 () -> reviews.review(user, essay)).getCode());
-        reviews.request(user, essay);
+        reviews.request(user, essay, examiner);
         assertEquals(done, reviews.review(user, essay));
         assertEquals(404, assertThrows(LearningRequestException.class,
                 () -> reviews.review(UUID.randomUUID(), essay)).getStatus());
@@ -235,7 +299,7 @@ class HumanReviewIntegrationTest {
         UUID essay = essay(user, "GRADED", false);
         when(client.createReview(any())).thenReturn(UUID.randomUUID());
 
-        reviews.request(user, essay);
+        reviews.request(user, essay, examiner);
 
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM kp_evidence", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM review_items", Integer.class));

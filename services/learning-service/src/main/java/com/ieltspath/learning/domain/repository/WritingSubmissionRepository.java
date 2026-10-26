@@ -27,6 +27,12 @@ public interface WritingSubmissionRepository {
     /** The learner's GRADING free-writing submissions for one essay question. */
     List<WritingSubmission> findGradingFree(UUID userId, UUID questionVersionId);
 
+    /**
+     * The learner's newest free-writing essay for the question that was sent to an examiner (a review was asked for);
+     * whether the examiner has finished it is known to Assessment, not here.
+     */
+    Optional<WritingSubmission> findLatestSentToExaminer(UUID userId, UUID questionVersionId);
+
     /** The newest submission of each essay question of the attempt, keyed by question version. */
     Map<UUID, WritingSubmission> latestForPractice(UUID userId, UUID practiceAttemptId);
 

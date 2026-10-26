@@ -42,4 +42,8 @@ public class GradingJobJpaEntity {
     private Instant completedAt;
     @Column(name = "prompt_version")
     private String promptVersion;
+    @Column(name = "requested_examiner_id")
+    private UUID requestedExaminerId;
+    @Column(name = "requested_at")
+    private Instant requestedAt;
 }

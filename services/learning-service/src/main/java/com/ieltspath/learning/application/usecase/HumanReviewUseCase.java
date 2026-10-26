@@ -36,13 +36,20 @@ public class HumanReviewUseCase {
         this.content = content;
     }
 
-    /** Asks for the review; returns the id of the review in Assessment. */
-    public UUID request(UUID userId, UUID submissionId) {
+    /**
+     * Asks the chosen examiner for the review; returns the id of the review in Assessment. The learner picks the
+     * examiner: nobody else receives the essay.
+     */
+    public UUID request(UUID userId, UUID submissionId, UUID examinerId) {
+        if (examinerId == null) {
+            throw new LearningRequestException(400, "EXAMINER_REQUIRED", "Choose the examiner who will grade the essay");
+        }
         WritingSubmission essay = owned(userId, submissionId);
         var existing = requests.findReviewId(submissionId);
         if (existing.isPresent()) return existing.get();
-        if (essay.status() != WritingSubmissionStatus.GRADED) {
-            throw new LearningRequestException(409, "NOT_REVIEWABLE", "Only a graded essay can be sent to a Mentor");
+        if (essay.status() != WritingSubmissionStatus.GRADED && essay.status() != WritingSubmissionStatus.AWAITING_EXAMINER) {
+            throw new LearningRequestException(409, "NOT_REVIEWABLE",
+                    "Only a graded essay, or one sent to an examiner, can be sent to a Mentor");
         }
         var rubric = content.getActiveRubric(essay.prompt().task());
 
@@ -51,7 +58,7 @@ public class HumanReviewUseCase {
         try {
             reviewId = createReview(new CreateReview(requestId(submissionId), userId, submissionId,
                     essay.blockId() != null ? "LESSON" : "PRACTICE", essay.prompt().task(), essay.prompt().stem(),
-                    essay.essayText(), rubric.code(), rubric.version()));
+                    essay.essayText(), rubric.code(), rubric.version(), examinerId));
         } catch (LearningRequestException failure) {
             if (charged && refused(failure)) refund(submissionId);
             throw failure;
@@ -83,7 +90,8 @@ public class HumanReviewUseCase {
 
     /** Assessment answered that it did not create the review. */
     private static boolean refused(LearningRequestException failure) {
-        return "HUMAN_GRADING_CONFLICT".equals(failure.getCode()) || "HUMAN_REVIEW_REJECTED".equals(failure.getCode());
+        return "HUMAN_GRADING_CONFLICT".equals(failure.getCode()) || "HUMAN_REVIEW_REJECTED".equals(failure.getCode())
+                || "EXAMINER_UNAVAILABLE".equals(failure.getCode());
     }
 
     private WritingSubmission owned(UUID userId, UUID submissionId) {
