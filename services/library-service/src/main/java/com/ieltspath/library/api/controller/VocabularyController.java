@@ -16,8 +16,12 @@ import com.ieltspath.library.application.usecase.CreateVocabularyItemUseCase;
 import com.ieltspath.library.application.usecase.GetVocabularyDetailUseCase;
 import com.ieltspath.library.application.usecase.GetVocabularySensesUseCase;
 import com.ieltspath.library.application.usecase.SearchVocabularyUseCase;
-import com.ieltspath.library.application.usecase.BrowseVocabularyUseCase;
 import com.ieltspath.library.application.usecase.VocabularyCatalogUseCase;
+import com.ieltspath.library.application.query.CatalogBrowseQuery;
+import com.ieltspath.library.application.query.PageQuery;
+import com.ieltspath.library.application.result.CatalogItemResult;
+import com.ieltspath.library.application.result.PageResult;
+import com.ieltspath.library.domain.vo.CefrLevel;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -43,7 +47,6 @@ import com.ieltspath.library.application.result.VocabularySenseResult;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.UUID;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/content/vocabulary")
@@ -58,19 +61,20 @@ public class VocabularyController {
     private final GetVocabularySensesUseCase getVocabularySensesUseCase;
     private final CreateVocabularyItemUseCase createVocabularyItemUseCase;
     private final AddVocabularySenseUseCase addVocabularySenseUseCase;
-    private final BrowseVocabularyUseCase browseVocabularyUseCase;
     private final VocabularyCatalogUseCase catalog;
 
     @GetMapping
-    public ResponseEntity<Map<String,Object>> browse(
+    public ResponseEntity<PageResult<CatalogItemResult>> browse(
             @RequestParam(defaultValue = "") @Size(max = 100) String q,
             @RequestParam(defaultValue = "EN") @jakarta.validation.constraints.Pattern(regexp = "EN|VI", flags = jakarta.validation.constraints.Pattern.Flag.CASE_INSENSITIVE) String lang,
             @RequestParam(required = false) @jakarta.validation.constraints.Pattern(regexp = "A1|A2|B1|B2|C1|C2", flags = jakarta.validation.constraints.Pattern.Flag.CASE_INSENSITIVE) String cefr,
             @RequestParam(required = false) UUID topicId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
-        var response = catalog.browse(q, lang, cefr == null ? null : cefr.toUpperCase(), topicId, page, size);
-        return ResponseEntity.ok().cacheControl(CacheControl.maxAge(java.time.Duration.ofMinutes(5)).cachePublic()).body(response);
+        var query = new CatalogBrowseQuery(q, "VI".equalsIgnoreCase(lang),
+                cefr == null ? null : CefrLevel.valueOf(cefr.toUpperCase()), topicId, new PageQuery(page, size));
+        return ResponseEntity.ok().cacheControl(CacheControl.maxAge(java.time.Duration.ofMinutes(5)).cachePublic())
+                .body(catalog.browse(query));
     }
 
     @GetMapping("/search")
@@ -110,10 +114,9 @@ public class VocabularyController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Map<String,Object>> getById(@PathVariable("id") UUID id) {
-        var active = catalog.detail(id);
+    public ResponseEntity<CatalogItemResult> getById(@PathVariable("id") UUID id) {
         return ResponseEntity.ok().cacheControl(CacheControl.maxAge(java.time.Duration.ofMinutes(5)).cachePublic())
-                .body(active);
+                .body(catalog.detail(id));
     }
 
     @PostMapping

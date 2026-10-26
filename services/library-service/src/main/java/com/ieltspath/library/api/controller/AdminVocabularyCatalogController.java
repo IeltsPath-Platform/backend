@@ -1,75 +1,137 @@
 package com.ieltspath.library.api.controller;
 
+import com.ieltspath.library.api.dto.request.CollocationRequest;
+import com.ieltspath.library.api.dto.request.CommonMistakeRequest;
+import com.ieltspath.library.api.dto.request.UpdateVocabularyItemRequest;
+import com.ieltspath.library.api.dto.request.UpdateVocabularySenseRequest;
+import com.ieltspath.library.api.dto.request.UsageExampleRequest;
+import com.ieltspath.library.api.dto.request.VocabularySetRequest;
+import com.ieltspath.library.api.dto.request.VocabularyTopicRequest;
+import com.ieltspath.library.api.dto.request.WordRelationRequest;
+import com.ieltspath.library.application.result.CatalogItemResult;
+import com.ieltspath.library.application.result.CollocationResult;
+import com.ieltspath.library.application.result.CommonMistakeResult;
+import com.ieltspath.library.application.result.UsageExampleResult;
+import com.ieltspath.library.application.result.VocabularySetResult;
+import com.ieltspath.library.application.result.VocabularyTopicResult;
+import com.ieltspath.library.application.result.WordRelationResult;
 import com.ieltspath.library.application.usecase.VocabularyCatalogUseCase;
+import com.ieltspath.library.domain.catalog.CatalogLimits;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
+/** Author edits of the dictionary catalog. Rules live in the domain values the requests are mapped to. */
 @RestController
 @RequestMapping("/api/content/admin/vocabulary")
-@RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('CONTENT_AUTHOR','ADMIN')")
+@RequiredArgsConstructor
 @Validated
 public class AdminVocabularyCatalogController {
     private final VocabularyCatalogUseCase catalog;
 
-    @PutMapping("/items/{id}") public Map<String,Object> updateItem(@PathVariable UUID id,@RequestBody @jakarta.validation.constraints.NotEmpty Map<String,Object> body) {
-        Object rank=body.get("frequencyRank"); if(rank instanceof Number n && n.intValue()<0)throw new IllegalArgumentException("frequencyRank must be non-negative");
-        Object awl=body.get("academicWordList"); if(awl!=null && !(awl instanceof Boolean))throw new IllegalArgumentException("academicWordList must be a boolean");
-        return catalog.updateItem(id,body);
-    }
-    @PutMapping("/senses/{id}") public Map<String,Object> updateSense(@PathVariable UUID id,@RequestBody @jakarta.validation.constraints.NotEmpty Map<String,Object> body) {
-        Object cefr=body.get("cefrLevel"); if(cefr!=null) { String normalized=cefr.toString().toUpperCase(); com.ieltspath.library.domain.vo.CefrLevel.valueOf(normalized); body.put("cefrLevel",normalized); }
-        Object topic=body.get("topicId"); if(topic!=null) { if(topic.toString().isBlank())throw new IllegalArgumentException("topicId must be a UUID or null"); body.put("topicId",UUID.fromString(topic.toString())); }
-        if(body.containsKey("register") && body.get("register")!=null && body.get("register").toString().length()>30)throw new IllegalArgumentException("register must be at most 30 characters");
-        return catalog.updateSense(id,body);
-    }
-    @PutMapping("/senses/{id}/{kind}")
-    public List<Map<String,Object>> replaceChildren(@PathVariable UUID id,@PathVariable String kind,@RequestBody @Size(max=30) List<Map<String,Object>> body) {
-        if(!List.of("collocations","relations","common-mistakes","examples").contains(kind)) throw new IllegalArgumentException("unsupported child collection");
-        if(body==null||body.size()>30)throw new IllegalArgumentException("at most 30 entries are allowed");
-        body.forEach(row -> validateChild(kind,row));
-        return catalog.replaceChildren(kind,id,body);
-    }
-    @GetMapping("/topics") public List<Map<String,Object>> topics() { return catalog.topicsAdmin(); }
-    @PostMapping("/topics") @ResponseStatus(HttpStatus.CREATED) public Map<String,Object> createTopic(@RequestBody @jakarta.validation.constraints.NotEmpty Map<String,Object> body) { validateTopic(body); return catalog.saveTopic(null,body); }
-    @PutMapping("/topics/{id}") public Map<String,Object> updateTopic(@PathVariable UUID id,@RequestBody @jakarta.validation.constraints.NotEmpty Map<String,Object> body) { validateTopic(body); return catalog.saveTopic(id,body); }
-    @DeleteMapping("/topics/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) public void deleteTopic(@PathVariable UUID id) { catalog.deleteTopic(id); }
-    @GetMapping("/sets") public List<Map<String,Object>> sets() { return catalog.setsAdmin(); }
-    @PostMapping("/sets") @ResponseStatus(HttpStatus.CREATED) public Map<String,Object> createSet(@RequestBody @jakarta.validation.constraints.NotEmpty Map<String,Object> body) { validateSet(body); return catalog.saveSet(null,body); }
-    @PutMapping("/sets/{id}") public Map<String,Object> updateSet(@PathVariable UUID id,@RequestBody @jakarta.validation.constraints.NotEmpty Map<String,Object> body) { validateSet(body); return catalog.saveSet(id,body); }
-    @DeleteMapping("/sets/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) public void deleteSet(@PathVariable UUID id) { catalog.deleteSet(id); }
-    @PutMapping("/sets/{id}/items") @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void replaceSetItems(@PathVariable UUID id,@RequestBody @Size(max=500) List<UUID> senseIds) {
-        if(senseIds==null||senseIds.size()>500)throw new IllegalArgumentException("at most 500 senses are allowed");
-        if(senseIds.stream().distinct().count()!=senseIds.size())throw new IllegalArgumentException("senseIds must be unique");
-        catalog.replaceSetItems(id,senseIds);
+    @PutMapping("/items/{id}")
+    public CatalogItemResult updateItem(@PathVariable UUID id, @Valid @RequestBody UpdateVocabularyItemRequest request) {
+        return catalog.updateItem(id, request.toDetails());
     }
 
-    private void validateTopic(Map<String,Object> body) {
-        required(body,"slug",100); required(body,"name",120); required(body,"nameVi",120);
-        Object cover=body.get("coverKey"); if(cover!=null && cover.toString().startsWith("http"))throw new IllegalArgumentException("coverKey must be an object key");
+    @PutMapping("/senses/{id}")
+    public CatalogItemResult updateSense(@PathVariable UUID id, @Valid @RequestBody UpdateVocabularySenseRequest request) {
+        return catalog.updateSense(id, request.toDetails());
     }
-    private void validateSet(Map<String,Object> body) {
-        required(body,"title",180); Object kind=body.get("kind"); if(kind==null || !List.of("BAND","TOPIC").contains(kind.toString().toUpperCase()))throw new IllegalArgumentException("kind must be BAND or TOPIC"); body.put("kind",kind.toString().toUpperCase());
-        if("BAND".equalsIgnoreCase(kind.toString())) { Object cefr=body.get("cefrLevel"); if(cefr==null)throw new IllegalArgumentException("cefrLevel is required for BAND sets"); String normalized=cefr.toString().toUpperCase(); com.ieltspath.library.domain.vo.CefrLevel.valueOf(normalized); body.put("cefrLevel",normalized); if(body.get("topicId")!=null)throw new IllegalArgumentException("topicId is not allowed for BAND sets"); }
-        else { Object topic=body.get("topicId"); if(topic==null)throw new IllegalArgumentException("topicId is required for TOPIC sets"); body.put("topicId",UUID.fromString(topic.toString())); if(body.get("cefrLevel")!=null)throw new IllegalArgumentException("cefrLevel is not allowed for TOPIC sets"); }
-        Object cover=body.get("coverKey"); if(cover!=null && cover.toString().startsWith("http"))throw new IllegalArgumentException("coverKey must be an object key");
+
+    @PutMapping("/senses/{id}/collocations")
+    public List<CollocationResult> replaceCollocations(
+            @PathVariable UUID id,
+            @RequestBody @NotNull @Size(max = CatalogLimits.MAX_CHILDREN_PER_SENSE) List<@Valid @NotNull CollocationRequest> body) {
+        return catalog.replaceCollocations(id, body.stream().map(CollocationRequest::toCollocation).toList());
     }
-    private void validateChild(String kind,Map<String,Object> row) {
-        switch(kind) {
-            case "collocations" -> required(row,"phrase",255);
-            case "relations" -> { required(row,"relatedLemma",255); Object relation=row.get("kind"); if(relation==null||!List.of("SYNONYM","ANTONYM","RELATED").contains(relation.toString().toUpperCase()))throw new IllegalArgumentException("invalid relation kind"); row.put("kind",relation.toString().toUpperCase()); Object related=row.get("relatedItemId"); if(related!=null)row.put("relatedItemId",UUID.fromString(related.toString())); }
-            case "common-mistakes" -> { required(row,"wrongUsage",10000); required(row,"correctUsage",10000); }
-            case "examples" -> { required(row,"sentence",10000); required(row,"translationVi",10000); }
-        }
+
+    @PutMapping("/senses/{id}/relations")
+    public List<WordRelationResult> replaceRelations(
+            @PathVariable UUID id,
+            @RequestBody @NotNull @Size(max = CatalogLimits.MAX_CHILDREN_PER_SENSE) List<@Valid @NotNull WordRelationRequest> body) {
+        return catalog.replaceRelations(id, body.stream().map(WordRelationRequest::toRelation).toList());
     }
-    private void required(Map<String,Object> body,String key,int max) { Object value=body.get(key); if(value==null||value.toString().isBlank()||value.toString().length()>max)throw new IllegalArgumentException(key+" is required and must not exceed "+max+" characters"); }
+
+    @PutMapping("/senses/{id}/common-mistakes")
+    public List<CommonMistakeResult> replaceCommonMistakes(
+            @PathVariable UUID id,
+            @RequestBody @NotNull @Size(max = CatalogLimits.MAX_CHILDREN_PER_SENSE) List<@Valid @NotNull CommonMistakeRequest> body) {
+        return catalog.replaceCommonMistakes(id, body.stream().map(CommonMistakeRequest::toMistake).toList());
+    }
+
+    @PutMapping("/senses/{id}/examples")
+    public List<UsageExampleResult> replaceExamples(
+            @PathVariable UUID id,
+            @RequestBody @NotNull @Size(max = CatalogLimits.MAX_CHILDREN_PER_SENSE) List<@Valid @NotNull UsageExampleRequest> body) {
+        return catalog.replaceExamples(id, body.stream().map(UsageExampleRequest::toExample).toList());
+    }
+
+    @GetMapping("/topics")
+    public List<VocabularyTopicResult> topics() {
+        return catalog.allTopics();
+    }
+
+    @PostMapping("/topics")
+    @ResponseStatus(HttpStatus.CREATED)
+    public VocabularyTopicResult createTopic(@Valid @RequestBody VocabularyTopicRequest request) {
+        return catalog.createTopic(request.toDraft());
+    }
+
+    @PutMapping("/topics/{id}")
+    public VocabularyTopicResult updateTopic(@PathVariable UUID id, @Valid @RequestBody VocabularyTopicRequest request) {
+        return catalog.updateTopic(id, request.toDraft());
+    }
+
+    @DeleteMapping("/topics/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTopic(@PathVariable UUID id) {
+        catalog.deactivateTopic(id);
+    }
+
+    @GetMapping("/sets")
+    public List<VocabularySetResult> sets() {
+        return catalog.allSets();
+    }
+
+    @PostMapping("/sets")
+    @ResponseStatus(HttpStatus.CREATED)
+    public VocabularySetResult createSet(@Valid @RequestBody VocabularySetRequest request) {
+        return catalog.createSet(request.toDraft());
+    }
+
+    @PutMapping("/sets/{id}")
+    public VocabularySetResult updateSet(@PathVariable UUID id, @Valid @RequestBody VocabularySetRequest request) {
+        return catalog.updateSet(id, request.toDraft());
+    }
+
+    @DeleteMapping("/sets/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSet(@PathVariable UUID id) {
+        catalog.deactivateSet(id);
+    }
+
+    @PutMapping("/sets/{id}/items")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void replaceSetItems(@PathVariable UUID id,
+                                @RequestBody @NotNull @Size(max = CatalogLimits.MAX_SENSES_PER_SET) List<@NotNull UUID> senseIds) {
+        catalog.replaceSetItems(id, senseIds);
+    }
 }

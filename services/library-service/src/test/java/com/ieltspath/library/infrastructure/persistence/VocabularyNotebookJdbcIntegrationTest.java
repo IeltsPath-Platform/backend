@@ -4,6 +4,10 @@ import com.ieltspath.library.application.query.NotebookQuery;
 import com.ieltspath.library.domain.vo.UnderstandingLevel;
 import com.ieltspath.library.infrastructure.adapter.VocabularyNotebookJdbcAdapter;
 import com.ieltspath.library.infrastructure.adapter.VocabularyCatalogJdbcAdapter;
+import com.ieltspath.library.application.query.CatalogBrowseQuery;
+import com.ieltspath.library.application.query.PageQuery;
+import com.ieltspath.library.domain.vo.CefrLevel;
+import com.ieltspath.library.domain.vo.VocabularySetKind;
 import com.ieltspath.library.infrastructure.adapter.VocabularyProgressJdbcAdapter;
 import com.ieltspath.library.application.port.FlashcardImageStorage;
 import org.junit.jupiter.api.Test;
@@ -33,14 +37,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @JdbcTest
 @Testcontainers(disabledWithoutDocker = true)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({VocabularyNotebookJdbcAdapter.class, VocabularyCatalogJdbcAdapter.class, VocabularyProgressJdbcAdapter.class})
+@Import({VocabularyNotebookJdbcAdapter.class, VocabularyCatalogJdbcAdapter.class, VocabularyProgressJdbcAdapter.class,
+        com.ieltspath.library.application.usecase.VocabularyCatalogUseCase.class})
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @TestPropertySource(properties = {"spring.flyway.enabled=true", "spring.cloud.config.enabled=false", "eureka.client.enabled=false"})
 class VocabularyNotebookJdbcIntegrationTest {
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:15-alpine");
     @Autowired JdbcTemplate jdbc;
     @Autowired VocabularyNotebookJdbcAdapter adapter;
-    @Autowired VocabularyCatalogJdbcAdapter catalog;
+    @Autowired com.ieltspath.library.application.usecase.VocabularyCatalogUseCase catalog;
     @Autowired VocabularyProgressJdbcAdapter progress;
     @MockBean FlashcardImageStorage imageStorage;
 
@@ -91,20 +96,22 @@ class VocabularyNotebookJdbcIntegrationTest {
         jdbc.update("insert into vocabulary_common_mistakes(sense_id,wrong_usage,correct_usage) values(?,?,?)",sense,"wrong form","correct form");
         jdbc.update("insert into vocabulary_examples(sense_id,sentence,translation_vi) values(?,?,?)",sense,"A separate example.","Một ví dụ riêng.");
 
-        var filtered=catalog.browse("từ tìm kiếm","VI","B2",topic,0,10);
-        assertEquals(1L,filtered.get("total"));
-        @SuppressWarnings("unchecked") var items=(List<java.util.Map<String,Object>>)filtered.get("items");
-        @SuppressWarnings("unchecked") var senses=(List<java.util.Map<String,Object>>)items.getFirst().get("senses");
-        var enriched=senses.getFirst();
-        assertTrue(items.getFirst().keySet().containsAll(List.of("id","lemma","normalizedLemma","ipa","pronunciationAudioReference","status","createdAt","updatedAt","senses")));
-        assertTrue(enriched.keySet().containsAll(List.of("id","vocabularyItemId","partOfSpeech","englishDefinition","vietnameseMeaning","exampleSentence","imageUrl","sortOrder","status","createdAt","updatedAt")));
-        assertEquals(5.5,((com.ieltspath.library.domain.vo.IeltsBandRange)enriched.get("bandRange")).min());
-        assertEquals(1,((List<?>)enriched.get("collocations")).size());
-        assertEquals(1,((List<?>)enriched.get("synonyms")).size());
-        assertEquals(1,((List<?>)enriched.get("commonMistakes")).size());
-        assertEquals(1,((List<?>)enriched.get("examples")).size());
-        assertEquals(1,((java.util.Map<?,?>)enriched.get("counts")).get("thesaurus"));
-        assertEquals(0L,catalog.browse("nothing","VI","B2",topic,0,10).get("total"));
+        var filtered=catalog.browse(browse("từ tìm kiếm",true,CefrLevel.B2,topic,0));
+        assertEquals(1L,filtered.total());
+        var found=filtered.items().getFirst();
+        assertEquals(item,found.id());
+        assertEquals("test lemma",found.lemma());
+        var enriched=found.senses().getFirst();
+        assertEquals(sense,enriched.id());
+        assertEquals(CefrLevel.B2,enriched.cefrLevel());
+        assertEquals(5.5,enriched.bandRange().min());
+        assertEquals(1,enriched.collocations().size());
+        assertEquals(1,enriched.synonyms().size());
+        assertEquals(1,enriched.commonMistakes().size());
+        assertEquals(1,enriched.examples().size());
+        assertEquals(1,enriched.counts().thesaurus());
+        assertEquals(1,found.counts().definitions());
+        assertEquals(0L,catalog.browse(browse("nothing",true,CefrLevel.B2,topic,0)).total());
     }
 
     @Test void mindmapDoesNotExceedEightyNodes() {
@@ -117,29 +124,31 @@ class VocabularyNotebookJdbcIntegrationTest {
             jdbc.update("insert into vocabulary_relations(sense_id,related_lemma,kind) values(?,?,'SYNONYM')",sense,"synonym"+i);
         }
         var map=catalog.mindmap(topic,null);
-        @SuppressWarnings("unchecked") var nodes=(List<java.util.Map<String,Object>>)map.get("nodes");
-        @SuppressWarnings("unchecked") var edges=(List<java.util.Map<String,Object>>)map.get("edges");
-        assertEquals(80,nodes.size());
-        assertTrue(edges.size()<=80);
+        assertEquals(80,map.nodes().size());
+        assertTrue(map.edges().size()<=80);
     }
 
     @Test void listsTopicsAndPagesBandAndTopicSets() {
         assertEquals(6,catalog.topics().size());
         assertFalse(catalog.suggestions("re").isEmpty());
-        var bands=catalog.sets("BAND",0,10);
-        assertEquals(6L,bands.get("total"));
+        var bands=catalog.sets(VocabularySetKind.BAND,new PageQuery(0,10));
+        assertEquals(6L,bands.total());
         UUID bandId=UUID.fromString("c2000000-0000-4000-8000-000000000004");
-        assertEquals("BAND",catalog.set(bandId).get("kind"));
-        var bandWords=catalog.setWords(bandId,null,0,10);
-        assertTrue((Long)bandWords.get("total")>0);
+        assertEquals(VocabularySetKind.BAND,catalog.set(bandId).kind());
+        var bandWords=catalog.setWords(bandId,null,new PageQuery(0,10));
+        assertTrue(bandWords.total()>0);
         UUID topicSet=UUID.fromString("c2000000-0000-4000-8000-000000000106");
-        assertEquals("TOPIC",catalog.set(topicSet).get("kind"));
-        var topicWords=catalog.setWords(topicSet,null,0,10);
-        assertTrue((Long)topicWords.get("total")>0);
+        assertEquals(VocabularySetKind.TOPIC,catalog.set(topicSet).kind());
+        var topicWords=catalog.setWords(topicSet,null,new PageQuery(0,10));
+        assertTrue(topicWords.total()>0);
         UUID proficiencySet=UUID.fromString("c2000000-0000-4000-8000-000000000006");
-        assertTrue((Long)catalog.setWords(proficiencySet,null,0,10).get("total")>0);
-        assertTrue(((List<?>)catalog.browse("","EN",null,null,Integer.MAX_VALUE,10).get("items")).isEmpty());
-        assertTrue(((List<?>)catalog.sets("BAND",Integer.MAX_VALUE,10).get("items")).isEmpty());
+        assertTrue(catalog.setWords(proficiencySet,null,new PageQuery(0,10)).total()>0);
+        assertTrue(catalog.browse(browse("",false,null,null,1_000_000)).items().isEmpty());
+        assertTrue(catalog.sets(VocabularySetKind.BAND,new PageQuery(1_000_000,10)).items().isEmpty());
+    }
+
+    private static CatalogBrowseQuery browse(String text,boolean vietnamese,CefrLevel cefr,UUID topic,int page) {
+        return new CatalogBrowseQuery(text,vietnamese,cefr,topic,new PageQuery(page,10));
     }
 
     @Test void progressAggregatesAreScopedToTheCurrentUserAndRespectCatalogFilters() {

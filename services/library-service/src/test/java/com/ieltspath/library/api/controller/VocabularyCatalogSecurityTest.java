@@ -58,7 +58,6 @@ class VocabularyCatalogSecurityTest {
     @MockBean GetVocabularySensesUseCase senses;
     @MockBean CreateVocabularyItemUseCase create;
     @MockBean AddVocabularySenseUseCase addSense;
-    @MockBean BrowseVocabularyUseCase browse;
     @MockBean VocabularyCatalogUseCase catalog;
     @MockBean com.ieltspath.library.application.usecase.VocabularyProgressUseCase progress;
 
@@ -66,11 +65,18 @@ class VocabularyCatalogSecurityTest {
         registry.add("app.auth.internal-jwt-secret", () -> SECRET);
     }
 
+    private static com.ieltspath.library.application.result.CatalogItemResult catalogItem(UUID id, String lemma) {
+        return new com.ieltspath.library.application.result.CatalogItemResult(id, lemma, lemma, null, null, null, null, null, null,
+                null, false, null, com.ieltspath.library.domain.vo.ContentStatus.ACTIVE, null, null, List.of(),
+                new com.ieltspath.library.application.result.CatalogCountsResult(0, 0, 0, 0, 0));
+    }
+
     @Test void catalogGetRoutesArePublicButAdjacentRoutesRemainProtected() throws Exception {
         UUID id = UUID.fromString("10000000-0000-4000-8000-000000000001");
         Instant now = Instant.parse("2026-10-26T00:00:00Z");
-        when(catalog.browse("", "EN", null, null, 0, 20)).thenReturn(java.util.Map.of("items",List.of(),"page",0,"size",20,"total",0));
-        when(catalog.detail(id)).thenReturn(java.util.Map.of("id",id,"lemma","word","senses",List.of()));
+        when(catalog.browse(new com.ieltspath.library.application.query.CatalogBrowseQuery("", false, null, null, new com.ieltspath.library.application.query.PageQuery(0, 20))))
+                .thenReturn(new com.ieltspath.library.application.result.PageResult<>(List.of(), 0, 20, 0));
+        when(catalog.detail(id)).thenReturn(catalogItem(id, "word"));
         mvc.perform(get("/api/content/vocabulary")).andExpect(status().isOk());
         mvc.perform(get("/api/content/vocabulary/{id}", id)).andExpect(status().isOk());
         mvc.perform(get("/api/content/vocabulary/suggestions").param("q","wo")).andExpect(status().isOk());
@@ -109,6 +115,61 @@ class VocabularyCatalogSecurityTest {
                         .header(HttpHeaders.AUTHORIZATION,"Bearer "+signedInternalToken("CONTENT_AUTHOR"))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"cefrLevel\":\"Z9\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder authorPut(String path, UUID id, String json) {
+        return org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path, id)
+                .header(HttpHeaders.AUTHORIZATION,"Bearer "+signedInternalToken("CONTENT_AUTHOR"))
+                .contentType(MediaType.APPLICATION_JSON).content(json);
+    }
+
+    @Test void authorSenseUpdateAcceptsEmptyChoicesAndMapsThemToNoValue() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(catalog.updateSense(org.mockito.ArgumentMatchers.eq(id), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(catalogItem(UUID.randomUUID(), "word"));
+
+        mvc.perform(authorPut("/api/content/admin/vocabulary/senses/{id}", id,
+                        "{\"cefrLevel\":\"b2\",\"topicId\":\"\",\"register\":\"formal\"}"))
+                .andExpect(status().isOk());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(com.ieltspath.library.domain.catalog.VocabularySenseDetails.class);
+        org.mockito.Mockito.verify(catalog).updateSense(org.mockito.ArgumentMatchers.eq(id), captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(com.ieltspath.library.domain.vo.CefrLevel.B2, captor.getValue().cefrLevel());
+        org.junit.jupiter.api.Assertions.assertNull(captor.getValue().topicId());
+    }
+
+    @Test void authorWritesRejectBadBodiesWithBadRequest() throws Exception {
+        UUID id = UUID.randomUUID();
+        mvc.perform(authorPut("/api/content/admin/vocabulary/senses/{id}", id, "{\"topicId\":\"not-a-uuid\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(authorPut("/api/content/admin/vocabulary/senses/{id}", id, "{\"register\":\"" + "x".repeat(31) + "\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(authorPut("/api/content/admin/vocabulary/items/{id}", id, "{\"frequencyRank\":0}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(authorPut("/api/content/admin/vocabulary/senses/{id}/collocations", id, "[{\"phrase\":\" \"}]"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(authorPut("/api/content/admin/vocabulary/senses/{id}/relations", id,
+                        "[{\"relatedLemma\":\"steady\",\"kind\":\"OPPOSITE\"}]"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(authorPut("/api/content/admin/vocabulary/senses/{id}/examples", id,
+                        "[" + "{\"sentence\":\"s\",\"translationVi\":\"t\"},".repeat(30) + "{\"sentence\":\"s\",\"translationVi\":\"t\"}]"))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(catalog);
+    }
+
+    @Test void authorSetNeedsTheFieldsOfItsKind() throws Exception {
+        String token = signedInternalToken("CONTENT_AUTHOR");
+        mvc.perform(post("/api/content/admin/vocabulary/sets").header(HttpHeaders.AUTHORIZATION,"Bearer "+token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"B2 words\",\"kind\":\"BAND\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/content/admin/vocabulary/sets").header(HttpHeaders.AUTHORIZATION,"Bearer "+token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"B2 words\",\"kind\":\"SPECIAL\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/content/admin/vocabulary/topics").header(HttpHeaders.AUTHORIZATION,"Bearer "+token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"slug\":\"env\",\"name\":\"Environment\",\"nameVi\":\"Môi trường\",\"coverKey\":\"https://x.example/a.png\"}"))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(catalog);
     }
 
     @Test void progressEndpointsRejectInvalidTimezoneAndGoalTarget() throws Exception {
