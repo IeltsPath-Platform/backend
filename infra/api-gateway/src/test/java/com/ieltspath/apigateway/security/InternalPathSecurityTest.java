@@ -10,12 +10,19 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -34,6 +41,7 @@ import reactor.core.publisher.Mono;
         "spring.cloud.config.enabled=false"
 })
 @AutoConfigureWebTestClient
+@Import(InternalPathSecurityTest.PublicCatalogTestConfiguration.class)
 class InternalPathSecurityTest {
     private static final byte[] EXTERNAL_KEY = new byte[32];
     private static final byte[] INTERNAL_KEY = new byte[32];
@@ -67,6 +75,30 @@ class InternalPathSecurityTest {
                 .headers(headers -> headers.setBearerAuth(jwt.serialize()))
                 .exchange()
                 .expectStatus().isForbidden();
+    }
+
+    @Test
+    void onlyVocabularyCatalogGetRoutesArePublic() {
+        client.get().uri("/api/content/vocabulary")
+                .exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/10000000-0000-4000-8000-000000000001")
+                .exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/suggestions?q=po").exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/topics").exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/sets").exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/sets/10000000-0000-4000-8000-000000000001").exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/sets/10000000-0000-4000-8000-000000000001/words").exchange().expectStatus().isOk();
+        client.get().uri("/api/content/vocabulary/mindmap?itemId=10000000-0000-4000-8000-000000000001")
+                .exchange().expectStatus().isOk();
+
+        client.post().uri("/api/content/vocabulary").bodyValue("{}")
+                .exchange().expectStatus().isUnauthorized();
+        client.get().uri("/api/content/vocabulary/search")
+                .exchange().expectStatus().isUnauthorized();
+        client.get().uri("/api/content/vocabulary/senses?ids=10000000-0000-4000-8000-000000000001")
+                .exchange().expectStatus().isUnauthorized();
+        client.get().uri("/api/content/admin/vocabulary/10000000-0000-4000-8000-000000000001")
+                .exchange().expectStatus().isUnauthorized();
     }
 
     @Test
@@ -108,6 +140,36 @@ class InternalPathSecurityTest {
             return jwt.serialize();
         } catch (Exception exception) {
             throw new IllegalStateException(exception);
+        }
+    }
+
+    @TestConfiguration
+    static class PublicCatalogTestConfiguration {
+        @Bean
+        RouteLocator testPublicCatalogRoute(RouteLocatorBuilder builder) {
+            return builder.routes()
+                    .route("test-public-vocabulary", route -> route
+                            .path("/api/content/vocabulary", "/api/content/vocabulary/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}",
+                                    "/api/content/vocabulary/suggestions", "/api/content/vocabulary/topics", "/api/content/vocabulary/sets", "/api/content/vocabulary/mindmap",
+                                    "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}",
+                                    "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/words")
+                            .and().method(HttpMethod.GET)
+                            .filters(filters -> filters.setPath("/__test/catalog"))
+                            .uri("forward:///"))
+                    .build();
+        }
+
+        @Bean
+        TestPublicCatalogController testPublicCatalogController() {
+            return new TestPublicCatalogController();
+        }
+    }
+
+    @org.springframework.web.bind.annotation.RestController
+    static class TestPublicCatalogController {
+        @org.springframework.web.bind.annotation.GetMapping("/__test/catalog")
+        org.springframework.http.ResponseEntity<Void> catalog() {
+            return org.springframework.http.ResponseEntity.ok().build();
         }
     }
 }

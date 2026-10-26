@@ -112,7 +112,7 @@ public class FlashcardController {
     public FlashcardResponse review(@PathVariable("id") UUID id,
                                     @Valid @RequestBody ReviewFlashcardRequest request) {
         return FlashcardResponse.from(reviewFlashcardUseCase.execute(currentUserProvider.requireUserId(), id,
-                request.correct(), request.requestId()));
+                request.correct(), request.requestId(), request.sessionId()));
     }
 
     @GetMapping("/{id}")

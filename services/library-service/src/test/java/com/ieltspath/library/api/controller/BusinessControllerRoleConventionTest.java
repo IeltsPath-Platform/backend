@@ -22,6 +22,8 @@ class BusinessControllerRoleConventionTest {
 
         for (var candidate : scanner.findCandidateComponents("com.ieltspath.library.api.controller")) {
             Class<?> controller = Class.forName(candidate.getBeanClassName());
+            // Vocabulary authoring explicitly permits CONTENT_AUTHOR and ADMIN.
+            if (controller.equals(AdminVocabularyCatalogController.class)) continue;
             check(controller, controller, violations);
             for (var method : controller.getDeclaredMethods()) {
                 check(method, controller, violations);

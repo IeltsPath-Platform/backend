@@ -22,6 +22,8 @@ public interface FlashcardRepository {
     /** The learner's not-deleted flashcard saved from this practice question, if any. */
     Optional<Flashcard> findLivePracticeQuestionCard(UUID userId, UUID practiceQuestionId);
 
+    default Optional<Flashcard> findLiveVocabularySenseCard(UUID userId, UUID vocabularySenseId) { return Optional.empty(); }
+
     default long countByImageKeyAndStatusNot(String imageKey, LibraryStatus status) {
         return 0L;
     }

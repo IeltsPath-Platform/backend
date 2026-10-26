@@ -42,6 +42,18 @@ an incorrect answer resets the card to box 1. Replaying the most recent `request
 resulting box comes from `library.srs.intervals-days`, defaulting to `[1, 2, 4, 8, 16]`.
 See the [flashcard SRS contract](../../docs/contracts/flashcard-srs-v1.md) for request, response, and ownership details.
 
+## Vocabulary notebook and catalog
+
+`GET /api/content/vocabulary?q=&page=0&size=20` browses active catalog items (maximum page size 50); `GET /api/content/vocabulary/{id}` returns one active item. These two GET routes are public and cacheable for five minutes. `/search`, `/senses`, writes, and `/api/content/admin/vocabulary/**` still require authentication. See the [vocabulary notebook contract](../../docs/contracts/vocabulary-notebook-v1.md).
+
+The public catalog also supports `lang=EN|VI`, CEFR/topic filters, `/suggestions`, `/topics`, `/sets`, set words, and `/mindmap`. V19 adds UK/US pronunciation slots, CEFR and library-owned vocabulary topics, examples/collocations/thesaurus/common-mistake tables, and band/topic sets. IELTS band ranges are derived from CEFR in the domain. V20 adds six demo topics and demo enrichment for existing V4/V15 entries; frequency ranks remain null because no COCA source is loaded. The AWL flag is enabled only for verified Coxhead entries. **Demo content authored by AI; requires review by an IELTS examiner before production.**
+
+Topics and sets are part of the Library dictionary and are independent from Content curriculum topics. Topic/set cover keys reuse the existing `flashcards` storage bucket and `POST /api/learning-support/flashcards/images`; no additional bucket or environment variable is required.
+
+Learners save vocabulary senses with `POST /api/learning-support/flashcards/notebook/entries`, list/filter/sort them at `/entries`, read aggregate counts at `/summary`, and set understanding at `/entries/{flashcardId}/level`. Existing flashcard review and delete routes remain in use. One non-deleted card is allowed per learner and sense; level is derived from Leitner boxes (1 UNKNOWN, 2 FAMILIAR, 3 LEARNING, 4–5 MASTERED). Notes use `sourceType=VOCABULARY_SENSE` and are limited to 300 characters. Migration V18 adds the partial unique index.
+
+Reviews optionally accept `sessionId` and append `flashcard_review_events` in the review transaction only when the request is applied. Notebook progress includes weekly goals (`library.vocabulary.weekly-goal-default`, default 120), the six-band vocabulary map, topic/set progress, recent session result, and read-time achievements. Summary and entry responses only gain fields; entries accept `topicId` and `setId` filters. These authenticated endpoints scope every learner aggregate to the current user, use SQL aggregates, and do not call learning-service or award XP/points. Migration V21 adds review events and per-user weekly goals.
+
 When saving a video, Library verifies its topic through Content's `GET /api/content/topics/{id}`, forwarding the
 authenticated bearer token and `X-Correlation-Id`. The HTTP client uses a 2-second connection and 5-second read
 timeout; Content failures return 503. `POST /internal/game-content/snapshots` serves `VOCABULARY` using the shared
