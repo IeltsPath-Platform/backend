@@ -124,7 +124,9 @@ These paths require `CONTENT_AUTHOR` or `ADMIN`; missing/invalid authentication 
 
 Topic/set covers store an object key in the existing `flashcards` bucket and resolve a public URL through common-storage. Uploads reuse `POST /api/learning-support/flashcards/images`; no extra bucket or environment setting is introduced.
 
-Migrations V19 (additive schema) and V20 (demo catalog) extend the library database. Demo CEFR/topic/examples/collocations/mistakes are authored content and require IELTS examiner review. `frequency_rank` remains null without a COCA source; only the verified Coxhead AWL lemmas `data`, `method`, and `research` are marked true.
+Migrations V19 (additive schema) and V20 (demo catalog) extend the library database. Demo CEFR/topic/examples/collocations/mistakes are authored content and require IELTS examiner review. `frequency_rank` remains null without a COCA source; only Coxhead AWL lemmas are marked true (`data`, `method`, `research`, plus `income`, `network`, `diversity`, `assignment` from V22).
+
+Migration V22 enriches 48 more existing V4 words (8 per topic) with CEFR, topic, register, US IPA, two collocations, a synonym, a common mistake and two examples, then appends them to the existing topic and band sets. It creates no new words and skips senses that are already enriched. Same review requirement as V20.
 
 `/api/content/vocabulary/search`, `/api/content/vocabulary/senses`, catalog writes, `/api/content/admin/vocabulary/**`, and every notebook route require authentication. Unauthorized requests return 401; authenticated users without the required author role receive 403 for the catalog author API.
 
