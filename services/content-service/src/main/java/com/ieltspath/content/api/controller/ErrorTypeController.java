@@ -39,7 +39,7 @@ public class ErrorTypeController {
      * listed, the same set a learner is ever shown in grading output, and nothing about ids or review status.
      */
     @GetMapping("/approved")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN', 'CONTENT_AUTHOR', 'EXAMINER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_AUTHOR', 'EXAMINER')")
     public List<LearnerErrorTypeResponse> approved() {
         return listErrorTypes.executeApprovedActive().stream().map(LearnerErrorTypeResponse::from).toList();
     }
