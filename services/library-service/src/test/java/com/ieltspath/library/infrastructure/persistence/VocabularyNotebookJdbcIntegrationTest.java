@@ -114,6 +114,18 @@ class VocabularyNotebookJdbcIntegrationTest {
         assertEquals(0L,catalog.browse(browse("nothing",true,CefrLevel.B2,topic,0)).total());
     }
 
+    @Test void searchTextIsMatchedLiterallyNotAsLikeWildcards() {
+        long all=catalog.browse(browse("",false,null,null,0)).total();
+        assertTrue(all>10);
+        for (String wildcard : new String[] {"%","_","\\","a%","%_%"}) {
+            assertEquals(0L,catalog.browse(browse(wildcard,false,null,null,0)).total(),wildcard);
+            assertEquals(0L,catalog.browse(browse(wildcard,true,null,null,0)).total(),wildcard);
+        }
+        assertTrue(catalog.suggestions("%").isEmpty());
+        assertTrue(catalog.suggestions("_").isEmpty());
+        assertFalse(catalog.suggestions("pro").isEmpty());
+    }
+
     @Test void mindmapDoesNotExceedEightyNodes() {
         UUID topic=UUID.fromString("c1000000-0000-4000-8000-000000000002");
         for(int i=0;i<45;i++) {

@@ -70,6 +70,11 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
         this.storage = storage;
     }
 
+    /** Makes user text match literally: {@code %}, {@code _} and the escape character itself lose their LIKE meaning. */
+    private static String escapeLike(String text) {
+        return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
     @Override
     public Optional<CatalogItemResult> findActiveItem(UUID itemId) {
         return loadItems(List.of(itemId), true).stream().findFirst();
@@ -81,9 +86,9 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
         // The column is chosen from a closed pair, never from input text.
         String searchColumn = query.vietnamese() ? "s.vietnamese_meaning" : "i.lemma";
         String text = query.text().toLowerCase(Locale.ROOT);
-        String senseFilters = "AND (:query='' OR lower(" + searchColumn + ") LIKE :pattern)";
+        String senseFilters = "AND (:query='' OR lower(" + searchColumn + ") LIKE :pattern ESCAPE '\\')";
         MapSqlParameterSource p = new MapSqlParameterSource().addValue("query", text)
-                .addValue("pattern", "%" + text + "%").addValue("limit", page.size()).addValue("offset", offset(page));
+                .addValue("pattern", "%" + escapeLike(text) + "%").addValue("limit", page.size()).addValue("offset", offset(page));
         if (query.cefrLevel() != null) {
             senseFilters += " AND s.cefr_level=:cefr";
             p.addValue("cefr", query.cefrLevel().name());
@@ -102,9 +107,9 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
 
     @Override
     public List<VocabularySuggestionResult> suggestions(String prefix) {
-        return jdbc.query("SELECT id, lemma FROM vocabulary_items WHERE status='ACTIVE' AND lower(lemma) LIKE :q "
+        return jdbc.query("SELECT id, lemma FROM vocabulary_items WHERE status='ACTIVE' AND lower(lemma) LIKE :q ESCAPE '\\' "
                         + "ORDER BY lower(lemma), id LIMIT 8",
-                Map.of("q", prefix.toLowerCase(Locale.ROOT) + "%"),
+                Map.of("q", escapeLike(prefix.toLowerCase(Locale.ROOT)) + "%"),
                 (rs, n) -> new VocabularySuggestionResult(uuid(rs, "id"), rs.getString("lemma")));
     }
 
