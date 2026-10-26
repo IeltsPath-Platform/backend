@@ -64,7 +64,8 @@ class VocabularySeedMigrationTest {
         assertEquals(6, count("vocabulary_topics"));
         assertEquals(12, count("vocabulary_sets"));
         assertEquals(0, count("vocabulary_items WHERE frequency_rank IS NOT NULL"));
-        assertEquals(3, count("vocabulary_items WHERE academic_word_list = true"));
+        assertEquals(7, count("vocabulary_items WHERE academic_word_list = true"));
+        assertEquals(64, count("vocabulary_senses WHERE cefr_level IS NOT NULL"));
         assertEquals(0, count("vocabulary_senses WHERE cefr_level IS NOT NULL AND topic_id IS NULL"));
         assertEquals(0, count("vocabulary_senses WHERE topic_id IS NOT NULL AND cefr_level IS NULL"));
         assertEquals(1, count("vocabulary_senses s JOIN vocabulary_items i ON i.id=s.vocabulary_item_id WHERE i.normalized_lemma='research' AND s.cefr_level='B2' AND s.topic_id IS NOT NULL"));
