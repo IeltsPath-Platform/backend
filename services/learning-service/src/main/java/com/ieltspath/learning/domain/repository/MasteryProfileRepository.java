@@ -2,6 +2,7 @@ package com.ieltspath.learning.domain.repository;
 
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,12 @@ public interface MasteryProfileRepository {
     Map<UUID, MasteryProfile> find(UUID userId, Collection<UUID> knowledgePointIds);
 
     List<MasteryProfile> findAll(UUID userId);
+
+    /**
+     * How many of the learner's maintained points have reached their review date at {@code now}, counted where
+     * {@link #findAll} lists them: error-trap points are left out, and so are the {@code excludedKnowledgePointIds}.
+     */
+    int countDue(UUID userId, Instant now, Collection<UUID> excludedKnowledgePointIds);
 
     /** Stored profiles for error-trap knowledge points, kept separate from learner aggregates. */
     List<MasteryProfile> findErrorTrapProfiles(UUID userId);

@@ -225,6 +225,21 @@ The associated lesson is a preference when selecting a set, not an eligibility r
 review `DONE`, writes `review_set` evidence and updates mastery. Optional reviews end `SKIPPED` on a failed set.
 Creation limits and excluded Writing sources are described in [lesson-writing-v1](lesson-writing-v1.md).
 
+### `GET /review-basket/summary`
+
+Role `CUSTOMER`. The counts of the basket without its items, for a badge that is read on every page.
+
+```json
+{"required":2,"due":5}
+```
+
+- `required`: the learner's `PENDING` blocking reviews, the size of `required` in `GET /review-basket`.
+- `due`: maintained points whose `dueAt` (`next_review_at`) has come and that no blocking review holds, the size of `due`
+  in `GET /review-basket`. Error-trap child points are not counted, as in the basket.
+- `consolidate` and `weak` are not counted: they stay for as long as the learner is unsure and would keep the number high.
+- It reads only the learner's own mastery profiles and reviews in Learning's database and never asks Content, so it has
+  no `hasUnrevealedSet`: a counted due point may have no unseen set left, which `GET /review-basket` shows.
+
 ### `POST /review-basket/{knowledgePointId}/start`
 
 Role `CUSTOMER`. Starts an optional review of the point and returns it like `GET /reviews/{reviewId}`, with the first set.

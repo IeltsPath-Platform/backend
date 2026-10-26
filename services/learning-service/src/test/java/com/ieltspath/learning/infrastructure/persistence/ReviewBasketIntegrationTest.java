@@ -64,6 +64,7 @@ class ReviewBasketIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired RefreshLearningTopicsUseCase topics;
     @Autowired GetReviewBasketUseCase basket;
+    @Autowired GetReviewBasketSummaryUseCase summary;
     @Autowired StartBasketReviewUseCase start;
     @Autowired GetReviewUseCase getReview;
     @Autowired SubmitReviewUseCase submitReview;
@@ -173,6 +174,82 @@ class ReviewBasketIntegrationTest {
         assertFalse(result.due().getFirst().hasUnrevealedSet(), "Content has no unseen set for this point");
         assertFalse(result.consolidate().stream().anyMatch(item -> item.knowledgePointId().equals(kpLater)),
                 "a maintained point that is not due yet is not in the basket");
+    }
+
+    private void review(UUID user, UUID point, boolean blocking) {
+        jdbc.update("""
+                INSERT INTO review_items(id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind, blocking)
+                VALUES (?, ?, ?, ?, 'PENDING', 'READING', ?, ?)
+                """, UUID.randomUUID(), user, point, lesson, blocking ? "PRACTICE" : "CONSOLIDATE", blocking);
+    }
+
+    /** The summary must say exactly what the basket lists, so the number on the navigation never disagrees with it. */
+    private void assertSummaryMatchesBasket(UUID user, int required, int due) {
+        ReviewBasketResult result = basket.execute(user);
+        var counts = summary.execute(user);
+        assertEquals(required, counts.required());
+        assertEquals(due, counts.due());
+        assertEquals(result.required().size(), counts.required(), "required matches the basket group");
+        assertEquals(result.due().size(), counts.due(), "due matches the basket group");
+    }
+
+    @Test
+    void theSummaryCountsTheDuePointAndNothingElseForALearnerWithNoReview() {
+        UUID user = learner();
+        availability = Map.of();
+
+        assertSummaryMatchesBasket(user, 0, 1);
+    }
+
+    @Test
+    void aBlockingReviewIsRequiredAndHidesItsPointFromDue() {
+        UUID user = learner();
+        review(user, kpPriority, true);
+        assertSummaryMatchesBasket(user, 1, 1);
+
+        review(user, kpDue, true);
+        assertSummaryMatchesBasket(user, 2, 0);
+    }
+
+    @Test
+    void anOptionalReviewIsNotRequiredAndItsDuePointStillCounts() {
+        UUID user = learner();
+        review(user, kpDue, false);
+        review(user, kpConsolidate, false);
+
+        assertSummaryMatchesBasket(user, 0, 1);
+    }
+
+    @Test
+    void aMaintainedPointNotDueYetAndAPointOfAnotherLearnerAreNotCounted() {
+        UUID user = learner();
+        UUID other = learner();
+        review(other, kpPriority, true);
+        jdbc.update("UPDATE kp_mastery_profiles SET next_review_at = now() + interval '5 days' WHERE user_id = ? "
+                + "AND knowledge_point_id = ?", user, kpDue);
+
+        assertSummaryMatchesBasket(user, 0, 0);
+        assertSummaryMatchesBasket(other, 1, 1);
+    }
+
+    @Test
+    void aMaintainedPointWithoutAReviewDateIsNotDue() {
+        UUID user = learner();
+        jdbc.update("UPDATE kp_mastery_profiles SET next_review_at = NULL WHERE user_id = ? AND knowledge_point_id = ?",
+                user, kpDue);
+
+        assertSummaryMatchesBasket(user, 0, 0);
+    }
+
+    @Test
+    void anErrorTrapChildIsNotCounted() {
+        UUID user = learner();
+        UUID trap = UUID.randomUUID();
+        jdbc.update("INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set, parent_kp_id, error_code) "
+                + "VALUES (?, ?, FALSE, ?, ?)", trap, topic, kpDue, "TFNG_NG_AS_FALSE");
+        profile(user, trap, "0.900", "MAINTAIN", Instant.now().minus(2, ChronoUnit.DAYS));
+
+        assertSummaryMatchesBasket(user, 0, 1);
     }
 
     @Test
