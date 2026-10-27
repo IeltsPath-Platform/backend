@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  */
 final class CoursePromptBuilder {
 
-    static final String VERSION = "COURSE-v1";
+    static final String VERSION = "COURSE-v2";
     private static final int DESCRIPTION_LIMIT = 200;
 
     private CoursePromptBuilder() {
@@ -68,11 +68,15 @@ final class CoursePromptBuilder {
                 luyện và câu hỏi cho từng lesson, đặt mã và tiêu đề cho đề cuối của từng topic và của cả course. Giữ thứ tự học:
                 kiến thức tiên quyết phải đứng ở lesson trước hoặc cùng topic phía trước. Mỗi kiến thức, gói và câu hỏi chỉ dùng
                 một lần. Mã của topic, lesson và đề cuối là mã mới do bạn đặt, chỉ gồm chữ, số, dấu chấm, gạch dưới và gạch ngang.
+                Mỗi lesson có thêm "estimatedMinutes" (số nguyên từ 5 đến 60, ước lượng thời gian học) và "summaryMarkdown": dàn ý
+                3 đến 6 gạch đầu dòng Markdown nói bài này học gì, viết CHỈ từ tên và mô tả của các kiến thức trong bài, không thêm
+                kiến thức, ví dụ hay số liệu mới. Không tạo slide hay tài liệu; người soạn sẽ thêm sau.
 
                 Trả về DUY NHẤT một đối tượng JSON dạng:
                 {"course":{"code":"...","name":"..."},
                  "topics":[{"code":"...","name":"...","skill":"READING",
-                   "lessons":[{"code":"...","title":"...","summary":"...","knowledgePoints":["MÃ_KIẾN_THỨC"],
+                   "lessons":[{"code":"...","title":"...","summary":"...","summaryMarkdown":"- ý 1\\n- ý 2","estimatedMinutes":15,
+                               "knowledgePoints":["MÃ_KIẾN_THỨC"],
                                "practiceSets":["MÃ_GÓI"],"questions":["Q1"]}],
                    "topicTest":{"code":"...","title":"..."}}],
                  "courseTest":{"code":"...","title":"..."}}

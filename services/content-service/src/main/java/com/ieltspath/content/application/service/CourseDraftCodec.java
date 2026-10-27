@@ -34,6 +34,10 @@ public class CourseDraftCodec {
     static final int MAX_QUESTION_REFS = 100;
     static final int MAX_KNOWLEDGE_POINTS = 50;
     static final int MAX_PRACTICE_SETS = 20;
+    static final int MAX_RESOURCES = 20;
+    static final int MAX_SUMMARY_MARKDOWN = 20000;
+    static final int MAX_MINUTES = 600;
+    private static final Pattern WEB_LINK = Pattern.compile("(?i)^https?://\\S+$");
     static final int MAX_MILESTONES = 100;
     private static final Pattern CODE = Pattern.compile("[A-Za-z0-9._-]{1,100}");
     private static final BigDecimal NINE = new BigDecimal("9");
@@ -144,6 +148,29 @@ public class CourseDraftCodec {
         if (lesson.summary() != null && lesson.summary().length() > 2000) problems.add(new Problem(at + ".summary", "TOO_LONG"));
         if (lesson.knowledgePointIds().size() > MAX_KNOWLEDGE_POINTS) {
             problems.add(new Problem(at + ".knowledgePointIds", "TOO_MANY"));
+        }
+        if (lesson.summaryMarkdown() != null && lesson.summaryMarkdown().length() > MAX_SUMMARY_MARKDOWN) {
+            problems.add(new Problem(at + ".summaryMarkdown", "TOO_LONG"));
+        }
+        if (lesson.estimatedMinutes() != null && (lesson.estimatedMinutes() < 1 || lesson.estimatedMinutes() > MAX_MINUTES)) {
+            problems.add(new Problem(at + ".estimatedMinutes", "OUT_OF_RANGE"));
+        }
+        if (lesson.resources().size() > MAX_RESOURCES) problems.add(new Problem(at + ".resources", "TOO_MANY"));
+        // A lesson has one slide; any number of documents.
+        if (lesson.resources().stream().filter(r -> r != null && r.type() == com.ieltspath.content.domain.vo.LessonResourceType.SLIDE).count() > 1) {
+            problems.add(new Problem(at + ".resources", "TOO_MANY_SLIDES"));
+        }
+        for (int r = 0; r < lesson.resources().size(); r++) {
+            var resource = lesson.resources().get(r);
+            String where = at + ".resources[" + r + "]";
+            if (resource == null || resource.type() == null) {
+                problems.add(new Problem(where + ".type", "REQUIRED"));
+                continue;
+            }
+            text(problems, where + ".title", resource.title(), 255);
+            if (resource.url() == null || resource.url().length() > 2000 || !WEB_LINK.matcher(resource.url().trim()).matches()) {
+                problems.add(new Problem(where + ".url", "INVALID"));
+            }
         }
         if (lesson.practiceSetPackageIds().size() > MAX_PRACTICE_SETS) {
             problems.add(new Problem(at + ".practiceSetPackageIds", "TOO_MANY"));

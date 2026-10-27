@@ -160,4 +160,53 @@ class CourseDraftCodecTest {
 
         assertEquals(plan, codec.read(codec.write(plan)));
     }
+
+    @Test
+    void aLessonKeepsItsMarkdownSummaryMinutesAndResources() throws Exception {
+        String lesson = "{\"code\":\"L1\",\"title\":\"Lesson\",\"summaryMarkdown\":\"- one\\n- two\",\"estimatedMinutes\":15,"
+                + "\"resources\":[{\"type\":\"SLIDE\",\"title\":\"Deck\",\"url\":\"https://slides.example/deck\"},"
+                + "{\"type\":\"DOCUMENT\",\"title\":\"Sheet\",\"url\":\"https://docs.example/sheet\"}]}";
+
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals("- one\n- two", read.summaryMarkdown());
+        assertEquals(15, read.estimatedMinutes());
+        assertEquals(2, read.resources().size());
+        assertEquals("https://slides.example/deck", read.resources().get(0).url());
+    }
+
+    @Test
+    void aDraftWithoutTheNewLessonFieldsStillReads() throws Exception {
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson("L1") + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals(null, read.summaryMarkdown());
+        assertEquals(null, read.estimatedMinutes());
+        assertEquals(List.of(), read.resources());
+    }
+
+    @Test
+    void badLessonMinutesAndResourceLinksAreReportedWithTheirPath() throws Exception {
+        String lesson = "{\"code\":\"L1\",\"title\":\"Lesson\",\"estimatedMinutes\":0,"
+                + "\"resources\":[{\"type\":\"SLIDE\",\"title\":\"Deck\",\"url\":\"ftp://nope\"},"
+                + "{\"type\":\"DOCUMENT\",\"title\":\" \",\"url\":\"https://ok.example\"}]}";
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".lessons[0].estimatedMinutes") && p.problem().equals("OUT_OF_RANGE")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources[0].url") && p.problem().equals("INVALID")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources[1].title")));
+    }
+
+    @Test
+    void aLessonMayHaveOnlyOneSlide() throws Exception {
+        String lesson = "{\"code\":\"L1\",\"title\":\"Lesson\",\"resources\":["
+                + "{\"type\":\"SLIDE\",\"title\":\"A\",\"url\":\"https://slides.example/a\"},"
+                + "{\"type\":\"SLIDE\",\"title\":\"B\",\"url\":\"https://slides.example/b\"},"
+                + "{\"type\":\"DOCUMENT\",\"title\":\"D1\",\"url\":\"https://docs.example/1\"},"
+                + "{\"type\":\"DOCUMENT\",\"title\":\"D2\",\"url\":\"https://docs.example/2\"}]}";
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources") && p.problem().equals("TOO_MANY_SLIDES")));
+    }
 }

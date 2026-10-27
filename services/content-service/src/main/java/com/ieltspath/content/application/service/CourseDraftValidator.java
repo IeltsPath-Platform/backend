@@ -83,7 +83,8 @@ public class CourseDraftValidator {
                         null, List.of(), questions.stream().map(UUID::toString).toList()));
                 lessons.add(new LessonPlan(unique(code(lessonNode.path("code"), "LESSON_" + (lessons.size() + 1)),
                         usedCodes), text(lessonNode.path("title"), 255, "Lesson"), summary(lessonNode.path("summary")),
-                        points, blocks, sets));
+                        points, blocks, sets, outline(lessonNode.path("summaryMarkdown")), minutes(lessonNode.path("estimatedMinutes")),
+                        List.of()));
             }
             if (lessons.isEmpty()) {
                 warnings.add(new Warning(EMPTY_TOPIC_DROPPED, text(topicNode.path("code"), 100)));
@@ -167,6 +168,19 @@ public class CourseDraftValidator {
     private static String text(JsonNode node, int max) {
         String value = node.asText("").replaceAll("\\s+", " ").trim();
         return value.length() > max ? value.substring(0, max) : value;
+    }
+
+    /** A short outline the model wrote from the knowledge points of the lesson; kept within a sensible length. */
+    private static String outline(JsonNode node) {
+        String value = node.asText("").trim();
+        return value.isEmpty() ? null : value.length() > 3000 ? value.substring(0, 3000) : value;
+    }
+
+    /** Minutes the model estimated; anything outside 1 to 240 is ignored rather than trusted. */
+    private static Integer minutes(JsonNode node) {
+        if (!node.isNumber()) return null;
+        int value = node.asInt();
+        return value >= 1 && value <= 240 ? value : null;
     }
 
     private static String summary(JsonNode node) {

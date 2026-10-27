@@ -27,6 +27,8 @@ import com.ieltspath.content.infrastructure.persistence.adapter.JdbcCourseCatalo
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcPracticeTestMilestoneRepository;
 import com.ieltspath.content.infrastructure.persistence.adapter.LessonAuthoringRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.adapter.LessonResourceRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.mapper.LessonResourcePersistenceMapperImpl;
 import com.ieltspath.content.infrastructure.persistence.adapter.TopicRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.mapper.ContentPackagePersistenceMapper;
 import com.ieltspath.content.infrastructure.persistence.mapper.CoursePersistenceMapperImpl;
@@ -74,7 +76,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         LessonAuthoringRepositoryAdapter.class, ContentPackageRepositoryAdapter.class,
         ContentPackagePersistenceMapper.class, CreateContentPackageUseCase.class,
         CreateDraftPackageVersionUseCase.class, JdbcLearningContentReader.class,
-        JdbcPracticeTestMilestoneRepository.class, CourseMaterializer.class, AiCourseDraftIntegrationTest.Beans.class})
+        JdbcPracticeTestMilestoneRepository.class, CreateLessonResourceUseCase.class,
+        LessonResourceRepositoryAdapter.class, LessonResourcePersistenceMapperImpl.class, CourseMaterializer.class, AiCourseDraftIntegrationTest.Beans.class})
 @Testcontainers(disabledWithoutDocker = true)
 class AiCourseDraftIntegrationTest {
 
@@ -184,7 +187,7 @@ class AiCourseDraftIntegrationTest {
 
         assertThat(draft.getStatus()).isEqualTo(DraftStatus.READY);
         assertThat(draft.getModel()).isEqualTo("stand-in-model");
-        assertThat(draft.getPromptVersion()).isEqualTo("COURSE-v1");
+        assertThat(draft.getPromptVersion()).isEqualTo("COURSE-v2");
         JsonNode result = json.readTree(draft.getResultJson());
         JsonNode lessons = result.path("topics").get(0).path("lessons");
         assertThat(lessons).hasSize(2);

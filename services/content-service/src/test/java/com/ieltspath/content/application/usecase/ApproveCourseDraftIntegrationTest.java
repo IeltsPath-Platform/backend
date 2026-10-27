@@ -19,6 +19,8 @@ import com.ieltspath.content.infrastructure.persistence.adapter.JdbcCourseCatalo
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcPracticeTestMilestoneRepository;
 import com.ieltspath.content.infrastructure.persistence.adapter.LessonAuthoringRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.adapter.LessonResourceRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.mapper.LessonResourcePersistenceMapperImpl;
 import com.ieltspath.content.infrastructure.persistence.adapter.TopicRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.mapper.ContentPackagePersistenceMapper;
 import com.ieltspath.content.infrastructure.persistence.mapper.CoursePersistenceMapperImpl;
@@ -65,6 +67,7 @@ import static org.mockito.Mockito.doThrow;
         ContentPackageRepositoryAdapter.class, ContentPackagePersistenceMapper.class,
         CreateContentPackageUseCase.class, CreateDraftPackageVersionUseCase.class, JdbcLearningContentReader.class,
         JdbcPracticeTestMilestoneRepository.class, JdbcAiDraftRepository.class,
+        CreateLessonResourceUseCase.class, LessonResourceRepositoryAdapter.class, LessonResourcePersistenceMapperImpl.class,
         ApproveCourseDraftIntegrationTest.Beans.class})
 @Testcontainers(disabledWithoutDocker = true)
 class ApproveCourseDraftIntegrationTest {
@@ -151,6 +154,11 @@ class ApproveCourseDraftIntegrationTest {
                 + "(SELECT id FROM topics WHERE course_id=?)", String.class, approved.courseId()))
                 .containsOnly("DRAFT");
         UUID first = approved.lessonIds().get(0);
+        assertThat(jdbc.queryForObject("SELECT summary_markdown FROM lessons WHERE id=?", String.class, first)).isEqualTo("- one\n- two");
+        assertThat(jdbc.queryForObject("SELECT estimated_minutes FROM lessons WHERE id=?", Integer.class, first)).isEqualTo(20);
+        assertThat(jdbc.queryForList("SELECT resource_type || ':' || sort_order || ':' || title FROM lesson_resources WHERE lesson_id=? "
+                + "ORDER BY resource_type DESC, sort_order", String.class, first))
+                .containsExactly("SLIDE:0:Deck", "DOCUMENT:0:Sheet B", "DOCUMENT:1:Sheet A");
         assertThat(jdbc.queryForList("SELECT knowledge_point_id FROM lesson_knowledge_points WHERE lesson_id=?",
                 UUID.class, first)).contains(kpFoundation);
         assertThat(jdbc.queryForList("SELECT block_type FROM lesson_blocks WHERE lesson_id=? ORDER BY sort_order",
@@ -300,6 +308,10 @@ class ApproveCourseDraftIntegrationTest {
                   {"code":"%1$s_T1","name":"Foundations","skill":"READING","sortOrder":%2$d,
                    "lessons":[
                      {"code":"%1$s_L1","title":"Basics","summary":"s","knowledgePointIds":["%3$s"],
+                      "summaryMarkdown":"- one\\n- two","estimatedMinutes":20,
+                      "resources":[{"type":"SLIDE","title":"Deck","url":"https://slides.example/deck"},
+                                   {"type":"DOCUMENT","title":"Sheet B","url":"https://docs.example/b"},
+                                   {"type":"DOCUMENT","title":"Sheet A","url":"https://docs.example/a"}],
                       "blocks":[{"type":"TEXT","text":"Intro","knowledgePointIds":["%3$s"]},
                                 {"type":"EXERCISE","questionRefs":["%1$s-Q1"]}],
                       "practiceSetPackageIds":["%5$s"]},

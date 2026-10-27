@@ -206,4 +206,25 @@ class CourseDraftValidatorTest {
         assertEquals(2000, lesson.summary().length());
         assertTrue(validator.build(request, candidates, reply(reply), 1).structure().topics().get(0).name().length() <= 255);
     }
+
+    @Test
+    void theModelMayFillMinutesAndAnOutlineAndNothingElseOfTheLesson() throws Exception {
+        String withExtras = GOOD.replace("\"summary\":\"s\"", "\"summary\":\"s\",\"summaryMarkdown\":\"- paraphrase\\n- keep meaning\",\"estimatedMinutes\":20,"
+                + "\"resources\":[{\"type\":\"SLIDE\",\"title\":\"Invented\",\"url\":\"https://made.up\"}]");
+
+        LessonPlan first = validator.build(request, candidates, reply(withExtras), 971).structure().topics().get(0).lessons().get(0);
+
+        assertEquals("- paraphrase\n- keep meaning", first.summaryMarkdown());
+        assertEquals(20, first.estimatedMinutes());
+        assertEquals(List.of(), first.resources());
+    }
+
+    @Test
+    void minutesOutsideTheSensibleRangeAreIgnored() throws Exception {
+        String absurd = GOOD.replace("\"summary\":\"s\"", "\"summary\":\"s\",\"estimatedMinutes\":5000");
+
+        LessonPlan first = validator.build(request, candidates, reply(absurd), 971).structure().topics().get(0).lessons().get(0);
+
+        assertEquals(null, first.estimatedMinutes());
+    }
 }

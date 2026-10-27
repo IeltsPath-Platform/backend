@@ -25,6 +25,10 @@ import com.ieltspath.content.domain.vo.CourseDraftStructure;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.BlockPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.FinalTestPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.LessonPlan;
+import com.ieltspath.content.domain.vo.CourseDraftStructure.ResourcePlan;
+import com.ieltspath.content.domain.vo.LessonResourceType;
+import com.ieltspath.content.application.command.CreateLessonResourceCommand;
+import com.ieltspath.content.application.usecase.CreateLessonResourceUseCase;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.TopicPlan;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PracticeTestMilestone;
@@ -56,13 +60,14 @@ public class CourseMaterializer {
     private final CreateContentPackageUseCase createPackage;
     private final CreateDraftPackageVersionUseCase createDraftVersion;
     private final PracticeTestMilestoneRepository milestones;
+    private final CreateLessonResourceUseCase lessonResources;
 
     public CourseMaterializer(CreateCourseUseCase createCourse, UpdateCourseUseCase updateCourse,
                               CreateTopicUseCase createTopic, UpdateTopicUseCase updateTopic,
                               LessonAuthoringUseCase lessons, ContentPackageRepository packages,
                               CreateContentPackageUseCase createPackage,
                               CreateDraftPackageVersionUseCase createDraftVersion,
-                              PracticeTestMilestoneRepository milestones) {
+                              PracticeTestMilestoneRepository milestones, CreateLessonResourceUseCase lessonResources) {
         this.createCourse = createCourse;
         this.updateCourse = updateCourse;
         this.createTopic = createTopic;
@@ -72,6 +77,7 @@ public class CourseMaterializer {
         this.createPackage = createPackage;
         this.createDraftVersion = createDraftVersion;
         this.milestones = milestones;
+        this.lessonResources = lessonResources;
     }
 
     /** What was created. The maps give the ids by the codes of the structure. */
@@ -126,7 +132,7 @@ public class CourseMaterializer {
         int position = 1;
         for (LessonPlan lessonPlan : topic.lessons()) {
             LessonAuthoringResult lesson = lessons.create(topicId, lessonPlan.code(), lessonPlan.title(),
-                    lessonPlan.summary(), null, null, position++);
+                    lessonPlan.summary(), lessonPlan.summaryMarkdown(), lessonPlan.estimatedMinutes(), position++);
             lessonIds.add(lesson.id());
             lessonsByCode.put(lessonPlan.code(), lesson.id());
             if (!lessonPlan.knowledgePointIds().isEmpty()) {
@@ -135,12 +141,23 @@ public class CourseMaterializer {
             for (BlockPlan block : lessonPlan.blocks()) {
                 addBlock(lesson.id(), block, questionVersionsByRef);
             }
+            addResources(lesson.id(), lessonPlan);
             for (UUID practiceSet : lessonPlan.practiceSetPackageIds()) {
                 if (!packages.attachPracticeSetToLesson(practiceSet, lesson.id())) {
                     throw new InvalidPackageLessonException("Package " + practiceSet
                             + " is not a practice set that is free to join a lesson");
                 }
             }
+        }
+    }
+
+    /** Slides and documents are numbered per type, in the order the author listed them. */
+    private void addResources(UUID lessonId, LessonPlan lessonPlan) {
+        Map<LessonResourceType, Integer> next = new java.util.EnumMap<>(LessonResourceType.class);
+        for (ResourcePlan resource : lessonPlan.resources()) {
+            int order = next.merge(resource.type(), 1, Integer::sum) - 1;
+            lessonResources.execute(new CreateLessonResourceCommand(lessonId, resource.type(), resource.title().trim(),
+                    resource.url().trim(), order));
         }
     }
 

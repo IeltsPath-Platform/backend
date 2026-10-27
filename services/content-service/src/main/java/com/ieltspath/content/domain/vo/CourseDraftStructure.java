@@ -31,12 +31,25 @@ public record CourseDraftStructure(CourseInfo course, List<TopicPlan> topics, Fi
         }
     }
 
+    /**
+     * {@code summaryMarkdown} is the summary the learner reads on the lesson page, {@code estimatedMinutes} how long the
+     * lesson takes, and {@code resources} its slides and documents (links). A draft that predates these fields reads them
+     * as empty.
+     */
     public record LessonPlan(String code, String title, String summary, List<UUID> knowledgePointIds,
-                             List<BlockPlan> blocks, List<UUID> practiceSetPackageIds) {
+                             List<BlockPlan> blocks, List<UUID> practiceSetPackageIds, String summaryMarkdown,
+                             Integer estimatedMinutes, List<ResourcePlan> resources) {
         public LessonPlan {
             knowledgePointIds = knowledgePointIds == null ? List.of() : List.copyOf(knowledgePointIds);
             blocks = blocks == null ? List.of() : List.copyOf(blocks);
             practiceSetPackageIds = practiceSetPackageIds == null ? List.of() : List.copyOf(practiceSetPackageIds);
+            resources = resources == null ? List.of() : List.copyOf(resources);
+        }
+
+        /** A lesson with only the fields a draft had before the summary, minutes and resources existed. */
+        public LessonPlan(String code, String title, String summary, List<UUID> knowledgePointIds,
+                          List<BlockPlan> blocks, List<UUID> practiceSetPackageIds) {
+            this(code, title, summary, knowledgePointIds, blocks, practiceSetPackageIds, null, null, List.of());
         }
 
         /** Every knowledge point the lesson teaches: its own and those of its blocks. */
@@ -45,6 +58,10 @@ public record CourseDraftStructure(CourseInfo course, List<TopicPlan> topics, Fi
             blocks.forEach(block -> all.addAll(block.knowledgePointIds()));
             return List.copyOf(all);
         }
+    }
+
+    /** A slide or document of a lesson: a title and the link to open. */
+    public record ResourcePlan(com.ieltspath.content.domain.vo.LessonResourceType type, String title, String url) {
     }
 
     /** {@code type} is {@code TEXT} or {@code EXERCISE}; an exercise lists question references. */
