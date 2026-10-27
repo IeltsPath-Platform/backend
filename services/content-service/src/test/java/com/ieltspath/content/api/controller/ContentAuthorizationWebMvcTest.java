@@ -103,6 +103,7 @@ class ContentAuthorizationWebMvcTest {
     }
     @MockitoBean ListQuestionsUseCase listQuestions;
     @MockitoBean GetQuestionDetailUseCase getQuestionDetail;
+    @MockitoBean GetQuestionPassagesUseCase getQuestionPassages;
     @MockitoBean CreateQuestionUseCase createQuestion;
     @MockitoBean AddQuestionVersionUseCase addQuestionVersion;
     @MockitoBean ArchiveQuestionUseCase archiveQuestion;

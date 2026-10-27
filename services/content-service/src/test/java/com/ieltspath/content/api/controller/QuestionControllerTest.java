@@ -48,6 +48,9 @@ class QuestionControllerTest {
     private GetQuestionDetailUseCase getQuestionDetailUseCase;
 
     @Mock
+    private GetQuestionPassagesUseCase getQuestionPassagesUseCase;
+
+    @Mock
     private CreateQuestionUseCase createQuestionUseCase;
 
     @Mock
@@ -103,6 +106,22 @@ class QuestionControllerTest {
                 .andExpect(jsonPath("$.page").value(2))
                 .andExpect(jsonPath("$.totalElements").value(23))
                 .andExpect(jsonPath("$.totalPages").value(3));
+    }
+
+    @Test
+    @DisplayName("GET /api/content/admin/questions/versions/{id}/passages returns the passages of the version")
+    void shouldReturnThePassagesOfAVersion() throws Exception {
+        UUID version = UUID.randomUUID();
+        UUID asset = UUID.randomUUID();
+        when(getQuestionPassagesUseCase.execute(version)).thenReturn(List.of(new com.ieltspath.content.application.port.QuestionPassageReader.Passage(
+                asset, "A. In autumn", com.ieltspath.content.application.port.QuestionPassageReader.Source.LESSON, "Reading lesson")));
+
+        mockMvc.perform(get("/api/content/admin/questions/versions/" + version + "/passages"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].assetId").value(asset.toString()))
+                .andExpect(jsonPath("$[0].text").value("A. In autumn"))
+                .andExpect(jsonPath("$[0].source").value("LESSON"))
+                .andExpect(jsonPath("$[0].sourceName").value("Reading lesson"));
     }
 
     @Test
