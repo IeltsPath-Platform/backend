@@ -416,6 +416,27 @@ class ExaminerSelectionIntegrationTest extends ExaminerIntegrationSupport {
         assertEquals(1, count("SELECT count(*) FROM grading_jobs WHERE requested_examiner_id=?", second));
     }
     @Test
+    void theLearnerListAsksTheUserServiceOnceForAllTheExaminersNotOnceEach() throws Exception {
+        List<UUID> ids = List.of(examiner, second, third, fourth);
+        when(examinerDirectory.findAll(org.mockito.ArgumentMatchers.anyCollection())).thenReturn(java.util.Map.of(
+                examiner, new ExaminerDirectory.Examiner(examiner, true, 10),
+                second, new ExaminerDirectory.Examiner(second, false, 10),
+                third, new ExaminerDirectory.Examiner(third, true, 10)));
+        org.mockito.Mockito.clearInvocations(examinerDirectory);
+
+        mvc.perform(get("/api/assessments/examiners/availability")
+                        .param("ids", ids.stream().map(UUID::toString).toArray(String[]::new))
+                        .header("Authorization", "Bearer " + internalToken(learner, "CUSTOMER")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[?(@.examinerId=='" + examiner + "')].full").value(false))
+                .andExpect(jsonPath("$[?(@.examinerId=='" + second + "')].full").value(true))
+                .andExpect(jsonPath("$[?(@.examinerId=='" + fourth + "')]").isEmpty());
+
+        org.mockito.Mockito.verify(examinerDirectory, org.mockito.Mockito.times(1)).findAll(org.mockito.ArgumentMatchers.anyCollection());
+        org.mockito.Mockito.verify(examinerDirectory, org.mockito.Mockito.never()).find(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void anExaminerWithFiveLateJobsTakesNoNewSubmissionUntilTheyGradeSome() throws Exception {
         String learnerToken = internalToken(learner, "CUSTOMER");
         java.util.List<UUID> late = new java.util.ArrayList<>();

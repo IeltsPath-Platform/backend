@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +49,14 @@ public class JdbcExaminerDirectoryReader implements ExaminerDirectoryReader {
     public Optional<Examiner> findActive(UUID userId) {
         return jdbc.query(SELECT + " AND u.id = :id", new MapSqlParameterSource("id", userId),
                 JdbcExaminerDirectoryReader::examiner).stream().findFirst();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Examiner> findActive(Collection<UUID> userIds) {
+        if (userIds.isEmpty()) return List.of();
+        return jdbc.query(SELECT + " AND u.id IN (:ids)", new MapSqlParameterSource("ids", userIds),
+                JdbcExaminerDirectoryReader::examiner);
     }
 
     @Override

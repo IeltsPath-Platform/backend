@@ -8,7 +8,6 @@ import com.ieltspath.events.assessment.GradingRequestedTopology;
 
 import org.springframework.amqp.core.Declarables;
 import org.springframework.amqp.core.TopicExchange;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -20,10 +19,13 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class AssessmentMessagingConfiguration {
 
+    /**
+     * The exchange name is the shared constant, not a property: the grading queues are bound to the same constant in both
+     * services, so a different name here would publish where no queue listens.
+     */
     @Bean
-    TopicExchange assessmentEventsExchange(
-            @Value("${assessment.messaging.exchange:" + AssessmentMessaging.EXCHANGE + "}") String exchangeName) {
-        return new TopicExchange(exchangeName, true, false);
+    TopicExchange assessmentEventsExchange() {
+        return new TopicExchange(AssessmentMessaging.EXCHANGE, true, false);
     }
 
     /**

@@ -74,13 +74,17 @@ public class ExaminerAssignmentService {
      */
     @Transactional(readOnly = true)
     public List<Availability> availability(Collection<UUID> examinerIds) {
-        Map<UUID, Integer> received = store.receivedSince(examinerIds, startOfToday());
-        Map<UUID, Integer> late = store.overdueOpen(examinerIds, overdueBefore());
-        return examinerIds.stream().distinct().flatMap(id -> directory.find(id).stream().map(examiner -> {
+        List<UUID> ids = examinerIds.stream().distinct().toList();
+        Map<UUID, Integer> received = store.receivedSince(ids, startOfToday());
+        Map<UUID, Integer> late = store.overdueOpen(ids, overdueBefore());
+        // One call to the user service for the whole list, however many examiners it holds.
+        Map<UUID, ExaminerDirectory.Examiner> known = directory.findAll(ids);
+        return ids.stream().filter(known::containsKey).map(id -> {
+            ExaminerDirectory.Examiner examiner = known.get(id);
             boolean backlog = late.getOrDefault(id, 0) >= ExaminerAssignmentPolicy.MAX_OVERDUE_OPEN;
             boolean full = !examiner.acceptingSubmissions() || received.getOrDefault(id, 0) >= examiner.dailyLimit();
             return new Availability(id, full || backlog, backlog);
-        })).toList();
+        }).toList();
     }
 
     public record Availability(UUID examinerId, boolean full, boolean backlog) {}

@@ -77,6 +77,21 @@ class JdbcExaminerDirectoryReaderTest {
     }
 
     @Test
+    void severalExaminersAreReadInOneQueryAndWhoIsNotAnActiveExaminerIsLeftOut() {
+        UUID accepting = user("ACTIVE", "EXAMINER");
+        UUID paused = user("ACTIVE", "EXAMINER");
+        reader.saveProfile(paused, null, "[]", false);
+        UUID learner = user("ACTIVE", "CUSTOMER");
+        UUID locked = user("LOCKED", "EXAMINER");
+
+        var found = reader.findActive(java.util.List.of(accepting, paused, learner, locked, UUID.randomUUID()));
+
+        assertEquals(java.util.Set.of(accepting, paused), found.stream().map(e -> e.id()).collect(java.util.stream.Collectors.toSet()));
+        assertFalse(found.stream().filter(e -> e.id().equals(paused)).findFirst().orElseThrow().acceptingSubmissions());
+        assertTrue(reader.findActive(java.util.List.<UUID>of()).isEmpty());
+    }
+
+    @Test
     void anExaminerWhoStoppedAcceptingIsKnownButNotListed() {
         UUID id = user("ACTIVE", "EXAMINER");
         reader.saveProfile(id, new BigDecimal("8.5"), "[{\"name\":\"CELTA\",\"issuer\":\"Cambridge\",\"year\":2018,\"score\":\"A\"}]", false);

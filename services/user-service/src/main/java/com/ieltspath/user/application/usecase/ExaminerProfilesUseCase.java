@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -38,6 +39,12 @@ public class ExaminerProfilesUseCase {
     public ExaminerResult get(UUID examinerId) {
         return directory.findActive(Objects.requireNonNull(examinerId)).map(this::result)
                 .orElseThrow(ResourceNotFoundException::new);
+    }
+
+    /** Several examiners in one read, for a list; an id that is not an active examiner is left out. */
+    @Transactional(readOnly = true)
+    public List<ExaminerResult> getAll(Collection<UUID> examinerIds) {
+        return directory.findActive(Objects.requireNonNull(examinerIds)).stream().map(this::result).toList();
     }
 
     @Transactional

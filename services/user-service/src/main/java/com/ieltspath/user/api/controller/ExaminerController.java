@@ -6,6 +6,7 @@ import com.ieltspath.user.api.dto.request.UpdateExaminerProfileRequest;
 import com.ieltspath.user.api.dto.response.ExaminerAvailabilityResponse;
 import com.ieltspath.user.api.dto.response.ExaminerResponse;
 import com.ieltspath.user.application.usecase.ExaminerProfilesUseCase;
+import com.ieltspath.user.domain.exception.InvalidDataException;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -23,6 +25,8 @@ import java.util.UUID;
 @RestController
 @RequiredArgsConstructor
 public class ExaminerController {
+    static final int MAX_BATCH = 50;
+
     private final ExaminerProfilesUseCase examiners;
     private final CurrentUserProvider currentUserProvider;
 
@@ -60,5 +64,18 @@ public class ExaminerController {
     @GetMapping("/internal/users/examiners/{id}")
     public ExaminerAvailabilityResponse availability(@PathVariable("id") UUID id) {
         return ExaminerAvailabilityResponse.from(examiners.get(id));
+    }
+
+    /**
+     * The same for several examiners in one call, so a list needs one request, not one per examiner. Ids that are not active
+     * examiners are left out; at most {@value #MAX_BATCH} ids.
+     */
+    @Hidden
+    @GetMapping("/internal/users/examiners")
+    public List<ExaminerAvailabilityResponse> availabilityOf(@RequestParam("ids") List<UUID> ids) {
+        if (ids.isEmpty() || ids.size() > MAX_BATCH) {
+            throw new InvalidDataException("ids must hold 1 to " + MAX_BATCH + " examiner ids");
+        }
+        return examiners.getAll(ids.stream().distinct().toList()).stream().map(ExaminerAvailabilityResponse::from).toList();
     }
 }

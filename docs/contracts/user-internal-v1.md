@@ -102,3 +102,14 @@ gateway.
 ```
 
 `404` for an unknown, inactive or non-examiner user.
+
+### `GET /internal/users/examiners?ids=<id>,<id>…`
+
+The same lookup for a list, so a caller that shows several examiners makes one request, not one per examiner (the
+learner's list of which examiners are full). Same service JWT, not routed through the gateway. 1 to 50 ids, otherwise `400`.
+
+```json
+[{ "id": "<user-id>", "acceptingSubmissions": true, "dailyLimit": 10 }]
+```
+
+An id that is unknown, inactive or not an examiner is left out of the answer, not an error. Repeated ids count once.

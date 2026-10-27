@@ -60,6 +60,21 @@ abstract class ExaminerIntegrationSupport {
     final UUID learner = UUID.randomUUID();
     final UUID examiner = UUID.randomUUID();
 
+    /**
+     * The service reads a list of examiners with one {@code findAll}. Tests describe an examiner by stubbing {@code find}; this
+     * lets {@code findAll} answer from those same stubs, so both ways of asking see the same examiners.
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void findAllAnswersFromTheStubbedExaminers() {
+        when(examinerDirectory.findAll(org.mockito.ArgumentMatchers.anyCollection())).thenAnswer(call -> {
+            Map<UUID, com.ieltspath.assessment.application.port.ExaminerDirectory.Examiner> found = new HashMap<>();
+            for (Object id : (Collection<?>) call.getArgument(0)) {
+                examinerDirectory.find((UUID) id).ifPresent(examiner -> found.put(examiner.id(), examiner));
+            }
+            return found;
+        });
+    }
+
     String internalToken(UUID subject, String role) throws Exception {
         var claims = new JWTClaimsSet.Builder().issuer("urn:test:gateway").subject(subject.toString())
                 .expirationTime(java.util.Date.from(Instant.now().plusSeconds(300)))

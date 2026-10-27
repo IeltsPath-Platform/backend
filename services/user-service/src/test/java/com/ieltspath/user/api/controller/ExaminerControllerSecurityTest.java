@@ -156,6 +156,36 @@ class ExaminerControllerSecurityTest {
                 .andExpect(jsonPath("$.length()").value(3));
     }
 
+    @Test
+    void assessmentAsksAboutSeveralExaminersInOneCallAndEachAnswerHoldsOnlyWhatItNeeds() throws Exception {
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        when(useCase.getAll(List.of(first, second))).thenReturn(List.of(result(first, true), result(second, false)));
+
+        mvc.perform(get("/internal/users/examiners").param("ids", first + "," + second + "," + first)
+                        .header(HttpHeaders.AUTHORIZATION, token(UUID.randomUUID(), "CUSTOMER")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(first.toString())).andExpect(jsonPath("$[0].acceptingSubmissions").value(true))
+                .andExpect(jsonPath("$[1].acceptingSubmissions").value(false)).andExpect(jsonPath("$[0].dailyLimit").value(10))
+                .andExpect(jsonPath("$[0].length()").value(3));
+        verify(useCase).getAll(List.of(first, second));
+    }
+
+    @Test
+    void theBatchLookupNeedsAVerifiedTokenAndBetweenOneAndFiftyIds() throws Exception {
+        UUID id = UUID.randomUUID();
+        mvc.perform(get("/internal/users/examiners").param("ids", id.toString())).andExpect(status().isUnauthorized());
+
+        String tooMany = String.join(",", java.util.Collections.nCopies(51, "x").stream().map(x -> UUID.randomUUID().toString()).toList());
+        mvc.perform(get("/internal/users/examiners").param("ids", tooMany)
+                        .header(HttpHeaders.AUTHORIZATION, token(UUID.randomUUID(), "CUSTOMER")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/internal/users/examiners").param("ids", "")
+                        .header(HttpHeaders.AUTHORIZATION, token(UUID.randomUUID(), "CUSTOMER")))
+                .andExpect(status().isBadRequest());
+        verify(useCase, never()).getAll(any());
+    }
+
     private static ExaminerResult result(UUID id, boolean accepting) {
         return new ExaminerResult(id, "Ms Lan", "https://images.test/lan.png", "Bio", new BigDecimal("8.0"),
                 List.of(new ExaminerResult.Certificate("CELTA", "Cambridge", 2018, "A")), accepting, 10);

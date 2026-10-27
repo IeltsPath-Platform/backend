@@ -37,14 +37,11 @@ public class RabbitOutboxEventPublisher implements OutboxEventPublisher {
             com.ieltspath.events.assessment.GradingCompletedV1.EVENT_TYPE, AssessmentMessaging.GRADING_COMPLETED_ROUTING_KEY);
 
     private final RabbitTemplate rabbitTemplate;
-    private final String exchange;
     private final Duration confirmTimeout;
 
     public RabbitOutboxEventPublisher(RabbitTemplate rabbitTemplate,
-                                      @Value("${assessment.messaging.exchange:" + AssessmentMessaging.EXCHANGE + "}") String exchange,
                                       @Value("${assessment.outbox.relay.confirm-timeout:PT5S}") Duration confirmTimeout) {
         this.rabbitTemplate = rabbitTemplate;
-        this.exchange = exchange;
         this.confirmTimeout = confirmTimeout;
     }
 
@@ -65,7 +62,7 @@ public class RabbitOutboxEventPublisher implements OutboxEventPublisher {
                 .setHeader("aggregate_id", event.aggregateId())
                 .build();
         CorrelationData correlation = new CorrelationData(event.id().toString());
-        rabbitTemplate.send(exchange, routingKey, message, correlation);
+        rabbitTemplate.send(AssessmentMessaging.EXCHANGE, routingKey, message, correlation);
         CorrelationData.Confirm confirm;
         try {
             confirm = correlation.getFuture().get(confirmTimeout.toMillis(), TimeUnit.MILLISECONDS);

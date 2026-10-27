@@ -52,6 +52,20 @@ class ExaminerProfilesUseCaseTest {
     }
 
     @Test
+    void severalExaminersAreReadInOneCallAndAnIdThatIsNotAnActiveExaminerIsLeftOut() {
+        UUID other = UUID.randomUUID();
+        when(directory.findActive(List.of(id, other))).thenReturn(List.of(stored(null, true)));
+
+        var shown = useCase.getAll(List.of(id, other));
+
+        assertEquals(1, shown.size());
+        assertEquals(id, shown.getFirst().id());
+        assertEquals(10, shown.getFirst().dailyLimit());
+        verify(directory).findActive(List.of(id, other));
+        verify(directory, never()).findActive(any(UUID.class));
+    }
+
+    @Test
     void anUnknownOrInactiveExaminerIsNotFound() {
         when(directory.findActive(id)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> useCase.get(id));

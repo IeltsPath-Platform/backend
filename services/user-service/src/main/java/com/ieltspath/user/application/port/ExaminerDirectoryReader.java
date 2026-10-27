@@ -1,6 +1,7 @@
 package com.ieltspath.user.application.port;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,9 @@ public interface ExaminerDirectoryReader {
 
     /** An active examiner, accepting submissions or not. */
     Optional<Examiner> findActive(UUID userId);
+
+    /** The active examiners among the given users, in one read; ids that are not active examiners are left out. */
+    List<Examiner> findActive(Collection<UUID> userIds);
 
     void saveProfile(UUID userId, BigDecimal ieltsBand, String certificatesJson, boolean acceptingSubmissions);
 
