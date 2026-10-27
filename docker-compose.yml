@@ -229,6 +229,8 @@ services:
         condition: service_healthy
       access-service:
         condition: service_healthy
+      user-service:
+        condition: service_healthy
 
   learning-service:
     <<: *spring-service

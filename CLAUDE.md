@@ -1,6 +1,6 @@
 # CLAUDE.md — IELTSPath backend
 
-- Cập nhật lần cuối: 2026-10-19 (bổ sung `common-events`); thay đổi URL service giữ mốc 2026-10-15; dữ kiện kiến trúc khác đã kiểm ngày 2026-10-07 sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
+- Cập nhật lần cuối: 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); thay đổi URL service giữ mốc 2026-10-15; dữ kiện kiến trúc khác đã kiểm ngày 2026-10-07 sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
 - Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
@@ -38,9 +38,11 @@ Reactor gồm 14 module: 3 infra, 2 shared, 9 business. Hai module shared là th
 | `services/learning-service` | Java | 8086 | `learning_db` (Compose PostgreSQL host 5440) | `/api/learning/**` |
 
 `common-events` mã hóa exchange/routing key/header và record payload cho points, assessment, community. Đổi tên hoặc
-hình dạng event phải đổi module và contract tương ứng cùng lúc. Service giữ quyền sở hữu queue, kể cả retry và DLQ của
-Notification; các tên đó không nằm trong thư viện. Chỉ hai queue grant dùng `MessageRetry`/`RetryTopology`; Learning assessment
-và Notification giữ cơ chế retry riêng.
+hình dạng event phải đổi module và contract tương ứng cùng lúc. Service consumer giữ quyền sở hữu queue, kể cả retry và DLQ của
+mình; các tên đó không nằm trong thư viện, trừ bốn queue `notification.grading-{requested,completed,due-soon,overdue}.v1`:
+tên nằm trong các lớp `Grading*Topology` của `common-events` và được khai báo ở cả Assessment lẫn Notification, để thông báo
+không mất khi Notification chưa từng khởi động. `MessageRetry`/`RetryTopology` dùng cho hai queue grant và bốn queue chấm bài
+của Notification; Learning assessment và consumer Community của Notification giữ cơ chế retry riêng.
 
 Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/config-repo/*.yaml`, `docker-compose.yml`.
 

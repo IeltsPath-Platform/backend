@@ -3,11 +3,14 @@ package com.ieltspath.learning.api.controller;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.port.HumanReviewClient;
 import com.ieltspath.learning.application.usecase.HumanReviewUseCase;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,14 +32,17 @@ public class HumanReviewController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public Requested request(@PathVariable("id") UUID id) {
-        return new Requested(reviews.request(currentUser.requireUserId(), id), "REQUESTED");
+    public Requested request(@PathVariable("id") UUID id, @Valid @RequestBody ChooseExaminer body) {
+        return new Requested(reviews.request(currentUser.requireUserId(), id, body.examinerId()), "REQUESTED");
     }
 
     @GetMapping
     public HumanReviewClient.Review review(@PathVariable("id") UUID id) {
         return reviews.review(currentUser.requireUserId(), id);
     }
+
+    /** The examiner the learner chose from the list User Service offers. */
+    public record ChooseExaminer(@NotNull UUID examinerId) {}
 
     public record Requested(UUID reviewSubmissionId, String status) {}
 }

@@ -10,14 +10,15 @@ import java.util.UUID;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record HumanReviewResponse(UUID requestId, UUID reviewSubmissionId, String status, BigDecimal band,
-                                 JsonNode criteria, List<String> errorCodes, String feedback) {
+                                 JsonNode criteria, List<String> errorCodes, String feedback, JsonNode annotations,
+                                 UUID examinerId) {
     public static HumanReviewResponse created(HumanReviewStore.Review review) {
         return new HumanReviewResponse(review.requestId(), review.reviewSubmissionId(), review.status(), null,
-                null, null, null);
+                null, null, null, null, null);
     }
 
     public static HumanReviewResponse result(HumanReviewStore.ReviewResult result) {
         return new HumanReviewResponse(null, result.reviewSubmissionId(), result.status(), result.band(),
-                result.criteria(), result.errorCodes(), result.feedback());
+                result.criteria(), result.errorCodes(), result.feedback(), result.annotations(), result.examinerId());
     }
 }

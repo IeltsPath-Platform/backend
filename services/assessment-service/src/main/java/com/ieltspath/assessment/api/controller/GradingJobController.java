@@ -42,7 +42,8 @@ public class GradingJobController {
     public ExaminerQueueStore.QueuePage list(@RequestParam(name="mode",defaultValue="HUMAN") String mode,
             @RequestParam(name="status",defaultValue="QUEUED") String status,@RequestParam(name="page",defaultValue="0") int page,
             @RequestParam(name="size",defaultValue="20") int size) {
-        return listQueue.execute(mode,status,page,size);
+        // An examiner sees only the jobs learners chose them for. Administrators are not granted this endpoint.
+        return listQueue.executeFor(currentUser.requireUserId(),mode,status,page,size);
     }
 
     @PostMapping("/{id}/claim")
@@ -66,7 +67,8 @@ public class GradingJobController {
                 request.skill(),
                 request.gradingMode(),
                 request.pointCostSnapshot(),
-                request.idempotencyKey()
+                request.idempotencyKey(),
+                request.examinerId()
         ));
         return GradingJobResponse.from(result);
     }

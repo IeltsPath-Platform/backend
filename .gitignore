@@ -71,3 +71,6 @@ agents/
 
 ### Local media copies (uploaded to the media bucket, never committed) ###
 services/content-service/media/
+
+# Reference clones kept on a developer's machine to read, never tracked (AGENTS.md: third_party/ is not part of the build)
+third_party/

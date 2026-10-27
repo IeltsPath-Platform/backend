@@ -22,9 +22,12 @@ LLM_FAILED, LLM_QUOTA, LLM_NOT_CONFIGURED, HUMAN_CREDIT, or QA_SAMPLE. QA_SAMPLE
 jobs use the QA review routes in [admin-area-v1](admin-area-v1.md#examiner-quality-review).
 
 A claim remains QUEUED until finalization, so the default queue shows its assignee.
-After **more than 24 hours**, an unfinished claim can be replaced. Reading/saving/finalizing
-uses the current assignee; the previous examiner loses access when another examiner
-reclaims it. Claims and result writes lock the same job rows.
+A job a learner chose an examiner for can be claimed only by that examiner
+([`human-review-v1`](human-review-v1.md): there is no shared queue); the learner may replace
+the examiner once the job is late, which drops the previous claim and unfinished review.
+After **more than 24 hours**, an unfinished claim on a `QA_SAMPLE` job can be replaced
+by another examiner. Reading/saving/finalizing uses the current assignee. Claims and
+result writes lock the same job rows.
 
 Because result finalization covers the whole attempt, claiming an essay also claims
 the other unassigned/expired HUMAN jobs of that attempt. A live claim held by another
@@ -74,8 +77,9 @@ criteria are stored as supplied; rubric validation is deferred. Error codes must
 exist in the active catalog or saving returns 422 `UNKNOWN_ERROR_CODE`.
 Every item still requires score/maxScore; finalization is idempotent for an already
 completed result version. A regrade opens another result version and reopens its
-completed HUMAN jobs as unassigned QUEUED jobs. The examiner then claims the attempt
-before reading essays or saving details; another examiner can perform the regrade.
+completed HUMAN jobs as unassigned QUEUED jobs that still belong to the examiner the
+learner chose. That examiner claims the attempt again before reading essays or saving
+details; no other examiner can take the regrade, as there is no shared queue.
 Learners cannot modify course result details through the legacy owner route.
 
 ## Course essay policy and comparisons

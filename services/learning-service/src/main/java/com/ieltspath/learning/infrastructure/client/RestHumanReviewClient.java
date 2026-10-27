@@ -70,15 +70,31 @@ public class RestHumanReviewClient implements HumanReviewClient {
                 .headers(this::forward).retrieve().body(Review.class), false);
     }
 
+    @Override
+    public Review cancelReview(UUID reviewSubmissionId) {
+        return call(() -> assessment.post().uri("/internal/assessments/human-reviews/{id}/cancel", reviewSubmissionId)
+                .headers(this::forward).retrieve().body(Review.class), false);
+    }
+
     private static Map<String, Object> body(CreateReview request) {
         Map<String, Object> rubric = new java.util.LinkedHashMap<>();
         rubric.put("code", request.rubricCode());
         rubric.put("version", request.rubricVersion());
         rubric.put("criteria", java.util.List.of());
+        Map<String, Object> prompt = new java.util.LinkedHashMap<>();
+        prompt.put("stem", request.promptStem());
+        // The chart of a Task 1 prompt, so the examiner sees what the learner saw.
+        if (!request.images().isEmpty()) {
+            prompt.put("images", request.images().stream()
+                    .map(image -> image.altText() == null
+                            ? Map.of("url", image.url())
+                            : Map.of("url", image.url(), "altText", image.altText()))
+                    .toList());
+        }
         return Map.of("requestId", request.requestId(), "learnerId", request.learnerId(),
                 "sourceSubmissionId", request.sourceSubmissionId(), "source", request.source(),
-                "task", request.task(), "promptSnapshot", Map.of("stem", request.promptStem()),
-                "essay", request.essay(), "rubric", rubric);
+                "task", request.task(), "promptSnapshot", prompt,
+                "essay", request.essay(), "rubric", rubric, "examinerId", request.examinerId());
     }
 
     /** {@code refusalIsDefinite}: a 4xx answer to a create call means nothing was created, unlike a timeout or a 5xx. */
@@ -94,6 +110,14 @@ public class RestHumanReviewClient implements HumanReviewClient {
                         "No human-grading credit is left");
             }
             if (status == 409) {
+                if ("GRADING_CANCEL_NOT_ALLOWED".equals(errorCode(exception))) {
+                    throw new LearningRequestException(409, "REVIEW_CANCEL_NOT_ALLOWED",
+                            "The request can be cancelled only when it is late and the examiner can no longer be changed");
+                }
+                if (refusalIsDefinite && "EXAMINER_UNAVAILABLE".equals(errorCode(exception))) {
+                    throw new LearningRequestException(409, "EXAMINER_UNAVAILABLE",
+                            "The chosen examiner cannot take this essay; choose another examiner");
+                }
                 throw new LearningRequestException(409, "HUMAN_GRADING_CONFLICT", "The review request conflicts");
             }
             if (refusalIsDefinite && status >= 400 && status < 500 && status != 401) {
@@ -102,6 +126,15 @@ public class RestHumanReviewClient implements HumanReviewClient {
             throw unavailable();
         } catch (RestClientException exception) {
             throw unavailable();
+        }
+    }
+
+    private static String errorCode(RestClientResponseException exception) {
+        try {
+            ErrorBody body = exception.getResponseBodyAs(ErrorBody.class);
+            return body == null ? null : body.code();
+        } catch (RuntimeException unreadable) {
+            return null;
         }
     }
 
@@ -117,4 +150,6 @@ public class RestHumanReviewClient implements HumanReviewClient {
 
     private record Credits(int remainingCredits, Boolean charged) {}
     private record Created(UUID reviewSubmissionId) {}
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+    private record ErrorBody(String code) {}
 }

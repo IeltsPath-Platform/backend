@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.sql.Array;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -47,10 +48,12 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
 
         jdbc.update("""
                 INSERT INTO grading_jobs(id,submission_id,human_review_submission_id,user_id,skill,grading_mode,
-                    status,idempotency_key,reason)
-                VALUES (:jobId,NULL,:submissionId,:learnerId,'WRITING','HUMAN','QUEUED',:key,'HUMAN_CREDIT')
+                    status,idempotency_key,reason,requested_examiner_id,requested_at)
+                VALUES (:jobId,NULL,:submissionId,:learnerId,'WRITING','HUMAN','QUEUED',:key,'HUMAN_CREDIT',
+                    :examiner,CURRENT_TIMESTAMP)
                 """, new MapSqlParameterSource().addValue("jobId", UUID.randomUUID()).addValue("submissionId", id)
-                .addValue("learnerId", review.learnerId()).addValue("key", "human-review:" + review.requestId()));
+                .addValue("learnerId", review.learnerId()).addValue("key", "human-review:" + review.requestId())
+                .addValue("examiner", review.examinerId()));
         jdbc.update("INSERT INTO human_reviews(id,grading_job_id,status) VALUES (:id,:jobId,'QUEUED')",
                 new MapSqlParameterSource("id", UUID.randomUUID()).addValue("jobId", jobId(id)));
         return new Review(review.requestId(), id, "PENDING");
@@ -97,19 +100,32 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
 
     @Override
     @Transactional(readOnly = true)
+    public boolean exists(UUID requestId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM human_review_submissions WHERE request_id=:id)",
+                new MapSqlParameterSource("id", requestId), Boolean.class));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<ReviewResult> find(UUID reviewId, UUID learnerId) {
         return jdbc.query("""
-                SELECT h.id,j.status,h.band,h.criteria::text AS criteria,h.error_codes,h.feedback
+                SELECT h.id,j.status,j.requested_examiner_id,h.band,h.criteria::text AS criteria,h.error_codes,h.feedback,
+                       h.annotations::text AS annotations
                 FROM human_review_submissions h JOIN grading_jobs j ON j.human_review_submission_id=h.id
                 WHERE h.id=:id AND h.learner_id=:learnerId
                 """, new MapSqlParameterSource("id", reviewId).addValue("learnerId", learnerId), (row, index) -> {
-            String status = "COMPLETED".equals(row.getString("status")) ? "DONE" : "PENDING";
-            if ("PENDING".equals(status)) return new ReviewResult(row.getObject("id", UUID.class), status,
-                    null, null, null, null);
+            String jobStatus = row.getString("status");
+            String status = "COMPLETED".equals(jobStatus) ? "DONE" : "CANCELLED".equals(jobStatus) ? "CANCELLED" : "PENDING";
+            UUID examiner = row.getObject("requested_examiner_id", UUID.class);
+            if (!"DONE".equals(status)) return new ReviewResult(row.getObject("id", UUID.class), status,
+                    null, null, null, null, null, examiner);
             try {
                 Array codes = row.getArray("error_codes");
+                String marked = row.getString("annotations");
                 return new ReviewResult(row.getObject("id", UUID.class), status, row.getBigDecimal("band"),
-                        json.readTree(row.getString("criteria")), codes(codes), row.getString("feedback"));
+                        json.readTree(row.getString("criteria")), codes(codes), row.getString("feedback"),
+                        marked == null ? null : json.readTree(marked), examiner);
             } catch (JsonProcessingException exception) {
                 throw new IllegalStateException("Stored human review criteria are invalid", exception);
             }
@@ -118,46 +134,126 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
 
     @Override
     @Transactional
-    public void complete(UUID jobId, UUID examinerId, BigDecimal band, JsonNode criteria, List<String> errorCodes,
-                         String feedback) {
+    public Optional<Completed> complete(UUID jobId, UUID examinerId, BigDecimal band, JsonNode criteria,
+                                        List<String> errorCodes, String feedback, JsonNode annotations) {
         Job job = jdbc.query("""
-                SELECT human_review_submission_id,assigned_examiner_id,status
+                SELECT human_review_submission_id,assigned_examiner_id,status,user_id,skill
                 FROM grading_jobs WHERE id=:id AND grading_mode='HUMAN' FOR UPDATE
                 """, new MapSqlParameterSource("id", jobId), (row, index) -> new Job(
                 row.getObject("human_review_submission_id", UUID.class),
-                row.getObject("assigned_examiner_id", UUID.class), row.getString("status")))
+                row.getObject("assigned_examiner_id", UUID.class), row.getString("status"),
+                row.getObject("user_id", UUID.class), row.getString("skill")))
                 .stream().findFirst().orElseThrow(() -> new AssessmentNotFoundException("Human review job not found"));
         if (job.submissionId() == null) throw new AssessmentNotFoundException("Standalone human review not found");
         if ("COMPLETED".equals(job.status())) {
-            if (alreadyCompleted(job.submissionId(), band, criteria, errorCodes, feedback)) return;
+            if (alreadyCompleted(job.submissionId(), band, criteria, errorCodes, feedback, annotations)) return Optional.empty();
             throw new RevisionConflictException("Human review has already been completed");
         }
+        // The learner gave the job up while the examiner was still writing: nothing is graded after that.
+        if ("CANCELLED".equals(job.status())) throw new RevisionConflictException("The learner cancelled this request");
         if (!examinerId.equals(job.examinerId())) {
             throw new AssessmentAccessDeniedException("Claim the human review before completing it");
         }
         int changed = jdbc.update("""
                 UPDATE human_review_submissions SET band=:band,criteria=CAST(:criteria AS jsonb),
-                    error_codes=CAST(:codes AS varchar[]),feedback=:feedback,completed_at=CURRENT_TIMESTAMP
+                    error_codes=CAST(:codes AS varchar[]),feedback=:feedback,annotations=CAST(:annotations AS jsonb),
+                    completed_at=CURRENT_TIMESTAMP
                 WHERE id=:id AND band IS NULL
                 """, new MapSqlParameterSource("band", band).addValue("criteria", criteria.toString())
-                .addValue("codes", stringArray(errorCodes)).addValue("feedback", feedback).addValue("id", job.submissionId()));
+                .addValue("codes", stringArray(errorCodes)).addValue("feedback", feedback)
+                .addValue("annotations", annotations == null ? null : annotations.toString(), Types.VARCHAR)
+                .addValue("id", job.submissionId()));
         if (changed != 1) throw new RevisionConflictException("Human review has already been completed");
         jdbc.update("UPDATE grading_jobs SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE id=:id",
                 new MapSqlParameterSource("id", jobId));
+        // A completed review keeps no draft: the draft goes in the same statement that sets COMPLETED.
         jdbc.update("""
-                UPDATE human_reviews SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP
+                UPDATE human_reviews SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP,
+                    draft_payload=NULL,draft_saved_at=NULL
                 WHERE grading_job_id=:id AND grader_user_id=:examiner
                 """, new MapSqlParameterSource("id", jobId).addValue("examiner", examinerId));
+        return Optional.of(new Completed(job.learnerId(), job.submissionId(), job.skill()));
     }
 
     private boolean alreadyCompleted(UUID submissionId, BigDecimal band, JsonNode criteria, List<String> errors,
-                                     String feedback) {
+                                     String feedback, JsonNode annotations) {
         return Boolean.TRUE.equals(jdbc.query("""
                 SELECT band=:band AND criteria=CAST(:criteria AS jsonb) AND error_codes=CAST(:codes AS varchar[])
-                    AND feedback=:feedback FROM human_review_submissions WHERE id=:id
+                    AND feedback=:feedback AND annotations IS NOT DISTINCT FROM CAST(:annotations AS jsonb)
+                FROM human_review_submissions WHERE id=:id
                 """, new MapSqlParameterSource("band", band).addValue("criteria", criteria.toString())
-                .addValue("codes", stringArray(errors)).addValue("feedback", feedback).addValue("id", submissionId),
+                .addValue("codes", stringArray(errors)).addValue("feedback", feedback)
+                .addValue("annotations", annotations == null ? null : annotations.toString(), Types.VARCHAR)
+                .addValue("id", submissionId),
                 (row, index) -> row.getBoolean(1)).stream().findFirst().orElse(false));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<String> essay(UUID jobId) {
+        return jdbc.query("""
+                SELECT h.essay_text FROM grading_jobs j
+                JOIN human_review_submissions h ON h.id=j.human_review_submission_id
+                WHERE j.id=:id AND j.grading_mode='HUMAN'
+                """, new MapSqlParameterSource("id", jobId), (row, index) -> row.getString("essay_text"))
+                .stream().findFirst();
+    }
+
+    @Override
+    @Transactional
+    public void saveDraft(UUID jobId, UUID examinerId, JsonNode payload) {
+        int changed = jdbc.update("""
+                UPDATE human_reviews r SET draft_payload=CAST(:payload AS jsonb),draft_saved_at=CURRENT_TIMESTAMP,
+                    status='IN_REVIEW',started_at=COALESCE(r.started_at,CURRENT_TIMESTAMP)
+                FROM grading_jobs j
+                WHERE r.grading_job_id=j.id AND j.id=:id AND j.grading_mode='HUMAN'
+                  AND j.human_review_submission_id IS NOT NULL AND j.assigned_examiner_id=:examiner
+                  AND j.status IN ('QUEUED','PROCESSING') AND r.status<>'COMPLETED'
+                """, new MapSqlParameterSource("payload", payload.toString()).addValue("id", jobId)
+                .addValue("examiner", examinerId));
+        if (changed == 1) return;
+        throw draftRefusal(jobId, "saving a draft");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Draft> draft(UUID jobId, UUID examinerId) {
+        List<Draft> rows = jdbc.query("""
+                SELECT r.draft_payload::text AS payload,r.draft_saved_at
+                FROM human_reviews r JOIN grading_jobs j ON j.id=r.grading_job_id
+                WHERE j.id=:id AND j.grading_mode='HUMAN' AND j.human_review_submission_id IS NOT NULL
+                  AND j.assigned_examiner_id=:examiner
+                """, new MapSqlParameterSource("id", jobId).addValue("examiner", examinerId), (row, index) -> {
+            String payload = row.getString("payload");
+            if (payload == null) return null;
+            try {
+                return new Draft(json.readTree(payload), row.getTimestamp("draft_saved_at").toInstant());
+            } catch (JsonProcessingException exception) {
+                throw new IllegalStateException("Stored human review draft is invalid", exception);
+            }
+        });
+        if (rows.isEmpty()) throw draftRefusal(jobId, "reading a draft");
+        return Optional.ofNullable(rows.getFirst());
+    }
+
+    /** Tells apart a job that does not exist, one that is finished, and one the examiner has not claimed. */
+    private RuntimeException draftRefusal(UUID jobId, String action) {
+        List<String> states = jdbc.query("""
+                SELECT status FROM grading_jobs
+                WHERE id=:id AND grading_mode='HUMAN' AND human_review_submission_id IS NOT NULL
+                """, new MapSqlParameterSource("id", jobId), (row, index) -> row.getString("status"));
+        if (states.isEmpty()) return new AssessmentNotFoundException("Standalone human review not found");
+        if ("COMPLETED".equals(states.getFirst())) {
+            return new RevisionConflictException("Human review has already been completed");
+        }
+        if ("CANCELLED".equals(states.getFirst())) return new RevisionConflictException("The learner cancelled this request");
+        return new AssessmentAccessDeniedException("Claim the human review before " + action);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UUID jobIdOf(UUID reviewSubmissionId) {
+        return jobId(reviewSubmissionId);
     }
 
     private UUID jobId(UUID submissionId) {
@@ -197,5 +293,5 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
 
     private record StoredRequest(UUID id, UUID requestId, UUID learnerId, UUID sourceSubmissionId, String source,
                                  String task, String prompt, String essay, String rubric) {}
-    private record Job(UUID submissionId, UUID examinerId, String status) {}
+    private record Job(UUID submissionId, UUID examinerId, String status, UUID learnerId, String skill) {}
 }

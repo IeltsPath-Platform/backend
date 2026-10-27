@@ -11,6 +11,8 @@ public interface ExaminerQueueStore {
     default QueuePage listByReason(String mode, String status, int page, int size, String reason) {
         return list(mode, status, page, size);
     }
+    /** The jobs the learners chose this examiner for. */
+    QueuePage listFor(UUID examinerId, String mode, String status, int page, int size);
     /**
      * Quality-review jobs the reviewer claimed and has not yet submitted a review for, oldest claim first. The default
      * is empty so stores without this view stay valid.
@@ -28,9 +30,14 @@ public interface ExaminerQueueStore {
     record QueuePage(List<QueueEntry> content, int page, int size, long totalElements) {}
     record QueueEntry(UUID id, UUID submissionId, UUID attemptId, UUID attemptItemId, String attemptType,
                       String source, String skill, String task, String status, String reason, UUID assignedExaminerId,
-                      Instant claimedAt, Instant createdAt, long waitSeconds, boolean overdue) {}
+                      Instant claimedAt, Instant createdAt, long waitSeconds, boolean overdue,
+                      UUID requestedExaminerId, boolean hasDraft) {}
+    /** {@code images} are the chart images of the prompt (Task 1), empty when the task has none. */
     record Essay(UUID jobId, UUID attemptId, UUID attemptItemId, String prompt, String essay, String task,
-                 Object rubric, String source) {
+                 Object rubric, String source, List<PromptImage> images) {
+        public Essay {
+            images = images == null ? List.of() : List.copyOf(images);
+        }
         @Override public String toString() { return "Essay[jobId=" + jobId + "]"; }
     }
 }

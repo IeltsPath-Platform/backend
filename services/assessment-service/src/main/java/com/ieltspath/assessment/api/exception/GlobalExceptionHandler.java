@@ -2,6 +2,7 @@ package com.ieltspath.assessment.api.exception;
 
 import com.ieltspath.assessment.application.exception.ContentUnavailableException;
 import com.ieltspath.assessment.application.exception.UnknownErrorCodeException;
+import com.ieltspath.assessment.application.exception.UserServiceUnavailableException;
 import com.ieltspath.assessment.domain.exception.*;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +25,30 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> claimed(JobAlreadyClaimedException e, HttpServletRequest r) {
         return build(HttpStatus.CONFLICT, e.getMessage(), r.getRequestURI(), null, "JOB_ALREADY_CLAIMED");
     }
+    @ExceptionHandler(ExaminerUnavailableException.class)
+    public ResponseEntity<ErrorResponse> examinerUnavailable(ExaminerUnavailableException e, HttpServletRequest r) {
+        return build(HttpStatus.CONFLICT, e.getMessage(), r.getRequestURI(), Map.of("reason", e.reason().name()),
+                "EXAMINER_UNAVAILABLE");
+    }
+
+    @ExceptionHandler(ExaminerChangeNotAllowedException.class)
+    public ResponseEntity<ErrorResponse> examinerChangeNotAllowed(ExaminerChangeNotAllowedException e, HttpServletRequest r) {
+        return build(HttpStatus.CONFLICT, e.getMessage(), r.getRequestURI(), Map.of("reason", e.reason().name()),
+                "EXAMINER_CHANGE_NOT_ALLOWED");
+    }
+
+    @ExceptionHandler(GradingCancelNotAllowedException.class)
+    public ResponseEntity<ErrorResponse> gradingCancelNotAllowed(GradingCancelNotAllowedException e, HttpServletRequest r) {
+        return build(HttpStatus.CONFLICT, e.getMessage(), r.getRequestURI(), Map.of("reason", e.reason().name()),
+                "GRADING_CANCEL_NOT_ALLOWED");
+    }
+
+    @ExceptionHandler(UserServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponse> userServiceUnavailable(UserServiceUnavailableException e, HttpServletRequest r) {
+        return build(HttpStatus.SERVICE_UNAVAILABLE, "User Service is unavailable", r.getRequestURI(), null,
+                "USER_SERVICE_UNAVAILABLE");
+    }
+
     @ExceptionHandler(HumanGradingCreditInsufficientException.class)
     public ResponseEntity<ErrorResponse> creditsRequired(HumanGradingCreditInsufficientException e, HttpServletRequest r) {
         return build(HttpStatus.PAYMENT_REQUIRED, e.getMessage(), r.getRequestURI(), null, "HUMAN_GRADING_CREDIT_REQUIRED");

@@ -34,8 +34,14 @@ public class InternalHumanReviewController {
         }
         HumanReviewStore.Review review = reviews.create(new HumanReviewStore.CreateReview(request.requestId(),
                 learnerId, request.sourceSubmissionId(), request.source().name(), request.task(),
-                request.promptSnapshot(), request.essay(), request.rubric()));
+                request.promptSnapshot(), request.essay(), request.rubric(), request.examinerId()));
         return HumanReviewResponse.created(review);
+    }
+
+    /** The learner gives up a late review whose examiner can no longer be changed; Learning then gives the credit back. */
+    @PostMapping("/internal/assessments/human-reviews/{reviewSubmissionId}/cancel")
+    public HumanReviewResponse cancel(@PathVariable("reviewSubmissionId") UUID reviewSubmissionId) {
+        return HumanReviewResponse.result(reviews.cancel(reviewSubmissionId, currentUser.requireUserId()));
     }
 
     @GetMapping("/internal/assessments/human-reviews/{reviewSubmissionId}")
