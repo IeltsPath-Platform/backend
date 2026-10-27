@@ -23,8 +23,8 @@ public interface ExaminerHistoryStore {
 
     record Item(UUID jobId, String source, String skill, String task, BigDecimal band, Instant completedAt) {}
 
-    record GradedReview(UUID jobId, String source, String skill, String task, String prompt, String essay,
-                        BigDecimal band, JsonNode criteria, List<String> errorCodes, String feedback,
+    record GradedReview(UUID jobId, String source, String skill, String task, String prompt, List<PromptImage> images,
+                        String essay, BigDecimal band, JsonNode criteria, List<String> errorCodes, String feedback,
                         JsonNode annotations, Instant completedAt) {
         @Override public String toString() { return "GradedReview[jobId=" + jobId + "]"; }
     }

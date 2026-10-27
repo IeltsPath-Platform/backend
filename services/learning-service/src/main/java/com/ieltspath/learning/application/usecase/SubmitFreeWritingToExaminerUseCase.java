@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -75,12 +76,12 @@ public class SubmitFreeWritingToExaminerUseCase {
 
     /**
      * The id of the learner's essay for this prompt that was sent to an examiner and has not been graded yet. Only the newest
-     * essay can be waiting: a new one is not accepted until the last is graded. Assessment knows whether it was graded, so
+     * essay can be waiting: a new one is not accepted until the last is graded or cancelled. Assessment knows which, so
      * that is asked here; no transaction is open.
      */
     public Optional<UUID> pending(UUID userId, UUID questionVersionId) {
         return essays.findLatestSentToExaminer(userId, questionVersionId)
-                .filter(sent -> !"DONE".equals(reviews.review(userId, sent.id()).status()))
+                .filter(sent -> !Set.of("DONE", "CANCELLED").contains(reviews.review(userId, sent.id()).status()))
                 .map(WritingSubmission::id);
     }
 

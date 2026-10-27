@@ -115,9 +115,10 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
                 FROM human_review_submissions h JOIN grading_jobs j ON j.human_review_submission_id=h.id
                 WHERE h.id=:id AND h.learner_id=:learnerId
                 """, new MapSqlParameterSource("id", reviewId).addValue("learnerId", learnerId), (row, index) -> {
-            String status = "COMPLETED".equals(row.getString("status")) ? "DONE" : "PENDING";
+            String jobStatus = row.getString("status");
+            String status = "COMPLETED".equals(jobStatus) ? "DONE" : "CANCELLED".equals(jobStatus) ? "CANCELLED" : "PENDING";
             UUID examiner = row.getObject("requested_examiner_id", UUID.class);
-            if ("PENDING".equals(status)) return new ReviewResult(row.getObject("id", UUID.class), status,
+            if (!"DONE".equals(status)) return new ReviewResult(row.getObject("id", UUID.class), status,
                     null, null, null, null, null, examiner);
             try {
                 Array codes = row.getArray("error_codes");
@@ -148,6 +149,8 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
             if (alreadyCompleted(job.submissionId(), band, criteria, errorCodes, feedback, annotations)) return Optional.empty();
             throw new RevisionConflictException("Human review has already been completed");
         }
+        // The learner gave the job up while the examiner was still writing: nothing is graded after that.
+        if ("CANCELLED".equals(job.status())) throw new RevisionConflictException("The learner cancelled this request");
         if (!examinerId.equals(job.examinerId())) {
             throw new AssessmentAccessDeniedException("Claim the human review before completing it");
         }
@@ -243,6 +246,7 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
         if ("COMPLETED".equals(states.getFirst())) {
             return new RevisionConflictException("Human review has already been completed");
         }
+        if ("CANCELLED".equals(states.getFirst())) return new RevisionConflictException("The learner cancelled this request");
         return new AssessmentAccessDeniedException("Claim the human review before " + action);
     }
 

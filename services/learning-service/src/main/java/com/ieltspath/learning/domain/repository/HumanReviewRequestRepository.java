@@ -9,6 +9,9 @@ import java.util.UUID;
 public interface HumanReviewRequestRepository {
     Optional<UUID> findReviewId(UUID submissionId);
 
+    /** The essay of the learner's review request, found by the review id Assessment holds; empty for anyone else's. */
+    Optional<UUID> findSubmissionId(UUID reviewSubmissionId, UUID userId);
+
     /** Remembers the request; false when the essay already has one (the first request is kept). */
     boolean insert(UUID submissionId, UUID userId, UUID reviewSubmissionId);
 

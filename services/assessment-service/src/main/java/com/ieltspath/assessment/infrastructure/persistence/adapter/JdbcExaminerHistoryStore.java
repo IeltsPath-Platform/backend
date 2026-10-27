@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.assessment.application.port.ExaminerHistoryStore;
+import com.ieltspath.assessment.application.port.PromptImage;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -50,14 +51,16 @@ public class JdbcExaminerHistoryStore implements ExaminerHistoryStore {
     @Transactional(readOnly = true)
     public Optional<GradedReview> review(UUID examinerId, UUID jobId) {
         return jdbc.query("""
-                SELECT j.id,h.source,j.skill,h.task,h.prompt_snapshot->>'stem' AS prompt,h.essay_text,h.band,
+                SELECT j.id,h.source,j.skill,h.task,h.prompt_snapshot->>'stem' AS prompt,h.prompt_snapshot->'images' AS images,h.essay_text,h.band,
                        h.criteria::text AS criteria,h.error_codes,h.feedback,h.annotations::text AS annotations,j.completed_at
                 """ + FINISHED + " AND j.id=:id", new MapSqlParameterSource("examiner", examinerId).addValue("id", jobId),
                 (row, index) -> {
                     try {
                         String marked = row.getString("annotations");
+                        String charts = row.getString("images");
                         return new GradedReview(row.getObject("id", UUID.class), row.getString("source"),
                                 row.getString("skill"), row.getString("task"), row.getString("prompt"),
+                                charts == null ? List.of() : PromptImage.listOf(json.readTree(charts)),
                                 row.getString("essay_text"), row.getBigDecimal("band"),
                                 json.readTree(row.getString("criteria")), codes(row.getArray("error_codes")),
                                 row.getString("feedback"), marked == null ? null : json.readTree(marked),

@@ -1,0 +1,21 @@
+Media Storage → Thống nhất lưu ở đâu, dùng dịch vụ gì. (Hiển)
+Data, đề, các kiến thức có xin được không? Vì mỗi tháng mỗi trung tâm đi luyện đề để cập nhật đề, có kiến thức mới nhất → Liệu họ có đưa cho mình không? (Trung)
+Cá nhân hóa là hay, tốt, xu hướng. Vậy hệ thống của mình có gì thêm để user họ sử dụng thay vì dùng ChatGPT, NotebookLM? (Phương)
+
+Vấn đề hỗ trợ người học cá nhân hóa thì phải làm sao để có nhiều dữ liệu đầu vào bên cạnh bài test đầu vào, càng nhiều càng tốt (dữ liệu sạch).
+(Góp ý thầy Trung)
+Cần phải thống kê tiến trình người học giữa tháng này và tháng sau khác nhau như thế nào, để cho họ còn thấy được sự thay đổi của chính mình.
+(Thầy Hiển)
+
+Chưa phát biểu ra pain point của người học (mới chỉ đáp ứng được cái trung tâm thôi).
+→ Cần nghiên cứu thêm để giải quyết cái này.
+(Cô Phương)
+Góp ý thầy Trung:
+- Cần giải quyết được vấn đề của người học.
+- Làm sao mà hệ thống phải hướng dẫn được cách học và luyện tập sao cho có ích với họ.
+- Phải có được nhiều data để cá nhân hóa cho hiệu quả.
+
+Cô Phương muốn là hệ thống mà theo dõi được học viên qua hệ thống để xem học viên học như thế nào.
+Nếu yếu thì đẩy xuống band thấp hơn. Như thế cô mới thấy có ích.
+
+Thầy cô nói về việc dùng mẫu cũ, mẫu mới này ko nói rõ luôn là sẽ làm web hay app hay làm cả hai

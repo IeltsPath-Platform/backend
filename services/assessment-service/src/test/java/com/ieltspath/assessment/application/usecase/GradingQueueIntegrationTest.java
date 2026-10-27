@@ -34,7 +34,7 @@ class GradingQueueIntegrationTest extends ExaminerIntegrationSupport {
         }
     }
     @Test void queueFiltersPaginationAndMissingJobsAreValidated() throws Exception {
-        courseEssay();
+        humanJob(courseEssay());
         mvc.perform(get("/api/assessments/grading-jobs").param("size","1").with(user(examiner.toString()).roles("EXAMINER")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1)).andExpect(jsonPath("$.size").value(1));
         for (String query:java.util.List.of("?mode=AI","?page=-1","?size=101","?status=OTHER"))
@@ -68,12 +68,12 @@ class GradingQueueIntegrationTest extends ExaminerIntegrationSupport {
         mvc.perform(get("/api/assessments/grading-jobs/{id}/essay", job).with(user(examiner.toString()).roles("EXAMINER")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.essay").value("My essay about public transport."))
                 .andExpect(jsonPath("$..llmBand").doesNotExist());
-        // The other examiner has nothing in the queue; an administrator sees every job.
+        // The other examiner has nothing in the queue, and an administrator is not granted the examiners' queue at all.
         mvc.perform(get("/api/assessments/grading-jobs").with(user(other.toString()).roles("EXAMINER")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(0))
                 .andExpect(jsonPath("$.totalElements").value(0));
         mvc.perform(get("/api/assessments/grading-jobs").with(user(other.toString()).roles("ADMIN")))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1));
+                .andExpect(status().isForbidden());
     }
     @Test void aJobNobodyWasChosenForIsInNoExaminersQueueAndCannotBeClaimed() throws Exception {
         UUID job = unchosenHumanJob(courseEssay());
@@ -82,7 +82,6 @@ class GradingQueueIntegrationTest extends ExaminerIntegrationSupport {
         mvc.perform(post("/api/assessments/grading-jobs/{id}/claim", job).with(user(examiner.toString()).roles("EXAMINER")))
                 .andExpect(status().isConflict());
         mvc.perform(get("/api/assessments/grading-jobs").with(user(examiner.toString()).roles("ADMIN")))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1))
-                .andExpect(jsonPath("$.content[0].requestedExaminerId").doesNotExist());
+                .andExpect(status().isForbidden());
     }
 }

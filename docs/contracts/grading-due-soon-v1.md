@@ -74,3 +74,22 @@ The reminder asks the examiner to act, so the community notification preferences
   `overdue` (48 hours or more).
 
 There is no e-mail or mobile push channel yet.
+
+## Queue infrastructure
+
+| What | Name |
+|---|---|
+| Queue | `notification.grading-due-soon.v1` |
+| Retry queue | `notification.grading-due-soon.v1.retry` |
+| Dead-letter queue (DLQ) | `notification.grading-due-soon.v1.dlq` |
+| Dead-letter exchange (DLX) | `notification.grading-due-soon.dlx` |
+| Exchange and routing key | `assessment.events` / `assessment.grading-due-soon.v1` |
+
+- A message that may pass on a second try waits **30 seconds** on the retry queue and returns to the queue, at most **5** times;
+  after that, and for a message that breaks the contract or cannot be read, it goes to the DLQ.
+- **Both Assessment and Notification declare this queue** from the same class, `GradingDueSoonTopology` in `common-events`, and both bind
+  it to `AssessmentMessaging.EXCHANGE` (not to a configurable name), so the broker sees identical declarations and a notice
+  is not lost when Notification has never started. This is the one exception to the rule that a consumer owns its queues
+  (`AGENTS.md` §3.5).
+- Whoever changes a queue name, the retry delay, the retry count or the payload must change `GradingDueSoonTopology` (or the event record),
+  the consumer in Notification and **this contract together**.

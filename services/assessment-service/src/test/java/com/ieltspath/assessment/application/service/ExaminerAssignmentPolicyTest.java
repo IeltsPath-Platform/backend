@@ -26,8 +26,18 @@ class ExaminerAssignmentPolicyTest {
         assertEquals(WAITING, ExaminerAssignmentPolicy.stateOf("PROCESSING", true, now.minusSeconds(3600), now));
         assertEquals(OVERDUE, ExaminerAssignmentPolicy.stateOf("QUEUED", true, now.minusSeconds(49 * 3600), now));
         assertEquals(COMPLETED, ExaminerAssignmentPolicy.stateOf("COMPLETED", true, now.minusSeconds(49 * 3600), now));
-        assertEquals(CLOSED, ExaminerAssignmentPolicy.stateOf("CANCELLED", true, now, now));
+        assertEquals(CANCELLED, ExaminerAssignmentPolicy.stateOf("CANCELLED", true, now, now));
         assertEquals(CLOSED, ExaminerAssignmentPolicy.stateOf("FAILED", false, null, now));
+    }
+
+    @Test
+    void theLearnerMayCancelOnlyALateJobWhoseExaminerCanNoLongerBeChanged() {
+        int max = ExaminerAssignmentPolicy.MAX_CHANGES;
+        assertTrue(ExaminerAssignmentPolicy.canCancel(OVERDUE, max));
+        assertFalse(ExaminerAssignmentPolicy.canCancel(OVERDUE, max - 1));
+        assertFalse(ExaminerAssignmentPolicy.canCancel(WAITING, max));
+        assertFalse(ExaminerAssignmentPolicy.canCancel(COMPLETED, max));
+        assertFalse(ExaminerAssignmentPolicy.canCancel(CANCELLED, max));
     }
 
     @Test

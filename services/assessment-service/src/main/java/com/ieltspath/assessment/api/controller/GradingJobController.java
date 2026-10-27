@@ -6,7 +6,6 @@ import com.ieltspath.assessment.application.command.CreateGradingJobCommand;
 import com.ieltspath.assessment.application.usecase.CreateGradingJobUseCase;
 import com.ieltspath.assessment.application.usecase.GetGradingJobUseCase;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
-import com.ieltspath.commonsecurity.role.CanonicalRoles;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -43,10 +42,8 @@ public class GradingJobController {
     public ExaminerQueueStore.QueuePage list(@RequestParam(name="mode",defaultValue="HUMAN") String mode,
             @RequestParam(name="status",defaultValue="QUEUED") String status,@RequestParam(name="page",defaultValue="0") int page,
             @RequestParam(name="size",defaultValue="20") int size) {
-        var user = currentUser.requireCurrentUser();
-        // An examiner sees the jobs learners chose them for; an administrator sees all of them.
-        return user.hasRole(CanonicalRoles.ADMIN) ? listQueue.execute(mode,status,page,size)
-                : listQueue.executeFor(user.id(),mode,status,page,size);
+        // An examiner sees only the jobs learners chose them for. Administrators are not granted this endpoint.
+        return listQueue.executeFor(currentUser.requireUserId(),mode,status,page,size);
     }
 
     @PostMapping("/{id}/claim")

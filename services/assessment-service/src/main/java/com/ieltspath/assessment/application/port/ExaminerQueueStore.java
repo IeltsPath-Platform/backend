@@ -32,8 +32,12 @@ public interface ExaminerQueueStore {
                       String source, String skill, String task, String status, String reason, UUID assignedExaminerId,
                       Instant claimedAt, Instant createdAt, long waitSeconds, boolean overdue,
                       UUID requestedExaminerId, boolean hasDraft) {}
+    /** {@code images} are the chart images of the prompt (Task 1), empty when the task has none. */
     record Essay(UUID jobId, UUID attemptId, UUID attemptItemId, String prompt, String essay, String task,
-                 Object rubric, String source) {
+                 Object rubric, String source, List<PromptImage> images) {
+        public Essay {
+            images = images == null ? List.of() : List.copyOf(images);
+        }
         @Override public String toString() { return "Essay[jobId=" + jobId + "]"; }
     }
 }

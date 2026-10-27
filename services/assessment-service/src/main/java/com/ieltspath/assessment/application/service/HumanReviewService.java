@@ -76,6 +76,17 @@ public class HumanReviewService {
                 result.examinerId());
     }
 
+    /**
+     * The learner gives up a late review whose examiner can no longer be changed. Idempotent: a review already cancelled
+     * answers again with its status. A review that was graded in the meantime stays graded (409).
+     */
+    @Transactional
+    public HumanReviewStore.ReviewResult cancel(UUID reviewId, UUID learnerId) {
+        store.find(reviewId, learnerId).orElseThrow(() -> new AssessmentNotFoundException("Human review not found"));
+        assignments.cancel(learnerId, store.jobIdOf(reviewId));
+        return get(reviewId, learnerId);
+    }
+
     @Transactional
     public void complete(UUID jobId, UUID examinerId, CompleteHumanReviewCommand request) {
         requireHalfBand(request.band(), "band");

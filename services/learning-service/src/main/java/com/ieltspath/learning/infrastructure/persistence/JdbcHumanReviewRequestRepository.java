@@ -23,6 +23,12 @@ public class JdbcHumanReviewRequestRepository implements HumanReviewRequestRepos
     }
 
     @Override
+    public Optional<UUID> findSubmissionId(UUID reviewSubmissionId, UUID userId) {
+        return jdbc.queryForList("SELECT submission_id FROM human_review_requests WHERE review_submission_id = ? AND user_id = ?",
+                UUID.class, reviewSubmissionId, userId).stream().findFirst();
+    }
+
+    @Override
     public boolean insert(UUID submissionId, UUID userId, UUID reviewSubmissionId) {
         return jdbc.update("""
                 INSERT INTO human_review_requests (submission_id, user_id, review_submission_id) VALUES (?, ?, ?)

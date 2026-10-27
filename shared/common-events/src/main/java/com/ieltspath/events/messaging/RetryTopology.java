@@ -7,7 +7,11 @@ import org.springframework.amqp.core.Exchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 
-/** Retry topology shared by the two points grant queues; queue names remain owned by each service. */
+/**
+ * Builds the retry topology (main queue, retry queue, dead-letter queue and exchange) for the two points grant queues and the
+ * four grading notice queues. The names of the two grant queues stay owned by their services; the names of the four grading
+ * queues live in the {@code Grading*Topology} classes of this library.
+ */
 public final class RetryTopology {
     public record Names(String queue, String retryQueue, String deadLetterQueue, String deadLetterExchange) { }
 

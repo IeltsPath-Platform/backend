@@ -93,6 +93,10 @@ class HumanReviewFlowIntegrationTest extends ExaminerIntegrationSupport {
                 .andExpect(jsonPath("$.essay").value(ESSAY))
                 .andExpect(jsonPath("$.source").value("PRACTICE"))
                 .andExpect(jsonPath("$.rubric.code").value("IELTS_WRITING_TASK_2"))
+                // The chart the learner saw reaches the examiner; an entry without a url is not an image.
+                .andExpect(jsonPath("$.images.length()").value(1))
+                .andExpect(jsonPath("$.images[0].url").value("https://cdn.example/chart.png"))
+                .andExpect(jsonPath("$.images[0].altText").value("Bar chart"))
                 .andExpect(jsonPath("$.learnerId").doesNotExist());
 
         // Nothing is saved yet, so there is no draft to read.
@@ -319,6 +323,23 @@ class HumanReviewFlowIntegrationTest extends ExaminerIntegrationSupport {
     }
 
     @Test
+    void nothingIsGradedOrDraftedAfterTheLearnerCancelledTheRequest() throws Exception {
+        UUID[] ids = requestAndClaim();
+        UUID jobId = ids[1];
+        String examinerToken = "Bearer " + internalToken(examiner, "EXAMINER");
+        jdbc.update("UPDATE grading_jobs SET status='CANCELLED' WHERE id=?", jobId);
+
+        mvc.perform(put("/api/assessments/grading-jobs/{id}/human-review/draft", jobId).header("Authorization", examinerToken)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"band\":6.0}"))
+                .andExpect(status().isConflict());
+        mvc.perform(post("/api/assessments/grading-jobs/{id}/human-review", jobId).header("Authorization", examinerToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(completeBody("[]")))
+                .andExpect(status().isConflict());
+        assertEquals(0, count("SELECT count(*) FROM human_review_submissions WHERE band IS NOT NULL"));
+        assertEquals(1, count("SELECT count(*) FROM grading_jobs WHERE id=? AND status='CANCELLED'", jobId));
+    }
+
+    @Test
     void internalEndpointsRequireGatewaySignedJwt() throws Exception {
         mvc.perform(post("/internal/assessments/human-reviews")
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
@@ -328,7 +349,8 @@ class HumanReviewFlowIntegrationTest extends ExaminerIntegrationSupport {
     private String reviewRequest(UUID requestId, UUID sourceSubmissionId) {
         return """
                 {"requestId":"%s","learnerId":"%s","sourceSubmissionId":"%s","source":"PRACTICE",
-                 "task":"TASK_2","promptSnapshot":{"stem":"Discuss both views."},
+                 "task":"TASK_2","promptSnapshot":{"stem":"Discuss both views.",
+                   "images":[{"url":"https://cdn.example/chart.png","altText":"Bar chart"},{"altText":"no url"}]},
                  "essay":"%s",
                  "rubric":{"code":"IELTS_WRITING_TASK_2","version":1,"criteria":[{"code":"TR"}]},
                  "examinerId":"%s"}

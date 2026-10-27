@@ -1,6 +1,7 @@
 package com.ieltspath.assessment.infrastructure.persistence.adapter;
 
 import com.ieltspath.assessment.application.port.ExaminerQueueStore;
+import com.ieltspath.assessment.application.port.PromptImage;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -129,16 +130,18 @@ public class JdbcExaminerQueueStore implements ExaminerQueueStore {
                   COALESCE(i.question_snapshot->>'stem',l.prompt_snapshot->>'stem',h.prompt_snapshot->>'stem') AS prompt,
                   COALESCE(l.text_payload,h.essay_text) AS essay,
                   COALESCE(i.answer_snapshot->'answerSpec'->>'task',l.prompt_snapshot->>'task',h.task) AS task,
-                  h.rubric_snapshot::text AS rubric,h.source
+                  h.rubric_snapshot::text AS rubric,h.source,h.prompt_snapshot->'images' AS images
                 """+FROM+" WHERE j.id=:id AND j.grading_mode='HUMAN'",Map.of("id",id), (r,n) -> {
             JsonNode rubric = null;
+            List<PromptImage> images = List.of();
             try {
                 if (r.getString("rubric") != null) rubric = json.readTree(r.getString("rubric"));
+                if (r.getString("images") != null) images = PromptImage.listOf(json.readTree(r.getString("images")));
             } catch (java.io.IOException exception) {
-                throw new IllegalStateException("Stored rubric snapshot is invalid", exception);
+                throw new IllegalStateException("Stored rubric or prompt snapshot is invalid", exception);
             }
             return new Essay(id,r.getObject("attempt_id",UUID.class),r.getObject("attempt_item_id",UUID.class),
-                    r.getString("prompt"),r.getString("essay"),r.getString("task"),rubric,r.getString("source"));
+                    r.getString("prompt"),r.getString("essay"),r.getString("task"),rubric,r.getString("source"),images);
         }).stream().findFirst();
     }
     @Override @Transactional(propagation=Propagation.MANDATORY)

@@ -67,3 +67,22 @@ listed in `GET /api/notifications/preferences`.
 `GET /api/notifications` items gain `gradingJobId` (null for community notifications; `postId` and `commentId` are null for
 this one). Mark it read with `PUT /api/notifications/{id}/read` like any other. There is no e-mail or mobile push
 channel yet; only the in-app inbox and the push above.
+
+## Queue infrastructure
+
+| What | Name |
+|---|---|
+| Queue | `notification.grading-overdue.v1` |
+| Retry queue | `notification.grading-overdue.v1.retry` |
+| Dead-letter queue (DLQ) | `notification.grading-overdue.v1.dlq` |
+| Dead-letter exchange (DLX) | `notification.grading-overdue.dlx` |
+| Exchange and routing key | `assessment.events` / `assessment.grading-overdue.v1` |
+
+- A message that may pass on a second try waits **30 seconds** on the retry queue and returns to the queue, at most **5** times;
+  after that, and for a message that breaks the contract or cannot be read, it goes to the DLQ.
+- **Both Assessment and Notification declare this queue** from the same class, `GradingOverdueTopology` in `common-events`, and both bind
+  it to `AssessmentMessaging.EXCHANGE` (not to a configurable name), so the broker sees identical declarations and a notice
+  is not lost when Notification has never started. This is the one exception to the rule that a consumer owns its queues
+  (`AGENTS.md` §3.5).
+- Whoever changes a queue name, the retry delay, the retry count or the payload must change `GradingOverdueTopology` (or the event record),
+  the consumer in Notification and **this contract together**.

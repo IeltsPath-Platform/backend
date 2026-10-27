@@ -26,7 +26,11 @@ public class ExaminerController {
     private final ExaminerProfilesUseCase examiners;
     private final CurrentUserProvider currentUserProvider;
 
-    /** Examiners that take new submissions. Any signed-in user may look. */
+    /**
+     * Examiners that take new submissions. Any signed-in user may look, on purpose: the learner picks the examiner, so the profile
+     * (name, photo, introduction, band, certificates) is public to every signed-in user. It carries no e-mail and no workload
+     * limit (docs/contracts/user-internal-v1.md, "The examiner profile is public on purpose").
+     */
     @GetMapping("/api/users/examiners")
     public List<ExaminerResponse> list() {
         currentUserProvider.requireUserId();

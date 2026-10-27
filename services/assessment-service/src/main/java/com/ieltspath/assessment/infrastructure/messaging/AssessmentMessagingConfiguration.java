@@ -27,33 +27,31 @@ public class AssessmentMessagingConfiguration {
     }
 
     /**
-     * The one queue Assessment also declares: the late-examiner notices must reach a queue even if Notification has never
-     * started. Notification declares the very same queue from the same helper.
+     * The four grading notice queues Assessment also declares (the exception to the rule that a consumer owns its queues): the
+     * notices must reach a queue even if Notification has never started. Notification declares the very same queues from the
+     * same helpers, and both bind them to {@link AssessmentMessaging#EXCHANGE}, so a different exchange name in configuration
+     * can never separate a queue from the messages meant for it. This one is for the late-examiner notices.
      */
     @Bean
-    Declarables gradingOverdueTopology(
-            @Value("${assessment.messaging.exchange:" + AssessmentMessaging.EXCHANGE + "}") String exchangeName) {
-        return GradingOverdueTopology.declarables(exchangeName);
+    Declarables gradingOverdueTopology() {
+        return GradingOverdueTopology.declarables(AssessmentMessaging.EXCHANGE);
     }
 
-    /** Same reason for the examiner's "will be late soon" reminders. */
+    /** Same reason, and the same fixed exchange, for the examiner's "will be late soon" reminders. */
     @Bean
-    Declarables gradingDueSoonTopology(
-            @Value("${assessment.messaging.exchange:" + AssessmentMessaging.EXCHANGE + "}") String exchangeName) {
-        return GradingDueSoonTopology.declarables(exchangeName);
+    Declarables gradingDueSoonTopology() {
+        return GradingDueSoonTopology.declarables(AssessmentMessaging.EXCHANGE);
     }
 
-    /** Same reason for the examiner's "a learner chose you" notices. */
+    /** Same reason, and the same fixed exchange, for the examiner's "a learner chose you" notices. */
     @Bean
-    Declarables gradingRequestedTopology(
-            @Value("${assessment.messaging.exchange:" + AssessmentMessaging.EXCHANGE + "}") String exchangeName) {
-        return GradingRequestedTopology.declarables(exchangeName);
+    Declarables gradingRequestedTopology() {
+        return GradingRequestedTopology.declarables(AssessmentMessaging.EXCHANGE);
     }
 
-    /** Same reason for the learner's "your essay was graded" notices. */
+    /** Same reason, and the same fixed exchange, for the learner's "your essay was graded" notices. */
     @Bean
-    Declarables gradingCompletedTopology(
-            @Value("${assessment.messaging.exchange:" + AssessmentMessaging.EXCHANGE + "}") String exchangeName) {
-        return GradingCompletedTopology.declarables(exchangeName);
+    Declarables gradingCompletedTopology() {
+        return GradingCompletedTopology.declarables(AssessmentMessaging.EXCHANGE);
     }
 }

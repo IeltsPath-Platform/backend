@@ -39,9 +39,11 @@ public class ExaminerDashboardService {
     /**
      * @param dailyLimit how many new submissions the examiner takes a day; null when User Service cannot be reached, so the
      *                   rest of the dashboard still shows
+     * @param overdueLimit with this many late jobs ({@code overdue}) the examiner takes no new submission until they
+     *                     grade some
      */
     public record Summary(int queued, int processing, int dueSoon, int overdue, int completedToday, int completedThisWeek,
-                          int receivedToday, Integer dailyLimit) {}
+                          int receivedToday, Integer dailyLimit, int overdueLimit) {}
 
     @Transactional(readOnly = true)
     public Summary summary(UUID examinerId) {
@@ -52,7 +54,8 @@ public class ExaminerDashboardService {
         var counts = dashboard.counts(examinerId, now.minus(ExaminerAssignmentPolicy.REMINDER_AFTER),
                 now.minus(ExaminerAssignmentPolicy.DEADLINE), todayStart, weekStart);
         return new Summary(counts.queued(), counts.processing(), counts.dueSoon(), counts.overdue(), counts.completedToday(),
-                counts.completedThisWeek(), assignments.receivedSince(examinerId, todayStart), dailyLimit(examinerId));
+                counts.completedThisWeek(), assignments.receivedSince(examinerId, todayStart), dailyLimit(examinerId),
+                ExaminerAssignmentPolicy.MAX_OVERDUE_OPEN);
     }
 
     private Integer dailyLimit(UUID examinerId) {

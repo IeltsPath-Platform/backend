@@ -22,6 +22,15 @@ public interface ExaminerAssignmentStore {
     /** How many of the given examiners' human jobs were handed to each since {@code since}; absent means none. */
     java.util.Map<UUID, Integer> receivedSince(java.util.Collection<UUID> examinerIds, Instant since);
 
+    /** How many open human jobs the examiner was chosen for at or before {@code overdueBefore}: the ones already late. */
+    int overdueOpen(UUID examinerId, Instant overdueBefore);
+
+    /** The same count for several examiners at once; absent means none. */
+    java.util.Map<UUID, Integer> overdueOpen(java.util.Collection<UUID> examinerIds, Instant overdueBefore);
+
+    /** Closes an open job the learner gave up on and drops the unfinished review, so nobody can grade it any more. */
+    void cancel(UUID jobId);
+
     /**
      * Hands the jobs to the examiner and restarts the work: the claim, the unfinished review and the deadline clock are
      * reset. {@code replacing} counts the change when the jobs already had an examiner.

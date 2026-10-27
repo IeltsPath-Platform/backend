@@ -208,6 +208,18 @@ class FreeWritingToExaminerIntegrationTest {
     }
 
     @Test
+    void aCancelledRequestNoLongerBlocksTheLearnerFromSendingThePromptAgain() {
+        sendToExaminer.execute(USER, VERSION, ESSAY, UUID.randomUUID(), TEXT, EXAMINER);
+        when(client.fetchReview(any(), any())).thenReturn(review("CANCELLED"));
+
+        assertEquals(java.util.Optional.empty(), sendToExaminer.pending(USER, ESSAY));
+        sendToExaminer.execute(USER, VERSION, ESSAY, UUID.randomUUID(), TEXT + "Again.", OTHER_EXAMINER);
+
+        assertEquals(2, count("SELECT count(*) FROM lesson_writing_submissions"));
+        verify(client, times(2)).createReview(any());
+    }
+
+    @Test
     void anEssayThatWasNeverSentToAnExaminerDoesNotBlockWritingAgain() {
         when(client.consumeCredit(any())).thenThrow(new LearningRequestException(402, "HUMAN_GRADING_CREDIT_REQUIRED", "none"));
         assertThrows(LearningRequestException.class,

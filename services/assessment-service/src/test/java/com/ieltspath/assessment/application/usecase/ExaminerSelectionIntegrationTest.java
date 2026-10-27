@@ -166,6 +166,7 @@ class ExaminerSelectionIntegrationTest extends ExaminerIntegrationSupport {
 
     @Test
     void humanGradingJobsAreCreatedWithAnExaminerAndAiJobsWithout() throws Exception {
+        jdbc.update("DELETE FROM outbox_events WHERE event_type=?", REQUESTED);
         UUID submission = submissions.execute(new com.ieltspath.assessment.application.command.CreateLearnerSubmissionCommand(
                 learner, null, "{}", com.ieltspath.assessment.domain.vo.Skill.WRITING, "A practice essay.", null,
                 "selection-" + UUID.randomUUID())).id();
@@ -180,6 +181,8 @@ class ExaminerSelectionIntegrationTest extends ExaminerIntegrationSupport {
                         .contentType(MediaType.APPLICATION_JSON).content(job(submission, "HUMAN", examiner)))
                 .andExpect(status().isCreated());
         assertEquals(1, count("SELECT count(*) FROM grading_jobs WHERE submission_id=? AND requested_examiner_id=? AND requested_at IS NOT NULL", submission, examiner));
+        // The chosen examiner is told once; the refused requests above announced nothing.
+        assertEquals(1, count("SELECT count(*) FROM outbox_events WHERE event_type=? AND payload->>'examinerId'=?", REQUESTED, examiner.toString()));
     }
 
     @Test
@@ -368,6 +371,135 @@ class ExaminerSelectionIntegrationTest extends ExaminerIntegrationSupport {
         var event = json.readTree(jdbc.queryForObject("SELECT payload::text FROM outbox_events WHERE event_type=?", String.class, REQUESTED));
         assertEquals(second.toString(), event.get("examinerId").asText());
         assertEquals(job.toString(), event.get("gradingJobId").asText());
+    }
+
+    @Test
+    void anotherLearnerCannotReplaceTheExaminerOfSomeoneElsesLateJob() throws Exception {
+        UUID job = requestReview(examiner).job();
+        makeLate(job);
+        jdbc.update("DELETE FROM outbox_events WHERE event_type=?", REQUESTED);
+        String stranger = internalToken(UUID.randomUUID(), "CUSTOMER");
+
+        // The job is looked up by its id and its owner: for anyone else it does not exist.
+        choose(job, stranger, second).andExpect(status().isNotFound());
+
+        assertEquals(1, count("SELECT count(*) FROM grading_jobs WHERE id=? AND requested_examiner_id=? AND examiner_changes=0", job, examiner));
+        assertEquals(0, count("SELECT count(*) FROM outbox_events WHERE event_type=?", REQUESTED), "nobody is told about a refused change");
+        // And the stranger's own list never shows the job.
+        mvc.perform(get("/api/assessments/grading-jobs/mine").header("Authorization", "Bearer " + stranger))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        // The owner still can, so the refusal was about who asked.
+        choose(job, internalToken(learner, "CUSTOMER"), second).andExpect(status().isOk());
+    }
+
+    @Test
+    void twoRequestsToChooseTheSameExaminerForTheLastPlaceCannotBothSucceed() throws Exception {
+        accept(second, 1);
+        UUID firstJob = unchosenHumanJob(courseEssay());
+        UUID otherJob = unchosenHumanJob(courseEssay());
+        String token = internalToken(learner, "CUSTOMER");
+        var ready = new java.util.concurrent.CountDownLatch(2);
+        var go = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            java.util.function.Function<UUID, java.util.concurrent.Callable<Integer>> attempt = jobId -> () -> {
+                ready.countDown();
+                if (!go.await(10, java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("start timeout");
+                return choose(jobId, token, second).andReturn().getResponse().getStatus();
+            };
+            var one = pool.submit(attempt.apply(firstJob));
+            var other = pool.submit(attempt.apply(otherJob));
+            org.junit.jupiter.api.Assertions.assertTrue(ready.await(10, java.util.concurrent.TimeUnit.SECONDS));
+            go.countDown();
+            assertEquals(Set.of(200, 409), Set.of(one.get(20, java.util.concurrent.TimeUnit.SECONDS),
+                    other.get(20, java.util.concurrent.TimeUnit.SECONDS)));
+        }
+        assertEquals(1, count("SELECT count(*) FROM grading_jobs WHERE requested_examiner_id=?", second));
+    }
+    @Test
+    void anExaminerWithFiveLateJobsTakesNoNewSubmissionUntilTheyGradeSome() throws Exception {
+        String learnerToken = internalToken(learner, "CUSTOMER");
+        java.util.List<UUID> late = new java.util.ArrayList<>();
+        for (int i = 0; i < 4; i++) late.add(requestReview(second).job());
+        for (UUID job : late) makeLate(job);
+
+        // Four late jobs are still below the limit: the fifth is taken.
+        UUID fifth = requestReview(second).job();
+        mvc.perform(get("/api/assessments/examiners/availability").param("ids", second.toString())
+                        .header("Authorization", "Bearer " + learnerToken))
+                .andExpect(jsonPath("$[0].full").value(false)).andExpect(jsonPath("$[0].backlog").value(false));
+
+        makeLate(fifth);
+        postReview(reviewBody(UUID.randomUUID(), UUID.randomUUID(), second)).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("EXAMINER_UNAVAILABLE"))
+                .andExpect(jsonPath("$.details.reason").value("OVERDUE_BACKLOG"));
+        UUID waiting = unchosenHumanJob(courseEssay());
+        choose(waiting, learnerToken, second).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.details.reason").value("OVERDUE_BACKLOG"));
+        mvc.perform(get("/api/assessments/examiners/availability").param("ids", second.toString(), third.toString())
+                        .header("Authorization", "Bearer " + learnerToken))
+                .andExpect(jsonPath("$[?(@.examinerId=='" + second + "')].full").value(true))
+                .andExpect(jsonPath("$[?(@.examinerId=='" + second + "')].backlog").value(true))
+                .andExpect(jsonPath("$[?(@.examinerId=='" + third + "')].backlog").value(false));
+        mvc.perform(get("/api/assessments/examiners/me/summary").header("Authorization", "Bearer " + internalToken(second, "EXAMINER")))
+                .andExpect(jsonPath("$.overdue").value(5)).andExpect(jsonPath("$.overdueLimit").value(5));
+
+        // Their jobs that are already late stay with them, and grading some opens the door again.
+        assertEquals(5, count("SELECT count(*) FROM grading_jobs WHERE requested_examiner_id=? AND status='QUEUED'", second));
+        jdbc.update("UPDATE grading_jobs SET status='COMPLETED' WHERE id=?", fifth);
+        postReview(reviewBody(UUID.randomUUID(), UUID.randomUUID(), second)).andExpect(status().isAccepted());
+        choose(waiting, learnerToken, second).andExpect(status().isOk());
+    }
+
+    @Test
+    void aLateJobWithNoChangeLeftCanBeCancelledByItsLearnerAndOnlyByThem() throws Exception {
+        UUID job = requestReview(examiner).job();
+        UUID review = jdbc.queryForObject("SELECT human_review_submission_id FROM grading_jobs WHERE id=?", UUID.class, job);
+        String learnerToken = internalToken(learner, "CUSTOMER");
+
+        cancel(review, learnerToken).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("GRADING_CANCEL_NOT_ALLOWED"))
+                .andExpect(jsonPath("$.details.reason").value("NOT_OVERDUE"));
+        makeLate(job);
+        cancel(review, learnerToken).andExpect(status().isConflict()).andExpect(jsonPath("$.details.reason").value("CHANGES_LEFT"));
+        choose(job, learnerToken, second).andExpect(status().isOk());
+        makeLate(job);
+        choose(job, learnerToken, third).andExpect(status().isOk());
+        makeLate(job);
+        mvc.perform(get("/api/assessments/grading-jobs/mine").header("Authorization", "Bearer " + learnerToken))
+                .andExpect(jsonPath("$[0].state").value("OVERDUE")).andExpect(jsonPath("$[0].canChoose").value(false))
+                .andExpect(jsonPath("$[0].canCancel").value(true));
+
+        cancel(review, internalToken(UUID.randomUUID(), "CUSTOMER")).andExpect(status().isNotFound());
+        assertEquals(1, count("SELECT count(*) FROM grading_jobs WHERE id=? AND status='QUEUED'", job));
+
+        cancel(review, learnerToken).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+        cancel(review, learnerToken).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+        assertEquals(1, count("SELECT count(*) FROM grading_jobs WHERE id=? AND status='CANCELLED'", job));
+        mvc.perform(get("/api/assessments/grading-jobs/mine").header("Authorization", "Bearer " + learnerToken))
+                .andExpect(jsonPath("$[0].state").value("CANCELLED")).andExpect(jsonPath("$[0].canChoose").value(false))
+                .andExpect(jsonPath("$[0].canCancel").value(false));
+        mvc.perform(get("/internal/assessments/human-reviews/{id}", review).header("Authorization", "Bearer " + learnerToken))
+                .andExpect(jsonPath("$.status").value("CANCELLED")).andExpect(jsonPath("$.band").doesNotExist());
+        // The examiner's queue no longer holds it, and nobody can take it.
+        mvc.perform(get("/api/assessments/grading-jobs").header("Authorization", "Bearer " + internalToken(third, "EXAMINER")))
+                .andExpect(jsonPath("$.content.length()").value(0));
+        mvc.perform(post("/api/assessments/grading-jobs/{id}/claim", job).header("Authorization", "Bearer " + internalToken(third, "EXAMINER")))
+                .andExpect(status().isConflict());
+        choose(job, learnerToken, fourth).andExpect(status().isConflict());
+    }
+
+    @Test
+    void aJobThatWasGradedInTheMeantimeCannotBeCancelled() throws Exception {
+        UUID job = requestReview(examiner).job();
+        UUID review = jdbc.queryForObject("SELECT human_review_submission_id FROM grading_jobs WHERE id=?", UUID.class, job);
+        jdbc.update("UPDATE grading_jobs SET status='COMPLETED',examiner_changes=2 WHERE id=?", job);
+        jdbc.update("UPDATE human_review_submissions SET band=6.5,criteria='[]'::jsonb,error_codes='{}',feedback='Done.',completed_at=CURRENT_TIMESTAMP WHERE id=?", review);
+        makeLate(job);
+        cancel(review, internalToken(learner, "CUSTOMER")).andExpect(status().isConflict());
+        assertEquals(1, count("SELECT count(*) FROM grading_jobs WHERE id=? AND status='COMPLETED'", job));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions cancel(UUID review, String token) throws Exception {
+        return mvc.perform(post("/internal/assessments/human-reviews/{id}/cancel", review).header("Authorization", "Bearer " + token));
     }
 
     private void accept(UUID id, int limit) {

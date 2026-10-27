@@ -2,6 +2,7 @@ package com.ieltspath.learning.infrastructure.client;
 
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.HumanReviewClient.CreateReview;
+import com.ieltspath.learning.application.port.HumanReviewClient.PromptImage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,8 +45,40 @@ class RestHumanReviewClientTest {
     }
 
     private CreateReview request() {
+        return request(java.util.List.of());
+    }
+
+    private CreateReview request(java.util.List<PromptImage> images) {
         return new CreateReview(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "LESSON", "TASK_2", "stem",
-                "essay", "IELTS_WRITING", 1, examiner);
+                images, "essay", "IELTS_WRITING", 1, examiner);
+    }
+
+    @Test
+    void theChartOfTheTaskTravelsWithThePromptSoTheExaminerSeesWhatTheLearnerSaw() {
+        UUID review = UUID.randomUUID();
+        server.expect(requestTo("http://assessment/internal/assessments/human-reviews"))
+                .andExpect(jsonPath("$.promptSnapshot.stem").value("stem"))
+                .andExpect(jsonPath("$.promptSnapshot.images[0].url").value("https://cdn/chart.png"))
+                .andExpect(jsonPath("$.promptSnapshot.images[0].altText").value("Bar chart"))
+                .andExpect(jsonPath("$.promptSnapshot.images[1].url").value("https://cdn/map.png"))
+                .andExpect(jsonPath("$.promptSnapshot.images[1].altText").doesNotExist())
+                .andRespond(withSuccess("{\"reviewSubmissionId\":\"" + review + "\"}", MediaType.APPLICATION_JSON));
+
+        client.createReview(request(java.util.List.of(new PromptImage("https://cdn/chart.png", "Bar chart"),
+                new PromptImage("https://cdn/map.png", null))));
+        server.verify();
+    }
+
+    @Test
+    void aPromptWithoutImagesKeepsTheSnapshotAsItWas() {
+        UUID review = UUID.randomUUID();
+        server.expect(requestTo("http://assessment/internal/assessments/human-reviews"))
+                .andExpect(jsonPath("$.promptSnapshot.stem").value("stem"))
+                .andExpect(jsonPath("$.promptSnapshot.images").doesNotExist())
+                .andRespond(withSuccess("{\"reviewSubmissionId\":\"" + review + "\"}", MediaType.APPLICATION_JSON));
+
+        client.createReview(request());
+        server.verify();
     }
 
     @Test
@@ -80,6 +113,30 @@ class RestHumanReviewClientTest {
 
         assertEquals("HUMAN_GRADING_CONFLICT",
                 assertThrows(LearningRequestException.class, () -> client.createReview(request())).getCode());
+    }
+
+    @Test
+    void cancellingASendsOnlyTheReviewIdAndReadsBackTheCancelledReview() {
+        UUID review = UUID.randomUUID();
+        server.expect(requestTo("http://assessment/internal/assessments/human-reviews/" + review + "/cancel"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"reviewSubmissionId\":\"" + review + "\",\"status\":\"CANCELLED\"}", MediaType.APPLICATION_JSON));
+
+        assertEquals("CANCELLED", client.cancelReview(review).status());
+        server.verify();
+    }
+
+    @Test
+    void aCancelAssessmentRefusesBecauseAChangeIsLeftOrItIsNotLateIsNotAGradingConflict() {
+        UUID review = UUID.randomUUID();
+        server.expect(requestTo("http://assessment/internal/assessments/human-reviews/" + review + "/cancel"))
+                .andRespond(withStatus(HttpStatus.CONFLICT).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"status\":409,\"message\":\"x\",\"code\":\"GRADING_CANCEL_NOT_ALLOWED\"}"));
+
+        var refused = assertThrows(LearningRequestException.class, () -> client.cancelReview(review));
+
+        assertEquals(409, refused.getStatus());
+        assertEquals("REVIEW_CANCEL_NOT_ALLOWED", refused.getCode());
     }
 
     @Test

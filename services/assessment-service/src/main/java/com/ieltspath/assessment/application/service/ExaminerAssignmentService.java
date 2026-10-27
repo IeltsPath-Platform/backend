@@ -5,6 +5,7 @@ import com.ieltspath.assessment.application.port.ExaminerDirectory;
 import com.ieltspath.assessment.domain.exception.AssessmentNotFoundException;
 import com.ieltspath.assessment.domain.exception.ExaminerChangeNotAllowedException;
 import com.ieltspath.assessment.domain.exception.ExaminerUnavailableException;
+import com.ieltspath.assessment.domain.exception.GradingCancelNotAllowedException;
 import com.ieltspath.assessment.domain.exception.RevisionConflictException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -53,24 +54,58 @@ public class ExaminerAssignmentService {
             throw new ExaminerUnavailableException(ExaminerUnavailableException.Reason.NOT_ACCEPTING);
         }
         store.lockExaminer(examinerId);
+        if (store.overdueOpen(examinerId, overdueBefore()) >= ExaminerAssignmentPolicy.MAX_OVERDUE_OPEN) {
+            throw new ExaminerUnavailableException(ExaminerUnavailableException.Reason.OVERDUE_BACKLOG);
+        }
         if (store.receivedSince(examinerId, startOfToday()) + slots > examiner.dailyLimit()) {
             throw new ExaminerUnavailableException(ExaminerUnavailableException.Reason.FULL);
         }
     }
 
+    /** Jobs the examiner was chosen for at or before this moment are late. */
+    private static Instant overdueBefore() {
+        return Instant.now().minus(ExaminerAssignmentPolicy.DEADLINE);
+    }
+
     /**
-     * Which of the examiners cannot take any more submissions today, for the learner's list. Examiners that are unknown
-     * are left out; a full examiner has reached the daily limit or stopped accepting.
+     * Which of the examiners cannot take any more submissions now, for the learner's list. Examiners that are unknown are
+     * left out. {@code full} is true when they cannot take one: they stopped accepting, reached the daily limit, or have
+     * too many late jobs ({@code backlog}, which the list words differently).
      */
     @Transactional(readOnly = true)
     public List<Availability> availability(Collection<UUID> examinerIds) {
         Map<UUID, Integer> received = store.receivedSince(examinerIds, startOfToday());
-        return examinerIds.stream().distinct().flatMap(id -> directory.find(id).stream().map(examiner ->
-                new Availability(id, !examiner.acceptingSubmissions() || received.getOrDefault(id, 0) >= examiner.dailyLimit())))
-                .toList();
+        Map<UUID, Integer> late = store.overdueOpen(examinerIds, overdueBefore());
+        return examinerIds.stream().distinct().flatMap(id -> directory.find(id).stream().map(examiner -> {
+            boolean backlog = late.getOrDefault(id, 0) >= ExaminerAssignmentPolicy.MAX_OVERDUE_OPEN;
+            boolean full = !examiner.acceptingSubmissions() || received.getOrDefault(id, 0) >= examiner.dailyLimit();
+            return new Availability(id, full || backlog, backlog);
+        })).toList();
     }
 
-    public record Availability(UUID examinerId, boolean full) {}
+    public record Availability(UUID examinerId, boolean full, boolean backlog) {}
+
+    /**
+     * The learner gives up a late job whose examiner can no longer be changed. The job closes, so nobody can grade it any
+     * more; giving the credit back is Learning's step. A job already cancelled answers the same again.
+     */
+    @Transactional
+    public void cancel(UUID learnerId, UUID jobId) {
+        ExaminerAssignmentStore.JobRef job = store.lockJob(jobId)
+                .filter(found -> found.learnerId().equals(learnerId))
+                .orElseThrow(() -> new AssessmentNotFoundException("Grading job not found"));
+        if ("CANCELLED".equals(job.status())) return;
+        if (!ExaminerAssignmentPolicy.isOpen(job.status())) {
+            throw new RevisionConflictException("Grading of this submission is already finished");
+        }
+        if (job.requestedExaminerId() == null || !ExaminerAssignmentPolicy.isOverdue(job.requestedAt(), Instant.now())) {
+            throw new GradingCancelNotAllowedException(GradingCancelNotAllowedException.Reason.NOT_OVERDUE);
+        }
+        if (job.examinerChanges() < ExaminerAssignmentPolicy.MAX_CHANGES) {
+            throw new GradingCancelNotAllowedException(GradingCancelNotAllowedException.Reason.CHANGES_LEFT);
+        }
+        store.cancel(job.id());
+    }
 
     /**
      * The learner chooses the examiner of a job that waits for a choice, or replaces the examiner of a late job.
@@ -115,17 +150,17 @@ public class ExaminerAssignmentService {
                             : job.requestedAt().plus(ExaminerAssignmentPolicy.DEADLINE),
                     ExaminerAssignmentPolicy.canChoose(state, job.examinerChanges()),
                     Math.max(0, ExaminerAssignmentPolicy.MAX_CHANGES - job.examinerChanges()), job.createdAt(),
-                    job.band(), job.completedAt());
+                    job.band(), job.completedAt(), ExaminerAssignmentPolicy.canCancel(state, job.examinerChanges()));
         }).toList();
     }
 
     /**
      * {@code reviewSubmissionId} is the review id Learning holds for a Practice or Lesson essay; null for exam attempts.
      * {@code band} and {@code completedAt} are set once the examiner finished a standalone review, so the learner's list of
-     * graded essays needs no second call.
+     * graded essays needs no second call. {@code canCancel} is true for a late job whose examiner can no longer be changed.
      */
     public record MyJobView(UUID id, UUID reviewSubmissionId, String skill, String source,
                             ExaminerAssignmentPolicy.State state, UUID examinerId, Instant requestedAt, Instant deadline,
                             boolean canChoose, int changesLeft, Instant createdAt, java.math.BigDecimal band,
-                            Instant completedAt) {}
+                            Instant completedAt, boolean canCancel) {}
 }

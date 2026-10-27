@@ -66,3 +66,22 @@ The notice asks the examiner to act, so the community notification preferences d
 - The queue and the dashboard load again **as soon as the push arrives**, when the tab becomes visible again and every minute
   while it is visible (the socket can drop), so there is no reload button. The reload keeps what is on screen until the new
   data arrives.
+
+## Queue infrastructure
+
+| What | Name |
+|---|---|
+| Queue | `notification.grading-requested.v1` |
+| Retry queue | `notification.grading-requested.v1.retry` |
+| Dead-letter queue (DLQ) | `notification.grading-requested.v1.dlq` |
+| Dead-letter exchange (DLX) | `notification.grading-requested.dlx` |
+| Exchange and routing key | `assessment.events` / `assessment.grading-requested.v1` |
+
+- A message that may pass on a second try waits **30 seconds** on the retry queue and returns to the queue, at most **5** times;
+  after that, and for a message that breaks the contract or cannot be read, it goes to the DLQ.
+- **Both Assessment and Notification declare this queue** from the same class, `GradingRequestedTopology` in `common-events`, and both bind
+  it to `AssessmentMessaging.EXCHANGE` (not to a configurable name), so the broker sees identical declarations and a notice
+  is not lost when Notification has never started. This is the one exception to the rule that a consumer owns its queues
+  (`AGENTS.md` §3.5).
+- Whoever changes a queue name, the retry delay, the retry count or the payload must change `GradingRequestedTopology` (or the event record),
+  the consumer in Notification and **this contract together**.

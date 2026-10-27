@@ -37,6 +37,12 @@ public class GlobalExceptionHandler {
                 "EXAMINER_CHANGE_NOT_ALLOWED");
     }
 
+    @ExceptionHandler(GradingCancelNotAllowedException.class)
+    public ResponseEntity<ErrorResponse> gradingCancelNotAllowed(GradingCancelNotAllowedException e, HttpServletRequest r) {
+        return build(HttpStatus.CONFLICT, e.getMessage(), r.getRequestURI(), Map.of("reason", e.reason().name()),
+                "GRADING_CANCEL_NOT_ALLOWED");
+    }
+
     @ExceptionHandler(UserServiceUnavailableException.class)
     public ResponseEntity<ErrorResponse> userServiceUnavailable(UserServiceUnavailableException e, HttpServletRequest r) {
         return build(HttpStatus.SERVICE_UNAVAILABLE, "User Service is unavailable", r.getRequestURI(), null,

@@ -53,7 +53,7 @@ contains email addresses. An empty list, a list over 50, or a null ID returns `4
 The learner chooses who grades a Writing or Speaking submission, so User Service publishes the examiners. An examiner is
 an `ACTIVE` user with the `EXAMINER` role. Name, photo and introduction come from the learner profile
 (`display_name`, `avatar_reference`, `bio`); the band, certificates, availability and workload limit are stored in
-`examiner_profiles`, and an examiner who never edited it counts as accepting submissions with a limit of 10.
+`examiner_profiles`, and an examiner who never edited it counts as accepting submissions with a limit of 30.
 
 ```json
 {
@@ -79,6 +79,18 @@ an `ACTIVE` user with the `EXAMINER` role. Name, photo and introduction come fro
 
 `avatarUrl` is the stored picture address only when it is an `http` or `https` URL without credentials, otherwise `null`.
 The responses never contain email addresses.
+
+### The examiner profile is public on purpose
+
+`GET /api/users/examiners` and `GET /api/users/examiners/{id}` have no role check: **every signed-in user** (`requireUserId()`),
+not only learners, can read an examiner's profile. This is intended: the learner chooses who grades their essay, so they need to
+see who the examiner is before choosing and while waiting. An unauthenticated caller gets `401`.
+
+The only fields returned are the ones in the example above: `id`, `displayName`, `avatarUrl`, `bio`, `ieltsBand`,
+`certificates` (`name`, `issuer`, `year`, `score`) and `acceptingSubmissions`. Never returned: the email address, the
+phone, the roles, the workload limit (`dailyLimit`) or how many jobs the examiner has today. An examiner who must not be
+shown stops taking submissions (`acceptingSubmissions: false`) and drops off the list; their profile is still readable by
+learners who already chose them.
 
 ### `GET /internal/users/examiners/{id}`
 

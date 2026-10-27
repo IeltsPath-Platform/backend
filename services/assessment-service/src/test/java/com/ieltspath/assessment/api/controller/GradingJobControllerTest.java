@@ -26,7 +26,7 @@ class GradingJobControllerTest {
     @Test @WithMockUser(roles="EXAMINER") void essayAndQueueUseBlindProjections() throws Exception {
         UUID id=UUID.randomUUID(),examiner=UUID.randomUUID();
         org.mockito.Mockito.when(currentUser.requireUserId()).thenReturn(examiner);
-        org.mockito.Mockito.when(getEssay.execute(examiner,id)).thenReturn(new com.ieltspath.assessment.application.port.ExaminerQueueStore.Essay(id,UUID.randomUUID(),UUID.randomUUID(),"Prompt","Essay","TASK_2",null,null));
+        org.mockito.Mockito.when(getEssay.execute(examiner,id)).thenReturn(new com.ieltspath.assessment.application.port.ExaminerQueueStore.Essay(id,UUID.randomUUID(),UUID.randomUUID(),"Prompt","Essay","TASK_2",null,null,java.util.List.of()));
         org.mockito.Mockito.when(currentUser.requireCurrentUser()).thenReturn(
                 new com.ieltspath.commonsecurity.currentuser.CurrentUser(examiner,java.util.Set.of("EXAMINER")));
         // An examiner is given only the queue of the jobs learners chose them for.

@@ -295,6 +295,66 @@ class HumanReviewIntegrationTest {
     }
 
     @Test
+    void cancellingALateRequestClosesItInAssessmentThenGivesTheCreditBack() {
+        UUID essay = essay(user, "GRADED", false);
+        UUID review = UUID.randomUUID();
+        when(client.createReview(any())).thenReturn(review);
+        reviews.request(user, essay, examiner);
+        var cancelled = new HumanReviewClient.Review(review, "CANCELLED", null, null, null, null, null, examiner);
+        when(client.cancelReview(review)).thenReturn(cancelled);
+
+        assertEquals(cancelled, reviews.cancel(user, review));
+
+        var order = org.mockito.Mockito.inOrder(client);
+        order.verify(client).cancelReview(review);
+        order.verify(client).refundCredit(essay);
+    }
+
+    @Test
+    void aRequestThatCannotBeCancelledYetKeepsItsCredit() {
+        UUID essay = essay(user, "GRADED", false);
+        UUID review = UUID.randomUUID();
+        when(client.createReview(any())).thenReturn(review);
+        reviews.request(user, essay, examiner);
+        when(client.cancelReview(review)).thenThrow(new LearningRequestException(409, "REVIEW_CANCEL_NOT_ALLOWED", "x"));
+
+        assertEquals("REVIEW_CANCEL_NOT_ALLOWED", assertThrows(LearningRequestException.class, () -> reviews.cancel(user, review)).getCode());
+        verify(client, never()).refundCredit(any());
+    }
+
+    @Test
+    void afterAFailedRefundTheLearnerCancelsAgainAndTheCreditComesBack() {
+        UUID essay = essay(user, "GRADED", false);
+        UUID review = UUID.randomUUID();
+        when(client.createReview(any())).thenReturn(review);
+        reviews.request(user, essay, examiner);
+        when(client.cancelReview(review)).thenReturn(new HumanReviewClient.Review(review, "CANCELLED", null, null, null, null, null, examiner));
+        org.mockito.Mockito.doThrow(new LearningRequestException(503, "HUMAN_REVIEW_UNAVAILABLE", "x"))
+                .doNothing().when(client).refundCredit(essay);
+
+        assertEquals(503, assertThrows(LearningRequestException.class, () -> reviews.cancel(user, review)).getStatus());
+        assertEquals("CANCELLED", reviews.cancel(user, review).status());
+        verify(client, times(2)).refundCredit(essay);
+    }
+
+    @Test
+    void onlyTheOwnerCancelsAndACancelledRequestIsNotAskedAgain() {
+        UUID essay = essay(user, "GRADED", false);
+        UUID review = UUID.randomUUID();
+        when(client.createReview(any())).thenReturn(review);
+        reviews.request(user, essay, examiner);
+
+        assertEquals(404, assertThrows(LearningRequestException.class, () -> reviews.cancel(UUID.randomUUID(), review)).getStatus());
+        assertEquals(404, assertThrows(LearningRequestException.class, () -> reviews.cancel(user, UUID.randomUUID())).getStatus());
+        verify(client, never()).cancelReview(any());
+        verify(client, never()).refundCredit(any());
+
+        when(client.fetchReview(review, user)).thenReturn(new HumanReviewClient.Review(review, "CANCELLED", null, null, null, null, null, examiner));
+        assertEquals("REVIEW_CANCELLED", assertThrows(LearningRequestException.class, () -> reviews.request(user, essay, examiner)).getCode());
+        verify(client, times(1)).consumeCredit(essay);
+    }
+
+    @Test
     void aMentorReviewIsFeedbackOnlyAndWritesNoEvidenceOrReviews() {
         UUID essay = essay(user, "GRADED", false);
         when(client.createReview(any())).thenReturn(UUID.randomUUID());

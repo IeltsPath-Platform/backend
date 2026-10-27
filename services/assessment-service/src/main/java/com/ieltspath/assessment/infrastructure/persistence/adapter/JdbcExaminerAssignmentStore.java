@@ -83,6 +83,45 @@ public class JdbcExaminerAssignmentStore implements ExaminerAssignmentStore {
         return received;
     }
 
+    /** The open human jobs of an examiner, QA samples apart, as the dashboard counts the late ones. */
+    private static final String OVERDUE_OPEN = """
+            FROM grading_jobs
+            WHERE grading_mode='HUMAN' AND status IN ('QUEUED','PROCESSING') AND requested_at<=:before
+              AND COALESCE(reason,'')<>'QA_SAMPLE'
+            """;
+
+    @Override
+    @Transactional(readOnly = true)
+    public int overdueOpen(UUID examinerId, Instant overdueBefore) {
+        Integer late = jdbc.queryForObject("SELECT count(*) " + OVERDUE_OPEN + " AND requested_examiner_id=:id",
+                new MapSqlParameterSource("id", examinerId).addValue("before", java.sql.Timestamp.from(overdueBefore)),
+                Integer.class);
+        return late == null ? 0 : late;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Map<UUID, Integer> overdueOpen(java.util.Collection<UUID> examinerIds, Instant overdueBefore) {
+        java.util.Map<UUID, Integer> late = new java.util.HashMap<>();
+        if (examinerIds.isEmpty()) return late;
+        jdbc.query("SELECT requested_examiner_id AS examiner, count(*) AS late " + OVERDUE_OPEN
+                        + " AND requested_examiner_id IN (:ids) GROUP BY requested_examiner_id",
+                new MapSqlParameterSource("ids", examinerIds).addValue("before", java.sql.Timestamp.from(overdueBefore)),
+                row -> { late.put(row.getObject("examiner", UUID.class), row.getInt("late")); });
+        return late;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void cancel(UUID jobId) {
+        var args = new MapSqlParameterSource("id", jobId);
+        jdbc.update("UPDATE grading_jobs SET status='CANCELLED' WHERE id=:id AND status IN ('QUEUED','PROCESSING')", args);
+        jdbc.update("""
+                UPDATE human_reviews SET draft_payload=NULL,draft_saved_at=NULL
+                WHERE grading_job_id=:id AND status<>'COMPLETED'
+                """, args);
+    }
+
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void assign(List<UUID> jobIds, UUID examinerId, boolean replacing) {

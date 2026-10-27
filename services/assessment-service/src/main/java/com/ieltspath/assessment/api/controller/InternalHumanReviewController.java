@@ -38,6 +38,12 @@ public class InternalHumanReviewController {
         return HumanReviewResponse.created(review);
     }
 
+    /** The learner gives up a late review whose examiner can no longer be changed; Learning then gives the credit back. */
+    @PostMapping("/internal/assessments/human-reviews/{reviewSubmissionId}/cancel")
+    public HumanReviewResponse cancel(@PathVariable("reviewSubmissionId") UUID reviewSubmissionId) {
+        return HumanReviewResponse.result(reviews.cancel(reviewSubmissionId, currentUser.requireUserId()));
+    }
+
     @GetMapping("/internal/assessments/human-reviews/{reviewSubmissionId}")
     public HumanReviewResponse get(@PathVariable("reviewSubmissionId") UUID reviewSubmissionId) {
         return HumanReviewResponse.result(reviews.get(reviewSubmissionId, currentUser.requireUserId()));

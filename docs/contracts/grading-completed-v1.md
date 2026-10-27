@@ -74,3 +74,22 @@ The notice tells the learner something they are waiting for, so the community no
    active** error types as `{ code, name, category, fixHint }`, no ids and no review status: the same set a learner is ever
    shown. The result page shows the name and the fix of each marked error, and a short list of the kinds of error in the
    essay. When the list cannot be read the page shows the codes and everything else as before.
+
+## Queue infrastructure
+
+| What | Name |
+|---|---|
+| Queue | `notification.grading-completed.v1` |
+| Retry queue | `notification.grading-completed.v1.retry` |
+| Dead-letter queue (DLQ) | `notification.grading-completed.v1.dlq` |
+| Dead-letter exchange (DLX) | `notification.grading-completed.dlx` |
+| Exchange and routing key | `assessment.events` / `assessment.grading-completed.v1` |
+
+- A message that may pass on a second try waits **30 seconds** on the retry queue and returns to the queue, at most **5** times;
+  after that, and for a message that breaks the contract or cannot be read, it goes to the DLQ.
+- **Both Assessment and Notification declare this queue** from the same class, `GradingCompletedTopology` in `common-events`, and both bind
+  it to `AssessmentMessaging.EXCHANGE` (not to a configurable name), so the broker sees identical declarations and a notice
+  is not lost when Notification has never started. This is the one exception to the rule that a consumer owns its queues
+  (`AGENTS.md` §3.5).
+- Whoever changes a queue name, the retry delay, the retry count or the payload must change `GradingCompletedTopology` (or the event record),
+  the consumer in Notification and **this contract together**.

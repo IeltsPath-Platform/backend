@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.2
-- Cập nhật lần cuối: 2026-10-19 (bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -133,10 +133,16 @@ src/main/java/com/ieltspath/<service>
   chỉ chứa tên và hình dạng event dùng chung cùng helper AMQP, không có logic nghiệp vụ. Đổi tên exchange/routing key
   hoặc hình dạng payload phải sửa module và contract tương ứng trong `docs/contracts/` cùng lúc.
 - Service consumer sở hữu và khai báo queue, retry queue và DLQ, kể cả tên của chúng (ví dụ `community.events.retry`,
-  `community.events.dlx`, `community.notifications.v1.dlq` của Notification). `common-events` không chứa các tên này.
-- `MessageRetry` và `RetryTopology` chỉ dùng cho hai queue grant `access.points-grant` và
-  `learning.points-grant-settled`; tên queue và cấu hình bean nằm ở service sở hữu. Consumer assessment của Learning
-  và consumer Community của Notification giữ retry/topology riêng; không dùng hai helper này.
+  `community.events.dlx`, `community.notifications.v1.dlq` của Notification). `common-events` không chứa các tên này,
+  trừ bốn queue chấm bài nêu ngay dưới.
+- `MessageRetry` và `RetryTopology` dùng cho hai queue grant (`access.points-grant`, `learning.points-grant-settled`;
+  tên queue và cấu hình bean nằm ở service sở hữu) và bốn queue chấm bài của Notification
+  `notification.grading-{requested,completed,due-soon,overdue}.v1` (tên nằm trong các lớp
+  `Grading{Requested,Completed,DueSoon,Overdue}Topology` của `common-events`). Ngoại lệ: bốn queue chấm bài được khai báo
+  ở cả Assessment lẫn Notification từ cùng các lớp đó, và cả hai luôn dùng `AssessmentMessaging.EXCHANGE`, để thông báo
+  không mất khi Notification chưa từng khởi động. Consumer assessment của Learning và consumer Community của Notification
+  vẫn giữ retry/topology riêng; không dùng hai helper này. Đổi tên queue hoặc payload của bốn queue chấm bài phải sửa
+  `common-events` và contract tương ứng (`docs/contracts/grading-*-v1.md`) cùng lúc.
 - Chưa có API version prefix. Giữ path tương thích; đánh giá mọi consumer trước khi đổi API, event hoặc JWT claim contract.
 - Gateway chỉ chứa routing, security, CORS, filter, observability; KHÔNG chứa business logic.
 

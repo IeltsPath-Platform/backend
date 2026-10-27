@@ -12,10 +12,15 @@ public final class ExaminerAssignmentPolicy {
     public static final Duration REMINDER_AFTER = Duration.ofHours(36);
     /** How many times the learner may replace the examiner of one submission. */
     public static final int MAX_CHANGES = 2;
+    /**
+     * An examiner with this many open jobs already late takes no new submission until they grade some: a learner who
+     * chose them now would most likely wait 48 hours for nothing.
+     */
+    public static final int MAX_OVERDUE_OPEN = 5;
 
     private static final Set<String> OPEN = Set.of("QUEUED", "PROCESSING");
 
-    public enum State { AWAITING_CHOICE, WAITING, OVERDUE, COMPLETED, CLOSED }
+    public enum State { AWAITING_CHOICE, WAITING, OVERDUE, COMPLETED, CANCELLED, CLOSED }
 
     private ExaminerAssignmentPolicy() {}
 
@@ -29,6 +34,7 @@ public final class ExaminerAssignmentPolicy {
 
     public static State stateOf(String status, boolean examinerChosen, Instant requestedAt, Instant now) {
         if ("COMPLETED".equals(status)) return State.COMPLETED;
+        if ("CANCELLED".equals(status)) return State.CANCELLED;
         if (!isOpen(status)) return State.CLOSED;
         if (!examinerChosen) return State.AWAITING_CHOICE;
         return isOverdue(requestedAt, now) ? State.OVERDUE : State.WAITING;
@@ -37,5 +43,10 @@ public final class ExaminerAssignmentPolicy {
     /** The learner may choose when nobody was chosen yet, or replace the examiner once the job is late. */
     public static boolean canChoose(State state, int changesMade) {
         return state == State.AWAITING_CHOICE || (state == State.OVERDUE && changesMade < MAX_CHANGES);
+    }
+
+    /** The learner may cancel a late job and take the credit back once no examiner change is left. */
+    public static boolean canCancel(State state, int changesMade) {
+        return state == State.OVERDUE && changesMade >= MAX_CHANGES;
     }
 }
