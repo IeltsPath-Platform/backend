@@ -60,7 +60,7 @@ public class RefreshLearningTopicsUseCase {
         List<KnowledgePointCatalogEntry> entries = new ArrayList<>();
         for (var topic : topics) {
             for (var kp : topic.knowledgePoints()) {
-                LearningSkill skill = kp.skill() == null ? topic.skill() : LearningSkill.valueOf(kp.skill());
+                LearningSkill skill = skillOf(kp.skill(), topic.skill());
                 entries.add(new KnowledgePointCatalogEntry(kp.id(), topic.topicId(), kp.hasPracticeSet(), skill,
                         topic.course() == null ? null : topic.course().bandLevel(), kp.parentKnowledgePointId(),
                         kp.errorCode()));
@@ -86,5 +86,16 @@ public class RefreshLearningTopicsUseCase {
                     topic.course() != null && topic.course().hasCourseTest(), topic.skills(), topic.lessonCount()));
         }
         return List.copyOf(results);
+    }
+
+    /**
+     * The skill a knowledge point is practised in. Content marks a point that belongs to no single skill (grammar, for
+     * one) with {@code ALL}, or leaves it empty; such a point takes the skill of the topic that holds it.
+     */
+    static LearningSkill skillOf(String knowledgePointSkill, LearningSkill topicSkill) {
+        if (knowledgePointSkill == null || knowledgePointSkill.isBlank() || "ALL".equals(knowledgePointSkill)) {
+            return topicSkill;
+        }
+        return LearningSkill.valueOf(knowledgePointSkill);
     }
 }
