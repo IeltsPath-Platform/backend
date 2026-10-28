@@ -188,7 +188,7 @@ class AiCourseDraftIntegrationTest {
 
         assertThat(draft.getStatus()).isEqualTo(DraftStatus.READY);
         assertThat(draft.getModel()).isEqualTo("stand-in-model");
-        assertThat(draft.getPromptVersion()).isEqualTo("COURSE-v3");
+        assertThat(draft.getPromptVersion()).isEqualTo("COURSE-v4");
         JsonNode result = json.readTree(draft.getResultJson());
         JsonNode lessons = result.path("topics").get(0).path("lessons");
         assertThat(lessons).hasSize(2);

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ieltspath.content.application.exception.VocabularyRejectedException;
 import com.ieltspath.content.application.port.VocabularySenseLookup;
+import com.ieltspath.content.application.port.VocabularySenseLookup.SenseText;
 import com.ieltspath.content.application.port.VocabularySenseWriter;
 import com.ieltspath.content.application.service.CourseDraftAnalysisService;
 import com.ieltspath.content.application.service.CourseDraftCodec;
@@ -49,6 +50,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -92,10 +94,15 @@ class ApproveCourseDraftIntegrationTest {
     static class FakeLibrary implements VocabularySenseLookup, VocabularySenseWriter {
         final Set<UUID> inactive = new HashSet<>();
         final List<List<NewWord>> writes = new ArrayList<>();
+        final Map<UUID, SenseText> texts = new HashMap<>();
         String refusal;
 
         @Override public Set<UUID> findActiveSenseIds(List<UUID> ids) {
             return ids.stream().filter(id -> !inactive.contains(id)).collect(Collectors.toSet());
+        }
+
+        @Override public List<SenseText> describeActiveSenses(List<UUID> ids) {
+            return ids.stream().filter(id -> !inactive.contains(id) && texts.containsKey(id)).map(texts::get).toList();
         }
 
         @Override public Map<String, UUID> resolveOrCreate(List<NewWord> words) {
@@ -145,6 +152,7 @@ class ApproveCourseDraftIntegrationTest {
     void fixtures() {
         library.inactive.clear();
         library.writes.clear();
+        library.texts.clear();
         library.refusal = null;
         jdbc.update("DELETE FROM courses WHERE band_level = ?", BAND);
         fixtureTopic = UUID.randomUUID();
@@ -249,6 +257,29 @@ class ApproveCourseDraftIntegrationTest {
         assertThat(senseIdsOfVocabularyBlock(approved.lessonIds().get(0))).containsExactly(picked,
                 FakeLibrary.senseOf("fluctuate"), FakeLibrary.senseOf("trend"));
         assertThat(senseIdsOfVocabularyBlock(approved.lessonIds().get(1))).containsExactly(FakeLibrary.senseOf("trend"));
+    }
+
+    @Test
+    void theSummaryEndsWithAVocabularyCoreTableOfTheLessonsWords() throws Exception {
+        UUID picked = UUID.randomUUID();
+        library.texts.put(picked, new SenseText(picked, "accelerate", "tăng tốc"));
+        ObjectNode draft = (ObjectNode) json.readTree(goodDraft());
+        ArrayNode lessons = (ArrayNode) draft.path("topics").get(0).path("lessons");
+        ObjectNode first = (ObjectNode) lessons.get(0);
+        first.putArray("vocabularySenseIds").add(picked.toString());
+        first.putArray("newVocabulary").add(word("fluctuate")).add(word("Accelerate"));
+        UUID id = drafts.create(author, draft).getId();
+
+        var approved = approve.execute(author, id);
+        entityManager.flush();
+
+        String summary = jdbc.queryForObject("SELECT summary_markdown FROM lessons WHERE id=?", String.class,
+                approved.lessonIds().get(0));
+        assertThat(summary).startsWith("- one\n- two\n\n## Vocabulary Core\n\n| Từ | Nghĩa |\n| --- | --- |\n");
+        assertThat(summary).contains("| accelerate | tăng tốc |\n| fluctuate | dao dong |").doesNotContain("Accelerate");
+        // A lesson with no words gets no table; this one was given no summary, so it stays without one.
+        assertThat(jdbc.queryForObject("SELECT summary_markdown FROM lessons WHERE id=?", String.class,
+                approved.lessonIds().get(1))).isNull();
     }
 
     @Test

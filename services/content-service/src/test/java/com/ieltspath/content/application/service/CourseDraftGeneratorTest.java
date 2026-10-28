@@ -99,7 +99,7 @@ class CourseDraftGeneratorTest {
         GenerationOutcome outcome = generator.generate(draft());
 
         assertEquals("test-model", outcome.model());
-        assertEquals("COURSE-v3", outcome.promptVersion());
+        assertEquals("COURSE-v4", outcome.promptVersion());
         JsonNode result = json.readTree(outcome.resultJson());
         assertEquals("R65", result.path("course").path("code").asText());
         assertEquals(1001, result.path("topics").get(0).path("sortOrder").asInt());
@@ -178,6 +178,11 @@ class CourseDraftGeneratorTest {
         assertTrue(prompt.getValue().contains("PS-1"));
         assertTrue(prompt.getValue().contains("Q1"));
         assertTrue(prompt.getValue().contains("focus on short texts"));
+        // The summary is asked for as exactly two sections; the vocabulary table is added by the system, not the model.
+        assertTrue(prompt.getValue().contains("\"## Learning Outcomes\""));
+        assertTrue(prompt.getValue().contains("\"## Key Points\""));
+        assertFalse(prompt.getValue().contains("Collocations"));
+        assertFalse(prompt.getValue().contains("IELTS Note"));
         assertFalse(prompt.getValue().contains(question.toString()), "question ids are not sent, only labels");
         assertFalse(prompt.getValue().contains(setOne.toString()));
     }

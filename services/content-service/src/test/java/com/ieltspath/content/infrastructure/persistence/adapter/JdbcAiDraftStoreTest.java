@@ -56,6 +56,16 @@ class JdbcAiDraftStoreTest {
     }
 
     @Test
+    void aPracticeSetDraftIsStoredAndReadBackWithItsKind() {
+        JdbcAiDraftRepository drafts = new JdbcAiDraftRepository(jdbc);
+
+        UUID id = drafts.save(AiDraft.request(DraftKind.PRACTICE_SET, UUID.randomUUID(), "{\"count\":5}",
+                Instant.parse("2026-10-28T10:00:00Z"))).getId();
+
+        assertEquals(DraftKind.PRACTICE_SET, drafts.findById(id).orElseThrow().getKind());
+    }
+
+    @Test
     void importAllowanceIsCountedSeparatelyFromGeneration() {
         JdbcAiUsageQuota quota = new JdbcAiUsageQuota(jdbc);
         UUID author = UUID.randomUUID();

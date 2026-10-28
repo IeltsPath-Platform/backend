@@ -5,6 +5,7 @@ import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.usecase.ApproveCourseDraftUseCase;
 import com.ieltspath.content.application.usecase.CourseDraftUseCases;
+import com.ieltspath.content.application.usecase.FindPracticeSetsForPointsUseCase;
 import com.ieltspath.content.domain.aggregate.AiDraft;
 import com.ieltspath.content.domain.exception.CourseDraftErrorsException;
 import com.ieltspath.content.domain.exception.InvalidContentStateException;
@@ -37,6 +38,7 @@ class CourseDraftControllerTest {
 
     private final CourseDraftUseCases drafts = mock(CourseDraftUseCases.class);
     private final ApproveCourseDraftUseCase approve = mock(ApproveCourseDraftUseCase.class);
+    private final FindPracticeSetsForPointsUseCase practiceSets = mock(FindPracticeSetsForPointsUseCase.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final UUID author = UUID.randomUUID();
     private final UUID id = UUID.randomUUID();
@@ -46,12 +48,34 @@ class CourseDraftControllerTest {
     @BeforeEach
     void setUp() {
         when(currentUser.requireUserId()).thenReturn(author);
-        mockMvc = MockMvcBuilders.standaloneSetup(new CourseDraftController(drafts, approve, currentUser,
-                new ObjectMapper())).setControllerAdvice(new GlobalExceptionHandler()).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(new CourseDraftController(drafts, approve, practiceSets,
+                currentUser, new ObjectMapper())).setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
     private AiDraft ready() {
         return AiDraft.manual(DraftKind.COURSE, author, "{\"course\":null,\"topics\":[]}", Instant.parse("2026-10-23T00:00:00Z"));
+    }
+
+    @Test
+    void practiceSetsForPointsListsThePackageIdsThatFit() throws Exception {
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        UUID package1 = UUID.randomUUID();
+        when(practiceSets.execute(List.of(first, second))).thenReturn(java.util.Set.of(package1));
+
+        mockMvc.perform(get("/api/content/admin/course-drafts/practice-sets")
+                        .param("knowledgePointIds", first + "," + second))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.packageIds[0]").value(package1.toString()));
+    }
+
+    @Test
+    void practiceSetsForNoPointsIsAnEmptyList() throws Exception {
+        when(practiceSets.execute(List.of())).thenReturn(java.util.Set.of());
+
+        mockMvc.perform(get("/api/content/admin/course-drafts/practice-sets"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.packageIds").isEmpty());
     }
 
     @Test

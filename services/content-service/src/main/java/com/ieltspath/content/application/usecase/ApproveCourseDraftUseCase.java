@@ -2,6 +2,7 @@ package com.ieltspath.content.application.usecase;
 
 import com.ieltspath.content.application.exception.VocabularyRejectedException;
 import com.ieltspath.content.application.port.VocabularySenseLookup;
+import com.ieltspath.content.application.port.VocabularySenseLookup.SenseText;
 import com.ieltspath.content.application.port.VocabularySenseWriter;
 import com.ieltspath.content.application.service.CourseDraftAnalysisService;
 import com.ieltspath.content.application.service.CourseDraftCodec;
@@ -75,7 +76,7 @@ public class ApproveCourseDraftUseCase {
         Map<String, UUID> newWordSenses = resolveNewWords(plan);
 
         CourseMaterializer.Created created = materializer.create(plan, checked.facts().resolvedQuestionRefs(),
-                newWordSenses);
+                newWordSenses, describeChosenSenses(plan));
 
         draft.approve(reviewer, clock.instant());
         drafts.save(draft);
@@ -94,6 +95,18 @@ public class ApproveCourseDraftUseCase {
         List<Issue> missing = chosen.stream().filter(id -> !active.contains(id))
                 .map(id -> new Issue(VOCABULARY_SENSE_UNAVAILABLE, id.toString(), null)).toList();
         if (!missing.isEmpty()) throw new CourseDraftErrorsException(missing, false);
+    }
+
+    /** The word and meaning of every picked sense, which fill the vocabulary table of each lesson's summary. */
+    private Map<UUID, SenseText> describeChosenSenses(CourseDraftStructure plan) {
+        List<UUID> chosen = plan.lessonsInOrder().stream().flatMap(lesson -> lesson.vocabularySenseIds().stream())
+                .distinct().toList();
+        Map<UUID, SenseText> described = new LinkedHashMap<>();
+        for (int from = 0; from < chosen.size(); from += SENSE_BATCH) {
+            senses.describeActiveSenses(chosen.subList(from, Math.min(chosen.size(), from + SENSE_BATCH)))
+                    .forEach(text -> described.put(text.senseId(), text));
+        }
+        return described;
     }
 
     /** The sense of every proposed word, by lemma; a lemma that several lessons propose is resolved once. */

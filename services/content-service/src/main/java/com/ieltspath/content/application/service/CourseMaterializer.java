@@ -7,6 +7,7 @@ import com.ieltspath.content.application.command.UpdateCourseCommand;
 import com.ieltspath.content.application.command.UpdateTopicCommand;
 import com.ieltspath.content.application.result.CourseResult;
 import com.ieltspath.content.application.result.LessonAuthoringResult;
+import com.ieltspath.content.application.port.VocabularySenseLookup.SenseText;
 import com.ieltspath.content.application.result.TopicResult;
 import com.ieltspath.content.application.usecase.CreateContentPackageUseCase;
 import com.ieltspath.content.application.usecase.CreateCourseUseCase;
@@ -26,6 +27,7 @@ import com.ieltspath.content.domain.vo.CourseDraftStructure.BlockPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.FinalTestPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.LessonPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.NewWord;
+import com.ieltspath.content.domain.vo.CourseDraftStructure.PracticeSetPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.ResourcePlan;
 import com.ieltspath.content.domain.vo.LessonResourceType;
 import com.ieltspath.content.application.command.CreateLessonResourceCommand;
@@ -33,6 +35,7 @@ import com.ieltspath.content.application.usecase.CreateLessonResourceUseCase;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.TopicPlan;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PracticeTestMilestone;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,13 +65,16 @@ public class CourseMaterializer {
     private final CreateDraftPackageVersionUseCase createDraftVersion;
     private final PracticeTestMilestoneRepository milestones;
     private final CreateLessonResourceUseCase lessonResources;
+    private final PracticeSetMaterializer practiceSets;
 
+    /** {@code practiceSets} is resolved on first use: only a plan with sets the model wrote needs it. */
     public CourseMaterializer(CreateCourseUseCase createCourse, UpdateCourseUseCase updateCourse,
                               CreateTopicUseCase createTopic, UpdateTopicUseCase updateTopic,
                               LessonAuthoringUseCase lessons, ContentPackageRepository packages,
                               CreateContentPackageUseCase createPackage,
                               CreateDraftPackageVersionUseCase createDraftVersion,
-                              PracticeTestMilestoneRepository milestones, CreateLessonResourceUseCase lessonResources) {
+                              PracticeTestMilestoneRepository milestones, CreateLessonResourceUseCase lessonResources,
+                              @Lazy PracticeSetMaterializer practiceSets) {
         this.createCourse = createCourse;
         this.updateCourse = updateCourse;
         this.createTopic = createTopic;
@@ -79,6 +85,7 @@ public class CourseMaterializer {
         this.createDraftVersion = createDraftVersion;
         this.milestones = milestones;
         this.lessonResources = lessonResources;
+        this.practiceSets = practiceSets;
     }
 
     /** What was created. The maps give the ids by the codes of the structure. */
@@ -100,6 +107,16 @@ public class CourseMaterializer {
     @Transactional
     public Created create(CourseDraftStructure plan, Map<String, UUID> questionVersionsByRef,
                           Map<String, UUID> senseByLemma) {
+        return create(plan, questionVersionsByRef, senseByLemma, Map.of());
+    }
+
+    /**
+     * @param senseTexts the word and meaning of each library sense a lesson picked, by sense id; they fill the
+     *                   "Vocabulary Core" table of the lesson's summary
+     */
+    @Transactional
+    public Created create(CourseDraftStructure plan, Map<String, UUID> questionVersionsByRef,
+                          Map<String, UUID> senseByLemma, Map<UUID, SenseText> senseTexts) {
         BigDecimal band = plan.course().bandLevel();
         CourseResult course = createCourse.execute(new CreateCourseCommand(plan.course().code(),
                 plan.course().name(), band));
@@ -118,7 +135,7 @@ public class CourseMaterializer {
                     ContentStatus.INACTIVE, topicBand, topicPlan.skill(), course.id()));
             topicIds.add(topic.id());
             topicsByCode.put(topicPlan.code(), topic.id());
-            addLessons(topicPlan, topic.id(), questionVersionsByRef, senseByLemma, lessonIds, lessonsByCode);
+            addLessons(topicPlan, topic.id(), questionVersionsByRef, senseByLemma, senseTexts, lessonIds, lessonsByCode);
             if (topicPlan.topicTest() != null) {
                 finalTests.add(createFinalTest(PackageType.TOPIC_TEST, topicPlan.topicTest(), topic.id(), null));
             }
@@ -138,11 +155,13 @@ public class CourseMaterializer {
     }
 
     private void addLessons(TopicPlan topic, UUID topicId, Map<String, UUID> questionVersionsByRef,
-                            Map<String, UUID> senseByLemma, List<UUID> lessonIds, Map<String, UUID> lessonsByCode) {
+                            Map<String, UUID> senseByLemma, Map<UUID, SenseText> senseTexts, List<UUID> lessonIds,
+                            Map<String, UUID> lessonsByCode) {
         int position = 1;
         for (LessonPlan lessonPlan : topic.lessons()) {
             LessonAuthoringResult lesson = lessons.create(topicId, lessonPlan.code(), lessonPlan.title(),
-                    lessonPlan.summary(), lessonPlan.summaryMarkdown(), lessonPlan.estimatedMinutes(), position++);
+                    lessonPlan.summary(), summaryWithVocabulary(lessonPlan, senseTexts), lessonPlan.estimatedMinutes(),
+                    position++);
             lessonIds.add(lesson.id());
             lessonsByCode.put(lessonPlan.code(), lesson.id());
             if (!lessonPlan.knowledgePointIds().isEmpty()) {
@@ -153,6 +172,10 @@ public class CourseMaterializer {
             }
             addVocabulary(lesson.id(), lessonPlan, senseByLemma);
             addResources(lesson.id(), lessonPlan);
+            int ordinal = 1;
+            for (PracticeSetPlan newSet : lessonPlan.newPracticeSets()) {
+                practiceSets.create(lesson.id(), lessonPlan.code(), ordinal++, newSet);
+            }
             for (UUID practiceSet : lessonPlan.practiceSetPackageIds()) {
                 if (!packages.attachPracticeSetToLesson(practiceSet, lesson.id())) {
                     throw new InvalidPackageLessonException("Package " + practiceSet
@@ -160,6 +183,17 @@ public class CourseMaterializer {
                 }
             }
         }
+    }
+
+    /** The summary the author wrote, with the lesson's words as its "Vocabulary Core" table: picked senses, then proposed words. */
+    private static String summaryWithVocabulary(LessonPlan lessonPlan, Map<UUID, SenseText> senseTexts) {
+        List<LessonSummaryComposer.Word> words = new ArrayList<>();
+        for (UUID sense : lessonPlan.vocabularySenseIds()) {
+            SenseText text = senseTexts.get(sense);
+            if (text != null) words.add(new LessonSummaryComposer.Word(text.lemma(), text.vietnameseMeaning()));
+        }
+        lessonPlan.newVocabulary().forEach(word -> words.add(new LessonSummaryComposer.Word(word.lemma(), word.vietnameseMeaning())));
+        return LessonSummaryComposer.withVocabularyCore(lessonPlan.summaryMarkdown(), words);
     }
 
     /** One vocabulary block with the senses the author picked and those of the words the plan proposed. */
