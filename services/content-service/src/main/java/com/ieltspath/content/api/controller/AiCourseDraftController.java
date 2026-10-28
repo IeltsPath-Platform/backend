@@ -41,11 +41,12 @@ public class AiCourseDraftController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public AiDraftResponse requestCourse(@Valid @RequestBody Body body) {
         CourseDraftRequest command = new CourseDraftRequest(body.bandLevel(), body.skills(), body.topics(),
-                body.knowledgePointIds(), body.lessonCount(), body.instructions());
+                body.knowledgePointIds(), body.lessonCount(), body.instructions(), body.includePrerequisites());
         return AiDraftResponse.from(request.execute(currentUser.requireUserId(), command), json);
     }
 
     public record Body(@NotNull BigDecimal bandLevel, List<Skill> skills, List<String> topics,
-                       List<UUID> knowledgePointIds, Integer lessonCount, String instructions) {
+                       List<UUID> knowledgePointIds, Integer lessonCount, String instructions,
+                       Boolean includePrerequisites) {
     }
 }

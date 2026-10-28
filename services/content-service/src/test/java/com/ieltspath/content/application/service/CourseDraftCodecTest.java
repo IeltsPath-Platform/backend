@@ -160,4 +160,106 @@ class CourseDraftCodecTest {
 
         assertEquals(plan, codec.read(codec.write(plan)));
     }
+
+    @Test
+    void aLessonKeepsItsMarkdownSummaryMinutesAndResources() throws Exception {
+        String lesson = "{\"code\":\"L1\",\"title\":\"Lesson\",\"summaryMarkdown\":\"- one\\n- two\",\"estimatedMinutes\":15,"
+                + "\"resources\":[{\"type\":\"SLIDE\",\"title\":\"Deck\",\"url\":\"https://slides.example/deck\"},"
+                + "{\"type\":\"DOCUMENT\",\"title\":\"Sheet\",\"url\":\"https://docs.example/sheet\"}]}";
+
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals("- one\n- two", read.summaryMarkdown());
+        assertEquals(15, read.estimatedMinutes());
+        assertEquals(2, read.resources().size());
+        assertEquals("https://slides.example/deck", read.resources().get(0).url());
+    }
+
+    @Test
+    void aDraftWithoutTheNewLessonFieldsStillReads() throws Exception {
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson("L1") + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals(null, read.summaryMarkdown());
+        assertEquals(null, read.estimatedMinutes());
+        assertEquals(List.of(), read.resources());
+    }
+
+    @Test
+    void badLessonMinutesAndResourceLinksAreReportedWithTheirPath() throws Exception {
+        String lesson = "{\"code\":\"L1\",\"title\":\"Lesson\",\"estimatedMinutes\":0,"
+                + "\"resources\":[{\"type\":\"SLIDE\",\"title\":\"Deck\",\"url\":\"ftp://nope\"},"
+                + "{\"type\":\"DOCUMENT\",\"title\":\" \",\"url\":\"https://ok.example\"}]}";
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".lessons[0].estimatedMinutes") && p.problem().equals("OUT_OF_RANGE")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources[0].url") && p.problem().equals("INVALID")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources[1].title")));
+    }
+
+    @Test
+    void aLessonMayHaveOnlyOneSlide() throws Exception {
+        String lesson = "{\"code\":\"L1\",\"title\":\"Lesson\",\"resources\":["
+                + "{\"type\":\"SLIDE\",\"title\":\"A\",\"url\":\"https://slides.example/a\"},"
+                + "{\"type\":\"SLIDE\",\"title\":\"B\",\"url\":\"https://slides.example/b\"},"
+                + "{\"type\":\"DOCUMENT\",\"title\":\"D1\",\"url\":\"https://docs.example/1\"},"
+                + "{\"type\":\"DOCUMENT\",\"title\":\"D2\",\"url\":\"https://docs.example/2\"}]}";
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources") && p.problem().equals("TOO_MANY_SLIDES")));
+    }
+
+    private static String word(String lemma, String partOfSpeech, String meaning) {
+        return "{\"lemma\":\"" + lemma + "\",\"partOfSpeech\":\"" + partOfSpeech + "\",\"vietnameseMeaning\":\""
+                + meaning + "\",\"exampleSentence\":\"Example.\"}";
+    }
+
+    private static String lessonWith(String fields) {
+        return "{\"code\":\"L1\",\"title\":\"Lesson\"," + fields + "}";
+    }
+
+    @Test
+    void aLessonKeepsItsPickedSensesAndProposedWords() throws Exception {
+        UUID sense = UUID.randomUUID();
+        String lesson = lessonWith("\"vocabularySenseIds\":[\"" + sense + "\"],\"newVocabulary\":[" + word("trend", "NOUN", "xu huong") + "]");
+
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals(List.of(sense), read.vocabularySenseIds());
+        assertEquals("trend", read.newVocabulary().get(0).lemma());
+        assertEquals(read, codec.read(codec.write(codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]")))))
+                .topics().get(0).lessons().get(0));
+    }
+
+    @Test
+    void aDraftWithoutVocabularyReadsAsEmpty() throws Exception {
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson("L1") + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals(List.of(), read.vocabularySenseIds());
+        assertEquals(List.of(), read.newVocabulary());
+    }
+
+    @Test
+    void badProposedWordsAreReportedWithTheirPath() throws Exception {
+        String lesson = lessonWith("\"newVocabulary\":[" + word("", "NOUN", "x") + "," + word("ok", "PRONOUN", "x") + ","
+                + word("fine", "NOUN", " ") + "," + word("12 bad!", "NOUN", "x") + "]");
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary[0].lemma") && p.problem().equals("REQUIRED")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary[1].partOfSpeech") && p.problem().equals("INVALID_VALUE")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary[2].vietnameseMeaning") && p.problem().equals("REQUIRED")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary[3].lemma") && p.problem().equals("INVALID_VALUE")));
+    }
+
+    @Test
+    void vocabularyIsLimitedPerLesson() throws Exception {
+        String words = java.util.stream.IntStream.range(0, 21).mapToObj(n -> word("word", "NOUN", "x"))
+                .collect(java.util.stream.Collectors.joining(","));
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lessonWith("\"newVocabulary\":[" + words + "]") + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary") && p.problem().equals("TOO_MANY")));
+    }
 }

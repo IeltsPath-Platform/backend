@@ -99,7 +99,7 @@ class CourseDraftGeneratorTest {
         GenerationOutcome outcome = generator.generate(draft());
 
         assertEquals("test-model", outcome.model());
-        assertEquals("COURSE-v1", outcome.promptVersion());
+        assertEquals("COURSE-v3", outcome.promptVersion());
         JsonNode result = json.readTree(outcome.resultJson());
         assertEquals("R65", result.path("course").path("code").asText());
         assertEquals(1001, result.path("topics").get(0).path("sortOrder").asInt());

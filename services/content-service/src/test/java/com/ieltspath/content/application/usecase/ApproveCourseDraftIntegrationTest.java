@@ -4,13 +4,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.ieltspath.content.application.exception.VocabularyRejectedException;
 import com.ieltspath.content.application.port.VocabularySenseLookup;
+import com.ieltspath.content.application.port.VocabularySenseWriter;
 import com.ieltspath.content.application.service.CourseDraftAnalysisService;
 import com.ieltspath.content.application.service.CourseDraftCodec;
 import com.ieltspath.content.application.service.CourseMaterializer;
 import com.ieltspath.content.domain.exception.CourseDraftErrorsException;
 import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.repository.AiDraftRepository;
+import com.ieltspath.content.domain.vo.CourseDraftStructure.NewWord;
 import com.ieltspath.content.domain.vo.DraftStatus;
 import com.ieltspath.content.infrastructure.persistence.adapter.ContentPackageRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.adapter.CourseRepositoryAdapter;
@@ -19,6 +22,8 @@ import com.ieltspath.content.infrastructure.persistence.adapter.JdbcCourseCatalo
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcPracticeTestMilestoneRepository;
 import com.ieltspath.content.infrastructure.persistence.adapter.LessonAuthoringRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.adapter.LessonResourceRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.mapper.LessonResourcePersistenceMapperImpl;
 import com.ieltspath.content.infrastructure.persistence.adapter.TopicRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.mapper.ContentPackagePersistenceMapper;
 import com.ieltspath.content.infrastructure.persistence.mapper.CoursePersistenceMapperImpl;
@@ -43,8 +48,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -65,6 +76,7 @@ import static org.mockito.Mockito.doThrow;
         ContentPackageRepositoryAdapter.class, ContentPackagePersistenceMapper.class,
         CreateContentPackageUseCase.class, CreateDraftPackageVersionUseCase.class, JdbcLearningContentReader.class,
         JdbcPracticeTestMilestoneRepository.class, JdbcAiDraftRepository.class,
+        CreateLessonResourceUseCase.class, LessonResourceRepositoryAdapter.class, LessonResourcePersistenceMapperImpl.class,
         ApproveCourseDraftIntegrationTest.Beans.class})
 @Testcontainers(disabledWithoutDocker = true)
 class ApproveCourseDraftIntegrationTest {
@@ -73,7 +85,28 @@ class ApproveCourseDraftIntegrationTest {
     static class Beans {
         @Bean ObjectMapper objectMapper() { return new ObjectMapper(); }
         @Bean Clock clock() { return Clock.systemUTC(); }
-        @Bean VocabularySenseLookup senses() { return ids -> Set.copyOf(ids); }
+        @Bean FakeLibrary library() { return new FakeLibrary(); }
+    }
+
+    /** The vocabulary library as the approval sees it: which senses are switched off, and the words it is given. */
+    static class FakeLibrary implements VocabularySenseLookup, VocabularySenseWriter {
+        final Set<UUID> inactive = new HashSet<>();
+        final List<List<NewWord>> writes = new ArrayList<>();
+        String refusal;
+
+        @Override public Set<UUID> findActiveSenseIds(List<UUID> ids) {
+            return ids.stream().filter(id -> !inactive.contains(id)).collect(Collectors.toSet());
+        }
+
+        @Override public Map<String, UUID> resolveOrCreate(List<NewWord> words) {
+            if (refusal != null) throw new VocabularyRejectedException(refusal);
+            writes.add(words);
+            Map<String, UUID> senses = new LinkedHashMap<>();
+            words.forEach(word -> senses.put(word.normalizedLemma(), senseOf(word.normalizedLemma())));
+            return senses;
+        }
+
+        static UUID senseOf(String lemma) { return UUID.nameUUIDFromBytes(lemma.getBytes()); }
     }
 
     @Container
@@ -95,6 +128,7 @@ class ApproveCourseDraftIntegrationTest {
     @Autowired CourseDraftUseCases drafts;
     @Autowired ApproveCourseDraftUseCase approve;
     @Autowired AiDraftRepository draftStore;
+    @Autowired FakeLibrary library;
     @Autowired JdbcLearningContentReader reader;
     @MockitoSpyBean CreateDraftPackageVersionUseCase draftVersions;
 
@@ -109,6 +143,9 @@ class ApproveCourseDraftIntegrationTest {
 
     @BeforeEach
     void fixtures() {
+        library.inactive.clear();
+        library.writes.clear();
+        library.refusal = null;
         jdbc.update("DELETE FROM courses WHERE band_level = ?", BAND);
         fixtureTopic = UUID.randomUUID();
         jdbc.update("INSERT INTO topics(id,code,name,sort_order) VALUES(?,?,?,?)", fixtureTopic, tag + "_FIXTURE",
@@ -151,6 +188,11 @@ class ApproveCourseDraftIntegrationTest {
                 + "(SELECT id FROM topics WHERE course_id=?)", String.class, approved.courseId()))
                 .containsOnly("DRAFT");
         UUID first = approved.lessonIds().get(0);
+        assertThat(jdbc.queryForObject("SELECT summary_markdown FROM lessons WHERE id=?", String.class, first)).isEqualTo("- one\n- two");
+        assertThat(jdbc.queryForObject("SELECT estimated_minutes FROM lessons WHERE id=?", Integer.class, first)).isEqualTo(20);
+        assertThat(jdbc.queryForList("SELECT resource_type || ':' || sort_order || ':' || title FROM lesson_resources WHERE lesson_id=? "
+                + "ORDER BY resource_type DESC, sort_order", String.class, first))
+                .containsExactly("SLIDE:0:Deck", "DOCUMENT:0:Sheet B", "DOCUMENT:1:Sheet A");
         assertThat(jdbc.queryForList("SELECT knowledge_point_id FROM lesson_knowledge_points WHERE lesson_id=?",
                 UUID.class, first)).contains(kpFoundation);
         assertThat(jdbc.queryForList("SELECT block_type FROM lesson_blocks WHERE lesson_id=? ORDER BY sort_order",
@@ -183,6 +225,76 @@ class ApproveCourseDraftIntegrationTest {
                 .doesNotContainAnyElementsOf(approved.topicIds());
         assertThat(reader.publishedTestPackages(approved.topicIds().get(0))).isEmpty();
         assertThat(reader.courseTestPackages(approved.courseId())).isEmpty();
+    }
+
+    // --- vocabulary
+
+    @Test
+    void aLessonGetsOneVocabularyBlockWithThePickedAndTheProposedSenses() throws Exception {
+        UUID picked = UUID.randomUUID();
+        ObjectNode draft = (ObjectNode) json.readTree(goodDraft());
+        ArrayNode lessons = (ArrayNode) draft.path("topics").get(0).path("lessons");
+        ObjectNode first = (ObjectNode) lessons.get(0);
+        first.putArray("vocabularySenseIds").add(picked.toString());
+        first.putArray("newVocabulary").add(word("fluctuate")).add(word("Trend"));
+        ((ObjectNode) lessons.get(1)).putArray("newVocabulary").add(word("trend"));
+        UUID id = drafts.create(author, draft).getId();
+
+        var approved = approve.execute(author, id);
+        entityManager.flush();
+
+        // The library is asked once, and a lemma two lessons propose is sent once.
+        assertThat(library.writes).hasSize(1);
+        assertThat(library.writes.get(0)).extracting(NewWord::normalizedLemma).containsExactly("fluctuate", "trend");
+        assertThat(senseIdsOfVocabularyBlock(approved.lessonIds().get(0))).containsExactly(picked,
+                FakeLibrary.senseOf("fluctuate"), FakeLibrary.senseOf("trend"));
+        assertThat(senseIdsOfVocabularyBlock(approved.lessonIds().get(1))).containsExactly(FakeLibrary.senseOf("trend"));
+    }
+
+    @Test
+    void aLessonWithoutVocabularyGetsNoVocabularyBlockAndTheLibraryIsNotAsked() throws Exception {
+        UUID id = drafts.create(author, structure(goodDraft())).getId();
+
+        var approved = approve.execute(author, id);
+        entityManager.flush();
+
+        assertThat(library.writes).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM lesson_blocks WHERE block_type='VOCABULARY' AND lesson_id=?",
+                Integer.class, approved.lessonIds().get(0))).isZero();
+    }
+
+    @Test
+    void aPickedSenseThatIsNoLongerActiveIsRefusedAndNothingIsCreated() throws Exception {
+        UUID gone = UUID.randomUUID();
+        library.inactive.add(gone);
+        ObjectNode draft = (ObjectNode) json.readTree(goodDraft());
+        ((ObjectNode) draft.path("topics").get(0).path("lessons").get(0)).putArray("vocabularySenseIds")
+                .add(gone.toString());
+        UUID id = drafts.create(author, draft).getId();
+
+        assertThatThrownBy(() -> approve.execute(author, id)).isInstanceOfSatisfying(CourseDraftErrorsException.class,
+                error -> {
+                    assertThat(error.getIssues()).extracting("code").containsExactly("VOCABULARY_SENSE_UNAVAILABLE");
+                    assertThat(error.getIssues()).extracting("subject").containsExactly(gone.toString());
+                });
+        assertThat(library.writes).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM courses WHERE band_level=?", Integer.class, BAND)).isZero();
+    }
+
+    @Test
+    void aWordTheLibraryRefusesIsReportedAndNothingIsCreated() throws Exception {
+        library.refusal = "Vocabulary item is inactive: going";
+        ObjectNode draft = (ObjectNode) json.readTree(goodDraft());
+        ((ObjectNode) draft.path("topics").get(0).path("lessons").get(0)).putArray("newVocabulary").add(word("going"));
+        UUID id = drafts.create(author, draft).getId();
+
+        assertThatThrownBy(() -> approve.execute(author, id)).isInstanceOfSatisfying(CourseDraftErrorsException.class,
+                error -> {
+                    assertThat(error.getIssues()).extracting("code").containsExactly("VOCABULARY_REJECTED");
+                    assertThat(error.getIssues()).extracting("subject").containsExactly(library.refusal);
+                });
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM courses WHERE band_level=?", Integer.class, BAND)).isZero();
+        assertThat(draftStore.findById(id).orElseThrow().getStatus()).isEqualTo(DraftStatus.READY);
     }
 
     @Test
@@ -300,6 +412,10 @@ class ApproveCourseDraftIntegrationTest {
                   {"code":"%1$s_T1","name":"Foundations","skill":"READING","sortOrder":%2$d,
                    "lessons":[
                      {"code":"%1$s_L1","title":"Basics","summary":"s","knowledgePointIds":["%3$s"],
+                      "summaryMarkdown":"- one\\n- two","estimatedMinutes":20,
+                      "resources":[{"type":"SLIDE","title":"Deck","url":"https://slides.example/deck"},
+                                   {"type":"DOCUMENT","title":"Sheet B","url":"https://docs.example/b"},
+                                   {"type":"DOCUMENT","title":"Sheet A","url":"https://docs.example/a"}],
                       "blocks":[{"type":"TEXT","text":"Intro","knowledgePointIds":["%3$s"]},
                                 {"type":"EXERCISE","questionRefs":["%1$s-Q1"]}],
                       "practiceSetPackageIds":["%5$s"]},
@@ -310,6 +426,18 @@ class ApproveCourseDraftIntegrationTest {
                  "courseTest":{"code":"%1$s_COURSE_TEST","title":"Course test"},
                  "practiceTestMilestones":[{"packageId":"%7$s","afterTopicSequence":1}]}
                 """.formatted(tag, sortOrder(1), kpFoundation, kpAdvanced, practiceSet, sortOrder(2), practiceTest);
+    }
+
+    private ObjectNode word(String lemma) {
+        return json.createObjectNode().put("lemma", lemma).put("partOfSpeech", "VERB")
+                .put("englishDefinition", "to change often").put("vietnameseMeaning", "dao dong")
+                .put("exampleSentence", "Prices fluctuate.");
+    }
+
+    private List<UUID> senseIdsOfVocabularyBlock(UUID lessonId) {
+        return jdbc.queryForList("SELECT v.vocabulary_sense_id FROM lesson_block_vocabulary v "
+                + "JOIN lesson_blocks b ON b.id = v.block_id WHERE b.lesson_id=? AND b.block_type='VOCABULARY' "
+                + "ORDER BY v.sort_order", UUID.class, lessonId);
     }
 
     private int sortOrder(int n) {

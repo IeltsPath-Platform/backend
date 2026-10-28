@@ -5,6 +5,7 @@ import com.ieltspath.content.api.dto.request.AddQuestionVersionRequest;
 import com.ieltspath.content.api.dto.request.CreateQuestionRequest;
 import com.ieltspath.content.api.dto.response.QuestionDetailResponse;
 import com.ieltspath.content.api.dto.response.QuestionPageResponse;
+import com.ieltspath.content.api.dto.response.QuestionPassageResponse;
 import com.ieltspath.content.api.dto.response.QuestionResponse;
 import com.ieltspath.content.application.command.AddQuestionVersionCommand;
 import com.ieltspath.content.application.command.CreateQuestionCommand;
@@ -30,6 +31,7 @@ public class QuestionController {
 
     private final ListQuestionsUseCase listQuestionsUseCase;
     private final GetQuestionDetailUseCase getQuestionDetailUseCase;
+    private final GetQuestionPassagesUseCase getQuestionPassagesUseCase;
     private final CreateQuestionUseCase createQuestionUseCase;
     private final AddQuestionVersionUseCase addQuestionVersionUseCase;
     private final ArchiveQuestionUseCase archiveQuestionUseCase;
@@ -48,6 +50,13 @@ public class QuestionController {
             return QuestionPageResponse.from(listQuestionsUseCase.findByImportRef(importRef));
         }
         return QuestionPageResponse.from(listQuestionsUseCase.execute(skill, purpose, status, page, size));
+    }
+
+    /** The reading passages that go with one version of a question; empty when it has none. */
+    @GetMapping("/versions/{versionId}/passages")
+    @PreAuthorize("hasRole('CONTENT_AUTHOR')")
+    public List<QuestionPassageResponse> getVersionPassages(@PathVariable("versionId") UUID versionId) {
+        return getQuestionPassagesUseCase.execute(versionId).stream().map(QuestionPassageResponse::from).toList();
     }
 
     @GetMapping("/{id}")

@@ -133,7 +133,7 @@ class ErrorTrapCoverageMigrationTest {
                 "SELECT count(*) FROM content_packages WHERE code LIKE 'PS-TRAP-%'", Integer.class);
 
         org.junit.jupiter.api.Assertions.assertEquals(0, prefixed);
-        org.junit.jupiter.api.Assertions.assertEquals(19, sets);
+        org.junit.jupiter.api.Assertions.assertEquals(79, sets);
     }
 
     @Test

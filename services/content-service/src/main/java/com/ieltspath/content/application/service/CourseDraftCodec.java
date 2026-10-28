@@ -34,6 +34,18 @@ public class CourseDraftCodec {
     static final int MAX_QUESTION_REFS = 100;
     static final int MAX_KNOWLEDGE_POINTS = 50;
     static final int MAX_PRACTICE_SETS = 20;
+    static final int MAX_RESOURCES = 20;
+    static final int MAX_SUMMARY_MARKDOWN = 20000;
+    static final int MAX_MINUTES = 600;
+    static final int MAX_NEW_WORDS = 20;
+    static final int MAX_VOCABULARY = 50;
+    static final int MAX_LEMMA = 100;
+    static final int MAX_WORD_TEXT = 1000;
+    /** The parts of speech the library knows; a proposed word must name one. */
+    static final Set<String> PARTS_OF_SPEECH = Set.of("NOUN", "VERB", "ADJECTIVE", "ADVERB", "PREPOSITION",
+            "CONJUNCTION", "IDIOM", "PHRASAL_VERB");
+    static final Pattern LEMMA = Pattern.compile("[\\p{L}][\\p{L}\\p{N}' .-]*");
+    private static final Pattern WEB_LINK = Pattern.compile("(?i)^https?://\\S+$");
     static final int MAX_MILESTONES = 100;
     private static final Pattern CODE = Pattern.compile("[A-Za-z0-9._-]{1,100}");
     private static final BigDecimal NINE = new BigDecimal("9");
@@ -145,12 +157,70 @@ public class CourseDraftCodec {
         if (lesson.knowledgePointIds().size() > MAX_KNOWLEDGE_POINTS) {
             problems.add(new Problem(at + ".knowledgePointIds", "TOO_MANY"));
         }
+        if (lesson.summaryMarkdown() != null && lesson.summaryMarkdown().length() > MAX_SUMMARY_MARKDOWN) {
+            problems.add(new Problem(at + ".summaryMarkdown", "TOO_LONG"));
+        }
+        if (lesson.estimatedMinutes() != null && (lesson.estimatedMinutes() < 1 || lesson.estimatedMinutes() > MAX_MINUTES)) {
+            problems.add(new Problem(at + ".estimatedMinutes", "OUT_OF_RANGE"));
+        }
+        if (lesson.resources().size() > MAX_RESOURCES) problems.add(new Problem(at + ".resources", "TOO_MANY"));
+        // A lesson has one slide; any number of documents.
+        if (lesson.resources().stream().filter(r -> r != null && r.type() == com.ieltspath.content.domain.vo.LessonResourceType.SLIDE).count() > 1) {
+            problems.add(new Problem(at + ".resources", "TOO_MANY_SLIDES"));
+        }
+        for (int r = 0; r < lesson.resources().size(); r++) {
+            var resource = lesson.resources().get(r);
+            String where = at + ".resources[" + r + "]";
+            if (resource == null || resource.type() == null) {
+                problems.add(new Problem(where + ".type", "REQUIRED"));
+                continue;
+            }
+            text(problems, where + ".title", resource.title(), 255);
+            if (resource.url() == null || resource.url().length() > 2000 || !WEB_LINK.matcher(resource.url().trim()).matches()) {
+                problems.add(new Problem(where + ".url", "INVALID"));
+            }
+        }
+        vocabulary(problems, at, lesson);
         if (lesson.practiceSetPackageIds().size() > MAX_PRACTICE_SETS) {
             problems.add(new Problem(at + ".practiceSetPackageIds", "TOO_MANY"));
         }
         if (lesson.blocks().size() > MAX_BLOCKS) problems.add(new Problem(at + ".blocks", "TOO_MANY"));
         for (int b = 0; b < lesson.blocks().size(); b++) {
             block(problems, at + ".blocks[" + b + "]", lesson.blocks().get(b));
+        }
+    }
+
+    private static void vocabulary(List<Problem> problems, String at, LessonPlan lesson) {
+        if (lesson.newVocabulary().size() > MAX_NEW_WORDS) problems.add(new Problem(at + ".newVocabulary", "TOO_MANY"));
+        if (lesson.vocabularySenseIds().size() + lesson.newVocabulary().size() > MAX_VOCABULARY) {
+            problems.add(new Problem(at + ".vocabularySenseIds", "TOO_MANY"));
+        }
+        if (lesson.vocabularySenseIds().stream().anyMatch(java.util.Objects::isNull)) {
+            problems.add(new Problem(at + ".vocabularySenseIds", "REQUIRED"));
+        }
+        for (int w = 0; w < lesson.newVocabulary().size(); w++) {
+            var word = lesson.newVocabulary().get(w);
+            String where = at + ".newVocabulary[" + w + "]";
+            if (word == null) {
+                problems.add(new Problem(where, "REQUIRED"));
+                continue;
+            }
+            if (word.lemma() == null || word.lemma().isBlank()) {
+                problems.add(new Problem(where + ".lemma", "REQUIRED"));
+            } else if (word.lemma().length() > MAX_LEMMA) {
+                problems.add(new Problem(where + ".lemma", "TOO_LONG"));
+            } else if (!LEMMA.matcher(word.lemma().trim()).matches()) {
+                problems.add(new Problem(where + ".lemma", "INVALID_VALUE"));
+            }
+            if (word.partOfSpeech() == null || !PARTS_OF_SPEECH.contains(word.partOfSpeech())) {
+                problems.add(new Problem(where + ".partOfSpeech", "INVALID_VALUE"));
+            }
+            text(problems, where + ".vietnameseMeaning", word.vietnameseMeaning(), MAX_WORD_TEXT);
+            text(problems, where + ".exampleSentence", word.exampleSentence(), MAX_WORD_TEXT);
+            if (word.englishDefinition() != null && word.englishDefinition().length() > MAX_WORD_TEXT) {
+                problems.add(new Problem(where + ".englishDefinition", "TOO_LONG"));
+            }
+            if (word.ipa() != null && word.ipa().length() > MAX_LEMMA) problems.add(new Problem(where + ".ipa", "TOO_LONG"));
         }
     }
 

@@ -134,6 +134,96 @@ class CourseCandidateSelectorTest {
     }
 
     @Test
+    void prerequisitesOfPrerequisitesJoinAndTheEarliestIsTaughtFirst() {
+        Point a2 = reader.add("R_A2", "Basics", null, "A2");
+        Point b1 = reader.add("R_B1", "Word in context", null, "B1");
+        Point b2 = reader.add("R_B2", "Not given", null, "B2");
+        Point asked = reader.add("R_C1", "Inference", null, "C1");
+        reader.prerequisites.put(asked.id(), Set.of(b2.id()));
+        reader.prerequisites.put(b2.id(), Set.of(b1.id()));
+        reader.prerequisites.put(b1.id(), Set.of(a2.id()));
+
+        CourseCandidates result = selector.select(request(List.of(), List.of(asked.id())));
+
+        assertEquals(List.of("R_A2", "R_B1", "R_B2", "R_C1"), codes(result));
+        assertEquals(List.of(true, true, true, false),
+                result.points().stream().map(CourseCandidates.Candidate::foundation).toList());
+    }
+
+    @Test
+    void whenTheAuthorPicksThePrerequisitesTheGeneratorAddsNone() {
+        Point b1 = reader.add("R_B1", "Word in context", null, "B1");
+        Point b2 = reader.add("R_B2", "Not given", null, "B2");
+        Point c1 = reader.add("R_C1", "Inference", null, "C1");
+        Point other = reader.add("R_OTHER", "Other base", null, "B1");
+        reader.prerequisites.put(c1.id(), Set.of(b2.id(), other.id()));
+        reader.prerequisites.put(b2.id(), Set.of(b1.id()));
+        CourseDraftRequest picked = new CourseDraftRequest(new BigDecimal("6.5"), List.of(Skill.READING), List.of(),
+                List.of(c1.id(), b1.id(), b2.id()), 4, null, false);
+
+        CourseCandidates result = selector.select(picked);
+
+        // Only what was named, and a prerequisite the author left out stays out. The lowest level is taught first.
+        assertEquals(List.of("R_B1", "R_B2", "R_C1"), codes(result));
+        assertTrue(result.points().stream().noneMatch(CourseCandidates.Candidate::foundation));
+    }
+
+    @Test
+    void readyPointsAreTaughtFromTheLowestLevelUp() {
+        Point high = reader.add("R_HIGH", "High", null, "C1");
+        Point low = reader.add("R_LOW", "Low", null, "B1");
+        Point unleveled = reader.add("R_NONE", "No level", null, null);
+
+        assertEquals(List.of("R_LOW", "R_HIGH", "R_NONE"),
+                codes(selector.select(request(List.of(), List.of(unleveled.id(), high.id(), low.id())))));
+    }
+
+    @Test
+    void aPrerequisiteReachedByTwoWaysIsTakenOnce() {
+        Point shared = reader.add("R_SHARED", "Shared", null, "B1");
+        Point middle = reader.add("R_MIDDLE", "Middle", null, "B2");
+        Point first = reader.add("R_ONE", "One", null, "C1");
+        Point second = reader.add("R_TWO", "Two", null, "C1");
+        reader.prerequisites.put(first.id(), Set.of(middle.id(), shared.id()));
+        reader.prerequisites.put(second.id(), Set.of(shared.id()));
+        reader.prerequisites.put(middle.id(), Set.of(shared.id()));
+
+        CourseCandidates result = selector.select(request(List.of(), List.of(first.id(), second.id())));
+
+        // R_TWO is ready as soon as the shared point is taught, but the foundation point goes before the asked ones.
+        assertEquals(List.of("R_SHARED", "R_MIDDLE", "R_ONE", "R_TWO"), codes(result));
+        assertEquals(1, result.points().stream().filter(point -> point.code().equals("R_SHARED")).count());
+    }
+
+    @Test
+    void whenRoomRunsOutTheNearestPrerequisitesAreKept() {
+        properties.getAi().setMaxCourseCandidates(3);
+        Point deep = reader.add("R_DEEP", "Deep", null, "A2");
+        Point near = reader.add("R_NEAR", "Near", null, "B1");
+        Point middle = reader.add("R_MIDDLE", "Middle", null, "B2");
+        Point asked = reader.add("R_C1", "Asked", null, "C1");
+        reader.prerequisites.put(asked.id(), Set.of(middle.id()));
+        reader.prerequisites.put(middle.id(), Set.of(near.id()));
+        reader.prerequisites.put(near.id(), Set.of(deep.id()));
+
+        CourseCandidates result = selector.select(request(List.of(), List.of(asked.id())));
+
+        assertEquals(List.of("R_NEAR", "R_MIDDLE", "R_C1"), codes(result));
+    }
+
+    @Test
+    void aPrerequisiteCycleDoesNotLoop() {
+        Point one = reader.add("R_ONE", "One", null, "B1");
+        Point two = reader.add("R_TWO", "Two", null, "B2");
+        Point asked = reader.add("R_C1", "Asked", null, "C1");
+        reader.prerequisites.put(asked.id(), Set.of(two.id()));
+        reader.prerequisites.put(two.id(), Set.of(one.id()));
+        reader.prerequisites.put(one.id(), Set.of(two.id()));
+
+        assertEquals(3, selector.select(request(List.of(), List.of(asked.id()))).points().size());
+    }
+
+    @Test
     void everyPrerequisiteComesBeforeThePointsThatNeedIt() {
         Point c = reader.add("R_C", "C", null, "C1");
         Point b = reader.add("R_B", "B", null, "C1");
