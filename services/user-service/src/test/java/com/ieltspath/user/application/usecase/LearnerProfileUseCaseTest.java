@@ -121,7 +121,6 @@ class LearnerProfileUseCaseTest {
         UpdateLearnerProfileCommand cmd = new UpdateLearnerProfileCommand(
                 userId,
                 "New Name",
-                "avatar.png",
                 "My bio",
                 BigDecimal.valueOf(7.5),
                 "UTC",
@@ -138,14 +137,18 @@ class LearnerProfileUseCaseTest {
     }
 
     @Test
-    void updateLearnerProfileRejectsChangedUnownedAvatarReference() {
+    void updateLearnerProfileKeepsTheStoredAvatar() {
         UUID userId = UUID.randomUUID();
         LearnerProfile existing = existingProfile(userId, "UTC");
+        existing.updateAvatarReference("https://cdn.example.test/avatars/images/me.png");
         when(learnerProfileRepository.findByUserId(userId)).thenReturn(Optional.of(existing));
-        UpdateLearnerProfileCommand command = new UpdateLearnerProfileCommand(
-                userId, "Name", "https://example.com/tracker.png", null, null, "UTC", "PUBLIC");
-        assertThrows(IllegalArgumentException.class, () -> updateLearnerProfileUseCase.execute(command));
-        verify(learnerProfileRepository, never()).save(any());
+        when(learnerProfileRepository.save(existing)).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = updateLearnerProfileUseCase.execute(
+                new UpdateLearnerProfileCommand(userId, "Renamed", "Only the text changed", null, "UTC", null));
+
+        assertEquals("Renamed", result.displayName());
+        assertEquals("https://cdn.example.test/avatars/images/me.png", result.avatarReference());
     }
 
     @Test
@@ -190,7 +193,7 @@ class LearnerProfileUseCaseTest {
         when(learnerProfileRepository.findByUserId(userId)).thenReturn(Optional.of(existing));
         when(learnerProfileRepository.save(existing)).thenAnswer(inv -> inv.getArgument(0));
 
-        var command = new UpdateLearnerProfileCommand(userId, "Updated learner", null, "Updated bio",
+        var command = new UpdateLearnerProfileCommand(userId, "Updated learner", "Updated bio",
                 null, "Not/A_Timezone", null);
         var result = updateLearnerProfileUseCase.execute(command);
 
@@ -220,7 +223,7 @@ class LearnerProfileUseCaseTest {
     }
 
     private UpdateLearnerProfileCommand timezoneCommand(UUID userId, String timezone) {
-        return new UpdateLearnerProfileCommand(userId, "Learner", null, null, null, timezone, null);
+        return new UpdateLearnerProfileCommand(userId, "Learner", null, null, timezone, null);
     }
 
     @Test

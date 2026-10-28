@@ -137,7 +137,7 @@ class LearnerProfileSecurityTest {
                     "bio": "IELTS learner",
                     "selfReportedBand": 6.5,
                     "timezone": "Asia/Ho_Chi_Minh",
-                    "visibility": "COMMUNITY"
+                    "visibility": "PRIVATE"
                 }
                 """;
 

@@ -13,6 +13,7 @@ public record UpdateLearnerProfileRequest(
         @Size(max = 100, message = "Tên hiển thị không được vượt quá 100 ký tự")
         String displayName,
 
+        /** Ignored: the avatar changes only through POST and DELETE /api/users/me/avatar. Kept so existing clients still work. */
         @Size(max = 500, message = "Đường dẫn ảnh đại diện không hợp lệ")
         String avatarReference,
 
@@ -26,7 +27,7 @@ public record UpdateLearnerProfileRequest(
         @Size(max = 50, message = "Múi giờ không được vượt quá 50 ký tự")
         String timezone,
 
-        @Pattern(regexp = "PUBLIC|PRIVATE|COMMUNITY", flags = Pattern.Flag.CASE_INSENSITIVE, message = "Quyền hiển thị phải là PUBLIC, COMMUNITY hoặc PRIVATE")
+        @Pattern(regexp = "PUBLIC|PRIVATE", flags = Pattern.Flag.CASE_INSENSITIVE, message = "Quyền hiển thị phải là PUBLIC hoặc PRIVATE")
         String visibility
 ) {
 }

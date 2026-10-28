@@ -7,7 +7,7 @@ import com.ieltspath.user.domain.exception.InvalidActionTokenException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.AccountActionTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
-import com.ieltspath.user.domain.repository.StudySessionRepository;
+import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.vo.ActionTokenPurpose;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,7 @@ public class ResetPasswordUseCase {
     private final AccountActionTokenRepository accountActionTokenRepository;
     private final TokenHashService tokenHashService;
     private final PasswordEncoder passwordEncoder;
-    private final StudySessionRepository studySessions;
+    private final UserLock userLock;
     private final RefreshTokenRepository refreshTokenRepository;
 
     @Transactional
@@ -46,7 +46,7 @@ public class ResetPasswordUseCase {
 
         User user = userRepository.findById(actionToken.getUserId())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng sở hữu token này"));
-        studySessions.lockUser(user.getId());
+        userLock.lock(user.getId());
         if (!accountActionTokenRepository.consumePasswordResetToken(tokenHash, java.time.LocalDateTime.now())) {
             throw new InvalidActionTokenException("Mã token đã hết hạn hoặc đã được sử dụng");
         }

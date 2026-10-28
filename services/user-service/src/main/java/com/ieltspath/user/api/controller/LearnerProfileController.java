@@ -56,7 +56,6 @@ public class LearnerProfileController {
         return toResponse(updateLearnerProfileUseCase.execute(new UpdateLearnerProfileCommand(
                 userId,
                 request.displayName(),
-                request.avatarReference(),
                 request.bio(),
                 request.selfReportedBand(),
                 request.timezone(),

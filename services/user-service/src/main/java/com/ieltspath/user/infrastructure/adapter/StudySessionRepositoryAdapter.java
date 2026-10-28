@@ -22,7 +22,7 @@ public class StudySessionRepositoryAdapter implements StudySessionRepository {
             r.getLong("total_accepted_ms"), r.getString("status"));
     public void lockUser(UUID userId) {
         jdbc.query("SELECT pg_advisory_xact_lock(?)", (r, n) -> 0,
-                userId.getMostSignificantBits() ^ userId.getLeastSignificantBits());
+                AdvisoryUserLock.key(userId));
     }
     public Optional<StudySession> findByClient(UUID user, UUID client) {
         return jdbc.query("SELECT * FROM study_sessions WHERE user_id=? AND client_session_id=?", SESSION, user, client).stream().findFirst();

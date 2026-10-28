@@ -11,11 +11,10 @@ import com.ieltspath.user.domain.vo.ProfileVisibility;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.beans.factory.annotation.Value;
 
-import java.time.LocalDateTime;
 import java.util.Objects;
 
+/** Edits the text fields of a profile. The avatar is left as it is: it changes only through upload and delete. */
 @Service
 @RequiredArgsConstructor
 public class UpdateLearnerProfileUseCase {
@@ -23,8 +22,6 @@ public class UpdateLearnerProfileUseCase {
     private final UserRepository userRepository;
     private final LearningGoalRepository learningGoalRepository;
     private final ScheduleStudyGoalUseCase studyGoals;
-    @Value("${app.user.avatar.bucket:avatars}") private String avatarBucket;
-    @Value("${app.storage.supabase.url:}") private String supabaseUrl;
 
     @Transactional
     public LearnerProfileResult execute(UpdateLearnerProfileCommand command) {
@@ -34,25 +31,12 @@ public class UpdateLearnerProfileUseCase {
                     if (userRepository.findById(command.userId()).isEmpty()) {
                         throw new UserNotFoundException("Không tìm thấy người dùng với id: " + command.userId());
                     }
-                    return LearnerProfile.builder()
-                            .userId(command.userId())
-                            .displayName(command.displayName())
-                            .timezone("Asia/Ho_Chi_Minh")
-                            .visibility(ProfileVisibility.PUBLIC)
-                            .createdAt(LocalDateTime.now())
-                            .updatedAt(LocalDateTime.now())
-                            .build();
+                    return LearnerProfile.createDefault(command.userId(), command.displayName());
                 });
 
         String previousTimezone = profile.getTimezone();
-        if (!Objects.equals(profile.getAvatarReference(), command.avatarReference())
-                && command.avatarReference() != null
-                && AvatarReferences.ownedKey(command.avatarReference(), supabaseUrl, avatarBucket, command.userId()).isEmpty()) {
-            throw new IllegalArgumentException("Ảnh đại diện phải thuộc kho ảnh của tài khoản này");
-        }
         profile.updateDetails(
                 command.displayName(),
-                command.avatarReference(),
                 command.bio(),
                 command.selfReportedBand(),
                 command.timezone()

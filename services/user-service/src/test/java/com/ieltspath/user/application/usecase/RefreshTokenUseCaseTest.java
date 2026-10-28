@@ -6,7 +6,7 @@ import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.AuthenticationFailedException;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
-import com.ieltspath.user.domain.repository.StudySessionRepository;
+import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.UserStatus;
 import org.junit.jupiter.api.Test;
@@ -38,7 +38,7 @@ class RefreshTokenUseCaseTest {
     @Mock
     private AuthTokenIssuer authTokenIssuer;
     @Mock
-    private StudySessionRepository studySessions;
+    private UserLock userLock;
 
     @Test
     void rotatesUsableRefreshToken() {
@@ -47,7 +47,7 @@ class RefreshTokenUseCaseTest {
                 userRepository,
                 tokenHashService,
                 authTokenIssuer,
-                studySessions
+                userLock
         );
         UUID userId = UUID.randomUUID();
         RefreshToken storedToken = RefreshToken.builder()
@@ -78,7 +78,7 @@ class RefreshTokenUseCaseTest {
                 userRepository,
                 tokenHashService,
                 authTokenIssuer,
-                studySessions
+                userLock
         );
         RefreshToken storedToken = RefreshToken.builder()
                 .id(UUID.randomUUID())
@@ -105,7 +105,7 @@ class RefreshTokenUseCaseTest {
                 userRepository,
                 tokenHashService,
                 authTokenIssuer,
-                studySessions
+                userLock
         );
         UUID userId = UUID.randomUUID();
         RefreshToken storedToken = RefreshToken.builder()

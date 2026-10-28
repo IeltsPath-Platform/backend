@@ -8,7 +8,7 @@ import com.ieltspath.user.domain.exception.InvalidActionTokenException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.AccountActionTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
-import com.ieltspath.user.domain.repository.StudySessionRepository;
+import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.vo.ActionTokenPurpose;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +38,7 @@ class ActionTokenUseCaseTest {
     @Mock private AccountActionTokenRepository accountActionTokenRepository;
     @Mock private TokenHashService tokenHashService;
     @Mock private PasswordEncoder passwordEncoder;
-    @Mock private StudySessionRepository studySessions;
+    @Mock private UserLock userLock;
     @Mock private RefreshTokenRepository refreshTokenRepository;
 
     private ForgotPasswordUseCase forgotPasswordUseCase;
@@ -50,7 +50,7 @@ class ActionTokenUseCaseTest {
     void setUp() {
         forgotPasswordUseCase = new ForgotPasswordUseCase(userRepository, accountActionTokenRepository, tokenHashService);
         resetPasswordUseCase = new ResetPasswordUseCase(userRepository, accountActionTokenRepository, tokenHashService,
-                passwordEncoder, studySessions, refreshTokenRepository);
+                passwordEncoder, userLock, refreshTokenRepository);
         getActionTokensByUserIdUseCase = new GetActionTokensByUserIdUseCase(accountActionTokenRepository);
         revokeUserActionTokensUseCase = new RevokeUserActionTokensUseCase(accountActionTokenRepository);
     }
@@ -107,7 +107,7 @@ class ActionTokenUseCaseTest {
         assertEquals("new-hash", user.getPasswordHash());
         verify(accountActionTokenRepository).consumePasswordResetToken(eq("token-hash"), any(LocalDateTime.class));
         verify(userRepository).save(user);
-        verify(studySessions).lockUser(userId);
+        verify(userLock).lock(userId);
         verify(refreshTokenRepository).revokeAllActiveForUser(eq(userId), any(LocalDateTime.class));
     }
 

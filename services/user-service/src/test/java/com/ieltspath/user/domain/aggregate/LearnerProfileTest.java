@@ -20,10 +20,9 @@ class LearnerProfileTest {
                 .visibility(ProfileVisibility.PUBLIC)
                 .build();
 
-        profile.updateDetails("New Name", "avatar-key", "bio text", BigDecimal.valueOf(6.5), "Asia/Ho_Chi_Minh");
+        profile.updateDetails("New Name", "bio text", BigDecimal.valueOf(6.5), "Asia/Ho_Chi_Minh");
 
         assertThat(profile.getDisplayName()).isEqualTo("New Name");
-        assertThat(profile.getAvatarReference()).isEqualTo("avatar-key");
         assertThat(profile.getBio()).isEqualTo("bio text");
         assertThat(profile.getSelfReportedBand()).isEqualByComparingTo("6.5");
         assertThat(profile.getTimezone()).isEqualTo("Asia/Ho_Chi_Minh");
@@ -37,7 +36,7 @@ class LearnerProfileTest {
                 .displayName("Name")
                 .build();
 
-        assertThatThrownBy(() -> profile.updateDetails("", null, null, null, null))
+        assertThatThrownBy(() -> profile.updateDetails("", null, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -54,5 +53,28 @@ class LearnerProfileTest {
         assertThat(profile.getVisibility()).isEqualTo(ProfileVisibility.PRIVATE);
         assertThat(profile.getUpdatedAt()).isNotNull();
     }
-}
 
+    @Test
+    void createDefault_namesTheProfileAfterTheAccountAndMakesItPublic() {
+        UUID id = UUID.randomUUID();
+
+        LearnerProfile profile = LearnerProfile.createDefault(id, "  Nguyen Van A ");
+
+        assertThat(profile.getUserId()).isEqualTo(id);
+        assertThat(profile.getDisplayName()).isEqualTo("Nguyen Van A");
+        assertThat(profile.getVisibility()).isEqualTo(ProfileVisibility.PUBLIC);
+        assertThat(profile.getTimezone()).isEqualTo("Asia/Ho_Chi_Minh");
+        assertThat(profile.getAvatarReference()).isNull();
+        assertThat(LearnerProfile.createDefault(id, " ").getDisplayName()).isEqualTo("Learner");
+    }
+
+    @Test
+    void updateDetails_leavesTheAvatarAlone() {
+        LearnerProfile profile = LearnerProfile.createDefault(UUID.randomUUID(), "Name");
+        profile.updateAvatarReference("https://cdn.example.test/avatars/images/me.png");
+
+        profile.updateDetails("Other", "bio", null, "UTC");
+
+        assertThat(profile.getAvatarReference()).isEqualTo("https://cdn.example.test/avatars/images/me.png");
+    }
+}

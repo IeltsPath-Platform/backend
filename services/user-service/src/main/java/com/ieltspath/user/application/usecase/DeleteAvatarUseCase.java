@@ -6,12 +6,10 @@ import com.ieltspath.user.domain.aggregate.LearnerProfile;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.repository.LearnerProfileRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
-import com.ieltspath.user.domain.vo.ProfileVisibility;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
@@ -36,9 +34,6 @@ public class DeleteAvatarUseCase {
 
     private LearnerProfile defaultProfile(UUID userId) {
         User user = users.findById(userId).orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng"));
-        return LearnerProfile.builder().userId(userId)
-                .displayName(user.getFullName() == null || user.getFullName().isBlank() ? "Learner" : user.getFullName())
-                .timezone("Asia/Ho_Chi_Minh").visibility(ProfileVisibility.PUBLIC)
-                .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build();
+        return LearnerProfile.createDefault(userId, user.getFullName());
     }
 }
