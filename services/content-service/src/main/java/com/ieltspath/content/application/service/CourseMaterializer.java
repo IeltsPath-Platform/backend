@@ -25,6 +25,7 @@ import com.ieltspath.content.domain.vo.CourseDraftStructure;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.BlockPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.FinalTestPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.LessonPlan;
+import com.ieltspath.content.domain.vo.CourseDraftStructure.NewWord;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.ResourcePlan;
 import com.ieltspath.content.domain.vo.LessonResourceType;
 import com.ieltspath.content.application.command.CreateLessonResourceCommand;
@@ -90,6 +91,15 @@ public class CourseMaterializer {
      */
     @Transactional
     public Created create(CourseDraftStructure plan, Map<String, UUID> questionVersionsByRef) {
+        return create(plan, questionVersionsByRef, Map.of());
+    }
+
+    /**
+     * @param senseByLemma the library sense of each word the plan proposes, by {@link NewWord#normalizedLemma()}
+     */
+    @Transactional
+    public Created create(CourseDraftStructure plan, Map<String, UUID> questionVersionsByRef,
+                          Map<String, UUID> senseByLemma) {
         BigDecimal band = plan.course().bandLevel();
         CourseResult course = createCourse.execute(new CreateCourseCommand(plan.course().code(),
                 plan.course().name(), band));
@@ -108,7 +118,7 @@ public class CourseMaterializer {
                     ContentStatus.INACTIVE, topicBand, topicPlan.skill(), course.id()));
             topicIds.add(topic.id());
             topicsByCode.put(topicPlan.code(), topic.id());
-            addLessons(topicPlan, topic.id(), questionVersionsByRef, lessonIds, lessonsByCode);
+            addLessons(topicPlan, topic.id(), questionVersionsByRef, senseByLemma, lessonIds, lessonsByCode);
             if (topicPlan.topicTest() != null) {
                 finalTests.add(createFinalTest(PackageType.TOPIC_TEST, topicPlan.topicTest(), topic.id(), null));
             }
@@ -128,7 +138,7 @@ public class CourseMaterializer {
     }
 
     private void addLessons(TopicPlan topic, UUID topicId, Map<String, UUID> questionVersionsByRef,
-                            List<UUID> lessonIds, Map<String, UUID> lessonsByCode) {
+                            Map<String, UUID> senseByLemma, List<UUID> lessonIds, Map<String, UUID> lessonsByCode) {
         int position = 1;
         for (LessonPlan lessonPlan : topic.lessons()) {
             LessonAuthoringResult lesson = lessons.create(topicId, lessonPlan.code(), lessonPlan.title(),
@@ -141,6 +151,7 @@ public class CourseMaterializer {
             for (BlockPlan block : lessonPlan.blocks()) {
                 addBlock(lesson.id(), block, questionVersionsByRef);
             }
+            addVocabulary(lesson.id(), lessonPlan, senseByLemma);
             addResources(lesson.id(), lessonPlan);
             for (UUID practiceSet : lessonPlan.practiceSetPackageIds()) {
                 if (!packages.attachPracticeSetToLesson(practiceSet, lesson.id())) {
@@ -148,6 +159,21 @@ public class CourseMaterializer {
                             + " is not a practice set that is free to join a lesson");
                 }
             }
+        }
+    }
+
+    /** One vocabulary block with the senses the author picked and those of the words the plan proposed. */
+    private void addVocabulary(UUID lessonId, LessonPlan lessonPlan, Map<String, UUID> senseByLemma) {
+        List<UUID> senses = new ArrayList<>(lessonPlan.vocabularySenseIds());
+        for (NewWord word : lessonPlan.newVocabulary()) {
+            UUID sense = senseByLemma.get(word.normalizedLemma());
+            if (sense == null) {
+                throw new IllegalStateException("No library sense was resolved for the word " + word.lemma());
+            }
+            if (!senses.contains(sense)) senses.add(sense);
+        }
+        if (!senses.isEmpty()) {
+            lessons.addBlock(lessonId, BlockType.VOCABULARY, null, null, null, senses, null, null);
         }
     }
 

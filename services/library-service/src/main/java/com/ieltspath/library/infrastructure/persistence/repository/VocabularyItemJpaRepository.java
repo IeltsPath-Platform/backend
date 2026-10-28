@@ -18,6 +18,9 @@ public interface VocabularyItemJpaRepository extends JpaRepository<VocabularyIte
     @EntityGraph(attributePaths = {"senses"})
     Optional<VocabularyItemJpaEntity> findByNormalizedLemma(String normalizedLemma);
 
+    @EntityGraph(attributePaths = {"senses"})
+    List<VocabularyItemJpaEntity> findAllByNormalizedLemmaIn(Collection<String> normalizedLemmas);
+
     @Override
     @EntityGraph(attributePaths = {"senses"})
     Optional<VocabularyItemJpaEntity> findById(UUID id);

@@ -1,7 +1,10 @@
 package com.ieltspath.content.infrastructure.client;
 
+import com.ieltspath.content.application.exception.VocabularyRejectedException;
 import com.ieltspath.content.application.exception.VocabularyServiceUnavailableException;
 import com.ieltspath.content.application.port.VocabularySenseLookup;
+import com.ieltspath.content.application.port.VocabularySenseWriter;
+import com.ieltspath.content.domain.vo.CourseDraftStructure.NewWord;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -10,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -17,13 +21,15 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Component
-public class LibraryVocabularySenseClient implements VocabularySenseLookup {
+public class LibraryVocabularySenseClient implements VocabularySenseLookup, VocabularySenseWriter {
     private final RestClient restClient;
 
     @Autowired
@@ -42,10 +48,7 @@ public class LibraryVocabularySenseClient implements VocabularySenseLookup {
     @Override
     public Set<UUID> findActiveSenseIds(List<UUID> senseIds) {
         if (senseIds == null || senseIds.isEmpty() || senseIds.size() > 100) return Set.of();
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (!(authentication instanceof JwtAuthenticationToken token) || !authentication.isAuthenticated()) {
-            throw new VocabularyServiceUnavailableException(new IllegalStateException("Authenticated gateway JWT required"));
-        }
+        JwtAuthenticationToken token = signedIn();
         try {
             VocabularySense[] response = restClient.get()
                     .uri(uriBuilder -> uriBuilder.path("/api/content/vocabulary/senses")
@@ -61,6 +64,47 @@ public class LibraryVocabularySenseClient implements VocabularySenseLookup {
         }
     }
 
+    @Override
+    public Map<String, UUID> resolveOrCreate(List<NewWord> words) {
+        if (words == null || words.isEmpty()) return Map.of();
+        JwtAuthenticationToken token = signedIn();
+        List<Entry> entries = words.stream().map(word -> new Entry(word.lemma(), word.ipa(), word.partOfSpeech(),
+                word.englishDefinition(), word.vietnameseMeaning(), word.exampleSentence())).toList();
+        try {
+            Resolved[] response = restClient.post().uri("/api/content/admin/vocabulary/bulk")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token.getToken().getTokenValue())
+                    .header("X-Correlation-Id", correlationId())
+                    .body(new Bulk(entries)).retrieve().body(Resolved[].class);
+            Map<String, UUID> senses = new LinkedHashMap<>();
+            if (response != null) Arrays.stream(response).forEach(resolved -> senses.put(resolved.lemma(), resolved.senseId()));
+            return senses;
+        } catch (HttpClientErrorException refused) {
+            throw new VocabularyRejectedException(refusal(refused));
+        } catch (RestClientException exception) {
+            throw new VocabularyServiceUnavailableException(exception);
+        }
+    }
+
+    /** The author's own signed-in token: the library only lets authors write words. */
+    private JwtAuthenticationToken signedIn() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (!(authentication instanceof JwtAuthenticationToken token) || !authentication.isAuthenticated()) {
+            throw new VocabularyServiceUnavailableException(new IllegalStateException("Authenticated gateway JWT required"));
+        }
+        return token;
+    }
+
+    private static String refusal(HttpClientErrorException refused) {
+        try {
+            Map<?, ?> body = refused.getResponseBodyAs(Map.class);
+            Object message = body == null ? null : body.get("message");
+            if (message != null && !message.toString().isBlank()) return message.toString();
+        } catch (RuntimeException unreadable) {
+            // fall through to the status
+        }
+        return "Vocabulary service refused the words (" + refused.getStatusCode().value() + ")";
+    }
+
     private String correlationId() {
         if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes) {
             String value = attributes.getRequest().getHeader("X-Correlation-Id");
@@ -70,4 +114,11 @@ public class LibraryVocabularySenseClient implements VocabularySenseLookup {
     }
 
     private record VocabularySense(UUID senseId) {}
+
+    private record Entry(String lemma, String ipa, String partOfSpeech, String englishDefinition,
+                         String vietnameseMeaning, String exampleSentence) {}
+
+    private record Bulk(List<Entry> entries) {}
+
+    private record Resolved(String lemma, UUID senseId) {}
 }

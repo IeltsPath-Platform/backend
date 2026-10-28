@@ -227,4 +227,72 @@ class CourseDraftValidatorTest {
 
         assertEquals(null, first.estimatedMinutes());
     }
+
+    private static String word(String lemma, String extra) {
+        return "{\"lemma\":\"" + lemma + "\",\"partOfSpeech\":\"VERB\",\"englishDefinition\":\"to vary\","
+                + "\"vietnameseMeaning\":\"dao dong\",\"exampleSentence\":\"Prices fluctuate.\"" + extra + "}";
+    }
+
+    private LessonPlan firstLessonWithVocabulary(String words) throws Exception {
+        String withWords = GOOD.replace("\"summary\":\"s\"", "\"summary\":\"s\",\"vocabulary\":[" + words + "]");
+        return validator.build(request, candidates, reply(withWords), 971).structure().topics().get(0).lessons().get(0);
+    }
+
+    @Test
+    void theModelsWordsBecomeProposalsForTheAuthorToReview() throws Exception {
+        LessonPlan first = firstLessonWithVocabulary(word("Fluctuate", ",\"ipa\":\"\"") + "," + word("trend", ",\"ipa\":\"/trend/\""));
+
+        assertEquals(2, first.newVocabulary().size());
+        var fluctuate = first.newVocabulary().get(0);
+        assertEquals("Fluctuate", fluctuate.lemma());
+        assertEquals("fluctuate", fluctuate.normalizedLemma());
+        assertEquals("VERB", fluctuate.partOfSpeech());
+        assertNull(fluctuate.ipa());
+        assertEquals("/trend/", first.newVocabulary().get(1).ipa());
+        assertEquals(List.of(), first.vocabularySenseIds());
+    }
+
+    @Test
+    void aWordWithoutAMeaningAnExampleOrAKnownPartOfSpeechIsDroppedWithAWarning() throws Exception {
+        String noMeaning = "{\"lemma\":\"a\",\"partOfSpeech\":\"VERB\",\"exampleSentence\":\"x\"}";
+        String noExample = "{\"lemma\":\"b\",\"partOfSpeech\":\"VERB\",\"vietnameseMeaning\":\"y\"}";
+        String badPart = "{\"lemma\":\"c\",\"partOfSpeech\":\"PRONOUN\",\"vietnameseMeaning\":\"y\",\"exampleSentence\":\"x\"}";
+        String withWords = GOOD.replace("\"summary\":\"s\"", "\"summary\":\"s\",\"vocabulary\":["
+                + noMeaning + "," + noExample + "," + badPart + "," + word("keep", "") + "]");
+
+        Built built = validator.build(request, candidates, reply(withWords), 971);
+
+        assertEquals(List.of("keep"), built.structure().topics().get(0).lessons().get(0).newVocabulary().stream()
+                .map(w -> w.lemma()).toList());
+        assertEquals(List.of(new Warning("VOCABULARY_INVALID", "a"), new Warning("VOCABULARY_INVALID", "b"),
+                new Warning("VOCABULARY_INVALID", "c")), built.warnings());
+    }
+
+    @Test
+    void aPartOfSpeechWrittenLooselyIsAccepted() throws Exception {
+        LessonPlan first = firstLessonWithVocabulary(word("carry out", "").replace("VERB", "phrasal verb"));
+
+        assertEquals("PHRASAL_VERB", first.newVocabulary().get(0).partOfSpeech());
+    }
+
+    @Test
+    void aWordProposedTwiceInTheCourseIsKeptOnceAndWarned() throws Exception {
+        String twice = GOOD.replace("\"summary\":\"s\"", "\"summary\":\"s\",\"vocabulary\":[" + word("trend", "") + "]")
+                .replace("\"title\":\"Skim\"", "\"title\":\"Skim\",\"vocabulary\":[" + word("TREND", "") + "]");
+
+        Built built = validator.build(request, candidates, reply(twice), 971);
+
+        var lessons = built.structure().topics().get(0).lessons();
+        assertEquals(1, lessons.get(0).newVocabulary().size());
+        assertEquals(0, lessons.get(1).newVocabulary().size());
+        assertEquals(List.of(new Warning("DUPLICATE_REFERENCE", "TREND")), built.warnings());
+    }
+
+    @Test
+    void noMoreThanEightWordsAreKeptForALesson() throws Exception {
+        String many = java.util.stream.IntStream.range(0, 12).mapToObj(n -> word("word" + (char) ('a' + n), ""))
+                .collect(java.util.stream.Collectors.joining(","));
+
+        assertEquals(8, firstLessonWithVocabulary(many).newVocabulary().size());
+    }
 }

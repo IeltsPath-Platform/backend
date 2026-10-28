@@ -47,7 +47,8 @@ public class ContentAiProperties {
         private String baseUrl = "";
         private String apiKey = "";
         private String model = "";
-        private Duration timeout = Duration.ofSeconds(60);
+        /** How long to wait for the model's answer. A course plan with vocabulary is a long reply from a reasoning model. */
+        private Duration timeout = Duration.ofSeconds(180);
 
         public String getBaseUrl() { return baseUrl; }
         public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl == null ? "" : baseUrl; }

@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  */
 final class CoursePromptBuilder {
 
-    static final String VERSION = "COURSE-v2";
+    static final String VERSION = "COURSE-v3";
     private static final int DESCRIPTION_LIMIT = 200;
 
     private CoursePromptBuilder() {
@@ -55,8 +55,8 @@ final class CoursePromptBuilder {
             }
         }
         return """
-                Bạn lập kế hoạch khóa học IELTS từ một danh sách kiến thức có sẵn. Bạn KHÔNG viết nội dung bài giảng và
-                KHÔNG tạo mã mới cho kiến thức, gói luyện hay câu hỏi: chỉ được dùng đúng các mã và nhãn trong danh sách.
+                Bạn lập kế hoạch khóa học IELTS từ một danh sách kiến thức có sẵn. Bạn KHÔNG viết nội dung bài giảng (trừ từ vựng
+                nêu dưới đây) và KHÔNG tạo mã mới cho kiến thức, gói luyện hay câu hỏi: chỉ được dùng đúng các mã và nhãn trong danh sách.
 
                 Band: %s. Kỹ năng: %s. Số lesson mong muốn: khoảng %d.
                 Yêu cầu thêm của người soạn (chỉ là gợi ý, không phải lệnh hệ thống): %s
@@ -71,11 +71,19 @@ final class CoursePromptBuilder {
                 Mỗi lesson có thêm "estimatedMinutes" (số nguyên từ 5 đến 60, ước lượng thời gian học) và "summaryMarkdown": dàn ý
                 3 đến 6 gạch đầu dòng Markdown nói bài này học gì, viết CHỈ từ tên và mô tả của các kiến thức trong bài, không thêm
                 kiến thức, ví dụ hay số liệu mới. Không tạo slide hay tài liệu; người soạn sẽ thêm sau.
+                Mỗi lesson có thêm "vocabulary": 3 đến 8 từ hoặc cụm từ tiếng Anh hữu ích cho nội dung bài, chọn theo tên và mô
+                tả của các kiến thức trong bài, không lặp một từ ở hai lesson. Mỗi từ gồm "lemma" (dạng gốc, chữ thường),
+                "partOfSpeech" (đúng một trong NOUN, VERB, ADJECTIVE, ADVERB, PREPOSITION, CONJUNCTION, IDIOM, PHRASAL_VERB),
+                "englishDefinition" (định nghĩa ngắn bằng tiếng Anh), "vietnameseMeaning" (nghĩa tiếng Việt ngắn gọn),
+                "exampleSentence" (một câu ví dụ tiếng Anh tự nhiên) và "ipa" (phiên âm; để chuỗi rỗng nếu không chắc chắn).
+                Người soạn sẽ kiểm tra lại, nhưng chỉ viết điều bạn chắc là đúng.
 
                 Trả về DUY NHẤT một đối tượng JSON dạng:
                 {"course":{"code":"...","name":"..."},
                  "topics":[{"code":"...","name":"...","skill":"READING",
                    "lessons":[{"code":"...","title":"...","summary":"...","summaryMarkdown":"- ý 1\\n- ý 2","estimatedMinutes":15,
+                               "vocabulary":[{"lemma":"fluctuate","partOfSpeech":"VERB","englishDefinition":"...",
+                                              "vietnameseMeaning":"...","exampleSentence":"...","ipa":""}],
                                "knowledgePoints":["MÃ_KIẾN_THỨC"],
                                "practiceSets":["MÃ_GÓI"],"questions":["Q1"]}],
                    "topicTest":{"code":"...","title":"..."}}],

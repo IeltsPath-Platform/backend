@@ -15,6 +15,7 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,7 +27,8 @@ import java.util.stream.Collectors;
 
 /**
  * Chooses, by fixed rules and without the model, the knowledge points a course draft may use: the ones asked for (by id
- * or by matching a topic phrase), the lower-level prerequisites that support them, in teaching order, each with its
+ * or by matching a topic phrase), the lower-level prerequisites that support them, direct and indirect, in teaching
+ * order (the earliest prerequisite first), each with its
  * unlinked practice sets and learning questions. The model only ever sees and picks from this set.
  */
 @Component
@@ -66,7 +68,8 @@ public class CourseCandidateSelector {
         List<Point> asked = requested.values().stream().limit(limit).toList();
         Map<UUID, Point> selected = new LinkedHashMap<>();
         asked.forEach(point -> selected.put(point.id(), point));
-        Set<UUID> foundationIds = foundation(asked, level, limit - selected.size(), selected);
+        Set<UUID> foundationIds = request.withPrerequisites() ? foundation(asked, level, limit - selected.size(), selected)
+                : Set.of();
         reader.activeByIds(foundationIds).forEach(point -> selected.put(point.id(), point));
 
         List<UUID> ordered = teachingOrder(selected);
@@ -81,24 +84,40 @@ public class CourseCandidateSelector {
         return new CourseCandidates(candidates, unmatched);
     }
 
-    /** Prerequisites of the asked points that sit at a lower CEFR level than the course and are not already chosen. */
+    /**
+     * The prerequisites of the asked points, and theirs in turn, that sit at a lower CEFR level than the course and are
+     * not already chosen. The graph is walked upward one step at a time, so a point near the asked ones is taken before
+     * a deeper one when the room runs out. A point is looked at once, however many ways lead to it, and the walk goes on
+     * only through the points it takes.
+     */
     private Set<UUID> foundation(List<Point> asked, CefrLevel courseLevel, int room, Map<UUID, Point> selected) {
         Set<UUID> ids = new LinkedHashSet<>();
         if (room <= 0 || courseLevel == null) return ids;
-        Map<UUID, Set<UUID>> prerequisites = reader.prerequisites(asked.stream().map(Point::id).toList());
-        Set<UUID> candidates = new LinkedHashSet<>();
-        prerequisites.values().forEach(candidates::addAll);
-        candidates.removeAll(selected.keySet());
-        for (Point point : reader.activeByIds(candidates)) {
-            CefrLevel pointLevel = level(point);
-            if (pointLevel != null && pointLevel.compareTo(courseLevel) < 0 && ids.size() < room) {
-                ids.add(point.id());
+        Set<UUID> seen = new HashSet<>(selected.keySet());
+        List<UUID> frontier = asked.stream().map(Point::id).toList();
+        while (!frontier.isEmpty() && ids.size() < room) {
+            Set<UUID> next = new LinkedHashSet<>();
+            reader.prerequisites(frontier).values().forEach(next::addAll);
+            next.removeAll(seen);
+            seen.addAll(next);
+            List<UUID> taken = new ArrayList<>();
+            for (Point point : reader.activeByIds(next)) {
+                CefrLevel pointLevel = level(point);
+                if (pointLevel != null && pointLevel.compareTo(courseLevel) < 0 && ids.size() < room) {
+                    ids.add(point.id());
+                    taken.add(point.id());
+                }
             }
+            frontier = taken;
         }
         return ids;
     }
 
-    /** Kahn's algorithm over the prerequisite edges among the chosen points; ties keep the order they were chosen in. */
+    /**
+     * Kahn's algorithm over the prerequisite edges among the chosen points. When several points are ready at once the
+     * one of the lowest CEFR level goes first, so the course climbs from the earliest prerequisite; after that, ties
+     * keep the order they were chosen in.
+     */
     private List<UUID> teachingOrder(Map<UUID, Point> selected) {
         List<UUID> chosen = List.copyOf(selected.keySet());
         Map<UUID, Integer> position = new HashMap<>();
@@ -113,7 +132,8 @@ public class CourseCandidateSelector {
             waiting.put(id, within.size());
             within.forEach(prerequisite -> dependents.computeIfAbsent(prerequisite, ignored -> new ArrayList<>()).add(id));
         }
-        PriorityQueue<UUID> ready = new PriorityQueue<>(java.util.Comparator.comparingInt(position::get));
+        PriorityQueue<UUID> ready = new PriorityQueue<>(java.util.Comparator
+                .comparingInt((UUID id) -> levelRank(selected.get(id))).thenComparingInt(position::get));
         chosen.stream().filter(id -> waiting.get(id) == 0).forEach(ready::add);
         List<UUID> ordered = new ArrayList<>();
         while (!ready.isEmpty()) {
@@ -126,6 +146,12 @@ public class CourseCandidateSelector {
         // A cycle cannot exist in a valid tree; if one does, the points left over still go in, in chosen order.
         chosen.stream().filter(id -> !ordered.contains(id)).forEach(ordered::add);
         return ordered;
+    }
+
+    /** A point without a level is taught after the ones that have one. */
+    private static int levelRank(Point point) {
+        CefrLevel level = level(point);
+        return level == null ? CefrLevel.values().length : level.ordinal();
     }
 
     private static CefrLevel level(Point point) {

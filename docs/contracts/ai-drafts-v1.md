@@ -44,7 +44,9 @@ Stored in `errorCode`, safe to show. They never include the prompt or the model'
 | Code | Meaning |
 | --- | --- |
 | `NOT_CONFIGURED` | `CONTENT_LLM_BASE_URL` or `CONTENT_LLM_MODEL` is empty. |
-| `FAILED` | The model call failed or timed out. |
+| `TIMEOUT` | The model did not answer within `content.llm.timeout` (default 180 seconds). |
+| `HTTP_<status>` | The model endpoint answered with an error status, for example `HTTP_429` (rate limit) or `HTTP_503` (overloaded). Only the status is kept, never the body. A busy answer (`429`, `502`, `503`, `504`) is tried again twice, after 5 and 15 seconds, before the draft fails with the last status. |
+| `FAILED` | The model call failed in another way, such as the endpoint not being reachable. |
 | `INVALID_REPLY` | The model answered without usable text: none, not JSON, or (for a course plan, after a second try) nothing that fits the candidate set. |
 | `NO_CANDIDATES` | A course request matched no knowledge point, so there was nothing to plan from. |
 | `UNSUPPORTED_KIND` | No generator is registered for the draft's kind. |
@@ -62,7 +64,7 @@ Stored in `errorCode`, safe to show. They never include the prompt or the model'
 | `content.llm.base-url` | (empty) | OpenAI-compatible base URL. Read from `CONTENT_LLM_BASE_URL`, else `LEARNING_LLM_BASE_URL`. |
 | `content.llm.api-key` | (empty) | Read from `CONTENT_LLM_API_KEY`, else `LEARNING_LLM_API_KEY`. Keep it in `.env` only. |
 | `content.llm.model` | (empty) | Read from `CONTENT_LLM_MODEL`, else `LEARNING_LLM_MODEL`. |
-| `content.llm.timeout` | PT60S | Connect and read timeout for the model call. |
+| `content.llm.timeout` | PT180S | How long to wait for the model's answer (read timeout). Connecting is capped at 10 seconds. |
 
 Several instances may run the job. Claiming uses row locks that skip rows another instance holds, so no draft is
 generated twice.

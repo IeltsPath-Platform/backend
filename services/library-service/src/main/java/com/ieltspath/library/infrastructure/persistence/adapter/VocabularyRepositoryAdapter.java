@@ -69,6 +69,13 @@ public class VocabularyRepositoryAdapter implements VocabularyRepository {
     }
 
     @Override
+    public List<VocabularyItem> findByNormalizedLemmas(java.util.Collection<String> normalizedLemmas) {
+        if (normalizedLemmas == null || normalizedLemmas.isEmpty()) return List.of();
+        return vocabularyItemJpaRepository.findAllByNormalizedLemmaIn(normalizedLemmas).stream()
+                .map(mapper::toDomain).toList();
+    }
+
+    @Override
     public boolean existsByNormalizedLemma(String normalizedLemma) {
         return vocabularyItemJpaRepository.existsByNormalizedLemma(normalizedLemma);
     }

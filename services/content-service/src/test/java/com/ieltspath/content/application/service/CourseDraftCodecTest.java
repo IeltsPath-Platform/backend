@@ -209,4 +209,57 @@ class CourseDraftCodecTest {
 
         assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources") && p.problem().equals("TOO_MANY_SLIDES")));
     }
+
+    private static String word(String lemma, String partOfSpeech, String meaning) {
+        return "{\"lemma\":\"" + lemma + "\",\"partOfSpeech\":\"" + partOfSpeech + "\",\"vietnameseMeaning\":\""
+                + meaning + "\",\"exampleSentence\":\"Example.\"}";
+    }
+
+    private static String lessonWith(String fields) {
+        return "{\"code\":\"L1\",\"title\":\"Lesson\"," + fields + "}";
+    }
+
+    @Test
+    void aLessonKeepsItsPickedSensesAndProposedWords() throws Exception {
+        UUID sense = UUID.randomUUID();
+        String lesson = lessonWith("\"vocabularySenseIds\":[\"" + sense + "\"],\"newVocabulary\":[" + word("trend", "NOUN", "xu huong") + "]");
+
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals(List.of(sense), read.vocabularySenseIds());
+        assertEquals("trend", read.newVocabulary().get(0).lemma());
+        assertEquals(read, codec.read(codec.write(codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]")))))
+                .topics().get(0).lessons().get(0));
+    }
+
+    @Test
+    void aDraftWithoutVocabularyReadsAsEmpty() throws Exception {
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson("L1") + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals(List.of(), read.vocabularySenseIds());
+        assertEquals(List.of(), read.newVocabulary());
+    }
+
+    @Test
+    void badProposedWordsAreReportedWithTheirPath() throws Exception {
+        String lesson = lessonWith("\"newVocabulary\":[" + word("", "NOUN", "x") + "," + word("ok", "PRONOUN", "x") + ","
+                + word("fine", "NOUN", " ") + "," + word("12 bad!", "NOUN", "x") + "]");
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary[0].lemma") && p.problem().equals("REQUIRED")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary[1].partOfSpeech") && p.problem().equals("INVALID_VALUE")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary[2].vietnameseMeaning") && p.problem().equals("REQUIRED")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary[3].lemma") && p.problem().equals("INVALID_VALUE")));
+    }
+
+    @Test
+    void vocabularyIsLimitedPerLesson() throws Exception {
+        String words = java.util.stream.IntStream.range(0, 21).mapToObj(n -> word("word", "NOUN", "x"))
+                .collect(java.util.stream.Collectors.joining(","));
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lessonWith("\"newVocabulary\":[" + words + "]") + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary") && p.problem().equals("TOO_MANY")));
+    }
 }
