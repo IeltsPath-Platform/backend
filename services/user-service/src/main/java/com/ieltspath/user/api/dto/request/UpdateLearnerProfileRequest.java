@@ -26,7 +26,7 @@ public record UpdateLearnerProfileRequest(
         @Size(max = 50, message = "Múi giờ không được vượt quá 50 ký tự")
         String timezone,
 
-        @Pattern(regexp = "PUBLIC|PRIVATE", flags = Pattern.Flag.CASE_INSENSITIVE, message = "Quyền hiển thị phải là PUBLIC hoặc PRIVATE")
+        @Pattern(regexp = "PUBLIC|PRIVATE|COMMUNITY", flags = Pattern.Flag.CASE_INSENSITIVE, message = "Quyền hiển thị phải là PUBLIC, COMMUNITY hoặc PRIVATE")
         String visibility
 ) {
 }

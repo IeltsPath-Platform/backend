@@ -11,6 +11,7 @@ import com.ieltspath.user.domain.vo.ProfileVisibility;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -22,6 +23,8 @@ public class UpdateLearnerProfileUseCase {
     private final UserRepository userRepository;
     private final LearningGoalRepository learningGoalRepository;
     private final ScheduleStudyGoalUseCase studyGoals;
+    @Value("${app.user.avatar.bucket:avatars}") private String avatarBucket;
+    @Value("${app.storage.supabase.url:}") private String supabaseUrl;
 
     @Transactional
     public LearnerProfileResult execute(UpdateLearnerProfileCommand command) {
@@ -42,6 +45,11 @@ public class UpdateLearnerProfileUseCase {
                 });
 
         String previousTimezone = profile.getTimezone();
+        if (!Objects.equals(profile.getAvatarReference(), command.avatarReference())
+                && command.avatarReference() != null
+                && AvatarReferences.ownedKey(command.avatarReference(), supabaseUrl, avatarBucket, command.userId()).isEmpty()) {
+            throw new IllegalArgumentException("Ảnh đại diện phải thuộc kho ảnh của tài khoản này");
+        }
         profile.updateDetails(
                 command.displayName(),
                 command.avatarReference(),

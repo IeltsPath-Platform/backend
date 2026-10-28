@@ -40,6 +40,11 @@ public class LearnerProfile {
         touch();
     }
 
+    public void updateAvatarReference(String avatarReference) {
+        this.avatarReference = avatarReference;
+        touch();
+    }
+
     private static boolean isValidTimezone(String timezone) {
         try {
             ZoneId.of(timezone);

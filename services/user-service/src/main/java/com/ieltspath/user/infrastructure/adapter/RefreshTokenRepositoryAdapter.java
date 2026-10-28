@@ -33,6 +33,11 @@ public class RefreshTokenRepositoryAdapter implements RefreshTokenRepository {
                 .filter(token -> refreshTokenJpaRepository.revokeActiveToken(tokenHash, consumedAt) == 1);
     }
 
+    @Override
+    public int revokeAllActiveForUser(java.util.UUID userId, LocalDateTime revokedAt) {
+        return refreshTokenJpaRepository.revokeAllActiveForUser(userId, revokedAt);
+    }
+
     private RefreshToken toDomain(RefreshTokenJpaEntity entity) {
         return RefreshToken.builder()
                 .id(entity.getId())

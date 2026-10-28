@@ -7,6 +7,7 @@ import com.ieltspath.user.domain.exception.AuthenticationFailedException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
+import com.ieltspath.user.domain.repository.StudySessionRepository;
 import com.ieltspath.user.domain.vo.UserStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ public class RefreshTokenUseCase {
     private final UserRepository userRepository;
     private final TokenHashService tokenHashService;
     private final AuthTokenIssuer authTokenIssuer;
+    private final StudySessionRepository studySessions;
 
     @Transactional
     public AuthTokenResult execute(String refreshToken) {
@@ -28,7 +30,11 @@ public class RefreshTokenUseCase {
             throw new AuthenticationFailedException("Refresh token không hợp lệ");
         }
         LocalDateTime now = LocalDateTime.now();
-        RefreshToken storedToken = refreshTokenRepository.consumeActiveToken(tokenHashService.hash(refreshToken), now)
+        String tokenHash = tokenHashService.hash(refreshToken);
+        RefreshToken tokenCandidate = refreshTokenRepository.findByTokenHash(tokenHash)
+                .orElseThrow(() -> new AuthenticationFailedException("Refresh token không hợp lệ"));
+        studySessions.lockUser(tokenCandidate.getUserId());
+        RefreshToken storedToken = refreshTokenRepository.consumeActiveToken(tokenHash, now)
                 .orElseThrow(() -> new AuthenticationFailedException("Refresh token không hợp lệ"));
         if (!storedToken.isUsable(now)) {
             throw new AuthenticationFailedException("Refresh token không hợp lệ");

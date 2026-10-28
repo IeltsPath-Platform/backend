@@ -6,6 +6,7 @@ import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.AuthenticationFailedException;
 import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
+import com.ieltspath.user.domain.repository.StudySessionRepository;
 import com.ieltspath.user.domain.vo.Email;
 import com.ieltspath.user.domain.vo.UserStatus;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,8 @@ class RefreshTokenUseCaseTest {
     private TokenHashService tokenHashService;
     @Mock
     private AuthTokenIssuer authTokenIssuer;
+    @Mock
+    private StudySessionRepository studySessions;
 
     @Test
     void rotatesUsableRefreshToken() {
@@ -43,7 +46,8 @@ class RefreshTokenUseCaseTest {
                 refreshTokenRepository,
                 userRepository,
                 tokenHashService,
-                authTokenIssuer
+                authTokenIssuer,
+                studySessions
         );
         UUID userId = UUID.randomUUID();
         RefreshToken storedToken = RefreshToken.builder()
@@ -55,6 +59,7 @@ class RefreshTokenUseCaseTest {
         User user = activeUser(userId);
         AuthTokenResult replacementTokens = new AuthTokenResult("access-2", "refresh-2", 3600, 604800);
         when(tokenHashService.hash("refresh-1")).thenReturn("hashed-token");
+        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(storedToken));
         when(refreshTokenRepository.consumeActiveToken(eq("hashed-token"), any(LocalDateTime.class))).thenReturn(Optional.of(storedToken));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(authTokenIssuer.issue(user)).thenReturn(replacementTokens);
@@ -72,7 +77,8 @@ class RefreshTokenUseCaseTest {
                 refreshTokenRepository,
                 userRepository,
                 tokenHashService,
-                authTokenIssuer
+                authTokenIssuer,
+                studySessions
         );
         RefreshToken storedToken = RefreshToken.builder()
                 .id(UUID.randomUUID())
@@ -82,6 +88,7 @@ class RefreshTokenUseCaseTest {
                 .revokedAt(LocalDateTime.now().minusMinutes(1))
                 .build();
         when(tokenHashService.hash("refresh-1")).thenReturn("hashed-token");
+        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(storedToken));
         when(refreshTokenRepository.consumeActiveToken(eq("hashed-token"), any(LocalDateTime.class))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> useCase.execute("refresh-1"))
@@ -97,7 +104,8 @@ class RefreshTokenUseCaseTest {
                 refreshTokenRepository,
                 userRepository,
                 tokenHashService,
-                authTokenIssuer
+                authTokenIssuer,
+                studySessions
         );
         UUID userId = UUID.randomUUID();
         RefreshToken storedToken = RefreshToken.builder()
@@ -113,6 +121,7 @@ class RefreshTokenUseCaseTest {
                 .status(UserStatus.INACTIVE)
                 .build();
         when(tokenHashService.hash("refresh-1")).thenReturn("hashed-token");
+        when(refreshTokenRepository.findByTokenHash("hashed-token")).thenReturn(Optional.of(storedToken));
         when(refreshTokenRepository.consumeActiveToken(eq("hashed-token"), any(LocalDateTime.class))).thenReturn(Optional.of(storedToken));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 

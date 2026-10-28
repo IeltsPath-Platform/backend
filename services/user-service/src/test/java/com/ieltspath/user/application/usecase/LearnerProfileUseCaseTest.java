@@ -108,6 +108,7 @@ class LearnerProfileUseCaseTest {
         LearnerProfile existing = LearnerProfile.builder()
                 .userId(userId)
                 .displayName("Old Name")
+                .avatarReference("avatar.png")
                 .visibility(ProfileVisibility.PUBLIC)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -134,6 +135,17 @@ class LearnerProfileUseCaseTest {
         assertEquals(BigDecimal.valueOf(7.5), result.selfReportedBand());
         assertEquals("UTC", result.timezone());
         assertEquals("PRIVATE", result.visibility());
+    }
+
+    @Test
+    void updateLearnerProfileRejectsChangedUnownedAvatarReference() {
+        UUID userId = UUID.randomUUID();
+        LearnerProfile existing = existingProfile(userId, "UTC");
+        when(learnerProfileRepository.findByUserId(userId)).thenReturn(Optional.of(existing));
+        UpdateLearnerProfileCommand command = new UpdateLearnerProfileCommand(
+                userId, "Name", "https://example.com/tracker.png", null, null, "UTC", "PUBLIC");
+        assertThrows(IllegalArgumentException.class, () -> updateLearnerProfileUseCase.execute(command));
+        verify(learnerProfileRepository, never()).save(any());
     }
 
     @Test

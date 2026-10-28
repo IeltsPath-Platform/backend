@@ -8,6 +8,8 @@ import com.ieltspath.user.domain.exception.InvalidActionTokenException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.AccountActionTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
+import com.ieltspath.user.domain.repository.StudySessionRepository;
+import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.vo.ActionTokenPurpose;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +38,8 @@ class ActionTokenUseCaseTest {
     @Mock private AccountActionTokenRepository accountActionTokenRepository;
     @Mock private TokenHashService tokenHashService;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private StudySessionRepository studySessions;
+    @Mock private RefreshTokenRepository refreshTokenRepository;
 
     private ForgotPasswordUseCase forgotPasswordUseCase;
     private ResetPasswordUseCase resetPasswordUseCase;
@@ -44,7 +49,8 @@ class ActionTokenUseCaseTest {
     @BeforeEach
     void setUp() {
         forgotPasswordUseCase = new ForgotPasswordUseCase(userRepository, accountActionTokenRepository, tokenHashService);
-        resetPasswordUseCase = new ResetPasswordUseCase(userRepository, accountActionTokenRepository, tokenHashService, passwordEncoder);
+        resetPasswordUseCase = new ResetPasswordUseCase(userRepository, accountActionTokenRepository, tokenHashService,
+                passwordEncoder, studySessions, refreshTokenRepository);
         getActionTokensByUserIdUseCase = new GetActionTokensByUserIdUseCase(accountActionTokenRepository);
         revokeUserActionTokensUseCase = new RevokeUserActionTokensUseCase(accountActionTokenRepository);
     }
@@ -92,15 +98,17 @@ class ActionTokenUseCaseTest {
         when(tokenHashService.hash("my-token")).thenReturn("token-hash");
         when(accountActionTokenRepository.findByTokenHashAndPurpose("token-hash", ActionTokenPurpose.PASSWORD_RESET))
                 .thenReturn(Optional.of(token));
+        when(accountActionTokenRepository.consumePasswordResetToken(eq("token-hash"), any(LocalDateTime.class))).thenReturn(true);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(passwordEncoder.encode("new-secret")).thenReturn("new-hash");
 
         resetPasswordUseCase.execute(new ResetPasswordCommand("my-token", "new-secret"));
 
-        assertTrue(token.isUsed());
         assertEquals("new-hash", user.getPasswordHash());
-        verify(accountActionTokenRepository).save(token);
+        verify(accountActionTokenRepository).consumePasswordResetToken(eq("token-hash"), any(LocalDateTime.class));
         verify(userRepository).save(user);
+        verify(studySessions).lockUser(userId);
+        verify(refreshTokenRepository).revokeAllActiveForUser(eq(userId), any(LocalDateTime.class));
     }
 
     @Test

@@ -151,6 +151,11 @@ POST /auth/refresh
 POST /auth/logout
 GET  /auth/me
 POST /api/users/register
+GET  /api/users/me/profile
+PUT  /api/users/me/profile
+POST /api/users/me/avatar
+DELETE /api/users/me/avatar
+POST /api/users/me/password
 GET  /api/users
 GET  /api/users/{id}
 PUT  /api/users/{id}
@@ -211,6 +216,25 @@ Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho
   URL with a host and no user credentials; opaque references return null. Bio/avatar are edited through the
   existing `PUT /api/users/me/profile` API (`avatarReference`, `bio`). No schema change is required.
 - The bounded batch uses a single query joining profile, active goal, and streak in `user_db`.
+
+## Personal profile and account security
+
+- `POST /api/users/me/avatar` accepts multipart field `file`; JPEG, PNG, or WebP up to 2 MB. The authenticated user ID
+  comes from `CurrentUserProvider`. Objects are stored in the public-read `avatars` bucket under
+  `images/<userId>/<uuid>.<ext>`; writes and deletes use the server-side Supabase key. Uploads are limited to 10 per
+  user per hour per service instance.
+- `DELETE /api/users/me/avatar` clears the profile reference and best-effort deletes an owned avatar object.
+- `POST /api/users/me/password` accepts `{currentPassword, newPassword}` and returns 204. New passwords must contain
+  at least 6 characters. Five incorrect current-password attempts in a 15-minute window lock further attempts for
+  that user for 15 minutes; this in-memory limiter applies per service instance and resets on restart.
+  Changing or resetting the password revokes all active refresh tokens, including the current session because the access-token
+  contract does not identify its refresh-token session.
+- `PUT /api/users/me/profile` accepts `PUBLIC`, `COMMUNITY`, or `PRIVATE`. A changed `avatarReference` must be a public
+  URL for an object owned by the current user in the configured avatar bucket; null and the unchanged stored value are
+  accepted.
+- Runtime configuration: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and optional `USER_AVATAR_BUCKET` (defaults to
+  `avatars`). Keep the secret key only in the ignored root `.env`. The bucket must allow public reads for returned
+  avatar URLs; uploads/deletes remain server-side.
 
 ## Recorded study time
 
