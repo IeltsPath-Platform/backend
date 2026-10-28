@@ -29,12 +29,18 @@ public final class CanonicalRoles {
     /** Vai tro nhan vien kinh doanh. */
     public static final String SALES_STAFF = "SALES_STAFF";
 
+    /** Vai tro quan ly nhan vien. */
+    public static final String STAFF_MANAGER = "STAFF_MANAGER";
+
+    /** Vai tro nhan vien. */
+    public static final String STAFF = "STAFF";
+
     /**
      * Tap hop tat ca cac vai tro hop le cua he thong.
      * Su dung de xac thuc token: tu choi bat ky role nao khong co trong tap hop nay.
      */
     public static final Set<String> ALL = Set.of(
-            ADMIN, CUSTOMER, CONTENT_AUTHOR, EXAMINER, SALES_STAFF
+            ADMIN, CUSTOMER, CONTENT_AUTHOR, EXAMINER, SALES_STAFF, STAFF_MANAGER, STAFF
     );
 
     private CanonicalRoles() {
