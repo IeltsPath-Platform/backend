@@ -5,7 +5,9 @@ public enum RoleName {
     CUSTOMER,
     CONTENT_AUTHOR,
     EXAMINER,
-    SALES_STAFF;
+    SALES_STAFF,
+    STAFF_MANAGER,
+    STAFF;
 
     public static RoleName from(String value) {
         if (value == null || value.isBlank()) {
