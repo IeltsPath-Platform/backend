@@ -151,6 +151,11 @@ POST /auth/refresh
 POST /auth/logout
 GET  /auth/me
 POST /api/users/register
+GET  /api/users/me/profile
+PUT  /api/users/me/profile
+POST /api/users/me/avatar
+DELETE /api/users/me/avatar
+POST /api/users/me/password
 GET  /api/users
 GET  /api/users/{id}
 PUT  /api/users/{id}
@@ -208,9 +213,34 @@ Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho
   self-reported band, exam date, or schedule are returned.
 - `targetBand` is the current active learning goal's target, otherwise null. `streak` is the stored current-day
   streak, otherwise zero. `avatarUrl` contains the existing avatar reference only if it is an absolute HTTP(S)
-  URL with a host and no user credentials; opaque references return null. Bio/avatar are edited through the
-  existing `PUT /api/users/me/profile` API (`avatarReference`, `bio`). No schema change is required.
+  URL with a host and no user credentials; opaque references return null. The bio is edited through
+  `PUT /api/users/me/profile` and the avatar through `POST`/`DELETE /api/users/me/avatar`.
 - The bounded batch uses a single query joining profile, active goal, and streak in `user_db`.
+
+## Personal profile and account security
+
+- `POST /api/users/me/avatar` accepts multipart field `file`; JPEG, PNG, or WebP up to 2 MB. The authenticated user ID
+  comes from `CurrentUserProvider`. Objects are stored in the public-read `avatars` bucket under
+  `images/<userId>/<uuid>.<ext>`; writes and deletes use the server-side Supabase key. Uploads are limited to 10 per
+  user per hour per service instance (in memory; idle users are forgotten periodically). A replaced avatar object is
+  deleted after the new one is saved.
+- `DELETE /api/users/me/avatar` clears the profile reference and best-effort deletes an owned avatar object.
+- `POST /api/users/me/password` accepts `{currentPassword, newPassword}` and returns 204. New passwords must contain
+  at least 6 characters (the same rule as password reset). Five incorrect current-password attempts in a 15-minute
+  window lock further attempts for that user for 15 minutes. The counter is stored in `password_change_attempts`
+  (migration V9), so the limit holds across service instances and restarts; it is cleared by a successful change.
+  Changing or resetting the password revokes all active refresh tokens, including the current session because the access-token
+  contract does not identify its refresh-token session.
+- `PUT /api/users/me/profile` edits the display name, bio, self-reported band, timezone and visibility (`PUBLIC` or
+  `PRIVATE`). `avatarReference` in the body is ignored: the stored avatar is never changed or cleared by this call, so a
+  form that only edits text cannot lose the photo or orphan the stored object. Only upload and delete change it.
+  `COMMUNITY` exists in the database and enum but is not accepted until it has behaviour of its own distinct from
+  `PUBLIC`.
+- Storage is enabled with an empty `SUPABASE_URL` by default: the service still starts, and avatar upload answers
+  503 until the variables are set.
+- Runtime configuration: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and optional `USER_AVATAR_BUCKET` (defaults to
+  `avatars`). Keep the secret key only in the ignored root `.env`. The bucket must allow public reads for returned
+  avatar URLs; uploads/deletes remain server-side.
 
 ## Recorded study time
 

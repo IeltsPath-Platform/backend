@@ -14,8 +14,20 @@ spring:
     locations: classpath:db/migration,classpath:db/callback
     placeholders:
       demoData: ${DEMO_DATA_ENABLED:false}
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
 
 app:
+  storage:
+    enabled: true
+    supabase:
+      url: ${SUPABASE_URL:}
+      secret-key: ${SUPABASE_SECRET_KEY:}
+  user:
+    avatar:
+      bucket: ${USER_AVATAR_BUCKET:avatars}
   study-time:
     learning-url: ${LEARNING_SERVICE_URL:http://localhost:8086}
     assessment-url: ${ASSESSMENT_SERVICE_URL:http://localhost:8083}

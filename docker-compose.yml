@@ -134,6 +134,9 @@ services:
       USER_DB_URL: jdbc:postgresql://postgres:5432/user_db
       USER_DB_PASSWORD: "${POSTGRES_PASSWORD}"
       DEMO_DATA_ENABLED: "${DEMO_DATA_ENABLED:-true}"
+      SUPABASE_URL: "${SUPABASE_URL:-}"
+      SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY:-}"
+      USER_AVATAR_BUCKET: "${USER_AVATAR_BUCKET:-avatars}"
       LEARNING_SERVICE_URL: http://learning-service:8086
       ASSESSMENT_SERVICE_URL: http://assessment-service:8083
     depends_on: *after-infra

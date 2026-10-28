@@ -25,4 +25,8 @@ public interface RefreshTokenJpaRepository extends JpaRepository<RefreshTokenJpa
             @Param("tokenHash") String tokenHash,
             @Param("consumedAt") LocalDateTime consumedAt
     );
+
+    @Modifying
+    @Query("update RefreshTokenJpaEntity token set token.revokedAt = :revokedAt where token.userId = :userId and token.revokedAt is null and token.expiresAt > :revokedAt")
+    int revokeAllActiveForUser(@Param("userId") UUID userId, @Param("revokedAt") LocalDateTime revokedAt);
 }

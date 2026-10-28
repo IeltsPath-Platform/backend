@@ -12,9 +12,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.Objects;
 
+/** Edits the text fields of a profile. The avatar is left as it is: it changes only through upload and delete. */
 @Service
 @RequiredArgsConstructor
 public class UpdateLearnerProfileUseCase {
@@ -31,20 +31,12 @@ public class UpdateLearnerProfileUseCase {
                     if (userRepository.findById(command.userId()).isEmpty()) {
                         throw new UserNotFoundException("Không tìm thấy người dùng với id: " + command.userId());
                     }
-                    return LearnerProfile.builder()
-                            .userId(command.userId())
-                            .displayName(command.displayName())
-                            .timezone("Asia/Ho_Chi_Minh")
-                            .visibility(ProfileVisibility.PUBLIC)
-                            .createdAt(LocalDateTime.now())
-                            .updatedAt(LocalDateTime.now())
-                            .build();
+                    return LearnerProfile.createDefault(command.userId(), command.displayName());
                 });
 
         String previousTimezone = profile.getTimezone();
         profile.updateDetails(
                 command.displayName(),
-                command.avatarReference(),
                 command.bio(),
                 command.selfReportedBand(),
                 command.timezone()

@@ -146,7 +146,6 @@ public class UserManagementController {
         return toLearnerProfileResponse(updateLearnerProfileUseCase.execute(new UpdateLearnerProfileCommand(
                 id,
                 request.displayName(),
-                request.avatarReference(),
                 request.bio(),
                 request.selfReportedBand(),
                 request.timezone(),
