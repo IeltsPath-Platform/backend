@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Repository
@@ -31,6 +32,11 @@ public class LoginHistoryRepositoryAdapter implements LoginHistoryRepository {
         Page<LoginHistoryJpaEntity> result = loginHistoryJpaRepository.findByUserId(
                 userId, PageRequest.of(page, size, NEWEST_FIRST));
         return new OwnedPage<>(result.getContent().stream().map(this::toDomain).toList(), result.getTotalElements());
+    }
+
+    @Override
+    public int deleteOlderThan(LocalDateTime cutoff) {
+        return loginHistoryJpaRepository.deleteOlderThan(cutoff);
     }
 
     private LoginAttempt toDomain(LoginHistoryJpaEntity entity) {
