@@ -19,6 +19,7 @@ import com.ieltspath.content.domain.vo.DraftStatus;
 import com.ieltspath.content.infrastructure.persistence.adapter.ContentPackageRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.adapter.CourseRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcAiDraftRepository;
+import com.ieltspath.content.infrastructure.persistence.adapter.JdbcCourseCandidateReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcCourseCatalogReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcPracticeTestMilestoneRepository;
@@ -71,7 +72,7 @@ import static org.mockito.Mockito.doThrow;
 @DataJpaTest(properties = {"spring.cloud.config.enabled=false", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({ApproveCourseDraftUseCase.class, CourseDraftUseCases.class, CourseMaterializer.class, CourseDraftCodec.class,
-        CourseDraftAnalysisService.class, JdbcCourseCatalogReader.class, CreateCourseUseCase.class,
+        CourseDraftAnalysisService.class, JdbcCourseCatalogReader.class, JdbcCourseCandidateReader.class, CreateCourseUseCase.class,
         UpdateCourseUseCase.class, CourseRepositoryAdapter.class, CoursePersistenceMapperImpl.class,
         CreateTopicUseCase.class, UpdateTopicUseCase.class, TopicRepositoryAdapter.class,
         TopicPersistenceMapper.class, LessonAuthoringUseCase.class, LessonAuthoringRepositoryAdapter.class,
@@ -137,6 +138,7 @@ class ApproveCourseDraftIntegrationTest {
     @Autowired AiDraftRepository draftStore;
     @Autowired FakeLibrary library;
     @Autowired JdbcLearningContentReader reader;
+    @Autowired JdbcCourseCandidateReader candidates;
     @MockitoSpyBean CreateDraftPackageVersionUseCase draftVersions;
 
     private final UUID author = UUID.randomUUID();
@@ -434,6 +436,24 @@ class ApproveCourseDraftIntegrationTest {
                 .isZero();
     }
 
+    @Test
+    void aQuestionThatAPackageHoldsIsNotOfferedAndIsAnErrorWhenADraftUsesIt() throws Exception {
+        assertThat(candidates.exerciseQuestions(List.of(kpFoundation), 10).get(kpFoundation)).containsExactly(questionVersion);
+        UUID id = drafts.create(author, structure(goodDraft())).getId();
+        assertThat(drafts.analyze(author, id).errors()).extracting("code").doesNotContain("QUESTION_ALREADY_OWNED");
+
+        // The question joins a package section: from now on it has a home.
+        UUID section = jdbc.queryForObject("SELECT s.id FROM content_sections s JOIN content_packages p "
+                + "ON p.current_published_version_id = s.package_version_id WHERE p.id = ?", UUID.class, practiceTest);
+        jdbc.update("INSERT INTO section_questions(section_id,question_version_id,sort_order) VALUES(?,?,2)",
+                section, questionVersion);
+
+        assertThat(candidates.exerciseQuestions(List.of(kpFoundation), 10)).doesNotContainKey(kpFoundation);
+        var analysis = drafts.analyze(author, id);
+        assertThat(analysis.errors()).extracting("code").contains("QUESTION_ALREADY_OWNED");
+        assertThat(analysis.gaps()).extracting("reason").contains("NO_EXERCISE_QUESTION");
+    }
+
     // --- fixtures
 
     private String goodDraft() {
@@ -497,8 +517,17 @@ class ApproveCourseDraftIntegrationTest {
         UUID section = UUID.randomUUID();
         jdbc.update("INSERT INTO content_sections(id,package_version_id,title,sort_order) VALUES(?,?,'S',1)",
                 section, version);
+        // A package holds a question of its own: the exercise question of a lesson belongs to that lesson alone.
+        UUID ownQuestion = UUID.randomUUID();
+        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status) "
+                + "VALUES(?,'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED')", ownQuestion);
+        UUID ownVersion = UUID.randomUUID();
+        jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) "
+                + "VALUES(?,?,1,'Package stem','PUBLISHED')", ownVersion, ownQuestion);
+        jdbc.update("INSERT INTO question_knowledge_points(question_version_id,knowledge_point_id) VALUES(?,?)",
+                ownVersion, kpFoundation);
         jdbc.update("INSERT INTO section_questions(section_id,question_version_id,sort_order) VALUES(?,?,1)",
-                section, questionVersion);
+                section, ownVersion);
         jdbc.update("UPDATE content_packages SET status='PUBLISHED', current_published_version_id=? WHERE id=?",
                 version, id);
         return id;

@@ -61,20 +61,56 @@ class ResolveVocabularyUseCaseTest {
     }
 
     @Test
-    void keepsTheFirstActiveSenseOfAWordTheLibraryAlreadyHas() {
+    void keepsTheSenseOfAWordTheLibraryAlreadyHasWithTheSameMeaning() {
         VocabularyItem item = VocabularyItem.create("fluctuate", null, null);
-        UUID later = senseOf(item, 2, ContentStatus.ACTIVE);
-        UUID first = senseOf(item, 1, ContentStatus.ACTIVE);
-        senseOf(item, 0, ContentStatus.INACTIVE);
+        UUID other = senseOf(item, 0, PartOfSpeech.NOUN, "biến động", ContentStatus.ACTIVE);
+        UUID later = senseOf(item, 2, PartOfSpeech.VERB, "dao động", ContentStatus.ACTIVE);
+        UUID first = senseOf(item, 1, PartOfSpeech.VERB, "  Dao   động ", ContentStatus.ACTIVE);
+        senseOf(item, 3, PartOfSpeech.VERB, "dao động", ContentStatus.INACTIVE);
         when(vocabulary.findByNormalizedLemmas(List.of("fluctuate"))).thenReturn(List.of(item));
 
         List<ResolvedVocabularyResult> result = useCase.execute(new ResolveVocabularyCommand(List.of(entry("fluctuate"))));
 
         assertThat(result).singleElement().satisfies(resolved -> {
             assertThat(resolved.created()).isFalse();
-            assertThat(resolved.senseId()).isEqualTo(first).isNotEqualTo(later);
+            assertThat(resolved.senseId()).isEqualTo(first).isNotEqualTo(later).isNotEqualTo(other);
         });
         verify(vocabulary, never()).save(any(VocabularyItem.class));
+    }
+
+    @Test
+    void addsTheProposedMeaningBesideTheOnesAWordAlreadyHas() {
+        VocabularyItem item = VocabularyItem.create("sentence", null, null);
+        UUID court = senseOf(item, 0, PartOfSpeech.NOUN, "bản án", ContentStatus.ACTIVE);
+        when(vocabulary.findByNormalizedLemmas(List.of("sentence"))).thenReturn(List.of(item));
+        when(vocabulary.save(any(VocabularyItem.class))).thenAnswer(call -> call.getArgument(0));
+
+        List<ResolvedVocabularyResult> result = useCase.execute(new ResolveVocabularyCommand(List.of(
+                new Entry("sentence", null, PartOfSpeech.NOUN, null, "câu", "The topic sentence opens the paragraph."))));
+
+        assertThat(result).singleElement().satisfies(resolved -> {
+            assertThat(resolved.created()).isTrue();
+            assertThat(resolved.senseId()).isNotEqualTo(court);
+        });
+        assertThat(item.getSenses()).extracting(VocabularySense::getVietnameseMeaning).containsExactly("bản án", "câu");
+        // The new sense comes after the old one and the old one is untouched.
+        assertThat(item.getSenses()).extracting(VocabularySense::getSortOrder).containsExactly(0, 1);
+        assertThat(item.getSenses().get(0).getStatus()).isEqualTo(ContentStatus.ACTIVE);
+        verify(vocabulary).save(item);
+    }
+
+    @Test
+    void theSameMeaningUnderAnotherPartOfSpeechIsANewSense() {
+        VocabularyItem item = VocabularyItem.create("rise", null, null);
+        senseOf(item, 5, PartOfSpeech.NOUN, "sự tăng", ContentStatus.ACTIVE);
+        when(vocabulary.findByNormalizedLemmas(List.of("rise"))).thenReturn(List.of(item));
+        when(vocabulary.save(any(VocabularyItem.class))).thenAnswer(call -> call.getArgument(0));
+
+        useCase.execute(new ResolveVocabularyCommand(List.of(
+                new Entry("rise", null, PartOfSpeech.VERB, null, "sự tăng", "Prices rise."))));
+
+        assertThat(item.getSenses()).hasSize(2);
+        assertThat(item.getSenses().get(1).getSortOrder()).isEqualTo(6);
     }
 
     @Test
@@ -114,7 +150,12 @@ class ResolveVocabularyUseCaseTest {
     }
 
     private static UUID senseOf(VocabularyItem item, int sortOrder, ContentStatus status) {
-        VocabularySense sense = new VocabularySense(UUID.randomUUID(), item.getId(), PartOfSpeech.VERB, "def", "nghĩa",
+        return senseOf(item, sortOrder, PartOfSpeech.VERB, "nghĩa", status);
+    }
+
+    private static UUID senseOf(VocabularyItem item, int sortOrder, PartOfSpeech partOfSpeech, String meaning,
+                                ContentStatus status) {
+        VocabularySense sense = new VocabularySense(UUID.randomUUID(), item.getId(), partOfSpeech, "def", meaning,
                 "Example.", null, sortOrder, status, Instant.now(), Instant.now());
         item.addSense(sense);
         return sense.getId();

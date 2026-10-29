@@ -20,9 +20,10 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Gives every reviewed word a sense. A lemma the library already has keeps its own first active sense and the entry's
- * text is ignored; a lemma it lacks is created with the sense the author reviewed. All of it is one transaction, and a
- * lemma that appears twice is resolved once.
+ * Gives every reviewed word a sense. A word the library already has with the same part of speech and the same meaning
+ * keeps that sense; with a different meaning it gains a new sense beside the old ones, which stay as they are; a word
+ * the library lacks is created with the sense the author reviewed. A word is never entered twice. All of it is one
+ * transaction, and a lemma that appears twice is resolved once, by its first entry.
  */
 @Service
 @Transactional
@@ -54,20 +55,33 @@ public class ResolveVocabularyUseCase {
         if (existing != null && existing.getStatus() != ContentStatus.ACTIVE) {
             throw new InvalidContentStateException("Vocabulary item is inactive: " + entry.lemma().trim());
         }
-        Optional<VocabularySense> usable = existing == null ? Optional.empty() : existing.getSenses().stream()
+        Optional<VocabularySense> same = existing == null ? Optional.empty() : existing.getSenses().stream()
                 .filter(sense -> sense.getStatus() == ContentStatus.ACTIVE)
+                .filter(sense -> sense.getPartOfSpeech() == entry.partOfSpeech()
+                        && sameMeaning(sense.getVietnameseMeaning(), entry.vietnameseMeaning()))
                 .min(Comparator.comparingInt(VocabularySense::getSortOrder));
-        if (usable.isPresent()) {
-            return new ResolvedVocabularyResult(key, usable.get().getId(), false);
+        if (same.isPresent()) {
+            return new ResolvedVocabularyResult(key, same.get().getId(), false);
         }
         VocabularyItem item = existing != null ? existing
                 : vocabulary.save(VocabularyItem.create(entry.lemma(), blankToNull(entry.ipa()), null));
+        // After every sense the word has, switched-off ones included, so no order number is taken twice.
+        int next = item.getSenses().stream().mapToInt(VocabularySense::getSortOrder).max().orElse(-1) + 1;
         VocabularySense sense = VocabularySense.create(item.getId(), entry.partOfSpeech(),
                 blankToNull(entry.englishDefinition()), entry.vietnameseMeaning().trim(),
-                entry.exampleSentence().trim(), null, 0);
+                entry.exampleSentence().trim(), null, next);
         item.addSense(sense);
         vocabulary.save(item);
         return new ResolvedVocabularyResult(key, sense.getId(), true);
+    }
+
+    /** Meanings are the same when they differ only in case, spacing or the ends of the text. */
+    static boolean sameMeaning(String libraryMeaning, String proposed) {
+        return libraryMeaning != null && proposed != null && squash(libraryMeaning).equals(squash(proposed));
+    }
+
+    private static String squash(String meaning) {
+        return meaning.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
 
     private static VocabularyItem preferActive(VocabularyItem first, VocabularyItem second) {

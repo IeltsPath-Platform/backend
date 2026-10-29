@@ -6,6 +6,7 @@ import com.ieltspath.content.application.result.LessonAuthoringSummaryResult;
 import com.ieltspath.content.domain.aggregate.Lesson;
 import com.ieltspath.content.domain.aggregate.LessonBlock;
 import com.ieltspath.content.domain.exception.LessonBlockInvalidException;
+import com.ieltspath.content.domain.exception.QuestionAlreadyOwnedException;
 import com.ieltspath.content.domain.exception.LessonNotFoundException;
 import com.ieltspath.content.domain.exception.LessonNotPublishableException;
 import com.ieltspath.content.domain.exception.LessonSortConflictException;
@@ -82,6 +83,7 @@ public class LessonAuthoringUseCase {
         if (type == BlockType.EXERCISE) lesson.ensureExerciseEditable();
         validateBlock(lessonId, type, sortOrder, textContent, assetId, vocabularySenseIds,
                 questionVersionIds, knowledgePointIds);
+        if (type == BlockType.EXERCISE) requireQuestionsFree(null, questionVersionIds);
         int position = sortOrder == null ? lesson.getBlocks().size() : sortOrder;
         lesson.addBlock(LessonBlock.create(lessonId, type, position, textContent, assetId,
                 vocabularySenseIds, questionVersionIds, knowledgePointIds));
@@ -104,6 +106,7 @@ public class LessonAuthoringUseCase {
         }
         validateBlock(lessonId, blockType, sortOrder, textContent, assetId, vocabularySenseIds,
                 questionVersionIds, knowledgePointIds);
+        if (blockType == BlockType.EXERCISE) requireQuestionsFree(blockId, questionVersionIds);
         block.update(sortOrder, textContent, assetId,
                 vocabularySenseIds, questionVersionIds, knowledgePointIds);
         repository.save(lesson);
@@ -168,6 +171,13 @@ public class LessonAuthoringUseCase {
                 && !vocabulary.findActiveSenseIds(block.getVocabularySenseIds()).containsAll(block.getVocabularySenseIds())) {
             throw new LessonBlockInvalidException("Vocabulary block contains a missing or inactive sense");
         }
+    }
+
+    /** Every question of an exercise block must be free: one that has a home elsewhere is refused, and none is taken. */
+    private void requireQuestionsFree(UUID blockId, List<UUID> questionVersionIds) {
+        if (questionVersionIds == null || questionVersionIds.isEmpty()) return;
+        List<UUID> taken = repository.questionVersionsOwnedElsewhere(blockId, questionVersionIds);
+        if (!taken.isEmpty()) throw new QuestionAlreadyOwnedException(taken);
     }
 
     private void requireUniqueOrder(List<UUID> ids) {
