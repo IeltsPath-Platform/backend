@@ -155,8 +155,17 @@ class AiCourseDraftIntegrationTest {
         UUID section = UUID.randomUUID();
         jdbc.update("INSERT INTO content_sections(id,package_version_id,title,sort_order) VALUES(?,?,'S',1)",
                 section, setVersion);
+        // The set holds a question of its own: the exercise question above belongs to no package.
+        UUID setQuestion = UUID.randomUUID();
+        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status) "
+                + "VALUES(?,'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED')", setQuestion);
+        UUID setQuestionVersion = UUID.randomUUID();
+        jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) "
+                + "VALUES(?,?,1,'Set stem','PUBLISHED')", setQuestionVersion, setQuestion);
+        jdbc.update("INSERT INTO question_knowledge_points(question_version_id,knowledge_point_id) VALUES(?,?)",
+                setQuestionVersion, kpFoundation);
         jdbc.update("INSERT INTO section_questions(section_id,question_version_id,sort_order) VALUES(?,?,1)",
-                section, version);
+                section, setQuestionVersion);
         jdbc.update("UPDATE content_packages SET status='PUBLISHED', current_published_version_id=? WHERE id=?",
                 setVersion, practiceSet);
 
@@ -188,7 +197,7 @@ class AiCourseDraftIntegrationTest {
 
         assertThat(draft.getStatus()).isEqualTo(DraftStatus.READY);
         assertThat(draft.getModel()).isEqualTo("stand-in-model");
-        assertThat(draft.getPromptVersion()).isEqualTo("COURSE-v3");
+        assertThat(draft.getPromptVersion()).isEqualTo("COURSE-v4");
         JsonNode result = json.readTree(draft.getResultJson());
         JsonNode lessons = result.path("topics").get(0).path("lessons");
         assertThat(lessons).hasSize(2);

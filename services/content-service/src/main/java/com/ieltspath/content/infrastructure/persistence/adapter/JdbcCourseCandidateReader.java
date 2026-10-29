@@ -101,7 +101,11 @@ public class JdbcCourseCandidateReader implements CourseCandidateReader {
                   FROM question_knowledge_points qkp
                   JOIN question_versions qv ON qv.id = qkp.question_version_id
                   JOIN questions q ON q.id = qv.question_id
-                  WHERE qkp.knowledge_point_id IN (:ids) AND qv.status = 'PUBLISHED' AND q.purpose = 'LEARNING') ranked
+                  WHERE qkp.knowledge_point_id IN (:ids) AND qv.status = 'PUBLISHED' AND q.purpose = 'LEARNING'
+                    -- A question has one home: one already in a lesson's exercise block or in a package section
+                    -- cannot be the exercise of another lesson, so the model is never offered it.
+                    AND NOT EXISTS (SELECT 1 FROM lesson_block_questions owned WHERE owned.question_version_id = qv.id)
+                    AND NOT EXISTS (SELECT 1 FROM section_questions owned_sq WHERE owned_sq.question_version_id = qv.id)) ranked
                 WHERE rank_in_point <= :limit
                 ORDER BY point, rank_in_point
                 """, new MapSqlParameterSource("ids", List.copyOf(pointIds)).addValue("limit", perPoint), rs -> {

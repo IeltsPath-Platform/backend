@@ -30,9 +30,13 @@ Returns the `ACTIVE` words whose lemma is exactly one of those asked for (trimme
 
 - 1–200 entries. `lemma` (up to 255), `partOfSpeech`, `vietnameseMeaning` and `exampleSentence` are required;
   `partOfSpeech` is `NOUN`, `VERB`, `ADJECTIVE`, `ADVERB`, `PREPOSITION`, `CONJUNCTION`, `IDIOM` or `PHRASAL_VERB`.
-- For each distinct lemma (trimmed, lower case): if the library has the word and it has an active sense, that sense is
-  returned and the entry's text is ignored (`created: false`); if the word has no active sense, the entry's sense is added to
-  it; if the library lacks the word, the word and the entry's sense are created. Created words and senses are `ACTIVE`.
+- For each distinct lemma (trimmed, lower case; a lemma entered twice is resolved by its first entry), in this order:
+  1. the library has the word with an active sense of the same `partOfSpeech` and the same `vietnameseMeaning` (ignoring
+     case and spacing): that sense is returned and nothing is written (`created: false`);
+  2. the library has the word but no such sense: the entry's sense is added to the word, after every sense it already has
+     (`sortOrder` one past the highest, switched-off senses counted). The older senses are not changed (`created: true`);
+  3. the library lacks the word: the word and the entry's sense are created (`created: true`).
+  Created words and senses are `ACTIVE`. A word is never entered twice.
 - A word that exists but is switched off returns `400` and nothing is written. The whole call is one transaction.
 
 `200 OK`, one item per distinct lemma, in order of first appearance:

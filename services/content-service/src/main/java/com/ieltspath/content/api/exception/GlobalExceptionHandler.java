@@ -351,6 +351,13 @@ public class GlobalExceptionHandler {
                 Map.of("code", "LESSON_EXERCISE_LOCKED"));
     }
 
+    @ExceptionHandler(QuestionAlreadyOwnedException.class)
+    public ResponseEntity<ErrorResponse> handleQuestionAlreadyOwned(QuestionAlreadyOwnedException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "QUESTION_ALREADY_OWNED",
+                        "questionVersionIds", ex.getQuestionVersionIds().stream().map(java.util.UUID::toString).toList()));
+    }
+
     @ExceptionHandler(LessonSortConflictException.class)
     public ResponseEntity<ErrorResponse> handleLessonSortConflict(LessonSortConflictException ex, HttpServletRequest request) {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),

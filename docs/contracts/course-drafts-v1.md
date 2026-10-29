@@ -98,6 +98,8 @@ lesson. Each expected point that appears in none is the warning `KP_NOT_COVERED`
 | `KNOWLEDGE_POINT_UNKNOWN` | id | | The knowledge point does not exist. |
 | `KNOWLEDGE_POINT_INACTIVE` | id | | The knowledge point is not `ACTIVE`. |
 | `QUESTION_REF_UNKNOWN` | the reference | | No question version or import reference matches. |
+| `QUESTION_ALREADY_OWNED` | the reference | | The question already belongs to an exercise block of a lesson or to a package section. A question has one home. |
+| `QUESTION_REUSED` | the reference | | The question is used a second time in the draft. Reported once per question. |
 | `PACKAGE_UNKNOWN` | id | | The package does not exist. |
 | `PACKAGE_NOT_PUBLISHED` | id | | The package is not `PUBLISHED`. |
 | `PACKAGE_WRONG_TYPE` | id | | A lesson's practice set is not a `PRACTICE_SET`, or a milestone is not a `PRACTICE_TEST`. |
@@ -108,7 +110,8 @@ lesson. Each expected point that appears in none is the warning `KP_NOT_COVERED`
 
 **Gaps.** For every knowledge point used in a lesson: `NO_PRACTICE_SET` when no published practice set that belongs to
 no lesson measures it, `FEW_PRACTICE_SETS` when there are one or two (three are wanted), and `NO_EXERCISE_QUESTION` when
-no `PUBLISHED` question of purpose `LEARNING` measures it. A point can have more than one gap. Gaps are not filled
+no `PUBLISHED` question of purpose `LEARNING` that belongs to no lesson block and no package section measures it. A point
+can have more than one gap. Gaps are not filled
 here: the author asks for questions with the [question drafts](question-drafts-v1.md) and tries again.
 
 ## Approval
@@ -129,8 +132,10 @@ vocabulary: the library is another service, so words written to it in step 1 sta
 reviewed entries, and approving again finds them instead of writing them twice.
 
 1. The `newVocabulary` words of all lessons, once for each lemma, go to the library in one call
-   (`POST /api/content/admin/vocabulary/bulk`). A lemma the library already has keeps its own first active sense and
-   the draft's text is ignored; any other is stored with the sense the author reviewed.
+   (`POST /api/content/admin/vocabulary/bulk`). A word the library has with the same
+   part of speech and meaning keeps that sense; with another meaning it gains a new sense beside the old ones; a word the
+   library lacks is created with the sense the author reviewed. To use the library's own sense instead, the author moves
+   the word to `vocabularySenseIds` before approving.
 2. The course, `INACTIVE`, so learners cannot see it until its author activates it.
 3. Each topic, `INACTIVE`, in the course, with the course band, its skill and its sort order.
 4. Each lesson, `DRAFT`, in its topic (positions follow the list), with its knowledge points and blocks. `EXERCISE`
@@ -187,7 +192,8 @@ anywhere until an author has reviewed and approved them.
    the model, requested points first. They are ordered so every prerequisite comes before the points that need it, and
    among points that are ready at once the foundation points come first, so the course climbs from the earliest
    prerequisite. Each point comes with the published practice sets that belong to
-   no lesson and the published learning questions that measure it.
+   no lesson and the published learning questions that measure it. A question that already belongs to a lesson's exercise
+   block or to a package section is left out, so the model is never offered one that could not be used.
 2. *The model* receives the points (code, name, short description, foundation flag), the practice set codes and short
    question labels, never question text or learner data. It returns lessons that group the points, with a name, a
    summary, the practice sets and questions chosen for each lesson, final test names, and a course name.

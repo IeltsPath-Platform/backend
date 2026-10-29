@@ -6,6 +6,7 @@ import com.ieltspath.content.application.result.LessonAuthoringResult;
 import com.ieltspath.content.domain.exception.LessonBlockInvalidException;
 import com.ieltspath.content.domain.exception.LessonExerciseLockedException;
 import com.ieltspath.content.domain.exception.LessonNotPublishableException;
+import com.ieltspath.content.domain.exception.QuestionAlreadyOwnedException;
 import com.ieltspath.content.domain.aggregate.Lesson;
 import com.ieltspath.content.domain.aggregate.LessonBlock;
 import com.ieltspath.content.domain.repository.LessonAuthoringRepository;
@@ -19,6 +20,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -43,6 +45,39 @@ class LessonAuthoringUseCaseTest {
                 List.of(), List.of(UUID.randomUUID()), List.of()))
                 .isInstanceOf(LessonExerciseLockedException.class);
         verify(repository, never()).save(any(Lesson.class));
+    }
+
+    @Test void refusesToAddAQuestionThatBelongsToAnotherLessonOrAPackage() {
+        UUID owned = UUID.randomUUID();
+        UUID free = UUID.randomUUID();
+        when(repository.lockAndFindById(lessonId)).thenReturn(Optional.of(lesson(LessonStatus.DRAFT)));
+        when(repository.questionVersionsOwnedElsewhere(null, List.of(owned, free))).thenReturn(List.of(owned));
+
+        assertThatThrownBy(() -> useCase.addBlock(lessonId, BlockType.EXERCISE, null, null, null,
+                List.of(), List.of(owned, free), List.of()))
+                .isInstanceOfSatisfying(QuestionAlreadyOwnedException.class,
+                        failure -> assertThat(failure.getQuestionVersionIds()).containsExactly(owned));
+        verify(repository, never()).save(any(Lesson.class));
+    }
+
+    @Test void checksTheQuestionsOfAnEditedBlockAgainstEveryOtherBlock() {
+        UUID owned = UUID.randomUUID();
+        when(repository.lockAndFindById(lessonId)).thenReturn(Optional.of(lesson(LessonStatus.DRAFT, exerciseBlock())));
+        when(repository.questionVersionsOwnedElsewhere(blockId, List.of(owned))).thenReturn(List.of(owned));
+
+        assertThatThrownBy(() -> useCase.updateBlock(lessonId, blockId, BlockType.EXERCISE, null, null, null,
+                List.of(), List.of(owned), List.of()))
+                .isInstanceOf(QuestionAlreadyOwnedException.class);
+        verify(repository, never()).save(any(Lesson.class));
+    }
+
+    @Test void doesNotCheckOwnershipForABlockWithoutQuestions() {
+        when(repository.lockAndFindById(lessonId)).thenReturn(Optional.of(lesson(LessonStatus.DRAFT)));
+
+        // The block is saved; reading the lesson back is not stubbed, which is all this test lets fail.
+        assertThatThrownBy(() -> useCase.addBlock(lessonId, BlockType.TEXT, null, "text", null,
+                List.of(), List.of(), List.of()));
+        verify(repository, never()).questionVersionsOwnedElsewhere(any(), any());
     }
 
     @Test void rejectsBlockThatDoesNotBelongToLesson() {

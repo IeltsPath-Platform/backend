@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  */
 final class CoursePromptBuilder {
 
-    static final String VERSION = "COURSE-v3";
+    static final String VERSION = "COURSE-v4";
     private static final int DESCRIPTION_LIMIT = 200;
 
     private CoursePromptBuilder() {
@@ -68,9 +68,14 @@ final class CoursePromptBuilder {
                 luyện và câu hỏi cho từng lesson, đặt mã và tiêu đề cho đề cuối của từng topic và của cả course. Giữ thứ tự học:
                 kiến thức tiên quyết phải đứng ở lesson trước hoặc cùng topic phía trước. Mỗi kiến thức, gói và câu hỏi chỉ dùng
                 một lần. Mã của topic, lesson và đề cuối là mã mới do bạn đặt, chỉ gồm chữ, số, dấu chấm, gạch dưới và gạch ngang.
-                Mỗi lesson có thêm "estimatedMinutes" (số nguyên từ 5 đến 60, ước lượng thời gian học) và "summaryMarkdown": dàn ý
-                3 đến 6 gạch đầu dòng Markdown nói bài này học gì, viết CHỈ từ tên và mô tả của các kiến thức trong bài, không thêm
-                kiến thức, ví dụ hay số liệu mới. Không tạo slide hay tài liệu; người soạn sẽ thêm sau.
+                Mỗi lesson có thêm "estimatedMinutes" (số nguyên từ 5 đến 60, ước lượng thời gian học) và "summaryMarkdown": bài
+                tóm tắt viết bằng Markdown, gồm ĐÚNG hai mục, mỗi mục mở đầu bằng một dòng tiêu đề cấp hai viết đúng như sau:
+                1. "## Learning Outcomes": dòng "Sau bài học, bạn có thể:" rồi danh sách đánh số 2 đến 4 điều người học làm được,
+                   mỗi điều nói về một kiến thức của bài.
+                2. "## Key Points": 3 đến 5 gạch đầu dòng, mỗi dòng dạng "- **Tiêu đề ngắn:** giải thích một câu".
+                Viết bằng tiếng Việt, giữ thuật ngữ IELTS bằng tiếng Anh, CHỈ từ tên và mô tả của các kiến thức trong bài, không
+                thêm kiến thức, ví dụ hay số liệu mới. Không viết mục từ vựng hay cụm từ đi cùng nhau: hệ thống tự thêm bảng từ vựng
+                từ phần "vocabulary" bên dưới. Không tạo slide hay tài liệu; người soạn sẽ thêm sau.
                 Mỗi lesson có thêm "vocabulary": 3 đến 8 từ hoặc cụm từ tiếng Anh hữu ích cho nội dung bài, chọn theo tên và mô
                 tả của các kiến thức trong bài, không lặp một từ ở hai lesson. Mỗi từ gồm "lemma" (dạng gốc, chữ thường),
                 "partOfSpeech" (đúng một trong NOUN, VERB, ADJECTIVE, ADVERB, PREPOSITION, CONJUNCTION, IDIOM, PHRASAL_VERB),
@@ -81,7 +86,8 @@ final class CoursePromptBuilder {
                 Trả về DUY NHẤT một đối tượng JSON dạng:
                 {"course":{"code":"...","name":"..."},
                  "topics":[{"code":"...","name":"...","skill":"READING",
-                   "lessons":[{"code":"...","title":"...","summary":"...","summaryMarkdown":"- ý 1\\n- ý 2","estimatedMinutes":15,
+                   "lessons":[{"code":"...","title":"...","summary":"...","estimatedMinutes":15,
+                               "summaryMarkdown":"## Learning Outcomes\\n\\nSau bài học, bạn có thể:\\n\\n1. ...\\n2. ...\\n\\n## Key Points\\n\\n- **...:** ...",
                                "vocabulary":[{"lemma":"fluctuate","partOfSpeech":"VERB","englishDefinition":"...",
                                               "vietnameseMeaning":"...","exampleSentence":"...","ipa":""}],
                                "knowledgePoints":["MÃ_KIẾN_THỨC"],

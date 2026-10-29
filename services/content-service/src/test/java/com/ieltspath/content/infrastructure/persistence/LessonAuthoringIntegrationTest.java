@@ -5,6 +5,7 @@ import com.ieltspath.content.application.port.VocabularySenseLookup;
 import com.ieltspath.content.application.usecase.LessonAuthoringUseCase;
 import com.ieltspath.content.domain.exception.LessonExerciseLockedException;
 import com.ieltspath.content.domain.exception.LessonNotPublishableException;
+import com.ieltspath.content.domain.exception.QuestionAlreadyOwnedException;
 import com.ieltspath.content.domain.repository.LessonAuthoringRepository;
 import com.ieltspath.content.domain.vo.BlockType;
 import org.flywaydb.core.Flyway;
@@ -157,8 +158,24 @@ class LessonAuthoringIntegrationTest {
         var ownerOne = createLesson("OWNER_ONE"); var ownerTwo = createLesson("OWNER_TWO");
         UUID reused = question("MULTIPLE_CHOICE", "LEARNING", "PUBLISHED", "{}");
         useCase.addBlock(ownerOne.id(), BlockType.EXERCISE, 0, null, null, List.of(), List.of(reused), List.of());
-        useCase.addBlock(ownerTwo.id(), BlockType.EXERCISE, 0, null, null, List.of(), List.of(reused), List.of());
+        // A question has one home: a second lesson cannot take it, and nothing is written for the refused block.
+        assertThatThrownBy(() -> useCase.addBlock(ownerTwo.id(), BlockType.EXERCISE, 0, null, null, List.of(), List.of(reused), List.of()))
+                .isInstanceOf(QuestionAlreadyOwnedException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM lesson_blocks WHERE lesson_id=?", Integer.class, ownerTwo.id())).isZero();
         useCase.knowledgePoints(ownerOne.id(), List.of(pointId));
+        useCase.publish(ownerOne.id());
+    }
+
+    @Test void publicationStillRefusesAQuestionThatTwoLessonsHoldBecauseOfOlderData() {
+        var ownerOne = createLesson("OLD_ONE"); var ownerTwo = createLesson("OLD_TWO");
+        UUID reused = question("MULTIPLE_CHOICE", "LEARNING", "PUBLISHED", "{}");
+        useCase.addBlock(ownerOne.id(), BlockType.EXERCISE, 0, null, null, List.of(), List.of(reused), List.of());
+        useCase.addBlock(ownerTwo.id(), BlockType.EXERCISE, 0, null, null, List.of(), List.of(question("MULTIPLE_CHOICE", "LEARNING", "PUBLISHED", "{}")), List.of());
+        UUID otherBlock = jdbc.queryForObject("SELECT id FROM lesson_blocks WHERE lesson_id=?", UUID.class, ownerTwo.id());
+        // Data that predates the rule: the same question also sits in a second lesson's block.
+        jdbc.update("INSERT INTO lesson_block_questions(block_id,question_version_id,sort_order) VALUES(?,?,5)", otherBlock, reused);
+        useCase.knowledgePoints(ownerOne.id(), List.of(pointId));
+
         assertThatThrownBy(() -> useCase.publish(ownerOne.id())).isInstanceOf(LessonNotPublishableException.class);
     }
 

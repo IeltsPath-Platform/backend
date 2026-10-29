@@ -82,7 +82,7 @@ class VocabularyLemmaPersistenceTest {
         assertThat(jdbc.queryForObject("SELECT status FROM vocabulary_senses WHERE id = ?", String.class, sense)).isEqualTo("ACTIVE");
 
         List<ResolvedVocabularyResult> again = resolve.execute(new ResolveVocabularyCommand(
-                List.of(new Entry(lemma.toUpperCase(), null, PartOfSpeech.NOUN, null, "khác", "Other."))));
+                List.of(new Entry(lemma.toUpperCase(), null, PartOfSpeech.VERB, null, " Dao  động ", "Other."))));
 
         assertThat(again).singleElement().satisfies(result -> {
             assertThat(result.created()).isFalse();
@@ -90,6 +90,28 @@ class VocabularyLemmaPersistenceTest {
         });
         assertThat(jdbc.queryForObject("SELECT count(*) FROM vocabulary_items WHERE normalized_lemma = ?", Integer.class, lemma))
                 .isEqualTo(1);
+    }
+
+    @Test
+    void aDifferentMeaningIsAddedAsAnotherSenseOfTheSameWord() {
+        UUID first = resolve.execute(new ResolveVocabularyCommand(List.of(entry(lemma)))).get(0).senseId();
+        entityManager.flush();
+        entityManager.clear();
+
+        List<ResolvedVocabularyResult> added = resolve.execute(new ResolveVocabularyCommand(
+                List.of(new Entry(lemma, null, PartOfSpeech.NOUN, null, "biến động", "A fluctuation."))));
+        entityManager.flush();
+
+        assertThat(added).singleElement().satisfies(result -> {
+            assertThat(result.created()).isTrue();
+            assertThat(result.senseId()).isNotEqualTo(first);
+        });
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM vocabulary_items WHERE normalized_lemma = ?", Integer.class, lemma))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForList("""
+                SELECT s.vietnamese_meaning FROM vocabulary_senses s JOIN vocabulary_items i ON i.id = s.vocabulary_item_id
+                WHERE i.normalized_lemma = ? ORDER BY s.sort_order""", String.class, lemma))
+                .containsExactly("dao động", "biến động");
     }
 
     @Test

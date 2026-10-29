@@ -17,4 +17,10 @@ public interface LessonAuthoringRepository {
     Lesson save(Lesson lesson);
     void reorderLessons(UUID topicId, List<UUID> lessonIds);
     List<String> publicationViolations(UUID lessonId);
+
+    /**
+     * Those of the given question versions that already belong to an exercise block other than {@code exceptBlockId}
+     * (none excepted when it is null), or to a package section, in the order given.
+     */
+    List<UUID> questionVersionsOwnedElsewhere(UUID exceptBlockId, List<UUID> questionVersionIds);
 }

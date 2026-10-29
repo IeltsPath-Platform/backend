@@ -126,6 +126,22 @@ public class LessonAuthoringRepositoryAdapter implements LessonAuthoringReposito
         return errors;
     }
 
+    @Override
+    public List<UUID> questionVersionsOwnedElsewhere(UUID exceptBlockId, List<UUID> questionVersionIds) {
+        if (questionVersionIds.isEmpty()) return List.of();
+        java.util.Set<UUID> owned = new java.util.HashSet<>();
+        org.springframework.jdbc.core.namedparam.MapSqlParameterSource params =
+                new org.springframework.jdbc.core.namedparam.MapSqlParameterSource("ids", questionVersionIds)
+                        .addValue("except", exceptBlockId);
+        // `except` may be null: `block_id <> NULL` is never true, so the null case is a separate query.
+        String inBlocks = exceptBlockId == null
+                ? "SELECT question_version_id FROM lesson_block_questions WHERE question_version_id IN (:ids)"
+                : "SELECT question_version_id FROM lesson_block_questions WHERE question_version_id IN (:ids) AND block_id <> :except";
+        namedJdbc.query(inBlocks + " UNION SELECT question_version_id FROM section_questions WHERE question_version_id IN (:ids)",
+                params, rs -> { owned.add(rs.getObject(1, UUID.class)); });
+        return questionVersionIds.stream().filter(owned::contains).distinct().toList();
+    }
+
     private List<String> exerciseBlockIssues(UUID lessonId) {
         Map<UUID, List<LessonBlockKind.QuestionSpec>> questionsByBlock = new LinkedHashMap<>();
         Map<UUID, List<AssetType>> assetsByQuestion = new HashMap<>();

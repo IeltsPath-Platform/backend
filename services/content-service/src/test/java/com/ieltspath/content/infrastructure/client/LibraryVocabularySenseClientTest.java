@@ -2,6 +2,7 @@ package com.ieltspath.content.infrastructure.client;
 
 import com.ieltspath.content.application.exception.VocabularyRejectedException;
 import com.ieltspath.content.application.exception.VocabularyServiceUnavailableException;
+import com.ieltspath.content.application.port.VocabularySenseLookup;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.NewWord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,21 @@ class LibraryVocabularySenseClientTest {
                 .andRespond(withSuccess("[{\"senseId\":\"" + senseId + "\"}]", MediaType.APPLICATION_JSON));
 
         assertThat(client.findActiveSenseIds(List.of(senseId))).containsExactly(senseId);
+        server.verify();
+    }
+
+    @Test void describesTheActiveSensesWithTheirWordAndVietnameseMeaning() {
+        UUID senseId = UUID.randomUUID();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        LibraryVocabularySenseClient client = new LibraryVocabularySenseClient(builder.baseUrl("http://library.test").build());
+        signIn();
+        server.expect(requestTo("http://library.test/api/content/vocabulary/senses?ids=" + senseId))
+                .andRespond(withSuccess("[{\"senseId\":\"" + senseId + "\",\"lemma\":\"infer\",\"vietnameseMeaning\":\"suy luận\","
+                        + "\"imageUrl\":null}]", MediaType.APPLICATION_JSON));
+
+        assertThat(client.describeActiveSenses(List.of(senseId)))
+                .containsExactly(new VocabularySenseLookup.SenseText(senseId, "infer", "suy luận"));
         server.verify();
     }
 

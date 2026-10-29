@@ -69,6 +69,10 @@ changing its questions or removing the block is allowed only while the lesson is
 `409` with `details.code = LESSON_EXERCISE_LOCKED`. Block order may be changed in any state. Reordering uses a
 temporary sort range inside the same transaction so existing negative vocabulary sort positions cannot collide.
 
+A question has one home. Adding or changing the questions of an `EXERCISE` block is refused with `409` and
+`details.code = QUESTION_ALREADY_OWNED` (`details.questionVersionIds` lists them) when any of them already belongs to
+another exercise block or to a package section. The block being changed does not count against itself.
+
 ## Publish and archive
 
 `POST /api/content/admin/lessons/{lessonId}/publish` validates the full lesson and returns the updated detail when

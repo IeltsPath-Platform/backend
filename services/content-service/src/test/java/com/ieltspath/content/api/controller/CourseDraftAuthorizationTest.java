@@ -46,6 +46,7 @@ class CourseDraftAuthorizationTest {
     @MockitoBean CourseDraftUseCases drafts;
     @MockitoBean ApproveCourseDraftUseCase approve;
     @MockitoBean com.ieltspath.content.application.usecase.RequestCourseDraftUseCase requestCourse;
+    @MockitoBean com.ieltspath.content.application.usecase.FindPracticeSetsForPointsUseCase practiceSets;
     @MockitoBean CurrentUserProvider currentUser;
 
     @Test
@@ -60,10 +61,12 @@ class CourseDraftAuthorizationTest {
                 .content("{\"structure\":{}}")).andExpect(status().isForbidden());
         mockMvc.perform(get(base + "/{id}/analysis", id)).andExpect(status().isForbidden());
         mockMvc.perform(post(base + "/{id}/approve", id)).andExpect(status().isForbidden());
+        mockMvc.perform(get(base + "/practice-sets").param("knowledgePointIds", id.toString()))
+                .andExpect(status().isForbidden());
         mockMvc.perform(post("/api/content/admin/ai-drafts/courses").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"bandLevel\":6.5,\"skills\":[\"READING\"],\"topics\":[\"a\"]}"))
                 .andExpect(status().isForbidden());
 
-        verifyNoInteractions(drafts, approve, requestCourse);
+        verifyNoInteractions(drafts, approve, requestCourse, practiceSets);
     }
 }

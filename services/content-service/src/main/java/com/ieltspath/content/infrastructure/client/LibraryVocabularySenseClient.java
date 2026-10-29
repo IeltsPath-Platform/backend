@@ -47,7 +47,12 @@ public class LibraryVocabularySenseClient implements VocabularySenseLookup, Voca
 
     @Override
     public Set<UUID> findActiveSenseIds(List<UUID> senseIds) {
-        if (senseIds == null || senseIds.isEmpty() || senseIds.size() > 100) return Set.of();
+        return describeActiveSenses(senseIds).stream().map(SenseText::senseId).collect(Collectors.toUnmodifiableSet());
+    }
+
+    @Override
+    public List<SenseText> describeActiveSenses(List<UUID> senseIds) {
+        if (senseIds == null || senseIds.isEmpty() || senseIds.size() > 100) return List.of();
         JwtAuthenticationToken token = signedIn();
         try {
             VocabularySense[] response = restClient.get()
@@ -57,8 +62,9 @@ public class LibraryVocabularySenseClient implements VocabularySenseLookup, Voca
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token.getToken().getTokenValue())
                     .header("X-Correlation-Id", correlationId())
                     .retrieve().body(VocabularySense[].class);
-            if (response == null) return Set.of();
-            return Arrays.stream(response).map(VocabularySense::senseId).collect(Collectors.toUnmodifiableSet());
+            if (response == null) return List.of();
+            return Arrays.stream(response)
+                    .map(sense -> new SenseText(sense.senseId(), sense.lemma(), sense.vietnameseMeaning())).toList();
         } catch (RestClientException exception) {
             throw new VocabularyServiceUnavailableException(exception);
         }
@@ -113,7 +119,7 @@ public class LibraryVocabularySenseClient implements VocabularySenseLookup, Voca
         return UUID.randomUUID().toString();
     }
 
-    private record VocabularySense(UUID senseId) {}
+    private record VocabularySense(UUID senseId, String lemma, String vietnameseMeaning) {}
 
     private record Entry(String lemma, String ipa, String partOfSpeech, String englishDefinition,
                          String vietnameseMeaning, String exampleSentence) {}
