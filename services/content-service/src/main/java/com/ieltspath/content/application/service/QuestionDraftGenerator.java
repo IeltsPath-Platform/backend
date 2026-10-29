@@ -20,10 +20,15 @@ import com.ieltspath.content.domain.aggregate.AiDraft;
 import com.ieltspath.content.domain.vo.ContentStatus;
 import com.ieltspath.content.domain.vo.DraftKind;
 import com.ieltspath.content.infrastructure.config.ContentAiProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -32,6 +37,8 @@ import java.util.stream.Collectors;
  */
 @Component
 public class QuestionDraftGenerator implements AiDraftGenerator {
+
+    private static final Logger log = LoggerFactory.getLogger(QuestionDraftGenerator.class);
 
     private final ContentGenerationPort model;
     private final KnowledgePointRepository knowledgePoints;
@@ -64,9 +71,10 @@ public class QuestionDraftGenerator implements AiDraftGenerator {
                 .orElseThrow(() -> new ContentGenerationException(ContentGenerationException.FAILED,
                         "Knowledge point is not available"));
 
-        GenerationReply reply = model.generate(QuestionDraftPromptBuilder.build(point, request));
+        List<ErrorType> codes = errorTypes.findApprovedActive();
+        Set<String> activeCodes = codes.stream().map(ErrorType::getCode).collect(Collectors.toSet());
+        GenerationReply reply = model.generate(QuestionDraftPromptBuilder.build(point, request, codes));
         JsonNode candidates = candidates(reply.text());
-        Set<String> activeCodes = errorTypes.findApprovedActive().stream().map(ErrorType::getCode).collect(Collectors.toSet());
         // Stems the point already has, and then those kept from this reply, so neither is repeated.
         Set<String> knownStems = stems.stemsOf(point.getId()).stream().map(QuestionDraftItems::normalize)
                 .collect(Collectors.toCollection(HashSet::new));
@@ -75,7 +83,7 @@ public class QuestionDraftGenerator implements AiDraftGenerator {
         ArrayNode rejected = json.createArrayNode();
         int limit = Math.min(request.count(), properties.getAi().getMaxItemsPerRequest());
         for (int index = 0; index < candidates.size(); index++) {
-            JsonNode candidate = candidates.get(index);
+            JsonNode candidate = withKnownDistractors(candidates.get(index), activeCodes);
             if (accepted.size() >= limit) {
                 break;
             }
@@ -88,6 +96,9 @@ public class QuestionDraftGenerator implements AiDraftGenerator {
                 rejected.add(json.createObjectNode().put("index", index).put("reason", reason));
             }
         }
+        // Only the reasons are logged, never the reply: it may echo the prompt.
+        log.info("Question draft for {}: {} items usable, {} rejected {}", point.getId(), accepted.size(),
+                rejected.size(), reasonCounts(rejected));
         if (accepted.isEmpty()) {
             throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY,
                     "No usable question in the reply");
@@ -117,6 +128,38 @@ public class QuestionDraftGenerator implements AiDraftGenerator {
         } catch (JsonProcessingException invalid) {
             throw new ContentGenerationException(ContentGenerationException.INVALID_REPLY, "Reply is not JSON");
         }
+    }
+
+    /**
+     * A wrong option that names a code outside the approved list loses that label and keeps its place: the question
+     * itself is still sound, and the label only says what the learner's mistake is.
+     */
+    private ObjectNode withKnownDistractors(JsonNode candidate, Set<String> activeCodes) {
+        ObjectNode copy = candidate.isObject() ? ((ObjectNode) candidate).deepCopy() : json.createObjectNode();
+        JsonNode distractors = copy.path("distractors");
+        if (!distractors.isObject()) {
+            return copy;
+        }
+        ObjectNode known = json.createObjectNode();
+        distractors.fields().forEachRemaining(entry -> {
+            if (activeCodes.contains(entry.getValue().asText(""))) {
+                known.set(entry.getKey(), entry.getValue());
+            }
+        });
+        if (known.size() == distractors.size()) {
+            return copy;
+        }
+        copy.remove("distractors");
+        if (known.size() > 0) {
+            copy.set("distractors", known);
+        }
+        return copy;
+    }
+
+    private static Map<String, Integer> reasonCounts(ArrayNode rejected) {
+        Map<String, Integer> counts = new TreeMap<>();
+        rejected.forEach(entry -> counts.merge(entry.path("reason").asText(), 1, Integer::sum));
+        return counts;
     }
 
     private QuestionDraftRequest readRequest(String text) {
