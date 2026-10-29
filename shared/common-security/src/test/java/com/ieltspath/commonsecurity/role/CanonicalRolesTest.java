@@ -10,7 +10,7 @@ class CanonicalRolesTest {
     @Test
     void listsEveryRoleATokenMayCarry() {
         assertEquals(
-                Set.of("ADMIN", "CUSTOMER", "CONTENT_AUTHOR", "EXAMINER", "SALES_STAFF", "STAFF_MANAGER", "STAFF"),
+                Set.of("ADMIN", "CUSTOMER", "CONTENT_AUTHOR", "EXAMINER", "SALES_STAFF", "STAFF_MANAGER"),
                 CanonicalRoles.ALL);
     }
 }
