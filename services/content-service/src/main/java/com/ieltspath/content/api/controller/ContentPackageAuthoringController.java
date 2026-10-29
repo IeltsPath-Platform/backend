@@ -7,7 +7,10 @@ import com.ieltspath.content.api.dto.response.AuthorPackageSummaryResponse;
 import com.ieltspath.content.application.command.CreateContentPackageCommand;
 import com.ieltspath.content.application.command.SaveContentSectionCommand;
 import com.ieltspath.content.application.port.AuthorPackageReader;
+import com.ieltspath.content.application.usecase.ArchiveContentPackageUseCase;
+import com.ieltspath.content.application.usecase.CopyPackageVersionToDraftUseCase;
 import com.ieltspath.content.application.usecase.CreateContentPackageUseCase;
+import com.ieltspath.content.application.usecase.UpdateContentPackageUseCase;
 import com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PublicationStatus;
@@ -57,6 +60,9 @@ public class ContentPackageAuthoringController {
     private final RemoveAndReorderSectionQuestionsUseCase removeAndReorderQuestions;
     private final ListAuthorPackagesUseCase listPackages;
     private final CreateContentPackageUseCase createPackage;
+    private final UpdateContentPackageUseCase updatePackage;
+    private final ArchiveContentPackageUseCase archivePackage;
+    private final CopyPackageVersionToDraftUseCase copyToDraft;
 
     @GetMapping
     public List<AuthorPackageSummaryResponse> list(
@@ -84,6 +90,20 @@ public class ContentPackageAuthoringController {
         return AuthorPackageResponse.from(getPackage.execute(packageId));
     }
 
+    @PutMapping("/{packageId}")
+    public AuthorPackageResponse update(@PathVariable("packageId") UUID packageId,
+                                        @Valid @RequestBody AuthorPackageRequests.UpdatePackage request) {
+        return AuthorPackageResponse.from(updatePackage.execute(packageId, request.title(),
+                AccessLevelCompatibility.toRequiredFeatureKey(request.accessLevel(), "PREMIUM_CONTENT")));
+    }
+
+    /** Soft delete: the package is archived, which hides it from learners and keeps all of its data. */
+    @DeleteMapping("/{packageId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void archive(@PathVariable("packageId") UUID packageId) {
+        archivePackage.execute(packageId);
+    }
+
     @PostMapping("/{packageId}/versions")
     @ResponseStatus(HttpStatus.CREATED)
     public AuthorPackageResponse.Version createDraftVersion(@PathVariable("packageId") UUID packageId,
@@ -92,6 +112,14 @@ public class ContentPackageAuthoringController {
         String rulesJson = request == null ? null : request.rulesJson();
         AuthorVersionResult version = createDraft.execute(packageId, rulesJson);
         return AuthorPackageResponse.Version.from(version);
+    }
+
+    /** Starts the next draft with the sections, questions, passages and audio of the given version. */
+    @PostMapping("/{packageId}/versions/{versionId}/copy")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AuthorPackageResponse.Version copyVersionToDraft(@PathVariable("packageId") UUID packageId,
+                                                            @PathVariable("versionId") UUID versionId) {
+        return AuthorPackageResponse.Version.from(copyToDraft.execute(packageId, versionId));
     }
 
     @PostMapping("/{packageId}/versions/{versionId}/sections")

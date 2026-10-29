@@ -228,7 +228,7 @@ Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho
 - `POST /api/users/me/password` accepts `{currentPassword, newPassword}` and returns 204. New passwords must contain
   at least 6 characters (the same rule as password reset). Five incorrect current-password attempts in a 15-minute
   window lock further attempts for that user for 15 minutes. The counter is stored in `password_change_attempts`
-  (migration V9), so the limit holds across service instances and restarts; it is cleared by a successful change.
+  (migration V12), so the limit holds across service instances and restarts; it is cleared by a successful change.
   Changing or resetting the password revokes all active refresh tokens, including the current session because the access-token
   contract does not identify its refresh-token session.
 - `PUT /api/users/me/profile` edits the display name, bio, self-reported band, timezone and visibility (`PUBLIC` or

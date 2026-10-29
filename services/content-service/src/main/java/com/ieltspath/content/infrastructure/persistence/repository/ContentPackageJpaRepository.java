@@ -38,6 +38,47 @@ public interface ContentPackageJpaRepository extends JpaRepository<ContentPackag
     @Query(value = "SET CONSTRAINTS uq_section_questions_sort_order DEFERRED", nativeQuery = true)
     int deferQuestionOrderCheck();
 
+    /**
+     * Copies the sections of one version into another, with their question groups, questions and the passage and
+     * audio linked to them. The copies get new ids; questions, assets and covers are shared, not duplicated. It is one
+     * statement, so the foreign keys between the copied rows are checked when all of them exist.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            WITH section_map AS (
+                SELECT id AS old_id, gen_random_uuid() AS new_id
+                FROM content_sections WHERE package_version_id = :fromVersionId
+            ), group_map AS (
+                SELECT g.id AS old_id, gen_random_uuid() AS new_id
+                FROM section_question_groups g JOIN section_map m ON m.old_id = g.section_id
+            ), copied_sections AS (
+                INSERT INTO content_sections (id, package_version_id, title, skill, sort_order, time_limit_seconds,
+                                              instructions, part_no, cover_asset_id)
+                SELECT m.new_id, :toVersionId, s.title, s.skill, s.sort_order, s.time_limit_seconds,
+                       s.instructions, s.part_no, s.cover_asset_id
+                FROM content_sections s JOIN section_map m ON m.old_id = s.id
+                RETURNING id
+            ), copied_groups AS (
+                INSERT INTO section_question_groups (id, section_id, sort_order, format_code, instructions)
+                SELECT gm.new_id, sm.new_id, g.sort_order, g.format_code, g.instructions
+                FROM section_question_groups g
+                JOIN group_map gm ON gm.old_id = g.id
+                JOIN section_map sm ON sm.old_id = g.section_id
+                RETURNING id
+            ), copied_questions AS (
+                INSERT INTO section_questions (id, section_id, question_version_id, sort_order, max_score, group_id)
+                SELECT gen_random_uuid(), sm.new_id, q.question_version_id, q.sort_order, q.max_score, gm.new_id
+                FROM section_questions q
+                JOIN section_map sm ON sm.old_id = q.section_id
+                LEFT JOIN group_map gm ON gm.old_id = q.group_id
+                RETURNING id
+            )
+            INSERT INTO content_asset_links (id, asset_id, section_id, sort_order)
+            SELECT gen_random_uuid(), l.asset_id, sm.new_id, l.sort_order
+            FROM content_asset_links l JOIN section_map sm ON sm.old_id = l.section_id
+            """, nativeQuery = true)
+    int copyVersionContent(@Param("fromVersionId") UUID fromVersionId, @Param("toVersionId") UUID toVersionId);
+
     @Query(value = "SELECT EXISTS (SELECT 1 FROM question_versions WHERE id = :id)", nativeQuery = true)
     boolean questionVersionExists(@Param("id") UUID id);
 

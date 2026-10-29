@@ -29,6 +29,12 @@ public final class AuthorPackageRequests {
             UUID courseId) {
     }
 
+    /** What an author may change after creating a package. */
+    public record UpdatePackage(
+            @NotBlank @Size(max = 255) String title,
+            @NotNull AccessLevel accessLevel) {
+    }
+
     /** {@code rulesJson} defaults to {@code "{}"} when omitted; a non-JSON value is refused by the use case. */
     public record CreateDraftVersion(@Size(max = 20000) String rulesJson) {
     }

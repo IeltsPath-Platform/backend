@@ -20,6 +20,12 @@ public interface ContentPackageRepository {
     /** Checks the question order uniqueness within a section at commit, for removals and reorderings. */
     void deferQuestionOrderCheck();
 
+    /**
+     * Copies the sections of {@code fromVersionId}, with their questions, passages and audio, into {@code toVersionId}.
+     * Saves what is waiting first, so the target version may be one that was just added to its package.
+     */
+    void copyVersionContent(UUID fromVersionId, UUID toVersionId);
+
     /** Whether a question version exists; the author may only attach versions that do. */
     boolean questionVersionExists(UUID questionVersionId);
 

@@ -4,6 +4,7 @@ import com.ieltspath.content.domain.entity.ContentPackageVersion;
 import com.ieltspath.content.domain.entity.ContentSection;
 import com.ieltspath.content.domain.exception.ContentSectionNotFoundException;
 import com.ieltspath.content.domain.exception.DraftVersionExistsException;
+import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.exception.InvalidPackageLessonException;
 import com.ieltspath.content.domain.exception.PackageVersionNotFoundException;
 import com.ieltspath.content.domain.vo.PackageType;
@@ -107,8 +108,36 @@ public class ContentPackage {
                 PublicationStatus.DRAFT, null, now, now, new ArrayList<>(), null, courseId, null, topicId);
     }
 
+    /** The title and who may open the package. The code, type and what it is bound to stay as created. */
+    public void updateDetails(String title, String requiredFeatureKey) {
+        requireNotArchived();
+        this.title = Objects.requireNonNull(title, "title must not be null");
+        this.requiredFeatureKey = requiredFeatureKey;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * The author's soft delete. Nothing is removed, because attempts and history refer to the package, but learners
+     * no longer see it and it can no longer be changed or published. Versions waiting for a scheduled publication
+     * stop waiting.
+     */
+    public void archive() {
+        requireNotArchived();
+        versions.stream().filter(version -> version.getPublishAt() != null)
+                .forEach(ContentPackageVersion::cancelScheduledPublication);
+        this.status = PublicationStatus.ARCHIVED;
+        this.updatedAt = Instant.now();
+    }
+
+    private void requireNotArchived() {
+        if (status == PublicationStatus.ARCHIVED) {
+            throw new InvalidContentStateException("The package is already deleted");
+        }
+    }
+
     public void publishVersion(UUID versionId) {
         Objects.requireNonNull(versionId, "versionId must not be null");
+        requireNotArchived();
         boolean exists = versions.stream().anyMatch(v -> v.getId().equals(versionId));
         if (!exists) {
             throw new IllegalArgumentException("Version does not belong to package: " + versionId);
@@ -125,6 +154,7 @@ public class ContentPackage {
 
     /** Starts the next draft. A package has at most one draft; the number follows the highest existing version. */
     public ContentPackageVersion createDraftVersion(String rulesJson) {
+        requireNotArchived();
         if (versions.stream().anyMatch(v -> v.getStatus() == PublicationStatus.DRAFT)) {
             throw new DraftVersionExistsException();
         }

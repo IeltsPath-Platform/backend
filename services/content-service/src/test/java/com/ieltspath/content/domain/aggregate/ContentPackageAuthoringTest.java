@@ -4,6 +4,7 @@ import com.ieltspath.content.domain.entity.ContentPackageVersion;
 import com.ieltspath.content.domain.entity.ContentSection;
 import com.ieltspath.content.domain.exception.ContentSectionNotFoundException;
 import com.ieltspath.content.domain.exception.DraftVersionExistsException;
+import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.exception.VersionNotDraftException;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.PublicationStatus;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ContentPackageAuthoringTest {
@@ -118,6 +120,55 @@ class ContentPackageAuthoringTest {
         draft.removeSection(a.getId());
 
         assertEquals(0, draft.getSections().size());
+    }
+
+    @Test
+    void detailsChangeTitleAndAccessOnly() {
+        ContentPackage pkg = newPackage();
+
+        pkg.updateDetails("Renamed", "PREMIUM_CONTENT");
+
+        assertEquals("Renamed", pkg.getTitle());
+        assertEquals("PREMIUM_CONTENT", pkg.getRequiredFeatureKey());
+        assertEquals(PackageType.PRACTICE_SET, pkg.getPackageType());
+    }
+
+    @Test
+    void neverPublishedPackageIsArchivedAndItsScheduleIsDropped() {
+        ContentPackage pkg = newPackage();
+        ContentPackageVersion draft = pkg.createDraftVersion("{}");
+        draft.schedulePublication(java.time.Instant.now().plusSeconds(3600));
+
+        pkg.archive();
+
+        assertEquals(PublicationStatus.ARCHIVED, pkg.getStatus());
+        assertNull(draft.getPublishAt());
+    }
+
+    @Test
+    void publishedPackageIsArchivedAndKeepsItsVersions() {
+        ContentPackage pkg = newPackage();
+        ContentPackageVersion published = publishedVersion(pkg.getId(), 1);
+        pkg.addVersion(published);
+        pkg.publishVersion(published.getId());
+
+        pkg.archive();
+
+        assertEquals(PublicationStatus.ARCHIVED, pkg.getStatus());
+        assertEquals(1, pkg.getVersions().size());
+        assertEquals(PublicationStatus.PUBLISHED, published.getStatus());
+    }
+
+    @Test
+    void archivedPackageRefusesEditsAndPublishing() {
+        ContentPackage pkg = newPackage();
+        ContentPackageVersion draft = pkg.createDraftVersion("{}");
+        pkg.archive();
+
+        assertThrows(InvalidContentStateException.class, () -> pkg.updateDetails("Again", null));
+        assertThrows(InvalidContentStateException.class, () -> pkg.publishVersion(draft.getId()));
+        assertThrows(InvalidContentStateException.class, () -> pkg.createDraftVersion("{}"));
+        assertThrows(InvalidContentStateException.class, pkg::archive);
     }
 
     private static ContentPackage newPackage() {

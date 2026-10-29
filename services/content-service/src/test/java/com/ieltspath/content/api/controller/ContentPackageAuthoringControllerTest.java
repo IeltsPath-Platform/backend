@@ -22,6 +22,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.UUID;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -59,6 +60,9 @@ class ContentPackageAuthoringControllerTest {
     @MockitoBean com.ieltspath.content.application.usecase.RemoveAndReorderSectionQuestionsUseCase removeAndReorderQuestions;
     @MockitoBean com.ieltspath.content.application.usecase.ListAuthorPackagesUseCase listPackages;
     @MockitoBean com.ieltspath.content.application.usecase.CreateContentPackageUseCase createPackage;
+    @MockitoBean com.ieltspath.content.application.usecase.UpdateContentPackageUseCase updatePackage;
+    @MockitoBean com.ieltspath.content.application.usecase.ArchiveContentPackageUseCase archivePackage;
+    @MockitoBean com.ieltspath.content.application.usecase.CopyPackageVersionToDraftUseCase copyToDraft;
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
@@ -93,7 +97,36 @@ class ContentPackageAuthoringControllerTest {
                         .content("{\"code\":\"X\",\"title\":\"T\",\"packageType\":\"PRACTICE_SET\"}"))
                 .andExpect(status().isForbidden());
 
+        mockMvc.perform(put("/api/content/admin/packages/{id}", packageId)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"T\",\"accessLevel\":\"FREE\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/content/admin/packages/{id}", packageId))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/content/admin/packages/{p}/versions/{v}/copy", packageId, versionId))
+                .andExpect(status().isForbidden());
+
         verifyNoInteractions(getPackage, createDraft, createSection, updateSection, deleteSection, reorderSections,
-                listPackages, createPackage);
+                listPackages, createPackage, updatePackage, archivePackage, copyToDraft);
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void authorDeletesAPackageWithNoContent() throws Exception {
+        UUID packageId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/content/admin/packages/{id}", packageId))
+                .andExpect(status().isNoContent());
+
+        verify(archivePackage).execute(packageId);
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void updateRefusesABlankTitleBeforeReachingTheUseCase() throws Exception {
+        mockMvc.perform(put("/api/content/admin/packages/{id}", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\" \",\"accessLevel\":\"FREE\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(updatePackage);
     }
 }

@@ -51,6 +51,11 @@ public class ContentPackageRepositoryAdapter implements ContentPackageRepository
     }
 
     @Override
+    public void copyVersionContent(UUID fromVersionId, UUID toVersionId) {
+        contentPackageJpaRepository.copyVersionContent(fromVersionId, toVersionId);
+    }
+
+    @Override
     public boolean questionVersionExists(UUID questionVersionId) {
         return contentPackageJpaRepository.questionVersionExists(questionVersionId);
     }

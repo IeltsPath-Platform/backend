@@ -2,6 +2,9 @@ package com.ieltspath.content.api.controller;
 
 import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.usecase.AddSectionQuestionUseCase;
+import com.ieltspath.content.application.usecase.ArchiveContentPackageUseCase;
+import com.ieltspath.content.application.usecase.CopyPackageVersionToDraftUseCase;
+import com.ieltspath.content.application.usecase.UpdateContentPackageUseCase;
 import com.ieltspath.content.application.usecase.RemoveAndReorderSectionQuestionsUseCase;
 import com.ieltspath.content.application.usecase.CreateContentPackageUseCase;
 import com.ieltspath.content.application.usecase.CreateContentSectionUseCase;
@@ -47,7 +50,9 @@ class ContentPackageAuthoringErrorTest {
                         mock(GetAuthorPackageUseCase.class), createDraft, mock(CreateContentSectionUseCase.class),
                         updateSection, mock(DeleteContentSectionUseCase.class), reorderSections,
                         mock(AddSectionQuestionUseCase.class), mock(RemoveAndReorderSectionQuestionsUseCase.class),
-                        mock(ListAuthorPackagesUseCase.class), createPackage))
+                        mock(ListAuthorPackagesUseCase.class), createPackage,
+                        mock(UpdateContentPackageUseCase.class), mock(ArchiveContentPackageUseCase.class),
+                        mock(CopyPackageVersionToDraftUseCase.class)))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
