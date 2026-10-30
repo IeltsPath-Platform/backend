@@ -70,6 +70,7 @@ public class DebitPointsUseCase {
     private static PointTransactionType transactionType(String referenceType) {
         return switch (referenceType) {
             case "HEART_REFILL" -> PointTransactionType.HEART_REFILL_DEBIT;
+            case "COURSE_UNLOCK" -> PointTransactionType.COURSE_UNLOCK_DEBIT;
             case "STREAK_FREEZE" -> PointTransactionType.STREAK_FREEZE_DEBIT;
             default -> PointTransactionType.AI_GRADING_DEBIT;
         };
