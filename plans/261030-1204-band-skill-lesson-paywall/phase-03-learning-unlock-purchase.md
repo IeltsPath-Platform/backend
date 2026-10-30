@@ -67,4 +67,4 @@ In `learning-service` tests:
 - Added V38, the `learner_course_unlocks` repository, a `REQUIRES_NEW` intent writer, debit reconciliation, course unlock endpoint, course-list purchase fields and graceful Premium lookup fallback.
 - Focused unit/API tests: 16 passed. Persistence and V38 Testcontainers tests: 3 passed. Combined focused runs: 21 passed, 0 failures/errors/skips.
 - Full learning-service reactor: 1,019 tests passed, 0 failures/errors/skips. Surefire waited 30 seconds for broker-listener shutdown, then reported BUILD SUCCESS.
-- Implementation commit is recorded in the acceptance report.
+- Implementation commit: `6ec31d7a`.
