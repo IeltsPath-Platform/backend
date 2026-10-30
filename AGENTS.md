@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.2
-- Cập nhật lần cuối: 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -28,7 +28,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `services/access-service` | Gói, subscription, activation key, điểm. |
 | `services/game-service` | Phòng game, trận, phiên chơi, WebSocket. |
 | `services/community-service` | Bài viết, bình luận, reaction, kiểm duyệt. |
-| `services/notification-service` | Chưa triển khai (khung package). |
+| `services/notification-service` | Cổng 8088, `notification_db` (Compose PostgreSQL host 5440, migration V1-V4: `notifications`, `notification_preferences`): nhận event RabbitMQ (bốn queue chấm bài `notification.grading-{requested,completed,due-soon,overdue}.v1` và `community.notifications.v1`), lưu hộp thư thông báo, tùy chọn thông báo theo loại sự kiện. Route `/api/notifications/**`. |
 | `services/learning-service` | Cổng 8086, `learning_db` (Compose PostgreSQL host 5440): thứ tự topic, bài học, nộp bài, cổng mở bài, mastery theo KP, bài ôn, giao mã đề cuối, consumer `AssessmentCompleted.v2`. Route `/api/learning/**`. |
 
 Mỗi business service sở hữu một database PostgreSQL riêng. Gateway chuyển hai nhóm activity/streak tới user-service;
