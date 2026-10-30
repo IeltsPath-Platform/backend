@@ -20,13 +20,26 @@ public record TopicSequenceResponse(
         Course course,
         List<Skill> skills,
         boolean active,
-        int lessonCount
+        int lessonCount,
+        String description
 ) {
+    public TopicSequenceResponse(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                                 List<KnowledgePoint> knowledgePoints, Skill skill, boolean hasTopicTest, Course course,
+                                 List<Skill> skills, boolean active, int lessonCount) {
+        this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, skills,
+                active, lessonCount, null);
+    }
+
     public record Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
-                         boolean hasCourseTest, boolean active) {
+                         boolean hasCourseTest, boolean active, String coverImageUrl, String description) {
+        public Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
+                      boolean hasCourseTest, boolean active) {
+            this(courseId, code, name, bandLevel, hasCourseTest, active, null, null);
+        }
+
         static Course from(TopicSequenceResult.CourseEntry entry) {
             return entry == null ? null : new Course(entry.courseId(), entry.code(), entry.name(), entry.bandLevel(),
-                    entry.hasCourseTest(), entry.active());
+                    entry.hasCourseTest(), entry.active(), entry.coverImageUrl(), entry.description());
         }
     }
     public record KnowledgePoint(UUID id, String code, String name, LearningType learningType, Skill skill,
@@ -42,6 +55,6 @@ public record TopicSequenceResponse(
                                 kp.scopeOut(), kp.parentKnowledgePointId(), kp.errorCode()))
                         .toList(),
                 result.skill(), result.hasTopicTest(), Course.from(result.course()), result.skills(), result.active(),
-                result.lessonCount());
+                result.lessonCount(), result.description());
     }
 }

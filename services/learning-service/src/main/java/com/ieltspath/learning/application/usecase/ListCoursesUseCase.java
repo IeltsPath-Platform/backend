@@ -93,7 +93,8 @@ public class ListCoursesUseCase {
                             passedCount, course.courseId().equals(recommended), testStatus,
                             progress == null ? null : progress.passedAt(),
                             completedLessons.getOrDefault(course.courseId(), 0),
-                            totalLessons.getOrDefault(course.courseId(), 0), lastStudied.get(course.courseId()));
+                            totalLessons.getOrDefault(course.courseId(), 0), lastStudied.get(course.courseId()),
+                            course.coverImageUrl(), course.description());
                 }).toList();
     }
 

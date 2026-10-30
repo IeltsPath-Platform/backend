@@ -200,6 +200,45 @@ class RestLearningContentClientTest {
     }
 
     @Test
+    void mapsOptionalCourseAndTopicDescriptionsAndCoverImageUrl() {
+        server.expect(requestTo(INTERNAL_PATH + "/topic-sequence"))
+                .andRespond(withSuccess("""
+                        [{"topicId":"10000000-0000-4000-8000-000000000001","code":"R65",
+                          "name":"Reading 6.5","description":"Build inference skills","sortOrder":960,
+                          "requiredFeatureKey":null,"skill":"READING","hasTopicTest":true,
+                          "course":{"courseId":"30000000-0000-4000-8000-000000000002",
+                            "code":"IELTS_6_5","name":"IELTS 6.5","bandLevel":6.5,"hasCourseTest":true,
+                            "coverImageUrl":"https://cdn.example/course.jpg","description":"Course overview"},
+                          "knowledgePoints":[]}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var topic = client.getTopicSequence().getFirst();
+
+        assertEquals("Build inference skills", topic.description());
+        assertEquals("https://cdn.example/course.jpg", topic.course().coverImageUrl());
+        assertEquals("Course overview", topic.course().description());
+    }
+
+    @Test
+    void olderTopicSequencePayloadKeepsNewFieldsNull() {
+        server.expect(requestTo(INTERNAL_PATH + "/topic-sequence"))
+                .andRespond(withSuccess("""
+                        [{"topicId":"10000000-0000-4000-8000-000000000001","code":"R65",
+                          "name":"Reading 6.5","sortOrder":960,"requiredFeatureKey":null,
+                          "skill":"READING","hasTopicTest":true,
+                          "course":{"courseId":"30000000-0000-4000-8000-000000000002",
+                            "code":"IELTS_6_5","name":"IELTS 6.5","bandLevel":6.5,"hasCourseTest":true},
+                          "knowledgePoints":[]}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var topic = client.getTopicSequence().getFirst();
+
+        assertNull(topic.description());
+        assertNull(topic.course().coverImageUrl());
+        assertNull(topic.course().description());
+    }
+
+    @Test
     void mapsDerivedSkillsAndFallsBackToTheSingleSkillOfAnOlderResponse() {
         server.expect(requestTo(INTERNAL_PATH + "/topic-sequence"))
                 .andRespond(withSuccess("""

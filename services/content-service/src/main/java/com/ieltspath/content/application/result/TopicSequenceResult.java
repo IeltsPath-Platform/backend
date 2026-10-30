@@ -26,7 +26,8 @@ public record TopicSequenceResult(
         CourseEntry course,
         List<Skill> skills,
         boolean active,
-        int lessonCount
+        int lessonCount,
+        String description
 ) {
     public TopicSequenceResult {
         skills = skills.stream().filter(s -> s != Skill.ALL).distinct().sorted().toList();
@@ -37,14 +38,21 @@ public record TopicSequenceResult(
                                List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest,
                                CourseEntry course) {
         this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
-                skill == null ? List.of() : List.of(skill), true, 0);
+                skill == null ? List.of() : List.of(skill), true, 0, null);
     }
 
     public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                                List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest,
                                CourseEntry course, List<Skill> skills) {
         this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, skills,
-                true, 0);
+                true, 0, null);
+    }
+
+    public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                               List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest,
+                               CourseEntry course, List<Skill> skills, boolean active, int lessonCount) {
+        this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, skills,
+                active, lessonCount, null);
     }
 
     public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
@@ -53,7 +61,12 @@ public record TopicSequenceResult(
     }
 
     public record CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
-                              boolean active) {
+                              boolean active, String coverImageUrl, String description) {
+        public CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
+                           boolean active) {
+            this(courseId, code, name, bandLevel, hasCourseTest, active, null, null);
+        }
+
         public CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {
             this(courseId, code, name, bandLevel, hasCourseTest, true);
         }

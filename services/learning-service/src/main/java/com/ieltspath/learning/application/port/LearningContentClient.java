@@ -174,31 +174,37 @@ public interface LearningContentClient {
     /**
      * {@code requiredFeatureKey} is the Access feature needed to learn the topic; null means free. {@code skills} are
      * the skills its lessons teach; a response without them falls back to {@code skill}. {@code lessonCount} is the
-     * number of published lessons; 0 from Content that does not send it.
+     * number of published lessons; 0 from Content that does not send it. {@code description} can be null.
      */
     record Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                  List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
-                 Set<LearningSkill> skills, Boolean active, int lessonCount) {
+                 Set<LearningSkill> skills, Boolean active, int lessonCount, String description) {
         public Topic {
             skills = skillsOrSingle(skills, skill);
             active = active == null || active;
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
+                     Set<LearningSkill> skills, Boolean active, int lessonCount) {
+            this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
+                    skills, active, lessonCount, null);
+        }
+        public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                     List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
                      Set<LearningSkill> skills, Boolean active) {
             this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
-                    skills, active, 0);
+                    skills, active, 0, null);
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course,
                      Set<LearningSkill> skills) {
             this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
-                    skills, true, 0);
+                    skills, true, 0, null);
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest, Course course) {
             this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
-                    null, true, 0);
+                    null, true, 0, null);
         }
         public Topic(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                      List<KnowledgePoint> knowledgePoints, LearningSkill skill, boolean hasTopicTest) {
@@ -213,9 +219,15 @@ public interface LearningContentClient {
         }
     }
 
-    record Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest, Boolean active) {
+    record Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest, Boolean active,
+                  String coverImageUrl, String description) {
         public Course {
             active = active == null || active;
+        }
+
+        public Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
+                      Boolean active) {
+            this(courseId, code, name, bandLevel, hasCourseTest, active, null, null);
         }
 
         public Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {

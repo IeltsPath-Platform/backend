@@ -11,4 +11,12 @@ import java.util.UUID;
  */
 public record CourseResult(UUID courseId, String code, String name, BigDecimal bandLevel, int topicCount,
                            int passedTopicCount, boolean recommended, String testStatus, Instant passedAt,
-                           int completedLessonCount, int totalLessonCount, Instant lastStudiedAt) {}
+                           int completedLessonCount, int totalLessonCount, Instant lastStudiedAt,
+                           String coverImageUrl, String description) {
+    public CourseResult(UUID courseId, String code, String name, BigDecimal bandLevel, int topicCount,
+                        int passedTopicCount, boolean recommended, String testStatus, Instant passedAt,
+                        int completedLessonCount, int totalLessonCount, Instant lastStudiedAt) {
+        this(courseId, code, name, bandLevel, topicCount, passedTopicCount, recommended, testStatus, passedAt,
+                completedLessonCount, totalLessonCount, lastStudiedAt, null, null);
+    }
+}

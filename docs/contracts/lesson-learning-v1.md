@@ -44,7 +44,7 @@ All routes in this section have prefix `/api/learning`, require the learner bear
 
 ### `GET /topics`
 
-Refreshes the shared `knowledge_point_catalog` and the user's topic order from one Content `topic-sequence` read. Returns `[{topicId, code, name, sequenceOrder, status, completedLessonCount, accessLevel, skill, hasTopicTest, course}]`, where `course` is `{courseId, code, name, bandLevel}`. `accessLevel` is `FREE`, or `PREMIUM` when Content requires a paid feature for the topic (`requiredFeatureKey`); Learning does not check the learner's plan yet. Topics are ordered by course band, free before premium, topic `sortOrder`, then `topicId`. Within each course, a topic is `PASSED` when `passed_at` exists; otherwise the first unpassed topic is `IN_PROGRESS` and later topics are `LOCKED`, regardless of skill. Topics whose course is not yet known share a separate null-course group. Removed topics have no sequence order and are omitted.
+Refreshes the shared `knowledge_point_catalog` and the user's topic order from one Content `topic-sequence` read. Returns `[{topicId, code, name, description, sequenceOrder, status, completedLessonCount, accessLevel, skill, hasTopicTest, course}]`, where `course` is `{courseId, code, name, bandLevel, coverImageUrl, description}`. The descriptions and `coverImageUrl` are nullable and remain null when returned by an older Content service or unset in Content. `accessLevel` is `FREE`, or `PREMIUM` when Content requires a paid feature for the topic (`requiredFeatureKey`); Learning does not check the learner's plan yet. Topics are ordered by course band, free before premium, topic `sortOrder`, then `topicId`. Within each course, a topic is `PASSED` when `passed_at` exists; otherwise the first unpassed topic is `IN_PROGRESS` and later topics are `LOCKED`, regardless of skill. Topics whose course is not yet known share a separate null-course group. Removed topics have no sequence order and are omitted.
 
 ```json
 [
@@ -56,7 +56,7 @@ Refreshes the shared `knowledge_point_catalog` and the user's topic order from o
 
 ### `GET /courses`
 
-Available only to role `CUSTOMER`. Returns courses ordered by `bandLevel` as `[{courseId, code, name, bandLevel, topicCount, passedTopicCount, recommended, testStatus, passedAt}]`. A recommendation uses the learner's latest non-null `overall_band` from a `PLACEMENT` result: the lowest course band at or above it, or the highest course if no band is high enough. Without a placement, no course is recommended. Placement never changes topic status. `testStatus` is `NONE` when the course has no published final test, `LOCKED` while a course topic remains unpassed, `AVAILABLE` once all topics pass, and `PASSED` after the course test reaches 70%.
+Available only to role `CUSTOMER`. Returns courses ordered by `bandLevel` as `[{courseId, code, name, bandLevel, coverImageUrl, description, topicCount, passedTopicCount, recommended, testStatus, passedAt}]`. `coverImageUrl` and `description` are nullable and remain null when returned by an older Content service or unset in Content. A recommendation uses the learner's latest non-null `overall_band` from a `PLACEMENT` result: the lowest course band at or above it, or the highest course if no band is high enough. Without a placement, no course is recommended. Placement never changes topic status. `testStatus` is `NONE` when the course has no published final test, `LOCKED` while a course topic remains unpassed, `AVAILABLE` once all topics pass, and `PASSED` after the course test reaches 70%.
 
 ### `GET /placement-test`
 

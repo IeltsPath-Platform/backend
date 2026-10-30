@@ -144,10 +144,10 @@ public class JdbcLearningContentReader implements LearningContentReader {
     public List<TopicSequenceResult> topicSequence(int minPracticeQuestions, boolean includeErrorTraps) {
         record TopicRow(UUID id, String code, String name, int sortOrder, String requiredFeatureKey, Skill skill,
                         boolean hasTopicTest, TopicSequenceResult.CourseEntry course, List<Skill> skills,
-                        int lessonCount) {}
+                        int lessonCount, String description) {}
         // Course metadata is read with the topic; topics outside an active course do not join the curriculum.
         List<TopicRow> topics = jdbc.query("""
-                SELECT t.id, t.code, t.name, t.sort_order, t.required_feature_key, t.skill,
+                SELECT t.id, t.code, t.name, t.description, t.sort_order, t.required_feature_key, t.skill,
                        ARRAY(SELECT DISTINCT ls.skill FROM lessons l
                              CROSS JOIN LATERAL (%s) ls
                              WHERE l.topic_id = t.id AND l.status = 'PUBLISHED') AS skills,
@@ -158,6 +158,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
                        (SELECT count(*) FROM lessons l
                         WHERE l.topic_id = t.id AND l.status = 'PUBLISHED') AS lesson_count,
                        c.id AS course_id, c.code AS course_code, c.name AS course_name, c.band_level,
+                       c.cover_image_url, c.description AS course_description,
                        EXISTS (SELECT 1 FROM content_packages p
                                WHERE p.course_id = c.id AND p.package_type = 'COURSE_TEST'
                                  AND p.status = 'PUBLISHED' AND p.current_published_version_id IS NOT NULL)
@@ -171,8 +172,9 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 rs.getInt("sort_order"), rs.getString("required_feature_key"),
                 enumOrNull(Skill.class, rs.getString("skill")), rs.getBoolean("has_topic_test"),
                 new TopicSequenceResult.CourseEntry(uuid(rs, "course_id"), rs.getString("course_code"),
-                        rs.getString("course_name"), rs.getBigDecimal("band_level"), rs.getBoolean("has_course_test")), skills(rs),
-                rs.getInt("lesson_count")));
+                        rs.getString("course_name"), rs.getBigDecimal("band_level"), rs.getBoolean("has_course_test"),
+                        true, rs.getString("cover_image_url"), rs.getString("course_description")), skills(rs),
+                rs.getInt("lesson_count"), rs.getString("description")));
         if (topics.isEmpty()) {
             return List.of();
         }
@@ -218,7 +220,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
         return topics.stream()
                 .map(t -> new TopicSequenceResult(t.id(), t.code(), t.name(), t.sortOrder(), t.requiredFeatureKey(),
                         pointsByTopic.getOrDefault(t.id(), List.of()), t.skill(), t.hasTopicTest(), t.course(), t.skills(),
-                        true, t.lessonCount()))
+                        true, t.lessonCount(), t.description()))
                 .toList();
     }
 
