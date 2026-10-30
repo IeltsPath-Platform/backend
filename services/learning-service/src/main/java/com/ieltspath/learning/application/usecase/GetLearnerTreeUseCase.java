@@ -1,15 +1,18 @@
 package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.exception.LearningRequestException;
+import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.result.LearnerReportResult.ErrorTrapPoint;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.KnowledgePoint;
 import com.ieltspath.learning.application.port.LearningContentClient.Topic;
+import com.ieltspath.learning.application.service.PaywallGate;
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
 import com.ieltspath.learning.domain.repository.LearnerCurriculumRepository;
 import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
+import com.ieltspath.learning.domain.repository.LessonProgressRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,16 +40,22 @@ public class GetLearnerTreeUseCase {
     private final PracticeAttemptRepository attempts;
     private final LearningContentClient content;
     private final int reserve;
+    private final PaywallGate paywall;
+    private final LessonProgressRepository lessonProgress;
 
     public GetLearnerTreeUseCase(LearnerCurriculumRepository curricula, MasteryProfileRepository profiles,
                                  ReviewItemRepository reviews, PracticeAttemptRepository attempts,
                                  LearningContentClient content,
+                                 PaywallGate paywall,
+                                 LessonProgressRepository lessonProgress,
                                  @Value("${learning.free-practice.reserve:2}") int reserve) {
         this.curricula = curricula;
         this.profiles = profiles;
         this.reviews = reviews;
         this.attempts = attempts;
         this.content = content;
+        this.paywall = paywall;
+        this.lessonProgress = lessonProgress;
         this.reserve = reserve;
     }
 
@@ -72,8 +81,12 @@ public class GetLearnerTreeUseCase {
         if (!taking) throw new LearningRequestException(403, "COURSE_NOT_JOINED", "The learner is not taking this course");
 
         Map<UUID, KnowledgePoint> points = new LinkedHashMap<>();
+        Map<UUID, Topic> topicByPoint = new LinkedHashMap<>();
         for (Topic topic : topics) {
-            for (KnowledgePoint point : topic.knowledgePoints()) points.putIfAbsent(point.id(), point);
+            for (KnowledgePoint point : topic.knowledgePoints()) {
+                points.putIfAbsent(point.id(), point);
+                topicByPoint.putIfAbsent(point.id(), topic);
+            }
         }
         List<UUID> ids = points.keySet().stream().sorted(Comparator.comparing(UUID::toString)).toList();
         List<UUID> parentIds = points.values().stream().filter(point -> point.parentKnowledgePointId() == null)
@@ -92,11 +105,22 @@ public class GetLearnerTreeUseCase {
         if (prerequisites == null) prerequisites = Map.of();
         Map<UUID, Integer> unseen = parentIds.isEmpty() ? Map.of() : content.practiceSetAvailability(parentIds, excluded(userId),
                 GetReviewBasketUseCase.MIN_SET_QUESTIONS);
+        Set<UUID> grandfatheredPoints = ids.isEmpty() ? Set.of()
+                : lessonProgress.findGrandfatheredKnowledgePointIds(userId);
 
         List<Node> nodes = new ArrayList<>();
+        PaywallGate.Request paywallRequest = paywall.forLearner(userId);
         for (UUID id : parentIds) {
             KnowledgePoint point = points.get(id);
             MasteryProfile profile = standing.get(id);
+            boolean locked;
+            try {
+                locked = !paywallRequest.knowledgePointOpen(topicByPoint.get(id), point,
+                        grandfatheredPoints.contains(id));
+            } catch (AccessUnavailableException unavailable) {
+                locked = true;
+            }
+            boolean practiceAvailable = unseen.getOrDefault(id, 0) > reserve && !locked;
             nodes.add(new Node(id, point.code(), point.name(), point.skill(), point.learningType(),
                     point.cefrLevel(), point.canDo(),
                     profile == null ? null : profile.mastery(),
@@ -104,7 +128,7 @@ public class GetLearnerTreeUseCase {
                     profile == null ? 0 : profile.evidenceCount(),
                     profile == null ? null : profile.nextReviewAt(),
                     prerequisites.getOrDefault(id, List.of()),
-                    unseen.getOrDefault(id, 0) > reserve, trapsByParent.getOrDefault(id, List.of())));
+                    locked, practiceAvailable, trapsByParent.getOrDefault(id, List.of())));
         }
         return new Result(courseId, nodes);
     }
@@ -123,7 +147,7 @@ public class GetLearnerTreeUseCase {
     public record Node(UUID knowledgePointId, String code, String name, String skill, String kind, String cefrLevel,
                        String canDo, Double mastery,
                        String tier, int evidenceCount, Instant nextReviewAt, List<UUID> prerequisiteIds,
-                       boolean practiceAvailable, List<ErrorTrapPoint> errorTraps) {
+                       boolean locked, boolean practiceAvailable, List<ErrorTrapPoint> errorTraps) {
         public Node {
             errorTraps = errorTraps == null ? List.of() : List.copyOf(errorTraps);
         }
@@ -131,7 +155,13 @@ public class GetLearnerTreeUseCase {
                     String canDo, Double mastery, String tier, int evidenceCount, Instant nextReviewAt,
                     List<UUID> prerequisiteIds, boolean practiceAvailable) {
             this(knowledgePointId, code, name, skill, kind, cefrLevel, canDo, mastery, tier, evidenceCount,
-                    nextReviewAt, prerequisiteIds, practiceAvailable, List.of());
+                    nextReviewAt, prerequisiteIds, false, practiceAvailable, List.of());
+        }
+        public Node(UUID knowledgePointId, String code, String name, String skill, String kind, String cefrLevel,
+                    String canDo, Double mastery, String tier, int evidenceCount, Instant nextReviewAt,
+                    List<UUID> prerequisiteIds, boolean practiceAvailable, List<ErrorTrapPoint> errorTraps) {
+            this(knowledgePointId, code, name, skill, kind, cefrLevel, canDo, mastery, tier, evidenceCount,
+                    nextReviewAt, prerequisiteIds, false, practiceAvailable, errorTraps);
         }
     }
 

@@ -26,18 +26,26 @@ public record TopicLessonsResult(UUID topicId, List<LessonSummary> lessons, Stri
      */
     public record LessonSummary(UUID lessonId, String code, String title, int sortOrder, String status,
                                 PracticeStatus practiceStatus, PracticePassReason practicePassReason,
-                                Integer estimatedMinutes, UUID blockingReviewId) {
+                                Integer estimatedMinutes, UUID blockingReviewId, boolean paywall,
+                                boolean freePreview) {
+        public LessonSummary(UUID lessonId, String code, String title, int sortOrder, String status,
+                             PracticeStatus practiceStatus, PracticePassReason practicePassReason,
+                             Integer estimatedMinutes, UUID blockingReviewId) {
+            this(lessonId, code, title, sortOrder, status, practiceStatus, practicePassReason, estimatedMinutes,
+                    blockingReviewId, false, false);
+        }
         public LessonSummary(UUID lessonId, String code, String title, int sortOrder, String status,
                              PracticeStatus practiceStatus, PracticePassReason practicePassReason,
                              Integer estimatedMinutes) {
-            this(lessonId, code, title, sortOrder, status, practiceStatus, practicePassReason, estimatedMinutes, null);
+            this(lessonId, code, title, sortOrder, status, practiceStatus, practicePassReason, estimatedMinutes, null,
+                    false, false);
         }
         public LessonSummary(UUID lessonId, String code, String title, int sortOrder, String status,
                              PracticeStatus practiceStatus, PracticePassReason practicePassReason) {
-            this(lessonId, code, title, sortOrder, status, practiceStatus, practicePassReason, null, null);
+            this(lessonId, code, title, sortOrder, status, practiceStatus, practicePassReason, null, null, false, false);
         }
         public LessonSummary(UUID lessonId, String code, String title, int sortOrder, String status) {
-            this(lessonId, code, title, sortOrder, status, null, null, null, null);
+            this(lessonId, code, title, sortOrder, status, null, null, null, null, false, false);
         }
     }
 }

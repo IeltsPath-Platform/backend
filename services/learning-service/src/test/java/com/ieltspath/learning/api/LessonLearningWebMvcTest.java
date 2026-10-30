@@ -495,7 +495,9 @@ class LessonLearningWebMvcTest {
                 .andExpect(jsonPath("$[1].accessLevel").value("PREMIUM"));
         mvc.perform(authenticated(get("/api/learning/topics/{id}/lessons", TOPIC)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.testStatus").value("AVAILABLE"))
-                .andExpect(jsonPath("$.lessons[0].status").value("COMPLETED"));
+                .andExpect(jsonPath("$.lessons[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.lessons[0].paywall").value(false))
+                .andExpect(jsonPath("$.lessons[0].freePreview").value(false));
         mvc.perform(authenticated(get("/api/learning/mastery")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].knowledgePointId").value(KP.toString()))
                 .andExpect(jsonPath("$[0].mastery").value(0.729)).andExpect(jsonPath("$[0].evidenceCount").value(4));
@@ -506,6 +508,17 @@ class LessonLearningWebMvcTest {
         verify(getTopicLessonsUseCase).execute(USER, TOPIC);
         verify(mastery).execute(USER);
         verify(completeLessonUseCase).execute(USER, LESSON);
+    }
+
+    @Test
+    void paywallGateMapsToForbiddenWithExplicitCode() throws Exception {
+        when(completeLessonUseCase.execute(USER, LESSON)).thenThrow(
+                new com.ieltspath.learning.domain.exception.LearningGateException("PAYWALL", List.of()));
+
+        JsonNode response = body(mvc.perform(authenticated(post("/api/learning/lessons/{id}/complete", LESSON)))
+                .andExpect(status().isForbidden()).andReturn());
+
+        assertEquals("PAYWALL", response.path("code").asText());
     }
 
     enum ProtectedRoute { TOPICS, TOPIC_LESSONS, LESSON, SUBMISSION, COMPLETE, MASTERY }

@@ -51,7 +51,7 @@ show available bands and the optional placement recommendation, then group topic
 | POST | `/courses/{id}/unlocks` | CUSTOMER only; `{ "target": "READING" | "LISTENING" | "WRITING" | "SPEAKING" | "COMBO" }` plus UUID `Idempotency-Key` buys a skill or band combo with Points. Unlock intent is durable before debit and replayed safely after failures. |
 | GET | `/topics` | One Content `topic-sequence` read refreshes the shared KP catalog and the user's topic order; returns `skill`, `course`, `hasTopicTest`, statuses and completed lesson counts. Each course skill has an independent topic sequence. |
 | POST | `/courses/{id}/test-assignments` | CUSTOMER only; assigns/returns a course final-test package after every topic in that course passes. `COURSE_GATE` at 70% passes the course without blocking another course. |
-| GET | `/topics/{id}/lessons` | Lists lessons with `practiceStatus` and `practicePassReason`, plus topic `skill`, `hasTopicTest`, and `testStatus`. |
+| GET | `/topics/{id}/lessons` | Lists lesson progress and practice fields plus `paywall` and `freePreview`; also returns topic `skill`, `hasTopicTest`, and `testStatus`. |
 | GET | `/lessons/{id}` | Applies the lesson gate and returns ordered blocks; a passed exercise block includes its solutions. |
 | POST | `/lessons/{id}/exercises/{blockId}/submissions` | Grades every question in the block, saves an idempotent response and completes the lesson when all exercise blocks have passed. |
 | POST | `/lessons/{id}/essays/{blockId}/submissions` | `{requestId, essayText}`: grades the essay within the request (see below) and returns the band, four criteria, corrections and summary once points are charged. |
@@ -70,13 +70,17 @@ show available bands and the optional placement recommendation, then group topic
 
 Topics derive `PASSED` from `passed_at`; the first unpassed topic in each skill is `IN_PROGRESS`
 and later topics of that skill are `LOCKED`. Topics without a skill share a separate order.
-Free topics precede premium topics within each skill. A topic without a final test has
+Course topics no longer have Premium-only gates. The first three lessons in each course skill are free; later lessons open
+with an ACTIVE skill/combo unlock, grandfathered lesson progress, or active Premium. Existing lesson progress is
+grandfathered by migration, while new progress is not; after Premium expires, lessons outside the free/owned/grandfathered
+set lock again. A topic without a final test has
 `testStatus: NONE` and passes when all published lessons are completed; requesting its
 test assignment returns `409 NO_TOPIC_TEST`. Pending reviews gate only their own skill;
 legacy reviews with no skill gate every skill. Removed topics lose their sequence order and leave
 the topic list. Lessons become available in order after earlier lessons are completed and their Practice is passed.
-Lesson GET, submission and completion apply errors in this order:
-`REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`, `PRACTICE_REQUIRED` (403, with `lessonIds`). Exercise blocks carry `blockKind`: essay blocks show only the prompt, task,
+Lesson GET, resources, practice-set listing, submissions and completion return `403 PAYWALL` when a lesson is not open.
+The topic lesson list keeps this separate from progress `LOCKED` status. Existing access gates still apply after the paywall:
+`REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`, `PRACTICE_REQUIRED` (403, with `lessonIds`). Free practice by knowledge point follows the same lesson-position, unlock and grandfathering rules; the knowledge tree returns `locked` and disables `practiceAvailable` for gated points. Exercise blocks carry `blockKind`: essay blocks show only the prompt, task,
 minimum words, pass band and images, never count toward completion and reject exercise
 submissions with `409 ESSAY_BLOCK`. Media assets expose `mediaUrl`; an audio transcript
 appears only once the lesson is completed.

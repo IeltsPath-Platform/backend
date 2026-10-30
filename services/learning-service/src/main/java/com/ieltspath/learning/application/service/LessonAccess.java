@@ -36,12 +36,13 @@ public class LessonAccess {
     private final RefreshLearningTopicsUseCase refreshTopics;
     private final PracticeProgress practice;
     private final RecordCourseStudyActivity courseActivity;
+    private final PaywallGate paywall;
     private final LessonAccessGate gate = new LessonAccessGate();
 
     public LessonAccess(LearningContentClient content, LessonProgressRepository lessons,
                         LearnerCurriculumRepository curricula, ReviewItemRepository reviews,
                         KnowledgeEvidenceRepository evidence, RefreshLearningTopicsUseCase refreshTopics,
-                        PracticeProgress practice, RecordCourseStudyActivity courseActivity) {
+                        PracticeProgress practice, RecordCourseStudyActivity courseActivity, PaywallGate paywall) {
         this.content = content;
         this.lessons = lessons;
         this.curricula = curricula;
@@ -50,6 +51,7 @@ public class LessonAccess {
         this.refreshTopics = refreshTopics;
         this.practice = practice;
         this.courseActivity = courseActivity;
+        this.paywall = paywall;
     }
 
     public Context authorize(UUID userId, UUID lessonId) {
@@ -70,16 +72,26 @@ public class LessonAccess {
     }
 
     private Context authorize(UUID userId, Lesson lesson, boolean reading) {
+        var paywallRequest = paywall.forLearner(userId);
         var summaries = orderedLessons(content.getTopicLessons(lesson.topicId()));
         var progress = lessons.findByTopic(userId, lesson.topicId());
         boolean previousComplete = true;
         boolean found = false;
+        Set<LearningSkill> lessonSkills = lesson.skills();
         List<UUID> previousIds = new ArrayList<>();
         for (var summary : summaries) {
-            if (summary.lessonId().equals(lesson.lessonId())) { found = true; break; }
+            if (summary.lessonId().equals(lesson.lessonId())) {
+                found = true;
+                if (lessonSkills.isEmpty()) lessonSkills = summary.skills();
+                break;
+            }
             previousComplete &= completed(progress.get(summary.lessonId()));
             previousIds.add(summary.lessonId());
         }
+        var currentProgress = progress.get(lesson.lessonId());
+        if (currentProgress == null) currentProgress = lessons.find(userId, lesson.lessonId()).orElse(null);
+        if (!found) throw new LearningRequestException(404, "NOT_FOUND", "Lesson was not found");
+        paywallRequest.requireLessonOpen(lesson, currentProgress, lessonSkills);
         var topic = topic(userId, lesson.topicId());
         List<UUID> needPractice = found && previousComplete
                 ? lessonsNeedingPractice(userId, lesson.topicId(), previousIds, progress) : List.of();
@@ -91,8 +103,8 @@ public class LessonAccess {
         }
         gate.authorize(pending, null, skillsOf(lesson, topic), previous,
                 status(userId, lesson.topicId()), previousComplete, needPractice);
-        if (!found) throw new LearningRequestException(404, "NOT_FOUND", "Lesson was not found");
-        return new Context(lesson, progress.get(lesson.lessonId()), previousComplete, previous, needPractice);
+        return new Context(lesson, currentProgress, previousComplete, previous, needPractice, paywallRequest,
+                lessonSkills);
     }
 
     /**
@@ -112,6 +124,8 @@ public class LessonAccess {
 
     /** Checks the gate again after a curriculum refresh may have changed the learner's current topic. */
     public void reauthorize(UUID userId, Context context) {
+        context.paywallRequest().requireLessonOpen(context.lesson(), context.progress(),
+                context.skills());
         var topic = topic(userId, context.lesson().topicId());
         gate.authorize(reviews.findPending(userId), null, skillsOf(context.lesson(), topic),
                 context.previousLessonIds(), status(userId, context.lesson().topicId()),
@@ -178,5 +192,18 @@ public class LessonAccess {
      * ones among them whose Practice was not passed when the lesson was opened.
      */
     public record Context(Lesson lesson, LessonProgress progress, boolean previousLessonsComplete,
-                          Set<UUID> previousLessonIds, List<UUID> lessonsNeedingPractice) {}
+                          Set<UUID> previousLessonIds, List<UUID> lessonsNeedingPractice,
+                          PaywallGate.Request paywallRequest, Set<LearningSkill> skills) {
+        public Context(Lesson lesson, LessonProgress progress, boolean previousLessonsComplete,
+                       Set<UUID> previousLessonIds, List<UUID> lessonsNeedingPractice) {
+            this(lesson, progress, previousLessonsComplete, previousLessonIds, lessonsNeedingPractice, null,
+                    lesson.skills());
+        }
+        public Context(Lesson lesson, LessonProgress progress, boolean previousLessonsComplete,
+                       Set<UUID> previousLessonIds, List<UUID> lessonsNeedingPractice,
+                       PaywallGate.Request paywallRequest) {
+            this(lesson, progress, previousLessonsComplete, previousLessonIds, lessonsNeedingPractice,
+                    paywallRequest, lesson.skills());
+        }
+    }
 }

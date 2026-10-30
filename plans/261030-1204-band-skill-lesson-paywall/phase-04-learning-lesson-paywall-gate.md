@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Learning lesson paywall gate"
-status: pending
+status: done
 priority: P1
 effort: "7h"
 dependencies: [2, 3, 7]
@@ -67,11 +67,19 @@ Enforce the open/locked rule on the server at every lesson entry point, and repo
 
 ## Success Criteria
 
-- [ ] Policy, order-of-checks, entry-point, free-practice and tree tests green.
-- [ ] Direct API calls to a locked lesson return 403 `PAYWALL` on every gated entry point.
-- [ ] Learners with progress before go-live keep access to those lessons.
-- [ ] Access outage does not affect free, owned or grandfathered lessons.
-- [ ] No existing gate test changed behaviour.
+- [x] Policy, order-of-checks, entry-point, free-practice and tree tests green.
+- [x] Direct API calls to a locked lesson return 403 `PAYWALL` on every gated entry point.
+- [x] Learners with progress before go-live keep access to those lessons.
+- [x] Access outage does not affect free, owned or grandfathered lessons.
+- [x] No existing gate test changed behaviour.
+
+## Completion
+
+- Added the shared request-scoped paywall gate and pure lesson policy. Lesson reads, resources, practice sets, submissions and completion enforce it before progress side effects; lesson lists expose `paywall` and `freePreview` separately from progress status.
+- Added V39 grandfathering for existing lesson progress. Free practice checks the same point-level gate before hearts or attempts; the knowledge tree marks locked points and disables free practice, while Access outages only lock points needing Premium.
+- Focused Phase F tests: 84 passed, 0 failures/errors/skips, including PostgreSQL V39 upgrade, premium expiry, free-practice no-side-effect and tree-outage checks.
+- Full learning-service reactor: 1,035 tests passed, 0 failures/errors/skips. Surefire waited 30 seconds for broker-listener shutdown, then reported BUILD SUCCESS.
+- Implementation commit is recorded in the acceptance report.
 
 ## Risk Assessment
 

@@ -4,6 +4,8 @@ import com.ieltspath.learning.application.command.SubmitExerciseCommand;
 import com.ieltspath.learning.application.command.SubmitReviewCommand;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.*;
+import com.ieltspath.learning.application.port.AccessClient;
+import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.result.TopicLessonsResult;
 import com.ieltspath.learning.application.usecase.*;
 import com.ieltspath.learning.domain.exception.LearningGateException;
@@ -64,6 +66,7 @@ class PracticeGatedLessonUnlockIntegrationTest {
     @Autowired GetReviewUseCase getReview;
     @Autowired SubmitReviewUseCase submitReview;
     @MockitoBean LearningContentClient content;
+    @MockitoBean AccessClient access;
 
     private final UUID topic = UUID.randomUUID();
     private final UUID lesson1 = UUID.randomUUID();
@@ -179,6 +182,65 @@ class PracticeGatedLessonUnlockIntegrationTest {
 
         assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
         assertDoesNotThrow(() -> getLesson.execute(user, lesson2));
+    }
+
+    @Test
+    void lessonsBeyondTheFreePreviewReturnPaywallWhileTheFirstThreeStayOpen() {
+        UUID courseId = UUID.randomUUID();
+        var course = new Course(courseId, "C65", "Band 6.5", new BigDecimal("6.5"), false);
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(topic, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(kpA, "A", "A", "PROCEDURE", "READING", "", true)),
+                LearningSkill.READING, false, course)));
+        when(content.getTopicLessons(topic)).thenReturn(List.of(
+                new LessonSummary(lesson1, topic, "L1", "Lesson one", null, 1, List.of(kpA), List.of(),
+                        Set.of(LearningSkill.READING), null, courseId, LearningSkill.READING, 2),
+                new LessonSummary(lesson2, topic, "L2", "Lesson two", null, 2, List.of(kpA), List.of(),
+                        Set.of(LearningSkill.READING), null, courseId, LearningSkill.READING, 4)));
+        when(content.getLesson(lesson1)).thenReturn(new Lesson(lesson1, topic, "L1", "Lesson one", null, 1,
+                List.of(kpA), List.of(), LearningSkill.READING, Set.of(LearningSkill.READING), courseId, 2));
+        when(content.getLesson(lesson2)).thenReturn(new Lesson(lesson2, topic, "L2", "Lesson two", null, 2,
+                List.of(kpA), List.of(), LearningSkill.READING, Set.of(LearningSkill.READING), courseId, 4));
+        when(access.premium()).thenReturn(false);
+        UUID user = UUID.randomUUID();
+        topics.execute(user);
+
+        assertDoesNotThrow(() -> getLesson.execute(user, lesson1));
+        LearningGateException error = assertThrows(LearningGateException.class, () -> getLesson.execute(user, lesson2));
+        assertEquals("PAYWALL", error.getCode());
+        TopicLessonsResult result = topicLessons.execute(user, topic);
+        assertFalse(result.lessons().get(0).paywall());
+        assertTrue(result.lessons().get(0).freePreview());
+        assertTrue(result.lessons().get(1).paywall());
+        assertFalse(result.lessons().get(1).freePreview());
+    }
+
+    @Test
+    void premiumExpiryLocksNewPremiumProgressButGrandfatheredProgressStaysReadableDuringAccessOutage() {
+        UUID courseId = UUID.randomUUID();
+        var course = new Course(courseId, "C65", "Band 6.5", new BigDecimal("6.5"), false);
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(topic, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(kpA, "A", "A", "PROCEDURE", "READING", "", true)),
+                LearningSkill.READING, false, course)));
+        when(content.getTopicLessons(topic)).thenReturn(List.of(new LessonSummary(lesson1, topic, "L1",
+                "Lesson one", null, 1, List.of(kpA), List.of(), Set.of(LearningSkill.READING), null, courseId,
+                LearningSkill.READING, 4)));
+        when(content.getLesson(lesson1)).thenReturn(new Lesson(lesson1, topic, "L1", "Lesson one", null, 1,
+                List.of(kpA), List.of(), LearningSkill.READING, Set.of(LearningSkill.READING), courseId, 4));
+        UUID user = UUID.randomUUID();
+        topics.execute(user);
+        when(access.premium()).thenReturn(true);
+        complete.execute(user, lesson1);
+        assertFalse(jdbc.queryForObject("SELECT grandfathered FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
+                Boolean.class, user, lesson1));
+
+        when(access.premium()).thenReturn(false);
+        assertEquals("PAYWALL", assertThrows(LearningGateException.class,
+                () -> getLesson.execute(user, lesson1)).getCode());
+
+        jdbc.update("UPDATE lesson_progress SET grandfathered = true WHERE user_id = ? AND lesson_id = ?",
+                user, lesson1);
+        when(access.premium()).thenThrow(new AccessUnavailableException(503));
+        assertDoesNotThrow(() -> getLesson.execute(user, lesson1));
     }
 
     @Test

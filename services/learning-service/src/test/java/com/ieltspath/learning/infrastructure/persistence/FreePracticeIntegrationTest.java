@@ -10,6 +10,7 @@ import com.ieltspath.learning.application.usecase.GetLearnerTreeUseCase;
 import com.ieltspath.learning.application.usecase.StartFreePracticeUseCase;
 import com.ieltspath.learning.application.usecase.SubmitPracticeAttemptUseCase;
 import com.ieltspath.learning.domain.vo.LearningSkill;
+import com.ieltspath.learning.domain.exception.LearningGateException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** Free practice on one knowledge point, end to end against a real database and a stubbed Content. */
@@ -289,6 +291,21 @@ class FreePracticeIntegrationTest {
     }
 
     @Test
+    void freePracticeForAPaywalledPointIsRefusedBeforeHeartsOrAttemptsAreCreated() {
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(KP, "R_LOCKED", "Locked point", "PROCEDURE", "READING", "", true,
+                        null, null, null, null, 4)), LearningSkill.READING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+        UUID user = enrolled();
+
+        LearningGateException error = assertThrows(LearningGateException.class, () -> start.execute(user, KP));
+
+        assertEquals("PAYWALL", error.getCode());
+        assertEquals(0, count("SELECT count(*) FROM learner_hearts WHERE user_id = ?", user));
+        assertEquals(0, count("SELECT count(*) FROM practice_attempts WHERE user_id = ?", user));
+    }
+
+    @Test
     void theTreeListsThePointsOfTheCourseWithFreePracticeOpen() {
         var tree = treeUseCase.execute(enrolled(), COURSE);
 
@@ -299,6 +316,35 @@ class FreePracticeIntegrationTest {
         assertNull(node.mastery(), "no evidence yet, so no score or tier");
         assertNull(node.tier());
         assertTrue(node.practiceAvailable());
+        assertFalse(node.locked());
+    }
+
+    @Test
+    void theTreeMarksPaywalledPointsAndDisablesFreePractice() {
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(KP, "R_LOCKED", "Locked point", "PROCEDURE", "READING", "", true,
+                        null, null, null, null, 4)), LearningSkill.READING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+
+        var node = treeUseCase.execute(enrolled(), COURSE).knowledgePoints().get(0);
+
+        assertTrue(node.locked());
+        assertFalse(node.practiceAvailable());
+    }
+
+    @Test
+    void accessOutageLocksOnlyPaywalledTreePointsWithoutFailingTheTree() {
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(KP, "R_LOCKED", "Locked point", "PROCEDURE", "READING", "", true,
+                        null, null, null, null, 4)), LearningSkill.READING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+        when(access.premium()).thenThrow(new AccessUnavailableException(503));
+
+        var node = treeUseCase.execute(enrolled(), COURSE).knowledgePoints().get(0);
+
+        assertTrue(node.locked());
+        assertFalse(node.practiceAvailable());
+        verify(access).premium();
     }
 
     @Test

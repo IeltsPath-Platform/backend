@@ -15,7 +15,7 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 | C. Content unlock prices/facts | DONE | V87 prices, V88 clear topic gates, one-skill authoring checks, learning payload fields and SQL ordering facts. Data audit identifies the existing `TREES_MULTI_SKILL` violation; content owner fixes remain a ship prerequisite. |
 | D. Per-skill progression | DONE | `TopicStatusDeriver` now opens one topic per course skill. Focused tests 33/33; full learning-service reactor 1,002/1,002. Commit `b302c4f0`. |
 | E. Learning purchase | DONE | Durable V38 unlock purchase, replay/reconciliation and `/courses` ownership/pricing fields. Focused unit/API + 3 PostgreSQL integration tests passed; full learning-service reactor: 1,019 tests passed. Commit `6ec31d7a`. |
-| F. Paywall gate | PENDING |  |
+| F. Paywall gate | DONE | Shared request-scoped gate, V39 grandfathering, lesson-list flags, free-practice and tree enforcement. Focused 84/84; full learning-service reactor 1,035/1,035. |
 | G. Frontend paywall/admin prices | PENDING |  |
 | H. Audit/contracts/scenarios | PENDING |  |
 
@@ -90,3 +90,12 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 - Focused unit/API tests: 16 passed. V38/PostgreSQL persistence integration tests: 3 passed. Combined focused coverage: 21 passed, 0 failures/errors/skips.
 - Full learning-service reactor: 1,019 tests passed, 0 failures/errors/skips. Surefire waited 30 seconds for broker-listener shutdown, then reported BUILD SUCCESS.
 - Implementation commit: `6ec31d7a`.
+
+## F — Lesson paywall gate
+
+- `PaywallPolicy` and a request-scoped `PaywallGate` enforce free-first-three, ACTIVE skill/combo ownership, grandfathered progress and Premium in that order. Premium is fetched once only when earlier rules do not open the content.
+- Lesson reads, resources, practice-set listing, exercise/essay submissions and completion share `LessonAccess`; topic lesson summaries expose `paywall` and `freePreview` independently of progress `LOCKED`.
+- V39 marks pre-existing lesson progress grandfathered and leaves new rows false. Free practice checks the point's earliest lesson position before hearts or attempts; the tree adds `locked` and suppresses `practiceAvailable`, degrading Access outages to locked only for points that need Premium.
+- Focused Phase F tests: 84 passed, 0 failures/errors/skips, including migration, Premium expiry, no-side-effect and tree outage scenarios.
+- Full learning-service reactor: 1,035 tests passed, 0 failures/errors/skips. Surefire waited 30 seconds for broker-listener shutdown, then reported BUILD SUCCESS.
+- Implementation commit is recorded in Git history.
