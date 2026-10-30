@@ -11,7 +11,8 @@ import java.util.*;
 /**
  * A learner's ordered topics. Content decides the order; the learner finishes topics one way, by passing the topic test
  * or just taking it. The first unfinished topic of a course in order is IN_PROGRESS and the rest LOCKED
- * ({@link TopicStatusDeriver}).
+ * ({@link TopicStatusDeriver}): the first unfinished topic in each course skill is IN_PROGRESS, and the rest are LOCKED.
+ * Topics outside courses share one sequence.
  */
 public final class LearnerCurriculum {
     private static final TopicStatusDeriver STATUSES = new TopicStatusDeriver();

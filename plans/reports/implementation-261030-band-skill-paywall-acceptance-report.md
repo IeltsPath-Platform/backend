@@ -13,7 +13,7 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 | A.3 Cover frontend | DONE | Admin forms, learner course/topic adapters, banner/cards and placement summary updated; focused tests, typecheck and lint xanh. Commit `cdcad2e`. |
 | B. Access unlock debit | DONE | V5 ledger check plus `COURSE_UNLOCK_DEBIT` mapping; focused tests + Testcontainers integration xanh. |
 | C. Content unlock prices/facts | DONE | V87 prices, V88 clear topic gates, one-skill authoring checks, learning payload fields and SQL ordering facts. Data audit identifies the existing `TREES_MULTI_SKILL` violation; content owner fixes remain a ship prerequisite. |
-| D. Per-skill progression | PENDING |  |
+| D. Per-skill progression | DONE | `TopicStatusDeriver` now opens one topic per course skill. Focused tests 33/33; full learning-service reactor 1,002/1,002. Commit `b302c4f0`. |
 | E. Learning purchase | PENDING |  |
 | F. Paywall gate | PENDING |  |
 | G. Frontend paywall/admin prices | PENDING |  |
@@ -73,3 +73,11 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 - Focused clean Maven run: 91 tests, 0 failures/errors, including course pricing/controller/persistence, topic/KP/lesson validation, course sequence on the old v52 schema, lesson pipeline on v79, and V87/V88 Testcontainers migration/reader/audit checks.
 - Follow-up `TopicSequenceCourseMetadataIntegrationTest`: 4/4 passed after adding cross-topic skill ranking edge cases (inactive topics and draft lessons are excluded; knowledge-point earliest position is skill-local).
 - Graphify refreshed after phase C: backend graph reports 22,750 nodes and 91,898 edges.
+
+## D — Per-skill topic progression
+
+- Topic ordering now groups by `(courseId, skill)`, so a learner can have one `IN_PROGRESS` topic in each course skill. Topics without a course retain a shared sequence; completed and passed topics keep their prior status meaning. No schema migration is needed, and current progress remains derived from stored `passedAt` / `testedAt` values.
+- Updated the `LearnerCurriculum` rule comment and learning-service README. Lesson access, course aggregation and suggestions already consume derived statuses and aggregate by course, so they needed no behavior changes.
+- Focused regression tests for progression and lesson gates: 33 passed, 0 failures/errors.
+- Full learning-service reactor: 1,002 tests passed, 0 failures/errors/skips, including Testcontainers integrations. Surefire waited 30 seconds for broker-listener shutdown after the suite, then reported BUILD SUCCESS.
+- Commit: `b302c4f0`.

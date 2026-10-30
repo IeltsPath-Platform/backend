@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "Per-skill topic progression"
-status: pending
+status: done
 priority: P1
 effort: "3h"
 dependencies: []
@@ -46,9 +46,9 @@ Today a course has exactly one `IN_PROGRESS` topic, ordered across all skills, s
 
 ## Success Criteria
 
-- [ ] A learner can have one `IN_PROGRESS` topic in each of the four skills of a course.
-- [ ] Existing in-progress learners keep every current `IN_PROGRESS` topic.
-- [ ] All existing learning-service tests green.
+- [x] A learner can have one `IN_PROGRESS` topic in each of the four skills of a course.
+- [x] Existing in-progress learners keep every current `IN_PROGRESS` topic.
+- [x] All existing learning-service tests green.
 
 ## Risk Assessment
 
@@ -56,3 +56,10 @@ Today a course has exactly one `IN_PROGRESS` topic, ordered across all skills, s
 - Course progress counts `PASSED` / `COMPLETED` topics (`ListCoursesUseCase`), so a free learner never completes a course. Expected.
 - Existing multi-skill topics (see the phase 2 data audit) must be fixed before this phase ships, otherwise they land in an arbitrary group. Learners with such a topic need the content owner's fix first.
 - Rollback: restore the old group key; no data to undo.
+
+## Completion
+
+- `TopicStatusDeriver` keys active progression by `(courseId, skill)`; topics without a course retain one shared group.
+- Added interleaved four-skill, same-skill sequencing, passed-topic and no-course regression cases. Updated the curriculum comment and service README.
+- Focused gate/progression tests: 33 passed. Full learning-service reactor: 1,002 passed, 0 failures/errors/skips. Testcontainers ran; Surefire waited 30 seconds for broker-listener shutdown after the suite before reporting BUILD SUCCESS.
+- Commit: `b302c4f0`.
