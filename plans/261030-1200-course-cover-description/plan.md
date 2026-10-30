@@ -32,6 +32,7 @@ Quyết định đã chốt: ảnh là URL dán vào (không upload), một ản
 ## Acceptance criteria
 
 - Tạo/sửa course với `coverImageUrl`, `description`; tạo/sửa topic với `description`; GET trả lại đúng; để trống thì trả `null`.
+- R&D đổi hoặc xóa ảnh bìa của course đã tạo ngay trong drawer sửa course ở admin (đổi URL, hoặc để trống để quay về `CourseArt`); learner thấy ảnh mới sau khi tải lại, không cần deploy.
 - `GET /api/learning/courses` và topic path trả 3 trường mới.
 - Course có ảnh thì tile + banner hiện ảnh; không có thì vẫn là `CourseArt`.
 - `TopicPage` hiện mô tả topic khi có.

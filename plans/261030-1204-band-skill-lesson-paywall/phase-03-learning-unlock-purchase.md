@@ -15,15 +15,16 @@ Persist what a learner unlocked and let them buy a skill or a band combo with Po
 
 ## Requirements
 
-- Functional: `POST /api/learning/courses/{courseId}/unlocks` body `{ "target": "READING" | "LISTENING" | "WRITING" | "SPEAKING" | "COMBO" }`, header `Idempotency-Key` (UUID). `GET /api/learning/courses` also returns per course: `skillUnlockPoints`, `comboUnlockPoints`, `unlockedSkills[]`, `comboUnlocked`, `comboPayablePoints` (after deduction), `availableSkills[]`, `premium`.
-- Price rules (server-side only): skill = `skill_unlock_points`; combo = max(0, `combo_unlock_points` - sum(`point_cost` of this learner's ACTIVE skill unlocks in the course)). Null price = `NOT_FOR_SALE` (409). Target already owned, or any target when combo owned = `ALREADY_UNLOCKED` (409), no debit. Skill not in the course's `skills[]` = `SKILL_NOT_AVAILABLE` (409), so Speaking cannot be sold before it has lessons.
+- Functional: `POST /api/learning/courses/{courseId}/unlocks` body `{ "target": "READING" | "LISTENING" | "WRITING" | "SPEAKING" | "COMBO" }`, header `Idempotency-Key` (UUID). `GET /api/learning/courses` also returns per course: `skillPrices` (map skill -> Points, absent = not for sale; prices differ per skill and per course), `comboUnlockPoints`, `unlockedSkills[]`, `comboUnlocked`, `comboPayablePoints` (after deduction), `availableSkills[]`, `premium`.
+- Price rules (server-side only): skill = the price of that skill in the course's `skillPrices` (content-service, edited by R&D); combo = max(0, `comboUnlockPoints` - sum(`point_cost` of this learner's ACTIVE skill unlocks in the course)), where `point_cost` is what the learner actually paid, not the current price. Null price = `NOT_FOR_SALE` (409). Target already owned, or any target when combo owned = `ALREADY_UNLOCKED` (409), no debit. Skill not in the course's `skills[]` = `SKILL_NOT_AVAILABLE` (409), so Speaking cannot be sold before it has lessons.
 - Durable intent: the purchase is recorded as a PENDING row (target, price, request id) in its own committed transaction BEFORE the debit; the row becomes ACTIVE after the debit succeeds. A PENDING row is completed by replaying the debit with the stored request id and stored amount (Access replays only an identical debit, so the stored amount keeps a retry valid even if prices change).
 - Non-functional: no double debit; no Points lost if the process dies after the debit; per-user lock via `LearnerLock` (`JdbcLearnerLock`); insufficient Points maps to the existing `InsufficientPointsException` response.
 
 ## Tests first (red)
 
 In `learning-service` tests:
-- Domain: unlock pricing (skill price; combo with 0, 1, 3 owned skills; floor at 0; null price; PENDING rows excluded from deduction).
+- Domain: unlock pricing (a different price per skill; combo with 0, 1, 3 owned skills bought at different prices; floor at 0; null price; PENDING rows excluded from deduction).
+- Price edited by R&D after a purchase: the ACTIVE unlock stays and keeps its paid `point_cost`; the next purchase uses the new price; the combo deduction uses the old paid amounts.
 - Use case with fake `AccessClient`/content:
   - success writes PENDING, debits once with reference type `COURSE_UNLOCK`, ends ACTIVE with ledger id;
   - same `Idempotency-Key` twice debits once;
@@ -58,4 +59,5 @@ In `learning-service` tests:
 ## Risk Assessment
 
 - Replaying a debit whose original did not happen charges at reconcile time; if the balance is then too low the row is cancelled and the learner sees the normal insufficient-points path.
+- A learner who bought a skill at a high price and later sees a cheaper price pays no refund (refunds are out of scope); R&D should lower prices sparingly. The combo deduction keeps what was paid, so total spend on a band never exceeds the larger of the combo price and the sum already paid.
 - Cancelled rows accumulate; they are tiny and keep an audit trail. No cleanup job in scope.

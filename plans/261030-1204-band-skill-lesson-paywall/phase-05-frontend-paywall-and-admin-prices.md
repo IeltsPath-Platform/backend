@@ -18,24 +18,27 @@ Show lock state, let the learner unlock a skill or combo, remove the permanent P
 - Functional:
   - Lesson list distinguishes "Cần mở khóa" (paywall) from "Chưa học xong bài trước" (progress), and marks free-preview lessons.
   - Paywall dialog on a locked lesson or a locked skill: skill price, combo net price (with deduction), current Point balance, button to unlock, link to top up Points (existing `KeyActivationDialog`), Premium mention. Insufficient points shows the shortfall.
+  - Knowledge tree (`KnowledgeTreePage`) shows `locked` nodes differently from "not started" ones and offers the unlock dialog instead of the practice button; free-practice start handles 403 `PAYWALL` the same way as a locked lesson.
   - Skills missing from `availableSkills[]` (Speaking today) show "sắp ra mắt" and have no unlock button.
   - A purchase that fails with 503 or a lost response is not shown as failed money: refresh the course list (the server reconciles pending purchases) and show the resulting state.
-  - `mapTopicSummary` stops forcing Premium topics to `LOCKED`; use `premium` from the course list.
-  - Admin `CourseForm`: two price inputs (skill, combo), no hint text.
+  - `mapTopicSummary` stops forcing Premium topics to `LOCKED` (no topic is Premium-only any more); use `premium` from the course list.
+  - Admin `TopicForm` requires a skill for a topic that belongs to a course: its skill select currently offers "Chưa chọn" and sends `skill: null`; make the empty choice invalid when a course is selected. It has no Premium or feature-key field (checked), so nothing to remove there.
+  - Copy for a skill whose topic test is unreachable ("mở khóa kỹ năng để làm bài kiểm tra chủ đề") on the topic page.
+  - Admin course edit drawer (`CourseForm`): one block "Giá mở khóa" with a price input for each of the four skills and one for the combo, per course; empty = not for sale; R&D can change any of them at any time. Validates positive integers, combo >= highest skill price and, with two or more skill prices, combo <= their sum; shows the server's validation error. No hint text under fields.
 - Non-functional: pass an `Idempotency-Key` per purchase attempt and reuse it on retry; handle 403 `PAYWALL`, 409 codes and insufficient points; keyboard accessible dialog.
 
 ## Tests first (red)
 
-- Adapter tests: DTO -> `CourseSummary` unlock fields; lesson summary paywall flag; Premium topic no longer always `LOCKED`.
+- Adapter tests: DTO -> `CourseSummary` unlock fields; lesson summary paywall flag; a topic is no longer forced to `LOCKED`; `TopicForm` rejects a course topic without a skill.
 - Component tests: `UnlockDialog` shows prices and net combo price, disables unlock when thiếu Point and shows shortfall, calls API once on double click, reuses key on retry; lesson list renders the two lock reasons differently.
-- Admin: `CourseForm` validates positive integers and combo >= skill, sends both fields, null when empty.
+- Admin: `CourseForm` validates positive integers and the combo rules above, sends the skill-price map and the combo price, null when empty; editing one skill price re-validates the combo; reopening the drawer shows the saved prices.
 
 ## Related Code Files
 
-- Create: `features/learning-path/components/UnlockDialog.tsx`. No client-side price math: show `skillUnlockPoints`, `comboPayablePoints` and balance exactly as the server returns them.
-- Modify: `types/learningPath.ts`, `features/learning-path/api/learningAdapters.ts`, `httpLearningApi.ts`, `learningApi.ts`, mock API, `components/TopicLessonsPanel.tsx`, `pages/CourseListPage.tsx`, `pages/TopicListPage.tsx`, `pages/TopicPage.tsx`, `api/apiError.ts`/`errorHint.ts` (new codes), CSS in `learning-path.css`.
+- Create: `features/learning-path/components/UnlockDialog.tsx`. No client-side price math: show the skill's entry in `skillPrices`, `comboPayablePoints` and balance exactly as the server returns them.
+- Modify: `types/learningPath.ts`, `features/learning-path/api/learningAdapters.ts`, `httpLearningApi.ts`, `learningApi.ts`, mock API, `components/TopicLessonsPanel.tsx`, `pages/CourseListPage.tsx`, `pages/TopicListPage.tsx`, `pages/TopicPage.tsx`, `pages/KnowledgeTreePage.tsx` (+ its test and `api/mock/mockTree.ts`; `Node.locked`), `api/apiError.ts`/`errorHint.ts` (new codes), CSS in `learning-path.css`.
 - Modify (admin): `features/admin/courses/types.ts`, `components/CourseForm.tsx`, `api/courseApi.ts`, related tests.
-- Reuse: Point balance source from `features/point-management` or the existing balance call.
+- Reuse: the existing Point balance call in `features/home/accessApi.ts` (also `features/auth/api/accessApi.ts`); top-up dialog `features/home/components/KeyActivationDialog.tsx`. `UnlockDialog.tsx` does not exist yet and is created here.
 
 ## Implementation Steps
 
