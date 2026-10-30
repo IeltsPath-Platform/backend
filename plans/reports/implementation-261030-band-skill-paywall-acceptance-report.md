@@ -7,12 +7,12 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 
 | Hạng mục | Trạng thái | Ghi chú |
 |---|---|---|
-| Graphify backend/frontend | DONE | AST cục bộ; backend 22,298 nút/90,468 cạnh, frontend sau A.3 8,267 nút/20,766 cạnh. Bản chạy semantic cần API key nên chuyển `--code-only`. Output nằm trong `graphify-out/` và không được đưa vào commit. |
+| Graphify backend/frontend | DONE | AST cục bộ; backend sau phase C 22,750 nút/91,898 cạnh, frontend sau A.3 8,267 nút/20,766 cạnh. Graph query xác nhận các node course, `course_skill_prices`, reader, `LearningContentClient` và lesson. Output nằm trong `graphify-out/` và không được đưa vào commit. |
 | A.1 Cover content-service | DONE | V86 và API/content mapping đã commit; test controller và draft controller chạy xanh. TDD red-first bị lệch: dependency download bị chặn nên test chỉ chạy sau khi triển khai. |
 | A.2 Cover learning-service passthrough | DONE | Commit `7ce7556b`; DTO/client/content response mapping và V86 reader integration xanh. |
 | A.3 Cover frontend | DONE | Admin forms, learner course/topic adapters, banner/cards and placement summary updated; focused tests, typecheck and lint xanh. Commit `cdcad2e`. |
 | B. Access unlock debit | DONE | V5 ledger check plus `COURSE_UNLOCK_DEBIT` mapping; focused tests + Testcontainers integration xanh. |
-| C. Content unlock prices/facts | PENDING |  |
+| C. Content unlock prices/facts | DONE | V87 prices, V88 clear topic gates, one-skill authoring checks, learning payload fields and SQL ordering facts. Data audit identifies the existing `TREES_MULTI_SKILL` violation; content owner fixes remain a ship prerequisite. |
 | D. Per-skill progression | PENDING |  |
 | E. Learning purchase | PENDING |  |
 | F. Paywall gate | PENDING |  |
@@ -34,6 +34,7 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 - Backend: `3534de4f test(content): assert topic descriptions pass through requests`.
 - Backend: `7ce7556b feat(learning): pass course cover and descriptions`.
 - Frontend: `cdcad2e feat(frontend): show course covers and descriptions`.
+- Backend: phase C commit pending.
 
 ## A.1 — Cover content-service
 
@@ -61,3 +62,14 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 
 - Thêm `COURSE_UNLOCK_DEBIT` và ánh xạ reference `COURSE_UNLOCK` trong writer và idempotent replay; V5 mở rộng transaction-type check mà giữ nguyên các giá trị cũ.
 - Tests trước implementation đỏ do enum chưa có giá trị mới (test compile); sau implementation, focused Access tests xanh: DebitPointsUseCase, PointDebitWriter và `PointCreditIntegrationTest`, tổng 16 test, 0 lỗi. Testcontainers xác nhận V5 chạy và debit trả đúng ledger type.
+
+## C — Content prices and paywall facts
+
+- Added `course_skill_prices` and `courses.combo_unlock_points` in V87, plus V88 clearing `required_feature_key` from every topic. Prices are not seeded; the course create/update API replaces the skill-price map, preserves omitted legacy fields, and validates positive prices and combo boundaries.
+- Course topics now require one non-`ALL` skill; course topic knowledge points must use that skill or `ALL`, and lesson knowledge point assignments reject mismatches. The audit is diagnostic only and does not mutate seed content.
+- Content reader returns course prices, available skills, topic skill, 1-based skill position and earliest lesson position. Position ranking uses active course topics and published lessons ordered by topic order/id then lesson order/id. Legacy schema targets keep passing through nullable projection fallbacks.
+- Learning-content client, learner topic result and lesson response now carry course prices and lesson course/skill/position facts.
+- Added audit SQL and report. Latest test database reports one unskilled course topic (`TREES_MULTI_SKILL`), five mismatched knowledge points (`TRAP_KEYWORD_MATCH_ONLY`, `TR_L_DETAIL`, `TR_R_SCANNING`, `TR_R_WORD_IN_CONTEXT`, `TR_W_OPINION`), and two multi-skill lessons (`T1`, `T2`). These seed violations remain a content-owner prerequisite before enabling the paywall.
+- Focused clean Maven run: 91 tests, 0 failures/errors, including course pricing/controller/persistence, topic/KP/lesson validation, course sequence on the old v52 schema, lesson pipeline on v79, and V87/V88 Testcontainers migration/reader/audit checks.
+- Follow-up `TopicSequenceCourseMetadataIntegrationTest`: 4/4 passed after adding cross-topic skill ranking edge cases (inactive topics and draft lessons are excluded; knowledge-point earliest position is skill-local).
+- Graphify refreshed after phase C: backend graph reports 22,750 nodes and 91,898 edges.

@@ -41,6 +41,12 @@ public class UpdateTopicUseCase {
             courseRepository.findById(command.courseId())
                     .orElseThrow(() -> new CourseNotFoundException(command.courseId()));
         }
+        if (command.courseId() != null || topic.getCourseId() != null) {
+            var effectiveSkill = command.skill() == null ? topic.getSkill() : command.skill();
+            if (effectiveSkill == null || effectiveSkill == com.ieltspath.content.domain.vo.Skill.ALL) {
+                throw new IllegalArgumentException("A course topic must have exactly one skill");
+            }
+        }
 
         boolean moved = !java.util.Objects.equals(command.parentTopicId(), topic.getParentTopicId())
                 || command.sortOrder() != topic.getSortOrder();

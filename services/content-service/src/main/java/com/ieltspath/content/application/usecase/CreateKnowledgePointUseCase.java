@@ -11,6 +11,7 @@ import com.ieltspath.content.domain.repository.KnowledgePointRepository;
 import com.ieltspath.content.domain.repository.TopicRepository;
 import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.KnowledgePointCodeRules;
+import com.ieltspath.content.domain.vo.Skill;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +46,9 @@ public class CreateKnowledgePointUseCase {
         }
         var topic = topicRepository.findById(command.topicId())
                 .orElseThrow(() -> new TopicNotFoundException(command.topicId()));
+        if (topic.getCourseId() != null && command.skill() != Skill.ALL && command.skill() != topic.getSkill()) {
+            throw new IllegalArgumentException("A knowledge point in a course topic must match its skill");
+        }
 
         CefrLevel cefrLevel = command.cefrLevel();
         if (cefrLevel == null && courseRepository != null && topic.getCourseId() != null) {

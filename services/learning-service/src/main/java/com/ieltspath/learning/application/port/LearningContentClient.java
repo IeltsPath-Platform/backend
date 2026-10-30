@@ -220,14 +220,23 @@ public interface LearningContentClient {
     }
 
     record Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest, Boolean active,
-                  String coverImageUrl, String description) {
+                  String coverImageUrl, String description, Map<LearningSkill, Integer> skillUnlockPoints,
+                  Integer comboUnlockPoints, List<LearningSkill> availableSkills) {
         public Course {
             active = active == null || active;
+            skillUnlockPoints = skillUnlockPoints == null ? Map.of() : Map.copyOf(skillUnlockPoints);
+            availableSkills = availableSkills == null ? List.of() : List.copyOf(availableSkills);
+        }
+
+        public Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
+                      Boolean active, String coverImageUrl, String description) {
+            this(courseId, code, name, bandLevel, hasCourseTest, active, coverImageUrl, description, Map.of(), null,
+                    List.of());
         }
 
         public Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
                       Boolean active) {
-            this(courseId, code, name, bandLevel, hasCourseTest, active, null, null);
+            this(courseId, code, name, bandLevel, hasCourseTest, active, null, null, Map.of(), null, List.of());
         }
 
         public Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {
@@ -238,48 +247,69 @@ public interface LearningContentClient {
     /** {@code cefrLevel} ({@code A1} to {@code C2}) and {@code canDo} are null when Content has not set them. */
     record KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
                           String description, boolean hasPracticeSet, String cefrLevel, String canDo,
-                          UUID parentKnowledgePointId, String errorCode) {
+                          UUID parentKnowledgePointId, String errorCode, Integer earliestLessonPosition) {
+        public KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
+                              String description, boolean hasPracticeSet, String cefrLevel, String canDo,
+                              UUID parentKnowledgePointId, String errorCode) {
+            this(id, code, name, learningType, skill, description, hasPracticeSet, cefrLevel, canDo,
+                    parentKnowledgePointId, errorCode, null);
+        }
         public KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
                               String description, boolean hasPracticeSet, String cefrLevel, String canDo) {
-            this(id, code, name, learningType, skill, description, hasPracticeSet, cefrLevel, canDo, null, null);
+            this(id, code, name, learningType, skill, description, hasPracticeSet, cefrLevel, canDo, null, null, null);
         }
         public KnowledgePoint(UUID id, String code, String name, String learningType, String skill,
                               String description, boolean hasPracticeSet) {
-            this(id, code, name, learningType, skill, description, hasPracticeSet, null, null, null, null);
+            this(id, code, name, learningType, skill, description, hasPracticeSet, null, null, null, null, null);
         }
     }
 
     record LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
                          int sortOrder, List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds,
-                         Set<LearningSkill> skills, Integer estimatedMinutes) {
+                         Set<LearningSkill> skills, Integer estimatedMinutes, UUID courseId,
+                         LearningSkill skill, Integer skillPosition) {
         public LessonSummary {
-            skills = skillsOrSingle(skills, null);
+            skills = skillsOrSingle(skills, skill);
+        }
+        public LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
+                             int sortOrder, List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds,
+                             Set<LearningSkill> skills, Integer estimatedMinutes) {
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, skills,
+                    estimatedMinutes, null, null, null);
         }
         public LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
                              int sortOrder, List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds,
                              Set<LearningSkill> skills) {
-            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, skills, null);
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, skills, null,
+                    null, null, null);
         }
         public LessonSummary(UUID lessonId, UUID topicId, String code, String title, String summary,
                              int sortOrder, List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds) {
-            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, null, null);
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, null, null,
+                    null, null, null);
         }
     }
 
     /** {@code skills} are the skills the lesson teaches; a response without them falls back to {@code skill}. */
     record Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
                   int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks, LearningSkill skill,
-                  Set<LearningSkill> skills) {
+                  Set<LearningSkill> skills, UUID courseId, Integer skillPosition) {
         public Lesson {
             skills = skillsOrSingle(skills, skill);
         }
         public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
+                      int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks, LearningSkill skill,
+                      Set<LearningSkill> skills) {
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, skill, skills, null,
+                    null);
+        }
+        public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
                       int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks, LearningSkill skill) {
-            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, skill, null);
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, skill, null, null, null);
         }
         public Lesson(UUID lessonId, UUID topicId, String code, String title, String summary,
                       int sortOrder, List<UUID> knowledgePointIds, List<Block> blocks) {
-            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, null);
+            this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, null, null, null, null);
         }
     }
 

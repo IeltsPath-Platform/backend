@@ -34,13 +34,15 @@ public class CourseController {
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public CourseResponse create(@Valid @RequestBody CreateCourseRequest request) {
         return CourseResponse.from(createCourse.execute(new CreateCourseCommand(request.code(), request.name(),
-                request.bandLevel(), request.coverImageUrl(), request.description())));
+                request.bandLevel(), request.coverImageUrl(), request.description(), request.skillUnlockPoints(),
+                request.comboUnlockPoints())));
     }
 
     @PutMapping("/api/content/admin/courses/{id}")
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public CourseResponse update(@PathVariable("id") UUID id, @Valid @RequestBody UpdateCourseRequest request) {
         return CourseResponse.from(updateCourse.execute(new UpdateCourseCommand(id, request.name(),
-                request.bandLevel(), request.status(), request.coverImageUrl(), request.description())));
+                request.bandLevel(), request.status(), request.coverImageUrl(), request.description(),
+                request.skillUnlockPoints(), request.comboUnlockPoints())));
     }
 }

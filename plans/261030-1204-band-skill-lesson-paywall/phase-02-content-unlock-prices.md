@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Content unlock prices and lesson paywall facts"
-status: pending
+status: done
 priority: P1
 effort: "6h"
 dependencies: ["261030-1200-course-cover-description"]
