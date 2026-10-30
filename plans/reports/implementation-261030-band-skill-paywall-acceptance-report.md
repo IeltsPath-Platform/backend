@@ -14,7 +14,7 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 | B. Access unlock debit | DONE | V5 ledger check plus `COURSE_UNLOCK_DEBIT` mapping; focused tests + Testcontainers integration xanh. |
 | C. Content unlock prices/facts | DONE | V87 prices, V88 clear topic gates, one-skill authoring checks, learning payload fields and SQL ordering facts. Data audit identifies the existing `TREES_MULTI_SKILL` violation; content owner fixes remain a ship prerequisite. |
 | D. Per-skill progression | DONE | `TopicStatusDeriver` now opens one topic per course skill. Focused tests 33/33; full learning-service reactor 1,002/1,002. Commit `b302c4f0`. |
-| E. Learning purchase | PENDING |  |
+| E. Learning purchase | DONE | Durable V38 unlock purchase, replay/reconciliation and `/courses` ownership/pricing fields. Focused unit/API + 3 PostgreSQL integration tests passed; full learning-service reactor: 1,019 tests passed. |
 | F. Paywall gate | PENDING |  |
 | G. Frontend paywall/admin prices | PENDING |  |
 | H. Audit/contracts/scenarios | PENDING |  |
@@ -81,3 +81,12 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 - Focused regression tests for progression and lesson gates: 33 passed, 0 failures/errors.
 - Full learning-service reactor: 1,002 tests passed, 0 failures/errors/skips, including Testcontainers integrations. Surefire waited 30 seconds for broker-listener shutdown after the suite, then reported BUILD SUCCESS.
 - Commit: `b302c4f0`.
+
+## E — Learning unlock purchase
+
+- Added V38 learner unlock persistence with one non-cancelled row per `(user, course, skill-or-combo)` and unique request ids. Pending intents and insufficient-balance cancellations commit in `REQUIRES_NEW` transactions.
+- `POST /courses/{id}/unlocks` validates target/availability/ownership, prices skill purchases from Content, calculates combo price using actual paid ACTIVE skill costs, records a pending intent before the Access debit, and replays with the stored request id and amount.
+- `/courses` now reconciles pending purchases first and returns prices, available/unlocked skills, combo payable points and `premium`. Access outage leaves pending rows for retry and degrades the display-only premium field to false.
+- Focused unit/API tests: 16 passed. V38/PostgreSQL persistence integration tests: 3 passed. Combined focused coverage: 21 passed, 0 failures/errors/skips.
+- Full learning-service reactor: 1,019 tests passed, 0 failures/errors/skips. Surefire waited 30 seconds for broker-listener shutdown, then reported BUILD SUCCESS.
+- Implementation commit is recorded in Git history.

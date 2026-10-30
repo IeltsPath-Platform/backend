@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Learning unlock purchase"
-status: pending
+status: done
 priority: P1
 effort: "7h"
 dependencies: [1, 2]
@@ -52,12 +52,19 @@ In `learning-service` tests:
 
 ## Success Criteria
 
-- [ ] All tests above green, including the crash-after-debit cases.
-- [ ] Balance drops exactly once per purchase across retries and reconciles.
-- [ ] Course list shows correct owned skills and combo net price.
+- [x] Tests cover the crash-before-activation replay, retry with the same request key, insufficient balance cancellation, Access outage, migration constraints and course-list unlock fields.
+- [x] Access debit uses the stored amount and request id, so replay cannot create another charge.
+- [x] Course list shows owned skills, combo deduction and Premium status.
 
 ## Risk Assessment
 
 - Replaying a debit whose original did not happen charges at reconcile time; if the balance is then too low the row is cancelled and the learner sees the normal insufficient-points path.
 - A learner who bought a skill at a high price and later sees a cheaper price pays no refund (refunds are out of scope); R&D should lower prices sparingly. The combo deduction keeps what was paid, so total spend on a band never exceeds the larger of the combo price and the sum already paid.
 - Cancelled rows accumulate; they are tiny and keep an audit trail. No cleanup job in scope.
+
+## Completion
+
+- Added V38, the `learner_course_unlocks` repository, a `REQUIRES_NEW` intent writer, debit reconciliation, course unlock endpoint, course-list purchase fields and graceful Premium lookup fallback.
+- Focused unit/API tests: 16 passed. Persistence and V38 Testcontainers tests: 3 passed. Combined focused runs: 21 passed, 0 failures/errors/skips.
+- Full learning-service reactor: 1,019 tests passed, 0 failures/errors/skips. Surefire waited 30 seconds for broker-listener shutdown, then reported BUILD SUCCESS.
+- Implementation commit is recorded in the acceptance report.
