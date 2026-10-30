@@ -96,7 +96,7 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 - `CONTENT_SERVICE_URL` của game-service trong config-repo mặc định `http://content-service:8082` (tên trong Docker) và ghi
   đè default local → khi chạy game trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082`.
 - Game gọi library qua `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) cho `VOCABULARY`, gọi content qua
-  `CONTENT_SERVICE_URL` cho `GRAMMAR`. Library gọi `GET /api/content/topics/{id}` để kiểm topic khi ghi video.
+  `CONTENT_SERVICE_URL` cho `GRAMMAR`. Content gọi library qua `LIBRARY_SERVICE_URL` (khóa `content.library.base-url`) để tra và tạo từ vựng khi soạn bài; library không gọi lại content (video chỉ lưu `topicId` như tham chiếu).
 - PostgreSQL init script chỉ chạy khi volume mới được tạo. `docker compose down -v` xóa schema và toàn bộ seed để khởi tạo lại.
 - Jar build bằng `package` không `clean` sau khi code bị xóa/chuyển service vẫn chứa class cũ trong `target/classes` (content
   từng chết khi khởi động vì `VocabularyRepositoryAdapter`): dùng `mvn clean package` khi không có service nào chạy từ IDE.

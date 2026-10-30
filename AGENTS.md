@@ -22,7 +22,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-events` | Thư viện tên exchange/routing key/header, record payload và helper `MessageRetry`/`RetryTopology` dùng chung; không deploy độc lập. |
 | `shared/common-storage` | Thư viện lưu object dùng chung (`ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy`); không deploy độc lập; service tự cấu hình bucket. |
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity và streak tại `/api/learning-support/{activities,streak}`. |
-| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset; kiểm topic cho library. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
+| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
 | `services/library-service` | Cổng 8081, `library_db` (Compose PostgreSQL host 5440): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
 | `services/assessment-service` | Làm bài, chấm objective/LLM cho essay gate và EXAMINER, kết quả; phát `AssessmentCompleted.v2`. |
 | `services/access-service` | Gói, subscription, activation key, điểm. |
@@ -122,7 +122,7 @@ src/main/java/com/ieltspath/<service>
 
 - Mỗi service sở hữu bounded context và database; không đọc/ghi database hay dùng chung JPA entity của service khác.
 - Gọi đồng bộ service-to-service bằng HTTP tới endpoint nội bộ hoặc public của service đích, kèm bearer của request và
-  `X-Correlation-Id` (như assessment → content, library → content, game → library/content, learning → content/access/user).
+  `X-Correlation-Id` (như assessment → content, content → library, game → library/content, learning → content/access/user).
   Learning gọi user-service chỉ để đọc mục tiêu band (`/internal/users/{id}/learning-goal`) và tên hiển thị
   (`/internal/users/display-names`); lỗi hoặc timeout thì báo cáo và bảng league vẫn trả, thiếu phần đó.
 - Bất đồng bộ qua transactional outbox + RabbitMQ; event có version trong tên và contract ở `docs/contracts/`. Consumer

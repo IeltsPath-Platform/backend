@@ -24,7 +24,7 @@ Client --> API Gateway :8080 --(internal JWT)--> user :8085, content :8082, libr
 
 assessment --outbox--> RabbitMQ exchange assessment.events --assessment.completed.v2--> learning consumer
 assessment --HTTP--> content, user        game --HTTP--> library, content
-library --HTTP--> content                 learning --HTTP--> content (/internal/learning-content/*)
+content --HTTP--> library                 learning --HTTP--> content (/internal/learning-content/*)
 ```
 
 `third_party/deeptutor` là bản clone DeepTutor dùng để đọc; công thức mastery của learning-service được port từ đó, không service nào build hay import thư mục này.
@@ -38,7 +38,7 @@ library --HTTP--> content                 learning --HTTP--> content (/internal/
 | `infra/api-gateway` | Ingress WebFlux: xác thực external JWT, ký internal JWT, routing, CORS, correlation id | — | — |
 | `shared/common-security` | Thư viện: security servlet cho downstream, internal JWT, `CanonicalRoles`, `CurrentUserProvider` | — | — |
 | `user-service` | Tài khoản, role, đăng nhập/refresh/logout, hồ sơ học viên (gồm avatar Supabase), đổi mật khẩu, learning goal, activity và streak | `user_db` (Compose PostgreSQL host 5440; V5 tạo `learning_activities`, `streaks`) | `/auth/**`, `/api/users/**`, `/api/learning-support/{activities,streak}/**` |
-| `content-service` | Course theo band, topic, knowledge point, câu hỏi (có version), gói nội dung/bài đọc, asset; kiểm topic cho library và snapshot grammar cho game | `content_db` (Compose PostgreSQL host 5440; V7 xóa năm bảng catalog) | `/api/content/**` trừ nhóm từ vựng/video |
+| `content-service` | Course theo band, topic, knowledge point, câu hỏi (có version), gói nội dung/bài đọc, asset; snapshot grammar cho game | `content_db` (Compose PostgreSQL host 5440; V7 xóa năm bảng catalog) | `/api/content/**` trừ nhóm từ vựng/video |
 | `library-service` | Catalog từ vựng/video (V1, năm bảng; V19 mở rộng CEFR/chủ đề/bộ từ), flashcard/deck, note, tiến độ video và đoạn đã lưu (V2, sáu bảng) | `library_db` (Compose PostgreSQL host 5440) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
 | `assessment-service` | Lượt làm bài, chấm tự động và LLM cho thi topic/course, chấm EXAMINER, kết quả (có version), bài nộp, video practice; phát `AssessmentCompleted.v2` | `assessment_db` (Compose PostgreSQL host 5440) | `/api/assessments/**` |
 | `access-service` | Gói, subscription, activation key, ví điểm và sổ điểm | `access_db` (Compose PostgreSQL host 5440) | `/api/access/**` |
@@ -67,7 +67,7 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | Caller | Callee | Endpoint | Cấu hình base URL |
 | --- | --- | --- | --- |
 | assessment | content | `GET /internal/learning-content/package-versions/{id}` khi tạo attempt (ngoài transaction) | `CONTENT_SERVICE_URL` |
-| library | content | `GET /api/content/topics/{id}` khi ghi video | `CONTENT_SERVICE_URL` (mặc định `http://localhost:8082`) |
+| content | library | `GET /api/content/vocabulary/senses`, `POST /api/content/admin/vocabulary/bulk` khi duyệt course draft và soạn lesson, bearer của tác giả | `LIBRARY_SERVICE_URL` (khóa `content.library.base-url`, mặc định `http://localhost:8081`) |
 | game (`VOCABULARY`) | library | `POST /internal/game-content/snapshots` | `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) |
 | game (`GRAMMAR`) | content | `POST /internal/game-content/snapshots` | `CONTENT_SERVICE_URL` |
 | learning | content | `/internal/learning-content/{topic-sequence,topics/{id}/lessons,lessons/{id},lessons/{id}/practice-sets,topics/{id}/practice-sets,topics/{id}/test-packages,practice-sets/search,practice-sets/availability,package-versions/{id}}` | `CONTENT_SERVICE_URL` (mặc định `http://localhost:8082`) |
@@ -75,8 +75,8 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | learning | LLM (ngoài hệ thống) | `POST {base}/chat/completions` (OpenAI-compatible) khi chấm bài luận, ngoài mọi transaction | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` |
 | assessment | LLM (ngoài hệ thống) | `POST {base}/chat/completions` cho essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE`, ngoài transaction | `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL`; quota ngày `ASSESSMENT_LLM_DAILY_LIMIT` |
 
-Assessment, library, game và learning gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`.
-Library dùng timeout kết nối 2 giây, đọc 5 giây; lỗi Content khi kiểm topic trả 503. Hai nơi cài snapshot game theo
+Assessment, content, game và learning gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`.
+Content dùng timeout kết nối 2 giây, đọc 5 giây khi gọi Library; Library không đáp được thì Content trả 503 mã `VOCABULARY_SERVICE_UNAVAILABLE`. Library không gọi Content. Hai nơi cài snapshot game theo
 cùng [contract](contracts/game-content-snapshot-v1.md). Learning gọi Content qua API nội bộ (Gateway chặn `/internal/**`,
 contract [`learning-content-internal-v1`](contracts/learning-content-internal-v1.md)); Content là nơi duy nhất ghép URL media.
 

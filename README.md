@@ -277,7 +277,7 @@ Gateway giữ path công khai: `/api/content/videos/**`, `/api/content/vocabular
 tới library; `/api/learning-support/{activities,streak}/**` tới user; `/api/learning/**` tới learning. Gateway chặn
 `/internal/**`. Game chọn snapshot `VOCABULARY` từ library (`LIBRARY_SERVICE_URL` mặc định `http://localhost:8081`),
 `GRAMMAR` từ content. Khi game chạy trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082` vì Config Server vẫn
-mặc định địa chỉ `http://content-service:8082`. Library kiểm topic video qua Content. Content V7 xóa năm bảng catalog;
+mặc định địa chỉ `http://content-service:8082`. Library không gọi Content; video chỉ lưu `topicId` như tham chiếu. Content V7 xóa năm bảng catalog;
 chỉ cho Flyway chạy migration phá hủy này trên Testcontainers cho tới khi có duyệt riêng đối với `content_db` dùng chung.
 
 Nội dung demo Reading, Writing, Listening và lesson nhiều skill nằm trong các migration Content V9–V23. V13 thêm gợi ý
