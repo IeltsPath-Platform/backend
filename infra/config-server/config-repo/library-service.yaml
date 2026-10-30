@@ -45,8 +45,6 @@ app:
 library:
   vocabulary:
     weekly-goal-default: 120
-  content:
-    base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
   flashcard-images:
     bucket: ${LIBRARY_FLASHCARD_BUCKET:flashcards}
 
