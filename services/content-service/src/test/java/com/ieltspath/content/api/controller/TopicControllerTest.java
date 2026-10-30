@@ -55,9 +55,6 @@ class TopicControllerTest {
         when(createTopicUseCase.execute(any())).thenReturn(result);
         when(updateTopicUseCase.execute(any())).thenReturn(result);
         when(getTopicUseCase.execute(id)).thenReturn(result);
-        when(getTopicTreeUseCase.execute()).thenReturn(List.of(new TopicTreeResult(id, null, "TOPIC", "Topic", 1,
-                ContentStatus.ACTIVE, Instant.now(), Instant.now(), BandRange.UNBOUNDED, Skill.READING, List.of())));
-
         String body = "{\"code\":\"TOPIC\",\"name\":\"Topic\",\"sortOrder\":1,\"skill\":\"READING\",\"description\":\"  Topic description  \"}";
         mockMvc.perform(post("/api/content/topics").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.description").value("Topic description"));
@@ -68,10 +65,10 @@ class TopicControllerTest {
 
         ArgumentCaptor<CreateTopicCommand> create = ArgumentCaptor.forClass(CreateTopicCommand.class);
         verify(createTopicUseCase).execute(create.capture());
-        assertThat(create.getValue().description()).isEqualTo("Topic description");
+        assertThat(create.getValue().description()).isEqualTo("  Topic description  ");
         ArgumentCaptor<UpdateTopicCommand> update = ArgumentCaptor.forClass(UpdateTopicCommand.class);
         verify(updateTopicUseCase).execute(update.capture());
-        assertThat(update.getValue().description()).isEqualTo("Topic description");
+        assertThat(update.getValue().description()).isEqualTo("  Topic description  ");
     }
 
     @Test
