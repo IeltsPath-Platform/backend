@@ -44,7 +44,8 @@ public class CreateTopicUseCase {
                 command.name(),
                 command.sortOrder(),
                 command.band(),
-                command.skill()
+                command.skill(),
+                command.description()
         );
         if (command.courseId() != null) topic.assignCourse(command.courseId());
 
@@ -60,7 +61,8 @@ public class CreateTopicUseCase {
                 saved.getUpdatedAt(),
                 saved.getBand(),
                 saved.getSkill(),
-                saved.getCourseId()
+                saved.getCourseId(),
+                saved.getDescription()
         );
     }
 }

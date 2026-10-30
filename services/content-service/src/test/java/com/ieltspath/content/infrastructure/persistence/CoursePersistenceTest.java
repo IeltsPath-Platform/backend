@@ -27,7 +27,8 @@ class CoursePersistenceTest {
 
     @Test
     void concurrentCodeOrBandConflictsBecomeCourseConflicts() {
-        Course course = Course.create("IELTS", "IELTS", new BigDecimal("5.5"));
+        Course course = Course.create("IELTS", "IELTS", new BigDecimal("5.5"),
+                "https://images.example/ielts.jpg", "Course description");
         for (String constraint : List.of("courses_code_key", "courses_band_level_key")) {
             var jpa = mock(CourseJpaRepository.class);
             when(jpa.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("Duplicate course",
@@ -51,7 +52,8 @@ class CoursePersistenceTest {
 
     @Test
     void courseFieldsRoundTripThroughTheJpaMapper() {
-        Course course = Course.create("IELTS", "IELTS", new BigDecimal("5.5"));
+        Course course = Course.create("IELTS", "IELTS", new BigDecimal("5.5"),
+                "https://images.example/ielts.jpg", "Course description");
         Course restored = mapper.toDomain(mapper.toEntity(course));
         assertThat(restored).usingRecursiveComparison().isEqualTo(course);
     }
@@ -70,7 +72,7 @@ class CoursePersistenceTest {
 
     @Test
     void topicCourseMembershipRoundTripsWithoutChangingBandMetadata() {
-        Topic topic = Topic.create(null, "TOPIC", "Topic", 1);
+        Topic topic = Topic.create(null, "TOPIC", "Topic", 1, null, null, "Topic description");
         topic.assignCourse(UUID.randomUUID());
         var topicMapper = new TopicPersistenceMapper();
         assertThat(topicMapper.toDomain(topicMapper.toEntity(topic))).usingRecursiveComparison().isEqualTo(topic);

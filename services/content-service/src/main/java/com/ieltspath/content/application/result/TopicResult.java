@@ -18,11 +18,17 @@ public record TopicResult(
         Instant updatedAt,
         BandRange band,
         Skill skill,
-        UUID courseId
+        UUID courseId,
+        String description
 ) {
     public TopicResult(UUID id, UUID parentTopicId, String code, String name, int sortOrder, ContentStatus status,
                        Instant createdAt, Instant updatedAt, BandRange band, Skill skill) {
-        this(id, parentTopicId, code, name, sortOrder, status, createdAt, updatedAt, band, skill, null);
+        this(id, parentTopicId, code, name, sortOrder, status, createdAt, updatedAt, band, skill, null, null);
+    }
+
+    public TopicResult(UUID id, UUID parentTopicId, String code, String name, int sortOrder, ContentStatus status,
+                       Instant createdAt, Instant updatedAt, BandRange band, Skill skill, UUID courseId) {
+        this(id, parentTopicId, code, name, sortOrder, status, createdAt, updatedAt, band, skill, courseId, null);
     }
 }
 

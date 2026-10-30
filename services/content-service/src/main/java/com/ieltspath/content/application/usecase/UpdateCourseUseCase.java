@@ -24,7 +24,7 @@ public class UpdateCourseUseCase {
         if (repository.findByBandLevel(band).filter(existing -> !existing.getId().equals(course.getId())).isPresent()) {
             throw new DuplicateCourseException("bandLevel", band.toPlainString());
         }
-        course.update(command.name(), band, command.status());
+        course.update(command.name(), band, command.status(), command.coverImageUrl(), command.description());
         return CourseResult.from(repository.save(course));
     }
 }

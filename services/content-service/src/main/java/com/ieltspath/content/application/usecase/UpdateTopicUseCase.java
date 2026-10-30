@@ -49,7 +49,7 @@ public class UpdateTopicUseCase {
         }
 
         topic.update(command.parentTopicId(), command.name(), command.sortOrder(), command.status(),
-                command.band());
+                command.band(), command.description());
         if (command.skill() != null && command.skill() != topic.getSkill()) {
             topic.changeSkill(command.skill());
         }
@@ -67,7 +67,8 @@ public class UpdateTopicUseCase {
                 saved.getUpdatedAt(),
                 saved.getBand(),
                 saved.getSkill(),
-                saved.getCourseId()
+                saved.getCourseId(),
+                saved.getDescription()
         );
     }
 }

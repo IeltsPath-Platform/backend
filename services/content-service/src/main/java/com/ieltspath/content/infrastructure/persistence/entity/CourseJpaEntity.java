@@ -26,6 +26,10 @@ public class CourseJpaEntity {
     private String name;
     @Column(name = "band_level", nullable = false, unique = true, precision = 2, scale = 1)
     private BigDecimal bandLevel;
+    @Column(name = "cover_image_url", length = 500)
+    private String coverImageUrl;
+    @Column(columnDefinition = "text")
+    private String description;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ContentStatus status;

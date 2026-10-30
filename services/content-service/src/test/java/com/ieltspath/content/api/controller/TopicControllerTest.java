@@ -48,6 +48,33 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class TopicControllerTest {
     @Test
+    void passesDescriptionThroughTopicCreateUpdateAndReadResponses() throws Exception {
+        UUID id = UUID.randomUUID();
+        TopicResult result = new TopicResult(id, null, "TOPIC", "Topic", 1, ContentStatus.ACTIVE,
+                Instant.now(), Instant.now(), BandRange.UNBOUNDED, Skill.READING, null, "Topic description");
+        when(createTopicUseCase.execute(any())).thenReturn(result);
+        when(updateTopicUseCase.execute(any())).thenReturn(result);
+        when(getTopicUseCase.execute(id)).thenReturn(result);
+        when(getTopicTreeUseCase.execute()).thenReturn(List.of(new TopicTreeResult(id, null, "TOPIC", "Topic", 1,
+                ContentStatus.ACTIVE, Instant.now(), Instant.now(), BandRange.UNBOUNDED, Skill.READING, List.of())));
+
+        String body = "{\"code\":\"TOPIC\",\"name\":\"Topic\",\"sortOrder\":1,\"skill\":\"READING\",\"description\":\"  Topic description  \"}";
+        mockMvc.perform(post("/api/content/topics").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.description").value("Topic description"));
+        mockMvc.perform(put("/api/content/topics/{id}", id).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.description").value("Topic description"));
+        mockMvc.perform(get("/api/content/topics/{id}", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("Topic description"));
+
+        ArgumentCaptor<CreateTopicCommand> create = ArgumentCaptor.forClass(CreateTopicCommand.class);
+        verify(createTopicUseCase).execute(create.capture());
+        assertThat(create.getValue().description()).isEqualTo("Topic description");
+        ArgumentCaptor<UpdateTopicCommand> update = ArgumentCaptor.forClass(UpdateTopicCommand.class);
+        verify(updateTopicUseCase).execute(update.capture());
+        assertThat(update.getValue().description()).isEqualTo("Topic description");
+    }
+
+    @Test
     void courseMembershipPassesThroughCreateUpdateAndReadResponses() throws Exception {
         UUID id = UUID.randomUUID();
         UUID courseId = UUID.randomUUID();
