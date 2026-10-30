@@ -1,3 +1,17 @@
+-- Published lesson counts for each course skill; zero rows identify skills with no sellable lessons.
+WITH course_skills AS (
+    SELECT c.id AS course_id, c.code AS course_code, c.band_level, skill.name AS skill
+    FROM courses c
+    CROSS JOIN (VALUES ('LISTENING'), ('READING'), ('WRITING'), ('SPEAKING')) AS skill(name)
+)
+SELECT cs.course_code, cs.band_level, cs.skill, count(DISTINCT l.id) AS published_lesson_count,
+       greatest(count(DISTINCT l.id) - 3, 0) AS lessons_beyond_free_preview
+FROM course_skills cs
+LEFT JOIN topics t ON t.course_id = cs.course_id AND t.skill = cs.skill
+LEFT JOIN lessons l ON l.topic_id = t.id AND l.status = 'PUBLISHED'
+GROUP BY cs.course_id, cs.course_code, cs.band_level, cs.skill
+ORDER BY cs.band_level, cs.course_code, cs.skill;
+
 -- Course topics that cannot be grouped into one (course, skill) progression.
 SELECT c.code AS course_code, t.code AS topic_code, t.id AS topic_id
 FROM topics t

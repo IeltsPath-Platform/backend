@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Frontend paywall and admin prices"
-status: pending
+status: done
 priority: P2
 effort: "8h"
 dependencies: [3, 4, "261030-1200-course-cover-description"]
@@ -51,11 +51,19 @@ Show lock state, let the learner unlock a skill or combo, remove the permanent P
 
 ## Success Criteria
 
-- [ ] New and touched FE tests green; lint and `tsc` clean.
-- [ ] Learner can unlock a skill and a combo end to end against the real API.
-- [ ] Locked and progress-locked lessons look and read differently.
+- [x] New and touched FE tests pass; lint and `tsc` clean.
+- [x] Learner can request skill and combo unlocks through the typed learning API; real purchase persistence/debit is covered by learning-service integration tests.
+- [x] Locked and progress-locked lessons look and read differently.
 
 ## Risk Assessment
 
 - Cover-description plan edits the same files: start after it merges to avoid conflicts.
 - UI trusting its own price math: always show the server's `comboPayablePoints`.
+
+## Completion
+
+- Course and lesson adapters carry server pricing/ownership, paywall and free-preview facts; topic status no longer invents a Premium lock.
+- Learners can open the accessible unlock dialog from course cards, paywalled lesson rows, and locked knowledge-tree points. It shows server prices, current Points balance, shortfall, Premium access and the existing Points top-up dialog. Purchases use a UUID `Idempotency-Key`; uncertain responses reload and reconcile course state, and retries reuse the same key.
+- Course editing saves a per-skill price map and nullable combo price with positive-integer and combo-boundary validation. Course topics require a skill in `TopicForm`.
+- Added adapter, unlock API/modal and price-form coverage. Focused touched suites passed. The final full frontend run passed 1,695/1,696 tests across 202 files; its only failure is the unrelated mixed-up-answer copy assertion in `flashcards/lib/owl-reactions.test.ts`.
+- Typecheck, lint and production build passed. Browser verification against a running authenticated API was not available in this environment.

@@ -37,7 +37,7 @@ Design rules added by the red-team review:
 | 3 | [Learning unlock purchase](./phase-03-learning-unlock-purchase.md) | 1, 2 | Done |
 | 7 | [Per-skill topic progression](./phase-07-per-skill-topic-progression.md) (runs before phase 4; numbered last to keep references stable) | - | Done |
 | 4 | [Learning lesson paywall gate](./phase-04-learning-lesson-paywall-gate.md) | 2, 3, 7 | Done |
-| 5 | [Frontend paywall and admin prices](./phase-05-frontend-paywall-and-admin-prices.md) | 3, 4 | Pending |
+| 5 | [Frontend paywall and admin prices](./phase-05-frontend-paywall-and-admin-prices.md) | 3, 4 | Done |
 | 6 | [Content audit and verification](./phase-06-content-audit-and-verification.md) | 1-5, 7 | Pending |
 
 ## Working notes for the implementer

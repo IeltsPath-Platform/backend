@@ -1,4 +1,4 @@
-﻿# Báo cáo nghiệm thu — Band-skill paywall
+# Báo cáo nghiệm thu — Band-skill paywall
 
 Ngày cập nhật: 2026-10-30
 Nhánh: `feat/band-skill-paywall` ở backend và frontend.
@@ -16,8 +16,8 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 | D. Per-skill progression | DONE | `TopicStatusDeriver` now opens one topic per course skill. Focused tests 33/33; full learning-service reactor 1,002/1,002. Commit `b302c4f0`. |
 | E. Learning purchase | DONE | Durable V38 unlock purchase, replay/reconciliation and `/courses` ownership/pricing fields. Focused unit/API + 3 PostgreSQL integration tests passed; full learning-service reactor: 1,019 tests passed. Commit `6ec31d7a`. |
 | F. Paywall gate | DONE | Shared request-scoped gate, V39 grandfathering, lesson-list flags, free-practice and tree enforcement. Focused 84/84; full learning-service reactor 1,035/1,035. |
-| G. Frontend paywall/admin prices | PENDING |  |
-| H. Audit/contracts/scenarios | PENDING |  |
+| G. Frontend paywall/admin prices | DONE_WITH_LIMITS | Touched tests, typecheck, lint and production build pass; the full suite has one unrelated flashcard copy assertion failure. Browser verification against a running authenticated API remains unrun. |
+| H. Audit/contracts/scenarios | PARTIAL | Learning and Access contract docs plus lesson-count audit SQL updated. Existing seed audit violations remain; no dev database is running, and source has no money prices or AI grading cost to approve the price table. |
 
 ## Môi trường
 
@@ -99,3 +99,23 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 - Focused Phase F tests: 84 passed, 0 failures/errors/skips, including migration, Premium expiry, no-side-effect and tree outage scenarios.
 - Full learning-service reactor: 1,035 tests passed, 0 failures/errors/skips. Surefire waited 30 seconds for broker-listener shutdown, then reported BUILD SUCCESS.
 - Implementation commit is recorded in Git history.
+
+## G — Frontend paywall and admin prices
+
+- Learner course summaries now carry skill/combo prices, ownership, availability and Premium state. Lesson rows distinguish paywall from progress locks and mark free previews; topic mapping preserves server status.
+- Added an accessible unlock dialog on course cards, paywalled lesson rows, and locked tree points. It displays server skill/combo net price, Points balance and shortfall; reuses the existing Points key activation dialog. The client sends UUID `Idempotency-Key` and keeps the key after an uncertain response while it refreshes/reconciles course state.
+- Topic test copy explains the unlock requirement. Speaking has no purchase CTA and is shown as coming soon. A tree `PAYWALL` response opens the unlock dialog.
+- Admin course edit saves the per-skill price map and nullable combo price with positive integer and combo-range validation. Course topic creation requires a skill. Existing affected admin fixtures/assertions were updated to the new request shape.
+- Focused Phase G suites passed, including 26 earlier learner/admin tests, 43 affected admin/adapter tests, and 16 tree/lesson/unlock tests; added retry-key and unlock HTTP contract tests pass (3 tests).
+- Final full frontend run completed 202 files / 1,696 tests: 1,695 passed and one unrelated mixed-up-answer copy assertion failed in `flashcards/lib/owl-reactions.test.ts`. The admin/package fixtures affected by this feature were corrected and their focused suites passed.
+- `npm run typecheck`, ESLint, and production build passed. Browser verification against a running authenticated API was unavailable.
+
+- Frontend implementation commit: `08c0813` (`feat(frontend): add band skill paywall UI`). The pre-existing frontend `package-lock.json` modification was left uncommitted.
+
+## H — Content audit, contracts, and scenarios
+
+- Updated `lesson-learning-v1.md` with per-skill topic progression, course unlock fields, `POST /courses/{id}/unlocks`, idempotency and lesson/free-practice paywall behavior. Updated `access-points-v1.md` with the service-to-service debit contract and `COURSE_UNLOCK_DEBIT` ledger mapping.
+- Extended `course-skill-content-audit.sql` with published lesson counts and counts beyond the 3-lesson free preview for every `(course, skill)`, including zero-content skills.
+- The last recorded content audit found one unskilled topic (`TREES_MULTI_SKILL`), five mismatched knowledge points and two multi-skill lessons (`T1`, `T2`). These are unchanged content-owner prerequisites and were not auto-fixed.
+- The audit query was not run against a development database because none was running. Access source contains key product entitlements but no money prices, and the repository does not state the AI grading Point cost; therefore the product-approved price table cannot be derived without inventing inputs. No R&D price was entered.
+- Backend automated suites for Access, Content and Learning passed in prior phases; Learning's full reactor passed at 1,035 tests after Phase F. The planned manual end-to-end scenarios still need an active environment/account and R&D-approved prices. Contract/audit documentation changes are pending their documentation commit.
