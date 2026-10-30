@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${COMMUNITY_DB_URL:jdbc:postgresql://localhost:5432/community_db}
+    url: ${COMMUNITY_DB_URL:jdbc:postgresql://localhost:5440/community_db}
     username: ${COMMUNITY_DB_USERNAME:postgres}
     password: ${COMMUNITY_DB_PASSWORD:123456}
   jpa:
