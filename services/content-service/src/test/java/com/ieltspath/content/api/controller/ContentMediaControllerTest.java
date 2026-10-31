@@ -4,7 +4,7 @@ import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.commonstorage.StorageException;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.content.api.exception.GlobalExceptionHandler;
-import com.ieltspath.content.application.result.StoredAudioResult;
+import com.ieltspath.content.application.result.StoredMediaResult;
 import com.ieltspath.content.application.usecase.SectionMediaUseCases;
 import com.ieltspath.content.application.usecase.UploadContentAudioUseCase;
 import com.ieltspath.content.domain.exception.VersionNotDraftException;
@@ -51,7 +51,7 @@ class ContentMediaControllerTest {
     @Test
     void uploadReturnsTheKeyAndUrl() throws Exception {
         when(upload.execute(eq(userId), eq("audio/mpeg"), any())).thenReturn(
-                new StoredAudioResult("content-audio/u/f.mp3", "https://media.example.test/content-audio/u/f.mp3",
+                new StoredMediaResult("content-audio/u/f.mp3", "https://media.example.test/content-audio/u/f.mp3",
                         "audio/mpeg", 4));
 
         mockMvc.perform(multipart("/api/content/admin/media/audio").file(file()))

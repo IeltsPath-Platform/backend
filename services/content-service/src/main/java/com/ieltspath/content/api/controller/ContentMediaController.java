@@ -3,7 +3,7 @@ package com.ieltspath.content.api.controller;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.content.api.dto.response.StoredAudioResponse;
-import com.ieltspath.content.application.result.StoredAudioResult;
+import com.ieltspath.content.application.result.StoredMediaResult;
 import com.ieltspath.content.application.usecase.UploadContentAudioUseCase;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -43,7 +43,7 @@ public class ContentMediaController {
         } catch (IOException unreadable) {
             throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
         }
-        StoredAudioResult stored = uploadAudio.execute(currentUser.requireUserId(), file.getContentType(), bytes);
+        StoredMediaResult stored = uploadAudio.execute(currentUser.requireUserId(), file.getContentType(), bytes);
         return StoredAudioResponse.from(stored);
     }
 }
