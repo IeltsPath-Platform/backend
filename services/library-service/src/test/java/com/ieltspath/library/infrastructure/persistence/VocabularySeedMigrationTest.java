@@ -24,10 +24,11 @@ class VocabularySeedMigrationTest {
                 .locations("classpath:db/migration").load().migrate();
     }
 
-    // V4 seeds 300 mock items; V15 adds 30 lesson items and their 32 senses. V11 pronunciations are inactive.
+    // V4 seeds 300 mock items; V15 adds 30 lesson items and their 32 senses; V24-V29 add the game words, activating any
+    // pronunciation row they give a meaning to (V30). The remaining V11 pronunciations are inactive.
     private static final String IELTS_ITEMS = "vocabulary_items WHERE status = 'ACTIVE'";
-    private static final int ACTIVE_ITEM_COUNT = 330;
-    private static final int SENSE_COUNT = 334;
+    private static final int ACTIVE_ITEM_COUNT = 960;
+    private static final int SENSE_COUNT = 964;
 
     @Test
     void vocabularySeedsIncludeMockAndLessonContent() throws Exception {
@@ -61,12 +62,12 @@ class VocabularySeedMigrationTest {
     @Test
     void catalogMigrationsAddTopicsSetsAndMetadataWithoutAddingVocabularyRows() throws Exception {
         assertEquals(ACTIVE_ITEM_COUNT, count(IELTS_ITEMS));
-        assertEquals(6, count("vocabulary_topics"));
+        assertEquals(7, count("vocabulary_topics"));
         assertEquals(12, count("vocabulary_sets"));
         assertEquals(0, count("vocabulary_items WHERE frequency_rank IS NOT NULL"));
         assertEquals(7, count("vocabulary_items WHERE academic_word_list = true"));
-        assertEquals(64, count("vocabulary_senses WHERE cefr_level IS NOT NULL"));
-        assertEquals(0, count("vocabulary_senses WHERE cefr_level IS NOT NULL AND topic_id IS NULL"));
+        assertEquals(951, count("vocabulary_senses WHERE cefr_level IS NOT NULL"));
+        assertEquals(77, count("vocabulary_senses WHERE cefr_level IS NOT NULL AND topic_id IS NULL"), "general academic words have no topic");
         assertEquals(0, count("vocabulary_senses WHERE topic_id IS NOT NULL AND cefr_level IS NULL"));
         assertEquals(1, count("vocabulary_senses s JOIN vocabulary_items i ON i.id=s.vocabulary_item_id WHERE i.normalized_lemma='research' AND s.cefr_level='B2' AND s.topic_id IS NOT NULL"));
         assertEquals(16, count("vocabulary_senses s JOIN vocabulary_items i ON i.id=s.vocabulary_item_id WHERE s.cefr_level IS NOT NULL AND i.normalized_lemma IN ('pupil','curriculum','research','pollution','renewable','sustainable','device','algorithm','software','diet','stress','salary','community','policy','method','dissertation')"));
