@@ -305,7 +305,7 @@ class InternalLearningContentControllerTest {
     void lessonBlocksCarryOnlyTheirOwnFieldsAndAnswerSpecsAsJson() throws Exception {
         UUID lessonId = UUID.randomUUID();
         UUID kp = UUID.randomUUID();
-        when(lessonContent.execute(lessonId)).thenReturn(new LessonContentResult(lessonId, UUID.randomUUID(), "L1",
+        when(lessonContent.execute(lessonId, false)).thenReturn(new LessonContentResult(lessonId, UUID.randomUUID(), "L1",
                 "Câu chủ đề nằm ở đâu", null, 1, List.of(), List.of(
                 new LessonContentResult.Block(UUID.randomUUID(), BlockType.TEXT, null, 1, "Mẹo", null, null, null,
                         List.of(kp)),
@@ -365,7 +365,7 @@ class InternalLearningContentControllerTest {
     @Test
     void unknownIdsAreNotFound() throws Exception {
         UUID id = UUID.randomUUID();
-        when(lessonContent.execute(id)).thenThrow(new LessonNotFoundException(id));
+        when(lessonContent.execute(id, false)).thenThrow(new LessonNotFoundException(id));
         when(topicLessons.execute(id)).thenThrow(new TopicNotFoundException(id));
 
         mockMvc.perform(get("/internal/learning-content/lessons/{id}", id)).andExpect(status().isNotFound());

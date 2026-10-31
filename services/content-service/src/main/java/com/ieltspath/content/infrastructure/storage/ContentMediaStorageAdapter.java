@@ -35,16 +35,23 @@ public class ContentMediaStorageAdapter implements ContentMediaStorage {
 
     @Override
     public StoredMediaResult store(String key, byte[] content, String contentType) {
+        return store(bucket, key, content, contentType);
+    }
+
+    @Override
+    public StoredMediaResult store(String targetBucket, String key, byte[] content, String contentType) {
         try {
-            StoredObject stored = objectStorage.put(bucket, key, content, contentType);
-            return new StoredMediaResult(stored.key(), publicUrl(stored.key()), stored.contentType(),
+            StoredObject stored = objectStorage.put(targetBucket, key, content, contentType);
+            String url = targetBucket.equals(bucket) ? publicUrl(stored.key()) : null;
+            return new StoredMediaResult(stored.key(), url, stored.contentType(),
                     stored.sizeBytes());
         } catch (StorageException failure) {
             if (failure.outcomeUnknown()) {
                 try {
-                    objectStorage.delete(bucket, key);
+                    objectStorage.delete(targetBucket, key);
                 } catch (RuntimeException cleanupFailed) {
-                    log.warn("Cleanup after an uncertain audio upload failed: ref={}", StorageException.ref(bucket, key));
+                    log.warn("Cleanup after an uncertain audio upload failed: ref={}",
+                            StorageException.ref(targetBucket, key));
                 }
             }
             throw failure;

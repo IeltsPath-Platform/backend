@@ -7,6 +7,7 @@ import com.ieltspath.content.api.dto.response.StoredImageResponse;
 import com.ieltspath.content.application.result.StoredMediaResult;
 import com.ieltspath.content.application.usecase.UploadContentAudioUseCase;
 import com.ieltspath.content.application.usecase.UploadContentImageUseCase;
+import com.ieltspath.content.domain.vo.AccessTier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,7 +39,8 @@ public class ContentMediaController {
 
     @PostMapping(value = "/audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public StoredAudioResponse upload(@RequestParam("file") MultipartFile file) {
+    public StoredAudioResponse upload(@RequestParam("file") MultipartFile file,
+                                      @RequestParam(value = "tier", defaultValue = "PUBLIC") AccessTier tier) {
         if (file == null || file.isEmpty()) {
             throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
         }
@@ -48,7 +50,9 @@ public class ContentMediaController {
         } catch (IOException unreadable) {
             throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
         }
-        StoredMediaResult stored = uploadAudio.execute(currentUser.requireUserId(), file.getContentType(), bytes);
+        StoredMediaResult stored = tier == AccessTier.PUBLIC
+                ? uploadAudio.execute(currentUser.requireUserId(), file.getContentType(), bytes)
+                : uploadAudio.execute(currentUser.requireUserId(), file.getContentType(), bytes, tier);
         return StoredAudioResponse.from(stored);
     }
 

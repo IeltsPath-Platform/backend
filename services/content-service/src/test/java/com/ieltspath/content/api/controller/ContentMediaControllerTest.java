@@ -8,6 +8,7 @@ import com.ieltspath.content.application.result.StoredMediaResult;
 import com.ieltspath.content.application.usecase.SectionMediaUseCases;
 import com.ieltspath.content.application.usecase.UploadContentAudioUseCase;
 import com.ieltspath.content.application.usecase.UploadContentImageUseCase;
+import com.ieltspath.content.domain.vo.AccessTier;
 import com.ieltspath.content.domain.exception.VersionNotDraftException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,6 +63,16 @@ class ContentMediaControllerTest {
                 .andExpect(jsonPath("$.mediaUrl").value("https://media.example.test/content-audio/u/f.mp3"))
                 .andExpect(jsonPath("$.contentType").value("audio/mpeg"))
                 .andExpect(jsonPath("$.sizeBytes").value(4));
+    }
+
+    @Test
+    void premiumAudioUploadSelectsThePremiumTier() throws Exception {
+        when(upload.execute(eq(userId), eq("audio/mpeg"), any(), eq(AccessTier.PREMIUM))).thenReturn(
+                new StoredMediaResult("content-audio/u/f.mp3", null, "audio/mpeg", 4));
+
+        mockMvc.perform(multipart("/api/content/admin/media/audio").file(file()).param("tier", "PREMIUM"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mediaReference").value("content-audio/u/f.mp3"));
     }
 
     @Test

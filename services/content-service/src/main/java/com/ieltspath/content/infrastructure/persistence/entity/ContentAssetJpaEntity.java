@@ -2,6 +2,7 @@ package com.ieltspath.content.infrastructure.persistence.entity;
 
 import com.ieltspath.content.domain.vo.AssetType;
 import com.ieltspath.content.domain.vo.AssetValidationStatus;
+import com.ieltspath.content.domain.vo.AccessTier;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -41,6 +42,10 @@ public class ContentAssetJpaEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "validation_status", nullable = false, length = 50)
     private AssetValidationStatus validationStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "access_tier", nullable = false, length = 10)
+    private AccessTier accessTier;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

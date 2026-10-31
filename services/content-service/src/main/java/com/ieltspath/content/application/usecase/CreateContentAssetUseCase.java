@@ -23,7 +23,8 @@ public class CreateContentAssetUseCase {
                 command.textContent(),
                 command.mediaReference(),
                 command.durationSeconds(),
-                command.checksum()
+                command.checksum(),
+                command.accessTier()
         );
 
         ContentAsset saved = contentAssetRepository.save(asset);
@@ -35,7 +36,8 @@ public class CreateContentAssetUseCase {
                 saved.getDurationSeconds(),
                 saved.getChecksum(),
                 saved.getValidationStatus(),
-                saved.getCreatedAt()
+                saved.getCreatedAt(),
+                saved.getAccessTier()
         );
     }
 }

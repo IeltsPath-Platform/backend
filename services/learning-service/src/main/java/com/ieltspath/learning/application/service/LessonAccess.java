@@ -68,7 +68,24 @@ public class LessonAccess {
      * review. The review still blocks submitting work and opening a lesson not yet reached.
      */
     public Context authorizeToRead(UUID userId, UUID lessonId) {
-        return authorize(userId, content.getLesson(lessonId), true, false);
+        return authorizeToRead(userId, content.getLesson(lessonId));
+    }
+
+    public Context authorizeToRead(UUID userId, Lesson lesson) {
+        return authorize(userId, lesson, true, false);
+    }
+
+    /** Checks lesson access using the catalog summary before the full lesson payload, including audio URLs, is read. */
+    public Context authorizeToRead(UUID userId, LessonSummary summary) {
+        Lesson lesson = new Lesson(summary.lessonId(), summary.topicId(), summary.code(), summary.title(),
+                summary.summary(), summary.sortOrder(), summary.knowledgePointIds(), List.of(), summary.skill(),
+                summary.skills(), summary.courseId(), summary.skillPosition());
+        return authorize(userId, lesson, true, false);
+    }
+
+    public ReadContext authorizeAndLoadForReading(UUID userId, UUID lessonId) {
+        Context context = authorizeToRead(userId, content.getLessonAccessSummary(lessonId));
+        return new ReadContext(context, content.getLesson(lessonId, true));
     }
 
     /** Completed lesson practice and review catalogs stay available after Premium expires. */
@@ -223,4 +240,6 @@ public class LessonAccess {
                     paywallRequest, lesson.skills());
         }
     }
+
+    public record ReadContext(Context access, Lesson lesson) {}
 }

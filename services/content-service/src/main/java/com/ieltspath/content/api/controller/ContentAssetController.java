@@ -9,6 +9,7 @@ import com.ieltspath.content.application.result.ContentAssetResult;
 import com.ieltspath.content.application.usecase.CreateContentAssetUseCase;
 import com.ieltspath.content.application.usecase.GetContentAssetUseCase;
 import com.ieltspath.content.application.usecase.LinkAssetUseCase;
+import com.ieltspath.content.domain.vo.AccessTier;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -43,7 +44,8 @@ public class ContentAssetController {
                 request.textContent(),
                 request.mediaReference(),
                 request.durationSeconds(),
-                request.checksum()
+                request.checksum(),
+                request.accessTier() == null ? AccessTier.PUBLIC : request.accessTier()
         ));
         return ContentAssetResponse.from(result);
     }

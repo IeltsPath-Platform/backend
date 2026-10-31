@@ -5,6 +5,7 @@ import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.content.application.usecase.SectionMediaUseCases;
 import com.ieltspath.content.application.usecase.UploadContentAudioUseCase;
 import com.ieltspath.content.application.usecase.UploadContentImageUseCase;
+import com.ieltspath.content.application.result.StoredMediaResult;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -22,6 +23,8 @@ import java.util.Base64;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -72,5 +75,25 @@ class ContentMediaAuthorizationTest {
         mockMvc.perform(delete(section + "/audio", p, v, s)).andExpect(status().isForbidden());
 
         verifyNoInteractions(uploadAudio, uploadImage, media);
+    }
+
+    @Test
+    @WithMockUser(roles = "CONTENT_AUTHOR")
+    void contentAuthorCanRequestPremiumAudioUpload() throws Exception {
+        UUID authorId = UUID.randomUUID();
+        when(currentUser.requireUserId()).thenReturn(authorId);
+        when(uploadAudio.execute(org.mockito.ArgumentMatchers.eq(authorId),
+                org.mockito.ArgumentMatchers.eq("audio/mpeg"), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(com.ieltspath.content.domain.vo.AccessTier.PREMIUM)))
+                .thenReturn(new StoredMediaResult("content-audio/a/f.mp3", null, "audio/mpeg", 1));
+
+        mockMvc.perform(multipart("/api/content/admin/media/audio")
+                        .file(new MockMultipartFile("file", "a.mp3", "audio/mpeg", new byte[]{1}))
+                        .param("tier", "PREMIUM"))
+                .andExpect(status().isCreated());
+
+        verify(uploadAudio).execute(org.mockito.ArgumentMatchers.eq(authorId),
+                org.mockito.ArgumentMatchers.eq("audio/mpeg"), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(com.ieltspath.content.domain.vo.AccessTier.PREMIUM));
     }
 }

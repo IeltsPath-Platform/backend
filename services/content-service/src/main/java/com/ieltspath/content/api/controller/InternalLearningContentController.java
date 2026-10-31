@@ -128,8 +128,17 @@ public class InternalLearningContentController {
     }
 
     @GetMapping("/lessons/{id}")
-    public LessonContentResponse lesson(@PathVariable("id") UUID lessonId) {
-        return LessonContentResponse.from(getLessonContent.execute(lessonId));
+    public LessonContentResponse lesson(@PathVariable("id") UUID lessonId,
+                                        @RequestParam(value = "signedAudio", defaultValue = "false") boolean signedAudio) {
+        return LessonContentResponse.from(getLessonContent.execute(lessonId, signedAudio));
+    }
+
+    @GetMapping("/lessons/{id}/access")
+    public LessonSummaryResponse lessonAccess(@PathVariable("id") UUID lessonId) {
+        var lesson = getLessonContent.accessSummary(lessonId);
+        return new LessonSummaryResponse(lesson.lessonId(), lesson.topicId(), lesson.code(), lesson.title(),
+                lesson.summary(), lesson.sortOrder(), lesson.knowledgePointIds(), List.of(), lesson.skills(), null,
+                lesson.courseId(), lesson.skill(), lesson.skillPosition());
     }
 
     @GetMapping("/topics/{id}/test-packages")

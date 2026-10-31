@@ -86,6 +86,41 @@ class LessonPipelineSeedTest {
     }
 
     @Test
+    void sharedListeningRecordingIsPremiumForLessonsAndPublicForPlacement() {
+        UUID lessonId = UUID.fromString("23000000-0000-4000-8000-030000000001");
+        UUID originalAssetId = UUID.fromString("23000000-0000-4000-8000-050000000001");
+        UUID placementAssetId = UUID.fromString("2b000000-0000-4000-8000-050000000001");
+
+        var lesson = reader.publishedLesson(lessonId).orElseThrow();
+        var lessonAudio = lesson.blocks().stream().filter(block -> block.asset() != null)
+                .map(LessonContentResult.Block::asset).filter(asset -> asset.assetType() == AssetType.AUDIO)
+                .findFirst().orElseThrow();
+        Map<String, Object> lessonAsset = jdbc.getJdbcTemplate().queryForMap(
+                "SELECT id, media_reference, access_tier FROM content_assets WHERE id = ?", originalAssetId);
+        Map<String, Object> placementAsset = jdbc.getJdbcTemplate().queryForMap("""
+                SELECT a.id, a.media_reference, a.access_tier
+                FROM content_asset_links al
+                JOIN content_assets a ON a.id = al.asset_id
+                WHERE al.id = '2b000000-0000-4000-8000-0c0000000001'
+                  AND al.section_id = '2b000000-0000-4000-8000-0a0000000001'
+                """);
+        var placement = new GetPackageVersionContentUseCase(reader, MEDIA).execute(
+                UUID.fromString("2b000000-0000-4000-8000-090000000001"));
+        String placementAudioUrl = placement.sections().stream().map(PackageVersionContentResult.Section::audio)
+                .filter(java.util.Objects::nonNull).map(PackageVersionContentResult.SectionAudio::mediaUrl)
+                .findFirst().orElseThrow();
+
+        assertThat(lessonAudio.accessTier().name()).isEqualTo("PREMIUM");
+        assertThat(lessonAsset.get("media_reference")).isEqualTo("listening/demo/ls1.mp3");
+        assertThat(lessonAsset.get("access_tier")).isEqualTo("PREMIUM");
+        assertThat(placementAsset.get("id")).isEqualTo(placementAssetId);
+        assertThat(placementAsset.get("media_reference")).isEqualTo("listening/placement/placement-ls1.mp3");
+        assertThat(placementAsset.get("access_tier")).isEqualTo("PUBLIC");
+        assertThat(placementAudioUrl)
+                .isEqualTo("https://media.example.test/ieltspath/listening/placement/placement-ls1.mp3");
+    }
+
+    @Test
     void lessonOrderIsUniqueWithinATopic() {
         assertThrows(SQLException.class, () -> execute("INSERT INTO lessons (topic_id, code, title, sort_order) "
                 + "VALUES ('" + DEMO_READING + "', 'L1-DUP', 'Duplicate', 1)"));
