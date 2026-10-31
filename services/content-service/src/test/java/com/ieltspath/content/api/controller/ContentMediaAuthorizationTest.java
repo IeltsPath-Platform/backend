@@ -4,6 +4,7 @@ import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.content.application.usecase.SectionMediaUseCases;
 import com.ieltspath.content.application.usecase.UploadContentAudioUseCase;
+import com.ieltspath.content.application.usecase.UploadContentImageUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -45,6 +46,7 @@ class ContentMediaAuthorizationTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean UploadContentAudioUseCase uploadAudio;
+    @MockitoBean UploadContentImageUseCase uploadImage;
     @MockitoBean SectionMediaUseCases media;
     @MockitoBean CurrentUserProvider currentUser;
 
@@ -59,6 +61,9 @@ class ContentMediaAuthorizationTest {
         mockMvc.perform(multipart("/api/content/admin/media/audio")
                         .file(new MockMultipartFile("file", "a.mp3", "audio/mpeg", new byte[]{1})))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(multipart("/api/content/admin/media/image")
+                        .file(new MockMultipartFile("file", "cover.png", "image/png", new byte[]{1})))
+                .andExpect(status().isForbidden());
         mockMvc.perform(put(section + "/passage", p, v, s).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"text\":\"x\"}")).andExpect(status().isForbidden());
         mockMvc.perform(delete(section + "/passage", p, v, s)).andExpect(status().isForbidden());
@@ -66,6 +71,6 @@ class ContentMediaAuthorizationTest {
                 .content("{\"mediaReference\":\"a/b.mp3\",\"durationSeconds\":5}")).andExpect(status().isForbidden());
         mockMvc.perform(delete(section + "/audio", p, v, s)).andExpect(status().isForbidden());
 
-        verifyNoInteractions(uploadAudio, media);
+        verifyNoInteractions(uploadAudio, uploadImage, media);
     }
 }

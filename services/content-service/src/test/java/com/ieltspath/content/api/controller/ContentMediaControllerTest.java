@@ -7,6 +7,7 @@ import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.result.StoredMediaResult;
 import com.ieltspath.content.application.usecase.SectionMediaUseCases;
 import com.ieltspath.content.application.usecase.UploadContentAudioUseCase;
+import com.ieltspath.content.application.usecase.UploadContentImageUseCase;
 import com.ieltspath.content.domain.exception.VersionNotDraftException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ContentMediaControllerTest {
 
     private final UploadContentAudioUseCase upload = mock(UploadContentAudioUseCase.class);
+    private final UploadContentImageUseCase uploadImage = mock(UploadContentImageUseCase.class);
     private final SectionMediaUseCases media = mock(SectionMediaUseCases.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final UUID userId = UUID.randomUUID();
@@ -39,7 +41,7 @@ class ContentMediaControllerTest {
     @BeforeEach
     void setUp() {
         when(currentUser.requireUserId()).thenReturn(userId);
-        mockMvc = MockMvcBuilders.standaloneSetup(new ContentMediaController(upload, currentUser),
+        mockMvc = MockMvcBuilders.standaloneSetup(new ContentMediaController(upload, uploadImage, currentUser),
                         new SectionMediaController(media))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
@@ -60,6 +62,30 @@ class ContentMediaControllerTest {
                 .andExpect(jsonPath("$.mediaUrl").value("https://media.example.test/content-audio/u/f.mp3"))
                 .andExpect(jsonPath("$.contentType").value("audio/mpeg"))
                 .andExpect(jsonPath("$.sizeBytes").value(4));
+    }
+
+    @Test
+    void imageUploadReturnsCreatedWithReferenceUrlTypeAndSize() throws Exception {
+        when(uploadImage.execute(eq(userId), eq("image/png"), any())).thenReturn(
+                new StoredMediaResult("content-image/u/f.png", "https://media.example.test/content-image/u/f.png",
+                        "image/png", 12));
+        MockMultipartFile image = new MockMultipartFile("file", "cover.png", "image/png",
+                new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0});
+
+        mockMvc.perform(multipart("/api/content/admin/media/image").file(image))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mediaReference").value("content-image/u/f.png"))
+                .andExpect(jsonPath("$.mediaUrl").value("https://media.example.test/content-image/u/f.png"))
+                .andExpect(jsonPath("$.contentType").value("image/png"))
+                .andExpect(jsonPath("$.sizeBytes").value(12));
+    }
+
+    @Test
+    void emptyImageFileIsBadRequest() throws Exception {
+        mockMvc.perform(multipart("/api/content/admin/media/image")
+                        .file(new MockMultipartFile("file", "cover.png", "image/png", new byte[0])))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.code").value("EMPTY_FILE"));
     }
 
     @Test
