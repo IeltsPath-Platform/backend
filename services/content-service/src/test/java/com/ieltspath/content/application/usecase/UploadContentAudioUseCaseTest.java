@@ -1,13 +1,21 @@
 package com.ieltspath.content.application.usecase;
 
 import com.ieltspath.commonstorage.UploadRejectedException;
-import com.ieltspath.content.application.port.ContentAudioStorage;
-import com.ieltspath.content.application.result.StoredAudioResult;
+import com.ieltspath.content.application.port.ContentMediaStorage;
+import com.ieltspath.content.application.result.StoredMediaResult;
+import com.ieltspath.content.domain.vo.AccessTier;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -18,10 +26,10 @@ class UploadContentAudioUseCaseTest {
 
     private final AtomicReference<String> storedKey = new AtomicReference<>();
     private final AtomicReference<String> storedType = new AtomicReference<>();
-    private final ContentAudioStorage storage = (key, content, contentType) -> {
+    private final ContentMediaStorage storage = (key, content, contentType) -> {
         storedKey.set(key);
         storedType.set(contentType);
-        return new StoredAudioResult(key, "https://media.example.test/" + key, contentType, content.length);
+        return new StoredMediaResult(key, "https://media.example.test/" + key, contentType, content.length);
     };
     private final UploadContentAudioUseCase useCase = new UploadContentAudioUseCase(storage);
     private final UUID userId = UUID.randomUUID();
@@ -34,7 +42,7 @@ class UploadContentAudioUseCaseTest {
 
     @Test
     void anMp3IsStoredUnderTheUsersFolder() {
-        StoredAudioResult result = useCase.execute(userId, "audio/mpeg", mp3());
+        StoredMediaResult result = useCase.execute(userId, "audio/mpeg", mp3());
 
         assertTrue(result.key().startsWith("content-audio/" + userId + "/"));
         assertTrue(result.key().endsWith(".mp3"));
@@ -91,5 +99,18 @@ class UploadContentAudioUseCaseTest {
 
         assertTrue(useCase.execute(userId, "audio/wav", wav).key().endsWith(".wav"));
         assertTrue(useCase.execute(userId, "audio/ogg", ogg).key().endsWith(".ogg"));
+    }
+
+    @Test
+    void premiumAudioUploadsUseThePrivateBucket() {
+        ContentMediaStorage bucketStorage = mock(ContentMediaStorage.class);
+        when(bucketStorage.store(eq("media-premium"), anyString(), any(), eq("audio/mpeg")))
+                .thenAnswer(call -> new StoredMediaResult(call.getArgument(1), null, "audio/mpeg", 64));
+        UploadContentAudioUseCase premiumUpload = new UploadContentAudioUseCase(bucketStorage, "media-premium");
+
+        StoredMediaResult result = premiumUpload.execute(userId, "audio/mpeg", mp3(), AccessTier.PREMIUM);
+
+        assertTrue(result.key().startsWith("content-audio/" + userId + "/"));
+        verify(bucketStorage).store(eq("media-premium"), eq(result.key()), any(), eq("audio/mpeg"));
     }
 }

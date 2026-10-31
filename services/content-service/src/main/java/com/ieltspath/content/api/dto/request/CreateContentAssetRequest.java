@@ -1,6 +1,7 @@
 package com.ieltspath.content.api.dto.request;
 
 import com.ieltspath.content.domain.vo.AssetType;
+import com.ieltspath.content.domain.vo.AccessTier;
 import jakarta.validation.constraints.NotNull;
 
 public record CreateContentAssetRequest(
@@ -10,6 +11,7 @@ public record CreateContentAssetRequest(
         String textContent,
         String mediaReference,
         Integer durationSeconds,
-        String checksum
+        String checksum,
+        AccessTier accessTier
 ) {}
 

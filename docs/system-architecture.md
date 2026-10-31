@@ -85,11 +85,33 @@ Content dùng timeout kết nối 2 giây, đọc 5 giây khi gọi Library; Lib
 cùng [contract](contracts/game-content-snapshot-v1.md). Learning gọi Content qua API nội bộ (Gateway chặn `/internal/**`,
 contract [`learning-content-internal-v1`](contracts/learning-content-internal-v1.md)); Content là nơi duy nhất ghép URL media.
 
-Listening dùng mp3 do team tự upload lên bucket cloud public-read. Content resolve key với `CONTENT_MEDIA_BASE_URL`
-(prefix `https://`) thành `mediaUrl`; URL `https://` đầy đủ được giữ nguyên, không cần base. Learning và Assessment
-chuyển tiếp URL đã resolve, không ghép lại. Transcript nằm trong `content_assets.text_content`: Learning trả khi bài
+Content resolve asset `PUBLIC` bằng `CONTENT_MEDIA_BASE_URL` của bucket `media`; asset `PREMIUM` được cấp URL ký từ
+bucket riêng tư `media-premium`. Learning chỉ xin URL ký sau khi lesson gate cho phép đọc. URL `https://` đầy đủ vẫn
+được giữ nguyên; Learning và Assessment chuyển tiếp URL đã resolve, không ghép lại. Transcript nằm trong
+`content_assets.text_content`: Learning trả khi bài
 hoàn thành, hoặc sau khi nộp practice attempt hay set ôn; Assessment giữ trong snapshot server và trả `sectionSolutions`
 khi kết quả ≥ 70%.
+
+### Lưu trữ file (Supabase Storage)
+
+Các service dùng chung quy ước bucket và khóa object dưới đây. Cùng chủ và cùng chính sách thì dùng chung bucket, phân
+biệt bằng tiền tố khóa; khác chính sách thì dùng bucket mới; khác service thì không dùng chung bucket.
+
+| Bucket | Công khai | Dùng để | Giới hạn | Loại file (MIME) | Chủ | Khóa thường gặp | Trạng thái |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `avatars` | có | Ảnh đại diện học viên | 2 MB | png, jpeg, webp | user-service | `images/{userId}/{uuid}.{ext}` | đã có |
+| `flashcards` | có | Ảnh thẻ, bìa bộ thẻ, bìa catalog từ vựng | 2 MB | png, jpeg, webp | library-service | `images/{userId}/{uuid}.{ext}`; bìa catalog `catalog-cover/{userId}/{uuid}.{ext}` | đã có; bìa catalog là kế hoạch |
+| `community` | có | Ảnh bài đăng cộng đồng | 5 MB | png, jpeg, webp, gif | community-service | `community/post/{userId}/{uuid}.{ext}` | đã có |
+| `media` | có | Audio và ảnh nội dung bài học | 25 MB | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service | seed: `listening/demo/ls1.mp3`; upload API: `content-audio/{userId}/{uuid}.{ext}` | đã có |
+| `speaking-recordings` | không | Ghi âm Speaking của học viên | 5 MB | webm, mp4, ogg, mpeg, wav | assessment-service | `speaking/{userId}/{uuid}.{ext}` | đã có, chưa dùng |
+| `media-premium` | không | Audio PREMIUM, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | đã có |
+
+Content lưu `access_tier` cùng asset. `PUBLIC` dùng URL công khai của `media`; `PREMIUM` dùng URL ký của
+`media-premium` với TTL 900 giây. Learning kiểm tra lesson gate trước khi Content tạo URL ký. URL ký chỉ giữ ở response,
+không lưu vào DB hoặc log; frontend có thể xin URL mới khi URL hiện tại hết hạn.
+
+Ví dụ URL công khai và URL ký, cùng các quy tắc tạo, kiểm tra khóa và giới hạn TTL, được ghi trong
+[`shared/common-storage/README.md`](../shared/common-storage/README.md).
 
 ### Bất đồng bộ (RabbitMQ)
 
@@ -301,7 +323,7 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | Giá chấm Writing nằm ở hai nơi | Learning `learning.writing.point-cost` (3) cho bài luận trong bài học; assessment `grading_point_costs.WRITING` cho chấm qua `grading_jobs`. Đổi giá phải sửa cả hai |
 | Bài Writing lưu ở hai nơi | Bài luận trong bài học ở `learning_db.lesson_writing_submissions`; Writing trong đề (sau MVP) ở `assessment_db.learner_submissions` |
 | Ảnh biểu đồ Task 1 mới dùng tham chiếu media | Content nhận URL `https://` hoặc data URI ảnh Base64 và trả `mediaUrl`; chưa có luồng upload hay tích hợp object storage cho ảnh. Seed dùng SVG data URI; grader đọc `chartFacts`, không đọc ảnh |
-| Media Listening dùng bucket public-read | Team tự upload 8 mp3 của seed; backend chưa có upload API, signed URL hay giới hạn lượt nghe. Thiếu `CONTENT_MEDIA_BASE_URL` thì các reference dạng key không resolve được (`INVALID_MEDIA_REFERENCE`); URL `https://` đầy đủ không cần base |
+| Bản public cũ của audio `listening/demo/ls1.mp3` còn trong `media` | Lesson dùng chung audio đã chuyển sang `PREMIUM` và phát qua URL ký sau lesson gate; Placement dùng khóa public riêng. Xóa object public cũ còn chờ phê duyệt |
 | Writing trong Practice và gate dùng chính sách phí khác nhau | Practice trừ điểm; essay trong `TOPIC_GATE`/`COURSE_GATE` chấm miễn phí và có quota riêng ở Assessment |
 | Một số ghi Writing chưa theo quy tắc khóa mọi lượt ghi theo user | Bắt đầu/kết thúc chấm có transaction và advisory lock; quota, lưu grade và lỗi trung gian dùng SQL nguyên tử có điều kiện ngoài các transaction này. Dữ kiện hiện tại, không thay quy tắc AGENTS.md §3.8 |
 | Cổng bài học là authority cho luồng học | `LessonAccessGate` giữ tiến trình review/topic/bài; `PaywallGate` mở 3 bài đầu mỗi skill, unlock skill/combo, tiến độ grandfathered, rồi Premium. Access outage chỉ chặn nội dung cần kiểm tra Premium. |

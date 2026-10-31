@@ -13,6 +13,7 @@ import com.ieltspath.content.application.result.PackageQuestionSpec;
 import com.ieltspath.content.application.result.KnowledgeTreeNodeResult;
 import com.ieltspath.content.domain.vo.QuestionType;
 import com.ieltspath.content.domain.vo.AssetType;
+import com.ieltspath.content.domain.vo.AccessTier;
 import com.ieltspath.content.domain.vo.BlockType;
 import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.domain.vo.LearningType;
@@ -451,7 +452,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
         List<LessonContentResult.Block> blocks = jdbc.query("""
                 SELECT b.id, b.block_type, b.sort_order, b.text_content, a.id AS asset_id, a.asset_type,
-                       a.text_content AS asset_text, a.media_reference, a.duration_seconds
+                       a.text_content AS asset_text, a.media_reference, a.duration_seconds, a.access_tier
                 FROM lesson_blocks b
                 LEFT JOIN content_assets a ON a.id = b.asset_id
                 WHERE b.lesson_id = :lessonId
@@ -462,7 +463,9 @@ public class JdbcLearningContentReader implements LearningContentReader {
             LessonContentResult.Asset asset = type == BlockType.ASSET
                     ? new LessonContentResult.Asset(uuid(rs, "asset_id"),
                     AssetType.valueOf(rs.getString("asset_type")), rs.getString("asset_text"),
-                    rs.getString("media_reference"), (Integer) rs.getObject("duration_seconds"), null)
+                    rs.getString("media_reference"), (Integer) rs.getObject("duration_seconds"), null,
+                    enumOrNull(AccessTier.class, rs.getString("access_tier")) == null ? AccessTier.PUBLIC
+                            : enumOrNull(AccessTier.class, rs.getString("access_tier")))
                     : null;
             List<LessonContentResult.Question> questions =
                     type == BlockType.EXERCISE ? questionsByBlock.getOrDefault(blockId, List.of()) : null;

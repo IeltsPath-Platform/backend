@@ -53,6 +53,31 @@ class RestLearningContentClientTest {
     }
 
     @Test
+    void readsLessonAccessSummaryBeforeRequestingLessonMedia() {
+        server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID + "/access"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"lessonId":"%s","topicId":"%s","code":"L4","title":"Lesson",
+                         "sortOrder":4,"knowledgePointIds":[],"exerciseBlockIds":[],
+                         "skills":["LISTENING"],"courseId":"%s","skill":"LISTENING","skillPosition":4}
+                        """.formatted(LESSON_ID, TOPIC_ID, UUID.randomUUID()), MediaType.APPLICATION_JSON));
+        var summary = client.getLessonAccessSummary(LESSON_ID);
+        assertEquals(4, summary.sortOrder());
+        assertEquals(4, summary.skillPosition());
+    }
+
+    @Test
+    void requestsSignedAudioOnlyForTheLessonPayloadFetch() {
+        server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID + "?signedAudio=true"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"lessonId":"%s","topicId":"%s","code":"L4","title":"Lesson",
+                         "sortOrder":4,"knowledgePointIds":[],"blocks":[],"skills":["LISTENING"]}
+                        """.formatted(LESSON_ID, TOPIC_ID), MediaType.APPLICATION_JSON));
+        assertEquals(LESSON_ID, client.getLesson(LESSON_ID, true).lessonId());
+    }
+
+    @Test
     void readsActiveRubricAndTheErrorTypeCatalog() {
         server.expect(requestTo(INTERNAL_PATH + "/rubrics/active?task=TASK_2"))
                 .andExpect(method(HttpMethod.GET))

@@ -1,6 +1,7 @@
 package com.ieltspath.content.application.result;
 
 import com.ieltspath.content.domain.vo.AssetType;
+import com.ieltspath.content.domain.vo.AccessTier;
 import com.ieltspath.content.domain.vo.BlockType;
 import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.domain.vo.Skill;
@@ -82,9 +83,13 @@ public record LessonContentResult(
 
     /** {@code mediaUrl} is set for media assets once the use case has checked the stored reference. */
     public record Asset(UUID id, AssetType assetType, String textContent, String mediaReference,
-                        Integer durationSeconds, String mediaUrl) {
+                        Integer durationSeconds, String mediaUrl, AccessTier accessTier) {
+        public Asset(UUID id, AssetType assetType, String textContent, String mediaReference,
+                     Integer durationSeconds, String mediaUrl) {
+            this(id, assetType, textContent, mediaReference, durationSeconds, mediaUrl, AccessTier.PUBLIC);
+        }
         public Asset withMediaUrl(String url) {
-            return new Asset(id, assetType, textContent, mediaReference, durationSeconds, url);
+            return new Asset(id, assetType, textContent, mediaReference, durationSeconds, url, accessTier);
         }
     }
 

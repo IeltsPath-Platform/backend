@@ -40,8 +40,8 @@ app:
 
 ## Bucket
 
-Module không biết bucket nào công khai; bảng dưới là quy ước chung của cả hệ thống. Cột "Trạng thái" phân biệt đã có
-trên project Supabase (kiểm ngày 2026-10-31) với kế hoạch chưa tạo.
+Module không biết bucket nào công khai; bảng dưới là quy ước chung của cả hệ thống. Cột "Trạng thái" ghi tình trạng
+theo kiểm kê ngày 2026-10-31.
 
 | Bucket | Công khai | Dùng để | Giới hạn | Loại file (MIME) | Chủ | Khóa thường gặp | Trạng thái |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -50,9 +50,10 @@ trên project Supabase (kiểm ngày 2026-10-31) với kế hoạch chưa tạo.
 | `community` | có | Ảnh bài đăng cộng đồng | 5 MB | png, jpeg, webp, gif | community-service | `community/post/{userId}/{uuid}.{ext}` | đã có |
 | `media` | có | Audio và ảnh nội dung bài học | 25 MB | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service | seed: `listening/demo/ls1.mp3`; upload API: `content-audio/{userId}/{uuid}.{ext}` | đã có |
 | `speaking-recordings` | không | Ghi âm Speaking của học viên | 5 MB | webm, mp4, ogg, mpeg, wav | assessment-service | `speaking/{userId}/{uuid}.{ext}` | đã có, chưa dùng |
-| `media-premium` | không | Audio bài trả phí, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | kế hoạch, chưa tạo |
+| `media-premium` | không | Audio PREMIUM, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | đã có |
 
-Biến cấu hình tên bucket: `USER_AVATAR_BUCKET`, `LIBRARY_FLASHCARD_BUCKET`, `COMMUNITY_MEDIA_BUCKET`, `CONTENT_MEDIA_BUCKET`.
+Biến cấu hình tên bucket: `USER_AVATAR_BUCKET`, `LIBRARY_FLASHCARD_BUCKET`, `COMMUNITY_MEDIA_BUCKET`,
+`CONTENT_MEDIA_BUCKET`, `CONTENT_PREMIUM_MEDIA_BUCKET`.
 Giới hạn trong code là nguồn chuẩn; giới hạn bucket phải bằng hoặc lớn hơn giới hạn code.
 
 ### URL mẫu
@@ -83,6 +84,10 @@ https://<project-ref>.supabase.co/storage/v1/object/upload/sign/<bucket>/<key>?t
 
 Biến `CONTENT_MEDIA_BASE_URL` của content-service là tiền tố công khai của bucket `media`, dạng
 `https://<project-ref>.supabase.co/storage/v1/object/public/media/`, có `/` cuối. Khóa tương đối được ghép vào tiền tố này.
+
+Content đánh dấu mỗi asset bằng `access_tier`: `PUBLIC` được resolve qua bucket `media`; `PREMIUM` được cấp URL ký
+từ bucket riêng tư `media-premium` với TTL 900 giây. Learning chỉ yêu cầu URL ký sau khi lesson gate cho phép đọc.
+URL ký không lưu vào DB hoặc log; cần URL mới thì service xin lại.
 
 ### Khóa object
 

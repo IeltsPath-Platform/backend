@@ -3,6 +3,7 @@ package com.ieltspath.content.api.dto.response;
 import com.ieltspath.content.application.result.ContentAssetResult;
 import com.ieltspath.content.domain.vo.AssetType;
 import com.ieltspath.content.domain.vo.AssetValidationStatus;
+import com.ieltspath.content.domain.vo.AccessTier;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -15,7 +16,8 @@ public record ContentAssetResponse(
         Integer durationSeconds,
         String checksum,
         AssetValidationStatus validationStatus,
-        Instant createdAt
+        Instant createdAt,
+        AccessTier accessTier
 ) {
     public static ContentAssetResponse from(ContentAssetResult result) {
         return new ContentAssetResponse(
@@ -26,7 +28,8 @@ public record ContentAssetResponse(
                 result.durationSeconds(),
                 result.checksum(),
                 result.validationStatus(),
-                result.createdAt()
+                result.createdAt(),
+                result.accessTier()
         );
     }
 }

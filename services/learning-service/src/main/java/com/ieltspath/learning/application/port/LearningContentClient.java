@@ -30,6 +30,17 @@ public interface LearningContentClient {
 
     Lesson getLesson(UUID lessonId);
 
+    default LessonSummary getLessonAccessSummary(UUID lessonId) {
+        Lesson lesson = getLesson(lessonId);
+        return new LessonSummary(lesson.lessonId(), lesson.topicId(), lesson.code(), lesson.title(), lesson.summary(),
+                lesson.sortOrder(), lesson.knowledgePointIds(), List.of(), lesson.skills(), null, lesson.courseId(),
+                lesson.skill(), lesson.skillPosition());
+    }
+
+    default Lesson getLesson(UUID lessonId, boolean signedAudio) {
+        return getLesson(lessonId);
+    }
+
     List<TestPackage> getTopicTestPackages(UUID topicId);
 
     List<TestPackage> getCourseTestPackages(UUID courseId);

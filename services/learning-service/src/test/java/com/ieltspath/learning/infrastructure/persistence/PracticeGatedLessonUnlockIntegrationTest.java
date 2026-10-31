@@ -84,6 +84,7 @@ class PracticeGatedLessonUnlockIntegrationTest {
 
     @BeforeEach
     void stubContent() {
+        LearningContentClientTestSupport.stubLessonAccessSummaries(content);
         when(content.getTopicSequence()).thenReturn(List.of(new Topic(topic, "READ", "Reading", 1, null,
                 List.of(new KnowledgePoint(kpA, "A", "A", "PROCEDURE", "READING", "", true),
                         new KnowledgePoint(kpB, "B", "B", "PROCEDURE", "READING", "", true)),
