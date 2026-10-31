@@ -39,6 +39,26 @@ class CreateLearnerSubmissionUseCaseTest {
     }
 
     @Test
+    void speakingSubmissionWithTextAndNoRecordingIsRejectedAsInvalidState() {
+        var command = new CreateLearnerSubmissionCommand(
+                userId, null, "{}", Skill.SPEAKING, "transcript", null, "submission-1");
+
+        assertThrows(InvalidAssessmentStateException.class, () -> useCase.execute(command));
+        verifyNoInteractions(storage);
+        verify(submissions, never()).save(any());
+    }
+
+    @Test
+    void speakingSubmissionWithBothPayloadsIsRejectedAsInvalidState() {
+        var command = new CreateLearnerSubmissionCommand(
+                userId, null, "{}", Skill.SPEAKING, "transcript", keyFor(userId), "submission-1");
+
+        assertThrows(InvalidAssessmentStateException.class, () -> useCase.execute(command));
+        verifyNoInteractions(storage);
+        verify(submissions, never()).save(any());
+    }
+
+    @Test
     void rejectsAWellFormedRecordingKeyWhenTheObjectDoesNotExist() {
         String key = keyFor(userId);
         when(storage.exists("speaking-recordings", key)).thenReturn(false);

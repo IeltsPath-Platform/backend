@@ -1,13 +1,20 @@
 package com.ieltspath.assessment.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.stereotype.Component;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 @Component
 @ConfigurationProperties(prefix = "assessment.speaking")
+@Validated
 public class SpeakingRecordingProperties {
     private String bucket = "speaking-recordings";
+    @Min(1)
     private int retentionDays = 90;
+    @Min(1)
+    @Max(900)
     private int recordingUrlTtlSeconds = 900;
 
     public SpeakingRecordingProperties() {

@@ -33,6 +33,8 @@ public class CreateLearnerSubmissionUseCase {
     @Transactional
     public LearnerSubmissionResult execute(CreateLearnerSubmissionCommand c) {
         if (c.skill() != com.ieltspath.assessment.domain.vo.Skill.WRITING && c.skill() != com.ieltspath.assessment.domain.vo.Skill.SPEAKING) throw new InvalidAssessmentStateException("Only writing or speaking submissions are supported");
+        if (c.skill() == com.ieltspath.assessment.domain.vo.Skill.SPEAKING
+                && (c.audioReference() == null || c.textPayload() != null)) throw invalidRecording();
         if ((c.textPayload() == null) == (c.audioReference() == null)) throw new InvalidAssessmentStateException("Exactly one text or audio payload is required");
         if (c.skill() == com.ieltspath.assessment.domain.vo.Skill.SPEAKING) {
             String reference = c.audioReference();
