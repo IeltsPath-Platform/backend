@@ -86,9 +86,9 @@ Cuối cùng báo cáo đúng mẫu trong plan.md (Phase, Status, Commits, Files
 
 | Phase | Người làm | Trạng thái | Commit cuối | Báo cáo review |
 |---|---|---|---|---|
-| 1 | Claude | Chưa bắt đầu | — | — |
-| 2 | Claude | Chưa bắt đầu | — | — |
-| 3 | Codex | Chờ phase 1, 2 | — | — |
+| 1 | Claude | Code xong, chờ kiểm tay (stack thật, 2 instance) | `3c6abea7`…`c54dfbdb` | — |
+| 2 | Claude | Code xong, chờ kiểm tay (log, Prometheus, Rabbit thật) | `fa162926`…`(prometheus)` | — |
+| 3 | Codex | Chờ kiểm tay phase 1, 2 | — | — |
 | 4 | Codex | Chờ | — | — |
 | 5 | Codex | Chờ | — | — |
 | 6 | Codex | Chờ | — | — |
