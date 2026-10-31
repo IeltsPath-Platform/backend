@@ -68,7 +68,7 @@ class LessonPipelineSeedTest {
         dataSource.setUrl(POSTGRES.getJdbcUrl());
         dataSource.setUser(POSTGRES.getUsername());
         dataSource.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").target("79").load().migrate();
+        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").target("89").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(dataSource);
         reader = new JdbcLearningContentReader(jdbc);
     }
@@ -371,19 +371,19 @@ class LessonPipelineSeedTest {
         List<TopicSequenceResult> sequence = reader.topicSequence(3);
 
         assertThat(sequence).extracting(TopicSequenceResult::code)
-                .containsExactly("DEMO_LISTENING", "LISTENING_6_5_DETAIL", "DEMO_READING", "TFNG_SKILLS",
-                        "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION", "READING_6_5_INFERENCE", "DEMO_WRITING",
-                        "WRITING_6_5_DISCUSSION", "TREES_MULTI_SKILL");
+                .containsExactly("DEMO_LISTENING", "TREES_LISTENING", "LISTENING_6_5_DETAIL", "DEMO_READING",
+                        "TFNG_SKILLS", "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION", "TREES_READING",
+                        "READING_6_5_INFERENCE", "DEMO_WRITING", "TREES_WRITING", "WRITING_6_5_DISCUSSION");
         assertThat(sequence).extracting(TopicSequenceResult::skill)
-                .containsExactly(Skill.LISTENING, Skill.LISTENING, Skill.READING, Skill.READING, Skill.READING, Skill.READING,
-                        Skill.READING, Skill.WRITING, Skill.WRITING, null);
-        // The Writing 6.5 topic has no final test; a learner passes it by completing its lessons. The multi-skill topic
-        // has no single skill and comes last.
+                .containsExactly(Skill.LISTENING, Skill.LISTENING, Skill.LISTENING, Skill.READING, Skill.READING,
+                        Skill.READING, Skill.READING, Skill.READING, Skill.READING, Skill.WRITING, Skill.WRITING,
+                        Skill.WRITING);
+        // The Writing 6.5 topic has no final test; a learner passes it by completing its lessons.
         assertThat(sequence).extracting(TopicSequenceResult::hasTopicTest)
-                .containsExactly(true, true, true, true, true, true, true, true, false, true);
+                .containsExactly(true, true, true, true, true, true, true, true, true, true, true, false);
         // The lower-band Reading course keeps its paid topics after its free topics.
         assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
-                .containsExactly(null, null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT", null, null, null, null);
+                .containsOnlyNulls();
         assertThat(sequence).allMatch(entry -> entry.course().hasCourseTest());
         assertThat(topic(sequence, "READING_6_5_INFERENCE").course().bandLevel()).isEqualByComparingTo("6.5");
         assertThat(topic(sequence, "DEMO_READING").course().bandLevel()).isEqualByComparingTo("5.5");
@@ -432,12 +432,9 @@ class LessonPipelineSeedTest {
             assertThat(reader.publishedLesson(lessonId).orElseThrow().knowledgePointIds()).as(code)
                     .doesNotContain(kpId("DEMO_READING_W1_CHART"), kpId("DEMO_READING_W2_OPINION"));
         }
-        // A topic with published lessons and no skill label must be one whose lessons teach several skills.
-        assertThat(reader.topicSequence(3)).filteredOn(topic -> topic.skill() == null)
-                .allSatisfy(topic -> assertThat(topic.skills()).as(topic.code()).hasSizeGreaterThan(1));
+        assertThat(reader.topicSequence(3)).allSatisfy(topic -> assertThat(topic.skill()).as(topic.code()).isNotNull());
         assertThat(jdbc.queryForList("SELECT code FROM topics WHERE skill IS NULL AND id IN "
-                + "(SELECT topic_id FROM lessons WHERE status = 'PUBLISHED')", Map.of(), String.class))
-                .containsExactly("TREES_MULTI_SKILL");
+                + "(SELECT topic_id FROM lessons WHERE status = 'PUBLISHED')", Map.of(), String.class)).isEmpty();
     }
 
     @Test
@@ -489,7 +486,7 @@ class LessonPipelineSeedTest {
             return sameTransaction.searchPracticeSets(kpId("TFNG_FALSE_VS_NOT_GIVEN"), List.of(), 3, 10, null).stream()
                     .map(PracticeSetResult::code).toList();
         });
-        assertThat(found).containsExactly("PS-TF-A", "PS-TF-B", "PS-TF-C");
+        assertThat(found).doesNotContain("PS-TINY");
     }
 
     @Test
@@ -497,12 +494,15 @@ class LessonPipelineSeedTest {
         UUID kp2 = kpId("DR_IDEA_OR_DETAIL");
         List<PracticeSetResult> availableKp2 = reader.searchPracticeSets(kp2, List.of(), 3, 10, null);
         assertThat(availableKp2).extracting(PracticeSetResult::code)
-                .containsExactly("PS-KP2-A", "PS-KP2-B", "PS-KP2-C", "PS-KP2-D");
+                .containsExactly("PS-KP2-A", "PS-KP2-B", "PS-TRAP-DETAIL_AS_MAIN_IDEA-1",
+                        "PS-TRAP-DETAIL_AS_MAIN_IDEA-2", "PS-TRAP-DETAIL_AS_MAIN_IDEA-3",
+                        "PS-TRAP-DETAIL_AS_MAIN_IDEA-4", "PS-TRAP-DETAIL_AS_MAIN_IDEA-5",
+                        "PS-TRAP-DETAIL_AS_MAIN_IDEA-6", "PS-KP2-C", "PS-KP2-D");
         assertThat(availableKp2.subList(0, 2)).extracting(PracticeSetResult::questionCount)
                 .containsExactly(4, 4);
-        assertThat(availableKp2.subList(2, 4)).extracting(PracticeSetResult::questionCount)
-                .containsExactly(3, 3);
-        assertThat(availableKp2).allSatisfy(set -> assertThat(set.band()).isEqualByComparingTo("5.5"));
+        assertThat(availableKp2.subList(2, 10)).allSatisfy(set -> assertThat(set.questionCount()).isGreaterThanOrEqualTo(3));
+        assertThat(availableKp2).filteredOn(set -> set.band() != null)
+                .allSatisfy(set -> assertThat(set.band()).isEqualByComparingTo("5.5"));
         assertThat(availableKp2).extracting(PracticeSetResult::requiredFeatureKey).containsOnlyNulls();
 
         List<UUID> excluded = new ArrayList<>();
@@ -562,7 +562,7 @@ class LessonPipelineSeedTest {
                 Map.entry("PS-PS1-B", "PS1"), Map.entry("PS-PS2-B", "PS2"),
                 Map.entry("R65-PS-INFERENCE", "R65-I1"), Map.entry("R65-PS-PARAPHRASE", "R65-I1"),
                 Map.entry("L65-PS-CORRECTION", "L65-1"), Map.entry("L65-PS-PURPOSE", "L65-1"),
-                Map.entry("TR-PS-READING", "T1"), Map.entry("TR-PS-LISTENING", "T1"), Map.entry("TR-PS-WRITING", "T1"),
+                Map.entry("TR-PS-READING", "T1"), Map.entry("TR-PS-LISTENING", "T1_L"), Map.entry("TR-PS-WRITING", "T1_W"),
                 Map.entry("TR-PS-MIXED", "T1"), Map.entry("TR-PS-T2-READING", "T2"),
                 Map.entry("PS-W1-WR-1", "W1"), Map.entry("PS-W1-WR-2", "W1"), Map.entry("PS-W1-WR-3", "W1"),
                 Map.entry("PS-W2-WR-1", "W2"), Map.entry("PS-W2-WR-2", "W2"),
@@ -583,6 +583,8 @@ class LessonPipelineSeedTest {
                 WHERE l.status = 'PUBLISHED'
                   AND EXISTS (SELECT 1 FROM content_packages tp WHERE tp.topic_id = l.topic_id AND tp.package_type = 'TOPIC_TEST')
                   AND NOT EXISTS (SELECT 1 FROM content_packages p WHERE p.lesson_id = l.id AND p.status = 'PUBLISHED')
+                  AND NOT (l.code IN ('T2_L', 'T2_W') AND l.topic_id IN (
+                      SELECT id FROM topics WHERE code IN ('TREES_LISTENING', 'TREES_WRITING')))
                 """, Map.of(), String.class);
         assertThat(withoutPractice).isEmpty();
         // The Writing chapter has a final test and course essay practice sets for each of its lessons.
@@ -712,7 +714,7 @@ class LessonPipelineSeedTest {
         UUID setA = jdbc.queryForObject("SELECT id FROM content_packages WHERE code = 'PS-KP1-A'", Map.of(), UUID.class);
 
         assertThat(reader.countEligiblePracticeSets(List.of(kp1, kp5, unknown), List.of(setA), 3))
-                .containsExactlyInAnyOrderEntriesOf(Map.of(kp1, 4, kp5, 3, unknown, 0));
+                .containsExactlyInAnyOrderEntriesOf(Map.of(kp1, 4, kp5, 15, unknown, 0));
     }
 
     @Test

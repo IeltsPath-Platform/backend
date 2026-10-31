@@ -15,7 +15,7 @@ import org.testcontainers.junit.jupiter.*;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
-/** The seeded multi-skill topic: lessons that teach Reading, Listening and Writing together. */
+/** The tree course keeps its reading, listening and writing content in separate topics. */
 @Testcontainers(disabledWithoutDocker = true)
 class MultiSkillSeedTest {
     private static final List<Skill> ALL_THREE = List.of(Skill.LISTENING, Skill.READING, Skill.WRITING);
@@ -30,68 +30,62 @@ class MultiSkillSeedTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("58").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("89").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
         reader = new JdbcLearningContentReader(jdbc);
     }
 
     @Test
-    void theTopicJoinsTheLowerCourseAndTeachesThreeSkills() {
-        TopicSequenceResult topic = topic();
-        assertThat(topic.course().code()).isEqualTo("IELTS_5_5");
-        assertThat(topic.skills()).containsExactlyElementsOf(ALL_THREE);
-        assertThat(topic.skill()).isNull();
-        assertThat(topic.hasTopicTest()).isTrue();
-        assertThat(topic.knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::skill)
-                .containsExactlyInAnyOrder(Skill.READING, Skill.READING, Skill.LISTENING, Skill.WRITING);
+    void eachTreeTopicHasOneSkillAndItsOwnTopicTest() {
+        assertThat(reader.topicSequence(3).stream().filter(topic -> topic.code().startsWith("TREES_")))
+                .extracting(TopicSequenceResult::code, TopicSequenceResult::skill, topic -> topic.course().code(),
+                        TopicSequenceResult::hasTopicTest)
+                .containsExactlyInAnyOrder(
+                        tuple("TREES_READING", Skill.READING, "IELTS_5_5", true),
+                        tuple("TREES_LISTENING", Skill.LISTENING, "IELTS_5_5", true),
+                        tuple("TREES_WRITING", Skill.WRITING, "IELTS_5_5", true));
+        assertThat(jdbc.queryForList("SELECT code FROM topics WHERE code LIKE 'TREES_%' AND skill IS NULL", Map.of(), String.class))
+                .isEmpty();
     }
 
     @Test
-    void bothLessonsTeachEverySkillAndEachTheoryBlockNamesItsKnowledgePoints() {
-        List<LessonSummaryResult> lessons = reader.publishedLessons(topic().topicId());
-        assertThat(lessons).extracting(LessonSummaryResult::code).containsExactly("T1", "T2");
-        for (LessonSummaryResult lesson : lessons) {
-            assertThat(lesson.skills()).as(lesson.code()).containsExactlyElementsOf(ALL_THREE);
-            LessonContentResult content = reader.publishedLesson(lesson.lessonId()).orElseThrow();
-            assertThat(content.skills()).containsExactlyElementsOf(ALL_THREE);
-            assertThat(content.blocks()).filteredOn(block -> block.blockType() == BlockType.TEXT).hasSize(3)
-                    .allSatisfy(block -> assertThat(block.knowledgePointIds()).isNotEmpty());
+    void splitLessonsTeachOnlyTheirTopicsSkillAndKeepTheoryKnowledgePoints() {
+        for (var skill : ALL_THREE) {
+            TopicSequenceResult topic = topic(skill);
+            List<LessonSummaryResult> lessons = reader.publishedLessons(topic.topicId());
+            assertThat(lessons).hasSize(2).allSatisfy(lesson -> {
+                assertThat(lesson.skill()).isEqualTo(skill);
+                assertThat(lesson.skills()).containsExactly(skill);
+                LessonContentResult content = reader.publishedLesson(lesson.lessonId()).orElseThrow();
+                assertThat(content.skill()).isEqualTo(skill);
+                assertThat(content.skills()).containsExactly(skill);
+                assertThat(content.blocks()).filteredOn(block -> block.blockType() == BlockType.TEXT)
+                        .allSatisfy(block -> assertThat(block.knowledgePointIds()).isNotEmpty());
+            });
         }
     }
 
     @Test
-    void theFirstLessonOffersSingleSkillAndMixedPractice() {
-        UUID t1 = reader.publishedLessons(topic().topicId()).getFirst().lessonId();
-        assertThat(reader.lessonPracticeSets(t1)).hasSize(4);
-        assertThat(reader.lessonPracticeSets(t1, Optional.of(Skill.WRITING))).singleElement()
-                .satisfies(set -> assertThat(set.questionCount()).isEqualTo(1));
-        assertThat(reader.lessonPracticeSets(t1, Optional.of(Skill.READING))).singleElement()
-                .satisfies(set -> assertThat(set.questionCount()).isGreaterThanOrEqualTo(3));
-        assertThat(reader.lessonPracticeSets(t1, Optional.of(Skill.LISTENING))).singleElement()
-                .satisfies(set -> assertThat(set.questionCount()).isGreaterThanOrEqualTo(3));
-        var mixed = reader.lessonPracticeSets(t1).stream()
-                .filter(set -> set.skills().equals(List.of(Skill.LISTENING, Skill.READING))).toList();
-        assertThat(mixed).singleElement();
-        Map<String, Integer> perSkill = new HashMap<>();
-        jdbc.query("""
-                SELECT s.skill, count(*) AS questions FROM content_sections s
-                JOIN section_questions sq ON sq.section_id = s.id
-                WHERE s.package_version_id = :version GROUP BY s.skill
-                """, Map.of("version", mixed.getFirst().packageVersionId()),
-                rs -> { perSkill.put(rs.getString("skill"), rs.getInt("questions")); });
-        assertThat(perSkill).containsOnlyKeys("READING", "LISTENING").allSatisfy((skill, count) ->
-                assertThat(count).isGreaterThanOrEqualTo(3));
+    void skillPracticeSetsStayWithTheirLessonsAndMixedSetIsRetired() {
+        assertThat(reader.lessonPracticeSets(lesson("T1"))).extracting(set -> set.code())
+                .containsExactly("TR-PS-READING");
+        assertThat(reader.lessonPracticeSets(lesson("T1_L"))).extracting(set -> set.code())
+                .containsExactly("TR-PS-LISTENING");
+        assertThat(reader.lessonPracticeSets(lesson("T1_W"))).extracting(set -> set.code())
+                .containsExactly("TR-PS-WRITING");
+        assertThat(jdbc.queryForObject("SELECT status FROM content_packages WHERE code = 'TR-PS-MIXED'", Map.of(), String.class))
+                .isEqualTo("ARCHIVED");
     }
 
     @Test
-    void theTopicTestMixesReadingListeningAndOneEssay() {
-        var tests = reader.publishedTestPackages(topic().topicId());
-        assertThat(tests).hasSize(1);
-        var payload = reader.publishedPackageVersion(tests.getFirst().packageVersionId()).orElseThrow();
-        assertThat(payload.sections()).extracting(section -> section.skill())
-                .containsExactly(Skill.READING, Skill.LISTENING, Skill.WRITING);
-        assertThat(reader.packageQuestionSpecs(tests.getFirst().packageVersionId()))
-                .filteredOn(question -> question.questionType() == QuestionType.ESSAY).hasSize(1);
+    void topicTestsContainOnlyTheTopicSkillAndKeepQuestionIdentities() {
+        for (var skill : ALL_THREE) {
+            var tests = reader.publishedTestPackages(topic(skill).topicId());
+            assertThat(tests).hasSize(1);
+            var payload = reader.publishedPackageVersion(tests.getFirst().packageVersionId()).orElseThrow();
+            assertThat(payload.sections()).extracting(section -> section.skill()).containsExactly(skill);
+            assertThat(reader.packageQuestionSpecs(tests.getFirst().packageVersionId())).isNotEmpty();
+        }
     }
 
     @Test
@@ -119,8 +113,14 @@ class MultiSkillSeedTest {
         assertThat(shared).isZero();
     }
 
-    private static TopicSequenceResult topic() {
-        return reader.topicSequence(3).stream().filter(topic -> topic.code().equals("TREES_MULTI_SKILL"))
+    private static TopicSequenceResult topic(Skill skill) {
+        return reader.topicSequence(3).stream().filter(topic -> topic.code().equals("TREES_" + skill.name()))
                 .findFirst().orElseThrow();
+    }
+
+    private static UUID lesson(String code) {
+        return reader.topicSequence(3).stream().filter(topic -> topic.code().startsWith("TREES_"))
+                .flatMap(topic -> reader.publishedLessons(topic.topicId()).stream())
+                .filter(lesson -> lesson.code().equals(code)).map(LessonSummaryResult::lessonId).findFirst().orElseThrow();
     }
 }
