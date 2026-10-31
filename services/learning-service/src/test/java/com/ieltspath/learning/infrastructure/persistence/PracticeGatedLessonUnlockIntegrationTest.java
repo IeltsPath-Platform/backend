@@ -316,6 +316,34 @@ class PracticeGatedLessonUnlockIntegrationTest {
     }
 
     @Test
+    void listingCompletedLessonPracticeSetsDoesNotWritePracticePassesInReadOnlyTransaction() {
+        var target = practiceListingLesson(4, true, false, false);
+        UUID topicId = jdbc.queryForObject("SELECT topic_id FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
+                UUID.class, target.userId(), target.lessonId());
+        UUID previousLessonId = UUID.randomUUID();
+        UUID previousKnowledgePointId = UUID.randomUUID();
+        Lesson current = content.getLesson(target.lessonId());
+        Lesson previous = new Lesson(previousLessonId, topicId, "PREVIOUS", "Previous lesson", null, 1,
+                List.of(previousKnowledgePointId), List.of(), LearningSkill.READING);
+        LessonSummary previousSummary = new LessonSummary(previousLessonId, topicId, "PREVIOUS", "Previous lesson",
+                null, 1, List.of(previousKnowledgePointId), List.of());
+        LessonSummary currentSummary = new LessonSummary(current.lessonId(), current.topicId(), current.code(),
+                current.title(), current.summary(), 2, current.knowledgePointIds(), List.of(), current.skills(), null,
+                current.courseId(), current.skill(), current.skillPosition());
+        when(content.getTopicLessons(topicId)).thenReturn(List.of(previousSummary, currentSummary));
+        when(content.getLesson(previousLessonId)).thenReturn(previous);
+        jdbc.update("INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, "
+                        + "knowledge_point_ids, completed_at) VALUES (?, ?, ?, 1, ARRAY[CAST(? AS uuid)], now())",
+                target.userId(), previousLessonId, topicId, previousKnowledgePointId.toString());
+        when(access.premium()).thenReturn(false);
+
+        var result = assertDoesNotThrow(() -> practiceSets.execute(target.userId(), target.lessonId()));
+
+        assertTrue(result.lessonCompleted());
+        assertEquals(1, result.items().size());
+    }
+
+    @Test
     void premiumLearnerCanListPracticeSetsForAnUnownedPaywalledLesson() {
         var target = practiceListingLesson(4, false, false, false);
         when(access.premium()).thenReturn(true);

@@ -73,7 +73,7 @@ public class LessonAccess {
 
     /** Completed lesson practice and review catalogs stay available after Premium expires. */
     public Context authorizePracticeSets(UUID userId, UUID lessonId) {
-        return authorize(userId, content.getLesson(lessonId), true, true);
+        return authorize(userId, content.getLesson(lessonId), true, true, false);
     }
 
     private Context authorize(UUID userId, Lesson lesson, boolean reading) {
@@ -81,6 +81,11 @@ public class LessonAccess {
     }
 
     private Context authorize(UUID userId, Lesson lesson, boolean reading, boolean allowCompletedPaywall) {
+        return authorize(userId, lesson, reading, allowCompletedPaywall, true);
+    }
+
+    private Context authorize(UUID userId, Lesson lesson, boolean reading, boolean allowCompletedPaywall,
+                              boolean persistPracticePasses) {
         var paywallRequest = paywall.forLearner(userId);
         var summaries = orderedLessons(content.getTopicLessons(lesson.topicId()));
         var progress = lessons.findByTopic(userId, lesson.topicId());
@@ -105,7 +110,8 @@ public class LessonAccess {
         }
         var topic = topic(userId, lesson.topicId());
         List<UUID> needPractice = found && previousComplete
-                ? lessonsNeedingPractice(userId, lesson.topicId(), previousIds, progress) : List.of();
+                ? lessonsNeedingPractice(userId, lesson.topicId(), previousIds, progress, persistPracticePasses)
+                : List.of();
         Set<UUID> previous = Set.copyOf(previousIds);
         var pending = reviews.findPending(userId);
         if (reading && (completed(progress.get(lesson.lessonId()))
@@ -124,12 +130,12 @@ public class LessonAccess {
      * The first lesson of a topic has no earlier lesson, so Content is not asked for Practice at all.
      */
     private List<UUID> lessonsNeedingPractice(UUID userId, UUID topicId, List<UUID> previousIds,
-                                              Map<UUID, LessonProgress> progress) {
+                                              Map<UUID, LessonProgress> progress, boolean persistPracticePasses) {
         if (previousIds.isEmpty()) return List.of();
         Map<UUID, Boolean> completedByLesson = new LinkedHashMap<>();
         for (UUID id : previousIds) completedByLesson.put(id, completed(progress.get(id)));
         var states = practice.forTopic(userId, topicId, completedByLesson).clearances();
-        practice.persistPassed(userId, states);
+        if (persistPracticePasses) practice.persistPassed(userId, states);
         return previousIds.stream().filter(id -> states.get(id).status() != PracticeStatus.PASSED).toList();
     }
 
