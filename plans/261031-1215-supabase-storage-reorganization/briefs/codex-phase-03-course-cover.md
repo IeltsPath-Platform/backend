@@ -48,6 +48,9 @@ Kết quả: `Status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT`, kèm
 
 Không tạo migration. Cột `cover_image_url` đã đủ (V86).
 
+Thêm vào phạm vi (đã chốt 2026-10-31): `services/content-service/src/test/java/com/ieltspath/content/api/controller/ContentAuthorizationWebMvcTest.java`. CourseController nay phụ thuộc MediaReferencePolicy, nên test này cần thêm `@MockitoBean MediaReferencePolicy`. Chỉ thêm bean giả; không đổi assertion, không xoá test, không đổi danh sách test.
+
+
 ## Frontend (repo `frontend/`)
 
 - Tạo `frontend/src/features/admin/media/api/mediaUploadApi.ts`:
