@@ -1,8 +1,8 @@
 package com.ieltspath.content.application.usecase;
 
 import com.ieltspath.commonstorage.UploadRejectedException;
-import com.ieltspath.content.application.port.ContentAudioStorage;
-import com.ieltspath.content.application.result.StoredAudioResult;
+import com.ieltspath.content.application.port.ContentMediaStorage;
+import com.ieltspath.content.application.result.StoredMediaResult;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -18,10 +18,10 @@ class UploadContentAudioUseCaseTest {
 
     private final AtomicReference<String> storedKey = new AtomicReference<>();
     private final AtomicReference<String> storedType = new AtomicReference<>();
-    private final ContentAudioStorage storage = (key, content, contentType) -> {
+    private final ContentMediaStorage storage = (key, content, contentType) -> {
         storedKey.set(key);
         storedType.set(contentType);
-        return new StoredAudioResult(key, "https://media.example.test/" + key, contentType, content.length);
+        return new StoredMediaResult(key, "https://media.example.test/" + key, contentType, content.length);
     };
     private final UploadContentAudioUseCase useCase = new UploadContentAudioUseCase(storage);
     private final UUID userId = UUID.randomUUID();
@@ -34,7 +34,7 @@ class UploadContentAudioUseCaseTest {
 
     @Test
     void anMp3IsStoredUnderTheUsersFolder() {
-        StoredAudioResult result = useCase.execute(userId, "audio/mpeg", mp3());
+        StoredMediaResult result = useCase.execute(userId, "audio/mpeg", mp3());
 
         assertTrue(result.key().startsWith("content-audio/" + userId + "/"));
         assertTrue(result.key().endsWith(".mp3"));

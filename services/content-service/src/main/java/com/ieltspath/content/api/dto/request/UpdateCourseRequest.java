@@ -9,7 +9,7 @@ import com.ieltspath.content.domain.vo.Skill;
 public record UpdateCourseRequest(@NotBlank @Size(max = 255) String name,
                                   @NotNull @DecimalMin("0.0") @DecimalMax("9.0") BigDecimal bandLevel,
                                   ContentStatus status,
-                                  @Size(max = 500) @Pattern(regexp = "(?i)^\\s*(https?://.*)?\\s*$") String coverImageUrl,
+                                  @Size(max = 500) @Pattern(regexp = "(?i)^\\s*(https?://\\S+|content-image/[A-Za-z0-9._/-]+)?\\s*$") String coverImageUrl,
                                   @Size(max = 2000) String description,
                                   Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints) {
     public UpdateCourseRequest(String name, BigDecimal bandLevel, ContentStatus status, String coverImageUrl,

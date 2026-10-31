@@ -4,6 +4,10 @@ import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.domain.vo.LearningType;
 import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.domain.vo.AssetType;
+import com.ieltspath.content.domain.vo.MediaReferencePolicy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.UUID;
@@ -23,6 +27,7 @@ public record TopicSequenceResponse(
         int lessonCount,
         String description
 ) {
+    private static final Logger log = LoggerFactory.getLogger(TopicSequenceResponse.class);
     public TopicSequenceResponse(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                                  List<KnowledgePoint> knowledgePoints, Skill skill, boolean hasTopicTest, Course course,
                                  List<Skill> skills, boolean active, int lessonCount) {
@@ -48,10 +53,14 @@ public record TopicSequenceResponse(
                     java.util.Map.of(), null, List.of());
         }
 
-        static Course from(TopicSequenceResult.CourseEntry entry) {
+        static Course from(TopicSequenceResult.CourseEntry entry, MediaReferencePolicy mediaPolicy) {
             return entry == null ? null : new Course(entry.courseId(), entry.code(), entry.name(), entry.bandLevel(),
-                    entry.hasCourseTest(), entry.active(), entry.coverImageUrl(), entry.description(),
+                    entry.hasCourseTest(), entry.active(), resolveCoverImage(entry.coverImageUrl(), mediaPolicy), entry.description(),
                     entry.skillUnlockPoints(), entry.comboUnlockPoints(), entry.availableSkills());
+        }
+
+        static Course from(TopicSequenceResult.CourseEntry entry) {
+            return from(entry, null);
         }
     }
     public record KnowledgePoint(UUID id, String code, String name, LearningType learningType, Skill skill,
@@ -67,6 +76,10 @@ public record TopicSequenceResponse(
     }
 
     public static TopicSequenceResponse from(TopicSequenceResult result) {
+        return from(result, null);
+    }
+
+    public static TopicSequenceResponse from(TopicSequenceResult result, MediaReferencePolicy mediaPolicy) {
         return new TopicSequenceResponse(result.topicId(), result.code(), result.name(), result.sortOrder(),
                 result.requiredFeatureKey(),
                 result.knowledgePoints().stream()
@@ -74,7 +87,17 @@ public record TopicSequenceResponse(
                                 kp.description(), kp.hasPracticeSet(), kp.cefrLevel(), kp.canDo(), kp.scopeIn(),
                                 kp.scopeOut(), kp.parentKnowledgePointId(), kp.errorCode(), kp.earliestLessonPosition()))
                         .toList(),
-                result.skill(), result.hasTopicTest(), Course.from(result.course()), result.skills(), result.active(),
+                result.skill(), result.hasTopicTest(), Course.from(result.course(), mediaPolicy), result.skills(), result.active(),
                 result.lessonCount(), result.description());
+    }
+
+    private static String resolveCoverImage(String reference, MediaReferencePolicy mediaPolicy) {
+        if (reference == null || !reference.startsWith("content-image/") || mediaPolicy == null) return reference;
+        try {
+            return mediaPolicy.resolve(AssetType.IMAGE, reference);
+        } catch (RuntimeException unresolvable) {
+            log.warn("Course cover image key could not be resolved in topic sequence");
+            return null;
+        }
     }
 }

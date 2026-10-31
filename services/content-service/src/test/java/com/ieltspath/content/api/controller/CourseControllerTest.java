@@ -4,6 +4,7 @@ import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.usecase.*;
 import com.ieltspath.content.domain.aggregate.Course;
 import com.ieltspath.content.domain.repository.CourseRepository;
+import com.ieltspath.content.domain.vo.MediaReferencePolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -27,7 +28,8 @@ class CourseControllerTest {
     @BeforeEach
     void setup() {
         mvc = MockMvcBuilders.standaloneSetup(new CourseController(new CreateCourseUseCase(repository),
-                        new UpdateCourseUseCase(repository), new ListCoursesUseCase(repository)))
+                        new UpdateCourseUseCase(repository), new ListCoursesUseCase(repository),
+                        new MediaReferencePolicy("https://media.example.test/storage/v1/object/public/media")))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
@@ -116,6 +118,21 @@ class CourseControllerTest {
                     .andExpect(status().isBadRequest());
         }
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void acceptsSafeImageKeysAndRejectsInvalidKeys() throws Exception {
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"KEYED\",\"name\":\"Keyed\",\"bandLevel\":5.5,\"coverImageUrl\":\"content-image/user-1/cover.png\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.coverImageUrl").value("https://media.example.test/storage/v1/object/public/media/content-image/user-1/cover.png"));
+
+        for (String key : new String[]{"content-image/../cover.png", "/content-image/user/cover.png", "media/user/cover.png"}) {
+            mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"code\":\"INVALID\",\"name\":\"Invalid\",\"bandLevel\":5.5,\"coverImageUrl\":\"" + key + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
     @Test

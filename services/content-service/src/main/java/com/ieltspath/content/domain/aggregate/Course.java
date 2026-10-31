@@ -129,8 +129,14 @@ public class Course {
 
     private static String normalizeCoverImageUrl(String value) {
         String normalized = normalizeOptionalText(value, "coverImageUrl", 500);
+        if (normalized != null && normalized.startsWith("content-image/")) {
+            if (normalized.contains("..") || !normalized.matches("^content-image/[A-Za-z0-9._/-]+$")) {
+                throw new IllegalArgumentException("coverImageUrl must be a safe content image key");
+            }
+            return normalized;
+        }
         if (normalized != null && !normalized.matches("(?i)^https?://.*")) {
-            throw new IllegalArgumentException("coverImageUrl must use http or https");
+            throw new IllegalArgumentException("coverImageUrl must be an http(s) URL or content image key");
         }
         return normalized;
     }
