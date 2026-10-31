@@ -147,6 +147,13 @@ Brief chi tiết cho Codex nằm trong `briefs/`: phase 2, 3, 4, 5, 6, 7, 8. Pha
 - Diff chỉ nằm trong danh sách file của brief.
 - Claude review, kiểm tra không có secret và không có lệnh ghi Supabase.
 
+### Việc mới phát hiện và đã chốt (2026-10-31)
+
+Brief: `briefs/codex-hardcoded-storage-cleanup.md`. Gồm ba mục:
+- Chỉ cho phép host Supabase của project mình khi tải ảnh và video cộng đồng (bỏ cho phép mọi `*.supabase.co`). **Đã chốt.**
+- Bỏ ảnh `data:` base64 ở backend sau khi phase 4 xong.
+- Ảnh thẻ học ở trang luyện tập chuyển từ localStorage lên server. **Đã chốt.** Codex phải kiểm trước xem hai tính năng có chung dữ liệu không.
+
 ### Trạng thái hiện tại
 
 - Đã xong: bucket `community` và `media` (2026-10-31); RLS đã kiểm (không có policy trên `storage.objects`, RLS bật); mặc định `CONTENT_MEDIA_BASE_URL` trong compose (`f708ef9d`); README content (`de1bec41`); README common-storage (`1aca55e1`). Nhánh `feat/supabase-storage-reorganization` đã có các commit này.
