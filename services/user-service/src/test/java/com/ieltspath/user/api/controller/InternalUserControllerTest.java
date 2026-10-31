@@ -4,6 +4,7 @@ import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.user.application.result.InternalLearningGoalResult;
 import com.ieltspath.user.application.result.UserDisplayNameResult;
 import com.ieltspath.user.application.usecase.GetInternalLearningGoalUseCase;
+import com.ieltspath.user.application.usecase.GetStudyTimezoneUseCase;
 import com.ieltspath.user.application.usecase.GetUserDisplayNamesUseCase;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -57,6 +58,7 @@ class InternalUserControllerTest {
     @Autowired MockMvc mockMvc;
     @MockBean GetInternalLearningGoalUseCase learningGoal;
     @MockBean GetUserDisplayNamesUseCase displayNames;
+    @MockBean GetStudyTimezoneUseCase studyTimezone;
 
     @DynamicPropertySource
     static void hmacProperties(DynamicPropertyRegistry registry) {
@@ -92,6 +94,25 @@ class InternalUserControllerTest {
         mockMvc.perform(get("/internal/users/{id}/learning-goal", userId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(userId)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void studyTimezoneIsTheOneOnTheProfile() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(studyTimezone.execute(userId)).thenReturn("America/Los_Angeles");
+
+        mockMvc.perform(get("/internal/users/{id}/study-timezone", userId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(UUID.randomUUID())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.timezone").value("America/Los_Angeles"));
+        verify(studyTimezone).execute(userId);
+    }
+
+    @Test
+    void studyTimezoneRequiresAnInternalToken() throws Exception {
+        mockMvc.perform(get("/internal/users/{id}/study-timezone", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(studyTimezone);
     }
 
     @Test
