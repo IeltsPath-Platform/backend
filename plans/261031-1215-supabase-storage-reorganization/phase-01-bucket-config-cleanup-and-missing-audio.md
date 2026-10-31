@@ -13,7 +13,9 @@ dependencies: []
 
 - **Claude và bạn**, không giao Codex: ghi lên Supabase cần xác nhận từng bước; 20 mp3 do bạn thu và upload; `.env` do bạn điền.
 - Đã xong: `community` và `media` đã chỉnh (2026-10-31); compose đã đổi mặc định (`f708ef9d`).
-- Còn lại: 20 mp3, dọn file thử (chờ kiểm DB local), xác nhận giá trị `CONTENT_MEDIA_BASE_URL` thật.
+- 20 mp3 đã upload và kiểm (2026-10-31): `listening/demo/` 8 file, `listening/practice/` 12 file, đều trả `200 audio/mpeg`. Kích thước khớp file local.
+- Còn lại: dọn file thử (chờ kiểm DB đã migrate đủ), xác nhận giá trị `CONTENT_MEDIA_BASE_URL` thật.
+- Ảnh `writing/lessons/PS-W1-WR-3/ps-w1-wr-3-marriage-age.png` đã upload (thuộc phase 6, ghi ở đây cho đủ).
 
 ## Overview
 
