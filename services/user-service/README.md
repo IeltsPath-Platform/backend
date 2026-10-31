@@ -1,6 +1,6 @@
 # User Service
 
-`user-service` quản lý người dùng, đăng nhập, refresh token, phát hành external JWT và lưu activity/streak của học viên.
+`user-service` quản lý người dùng, đăng nhập, refresh token, phát hành external JWT và lưu activity của học viên. Streak do Learning Service tính và giữ (`GET /api/learning/me/streak`); bảng `streaks` cũ trong `user_db` còn nguyên nhưng không còn được ghi hay đọc.
 
 ## Vai trò
 
@@ -10,7 +10,7 @@
 - Lưu refresh token dạng hash trong database.
 - Verify internal JWT do API Gateway ký khi nhận request protected.
 - Cung cấp API quản lý user/role cho `ADMIN`.
-- Ghi `learning_activities`, đọc streak theo cùng public path `/api/learning-support/{activities,streak}`; Gateway route hai nhóm này tới user-service.
+- Ghi `learning_activities` theo public path `/api/learning-support/activities`; Gateway route nhóm này tới user-service.
 
 ## Luồng đăng nhập
 
@@ -164,7 +164,6 @@ PUT  /api/users/{id}/status
 DELETE /api/users/{id}
 POST /api/learning-support/activities
 GET  /api/learning-support/activities
-GET  /api/learning-support/streak
 GET  /internal/users/{userId}/learning-goal
 POST /internal/users/display-names
 ```
@@ -201,7 +200,7 @@ Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho
 ## Community public profiles
 
 - `GET /api/users/{userId}/public-profile` requires authentication and returns
-  `{id, displayName, avatarUrl, bio, targetBand, streak}`.
+  `{id, displayName, avatarUrl, bio, targetBand}`; the streak is not part of the profile (Community reads it from Learning).
 - `POST /internal/users/public-profiles` accepts `{userIds: UUID[]}` (at most 100 entries; empty is allowed)
   and returns `{profiles: [...]}`. It uses the forwarded internal JWT's viewer identity and is blocked at Gateway.
   IDs are deduplicated in input order. Missing or hidden profiles are omitted.
@@ -211,11 +210,10 @@ Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho
 - Existing users without a learner profile follow the current default profile policy: account full name (or
   `Learner`) and public visibility, without creating a profile on read. No email, phone, roles, timezone,
   self-reported band, exam date, or schedule are returned.
-- `targetBand` is the current active learning goal's target, otherwise null. `streak` is the stored current-day
-  streak, otherwise zero. `avatarUrl` contains the existing avatar reference only if it is an absolute HTTP(S)
+- `targetBand` is the current active learning goal's target, otherwise null. `avatarUrl` contains the existing avatar reference only if it is an absolute HTTP(S)
   URL with a host and no user credentials; opaque references return null. The bio is edited through
   `PUT /api/users/me/profile` and the avatar through `POST`/`DELETE /api/users/me/avatar`.
-- The bounded batch uses a single query joining profile, active goal, and streak in `user_db`.
+- The bounded batch uses a single query joining profile and active goal in `user_db`.
 
 ## Personal profile and account security
 

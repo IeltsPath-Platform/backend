@@ -35,7 +35,6 @@ class GetPublicProfilesUseCaseTest {
         assertEquals(List.of(first, community, viewer), results.stream().map(r -> r.id()).toList());
         assertEquals("Display", results.getFirst().displayName());
         assertEquals(new BigDecimal("7.5"), results.getFirst().targetBand());
-        assertEquals(4, results.getFirst().streak());
         assertEquals("https://images.test/avatar.png", results.getFirst().avatarUrl());
         verify(repository).findByUserIds(Set.of(first, community, hidden, missing, viewer));
         verifyNoMoreInteractions(repository);
@@ -56,22 +55,21 @@ class GetPublicProfilesUseCaseTest {
     }
 
     @Test
-    void absentOptionalDataUsesExistingDefaultNameAndZeroStreak() {
+    void absentOptionalDataUsesExistingDefaultName() {
         when(repository.findByUserIds(Set.of(viewer))).thenReturn(List.of(
-                new PublicProfile(viewer, null, "Default name", null, null, null, null, null)));
+                new PublicProfile(viewer, null, "Default name", null, null, null, null)));
         var result = useCase.execute(viewer, viewer);
         assertEquals("Default name", result.displayName());
         assertNull(result.targetBand());
         assertNull(result.bio());
         assertNull(result.avatarUrl());
-        assertEquals(0, result.streak());
     }
 
     @Test
     void realAccountNameOfUserWithoutProfileIsHiddenFromOthers() {
         UUID other = UUID.randomUUID();
         when(repository.findByUserIds(Set.of(other))).thenReturn(List.of(
-                new PublicProfile(other, null, "Real Account Name", null, null, null, null, null)));
+                new PublicProfile(other, null, "Real Account Name", null, null, null, null)));
         assertEquals("Learner", useCase.execute(viewer, other).displayName());
     }
 
@@ -106,6 +104,6 @@ class GetPublicProfilesUseCaseTest {
     }
 
     private PublicProfile profile(UUID id, ProfileVisibility visibility, String avatar) {
-        return new PublicProfile(id, "Display", "Account name", avatar, "Bio", new BigDecimal("7.5"), 4, visibility);
+        return new PublicProfile(id, "Display", "Account name", avatar, "Bio", new BigDecimal("7.5"), visibility);
     }
 }
