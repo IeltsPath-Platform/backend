@@ -1,6 +1,6 @@
 # Báo cáo nghiệm thu — Band-skill paywall
 
-Ngày cập nhật: 2026-10-30
+Ngày cập nhật: 2026-10-31
 Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 
 ## Tiến độ
@@ -16,16 +16,16 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 | D. Per-skill progression | DONE | `TopicStatusDeriver` now opens one topic per course skill. Focused tests 33/33; full learning-service reactor 1,002/1,002. Commit `215ee045`. |
 | E. Learning purchase | DONE | Durable V38 unlock purchase, replay/reconciliation and `/courses` ownership/pricing fields. Focused unit/API + 3 PostgreSQL integration tests passed; full learning-service reactor: 1,019 tests passed. Commit `6ec31d7a`. |
 | F. Paywall gate | DONE | Shared request-scoped gate, V39 grandfathering, lesson-list flags, free-practice and tree enforcement. Focused 84/84; full learning-service reactor 1,035/1,035. |
-| G. Frontend paywall/admin prices | DONE_WITH_LIMITS | Touched tests, typecheck, lint and production build pass; the full suite has one unrelated flashcard copy assertion failure. Browser verification against a running authenticated API remains unrun. |
-| H. Audit/contracts/scenarios | PARTIAL | Learning and Access contract docs plus lesson-count audit SQL updated. Existing seed audit violations remain; no dev database is running, and source has no monetary prices for key products. The Assessment V2 seed sets AI Writing grading at 3 Points; the monetary price table still needs product-owner inputs. |
+| G. Frontend paywall/admin prices | DONE_WITH_LIMITS | Touched tests, typecheck and lint pass; the latest full suite passes. Browser verification against a running authenticated API remains unrun. |
+| H. Audit/contracts/scenarios | DONE_WITH_LIMITS | Learning and Access contract docs plus lesson-count audit SQL updated; V89 repairs the seed violations. The isolated live-stack scenarios pass. Product-owner approval and monetary Point/Premium prices remain external inputs. |
 
 ## Môi trường
 
 - Java: 21.0.6.
 - Node.js: 24.21.0.
 - Docker Desktop/daemon: chạy được trong test nâng quyền; A.2 reader integration với Testcontainers đã xanh. Cần xác nhận lại trạng thái khi chạy các integration suite cuối và audit DB.
-- `npm --version` hiện lỗi EPERM khi Node cố truy cập `C:\Users\pduy8`; sẽ thử lệnh trực tiếp trong workspace và ghi rõ kết quả.
-- Chưa đọc hoặc sửa tệp `.env`/secret.
+- Windows sandboxed Node initially returned EPERM while resolving `C:\Users\pduy8`; requested frontend checks passed when run with process execution permission, with no project configuration changes.
+- No persistent project `.env` or secret file was read or changed; the temporary random Compose env file was removed during teardown.
 
 ## Commits
 
@@ -34,6 +34,7 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 - Backend: `3534de4f test(content): assert topic descriptions pass through requests`.
 - Backend: `7ce7556b feat(learning): pass course cover and descriptions`.
 - Frontend: `cdcad2e feat(frontend): show course covers and descriptions`.
+- Backend: `32c54434 fix(learning): keep practice catalog reads side-effect free`.
 
 ## A.1 — Cover content-service
 
@@ -124,15 +125,15 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 - Before this fix round, the full content-service suite had not been run. Its first full verification failed once at `MultiSkillContentIntegrationTest.singleSkillCompatibilityComesFromExercisesRatherThanTopicMetadata`: it expected `LISTENING` but the reader correctly returned topic skill `READING`. The test now asserts singular lesson/topic skill `READING` and separately asserts plural `skills` remains derived from exercises/knowledge points (`LISTENING`). A later run exposed a stale IDE-generated test class with an unresolved-import stub; cleaning generated Maven targets and recompiling fixed that separate build artifact issue, and the latest full suite then passed.
 - Knowledge-point gating now uses `topic.skill()` when point skill is null, blank, `ALL`, or unparsable. Free practice applies the same fallback. Tests cover WRITING ownership opening an `ALL` point at earliest position 5, READING ownership not opening it, explicit point skill precedence, tree state, and free practice.
 - Practice-set listing now goes through `LessonAccess.authorizePracticeSets` and the shared `PaywallGate`. Tests cover free preview, unowned paywall (`403 PAYWALL`), completed lessons after Premium expiry, owned skill, grandfathered progress, Premium, and Access outage: free/owned/grandfathered/completed still list, while a paywalled lesson fails with Access `503` and is not mislabeled `PAYWALL`. Normal lesson reading still uses the regular paywall path.
-- Latest full backend runs (target module totals): content-service **1,077 tests, 0 failures, 0 errors, 1 skipped**; learning-service **1,043 tests, 0 failures, 0 errors, 0 skipped**; access-service **77 tests, 0 failures, 0 errors, 0 skipped**. The `-am` content run also ran common-security (9, all passed) and common-storage (60 total, 57 passed and 3 skipped); learning/access runs also ran common-events (17) and common-security (9), all passed. Aggregate reactor totals: content **1,146 run / 0 failed / 0 errors / 4 skipped**; learning **1,069 / 0 / 0 / 0**; access **103 / 0 / 0 / 0**. The focused learning tests passed **45/45** with no skips.
-- Latest frontend checks: `npm run typecheck` passed (exit 0); `npm run lint` passed (exit 0); requested learning-path/admin-courses Vitest run passed **234/234 across 37 files**. One full `npm run test` rerun reported **202 files, 1,697 tests: 1,695 passed, 2 failed**. Both failures were unrelated copy assertions in the unchanged `src/features/flashcards/lib/owl-reactions.test.ts`; isolated rerun passed **21/21**, so this is treated as flaky and remains unresolved.
+- Latest full backend runs (target module totals): content-service **1,080 tests, 0 failures, 0 errors, 1 skipped**; learning-service **1,044 tests, 0 failures, 0 errors, 0 skipped**; access-service **77 tests, 0 failures, 0 errors, 0 skipped**. The `-am` content run also ran common-security (**9/9**) and common-storage (**60 total, 57 passed, 3 skipped**); learning/access runs also ran common-events (**17/17**) and common-security (**9/9**). Aggregate reactor totals: content **1,149 run / 0 failed / 0 errors / 4 skipped**; learning **1,070 / 0 / 0 / 0**; access **103 / 0 / 0 / 0**. The focused reader regression passed **6/6**; focused learning fallback/catalog tests passed **46/46**.
+- Latest frontend checks: `npm run typecheck` passed; `npm run lint` passed; requested learning-path/admin-courses Vitest run passed **234/234 across 37 files**. The latest full `npm run test` passed **202/202 files and 1,697/1,697 tests**. Earlier full runs had copy assertion failures in the untouched `src/features/flashcards/lib/owl-reactions.test.ts`; its isolated **21/21** run passed, and the latest full run had no owl-reactions failure.
 - On Windows, javac previously hit `AccessDeniedException` while resolving jars under `backend/.m2`. Tests were run with process-only `MAVEN_OPTS` setting the local Maven repository to `backend/.m2/repository` and `java.io.tmpdir` to `backend/target`; no shared Maven or project build configuration was changed.
 - Hygiene: `backend/.m2/` is locally excluded through `.git/info/exclude`, not shared `.gitignore`. The service-boundary cleanup plan was left untouched.
-- Acceptance: backend paywall/fallback/listing fixes and regression coverage are complete; all three backend full suites passed. Frontend checks passed except the two unrelated flaky owl-reaction copy assertions in the single required full run. Live browser scenarios and monetary prices were not verified and remain out of scope.
+- Acceptance: backend paywall fallback and practice-catalog fixes and regression coverage are complete; all three backend reactor suites and the latest frontend checks passed. Isolated live-stack checks are recorded in Phase 6 below; no live browser session was run. Monetary product prices still require owner approval.
 
 ## Phase 6 closeout — 2026-10-31
 
-Status: IN_PROGRESS. The seed repair, audit and proposed-price table are complete. Isolated live-stack scenarios remain.
+Status: DONE_WITH_CONCERNS. Seed repair, audit, proposed-price table, and isolated live-stack scenarios are complete. Actual monetary prices still need owner approval; crash recovery was verified by recreating the persisted post-debit/pre-activation state, not by killing a running process.
 
 ### Seed repair and audit
 
@@ -178,3 +179,25 @@ Rule: `10 Points × lessons beyond the first 3`, clamped to 20–50 Points. Prop
 - IELTS 5.5 has three priced skills totaling 110 Points; 70% is 77, rounded up to 80. This is above the highest skill price (50), below the sum (110), and under the 100-Point cap.
 - A dash means no proposed price because that skill has no lessons beyond the free preview; no combo is proposed for courses with fewer than three priced skills. Premium opens all lessons and has no Points price.
 - These are Points amounts only, derived from the requested rule. Actual monetary prices for Point and Premium products are unknown. Product-owner approval is required before R&D enters any price. No price was written to a database.
+
+### Isolated live-stack scenarios
+
+The `paywall-e2e` Compose project used fresh temporary volumes and secrets; all of its containers, network, volumes and the temporary env file were removed after verification. No persistent development database or `ieltspath_*` volume was used.
+
+| # | Scenario | Result |
+|---|---|---|
+| 1 | Free preview opens the first three lessons per skill; the fourth Reading lesson and its practice catalog/free practice are refused with PAYWALL. | PASS |
+| 2 | Buying Reading opens its fourth lesson while unowned Listening and Writing fourth lessons remain paywalled; replaying the same purchase request does not debit twice. | PASS |
+| 3 | Buying the combo after Reading charges only the remaining net Points and opens the other skills. | PASS |
+| 4 | Insufficient balance returns HTTP 402; the unlock is CANCELLED with no pending or active unlock left behind. | PASS |
+| 5 | Changing a skill price preserves prior ownership and charges later buyers the new price; the updated course cover is visible in the learner payload. | PASS |
+| 6 | Reconciliation of a persisted post-debit/pre-activation row reuses its existing ledger debit and activates the unlock. This state was simulated in the isolated database; a process kill was not exercised. | PASS, with simulation limitation |
+| 7 | Grandfathered progress keeps the learner's fourth lesson and practice catalog available. | PASS |
+| 8 | Premium opens a paywalled lesson; after expiry normal reading is paywalled again while a completed lesson's practice catalog remains listable. With Access stopped, free, owned, grandfathered and completed catalogs remain listable; paywalled reading and catalog requests return HTTP 503, not PAYWALL. | PASS |
+| 9 | Free topic test is refused, the knowledge tree marks locked points, and free practice is refused for a locked point. | PASS |
+| 10 | The admin-updated course cover appears in the learner course response. | PASS |
+
+- On this Windows host, Maven tests used process-only `MAVEN_OPTS` to place the local repository at `backend/.m2/repository` and `java.io.tmpdir` at `backend/target`, avoiding the prior javac `AccessDeniedException`. The temporary learning-service image build used its existing `SKIP_GO_OFFLINE=true` build argument after the default dependency prefetch stalled. No shared Maven or project configuration was changed.
+- Hygiene: `backend/.m2/` is locally excluded through `.git/info/exclude`, not shared `.gitignore`. The service-boundary cleanup plan and other unrelated working-tree changes were left untouched.
+- Final verification: content reactor **1,149/1,149 run, 0 failures, 0 errors, 4 skipped**; learning reactor **1,070/1,070, 0 failures/errors/skips**; access reactor **103/103, 0 failures/errors/skips**; frontend typecheck and lint passed; focused Vitest **37 files / 234 tests passed**; full Vitest **202 files / 1,697 tests passed**.
+- Acceptance: Phase 6 acceptance criteria for seed repair, content audit, proposal table and isolated scenarios are met. Proposed Point prices are not approved monetary prices. Crash recovery used persisted-state simulation, and live browser flows were not verified.
