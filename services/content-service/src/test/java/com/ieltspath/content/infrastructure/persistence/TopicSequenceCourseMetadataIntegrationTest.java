@@ -27,7 +27,7 @@ class TopicSequenceCourseMetadataIntegrationTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("88").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("89").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
         reader = new JdbcLearningContentReader(jdbc);
     }
@@ -78,7 +78,7 @@ class TopicSequenceCourseMetadataIntegrationTest {
     }
 
     @Test
-    void seededCourseSkillViolationsMatchTheContentAudit() {
+    void seededCourseSkillAuditHasNoViolations() {
         var unskilledTopics = jdbc.getJdbcTemplate().queryForList("""
                 SELECT t.code FROM topics t JOIN courses c ON c.id = t.course_id WHERE t.skill IS NULL ORDER BY t.code
                 """, String.class);
@@ -96,10 +96,9 @@ class TopicSequenceCourseMetadataIntegrationTest {
                 GROUP BY l.id, t.code, l.code HAVING count(DISTINCT kp.skill) > 1 ORDER BY t.code || '/' || l.code
                 """, String.class);
 
-        assertThat(unskilledTopics).containsExactly("TREES_MULTI_SKILL");
-        assertThat(mismatchedPoints).containsExactly("TRAP_KEYWORD_MATCH_ONLY", "TR_L_DETAIL", "TR_R_SCANNING",
-                "TR_R_WORD_IN_CONTEXT", "TR_W_OPINION");
-        assertThat(multiskilledLessons).containsExactly("TREES_MULTI_SKILL/T1", "TREES_MULTI_SKILL/T2");
+        assertThat(unskilledTopics).isEmpty();
+        assertThat(mismatchedPoints).isEmpty();
+        assertThat(multiskilledLessons).isEmpty();
         assertThat(jdbc.getJdbcTemplate().queryForObject("SELECT count(*) FROM topics WHERE required_feature_key IS NOT NULL",
                 Long.class)).isZero();
     }
