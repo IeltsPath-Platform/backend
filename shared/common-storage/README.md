@@ -49,8 +49,8 @@ theo kiểm kê ngày 2026-10-31.
 | `flashcards` | có | Ảnh thẻ, bìa bộ thẻ, bìa catalog từ vựng | 2 MB | png, jpeg, webp | library-service | `images/{userId}/{uuid}.{ext}`; bìa catalog `catalog-cover/{userId}/{uuid}.{ext}` | đã có; bìa catalog là kế hoạch |
 | `community` | có | Ảnh bài đăng cộng đồng | 5 MB | png, jpeg, webp, gif | community-service | `community/post/{userId}/{uuid}.{ext}` | đã có |
 | `media` | có | Audio và ảnh nội dung bài học | 25 MB | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service | seed: `listening/demo/ls1.mp3`; upload API: `content-audio/{userId}/{uuid}.{ext}` | đã có |
-| `speaking-recordings` | không | Ghi âm Speaking của học viên | 5 MB | webm, mp4, ogg, mpeg, wav | assessment-service | `speaking/{userId}/{uuid}.{ext}` | đã có, chưa dùng |
-| `media-premium` | không | Audio PREMIUM, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | đã có |
+| `speaking-recordings` | không | Ghi âm Speaking của học viên | 5 MB | webm, mp4, ogg, mpeg, wav | assessment-service | `speaking/{userId}/{uuid}.{ext}` | đang dùng (upload ghi âm Speaking) |
+| `media-premium` | không | Audio bài trả phí, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | đã tạo, riêng tư |
 
 Biến cấu hình tên bucket: `USER_AVATAR_BUCKET`, `LIBRARY_FLASHCARD_BUCKET`, `COMMUNITY_MEDIA_BUCKET`,
 `CONTENT_MEDIA_BUCKET`, `CONTENT_PREMIUM_MEDIA_BUCKET`.
