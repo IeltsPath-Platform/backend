@@ -89,7 +89,7 @@ Số migration (kiểm tra lại thư mục `db/migration` ngay trước khi t�
 
 ## Phân công và phối hợp (Claude và Codex làm song song)
 
-Brief chi tiết cho Codex nằm trong `briefs/`: phase 2, 3, 5, 8. Phase 4, 6, 7 có phần "Phân công" riêng trong file phase.
+Brief chi tiết cho Codex nằm trong `briefs/`: phase 2, 3, 4, 5, 6, 7, 8. Phase 4, 6, 7 có điều kiện chờ (xem mục quyết định bên dưới). Phase 4, 6, 7 có phần "Phân công" riêng trong file phase.
 
 ### Ai làm gì
 
@@ -179,6 +179,19 @@ Brief chi tiết cho Codex nằm trong `briefs/`: phase 2, 3, 5, 8. Phase 4, 6, 
 - Học viên ghi âm Speaking: file lên `speaking-recordings`, `audio_reference` là khóa thật thuộc đúng user, người chấm được giao nghe được qua URL ký, quá 90 ngày thì bị xóa.
 - Không còn khóa `writtings/leassons`; 4 ảnh Writing hiển thị.
 - `mvn verify` các service chạm vào xanh; test FE liên quan xanh.
+
+### Quyết định đang chờ bạn
+
+1. **Phase 7, D1:** `listening/demo/ls1.mp3` vừa là audio bài 1 (miễn phí) vừa là audio bài 4 (trả phí) của Listening 5.5. Chọn một:
+   - (A) Khuyến nghị: chuyển `ls1.mp3` sang `media-premium`, đánh dấu PREMIUM. Bài 1 cũng phát bằng URL ký. Không cần thu âm mới.
+   - (B) Bạn thu một bản riêng cho bài 4, lưu trong `media-premium`. Bài 1 giữ công khai.
+2. **Phase 7, D2:** tên bucket `media-premium`. Giữ hay đổi?
+3. **Phase 6:** `PS-W1-WR-3` không có file trên bucket (biểu đồ đang hỏng). Chọn: (a) bạn cung cấp file; (b) giữ hỏng; (c) xóa tham chiếu biểu đồ.
+4. **Ghi Supabase:** hỏi từng bước (hiện tại), hay cho phép một lần cho các lệnh đã định nghĩa trong brief (86 upload phase 4, 5 khóa phase 6, tạo `media-premium` phase 7)?
+5. **Bạn:** thu 20 mp3 và điền `SUPABASE_URL`, `SUPABASE_SECRET_KEY` trong `.env`.
+6. **Git:** push các nhánh và mở PR draft (backend và frontend)?
+
+Đã chốt bằng ràng buộc kỹ thuật, không cần bạn: TTL URL ký = 900 giây (giới hạn `MAX_TTL` của `common-storage`).
 
 ## Câu hỏi còn mở
 

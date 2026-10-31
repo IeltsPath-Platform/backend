@@ -15,7 +15,8 @@ dependencies: [1, 3, 6]
   1. **Kiểm kê endpoint** phát `mediaUrl` của audio: lập bảng (endpoint, gọi bởi ai, qua gateway hay nội bộ, có cổng paywall không). Đã biết: `GetLessonContentUseCase`, `GetPackageVersionContentUseCase`, `GetAuthorPackageUseCase`, `GetPackageVersionPreviewUseCase`, `SectionMediaUseCases`; cần thêm phía assessment (`StartAssessmentAttemptUseCase`, `AttemptStructureResponse`) và learning.
   2. **TTL URL ký:** plan ghi 3600 giây, nhưng `common-storage` giới hạn tối đa 900 giây. Chọn một: giữ 900 và FE tải lại khi hết hạn (khuyến nghị), hoặc đổi giới hạn module.
   3. **Tên bucket** `media-premium` (hoặc tên khác) và **danh sách audio PREMIUM** (quyết định sản phẩm).
-- Sau khi có ba mục trên, Claude viết `briefs/codex-phase-07-premium-audio.md` và Codex làm. Trước phase 7: phase 3 phải merge (vì cùng sửa `ContentMediaController`).
+- Brief đã viết: `briefs/codex-phase-07-premium-audio.md`. Bị chặn bởi quyết định D1 (ls1 dùng chung bài miễn phí và bài trả phí) và D2 (tên bucket). TTL đã chốt 900 giây.
+- Kiểm kê đã làm: đường phát audio cho học viên là `GET /api/learning/lessons/{id}`; đề thử giữ công khai. Trước phase 7: phase 3 phải merge (vì cùng sửa `ContentMediaController`).
 
 ## Overview
 

@@ -15,7 +15,7 @@ dependencies: [1, 3]
 
 - **Claude** làm bước 1 đến 5: kiểm kê id (truy vấn chỉ đọc), kiểm luồng chấm dùng biểu đồ (bước 2), xuất WebP, lưu bản sao lưu SVG ngoài repo, upload lên `media` (xin xác nhận từng lần ghi).
 - Claude xuất một file danh sách `id → khóa` trong thư mục plan để Codex dùng viết migration.
-- **Codex** làm bước 3 và 6 (test và migration `V90`) **sau** khi Claude báo đã upload đủ. Chưa có brief Codex cho phase này; viết sau khi bước 2 có kết quả.
+- **Codex** làm bước 3 và 6 (test và migration `V90`) **sau** khi Claude báo đã upload đủ. Brief: `briefs/codex-phase-04-inline-images.md`. Đã kiểm kê trên DB tạm chạy đủ 89 migration: 58 bìa và 28 biểu đồ = 86 dòng, khớp plan. Danh sách: `data/phase-04-inline-images.csv`.
 
 ## Overview
 

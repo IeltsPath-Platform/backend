@@ -12,7 +12,7 @@ dependencies: [1, 4]
 ## Phân công
 
 - **Claude**: bước 1 (quét DB toàn bộ cột và JSON tìm `writtings`), bước 3 (sao chép 4 file, cộng các file biểu đồ phase 4 nếu chúng nằm cùng thư mục), bước 7 (xóa khóa cũ sau khi xác nhận).
-- **Codex**: bước 2, 4, 5 (test, migration `V91`, cập nhật `scripts/generate-course-writing-charts.py`, CSV, README, `LessonPipelineSeedTest`). Chưa có brief Codex; viết sau khi Claude có kết quả quét.
+- **Codex**: bước 2, 4, 5 (test, migration `V91`, cập nhật `scripts/generate-course-writing-charts.py`, CSV, README, `LessonPipelineSeedTest`). Brief: `briefs/codex-phase-06-writing-key-rename.md`. Đã sửa giả định cũ: có **5** dòng `writtings`, đều là URL đầy đủ (không phải khóa), không phải 4. Dòng thứ 5 (`PS-W1-WR-3`) không có file trên bucket. Danh sách: `data/phase-06-writtings-url-rows.csv`.
 - Deploy: migration chỉ merge sau khi file đã có trên bucket.
 
 ## Overview
