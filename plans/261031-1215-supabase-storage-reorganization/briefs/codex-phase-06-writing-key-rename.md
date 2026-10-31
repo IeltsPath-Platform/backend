@@ -7,7 +7,7 @@ Kết quả: `Status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT`, kèm
 
 1. Claude báo đã sao chép các file sang khóa mới trên `media` và `curl` trả `200 image/png` cho từng khóa mới.
 2. Phase 4 đã merge (cùng vùng `content_assets`; V91 đứng sau V90).
-3. Quyết định về `PS-W1-WR-3` đã có (xem dưới). Nếu chưa có, dừng.
+3. Bạn đã chọn: sẽ đưa file ảnh `PS-W1-WR-3`. Claude upload vào `writing/lessons/PS-W1-WR-3/` trước. Nếu file chưa có, làm các dòng còn lại và báo `DONE_WITH_CONCERNS`, chưa xóa tham chiếu của dòng đó.
 
 ## Hiện trạng đã kiểm (trên DB tạm chạy đủ 89 migration)
 
@@ -25,14 +25,9 @@ Danh sách đầy đủ: `plans/261031-1215-supabase-storage-reorganization/data
 
 Vì là URL đầy đủ, migration phải **thay chuỗi con** `writtings/leassons/` thành `writing/lessons/` trong `media_reference`, không chỉ thay tiền tố khóa. Query `LIKE 'writtings/leassons/%'` của plan cũ **sẽ không khớp** và phải bỏ.
 
-## Quyết định đang chờ (bạn)
+## Đã chốt
 
-`PS-W1-WR-3` không có file trên bucket. Có ba lựa chọn, Codex không tự chọn:
-- (a) Bạn đưa file ảnh; Claude upload vào `writing/lessons/PS-W1-WR-3/...`.
-- (b) Giữ dòng, để ảnh hỏng cho tới khi có file.
-- (c) Đặt `media_reference` của dòng đó về rỗng (bài Writing không có biểu đồ).
-
-Nếu không có chọn lựa, Codex làm phần còn lại (thay chuỗi cho 4 dòng có file) và để dòng thứ 5 nguyên, báo `DONE_WITH_CONCERNS`.
+`PS-W1-WR-3` không có file trên bucket. Bạn sẽ đưa file ảnh. Claude upload trước khi Codex merge V91. Codex không xóa tham chiếu của dòng này.
 
 ## Việc cần làm
 

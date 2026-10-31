@@ -1,7 +1,7 @@
 # Brief Codex: phase 7, audio PREMIUM qua URL ký
 
 Người làm: **Codex**. Claude review. Không ghi Supabase, không đọc `.env`.
-**Không bắt đầu trước khi bạn trả lời hai quyết định ở mục dưới.**
+**Đã chốt (2026-10-31):** D1 = (A), chuyển `listening/demo/ls1.mp3` sang `media-premium`, bài 1 cũng phát bằng URL ký. D2 = tên bucket `media-premium`. Hai quyết định dưới đây giữ lại để tham chiếu.
 
 ## Quyết định cần bạn (chặn việc này)
 
