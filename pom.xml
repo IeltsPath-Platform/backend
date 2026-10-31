@@ -23,6 +23,7 @@
         <module>shared/common-events</module>
         <module>shared/common-security</module>
         <module>shared/common-storage</module>
+        <module>shared/common-observability</module>
         <module>infra/api-gateway</module>
         <module>infra/config-server</module>
         <module>infra/eureka-server</module>
