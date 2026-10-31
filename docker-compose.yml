@@ -207,6 +207,10 @@ services:
     environment:
       <<: *spring-env
       SERVER_PORT: 8083
+      SUPABASE_URL: "${SUPABASE_URL:-}"
+      SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY:-}"
+      ASSESSMENT_SPEAKING_BUCKET: "${ASSESSMENT_SPEAKING_BUCKET:-speaking-recordings}"
+      ASSESSMENT_SPEAKING_RETENTION_DAYS: "${ASSESSMENT_SPEAKING_RETENTION_DAYS:-90}"
       ASSESSMENT_DB_URL: jdbc:postgresql://postgres:5432/assessment_db
       ASSESSMENT_DB_PASSWORD: "${POSTGRES_PASSWORD}"
       RABBITMQ_HOST: rabbitmq
