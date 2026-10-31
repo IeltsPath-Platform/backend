@@ -21,7 +21,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-security` | Thư viện security servlet dùng chung (internal JWT, `CanonicalRoles`, `CurrentUserProvider`); không deploy độc lập. |
 | `shared/common-events` | Thư viện tên exchange/routing key/header, record payload và helper `MessageRetry`/`RetryTopology` dùng chung; không deploy độc lập. |
 | `shared/common-storage` | Thư viện lưu object dùng chung (`ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy`); không deploy độc lập; service tự cấu hình bucket. |
-| `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity và streak tại `/api/learning-support/{activities,streak}`. |
+| `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity tại `/api/learning-support/activities`. Streak do learning-service giữ. |
 | `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
 | `services/library-service` | Cổng 8081, `library_db` (Compose PostgreSQL host 5440): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
 | `services/assessment-service` | Làm bài, chấm objective/LLM cho essay gate và EXAMINER, kết quả; phát `AssessmentCompleted.v2`. |
@@ -31,7 +31,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `services/notification-service` | Cổng 8088, `notification_db` (Compose PostgreSQL host 5440, migration V1-V4: `notifications`, `notification_preferences`): nhận event RabbitMQ (bốn queue chấm bài `notification.grading-{requested,completed,due-soon,overdue}.v1` và `community.notifications.v1`), lưu hộp thư thông báo, tùy chọn thông báo theo loại sự kiện. Route `/api/notifications/**`. |
 | `services/learning-service` | Cổng 8086, `learning_db` (Compose PostgreSQL host 5440): thứ tự topic, bài học, nộp bài, cổng mở bài, mastery theo KP, bài ôn, giao mã đề cuối, consumer `AssessmentCompleted.v2`. Route `/api/learning/**`. |
 
-Mỗi business service sở hữu một database PostgreSQL riêng. Gateway chuyển hai nhóm activity/streak tới user-service;
+Mỗi business service sở hữu một database PostgreSQL riêng. Gateway chuyển nhóm activity tới user-service;
 không còn route tổng quát `/api/learning-support/**`.
 
 ## 2. Tech Stack - Bắt buộc tuân thủ
@@ -268,8 +268,8 @@ src/main/java/com/ieltspath/<service>
   (`free-practice-v1.md`). Bằng chứng luyện tự do là bằng chứng luyện tập (trọng số và trần 3 bài luyện của MP-1.0).
 - Gamification (`gamification-v1.md`): XP chỉ ở lần nộp đầu, đáp án trên trần ngày là XP bóng (không tính); sai câu khách
   quan trừ tim ở bài tập lesson, Practice và luyện tự do (hết tim thì `403 HEARTS_DEPLETED`, bài ôn vẫn nộp được); streak
-  tính ở server từ câu trả lời thật theo múi giờ học viên và là nguồn duy nhất cho thưởng (streak của user-service do client
-  gửi, không dùng); streak và nhiệm vụ ngày chạy trong transaction của lần nộp qua listener `BEFORE_COMMIT` trên
+  tính ở server từ câu trả lời thật theo múi giờ học viên và là nguồn duy nhất cho thưởng (user-service không còn streak; hồ sơ
+  công khai lấy streak từ learning qua community); streak và nhiệm vụ ngày chạy trong transaction của lần nộp qua listener `BEFORE_COMMIT` trên
   `QuestionEventsAppended` (mang các câu MỚI của lần ghi, nên nộp lặp không cộng thêm); XP tuần của league và huy hiệu
   được gọi từ nơi phát sinh sự kiện, cùng transaction, và cấp đúng một lần nhờ khóa duy nhất. Mọi thưởng
   XP đi qua sổ `xp_ledger` có khóa duy nhất theo nguồn và tham chiếu; thưởng điểm đi qua `reward_grants`. Mua bằng điểm

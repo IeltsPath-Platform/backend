@@ -27,7 +27,7 @@ Reactor gồm 14 module: 3 infra, 2 shared, 9 business. Hai module shared là th
 | `shared/common-security` | Java lib | — | — | — |
 | `shared/common-events` | Java lib (tên/hình dạng event, `MessageRetry`, `RetryTopology`) | — | — | — |
 | `shared/common-storage` | Java lib | — | — | — |
-| `services/user-service` | Java | 8085 | `user_db` (Compose PostgreSQL host 5440) | `/auth/**`, `/api/users/**`, `/api/learning-support/{activities,streak}/**` |
+| `services/user-service` | Java | 8085 | `user_db` (Compose PostgreSQL host 5440) | `/auth/**`, `/api/users/**`, `/api/learning-support/activities/**` |
 | `services/content-service` | Java | 8082 | `content_db` (Compose PostgreSQL host 5440) | `/api/content/**` trừ ba nhóm catalog chuyển tới library |
 | `services/library-service` | Java | 8081 | `library_db` (Compose PostgreSQL host 5440) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
 | `services/assessment-service` | Java | 8083 | `assessment_db` (Compose PostgreSQL host 5440) | `/api/assessments/**` |
