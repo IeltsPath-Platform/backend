@@ -89,6 +89,40 @@ class PaywallGateTest {
     }
 
     @Test
+    void allKnowledgePointSkillFallsBackToTopicSkillForOwnership() {
+        var courseInfo = new com.ieltspath.learning.application.port.LearningContentClient.Course(course, "C",
+                "Course", BigDecimal.valueOf(6.5), false);
+        Topic topic = new Topic(topicId, "WRITING", "Writing", 1, null, List.of(), LearningSkill.WRITING,
+                false, courseInfo);
+        KnowledgePoint point = new KnowledgePoint(UUID.randomUUID(), "KP", "Point", "STRATEGY", "ALL",
+                null, true, null, null, null, null, 5);
+
+        when(unlocks.findActive(user, course)).thenReturn(List.of(unlock(LearningSkill.WRITING)));
+        assertTrue(gate.forLearner(user).knowledgePointOpen(topic, point, false));
+
+        when(unlocks.findActive(user, course)).thenReturn(List.of(unlock(LearningSkill.READING)));
+        when(access.premium()).thenReturn(false);
+        assertFalse(gate.forLearner(user).knowledgePointOpen(topic, point, false));
+    }
+
+    @Test
+    void explicitKnowledgePointSkillTakesPrecedenceOverTopicSkill() {
+        var courseInfo = new com.ieltspath.learning.application.port.LearningContentClient.Course(course, "C",
+                "Course", BigDecimal.valueOf(6.5), false);
+        Topic topic = new Topic(topicId, "WRITING", "Writing", 1, null, List.of(), LearningSkill.WRITING,
+                false, courseInfo);
+        KnowledgePoint point = new KnowledgePoint(UUID.randomUUID(), "KP", "Point", "STRATEGY", "READING",
+                null, true, null, null, null, null, 5);
+
+        when(unlocks.findActive(user, course)).thenReturn(List.of(unlock(LearningSkill.READING)));
+        assertTrue(gate.forLearner(user).knowledgePointOpen(topic, point, false));
+
+        when(unlocks.findActive(user, course)).thenReturn(List.of(unlock(LearningSkill.WRITING)));
+        when(access.premium()).thenReturn(false);
+        assertFalse(gate.forLearner(user).knowledgePointOpen(topic, point, false));
+    }
+
+    @Test
     void pendingAndCancelledRowsNeverUnlock() {
         var pending = new LearnerCourseUnlock(UUID.randomUUID(), user, course, LearningSkill.READING, 50,
                 UUID.randomUUID(), LearnerCourseUnlock.Status.PENDING, null);

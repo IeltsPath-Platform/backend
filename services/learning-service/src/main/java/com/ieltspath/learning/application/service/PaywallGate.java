@@ -86,7 +86,8 @@ public class PaywallGate {
             UUID courseId = topic.course() == null ? null : topic.course().courseId();
             Integer position = point.earliestLessonPosition();
             if (courseId == null || position == null) return true;
-            LearningSkill skill = point.skill() == null ? topic.skill() : parseSkill(point.skill());
+            LearningSkill skill = parseSkill(point.skill());
+            if (skill == null) skill = topic.skill();
             Set<LearningSkill> pointSkills = skill == null ? Set.of() : Set.of(skill);
             Ownership ownership = ownership(courseId);
             if (PaywallPolicy.isOpen(courseId, position, pointSkills, ownership.skills, ownership.combo,
@@ -136,7 +137,8 @@ public class PaywallGate {
     }
 
     private static LearningSkill parseSkill(String skill) {
-        try { return LearningSkill.valueOf(skill); }
+        if (skill == null || skill.isBlank()) return null;
+        try { return LearningSkill.valueOf(skill.trim()); }
         catch (IllegalArgumentException ignored) { return null; }
     }
 

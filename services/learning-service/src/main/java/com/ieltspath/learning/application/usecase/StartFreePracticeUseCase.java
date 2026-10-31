@@ -163,10 +163,10 @@ public class StartFreePracticeUseCase {
     /** The point's skill as Content names it; a point whose skill is missing or unknown cannot be practised freely. */
     private Optional<LearningSkill> skillOf(Topic topic, UUID knowledgePointId) {
         String named = directory.describe().getOrDefault(knowledgePointId, KnowledgePointDirectory.Entry.UNKNOWN).skill();
-        if (named == null) named = topic.skill() == null ? null : topic.skill().name();
-        String skillName = named;
-        return Arrays.stream(LearningSkill.values()).filter(skill -> Objects.equals(skill.name(), skillName))
-                .findFirst();
+        if (named == null || named.isBlank()) return Optional.ofNullable(topic.skill());
+        Optional<LearningSkill> pointSkill = Arrays.stream(LearningSkill.values())
+                .filter(skill -> skill.name().equals(named.trim())).findFirst();
+        return pointSkill.isPresent() ? pointSkill : Optional.ofNullable(topic.skill());
     }
 
     private static LearningRequestException exhausted() {

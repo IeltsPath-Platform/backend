@@ -68,10 +68,19 @@ public class LessonAccess {
      * review. The review still blocks submitting work and opening a lesson not yet reached.
      */
     public Context authorizeToRead(UUID userId, UUID lessonId) {
-        return authorize(userId, content.getLesson(lessonId), true);
+        return authorize(userId, content.getLesson(lessonId), true, false);
+    }
+
+    /** Completed lesson practice and review catalogs stay available after Premium expires. */
+    public Context authorizePracticeSets(UUID userId, UUID lessonId) {
+        return authorize(userId, content.getLesson(lessonId), true, true);
     }
 
     private Context authorize(UUID userId, Lesson lesson, boolean reading) {
+        return authorize(userId, lesson, reading, false);
+    }
+
+    private Context authorize(UUID userId, Lesson lesson, boolean reading, boolean allowCompletedPaywall) {
         var paywallRequest = paywall.forLearner(userId);
         var summaries = orderedLessons(content.getTopicLessons(lesson.topicId()));
         var progress = lessons.findByTopic(userId, lesson.topicId());
@@ -91,7 +100,9 @@ public class LessonAccess {
         var currentProgress = progress.get(lesson.lessonId());
         if (currentProgress == null) currentProgress = lessons.find(userId, lesson.lessonId()).orElse(null);
         if (!found) throw new LearningRequestException(404, "NOT_FOUND", "Lesson was not found");
-        paywallRequest.requireLessonOpen(lesson, currentProgress, lessonSkills);
+        if (!(reading && allowCompletedPaywall && completed(currentProgress))) {
+            paywallRequest.requireLessonOpen(lesson, currentProgress, lessonSkills);
+        }
         var topic = topic(userId, lesson.topicId());
         List<UUID> needPractice = found && previousComplete
                 ? lessonsNeedingPractice(userId, lesson.topicId(), previousIds, progress) : List.of();

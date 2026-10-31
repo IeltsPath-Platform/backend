@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,6 +60,7 @@ class PracticeGatedLessonUnlockIntegrationTest {
     @Autowired RefreshLearningTopicsUseCase topics;
     @Autowired GetLessonUseCase getLesson;
     @Autowired GetTopicLessonsUseCase topicLessons;
+    @Autowired GetLessonPracticeSetsUseCase practiceSets;
     @Autowired CompleteLessonUseCase complete;
     @Autowired SubmitLessonExerciseUseCase exercise;
     @Autowired StartPracticeAttemptUseCase start;
@@ -289,6 +291,101 @@ class PracticeGatedLessonUnlockIntegrationTest {
         assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
         assertDoesNotThrow(() -> getLesson.execute(user, lesson2));
     }
+
+    @Test
+    void practiceSetListingRejectsAnUnownedPaywalledLesson() {
+        var target = practiceListingLesson(4, false, false, false);
+        when(access.premium()).thenReturn(false);
+
+        LearningGateException error = assertThrows(LearningGateException.class,
+                () -> practiceSets.execute(target.userId(), target.lessonId()));
+
+        assertEquals("PAYWALL", error.getCode());
+    }
+
+    @Test
+    void completedLessonPracticeSetsRemainListableAfterPremiumExpires() {
+        var target = practiceListingLesson(4, true, false, false);
+        // Durable completion remains reviewable after Premium expires.
+        when(access.premium()).thenReturn(false);
+
+        var result = practiceSets.execute(target.userId(), target.lessonId());
+
+        assertTrue(result.lessonCompleted());
+        assertEquals(1, result.items().size());
+    }
+
+    @Test
+    void premiumLearnerCanListPracticeSetsForAnUnownedPaywalledLesson() {
+        var target = practiceListingLesson(4, false, false, false);
+        when(access.premium()).thenReturn(true);
+
+        var result = practiceSets.execute(target.userId(), target.lessonId());
+
+        assertEquals(1, result.items().size());
+    }
+
+    @Test
+    void accessOutageAllowsFreeOwnedGrandfatheredAndCompletedPracticeSetsButFailsClosedForPaywalledLessons() {
+        when(access.premium()).thenThrow(new AccessUnavailableException(503));
+
+        var free = practiceListingLesson(3, false, false, false);
+        assertDoesNotThrow(() -> practiceSets.execute(free.userId(), free.lessonId()));
+
+        var owned = practiceListingLesson(4, false, false, true);
+        assertDoesNotThrow(() -> practiceSets.execute(owned.userId(), owned.lessonId()));
+
+        var grandfathered = practiceListingLesson(4, false, true, false);
+        assertDoesNotThrow(() -> practiceSets.execute(grandfathered.userId(), grandfathered.lessonId()));
+        var completed = practiceListingLesson(4, true, false, false);
+        var completedResult = assertDoesNotThrow(() -> practiceSets.execute(completed.userId(), completed.lessonId()));
+        assertTrue(completedResult.lessonCompleted());
+
+        var paywalled = practiceListingLesson(4, false, false, false);
+        AccessUnavailableException error = assertThrows(AccessUnavailableException.class,
+                () -> practiceSets.execute(paywalled.userId(), paywalled.lessonId()));
+        assertTrue(error.getMessage().contains("status 503"));
+        verify(access, times(1)).premium();
+    }
+
+    private PracticeListingTarget practiceListingLesson(int skillPosition, boolean completed, boolean grandfathered,
+                                                         boolean owned) {
+        UUID courseId = UUID.randomUUID();
+        UUID topicId = UUID.randomUUID();
+        UUID lessonId = UUID.randomUUID();
+        UUID kpId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID packageId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        var course = new Course(courseId, "C60", "Band 6.0", new BigDecimal("6.0"), true, true);
+        var topic = new Topic(topicId, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(kpId, "READ", "Reading", "PROCEDURE", "READING", "", true)),
+                LearningSkill.READING, false, course);
+        var summary = new LessonSummary(lessonId, topicId, "L", "Lesson", null, 1, List.of(kpId), List.of(),
+                Set.of(LearningSkill.READING), null, courseId, LearningSkill.READING, skillPosition);
+        var lesson = new Lesson(lessonId, topicId, "L", "Lesson", null, 1, List.of(kpId), List.of(),
+                LearningSkill.READING, Set.of(LearningSkill.READING), courseId, skillPosition);
+        when(content.getTopicSequence()).thenReturn(List.of(topic));
+        when(content.getTopicLessons(topicId)).thenReturn(List.of(summary));
+        when(content.getLesson(lessonId)).thenReturn(lesson);
+        when(content.lessonPracticeSets(lessonId)).thenReturn(List.of(new LessonPracticeSet(packageId, versionId,
+                "PS", "Practice", 2, List.of(), null)));
+        topics.execute(userId);
+        if (owned) {
+            jdbc.update("INSERT INTO learner_course_unlocks (user_id, course_id, skill, point_cost, request_id, status) "
+                    + "VALUES (?, ?, 'READING', 50, ?, 'ACTIVE')", userId, courseId, UUID.randomUUID());
+        }
+        if (completed || grandfathered) {
+            jdbc.update("INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, "
+                            + "knowledge_point_ids, completed_at, grandfathered) "
+                            + "VALUES (?, ?, ?, 1, ARRAY[CAST(? AS uuid)], ?, ?)", userId, lessonId, topicId,
+                    kpId.toString(), completed ? java.sql.Timestamp.from(java.time.Instant.now()) : null,
+                    grandfathered);
+        }
+        return new PracticeListingTarget(userId, lessonId);
+    }
+
+    private record PracticeListingTarget(UUID userId, UUID lessonId) {}
 
     @Test
     void aFirstLessonWithoutPracticeOpensTheSecondAndAnOpenedLessonStaysOpenWhenSetsArePublishedLater() {

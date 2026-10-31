@@ -306,6 +306,20 @@ class FreePracticeIntegrationTest {
     }
 
     @Test
+    void freePracticeUsesWritingTopicSkillForAnAllKnowledgePoint() {
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "WRITE", "Writing", 1, null,
+                List.of(new KnowledgePoint(KP, "W_ALL", "General writing point", "STRATEGY", "ALL", "", true,
+                        null, null, null, null, 5)), LearningSkill.WRITING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+        UUID user = enrolled();
+        ownSkill(user, LearningSkill.WRITING);
+
+        start.execute(user, KP);
+
+        assertEquals(1, count("SELECT count(*) FROM practice_attempts WHERE user_id = ?", user));
+    }
+
+    @Test
     void theTreeListsThePointsOfTheCourseWithFreePracticeOpen() {
         var tree = treeUseCase.execute(enrolled(), COURSE);
 
@@ -330,6 +344,20 @@ class FreePracticeIntegrationTest {
 
         assertTrue(node.locked());
         assertFalse(node.practiceAvailable());
+    }
+
+    @Test
+    void theTreeOpensAnAllPointUsingItsWritingTopicForSkillOwnership() {
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "WRITE", "Writing", 1, null,
+                List.of(new KnowledgePoint(KP, "W_ALL", "General writing point", "STRATEGY", "ALL", "", true,
+                        null, null, null, null, 5)), LearningSkill.WRITING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+        UUID user = enrolled();
+        ownSkill(user, LearningSkill.WRITING);
+
+        var node = treeUseCase.execute(user, COURSE).knowledgePoints().get(0);
+
+        assertFalse(node.locked());
     }
 
     @Test
@@ -405,6 +433,11 @@ class FreePracticeIntegrationTest {
         UUID user = UUID.randomUUID();
         jdbc.update("INSERT INTO topic_progress (user_id, topic_id, sequence_order) VALUES (?, ?, 1)", user, TOPIC);
         return user;
+    }
+
+    private void ownSkill(UUID user, LearningSkill skill) {
+        jdbc.update("INSERT INTO learner_course_unlocks (user_id, course_id, skill, point_cost, request_id, status) "
+                        + "VALUES (?, ?, ?, 50, ?, 'ACTIVE')", user, COURSE, skill.name(), UUID.randomUUID());
     }
 
     private int count(String sql, UUID... args) {

@@ -13,7 +13,7 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 | A.3 Cover frontend | DONE | Admin forms, learner course/topic adapters, banner/cards and placement summary updated; focused tests, typecheck and lint xanh. Commit `cdcad2e`. |
 | B. Access unlock debit | DONE | V5 ledger check plus `COURSE_UNLOCK_DEBIT` mapping; focused tests + Testcontainers integration xanh. |
 | C. Content unlock prices/facts | DONE | V87 prices, V88 clear topic gates, one-skill authoring checks, learning payload fields and SQL ordering facts. Data audit identifies the existing `TREES_MULTI_SKILL` violation; content owner fixes remain a ship prerequisite. |
-| D. Per-skill progression | DONE | `TopicStatusDeriver` now opens one topic per course skill. Focused tests 33/33; full learning-service reactor 1,002/1,002. Commit `b302c4f0`. |
+| D. Per-skill progression | DONE | `TopicStatusDeriver` now opens one topic per course skill. Focused tests 33/33; full learning-service reactor 1,002/1,002. Commit `215ee045`. |
 | E. Learning purchase | DONE | Durable V38 unlock purchase, replay/reconciliation and `/courses` ownership/pricing fields. Focused unit/API + 3 PostgreSQL integration tests passed; full learning-service reactor: 1,019 tests passed. Commit `6ec31d7a`. |
 | F. Paywall gate | DONE | Shared request-scoped gate, V39 grandfathering, lesson-list flags, free-practice and tree enforcement. Focused 84/84; full learning-service reactor 1,035/1,035. |
 | G. Frontend paywall/admin prices | DONE_WITH_LIMITS | Touched tests, typecheck, lint and production build pass; the full suite has one unrelated flashcard copy assertion failure. Browser verification against a running authenticated API remains unrun. |
@@ -34,7 +34,6 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 - Backend: `3534de4f test(content): assert topic descriptions pass through requests`.
 - Backend: `7ce7556b feat(learning): pass course cover and descriptions`.
 - Frontend: `cdcad2e feat(frontend): show course covers and descriptions`.
-- Backend: phase C commit pending.
 
 ## A.1 — Cover content-service
 
@@ -80,7 +79,7 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 - Updated the `LearnerCurriculum` rule comment and learning-service README. Lesson access, course aggregation and suggestions already consume derived statuses and aggregate by course, so they needed no behavior changes.
 - Focused regression tests for progression and lesson gates: 33 passed, 0 failures/errors.
 - Full learning-service reactor: 1,002 tests passed, 0 failures/errors/skips, including Testcontainers integrations. Surefire waited 30 seconds for broker-listener shutdown after the suite, then reported BUILD SUCCESS.
-- Commit: `b302c4f0`.
+- Commit: `215ee045`.
 
 ## E — Learning unlock purchase
 
@@ -94,10 +93,10 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 ## F — Lesson paywall gate
 
 - `PaywallPolicy` and a request-scoped `PaywallGate` enforce free-first-three, ACTIVE skill/combo ownership, grandfathered progress and Premium in that order. Premium is fetched once only when earlier rules do not open the content.
-- Lesson reads, resources, practice-set listing, exercise/essay submissions and completion share `LessonAccess`; topic lesson summaries expose `paywall` and `freePreview` independently of progress `LOCKED`.
+- Lesson reads, resources, exercise/essay submissions and completion share `LessonAccess`; topic lesson summaries expose `paywall` and `freePreview` independently of progress `LOCKED`. Practice-set listing was not gated through `LessonAccess` at this phase; it was added in the fix round below. The listing gate preserves completed-lesson review catalogs after Premium expires, while regular lesson reading remains subject to the paywall.
 - V39 marks pre-existing lesson progress grandfathered and leaves new rows false. Free practice checks the point's earliest lesson position before hearts or attempts; the tree adds `locked` and suppresses `practiceAvailable`, degrading Access outages to locked only for points that need Premium.
 - Focused Phase F tests: 84 passed, 0 failures/errors/skips, including migration, Premium expiry, no-side-effect and tree outage scenarios.
-- Full learning-service reactor: 1,035 tests passed, 0 failures/errors/skips. Surefire waited 30 seconds for broker-listener shutdown, then reported BUILD SUCCESS.
+- Full learning-service reactor at the end of Phase F: 1,035 tests passed, 0 failures/errors/skips. The latest full reactor after this fix round is recorded in the acceptance update below.
 - Implementation commit is recorded in Git history.
 
 ## G — Frontend paywall and admin prices
@@ -107,7 +106,7 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 - Topic test copy explains the unlock requirement. Speaking has no purchase CTA and is shown as coming soon. A tree `PAYWALL` response opens the unlock dialog.
 - Admin course edit saves the per-skill price map and nullable combo price with positive integer and combo-range validation. Course topic creation requires a skill. Existing affected admin fixtures/assertions were updated to the new request shape.
 - Focused Phase G suites passed, including 26 earlier learner/admin tests, 43 affected admin/adapter tests, and 16 tree/lesson/unlock tests; added retry-key and unlock HTTP contract tests pass (3 tests).
-- Final full frontend run completed 202 files / 1,696 tests: 1,695 passed and one unrelated mixed-up-answer copy assertion failed in `flashcards/lib/owl-reactions.test.ts`. The admin/package fixtures affected by this feature were corrected and their focused suites passed.
+- Final full frontend run at Phase G completed 202 files / 1,696 tests: 1,695 passed and one unrelated mixed-up-answer copy assertion failed in `flashcards/lib/owl-reactions.test.ts`. In the fix round below, the full frontend suite was rerun once; the same untouched file had two copy assertions fail while its isolated 21-test run passed. The admin/package fixtures affected by this feature were corrected and their focused suites passed.
 - `npm run typecheck`, ESLint, and production build passed. Browser verification against a running authenticated API was unavailable.
 
 - Frontend implementation commit: `08c0813` (`feat(frontend): add band skill paywall UI`). The pre-existing frontend `package-lock.json` modification was left uncommitted.
@@ -118,4 +117,15 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 - Extended `course-skill-content-audit.sql` with published lesson counts and counts beyond the 3-lesson free preview for every `(course, skill)`, including zero-content skills.
 - The last recorded content audit found one unskilled topic (`TREES_MULTI_SKILL`), five mismatched knowledge points and two multi-skill lessons (`T1`, `T2`). These are unchanged content-owner prerequisites and were not auto-fixed.
 - The audit query was not run against a development database because none was running. Access source contains key product entitlements but no monetary prices for Point/Premium products. Assessment V2 seeds Writing AI grading at 3 Points. The money-to-Points conversion and product-approved price table still cannot be derived without monetary price inputs and owner sign-off. No R&D price was entered.
-- Backend automated suites for Access, Content and Learning passed in prior phases; Learning's full reactor passed at 1,035 tests after Phase F. The planned manual end-to-end scenarios still need an active environment/account and R&D-approved prices. Contract/audit documentation commit: `89cd9f97`. The database counts, content-owner fixes, approved price table and manual live scenarios remain outstanding.
+- Contract/audit documentation commit: `89cd9f97`. The database counts, content-owner fixes, approved price table and manual live scenarios remain outstanding.
+
+## Fix round acceptance — 2026-10-31
+
+- Before this fix round, the full content-service suite had not been run. Its first full verification failed once at `MultiSkillContentIntegrationTest.singleSkillCompatibilityComesFromExercisesRatherThanTopicMetadata`: it expected `LISTENING` but the reader correctly returned topic skill `READING`. The test now asserts singular lesson/topic skill `READING` and separately asserts plural `skills` remains derived from exercises/knowledge points (`LISTENING`). A later run exposed a stale IDE-generated test class with an unresolved-import stub; cleaning generated Maven targets and recompiling fixed that separate build artifact issue, and the latest full suite then passed.
+- Knowledge-point gating now uses `topic.skill()` when point skill is null, blank, `ALL`, or unparsable. Free practice applies the same fallback. Tests cover WRITING ownership opening an `ALL` point at earliest position 5, READING ownership not opening it, explicit point skill precedence, tree state, and free practice.
+- Practice-set listing now goes through `LessonAccess.authorizePracticeSets` and the shared `PaywallGate`. Tests cover free preview, unowned paywall (`403 PAYWALL`), completed lessons after Premium expiry, owned skill, grandfathered progress, Premium, and Access outage: free/owned/grandfathered/completed still list, while a paywalled lesson fails with Access `503` and is not mislabeled `PAYWALL`. Normal lesson reading still uses the regular paywall path.
+- Latest full backend runs (target module totals): content-service **1,077 tests, 0 failures, 0 errors, 1 skipped**; learning-service **1,043 tests, 0 failures, 0 errors, 0 skipped**; access-service **77 tests, 0 failures, 0 errors, 0 skipped**. The `-am` content run also ran common-security (9, all passed) and common-storage (60 total, 57 passed and 3 skipped); learning/access runs also ran common-events (17) and common-security (9), all passed. Aggregate reactor totals: content **1,146 run / 0 failed / 0 errors / 4 skipped**; learning **1,069 / 0 / 0 / 0**; access **103 / 0 / 0 / 0**. The focused learning tests passed **45/45** with no skips.
+- Latest frontend checks: `npm run typecheck` passed (exit 0); `npm run lint` passed (exit 0); requested learning-path/admin-courses Vitest run passed **234/234 across 37 files**. One full `npm run test` rerun reported **202 files, 1,697 tests: 1,695 passed, 2 failed**. Both failures were unrelated copy assertions in the unchanged `src/features/flashcards/lib/owl-reactions.test.ts`; isolated rerun passed **21/21**, so this is treated as flaky and remains unresolved.
+- On Windows, javac previously hit `AccessDeniedException` while resolving jars under `backend/.m2`. Tests were run with process-only `MAVEN_OPTS` setting the local Maven repository to `backend/.m2/repository` and `java.io.tmpdir` to `backend/target`; no shared Maven or project build configuration was changed.
+- Hygiene: `backend/.m2/` is locally excluded through `.git/info/exclude`, not shared `.gitignore`. The service-boundary cleanup plan was left untouched.
+- Acceptance: backend paywall/fallback/listing fixes and regression coverage are complete; all three backend full suites passed. Frontend checks passed except the two unrelated flaky owl-reaction copy assertions in the single required full run. Live browser scenarios and monetary prices were not verified and remain out of scope.
