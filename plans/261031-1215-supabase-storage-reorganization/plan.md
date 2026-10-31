@@ -157,7 +157,12 @@ Brief: `briefs/codex-hardcoded-storage-cleanup.md`. Gồm ba mục:
 ### Trạng thái hiện tại
 
 - Đã xong: bucket `community` và `media` (2026-10-31); RLS đã kiểm (không có policy trên `storage.objects`, RLS bật); mặc định `CONTENT_MEDIA_BASE_URL` trong compose (`f708ef9d`); README content (`de1bec41`); README common-storage (`1aca55e1`). Nhánh `feat/supabase-storage-reorganization` đã có các commit này.
-- Chưa làm: 20 mp3, bucket `media-premium` (chờ quyết định TTL và tên), toàn bộ code phase 2 đến 8.
+- Cập nhật 2026-10-31 (sau lượt kiểm chéo):
+  - Đã có trên Supabase: bucket `media-premium` (riêng tư, 25 MB, mpeg/mp4/wav/ogg; ẩn danh nhận 400); `speaking-recordings` đúng cấu hình (riêng tư, 5 MB); `flashcards` công khai (trả lời câu hỏi cleanup C: ảnh flashcard xem được qua URL công khai); 20 mp3 đã nạp trước đó.
+  - Đã copy `media/listening/demo/ls1.mp3` sang `media/listening/placement/placement-ls1.mp3` (MD5 khớp, 664598 byte). Bản `media-premium/listening/demo/ls1.mp3` đã có sẵn, khớp kích thước. Bản công khai `media/listening/demo/ls1.mp3` **chưa xóa** (chờ phase 7 deploy và duyệt).
+  - `library_db` local: Flyway V4, chưa có bảng catalog, không có `cover_key` nào. Phase 5 được siết `CatalogText`.
+  - Chưa làm (chờ Codex): code phase 2 đến 8 và cleanup; PR #126 còn lỗi F1–F3; V92/V93; cleanup A và C.
+  - Chờ người dùng duyệt: xóa `writtings/leassons/` (sau V91), xóa `media/listening/demo/ls1.mp3` (sau phase 7), xóa `.emptyFolderPlaceholder` và ảnh thử trong `community`.
 
 ## Working notes cho người làm
 
