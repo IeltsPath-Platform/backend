@@ -40,7 +40,8 @@ Cho phép chạy 2+ instance mỗi service mà không chạy job trùng, không 
 - **Vé game:** `InMemoryWebSocketTicketStore` → `RedisWebSocketTicketStore` (TTL, `GETDEL` để dùng một lần), vì vé phát qua REST ở instance A có thể được dùng ở instance B.
 - **Scheduler:**
   - Job có store claim theo hàng (`SKIP LOCKED`): không bọc gì, chỉ thêm test song song. Áp cho 2 relay và `GateEssayGradingScheduler` (gọi LLM, không được giữ khóa qua HTTP).
-  - Game: claim theo trận bắt buộc: `dueMatches`/`due` chọn bằng `FOR UPDATE SKIP LOCKED` trong transaction của lần xử lý, hoặc `pg_try_advisory_xact_lock(hash(matchId))` trước khi `advance`/`timeout`; trận đang bị instance khác xử lý thì bỏ qua lượt này.
+  - Game (đã kiểm, **không cần khóa thêm**): `RocketGameplayUseCase.advance` khóa trận bằng `FOR UPDATE` và `settle` kiểm trạng thái vòng trước khi đóng; `SoloGameplayUseCase.timeout` khóa `FOR UPDATE OF m,p` và kiểm deadline. Lần chạy trùng thứ hai thấy vòng đã đóng nên không làm gì. Bằng chứng: test `concurrentSchedulesCloseAnExpiredRoundOnlyOnce` (Rocket) chạy hai luồng đồng thời, chỉ một sự kiện `Closed`. Rủi ro còn lại là tốn tải truy vấn, không sai dữ liệu. <!-- Updated: đo bằng test, bỏ yêu cầu claim sau red-team #2 -->
+  - Solo: cùng mẫu khóa; chưa có test đồng thời, ghi là bước kiểm tiếp.
   - Job còn lại (`GradingDeadlineScheduler`, `AiDraftScheduler`, `SpeakingRecordingRetentionScheduler`, `LoginHistoryPurgeScheduler`): kiểm store; nếu không claim theo hàng và job không gọi HTTP trong lúc giữ khóa → bọc toàn job bằng `pg_try_advisory_xact_lock` (mẫu `content/infrastructure/scheduling/PostgresAdvisoryLock.java`); nếu có gọi HTTP → chuyển sang claim theo hàng.
   - Không thêm ShedLock.
 - **Compose:** service ứng dụng không có `container_name` và không mở cổng host → `--scale` chạy được. Gateway giữ 1 bản (cổng 8080). Không cần load balancer tùy chỉnh ở gateway.

@@ -126,7 +126,7 @@ Ngày 2026-10-31. Bốn góc nhìn (bảo mật, giả định sai, chế độ 
 | # | Mức | Phát hiện | Bằng chứng | Xử lý | Phase |
 |---|---|---|---|---|---|
 | 1 | Critical | Sticky theo phòng không làm được (một endpoint `/ws/games`, không `roomId`) và không phủ event do scheduler sinh | `GameWebSocketConfig.java:28`, `GameWebSocketHandler.java:66`, `:262`, `RocketRoundScheduler.java:27` | Đổi sang Redis pub/sub cho event phòng (người dùng chốt) | 1 |
-| 2 | High | Scheduler Rocket/Solo đọc trận không claim → 2 instance xử lý trùng | `RocketMatchStoreAdapter.java:130`, `SoloGameplayRepositoryAdapter.java:531` | Bắt buộc claim theo trận | 1 |
+| 2 | ~~High~~ → **Đã hạ/bác** (kiểm khi làm phase 1) | Scheduler Rocket/Solo đọc trận không claim → 2 instance xử lý trùng | `RocketMatchStoreAdapter.java:40` (`FOR UPDATE`), `RocketGameplayUseCase.java:66-69,249-251` | Trùng chỉ tốn tải; test đồng thời xanh (`concurrentSchedulesCloseAnExpiredRoundOnlyOnce`). Không thêm khóa | 1 |
 | 3 | High | Khóa login theo email cho phép khóa tài khoản người khác | `AuthController.java:62` | Chặn theo email+IP; theo email chỉ trễ tăng dần | 3 |
 | 4 | High | `/actuator/prometheus` bị security chặn; exposure ghi đè ở từng service | `CommonSecurityAutoConfiguration.java:56`, `learning-service.yaml:155` | Sửa rule + mọi file config-repo khai báo exposure (hiện 12) + test 200 | 2 |
 | 5 | Medium | Có metric nhưng không ai thu thập | `config-repo/application.yaml:12` | Prometheus trong compose, profile `observability`, Eureka SD | 2 |

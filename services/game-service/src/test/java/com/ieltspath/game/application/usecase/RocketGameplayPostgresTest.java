@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.game.application.result.RocketGameplayResults.Round;
+import com.ieltspath.game.application.result.RocketRoundEvents;
 import com.ieltspath.game.domain.aggregate.RocketRound;
 import com.ieltspath.game.domain.exception.GameMatchNotFoundException;
 import com.ieltspath.game.domain.exception.SoloGameplayException;
@@ -35,6 +36,7 @@ class RocketGameplayPostgresTest {
     RocketRoundRepositoryAdapter rounds;
     RocketMatchStoreAdapter store;
     RocketGameplayUseCase gameplay;
+    final List<Object> published = new java.util.concurrent.CopyOnWriteArrayList<>();
     Instant now = Instant.parse("2026-10-22T05:00:00Z");
     final UUID user = UUID.randomUUID();
     final List<RocketWord> bank = List.of(word("actor", "Diễn viên (nam)"), word("driver", "Tài xế"),
@@ -53,7 +55,7 @@ class RocketGameplayPostgresTest {
         store = new RocketMatchStoreAdapter(sql) {
             @Override public Instant now() { return now; }
         };
-        gameplay = new RocketGameplayUseCase(store, rounds, new DataSourceTransactionManager(ds), event -> {});
+        gameplay = new RocketGameplayUseCase(store, rounds, new DataSourceTransactionManager(ds), published::add);
     }
 
     /** A started solo match as StartRocketMatchUseCase leaves it: room IN_MATCH, one player, round 1 open. */
@@ -548,5 +550,27 @@ class RocketGameplayPostgresTest {
         assertCode("INVALID_OPTION", () -> gameplay.answer(match, round.roundId(), user, "x", UUID.randomUUID()));
         assertEquals(RocketRound.Status.OPEN.name(),
                 sql.queryForObject("SELECT status FROM game_rocket_rounds WHERE id=?", String.class, round.roundId()));
+    }
+
+    @Test void concurrentSchedulesCloseAnExpiredRoundOnlyOnce() throws Exception {
+        UUID match = start(3);
+        now = now.plusSeconds(16);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var barrier = new java.util.concurrent.CyclicBarrier(2);
+        try {
+            var runs = java.util.stream.Stream.of(1, 2).map(i -> pool.submit(() -> {
+                barrier.await();
+                gameplay.advance(match);
+                return null;
+            })).toList();
+            for (var run : runs) run.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+        long closes = published.stream()
+                .filter(event -> event instanceof RocketRoundEvents.Closed).count();
+        assertEquals(1, closes);
+        assertEquals(1, sql.queryForObject(
+                "SELECT count(*) FROM game_rocket_rounds WHERE match_id=? AND status='CLOSED'", Integer.class, match));
     }
 }
