@@ -133,7 +133,7 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 
 ## Phase 6 closeout — 2026-10-31
 
-Status: DONE_WITH_CONCERNS. Seed repair, audit, proposed-price table, and isolated live-stack scenarios are complete. Points prices for IELTS 5.5 were approved on 2026-10-31, monetary prices for Point and Premium products are still unknown; crash recovery was verified by recreating the persisted post-debit/pre-activation state, not by killing a running process.
+Status: DONE_WITH_CONCERNS. Seed repair, audit, proposed-price table, and isolated live-stack scenarios are complete. Points prices for IELTS 5.5 were approved on 2026-10-31, monetary prices (VND) for the Point and Premium key products were approved the same day; crash recovery was verified by recreating the persisted post-debit/pre-activation state, not by killing a running process.
 
 ### Seed repair and audit
 
@@ -178,7 +178,21 @@ Rule: `10 Points × lessons beyond the first 3`, clamped to 20–50 Points. Prop
 
 - IELTS 5.5 has three priced skills totaling 110 Points; 70% is 77, rounded up to 80. This is above the highest skill price (50), below the sum (110), and under the 100-Point cap.
 - A dash means no proposed price because that skill has no lessons beyond the free preview; no combo is proposed for courses with fewer than three priced skills. Premium opens all lessons and has no Points price.
-- These are Points amounts only, derived from the requested rule. Actual monetary prices for Point and Premium products are unknown. The Points table above was approved by the user on 2026-10-31; R&D may now enter it in the admin course drawer. Monetary prices for the Point and Premium products remain unapproved. No price was written to a database.
+- The Points table above was approved by the user on 2026-10-31; R&D may now enter it in the admin course drawer. No price was written to a database.
+
+### Key product prices (VND, approved 2026-10-31)
+
+`key_products` has no price column and keys are sold outside the application, so these are recorded as the sales decision, not stored in code.
+
+| Code | Product | Price (VND) |
+|---|---|---:|
+| `POINT_50` | 50 AI Points | 59,000 |
+| `POINT_100` | 100 AI Points | 99,000 |
+| `PREMIUM_30D` | Premium 30 days, 4 human grading credits | 149,000 |
+| `PREMIUM_90D` | Premium 90 days, 12 human grading credits | 349,000 |
+
+- About 1,180 VND per Point in the 50 pack and 990 in the 100 pack; the IELTS 5.5 combo (80 Points) costs roughly 79,000–95,000 VND, below Premium 30 days. The 90-day plan is about 22% cheaper than three 30-day plans.
+- These levels are a starting proposal chosen from three options (budget, balanced, premium); they were not validated against market data.
 
 ### Isolated live-stack scenarios
 
