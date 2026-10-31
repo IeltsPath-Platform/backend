@@ -92,7 +92,7 @@ Frontend:
 
 ## Không làm
 
-- Không đổi `video_practice_attempts` (luyện theo video). Nếu thấy cùng lỗi chuỗi giả ở đó, **báo trong `Concerns`**, không sửa.
+- Không đổi `video_practice_attempts` (luyện theo video). Đã chốt 2026-10-31: không có lỗi ở đó. Lượt luyện video không nhận âm thanh (`CreateVideoPracticeAttemptRequest` không có trường audio; `SubmitVideoPracticeUseCase` tạo lượt với `audioReference = null`). Không cần báo hay sửa.
 - Không hỗ trợ admin nghe ghi âm.
 - Không ghi URL ký vào log hoặc DB.
 - Không trả tên bucket hay khóa thô cho client.
@@ -118,4 +118,4 @@ Thử tay trên trình duyệt (Claude hoặc bạn làm, không tự báo "đã
 
 - Không tìm thấy bảng gán examiner cho bài nộp.
 - Trình duyệt tạo MIME nằm ngoài danh sách server.
-- `video_practice_attempts` có cùng lỗi: báo, không tự mở rộng phạm vi.
+- Phát hiện lỗi khác ở luồng Speaking hoặc hồ sơ bài nộp: báo, không tự mở rộng phạm vi.
