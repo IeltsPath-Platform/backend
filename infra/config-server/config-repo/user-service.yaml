@@ -69,7 +69,6 @@ springdoc:
   paths-to-match:
     - /auth/**
     - /api/users/**
-    - /api/learning-support/activities/**
 
 management:
   endpoints:
