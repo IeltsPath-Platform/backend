@@ -104,23 +104,30 @@ clears the range.
 
 - `GET /api/content/assets/{id}` is for `ADMIN` and `CONTENT_AUTHOR` only: asset text can be a transcript. Learners
   receive media through the internal lesson and package payloads that Learning Service and Assessment relay.
-- Content is the only place that builds media URLs (`MediaReferencePolicy`). Images use an `https://` URL or a
-  `data:image/png|jpeg|svg+xml;base64,` URI; audio uses an `https://` URL or an object key joined to
+- Content is the only place that builds media URLs. Images use an `https://` URL or a
+  `data:image/png|jpeg|svg+xml;base64,` URI. `PUBLIC` audio uses an `https://` URL or an object key joined to
   `content.media.base-url` (env `CONTENT_MEDIA_BASE_URL`, an https prefix; blank means keys cannot resolve and the
-  read fails with `INVALID_MEDIA_REFERENCE`).
+  read fails with `INVALID_MEDIA_REFERENCE`). `PREMIUM` lesson audio is signed from the private
+  `content.media.premium-bucket` (`CONTENT_PREMIUM_MEDIA_BUCKET`, default `media-premium`) with a 900-second TTL.
+  Learning requests signed URLs only after its lesson gate allows access; assessment tests, package previews and author
+  reads keep the public media behavior.
 - Audio keys contain ASCII letters/digits, `.`, `_`, `-` and `/` between path segments; they cannot start with `/`
   or contain `..`. A full `https://` reference works without a base URL. Learning Service and Assessment forward
   the resolved URL; they do not build it themselves.
-- The team uploads mp3 files to a public-read cloud bucket. The backend has no upload API, signed URLs or listen-count
-  limit. Keep audio binaries out of Git; the media host must serve `audio/mpeg` and support range requests for playback.
+- Seed audio keys are stored in `media` or `media-premium` according to the asset's `accessTier`; Placement keeps its
+  public key `listening/placement/placement-ls1.mp3`. The public copy of `listening/demo/ls1.mp3` remains until its
+  removal is approved. Authors uploading through `POST /api/content/admin/media/audio` (`CONTENT_AUTHOR`, 25 MB) may
+  choose `tier=PREMIUM`; the generated key under `content-audio/{userId}/` is returned for creating a lesson asset with
+  the matching `accessTier`. Keep audio binaries out of Git; the media host must serve `audio/mpeg` and support range
+  requests for playback. Signed URLs expire after 900 seconds and must not be stored or logged.
 - Audio `text_content` is the transcript. Learning reveals it only after lesson completion or a passed review set
   (≥ 70%); Assessment keeps it out of attempt structure and returns it in `sectionSolutions` only at ≥ 70%.
-- The V12 Listening seed references 8 files to upload under the base URL (record them from the transcripts in the
-  seed; mp3 files are not committed):
+- The V12 Listening seed references 8 audio keys (recordings from the transcripts in the seed; mp3 files are not
+  committed). `ls1.mp3` is a PREMIUM lesson asset; the other listed keys use the public `media` bucket:
 
   | Key | Seconds | Used by |
   | --- | --- | --- |
-  | `listening/demo/ls1.mp3` | 45 | lesson LS1 |
+| `listening/demo/ls1.mp3` | 45 | lesson LS1 (private `media-premium`) |
   | `listening/demo/ls2.mp3` | 50 | lesson LS2 |
   | `listening/demo/numM.mp3` | 30 | practice set PS-NUM |
   | `listening/demo/spellM.mp3` | 35 | practice set PS-SPELL |
@@ -138,6 +145,8 @@ clears the range.
   | `listening/placement/part2.mp3` | 180 | placement Listening Part 2 |
   | `listening/placement/part3.mp3` | 170 | placement Listening Part 3 |
   | `listening/placement/part4.mp3` | 190 | placement Listening Part 4 |
+
+  The original shared V25 Placement sample uses the separate public key `listening/placement/placement-ls1.mp3`.
 
 - The Listening practice tests (V32, durations from V35, keys kept by V39) reference 12 files. The recordings are
   text-to-speech renderings of the transcripts; keep a local copy in `services/content-service/media/` (ignored by
@@ -174,8 +183,10 @@ Configuration (`infra/config-server/config-repo/content-service.yaml`, keys in t
   both sides means a draft fails with `NOT_CONFIGURED`; the service still starts and everything else works.
 - `content.ai.*`: `batch-size`, `stale-after`, `daily-limit` (shared by AI requests and imports, counted separately per
   author and day in `ai_usage_daily`), `max-items-per-request`, `max-course-candidates`, `quota-zone`.
-- `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `CONTENT_MEDIA_BUCKET`: author audio upload; without them the upload answers
-  `503`. Uploaded keys live under `content-audio/` and resolve through `CONTENT_MEDIA_BASE_URL`.
+- `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `CONTENT_MEDIA_BUCKET`, `CONTENT_PREMIUM_MEDIA_BUCKET`: author audio upload;
+  without storage configuration the upload answers `503`. Uploaded keys live under `content-audio/`; PUBLIC keys resolve
+  through `CONTENT_MEDIA_BASE_URL`, while PREMIUM lesson audio is signed from the private premium bucket after access
+  is authorized.
 
 An AI draft never reaches learners: a queued draft is generated by a scheduled job, an author reviews it, and approval
 creates ordinary `DRAFT` content. See [docs/ai-policy.md](../../docs/ai-policy.md#ai-sinh-nội-dung-khu-author-của-content).

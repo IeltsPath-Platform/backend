@@ -87,6 +87,7 @@ class ReviewBasketIntegrationTest {
 
     @BeforeEach
     void stubContent() {
+        LearningContentClientTestSupport.stubLessonAccessSummaries(content);
         List<UUID> kps = List.of(kpConsolidate, kpDue, kpLater, kpPriority);
         when(content.getTopicSequence()).thenReturn(List.of(new Topic(topic, "READ", "Reading", 1, null,
                 List.of(new KnowledgePoint(kpConsolidate, "CONSOLIDATE_ME", "Consolidate me", "PROCEDURE", "READING", "", true),

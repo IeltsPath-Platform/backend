@@ -9,6 +9,15 @@ dependencies: []
 
 # Phase 1: Bucket config cleanup and missing audio
 
+## Phân công
+
+- **Claude và bạn**, không giao Codex: ghi lên Supabase cần xác nhận từng bước; 20 mp3 do bạn thu và upload; `.env` do bạn điền.
+- Đã xong: `community` và `media` đã chỉnh (2026-10-31); compose đã đổi mặc định (`f708ef9d`).
+- 20 mp3 đã upload và kiểm (2026-10-31): `listening/demo/` 8 file, `listening/practice/` 12 file, đều trả `200 audio/mpeg`. Kích thước khớp file local.
+- Còn lại: dọn file thử (chờ kiểm DB đã migrate đủ), xác nhận giá trị `CONTENT_MEDIA_BASE_URL` thật.
+- Ảnh `writing/lessons/PS-W1-WR-3/ps-w1-wr-3-marriage-age.png` đã upload (thuộc phase 6, ghi ở đây cho đủ).
+- Đã làm thêm (2026-10-31, theo duyệt một lần): 86 ảnh WebP đã upload (`practice/covers/` 70, `writing/charts/` 16); bucket `media-premium` riêng tư đã tạo và `ls1.mp3` đã copy sang đó (phase 7). Bản công khai `ls1.mp3` vẫn còn, chưa xóa.
+
 ## Overview
 
 Không đổi code. Chỉnh cấu hình bucket cho khớp code, nạp 20 file mp3 Listening còn thiếu, đặt `CONTENT_MEDIA_BASE_URL`, dọn file thử. Làm trước vì các phase sau (ảnh bìa, khóa Writing) cần base URL đúng và bucket `media` cấu hình đủ.

@@ -8,6 +8,7 @@ import com.ieltspath.content.application.command.UpdateCourseCommand;
 import com.ieltspath.content.application.usecase.CreateCourseUseCase;
 import com.ieltspath.content.application.usecase.UpdateCourseUseCase;
 import com.ieltspath.content.application.usecase.ListCoursesUseCase;
+import com.ieltspath.content.domain.vo.MediaReferencePolicy;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,11 +23,12 @@ public class CourseController {
     private final CreateCourseUseCase createCourse;
     private final UpdateCourseUseCase updateCourse;
     private final ListCoursesUseCase listCourses;
+    private final MediaReferencePolicy mediaPolicy;
 
     @GetMapping("/api/content/courses")
     @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'CUSTOMER', 'EXAMINER')")
     public List<CourseResponse> list() {
-        return listCourses.execute().stream().map(CourseResponse::from).toList();
+        return listCourses.execute().stream().map(result -> CourseResponse.from(result, mediaPolicy)).toList();
     }
 
     @PostMapping("/api/content/admin/courses")
@@ -35,7 +37,7 @@ public class CourseController {
     public CourseResponse create(@Valid @RequestBody CreateCourseRequest request) {
         return CourseResponse.from(createCourse.execute(new CreateCourseCommand(request.code(), request.name(),
                 request.bandLevel(), request.coverImageUrl(), request.description(), request.skillUnlockPoints(),
-                request.comboUnlockPoints())));
+                request.comboUnlockPoints())), mediaPolicy);
     }
 
     @PutMapping("/api/content/admin/courses/{id}")
@@ -43,6 +45,6 @@ public class CourseController {
     public CourseResponse update(@PathVariable("id") UUID id, @Valid @RequestBody UpdateCourseRequest request) {
         return CourseResponse.from(updateCourse.execute(new UpdateCourseCommand(id, request.name(),
                 request.bandLevel(), request.status(), request.coverImageUrl(), request.description(),
-                request.skillUnlockPoints(), request.comboUnlockPoints())));
+                request.skillUnlockPoints(), request.comboUnlockPoints())), mediaPolicy);
     }
 }

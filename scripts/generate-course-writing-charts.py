@@ -228,7 +228,7 @@ def main():
             path = OUTPUT / f'{name}.png'
             if path.exists():
                 task_code = task_codes[name]
-                archive.write(path, arcname=f'writtings/leassons/{task_code}/{path.name}')
+                archive.write(path, arcname=f'writing/lessons/{task_code}/{path.name}')
         for filename in ['README.md', 'upload-urls.csv']:
             path = OUTPUT / filename
             if path.exists():

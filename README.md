@@ -255,7 +255,8 @@ Java chạy trên host (IDE hoặc `java -jar`); Compose chỉ chạy DB và Rab
 | `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | Broker trong compose; assessment và Learning Service trên host phải dùng đúng cặp này (mặc định `guest` sẽ fail) |
 | `GATEWAY_INTERNAL_JWT_SECRET` | Gateway và toàn bộ downstream service phải dùng cùng giá trị, lệch sẽ trả 401 |
 | `EXTERNAL_JWT_SECRET` | User Service ký token, Gateway xác thực |
-| `CONTENT_MEDIA_BASE_URL` | Prefix https của bucket chứa mp3 Listening; thiếu thì bài Listening trả 500 `INVALID_MEDIA_REFERENCE` |
+| `CONTENT_MEDIA_BASE_URL` | Prefix https của bucket công khai `media` cho asset PUBLIC; thiếu thì key PUBLIC trả 500 `INVALID_MEDIA_REFERENCE` |
+| `CONTENT_PREMIUM_MEDIA_BUCKET` | Bucket riêng tư cho audio lesson PREMIUM; mặc định `media-premium`, URL ký có hạn 900 giây |
 | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` | Endpoint OpenAI-compatible để Learning Service chấm bài luận Writing; thiếu thì nộp bài luận trả 503 `GRADING_UNAVAILABLE`. API key là secret. Gemini: base URL `https://generativelanguage.googleapis.com/v1beta/openai`, model `gemini-3.8-flash` (đã thử 2026-10-02; `gemini-2.5-flash` không còn cấp cho key mới) |
 | `LEARNING_LLM_REASONING_EFFORT` | Mức suy luận gửi cho model. Với `gemini-3.8-flash` đặt `low`: mặc định của client cho `gemini-3*` là `minimal`, model này trả 400 |
 | `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL` | Endpoint OpenAI-compatible để Assessment Service chấm essay trong thi topic/course. Thiếu cấu hình, lỗi LLM hoặc hết hạn mức ngày thì chuyển bài sang EXAMINER; bài thi MOCK vẫn do EXAMINER chấm. API key là secret. |

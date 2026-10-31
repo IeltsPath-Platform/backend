@@ -34,10 +34,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.nio.charset.StandardCharsets;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -68,7 +66,7 @@ class LessonPipelineSeedTest {
         dataSource.setUrl(POSTGRES.getJdbcUrl());
         dataSource.setUser(POSTGRES.getUsername());
         dataSource.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").target("89").load().migrate();
+        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(dataSource);
         reader = new JdbcLearningContentReader(jdbc);
     }
@@ -85,6 +83,41 @@ class LessonPipelineSeedTest {
                 "INSERT INTO content_packages (code, title, package_type) VALUES ('LESSON-PKG', 'x', 'LESSON')"));
         assertThat(topicTest).isEqualTo(1);
         assertThat(lessonPackage).isEqualTo(1);
+    }
+
+    @Test
+    void sharedListeningRecordingIsPremiumForLessonsAndPublicForPlacement() {
+        UUID lessonId = UUID.fromString("23000000-0000-4000-8000-030000000001");
+        UUID originalAssetId = UUID.fromString("23000000-0000-4000-8000-050000000001");
+        UUID placementAssetId = UUID.fromString("2b000000-0000-4000-8000-050000000001");
+
+        var lesson = reader.publishedLesson(lessonId).orElseThrow();
+        var lessonAudio = lesson.blocks().stream().filter(block -> block.asset() != null)
+                .map(LessonContentResult.Block::asset).filter(asset -> asset.assetType() == AssetType.AUDIO)
+                .findFirst().orElseThrow();
+        Map<String, Object> lessonAsset = jdbc.getJdbcTemplate().queryForMap(
+                "SELECT id, media_reference, access_tier FROM content_assets WHERE id = ?", originalAssetId);
+        Map<String, Object> placementAsset = jdbc.getJdbcTemplate().queryForMap("""
+                SELECT a.id, a.media_reference, a.access_tier
+                FROM content_asset_links al
+                JOIN content_assets a ON a.id = al.asset_id
+                WHERE al.id = '2b000000-0000-4000-8000-0c0000000001'
+                  AND al.section_id = '2b000000-0000-4000-8000-0a0000000001'
+                """);
+        var placement = new GetPackageVersionContentUseCase(reader, MEDIA).execute(
+                UUID.fromString("2b000000-0000-4000-8000-090000000001"));
+        String placementAudioUrl = placement.sections().stream().map(PackageVersionContentResult.Section::audio)
+                .filter(java.util.Objects::nonNull).map(PackageVersionContentResult.SectionAudio::mediaUrl)
+                .findFirst().orElseThrow();
+
+        assertThat(lessonAudio.accessTier().name()).isEqualTo("PREMIUM");
+        assertThat(lessonAsset.get("media_reference")).isEqualTo("listening/demo/ls1.mp3");
+        assertThat(lessonAsset.get("access_tier")).isEqualTo("PREMIUM");
+        assertThat(placementAsset.get("id")).isEqualTo(placementAssetId);
+        assertThat(placementAsset.get("media_reference")).isEqualTo("listening/placement/placement-ls1.mp3");
+        assertThat(placementAsset.get("access_tier")).isEqualTo("PUBLIC");
+        assertThat(placementAudioUrl)
+                .isEqualTo("https://media.example.test/ieltspath/listening/placement/placement-ls1.mp3");
     }
 
     @Test
@@ -634,7 +667,7 @@ class LessonPipelineSeedTest {
         assertThat(chart).singleElement().satisfies(row -> {
             assertThat(row.get("asset_type")).isEqualTo("IMAGE");
             String mediaReference = (String) row.get("media_reference");
-            assertThat(mediaReference).isEqualTo("https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W1-WR-3/ps-w1-wr-3-marriage-age.png");
+            assertThat(mediaReference).isEqualTo("https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writing/lessons/PS-W1-WR-3/ps-w1-wr-3-marriage-age.png");
             assertThat(MEDIA.resolve(AssetType.IMAGE, mediaReference)).isEqualTo(mediaReference);
         });
     }
@@ -652,10 +685,10 @@ class LessonPipelineSeedTest {
                 WHERE p.code IN ('PS-W1-WR-1', 'PS-W1-WR-2', 'PS-W5-WR-1', 'PS-W5-WR-2')
                 """, Map.of()).forEach(row -> chartUrls.put((String) row.get("code"), (String) row.get("media_reference")));
         assertThat(chartUrls).isEqualTo(Map.of(
-                "PS-W1-WR-1", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W1-WR-1/ps-w1-wr-1-car-ownership.png",
-                "PS-W1-WR-2", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W1-WR-2/ps-w1-wr-2-family-spending.png",
-                "PS-W5-WR-1", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W5-WR-1/ps-w5-wr-1-park-visitors.png",
-                "PS-W5-WR-2", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W5-WR-2/ps-w5-wr-2-fuel-prices.png"));
+                "PS-W1-WR-1", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writing/lessons/PS-W1-WR-1/ps-w1-wr-1-car-ownership.png",
+                "PS-W1-WR-2", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writing/lessons/PS-W1-WR-2/ps-w1-wr-2-family-spending.png",
+                "PS-W5-WR-1", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writing/lessons/PS-W5-WR-1/ps-w5-wr-1-park-visitors.png",
+                "PS-W5-WR-2", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writing/lessons/PS-W5-WR-2/ps-w5-wr-2-fuel-prices.png"));
     }
 
     @Test
@@ -818,14 +851,9 @@ class LessonPipelineSeedTest {
         assertThat(question.assets()).hasSize(1);
         assertThat(chart.assetType()).isEqualTo(AssetType.IMAGE);
         assertThat(chart.altText()).startsWith("Bar chart of July afternoon roof temperatures");
-        String prefix = "data:image/svg+xml;base64,";
-        assertThat(chart.mediaUrl()).startsWith(prefix);
-        byte[] svg = Base64.getDecoder().decode(chart.mediaUrl().substring(prefix.length()));
-        assertThat(svg.length).isLessThanOrEqualTo(8 * 1024);
-        String drawn = new String(svg, StandardCharsets.UTF_8);
+        assertThat(chart.mediaUrl()).isEqualTo("https://media.example.test/ieltspath/writing/charts/22000000-0000-4000-8000-050000000001.webp");
         for (String figure : List.of("82", "45", "33", "74", "41", "30", "61", "35", "25")) {
             assertThat(spec.get("chartFacts").asText()).contains(figure);
-            assertThat(drawn).as("chart shows " + figure).contains(">" + figure + "<");
         }
     }
     @Test

@@ -24,6 +24,8 @@ content:
     base-url: ${CONTENT_MEDIA_BASE_URL:}
     # Bucket that author uploads go to; new files live under content-audio/ so seeded files are never overwritten.
     bucket: ${CONTENT_MEDIA_BUCKET:media}
+    premium-bucket: ${CONTENT_PREMIUM_MEDIA_BUCKET:media-premium}
+    premium-url-ttl-seconds: 900
   # Language model for AI drafts (OpenAI-compatible). Blank values mean drafts fail with NOT_CONFIGURED; the rest of the
   # service still starts. Keys live only in the gitignored .env file. A CONTENT_LLM_* value wins; when it is not set the
   # learning service's LEARNING_LLM_* value is used, so one model configuration serves both.

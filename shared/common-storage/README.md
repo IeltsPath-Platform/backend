@@ -38,6 +38,64 @@ app:
 - Cả hai trống: service vẫn khởi động, mọi lệnh storage ném `UNAVAILABLE`.
 - `SUPABASE_*` là tên biến môi trường. Hiện chưa có service nào ánh xạ chúng vào config-repo; việc đó thuộc plan của từng service.
 
+## Bucket
+
+Module không biết bucket nào công khai; bảng dưới là quy ước chung của cả hệ thống. Cột "Trạng thái" ghi tình trạng
+theo kiểm kê ngày 2026-10-31.
+
+| Bucket | Công khai | Dùng để | Giới hạn | Loại file (MIME) | Chủ | Khóa thường gặp | Trạng thái |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `avatars` | có | Ảnh đại diện học viên | 2 MB | png, jpeg, webp | user-service | `images/{userId}/{uuid}.{ext}` | đã có |
+| `flashcards` | có | Ảnh thẻ, bìa bộ thẻ, bìa catalog từ vựng | 2 MB | png, jpeg, webp | library-service | `images/{userId}/{uuid}.{ext}`; bìa catalog `catalog-cover/{userId}/{uuid}.{ext}` | đã có; bìa catalog là kế hoạch |
+| `community` | có | Ảnh bài đăng cộng đồng | 5 MB | png, jpeg, webp, gif | community-service | `community/post/{userId}/{uuid}.{ext}` | đã có |
+| `media` | có | Audio và ảnh nội dung bài học | 25 MB | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service | seed: `listening/demo/ls1.mp3`; upload API: `content-audio/{userId}/{uuid}.{ext}` | đã có |
+| `speaking-recordings` | không | Ghi âm Speaking của học viên | 5 MB | webm, mp4, ogg, mpeg, wav | assessment-service | `speaking/{userId}/{uuid}.{ext}` | đang dùng (upload ghi âm Speaking) |
+| `media-premium` | không | Audio bài trả phí, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | đã tạo, riêng tư |
+
+Biến cấu hình tên bucket: `USER_AVATAR_BUCKET`, `LIBRARY_FLASHCARD_BUCKET`, `COMMUNITY_MEDIA_BUCKET`,
+`CONTENT_MEDIA_BUCKET`, `CONTENT_PREMIUM_MEDIA_BUCKET`.
+Giới hạn trong code là nguồn chuẩn; giới hạn bucket phải bằng hoặc lớn hơn giới hạn code.
+
+### URL mẫu
+
+`<project-ref>` là ref của project Supabase; `<key>` là khóa object.
+
+Công khai, cho bucket có `public = true`. `publicUrl(bucket, key)` chỉ ghép chuỗi, không gọi mạng:
+
+```
+https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>/<key>
+https://<project-ref>.supabase.co/storage/v1/object/public/media/listening/demo/ls1.mp3
+```
+
+Ký có hạn, cho bucket riêng tư. `signedDownloadUrl(bucket, key, ttl)` gọi mạng, trả URL dùng được trong `ttl`:
+
+```
+https://<project-ref>.supabase.co/storage/v1/object/sign/<bucket>/<key>?token=<jwt>
+```
+
+- `ttl` phải từ 1 giây đến **15 phút** (`MAX_TTL`); ngoài khoảng này module từ chối.
+- URL ký là bí mật: không lưu vào DB, không ghi log. Cấp lại mỗi lần cần.
+
+Upload ký, cho file lớn qua `signedUploadUrl(bucket, key)`. Không có tham số hạn; Supabase quyết định thời gian hiệu lực:
+
+```
+https://<project-ref>.supabase.co/storage/v1/object/upload/sign/<bucket>/<key>?token=<jwt>
+```
+
+Biến `CONTENT_MEDIA_BASE_URL` của content-service là tiền tố công khai của bucket `media`, dạng
+`https://<project-ref>.supabase.co/storage/v1/object/public/media/`, có `/` cuối. Khóa tương đối được ghép vào tiền tố này.
+
+Content đánh dấu mỗi asset bằng `access_tier`: `PUBLIC` được resolve qua bucket `media`; `PREMIUM` được cấp URL ký
+từ bucket riêng tư `media-premium` với TTL 900 giây. Learning chỉ yêu cầu URL ký sau khi lesson gate cho phép đọc.
+URL ký không lưu vào DB hoặc log; cần URL mới thì service xin lại.
+
+### Khóa object
+
+- `ObjectKeys.forUser(prefix, userId, ext)` sinh `{prefix}/{userId}/{uuid}.{ext}`.
+- `prefix`: chữ thường, số, dấu `-`, tối đa 32 ký tự. `ext`: 1 đến 5 ký tự chữ thường hoặc số.
+- Khóa do người quản trị đặt tay (seed): mỗi đoạn gồm `A-Z a-z 0-9 . _ -`, bắt đầu bằng chữ hoặc số, tối đa 100 ký tự; không có `..`, không bắt đầu bằng `/`.
+- Tên bucket: chữ thường, số, `_`, `-`; dài 3 đến 63 ký tự.
+
 ## Quy tắc khi dùng
 
 - **Key do client gửi lại:** gọi `ObjectKeys.requireOwnedBy` và `ObjectStorage.exists` trước khi lưu. Thư viện không ép

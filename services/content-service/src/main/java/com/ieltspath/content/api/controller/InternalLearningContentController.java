@@ -17,6 +17,7 @@ import com.ieltspath.content.application.command.CountPracticeSetsCommand;
 import com.ieltspath.content.application.command.SearchPracticeSetsCommand;
 import com.ieltspath.content.application.usecase.CountAvailablePracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetActiveKnowledgePrerequisitesUseCase;
+import com.ieltspath.content.domain.vo.MediaReferencePolicy;
 import com.ieltspath.content.application.usecase.GetLessonPracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetTopicPracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetLessonContentUseCase;
@@ -63,6 +64,7 @@ public class InternalLearningContentController {
     private final GetPlacementTestPackagesUseCase getPlacementTestPackages;
     private final ListErrorTypesUseCase listErrorTypes;
     private final GetActiveKnowledgePrerequisitesUseCase getActiveKnowledgePrerequisites;
+    private final MediaReferencePolicy mediaPolicy;
 
     @PostMapping("/knowledge-points/prerequisites")
     public Map<UUID, List<UUID>> knowledgePointPrerequisites(
@@ -116,7 +118,8 @@ public class InternalLearningContentController {
     @GetMapping("/topic-sequence")
     public List<TopicSequenceResponse> topicSequence(
             @RequestParam(value = "includeErrorTraps", defaultValue = "false") boolean includeErrorTraps) {
-        return getTopicSequence.execute(includeErrorTraps).stream().map(TopicSequenceResponse::from).toList();
+        return getTopicSequence.execute(includeErrorTraps).stream()
+                .map(result -> TopicSequenceResponse.from(result, mediaPolicy)).toList();
     }
 
     @GetMapping("/topics/{id}/lessons")
@@ -125,8 +128,17 @@ public class InternalLearningContentController {
     }
 
     @GetMapping("/lessons/{id}")
-    public LessonContentResponse lesson(@PathVariable("id") UUID lessonId) {
-        return LessonContentResponse.from(getLessonContent.execute(lessonId));
+    public LessonContentResponse lesson(@PathVariable("id") UUID lessonId,
+                                        @RequestParam(value = "signedAudio", defaultValue = "false") boolean signedAudio) {
+        return LessonContentResponse.from(getLessonContent.execute(lessonId, signedAudio));
+    }
+
+    @GetMapping("/lessons/{id}/access")
+    public LessonSummaryResponse lessonAccess(@PathVariable("id") UUID lessonId) {
+        var lesson = getLessonContent.accessSummary(lessonId);
+        return new LessonSummaryResponse(lesson.lessonId(), lesson.topicId(), lesson.code(), lesson.title(),
+                lesson.summary(), lesson.sortOrder(), lesson.knowledgePointIds(), List.of(), lesson.skills(), null,
+                lesson.courseId(), lesson.skill(), lesson.skillPosition());
     }
 
     @GetMapping("/topics/{id}/test-packages")

@@ -30,7 +30,7 @@ class MultiSkillSeedTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("89").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("92").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
         reader = new JdbcLearningContentReader(jdbc);
     }

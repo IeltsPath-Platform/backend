@@ -2,6 +2,7 @@ package com.ieltspath.content.api.dto.internal;
 
 import com.ieltspath.content.application.result.TopicSequenceResult;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.domain.vo.MediaReferencePolicy;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -38,5 +39,18 @@ class TopicSequenceResponseTest {
         assertThat(response.description()).isNull();
         assertThat(response.course().coverImageUrl()).isNull();
         assertThat(response.course().description()).isNull();
+    }
+
+    @Test
+    void resolvesCourseImageKeysAndKeepsTheTopicSequenceAvailableWithoutABaseUrl() {
+        var course = new TopicSequenceResult.CourseEntry(UUID.randomUUID(), "IELTS_6_5", "IELTS 6.5",
+                new BigDecimal("6.5"), true, true, "content-image/u/cover.png", "Course overview");
+        var result = new TopicSequenceResult(UUID.randomUUID(), "READING_6_5", "Reading 6.5", 1,
+                null, List.of(), Skill.READING, true, course, List.of(Skill.READING));
+
+        assertThat(TopicSequenceResponse.from(result, new MediaReferencePolicy("https://cdn.example/media"))
+                .course().coverImageUrl()).isEqualTo("https://cdn.example/media/content-image/u/cover.png");
+        assertThat(TopicSequenceResponse.from(result, new MediaReferencePolicy(""))
+                .course().coverImageUrl()).isNull();
     }
 }

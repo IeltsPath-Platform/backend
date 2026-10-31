@@ -11,12 +11,18 @@ dependencies: [1, 3]
 
 <!-- Updated: Validation Session 1 - phạm vi mở rộng sang biểu đồ Writing; WebP; base URL mặc định compose đã đổi -->
 
+## Phân công
+
+- **Claude** làm bước 1 đến 5: kiểm kê id (truy vấn chỉ đọc), kiểm luồng chấm dùng biểu đồ (bước 2), xuất WebP, lưu bản sao lưu SVG ngoài repo, upload lên `media` (xin xác nhận từng lần ghi).
+- Claude xuất một file danh sách `id → khóa` trong thư mục plan để Codex dùng viết migration.
+- **Codex** làm bước 3 và 6 (test và migration `V90`) **sau** khi Claude báo đã upload đủ. Brief: `briefs/codex-phase-04-inline-images.md`. Đã kiểm kê trên DB tạm chạy đủ 89 migration: 58 bìa và 28 biểu đồ = 86 dòng, khớp plan. Danh sách: `data/phase-04-inline-images.csv`.
+
 ## Overview
 
 Chuyển ảnh nhúng dạng data URI SVG base64 trong `content_assets.media_reference` sang file WebP trên bucket `media`; DB chỉ giữ khóa. Gồm hai nhóm:
 
 - **Bìa phần đề luyện tập:** 58 dòng do `V34__practice_test_topic_covers.sql` đặt.
-- **Biểu đồ Writing:** khoảng 28 chỗ trong `V11`, `V37`, `V38`, `V44` (con số cuối lấy từ kiểm kê DB ở bước 1, vì các migration ghi đè lên nhau).
+- **Đã kiểm lại (2026-10-31):** 86 ảnh gồm 70 bìa (58 của V34 và 12 ảnh chữ T1/T2 khác) và 16 biểu đồ thật (có trục, nhãn). Con số "28 biểu đồ" trước đây là sai, vì gộp cả 12 ảnh chữ vào. Nguồn: `V11`, `V32`, `V37`, `V38`, `V44` (con số cuối lấy từ kiểm kê DB ở bước 1, vì các migration ghi đè lên nhau).
 
 Tên phase giữ nguyên như plan; phạm vi gồm cả hai nhóm (quyết định đã chốt ở phiên validate 1).
 

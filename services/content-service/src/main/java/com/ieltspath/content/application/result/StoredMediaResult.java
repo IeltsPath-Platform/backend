@@ -1,6 +1,6 @@
 package com.ieltspath.content.application.result;
 
-public record StoredAudioResult(
+public record StoredMediaResult(
         String key,
         String url,
         String contentType,

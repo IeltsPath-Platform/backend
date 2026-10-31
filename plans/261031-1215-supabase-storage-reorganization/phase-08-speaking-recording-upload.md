@@ -9,6 +9,12 @@ dependencies: [1]
 
 # Phase 8: Speaking recording upload
 
+## Phân công
+
+- **Codex**, theo `briefs/codex-phase-08-speaking-upload.md` (backend và frontend). **Claude review** trước khi merge vì liên quan dữ liệu giọng nói và quyền nghe lại.
+- Đã có quyết định: 90 ngày, chủ bài và examiner được giao nghe lại, TTL 900 giây.
+- Điều kiện: Codex phải tìm được bảng gán examiner trước khi viết endpoint nghe lại; nếu không tìm thấy thì dừng.
+
 ## Overview
 
 Ghi âm Speaking hiện không được lưu: `SpeakingSectionRunner.tsx:82` gửi `audioReference: local-recording:{attemptId}:{itemId}` (chuỗi giả), cột `audio_reference` của `learner_submissions` (và `video_practice_attempts`) chỉ giữ chuỗi đó. Phase này làm upload thật vào bucket riêng tư `speaking-recordings`, nghe lại qua URL ký, và xóa theo thời hạn lưu. Ghi âm là dữ liệu cá nhân (giọng nói).

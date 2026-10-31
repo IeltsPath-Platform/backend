@@ -26,11 +26,14 @@ final class CatalogText {
         return text;
     }
 
-    /** Covers are stored as object keys; a full URL would bypass the storage that resolves them. */
+    /** Covers must stay inside the catalog-cover namespace and contain only safe key characters. */
     static String coverKey(String value) {
         String key = optional(value, 500, "coverKey");
-        if (key != null && key.regionMatches(true, 0, "http", 0, 4)) {
-            throw new InvalidDataException("coverKey must be an object key, not a URL");
+        if (key != null && (!key.startsWith("catalog-cover/")
+                || key.startsWith("/")
+                || key.contains("..")
+                || !key.matches("[A-Za-z0-9._/-]+"))) {
+            throw new InvalidDataException("coverKey must be a safe catalog-cover object key");
         }
         return key;
     }

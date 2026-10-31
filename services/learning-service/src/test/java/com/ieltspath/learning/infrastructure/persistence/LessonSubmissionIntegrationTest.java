@@ -111,6 +111,7 @@ class LessonSubmissionIntegrationTest {
 
     @BeforeEach
     void resetDataAndCurriculum() {
+        LearningContentClientTestSupport.stubLessonAccessSummaries(content);
         jdbc.execute("""
                 TRUNCATE review_theory_checks, diagnostic_probes, diagnostic_sessions,review_sets, review_items, practice_attempts, lesson_practice_passes,
                 lesson_exercise_submissions, kp_evidence,
@@ -231,7 +232,7 @@ class LessonSubmissionIntegrationTest {
         assertNull(read.get(1).hint());
         assertEquals(tfng.hint(), read.get(2).hint());
         assertNull(read.get(3).hint());
-        verify(content, times(1)).getLesson(LESSON);
+        verify(content, times(1)).getLesson(LESSON, true);
     }
 
     @Test

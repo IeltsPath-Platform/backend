@@ -63,6 +63,7 @@ class ContentAuthorizationWebMvcTest {
     @MockitoBean ListCoursesUseCase listCourses;
     @MockitoBean CreateCourseUseCase createCourse;
     @MockitoBean UpdateCourseUseCase updateCourse;
+    @MockitoBean MediaReferencePolicy mediaReferencePolicy;
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
