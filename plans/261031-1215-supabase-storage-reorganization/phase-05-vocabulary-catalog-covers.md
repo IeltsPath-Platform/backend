@@ -14,7 +14,7 @@ dependencies: [1]
 ## Phân công
 
 - **Codex**, theo `briefs/codex-phase-05-catalog-covers.md`. Claude review.
-- Điều kiện: phase 3 đã merge (dùng `mediaUploadApi.ts`). Seed không đặt `cover_key`; `library_db` thật chưa kiểm được (cần người dùng chạy truy vấn ở bước 2 trên DB đang dùng). Chưa có kết quả thì Codex không siết `CatalogText`.
+- Điều kiện: phase 3 đã merge (dùng `mediaUploadApi.ts`). Đã kiểm `library_db` local (Flyway V4, chưa có bảng catalog, nên không có `cover_key`) và seed V19/V20 không đặt `cover_key`: Codex được siết `CatalogText`. DB triển khai khác (nếu có) cần chạy lại truy vấn bước 2 trước khi deploy.
 
 ## Overview
 

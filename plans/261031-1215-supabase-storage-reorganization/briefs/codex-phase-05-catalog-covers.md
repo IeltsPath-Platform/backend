@@ -6,7 +6,7 @@ Kết quả: `Status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT`, kèm
 ## Điều kiện bắt đầu
 
 - Phase 3 đã merge vào `feat/supabase-storage-reorganization` (cần `mediaUploadApi.ts` ở frontend).
-- Kiểm dữ liệu (2026-10-31): migration seed của library-service (V19, V20) **không** đặt `cover_key`; `CatalogText.coverKey` đã từ chối URL từ trước nên chỉ còn khóa tương đối. Claude **chưa** đọc được `library_db` thật (Postgres của stack không chạy; project Supabase không chứa bảng ứng dụng). Mặc định: **không siết** `CatalogText` (bước 4 "có điều kiện") cho tới khi người dùng chạy truy vấn ở bước 2 trên DB đang dùng và dán kết quả cho Claude. Nếu có khóa không bắt đầu bằng `catalog-cover/`, dừng và hỏi.
+- Kiểm dữ liệu (2026-10-31): migration seed của library-service (V19, V20) **không** đặt `cover_key`; `CatalogText.coverKey` đã từ chối URL từ trước nên chỉ còn khóa tương đối. Claude đã chạy truy vấn bước 2 trên `library_db` của stack local (volume `ieltspath_postgres-data`): DB mới tới Flyway V4, **chưa có bảng `vocabulary_topics`/`vocabulary_sets`**, nên không có `cover_key` nào. Project Supabase không chứa bảng ứng dụng, và chưa có môi trường nào khác để kiểm. Kết luận: không có dữ liệu cũ bị ảnh hưởng ở local; siết `CatalogText` (bước 4) được phép. Nếu R&D có DB triển khai riêng, người đó chạy lại truy vấn trước khi deploy.
 
 ## Nhánh và PR
 
