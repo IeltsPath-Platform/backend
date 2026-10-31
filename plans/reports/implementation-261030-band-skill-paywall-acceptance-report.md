@@ -115,9 +115,9 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 
 - Updated `lesson-learning-v1.md` with per-skill topic progression, course unlock fields, `POST /courses/{id}/unlocks`, idempotency and lesson/free-practice paywall behavior. Updated `access-points-v1.md` with the service-to-service debit contract and `COURSE_UNLOCK_DEBIT` ledger mapping.
 - Extended `course-skill-content-audit.sql` with published lesson counts and counts beyond the 3-lesson free preview for every `(course, skill)`, including zero-content skills.
-- The last recorded content audit found one unskilled topic (`TREES_MULTI_SKILL`), five mismatched knowledge points and two multi-skill lessons (`T1`, `T2`). These are unchanged content-owner prerequisites and were not auto-fixed.
-- The audit query was not run against a development database because none was running. Access source contains key product entitlements but no monetary prices for Point/Premium products. Assessment V2 seeds Writing AI grading at 3 Points. The money-to-Points conversion and product-approved price table still cannot be derived without monetary price inputs and owner sign-off. No R&D price was entered.
-- Contract/audit documentation commit: `89cd9f97`. The database counts, content-owner fixes, approved price table and manual live scenarios remain outstanding.
+- Before the Phase 6 repair, the content audit found one unskilled tree topic, five mismatched knowledge points and two multi-skill tree lessons. V89 repairs these seed facts; the migrated-database audit now returns no violations in all three checks.
+- A persistent development database was not run or inspected. Access source contains key product entitlements but no monetary prices for Point/Premium products. Assessment V2 seeds Writing AI grading at 3 Points. The money-to-Points conversion and product-approved price table still require monetary price inputs and owner sign-off. No price was entered in a persistent database.
+- Contract/audit documentation commit: `89cd9f97`. Course counts and the clean-audit results are recorded in Phase 6 closeout below; approved prices and live-stack scenarios are handled separately.
 
 ## Fix round acceptance — 2026-10-31
 
@@ -130,12 +130,36 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 - Hygiene: `backend/.m2/` is locally excluded through `.git/info/exclude`, not shared `.gitignore`. The service-boundary cleanup plan was left untouched.
 - Acceptance: backend paywall/fallback/listing fixes and regression coverage are complete; all three backend full suites passed. Frontend checks passed except the two unrelated flaky owl-reaction copy assertions in the single required full run. Live browser scenarios and monetary prices were not verified and remain out of scope.
 
-## Phase 6 continuation — 2026-10-31
+## Phase 6 closeout — 2026-10-31
 
-- Re-ran the requested frontend checks: `npm run typecheck` and `npm run lint` passed; learning-path/admin-courses Vitest passed **234/234 tests across 37 files**.
-- The next full frontend run reproduced the random owl-copy assertion failure (1,696/1,697). An isolated run failed both assertions that assumed a specific random copy. The tests now inject a deterministic random function only for those two assertions; product copy selection remains random. The isolated owl suite then passed **21/21**, and the final full run passed **1,697/1,697 across 202 files**.
-- Backend suite totals remain the latest full runs from the fix round above: content-service reactor **1,146 run / 0 failed / 0 errors / 4 skipped** (target module 1,077, 1 skipped); learning-service reactor **1,069 / 0 / 0 / 0** (target module 1,043); access-service reactor **103 / 0 / 0 / 0** (target module 77). No backend source changed after those runs.
-- The audit SQL and known content violations remain documented, but the published-lesson count query has **not** been run against a persistent development `content_db`. Docker exposed only a temporary Testcontainers database during this session, not a development database; the persistent Compose database was not started or inspected. Therefore per-course/per-skill counts and the clean-audit-before-go-live criterion remain unverified.
-- Price proposal, product-owner sign-off, and R&D entry/price-change verification remain blocked by missing business inputs: actual monetary prices for Point and Premium keys, an agreed combo discount, and owner approval. No prices were guessed or entered. Assessment's demo seed still indicates AI Writing grading costs 3 Points.
-- Live scenarios requiring an authenticated running stack or a real learner were not executed: purchase/admin price changes and subsequent purchase, crash/recovery between debit and activation, real grandfathered-row counts, Premium expiry, and end-to-end learner UI behavior. Automated backend coverage and the API contracts are recorded above, but they are not substitutes for these live checks.
-- **Acceptance status: Phase 6 remains partial.** Code fixes, contracts, automated backend checks, frontend static checks, focused tests, and the full frontend suite pass. The database audit/counts, content-owner cleanup decision, approved prices/admin verification, and live-stack scenarios still need their required data, owner sign-off, or environment. The plan decisions and seed data were left unchanged.
+Status: IN_PROGRESS. The seed repair and audit are complete. The proposed-price table and isolated live-stack scenarios are recorded in separate follow-up updates.
+
+### Seed repair and audit
+
+- Added V89. Existing topic `2a000000-0000-4000-8000-010000000001` is now `TREES_READING`; created `TREES_LISTENING` (`...010000000002`) and `TREES_WRITING` (`...010000000003`). Existing Reading lessons `...030000000001/002` keep their identities. Added skill-specific lessons `...030000000003`–`...030000000006` (`T1_L`, `T2_L`, `T1_W`, `T2_W`).
+- Moved `TR_L_DETAIL` to Listening, `TR_W_OPINION` to Writing, and the Reading trap point to Reading. Reassigned lesson blocks and Listening audio resource `31000000-0000-4000-8000-000000000007`; Reading resources remain attached to the original T1.
+- Kept Reading practice packages in place, attached the existing Listening and Writing practice packages to `T1_L` and `T1_W`, and archived the mixed-skill practice package without deleting it. Created topic-test packages `...080000000007/008` and versions `...090000000007/008`; the existing Reading package/version remains in place. Published question and question-version IDs/content are preserved.
+- Fresh-database and V88-upgrade migration tests pass. The three audit checks return zero unskilled topics, zero mismatched course knowledge points, and zero published course lessons with multiple or topic-mismatched skills.
+
+| Course | Skill | Published lessons | Beyond first 3 |
+|---|---|---:|---:|
+| IELTS 5.5 | Listening | 4 | 1 |
+| IELTS 5.5 | Reading | 11 | 8 |
+| IELTS 5.5 | Speaking | 0 | 0 |
+| IELTS 5.5 | Writing | 7 | 4 |
+| IELTS 6.0 | Listening | 0 | 0 |
+| IELTS 6.0 | Reading | 0 | 0 |
+| IELTS 6.0 | Speaking | 0 | 0 |
+| IELTS 6.0 | Writing | 0 | 0 |
+| IELTS 6.5 | Listening | 1 | 0 |
+| IELTS 6.5 | Reading | 1 | 0 |
+| IELTS 6.5 | Speaking | 0 | 0 |
+| IELTS 6.5 | Writing | 1 | 0 |
+| IELTS 7.0 | Listening | 0 | 0 |
+| IELTS 7.0 | Reading | 0 | 0 |
+| IELTS 7.0 | Speaking | 0 | 0 |
+| IELTS 7.0 | Writing | 0 | 0 |
+
+- Counts and audit checks were verified on a fresh migrated Testcontainers PostgreSQL database. A persistent development `content_db` was not started or inspected.
+- Full content-service reactor: **1,149 tests run, 0 failures, 0 errors, 4 skipped**; target content-service module: **1,080 run, 0 failures, 0 errors, 1 skipped**. common-security contributed 9 passing tests; common-storage contributed 60 run, 0 failures/errors, 3 skipped.
+- Migration/test commit: `e901a459` (`fix(content): split tree course lessons by skill`).
