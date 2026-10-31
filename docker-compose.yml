@@ -357,6 +357,18 @@ services:
       redis:
         condition: service_healthy
 
+  # Optional metrics scraper. Start with: docker compose --profile observability up -d prometheus
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: ["observability"]
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:${PROMETHEUS_HOST_PORT:-9090}:9090"
+    networks:
+      - codebase-network
+
 networks:
   codebase-network:
     driver: bridge
