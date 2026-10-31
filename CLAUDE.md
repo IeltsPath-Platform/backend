@@ -27,7 +27,7 @@ Reactor gồm 14 module: 3 infra, 2 shared, 9 business. Hai module shared là th
 | `shared/common-security` | Java lib | — | — | — |
 | `shared/common-events` | Java lib (tên/hình dạng event, `MessageRetry`, `RetryTopology`) | — | — | — |
 | `shared/common-storage` | Java lib | — | — | — |
-| `services/user-service` | Java | 8085 | `user_db` (Compose PostgreSQL host 5440) | `/auth/**`, `/api/users/**`, `/api/learning-support/activities/**` |
+| `services/user-service` | Java | 8085 | `user_db` (Compose PostgreSQL host 5440) | `/auth/**`, `/api/users/**` (trừ goal và study-time đã chuyển sang learning) |
 | `services/content-service` | Java | 8082 | `content_db` (Compose PostgreSQL host 5440) | `/api/content/**` trừ ba nhóm catalog chuyển tới library |
 | `services/library-service` | Java | 8081 | `library_db` (Compose PostgreSQL host 5440) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
 | `services/assessment-service` | Java | 8083 | `assessment_db` (Compose PostgreSQL host 5440) | `/api/assessments/**` |
@@ -35,7 +35,7 @@ Reactor gồm 14 module: 3 infra, 2 shared, 9 business. Hai module shared là th
 | `services/game-service` | Java | 8087 | `game_db` (Compose PostgreSQL host 5440) | `/api/games/**`, ws `/ws/games/**` |
 | `services/notification-service` | Java | 8088 | `notification_db` (Compose PostgreSQL host 5440) | `/api/notifications/**` (hộp thư, đã đọc, tùy chọn); nhận event chấm bài và Community qua RabbitMQ |
 | `services/community-service` | Java | 8089 | `community_db` (Compose PostgreSQL host 5440) | `/api/community/**` |
-| `services/learning-service` | Java | 8086 | `learning_db` (Compose PostgreSQL host 5440) | `/api/learning/**` |
+| `services/learning-service` | Java | 8086 | `learning_db` (Compose PostgreSQL host 5440) | `/api/learning/**`, và các path công khai cũ của goal, activity, study-time (Gateway viết lại) |
 
 `common-events` mã hóa exchange/routing key/header và record payload cho points, assessment, community. Đổi tên hoặc
 hình dạng event phải đổi module và contract tương ứng cùng lúc. Service consumer giữ quyền sở hữu queue, kể cả retry và DLQ của

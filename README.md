@@ -274,7 +274,9 @@ Nếu mật khẩu có ký tự đặc biệt, hãy percent-encode hoặc chọn
 
 Gateway giữ path công khai: `/api/content/videos/**`, `/api/content/vocabulary/**` và
 `/api/content/admin/vocabulary/**` tới library; `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**`
-tới library; `/api/learning-support/activities/**` tới user; `/api/learning/**` tới learning. Gateway chặn
+tới library; `/api/learning/**` tới learning, cùng goal (`/api/users/me/learning-goals/**`), study-time
+(`/api/users/me/study-sessions/**`, `/api/users/me/statistics/study-time`) và activity (`/api/learning-support/activities/**`)
+mà Gateway viết lại sang learning. Gateway chặn
 `/internal/**`. Game chọn snapshot `VOCABULARY` từ library (`LIBRARY_SERVICE_URL` mặc định `http://localhost:8081`),
 `GRAMMAR` từ content. Khi game chạy trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082` vì Config Server vẫn
 mặc định địa chỉ `http://content-service:8082`. Library không gọi Content; video chỉ lưu `topicId` như tham chiếu. Content V7 xóa năm bảng catalog;

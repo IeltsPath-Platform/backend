@@ -102,6 +102,58 @@ always include the `hint` key, with `null` when hidden or unavailable. Review se
 quick-check and practice attempt questions carry Content hints; their results keep
 `hint: null`. Final assessments do not expose hints.
 
+## Goals, learning activity and study time
+
+These moved from the User Service (migration V40, data copied by `scripts/copy-study-data-to-learning.sh`). Clients keep
+calling the paths they always used; the Gateway rewrites them:
+
+| Public path | Learning path |
+| --- | --- |
+| `/api/users/me/learning-goals[/active\|/{id}/status]` | `/api/learning/goals[...]` |
+| `/api/users/{id}/learning-goals[/{goalId}/status]` (role `ADMIN`) | `/api/learning/admin/users/{id}/goals[...]` |
+| `/api/users/me/study-sessions[/{id}/heartbeats\|/{id}/close]` | `/api/learning/study-sessions[...]` |
+| `/api/users/me/statistics/study-time` | `/api/learning/statistics/study-time` |
+| `/api/learning-support/activities[/{id}]` | `/api/learning/activities[...]` |
+
+Study time:
+
+- `POST /study-sessions`: `{clientSessionId, sourceType, sourceId, takeover?}`. UUID identifiers; source types `LESSON`,
+  `PRACTICE`, `REVIEW`, `ASSESSMENT`.
+- `POST /study-sessions/{id}/heartbeats` and `/close`: `{epoch, sequence, intervals: [{startOffsetMs, endOffsetMs}]}`. At
+  most 16 ordered, non-overlapping intervals per request; offsets use the server session anchor. Close includes the final
+  flush.
+- `GET /statistics/study-time?from=YYYY-MM-DD&to=YYYY-MM-DD&grain=DAY&courseId=UUID`: inclusive range, at most 366 days;
+  grain is `DAY` (default), `WEEK` or `MONTH`; the course is optional.
+
+Start returns `sessionId`, `epoch`, `serverStartedAt`, `serverNow`, `leaseExpiresAt`, `nextSequence`, `heartbeatSeconds=30`,
+`idleSeconds=120`, `leaseSeconds=90`, `status` and `totalAcceptedMs`. Heartbeat and close return `sessionId`, `epoch`,
+`sequence`, `acceptedMs`, `totalAcceptedMs`, `leaseExpiresAt` and `status`. Retry the same payload and sequence after a lost
+response; a conflicting payload returns 409 `PAYLOAD_CONFLICT`. A closed or expired session is never revived: use a new
+`clientSessionId`. Only one session holds a user lease; an explicit takeover closes the previous session without filling
+gaps. The client excludes hidden and idle time; the server limits submitted intervals to elapsed server time and the latest
+90 seconds. This measures recorded activity, not verified human attention.
+
+Statistics return `availability`, `generatedAt`, `dataFrom`, `timezonePolicy=RECORDED_LOCAL_DATE`, `scope=ALL|courseId` and
+`days`. Each bucket has `date`, `timezone`, `actualSeconds`, `plannedSeconds` and `status` (`NOT_TRACKED`, `FUTURE`,
+`PARTIAL_DAY`, `COMPLETE`). Actual is null before measurement or for future dates; a measured inactive date is zero. Course
+targets are null. Week and month buckets sum raw milliseconds for dates inside the requested range before converting to whole
+seconds, and use the calendar bucket start date. Mixed timezone buckets say `MULTIPLE`; historical intervals keep their
+recorded date and timezone. Raw data is not purged automatically.
+
+Goal changes apply from the next local day, never overwrite a recorded day, and supersede pending future choices. The
+timezone comes from the User Service (`GET /internal/users/{id}/study-timezone`); when it cannot be read, the last stored
+timezone is used, then `Asia/Ho_Chi_Minh`. Starting a study session reschedules an active goal whose timezone has changed
+since it was scheduled.
+
+Before a session starts, the Learning Service checks that the source belongs to the learner. `LESSON`, `PRACTICE` and
+`REVIEW` are checked in `learning_db`; `ASSESSMENT` through `GET /api/assessments/me/statistics/study-context` of the
+Assessment Service (bearer and correlation id forwarded; 2 s connect, 3 s read). Owner failure returns 503
+`SOURCE_UNAVAILABLE`. For services on the host set `USER_SERVICE_URL=http://localhost:8085` and
+`ASSESSMENT_SERVICE_URL=http://localhost:8083`.
+
+`POST /internal/learning/streaks` (not routed by the Gateway) takes `{userIds}` (at most 100) and returns
+`{streaks: [{userId, currentDays}]}` for the learners who have a streak; Community uses it to show streaks beside profiles.
+
 ## Submission, mastery and review state
 
 `GET /api/learning/statistics/progress` supports at most 100 started courses per learner.
