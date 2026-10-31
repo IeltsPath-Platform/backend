@@ -34,10 +34,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.nio.charset.StandardCharsets;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -68,7 +66,7 @@ class LessonPipelineSeedTest {
         dataSource.setUrl(POSTGRES.getJdbcUrl());
         dataSource.setUser(POSTGRES.getUsername());
         dataSource.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").target("89").load().migrate();
+        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(dataSource);
         reader = new JdbcLearningContentReader(jdbc);
     }
@@ -818,14 +816,10 @@ class LessonPipelineSeedTest {
         assertThat(question.assets()).hasSize(1);
         assertThat(chart.assetType()).isEqualTo(AssetType.IMAGE);
         assertThat(chart.altText()).startsWith("Bar chart of July afternoon roof temperatures");
-        String prefix = "data:image/svg+xml;base64,";
-        assertThat(chart.mediaUrl()).startsWith(prefix);
-        byte[] svg = Base64.getDecoder().decode(chart.mediaUrl().substring(prefix.length()));
-        assertThat(svg.length).isLessThanOrEqualTo(8 * 1024);
-        String drawn = new String(svg, StandardCharsets.UTF_8);
+        assertThat(chart.mediaUrl()).isEqualTo(
+                "https://media.example.test/ieltspath/writing/charts/22000000-0000-4000-8000-050000000001.webp");
         for (String figure : List.of("82", "45", "33", "74", "41", "30", "61", "35", "25")) {
             assertThat(spec.get("chartFacts").asText()).contains(figure);
-            assertThat(drawn).as("chart shows " + figure).contains(">" + figure + "<");
         }
     }
     @Test

@@ -46,14 +46,15 @@ class GetLessonContentUseCaseTest {
 
     @Test
     void essayBlockKeepsItsCheckedImagesAndExerciseQuestionsDropTheirs() {
-        String svg = "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=";
+        String svg = "writing/charts/example.svg";
         when(reader.publishedLesson(lessonId)).thenReturn(Optional.of(lessonWith(question("ESSAY", List.of(image(svg))))));
 
         LessonContentResult.Block essay = new GetLessonContentUseCase(reader, policy).execute(lessonId).blocks().get(1);
 
         assertThat(essay.blockKind()).isEqualTo(LessonBlockKind.ESSAY);
         assertThat(essay.questions().get(0).assets()).singleElement()
-                .satisfies(asset -> assertThat(asset.mediaUrl()).isEqualTo(svg));
+                .satisfies(asset -> assertThat(asset.mediaUrl())
+                        .isEqualTo("https://media.example.test/ieltspath/" + svg));
 
         when(reader.publishedLesson(lessonId)).thenReturn(Optional.of(lessonWith(question("CHOICE", List.of()))));
         LessonContentResult.Block exercise = new GetLessonContentUseCase(reader, policy).execute(lessonId).blocks().get(1);
