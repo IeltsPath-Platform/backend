@@ -125,6 +125,11 @@ src/main/java/com/ieltspath/<service>
   `X-Correlation-Id` (như assessment → content, content → library, game → library/content, learning → content/access/user).
   Learning gọi user-service chỉ để đọc mục tiêu band (`/internal/users/{id}/learning-goal`) và tên hiển thị
   (`/internal/users/display-names`); lỗi hoặc timeout thì báo cáo và bảng league vẫn trả, thiếu phần đó.
+- Lời gọi đồng bộ giữa các service phải một chiều: hai service không được gọi HTTP lẫn nhau, trực tiếp hay qua service thứ ba.
+  Client HTTP mới phải ghi vào bảng "Đồng bộ (HTTP)" của `docs/system-architecture.md`, và URL đích khai báo trong
+  `infra/config-server/config-repo/<service>.yaml` bằng biến `<TÊN>_SERVICE_URL`. `ServiceDependencyGraphTest`
+  (`infra/api-gateway`) dựng đồ thị từ các biến đó và fail khi có vòng; nó không thấy lời gọi không khai báo ở config-repo
+  và không tính event. Cần dữ liệu của service đang gọi mình thì nhận qua event hoặc để bên kia đẩy sang, đừng thêm cạnh ngược.
 - Bất đồng bộ qua transactional outbox + RabbitMQ; event có version trong tên và contract ở `docs/contracts/`. Consumer
   phải idempotent và có retry/dead-letter (xem consumer của learning-service). Điểm thưởng của learning (streak, nhiệm vụ,
   huy hiệu) đi qua bảng `reward_grants` (outbox) rồi exchange `learning.points` sang access, không gọi HTTP cộng điểm
@@ -394,7 +399,8 @@ docker compose config --quiet
 
 6. Chỉ build/chạy Docker khi daemon khả dụng: `docker compose up -d --build <service...>`, `docker compose ps`.
 7. Không tuyên bố check nào đã chạy (CI, lint, coverage, contract test) khi chúng chưa tồn tại hoặc chưa thực sự chạy.
-8. Commit theo conventional commit; không nhắc việc dùng AI/agent để viết code, số phase hay mã plan trong commit, code
+8. Review PR: client HTTP mới nào trỏ tới service đã gọi ngược lại mình thì người viết phải giải thích trong mô tả PR (xem §3.5).
+9. Commit theo conventional commit; không nhắc việc dùng AI/agent để viết code, số phase hay mã plan trong commit, code
    comment, tên test hay migration (comment ghi nguồn port DeepTutor là chuyện khác và bắt buộc).
 
 ## 7. Điểm chưa nhất quán và nội dung cần làm rõ
