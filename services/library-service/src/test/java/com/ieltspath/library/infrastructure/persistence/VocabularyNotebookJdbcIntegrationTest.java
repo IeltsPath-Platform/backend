@@ -141,7 +141,7 @@ class VocabularyNotebookJdbcIntegrationTest {
     }
 
     @Test void listsTopicsAndPagesBandAndTopicSets() {
-        assertEquals(6,catalog.topics().size());
+        assertEquals(7,catalog.topics().size());
         assertFalse(catalog.suggestions("re").isEmpty());
         var bands=catalog.sets(VocabularySetKind.BAND,new PageQuery(0,10));
         assertEquals(6L,bands.total());

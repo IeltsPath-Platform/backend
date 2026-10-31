@@ -11,6 +11,7 @@ import com.ieltspath.game.domain.aggregate.GameRoom;
 import com.ieltspath.game.domain.aggregate.RocketRound;
 import com.ieltspath.game.domain.exception.GameRoomNotFoundException;
 import com.ieltspath.game.domain.exception.InvalidGameRoomStateException;
+import com.ieltspath.game.domain.exception.NotEnoughWordsException;
 import com.ieltspath.game.domain.repository.GameMatchPlayerRepository;
 import com.ieltspath.game.domain.repository.GameMatchRepository;
 import com.ieltspath.game.domain.repository.GameRoomRepository;
@@ -18,6 +19,7 @@ import com.ieltspath.game.domain.repository.RocketRoundRepository;
 import com.ieltspath.game.domain.vo.RocketDistractorPicker;
 import com.ieltspath.game.domain.vo.RocketRoomSettings;
 import com.ieltspath.game.domain.vo.RocketWord;
+import com.ieltspath.game.domain.vo.WordFilter;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -68,7 +70,7 @@ public class StartRocketMatchUseCase {
         if (!(preview.settings() instanceof RocketRoomSettings settings))
             throw new InvalidGameRoomStateException("Room is not a Rocket room");
         UUID matchId = UUID.randomUUID();
-        List<RocketRound> prepared = prepareRounds(matchId, settings, vocabulary());
+        List<RocketRound> prepared = prepareRounds(matchId, settings, vocabulary(settings.wordFilter()));
         return tx.execute(status -> {
             GameRoom room = rooms.findForUpdate(preview.id()).orElseThrow(() -> new GameRoomNotFoundException(preview.id()));
             if (!settings.equals(room.settings()))
@@ -82,6 +84,8 @@ public class StartRocketMatchUseCase {
             config.put("initialLives", settings.initialLives());
             config.put("questionCount", settings.questionCount());
             config.put("secondsPerQuestion", settings.secondsPerQuestion());
+            if (settings.wordFilter().cefrLevel() != null) config.put("cefrLevel", settings.wordFilter().cefrLevel());
+            if (settings.wordFilter().topicId() != null) config.put("topicId", settings.wordFilter().topicId().toString());
             GameMatch match = matches.save(new GameMatch(matchId, room.id(), room.gameType(), room.learningDomain(), config,
                     room.configSnapshot(), now));
             for (GameRoom.Member member : room.members().values()) {
@@ -104,10 +108,10 @@ public class StartRocketMatchUseCase {
         });
     }
 
-    /** Valid, de-duplicated catalog entries as Rocket words; options are shown in lower case. */
-    private List<RocketWord> vocabulary() {
+    /** Valid, de-duplicated catalog entries as Rocket words, answers and wrong options alike; options are shown in lower case. */
+    private List<RocketWord> vocabulary(WordFilter filter) {
         Map<String, RocketWord> unique = new LinkedHashMap<>();
-        for (var word : words.catalog()) {
+        for (var word : filter.isAny() ? words.catalog() : words.catalog(filter)) {
             if (word.sourceWordId() == null || word.answer() == null || word.answer().isBlank()
                     || word.meaning() == null || word.meaning().isBlank()) continue;
             String text = word.answer().trim().toLowerCase(Locale.ROOT);
@@ -118,7 +122,7 @@ public class StartRocketMatchUseCase {
 
     static List<RocketRound> prepareRounds(UUID matchId, RocketRoomSettings settings, List<RocketWord> vocabulary) {
         if (vocabulary.size() < Math.max(settings.questionCount(), RocketDistractorPicker.DISTRACTORS + 1))
-            throw new IllegalStateException("Not enough eligible vocabulary to start this match");
+            throw new NotEnoughWordsException(vocabulary.size());
         List<RocketWord> answers = new ArrayList<>(vocabulary);
         Collections.shuffle(answers, new Random(RocketDistractorPicker.seed(matchId, 0)));
         List<RocketRound> prepared = new ArrayList<>(settings.questionCount());

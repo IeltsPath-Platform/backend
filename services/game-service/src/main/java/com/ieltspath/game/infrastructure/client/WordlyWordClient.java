@@ -36,17 +36,20 @@ public class WordlyWordClient implements WordlyWordProvider {
         return "Bearer " + auth.getToken().getTokenValue();
     }
 
-    private Response request(String path, java.util.Map<String, Object> body) {
-        String correlation = UUID.randomUUID().toString();
+    private static String correlation() {
         if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs) {
             String value = attrs.getRequest().getHeader("X-Correlation-Id");
-            if (value != null && !value.isBlank() && value.length() <= 128) correlation = value;
+            if (value != null && !value.isBlank() && value.length() <= 128) return value;
         }
+        return UUID.randomUUID().toString();
+    }
+
+    private Response request(String path, java.util.Map<String, Object> body) {
         Response response =
                 client.post()
                         .uri(path)
                         .header("Authorization", bearer())
-                        .header("X-Correlation-Id", correlation)
+                        .header("X-Correlation-Id", correlation())
                         .body(body)
                         .retrieve()
                         .body(Response.class);
@@ -61,13 +64,29 @@ public class WordlyWordClient implements WordlyWordProvider {
     }
 
     public java.util.List<Word> catalog() {
+        return catalog(com.ieltspath.game.domain.vo.WordFilter.ANY);
+    }
+
+    public Filters filters() {
+        try {
+            Filters filters = client.get().uri("/internal/game-content/wordly/filters")
+                    .header("Authorization", bearer()).header("X-Correlation-Id", correlation())
+                    .retrieve().body(Filters.class);
+            if (filters != null && filters.topics() != null && filters.availability() != null) return filters;
+        } catch (org.springframework.web.client.RestClientException e) {
+            throw new com.ieltspath.game.domain.exception.SoloGameplayException(503, "WORD_FILTERS_UNAVAILABLE", "Word filters are unavailable");
+        }
+        throw new com.ieltspath.game.domain.exception.SoloGameplayException(503, "WORD_FILTERS_UNAVAILABLE", "Word filters are unavailable");
+    }
+
+    public java.util.List<Word> catalog(com.ieltspath.game.domain.vo.WordFilter filter) {
         java.util.List<Word> result = new java.util.ArrayList<>();
         String after = "";
         while (true) {
             var page =
                     request(
                                     "/internal/game-content/wordly/catalog",
-                                    java.util.Map.of("after", after, "limit", 500))
+                                    pageBody(after, filter))
                             .words();
             if (page.isEmpty()) return result;
             String next = page.get(page.size() - 1).answer();
@@ -78,6 +97,13 @@ public class WordlyWordClient implements WordlyWordProvider {
             if (result.size() > 100000)
                 throw new IllegalStateException("Vocabulary snapshot exceeds supported size");
         }
+    }
+
+    private static java.util.Map<String, Object> pageBody(String after, com.ieltspath.game.domain.vo.WordFilter filter) {
+        var body = new java.util.HashMap<String, Object>(java.util.Map.of("after", after, "limit", 500));
+        if (filter.cefrLevel() != null) body.put("cefrLevel", filter.cefrLevel());
+        if (filter.topicId() != null) body.put("topicId", filter.topicId());
+        return body;
     }
 
     private record Response(java.util.List<Word> words) {}

@@ -42,7 +42,8 @@ Current stays the way to resync after a reconnect.
 - Room `settings` for a Rocket room: `initialLives`, `questionCount`, `secondsPerQuestion`, `timeEnabled: true`;
   `wordTimeLimitSeconds`, `playMode` and `wordLimit` are null (they belong to Wordly, whose rooms carry
   `questionCount: null` and `secondsPerQuestion: null`). The host edits them while waiting with
-  `PUT /api/games/rooms/{roomId}/settings` `{initialLives, questionCount?, secondsPerQuestion?}` (null keeps a value);
+  `PUT /api/games/rooms/{roomId}/settings` `{initialLives, questionCount?, secondsPerQuestion?, cefrLevel, topicId}` (null keeps a value, except the
+  word filter, where null means any, see Wordly Game v1; answers and wrong options both come from the filter and it needs `questionCount` words, else 409 `NOT_ENOUGH_WORDS`);
   a change sets every READY member back to JOINED and is pushed as ROOM_STATE.
 
 - Current: `matchId`, `settings {questionCount, initialLives, secondsPerQuestion}`, `round` (null once the match ends),

@@ -9,6 +9,7 @@ import com.ieltspath.game.application.result.RocketGameplayResults.Current;
 import com.ieltspath.game.application.usecase.CreateWordlyRoomUseCase;
 import com.ieltspath.game.application.usecase.RocketGameplayUseCase;
 import com.ieltspath.game.domain.vo.RocketRoomSettings;
+import com.ieltspath.game.domain.vo.WordFilter;
 import com.ieltspath.game.domain.vo.WordlyRoomSettings;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -37,7 +38,8 @@ public class RocketGameController {
                 : RocketRoomSettings.multiplayer(request.questionCount(),
                         request.initialLives() == null ? RocketRoomSettings.DEFAULT_LIVES : request.initialLives(),
                         request.secondsPerQuestion() == null ? RocketRoomSettings.DEFAULT_SECONDS : request.secondsPerQuestion());
-        return GameRoomResponse.from(rooms.open(currentUser.requireUserId(), settings));
+        return GameRoomResponse.from(rooms.open(currentUser.requireUserId(),
+                settings.withWordFilter(new WordFilter(request.cefrLevel(), request.topicId()))));
     }
 
     @GetMapping("/matches/{matchId}/rounds/current")

@@ -35,20 +35,21 @@ public record GameRoomResult(UUID id, String roomCode, UUID hostUserId, String g
     }
     /**
      * Wordly fills the first five fields; Rocket fills initialLives, questionCount and secondsPerQuestion, with
-     * timeEnabled always true and the Wordly-only fields null.
+     * timeEnabled always true and the Wordly-only fields null. Both fill cefrLevel and topicId; null means any.
      */
     public record SettingsResult(int initialLives, Integer wordTimeLimitSeconds, String playMode, Integer wordLimit,
-            boolean timeEnabled, Integer questionCount, Integer secondsPerQuestion) {
+            boolean timeEnabled, Integer questionCount, Integer secondsPerQuestion, String cefrLevel, UUID topicId) {
         public SettingsResult(int initialLives, Integer wordTimeLimitSeconds, String playMode, Integer wordLimit, boolean timeEnabled) {
-            this(initialLives, wordTimeLimitSeconds, playMode, wordLimit, timeEnabled, null, null);
+            this(initialLives, wordTimeLimitSeconds, playMode, wordLimit, timeEnabled, null, null, null, null);
         }
 
         static SettingsResult of(com.ieltspath.game.domain.vo.RoomSettings settings) {
             return switch (settings) {
                 case com.ieltspath.game.domain.vo.WordlyRoomSettings w -> new SettingsResult(w.initialLives(),
-                        w.wordTimeLimitSeconds(), w.playMode().name(), w.wordLimit(), w.timeEnabled());
+                        w.wordTimeLimitSeconds(), w.playMode().name(), w.wordLimit(), w.timeEnabled(), null, null,
+                        w.wordFilter().cefrLevel(), w.wordFilter().topicId());
                 case com.ieltspath.game.domain.vo.RocketRoomSettings r -> new SettingsResult(r.initialLives(), null, null,
-                        null, true, r.questionCount(), r.secondsPerQuestion());
+                        null, true, r.questionCount(), r.secondsPerQuestion(), r.wordFilter().cefrLevel(), r.wordFilter().topicId());
                 case null, default -> null;
             };
         }
