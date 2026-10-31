@@ -7,4 +7,6 @@ public sealed interface RoomSettings permits WordlyRoomSettings, RocketRoomSetti
     boolean solo();
 
     int maxPlayers();
+
+    WordFilter wordFilter();
 }

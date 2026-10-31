@@ -53,8 +53,9 @@ class StartRocketMatchUseCaseTest {
 
     @Test
     void needsEnoughVocabularyForEveryQuestion() {
-        assertThrows(IllegalStateException.class,
+        var error = assertThrows(com.ieltspath.game.domain.exception.NotEnoughWordsException.class,
                 () -> StartRocketMatchUseCase.prepareRounds(UUID.randomUUID(), RocketRoomSettings.solo(13), bank));
+        assertEquals(12, error.available());
         assertDoesNotThrow(() -> StartRocketMatchUseCase.prepareRounds(UUID.randomUUID(), RocketRoomSettings.solo(12), bank));
     }
 

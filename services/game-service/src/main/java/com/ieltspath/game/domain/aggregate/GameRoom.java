@@ -116,24 +116,38 @@ public class GameRoom {
     }
 
     public void updateSettings(UUID actorId, int initialLives, Integer wordLimit, Boolean timeEnabled, Instant at) {
+        updateSettings(actorId, initialLives, wordLimit, timeEnabled, null, at);
+    }
+
+    /** A null filter keeps the current one; {@link com.ieltspath.game.domain.vo.WordFilter#ANY} clears it. */
+    public void updateSettings(UUID actorId, int initialLives, Integer wordLimit, Boolean timeEnabled,
+            com.ieltspath.game.domain.vo.WordFilter filter, Instant at) {
         if (!hostUserId.equals(actorId)) throw new com.ieltspath.game.domain.exception.GameRoomForbiddenException("Only the host can edit room settings");
         requireWaiting();
         if (!(settings instanceof WordlyRoomSettings wordly)) throw new InvalidGameRoomStateException("Room is not a Wordly room");
         WordlyRoomSettings next = new WordlyRoomSettings(wordly.playerMode(), initialLives,
-                wordly.playMode(), wordLimit, timeEnabled == null ? wordly.timeEnabled() : timeEnabled);
+                wordly.playMode(), wordLimit, timeEnabled == null ? wordly.timeEnabled() : timeEnabled,
+                filter == null ? wordly.wordFilter() : filter);
         if (next.equals(wordly)) return;
         replaceSettings(next, at);
     }
 
     /** Host-only, while waiting. A null question count or time keeps the current value. */
     public void updateRocketSettings(UUID actorId, int initialLives, Integer questionCount, Integer secondsPerQuestion, Instant at) {
+        updateRocketSettings(actorId, initialLives, questionCount, secondsPerQuestion, null, at);
+    }
+
+    /** A null filter keeps the current one; {@link com.ieltspath.game.domain.vo.WordFilter#ANY} clears it. */
+    public void updateRocketSettings(UUID actorId, int initialLives, Integer questionCount, Integer secondsPerQuestion,
+            com.ieltspath.game.domain.vo.WordFilter filter, Instant at) {
         if (!hostUserId.equals(actorId)) throw new com.ieltspath.game.domain.exception.GameRoomForbiddenException("Only the host can edit room settings");
         requireWaiting();
         if (!(settings instanceof com.ieltspath.game.domain.vo.RocketRoomSettings rocket))
             throw new InvalidGameRoomStateException("Room is not a Rocket room");
         var next = new com.ieltspath.game.domain.vo.RocketRoomSettings(rocket.solo(),
                 questionCount == null ? rocket.questionCount() : questionCount, initialLives,
-                secondsPerQuestion == null ? rocket.secondsPerQuestion() : secondsPerQuestion);
+                secondsPerQuestion == null ? rocket.secondsPerQuestion() : secondsPerQuestion,
+                filter == null ? rocket.wordFilter() : filter);
         if (next.equals(rocket)) return;
         replaceSettings(next, at);
     }

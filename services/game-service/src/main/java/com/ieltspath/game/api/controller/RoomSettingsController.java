@@ -23,6 +23,7 @@ public class RoomSettingsController {
     public GameRoomResponse update(@PathVariable("roomId") UUID roomId,
                                    @Valid @RequestBody UpdateRoomSettingsRequest request) {
         return GameRoomResponse.from(update.execute(roomId, user.requireUserId(), request.initialLives(), request.wordLimit(),
-                request.timeEnabled(), request.questionCount(), request.secondsPerQuestion()));
+                request.timeEnabled(), request.questionCount(), request.secondsPerQuestion(),
+                new com.ieltspath.game.domain.vo.WordFilter(request.cefrLevel(), request.topicId())));
     }
 }

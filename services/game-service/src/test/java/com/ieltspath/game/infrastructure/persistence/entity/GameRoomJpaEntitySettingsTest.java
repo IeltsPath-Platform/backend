@@ -28,6 +28,20 @@ class GameRoomJpaEntitySettingsTest {
     }
 
     @Test
+    void wordFilterRoundTripsForBothGames() {
+        var filter = new com.ieltspath.game.domain.vo.WordFilter("B1", UUID.randomUUID());
+        var rocket = room("ROCKET");
+        var rocketSettings = RocketRoomSettings.solo(8).withWordFilter(filter);
+        rocket.setSettings(rocketSettings);
+        assertEquals(rocketSettings, rocket.settings());
+        var wordly = room("WORDLY");
+        var wordlySettings = new WordlyRoomSettings(WordlyRoomSettings.PlayerMode.SOLO, 4,
+                WordlyRoomSettings.PlayMode.FINITE, 5).withWordFilter(filter);
+        wordly.setSettings(wordlySettings);
+        assertEquals(wordlySettings, wordly.settings());
+    }
+
+    @Test
     void wordlySettingsStillRoundTripAndLegacyRoomsHaveNone() {
         var entity = room("WORDLY");
         var settings = new WordlyRoomSettings(WordlyRoomSettings.PlayerMode.MULTIPLAYER, 5,
