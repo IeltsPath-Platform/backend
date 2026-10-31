@@ -9,6 +9,8 @@ blocks: [261030-1204-band-skill-lesson-paywall]
 
 Status: pending
 
+> **Cập nhật 2026-10-31:** quyết định "ảnh là URL dán vào (không upload)" bị thay thế. Người dùng chốt mọi ảnh bìa phải lưu file trên Supabase, DB chỉ giữ khóa. Việc thêm upload ảnh bìa khóa học nằm ở plan `261031-1215-supabase-storage-reorganization` (phase 3). Phần còn lại của plan này (cột, API, hiển thị) giữ nguyên.
+
 ## Mục tiêu
 
 Thêm 3 cột nullable, expose qua API admin + learner, hiển thị ở FE (fallback `CourseArt` khi không có ảnh).
