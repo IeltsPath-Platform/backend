@@ -13,7 +13,6 @@ import java.util.UUID;
 public class AdvisoryUserLock implements UserLock {
     private final JdbcTemplate jdbc;
 
-    /** The study-time code locks the same user with this key, so both kinds of work exclude each other. */
     static long key(UUID userId) {
         return userId.getMostSignificantBits() ^ userId.getLeastSignificantBits();
     }

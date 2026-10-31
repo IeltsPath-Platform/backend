@@ -1,12 +1,9 @@
 package com.ieltspath.user.api.controller;
 
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
-import com.ieltspath.user.application.result.InternalLearningGoalResult;
 import com.ieltspath.user.application.result.UserDisplayNameResult;
-import com.ieltspath.user.application.usecase.GetInternalLearningGoalUseCase;
 import com.ieltspath.user.application.usecase.GetStudyTimezoneUseCase;
 import com.ieltspath.user.application.usecase.GetUserDisplayNamesUseCase;
-import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.OctetSequenceKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -56,7 +53,6 @@ class InternalUserControllerTest {
     private static final String INTERNAL_ISSUER = "urn:code-base:api-gateway";
 
     @Autowired MockMvc mockMvc;
-    @MockBean GetInternalLearningGoalUseCase learningGoal;
     @MockBean GetUserDisplayNamesUseCase displayNames;
     @MockBean GetStudyTimezoneUseCase studyTimezone;
 
@@ -68,32 +64,8 @@ class InternalUserControllerTest {
     @Test
     void unauthenticatedInternalRequestsAreRejected() throws Exception {
         UUID id = UUID.randomUUID();
-        mockMvc.perform(get("/internal/users/{id}/learning-goal", id)).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/internal/users/display-names").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"ids\":[\"" + id + "\"]}")).andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void existingUserWithoutActiveGoalGetsNullTargetAndExamDate() throws Exception {
-        UUID userId = UUID.randomUUID();
-        when(learningGoal.execute(userId)).thenReturn(new InternalLearningGoalResult(null, null));
-
-        mockMvc.perform(get("/internal/users/{id}/learning-goal", userId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(userId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.targetBand").value(org.hamcrest.Matchers.nullValue()))
-                .andExpect(jsonPath("$.examDate").value(org.hamcrest.Matchers.nullValue()));
-        verify(learningGoal).execute(userId);
-    }
-
-    @Test
-    void missingUserReturns404() throws Exception {
-        UUID userId = UUID.randomUUID();
-        when(learningGoal.execute(userId)).thenThrow(new UserNotFoundException("User not found"));
-
-        mockMvc.perform(get("/internal/users/{id}/learning-goal", userId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(userId)))
-                .andExpect(status().isNotFound());
     }
 
     @Test
