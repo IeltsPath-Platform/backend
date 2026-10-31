@@ -13,7 +13,6 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.dao.QueryTimeoutException;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -35,7 +34,7 @@ class GradingRequestedListenerTest {
     private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private final RecordGradingRequestedUseCase record = mock(RecordGradingRequestedUseCase.class);
-    private final SimpMessagingTemplate socket = mock(SimpMessagingTemplate.class);
+    private final NoticePushBridge socket = mock(NoticePushBridge.class);
     private final RabbitTemplate rabbit = mock(RabbitTemplate.class);
     private final MessageRetry retry = new MessageRetry(rabbit, GradingRequestedMessagingConfig.RETRY_QUEUE, 2);
     private final GradingRequestedListener listener = new GradingRequestedListener(mapper, record, socket, retry);
@@ -66,7 +65,7 @@ class GradingRequestedListenerTest {
 
         listener.onGradingRequested(delivery());
 
-        verify(socket).convertAndSendToUser(eq(examiner.toString()), eq("/queue/notifications"), any(Object.class));
+        verify(socket).pushToUser(eq(examiner), any());
     }
 
     @Test

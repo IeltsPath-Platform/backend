@@ -12,7 +12,6 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -29,14 +28,14 @@ public class CommunityEventConsumer {
     private static final int MAX_RETRIES = 2;
     private final ObjectMapper mapper;
     private final RecordCommunityEventUseCase recordEvent;
-    private final SimpMessagingTemplate socket;
+    private final NoticePushBridge noticePush;
     private final RabbitTemplate rabbit;
 
     public CommunityEventConsumer(ObjectMapper mapper, RecordCommunityEventUseCase recordEvent,
-                                  SimpMessagingTemplate socket, RabbitTemplate rabbit) {
+                                  NoticePushBridge noticePush, RabbitTemplate rabbit) {
         this.mapper = mapper;
         this.recordEvent = recordEvent;
-        this.socket = socket;
+        this.noticePush = noticePush;
         this.rabbit = rabbit;
     }
 
@@ -68,10 +67,8 @@ public class CommunityEventConsumer {
     }
 
     private void push(UUID recipient, UUID id, UUID actor, String type, UUID post, Instant at) {
-        try {
-            socket.convertAndSendToUser(recipient.toString(), "/queue/notifications", Map.of("id", id, "actorId", actor,
-                    "eventType", type, "postId", post == null ? "" : post.toString(), "createdAt", at.toString()));
-        } catch (RuntimeException ignored) { /* REST reconciliation remains authoritative after push failure. */ }
+        noticePush.pushToUser(recipient, Map.of("id", id, "actorId", actor,
+                "eventType", type, "postId", post == null ? "" : post.toString(), "createdAt", at.toString()));
     }
 
     /**

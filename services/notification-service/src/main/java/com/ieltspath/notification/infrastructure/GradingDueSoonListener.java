@@ -11,7 +11,6 @@ import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -28,14 +27,14 @@ public class GradingDueSoonListener {
 
     private final ObjectMapper mapper;
     private final RecordGradingDueSoonUseCase record;
-    private final SimpMessagingTemplate socket;
+    private final NoticePushBridge noticePush;
     private final MessageRetry retry;
 
-    public GradingDueSoonListener(ObjectMapper mapper, RecordGradingDueSoonUseCase record, SimpMessagingTemplate socket,
+    public GradingDueSoonListener(ObjectMapper mapper, RecordGradingDueSoonUseCase record, NoticePushBridge noticePush,
                                   @Qualifier(GradingDueSoonMessagingConfig.RETRY) MessageRetry retry) {
         this.mapper = mapper;
         this.record = record;
-        this.socket = socket;
+        this.noticePush = noticePush;
         this.retry = retry;
     }
 
@@ -60,10 +59,8 @@ public class GradingDueSoonListener {
     }
 
     private void push(Notification notice) {
-        try {
-            socket.convertAndSendToUser(notice.recipientId().toString(), "/queue/notifications", Map.of("id", notice.id(),
+        noticePush.pushToUser(notice.recipientId(), Map.of("id", notice.id(),
                     "actorId", notice.actorId(), "eventType", notice.eventType(),
                     "gradingJobId", notice.gradingJobId(), "createdAt", notice.createdAt().toString()));
-        } catch (RuntimeException ignored) { /* The inbox over REST stays authoritative after a push failure. */ }
     }
 }

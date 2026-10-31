@@ -13,7 +13,6 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.dao.QueryTimeoutException;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -25,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,7 +35,7 @@ class GradingOverdueListenerTest {
     private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private final RecordGradingOverdueUseCase record = mock(RecordGradingOverdueUseCase.class);
-    private final SimpMessagingTemplate socket = mock(SimpMessagingTemplate.class);
+    private final NoticePushBridge socket = mock(NoticePushBridge.class);
     private final RabbitTemplate rabbit = mock(RabbitTemplate.class);
     private final MessageRetry retry = new MessageRetry(rabbit, GradingOverdueMessagingConfig.RETRY_QUEUE, 2);
     private final GradingOverdueListener listener = new GradingOverdueListener(mapper, record, socket, retry);
@@ -69,7 +67,7 @@ class GradingOverdueListenerTest {
 
         listener.onGradingOverdue(delivery());
 
-        verify(socket).convertAndSendToUser(eq(learner.toString()), eq("/queue/notifications"), any(Object.class));
+        verify(socket).pushToUser(eq(learner), any());
     }
 
     @Test
@@ -82,13 +80,12 @@ class GradingOverdueListenerTest {
     }
 
     @Test
-    void aFailedPushDoesNotLoseTheStoredNotice() throws Exception {
+    void aStoredNoticeIsPushedOnceAndNotRetried() throws Exception {
         when(record.execute(any(), anyString(), anyString())).thenReturn(Optional.of(stored()));
-        doThrow(new IllegalStateException("socket down")).when(socket)
-                .convertAndSendToUser(anyString(), anyString(), any(Object.class));
 
         listener.onGradingOverdue(delivery());
 
+        verify(socket).pushToUser(eq(learner), any());
         verify(rabbit, never()).send(anyString(), anyString(), any(Message.class));
     }
 
@@ -103,7 +100,7 @@ class GradingOverdueListenerTest {
         assertEquals(1, MessageRetry.retries(message));
 
         listener.onGradingOverdue(message);
-        verify(socket).convertAndSendToUser(eq(learner.toString()), anyString(), any(Object.class));
+        verify(socket).pushToUser(eq(learner), any());
     }
 
     @Test
