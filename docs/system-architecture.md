@@ -91,6 +91,23 @@ chuyển tiếp URL đã resolve, không ghép lại. Transcript nằm trong `co
 hoàn thành, hoặc sau khi nộp practice attempt hay set ôn; Assessment giữ trong snapshot server và trả `sectionSolutions`
 khi kết quả ≥ 70%.
 
+### Lưu trữ file (Supabase Storage)
+
+Các service dùng chung quy ước bucket và khóa object dưới đây. Cùng chủ và cùng chính sách thì dùng chung bucket, phân
+biệt bằng tiền tố khóa; khác chính sách thì dùng bucket mới; khác service thì không dùng chung bucket.
+
+| Bucket | Công khai | Dùng để | Giới hạn | Loại file (MIME) | Chủ | Khóa thường gặp | Trạng thái |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `avatars` | có | Ảnh đại diện học viên | 2 MB | png, jpeg, webp | user-service | `images/{userId}/{uuid}.{ext}` | đã có |
+| `flashcards` | có | Ảnh thẻ, bìa bộ thẻ, bìa catalog từ vựng | 2 MB | png, jpeg, webp | library-service | `images/{userId}/{uuid}.{ext}`; bìa catalog `catalog-cover/{userId}/{uuid}.{ext}` | đã có; bìa catalog là kế hoạch |
+| `community` | có | Ảnh bài đăng cộng đồng | 5 MB | png, jpeg, webp, gif | community-service | `community/post/{userId}/{uuid}.{ext}` | đã có |
+| `media` | có | Audio và ảnh nội dung bài học | 25 MB | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service | seed: `listening/demo/ls1.mp3`; upload API: `content-audio/{userId}/{uuid}.{ext}` | đã có |
+| `speaking-recordings` | không | Ghi âm Speaking của học viên | 5 MB | webm, mp4, ogg, mpeg, wav | assessment-service | `speaking/{userId}/{uuid}.{ext}` | đã có, chưa dùng |
+| `media-premium` | không | Audio bài trả phí, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | kế hoạch, chưa tạo |
+
+Ví dụ URL công khai và URL ký, cùng các quy tắc tạo, kiểm tra khóa và giới hạn TTL, được ghi trong
+[`shared/common-storage/README.md`](../shared/common-storage/README.md).
+
 ### Bất đồng bộ (RabbitMQ)
 
 Tên exchange, routing key, header và hình dạng payload của event dùng chung nằm ở `shared/common-events`
