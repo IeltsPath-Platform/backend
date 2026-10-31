@@ -9,4 +9,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,refresh
+        include: health,info,refresh,prometheus
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId:-}]"
