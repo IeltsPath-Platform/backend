@@ -23,6 +23,7 @@ class StartWordlyMultiplayerTest {
     final GameSessionRepository sessions=mock(GameSessionRepository.class);
     final WordlyWordProvider provider=mock(WordlyWordProvider.class);
     final WordlyMatchStore store=mock(WordlyMatchStore.class);
+    com.ieltspath.game.domain.vo.WordFilter filter=com.ieltspath.game.domain.vo.WordFilter.ANY;
     final GameRoom room=readyRoom();
     final List<WordlyWordProvider.Word> words=List.of("AIR","BOOK","ACTOR","PLANET","WATER").stream()
         .map(a->new WordlyWordProvider.Word(UUID.randomUUID(),a,"Meaning "+a)).toList();
@@ -60,9 +61,33 @@ class StartWordlyMultiplayerTest {
     }
     private GameRoom readyRoom() {
         var value=GameRoom.wordly(roomId,"ABC123",host,new WordlyRoomSettings(
-            WordlyRoomSettings.PlayerMode.MULTIPLAYER,4,WordlyRoomSettings.PlayMode.FINITE,5,true),clock.instant());
+            WordlyRoomSettings.PlayerMode.MULTIPLAYER,4,WordlyRoomSettings.PlayMode.FINITE,5,true,filter),clock.instant());
         value.join(guest,clock.instant());value.setReady(host,true,clock.instant());value.setReady(guest,true,clock.instant());
         return value;
+    }
+    private void chooseWords() {
+        filter=new com.ieltspath.game.domain.vo.WordFilter("A1",UUID.randomUUID());
+        room.updateSettings(host,4,5,true,filter,clock.instant());
+        room.setReady(host,true,clock.instant());room.setReady(guest,true,clock.instant());
+    }
+    @Test void answersFollowTheFilterWhileEveryCatalogWordStaysAValidGuess() {
+        chooseWords();
+        var zebra=new WordlyWordProvider.Word(UUID.randomUUID(),"ZEBRA","Meaning ZEBRA");
+        var full=new ArrayList<>(words);full.add(zebra);
+        when(provider.catalog()).thenReturn(full);
+        when(provider.catalog(filter)).thenReturn(words);
+        var result=start.execute(roomId,host);
+        verify(store).initialize(eq(result.matchId()),argThat(w->new HashSet<>(w).equals(new HashSet<>(words))),any(),any(),eq(true));
+        verify(store).prepareDictionary(argThat(w->w.contains(zebra)));
+    }
+    @Test void tooFewWordsForTheFilterReportsHowManyThereAre() {
+        chooseWords();
+        when(provider.catalog(filter)).thenReturn(words.subList(0,2));
+        var error=assertThrows(com.ieltspath.game.domain.exception.NotEnoughWordsException.class,()->start.execute(roomId,host));
+        assertEquals(2,error.available());
+        assertEquals(409,error.status());
+        assertEquals("WAITING",room.status().name());
+        verify(store,never()).initialize(any(),any(),any(),any(),anyBoolean());
     }
     @Test void loadsVocabularyOutsideLockAndStartsOnceUsingInjectedClock() {
         var result=start.execute(roomId,host);

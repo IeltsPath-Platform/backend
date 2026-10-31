@@ -67,9 +67,15 @@ public class StartGameMatchUseCase {
                 unique.putIfAbsent(w.answer(),w);
             }
             var candidates=new java.util.ArrayList<>(unique.values());
+            // Only the answers follow the level and topic; any word in the catalog stays a valid guess.
+            if(!settings.wordFilter().isAny()) {
+                var answers=new java.util.TreeMap<String,com.ieltspath.game.application.port.WordlyWordProvider.Word>();
+                for(var w:wordProvider.catalog(settings.wordFilter())) if(unique.containsKey(w.answer())) answers.putIfAbsent(w.answer(),w);
+                candidates=new java.util.ArrayList<>(answers.values());
+            }
+            if(candidates.size()<settings.requiredWords())
+                throw new com.ieltspath.game.domain.exception.NotEnoughWordsException(candidates.size());
             int count=settings.wordLimit()==null?Math.min(10,candidates.size()):settings.wordLimit();
-            if(count<1 || candidates.size()<count)
-                throw new IllegalStateException("Not enough eligible vocabulary to start this match");
             java.util.Collections.shuffle(candidates);
             words=List.copyOf(candidates.subList(0,count));
             dictionary=wordStore.prepareDictionary(List.copyOf(unique.values()));
@@ -103,6 +109,8 @@ public class StartGameMatchUseCase {
             matchConfig.put("timeEnabled", settings.timeEnabled());
             if (settings.timeEnabled()) matchConfig.put("wordTimeLimitSeconds", 180);
             if (settings.wordLimit() != null) matchConfig.put("wordLimit", settings.wordLimit());
+            if (settings.wordFilter().cefrLevel() != null) matchConfig.put("cefrLevel", settings.wordFilter().cefrLevel());
+            if (settings.wordFilter().topicId() != null) matchConfig.put("topicId", settings.wordFilter().topicId().toString());
         }
         GameMatch match=matchRepository.save(new GameMatch(matchId,roomId,room.gameType(),room.learningDomain(),
                 matchConfig,room.configSnapshot(),now));

@@ -13,12 +13,12 @@ Gateway validates it and forwards an internal JWT. Identity always comes from th
 | GET /api/games/me/active-game | none | 200 ActiveGame, or 204 when the caller belongs to no room in any room game |
 | POST /api/games/me/active-game/leave | none | 204; leaves the caller's active room (see One room per user) |
 | GET /api/games/wordly/me/active-game, POST …/leave | none | Aliases of the two routes above, kept for existing clients; same cross-game result |
-| POST /api/games/wordly/rooms | `{playerMode,initialLives,playMode,wordLimit,timeEnabled}` | 201 Room; caller becomes host; 409 ACTIVE_GAME_EXISTS while in another room |
+| POST /api/games/wordly/rooms | `{playerMode,initialLives,playMode,wordLimit,timeEnabled,cefrLevel?,topicId?}` | 201 Room; caller becomes host; 409 ACTIVE_GAME_EXISTS while in another room |
 | GET /api/games/rooms/{roomId} | none | 200 Room; active member |
 | GET /api/games/rooms/code/{roomCode} | none | 200 Room; active member, not a public lobby lookup |
 | POST /api/games/rooms/{roomId}/join | none | 200 Room; MULTIPLAYER WAITING with free slot; 409 ACTIVE_GAME_EXISTS for a room game while in another room |
 | POST /api/games/rooms/code/{roomCode}/join | none | same join behavior |
-| PUT /api/games/rooms/{roomId}/settings | `{initialLives,wordLimit,timeEnabled}` | 200 Room; WAITING host only; resets readiness, preserves members |
+| PUT /api/games/rooms/{roomId}/settings | `{initialLives,wordLimit,timeEnabled,cefrLevel,topicId}` | 200 Room; WAITING host only; resets readiness, preserves members |
 | POST /api/games/rooms/{roomId}/ready | `{ready:true}` | 200 Room; active member in WAITING |
 | POST /api/games/rooms/{roomId}/members/{userId}/kick | none | 200 Room; WAITING host, cannot kick self |
 | POST /api/games/rooms/{roomId}/leave | none | 200 Room; waiting-room lifecycle, use match leave during game |
@@ -56,6 +56,18 @@ flow would answer 409 GAME_NOT_SUPPORTED. Leaving without a room is a no-op.
 
 Settings: initialLives integer 3-6; playMode FINITE or ENDLESS. FINITE requires wordLimit >=5;
 ENDLESS requires null wordLimit. playerMode SOLO or MULTIPLAYER is fixed at creation.
+
+Word filter (Wordly and Rocket): `cefrLevel` is A1, A2, B1, B2, C1 or C2 and `topicId` a topic from
+`GET /api/games/word-filters`; null means any, and room `settings` returns both. In `PUT .../settings` null or an omitted
+field clears the choice, unlike the other fields of Rocket rooms. Wordly filters the answers only: any catalog word is
+still a valid guess. A word with several meanings shows a meaning that matches the filter.
+
+`GET /api/games/word-filters` returns `{topics:[{id,slug,name,nameVi}], availability:[{cefrLevel,topicId,words}]}`. A null
+`cefrLevel` or `topicId` on a row is the total across all of them, so `{null,null}` counts every word. It returns 503
+`WORD_FILTERS_UNAVAILABLE` when Library cannot answer; the rooms still work.
+
+Starting with too few words returns 409 `NOT_ENOUGH_WORDS` with `details.available`, and the room stays in the lobby. The
+minimum is `wordLimit` for FINITE and 5 for ENDLESS. An unknown or inactive topic counts as 0 words.
 MULTIPLAYER always has timeEnabled=true and wordTimeLimitSeconds=180. SOLO can disable time;
 then wordTimeLimitSeconds and word deadlines are null. Updates cannot change playMode/playerMode.
 Room `settings` also carries `questionCount` and `secondsPerQuestion`, which are null for Wordly rooms and set for
