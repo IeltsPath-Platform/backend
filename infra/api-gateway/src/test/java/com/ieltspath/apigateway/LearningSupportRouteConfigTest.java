@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class LearningSupportRouteConfigTest {
     @Test
-    void activityAndStreakRouteToUserWithoutGeneralFallback() throws Exception {
+    void activityRoutesToUserWithoutGeneralFallback() throws Exception {
         Path root = Path.of(System.getProperty("user.dir")).toAbsolutePath();
         while (root != null && !Files.exists(root.resolve("infra/config-server/config-repo/api-gateway.yaml"))) {
             root = root.getParent();
@@ -24,13 +24,13 @@ class LearningSupportRouteConfigTest {
         int userIndex = -1;
         for (int index = 0; index < 30; index++) {
             Object id = yaml.getProperty(prefix + index + "].id");
-            if ("user-activity-streak-service".equals(id)) userIndex = index;
+            if ("user-activity-service".equals(id)) userIndex = index;
             assertNotEquals("Path=/api/learning-support/**",
                     yaml.getProperty(prefix + index + "].predicates[0]"));
         }
         assertTrue(userIndex >= 0);
         assertEquals("lb://USER-SERVICE", yaml.getProperty(prefix + userIndex + "].uri"));
-        assertEquals("Path=/api/learning-support/activities/**,/api/learning-support/streak/**",
+        assertEquals("Path=/api/learning-support/activities/**",
                 yaml.getProperty(prefix + userIndex + "].predicates[0]"));
     }
 }

@@ -27,6 +27,9 @@ spring:
 community:
   user-service:
     base-url: ${USER_SERVICE_URL:http://localhost:8085}
+  # Learning owns the streak shown beside public profiles; without it profiles still load, with no streak.
+  learning-service:
+    base-url: ${LEARNING_SERVICE_URL:http://localhost:8086}
   media:
     bucket: ${COMMUNITY_MEDIA_BUCKET:community}
     image-hosts: ${COMMUNITY_IMAGE_HOSTS:images.unsplash.com,i.imgur.com}

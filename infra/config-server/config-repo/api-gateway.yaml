@@ -77,10 +77,10 @@ spring:
               predicates:
                 - Path=/api/learning-support/video-dictation/**
 
-            - id: user-activity-streak-service
+            - id: user-activity-service
               uri: lb://USER-SERVICE
               predicates:
-                - Path=/api/learning-support/activities/**,/api/learning-support/streak/**
+                - Path=/api/learning-support/activities/**
 
             - id: game-service
               uri: lb://GAME-SERVICE

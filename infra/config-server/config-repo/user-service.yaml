@@ -70,7 +70,6 @@ springdoc:
     - /auth/**
     - /api/users/**
     - /api/learning-support/activities/**
-    - /api/learning-support/streak/**
 
 management:
   endpoints:
