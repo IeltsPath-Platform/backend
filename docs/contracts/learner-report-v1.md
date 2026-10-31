@@ -94,8 +94,8 @@ The report body also carries four blocks added after `knowledgePoints`; the fiel
     enter it. `speakingIncluded` is true only when Speaking has a band.
   - `nextBandHints`: for a skill whose next band has at least 80% of its points at `CONSOLIDATE` or better, up to five points
     still to maintain there, weakest first.
-- `target`: set only when User Service returned a goal (`GET /internal/users/{id}/learning-goal`); otherwise `null` and the
-  report is otherwise complete (a slow or failing User Service never fails the report). `gap` is the target minus `estimatedBand.value` (`null` if either is unknown).
+- `target`: set only when the learner has an active goal (read from `learning_goals` in Learning's own database); otherwise `null`
+  and the report is otherwise complete. `gap` is the target minus `estimatedBand.value` (`null` if either is unknown).
   `projection` is described in [progress-snapshots-v1](progress-snapshots-v1.md) and is `null` without a target band.
 
 ## Mastery rules (Content Author)

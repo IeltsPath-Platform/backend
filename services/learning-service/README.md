@@ -3,7 +3,7 @@
 Spring Boot service on port 8086, registered in Eureka as `learning-service`.
 Gateway forwards `/api/learning/**` and supplies the internal JWT validated by
 `common-security`. The verified JWT subject scopes all learner progress and mastery.
-The module implements placement-based course recommendations, independent topic paths per course, course final-test
+The module implements placement-based course recommendations, independent topic paths per course skill, course final-test
 assignments and the `COURSE_GATE` result path, lessons (exercise and essay blocks, audio),
 exercise submissions, Writing essay grading (Task 1 and Task 2, LLM), mastery reads,
 review sets, final-test assignment and the `AssessmentCompleted.v2` consumer.
@@ -47,10 +47,11 @@ show available bands and the optional placement recommendation, then group topic
 | Method | Path | Behavior |
 | --- | --- | --- |
 | GET | `/placement-test` | CUSTOMER only; returns `{packageId, packageVersionId}` of the published placement test, `409 PLACEMENT_ALREADY_DONE` once a placement exists, `404 NO_PLACEMENT_TEST` without a package. The only route open before a placement. |
-| GET | `/courses` | CUSTOMER only; returns courses by band with placement-based `recommended`, topic counts and course-test `testStatus`. The placement test is optional: every course is open with or without a placement, which only sets `recommended`. |
-| GET | `/topics` | One Content `topic-sequence` read refreshes the shared KP catalog and the user's topic order; returns `skill`, `course`, `hasTopicTest`, statuses and completed lesson counts. Topic status sequences are independent per course and span skills. |
+| GET | `/courses` | CUSTOMER only; returns courses by band with placement-based `recommended`, topic counts, course-test `testStatus`, skill/combo prices, available and unlocked skills, combo payable price, and current `premium` status. Reconciles pending unlock debits first; Access outages leave pending purchases for retry and report `premium: false`. The placement test is optional. |
+| POST | `/courses/{id}/unlocks` | CUSTOMER only; `{ "target": "READING" | "LISTENING" | "WRITING" | "SPEAKING" | "COMBO" }` plus UUID `Idempotency-Key` buys a skill or band combo with Points. Unlock intent is durable before debit and replayed safely after failures. |
+| GET | `/topics` | One Content `topic-sequence` read refreshes the shared KP catalog and the user's topic order; returns `skill`, `course`, `hasTopicTest`, statuses and completed lesson counts. Each course skill has an independent topic sequence. |
 | POST | `/courses/{id}/test-assignments` | CUSTOMER only; assigns/returns a course final-test package after every topic in that course passes. `COURSE_GATE` at 70% passes the course without blocking another course. |
-| GET | `/topics/{id}/lessons` | Lists lessons with `practiceStatus` and `practicePassReason`, plus topic `skill`, `hasTopicTest`, and `testStatus`. |
+| GET | `/topics/{id}/lessons` | Lists lesson progress and practice fields plus `paywall` and `freePreview`; also returns topic `skill`, `hasTopicTest`, and `testStatus`. |
 | GET | `/lessons/{id}` | Applies the lesson gate and returns ordered blocks; a passed exercise block includes its solutions. |
 | POST | `/lessons/{id}/exercises/{blockId}/submissions` | Grades every question in the block, saves an idempotent response and completes the lesson when all exercise blocks have passed. |
 | POST | `/lessons/{id}/essays/{blockId}/submissions` | `{requestId, essayText}`: grades the essay within the request (see below) and returns the band, four criteria, corrections and summary once points are charged. |
@@ -69,13 +70,17 @@ show available bands and the optional placement recommendation, then group topic
 
 Topics derive `PASSED` from `passed_at`; the first unpassed topic in each skill is `IN_PROGRESS`
 and later topics of that skill are `LOCKED`. Topics without a skill share a separate order.
-Free topics precede premium topics within each skill. A topic without a final test has
+Course topics no longer have Premium-only gates. The first three lessons in each course skill are free; later lessons open
+with an ACTIVE skill/combo unlock, grandfathered lesson progress, or active Premium. Existing lesson progress is
+grandfathered by migration, while new progress is not; after Premium expires, lessons outside the free/owned/grandfathered
+set lock again. A topic without a final test has
 `testStatus: NONE` and passes when all published lessons are completed; requesting its
 test assignment returns `409 NO_TOPIC_TEST`. Pending reviews gate only their own skill;
 legacy reviews with no skill gate every skill. Removed topics lose their sequence order and leave
 the topic list. Lessons become available in order after earlier lessons are completed and their Practice is passed.
-Lesson GET, submission and completion apply errors in this order:
-`REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`, `PRACTICE_REQUIRED` (403, with `lessonIds`). Exercise blocks carry `blockKind`: essay blocks show only the prompt, task,
+Lesson GET, resources, practice-set listing, submissions and completion return `403 PAYWALL` when a lesson is not open.
+The topic lesson list keeps this separate from progress `LOCKED` status. Existing access gates still apply after the paywall:
+`REVIEW_REQUIRED`, `TOPIC_LOCKED`, `LESSON_LOCKED`, `PRACTICE_REQUIRED` (403, with `lessonIds`). Free practice by knowledge point follows the same lesson-position, unlock and grandfathering rules; the knowledge tree returns `locked` and disables `practiceAvailable` for gated points. Exercise blocks carry `blockKind`: essay blocks show only the prompt, task,
 minimum words, pass band and images, never count toward completion and reject exercise
 submissions with `409 ESSAY_BLOCK`. Media assets expose `mediaUrl`; an audio transcript
 appears only once the lesson is completed.
@@ -96,6 +101,58 @@ later correct answer in a failed block. New responses for a passed block have
 always include the `hint` key, with `null` when hidden or unavailable. Review set,
 quick-check and practice attempt questions carry Content hints; their results keep
 `hint: null`. Final assessments do not expose hints.
+
+## Goals, learning activity and study time
+
+These moved from the User Service (migration V40, data copied by `scripts/copy-study-data-to-learning.sh`). Clients keep
+calling the paths they always used; the Gateway rewrites them:
+
+| Public path | Learning path |
+| --- | --- |
+| `/api/users/me/learning-goals[/active\|/{id}/status]` | `/api/learning/goals[...]` |
+| `/api/users/{id}/learning-goals[/{goalId}/status]` (role `ADMIN`) | `/api/learning/admin/users/{id}/goals[...]` |
+| `/api/users/me/study-sessions[/{id}/heartbeats\|/{id}/close]` | `/api/learning/study-sessions[...]` |
+| `/api/users/me/statistics/study-time` | `/api/learning/statistics/study-time` |
+| `/api/learning-support/activities[/{id}]` | `/api/learning/activities[...]` |
+
+Study time:
+
+- `POST /study-sessions`: `{clientSessionId, sourceType, sourceId, takeover?}`. UUID identifiers; source types `LESSON`,
+  `PRACTICE`, `REVIEW`, `ASSESSMENT`.
+- `POST /study-sessions/{id}/heartbeats` and `/close`: `{epoch, sequence, intervals: [{startOffsetMs, endOffsetMs}]}`. At
+  most 16 ordered, non-overlapping intervals per request; offsets use the server session anchor. Close includes the final
+  flush.
+- `GET /statistics/study-time?from=YYYY-MM-DD&to=YYYY-MM-DD&grain=DAY&courseId=UUID`: inclusive range, at most 366 days;
+  grain is `DAY` (default), `WEEK` or `MONTH`; the course is optional.
+
+Start returns `sessionId`, `epoch`, `serverStartedAt`, `serverNow`, `leaseExpiresAt`, `nextSequence`, `heartbeatSeconds=30`,
+`idleSeconds=120`, `leaseSeconds=90`, `status` and `totalAcceptedMs`. Heartbeat and close return `sessionId`, `epoch`,
+`sequence`, `acceptedMs`, `totalAcceptedMs`, `leaseExpiresAt` and `status`. Retry the same payload and sequence after a lost
+response; a conflicting payload returns 409 `PAYLOAD_CONFLICT`. A closed or expired session is never revived: use a new
+`clientSessionId`. Only one session holds a user lease; an explicit takeover closes the previous session without filling
+gaps. The client excludes hidden and idle time; the server limits submitted intervals to elapsed server time and the latest
+90 seconds. This measures recorded activity, not verified human attention.
+
+Statistics return `availability`, `generatedAt`, `dataFrom`, `timezonePolicy=RECORDED_LOCAL_DATE`, `scope=ALL|courseId` and
+`days`. Each bucket has `date`, `timezone`, `actualSeconds`, `plannedSeconds` and `status` (`NOT_TRACKED`, `FUTURE`,
+`PARTIAL_DAY`, `COMPLETE`). Actual is null before measurement or for future dates; a measured inactive date is zero. Course
+targets are null. Week and month buckets sum raw milliseconds for dates inside the requested range before converting to whole
+seconds, and use the calendar bucket start date. Mixed timezone buckets say `MULTIPLE`; historical intervals keep their
+recorded date and timezone. Raw data is not purged automatically.
+
+Goal changes apply from the next local day, never overwrite a recorded day, and supersede pending future choices. The
+timezone comes from the User Service (`GET /internal/users/{id}/study-timezone`); when it cannot be read, the last stored
+timezone is used, then `Asia/Ho_Chi_Minh`. Starting a study session reschedules an active goal whose timezone has changed
+since it was scheduled.
+
+Before a session starts, the Learning Service checks that the source belongs to the learner. `LESSON`, `PRACTICE` and
+`REVIEW` are checked in `learning_db`; `ASSESSMENT` through `GET /api/assessments/me/statistics/study-context` of the
+Assessment Service (bearer and correlation id forwarded; 2 s connect, 3 s read). Owner failure returns 503
+`SOURCE_UNAVAILABLE`. For services on the host set `USER_SERVICE_URL=http://localhost:8085` and
+`ASSESSMENT_SERVICE_URL=http://localhost:8083`.
+
+`POST /internal/learning/streaks` (not routed by the Gateway) takes `{userIds}` (at most 100) and returns
+`{streaks: [{userId, currentDays}]}` for the learners who have a streak; Community uses it to show streaks beside profiles.
 
 ## Submission, mastery and review state
 

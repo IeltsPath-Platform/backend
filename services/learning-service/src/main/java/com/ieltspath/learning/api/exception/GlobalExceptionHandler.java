@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -73,6 +74,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<LearningErrorResponse> validation(MethodArgumentNotValidException exception,
                                                      HttpServletRequest request) {
         return ResponseEntity.unprocessableEntity().body(new LearningErrorResponse("Invalid request", null, null));
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<LearningErrorResponse> missingHeader(MissingRequestHeaderException exception) {
+        return ResponseEntity.badRequest().body(new LearningErrorResponse("Required header is missing",
+                "INVALID_REQUEST", null));
     }
 
     @ExceptionHandler({IllegalArgumentException.class, HttpMessageNotReadableException.class,

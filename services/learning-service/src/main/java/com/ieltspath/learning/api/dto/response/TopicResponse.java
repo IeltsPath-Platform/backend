@@ -10,11 +10,20 @@ import java.util.UUID;
 public record TopicResponse(UUID topicId, String code, String name, int sequenceOrder,
                             String status, int completedLessonCount, String accessLevel,
                             LearningSkill skill, boolean hasTopicTest, TopicResult.Course course,
-                            List<LearningSkill> skills, int totalLessonCount) {
+                            List<LearningSkill> skills, int totalLessonCount, String description) {
+    public TopicResponse(UUID topicId, String code, String name, int sequenceOrder,
+                         String status, int completedLessonCount, String accessLevel,
+                         LearningSkill skill, boolean hasTopicTest, TopicResult.Course course,
+                         List<LearningSkill> skills, int totalLessonCount) {
+        this(topicId, code, name, sequenceOrder, status, completedLessonCount, accessLevel, skill, hasTopicTest,
+                course, skills, totalLessonCount, null);
+    }
+
     public static TopicResponse from(TopicResult result) {
         return new TopicResponse(result.topicId(), result.code(), result.name(), result.sequenceOrder(),
                 result.status().name(), result.completedLessonCount(),
                 result.requiredFeatureKey() == null ? "FREE" : "PREMIUM", result.skill(), result.hasTopicTest(),
-                result.course(), result.skills().stream().sorted().toList(), result.totalLessonCount());
+                result.course(), result.skills().stream().sorted().toList(), result.totalLessonCount(),
+                result.description());
     }
 }

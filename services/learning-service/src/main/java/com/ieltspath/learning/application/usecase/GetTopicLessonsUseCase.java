@@ -3,6 +3,7 @@ package com.ieltspath.learning.application.usecase;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.result.TopicLessonsResult;
 import com.ieltspath.learning.application.service.LessonAccess;
+import com.ieltspath.learning.application.service.PaywallGate;
 import com.ieltspath.learning.application.service.PracticeProgress;
 import com.ieltspath.learning.domain.exception.LearningGateException;
 import com.ieltspath.learning.domain.repository.LessonProgressRepository;
@@ -27,14 +28,16 @@ public class GetTopicLessonsUseCase {
     private final LessonAccess access;
     private final LessonProgressRepository lessons;
     private final PracticeProgress practice;
+    private final PaywallGate paywall;
 
     public GetTopicLessonsUseCase(LearningContentClient content, LessonAccess access,
                                   LessonProgressRepository lessons,
-                                  PracticeProgress practice) {
+                                  PracticeProgress practice, PaywallGate paywall) {
         this.content = content;
         this.access = access;
         this.lessons = lessons;
         this.practice = practice;
+        this.paywall = paywall;
     }
 
     @Transactional
@@ -44,6 +47,7 @@ public class GetTopicLessonsUseCase {
         if (topicStatus == TopicStatus.LOCKED) throw new LearningGateException("TOPIC_LOCKED", List.of());
         var ordered = LessonAccess.orderedLessons(content.getTopicLessons(topicId));
         var progress = lessons.findByTopic(userId, topicId);
+        var paywallRequest = paywall.forLearner(userId);
         Map<UUID, Boolean> completedByLesson = new HashMap<>();
         for (var lesson : ordered) completedByLesson.put(lesson.lessonId(),
                 LessonAccess.completed(progress.get(lesson.lessonId())));
@@ -64,9 +68,11 @@ public class GetTopicLessonsUseCase {
                     : LessonAccessGate.blocking(topicPractice.pendingReviews(), topic.skills(), Set.copyOf(previousIds));
             UUID blockingReviewId = blockedBy.isEmpty() ? null : blockedBy.get(0).reviewId();
             String status = completed ? "COMPLETED" : previousOpen && blockedBy.isEmpty() ? "AVAILABLE" : "LOCKED";
+            boolean paywalled = !paywallRequest.lessonOpen(lesson, progress.get(lesson.lessonId()));
             summaries.add(new TopicLessonsResult.LessonSummary(lesson.lessonId(), lesson.code(), lesson.title(),
                     lesson.sortOrder(), status, clearance.status(), clearance.reason(), lesson.estimatedMinutes(),
-                    blockingReviewId));
+                    blockingReviewId, paywalled,
+                    paywallRequest.freePreview(lesson.courseId(), lesson.skillPosition())));
             previousIds.add(lesson.lessonId());
             previousComplete &= completed;
             previousOpen &= completed && clearance.status() == PracticeStatus.PASSED;

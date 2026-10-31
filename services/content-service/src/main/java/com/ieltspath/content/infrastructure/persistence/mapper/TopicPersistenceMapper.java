@@ -21,7 +21,8 @@ public class TopicPersistenceMapper {
                 entity.getSkill(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
-                entity.getCourseId()
+                entity.getCourseId(),
+                entity.getDescription()
         );
     }
 
@@ -38,6 +39,7 @@ public class TopicPersistenceMapper {
                 .bandMin(domain.getBand().min())
                 .bandMax(domain.getBand().max())
                 .skill(domain.getSkill())
+                .description(domain.getDescription())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())
                 .build();

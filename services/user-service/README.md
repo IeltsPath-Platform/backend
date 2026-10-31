@@ -1,6 +1,6 @@
 # User Service
 
-`user-service` quản lý người dùng, đăng nhập, refresh token, phát hành external JWT và lưu activity của học viên. Streak do Learning Service tính và giữ (`GET /api/learning/me/streak`); bảng `streaks` cũ trong `user_db` còn nguyên nhưng không còn được ghi hay đọc.
+`user-service` quản lý người dùng, đăng nhập, refresh token, phát hành external JWT và hồ sơ học viên. Mục tiêu học, activity, thời gian học và streak do Learning Service giữ (xem README của learning-service); các bảng `learning_goals`, `learning_activities`, `study_*` và `streaks` cũ trong `user_db` còn nguyên nhưng không còn được ghi hay đọc.
 
 ## Vai trò
 
@@ -10,7 +10,7 @@
 - Lưu refresh token dạng hash trong database.
 - Verify internal JWT do API Gateway ký khi nhận request protected.
 - Cung cấp API quản lý user/role cho `ADMIN`.
-- Ghi `learning_activities` theo public path `/api/learning-support/activities`; Gateway route nhóm này tới user-service.
+- Cho Learning Service đọc múi giờ học của học viên (`GET /internal/users/{userId}/study-timezone`).
 
 ## Luồng đăng nhập
 
@@ -113,7 +113,6 @@ Migration chính:
 
 ```text
 src/main/resources/db/migration/V1__create_user_tables.sql
-src/main/resources/db/migration/V5__create_learning_activity_and_streak_tables.sql
 ```
 
 Các bảng chính:
@@ -123,12 +122,11 @@ users
 roles
 user_roles
 refresh_tokens
-learning_activities
-streaks
 ```
 
-V5 tạo hai bảng activity/streak trong `user_db`; `user_id` là ID logic, không có FK tới `users`. `GlobalExceptionHandler`
-phân nhánh theo path `/api/learning-support/` để giữ định dạng lỗi của các endpoint cũ.
+Migration V4, V5, V6 và các bảng `learning_goals`, `learning_activities`, `study_*`, `streaks` được giữ lại để dữ liệu cũ còn
+đối chiếu được; không còn code nào ghi hay đọc chúng. Dữ liệu đã được chép sang `learning_db` bằng
+`scripts/copy-study-data-to-learning.sh` (xem `scripts/study-data-copy/`).
 
 ## Cấu hình quan trọng
 
@@ -162,17 +160,19 @@ PUT  /api/users/{id}
 PUT  /api/users/{id}/roles
 PUT  /api/users/{id}/status
 DELETE /api/users/{id}
-POST /api/learning-support/activities
-GET  /api/learning-support/activities
-GET  /internal/users/{userId}/learning-goal
+GET  /internal/users/{userId}/study-timezone
 POST /internal/users/display-names
 ```
 
-The two `/internal/users/**` routes require a verified internal service JWT and are not exposed to clients through the
-Gateway. The learning-goal response contains `targetBand` and `examDate`; both are `null` when the user has no active
-goal, while an unknown user returns 404. The display-name request accepts 1–50 IDs in one batch. It uses a learner
-profile's `displayName` when available, falls back to the account `fullName`, omits unknown IDs, and never returns email.
-These reads use the existing `users`, `learning_goals`, and `learner_profiles` tables; no migration is needed.
+The `/internal/users/**` routes require a verified internal service JWT and are not exposed to clients through the
+Gateway. The study-timezone response is `{"timezone": "..."}`: the timezone of the learner profile, or `Asia/Ho_Chi_Minh`
+when there is none. The display-name request accepts 1–50 IDs in one batch. It uses a learner profile's `displayName`
+when available, falls back to the account `fullName`, omits unknown IDs, and never returns email.
+
+Goals (`/api/users/me/learning-goals/**`, `/api/users/{id}/learning-goals/**`), study time
+(`/api/users/me/study-sessions/**`, `/api/users/me/statistics/study-time`) and learning activity
+(`/api/learning-support/activities/**`) are no longer served here: the Gateway rewrites those public paths to the
+Learning Service.
 
 ## Chạy local
 
@@ -200,7 +200,8 @@ Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho
 ## Community public profiles
 
 - `GET /api/users/{userId}/public-profile` requires authentication and returns
-  `{id, displayName, avatarUrl, bio, targetBand}`; the streak is not part of the profile (Community reads it from Learning).
+  `{id, displayName, avatarUrl, bio}`; the streak and the target band are not part of the profile (the streak is read from
+  Learning by Community; the target band is not shown with a profile).
 - `POST /internal/users/public-profiles` accepts `{userIds: UUID[]}` (at most 100 entries; empty is allowed)
   and returns `{profiles: [...]}`. It uses the forwarded internal JWT's viewer identity and is blocked at Gateway.
   IDs are deduplicated in input order. Missing or hidden profiles are omitted.
@@ -210,10 +211,10 @@ Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho
 - Existing users without a learner profile follow the current default profile policy: account full name (or
   `Learner`) and public visibility, without creating a profile on read. No email, phone, roles, timezone,
   self-reported band, exam date, or schedule are returned.
-- `targetBand` is the current active learning goal's target, otherwise null. `avatarUrl` contains the existing avatar reference only if it is an absolute HTTP(S)
+- `avatarUrl` contains the existing avatar reference only if it is an absolute HTTP(S)
   URL with a host and no user credentials; opaque references return null. The bio is edited through
   `PUT /api/users/me/profile` and the avatar through `POST`/`DELETE /api/users/me/avatar`.
-- The bounded batch uses a single query joining profile and active goal in `user_db`.
+- The bounded batch uses a single query joining the account and the profile in `user_db`.
 
 ## Personal profile and account security
 
@@ -239,48 +240,3 @@ Khi chạy qua docker-compose, user-service không nên expose trực tiếp cho
 - Runtime configuration: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and optional `USER_AVATAR_BUCKET` (defaults to
   `avatars`). Keep the secret key only in the ignored root `.env`. The bucket must allow public reads for returned
   avatar URLs; uploads/deletes remain server-side.
-
-## Recorded study time
-
-Authenticated personal APIs use `CurrentUserProvider`; existing activity CRUD does not contribute to these totals.
-
-- `POST /api/users/me/study-sessions`: `{clientSessionId, sourceType, sourceId, takeover?}`. UUID identifiers;
-  source types: `LESSON`, `PRACTICE`, `REVIEW`, `ASSESSMENT`.
-- `POST /api/users/me/study-sessions/{id}/heartbeats` and `/close`:
-  `{epoch, sequence, intervals: [{startOffsetMs, endOffsetMs}]}`. At most 16 ordered, non-overlapping
-  intervals per request; offsets use the server session anchor. Close includes the final flush.
-- `GET /api/users/me/statistics/study-time?from=YYYY-MM-DD&to=YYYY-MM-DD&grain=DAY&courseId=UUID`:
-  inclusive range, at most 366 days; grain is `DAY` (default), `WEEK`, or `MONTH`; course is optional.
-
-Start returns `sessionId`, `epoch`, `serverStartedAt`, `serverNow`, `leaseExpiresAt`, `nextSequence`,
-`heartbeatSeconds=30`, `idleSeconds=120`, `leaseSeconds=90`, `status`, and `totalAcceptedMs`.
-Heartbeat/close return `sessionId`, `epoch`, `sequence`, `acceptedMs`, `totalAcceptedMs`, `leaseExpiresAt`,
-and `status`. Retry the same payload/sequence after a lost response. A conflicting payload returns
-409 `PAYLOAD_CONFLICT`. A closed/expired session is never revived: use a new `clientSessionId`.
-Only one session holds a user lease; explicit takeover closes the previous session without filling gaps.
-The client excludes hidden/idle time; the server limits submitted intervals to elapsed server time and
-the latest 90 seconds. This measures recorded activity, not verified human attention.
-
-Statistics return `availability`, `generatedAt`, `dataFrom`, `timezonePolicy=RECORDED_LOCAL_DATE`,
-`scope=ALL|courseId`, and `days`. Each bucket contains `date`, `timezone`, `actualSeconds`,
-`plannedSeconds`, and `status` (`NOT_TRACKED`, `FUTURE`, `PARTIAL_DAY`, `COMPLETE`). Actual is null
-before measurement or for future dates; a measured inactive date is zero. Course targets are null.
-Week/month buckets sum raw milliseconds for dates inside the requested range before converting to whole
-seconds, and use the calendar bucket start date.
-Mixed timezone buckets say `MULTIPLE`; historical intervals retain their recorded date and timezone.
-
-Migration V6 adds sessions, durable replay receipts, an interval ledger, daily totals, goal snapshots,
-and the activation timestamp. Goal changes apply the next local day, never overwrite a recorded day,
-and supersede pending future choices. Current active goals are snapshotted at migration; no historical
-active time or targets are inferred. Changing the profile timezone reschedules an active goal using the
-saved timezone under the same per-user lock as goal updates; unchanged timezones and users without an
-active goal do not create another snapshot. Recorded days remain unchanged. Raw data is not automatically purged.
-
-Source ownership and course context are verified once before starting, outside the database transaction,
-through each owner’s `/statistics/study-context` endpoint. Bearer and correlation ID are forwarded;
-connection/read timeouts are 2/3 seconds. Owner failure returns 503 `SOURCE_UNAVAILABLE` and must not
-block lesson submission. Config Server defaults source URLs to Compose hostnames; for services on the
-host, set `LEARNING_SERVICE_URL=http://localhost:8086` and `ASSESSMENT_SERVICE_URL=http://localhost:8083`.
-
-Run `mvn -q -pl services/user-service -am test` from the repository root. Study-time PostgreSQL tests
-require Docker and explicitly skip when it is unavailable.

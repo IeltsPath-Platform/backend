@@ -22,7 +22,8 @@ class BusinessControllerRoleConventionTest {
 
         for (var candidate : scanner.findCandidateComponents("com.ieltspath.learning.api.controller")) {
             Class<?> controller = Class.forName(candidate.getBeanClassName());
-            if (controller == ActivityStatsController.class) {
+            // Administrators' own views: activity statistics, and a learner's goals as the User Service's admin API had them.
+            if (controller == ActivityStatsController.class || controller == AdminLearningGoalController.class) {
                 continue;
             }
             check(controller, controller, violations);

@@ -43,19 +43,6 @@ final class ServiceDependencyGraph {
         return graph;
     }
 
-    /** The graph without the given {@code from->to} edges. */
-    static Map<String, Set<String>> without(Map<String, Set<String>> graph, Set<String> edges) {
-        Map<String, Set<String>> kept = new TreeMap<>();
-        graph.forEach((from, targets) -> {
-            Set<String> remaining = new TreeSet<>();
-            for (String to : targets) {
-                if (!edges.contains(from + "->" + to)) remaining.add(to);
-            }
-            kept.put(from, remaining);
-        });
-        return kept;
-    }
-
     /** A cycle as a path whose first and last service are the same, or empty when calls only run one way. */
     static Optional<List<String>> findCycle(Map<String, Set<String>> graph) {
         Set<String> finished = new HashSet<>();

@@ -2,8 +2,7 @@ package com.ieltspath.user.api.controller;
 
 import com.ieltspath.user.api.dto.request.UserDisplayNamesRequest;
 import com.ieltspath.user.api.dto.response.UserDisplayNamesResponse;
-import com.ieltspath.user.application.result.InternalLearningGoalResult;
-import com.ieltspath.user.application.usecase.GetInternalLearningGoalUseCase;
+import com.ieltspath.user.application.usecase.GetStudyTimezoneUseCase;
 import com.ieltspath.user.application.usecase.GetUserDisplayNamesUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,13 +20,16 @@ import java.util.UUID;
 @RequestMapping("/internal/users")
 @RequiredArgsConstructor
 public class InternalUserController {
-    private final GetInternalLearningGoalUseCase learningGoals;
     private final GetUserDisplayNamesUseCase displayNames;
+    private final GetStudyTimezoneUseCase studyTimezone;
 
-    @GetMapping("/{userId}/learning-goal")
-    public InternalLearningGoalResult learningGoal(@PathVariable("userId") UUID userId) {
-        return learningGoals.execute(userId);
+    /** The timezone the learner's study days are counted in; read by the Learning Service. */
+    @GetMapping("/{userId}/study-timezone")
+    public StudyTimezoneResponse studyTimezone(@PathVariable("userId") UUID userId) {
+        return new StudyTimezoneResponse(studyTimezone.execute(userId));
     }
+
+    public record StudyTimezoneResponse(String timezone) {}
 
     @PostMapping("/display-names")
     public UserDisplayNamesResponse displayNames(@Valid @RequestBody UserDisplayNamesRequest request) {

@@ -35,6 +35,7 @@ public class CreateTopicUseCase {
         if (command.courseId() != null) {
             courseRepository.findById(command.courseId())
                     .orElseThrow(() -> new CourseNotFoundException(command.courseId()));
+            requireCourseSkill(command.skill());
         }
         TopicSortOrders.requireFree(topicRepository, command.parentTopicId(), command.sortOrder(), null);
 
@@ -44,7 +45,8 @@ public class CreateTopicUseCase {
                 command.name(),
                 command.sortOrder(),
                 command.band(),
-                command.skill()
+                command.skill(),
+                command.description()
         );
         if (command.courseId() != null) topic.assignCourse(command.courseId());
 
@@ -60,8 +62,15 @@ public class CreateTopicUseCase {
                 saved.getUpdatedAt(),
                 saved.getBand(),
                 saved.getSkill(),
-                saved.getCourseId()
+                saved.getCourseId(),
+                saved.getDescription()
         );
+    }
+
+    private void requireCourseSkill(com.ieltspath.content.domain.vo.Skill skill) {
+        if (skill == null || skill == com.ieltspath.content.domain.vo.Skill.ALL) {
+            throw new IllegalArgumentException("A course topic must have exactly one skill");
+        }
     }
 }
 

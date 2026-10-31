@@ -137,8 +137,6 @@ services:
       SUPABASE_URL: "${SUPABASE_URL:-}"
       SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY:-}"
       USER_AVATAR_BUCKET: "${USER_AVATAR_BUCKET:-avatars}"
-      LEARNING_SERVICE_URL: http://learning-service:8086
-      ASSESSMENT_SERVICE_URL: http://assessment-service:8083
     depends_on: *after-infra
 
   content-service:

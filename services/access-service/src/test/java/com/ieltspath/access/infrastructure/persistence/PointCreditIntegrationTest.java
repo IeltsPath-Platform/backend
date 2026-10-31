@@ -204,7 +204,8 @@ class PointCreditIntegrationTest {
                 userId);
         String token = signedInternalToken(userId);
         for (String[] pair : new String[][]{{"HEART_REFILL", "HEART_REFILL_DEBIT"},
-                {"STREAK_FREEZE", "STREAK_FREEZE_DEBIT"}}) {
+                {"STREAK_FREEZE", "STREAK_FREEZE_DEBIT"},
+                {"COURSE_UNLOCK", "COURSE_UNLOCK_DEBIT"}}) {
             String body = "{\"userId\":\"" + userId + "\",\"amount\":1,\"referenceType\":\""
                     + pair[0] + "\",\"referenceId\":\"" + UUID.randomUUID()
                     + "\",\"idempotencyKey\":\"debit-" + pair[0] + "\"}";

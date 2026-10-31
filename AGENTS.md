@@ -21,7 +21,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-security` | Thư viện security servlet dùng chung (internal JWT, `CanonicalRoles`, `CurrentUserProvider`); không deploy độc lập. |
 | `shared/common-events` | Thư viện tên exchange/routing key/header, record payload và helper `MessageRetry`/`RetryTopology` dùng chung; không deploy độc lập. |
 | `shared/common-storage` | Thư viện lưu object dùng chung (`ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy`); không deploy độc lập; service tự cấu hình bucket. |
-| `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity tại `/api/learning-support/activities`. Streak do learning-service giữ. |
+| `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên (có múi giờ). Mục tiêu học, activity và thời gian học do learning-service giữ; streak cũng vậy. |
 | `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
 | `services/library-service` | Cổng 8081, `library_db` (Compose PostgreSQL host 5440): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
 | `services/assessment-service` | Làm bài, chấm objective/LLM cho essay gate và EXAMINER, kết quả; phát `AssessmentCompleted.v2`. |
@@ -29,7 +29,7 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `services/game-service` | Phòng game, trận, phiên chơi, WebSocket. |
 | `services/community-service` | Bài viết, bình luận, reaction, kiểm duyệt. |
 | `services/notification-service` | Cổng 8088, `notification_db` (Compose PostgreSQL host 5440, migration V1-V4: `notifications`, `notification_preferences`): nhận event RabbitMQ (bốn queue chấm bài `notification.grading-{requested,completed,due-soon,overdue}.v1` và `community.notifications.v1`), lưu hộp thư thông báo, tùy chọn thông báo theo loại sự kiện. Route `/api/notifications/**`. |
-| `services/learning-service` | Cổng 8086, `learning_db` (Compose PostgreSQL host 5440): thứ tự topic, bài học, nộp bài, cổng mở bài, mastery theo KP, bài ôn, giao mã đề cuối, consumer `AssessmentCompleted.v2`. Route `/api/learning/**`. |
+| `services/learning-service` | Cổng 8086, `learning_db` (Compose PostgreSQL host 5440): thứ tự topic, bài học, nộp bài, cổng mở bài, mastery theo KP, bài ôn, giao mã đề cuối, consumer `AssessmentCompleted.v2`, mục tiêu học, activity, thời gian học và streak. Route `/api/learning/**`; Gateway còn chuyển các path công khai cũ của goal, activity và study-time tới đây. |
 
 Mỗi business service sở hữu một database PostgreSQL riêng. Gateway chuyển nhóm activity tới user-service;
 không còn route tổng quát `/api/learning-support/**`.
@@ -122,9 +122,10 @@ src/main/java/com/ieltspath/<service>
 
 - Mỗi service sở hữu bounded context và database; không đọc/ghi database hay dùng chung JPA entity của service khác.
 - Gọi đồng bộ service-to-service bằng HTTP tới endpoint nội bộ hoặc public của service đích, kèm bearer của request và
-  `X-Correlation-Id` (như assessment → content, content → library, game → library/content, learning → content/access/user).
-  Learning gọi user-service chỉ để đọc mục tiêu band (`/internal/users/{id}/learning-goal`) và tên hiển thị
-  (`/internal/users/display-names`); lỗi hoặc timeout thì báo cáo và bảng league vẫn trả, thiếu phần đó.
+  `X-Correlation-Id` (như assessment → content, content → library, game → library/content, learning → content/access/user/assessment).
+  Learning gọi user-service chỉ để đọc múi giờ học (`/internal/users/{id}/study-timezone`; lỗi thì dùng múi giờ đã lưu
+  lần gần nhất, rồi `Asia/Ho_Chi_Minh`) và tên hiển thị (`/internal/users/display-names`; lỗi thì bảng league vẫn trả, thiếu tên).
+  Learning gọi assessment để xác minh bài thi thuộc về người học khi mở phiên học (`/api/assessments/me/statistics/study-context`).
 - Lời gọi đồng bộ giữa các service phải một chiều: hai service không được gọi HTTP lẫn nhau, trực tiếp hay qua service thứ ba.
   Client HTTP mới phải ghi vào bảng "Đồng bộ (HTTP)" của `docs/system-architecture.md`, và URL đích khai báo trong
   `infra/config-server/config-repo/<service>.yaml` bằng biến `<TÊN>_SERVICE_URL`. `ServiceDependencyGraphTest`

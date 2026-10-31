@@ -7,8 +7,6 @@ import com.ieltspath.user.domain.exception.InvalidActionTokenException;
 import com.ieltspath.user.domain.exception.InvalidDataException;
 import com.ieltspath.user.domain.exception.InvalidUserStatusException;
 import com.ieltspath.user.domain.exception.LearnerProfileNotFoundException;
-import com.ieltspath.user.domain.exception.LearningGoalNotFoundException;
-import com.ieltspath.user.domain.exception.LearningGoalConflictException;
 import com.ieltspath.user.domain.exception.OAuthIdentityNotFoundException;
 import com.ieltspath.user.domain.exception.PhoneAlreadyExistsException;
 import com.ieltspath.user.domain.exception.RoleNotFoundException;
@@ -40,16 +38,6 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    @ExceptionHandler(com.ieltspath.user.domain.exception.StudyTrackingException.class)
-    ResponseEntity<ErrorResponse> handleStudyTracking(com.ieltspath.user.domain.exception.StudyTrackingException exception,
-                                                     HttpServletRequest request) {
-        HttpStatus status = switch(exception.getCode()) {
-            case "SESSION_NOT_FOUND", "SOURCE_NOT_AVAILABLE" -> HttpStatus.NOT_FOUND;
-            case "SOURCE_UNAVAILABLE" -> HttpStatus.SERVICE_UNAVAILABLE;
-            default -> HttpStatus.CONFLICT;
-        };
-        return error(status, exception.getCode(), request, Map.of("code", exception.getCode()));
-    }
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     void handleClientAbort(AsyncRequestNotUsableException exception, HttpServletRequest request) {
         log.debug("Client disconnected before response completed path={} reason={}",
@@ -60,7 +48,6 @@ public class GlobalExceptionHandler {
             UserNotFoundException.class,
             ResourceNotFoundException.class,
             LearnerProfileNotFoundException.class,
-            LearningGoalNotFoundException.class,
             OAuthIdentityNotFoundException.class
     })
     ResponseEntity<ErrorResponse> handleNotFound(RuntimeException exception, HttpServletRequest request) {
@@ -68,7 +55,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({EmailAlreadyExistsException.class, PhoneAlreadyExistsException.class,
-            LearningGoalConflictException.class, ConflictException.class, PasswordNotConfiguredException.class})
+            ConflictException.class, PasswordNotConfiguredException.class})
     ResponseEntity<ErrorResponse> handleConflict(RuntimeException exception, HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, exception.getMessage(), request, null);
     }
@@ -139,21 +126,19 @@ public class GlobalExceptionHandler {
             IllegalStateException.class
     })
     ResponseEntity<ErrorResponse> handleBadRequest(RuntimeException exception, HttpServletRequest request) {
-        return error(HttpStatus.BAD_REQUEST,
-                isLearningSupportPath(request) ? "Dữ liệu không hợp lệ" : exception.getMessage(), request, null);
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request, null);
     }
 
     @ExceptionHandler(InvalidDataException.class)
-    ResponseEntity<ErrorResponse> handleInvalidActivityData(InvalidDataException exception, HttpServletRequest request) {
+    ResponseEntity<ErrorResponse> handleInvalidData(InvalidDataException exception, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, "Dữ liệu không hợp lệ", request, null);
     }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MissingServletRequestParameterException.class,
             org.springframework.web.multipart.support.MissingServletRequestPartException.class,
             MethodArgumentTypeMismatchException.class})
-    ResponseEntity<ErrorResponse> handleMalformedActivityRequest(Exception exception, HttpServletRequest request) {
-        return isLearningSupportPath(request) || request.getRequestURI().startsWith("/api/users/me/study-sessions")
-                || request.getRequestURI().equals("/api/users/me/avatar")
+    ResponseEntity<ErrorResponse> handleMalformedRequest(Exception exception, HttpServletRequest request) {
+        return request.getRequestURI().equals("/api/users/me/avatar")
                 || request.getRequestURI().startsWith("/api/users/me/statistics/")
                 || request.getRequestURI().equals("/internal/users/public-profiles")
                 || request.getRequestURI().matches("/api/users/[^/]+/public-profile")
@@ -185,15 +170,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(new ErrorResponse(
                 LocalDateTime.now(),
                 status.value(),
-                isLearningSupportPath(request) ? status.getReasonPhrase() : reasonPhrase(status),
+                reasonPhrase(status),
                 message,
                 request.getRequestURI(),
                 details
         ));
-    }
-
-    private boolean isLearningSupportPath(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/api/learning-support/");
     }
 
     private String reasonPhrase(HttpStatus status) {
