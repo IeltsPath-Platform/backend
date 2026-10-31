@@ -9,6 +9,9 @@ import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,6 +30,24 @@ public class JdbcStreakRepository implements StreakRepository {
                        freeze_available, freeze_eligible_from, frozen_run_end, freeze_run, lost_streak_days
                 FROM learner_streaks WHERE user_id = ?
                 """, JdbcStreakRepository::toState, userId).stream().findFirst();
+    }
+
+    @Override
+    public Map<UUID, StreakState> findAll(Collection<UUID> userIds) {
+        if (userIds.isEmpty()) return Map.of();
+        Map<UUID, StreakState> states = new LinkedHashMap<>();
+        jdbc.query(connection -> {
+            var statement = connection.prepareStatement("""
+                    SELECT user_id, current_days, longest_days, last_active_date, streak_start, evaluated_through,
+                           freeze_available, freeze_eligible_from, frozen_run_end, freeze_run, lost_streak_days
+                    FROM learner_streaks WHERE user_id = ANY (?)
+                    """);
+            statement.setArray(1, connection.createArrayOf("uuid", userIds.stream().map(UUID::toString).toArray()));
+            return statement;
+        }, rows -> {
+            states.put(rows.getObject("user_id", UUID.class), toState(rows, 0));
+        });
+        return states;
     }
 
     @Override
