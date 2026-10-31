@@ -151,7 +151,7 @@ services:
       SERVER_PORT: 8082
       CONTENT_DB_URL: jdbc:postgresql://postgres:5432/content_db
       CONTENT_DB_PASSWORD: "${POSTGRES_PASSWORD}"
-      CONTENT_MEDIA_BASE_URL: "${CONTENT_MEDIA_BASE_URL:-https://media.example.invalid/}"
+      CONTENT_MEDIA_BASE_URL: "${CONTENT_MEDIA_BASE_URL:-https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/}"
       LIBRARY_SERVICE_URL: http://library-service:8081
       SUPABASE_URL: "${SUPABASE_URL:-}"
       SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY:-}"
