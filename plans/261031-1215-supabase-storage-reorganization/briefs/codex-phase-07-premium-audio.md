@@ -19,6 +19,15 @@ Lựa chọn:
 
 Quyết định đã chốt bằng ràng buộc kỹ thuật (không cần bạn): **TTL URL ký = 900 giây**, vì `common-storage` giới hạn `MAX_TTL` = 15 phút.
 
+## Xung đột `ls1.mp3` với bài Placement (gỡ ngày 2026-10-31)
+
+`listening/demo/ls1.mp3` còn được `V25__seed_placement_test.sql` dùng, và đề Placement phát bằng URL công khai qua assessment-service (không ký). D1=A chuyển file sang `media-premium` thì Placement mất audio khi xóa bản công khai.
+
+Cách gỡ (không cần thu âm mới):
+- Placement dùng khóa công khai riêng `listening/placement/placement-ls1.mp3` (cùng nội dung). Claude sao chép object này trong bucket `media` sau khi người dùng duyệt; Codex không ghi Supabase.
+- Migration dữ liệu `V93` làm hai việc, idempotent: đặt `access_tier = 'PREMIUM'` cho tài sản bài học V12 có `media_reference = 'listening/demo/ls1.mp3'`; đổi `media_reference` của tài sản Placement (hàng do V25 tạo) sang `listening/placement/placement-ls1.mp3`. Chọn đúng hàng bằng id/section của V25, không dùng `WHERE media_reference = ...` rộng.
+- V93 chỉ merge sau khi Claude xác nhận hai object đã có (`media-premium/listening/demo/ls1.mp3` đã có sẵn; `media/listening/placement/placement-ls1.mp3` Claude tạo).
+
 ## Điều kiện bắt đầu
 
 1. D1 và D2 đã trả lời.
