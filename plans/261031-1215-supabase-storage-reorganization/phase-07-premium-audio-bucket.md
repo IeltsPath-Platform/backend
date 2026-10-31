@@ -18,6 +18,8 @@ dependencies: [1, 3, 6]
 - Brief đã viết: `briefs/codex-phase-07-premium-audio.md`. Bị chặn bởi quyết định D1 (ls1 dùng chung bài miễn phí và bài trả phí) và D2 (tên bucket). TTL đã chốt 900 giây.
 - Kiểm kê đã làm: đường phát audio cho học viên là `GET /api/learning/lessons/{id}`; đề thử giữ công khai. Trước phase 7: phase 3 phải merge (vì cùng sửa `ContentMediaController`).
 
+**Trạng thái (2026-10-31):** bucket `media-premium` đã tạo (riêng tư, 25 MB, audio). `listening/demo/ls1.mp3` đã copy sang đó; URL ký (900 giây) phát được `audio/mpeg`; URL công khai của bucket riêng tư bị chặn. Bản công khai `media/listening/demo/ls1.mp3` vẫn còn, chờ code phase 7 (Codex) rồi mới xóa.
+
 ## Overview
 
 Tạo bucket riêng tư `media-premium` cho audio của bài trả phí sau paywall (plan `261030-1204-band-skill-lesson-paywall`). Audio PREMIUM chỉ phát qua URL ký có hạn do content-service cấp; URL công khai của chúng ngừng hoạt động. Hiện paywall khóa bài ở tầng API (`PAYWALL`) nhưng audio nằm bucket công khai với khóa đoán được (`listening/demo/ls1.mp3`), nên biết URL là nghe được.

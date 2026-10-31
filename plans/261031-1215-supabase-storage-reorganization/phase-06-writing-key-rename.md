@@ -15,6 +15,8 @@ dependencies: [1, 4]
 - **Codex**: bước 2, 4, 5 (test, migration `V91`, cập nhật `scripts/generate-course-writing-charts.py`, CSV, README, `LessonPipelineSeedTest`). Brief: `briefs/codex-phase-06-writing-key-rename.md`. Đã sửa giả định cũ: có **5** dòng `writtings`, đều là URL đầy đủ (không phải khóa), không phải 4. Dòng thứ 5 (`PS-W1-WR-3`) không có file trên bucket. Danh sách: `data/phase-06-writtings-url-rows.csv`.
 - Deploy: migration chỉ merge sau khi file đã có trên bucket.
 
+**Trạng thái (2026-10-31):** đã copy 4 ảnh sang `writing/lessons/` (HTTP 200) và upload `PS-W1-WR-3`. Chưa xóa khóa `writtings/leassons/` cũ; chờ migration V91 của Codex và kiểm hiển thị.
+
 ## Overview
 
 Đổi khóa ảnh biểu đồ Writing từ `writtings/leassons/…` sang `writing/lessons/…` (4 ảnh trong bucket `media`) và cập nhật mọi tham chiếu trong `content_db`, tài liệu và seed. Thứ tự an toàn: sao chép file → migration → kiểm → xóa khóa cũ.

@@ -16,6 +16,7 @@ dependencies: []
 - 20 mp3 đã upload và kiểm (2026-10-31): `listening/demo/` 8 file, `listening/practice/` 12 file, đều trả `200 audio/mpeg`. Kích thước khớp file local.
 - Còn lại: dọn file thử (chờ kiểm DB đã migrate đủ), xác nhận giá trị `CONTENT_MEDIA_BASE_URL` thật.
 - Ảnh `writing/lessons/PS-W1-WR-3/ps-w1-wr-3-marriage-age.png` đã upload (thuộc phase 6, ghi ở đây cho đủ).
+- Đã làm thêm (2026-10-31, theo duyệt một lần): 86 ảnh WebP đã upload (`practice/covers/` 70, `writing/charts/` 16); bucket `media-premium` riêng tư đã tạo và `ls1.mp3` đã copy sang đó (phase 7). Bản công khai `ls1.mp3` vẫn còn, chưa xóa.
 
 ## Overview
 

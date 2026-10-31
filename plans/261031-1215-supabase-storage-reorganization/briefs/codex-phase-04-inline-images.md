@@ -5,7 +5,7 @@ Kết quả: `Status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT`, kèm
 
 ## Điều kiện bắt đầu (phải đủ trước khi làm)
 
-1. Claude báo đã upload đủ 86 file lên `media`: `practice/covers/{id}.webp` (58 file) và `writing/charts/{id}.webp` (28 file), và `curl` từng khóa trả `200 image/webp`.
+1. Claude báo đã upload đủ 86 file lên `media`: `practice/covers/{id}.webp` (70 file) và `writing/charts/{id}.webp` (16 file), và `curl` từng khóa trả `200 image/webp`.
 2. Phase 3 đã merge vào `feat/supabase-storage-reorganization` (vì cùng chạm `ContentMediaController`).
 3. Số migration: `V90`. Kiểm lại `services/content-service/src/main/resources/db/migration` trước khi tạo, vì có thể đã có số mới.
 
@@ -17,17 +17,17 @@ Nếu thiếu điều kiện nào: trả `NEEDS_CONTEXT`, không tạo migration
 
 ## Dữ liệu đầu vào (đã xuất, đã kiểm)
 
-File: `plans/261031-1215-supabase-storage-reorganization/data/phase-04-inline-images.csv`, 86 dòng, cột `id,kind,target_key,svg_data_uri_chars`.
-- `kind = practice-cover`: 58 dòng. Đúng bằng danh sách id trong `V34__practice_test_topic_covers.sql`.
-- `kind = writing-chart`: 28 dòng. Nằm trong `V11`, `V37`, `V38`, `V44`.
+File: `plans/261031-1215-supabase-storage-reorganization/data/phase-04-inline-images.csv`, 86 dòng, cột `id,kind,target_key,source_group,svg_text_nodes`. `svg_text_nodes` là số thẻ `<text>` trong SVG, dùng để phân loại: từ 3 trở lên là biểu đồ.
+- `kind = practice-cover`: 70 dòng. 58 dòng khớp danh sách id trong `V34__practice_test_topic_covers.sql`; 12 dòng còn lại là ảnh chữ T1/T2 của các bài khác, cùng loại bìa.
+- `kind = writing-chart`: 16 dòng. Nằm trong `V11`, `V37`, `V38`, `V44`.
 - Trạng thái đã kiểm trên DB tạm chạy đủ 89 migration: `content_assets` có 86 dòng `IMAGE` chứa `data:image/svg+xml;base64,...`, không dòng nào khác.
 
 ## Việc cần làm
 
 1. Viết test migration (TDD) trước: sau khi áp `V90`:
    - không còn dòng `content_assets` nào có `media_reference LIKE 'data:%'`;
-   - 58 dòng bìa có `media_reference = 'practice/covers/' || id || '.webp'`;
-   - 28 dòng biểu đồ có `media_reference = 'writing/charts/' || id || '.webp'`;
+   - 70 dòng bìa có `media_reference = 'practice/covers/' || id || '.webp'`;
+   - 16 dòng biểu đồ có `media_reference = 'writing/charts/' || id || '.webp'`;
    - số dòng `IMAGE` không đổi (86).
 2. Tạo `services/content-service/src/main/resources/db/migration/V90__inline_images_to_storage_keys.sql`:
    - Có 86 câu `UPDATE` với id tường minh, lấy từ CSV (script một lần, không viết tay). Mỗi câu có điều kiện `AND media_reference LIKE 'data:image/svg+xml;base64,%'` để idempotent.
