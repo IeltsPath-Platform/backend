@@ -6,7 +6,7 @@ Kết quả: `Status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT`, kèm
 ## Điều kiện bắt đầu
 
 - Phase 3 đã merge vào `feat/supabase-storage-reorganization` (cần `mediaUploadApi.ts` ở frontend).
-- Claude đã xác nhận trong `library_db` mọi `cover_key` hiện có. Nếu có khóa không bắt đầu bằng `catalog-cover/`, dừng và hỏi trước khi siết `CatalogText` (xem bước 4).
+- Kiểm dữ liệu (2026-10-31): migration seed của library-service (V19, V20) **không** đặt `cover_key`; `CatalogText.coverKey` đã từ chối URL từ trước nên chỉ còn khóa tương đối. Claude **chưa** đọc được `library_db` thật (Postgres của stack không chạy; project Supabase không chứa bảng ứng dụng). Mặc định: **không siết** `CatalogText` (bước 4 "có điều kiện") cho tới khi người dùng chạy truy vấn ở bước 2 trên DB đang dùng và dán kết quả cho Claude. Nếu có khóa không bắt đầu bằng `catalog-cover/`, dừng và hỏi.
 
 ## Nhánh và PR
 

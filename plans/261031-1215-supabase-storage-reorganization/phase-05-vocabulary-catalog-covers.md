@@ -14,7 +14,7 @@ dependencies: [1]
 ## Phân công
 
 - **Codex**, theo `briefs/codex-phase-05-catalog-covers.md`. Claude review.
-- Điều kiện: phase 3 đã merge (dùng `mediaUploadApi.ts`). Claude kiểm `library_db` trước khi Codex siết `CatalogText`.
+- Điều kiện: phase 3 đã merge (dùng `mediaUploadApi.ts`). Seed không đặt `cover_key`; `library_db` thật chưa kiểm được (cần người dùng chạy truy vấn ở bước 2 trên DB đang dùng). Chưa có kết quả thì Codex không siết `CatalogText`.
 
 ## Overview
 
