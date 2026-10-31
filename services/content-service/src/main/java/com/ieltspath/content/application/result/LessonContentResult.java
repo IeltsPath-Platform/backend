@@ -23,11 +23,18 @@ public record LessonContentResult(
         List<UUID> knowledgePointIds,
         List<Block> blocks,
         Skill skill,
-        List<Skill> skills
+        List<Skill> skills,
+        UUID courseId,
+        Integer skillPosition
 ) {
     public LessonContentResult {
         skills = skills.stream().filter(s -> s != Skill.ALL).distinct().sorted().toList();
-        skill = skills.size() == 1 ? skills.getFirst() : null;
+        skill = skill != null ? skill : skills.size() == 1 ? skills.getFirst() : null;
+    }
+
+    public LessonContentResult(UUID lessonId, UUID topicId, String code, String title, String summary, int sortOrder,
+                               List<UUID> knowledgePointIds, List<Block> blocks, Skill skill, List<Skill> skills) {
+        this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, skill, skills, null, null);
     }
 
     public LessonContentResult(UUID lessonId, UUID topicId, String code, String title, String summary, int sortOrder,
@@ -38,7 +45,7 @@ public record LessonContentResult(
 
     public LessonContentResult withBlocks(List<Block> newBlocks) {
         return new LessonContentResult(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, newBlocks,
-                skill, skills);
+                skill, skills, courseId, skillPosition);
     }
 
     /**

@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /** Takes the topic order and knowledge point catalog from Content and returns the learner's topics with status. */
@@ -82,8 +83,11 @@ public class RefreshLearningTopicsUseCase {
                     statuses.get(topic.topicId()), counts.getOrDefault(topic.topicId(), 0),
                     topic.requiredFeatureKey(), topic.skill(), topic.hasTopicTest(), topic.course() == null ? null
                             : new TopicResult.Course(topic.course().courseId(), topic.course().code(),
-                            topic.course().name(), topic.course().bandLevel()),
-                    topic.course() != null && topic.course().hasCourseTest(), topic.skills(), topic.lessonCount()));
+                            topic.course().name(), topic.course().bandLevel(), topic.course().coverImageUrl(),
+                            topic.course().description(), topic.course().skillUnlockPoints(),
+                            topic.course().comboUnlockPoints(), Set.copyOf(topic.course().availableSkills())),
+                    topic.course() != null && topic.course().hasCourseTest(), topic.skills(), topic.lessonCount(),
+                    topic.description()));
         }
         return List.copyOf(results);
     }

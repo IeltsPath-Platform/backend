@@ -21,6 +21,7 @@ public final class LearningGateException extends RuntimeException {
             case "TOPIC_LOCKED" -> "This topic is locked.";
             case "LESSON_LOCKED" -> "Complete the earlier lessons first.";
             case "PRACTICE_REQUIRED" -> "Complete practice of the earlier lessons first.";
+            case "PAYWALL" -> "Unlock this skill to access the lesson.";
             default -> throw new IllegalArgumentException("Unknown learning gate code.");
         });
         this.code = code;

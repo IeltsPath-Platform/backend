@@ -35,6 +35,27 @@ public class LessonAuthoringRepositoryAdapter implements LessonAuthoringReposito
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<Skill> courseTopicSkillForLesson(UUID lessonId) {
+        return jdbc.query("""
+                SELECT COALESCE(t.skill, 'ALL') AS skill FROM lessons l JOIN topics t ON t.id = l.topic_id
+                WHERE l.id = ? AND t.course_id IS NOT NULL
+                """, rs -> rs.next() ? Optional.ofNullable(Skill.valueOf(rs.getString("skill"))) : Optional.empty(),
+                lessonId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, Skill> knowledgePointSkills(List<UUID> knowledgePointIds) {
+        if (knowledgePointIds == null || knowledgePointIds.isEmpty()) return Map.of();
+        Map<UUID, Skill> skills = new LinkedHashMap<>();
+        namedJdbc.query("SELECT id, skill FROM knowledge_points WHERE id IN (:ids)",
+                Map.of("ids", knowledgePointIds), (org.springframework.jdbc.core.RowCallbackHandler) rs ->
+                        skills.put(rs.getObject("id", UUID.class), Skill.valueOf(rs.getString("skill"))));
+        return Map.copyOf(skills);
+    }
+
+    @Override
     @Transactional
     public Lesson create(UUID topicId, String code, String title, String summary, String summaryMarkdown,
                          Integer estimatedMinutes, Integer sortOrder) {

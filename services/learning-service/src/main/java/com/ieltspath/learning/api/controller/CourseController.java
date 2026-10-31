@@ -2,15 +2,20 @@ package com.ieltspath.learning.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.response.CourseResponse;
+import com.ieltspath.learning.api.dto.response.CourseUnlockResponse;
 import com.ieltspath.learning.api.dto.response.TestAssignmentResponse;
+import com.ieltspath.learning.api.dto.request.UnlockCourseRequest;
 import com.ieltspath.learning.application.usecase.AssignCourseTestUseCase;
 import com.ieltspath.learning.application.usecase.ListCoursesUseCase;
+import com.ieltspath.learning.application.usecase.UnlockCourseUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -23,6 +28,7 @@ public class CourseController {
     private final CurrentUserProvider currentUser;
     private final ListCoursesUseCase listCourses;
     private final AssignCourseTestUseCase assignCourseTest;
+    private final UnlockCourseUseCase unlockCourse;
 
     @GetMapping
     @PreAuthorize("hasRole('CUSTOMER')")
@@ -34,5 +40,13 @@ public class CourseController {
     @PreAuthorize("hasRole('CUSTOMER')")
     public TestAssignmentResponse assign(@PathVariable("id") UUID id) {
         return TestAssignmentResponse.from(assignCourseTest.execute(currentUser.requireUserId(), id));
+    }
+
+    @PostMapping("/{id}/unlocks")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public CourseUnlockResponse unlock(@PathVariable("id") UUID id, @RequestBody UnlockCourseRequest request,
+                                       @RequestHeader("Idempotency-Key") UUID requestId) {
+        return CourseUnlockResponse.from(unlockCourse.execute(currentUser.requireUserId(), id,
+                request == null ? null : request.target(), requestId));
     }
 }

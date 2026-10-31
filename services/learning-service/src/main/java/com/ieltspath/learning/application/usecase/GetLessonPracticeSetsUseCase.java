@@ -2,6 +2,7 @@ package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.result.LessonPracticeSetsResult;
+import com.ieltspath.learning.application.service.LessonAccess;
 import com.ieltspath.learning.application.service.PracticeAccess;
 import com.ieltspath.learning.application.service.PracticeProgress;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
@@ -18,15 +19,17 @@ import java.util.Optional;
 @Service
 public class GetLessonPracticeSetsUseCase {
     private final LearningContentClient content;
+    private final LessonAccess lessons;
     private final PracticeAccess access;
     private final PracticeProgress progress;
     private final PracticeAttemptRepository attempts;
     private final ReviewItemRepository reviews;
 
-    public GetLessonPracticeSetsUseCase(LearningContentClient content, PracticeAccess access,
+    public GetLessonPracticeSetsUseCase(LearningContentClient content, LessonAccess lessons, PracticeAccess access,
                                         PracticeProgress progress, PracticeAttemptRepository attempts,
                                         ReviewItemRepository reviews) {
         this.content = content;
+        this.lessons = lessons;
         this.access = access;
         this.progress = progress;
         this.attempts = attempts;
@@ -41,6 +44,7 @@ public class GetLessonPracticeSetsUseCase {
     /** {@code skill} narrows the listed sets to those of that one skill; clearance always counts every set. */
     @Transactional(readOnly = true)
     public LessonPracticeSetsResult execute(UUID userId, UUID lessonId, Optional<LearningSkill> skill) {
+        lessons.authorizePracticeSets(userId, lessonId);
         var lesson = content.getLesson(lessonId);
         var allSets = content.lessonPracticeSets(lessonId);
         var sets = skill.isEmpty() ? allSets : allSets.stream()

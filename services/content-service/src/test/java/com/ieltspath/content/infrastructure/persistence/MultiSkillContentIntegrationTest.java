@@ -88,12 +88,16 @@ class MultiSkillContentIntegrationTest {
     }
 
     @Test
-    void singleSkillCompatibilityComesFromExercisesRatherThanTopicMetadata() {
+    void singularSkillCompatibilityComesFromTopicWhilePluralSkillsComeFromExercises() {
         exercise("LISTENING", 1);
         sql.update("UPDATE topics SET skill='READING' WHERE id=?", topic);
-        assertThat(reader.publishedLesson(lesson).orElseThrow().skill().name()).isEqualTo("LISTENING");
-        assertThat(reader.topicSequence(1).stream().filter(t -> t.topicId().equals(topic)).findFirst().orElseThrow().skill().name())
-                .isEqualTo("LISTENING");
+        var lessonResult = reader.publishedLesson(lesson).orElseThrow();
+        var topicResult = reader.topicSequence(1).stream().filter(t -> t.topicId().equals(topic)).findFirst()
+                .orElseThrow();
+        assertThat(lessonResult.skill()).isEqualTo(Skill.READING);
+        assertThat(lessonResult.skills()).containsExactly(Skill.LISTENING);
+        assertThat(topicResult.skill()).isEqualTo(Skill.READING);
+        assertThat(topicResult.skills()).containsExactly(Skill.LISTENING);
     }
 
     @Test

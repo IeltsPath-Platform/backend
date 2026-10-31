@@ -41,6 +41,84 @@ class CourseControllerTest {
     }
 
     @Test
+    void createsAndUpdatesCourseCoverAndDescription() throws Exception {
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        String cover = "https://images.example/course.jpg";
+        mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"IELTS_5_5\",\"name\":\"IELTS 5.5\",\"bandLevel\":5.5,\"coverImageUrl\":\" " + cover + " \",\"description\":\"  Course intro  \"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.coverImageUrl").value(cover))
+                .andExpect(jsonPath("$.description").value("Course intro"));
+
+        Course course = Course.create("UPDATE", "Old", new BigDecimal("6.5"));
+        when(repository.findById(course.getId())).thenReturn(Optional.of(course));
+        when(repository.findByBandLevel(new BigDecimal("6.5"))).thenReturn(Optional.of(course));
+        mvc.perform(put("/api/content/admin/courses/{id}", course.getId()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Updated\",\"bandLevel\":6.5,\"coverImageUrl\":\"https://images.example/new.jpg\",\"description\":\"Updated intro\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverImageUrl").value("https://images.example/new.jpg"))
+                .andExpect(jsonPath("$.description").value("Updated intro"));
+        mvc.perform(put("/api/content/admin/courses/{id}", course.getId()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Updated\",\"bandLevel\":6.5,\"coverImageUrl\":\" \",\"description\":\" \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.coverImageUrl").doesNotExist())
+                .andExpect(jsonPath("$.description").doesNotExist());
+    }
+
+    @Test
+    void acceptsCourseSkillPricesAndCombo() throws Exception {
+        when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"code":"PRICED","name":"Priced","bandLevel":5.5,
+                                 "skillUnlockPoints":{"READING":120,"WRITING":150},"comboUnlockPoints":250}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.skillUnlockPoints.READING").value(120))
+                .andExpect(jsonPath("$.skillUnlockPoints.WRITING").value(150))
+                .andExpect(jsonPath("$.skillUnlockPoints.LISTENING").doesNotExist())
+                .andExpect(jsonPath("$.comboUnlockPoints").value(250));
+
+        Course course = Course.create("UPDATE", "Old", new BigDecimal("6.5"));
+        when(repository.findById(course.getId())).thenReturn(Optional.of(course));
+        when(repository.findByBandLevel(new BigDecimal("6.5"))).thenReturn(Optional.of(course));
+        mvc.perform(put("/api/content/admin/courses/{id}", course.getId()).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Updated","bandLevel":6.5,
+                                 "skillUnlockPoints":{"LISTENING":80},"comboUnlockPoints":80}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.skillUnlockPoints.LISTENING").value(80))
+                .andExpect(jsonPath("$.skillUnlockPoints.READING").doesNotExist())
+                .andExpect(jsonPath("$.comboUnlockPoints").value(80));
+    }
+
+    @Test
+    void rejectsInvalidCourseSkillPricesAndCombos() throws Exception {
+        for (String body : new String[]{
+                "{\"code\":\"BAD\",\"name\":\"Bad\",\"bandLevel\":5.5,\"skillUnlockPoints\":{\"READING\":0}}",
+                "{\"code\":\"BAD\",\"name\":\"Bad\",\"bandLevel\":5.5,\"skillUnlockPoints\":{\"READING\":-1}}",
+                "{\"code\":\"BAD\",\"name\":\"Bad\",\"bandLevel\":5.5,\"skillUnlockPoints\":{\"ALL\":100}}",
+                "{\"code\":\"BAD\",\"name\":\"Bad\",\"bandLevel\":5.5,\"skillUnlockPoints\":{\"READING\":100},\"comboUnlockPoints\":99}",
+                "{\"code\":\"BAD\",\"name\":\"Bad\",\"bandLevel\":5.5,\"skillUnlockPoints\":{\"READING\":100,\"WRITING\":100},\"comboUnlockPoints\":201}"
+        }) {
+            mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void rejectsUnsafeCourseCoverImageSchemes() throws Exception {
+        for (String url : new String[]{"javascript:alert(1)", "data:image/png;base64,AAAA"}) {
+            mvc.perform(post("/api/content/admin/courses").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"code\":\"IELTS\",\"name\":\"IELTS\",\"bandLevel\":5.5,\"coverImageUrl\":\"" + url + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void duplicateBandOrCodeReturnsConflictWithoutSaving() throws Exception {
         when(repository.findByBandLevel(new BigDecimal("5.5")))
                 .thenReturn(Optional.of(Course.create("OLD", "Existing", new BigDecimal("5.5"))));

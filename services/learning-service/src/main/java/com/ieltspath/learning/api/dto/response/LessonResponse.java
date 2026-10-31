@@ -11,7 +11,7 @@ import java.util.UUID;
 
 public record LessonResponse(UUID lessonId, UUID topicId, String code, String title, String summary,
                              int sortOrder, String status, List<Block> blocks, LearningSkill skill,
-                             List<LearningSkill> skills) {
+                             List<LearningSkill> skills, UUID courseId, Integer skillPosition) {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Block(UUID blockId, String blockType, String blockKind, int sortOrder, String textContent,
                         Asset asset, List<UUID> vocabularySenseIds, Boolean passed, List<Question> questions,
@@ -77,6 +77,6 @@ public record LessonResponse(UUID lessonId, UUID topicId, String code, String ti
     public static LessonResponse from(LessonResult result) {
         return new LessonResponse(result.lessonId(), result.topicId(), result.code(), result.title(), result.summary(),
                 result.sortOrder(), result.status(), result.blocks().stream().map(Block::from).toList(), result.skill(),
-                result.skills().stream().sorted().toList());
+                result.skills().stream().sorted().toList(), result.courseId(), result.skillPosition());
     }
 }

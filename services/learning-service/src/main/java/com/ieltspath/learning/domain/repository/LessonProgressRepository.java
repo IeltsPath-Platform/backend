@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface LessonProgressRepository {
@@ -15,6 +16,10 @@ public interface LessonProgressRepository {
     Map<UUID, LessonProgress> findByTopic(UUID userId, UUID topicId);
 
     List<LessonProgress> findCompleted(UUID userId);
+
+    boolean hasGrandfatheredLessonForKnowledgePoint(UUID userId, UUID knowledgePointId);
+
+    Set<UUID> findGrandfatheredKnowledgePointIds(UUID userId);
 
     Map<UUID, Integer> completedCountsByTopic(UUID userId);
 

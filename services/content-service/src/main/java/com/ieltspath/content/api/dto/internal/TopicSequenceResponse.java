@@ -20,18 +20,51 @@ public record TopicSequenceResponse(
         Course course,
         List<Skill> skills,
         boolean active,
-        int lessonCount
+        int lessonCount,
+        String description
 ) {
+    public TopicSequenceResponse(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                                 List<KnowledgePoint> knowledgePoints, Skill skill, boolean hasTopicTest, Course course,
+                                 List<Skill> skills, boolean active, int lessonCount) {
+        this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, skills,
+                active, lessonCount, null);
+    }
+
     public record Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
-                         boolean hasCourseTest, boolean active) {
+                         boolean hasCourseTest, boolean active, String coverImageUrl, String description,
+                         java.util.Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints,
+                         List<Skill> availableSkills) {
+        public Course {
+            skillUnlockPoints = skillUnlockPoints == null ? java.util.Map.of() : java.util.Map.copyOf(skillUnlockPoints);
+            availableSkills = availableSkills == null ? List.of() : List.copyOf(availableSkills);
+        }
+        public Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
+                      boolean hasCourseTest, boolean active) {
+            this(courseId, code, name, bandLevel, hasCourseTest, active, null, null, java.util.Map.of(), null, List.of());
+        }
+        public Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
+                      boolean hasCourseTest, boolean active, String coverImageUrl, String description) {
+            this(courseId, code, name, bandLevel, hasCourseTest, active, coverImageUrl, description,
+                    java.util.Map.of(), null, List.of());
+        }
+
         static Course from(TopicSequenceResult.CourseEntry entry) {
             return entry == null ? null : new Course(entry.courseId(), entry.code(), entry.name(), entry.bandLevel(),
-                    entry.hasCourseTest(), entry.active());
+                    entry.hasCourseTest(), entry.active(), entry.coverImageUrl(), entry.description(),
+                    entry.skillUnlockPoints(), entry.comboUnlockPoints(), entry.availableSkills());
         }
     }
     public record KnowledgePoint(UUID id, String code, String name, LearningType learningType, Skill skill,
                                  String description, boolean hasPracticeSet, CefrLevel cefrLevel, String canDo,
-                                 String scopeIn, String scopeOut, UUID parentKnowledgePointId, String errorCode) {}
+                                 String scopeIn, String scopeOut, UUID parentKnowledgePointId, String errorCode,
+                                 Integer earliestLessonPosition) {
+        public KnowledgePoint(UUID id, String code, String name, LearningType learningType, Skill skill,
+                              String description, boolean hasPracticeSet, CefrLevel cefrLevel, String canDo,
+                              String scopeIn, String scopeOut, UUID parentKnowledgePointId, String errorCode) {
+            this(id, code, name, learningType, skill, description, hasPracticeSet, cefrLevel, canDo, scopeIn,
+                    scopeOut, parentKnowledgePointId, errorCode, null);
+        }
+    }
 
     public static TopicSequenceResponse from(TopicSequenceResult result) {
         return new TopicSequenceResponse(result.topicId(), result.code(), result.name(), result.sortOrder(),
@@ -39,9 +72,9 @@ public record TopicSequenceResponse(
                 result.knowledgePoints().stream()
                         .map(kp -> new KnowledgePoint(kp.id(), kp.code(), kp.name(), kp.learningType(), kp.skill(),
                                 kp.description(), kp.hasPracticeSet(), kp.cefrLevel(), kp.canDo(), kp.scopeIn(),
-                                kp.scopeOut(), kp.parentKnowledgePointId(), kp.errorCode()))
+                                kp.scopeOut(), kp.parentKnowledgePointId(), kp.errorCode(), kp.earliestLessonPosition()))
                         .toList(),
                 result.skill(), result.hasTopicTest(), Course.from(result.course()), result.skills(), result.active(),
-                result.lessonCount());
+                result.lessonCount(), result.description());
     }
 }

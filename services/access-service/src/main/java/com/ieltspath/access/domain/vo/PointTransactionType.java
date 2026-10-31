@@ -7,5 +7,6 @@ public enum PointTransactionType {
     ADMIN_ADJUSTMENT,
     LEARNING_REWARD,
     HEART_REFILL_DEBIT,
+    COURSE_UNLOCK_DEBIT,
     STREAK_FREEZE_DEBIT
 }

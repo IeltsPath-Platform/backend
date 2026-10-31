@@ -47,6 +47,11 @@ class DebitPointsUseCaseTest {
                 "LESSON_WRITING", refId, "idem-1", "Writing grading", Instant.now());
     }
 
+    private PointLedgerEntry courseUnlockEntry(long delta) {
+        return new PointLedgerEntry(UUID.randomUUID(), userId, delta, 17, PointTransactionType.COURSE_UNLOCK_DEBIT,
+                "COURSE_UNLOCK", refId.toString(), "idem-1", "Course unlock", Instant.now());
+    }
+
     @Test
     @DisplayName("Debit for another user is rejected before touching the wallet")
     void rejectsDebitForAnotherUser() {
@@ -63,6 +68,23 @@ class DebitPointsUseCaseTest {
         when(pointDebitWriter.debit(any())).thenReturn(written);
 
         assertThat(debitPointsUseCase.execute(command(userId, 3, refId))).isEqualTo(written);
+    }
+
+    @Test
+    @DisplayName("COURSE_UNLOCK maps to its ledger type and idempotent retries reuse the entry")
+    void writesAndReplaysCourseUnlockDebit() {
+        PointLedgerEntry existing = courseUnlockEntry(-8);
+        PointLedgerResult written = DebitPointsUseCase.toResult(existing);
+        DebitPointsCommand command = new DebitPointsCommand(userId, userId, 8, "COURSE_UNLOCK", refId,
+                "idem-1", "Course unlock");
+        when(pointLedgerRepository.findByIdempotencyKey("idem-1"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(existing));
+        when(pointDebitWriter.debit(command)).thenReturn(written);
+
+        assertThat(debitPointsUseCase.execute(command)).isEqualTo(written);
+        assertThat(debitPointsUseCase.execute(command)).isEqualTo(written);
+        verify(pointDebitWriter, times(1)).debit(command);
     }
 
     @Test

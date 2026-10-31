@@ -18,6 +18,7 @@ public class Topic {
     private ContentStatus status;
     private BandRange band;
     private Skill skill;
+    private String description;
     private final Instant createdAt;
     private Instant updatedAt;
 
@@ -28,6 +29,12 @@ public class Topic {
 
     public Topic(UUID id, UUID parentTopicId, String code, String name, int sortOrder,
                  ContentStatus status, BandRange band, Skill skill, Instant createdAt, Instant updatedAt, UUID courseId) {
+        this(id, parentTopicId, code, name, sortOrder, status, band, skill, createdAt, updatedAt, courseId, null);
+    }
+
+    public Topic(UUID id, UUID parentTopicId, String code, String name, int sortOrder,
+                 ContentStatus status, BandRange band, Skill skill, Instant createdAt, Instant updatedAt,
+                 UUID courseId, String description) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.parentTopicId = parentTopicId;
         this.courseId = courseId;
@@ -43,6 +50,7 @@ public class Topic {
         this.status = status != null ? status : ContentStatus.ACTIVE;
         this.band = band != null ? band : BandRange.UNBOUNDED;
         this.skill = requireSingleSkill(skill);
+        this.description = normalizeDescription(description);
         this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.updatedAt = updatedAt != null ? updatedAt : this.createdAt;
     }
@@ -53,17 +61,28 @@ public class Topic {
 
     public static Topic create(UUID parentTopicId, String code, String name, int sortOrder, BandRange band,
                                Skill skill) {
+        return create(parentTopicId, code, name, sortOrder, band, skill, null);
+    }
+
+    public static Topic create(UUID parentTopicId, String code, String name, int sortOrder, BandRange band,
+                               Skill skill, String description) {
         Instant now = Instant.now();
         return new Topic(UUID.randomUUID(), parentTopicId, code, name, sortOrder, ContentStatus.ACTIVE, band, skill,
-                now, now);
+                now, now, null, description);
     }
 
     /** Replaces every editable field, band included: a null band clears it. The skill is changed separately. */
     public void update(UUID parentTopicId, String name, int sortOrder, ContentStatus status, BandRange band) {
+        update(parentTopicId, name, sortOrder, status, band, description);
+    }
+
+    public void update(UUID parentTopicId, String name, int sortOrder, ContentStatus status, BandRange band,
+                       String description) {
         this.parentTopicId = parentTopicId;
         this.name = Objects.requireNonNull(name, "name must not be null");
         this.sortOrder = sortOrder;
         this.band = band != null ? band : BandRange.UNBOUNDED;
+        this.description = normalizeDescription(description);
         if (status != null) {
             this.status = status;
         }
@@ -99,6 +118,13 @@ public class Topic {
         return skill;
     }
 
+    private static String normalizeDescription(String value) {
+        if (value == null || value.isBlank()) return null;
+        String trimmed = value.trim();
+        if (trimmed.length() > 2000) throw new IllegalArgumentException("description exceeds 2000 characters");
+        return trimmed;
+    }
+
     public UUID getId() { return id; }
     public UUID getParentTopicId() { return parentTopicId; }
     public UUID getCourseId() { return courseId; }
@@ -113,6 +139,7 @@ public class Topic {
     public ContentStatus getStatus() { return status; }
     public BandRange getBand() { return band; }
     public Skill getSkill() { return skill; }
+    public String getDescription() { return description; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
