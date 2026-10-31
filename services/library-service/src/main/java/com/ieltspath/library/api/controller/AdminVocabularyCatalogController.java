@@ -8,6 +8,7 @@ import com.ieltspath.library.api.dto.request.UsageExampleRequest;
 import com.ieltspath.library.api.dto.request.VocabularySetRequest;
 import com.ieltspath.library.api.dto.request.VocabularyTopicRequest;
 import com.ieltspath.library.api.dto.request.WordRelationRequest;
+import com.ieltspath.library.api.dto.response.CatalogCoverResponse;
 import com.ieltspath.library.application.result.CatalogItemResult;
 import com.ieltspath.library.application.result.CollocationResult;
 import com.ieltspath.library.application.result.CommonMistakeResult;
@@ -15,13 +16,18 @@ import com.ieltspath.library.application.result.UsageExampleResult;
 import com.ieltspath.library.application.result.VocabularySetResult;
 import com.ieltspath.library.application.result.VocabularyTopicResult;
 import com.ieltspath.library.application.result.WordRelationResult;
+import com.ieltspath.library.application.result.StoredImageResult;
 import com.ieltspath.library.application.usecase.VocabularyCatalogUseCase;
+import com.ieltspath.library.application.usecase.UploadCatalogCoverUseCase;
+import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
+import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.library.domain.catalog.CatalogLimits;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -33,9 +39,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
+import java.io.IOException;
 
 /** Author edits of the dictionary catalog. Rules live in the domain values the requests are mapped to. */
 @RestController
@@ -45,6 +54,24 @@ import java.util.UUID;
 @Validated
 public class AdminVocabularyCatalogController {
     private final VocabularyCatalogUseCase catalog;
+    private final UploadCatalogCoverUseCase uploadCatalogCover;
+    private final CurrentUserProvider currentUserProvider;
+
+    @PostMapping(value = "/covers", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public CatalogCoverResponse uploadCover(@RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
+        }
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException e) {
+            throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
+        }
+        StoredImageResult result = uploadCatalogCover.execute(currentUserProvider.requireUserId(), file.getContentType(), bytes);
+        return CatalogCoverResponse.from(result);
+    }
 
     @PutMapping("/items/{id}")
     public CatalogItemResult updateItem(@PathVariable UUID id, @Valid @RequestBody UpdateVocabularyItemRequest request) {
