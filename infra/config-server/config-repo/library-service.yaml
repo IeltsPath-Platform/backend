@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${LIBRARY_DB_URL:jdbc:postgresql://localhost:5437/library_db}
+    url: ${LIBRARY_DB_URL:jdbc:postgresql://localhost:5440/library_db}
     username: ${LIBRARY_DB_USERNAME:postgres}
     password: ${LIBRARY_DB_PASSWORD}
   jpa:
@@ -45,8 +45,6 @@ app:
 library:
   vocabulary:
     weekly-goal-default: 120
-  content:
-    base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
   flashcard-images:
     bucket: ${LIBRARY_FLASHCARD_BUCKET:flashcards}
 

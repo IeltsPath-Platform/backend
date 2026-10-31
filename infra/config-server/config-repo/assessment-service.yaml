@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${ASSESSMENT_DB_URL:jdbc:postgresql://localhost:5432/assessment_db}
+    url: ${ASSESSMENT_DB_URL:jdbc:postgresql://localhost:5440/assessment_db}
     username: ${ASSESSMENT_DB_USERNAME:postgres}
     password: ${ASSESSMENT_DB_PASSWORD:123456}
   jpa:

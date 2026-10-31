@@ -5,9 +5,9 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 public record PublicProfileResponse(UUID id, String displayName, String avatarUrl, String bio,
-                                    BigDecimal targetBand, int streak) {
+                                    BigDecimal targetBand) {
     public static PublicProfileResponse from(PublicProfileResult result) {
         return new PublicProfileResponse(result.id(), result.displayName(), result.avatarUrl(), result.bio(),
-                result.targetBand(), result.streak());
+                result.targetBand());
     }
 }

@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${CONTENT_DB_URL:jdbc:postgresql://localhost:5432/content_db}
+    url: ${CONTENT_DB_URL:jdbc:postgresql://localhost:5440/content_db}
     username: ${CONTENT_DB_USERNAME:postgres}
     password: ${CONTENT_DB_PASSWORD:123456}
   jpa:
@@ -16,6 +16,9 @@ spring:
       max-request-size: 26MB
 
 content:
+  # Library service that owns vocabulary senses; Content resolves and creates words there while authors write lessons.
+  library:
+    base-url: ${LIBRARY_SERVICE_URL:http://localhost:8081}
   media:
     # Public https prefix of the bucket holding audio keys such as listening/demo/ls1.mp3; blank = keys cannot resolve.
     base-url: ${CONTENT_MEDIA_BASE_URL:}

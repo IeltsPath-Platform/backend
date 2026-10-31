@@ -34,7 +34,7 @@ public class LibraryVocabularySenseClient implements VocabularySenseLookup, Voca
 
     @Autowired
     public LibraryVocabularySenseClient(RestClient.Builder builder,
-            @Value("${library.content.base-url:http://localhost:8082}") String libraryBaseUrl) {
+            @Value("${content.library.base-url:http://localhost:8081}") String libraryBaseUrl) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(2));
         factory.setReadTimeout(Duration.ofSeconds(5));

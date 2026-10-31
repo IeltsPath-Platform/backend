@@ -39,7 +39,7 @@ IELTSPath/
 │   └── common-storage/         # ObjectStorage, client Supabase Storage, ObjectKeys, UploadPolicy
 ├── services/                   # Chứa các microservice nghiệp vụ
 │   ├── learning-service/       # [Port 8086] Thứ tự topic, bài học, mastery, bài ôn, mã đề, consumer kết quả thi
-│   ├── user-service/           # Identity, auth, learning goals, activity và streak
+│   ├── user-service/           # Identity, auth, learning goals, activity
 │   ├── content-service/        # Topic, knowledge point, câu hỏi, gói nội dung và asset
 │   ├── library-service/        # Catalog từ vựng/video và thư viện học cá nhân
 │   ├── game-service/           # Phòng game, phiên chơi và WebSocket
@@ -274,10 +274,10 @@ Nếu mật khẩu có ký tự đặc biệt, hãy percent-encode hoặc chọn
 
 Gateway giữ path công khai: `/api/content/videos/**`, `/api/content/vocabulary/**` và
 `/api/content/admin/vocabulary/**` tới library; `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**`
-tới library; `/api/learning-support/{activities,streak}/**` tới user; `/api/learning/**` tới learning. Gateway chặn
+tới library; `/api/learning-support/activities/**` tới user; `/api/learning/**` tới learning. Gateway chặn
 `/internal/**`. Game chọn snapshot `VOCABULARY` từ library (`LIBRARY_SERVICE_URL` mặc định `http://localhost:8081`),
 `GRAMMAR` từ content. Khi game chạy trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082` vì Config Server vẫn
-mặc định địa chỉ `http://content-service:8082`. Library kiểm topic video qua Content. Content V7 xóa năm bảng catalog;
+mặc định địa chỉ `http://content-service:8082`. Library không gọi Content; video chỉ lưu `topicId` như tham chiếu. Content V7 xóa năm bảng catalog;
 chỉ cho Flyway chạy migration phá hủy này trên Testcontainers cho tới khi có duyệt riêng đối với `content_db` dùng chung.
 
 Nội dung demo Reading, Writing, Listening và lesson nhiều skill nằm trong các migration Content V9–V23. V13 thêm gợi ý

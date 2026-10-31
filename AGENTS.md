@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
 - Phiên bản: 2.2
-- Cập nhật lần cuối: 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Cập nhật lần cuối: 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -21,17 +21,17 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-security` | Thư viện security servlet dùng chung (internal JWT, `CanonicalRoles`, `CurrentUserProvider`); không deploy độc lập. |
 | `shared/common-events` | Thư viện tên exchange/routing key/header, record payload và helper `MessageRetry`/`RetryTopology` dùng chung; không deploy độc lập. |
 | `shared/common-storage` | Thư viện lưu object dùng chung (`ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy`); không deploy độc lập; service tự cấu hình bucket. |
-| `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity và streak tại `/api/learning-support/{activities,streak}`. |
-| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset; kiểm topic cho library. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
+| `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên, learning goal, activity tại `/api/learning-support/activities`. Streak do learning-service giữ. |
+| `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
 | `services/library-service` | Cổng 8081, `library_db` (Compose PostgreSQL host 5440): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
 | `services/assessment-service` | Làm bài, chấm objective/LLM cho essay gate và EXAMINER, kết quả; phát `AssessmentCompleted.v2`. |
 | `services/access-service` | Gói, subscription, activation key, điểm. |
 | `services/game-service` | Phòng game, trận, phiên chơi, WebSocket. |
 | `services/community-service` | Bài viết, bình luận, reaction, kiểm duyệt. |
-| `services/notification-service` | Chưa triển khai (khung package). |
+| `services/notification-service` | Cổng 8088, `notification_db` (Compose PostgreSQL host 5440, migration V1-V4: `notifications`, `notification_preferences`): nhận event RabbitMQ (bốn queue chấm bài `notification.grading-{requested,completed,due-soon,overdue}.v1` và `community.notifications.v1`), lưu hộp thư thông báo, tùy chọn thông báo theo loại sự kiện. Route `/api/notifications/**`. |
 | `services/learning-service` | Cổng 8086, `learning_db` (Compose PostgreSQL host 5440): thứ tự topic, bài học, nộp bài, cổng mở bài, mastery theo KP, bài ôn, giao mã đề cuối, consumer `AssessmentCompleted.v2`. Route `/api/learning/**`. |
 
-Mỗi business service sở hữu một database PostgreSQL riêng. Gateway chuyển hai nhóm activity/streak tới user-service;
+Mỗi business service sở hữu một database PostgreSQL riêng. Gateway chuyển nhóm activity tới user-service;
 không còn route tổng quát `/api/learning-support/**`.
 
 ## 2. Tech Stack - Bắt buộc tuân thủ
@@ -122,9 +122,14 @@ src/main/java/com/ieltspath/<service>
 
 - Mỗi service sở hữu bounded context và database; không đọc/ghi database hay dùng chung JPA entity của service khác.
 - Gọi đồng bộ service-to-service bằng HTTP tới endpoint nội bộ hoặc public của service đích, kèm bearer của request và
-  `X-Correlation-Id` (như assessment → content, library → content, game → library/content, learning → content/access/user).
+  `X-Correlation-Id` (như assessment → content, content → library, game → library/content, learning → content/access/user).
   Learning gọi user-service chỉ để đọc mục tiêu band (`/internal/users/{id}/learning-goal`) và tên hiển thị
   (`/internal/users/display-names`); lỗi hoặc timeout thì báo cáo và bảng league vẫn trả, thiếu phần đó.
+- Lời gọi đồng bộ giữa các service phải một chiều: hai service không được gọi HTTP lẫn nhau, trực tiếp hay qua service thứ ba.
+  Client HTTP mới phải ghi vào bảng "Đồng bộ (HTTP)" của `docs/system-architecture.md`, và URL đích khai báo trong
+  `infra/config-server/config-repo/<service>.yaml` bằng biến `<TÊN>_SERVICE_URL`. `ServiceDependencyGraphTest`
+  (`infra/api-gateway`) dựng đồ thị từ các biến đó và fail khi có vòng; nó không thấy lời gọi không khai báo ở config-repo
+  và không tính event. Cần dữ liệu của service đang gọi mình thì nhận qua event hoặc để bên kia đẩy sang, đừng thêm cạnh ngược.
 - Bất đồng bộ qua transactional outbox + RabbitMQ; event có version trong tên và contract ở `docs/contracts/`. Consumer
   phải idempotent và có retry/dead-letter (xem consumer của learning-service). Điểm thưởng của learning (streak, nhiệm vụ,
   huy hiệu) đi qua bảng `reward_grants` (outbox) rồi exchange `learning.points` sang access, không gọi HTTP cộng điểm
@@ -263,8 +268,8 @@ src/main/java/com/ieltspath/<service>
   (`free-practice-v1.md`). Bằng chứng luyện tự do là bằng chứng luyện tập (trọng số và trần 3 bài luyện của MP-1.0).
 - Gamification (`gamification-v1.md`): XP chỉ ở lần nộp đầu, đáp án trên trần ngày là XP bóng (không tính); sai câu khách
   quan trừ tim ở bài tập lesson, Practice và luyện tự do (hết tim thì `403 HEARTS_DEPLETED`, bài ôn vẫn nộp được); streak
-  tính ở server từ câu trả lời thật theo múi giờ học viên và là nguồn duy nhất cho thưởng (streak của user-service do client
-  gửi, không dùng); streak và nhiệm vụ ngày chạy trong transaction của lần nộp qua listener `BEFORE_COMMIT` trên
+  tính ở server từ câu trả lời thật theo múi giờ học viên và là nguồn duy nhất cho thưởng (user-service không còn streak; hồ sơ
+  công khai lấy streak từ learning qua community); streak và nhiệm vụ ngày chạy trong transaction của lần nộp qua listener `BEFORE_COMMIT` trên
   `QuestionEventsAppended` (mang các câu MỚI của lần ghi, nên nộp lặp không cộng thêm); XP tuần của league và huy hiệu
   được gọi từ nơi phát sinh sự kiện, cùng transaction, và cấp đúng một lần nhờ khóa duy nhất. Mọi thưởng
   XP đi qua sổ `xp_ledger` có khóa duy nhất theo nguồn và tham chiếu; thưởng điểm đi qua `reward_grants`. Mua bằng điểm
@@ -394,7 +399,8 @@ docker compose config --quiet
 
 6. Chỉ build/chạy Docker khi daemon khả dụng: `docker compose up -d --build <service...>`, `docker compose ps`.
 7. Không tuyên bố check nào đã chạy (CI, lint, coverage, contract test) khi chúng chưa tồn tại hoặc chưa thực sự chạy.
-8. Commit theo conventional commit; không nhắc việc dùng AI/agent để viết code, số phase hay mã plan trong commit, code
+8. Review PR: client HTTP mới nào trỏ tới service đã gọi ngược lại mình thì người viết phải giải thích trong mô tả PR (xem §3.5).
+9. Commit theo conventional commit; không nhắc việc dùng AI/agent để viết code, số phase hay mã plan trong commit, code
    comment, tên test hay migration (comment ghi nguồn port DeepTutor là chuyện khác và bắt buộc).
 
 ## 7. Điểm chưa nhất quán và nội dung cần làm rõ

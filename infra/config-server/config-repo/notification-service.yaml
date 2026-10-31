@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${NOTIFICATION_DB_URL:jdbc:postgresql://localhost:5432/notification_db}
+    url: ${NOTIFICATION_DB_URL:jdbc:postgresql://localhost:5440/notification_db}
     username: ${NOTIFICATION_DB_USERNAME:postgres}
     password: ${NOTIFICATION_DB_PASSWORD:123456}
   jpa:

@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${GAME_DB_URL:jdbc:postgresql://localhost:5435/game_db}
+    url: ${GAME_DB_URL:jdbc:postgresql://localhost:5440/game_db}
     username: ${GAME_DB_USERNAME:postgres}
     password: ${GAME_DB_PASSWORD}
   jpa:
