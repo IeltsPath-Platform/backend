@@ -132,7 +132,7 @@ Nhánh: `feat/band-skill-paywall` ở backend và frontend.
 
 ## Phase 6 closeout — 2026-10-31
 
-Status: IN_PROGRESS. The seed repair and audit are complete. The proposed-price table and isolated live-stack scenarios are recorded in separate follow-up updates.
+Status: IN_PROGRESS. The seed repair, audit and proposed-price table are complete. Isolated live-stack scenarios remain.
 
 ### Seed repair and audit
 
@@ -163,3 +163,18 @@ Status: IN_PROGRESS. The seed repair and audit are complete. The proposed-price 
 - Counts and audit checks were verified on a fresh migrated Testcontainers PostgreSQL database. A persistent development `content_db` was not started or inspected.
 - Full content-service reactor: **1,149 tests run, 0 failures, 0 errors, 4 skipped**; target content-service module: **1,080 run, 0 failures, 0 errors, 1 skipped**. common-security contributed 9 passing tests; common-storage contributed 60 run, 0 failures/errors, 3 skipped.
 - Migration/test commit: `e901a459` (`fix(content): split tree course lessons by skill`).
+
+### Proposed Points prices
+
+Rule: `10 Points × lessons beyond the first 3`, clamped to 20–50 Points. Propose a combo only when at least three skills have prices: 70% of their sum, rounded up to a multiple of 5, bounded by the highest skill price and 100 Points.
+
+| Course | Listening | Reading | Speaking | Writing | Combo |
+|---|---:|---:|---:|---:|---:|
+| IELTS 5.5 | **20 PROPOSED** | **50 PROPOSED** | — | **40 PROPOSED** | **80 PROPOSED** |
+| IELTS 6.0 | — | — | — | — | — |
+| IELTS 6.5 | — | — | — | — | — |
+| IELTS 7.0 | — | — | — | — | — |
+
+- IELTS 5.5 has three priced skills totaling 110 Points; 70% is 77, rounded up to 80. This is above the highest skill price (50), below the sum (110), and under the 100-Point cap.
+- A dash means no proposed price because that skill has no lessons beyond the free preview; no combo is proposed for courses with fewer than three priced skills. Premium opens all lessons and has no Points price.
+- These are Points amounts only, derived from the requested rule. Actual monetary prices for Point and Premium products are unknown. Product-owner approval is required before R&D enters any price. No price was written to a database.
