@@ -11,6 +11,11 @@ dependencies: [1]
 
 <!-- Updated: Validation Session 1 - bỏ giả định job dọn mồ côi (không tồn tại); ảnh bìa cũ để mồ côi -->
 
+## Phân công
+
+- **Codex**, theo `briefs/codex-phase-05-catalog-covers.md`. Claude review.
+- Điều kiện: phase 3 đã merge (dùng `mediaUploadApi.ts`). Claude kiểm `library_db` trước khi Codex siết `CatalogText`.
+
 ## Overview
 
 Ảnh bìa chủ đề (`vocabulary_topics.cover_key`) và bộ từ vựng (`vocabulary_sets.cover_key`) của library-service phải là file trên Supabase. Đã xác minh: `FlashcardImageStorageAdapter` dùng bucket `flashcards` (`library.flashcard-images.bucket`, mặc định `flashcards`), và `VocabularyCatalogJdbcAdapter` resolve `cover_key` qua `FlashcardImageStorage.publicUrl`. Còn thiếu: không có endpoint upload dành cho admin catalog, nên admin không có cách tạo khóa hợp lệ.

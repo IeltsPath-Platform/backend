@@ -9,6 +9,12 @@ dependencies: []
 
 # Phase 1: Bucket config cleanup and missing audio
 
+## Phân công
+
+- **Claude và bạn**, không giao Codex: ghi lên Supabase cần xác nhận từng bước; 20 mp3 do bạn thu và upload; `.env` do bạn điền.
+- Đã xong: `community` và `media` đã chỉnh (2026-10-31); compose đã đổi mặc định (`f708ef9d`).
+- Còn lại: 20 mp3, dọn file thử (chờ kiểm DB local), xác nhận giá trị `CONTENT_MEDIA_BASE_URL` thật.
+
 ## Overview
 
 Không đổi code. Chỉnh cấu hình bucket cho khớp code, nạp 20 file mp3 Listening còn thiếu, đặt `CONTENT_MEDIA_BASE_URL`, dọn file thử. Làm trước vì các phase sau (ảnh bìa, khóa Writing) cần base URL đúng và bucket `media` cấu hình đủ.

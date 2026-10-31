@@ -9,6 +9,14 @@ dependencies: [1, 3, 6]
 
 # Phase 7: Premium audio bucket
 
+## Phân công
+
+- **Chưa giao Codex.** Phase này chưa đủ chi tiết để code. Trước khi có brief, Claude làm và bạn quyết:
+  1. **Kiểm kê endpoint** phát `mediaUrl` của audio: lập bảng (endpoint, gọi bởi ai, qua gateway hay nội bộ, có cổng paywall không). Đã biết: `GetLessonContentUseCase`, `GetPackageVersionContentUseCase`, `GetAuthorPackageUseCase`, `GetPackageVersionPreviewUseCase`, `SectionMediaUseCases`; cần thêm phía assessment (`StartAssessmentAttemptUseCase`, `AttemptStructureResponse`) và learning.
+  2. **TTL URL ký:** plan ghi 3600 giây, nhưng `common-storage` giới hạn tối đa 900 giây. Chọn một: giữ 900 và FE tải lại khi hết hạn (khuyến nghị), hoặc đổi giới hạn module.
+  3. **Tên bucket** `media-premium` (hoặc tên khác) và **danh sách audio PREMIUM** (quyết định sản phẩm).
+- Sau khi có ba mục trên, Claude viết `briefs/codex-phase-07-premium-audio.md` và Codex làm. Trước phase 7: phase 3 phải merge (vì cùng sửa `ContentMediaController`).
+
 ## Overview
 
 Tạo bucket riêng tư `media-premium` cho audio của bài trả phí sau paywall (plan `261030-1204-band-skill-lesson-paywall`). Audio PREMIUM chỉ phát qua URL ký có hạn do content-service cấp; URL công khai của chúng ngừng hoạt động. Hiện paywall khóa bài ở tầng API (`PAYWALL`) nhưng audio nằm bucket công khai với khóa đoán được (`listening/demo/ls1.mp3`), nên biết URL là nghe được.

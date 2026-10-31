@@ -9,6 +9,12 @@ dependencies: [1, 4]
 
 # Phase 6: Writing key rename
 
+## Phân công
+
+- **Claude**: bước 1 (quét DB toàn bộ cột và JSON tìm `writtings`), bước 3 (sao chép 4 file, cộng các file biểu đồ phase 4 nếu chúng nằm cùng thư mục), bước 7 (xóa khóa cũ sau khi xác nhận).
+- **Codex**: bước 2, 4, 5 (test, migration `V91`, cập nhật `scripts/generate-course-writing-charts.py`, CSV, README, `LessonPipelineSeedTest`). Chưa có brief Codex; viết sau khi Claude có kết quả quét.
+- Deploy: migration chỉ merge sau khi file đã có trên bucket.
+
 ## Overview
 
 Đổi khóa ảnh biểu đồ Writing từ `writtings/leassons/…` sang `writing/lessons/…` (4 ảnh trong bucket `media`) và cập nhật mọi tham chiếu trong `content_db`, tài liệu và seed. Thứ tự an toàn: sao chép file → migration → kiểm → xóa khóa cũ.

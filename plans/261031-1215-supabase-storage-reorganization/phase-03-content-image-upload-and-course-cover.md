@@ -9,6 +9,11 @@ dependencies: [1]
 
 # Phase 3: Content image upload and course cover
 
+## Phân công
+
+- **Codex**, theo `briefs/codex-phase-03-course-cover.md` (backend và frontend). Claude review.
+- Đây là phase đầu tiên trong chuỗi `ContentMediaController`: các phase 4 và 7 phải chờ phase này merge.
+
 ## Overview
 
 Thêm upload ảnh cho tác giả nội dung (content-service) và dùng nó cho **ảnh bìa khóa học**: R&D chọn file trong form khóa học, file lên bucket `media`, DB chỉ giữ khóa. Thay quyết định "chỉ dán URL" của plan `261030-1200-course-cover-description`.

@@ -9,6 +9,11 @@ dependencies: [1]
 
 # Phase 2: Docs and limit alignment
 
+## Phân công
+
+- **Codex**, theo `briefs/codex-phase-02-docs.md`. Claude review.
+- Đã làm trước: README content (`de1bec41`), README common-storage (`1aca55e1`).
+
 ## Overview
 
 Làm tài liệu và giới hạn khớp thực tế: sửa câu cũ trong README content-service, thêm bảng bucket vào tài liệu kiến trúc, và chốt một nguồn chuẩn cho giới hạn upload để code và cấu hình bucket không lệch lại.

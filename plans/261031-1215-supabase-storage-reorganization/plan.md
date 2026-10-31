@@ -85,7 +85,72 @@ Giai đoạn A (cấu hình, không đổi hành vi): phase 1, 2. Giai đoạn B
 
 Chạy song song được: phase 5 (library-service) và phase 8 (assessment-service) độc lập với nhau và với chuỗi content-service. Chuỗi content-service **phải tuần tự** 3 → 4 → 6 → 7 vì cùng sửa `ContentMediaController`, `MediaReferencePolicy` và đánh số migration.
 
-Số migration (kiểm tra lại thư mục `db/migration` ngay trước khi tạo file; plan khác có thể đã lấy số): content mới nhất `V89` (dự kiến phase 4 `V90`, phase 6 `V91`, phase 7 `V92`); library `V22` (phase 5 không cần); assessment `V19` (phase 8 có thể `V20`).
+Số migration (kiểm tra lại thư mục `db/migration` ngay trước khi tạo file; plan khác có thể đã lấy số): content mới nhất `V89` (dự kiến phase 4 `V90`, phase 6 `V91`, phase 7 `V92`); library `V22` (phase 5 không cần); assessment `V19` (phase 8 dùng `V20`).
+
+## Phân công và phối hợp (Claude và Codex làm song song)
+
+Brief chi tiết cho Codex nằm trong `briefs/`: phase 2, 3, 5, 8. Phase 4, 6, 7 có phần "Phân công" riêng trong file phase.
+
+### Ai làm gì
+
+| Việc | Người làm | Ghi chú |
+| --- | --- | --- |
+| Ghi Supabase (bucket, upload, sao chép, xóa) | Claude, sau xác nhận từng bước | Codex không có quyền này |
+| Thu âm 20 mp3, upload bằng Dashboard | Bạn | Kịch bản: `recording-script-listening-audio.md` |
+| Điền `SUPABASE_URL`, `SUPABASE_SECRET_KEY` trong `.env` | Bạn | Claude và Codex không đọc giá trị |
+| Code và tài liệu: phase 2, 3, 5, 8 | Codex theo brief | Claude review từng PR |
+| Migration và test: phase 4, 6 | Codex, sau khi Claude xuất danh sách id và sao chép file | |
+| Xuất ảnh và kiểm kê DB: phase 4, 6 | Claude | Dùng `scratchpad` cho file tạm, không đưa vào repo |
+| Thiết kế phase 7 (kiểm kê endpoint phát audio, TTL, phân loại PREMIUM) | Claude và bạn quyết định | Codex chỉ code sau khi có brief |
+| Merge vào nhánh tích hợp và vào `main` | Bạn quyết định | |
+
+### Nhánh và PR
+
+- Backend tích hợp: `feat/supabase-storage-reorganization` (đã có). Frontend tích hợp: cùng tên, tạo từ `main` của repo `frontend/`.
+- Mỗi brief Codex một nhánh con (`feat/storage-p<N>-<slug>`), PR vào nhánh tích hợp.
+- Claude không sửa nhánh của Codex. Claude làm việc trên Supabase và file tạm; mọi thay đổi repo do Claude làm đi qua PR.
+
+### Quyền sửa file (tránh xung đột)
+
+| File | Ai được sửa | Thứ tự |
+| --- | --- | --- |
+| `docker-compose.yml` | Phase 1 (đã xong), phase 8 (khối `assessment-service` only) | 8 sau 1 |
+| `ContentMediaController.java`, `ContentAudioStorage*`, `UploadContentAudioUseCase.java` | Phase 3 (đổi tên, thêm `/image`) | 3 trước 7 |
+| `Course.java`, `CreateCourseRequest.java`, `UpdateCourseRequest.java` | Phase 3 | |
+| `MediaReferencePolicy.java` | Phase 7 | sau 3 |
+| `CourseForm.tsx`, `types.ts` | Phase 3 | |
+| `frontend/src/features/admin/media/api/mediaUploadApi.ts` | Phase 3 tạo, phase 5 chỉ dùng | 3 trước 5 |
+| `AdminVocabularyPage.tsx`, `vocabularySchemas.ts` | Phase 5 | |
+| `SpeakingSectionRunner.tsx`, `useMicRecorder.ts` | Phase 8 | |
+| Migration content | Số đã giữ: V90 phase 4, V91 phase 6, V92 phase 7 | |
+| Migration assessment | V20, phase 8 | |
+| Migration library | Không có | |
+
+### Thứ tự
+
+1. **Ngay khi bạn chốt:** Codex làm phase 2 và phase 3. Claude kiểm kê `library_db` (cho phase 5), kiểm kê endpoint phát audio (cho phase 7), chuẩn bị danh sách id bìa đề luyện tập (cho phase 4).
+2. **Sau khi phase 3 merge:** Codex làm phase 5 và phase 8 (hai phase này độc lập với nhau). Claude xuất ảnh phase 4, upload file lên `media` và sao chép file phase 6.
+3. **Sau khi Claude hoàn tất sao chép file:** Codex merge migration phase 4 và phase 6. Không merge migration trước khi file đã có trên bucket, vì khóa không có file sẽ làm ảnh hỏng.
+4. **Phase 7:** Claude thiết kế, bạn quyết định, rồi Codex code.
+
+### Quy tắc cho Codex
+
+- Không ghi Supabase; không đọc hoặc in giá trị `.env`; không commit `.env`, khóa, URL ký.
+- Không đặt số phase, mã plan trong code, comment, tên test, tên migration, commit message.
+- Làm test trước, rồi code. Ghi lệnh test đã chạy và kết quả thật vào PR.
+- Kết quả báo theo định dạng: `Status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT`, `Summary`, `Concerns`.
+- Gặp mâu thuẫn với plan thì `NEEDS_CONTEXT`, không tự đổi quyết định đã chốt.
+
+### Điều kiện nhận PR
+
+- Test của module chạm vào đều xanh. Output thật được dán vào PR.
+- Diff chỉ nằm trong danh sách file của brief.
+- Claude review, kiểm tra không có secret và không có lệnh ghi Supabase.
+
+### Trạng thái hiện tại
+
+- Đã xong: bucket `community` và `media` (2026-10-31); RLS đã kiểm (không có policy trên `storage.objects`, RLS bật); mặc định `CONTENT_MEDIA_BASE_URL` trong compose (`f708ef9d`); README content (`de1bec41`); README common-storage (`1aca55e1`). Nhánh `feat/supabase-storage-reorganization` đã có các commit này.
+- Chưa làm: 20 mp3, bucket `media-premium` (chờ quyết định TTL và tên), toàn bộ code phase 2 đến 8.
 
 ## Working notes cho người làm
 

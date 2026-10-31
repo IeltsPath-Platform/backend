@@ -11,6 +11,12 @@ dependencies: [1, 3]
 
 <!-- Updated: Validation Session 1 - phạm vi mở rộng sang biểu đồ Writing; WebP; base URL mặc định compose đã đổi -->
 
+## Phân công
+
+- **Claude** làm bước 1 đến 5: kiểm kê id (truy vấn chỉ đọc), kiểm luồng chấm dùng biểu đồ (bước 2), xuất WebP, lưu bản sao lưu SVG ngoài repo, upload lên `media` (xin xác nhận từng lần ghi).
+- Claude xuất một file danh sách `id → khóa` trong thư mục plan để Codex dùng viết migration.
+- **Codex** làm bước 3 và 6 (test và migration `V90`) **sau** khi Claude báo đã upload đủ. Chưa có brief Codex cho phase này; viết sau khi bước 2 có kết quả.
+
 ## Overview
 
 Chuyển ảnh nhúng dạng data URI SVG base64 trong `content_assets.media_reference` sang file WebP trên bucket `media`; DB chỉ giữ khóa. Gồm hai nhóm:
