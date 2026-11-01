@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.events.access.AccessMessaging;
 import com.ieltspath.events.access.SubscriptionGrantedTopology;
 import com.ieltspath.events.access.SubscriptionGrantedV1;
+import com.ieltspath.notification.domain.repository.NotificationRepository;
+import com.ieltspath.notification.domain.vo.Notification;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
@@ -13,9 +15,11 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -36,6 +40,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doThrow;
 
 /**
  * The path inside Notification for "a Premium subscription was granted", against a real RabbitMQ and PostgreSQL: the
@@ -67,6 +73,7 @@ class SubscriptionGrantedBrokerIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
     @MockitoBean NoticePushBridge noticePush;
+    @MockitoSpyBean NotificationRepository notifications;
 
     @BeforeEach
     void clean() {
@@ -86,7 +93,11 @@ class SubscriptionGrantedBrokerIntegrationTest {
     }
 
     private static boolean eventually(BooleanSupplier condition) throws InterruptedException {
-        for (int i = 0; i < 100; i++) {
+        return eventually(condition, 100);
+    }
+
+    private static boolean eventually(BooleanSupplier condition, int attempts) throws InterruptedException {
+        for (int i = 0; i < attempts; i++) {
             if (condition.getAsBoolean()) return true;
             Thread.sleep(100);
         }
@@ -131,5 +142,20 @@ class SubscriptionGrantedBrokerIntegrationTest {
 
         assertEquals(0, noticesOf(learner));
         verify(noticePush, times(0)).pushToUser(any(), any(Map.class));
+    }
+
+    @Test
+    void temporaryFailureIsRetriedThenSucceeds() throws Exception {
+        UUID learner = UUID.randomUUID();
+        var event = event(learner);
+        doThrow(new TransientDataAccessResourceException("temporary database outage"))
+                .doCallRealMethod().when(notifications).insertIfAbsent(any(), any());
+
+        publish(event, json.writeValueAsBytes(event), event.eventId().toString());
+
+        assertTrue(eventually(() -> noticesOf(learner) == 1, 450),
+                "the message is retried after the temporary database error");
+        verify(notifications, times(2)).insertIfAbsent(eq(event.eventId()), any(Notification.class));
+        verify(noticePush, times(1)).pushToUser(eq(learner), any());
     }
 }

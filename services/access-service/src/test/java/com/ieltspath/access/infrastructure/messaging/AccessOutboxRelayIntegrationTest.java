@@ -3,6 +3,10 @@ package com.ieltspath.access.infrastructure.messaging;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.access.domain.entity.OutboxEvent;
 import com.ieltspath.access.domain.repository.OutboxEventRepository;
+import com.ieltspath.access.domain.aggregate.Plan;
+import com.ieltspath.access.domain.repository.PlanRepository;
+import com.ieltspath.access.application.command.GrantSubscriptionCommand;
+import com.ieltspath.access.application.usecase.GrantSubscriptionUseCase;
 import com.ieltspath.commonobservability.CorrelationIdFilter;
 import com.ieltspath.events.access.SubscriptionGrantedTopology;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +16,8 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.slf4j.MDC;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -31,6 +37,7 @@ import java.util.concurrent.CompletableFuture;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doThrow;
@@ -67,6 +74,9 @@ class AccessOutboxRelayIntegrationTest {
     @Autowired OutboxEventRepository outbox;
     @Autowired RabbitTemplate rabbit;
     @Autowired JdbcTemplate jdbc;
+    @Autowired PlanRepository plans;
+    @Autowired GrantSubscriptionUseCase grantSubscription;
+    @Autowired PlatformTransactionManager transactionManager;
     @Autowired ObjectMapper json;
     @MockitoSpyBean AccessEventPublisher publisher;
 
@@ -199,5 +209,22 @@ class AccessOutboxRelayIntegrationTest {
 
         assertEquals("NOT_RELAYED", status(debitId));
         assertEquals(0, receiveAll().size());
+    }
+
+    @Test
+    void rollbackLeavesNoOutboxRow() {
+        UUID learner = UUID.randomUUID();
+        Plan plan = plans.save(Plan.create("ROLLBACK-" + UUID.randomUUID(), "Rollback test plan"));
+
+        assertThrows(IllegalStateException.class, () -> new TransactionTemplate(transactionManager)
+                .executeWithoutResult(status -> {
+                    grantSubscription.execute(new GrantSubscriptionCommand(learner, plan.getId(), 30, 0));
+                    throw new IllegalStateException("roll back the subscription grant");
+                }));
+
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM outbox_events WHERE event_type = ?",
+                Integer.class, "SubscriptionGranted"));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM subscriptions WHERE user_id = ?",
+                Integer.class, learner));
     }
 }
