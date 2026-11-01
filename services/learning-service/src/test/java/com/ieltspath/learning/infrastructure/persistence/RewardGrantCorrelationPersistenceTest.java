@@ -38,12 +38,12 @@ class RewardGrantCorrelationPersistenceTest {
 
     @Test void storesCorrelationIdOfTheSavingThread() {
         MDC.put(CorrelationIdFilter.MDC_KEY, "req-1");
-        grants.enqueue(UUID.randomUUID(), "TEST", UUID.randomUUID().toString(), 1);
+        grants.enqueue(UUID.randomUUID(), "BADGE", UUID.randomUUID().toString(), 1);
         assertEquals("req-1", jdbc.queryForObject("SELECT correlation_id FROM reward_grants ORDER BY created_at DESC LIMIT 1", String.class));
     }
 
     @Test void storesNullWithoutCorrelationId() {
-        grants.enqueue(UUID.randomUUID(), "TEST", UUID.randomUUID().toString(), 1);
+        grants.enqueue(UUID.randomUUID(), "BADGE", UUID.randomUUID().toString(), 1);
         assertNull(jdbc.queryForObject("SELECT correlation_id FROM reward_grants ORDER BY created_at DESC LIMIT 1", String.class));
     }
 }
