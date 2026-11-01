@@ -11,12 +11,16 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.RedisConnectionFailureException;
 
 import java.time.Duration;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @Testcontainers
 class RedisLoginAttemptLimiterTest {
@@ -33,6 +37,9 @@ class RedisLoginAttemptLimiterTest {
         connectionFactory.afterPropertiesSet();
         StringRedisTemplate redis = new StringRedisTemplate(connectionFactory);
         redis.afterPropertiesSet();
+        try (var connection = redis.getConnectionFactory().getConnection()) {
+            connection.serverCommands().flushDb();
+        }
         limiter = new RedisLoginAttemptLimiter(redis);
     }
 
@@ -90,12 +97,12 @@ class RedisLoginAttemptLimiterTest {
 
     @Test
     void failsClosedWhenRedisIsDown() {
-        REDIS.stop();
-        try {
-            assertThatThrownBy(() -> limiter.checkAllowed("learner@example.com", UUID.randomUUID().toString()))
-                    .isInstanceOf(LoginLimiterUnavailableException.class);
-        } finally {
-            REDIS.start();
-        }
+        StringRedisTemplate unavailableRedis = mock(StringRedisTemplate.class);
+        when(unavailableRedis.getExpire(anyString()))
+                .thenThrow(new RedisConnectionFailureException("Redis unavailable"));
+        RedisLoginAttemptLimiter unavailableLimiter = new RedisLoginAttemptLimiter(unavailableRedis);
+
+        assertThatThrownBy(() -> unavailableLimiter.checkAllowed("learner@example.com", UUID.randomUUID().toString()))
+                .isInstanceOf(LoginLimiterUnavailableException.class);
     }
 }

@@ -16,11 +16,14 @@ import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
 import com.ieltspath.user.domain.exception.PasswordChangeException;
 import com.ieltspath.user.domain.exception.PasswordNotConfiguredException;
 import com.ieltspath.user.application.exception.AvatarUploadRateLimitException;
+import com.ieltspath.user.application.exception.LoginLimiterUnavailableException;
+import com.ieltspath.user.application.exception.LoginRateLimitedException;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.commonstorage.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -113,6 +116,22 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, null);
     }
 
+    @ExceptionHandler(LoginRateLimitedException.class)
+    ResponseEntity<ErrorResponse> handleLoginRateLimited(LoginRateLimitedException exception, HttpServletRequest request) {
+        long retryAfter = Math.max(1, exception.retryAfter().toSeconds());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfter))
+                .body(errorBody(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage(), request, null, "LOGIN_RATE_LIMITED"));
+    }
+
+    @ExceptionHandler(LoginLimiterUnavailableException.class)
+    ResponseEntity<ErrorResponse> handleLoginLimiterUnavailable(LoginLimiterUnavailableException exception,
+                                                                 HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(errorBody(HttpStatus.SERVICE_UNAVAILABLE, "Đăng nhập tạm thời không khả dụng", request,
+                        null, "LOGIN_TEMPORARILY_UNAVAILABLE"));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException exception, HttpServletRequest request) {
         return error(HttpStatus.FORBIDDEN, "Forbidden", request, null);
@@ -167,14 +186,20 @@ public class GlobalExceptionHandler {
             HttpServletRequest request,
             Map<String, String> details
     ) {
-        return ResponseEntity.status(status).body(new ErrorResponse(
+        return ResponseEntity.status(status).body(errorBody(status, message, request, details, null));
+    }
+
+    private ErrorResponse errorBody(HttpStatus status, String message, HttpServletRequest request,
+                                    Map<String, String> details, String code) {
+        return new ErrorResponse(
                 LocalDateTime.now(),
                 status.value(),
                 reasonPhrase(status),
                 message,
                 request.getRequestURI(),
-                details
-        ));
+                details,
+                code
+        );
     }
 
     private String reasonPhrase(HttpStatus status) {

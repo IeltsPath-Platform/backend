@@ -294,6 +294,16 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | Shared auto-configuration | `common-security` |
 | Global exception handler → `ErrorResponse` | Service Java |
 | WebSocket với ticket ngắn hạn | game |
+| Rate limit dùng chung qua Redis | API Gateway, user-service, community-service |
+
+Rate limit được cấu hình trong `infra/config-server/config-repo/api-gateway.yaml` theo các tier `auth`,
+`upload`, `ai` và `default`; mỗi tier có `replenishRate` (token/giây) và `burstCapacity`. Gateway ưu tiên
+khóa theo subject của JWT; request ẩn danh dùng IP, chỉ tin `X-Forwarded-For` từ proxy thuộc
+`gateway.rate-limit.trusted-proxies`. Redis dùng chung trạng thái giữa các gateway instance. Khi Redis lỗi,
+gateway cho request thường đi tiếp và ghi metric cảnh báo; login bị fail-closed với HTTP 503 để tránh bỏ qua
+giới hạn đăng nhập. Upload avatar, media và ảnh community dùng Redis limiter riêng theo user, với mức lần
+lượt 10, 30 và 30 upload mỗi giờ; lỗi Redis ở các limiter upload được fail-open để lỗi hạ tầng không chặn
+hoạt động upload.
 
 ## 10. Bài học kỹ thuật
 

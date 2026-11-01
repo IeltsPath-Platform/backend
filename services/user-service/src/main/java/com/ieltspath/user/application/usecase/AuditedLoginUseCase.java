@@ -1,6 +1,7 @@
 package com.ieltspath.user.application.usecase;
 
 import com.ieltspath.user.application.command.LoginContext;
+import com.ieltspath.user.application.port.LoginAttemptLimiter;
 import com.ieltspath.user.application.result.AuthTokenResult;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.AuthenticationFailedException;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import java.util.Locale;
 
 /**
  * Signs in through {@link LoginUseCase} and records the attempt for the account it targeted. The record is written
@@ -24,15 +26,21 @@ public class AuditedLoginUseCase {
     private final LoginUseCase loginUseCase;
     private final UserRepository userRepository;
     private final LoginHistoryRecorder recorder;
+    private final LoginAttemptLimiter loginAttemptLimiter;
 
     public AuthTokenResult execute(String email, String password, LoginContext context) {
+        String normalizedEmail = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+        String clientIp = context == null ? null : context.ipAddress();
+        loginAttemptLimiter.checkAllowed(normalizedEmail, clientIp);
         AuthTokenResult tokens;
         try {
             tokens = loginUseCase.execute(email, password);
         } catch (AuthenticationFailedException exception) {
+            loginAttemptLimiter.recordFailure(normalizedEmail, clientIp);
             findAccount(email).ifPresent(user -> recorder.recordFailure(user.getId(), failureReason(user), context));
             throw exception;
         }
+        loginAttemptLimiter.recordSuccess(normalizedEmail, clientIp);
         findAccount(email).ifPresent(user -> recorder.recordSuccess(user.getId(), context));
         return tokens;
     }

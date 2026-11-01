@@ -2,10 +2,19 @@ server:
   port: ${SERVER_PORT:8080}
 
 spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
   cloud:
     gateway:
       server:
         webflux:
+          default-filters:
+            - name: ClientRateLimit
+              args:
+                tier: default
           routes:
             # Goals, learning activity and study time are served by the Learning Service, but clients keep the paths the
             # User Service had. These routes come first: the Gateway takes the first route whose path matches, and
@@ -44,6 +53,24 @@ spring:
                 - Path=/api/learning-support/activities/**
               filters:
                 - RewritePath=/api/learning-support/activities(?<segment>/?.*), /api/learning/activities$\{segment}
+
+            - id: user-auth-limited
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/auth/login,/auth/refresh,/auth/forgot-password,/api/auth/login,/api/auth/refresh,/api/auth/forgot-password,/api/users/register
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: auth
+
+            - id: user-avatar-upload-limited
+              uri: lb://USER-SERVICE
+              predicates:
+                - Path=/api/users/me/avatar
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: upload
 
             - id: user-service
               # Đích mà Gateway sẽ forward request tới.
@@ -95,10 +122,55 @@ spring:
               predicates:
                 - Path=/api/content/videos/**,/api/content/vocabulary/**,/api/content/admin/vocabulary/**
 
+            - id: library-flashcard-image-upload-limited
+              uri: lb://LIBRARY-SERVICE
+              predicates:
+                - Path=/api/learning-support/flashcards/images
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: upload
+
+            - id: content-ai-drafts-limited
+              uri: lb://CONTENT-SERVICE
+              predicates:
+                - Path=/api/content/admin/ai-drafts/courses,/api/content/admin/ai-drafts/practice-sets
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: ai
+
+            - id: content-media-upload-limited
+              uri: lb://CONTENT-SERVICE
+              predicates:
+                - Path=/api/content/admin/media/audio,/api/content/admin/media/image
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: upload
+
             - id: content-service
               uri: lb://CONTENT-SERVICE
               predicates:
                 - Path=/api/content/**
+
+            - id: assessment-speaking-recording-upload-limited
+              uri: lb://ASSESSMENT-SERVICE
+              predicates:
+                - Path=/api/assessments/speaking-recordings
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: upload
+
+            - id: assessment-ai-actions-limited
+              uri: lb://ASSESSMENT-SERVICE
+              predicates:
+                - Path=/api/assessments/admin/ai-gold-essays,/api/assessments/admin/ai-gold-essays/import-comparisons,/api/assessments/admin/ai-evaluations,/api/assessments/admin/ai-prompt-activations,/api/assessments/attempts/*/submit
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: ai
 
             - id: assessment-service
               uri: lb://ASSESSMENT-SERVICE
@@ -134,6 +206,15 @@ spring:
               uri: lb:ws://NOTIFICATION-SERVICE
               predicates:
                 - Path=/ws/notifications
+
+            - id: community-image-upload-limited
+              uri: lb://COMMUNITY-SERVICE
+              predicates:
+                - Path=/api/community/media/images
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: upload
 
             - id: community-service
               uri: lb://COMMUNITY-SERVICE
@@ -219,6 +300,13 @@ app:
     frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
 
 gateway:
+  rate-limit:
+    trusted-proxies: []
+    tiers:
+      auth: { replenish-rate: 1, burst-capacity: 5 }
+      upload: { replenish-rate: 1, burst-capacity: 5 }
+      ai: { replenish-rate: 1, burst-capacity: 3 }
+      default: { replenish-rate: 20, burst-capacity: 40 }
   security:
     public-endpoints:
       - /auth/login

@@ -124,6 +124,8 @@ services:
       <<: *spring-env
       SERVER_PORT: 8080
       EXTERNAL_JWT_SECRET: "${EXTERNAL_JWT_SECRET:?Set EXTERNAL_JWT_SECRET}"
+      REDIS_HOST: redis
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:5173}"
     ports:
       - "127.0.0.1:${MVP_GATEWAY_PORT:-8080}:8080"
@@ -131,6 +133,8 @@ services:
       config-server:
         condition: service_healthy
       eureka-server:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   user-service:
@@ -144,13 +148,18 @@ services:
       <<: *spring-env
       SERVER_PORT: 8085
       EXTERNAL_JWT_SECRET: "${EXTERNAL_JWT_SECRET:?Set EXTERNAL_JWT_SECRET}"
+      REDIS_HOST: redis
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
       USER_DB_URL: jdbc:postgresql://postgres:5432/user_db
       USER_DB_PASSWORD: "${POSTGRES_PASSWORD}"
       DEMO_DATA_ENABLED: "${DEMO_DATA_ENABLED:-true}"
       SUPABASE_URL: "${SUPABASE_URL:-}"
       SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY:-}"
       USER_AVATAR_BUCKET: "${USER_AVATAR_BUCKET:-avatars}"
-    depends_on: *after-infra
+    depends_on:
+      <<: *after-infra
+      redis:
+        condition: service_healthy
 
   content-service:
     <<: *spring-service
@@ -317,6 +326,8 @@ services:
       SERVER_PORT: 8089
       COMMUNITY_DB_URL: jdbc:postgresql://postgres:5432/community_db
       COMMUNITY_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      REDIS_HOST: redis
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"
       RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
@@ -328,6 +339,8 @@ services:
     depends_on:
       <<: *after-infra
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       user-service:
         condition: service_healthy

@@ -13,8 +13,21 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.server.ServerWebExchange;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.cloud.gateway.support.ConfigurationService;
+import org.springframework.context.support.StaticApplicationContext;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 import reactor.core.publisher.Mono;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +37,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@Testcontainers
 class ClientRateLimitGatewayFilterFactoryTest {
+    @Container
+    private static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse("redis:7-alpine"))
+            .withExposedPorts(6379);
+
     private RedisRateLimiter limiter;
     private ClientKeyResolver keys;
     private RateLimitProperties properties;
@@ -58,23 +76,32 @@ class ClientRateLimitGatewayFilterFactoryTest {
     }
 
     @Test
-    void sharesLimitAcrossTwoGatewayInstances() {
+    void sharesLimitAcrossTwoGatewayInstances() throws IOException {
         when(keys.resolve(org.mockito.ArgumentMatchers.any())).thenReturn(Mono.just("ip:203.0.113.9"));
-        when(limiter.isAllowed(anyString(), anyString()))
-                .thenReturn(Mono.just(new RedisRateLimiter.Response(true, Map.of())))
-                .thenReturn(Mono.just(new RedisRateLimiter.Response(false, Map.of())));
+        LettuceConnectionFactory firstConnection = connectionFactory();
+        LettuceConnectionFactory secondConnection = connectionFactory();
+        RedisRateLimiter firstLimiter = redisLimiter(firstConnection);
+        RedisRateLimiter secondLimiter = redisLimiter(secondConnection);
         ClientRateLimitGatewayFilterFactory first = new ClientRateLimitGatewayFilterFactory(
-                limiter, keys, properties, meters);
+                firstLimiter, keys, properties, meters);
         ClientRateLimitGatewayFilterFactory second = new ClientRateLimitGatewayFilterFactory(
-                limiter, keys, properties, meters);
+                secondLimiter, keys, properties, meters);
 
-        MockServerWebExchange firstExchange = exchange("auth-login", "/api/auth/login");
-        MockServerWebExchange secondExchange = exchange("auth-login", "/api/auth/login");
-        first.apply(config("auth")).filter(firstExchange, ignored -> Mono.empty()).block();
-        second.apply(config("auth")).filter(secondExchange, ignored -> Mono.empty()).block();
+        try (var connection = firstConnection.getConnection()) {
+            connection.serverCommands().flushDb();
+        }
+        MockServerWebExchange lastExchange = null;
+        for (int attempt = 0; attempt < 6; attempt++) {
+            lastExchange = exchange("auth-login", "/api/auth/login");
+            GatewayFilter filter = attempt % 2 == 0 ? first.apply(config("auth")) : second.apply(config("auth"));
+            filter.filter(lastExchange, ignored -> Mono.empty()).block();
+        }
 
-        assertThat(firstExchange.getResponse().getStatusCode()).isNotEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-        assertThat(secondExchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(lastExchange).isNotNull();
+        assertThat(lastExchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(lastExchange.getResponse().getHeaders().getFirst("Retry-After")).isEqualTo("1");
+        firstConnection.destroy();
+        secondConnection.destroy();
     }
 
     @Test
@@ -92,11 +119,9 @@ class ClientRateLimitGatewayFilterFactoryTest {
     void keysByIpWhenAnonymous() {
         ClientKeyResolver resolver = new ClientKeyResolver(properties);
 
-        assertThat(resolver.resolve(exchange("test", "/").mutate()
-                        .request(MockServerHttpRequest.get("/").remoteAddress(
-                                new java.net.InetSocketAddress("203.0.113.7", 1234)))
-                        .build()))
-                .block()).isEqualTo("ip:203.0.113.7");
+        ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/")
+                .remoteAddress(new java.net.InetSocketAddress("203.0.113.7", 1234)));
+        assertThat(resolver.resolve(exchange).block()).isEqualTo("ip:203.0.113.7");
     }
 
     @Test
@@ -138,5 +163,29 @@ class ClientRateLimitGatewayFilterFactoryTest {
         exchange.getAttributes().put(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR,
                 Route.async().id(routeId).uri("http://localhost").predicate(ignored -> true).build());
         return exchange;
+    }
+
+    private LettuceConnectionFactory connectionFactory() {
+        LettuceConnectionFactory factory = new LettuceConnectionFactory(REDIS.getHost(), REDIS.getMappedPort(6379));
+        factory.afterPropertiesSet();
+        return factory;
+    }
+
+    @SuppressWarnings("unchecked")
+    private RedisRateLimiter redisLimiter(LettuceConnectionFactory connectionFactory) throws IOException {
+        ReactiveStringRedisTemplate redis = new ReactiveStringRedisTemplate(connectionFactory);
+        String source = new ClassPathResource("META-INF/scripts/request_rate_limiter.lua")
+                .getContentAsString(StandardCharsets.UTF_8);
+        RedisScript<List<Long>> script = new DefaultRedisScript<>(source, (Class<List<Long>>) (Class<?>) List.class);
+        RedisRateLimiter redisRateLimiter = new RedisRateLimiter(redis, script, (ConfigurationService) null);
+        redisRateLimiter.getConfig().put("auth", new RedisRateLimiter.Config()
+                .setReplenishRate(1).setBurstCapacity(5));
+        StaticApplicationContext applicationContext = new StaticApplicationContext();
+        applicationContext.getBeanFactory().registerSingleton("reactiveStringRedisTemplate", redis);
+        applicationContext.getBeanFactory().registerSingleton("redisRequestRateLimiterScript", script);
+        applicationContext.refresh();
+        redisRateLimiter.setApplicationContext(applicationContext);
+        applicationContext.close();
+        return redisRateLimiter;
     }
 }
