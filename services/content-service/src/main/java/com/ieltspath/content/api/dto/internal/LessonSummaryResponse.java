@@ -16,11 +16,20 @@ public record LessonSummaryResponse(
         List<UUID> knowledgePointIds,
         List<UUID> exerciseBlockIds,
         List<Skill> skills,
-        Integer estimatedMinutes
+        Integer estimatedMinutes,
+        UUID courseId,
+        Skill skill,
+        Integer skillPosition
 ) {
+    public LessonSummaryResponse(UUID lessonId, UUID topicId, String code, String title, String summary, int sortOrder,
+                                 List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds, List<Skill> skills,
+                                 Integer estimatedMinutes) {
+        this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, skills,
+                estimatedMinutes, null, null, null);
+    }
     public static LessonSummaryResponse from(LessonSummaryResult result) {
         return new LessonSummaryResponse(result.lessonId(), result.topicId(), result.code(), result.title(),
                 result.summary(), result.sortOrder(), result.knowledgePointIds(), result.exerciseBlockIds(), result.skills(),
-                result.estimatedMinutes());
+                result.estimatedMinutes(), result.courseId(), result.skill(), result.skillPosition());
     }
 }

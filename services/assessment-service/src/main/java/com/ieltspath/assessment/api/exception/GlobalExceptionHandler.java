@@ -4,6 +4,7 @@ import com.ieltspath.assessment.application.exception.ContentUnavailableExceptio
 import com.ieltspath.assessment.application.exception.UnknownErrorCodeException;
 import com.ieltspath.assessment.application.exception.UserServiceUnavailableException;
 import com.ieltspath.assessment.domain.exception.*;
+import com.ieltspath.commonstorage.StorageException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -13,7 +14,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -21,6 +25,21 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<ErrorResponse> storageUnavailable(StorageException e, HttpServletRequest r) {
+        log.error("Speaking recording storage failed: operation={} reason={}", e.operation(), e.reason());
+        return build(HttpStatus.SERVICE_UNAVAILABLE, "Recording storage is unavailable", r.getRequestURI(), null,
+                "STORAGE_UNAVAILABLE");
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> uploadTooLarge(MaxUploadSizeExceededException e, HttpServletRequest r) {
+        return build(HttpStatus.PAYLOAD_TOO_LARGE, "Recording file is too large", r.getRequestURI(), null,
+                "UPLOAD_TOO_LARGE");
+    }
+
     @ExceptionHandler(JobAlreadyClaimedException.class)
     public ResponseEntity<ErrorResponse> claimed(JobAlreadyClaimedException e, HttpServletRequest r) {
         return build(HttpStatus.CONFLICT, e.getMessage(), r.getRequestURI(), null, "JOB_ALREADY_CLAIMED");

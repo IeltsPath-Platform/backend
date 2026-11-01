@@ -2,30 +2,25 @@ package com.ieltspath.user.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.user.api.dto.request.AssignRoleRequest;
-import com.ieltspath.user.api.dto.request.ChangeLearningGoalStatusRequest;
 import com.ieltspath.user.api.dto.request.ChangeUserStatusRequest;
 import com.ieltspath.user.api.dto.request.CreateUserRequest;
 import com.ieltspath.user.api.dto.request.UpdateLearnerProfileRequest;
 import com.ieltspath.user.api.dto.request.UpdateUserRequest;
 import com.ieltspath.user.api.dto.response.ActionTokenResponse;
 import com.ieltspath.user.api.dto.response.LearnerProfileResponse;
-import com.ieltspath.user.api.dto.response.LearningGoalResponse;
 import com.ieltspath.user.api.dto.response.MessageResponse;
 import com.ieltspath.user.api.dto.response.OAuthIdentityResponse;
 import com.ieltspath.user.api.dto.response.RoleResponse;
 import com.ieltspath.user.api.dto.response.UserResponse;
 import com.ieltspath.user.application.command.AssignRoleCommand;
-import com.ieltspath.user.application.command.ChangeLearningGoalStatusCommand;
 import com.ieltspath.user.application.command.ChangeUserStatusCommand;
 import com.ieltspath.user.application.command.CreateUserCommand;
 import com.ieltspath.user.application.command.UpdateLearnerProfileCommand;
 import com.ieltspath.user.application.command.UpdateUserCommand;
 import com.ieltspath.user.application.result.AccountActionTokenResult;
 import com.ieltspath.user.application.result.LearnerProfileResult;
-import com.ieltspath.user.application.result.LearningGoalResult;
 import com.ieltspath.user.application.result.OAuthIdentityResult;
 import com.ieltspath.user.application.usecase.AssignRoleUseCase;
-import com.ieltspath.user.application.usecase.ChangeLearningGoalStatusUseCase;
 import com.ieltspath.user.application.usecase.ChangeUserStatusUseCase;
 import com.ieltspath.user.application.usecase.CreateUserUseCase;
 import com.ieltspath.user.application.usecase.DeleteLearnerProfileUseCase;
@@ -33,7 +28,6 @@ import com.ieltspath.user.application.usecase.DeleteUserUseCase;
 import com.ieltspath.user.application.usecase.GetActionTokensByUserIdUseCase;
 import com.ieltspath.user.application.usecase.GetAllUsersUseCase;
 import com.ieltspath.user.application.usecase.GetLearnerProfileUseCase;
-import com.ieltspath.user.application.usecase.GetLearningGoalsByUserIdUseCase;
 import com.ieltspath.user.application.usecase.GetOAuthIdentitiesUseCase;
 import com.ieltspath.user.application.usecase.GetUserByIdUseCase;
 import com.ieltspath.user.application.usecase.RevokeUserActionTokensUseCase;
@@ -80,8 +74,6 @@ public class UserManagementController {
     private final UpdateLearnerProfileUseCase updateLearnerProfileUseCase;
     private final DeleteLearnerProfileUseCase deleteLearnerProfileUseCase;
 
-    private final GetLearningGoalsByUserIdUseCase getLearningGoalsByUserIdUseCase;
-    private final ChangeLearningGoalStatusUseCase changeLearningGoalStatusUseCase;
 
     private final GetOAuthIdentitiesUseCase getOAuthIdentitiesUseCase;
     private final UnlinkOAuthIdentityUseCase unlinkOAuthIdentityUseCase;
@@ -159,27 +151,6 @@ public class UserManagementController {
         return new MessageResponse("Xóa hồ sơ học tập thành công");
     }
 
-    // --- Learning Goal Management ---
-    @GetMapping("/{id}/learning-goals")
-    public List<LearningGoalResponse> getLearningGoalsByUserId(@PathVariable("id") UUID id) {
-        return getLearningGoalsByUserIdUseCase.execute(id).stream()
-                .map(this::toLearningGoalResponse)
-                .toList();
-    }
-
-    @PutMapping("/{id}/learning-goals/{goalId}/status")
-    public LearningGoalResponse updateGoalStatusByAdmin(
-            @PathVariable("id") UUID id,
-            @PathVariable("goalId") UUID goalId,
-            @Valid @RequestBody ChangeLearningGoalStatusRequest request
-    ) {
-        return toLearningGoalResponse(changeLearningGoalStatusUseCase.execute(new ChangeLearningGoalStatusCommand(
-                goalId,
-                null,
-                request.status()
-        )));
-    }
-
     // --- OAuth Identity Management ---
     @GetMapping("/{id}/oauth")
     public List<OAuthIdentityResponse> getOAuthIdentitiesByUserId(@PathVariable("id") UUID id) {
@@ -240,21 +211,6 @@ public class UserManagementController {
                 result.selfReportedBand(),
                 result.timezone(),
                 result.visibility(),
-                result.createdAt(),
-                result.updatedAt()
-        );
-    }
-
-    private LearningGoalResponse toLearningGoalResponse(LearningGoalResult result) {
-        return new LearningGoalResponse(
-                result.id(),
-                result.userId(),
-                result.targetBand(),
-                result.examDate(),
-                result.availableMinutesPerDay(),
-                result.status(),
-                result.startedAt(),
-                result.endedAt(),
                 result.createdAt(),
                 result.updatedAt()
         );

@@ -53,6 +53,31 @@ class RestLearningContentClientTest {
     }
 
     @Test
+    void readsLessonAccessSummaryBeforeRequestingLessonMedia() {
+        server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID + "/access"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"lessonId":"%s","topicId":"%s","code":"L4","title":"Lesson",
+                         "sortOrder":4,"knowledgePointIds":[],"exerciseBlockIds":[],
+                         "skills":["LISTENING"],"courseId":"%s","skill":"LISTENING","skillPosition":4}
+                        """.formatted(LESSON_ID, TOPIC_ID, UUID.randomUUID()), MediaType.APPLICATION_JSON));
+        var summary = client.getLessonAccessSummary(LESSON_ID);
+        assertEquals(4, summary.sortOrder());
+        assertEquals(4, summary.skillPosition());
+    }
+
+    @Test
+    void requestsSignedAudioOnlyForTheLessonPayloadFetch() {
+        server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID + "?signedAudio=true"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"lessonId":"%s","topicId":"%s","code":"L4","title":"Lesson",
+                         "sortOrder":4,"knowledgePointIds":[],"blocks":[],"skills":["LISTENING"]}
+                        """.formatted(LESSON_ID, TOPIC_ID), MediaType.APPLICATION_JSON));
+        assertEquals(LESSON_ID, client.getLesson(LESSON_ID, true).lessonId());
+    }
+
+    @Test
     void readsActiveRubricAndTheErrorTypeCatalog() {
         server.expect(requestTo(INTERNAL_PATH + "/rubrics/active?task=TASK_2"))
                 .andExpect(method(HttpMethod.GET))
@@ -197,6 +222,45 @@ class RestLearningContentClientTest {
         assertEquals("IELTS 6.5", course.name());
         assertEquals(new BigDecimal("6.5"), course.bandLevel());
         assertTrue(course.hasCourseTest());
+    }
+
+    @Test
+    void mapsOptionalCourseAndTopicDescriptionsAndCoverImageUrl() {
+        server.expect(requestTo(INTERNAL_PATH + "/topic-sequence"))
+                .andRespond(withSuccess("""
+                        [{"topicId":"10000000-0000-4000-8000-000000000001","code":"R65",
+                          "name":"Reading 6.5","description":"Build inference skills","sortOrder":960,
+                          "requiredFeatureKey":null,"skill":"READING","hasTopicTest":true,
+                          "course":{"courseId":"30000000-0000-4000-8000-000000000002",
+                            "code":"IELTS_6_5","name":"IELTS 6.5","bandLevel":6.5,"hasCourseTest":true,
+                            "coverImageUrl":"https://cdn.example/course.jpg","description":"Course overview"},
+                          "knowledgePoints":[]}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var topic = client.getTopicSequence().getFirst();
+
+        assertEquals("Build inference skills", topic.description());
+        assertEquals("https://cdn.example/course.jpg", topic.course().coverImageUrl());
+        assertEquals("Course overview", topic.course().description());
+    }
+
+    @Test
+    void olderTopicSequencePayloadKeepsNewFieldsNull() {
+        server.expect(requestTo(INTERNAL_PATH + "/topic-sequence"))
+                .andRespond(withSuccess("""
+                        [{"topicId":"10000000-0000-4000-8000-000000000001","code":"R65",
+                          "name":"Reading 6.5","sortOrder":960,"requiredFeatureKey":null,
+                          "skill":"READING","hasTopicTest":true,
+                          "course":{"courseId":"30000000-0000-4000-8000-000000000002",
+                            "code":"IELTS_6_5","name":"IELTS 6.5","bandLevel":6.5,"hasCourseTest":true},
+                          "knowledgePoints":[]}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var topic = client.getTopicSequence().getFirst();
+
+        assertNull(topic.description());
+        assertNull(topic.course().coverImageUrl());
+        assertNull(topic.course().description());
     }
 
     @Test

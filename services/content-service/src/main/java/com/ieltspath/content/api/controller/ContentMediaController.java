@@ -3,8 +3,11 @@ package com.ieltspath.content.api.controller;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.content.api.dto.response.StoredAudioResponse;
-import com.ieltspath.content.application.result.StoredAudioResult;
+import com.ieltspath.content.api.dto.response.StoredImageResponse;
+import com.ieltspath.content.application.result.StoredMediaResult;
 import com.ieltspath.content.application.usecase.UploadContentAudioUseCase;
+import com.ieltspath.content.application.usecase.UploadContentImageUseCase;
+import com.ieltspath.content.domain.vo.AccessTier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,16 +27,20 @@ import java.io.IOException;
 public class ContentMediaController {
 
     private final UploadContentAudioUseCase uploadAudio;
+    private final UploadContentImageUseCase uploadImage;
     private final CurrentUserProvider currentUser;
 
-    public ContentMediaController(UploadContentAudioUseCase uploadAudio, CurrentUserProvider currentUser) {
+    public ContentMediaController(UploadContentAudioUseCase uploadAudio, UploadContentImageUseCase uploadImage,
+                                  CurrentUserProvider currentUser) {
         this.uploadAudio = uploadAudio;
+        this.uploadImage = uploadImage;
         this.currentUser = currentUser;
     }
 
     @PostMapping(value = "/audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public StoredAudioResponse upload(@RequestParam("file") MultipartFile file) {
+    public StoredAudioResponse upload(@RequestParam("file") MultipartFile file,
+                                      @RequestParam(value = "tier", defaultValue = "PUBLIC") AccessTier tier) {
         if (file == null || file.isEmpty()) {
             throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
         }
@@ -43,7 +50,25 @@ public class ContentMediaController {
         } catch (IOException unreadable) {
             throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
         }
-        StoredAudioResult stored = uploadAudio.execute(currentUser.requireUserId(), file.getContentType(), bytes);
+        StoredMediaResult stored = tier == AccessTier.PUBLIC
+                ? uploadAudio.execute(currentUser.requireUserId(), file.getContentType(), bytes)
+                : uploadAudio.execute(currentUser.requireUserId(), file.getContentType(), bytes, tier);
         return StoredAudioResponse.from(stored);
+    }
+
+    @PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public StoredImageResponse uploadImage(@RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
+        }
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException unreadable) {
+            throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
+        }
+        StoredMediaResult stored = uploadImage.execute(currentUser.requireUserId(), file.getContentType(), bytes);
+        return StoredImageResponse.from(stored);
     }
 }

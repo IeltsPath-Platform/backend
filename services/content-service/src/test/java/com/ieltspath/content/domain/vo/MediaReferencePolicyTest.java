@@ -14,13 +14,23 @@ class MediaReferencePolicyTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "https://cdn.example.com/charts/roofs.png",
+            "https://cdn.example.com/charts/roofs.png"
+    })
+    void imageUrlsAreReturnedUnchanged(String reference) {
+        assertThat(noBase.resolve(AssetType.IMAGE, reference)).isEqualTo(reference);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
             "data:image/png;base64,iVBORw0KGgo=",
             "data:image/jpeg;base64,/9j/4AAQ",
             "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4="
     })
-    void imageUrlsAndImageDataUrisAreReturnedUnchanged(String reference) {
-        assertThat(noBase.resolve(AssetType.IMAGE, reference)).isEqualTo(reference);
+    void inlineImageDataUrisAreRejected(String reference) {
+        assertThatThrownBy(() -> noBase.resolve(AssetType.IMAGE, reference))
+                .isInstanceOf(InvalidMediaReferenceException.class);
+        assertThatThrownBy(() -> policy.resolve(AssetType.IMAGE, reference))
+                .isInstanceOf(InvalidMediaReferenceException.class);
     }
 
     @ParameterizedTest

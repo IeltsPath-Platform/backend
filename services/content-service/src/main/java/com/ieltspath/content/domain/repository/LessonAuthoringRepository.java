@@ -2,13 +2,17 @@ package com.ieltspath.content.domain.repository;
 
 import com.ieltspath.content.domain.aggregate.Lesson;
 import com.ieltspath.content.domain.vo.LessonAuthoringSnapshot;
+import com.ieltspath.content.domain.vo.Skill;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
 
 public interface LessonAuthoringRepository {
     boolean topicExists(UUID topicId);
+    Optional<Skill> courseTopicSkillForLesson(UUID lessonId);
+    Map<UUID, Skill> knowledgePointSkills(List<UUID> knowledgePointIds);
     Lesson create(UUID topicId, String code, String title, String summary, String summaryMarkdown,
                                  Integer estimatedMinutes, Integer sortOrder);
     List<LessonAuthoringSnapshot> findByTopic(UUID topicId);

@@ -7,6 +7,44 @@ spring:
       server:
         webflux:
           routes:
+            # Goals, learning activity and study time are served by the Learning Service, but clients keep the paths the
+            # User Service had. These routes come first: the Gateway takes the first route whose path matches, and
+            # /api/users/** below would otherwise take them. "$\{name}" keeps the config from resolving it as a placeholder.
+            - id: learning-study-goals
+              uri: lb://learning-service
+              predicates:
+                - Path=/api/users/me/learning-goals/**
+              filters:
+                - RewritePath=/api/users/me/learning-goals(?<segment>/?.*), /api/learning/goals$\{segment}
+
+            - id: learning-study-sessions
+              uri: lb://learning-service
+              predicates:
+                - Path=/api/users/me/study-sessions/**
+              filters:
+                - RewritePath=/api/users/me/study-sessions(?<segment>/?.*), /api/learning/study-sessions$\{segment}
+
+            - id: learning-study-time-statistics
+              uri: lb://learning-service
+              predicates:
+                - Path=/api/users/me/statistics/study-time
+              filters:
+                - RewritePath=/api/users/me/statistics/study-time, /api/learning/statistics/study-time
+
+            - id: learning-study-goals-admin
+              uri: lb://learning-service
+              predicates:
+                - Path=/api/users/{id:[0-9a-fA-F-]{36}}/learning-goals/**
+              filters:
+                - RewritePath=/api/users/(?<id>[^/]+)/learning-goals(?<segment>/?.*), /api/learning/admin/users/$\{id}/goals$\{segment}
+
+            - id: learning-study-activities
+              uri: lb://learning-service
+              predicates:
+                - Path=/api/learning-support/activities/**
+              filters:
+                - RewritePath=/api/learning-support/activities(?<segment>/?.*), /api/learning/activities$\{segment}
+
             - id: user-service
               # Đích mà Gateway sẽ forward request tới.
               #
@@ -76,11 +114,6 @@ spring:
               uri: lb://LIBRARY-SERVICE
               predicates:
                 - Path=/api/learning-support/video-dictation/**
-
-            - id: user-activity-streak-service
-              uri: lb://USER-SERVICE
-              predicates:
-                - Path=/api/learning-support/activities/**,/api/learning-support/streak/**
 
             - id: game-service
               uri: lb://GAME-SERVICE

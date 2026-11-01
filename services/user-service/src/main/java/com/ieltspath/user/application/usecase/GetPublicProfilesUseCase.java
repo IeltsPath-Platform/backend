@@ -35,8 +35,7 @@ public class GetPublicProfilesUseCase {
         var profiles = new LinkedHashMap<UUID, PublicProfileResult>();
         repository.findByUserIds(ids).stream().filter(profile -> profile.visibleTo(viewerId)).forEach(profile ->
                 profiles.put(profile.id(), new PublicProfileResult(profile.id(), profile.resolvedDisplayName(viewerId),
-                        avatarUrl(profile.avatarReference()), profile.bio(), profile.targetBand(),
-                        profile.streak() == null ? 0 : profile.streak())));
+                        avatarUrl(profile.avatarReference()), profile.bio())));
         return ids.stream().map(profiles::get).filter(Objects::nonNull).toList();
     }
 
@@ -46,8 +45,7 @@ public class GetPublicProfilesUseCase {
             throw new IllegalArgumentException("query must contain 2 to 80 characters and limit must be 1 to 10");
         return repository.searchVisibleByName(viewerId, query.trim(), limit).stream()
                 .map(profile -> new PublicProfileResult(profile.id(), profile.resolvedDisplayName(viewerId),
-                        avatarUrl(profile.avatarReference()), profile.bio(), profile.targetBand(),
-                        profile.streak() == null ? 0 : profile.streak())).toList();
+                        avatarUrl(profile.avatarReference()), profile.bio())).toList();
     }
 
     private String avatarUrl(String reference) {

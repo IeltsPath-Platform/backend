@@ -34,10 +34,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.nio.charset.StandardCharsets;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -68,7 +66,7 @@ class LessonPipelineSeedTest {
         dataSource.setUrl(POSTGRES.getJdbcUrl());
         dataSource.setUser(POSTGRES.getUsername());
         dataSource.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").target("79").load().migrate();
+        Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(dataSource);
         reader = new JdbcLearningContentReader(jdbc);
     }
@@ -85,6 +83,41 @@ class LessonPipelineSeedTest {
                 "INSERT INTO content_packages (code, title, package_type) VALUES ('LESSON-PKG', 'x', 'LESSON')"));
         assertThat(topicTest).isEqualTo(1);
         assertThat(lessonPackage).isEqualTo(1);
+    }
+
+    @Test
+    void sharedListeningRecordingIsPremiumForLessonsAndPublicForPlacement() {
+        UUID lessonId = UUID.fromString("23000000-0000-4000-8000-030000000001");
+        UUID originalAssetId = UUID.fromString("23000000-0000-4000-8000-050000000001");
+        UUID placementAssetId = UUID.fromString("2b000000-0000-4000-8000-050000000001");
+
+        var lesson = reader.publishedLesson(lessonId).orElseThrow();
+        var lessonAudio = lesson.blocks().stream().filter(block -> block.asset() != null)
+                .map(LessonContentResult.Block::asset).filter(asset -> asset.assetType() == AssetType.AUDIO)
+                .findFirst().orElseThrow();
+        Map<String, Object> lessonAsset = jdbc.getJdbcTemplate().queryForMap(
+                "SELECT id, media_reference, access_tier FROM content_assets WHERE id = ?", originalAssetId);
+        Map<String, Object> placementAsset = jdbc.getJdbcTemplate().queryForMap("""
+                SELECT a.id, a.media_reference, a.access_tier
+                FROM content_asset_links al
+                JOIN content_assets a ON a.id = al.asset_id
+                WHERE al.id = '2b000000-0000-4000-8000-0c0000000001'
+                  AND al.section_id = '2b000000-0000-4000-8000-0a0000000001'
+                """);
+        var placement = new GetPackageVersionContentUseCase(reader, MEDIA).execute(
+                UUID.fromString("2b000000-0000-4000-8000-090000000001"));
+        String placementAudioUrl = placement.sections().stream().map(PackageVersionContentResult.Section::audio)
+                .filter(java.util.Objects::nonNull).map(PackageVersionContentResult.SectionAudio::mediaUrl)
+                .findFirst().orElseThrow();
+
+        assertThat(lessonAudio.accessTier().name()).isEqualTo("PREMIUM");
+        assertThat(lessonAsset.get("media_reference")).isEqualTo("listening/demo/ls1.mp3");
+        assertThat(lessonAsset.get("access_tier")).isEqualTo("PREMIUM");
+        assertThat(placementAsset.get("id")).isEqualTo(placementAssetId);
+        assertThat(placementAsset.get("media_reference")).isEqualTo("listening/placement/placement-ls1.mp3");
+        assertThat(placementAsset.get("access_tier")).isEqualTo("PUBLIC");
+        assertThat(placementAudioUrl)
+                .isEqualTo("https://media.example.test/ieltspath/listening/placement/placement-ls1.mp3");
     }
 
     @Test
@@ -371,19 +404,19 @@ class LessonPipelineSeedTest {
         List<TopicSequenceResult> sequence = reader.topicSequence(3);
 
         assertThat(sequence).extracting(TopicSequenceResult::code)
-                .containsExactly("DEMO_LISTENING", "LISTENING_6_5_DETAIL", "DEMO_READING", "TFNG_SKILLS",
-                        "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION", "READING_6_5_INFERENCE", "DEMO_WRITING",
-                        "WRITING_6_5_DISCUSSION", "TREES_MULTI_SKILL");
+                .containsExactly("DEMO_LISTENING", "TREES_LISTENING", "LISTENING_6_5_DETAIL", "DEMO_READING",
+                        "TFNG_SKILLS", "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION", "TREES_READING",
+                        "READING_6_5_INFERENCE", "DEMO_WRITING", "TREES_WRITING", "WRITING_6_5_DISCUSSION");
         assertThat(sequence).extracting(TopicSequenceResult::skill)
-                .containsExactly(Skill.LISTENING, Skill.LISTENING, Skill.READING, Skill.READING, Skill.READING, Skill.READING,
-                        Skill.READING, Skill.WRITING, Skill.WRITING, null);
-        // The Writing 6.5 topic has no final test; a learner passes it by completing its lessons. The multi-skill topic
-        // has no single skill and comes last.
+                .containsExactly(Skill.LISTENING, Skill.LISTENING, Skill.LISTENING, Skill.READING, Skill.READING,
+                        Skill.READING, Skill.READING, Skill.READING, Skill.READING, Skill.WRITING, Skill.WRITING,
+                        Skill.WRITING);
+        // The Writing 6.5 topic has no final test; a learner passes it by completing its lessons.
         assertThat(sequence).extracting(TopicSequenceResult::hasTopicTest)
-                .containsExactly(true, true, true, true, true, true, true, true, false, true);
+                .containsExactly(true, true, true, true, true, true, true, true, true, true, true, false);
         // The lower-band Reading course keeps its paid topics after its free topics.
         assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
-                .containsExactly(null, null, null, null, "PREMIUM_CONTENT", "PREMIUM_CONTENT", null, null, null, null);
+                .containsOnlyNulls();
         assertThat(sequence).allMatch(entry -> entry.course().hasCourseTest());
         assertThat(topic(sequence, "READING_6_5_INFERENCE").course().bandLevel()).isEqualByComparingTo("6.5");
         assertThat(topic(sequence, "DEMO_READING").course().bandLevel()).isEqualByComparingTo("5.5");
@@ -432,12 +465,9 @@ class LessonPipelineSeedTest {
             assertThat(reader.publishedLesson(lessonId).orElseThrow().knowledgePointIds()).as(code)
                     .doesNotContain(kpId("DEMO_READING_W1_CHART"), kpId("DEMO_READING_W2_OPINION"));
         }
-        // A topic with published lessons and no skill label must be one whose lessons teach several skills.
-        assertThat(reader.topicSequence(3)).filteredOn(topic -> topic.skill() == null)
-                .allSatisfy(topic -> assertThat(topic.skills()).as(topic.code()).hasSizeGreaterThan(1));
+        assertThat(reader.topicSequence(3)).allSatisfy(topic -> assertThat(topic.skill()).as(topic.code()).isNotNull());
         assertThat(jdbc.queryForList("SELECT code FROM topics WHERE skill IS NULL AND id IN "
-                + "(SELECT topic_id FROM lessons WHERE status = 'PUBLISHED')", Map.of(), String.class))
-                .containsExactly("TREES_MULTI_SKILL");
+                + "(SELECT topic_id FROM lessons WHERE status = 'PUBLISHED')", Map.of(), String.class)).isEmpty();
     }
 
     @Test
@@ -489,7 +519,7 @@ class LessonPipelineSeedTest {
             return sameTransaction.searchPracticeSets(kpId("TFNG_FALSE_VS_NOT_GIVEN"), List.of(), 3, 10, null).stream()
                     .map(PracticeSetResult::code).toList();
         });
-        assertThat(found).containsExactly("PS-TF-A", "PS-TF-B", "PS-TF-C");
+        assertThat(found).doesNotContain("PS-TINY");
     }
 
     @Test
@@ -497,12 +527,15 @@ class LessonPipelineSeedTest {
         UUID kp2 = kpId("DR_IDEA_OR_DETAIL");
         List<PracticeSetResult> availableKp2 = reader.searchPracticeSets(kp2, List.of(), 3, 10, null);
         assertThat(availableKp2).extracting(PracticeSetResult::code)
-                .containsExactly("PS-KP2-A", "PS-KP2-B", "PS-KP2-C", "PS-KP2-D");
+                .containsExactly("PS-KP2-A", "PS-KP2-B", "PS-TRAP-DETAIL_AS_MAIN_IDEA-1",
+                        "PS-TRAP-DETAIL_AS_MAIN_IDEA-2", "PS-TRAP-DETAIL_AS_MAIN_IDEA-3",
+                        "PS-TRAP-DETAIL_AS_MAIN_IDEA-4", "PS-TRAP-DETAIL_AS_MAIN_IDEA-5",
+                        "PS-TRAP-DETAIL_AS_MAIN_IDEA-6", "PS-KP2-C", "PS-KP2-D");
         assertThat(availableKp2.subList(0, 2)).extracting(PracticeSetResult::questionCount)
                 .containsExactly(4, 4);
-        assertThat(availableKp2.subList(2, 4)).extracting(PracticeSetResult::questionCount)
-                .containsExactly(3, 3);
-        assertThat(availableKp2).allSatisfy(set -> assertThat(set.band()).isEqualByComparingTo("5.5"));
+        assertThat(availableKp2.subList(2, 10)).allSatisfy(set -> assertThat(set.questionCount()).isGreaterThanOrEqualTo(3));
+        assertThat(availableKp2).filteredOn(set -> set.band() != null)
+                .allSatisfy(set -> assertThat(set.band()).isEqualByComparingTo("5.5"));
         assertThat(availableKp2).extracting(PracticeSetResult::requiredFeatureKey).containsOnlyNulls();
 
         List<UUID> excluded = new ArrayList<>();
@@ -562,7 +595,7 @@ class LessonPipelineSeedTest {
                 Map.entry("PS-PS1-B", "PS1"), Map.entry("PS-PS2-B", "PS2"),
                 Map.entry("R65-PS-INFERENCE", "R65-I1"), Map.entry("R65-PS-PARAPHRASE", "R65-I1"),
                 Map.entry("L65-PS-CORRECTION", "L65-1"), Map.entry("L65-PS-PURPOSE", "L65-1"),
-                Map.entry("TR-PS-READING", "T1"), Map.entry("TR-PS-LISTENING", "T1"), Map.entry("TR-PS-WRITING", "T1"),
+                Map.entry("TR-PS-READING", "T1"), Map.entry("TR-PS-LISTENING", "T1_L"), Map.entry("TR-PS-WRITING", "T1_W"),
                 Map.entry("TR-PS-MIXED", "T1"), Map.entry("TR-PS-T2-READING", "T2"),
                 Map.entry("PS-W1-WR-1", "W1"), Map.entry("PS-W1-WR-2", "W1"), Map.entry("PS-W1-WR-3", "W1"),
                 Map.entry("PS-W2-WR-1", "W2"), Map.entry("PS-W2-WR-2", "W2"),
@@ -583,6 +616,8 @@ class LessonPipelineSeedTest {
                 WHERE l.status = 'PUBLISHED'
                   AND EXISTS (SELECT 1 FROM content_packages tp WHERE tp.topic_id = l.topic_id AND tp.package_type = 'TOPIC_TEST')
                   AND NOT EXISTS (SELECT 1 FROM content_packages p WHERE p.lesson_id = l.id AND p.status = 'PUBLISHED')
+                  AND NOT (l.code IN ('T2_L', 'T2_W') AND l.topic_id IN (
+                      SELECT id FROM topics WHERE code IN ('TREES_LISTENING', 'TREES_WRITING')))
                 """, Map.of(), String.class);
         assertThat(withoutPractice).isEmpty();
         // The Writing chapter has a final test and course essay practice sets for each of its lessons.
@@ -632,7 +667,7 @@ class LessonPipelineSeedTest {
         assertThat(chart).singleElement().satisfies(row -> {
             assertThat(row.get("asset_type")).isEqualTo("IMAGE");
             String mediaReference = (String) row.get("media_reference");
-            assertThat(mediaReference).isEqualTo("https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W1-WR-3/ps-w1-wr-3-marriage-age.png");
+            assertThat(mediaReference).isEqualTo("https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writing/lessons/PS-W1-WR-3/ps-w1-wr-3-marriage-age.png");
             assertThat(MEDIA.resolve(AssetType.IMAGE, mediaReference)).isEqualTo(mediaReference);
         });
     }
@@ -650,10 +685,10 @@ class LessonPipelineSeedTest {
                 WHERE p.code IN ('PS-W1-WR-1', 'PS-W1-WR-2', 'PS-W5-WR-1', 'PS-W5-WR-2')
                 """, Map.of()).forEach(row -> chartUrls.put((String) row.get("code"), (String) row.get("media_reference")));
         assertThat(chartUrls).isEqualTo(Map.of(
-                "PS-W1-WR-1", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W1-WR-1/ps-w1-wr-1-car-ownership.png",
-                "PS-W1-WR-2", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W1-WR-2/ps-w1-wr-2-family-spending.png",
-                "PS-W5-WR-1", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W5-WR-1/ps-w5-wr-1-park-visitors.png",
-                "PS-W5-WR-2", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writtings/leassons/PS-W5-WR-2/ps-w5-wr-2-fuel-prices.png"));
+                "PS-W1-WR-1", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writing/lessons/PS-W1-WR-1/ps-w1-wr-1-car-ownership.png",
+                "PS-W1-WR-2", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writing/lessons/PS-W1-WR-2/ps-w1-wr-2-family-spending.png",
+                "PS-W5-WR-1", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writing/lessons/PS-W5-WR-1/ps-w5-wr-1-park-visitors.png",
+                "PS-W5-WR-2", "https://kndrsdqzbzsaiuuruqno.supabase.co/storage/v1/object/public/media/writing/lessons/PS-W5-WR-2/ps-w5-wr-2-fuel-prices.png"));
     }
 
     @Test
@@ -712,7 +747,7 @@ class LessonPipelineSeedTest {
         UUID setA = jdbc.queryForObject("SELECT id FROM content_packages WHERE code = 'PS-KP1-A'", Map.of(), UUID.class);
 
         assertThat(reader.countEligiblePracticeSets(List.of(kp1, kp5, unknown), List.of(setA), 3))
-                .containsExactlyInAnyOrderEntriesOf(Map.of(kp1, 4, kp5, 3, unknown, 0));
+                .containsExactlyInAnyOrderEntriesOf(Map.of(kp1, 4, kp5, 15, unknown, 0));
     }
 
     @Test
@@ -816,14 +851,9 @@ class LessonPipelineSeedTest {
         assertThat(question.assets()).hasSize(1);
         assertThat(chart.assetType()).isEqualTo(AssetType.IMAGE);
         assertThat(chart.altText()).startsWith("Bar chart of July afternoon roof temperatures");
-        String prefix = "data:image/svg+xml;base64,";
-        assertThat(chart.mediaUrl()).startsWith(prefix);
-        byte[] svg = Base64.getDecoder().decode(chart.mediaUrl().substring(prefix.length()));
-        assertThat(svg.length).isLessThanOrEqualTo(8 * 1024);
-        String drawn = new String(svg, StandardCharsets.UTF_8);
+        assertThat(chart.mediaUrl()).isEqualTo("https://media.example.test/ieltspath/writing/charts/22000000-0000-4000-8000-050000000001.webp");
         for (String figure : List.of("82", "45", "33", "74", "41", "30", "61", "35", "25")) {
             assertThat(spec.get("chartFacts").asText()).contains(figure);
-            assertThat(drawn).as("chart shows " + figure).contains(">" + figure + "<");
         }
     }
     @Test

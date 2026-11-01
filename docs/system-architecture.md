@@ -24,7 +24,8 @@ Client --> API Gateway :8080 --(internal JWT)--> user :8085, content :8082, libr
 
 assessment --outbox--> RabbitMQ exchange assessment.events --assessment.completed.v2--> learning consumer
 assessment --HTTP--> content, user        game --HTTP--> library, content
-library --HTTP--> content                 learning --HTTP--> content (/internal/learning-content/*)
+community --HTTP--> user, learning (streak)
+content --HTTP--> library                 learning --HTTP--> content (/internal/learning-content/*)
 ```
 
 `third_party/deeptutor` là bản clone DeepTutor dùng để đọc; công thức mastery của learning-service được port từ đó, không service nào build hay import thư mục này.
@@ -37,15 +38,15 @@ library --HTTP--> content                 learning --HTTP--> content (/internal/
 | `infra/eureka-server` | Service registry | — | — |
 | `infra/api-gateway` | Ingress WebFlux: xác thực external JWT, ký internal JWT, routing, CORS, correlation id | — | — |
 | `shared/common-security` | Thư viện: security servlet cho downstream, internal JWT, `CanonicalRoles`, `CurrentUserProvider` | — | — |
-| `user-service` | Tài khoản, role, đăng nhập/refresh/logout, hồ sơ học viên (gồm avatar Supabase), đổi mật khẩu, learning goal, activity và streak | `user_db` (Compose PostgreSQL host 5440; V5 tạo `learning_activities`, `streaks`) | `/auth/**`, `/api/users/**`, `/api/learning-support/{activities,streak}/**` |
-| `content-service` | Course theo band, topic, knowledge point, câu hỏi (có version), gói nội dung/bài đọc, asset; kiểm topic cho library và snapshot grammar cho game | `content_db` (Compose PostgreSQL host 5440; V7 xóa năm bảng catalog) | `/api/content/**` trừ nhóm từ vựng/video |
+| `user-service` | Tài khoản, role, đăng nhập/refresh/logout, hồ sơ học viên (gồm avatar Supabase và múi giờ), đổi mật khẩu | `user_db` (Compose PostgreSQL host 5440; `learning_goals`, `learning_activities`, `study_*` và `streaks` còn lại sau khi dữ liệu chuyển sang learning, không còn được ghi hay đọc) | `/auth/**`, `/api/users/**` (trừ goal và study-time) |
+| `content-service` | Course theo band, topic, knowledge point, câu hỏi (có version), gói nội dung/bài đọc, asset; snapshot grammar cho game | `content_db` (Compose PostgreSQL host 5440; V7 xóa năm bảng catalog) | `/api/content/**` trừ nhóm từ vựng/video |
 | `library-service` | Catalog từ vựng/video (V1, năm bảng; V19 mở rộng CEFR/chủ đề/bộ từ), flashcard/deck, note, tiến độ video và đoạn đã lưu (V2, sáu bảng) | `library_db` (Compose PostgreSQL host 5440) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
 | `assessment-service` | Lượt làm bài, chấm tự động và LLM cho thi topic/course, chấm EXAMINER, kết quả (có version), bài nộp, video practice; phát `AssessmentCompleted.v2` | `assessment_db` (Compose PostgreSQL host 5440) | `/api/assessments/**` |
 | `access-service` | Gói, subscription, activation key, ví điểm và sổ điểm | `access_db` (Compose PostgreSQL host 5440) | `/api/access/**` |
 | `game-service` | Phòng game, trận, phiên chơi, WebSocket realtime | `game_db` (Compose PostgreSQL host 5440) | `/api/games/**`, `/ws/games/**` |
 | `community-service` | Bài viết, bình luận, reaction, kiểm duyệt | `community_db` (Compose PostgreSQL host 5440) | `/api/community/**` |
 | `notification-service` | Thông báo bền vững từ Community events, REST unread/read và STOMP push | `notification_db` (Compose PostgreSQL host 5440) | `/api/notifications/**`, `/ws/notifications` |
-| `learning-service` | Placement recommendation; topic path theo course (một chuỗi cho mọi skill), bài học, Practice theo bài, mastery theo KP và KP con mã lỗi, phản hồi fix hint, thang ôn tập, course/topic progress và giao mã đề cuối; nhận kết quả thi chính thức | `learning_db` (Compose PostgreSQL host 5440; `learner_placements`, `course_progress`, `course_test_assignments`) | `/api/learning/**` |
+| `learning-service` | Placement recommendation; topic path theo course (một chuỗi cho mọi skill), bài học, Practice theo bài, mastery theo KP và KP con mã lỗi, phản hồi fix hint, thang ôn tập, course/topic progress và giao mã đề cuối; mục tiêu học, activity, thời gian học và streak; nhận kết quả thi chính thức | `learning_db` (Compose PostgreSQL host 5440; `learner_placements`, `course_progress`, `course_test_assignments`, `learning_goals`, `learning_activities`, `study_*`; V40 tạo các bảng goal/activity/study) | `/api/learning/**`; Gateway viết lại `/api/users/me/learning-goals/**`, `/api/users/{id}/learning-goals/**`, `/api/users/me/study-sessions/**`, `/api/users/me/statistics/study-time`, `/api/learning-support/activities/**` sang đây |
 
 Library owns the standalone vocabulary dictionary taxonomy in `vocabulary_topics` and vocabulary sets. These are separate from Content's curriculum `topics`; catalog reads do not call Content or synchronize curriculum topic IDs. Each sense's CEFR level lives in Library, and its IELTS band range is derived by Library domain rules rather than stored as a second level.
 
@@ -67,24 +68,50 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | Caller | Callee | Endpoint | Cấu hình base URL |
 | --- | --- | --- | --- |
 | assessment | content | `GET /internal/learning-content/package-versions/{id}` khi tạo attempt (ngoài transaction) | `CONTENT_SERVICE_URL` |
-| library | content | `GET /api/content/topics/{id}` khi ghi video | `CONTENT_SERVICE_URL` (mặc định `http://localhost:8082`) |
+| content | library | `GET /api/content/vocabulary/senses`, `POST /api/content/admin/vocabulary/bulk` khi duyệt course draft và soạn lesson, bearer của tác giả | `LIBRARY_SERVICE_URL` (khóa `content.library.base-url`, mặc định `http://localhost:8081`) |
+| community | user | `POST /internal/users/public-profiles`, `GET /internal/users/public-profiles/search`, bearer của người xem | `USER_SERVICE_URL` (khóa `community.user-service.base-url`) |
+| community | learning | `POST /internal/learning/streaks` (streak của tối đa 100 học viên một lần, thêm cạnh hồ sơ công khai; lỗi thì ẩn streak, hồ sơ vẫn trả) | `LEARNING_SERVICE_URL` (khóa `community.learning-service.base-url`, mặc định `http://localhost:8086`) |
 | game (`VOCABULARY`) | library | `POST /internal/game-content/snapshots` | `LIBRARY_SERVICE_URL` (mặc định `http://localhost:8081`) |
 | game (`GRAMMAR`) | content | `POST /internal/game-content/snapshots` | `CONTENT_SERVICE_URL` |
 | learning | content | `/internal/learning-content/{topic-sequence,topics/{id}/lessons,lessons/{id},lessons/{id}/practice-sets,topics/{id}/practice-sets,topics/{id}/test-packages,practice-sets/search,practice-sets/availability,package-versions/{id}}` | `CONTENT_SERVICE_URL` (mặc định `http://localhost:8082`) |
-| learning | access | `GET /api/access/me/points` (số dư), `POST /internal/access/points/debit` (trừ 3 point sau khi chấm bài luận), bearer của học viên | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
+| learning | user | `GET /internal/users/{id}/study-timezone` khi mở phiên học (lỗi thì dùng múi giờ đã lưu rồi `Asia/Ho_Chi_Minh`), `POST /internal/users/display-names` cho bảng league | `USER_SERVICE_URL` (mặc định `http://localhost:8085`) |
+| learning | assessment | `GET /api/assessments/me/statistics/study-context` xác minh bài thi của người học khi mở phiên học | `ASSESSMENT_SERVICE_URL` (mặc định `http://localhost:8083`) |
+| learning | access | `GET /api/access/me/points` (số dư), `POST /internal/access/points/debit` (AI grading and durable course-skill unlock purchases) | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
 | learning | LLM (ngoài hệ thống) | `POST {base}/chat/completions` (OpenAI-compatible) khi chấm bài luận, ngoài mọi transaction | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` |
 | assessment | LLM (ngoài hệ thống) | `POST {base}/chat/completions` cho essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE`, ngoài transaction | `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL`; quota ngày `ASSESSMENT_LLM_DAILY_LIMIT` |
 
-Assessment, library, game và learning gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`.
-Library dùng timeout kết nối 2 giây, đọc 5 giây; lỗi Content khi kiểm topic trả 503. Hai nơi cài snapshot game theo
+Assessment, content, game và learning gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`.
+Content dùng timeout kết nối 2 giây, đọc 5 giây khi gọi Library; Library không đáp được thì Content trả 503 mã `VOCABULARY_SERVICE_UNAVAILABLE`. Library không gọi Content. Hai nơi cài snapshot game theo
 cùng [contract](contracts/game-content-snapshot-v1.md). Learning gọi Content qua API nội bộ (Gateway chặn `/internal/**`,
 contract [`learning-content-internal-v1`](contracts/learning-content-internal-v1.md)); Content là nơi duy nhất ghép URL media.
 
-Listening dùng mp3 do team tự upload lên bucket cloud public-read. Content resolve key với `CONTENT_MEDIA_BASE_URL`
-(prefix `https://`) thành `mediaUrl`; URL `https://` đầy đủ được giữ nguyên, không cần base. Learning và Assessment
-chuyển tiếp URL đã resolve, không ghép lại. Transcript nằm trong `content_assets.text_content`: Learning trả khi bài
+Content resolve asset `PUBLIC` bằng `CONTENT_MEDIA_BASE_URL` của bucket `media`; asset `PREMIUM` được cấp URL ký từ
+bucket riêng tư `media-premium`. Learning chỉ xin URL ký sau khi lesson gate cho phép đọc. URL `https://` đầy đủ vẫn
+được giữ nguyên; Learning và Assessment chuyển tiếp URL đã resolve, không ghép lại. Transcript nằm trong
+`content_assets.text_content`: Learning trả khi bài
 hoàn thành, hoặc sau khi nộp practice attempt hay set ôn; Assessment giữ trong snapshot server và trả `sectionSolutions`
 khi kết quả ≥ 70%.
+
+### Lưu trữ file (Supabase Storage)
+
+Các service dùng chung quy ước bucket và khóa object dưới đây. Cùng chủ và cùng chính sách thì dùng chung bucket, phân
+biệt bằng tiền tố khóa; khác chính sách thì dùng bucket mới; khác service thì không dùng chung bucket.
+
+| Bucket | Công khai | Dùng để | Giới hạn | Loại file (MIME) | Chủ | Khóa thường gặp | Trạng thái |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `avatars` | có | Ảnh đại diện học viên | 2 MB | png, jpeg, webp | user-service | `images/{userId}/{uuid}.{ext}` | đã có |
+| `flashcards` | có | Ảnh thẻ, bìa bộ thẻ, bìa catalog từ vựng | 2 MB | png, jpeg, webp | library-service | `images/{userId}/{uuid}.{ext}`; bìa catalog `catalog-cover/{userId}/{uuid}.{ext}` | đã có; bìa catalog là kế hoạch |
+| `community` | có | Ảnh bài đăng cộng đồng | 5 MB | png, jpeg, webp, gif | community-service | `community/post/{userId}/{uuid}.{ext}` | đã có |
+| `media` | có | Audio và ảnh nội dung bài học | 25 MB | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service | seed: `listening/demo/ls1.mp3`; upload API: `content-audio/{userId}/{uuid}.{ext}` | đã có |
+| `speaking-recordings` | không | Ghi âm Speaking của học viên | 5 MB | webm, mp4, ogg, mpeg, wav | assessment-service | `speaking/{userId}/{uuid}.{ext}` | đã có, chưa dùng |
+| `media-premium` | không | Audio PREMIUM, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | đã có |
+
+Content lưu `access_tier` cùng asset. `PUBLIC` dùng URL công khai của `media`; `PREMIUM` dùng URL ký của
+`media-premium` với TTL 900 giây. Learning kiểm tra lesson gate trước khi Content tạo URL ký. URL ký chỉ giữ ở response,
+không lưu vào DB hoặc log; frontend có thể xin URL mới khi URL hiện tại hết hạn.
+
+Ví dụ URL công khai và URL ký, cùng các quy tắc tạo, kiểm tra khóa và giới hạn TTL, được ghi trong
+[`shared/common-storage/README.md`](../shared/common-storage/README.md).
 
 ### Bất đồng bộ (RabbitMQ)
 
@@ -202,13 +229,12 @@ giữ cả khi câu đúng ở lần sau nhưng khối vẫn trượt; khối đ
 
 ```text
 Client -> Gateway -> library: từ vựng/video, flashcard/deck, note, tiến độ và đoạn video đã lưu
-                              -> content: GET /api/content/topics/{id} khi ghi video
-Client -> Gateway -> user: POST/GET activity, GET streak (giữ prefix /api/learning-support)
+Client -> Gateway -> user: POST/GET activity (giữ prefix /api/learning-support)
 Client -> Gateway -> game: tạo phòng/phiên chơi -> chọn snapshot theo learningDomain
                               VOCABULARY -> library; GRAMMAR -> content
 ```
 
-Năm bảng catalog và sáu bảng thư viện cá nhân thuộc `library_db`; `learning_activities` và `streaks` thuộc `user_db`.
+Năm bảng catalog và sáu bảng thư viện cá nhân thuộc `library_db`; mục tiêu học, `learning_activities` và dữ liệu thời gian học thuộc `learning_db` (các bảng cũ trong `user_db` còn đó, không dùng); streak do `learner_streaks` của learning giữ.
 Game lưu snapshot để chơi; hai service cung cấp cùng request/response nội bộ.
 
 ### Kết quả thi → mastery
@@ -254,7 +280,7 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | Bằng chứng theo user (`kp_evidence`), mastery tính khi đọc bằng `compute_mastery` port từ DeepTutor | Không cần aggregate path; consumer áp dụng được khi chưa có trạng thái học | Thứ tự bằng chứng dựa vào cột `ordinal` |
 | Block từ vựng trong bài học (2026-10-21) chỉ cung cấp sense IDs; flashcard SRS dùng `VOCABULARY_SENSE`/`vocabularySenseId` riêng | Nội dung từ vựng bổ trợ, không chặn hoàn thành; SRS không ghi `kp_evidence`, mastery `VOCABULARY` đến từ bài tập được chấm | Tạo card/deck UX và chính sách hoàn thành từ vựng chưa thuộc phạm vi |
 | Outbox + RabbitMQ cho assessment → learning; consumer có retry/DLQ | Không mất kết quả thi khi learning tạm lỗi | Thêm broker; outbox các service khác chưa có relay |
-| Tách catalog/thư viện cá nhân sang library, activity/streak sang user | Mỗi nhóm dữ liệu có service và DB sở hữu rõ ràng, giữ public path | Gateway cần route theo nhóm; game chọn hai nguồn snapshot |
+| Tách catalog/thư viện cá nhân sang library, activity sang user (streak sau đó về learning) | Mỗi nhóm dữ liệu có service và DB sở hữu rõ ràng, giữ public path | Gateway cần route theo nhóm; game chọn hai nguồn snapshot |
 
 ## 9. Pattern đang dùng
 
@@ -286,7 +312,6 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | `GetAllUsersUseCase` dùng `findAll()` không phân trang | Giới hạn hiện tại |
 | Template service mới dùng `application/port`; user-service dùng `domain/repository` | Khác biệt template/hiện hữu |
 | `CONTENT_SERVICE_URL` của game trong config-repo mặc định `http://content-service:8082` | Sai khi game chạy trên host; đặt biến này thành `http://localhost:8082` |
-| `GlobalExceptionHandler` của user-service phân nhánh theo path `/api/learning-support/` | Giữ định dạng lỗi cũ sau khi activity/streak chuyển sang user; còn nợ kỹ thuật path-specific trong handler |
 | Content V7 xóa vĩnh viễn năm bảng catalog | Chỉ chạy trên Testcontainers cho tới khi duyệt chạy trên `content_db` dùng chung |
 | Outbox của access/content/game không có relay | Event chưa được phát |
 | Notification nhận Community event qua RabbitMQ và lưu idempotent theo event id | WebSocket chỉ push sau commit; REST là nguồn đồng bộ lại khi reconnect |
@@ -298,8 +323,8 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | Giá chấm Writing nằm ở hai nơi | Learning `learning.writing.point-cost` (3) cho bài luận trong bài học; assessment `grading_point_costs.WRITING` cho chấm qua `grading_jobs`. Đổi giá phải sửa cả hai |
 | Bài Writing lưu ở hai nơi | Bài luận trong bài học ở `learning_db.lesson_writing_submissions`; Writing trong đề (sau MVP) ở `assessment_db.learner_submissions` |
 | Ảnh biểu đồ Task 1 mới dùng tham chiếu media | Content nhận URL `https://` hoặc data URI ảnh Base64 và trả `mediaUrl`; chưa có luồng upload hay tích hợp object storage cho ảnh. Seed dùng SVG data URI; grader đọc `chartFacts`, không đọc ảnh |
-| Media Listening dùng bucket public-read | Team tự upload 8 mp3 của seed; backend chưa có upload API, signed URL hay giới hạn lượt nghe. Thiếu `CONTENT_MEDIA_BASE_URL` thì các reference dạng key không resolve được (`INVALID_MEDIA_REFERENCE`); URL `https://` đầy đủ không cần base |
+| Bản public cũ của audio `listening/demo/ls1.mp3` còn trong `media` | Lesson dùng chung audio đã chuyển sang `PREMIUM` và phát qua URL ký sau lesson gate; Placement dùng khóa public riêng. Xóa object public cũ còn chờ phê duyệt |
 | Writing trong Practice và gate dùng chính sách phí khác nhau | Practice trừ điểm; essay trong `TOPIC_GATE`/`COURSE_GATE` chấm miễn phí và có quota riêng ở Assessment |
 | Một số ghi Writing chưa theo quy tắc khóa mọi lượt ghi theo user | Bắt đầu/kết thúc chấm có transaction và advisory lock; quota, lưu grade và lỗi trung gian dùng SQL nguyên tử có điều kiện ngoài các transaction này. Dữ kiện hiện tại, không thay quy tắc AGENTS.md §3.8 |
-| Cổng bài học là authority cho luồng học | `LessonAccessGate` kiểm review/topic/bài trước; runtime Java MVP không có tutor hay `next_objective` |
+| Cổng bài học là authority cho luồng học | `LessonAccessGate` giữ tiến trình review/topic/bài; `PaywallGate` mở 3 bài đầu mỗi skill, unlock skill/combo, tiến độ grandfathered, rồi Premium. Access outage chỉ chặn nội dung cần kiểm tra Premium. |
 | Sơ đồ §1 còn cạnh assessment → user từ baseline cũ | Tạo attempt hiện chỉ đọc Content; không gọi User để lấy goal (xem §3 và §6) |

@@ -26,25 +26,33 @@ public record TopicSequenceResult(
         CourseEntry course,
         List<Skill> skills,
         boolean active,
-        int lessonCount
+        int lessonCount,
+        String description
 ) {
     public TopicSequenceResult {
         skills = skills.stream().filter(s -> s != Skill.ALL).distinct().sorted().toList();
-        skill = skills.size() == 1 ? skills.getFirst() : null;
+        skill = skill != null ? skill : skills.size() == 1 ? skills.getFirst() : null;
     }
 
     public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                                List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest,
                                CourseEntry course) {
         this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course,
-                skill == null ? List.of() : List.of(skill), true, 0);
+                skill == null ? List.of() : List.of(skill), true, 0, null);
     }
 
     public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
                                List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest,
                                CourseEntry course, List<Skill> skills) {
         this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, skills,
-                true, 0);
+                true, 0, null);
+    }
+
+    public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
+                               List<KnowledgePointEntry> knowledgePoints, Skill skill, boolean hasTopicTest,
+                               CourseEntry course, List<Skill> skills, boolean active, int lessonCount) {
+        this(topicId, code, name, sortOrder, requiredFeatureKey, knowledgePoints, skill, hasTopicTest, course, skills,
+                active, lessonCount, null);
     }
 
     public TopicSequenceResult(UUID topicId, String code, String name, int sortOrder, String requiredFeatureKey,
@@ -53,7 +61,25 @@ public record TopicSequenceResult(
     }
 
     public record CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
-                              boolean active) {
+                              boolean active, String coverImageUrl, String description,
+                              java.util.Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints,
+                              List<Skill> availableSkills) {
+        public CourseEntry {
+            skillUnlockPoints = skillUnlockPoints == null ? java.util.Map.of() : java.util.Map.copyOf(skillUnlockPoints);
+            availableSkills = availableSkills == null ? List.of() : availableSkills.stream().distinct().sorted().toList();
+        }
+
+        public CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
+                           boolean active, String coverImageUrl, String description) {
+            this(courseId, code, name, bandLevel, hasCourseTest, active, coverImageUrl, description,
+                    java.util.Map.of(), null, List.of());
+        }
+
+        public CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
+                           boolean active) {
+            this(courseId, code, name, bandLevel, hasCourseTest, active, null, null, java.util.Map.of(), null, List.of());
+        }
+
         public CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest) {
             this(courseId, code, name, bandLevel, hasCourseTest, true);
         }
@@ -75,19 +101,28 @@ public record TopicSequenceResult(
             String scopeOut
     ,
             UUID parentKnowledgePointId,
-            String errorCode
+            String errorCode,
+            Integer earliestLessonPosition
     ) {
         public KnowledgePointEntry(UUID id, UUID topicId, String code, String name, LearningType learningType,
                                    Skill skill, String description, boolean hasPracticeSet, CefrLevel cefrLevel,
                                    String canDo, String scopeIn, String scopeOut) {
             this(id, topicId, code, name, learningType, skill, description, hasPracticeSet, cefrLevel, canDo,
-                    scopeIn, scopeOut, null, null);
+                    scopeIn, scopeOut, null, null, null);
         }
 
         public KnowledgePointEntry(UUID id, UUID topicId, String code, String name, LearningType learningType,
                                    Skill skill, String description, boolean hasPracticeSet) {
             this(id, topicId, code, name, learningType, skill, description, hasPracticeSet,
-                    null, null, null, null, null, null);
+                    null, null, null, null, null, null, null);
+        }
+
+        public KnowledgePointEntry(UUID id, UUID topicId, String code, String name, LearningType learningType,
+                                   Skill skill, String description, boolean hasPracticeSet, CefrLevel cefrLevel,
+                                   String canDo, String scopeIn, String scopeOut, UUID parentKnowledgePointId,
+                                   String errorCode) {
+            this(id, topicId, code, name, learningType, skill, description, hasPracticeSet, cefrLevel, canDo,
+                    scopeIn, scopeOut, parentKnowledgePointId, errorCode, null);
         }
     }
 }

@@ -26,6 +26,7 @@ import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.domain.vo.PackageType;
 import com.ieltspath.content.domain.vo.Skill;
+import com.ieltspath.content.domain.vo.MediaReferencePolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -83,13 +84,15 @@ class InternalLearningContentControllerTest {
                 Skill.ALL, null, true, CefrLevel.B1, "Can use a subordinate clause.", "Basic clauses", "Reduced clauses");
         when(topicSequence.execute(false)).thenReturn(List.of(new TopicSequenceResult(UUID.randomUUID(), "TOPIC", "Topic",
                 1, null, List.of(knowledgePoint), Skill.READING, false,
-                new TopicSequenceResult.CourseEntry(course, "IELTS_5_5", "IELTS 5.5", new java.math.BigDecimal("5.5"), true))));
+                new TopicSequenceResult.CourseEntry(course, "IELTS_5_5", "IELTS 5.5", new java.math.BigDecimal("5.5"),
+                        true, true, "content-image/u/cover.png", "Course"))));
         when(courseTests.execute(course)).thenReturn(List.of(
                 new com.ieltspath.content.application.result.TopicTestPackageResult(pkg, version, "FINAL")));
         mockMvc.perform(get("/internal/learning-content/topic-sequence"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].course.courseId").value(course.toString()))
                 .andExpect(jsonPath("$[0].course.bandLevel").value(5.5))
                 .andExpect(jsonPath("$[0].course.hasCourseTest").value(true))
+                .andExpect(jsonPath("$[0].course.coverImageUrl").doesNotExist())
                 .andExpect(jsonPath("$[0].knowledgePoints[0].cefrLevel").value("B1"))
                 .andExpect(jsonPath("$[0].knowledgePoints[0].canDo").value("Can use a subordinate clause."))
                 .andExpect(jsonPath("$[0].knowledgePoints[0].scopeIn").value("Basic clauses"))
@@ -148,7 +151,8 @@ class InternalLearningContentControllerTest {
         validator.afterPropertiesSet();
         mockMvc = MockMvcBuilders.standaloneSetup(new InternalLearningContentController(topicSequence, topicLessons,
                         lessonContent, testPackages, search, packageVersion, lessonPracticeSets, topicPracticeSets,
-                        availability, courseTests, placementTests, errorTypes, activeKnowledgePrerequisites))
+                        availability, courseTests, placementTests, errorTypes, activeKnowledgePrerequisites,
+                        new MediaReferencePolicy("")))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -301,7 +305,7 @@ class InternalLearningContentControllerTest {
     void lessonBlocksCarryOnlyTheirOwnFieldsAndAnswerSpecsAsJson() throws Exception {
         UUID lessonId = UUID.randomUUID();
         UUID kp = UUID.randomUUID();
-        when(lessonContent.execute(lessonId)).thenReturn(new LessonContentResult(lessonId, UUID.randomUUID(), "L1",
+        when(lessonContent.execute(lessonId, false)).thenReturn(new LessonContentResult(lessonId, UUID.randomUUID(), "L1",
                 "Câu chủ đề nằm ở đâu", null, 1, List.of(), List.of(
                 new LessonContentResult.Block(UUID.randomUUID(), BlockType.TEXT, null, 1, "Mẹo", null, null, null,
                         List.of(kp)),
@@ -361,7 +365,7 @@ class InternalLearningContentControllerTest {
     @Test
     void unknownIdsAreNotFound() throws Exception {
         UUID id = UUID.randomUUID();
-        when(lessonContent.execute(id)).thenThrow(new LessonNotFoundException(id));
+        when(lessonContent.execute(id, false)).thenThrow(new LessonNotFoundException(id));
         when(topicLessons.execute(id)).thenThrow(new TopicNotFoundException(id));
 
         mockMvc.perform(get("/internal/learning-content/lessons/{id}", id)).andExpect(status().isNotFound());

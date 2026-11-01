@@ -1,6 +1,7 @@
 package com.ieltspath.content.application.result;
 
 import com.ieltspath.content.domain.vo.AssetType;
+import com.ieltspath.content.domain.vo.AccessTier;
 import com.ieltspath.content.domain.vo.BlockType;
 import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.domain.vo.Skill;
@@ -23,11 +24,18 @@ public record LessonContentResult(
         List<UUID> knowledgePointIds,
         List<Block> blocks,
         Skill skill,
-        List<Skill> skills
+        List<Skill> skills,
+        UUID courseId,
+        Integer skillPosition
 ) {
     public LessonContentResult {
         skills = skills.stream().filter(s -> s != Skill.ALL).distinct().sorted().toList();
-        skill = skills.size() == 1 ? skills.getFirst() : null;
+        skill = skill != null ? skill : skills.size() == 1 ? skills.getFirst() : null;
+    }
+
+    public LessonContentResult(UUID lessonId, UUID topicId, String code, String title, String summary, int sortOrder,
+                               List<UUID> knowledgePointIds, List<Block> blocks, Skill skill, List<Skill> skills) {
+        this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, skill, skills, null, null);
     }
 
     public LessonContentResult(UUID lessonId, UUID topicId, String code, String title, String summary, int sortOrder,
@@ -38,7 +46,7 @@ public record LessonContentResult(
 
     public LessonContentResult withBlocks(List<Block> newBlocks) {
         return new LessonContentResult(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, newBlocks,
-                skill, skills);
+                skill, skills, courseId, skillPosition);
     }
 
     /**
@@ -75,9 +83,13 @@ public record LessonContentResult(
 
     /** {@code mediaUrl} is set for media assets once the use case has checked the stored reference. */
     public record Asset(UUID id, AssetType assetType, String textContent, String mediaReference,
-                        Integer durationSeconds, String mediaUrl) {
+                        Integer durationSeconds, String mediaUrl, AccessTier accessTier) {
+        public Asset(UUID id, AssetType assetType, String textContent, String mediaReference,
+                     Integer durationSeconds, String mediaUrl) {
+            this(id, assetType, textContent, mediaReference, durationSeconds, mediaUrl, AccessTier.PUBLIC);
+        }
         public Asset withMediaUrl(String url) {
-            return new Asset(id, assetType, textContent, mediaReference, durationSeconds, url);
+            return new Asset(id, assetType, textContent, mediaReference, durationSeconds, url, accessTier);
         }
     }
 

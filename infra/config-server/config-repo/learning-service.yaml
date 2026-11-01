@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${LEARNING_DB_URL:jdbc:postgresql://localhost:5436/learning_db}
+    url: ${LEARNING_DB_URL:jdbc:postgresql://localhost:5440/learning_db}
     username: ${LEARNING_DB_USERNAME:postgres}
     password: ${LEARNING_DB_PASSWORD}
   jpa:

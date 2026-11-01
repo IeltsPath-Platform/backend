@@ -30,6 +30,14 @@ public class LearnerTimezones {
         return ZoneId.of(timezoneOf(userId));
     }
 
+    /** The timezone of each learner, in one query; a learner who has not chosen one gets the default. */
+    public java.util.Map<UUID, ZoneId> zonesOf(java.util.Collection<UUID> userIds) {
+        java.util.Map<UUID, String> saved = repository.timezones(userIds);
+        java.util.Map<UUID, ZoneId> zones = new java.util.HashMap<>();
+        for (UUID userId : userIds) zones.put(userId, ZoneId.of(saved.getOrDefault(userId, defaultTimezone)));
+        return zones;
+    }
+
     /** The saved timezone, or the default when the learner has not chosen one. */
     public String timezoneOf(UUID userId) {
         return repository.timezone(userId).orElse(defaultTimezone);

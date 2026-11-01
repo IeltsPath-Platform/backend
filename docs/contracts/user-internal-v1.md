@@ -3,27 +3,19 @@
 These service-to-service lookups require a verified internal JWT. The Gateway denies `/internal/**` requests from public
 clients.
 
-## Learning goal
+## Study timezone
 
-`GET /internal/users/{userId}/learning-goal` returns the learner's active goal:
-
-```json
-{
-  "targetBand": 6.5,
-  "examDate": "2027-01-20"
-}
-```
-
-If the user exists but has no active goal, both values are `null`:
+`GET /internal/users/{userId}/study-timezone` returns the timezone the learner's study days are counted in. It is the
+timezone of the learner profile, or `Asia/Ho_Chi_Minh` when the user has no profile or no timezone:
 
 ```json
 {
-  "targetBand": null,
-  "examDate": null
+  "timezone": "Asia/Ho_Chi_Minh"
 }
 ```
 
-An unknown user returns `404`.
+Learning reads it when a study session starts. Goals no longer live in User Service: Learning serves them under the same
+public paths, so `GET /internal/users/{userId}/learning-goal` is gone.
 
 ## Batch display names
 

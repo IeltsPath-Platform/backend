@@ -13,9 +13,16 @@ import java.util.UUID;
 public record TopicResult(UUID topicId, String code, String name, int sequenceOrder,
                           TopicStatus status, int completedLessonCount, String requiredFeatureKey,
                           LearningSkill skill, boolean hasTopicTest, Course course, boolean hasCourseTest,
-                          Set<LearningSkill> skills, int totalLessonCount) {
+                          Set<LearningSkill> skills, int totalLessonCount, String description) {
     public TopicResult {
         skills = skills == null ? (skill == null ? Set.of() : Set.of(skill)) : skills;
+    }
+    public TopicResult(UUID topicId, String code, String name, int sequenceOrder,
+                       TopicStatus status, int completedLessonCount, String requiredFeatureKey,
+                       LearningSkill skill, boolean hasTopicTest, Course course, boolean hasCourseTest,
+                       Set<LearningSkill> skills, int totalLessonCount) {
+        this(topicId, code, name, sequenceOrder, status, completedLessonCount, requiredFeatureKey, skill,
+                hasTopicTest, course, hasCourseTest, skills, totalLessonCount, null);
     }
     public TopicResult(UUID topicId, String code, String name, int sequenceOrder, TopicStatus status,
                        int completedLessonCount, String requiredFeatureKey, LearningSkill skill,
@@ -41,5 +48,20 @@ public record TopicResult(UUID topicId, String code, String name, int sequenceOr
                 false);
     }
 
-    public record Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel) {}
+    public record Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
+                         String coverImageUrl, String description,
+                         java.util.Map<LearningSkill, Integer> skillUnlockPoints,
+                         Integer comboUnlockPoints, Set<LearningSkill> availableSkills) {
+        public Course {
+            skillUnlockPoints = skillUnlockPoints == null ? java.util.Map.of() : java.util.Map.copyOf(skillUnlockPoints);
+            availableSkills = availableSkills == null ? Set.of() : Set.copyOf(availableSkills);
+        }
+        public Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
+                      String coverImageUrl, String description) {
+            this(courseId, code, name, bandLevel, coverImageUrl, description, java.util.Map.of(), null, Set.of());
+        }
+        public Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel) {
+            this(courseId, code, name, bandLevel, null, null, java.util.Map.of(), null, Set.of());
+        }
+    }
 }

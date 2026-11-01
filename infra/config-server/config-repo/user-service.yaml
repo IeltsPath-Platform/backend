@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${USER_DB_URL:jdbc:postgresql://localhost:5432/user_db}
+    url: ${USER_DB_URL:jdbc:postgresql://localhost:5440/user_db}
     username: ${USER_DB_USERNAME:postgres}
     password: ${USER_DB_PASSWORD:123456}
   jpa:
@@ -28,9 +28,6 @@ app:
   user:
     avatar:
       bucket: ${USER_AVATAR_BUCKET:avatars}
-  study-time:
-    learning-url: ${LEARNING_SERVICE_URL:http://localhost:8086}
-    assessment-url: ${ASSESSMENT_SERVICE_URL:http://localhost:8083}
   auth:
     external-jwt-issuer: ${EXTERNAL_JWT_ISSUER:urn:code-base:auth}
     external-jwt-secret: ${EXTERNAL_JWT_SECRET:FaU24nQz6jxA6m3ihV49zlGXoncSfkNMgYpgC7XPKXc=}
@@ -69,8 +66,6 @@ springdoc:
   paths-to-match:
     - /auth/**
     - /api/users/**
-    - /api/learning-support/activities/**
-    - /api/learning-support/streak/**
 
 management:
   endpoints:

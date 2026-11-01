@@ -3,6 +3,8 @@ package com.ieltspath.content.infrastructure.persistence;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.content.application.port.WritingTaskReader;
+import com.ieltspath.content.application.usecase.GetWritingTaskUseCase;
+import com.ieltspath.content.domain.vo.MediaReferencePolicy;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcWritingTaskReader;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
@@ -77,9 +79,15 @@ class JdbcWritingTaskReaderTest {
         assertThat(task.timeLimitSeconds()).isEqualTo(1200);
         assertThat(task.stem()).contains("line graph");
         assertThat(task.images()).singleElement().satisfies(image -> {
-            assertThat(image.mediaReference()).startsWith("data:image/svg+xml;base64,");
+            assertThat(image.mediaReference()).isEqualTo("writing/charts/2e000000-0000-4000-8000-010000003001.webp");
             assertThat(image.altText()).contains("Line graph");
         });
+        UUID version = sql.queryForObject("SELECT current_published_version_id FROM content_packages WHERE code = ?", UUID.class, "PT-WRITING-01");
+        UUID section = sql.queryForObject("SELECT id FROM content_sections WHERE package_version_id = ? AND part_no = 1", UUID.class, version);
+        var response = new GetWritingTaskUseCase(reader,
+                new MediaReferencePolicy("https://media.example.test/ieltspath")).execute(version, section);
+        assertThat(response.images()).singleElement().satisfies(image ->
+                assertThat(image.url()).isEqualTo("https://media.example.test/ieltspath/writing/charts/2e000000-0000-4000-8000-010000003001.webp"));
         assertThat(task.guide()).contains("## 1. Giải thích đề");
         JsonNode steps = JSON.readTree(task.guideSteps());
         assertThat(steps).hasSize(6);

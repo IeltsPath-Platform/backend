@@ -50,17 +50,27 @@ class CatalogDomainRulesTest {
     }
 
     @Test
-    void topicNeedsNamesAndRejectsCoverUrls() {
+    void topicCoverKeyMustUseTheCatalogCoverNamespaceAndSafeCharacters() {
         assertThrows(InvalidDataException.class, () -> new VocabularyTopicDraft("env", "Environment", " ", null, 0, null));
         assertThrows(InvalidDataException.class,
-                () -> new VocabularyTopicDraft("env", "Environment", "Môi trường", "https://cdn.example/x.png", 0, null));
-        assertThrows(InvalidDataException.class,
-                () -> new VocabularyTopicDraft("env", "Environment", "Môi trường", null, -1, null));
+                () -> new VocabularyTopicDraft("env", "Environment", "Environment", null, -1, null));
 
-        var topic = new VocabularyTopicDraft("env", "Environment", "Môi trường", " covers/env.png ", null, null);
-        assertEquals("covers/env.png", topic.coverKey());
+        var topic = new VocabularyTopicDraft("env", "Environment", "Environment", " catalog-cover/user-1/cover_01.v2.png ", null, null);
+        assertEquals("catalog-cover/user-1/cover_01.v2.png", topic.coverKey());
         assertEquals(0, topic.sortOrder());
         assertEquals(ContentStatus.ACTIVE, topic.status());
+
+        for (String invalidKey : List.of(
+                "https://cdn.example/x.png",
+                "../x",
+                "/x",
+                "covers/env.png",
+                "catalog-cover/user 1/cover.png",
+                "catalog-cover/user-1/cover?.png")) {
+            assertThrows(InvalidDataException.class,
+                    () -> new VocabularyTopicDraft("env", "Environment", "Environment", invalidKey, 0, null),
+                    invalidKey);
+        }
     }
 
     @Test

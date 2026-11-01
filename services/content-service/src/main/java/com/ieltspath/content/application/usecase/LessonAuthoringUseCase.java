@@ -71,6 +71,7 @@ public class LessonAuthoringUseCase {
     @Transactional
     public void knowledgePoints(UUID lessonId, List<UUID> knowledgePointIds) {
         Lesson lesson = requireLocked(lessonId);
+        requireCourseSkill(lessonId, knowledgePointIds);
         lesson.replaceKnowledgePoints(knowledgePointIds);
         repository.save(lesson);
     }
@@ -81,6 +82,7 @@ public class LessonAuthoringUseCase {
                                           List<UUID> questionVersionIds, List<UUID> knowledgePointIds) {
         Lesson lesson = requireLocked(lessonId);
         if (type == BlockType.EXERCISE) lesson.ensureExerciseEditable();
+        requireCourseSkill(lessonId, knowledgePointIds);
         validateBlock(lessonId, type, sortOrder, textContent, assetId, vocabularySenseIds,
                 questionVersionIds, knowledgePointIds);
         if (type == BlockType.EXERCISE) requireQuestionsFree(null, questionVersionIds);
@@ -100,6 +102,7 @@ public class LessonAuthoringUseCase {
         if (block.getType() != blockType) {
             throw new LessonBlockInvalidException("Block type cannot be changed");
         }
+        requireCourseSkill(lessonId, knowledgePointIds);
         List<UUID> requestedQuestions = questionVersionIds == null ? List.of() : questionVersionIds;
         if (blockType == BlockType.EXERCISE && !block.getQuestionVersionIds().equals(requestedQuestions)) {
             lesson.ensureExerciseEditable();
@@ -160,6 +163,18 @@ public class LessonAuthoringUseCase {
 
     private void requireTopic(UUID topicId) {
         if (!repository.topicExists(topicId)) throw new TopicNotFoundException(topicId);
+    }
+
+    private void requireCourseSkill(UUID lessonId, List<UUID> knowledgePointIds) {
+        if (knowledgePointIds == null || knowledgePointIds.isEmpty()) return;
+        var topicSkill = repository.courseTopicSkillForLesson(lessonId);
+        if (topicSkill.isEmpty()) return;
+        var skills = repository.knowledgePointSkills(knowledgePointIds);
+        if (!skills.keySet().containsAll(knowledgePointIds)
+                || skills.values().stream().anyMatch(skill -> skill != topicSkill.get()
+                        && skill != com.ieltspath.content.domain.vo.Skill.ALL)) {
+            throw new LessonBlockInvalidException("Lesson knowledge points must match the course topic skill");
+        }
     }
 
     private void validateBlock(UUID lessonId, BlockType type, Integer sortOrder, String textContent, UUID assetId,

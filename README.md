@@ -39,7 +39,7 @@ IELTSPath/
 │   └── common-storage/         # ObjectStorage, client Supabase Storage, ObjectKeys, UploadPolicy
 ├── services/                   # Chứa các microservice nghiệp vụ
 │   ├── learning-service/       # [Port 8086] Thứ tự topic, bài học, mastery, bài ôn, mã đề, consumer kết quả thi
-│   ├── user-service/           # Identity, auth, learning goals, activity và streak
+│   ├── user-service/           # Identity, auth, learning goals, activity
 │   ├── content-service/        # Topic, knowledge point, câu hỏi, gói nội dung và asset
 │   ├── library-service/        # Catalog từ vựng/video và thư viện học cá nhân
 │   ├── game-service/           # Phòng game, phiên chơi và WebSocket
@@ -255,7 +255,8 @@ Java chạy trên host (IDE hoặc `java -jar`); Compose chỉ chạy DB và Rab
 | `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | Broker trong compose; assessment và Learning Service trên host phải dùng đúng cặp này (mặc định `guest` sẽ fail) |
 | `GATEWAY_INTERNAL_JWT_SECRET` | Gateway và toàn bộ downstream service phải dùng cùng giá trị, lệch sẽ trả 401 |
 | `EXTERNAL_JWT_SECRET` | User Service ký token, Gateway xác thực |
-| `CONTENT_MEDIA_BASE_URL` | Prefix https của bucket chứa mp3 Listening; thiếu thì bài Listening trả 500 `INVALID_MEDIA_REFERENCE` |
+| `CONTENT_MEDIA_BASE_URL` | Prefix https của bucket công khai `media` cho asset PUBLIC; thiếu thì key PUBLIC trả 500 `INVALID_MEDIA_REFERENCE` |
+| `CONTENT_PREMIUM_MEDIA_BUCKET` | Bucket riêng tư cho audio lesson PREMIUM; mặc định `media-premium`, URL ký có hạn 900 giây |
 | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` | Endpoint OpenAI-compatible để Learning Service chấm bài luận Writing; thiếu thì nộp bài luận trả 503 `GRADING_UNAVAILABLE`. API key là secret. Gemini: base URL `https://generativelanguage.googleapis.com/v1beta/openai`, model `gemini-3.8-flash` (đã thử 2026-10-02; `gemini-2.5-flash` không còn cấp cho key mới) |
 | `LEARNING_LLM_REASONING_EFFORT` | Mức suy luận gửi cho model. Với `gemini-3.8-flash` đặt `low`: mặc định của client cho `gemini-3*` là `minimal`, model này trả 400 |
 | `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL` | Endpoint OpenAI-compatible để Assessment Service chấm essay trong thi topic/course. Thiếu cấu hình, lỗi LLM hoặc hết hạn mức ngày thì chuyển bài sang EXAMINER; bài thi MOCK vẫn do EXAMINER chấm. API key là secret. |
@@ -274,10 +275,12 @@ Nếu mật khẩu có ký tự đặc biệt, hãy percent-encode hoặc chọn
 
 Gateway giữ path công khai: `/api/content/videos/**`, `/api/content/vocabulary/**` và
 `/api/content/admin/vocabulary/**` tới library; `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**`
-tới library; `/api/learning-support/{activities,streak}/**` tới user; `/api/learning/**` tới learning. Gateway chặn
+tới library; `/api/learning/**` tới learning, cùng goal (`/api/users/me/learning-goals/**`), study-time
+(`/api/users/me/study-sessions/**`, `/api/users/me/statistics/study-time`) và activity (`/api/learning-support/activities/**`)
+mà Gateway viết lại sang learning. Gateway chặn
 `/internal/**`. Game chọn snapshot `VOCABULARY` từ library (`LIBRARY_SERVICE_URL` mặc định `http://localhost:8081`),
 `GRAMMAR` từ content. Khi game chạy trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082` vì Config Server vẫn
-mặc định địa chỉ `http://content-service:8082`. Library kiểm topic video qua Content. Content V7 xóa năm bảng catalog;
+mặc định địa chỉ `http://content-service:8082`. Library không gọi Content; video chỉ lưu `topicId` như tham chiếu. Content V7 xóa năm bảng catalog;
 chỉ cho Flyway chạy migration phá hủy này trên Testcontainers cho tới khi có duyệt riêng đối với `content_db` dùng chung.
 
 Nội dung demo Reading, Writing, Listening và lesson nhiều skill nằm trong các migration Content V9–V23. V13 thêm gợi ý

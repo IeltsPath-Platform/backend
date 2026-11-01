@@ -2,6 +2,7 @@ package com.ieltspath.library.api.controller;
 
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.library.application.result.PageResult;
+import com.ieltspath.library.application.result.StoredImageResult;
 import com.ieltspath.library.application.result.VocabularyItemResult;
 import com.ieltspath.library.application.usecase.*;
 import com.ieltspath.library.domain.vo.ContentStatus;
@@ -60,6 +61,7 @@ class VocabularyCatalogSecurityTest {
     @MockBean AddVocabularySenseUseCase addSense;
     @MockBean VocabularyCatalogUseCase catalog;
     @MockBean com.ieltspath.library.application.usecase.VocabularyProgressUseCase progress;
+    @MockBean UploadCatalogCoverUseCase uploadCatalogCover;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
         registry.add("app.auth.internal-jwt-secret", () -> SECRET);
@@ -108,6 +110,40 @@ class VocabularyCatalogSecurityTest {
                         .header(HttpHeaders.AUTHORIZATION,"Bearer "+signedInternalToken("CUSTOMER"))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"academicWordList\":false}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test void catalogCoverUploadReturnsStoredMediaReferenceForAuthors() throws Exception {
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "cover.png", "image/png",
+                new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A});
+        when(uploadCatalogCover.execute(org.mockito.ArgumentMatchers.any(UUID.class), org.mockito.ArgumentMatchers.eq("image/png"),
+                org.mockito.ArgumentMatchers.any(byte[].class)))
+                .thenReturn(new StoredImageResult("catalog-cover/user/cover.png",
+                        "https://storage.example/catalog-cover/user/cover.png", "image/png", file.getSize()));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
+                                "/api/content/admin/vocabulary/covers").file(file)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedInternalToken("CONTENT_AUTHOR")))
+                .andExpect(status().isCreated())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.mediaReference")
+                        .value("catalog-cover/user/cover.png"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.mediaUrl")
+                        .value("https://storage.example/catalog-cover/user/cover.png"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.contentType").value("image/png"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.sizeBytes").value(file.getSize()));
+    }
+
+    @Test void catalogCoverUploadRejectsLearnersAndEmptyFiles() throws Exception {
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "cover.png", "image/png", new byte[]{1});
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
+                                "/api/content/admin/vocabulary/covers").file(file)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedInternalToken("CUSTOMER")))
+                .andExpect(status().isForbidden());
+
+        var empty = new org.springframework.mock.web.MockMultipartFile("file", "cover.png", "image/png", new byte[0]);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
+                                "/api/content/admin/vocabulary/covers").file(empty)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + signedInternalToken("CONTENT_AUTHOR")))
+                .andExpect(status().isBadRequest());
     }
 
     @Test void catalogAdminWriteRejectsInvalidCefr() throws Exception {

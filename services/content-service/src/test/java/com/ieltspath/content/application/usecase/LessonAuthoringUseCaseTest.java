@@ -47,6 +47,16 @@ class LessonAuthoringUseCaseTest {
         verify(repository, never()).save(any(Lesson.class));
     }
 
+    @Test void refusesKnowledgePointsFromAnotherSkillForCourseLessons() {
+        UUID point = UUID.randomUUID();
+        when(repository.courseTopicSkillForLesson(lessonId)).thenReturn(Optional.of(Skill.READING));
+        when(repository.knowledgePointSkills(List.of(point))).thenReturn(java.util.Map.of(point, Skill.WRITING));
+
+        assertThatThrownBy(() -> useCase.knowledgePoints(lessonId, List.of(point)))
+                .isInstanceOf(LessonBlockInvalidException.class).hasMessageContaining("must match");
+        verify(repository, never()).save(any(Lesson.class));
+    }
+
     @Test void refusesToAddAQuestionThatBelongsToAnotherLessonOrAPackage() {
         UUID owned = UUID.randomUUID();
         UUID free = UUID.randomUUID();

@@ -70,6 +70,17 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public LessonSummary getLessonAccessSummary(UUID lessonId) {
+        return get("/lessons/{id}/access", new ParameterizedTypeReference<>() { }, lessonId);
+    }
+
+    @Override
+    public Lesson getLesson(UUID lessonId, boolean signedAudio) {
+        return get("/lessons/{id}?signedAudio={signedAudio}", new ParameterizedTypeReference<>() { }, lessonId,
+                signedAudio);
+    }
+
+    @Override
     public List<TestPackage> getTopicTestPackages(UUID topicId) {
         return get("/topics/{id}/test-packages", new ParameterizedTypeReference<>() { }, topicId);
     }

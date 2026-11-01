@@ -9,6 +9,9 @@ import java.util.UUID;
 public interface GamificationRepository {
     Optional<String> timezone(UUID userId);
 
+    /** The saved timezone of each learner that chose one, read in one query. */
+    java.util.Map<UUID, String> timezones(java.util.Collection<UUID> userIds);
+
     void saveTimezone(UUID userId, String timezone);
 
     /** Answer XP counted on the learner's given local day; milestone XP is not part of it. */

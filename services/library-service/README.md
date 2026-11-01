@@ -54,9 +54,8 @@ Learners save vocabulary senses with `POST /api/learning-support/flashcards/note
 
 Reviews optionally accept `sessionId` and append `flashcard_review_events` in the review transaction only when the request is applied. Notebook progress includes weekly goals (`library.vocabulary.weekly-goal-default`, default 120), the six-band vocabulary map, topic/set progress, recent session result, and read-time achievements. Summary and entry responses only gain fields; entries accept `topicId` and `setId` filters. These authenticated endpoints scope every learner aggregate to the current user, use SQL aggregates, and do not call learning-service or award XP/points. Migration V21 adds review events and per-user weekly goals.
 
-When saving a video, Library verifies its topic through Content's `GET /api/content/topics/{id}`, forwarding the
-authenticated bearer token and `X-Correlation-Id`. The HTTP client uses a 2-second connection and 5-second read
-timeout; Content failures return 503. `POST /internal/game-content/snapshots` serves `VOCABULARY` using the shared
+A video keeps its `topicId` as a plain reference: Library does not call Content to check that the topic exists, so the
+calls between the two services run one way only (Content calls Library for vocabulary). `POST /internal/game-content/snapshots` serves `VOCABULARY` using the shared
 [game snapshot contract](../../docs/contracts/game-content-snapshot-v1.md); Content serves `GRAMMAR`.
 
 ## Local setup
@@ -71,7 +70,6 @@ For the full container stack, run `docker compose up -d --build`. To run Library
 | `LIBRARY_DB_URL` | `jdbc:postgresql://localhost:5440/library_db` |
 | `LIBRARY_DB_USERNAME` | `postgres` |
 | `LIBRARY_DB_PASSWORD` | Required database password; no fallback in service config |
-| `CONTENT_SERVICE_URL` | `http://localhost:8082` for topic lookup |
 | `GATEWAY_INTERNAL_JWT_SECRET` | Verifies Gateway's internal JWT; use the same value as Gateway |
 | `SUPABASE_URL` | Supabase API URL for object storage |
 | `SUPABASE_SECRET_KEY` | Supabase secret key for storage access |

@@ -1,6 +1,10 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   datasource:
-    url: ${ASSESSMENT_DB_URL:jdbc:postgresql://localhost:5432/assessment_db}
+    url: ${ASSESSMENT_DB_URL:jdbc:postgresql://localhost:5440/assessment_db}
     username: ${ASSESSMENT_DB_USERNAME:postgres}
     password: ${ASSESSMENT_DB_PASSWORD:123456}
   jpa:
@@ -21,6 +25,10 @@ spring:
       mandatory: true
 
 assessment:
+  speaking:
+    bucket: ${ASSESSMENT_SPEAKING_BUCKET:speaking-recordings}
+    retention-days: ${ASSESSMENT_SPEAKING_RETENTION_DAYS:90}
+    recording-url-ttl-seconds: 900
   llm-grading:
     enabled: true
     base-url: ${ASSESSMENT_LLM_BASE_URL:}
@@ -52,6 +60,11 @@ assessment:
       confirm-timeout: PT5S
 
 app:
+  storage:
+    enabled: true
+    supabase:
+      url: ${SUPABASE_URL:}
+      secret-key: ${SUPABASE_SECRET_KEY:}
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
     internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET:HK5r8WcYA8J8jo2ruIBCEXRcHhUfSDUqP16H29P1sxo=}

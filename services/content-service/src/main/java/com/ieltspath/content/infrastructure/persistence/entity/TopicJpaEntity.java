@@ -53,6 +53,9 @@ public class TopicJpaEntity {
     @Column(name = "skill", length = 20)
     private Skill skill;
 
+    @Column(columnDefinition = "text")
+    private String description;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

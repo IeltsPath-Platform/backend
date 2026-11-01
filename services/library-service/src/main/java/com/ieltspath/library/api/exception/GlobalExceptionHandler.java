@@ -2,7 +2,6 @@ package com.ieltspath.library.api.exception;
 
 import com.ieltspath.commonstorage.StorageException;
 import com.ieltspath.commonstorage.UploadRejectedException;
-import com.ieltspath.library.application.exception.TopicServiceUnavailableException;
 import com.ieltspath.library.domain.exception.ConflictException;
 import com.ieltspath.library.domain.exception.ContentDomainException;
 import com.ieltspath.library.domain.exception.DuplicateCodeException;
@@ -145,12 +144,6 @@ public class GlobalExceptionHandler {
         log.warn("Access denied: {}", ex.getMessage());
         return buildResponse(HttpStatus.FORBIDDEN,
                 messageForPath(request, "Forbidden", "Access denied"), request.getRequestURI(), null);
-    }
-
-    @ExceptionHandler(TopicServiceUnavailableException.class)
-    public ResponseEntity<ErrorResponse> handleTopicUnavailable(TopicServiceUnavailableException ex,
-                                                                  HttpServletRequest request) {
-        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request.getRequestURI(), null);
     }
 
     @ExceptionHandler(Exception.class)

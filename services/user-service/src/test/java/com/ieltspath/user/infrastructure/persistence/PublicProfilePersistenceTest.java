@@ -34,25 +34,19 @@ class PublicProfilePersistenceTest {
     }
 
     @Test
-    void boundedJoinReturnsOneRowPerUserWithOnlyActiveTargetAndOptionalData() {
+    void boundedJoinReturnsOneRowPerUserWithOptionalData() {
         UUID complete = user(), absent = user();
         jdbc.update("INSERT INTO learner_profiles(user_id,display_name,avatar_reference,bio,profile_visibility) VALUES (?,?,?,?,?)",
                 complete, "Public display", "https://images.test/avatar.png", "About me", "COMMUNITY");
-        jdbc.update("INSERT INTO learning_goals(user_id,target_band,status) VALUES (?,7.5,'ACTIVE'),(?,8.5,'PAUSED')", complete, complete);
-        jdbc.update("INSERT INTO streaks(user_id,current_days,longest_days,timezone) VALUES (?,4,6,'UTC')", complete);
 
         var rows = repository.findByUserIds(Set.of(complete, absent, UUID.randomUUID()));
 
         assertEquals(2, rows.size());
         var profile = rows.stream().filter(row -> row.id().equals(complete)).findFirst().orElseThrow();
         assertEquals("Public display", profile.displayName());
-        assertEquals(new BigDecimal("7.5"), profile.targetBand());
-        assertEquals(4, profile.streak());
         assertEquals(ProfileVisibility.COMMUNITY, profile.visibility());
         var noProfile = rows.stream().filter(row -> row.id().equals(absent)).findFirst().orElseThrow();
         assertNull(noProfile.displayName());
-        assertNull(noProfile.targetBand());
-        assertNull(noProfile.streak());
         assertNull(noProfile.visibility());
         assertEquals("Account name", noProfile.defaultDisplayName());
     }

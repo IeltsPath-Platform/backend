@@ -9,6 +9,7 @@ import com.ieltspath.learning.application.result.PlacementTestResult;
 import com.ieltspath.learning.application.usecase.AssignCourseTestUseCase;
 import com.ieltspath.learning.application.usecase.GetPlacementTestUseCase;
 import com.ieltspath.learning.application.usecase.ListCoursesUseCase;
+import com.ieltspath.learning.application.usecase.UnlockCourseUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
@@ -64,6 +65,7 @@ class LearningSecurityWebMvcTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean CurrentUserProvider currentUser;
     @MockitoBean ListCoursesUseCase listCourses;
+    @MockitoBean UnlockCourseUseCase unlockCourse;
     @MockitoBean AssignCourseTestUseCase assignCourseTest;
     @MockitoBean GetPlacementTestUseCase getPlacementTest;
 
