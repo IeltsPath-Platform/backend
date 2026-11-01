@@ -8,6 +8,7 @@ import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.core.ReturnedMessage;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -19,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /** A grant counts as sent only when the broker confirms it and no queue returned it. */
 class RabbitPointsGrantPublisherTest {
@@ -65,5 +67,31 @@ class RabbitPointsGrantPublisherTest {
         brokerAnswers(correlation -> { });
 
         assertThrows(RabbitPointsGrantPublisher.GrantNotDeliveredException.class, () -> publisher.publish(grant));
+    }
+
+    @Test
+    void sendsHeaderWhenRowHasCorrelationId() {
+        brokerAnswers(correlation -> correlation.getFuture().complete(new CorrelationData.Confirm(true, null)));
+        PendingGrant correlated = new PendingGrant(grant.id(), grant.userId(), grant.amount(), grant.reason(),
+                grant.referenceId(), grant.attempts(), "req-learning");
+        ArgumentCaptor<Message> message = ArgumentCaptor.forClass(Message.class);
+
+        publisher.publish(correlated);
+
+        verify(rabbit).send(anyString(), anyString(), message.capture(), any(CorrelationData.class));
+        org.junit.jupiter.api.Assertions.assertEquals("req-learning",
+                message.getValue().getMessageProperties().getHeader("x-correlation-id"));
+    }
+
+    @Test
+    void omitsHeaderWhenRowHasNone() {
+        brokerAnswers(correlation -> correlation.getFuture().complete(new CorrelationData.Confirm(true, null)));
+        ArgumentCaptor<Message> message = ArgumentCaptor.forClass(Message.class);
+
+        publisher.publish(grant);
+
+        verify(rabbit).send(anyString(), anyString(), message.capture(), any(CorrelationData.class));
+        org.junit.jupiter.api.Assertions.assertNull(
+                message.getValue().getMessageProperties().getHeader("x-correlation-id"));
     }
 }
