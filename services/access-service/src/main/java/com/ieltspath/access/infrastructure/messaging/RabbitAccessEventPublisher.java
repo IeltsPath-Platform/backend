@@ -1,6 +1,7 @@
 package com.ieltspath.access.infrastructure.messaging;
 
 import com.ieltspath.access.domain.entity.OutboxEvent;
+import com.ieltspath.commonobservability.Correlation;
 import com.ieltspath.events.access.AccessMessaging;
 import com.ieltspath.events.access.SubscriptionGrantedV1;
 import org.springframework.amqp.core.Message;
@@ -39,15 +40,16 @@ public class RabbitAccessEventPublisher implements AccessEventPublisher {
         if (!OutboxEvent.RELAYED_EVENT_TYPES.contains(event.getEventType())) {
             throw new IllegalStateException("Event type is not relayed: " + event.getEventType());
         }
-        Message message = MessageBuilder.withBody(event.getPayload().getBytes(StandardCharsets.UTF_8))
+        var messageBuilder = MessageBuilder.withBody(event.getPayload().getBytes(StandardCharsets.UTF_8))
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON)
                 .setContentEncoding(StandardCharsets.UTF_8.name())
                 .setMessageId(event.getId().toString())
                 .setType(AccessMessaging.SUBSCRIPTION_GRANTED_ROUTING_KEY)
                 .setTimestamp(Date.from(event.getCreatedAt()))
                 .setDeliveryMode(MessageDeliveryMode.PERSISTENT)
-                .setHeader("aggregate_id", event.getAggregateId().toString())
-                .build();
+                .setHeader("aggregate_id", event.getAggregateId().toString());
+        if (event.getCorrelationId() != null) messageBuilder.setHeader(Correlation.HEADER, event.getCorrelationId());
+        Message message = messageBuilder.build();
         CorrelationData correlation = new CorrelationData(event.getId().toString());
         rabbitTemplate.send(AccessMessaging.EXCHANGE, AccessMessaging.SUBSCRIPTION_GRANTED_ROUTING_KEY, message, correlation);
         CorrelationData.Confirm confirm;

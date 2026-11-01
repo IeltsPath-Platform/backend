@@ -1,6 +1,7 @@
 package com.ieltspath.learning.infrastructure.persistence;
 
 import com.ieltspath.learning.domain.repository.RewardGrantRepository;
+import com.ieltspath.commonobservability.Correlation;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -22,21 +23,22 @@ public class JdbcRewardGrantRepository implements RewardGrantRepository {
     @Override
     public void enqueue(UUID userId, String reason, String referenceId, int amount) {
         jdbc.update("""
-                INSERT INTO reward_grants (id, user_id, amount, reason, reference_id)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO reward_grants (id, user_id, amount, reason, reference_id, correlation_id)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT (user_id, reason, reference_id) DO NOTHING
-                """, UUID.randomUUID(), userId, amount, reason, referenceId);
+                """, UUID.randomUUID(), userId, amount, reason, referenceId, Correlation.current());
     }
 
     @Override
     public List<PendingGrant> claimDue(int limit, Instant resendBefore) {
         return jdbc.query("""
-                SELECT id, user_id, amount, reason, reference_id, attempts FROM reward_grants
+                SELECT id, user_id, amount, reason, reference_id, attempts, correlation_id FROM reward_grants
                 WHERE status = 'PENDING' AND (attempts = 0 OR updated_at < ?)
                 ORDER BY created_at LIMIT ? FOR UPDATE SKIP LOCKED
                 """, (rows, index) -> new PendingGrant(rows.getObject("id", UUID.class),
                 rows.getObject("user_id", UUID.class), rows.getInt("amount"), rows.getString("reason"),
-                rows.getString("reference_id"), rows.getInt("attempts")), Timestamp.from(resendBefore), limit);
+                rows.getString("reference_id"), rows.getInt("attempts"), rows.getString("correlation_id")),
+                Timestamp.from(resendBefore), limit);
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.ieltspath.community.infrastructure.messaging;
 
 import com.ieltspath.events.community.CommunityMessaging;
+import com.ieltspath.commonobservability.Correlation;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -83,10 +84,10 @@ public class CommunityOutboxRelay {
                       AND (next_attempt_at IS NULL OR next_attempt_at <= now())
                     ORDER BY created_at, id
                     LIMIT ? FOR UPDATE SKIP LOCKED)
-                RETURNING id, event_type, payload::text payload, created_at, retry_count
+                RETURNING id, event_type, payload::text payload, created_at, retry_count, correlation_id
                 """, (rs, row) -> new OutboxRow(rs.getObject("id", java.util.UUID.class),
                 rs.getString("event_type"), rs.getString("payload"), rs.getTimestamp("created_at").toInstant(),
-                rs.getInt("retry_count")), lease.toSeconds(), batchSize));
+                rs.getInt("retry_count"), rs.getString("correlation_id")), lease.toSeconds(), batchSize));
         rows.sort(Comparator.comparing(OutboxRow::createdAt).thenComparing(OutboxRow::id));
         int published = 0;
         for (OutboxRow row : rows) {
@@ -123,15 +124,16 @@ public class CommunityOutboxRelay {
         if (route == null) throw new UnsupportedEventException();
         try {
             JsonNode payload = objectMapper.readTree(row.payload());
-            Message message = MessageBuilder.withBody(row.payload().getBytes(StandardCharsets.UTF_8))
+            var messageBuilder = MessageBuilder.withBody(row.payload().getBytes(StandardCharsets.UTF_8))
                     .setContentType(MessageProperties.CONTENT_TYPE_JSON)
                     .setContentEncoding(StandardCharsets.UTF_8.name())
                     .setMessageId(row.id().toString())
                     .setType(row.eventType())
                     .setTimestamp(Date.from(row.createdAt()))
                     .setDeliveryMode(MessageDeliveryMode.PERSISTENT)
-                    .setHeader("event_type", row.eventType())
-                    .build();
+                    .setHeader("event_type", row.eventType());
+            if (row.correlationId() != null) messageBuilder.setHeader(Correlation.HEADER, row.correlationId());
+            Message message = messageBuilder.build();
             CorrelationData correlation = new CorrelationData(row.id().toString());
             rabbit.send(exchange, route, message, correlation);
             CorrelationData.Confirm confirm = correlation.getFuture().get(confirmTimeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -151,5 +153,6 @@ public class CommunityOutboxRelay {
         UnsupportedEventException() { super("Unsupported community event type"); }
     }
 
-    private record OutboxRow(java.util.UUID id, String eventType, String payload, Instant createdAt, int retryCount) { }
+    private record OutboxRow(java.util.UUID id, String eventType, String payload, Instant createdAt, int retryCount,
+                             String correlationId) { }
 }

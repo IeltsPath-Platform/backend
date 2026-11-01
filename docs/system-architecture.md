@@ -138,6 +138,18 @@ Contract: [`docs/contracts/assessment-completed-v2.md`](contracts/assessment-com
 dụng được ngay, kể cả khi học viên chưa gọi API học. access, content và game có bảng outbox và ghi event nhưng chưa có
 relay, nên các event đó chưa được phát.
 
+### Correlation ID và metric
+
+`common-observability` đặt `correlationId` trong MDC cho mỗi request và chuyển tiếp header `X-Correlation-Id` qua HTTP
+client. Với event đi qua outbox, adapter ghi giá trị MDC vào cột nullable `correlation_id` ngay lúc lưu: `outbox_events`
+ở Assessment, Community, Access và `reward_grants` ở Learning. Relay có thể chạy ở thread khác; publisher đọc id đã lưu
+và gửi header RabbitMQ `x-correlation-id`, không đưa id vào payload. Event cũ hoặc do scheduler tạo không có id thì bỏ
+header; listener tạo context mới và xóa MDC sau khi xử lý.
+
+Các service Java mở `/actuator/prometheus` trong mạng nội bộ; Gateway không route actuator. Metric
+`dead_letter_messages{queue}` là gauge độ sâu DLQ hiện tại ở Notification, Access và Learning. Nếu broker không trả được
+số lượng, gauge trả `NaN` để biểu thị trạng thái chưa biết.
+
 ## 4. Mô hình bảo mật
 
 ```text

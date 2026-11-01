@@ -50,4 +50,7 @@ public class OutboxEventJpaEntity {
 
     @Column(name = "last_error", length = 500)
     private String lastError;
+
+    @Column(name = "correlation_id", length = 100)
+    private String correlationId;
 }

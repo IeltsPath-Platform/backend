@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.community.application.port.CommunityEventOutbox;
 import com.ieltspath.events.community.CommunityEventTypes;
+import com.ieltspath.commonobservability.Correlation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -39,10 +40,10 @@ public class CommunityEventOutboxAdapter implements CommunityEventOutbox {
             throw new IllegalStateException("Could not serialize community event", exception);
         }
         jdbc.update("""
-                INSERT INTO outbox_events(id, aggregate_type, aggregate_id, event_type, payload, created_at)
-                VALUES (?, 'COMMUNITY', ?, ?, CAST(? AS jsonb), ?)
+                INSERT INTO outbox_events(id, aggregate_type, aggregate_id, event_type, payload, created_at, correlation_id)
+                VALUES (?, 'COMMUNITY', ?, ?, CAST(? AS jsonb), ?, ?)
                 """, eventId, postId == null ? recipientId.toString() : postId.toString(), eventType, payload,
-                java.sql.Timestamp.from(occurredAt));
+                java.sql.Timestamp.from(occurredAt), Correlation.current());
     }
 
     /** Reactions and follows can be toggled freely, so the same actor/target pair notifies at most once per window. */

@@ -7,6 +7,7 @@ import com.ieltspath.events.points.PointsGrantMessaging;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.learning.application.port.PointsGrantPublisher;
+import com.ieltspath.commonobservability.Correlation;
 import com.ieltspath.learning.domain.repository.RewardGrantRepository.PendingGrant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,10 +57,12 @@ public class RabbitPointsGrantPublisher implements PointsGrantPublisher {
                 grant.reason(), grant.referenceId());
         Message message;
         try {
-            message = MessageBuilder.withBody(json.writeValueAsBytes(body))
+            var messageBuilder = MessageBuilder.withBody(json.writeValueAsBytes(body))
                     .setContentType(MessageProperties.CONTENT_TYPE_JSON)
                     .setDeliveryMode(MessageDeliveryMode.PERSISTENT)
-                    .setMessageId(grant.id().toString()).build();
+                    .setMessageId(grant.id().toString());
+            if (grant.correlationId() != null) messageBuilder.setHeader(Correlation.HEADER, grant.correlationId());
+            message = messageBuilder.build();
         } catch (JsonProcessingException failure) {
             throw new IllegalStateException("Points grant cannot be written", failure);
         }

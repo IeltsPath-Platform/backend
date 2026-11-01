@@ -337,7 +337,8 @@ public class AccessPersistenceMapper {
                 entity.getStatus(),
                 entity.getRetryCount(),
                 entity.getCreatedAt(),
-                entity.getPublishedAt()
+                entity.getPublishedAt(),
+                entity.getCorrelationId()
         );
     }
 
@@ -355,6 +356,7 @@ public class AccessPersistenceMapper {
         entity.setRetryCount(domain.getRetryCount());
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setPublishedAt(domain.getPublishedAt());
+        entity.setCorrelationId(domain.getCorrelationId());
         return entity;
     }
 }
