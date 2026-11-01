@@ -198,15 +198,18 @@ GET /api/learning/topics -> một lần gọi Content topic-sequence -> knowledg
   trong course) / LOCKED; mọi course đều mở và chuỗi không tách skill
 GET /api/learning/lessons/{id} -> Content trả block VOCABULARY cùng danh sách vocabularySenseIds theo thứ tự;
   client có thể lấy chi tiết qua Library GET /api/content/vocabulary/senses?ids=...; block không chặn hoàn thành bài
-POST /api/learning/lessons/{id}/exercises/{blockId}/submissions -> khóa theo user -> cổng (REVIEW_REQUIRED cùng skill,
-  TOPIC_LOCKED, LESSON_LOCKED) -> chấm answer-spec-v1 -> bằng chứng lần nộp đầu; xong bài không tạo bài ôn;
+POST /api/learning/lessons/{id}/exercises/{blockId}/submissions -> khóa theo user -> cổng (REVIEW_REQUIRED: bài ôn chờ
+  của lesson trước hoặc cùng skill, TOPIC_LOCKED, LESSON_LOCKED, PRACTICE_REQUIRED: Practice lesson trước phải đạt)
+  -> chấm answer-spec-v1 -> bằng chứng lần nộp đầu; xong bài không tạo bài ôn;
   topic không có thi cuối thì PASSED khi xong mọi bài
 POST /api/learning/lessons/{id}/practice-attempts -> nộp -> lời giải; lần nộp đầu của package chưa lộ ghi bằng chứng
   practice_set; < 70% tạo bài ôn cho KP < 70% (còn package chưa lộ); lưu lesson_practice_passes khi bài qua Practice
+GET /api/learning/topics/{id}/lessons -> topic LOCKED vẫn trả danh sách bài, mọi bài LOCKED (đọc trước lộ trình);
+  mở bài của topic đó vẫn 403 TOPIC_LOCKED
 GET /api/learning/reviews/{id} -> lý thuyết của KP; PRACTICE: một set chưa giao/chưa lộ, có hint (hết -> SKIPPED);
   THEORY: quick-check <= 3 câu của bài
-POST /api/learning/reviews/{id}/submissions -> mỗi set một lần, luôn có lời giải; >=70% -> DONE; trượt -> THEORY;
-  trượt set thứ hai -> SKIPPED
+POST /api/learning/reviews/{id}/submissions -> mỗi set một lần, luôn có lời giải; >=70% -> DONE; trượt lần đầu -> THEORY;
+  các lần sau set mới đến khi đạt; SKIPPED chỉ khi hết package chưa lộ (bài ôn tùy chọn trượt -> SKIPPED)
 POST /api/learning/reviews/{id}/theory-check -> không ghi bằng chứng -> PRACTICE
 POST /api/learning/topics/{id}/test-assignments -> REVIEW_REQUIRED, PRACTICE_REQUIRED (mọi bài phải qua Practice),
   TEST_LOCKED -> một mã đề dùng một lần, xoay vòng theo package

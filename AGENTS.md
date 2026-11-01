@@ -229,7 +229,8 @@ src/main/java/com/ieltspath/<service>
   package chưa lộ. Bài ôn **chặn** (`blocking = true`) vẫn chặn Practice và thi topic của cùng skill; bài ôn **tùy chọn**
   (giỏ ôn, practice test tự do) không bao giờ chặn. Thi cuối course không chặn tiến độ topic hay course khác.
   `LessonAccessGate` và use case trong `services/learning-service/src/main/java/com/ieltspath/learning/` quyết định cổng
-  bài; trạng thái topic suy ra khi đọc.
+  bài; trạng thái topic suy ra khi đọc. `GET /topics/{id}/lessons` của topic `LOCKED` vẫn trả danh sách bài, mọi bài
+  `LOCKED` (để xem trước lộ trình); mở bài của topic đó vẫn `403 TOPIC_LOCKED`.
 - Điểm và kết quả khóa: lần thi topic test đầu tiên (điểm nào cũng được) hoàn tất topic (`COMPLETED` dưới 70%, `PASSED`
   từ 70%) và mở topic sau; course test mở khi mọi topic đã thi. Đạt khóa theo điểm tổng có trọng số (Process, giữa khóa,
   cuối khóa; Admin chỉnh ở `course_score_configs`), không theo course test riêng lẻ: dưới ngưỡng thì `REMEDIATION`, làm
