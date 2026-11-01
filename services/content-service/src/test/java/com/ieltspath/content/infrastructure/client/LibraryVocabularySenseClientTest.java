@@ -67,6 +67,20 @@ class LibraryVocabularySenseClientTest {
         server.verify();
     }
 
+    @Test void libraryNotFoundIsReportedAsUnavailable() {
+        UUID senseId = UUID.randomUUID();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        LibraryVocabularySenseClient client = new LibraryVocabularySenseClient(builder.baseUrl("http://library.test").build());
+        signIn();
+        server.expect(requestTo("http://library.test/api/content/vocabulary/senses?ids=" + senseId))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThatThrownBy(() -> client.describeActiveSenses(List.of(senseId)))
+                .isInstanceOf(VocabularyServiceUnavailableException.class);
+        server.verify();
+    }
+
     private static NewWord word(String lemma) {
         return new NewWord(lemma, null, "NOUN", "a general direction", "xu hướng", "There is an upward trend.");
     }
