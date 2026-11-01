@@ -54,7 +54,7 @@ class VocabularyPronunciationAudioMigrationTest {
         try (var connection = DriverManager.getConnection(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
             ScriptUtils.executeSqlScript(connection,
-                    new ClassPathResource("db/migration/V26__vocabulary_audio_references_as_keys.sql"));
+                    new ClassPathResource("db/migration/V34__vocabulary_audio_references_as_keys.sql"));
 
             assertEquals("https://cdn.example.com/uk/hot.mp3", text("audio_uk_reference FROM vocabulary_items WHERE normalized_lemma = 'hot'"));
             assertEquals(KEYS + "us/hot.mp3", text("audio_us_reference FROM vocabulary_items WHERE normalized_lemma = 'hot'"));
