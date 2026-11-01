@@ -14,11 +14,6 @@ public class CommonObservabilityAutoConfiguration {
     }
 
     @Bean
-    static CorrelationRabbitBeanPostProcessor correlationRabbitBeanPostProcessor() {
-        return new CorrelationRabbitBeanPostProcessor();
-    }
-
-    @Bean
     CorrelationRestClientCustomizer correlationRestClientCustomizer() {
         return new CorrelationRestClientCustomizer();
     }
