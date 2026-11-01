@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @Testcontainers(disabledWithoutDocker = true)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({VocabularyNotebookJdbcAdapter.class, VocabularyCatalogJdbcAdapter.class, VocabularyProgressJdbcAdapter.class,
+        com.ieltspath.library.infrastructure.adapter.VocabularyAudioUrlResolver.class,
         com.ieltspath.library.application.usecase.VocabularyCatalogUseCase.class})
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @TestPropertySource(properties = {"spring.flyway.enabled=true", "spring.cloud.config.enabled=false", "eureka.client.enabled=false"})
@@ -47,6 +48,7 @@ class VocabularyNotebookJdbcIntegrationTest {
     @Autowired VocabularyNotebookJdbcAdapter adapter;
     @Autowired com.ieltspath.library.application.usecase.VocabularyCatalogUseCase catalog;
     @Autowired VocabularyProgressJdbcAdapter progress;
+    @Autowired VocabularyCatalogJdbcAdapter catalogStore;
     @MockBean FlashcardImageStorage imageStorage;
 
     @DynamicPropertySource static void datasource(DynamicPropertyRegistry registry) {
@@ -84,6 +86,20 @@ class VocabularyNotebookJdbcIntegrationTest {
         assertThrows(org.springframework.dao.DuplicateKeyException.class, () -> jdbc.update(
                 "insert into flashcards(id,user_id,source_type,vocabulary_sense_id,front,back,status) values(?,?,'VOCABULARY_SENSE',?,?,?,'ACTIVE')",
                 UUID.randomUUID(), user, sense, "apple", "meaning"));
+    }
+
+    @Test void pronunciationAudioIsReturnedOnlyForWordsThatHaveAny() {
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,audio_uk_reference) values(?,?,?,'ACTIVE',?)",
+                UUID.randomUUID(), "audio probe", "audio probe", "https://cdn.example.com/probe.mp3");
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status) values(?,?,?,'ACTIVE')",
+                UUID.randomUUID(), "silent probe", "silent probe");
+
+        var audio = catalogStore.pronunciationAudio(List.of("audio probe", "silent probe", "unknown probe"));
+
+        assertEquals(List.of("audio probe"), List.copyOf(audio.keySet()));
+        assertEquals("https://cdn.example.com/probe.mp3", audio.get("audio probe").audioUk());
+        assertNull(audio.get("audio probe").audioUs());
+        assertTrue(catalogStore.pronunciationAudio(List.of()).isEmpty());
     }
 
     @Test void catalogBrowseFiltersVietnameseAndCefrAndReturnsEnrichedDetails() {

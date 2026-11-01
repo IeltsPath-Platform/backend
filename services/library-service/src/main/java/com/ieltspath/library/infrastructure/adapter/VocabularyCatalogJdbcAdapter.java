@@ -15,6 +15,7 @@ import com.ieltspath.library.application.result.VocabularyMindmapResult;
 import com.ieltspath.library.application.result.VocabularySetResult;
 import com.ieltspath.library.application.result.VocabularySuggestionResult;
 import com.ieltspath.library.application.result.VocabularyTopicResult;
+import com.ieltspath.library.application.result.WordAudioResult;
 import com.ieltspath.library.application.result.WordRelationResult;
 import com.ieltspath.library.domain.catalog.Collocation;
 import com.ieltspath.library.domain.catalog.CommonMistake;
@@ -64,10 +65,13 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final FlashcardImageStorage storage;
+    private final VocabularyAudioUrlResolver audioUrls;
 
-    public VocabularyCatalogJdbcAdapter(NamedParameterJdbcTemplate jdbc, FlashcardImageStorage storage) {
+    public VocabularyCatalogJdbcAdapter(NamedParameterJdbcTemplate jdbc, FlashcardImageStorage storage,
+                                        VocabularyAudioUrlResolver audioUrls) {
         this.jdbc = jdbc;
         this.storage = storage;
+        this.audioUrls = audioUrls;
     }
 
     /** Makes user text match literally: {@code %}, {@code _} and the escape character itself lose their LIKE meaning. */
@@ -78,6 +82,22 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
     @Override
     public Optional<CatalogItemResult> findActiveItem(UUID itemId) {
         return loadItems(List.of(itemId), true).stream().findFirst();
+    }
+
+    @Override
+    public Map<String, WordAudioResult> pronunciationAudio(Collection<String> normalizedLemmas) {
+        if (normalizedLemmas.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, WordAudioResult> audioByLemma = new HashMap<>();
+        jdbc.query("SELECT normalized_lemma, audio_uk_reference, audio_us_reference FROM vocabulary_items "
+                        + "WHERE normalized_lemma IN (:lemmas) AND (audio_uk_reference IS NOT NULL OR audio_us_reference IS NOT NULL)",
+                new MapSqlParameterSource("lemmas", normalizedLemmas), rs -> {
+                    WordAudioResult audio = new WordAudioResult(audioUrls.resolve(rs.getString("audio_uk_reference")),
+                            audioUrls.resolve(rs.getString("audio_us_reference")));
+                    audioByLemma.put(rs.getString("normalized_lemma"), audio);
+                });
+        return audioByLemma;
     }
 
     @Override
@@ -598,7 +618,7 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
     private ItemRow itemRow(ResultSet rs, int n) throws SQLException {
         return new ItemRow(uuid(rs, "id"), rs.getString("lemma"), rs.getString("normalized_lemma"), rs.getString("ipa"),
                 rs.getString("pronunciation_audio_reference"), rs.getString("ipa_uk"), rs.getString("ipa_us"),
-                rs.getString("audio_uk_reference"), rs.getString("audio_us_reference"),
+                audioUrls.resolve(rs.getString("audio_uk_reference")), audioUrls.resolve(rs.getString("audio_us_reference")),
                 rs.getObject("frequency_rank", Integer.class),
                 rs.getBoolean("academic_word_list"), rs.getString("word_family"), ContentStatus.valueOf(rs.getString("status")),
                 instant(rs, "created_at"), instant(rs, "updated_at"));
