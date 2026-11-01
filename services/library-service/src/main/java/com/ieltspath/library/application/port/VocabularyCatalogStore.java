@@ -11,6 +11,7 @@ import com.ieltspath.library.application.result.VocabularyMindmapResult;
 import com.ieltspath.library.application.result.VocabularySetResult;
 import com.ieltspath.library.application.result.VocabularySuggestionResult;
 import com.ieltspath.library.application.result.VocabularyTopicResult;
+import com.ieltspath.library.application.result.WordAudioResult;
 import com.ieltspath.library.application.result.WordRelationResult;
 import com.ieltspath.library.domain.catalog.Collocation;
 import com.ieltspath.library.domain.catalog.CommonMistake;
@@ -22,13 +23,18 @@ import com.ieltspath.library.domain.catalog.VocabularyTopicDraft;
 import com.ieltspath.library.domain.catalog.WordRelation;
 import com.ieltspath.library.domain.vo.VocabularySetKind;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 /** Reads and writes the dictionary catalog: words, their usage data, topics and sets. */
 public interface VocabularyCatalogStore {
     Optional<CatalogItemResult> findActiveItem(UUID itemId);
+
+    /** Recorded pronunciation by normalized lemma, for the lemmas that have any; the URLs are ready to play. */
+    Map<String, WordAudioResult> pronunciationAudio(Collection<String> normalizedLemmas);
 
     PageResult<CatalogItemResult> browse(CatalogBrowseQuery query);
 

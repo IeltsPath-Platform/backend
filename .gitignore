@@ -72,5 +72,16 @@ agents/
 ### Local media copies (uploaded to the media bucket, never committed) ###
 services/content-service/media/
 
+# Vocabulary pronunciation tooling: generated mp3 and npm install stay local
+scripts/vocabulary-audio/.cache/
+scripts/vocabulary-audio/node_modules/
+
+# Practice cover tooling: downloaded candidates and generated covers stay local
+scripts/practice-covers/.cache/
+
+# Listening test tooling: generated recordings and npm install stay local
+scripts/listening-test/.cache/
+scripts/listening-test/node_modules/
+
 # Reference clones kept on a developer's machine to read, never tracked (AGENTS.md: third_party/ is not part of the build)
 third_party/

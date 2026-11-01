@@ -44,12 +44,13 @@ class ListeningPracticeAudioSeedTest {
                 WHERE p.package_type = 'PRACTICE_TEST' AND p.code LIKE 'PT-LISTENING-%'
                 """);
 
-        assertThat(sections).hasSize(12).allSatisfy(section -> {
+        // Tests 01-03 have short recordings (under two minutes); tests 04 and later are full-length, with recordings of several minutes.
+        assertThat(sections).hasSize(32).allSatisfy(section -> {
             String reference = (String) section.get("media_reference");
             assertThat(reference).startsWith("listening/practice/").endsWith(".mp3");
             assertThat(policy.resolve(AssetType.AUDIO, reference))
                     .isEqualTo("https://media.example.test/ieltspath/" + reference);
-            assertThat((Integer) section.get("duration_seconds")).isBetween(20, 120);
+            assertThat((Integer) section.get("duration_seconds")).isBetween(20, 600);
             assertThat((String) section.get("text_content")).isNotBlank();
         });
     }

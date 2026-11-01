@@ -198,7 +198,8 @@ class PracticeTestPersistenceTest {
         assertThat(isp.questionCount()).isEqualTo(15);
         assertThat(isp.timeLimitSeconds()).isEqualTo(3600);
         assertThat(isp.parts()).hasSize(3);
-        assertThat(isp.coverReference()).startsWith("data:image/svg+xml;base64,");
+        // A cover is either a stored illustration or the key of a photo in the media bucket.
+        assertThat(isp.coverReference()).matches("data:image/svg\\+xml;base64,.+|practice/covers/[0-9a-f-]+\\.webp");
         assertThat(isp.parts().getFirst().formats()).containsExactly("TRUE_FALSE_NOT_GIVEN", "GAP_FILLING");
 
         assertThat(catalog.search(new PracticeTestCatalogReader.Search(Skill.READING, "FULL", null,
