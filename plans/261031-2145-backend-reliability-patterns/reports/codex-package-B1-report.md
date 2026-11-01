@@ -2,7 +2,7 @@ Phase: B1
 Status: DONE_WITH_CONCERNS
 Commits:
 - b2d99032 test(reliability): cover scheduler lock and relay concurrency
-- 8cfe304c fix(learning): release sync lock before content lookup
+- f7f763e4 fix(learning): release sync lock before content lookup
 Files:
 - `services/learning-service/src/main/java/com/ieltspath/learning/application/service/WorkItemSync.java`
 - `services/learning-service/src/main/java/com/ieltspath/learning/infrastructure/scheduler/WorkItemSyncJob.java`
