@@ -28,14 +28,16 @@ Chế độ TDD: mỗi phase viết test trước (khóa hành vi hiện có, r�
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Nen nhieu instance](./phase-01-nen-nhieu-instance.md) | Pending |
-| 2 | [Observability](./phase-02-observability.md) | Pending |
-| 3 | [API reliability](./phase-03-api-reliability.md) | Pending |
-| 4 | [Outbox relay](./phase-04-outbox-relay.md) | Pending |
-| 5 | [Resilience va goi service](./phase-05-resilience-va-goi-service.md) | Pending |
-| 6 | [Idempotency va saga](./phase-06-idempotency-va-saga.md) | Pending |
-| 7 | [Ra messaging va concurrency](./phase-07-ra-messaging-va-concurrency.md) | Pending |
-| 8 | [Test loi tong](./phase-08-test-loi-tong.md) | Pending |
+| 1 | [Nen nhieu instance](./phase-01-nen-nhieu-instance.md) | Code xong, còn việc (gói B1) |
+| 2 | [Observability](./phase-02-observability.md) | Code xong, còn việc (gói B2) |
+| 3 | [API reliability](./phase-03-api-reliability.md) | Chờ sửa sau cổng duyệt (gói A) |
+| 4 | [Outbox relay](./phase-04-outbox-relay.md) | Code xong, còn việc (gói B3) |
+| 5 | [Resilience va goi service](./phase-05-resilience-va-goi-service.md) | Chưa làm, spec đã đính chính (gói C) |
+| 6 | [Idempotency va saga](./phase-06-idempotency-va-saga.md) | Chưa làm (gói D) |
+| 7 | [Ra messaging va concurrency](./phase-07-ra-messaging-va-concurrency.md) | Phần chính xong, còn việc (gói B4) |
+| 8 | [Test loi tong](./phase-08-test-loi-tong.md) | Chưa làm, thêm kịch bản draining (gói E) |
+
+**Đính chính sau rà soát (2026-11-01).** Năm lỗi thiết kế được sửa trong plan [261101-0930-reliability-followups](../261101-0930-reliability-followups/plan.md) và gộp vào các gói A–E ở [work-split-claude-codex.md](./work-split-claude-codex.md#chạy-một-mạch-các-gói-còn-lại-cho-codex). Khi một phase file ở đây mâu thuẫn với plan đính chính, plan đính chính thắng. Codex làm các gói A→B→C→D→E một mạch; Claude duyệt hàng loạt và làm kiểm tay.
 
 Chia việc, thứ tự, prompt dán sẵn cho Codex và bảng tiến độ: [work-split-claude-codex.md](./work-split-claude-codex.md).
 

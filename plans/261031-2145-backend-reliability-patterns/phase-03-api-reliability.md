@@ -20,7 +20,7 @@ Rate limit dùng chung giữa các instance ở gateway (Redis), chống dò m�
 
   | Nhóm | Route | replenish/giây | burst |
   |---|---|---|---|
-  | auth | `/api/auth/login`, `/api/auth/refresh`, `/api/auth/forgot-password`, `/api/users/register` | 1 | 5 |
+  | auth | `/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password`, `/api/users/register` (endpoint thật của `AuthController`; gateway không rewrite; `/auth/logout` ở tier `default`) | 1 | 5 |
   | upload | các route upload ảnh, audio, ghi âm | 1 | 5 |
   | ai | route sinh nội dung AI, chấm bằng LLM | 1 | 3 |
   | default | còn lại | 20 | 40 |
@@ -38,7 +38,7 @@ Rate limit dùng chung giữa các instance ở gateway (Redis), chống dò m�
 
 ## Architecture
 
-- Gateway là WebFlux → `spring-boot-starter-data-redis-reactive`. `KeyResolver` bean: lấy `sub` từ JWT đã kiểm (filter hiện có) hoặc IP từ `X-Forwarded-For` đầu tiên chỉ khi request đến từ proxy tin cậy (cấu hình), ngược lại địa chỉ remote.
+- Gateway là WebFlux → `spring-boot-starter-data-redis-reactive`. `KeyResolver` bean: lấy `sub` từ JWT đã kiểm (filter hiện có) hoặc IP client. IP client chỉ lấy từ `X-Forwarded-For` khi request đến từ proxy tin cậy (cấu hình), và phải **duyệt từ phải sang trái**, bỏ các hop tin cậy, lấy địa chỉ đầu tiên không tin cậy (phần tử bên trái do client tự gửi nên giả mạo được); không còn hop không tin cậy thì dùng địa chỉ remote.
 - Login limiter là port ở user-service (`LoginAttemptLimiter`), adapter Redis (`INCR` + `EXPIRE`), gọi trong `AuthController`/use case login trước khi kiểm mật khẩu.
 - Không đếm sai mật khẩu cho tài khoản không tồn tại theo cách lộ thông tin: đếm theo email chuẩn hóa dù tồn tại hay không.
 
@@ -96,7 +96,7 @@ Không dùng filter `RequestRateLimiter` có sẵn (nó trả 429 rỗng, không
 ```java
 package com.ieltspath.apigateway.ratelimit;
 
-/** "user:{sub}" khi có JwtAuthenticationToken; ngược lại "ip:{địa chỉ}" (X-Forwarded-For chỉ khi remote nằm trong trustedProxies). */
+/** "user:{sub}" khi có JwtAuthenticationToken; ngược lại "ip:{địa chỉ}" (X-Forwarded-For chỉ khi remote nằm trong trustedProxies; duyệt từ phải sang trái, bỏ hop tin cậy). */
 public class ClientKeyResolver implements KeyResolver {
     public ClientKeyResolver(RateLimitProperties properties) { }
     @Override public Mono<String> resolve(ServerWebExchange exchange) { }
@@ -143,7 +143,7 @@ spring:
       password: ${REDIS_PASSWORD:}
 ```
 
-- Route `auth`: thêm route mới id `user-auth-limited` **trước** route `user-service`, cùng `uri: lb://USER-SERVICE`, `Path=/api/auth/login,/api/auth/refresh,/api/auth/forgot-password,/api/users/register`, filter `ClientRateLimit` tier `auth`.
+- Route `auth`: thêm route mới id `user-auth-limited` **trước** route `user-service`, cùng `uri: lb://USER-SERVICE`, `Path=/auth/login,/auth/refresh,/auth/forgot-password,/auth/reset-password,/api/users/register`, filter `ClientRateLimit` tier `auth`. Không có `/api/auth/*` ở bất kỳ đâu.
 - Route `upload` và `ai`: liệt kê đường dẫn upload (ảnh, audio, ghi âm) và AI (sinh nội dung, chấm LLM) bằng cách grep `@PostMapping` có `consumes = MULTIPART` và controller AI trong `services/`; thêm route riêng trước route service tương ứng. Danh sách đường dẫn ghi vào báo cáo.
 - Mọi route còn lại: thêm `ClientRateLimit` tier `default` qua `default-filters`.
 - Thêm `spring-boot-starter-data-redis-reactive` vào `infra/api-gateway/pom.xml`.
@@ -222,3 +222,12 @@ Qua gateway thật: 6 lần login sai cùng email từ một máy → lần 6 nh
 - Kiểu `timestamp` **không đổi**. Game giữ `Instant`; 8 service còn lại giữ `LocalDateTime`. Đổi kiểu là đổi contract API mà frontend đang dùng, nên ngoài phạm vi phase này. Contract test chỉ kiểm **tên** field (`timestamp, status, error, message, path, details, code` khi có), không kiểm kiểu. Ghi ngoại lệ game trong Javadoc của contract test.
 - `@Valid` cho community và notification: **đã có** trên mọi `@RequestBody` (Codex đã xác nhận). Bỏ khỏi phạm vi, không sửa.
 - Các việc còn lại của phase 3 vẫn làm như khung.
+
+## Sửa sau cổng duyệt (bắt buộc, bổ sung sau `e5161ba3`)
+
+Cổng duyệt chạy lại `mvn -B -ntp -pl infra/api-gateway,services/user-service,services/community-service -am verify` xanh (user-service 211, community 140). Phase **chưa qua cổng** vì hai lỗi chặn. Thông số đầy đủ, test viết trước và lệnh kiểm chứng: [plan đính chính, phase 2](../261101-0930-reliability-followups/phase-02-chinh-phase-3-auth-va-xff.md). Tóm tắt:
+
+1. **Route auth:** tập path tier `auth` là đúng năm path `/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password`, `/api/users/register`. Xóa mọi `/api/auth/*` khỏi `api-gateway.yaml`, `ClientRateLimitGatewayFilterFactory.resolveTier` và test. Thêm `AuthRouteConsistencyTest` để cấu hình và code không lệch nhau.
+2. **`X-Forwarded-For`:** `ClientKeyResolver` duyệt từ phải sang trái, bỏ hop tin cậy. Thêm bốn test trong tài liệu đính chính.
+3. **Báo cáo phải ghi Deviation** cho hai test đã sửa sau commit đỏ: `failsClosedWhenRedisIsDown` (đổi sang mock; thêm một ca dùng `LettuceConnectionFactory` trỏ cổng đóng) và `sharesLimitAcrossTwoGatewayInstances` (dùng Redis thật).
+4. Kiểm tay qua gateway thật là việc của Claude, không phải Codex.

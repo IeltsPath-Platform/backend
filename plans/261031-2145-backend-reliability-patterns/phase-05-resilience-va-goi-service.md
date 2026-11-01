@@ -4,10 +4,12 @@ title: "Resilience va goi service"
 status: pending
 priority: P2
 effort: "L"
-dependencies: [2]
+dependencies: [2, 3]
 ---
 
 # Phase 5: Resilience và gọi service
+
+> **Thiết kế đã được đính chính.** Nguồn chuẩn: [plan đính chính, phase 3](../261101-0930-reliability-followups/phase-03-thiet-ke-lai-resilience.md). Khi mâu thuẫn với phần còn lại của file này, **file đính chính thắng**. Đã sửa tại chỗ trong file này: số lần thử, thứ tự bọc, phân loại `CallKind`, bảng client. Giữ nguyên từ file này: danh sách 22 client, fallback, mục Contract test và fixtures. Phase này cần trường `code` của `ErrorResponse` (phase 3), nên `dependencies` có thêm 3.
 
 ## Overview
 
@@ -29,7 +31,8 @@ Thêm circuit breaker, retry có giới hạn và bulkhead (Resilience4j) cho c�
 
 - Mỗi client có một instance breaker theo **service đích** (`content`, `access`, `user`, `assessment`, `library`, `learning`, `llm`), không theo từng client.
 - Timeout: giữ read timeout hiện có; thêm connect timeout 2 giây nếu thiếu. Không dùng `TimeLimiter` (RestClient đồng bộ).
-- Retry: chỉ GET và lỗi kết nối/5xx; tối đa 2 lần, backoff 200 ms → 400 ms; **không** retry POST (trừ khi có idempotency key: `RestAccessClient` debit đã có `idempotencyKey`, được phép retry).
+- Retry: chỉ lời gọi `READ` (không tác dụng phụ ở phía nhận, **kể cả POST dùng để mang body truy vấn**) và `IDEMPOTENT_WRITE`; chỉ khi lỗi kết nối/timeout đọc/5xx; tối đa **2 lần thử** (1 lần retry, 200 ms), để `số lần thử × read timeout + backoff ≤ response-timeout của route − 3 s`. `WRITE` không bao giờ retry. `IDEMPOTENT_WRITE` chỉ cho `RestAccessClient` (trừ điểm, khóa `idempotencyKey`) và `AccessHumanGradingCreditClient` (khóa `submissionId`), mỗi cái có test phía nhận: hai lần cùng khóa chỉ trừ một lần.
+- Vị trí bọc: `ResilientCall` bọc **lời gọi RestClient thô**; khối `catch` hiện có của client (404 → `NOT_FOUND`, 503 → `*_UNAVAILABLE`…) giữ nguyên và vẫn bao ngoài. `ResilientCall` ném lại exception gốc khi hết lượt, chỉ đổi breaker mở/bulkhead đầy thành `DownstreamUnavailableException`.
 - Bulkhead (semaphore): `llm` tối đa 4 lời gọi đồng thời mỗi instance; vượt → lỗi ngay, map thành 503 `AI_BUSY`.
 - Breaker mở hoặc bulkhead đầy → ném exception "Unavailable" hiện có của service (đã có ở nhiều client) → handler trả 503 với `code` theo service đích.
 - Fallback chỉ ở chỗ có giá trị hợp lý sẵn: `RestDisplayNameClient`, `UserPublicProfileClient` (tên hiển thị rỗng), `LearningStreakClient` (streak 0). Chỗ khác fail fast.
@@ -97,8 +100,8 @@ package com.ieltspath.commonresilience;
 
 /** Cách gọi quyết định retry. Không có giá trị nào khác. */
 public enum CallKind {
-    READ,               // GET: retry được
-    IDEMPOTENT_WRITE,   // POST có idempotencyKey/referenceId/submissionId: retry được
+    READ,               // không tác dụng phụ ở phía nhận (GET, hoặc POST truy vấn): retry được
+    IDEMPOTENT_WRITE,   // ghi mà phía nhận chống trùng theo khóa (idempotencyKey/submissionId): retry được
     WRITE               // còn lại, gồm mọi lời gọi LLM: không retry
 }
 
@@ -113,9 +116,11 @@ public class ResilientCall {
     public ResilientCall(CircuitBreakerRegistry breakers, RetryRegistry retries, BulkheadRegistry bulkheads) { }
     /**
      * target: content | access | user | assessment | library | learning | llm.
-     * Thứ tự: bulkhead (chỉ khi registry có instance target) → circuit breaker → retry (chỉ READ, IDEMPOTENT_WRITE).
+     * Thứ tự (ngoài vào trong): retry (chỉ READ, IDEMPOTENT_WRITE) → circuit breaker → bulkhead (chỉ khi registry có instance target) → request.
+     * Breaker mở hoặc bulkhead đầy: ném DownstreamUnavailableException ngay, không retry.
      * Tính lỗi cho breaker và retry: ResourceAccessException, RestClientResponseException 5xx.
-     * Không tính lỗi: 4xx (ném nguyên exception gốc, không bọc).
+     * Không tính lỗi và không retry: 4xx, lỗi giải mã, exception nghiệp vụ ném từ supplier (đi qua nguyên vẹn).
+     * Hết lượt retry: ném lại exception gốc (không bọc) để khối catch của client vẫn ánh xạ đúng.
      */
     public <T> T call(String target, CallKind kind, Supplier<T> request) { }
     public void run(String target, CallKind kind, Runnable request) { }
@@ -152,7 +157,7 @@ resilience4j:
       llm:        { base-config: default, slow-call-duration-threshold: 60s }
   retry:
     configs:
-      default: { max-attempts: 3, wait-duration: 200ms, enable-exponential-backoff: true, exponential-backoff-multiplier: 2 }
+      default: { max-attempts: 2, wait-duration: 200ms }
     instances:
       content: { base-config: default }
       access:  { base-config: default }
@@ -171,9 +176,9 @@ Mỗi lời gọi HTTP trong client bọc `resilientCall.call(target, kind, () -
 
 | Client | target | kind | Exception đổi sang |
 |---|---|---|---|
-| learning `RestLearningContentClient` | content | READ (GET), WRITE (`progressMetadata` POST) | `ContentUnavailableException` hiện dùng trong client |
+| learning `RestLearningContentClient` | content | READ cho mọi GET và 7 POST truy vấn (`progressMetadata`, `practiceSetAvailability`, `searchPracticeSets`, `prerequisites`, `questionDifficulties`, `workItemSubjects`, `suggestionCandidates`) | `LearningRequestException` 503 `CONTENT_UNAVAILABLE` hiện dùng trong client |
 | learning `RestAccessClient` | access | READ cho GET; IDEMPOTENT_WRITE cho trừ điểm (có `idempotencyKey`) | `AccessUnavailableException` |
-| learning `RestAssessmentStudyContextClient`, `RestEssayPromptActivationClient`, `RestHumanReviewClient` | assessment | GET → READ, POST → WRITE | exception hiện có của client |
+| learning `RestAssessmentStudyContextClient`, `RestEssayPromptActivationClient`, `RestHumanReviewClient` | assessment | từng phương thức tự ghi kind: GET và POST truy vấn thuần → READ; POST có tác dụng phụ → WRITE | exception hiện có của client |
 | learning `RestDisplayNameClient`, `UserServiceStudyTimezones` | user | READ | **fallback:** tên rỗng / timezone mặc định hiện có |
 | learning `OpenAiCompatibleLlmClient` | llm | WRITE | `LlmUnavailableException`; bulkhead đầy → 503 code `AI_BUSY` |
 | assessment `ContentErrorTypeClient`, `ContentPackageClient`, `ContentRubricClient` | content | READ | `ContentUnavailableException` |
@@ -254,3 +259,14 @@ Dừng content-service; gọi bài học qua gateway 15 lần → các lần sau
 - Client trong bảng không tồn tại hoặc đã đổi tên.
 - Không lấy được response thật của content cho mẫu bài học (seed không có bài phù hợp).
 - Version resilience4j xung đột với Spring Boot hiện tại.
+
+## Bổ sung theo đính chính (bắt buộc)
+
+Chi tiết và lý do: [plan đính chính, phase 3](../261101-0930-reliability-followups/phase-03-thiet-ke-lai-resilience.md).
+
+- **Hai lượt duyệt:** 3a = module `common-resilience` + `RestLearningContentClient` + cấu hình gateway; 3b = các client còn lại (assessment → game → community → content). Báo cáo riêng cho mỗi lượt.
+- **Ánh xạ phản hồi:** breaker mở → 503 với mã `*_UNAVAILABLE` hiện có của service và `Retry-After: 30`; bulkhead LLM đầy → 503 `AI_BUSY` và `Retry-After: 5`; gateway quá hạn → 504 `GATEWAY_TIMEOUT`. Phân biệt qua `DownstreamUnavailableException.reason()`.
+- **Timeout gateway theo nhóm route:** mặc định 15 s; upload 120 s; AI của assessment 120 s; **AI của learning (endpoint gọi `EssayGrader`/`LlmClient`, chấm 20 s + connect 5 s) 60 s**, đồng thời đưa các route này vào tier `ai` của rate limit; AI của content: đo `llm.timeout` rồi chốt (`llm.timeout + 20 s` retry bận + 10 s). Liệt kê endpoint LLM của learning bằng grep call graph và ghi vào báo cáo.
+- **Gateway `Retry`:** mặc định, 1 lần, chỉ `GET`, chỉ lỗi kết nối (`ConnectException`, `AnnotatedConnectException`), backoff 100 ms; không retry theo mã trạng thái; không bao giờ retry POST.
+- **Test thêm** (viết trước, phải đỏ): `ResilientCallTest`: `rethrowsOriginalExceptionAfterRetriesSoClientMappingStillWorks`, `fourHundredFourIsNeitherCountedNorRetried`, `doesNotRetryWhenBreakerIsOpen`, `postMarkedReadIsRetried`, `readTimeoutCountsAsFailure`, `businessExceptionFromSupplierPassesThrough`. Mỗi client 3a/3b: `notFoundStaysNotFoundAndKeepsBreakerClosed`, `repeatedServerErrorsOpenBreakerThenNoHttpRequestIsMade`, `openBreakerMapsToTheServiceUnavailableException`. Handler: `bulkheadFullReturns503AiBusyWithRetryAfter`. Gateway: `retriesGetOnceOnConnectionRefused`, `neverRetriesPost`. Phía nhận: `debitWithSameIdempotencyKeyChargesOnce`, `consumeWithSameSubmissionChargesOnce`.
+- **Dừng và hỏi (thêm):** client có `catch` bao cả `RestClient` lẫn xử lý khác, không tách được `rawRequest`; phía nhận không idempotent như giả định (không đánh dấu `IDEMPOTENT_WRITE`); không xác định được endpoint LLM của learning hoặc timeout LLM của content.

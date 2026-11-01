@@ -117,3 +117,18 @@ Ghi thời gian CI trước và sau (lấy từ run GitHub Actions gần nhất 
 
 - Một kịch bản không thể kiểm trong một service mà không dựng nhiều service thật.
 - Thời gian CI tăng > 10 phút dù đã dùng container tĩnh.
+
+## Bổ sung theo đính chính (gói E, Codex)
+
+Làm theo thứ tự: (1) cấu hình graceful shutdown và draining theo [đính chính, phase 4](../261101-0930-reliability-followups/phase-04-graceful-shutdown-va-draining.md) (`server.shutdown`, `await-termination`, `stop_grace_period`, Eureka và loadbalancer cache, DNS ngắn; test `GracefulShutdownTest` và `SchedulerShutdownTest`); (2) các kịch bản dưới đây; (3) bảng kịch bản trong tài liệu.
+
+Kịch bản thêm vào bộ test lỗi tổng:
+
+| Kịch bản | Hành vi cần chứng minh |
+|---|---|
+| Correlation HTTP → outbox → relay thread khác → consumer | Log và MDC của consumer có id của request gốc (cần gói B2) |
+| Dừng một replica khi replica khác còn chạy | Request đang xử lý hoàn tất; cửa sổ lỗi định tuyến cũ được đo và ghi; Retry của gateway chỉ cho GET |
+| Endpoint auth công khai | Cả năm path rơi vào tier `auth`; cấu hình và code không lệch (gói A) |
+| Breaker mở rồi hồi phục | 503 nhanh khi mở; 404 không làm mở; hồi phục ≤ 30 s (gói C) |
+
+Việc đo cửa sổ lỗi bằng `docker compose` trên stack thật là kiểm tay của Claude; Codex chỉ viết test tự động.

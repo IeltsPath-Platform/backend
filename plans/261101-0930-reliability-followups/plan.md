@@ -83,3 +83,7 @@ Các sửa lỗi sau đang nằm ở nhánh phụ, chưa vào `feat/reliability-
 
 - Timeout route của các endpoint chấm LLM (learning 20 s, assessment 45 s, content có retry bận 5 s + 15 s) cần đo thật ở phase 3 trước khi chốt số 60/120/180 giây.
 - Có đưa phase 1 mới thành điều kiện bắt buộc trước khi gộp PR không? Đề xuất: có, vì nếu không phase 2 cũ hứa điều không đạt được.
+
+## Cách thực hiện (cập nhật 2026-11-01)
+
+Plan này là **spec chi tiết đã đính chính** cho các gói A–E trong [work-split của plan 261031-2145](../261031-2145-backend-reliability-patterns/work-split-claude-codex.md#chạy-một-mạch-các-gói-còn-lại-cho-codex). Codex làm các gói A→B→C→D→E một mạch; Claude duyệt hàng loạt và làm kiểm tay. Ánh xạ: phase 1 → gói B2, phase 2 → gói A, phase 3 → gói C, phase 4 → gói E, phase 5 → gói B1. Cột "Người làm" ở bảng trên là phân công ban đầu, nay thay bằng ánh xạ này.

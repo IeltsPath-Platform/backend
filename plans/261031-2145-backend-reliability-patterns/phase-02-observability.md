@@ -17,13 +17,15 @@ Một request có cùng `correlationId` trong log của gateway, mọi service n
 
 - MDC: `correlationId` (header `SecurityHeaders.CORRELATION_ID`, gateway đã tạo trong `CorrelationIdFilter`), `userId` (nếu có), `service`.
 - Chuyển tiếp header ở mọi RestClient đi ra (22 client) và mọi message RabbitMQ publish; listener khôi phục MDC.
+  <!-- Updated: rà soát 2026-11-01 - đóng dấu theo MDC không đủ cho outbox -->
+  - **Qua outbox:** relay chạy ở thread khác không có MDC, nên đóng dấu theo MDC không mang được id của request gốc. Lưu `correlation_id` vào hàng outbox tại điểm ghi duy nhất của mỗi service (assessment, community, access, và `reward_grants` của learning) rồi publisher gắn header từ cột đó. Spec: [đính chính, phase 1](../261101-0930-reliability-followups/phase-01-correlation-qua-outbox.md) (gói B2). Tiêu chí "event assessment → learning listener" ở dưới chỉ đạt sau khi làm xong phần này.
 - Log JSON khi chạy trong docker (profile `json-logs`); log text khi chạy local.
 - `/actuator/prometheus` mở trong mạng nội bộ, **không** định tuyến qua gateway.
   <!-- Updated: Red Team Review - security chung chặn actuator ngoài health/info; exposure bị ghi đè ở từng service -->
   - `shared/common-security/.../CommonSecurityAutoConfiguration.java:56` chỉ `permitAll` cho `health`, `info` → phải thêm `GET /actuator/prometheus`, nếu không sẽ 401.
   - Exposure khai báo ở `config-repo/application.yaml:12` **và** ghi đè ở từng service (ví dụ `learning-service.yaml:155`); hiện 12 file trong config-repo khai báo exposure. <!-- Updated: Validation Session 1 - số file theo thực tế --> Ưu tiên xóa ghi đè để dùng giá trị chung; file nào cần khác thì thêm `prometheus`.
 - Prometheus trong compose, profile `observability` (không chạy mặc định), lấy danh sách instance qua Eureka (`eureka_sd_configs`) để thấy đủ bản sao khi scale; file `infra/prometheus/prometheus.yml`.
-- Metric riêng: `outbox_pending{service}`, `outbox_oldest_age_seconds{service}`, `messages_dead_lettered_total{queue}`, `rate_limit_rejected_total{route}` (phase 3 ghi), metric Resilience4j tự có (phase 5).
+- Metric riêng: `outbox_pending{service}`, `outbox_oldest_age_seconds{service}`, `dead_letter_messages{queue}` (gauge số message đang nằm trong từng DLQ của service có `DeadLetterReplayer`, đọc bằng `counts()`, `NaN` khi broker lỗi; thay cho counter `messages_dead_lettered_total` vì đo được tồn đọng thật mà không phải chèn vào mọi nơi từ chối message), `rate_limit_rejected_total{route}` (phase 3 ghi), metric Resilience4j tự có (phase 5).
 
 ## Architecture
 

@@ -161,3 +161,11 @@ mvn -B -ntp -pl shared/common-events,services/notification-service,services/acce
 
 - notification-service hoặc access-service chưa bật method security (`@PreAuthorize` không có tác dụng): kiểm bằng test `nonAdminIsForbidden`; nếu xanh không do `@PreAuthorize` → dừng.
 - Tên DLQ của listener không có hằng để tham chiếu và phải viết chuỗi mới.
+
+## Việc còn lại sau rà soát (gói B4, Codex)
+
+Đã xong và đã merge: `DeadLetterReplayer` (channel riêng có publisher confirm, mỗi lần chỉ lấy số message đang có), endpoint admin ở notification, access, learning; quy tắc version; golden `SubscriptionGranted`. Còn lại:
+
+- Test song song hai transaction cho: tiến độ bài học (learning, đã có khóa advisory theo learner), bộ thẻ (library, `PESSIMISTIC_WRITE`), phòng (game, `PESSIMISTIC_WRITE`). Kỳ vọng **xanh** (không mất cập nhật); nếu đỏ thì sửa bằng khóa hoặc `@Version` theo phase này và ghi vào báo cáo.
+- Test integration endpoint replay của learning (đã có cho notification và access).
+- Phân loại (a)/(b) kèm Javadoc cho mọi listener còn lại: access `LearningPointsGrantListener`, learning `PointsGrantSettledListener`, bốn listener grading của notification. `CommunityEventConsumer` và `AssessmentCompletedListener` đã phân loại (b) với lý do.

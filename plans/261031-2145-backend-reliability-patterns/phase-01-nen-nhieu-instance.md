@@ -91,3 +91,12 @@ Cho phép chạy 2+ instance mỗi service mà không chạy job trùng, không 
 - **Thứ tự event game:** Redis pub/sub giữ thứ tự trong một kênh từ một publisher; event từ hai instance có thể xen kẽ. Payload đã mang trạng thái đầy đủ (ranking, vòng) nên client chỉ cần hiển thị bản mới nhất; kiểm trong test bước 3.
 - **Redis chết:** game và notification mất push thời gian thực, REST vẫn chạy. Vé game không phát được → không vào phòng mới. Có metric cảnh báo (phase 2).
 - **Advisory lock giữ quá lâu:** chỉ dùng cho job không gọi HTTP; `pg_try_` để không chờ.
+
+## Việc còn lại sau rà soát (gói B1, Codex)
+
+Code của phase này đã xong và đã merge (Redis, vé game, `RoomEventBridge`, `NoticePushBridge`, test hai instance, test đồng thời Rocket/Solo). Còn lại, spec chi tiết ở [đính chính, phase 5](../261101-0930-reliability-followups/phase-05-don-phase-1-va-khoa-http.md):
+
+- Dọn 10 chỗ trong file này còn mâu thuẫn với kết luận "không cần khóa thêm" (dòng 12, 30, 44, 56, 58, 59, 61, 68, 77, 83, 93).
+- `WorkItemSync` không giữ khóa advisory và transaction trong lúc gọi HTTP sang content.
+- Test song song cho relay assessment và community.
+- Bảng cơ chế chống xử lý trùng của 21 `@Scheduled`; mục "Chạy nhiều instance" trong `docs/system-architecture.md` (kênh `game.room-events` và `notification.push`, khóa vé `game:ws-ticket:*`, push không bền, cách scale bằng `--scale`).

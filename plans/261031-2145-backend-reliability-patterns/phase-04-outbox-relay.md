@@ -228,3 +228,12 @@ Stack thật: admin cấp gói → người dùng thấy thông báo; dừng Rab
 
 - `ActivateKeyUseCase` cũng cấp Premium nhưng ghi loại event khác `SubscriptionGranted`: báo, không tự thêm vào danh sách relay.
 - Bảng `notifications` hoặc frontend không chấp nhận `event_type` mới mà không đổi thêm chỗ khác.
+
+## Việc còn lại sau rà soát (gói B3, Codex)
+
+Code, migration `V6`, contract `SubscriptionGrantedV1` và các test chính đã xong và đã merge. Còn lại:
+
+- Bước 11 "Tài liệu": bảng event trong `docs/system-architecture.md` (producer, consumer, queue, DLQ, link contract) cho `SubscriptionGranted`.
+- Test notification `temporaryFailureIsRetriedThenSucceeds` (lỗi DB tạm → vào queue retry → xử lý thành công).
+- Test access `rollbackLeavesNoOutboxRow` (giao dịch cấp gói bị rollback thì không còn hàng outbox).
+- Khung ở trên nhắc `PushBus`; code thực tế dùng `NoticePushBridge`. Không đổi tên.
