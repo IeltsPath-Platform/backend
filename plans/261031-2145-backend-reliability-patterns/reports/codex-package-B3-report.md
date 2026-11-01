@@ -1,20 +1,23 @@
-Phase: B3
-Status: NEEDS_CONTEXT
+Phase: B3 — retry routing reliability
+Status: DONE_WITH_CONCERNS
 Commits:
-- 84c9b70f test(messaging): cover grant retry and rollback
-- cd8c6f17 docs(messaging): document subscription grant event flow
+- `5ad92eee` — test(messaging): verify retry queue routes to source
+- `424e71c4` — fix(messaging): route retries through source exchange
 Files:
-- `services/access-service/src/test/java/com/ieltspath/access/infrastructure/messaging/AccessOutboxRelayIntegrationTest.java`
-- `services/notification-service/src/test/java/com/ieltspath/notification/infrastructure/SubscriptionGrantedBrokerIntegrationTest.java`
-- `docs/system-architecture.md`
-Red tests (commit test):
-- `SubscriptionGrantedBrokerIntegrationTest.temporaryFailureIsRetriedThenSucceeds` — after the first transient DB error, the retry queue returns the message to the main queue using the queue name as the received routing key. The consumer validates that routing key against the event type, rejects the retry as a contract violation, and dead-letters it. The test times out with no notice stored.
+- `shared/common-events/src/main/java/com/ieltspath/events/messaging/RetryTopology.java`
+- `shared/common-events/src/test/java/com/ieltspath/events/messaging/RetryTopologyTest.java`
+Red tests:
+- `RetryTopologyTest.retryQueueReturnsToTheSourceExchangeWithTheOriginalRoutingKey` — red because the retry queue was configured with an empty dead-letter exchange and queue-name routing key.
+- `SubscriptionGrantedBrokerIntegrationTest.temporaryFailureIsRetriedThenSucceeds` was red before the production change: retry delivery used the wrong routing key and was rejected by the consumer contract check.
 Verification:
-- Focused notification red test: `mvn -B -ntp -pl services/notification-service -am -Dtest=SubscriptionGrantedBrokerIntegrationTest#temporaryFailureIsRetriedThenSucceeds -Dsurefire.failIfNoSpecifiedTests=false test` → 1 test, 1 failure, 0 errors, 0 skipped.
-- Focused rollback test: `mvn -B -ntp -pl services/access-service -am -Dtest=AccessOutboxRelayIntegrationTest#rollbackLeavesNoOutboxRow -Dsurefire.failIfNoSpecifiedTests=false test` → 1 test, 0 failures, 0 errors, 0 skipped.
-- Package command: `mvn -B -ntp -pl services/access-service,services/notification-service -am verify` → 224 tests, 1 failure, 1 error, 0 skipped. Access: 100 tests, all passed. The new retry test failed as above. Separate existing `CorrelationListenerBrokerIntegrationTest.listenerSeesTheCorrelationIdOfTheMessageAndClearsIt` errored because Spring `SimpleMessageConverter` does not accept `CommunityEvent`.
-Deviations from skeleton:
-- The spec names `SubscriptionGrantedListenerIntegrationTest`; the repository has `SubscriptionGrantedBrokerIntegrationTest`, so the required retry test was added to that existing broker integration class.
-- No production files were changed. The remaining B3 scope only permits tests and documentation; fixing the retry routing key requires production messaging changes outside that remaining scope.
+- `common-events`: 20 tests, 0 failures, 0 errors, 0 skipped.
+- Notification retry integration: 1 test passed.
+- Access `LearningPointsGrantListenerFailureTest`: 5 passed.
+- Learning `PointsGrantSettledListenerTest`: 4 passed.
+- Access `DeadLetterReplayBrokerIntegrationTest`: 2 passed.
+- Learning `LearningDeadLetterReplayIntegrationTest`: blocked by Testcontainers startup; RabbitMQ `3.13-management-alpine` did not emit the configured `Server startup complete` log before timeout. No assertion ran.
+- Full `mvn -B -ntp verify`: stopped in learning-service at the same RabbitMQ container startup error. Partial reactor totals from generated Surefire XML: 1,858 tests, 0 failures, 1 error, 4 skipped; modules after learning were not reached.
+Deviations:
+- Production `RetryTopology` and its test were added to scope per Claude's decision because retry routing could not be corrected by the original test/docs-only B3 scope.
 Concerns:
-- Retry is not operationally correct until the message returns with its original contract routing key (or the consumer contract validation is redesigned). The architecture doc records this finding. This package must be resumed with explicit production-file scope before it can pass.
+- Learning DLQ replay could not be verified in this environment due RabbitMQ Testcontainers log-wait timeout. The feature test needs a successful run in a Docker environment that satisfies its wait strategy.
