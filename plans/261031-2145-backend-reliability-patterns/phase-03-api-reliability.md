@@ -143,7 +143,7 @@ spring:
       password: ${REDIS_PASSWORD:}
 ```
 
-- Route `auth`: thêm route mới id `user-auth-limited` **trước** route `user-service`, cùng `uri: lb://USER-SERVICE`, `Path=/auth/login,/auth/refresh,/auth/forgot-password,/auth/reset-password,/api/users/register`, filter `ClientRateLimit` tier `auth`. Không có `/api/auth/*` ở bất kỳ đâu.
+- Route `auth`: route id `user-auth-limited` **trước** route `user-service`, cùng `uri: lb://USER-SERVICE`, `Path=/auth/login,/auth/refresh,/auth/forgot-password,/auth/reset-password,/api/users/register`, filter `ClientRateLimit` tier `auth`. Không có `/api/auth/*` ở bất kỳ đâu; `/auth/logout` thuộc tier `default`.
 - Route `upload` và `ai`: liệt kê đường dẫn upload (ảnh, audio, ghi âm) và AI (sinh nội dung, chấm LLM) bằng cách grep `@PostMapping` có `consumes = MULTIPART` và controller AI trong `services/`; thêm route riêng trước route service tương ứng. Danh sách đường dẫn ghi vào báo cáo.
 - Mọi route còn lại: thêm `ClientRateLimit` tier `default` qua `default-filters`.
 - Thêm `spring-boot-starter-data-redis-reactive` vào `infra/api-gateway/pom.xml`.

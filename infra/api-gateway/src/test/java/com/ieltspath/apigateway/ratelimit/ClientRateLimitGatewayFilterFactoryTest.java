@@ -66,7 +66,7 @@ class ClientRateLimitGatewayFilterFactoryTest {
         when(limiter.isAllowed(anyString(), anyString()))
                 .thenReturn(Mono.just(new RedisRateLimiter.Response(false, Map.of())));
 
-        MockServerWebExchange exchange = exchange("auth-login", "/api/auth/login");
+        MockServerWebExchange exchange = exchange("auth-login", "/auth/login");
         filter("auth").filter(exchange, ignored -> Mono.empty()).block();
 
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
@@ -92,7 +92,7 @@ class ClientRateLimitGatewayFilterFactoryTest {
         }
         MockServerWebExchange lastExchange = null;
         for (int attempt = 0; attempt < 6; attempt++) {
-            lastExchange = exchange("auth-login", "/api/auth/login");
+            lastExchange = exchange("auth-login", "/auth/login");
             GatewayFilter filter = attempt % 2 == 0 ? first.apply(config("auth")) : second.apply(config("auth"));
             filter.filter(lastExchange, ignored -> Mono.empty()).block();
         }

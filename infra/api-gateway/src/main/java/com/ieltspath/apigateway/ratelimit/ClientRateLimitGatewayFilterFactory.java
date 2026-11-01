@@ -63,8 +63,7 @@ public class ClientRateLimitGatewayFilterFactory
     private String resolveTier(ServerWebExchange exchange, String configuredTier) {
         String path = exchange.getRequest().getURI().getRawPath();
         if (path.equals("/auth/login") || path.equals("/auth/refresh") || path.equals("/auth/forgot-password")
-                || path.equals("/api/auth/login") || path.equals("/api/auth/refresh")
-                || path.equals("/api/auth/forgot-password") || path.equals("/api/users/register")) return "auth";
+                || path.equals("/auth/reset-password") || path.equals("/api/users/register")) return "auth";
         if (path.equals("/api/users/me/avatar") || path.equals("/api/community/media/images")
                 || path.equals("/api/content/admin/media/audio") || path.equals("/api/content/admin/media/image")
                 || path.equals("/api/assessments/speaking-recordings")

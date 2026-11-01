@@ -57,7 +57,7 @@ spring:
             - id: user-auth-limited
               uri: lb://USER-SERVICE
               predicates:
-                - Path=/auth/login,/auth/refresh,/auth/forgot-password,/api/auth/login,/api/auth/refresh,/api/auth/forgot-password,/api/users/register
+                - Path=/auth/login,/auth/refresh,/auth/forgot-password,/auth/reset-password,/api/users/register
               filters:
                 - name: ClientRateLimit
                   args:
