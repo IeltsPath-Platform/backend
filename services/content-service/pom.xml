@@ -30,6 +30,11 @@
         </dependency>
         <dependency>
             <groupId>com.ieltspath</groupId>
+            <artifactId>common-resilience</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ieltspath</groupId>
             <artifactId>common-storage</artifactId>
             <version>${project.version}</version>
         </dependency>
