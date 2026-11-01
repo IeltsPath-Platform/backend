@@ -1,6 +1,7 @@
 package com.ieltspath.notification.infrastructure;
 
 import com.ieltspath.events.community.CommunityEvent;
+import com.ieltspath.events.community.CommunityMessaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.notification.application.RecordCommunityEventUseCase;
@@ -20,7 +21,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-/** AMQP adapter: decodes a community event, hands it to the use case, then acks, parks or requeues the message. */
+/**
+ * AMQP adapter: decodes a community event, hands it to the use case, then acks, parks or requeues the message.
+ * It keeps its own retry and park logic instead of {@code MessageRetry}: it acknowledges only after the broker confirms the
+ * parked copy, and it requeues on its own when that confirmation fails, which the shared helper does not do.
+ */
 @Component
 public class CommunityEventConsumer {
     private static final Logger log = LoggerFactory.getLogger(CommunityEventConsumer.class);
@@ -48,11 +53,11 @@ public class CommunityEventConsumer {
             channel.basicAck(tag, false);
             stored.ifPresent(n -> push(n.recipientId(), n.id(), n.actorId(), n.eventType(), n.postId(), n.createdAt()));
         } catch (IllegalArgumentException | com.fasterxml.jackson.core.JsonProcessingException bad) {
-            park(channel, tag, "community.events.dlx", "community.notifications.v1.dlq", message);
+            park(channel, tag, "community.events.dlx", CommunityMessaging.NOTIFICATIONS_DLQ, message);
         } catch (Exception transientFailure) {
             Object attemptsValue = message.getMessageProperties().getHeaders().get("community-retry-count");
             int attempts = attemptsValue instanceof Number n ? n.intValue() : 0;
-            if (attempts >= MAX_RETRIES) park(channel, tag, "community.events.dlx", "community.notifications.v1.dlq", message);
+            if (attempts >= MAX_RETRIES) park(channel, tag, "community.events.dlx", CommunityMessaging.NOTIFICATIONS_DLQ, message);
             else {
                 message.getMessageProperties().setHeader("community-retry-count", attempts + 1);
                 park(channel, tag, "community.events.retry", "retry." + message.getMessageProperties().getReceivedRoutingKey(), message);

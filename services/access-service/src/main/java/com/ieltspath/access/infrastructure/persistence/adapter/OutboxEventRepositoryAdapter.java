@@ -8,12 +8,16 @@ import com.ieltspath.access.infrastructure.persistence.repository.OutboxEventJpa
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Component
 public class OutboxEventRepositoryAdapter implements OutboxEventRepository {
+
+    /** Matches the length of the last_error column. */
+    private static final int MAX_ERROR_LENGTH = 500;
 
     private final OutboxEventJpaRepository outboxEventJpaRepository;
     private final AccessPersistenceMapper mapper;
@@ -33,6 +37,25 @@ public class OutboxEventRepositoryAdapter implements OutboxEventRepository {
         return outboxEventJpaRepository.findByStatusOrderByCreatedAtAsc("PENDING", PageRequest.of(0, limit)).stream()
                 .map(mapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public List<OutboxEvent> claimPending(int limit, int maxAttempts) {
+        return outboxEventJpaRepository.claimPending(limit, maxAttempts).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public void markPublished(UUID id, Instant publishedAt) {
+        outboxEventJpaRepository.markPublished(id, publishedAt);
+    }
+
+    @Override
+    public void recordFailure(UUID id, String error, int maxAttempts) {
+        String message = error == null ? "" : error;
+        outboxEventJpaRepository.recordFailure(id,
+                message.length() > MAX_ERROR_LENGTH ? message.substring(0, MAX_ERROR_LENGTH) : message, maxAttempts);
     }
 
     @Override

@@ -47,4 +47,7 @@ public class OutboxEventJpaEntity {
 
     @Column(name = "published_at")
     private Instant publishedAt;
+
+    @Column(name = "last_error", length = 500)
+    private String lastError;
 }

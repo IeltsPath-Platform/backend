@@ -1,9 +1,13 @@
 package com.ieltspath.access.domain.entity;
 
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 
 public class OutboxEvent {
+
+    /** Event types the relay publishes; any other type is kept as a record only and never leaves the service. */
+    public static final Set<String> RELAYED_EVENT_TYPES = Set.of("SubscriptionGranted");
 
     private final UUID id;
     private final String aggregateType;
@@ -28,7 +32,16 @@ public class OutboxEvent {
     }
 
     public static OutboxEvent create(String aggregateType, UUID aggregateId, String eventType, String payload) {
-        return new OutboxEvent(UUID.randomUUID(), aggregateType, aggregateId, eventType, payload, "PENDING", 0, Instant.now(), null);
+        return create(UUID.randomUUID(), aggregateType, aggregateId, eventType, payload);
+    }
+
+    /**
+     * The id is supplied by the caller because the payload carries it as the event id. A type outside
+     * {@link #RELAYED_EVENT_TYPES} is stored as NOT_RELAYED, so the relay never picks it up.
+     */
+    public static OutboxEvent create(UUID id, String aggregateType, UUID aggregateId, String eventType, String payload) {
+        String status = RELAYED_EVENT_TYPES.contains(eventType) ? "PENDING" : "NOT_RELAYED";
+        return new OutboxEvent(id, aggregateType, aggregateId, eventType, payload, status, 0, Instant.now(), null);
     }
 
     public UUID getId() {

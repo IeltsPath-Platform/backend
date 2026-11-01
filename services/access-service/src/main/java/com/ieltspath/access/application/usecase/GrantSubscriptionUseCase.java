@@ -10,9 +10,13 @@ import com.ieltspath.access.domain.repository.OutboxEventRepository;
 import com.ieltspath.access.domain.repository.PlanRepository;
 import com.ieltspath.access.domain.repository.SubscriptionRepository;
 import com.ieltspath.access.domain.vo.SubscriptionSourceType;
+import com.ieltspath.events.access.SubscriptionGrantedV1;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,15 +27,18 @@ public class GrantSubscriptionUseCase {
     private final SubscriptionRepository subscriptionRepository;
     private final PlanRepository planRepository;
     private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
 
     public GrantSubscriptionUseCase(
             SubscriptionRepository subscriptionRepository,
             PlanRepository planRepository,
-            OutboxEventRepository outboxEventRepository
+            OutboxEventRepository outboxEventRepository,
+            ObjectMapper objectMapper
     ) {
         this.subscriptionRepository = subscriptionRepository;
         this.planRepository = planRepository;
         this.outboxEventRepository = outboxEventRepository;
+        this.objectMapper = objectMapper;
     }
 
     public SubscriptionResult execute(GrantSubscriptionCommand command) {
@@ -55,10 +62,11 @@ public class GrantSubscriptionUseCase {
         }
         Subscription saved = subscriptionRepository.save(subscription);
 
+        UUID eventId = UUID.randomUUID();
         outboxEventRepository.save(OutboxEvent.create(
-                "Subscription", saved.getId(), "SubscriptionGranted",
-                String.format("{\"userId\":\"%s\",\"subscriptionId\":\"%s\",\"endsAt\":\"%s\"}",
-                        command.userId(), saved.getId(), saved.getEndsAt())
+                eventId, "Subscription", saved.getId(), "SubscriptionGranted",
+                toPayload(new SubscriptionGrantedV1(eventId, SubscriptionGrantedV1.EVENT_TYPE, Instant.now(),
+                        command.userId(), saved.getId(), plan.getCode(), saved.getEndsAt()))
         ));
 
         return new SubscriptionResult(
@@ -76,5 +84,13 @@ public class GrantSubscriptionUseCase {
                 saved.getCreatedAt(),
                 saved.getUpdatedAt()
         );
+    }
+
+    private String toPayload(SubscriptionGrantedV1 event) {
+        try {
+            return objectMapper.writeValueAsString(event);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Subscription granted event could not be serialized", exception);
+        }
     }
 }
