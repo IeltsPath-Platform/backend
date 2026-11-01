@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.auth.internal-jwt-secret=dGVzdC1vbmx5LWludGVybmFsLWp3dC1zaWduaW5nLWtleQ==",
         "app.auth.external-jwt-issuer=urn:code-base:auth",
         "app.auth.external-jwt-secret=dGVzdC1vbmx5LWV4dGVybmFsLWp3dC1zaWduaW5nLWtleQ==",
+        "app.storage.enabled=true",
         "management.endpoints.web.exposure.include=health,info,prometheus"
 })
 @AutoConfigureMockMvc
