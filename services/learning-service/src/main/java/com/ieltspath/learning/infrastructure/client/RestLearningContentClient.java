@@ -1,6 +1,13 @@
 package com.ieltspath.learning.infrastructure.client;
 
 import com.ieltspath.commonsecurity.header.SecurityHeaders;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.domain.vo.LearningSkill;
@@ -26,18 +33,30 @@ import java.util.function.Supplier;
 public class RestLearningContentClient implements LearningContentClient {
     private static final String INTERNAL_PATH = "/internal/learning-content";
     private final RestClient restClient;
+    private final ResilientCall resilientCall;
 
     @Autowired
     public RestLearningContentClient(RestClient.Builder builder,
-                                     @Value("${learning.content.base-url:http://localhost:8082}") String contentBaseUrl) {
+                                     @Value("${learning.content.base-url:http://localhost:8082}") String contentBaseUrl,
+                                     ResilientCall resilientCall) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
         requestFactory.setReadTimeout(Duration.ofSeconds(5));
         restClient = builder.requestFactory(requestFactory).baseUrl(contentBaseUrl).build();
+        this.resilientCall = resilientCall;
     }
 
     RestLearningContentClient(RestClient restClient) {
         this.restClient = restClient;
+        RetryConfig retryConfig = RetryConfig.custom().maxAttempts(2).waitDuration(Duration.ofMillis(1))
+                .retryOnException(ResilientCall::isTransientFailure).build();
+        this.resilientCall = new ResilientCall(CircuitBreakerRegistry.ofDefaults(),
+                RetryRegistry.of(retryConfig), BulkheadRegistry.ofDefaults());
+    }
+
+    RestLearningContentClient(RestClient restClient, ResilientCall resilientCall) {
+        this.restClient = restClient;
+        this.resilientCall = resilientCall;
     }
 
     @Override
@@ -54,7 +73,7 @@ public class RestLearningContentClient implements LearningContentClient {
 
     @Override
     public ProgressMetadata progressMetadata(List<UUID> courseIds) {
-        return response(() -> restClient.post().uri(INTERNAL_PATH + "/progress-metadata")
+        return response(CallKind.READ, () -> restClient.post().uri(INTERNAL_PATH + "/progress-metadata")
                 .headers(this::forwardRequestHeaders).body(Map.of("courseIds", courseIds))
                 .retrieve().body(ProgressMetadata.class));
     }
@@ -125,7 +144,7 @@ public class RestLearningContentClient implements LearningContentClient {
     @Override
     public Map<UUID, Integer> practiceSetAvailability(List<UUID> knowledgePointIds,
                                                        List<UUID> excludePackageIds, int minQuestions) {
-        Availability response = response(() -> restClient.post()
+        Availability response = response(CallKind.READ, () -> restClient.post()
                 .uri(INTERNAL_PATH + "/practice-sets/availability")
                 .headers(this::forwardRequestHeaders)
                 .body(new AvailabilityRequest(knowledgePointIds, excludePackageIds, minQuestions))
@@ -149,7 +168,7 @@ public class RestLearningContentClient implements LearningContentClient {
     public List<PracticeSet> searchPracticeSets(UUID knowledgePointId, List<UUID> excludePackageIds,
                                                int minQuestions, int limit, UUID preferredLessonId,
                                                String trapErrorCode) {
-        return response(() -> restClient.post()
+        return response(CallKind.READ, () -> restClient.post()
                 .uri(INTERNAL_PATH + "/practice-sets/search")
                 .headers(this::forwardRequestHeaders)
                 .body(new PracticeSearch(knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId,
@@ -165,7 +184,7 @@ public class RestLearningContentClient implements LearningContentClient {
 
     @Override
     public Map<UUID, List<UUID>> prerequisites(List<UUID> knowledgePointIds) {
-        return response(() -> restClient.post()
+        return response(CallKind.READ, () -> restClient.post()
                 .uri(INTERNAL_PATH + "/knowledge-points/prerequisites")
                 .headers(this::forwardRequestHeaders)
                 .body(new PrerequisitesRequest(knowledgePointIds))
@@ -176,7 +195,7 @@ public class RestLearningContentClient implements LearningContentClient {
     @Override
     public Map<UUID, String> questionDifficulties(java.util.Collection<UUID> questionVersionIds) {
         if (questionVersionIds.isEmpty()) return Map.of();
-        Difficulties response = response(() -> restClient.post()
+        Difficulties response = response(CallKind.READ, () -> restClient.post()
                 .uri(INTERNAL_PATH + "/questions/difficulties")
                 .headers(this::forwardRequestHeaders)
                 .body(new DifficultyRequest(List.copyOf(questionVersionIds)))
@@ -188,7 +207,7 @@ public class RestLearningContentClient implements LearningContentClient {
     public WorkItemSubjects workItemSubjects(java.util.Collection<UUID> knowledgePointIds,
                                              java.util.Collection<UUID> questionVersionIds) {
         if (knowledgePointIds.isEmpty() && questionVersionIds.isEmpty()) return new WorkItemSubjects(Map.of(), Map.of());
-        return response(() -> restClient.post()
+        return response(CallKind.READ, () -> restClient.post()
                 .uri(INTERNAL_PATH + "/work-item-subjects")
                 .headers(this::forwardRequestHeaders)
                 .body(new WorkItemSubjectsRequest(List.copyOf(knowledgePointIds), List.copyOf(questionVersionIds)))
@@ -197,7 +216,7 @@ public class RestLearningContentClient implements LearningContentClient {
 
     @Override
     public SuggestionCandidates suggestionCandidates(List<UUID> knowledgePointIds, java.math.BigDecimal maxBand) {
-        return response(() -> restClient.post()
+        return response(CallKind.READ, () -> restClient.post()
                 .uri(INTERNAL_PATH + "/suggestions/candidates")
                 .headers(this::forwardRequestHeaders)
                 .body(new SuggestionRequest(knowledgePointIds, maxBand))
@@ -220,16 +239,16 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     private <T> T get(String path, ParameterizedTypeReference<T> type, Object... uriVariables) {
-        return response(() -> restClient.get()
+        return response(CallKind.READ, () -> restClient.get()
                 .uri(INTERNAL_PATH + path, uriVariables)
                 .headers(this::forwardRequestHeaders)
                 .retrieve()
                 .body(type));
     }
 
-    private <T> T response(Supplier<T> request) {
+    private <T> T response(CallKind kind, Supplier<T> request) {
         try {
-            T body = request.get();
+            T body = resilientCall.call("content", kind, request);
             if (body == null) throw contentFailure();
             return body;
         } catch (RestClientResponseException exception) {
@@ -239,6 +258,8 @@ public class RestLearningContentClient implements LearningContentClient {
             if (exception.getStatusCode().value() == 503) throw contentUnavailable();
             throw contentFailure();
         } catch (ResourceAccessException exception) {
+            throw contentUnavailable();
+        } catch (DownstreamUnavailableException exception) {
             throw contentUnavailable();
         } catch (RestClientException exception) {
             throw contentFailure();

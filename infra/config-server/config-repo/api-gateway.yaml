@@ -11,10 +11,25 @@ spring:
     gateway:
       server:
         webflux:
+          httpclient:
+            connect-timeout: 2000
+            response-timeout: 15s
           default-filters:
             - name: ClientRateLimit
               args:
                 tier: default
+            - name: Retry
+              args:
+                retries: 1
+                methods: GET
+                exceptions:
+                  - java.net.ConnectException
+                  - io.netty.channel.AbstractChannel$AnnotatedConnectException
+                backoff:
+                  firstBackoff: 100ms
+                  maxBackoff: 100ms
+                  factor: 1
+                  basedOnPreviousValue: false
           routes:
             # Goals, learning activity and study time are served by the Learning Service, but clients keep the paths the
             # User Service had. These routes come first: the Gateway takes the first route whose path matches, and
@@ -133,6 +148,9 @@ spring:
 
             - id: content-ai-drafts-limited
               uri: lb://CONTENT-SERVICE
+              metadata:
+                connect-timeout: 2000
+                response-timeout: 210000
               predicates:
                 - Path=/api/content/admin/ai-drafts/courses,/api/content/admin/ai-drafts/practice-sets
               filters:
@@ -142,6 +160,9 @@ spring:
 
             - id: content-media-upload-limited
               uri: lb://CONTENT-SERVICE
+              metadata:
+                connect-timeout: 2000
+                response-timeout: 120000
               predicates:
                 - Path=/api/content/admin/media/audio,/api/content/admin/media/image
               filters:
@@ -156,6 +177,9 @@ spring:
 
             - id: assessment-speaking-recording-upload-limited
               uri: lb://ASSESSMENT-SERVICE
+              metadata:
+                connect-timeout: 2000
+                response-timeout: 120000
               predicates:
                 - Path=/api/assessments/speaking-recordings
               filters:
@@ -165,6 +189,9 @@ spring:
 
             - id: assessment-ai-actions-limited
               uri: lb://ASSESSMENT-SERVICE
+              metadata:
+                connect-timeout: 2000
+                response-timeout: 120000
               predicates:
                 - Path=/api/assessments/admin/ai-gold-essays,/api/assessments/admin/ai-gold-essays/import-comparisons,/api/assessments/admin/ai-evaluations,/api/assessments/admin/ai-prompt-activations,/api/assessments/attempts/*/submit
               filters:
@@ -209,6 +236,9 @@ spring:
 
             - id: community-image-upload-limited
               uri: lb://COMMUNITY-SERVICE
+              metadata:
+                connect-timeout: 2000
+                response-timeout: 120000
               predicates:
                 - Path=/api/community/media/images
               filters:
@@ -220,6 +250,18 @@ spring:
               uri: lb://COMMUNITY-SERVICE
               predicates:
                 - Path=/api/community/**
+
+            - id: learning-ai-writing-limited
+              uri: lb://learning-service
+              metadata:
+                connect-timeout: 2000
+                response-timeout: 60s
+              predicates:
+                - Path=/api/learning/free-writing/submissions,/api/learning/lessons/*/essays/*/submissions,/api/learning/practice-attempts/*/essays/*/submissions,/api/learning/writing-submissions/*/revisions
+              filters:
+                - name: ClientRateLimit
+                  args:
+                    tier: ai
 
             - id: learning-service
               uri: lb://learning-service

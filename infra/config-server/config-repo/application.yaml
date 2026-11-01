@@ -11,6 +11,45 @@ management:
       exposure:
         include: health,info,refresh,prometheus
 
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 5s
+        slow-call-rate-threshold: 80
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-failure-predicate: com.ieltspath.commonresilience.ResilientCall$TransientHttpFailure
+    instances:
+      content: { base-config: default }
+      access: { base-config: default }
+      user: { base-config: default }
+      assessment: { base-config: default }
+      library: { base-config: default }
+      learning: { base-config: default }
+      llm: { base-config: default, slow-call-duration-threshold: 60s }
+  retry:
+    configs:
+      default:
+        max-attempts: 2
+        wait-duration: 200ms
+        retry-exception-predicate: com.ieltspath.commonresilience.ResilientCall$TransientHttpFailure
+    instances:
+      content: { base-config: default }
+      access: { base-config: default }
+      user: { base-config: default }
+      assessment: { base-config: default }
+      library: { base-config: default }
+      learning: { base-config: default }
+  bulkhead:
+    instances:
+      llm: { max-concurrent-calls: 4, max-wait-duration: 0 }
+
 logging:
   pattern:
     level: "%5p [%X{correlationId:-}]"

@@ -65,7 +65,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(LearningRequestException.class)
     public ResponseEntity<LearningErrorResponse> learningRequest(LearningRequestException exception) {
-        return ResponseEntity.status(exception.getStatus())
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(exception.getStatus());
+        if ("AI_BUSY".equals(exception.getCode())) response.header("Retry-After", "5");
+        if ("CONTENT_UNAVAILABLE".equals(exception.getCode())) response.header("Retry-After", "30");
+        return response
                 .body(new LearningErrorResponse(exception.getMessage(), exception.getCode(), null,
                         exception.getSubmissionId(), exception.getLessonIds()));
     }

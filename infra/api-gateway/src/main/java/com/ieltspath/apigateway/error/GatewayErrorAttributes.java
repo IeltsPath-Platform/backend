@@ -21,6 +21,7 @@ public class GatewayErrorAttributes extends DefaultErrorAttributes {
         Map<String, Object> attributes = new LinkedHashMap<>();
         attributes.put("timestamp", LocalDateTime.now());
         attributes.put("status", status);
+        if (status == HttpStatus.GATEWAY_TIMEOUT.value()) attributes.put("code", "GATEWAY_TIMEOUT");
         attributes.put("error", error);
         attributes.put("message", message(defaultAttributes, error));
         attributes.put("path", request.path());
@@ -58,6 +59,7 @@ public class GatewayErrorAttributes extends DefaultErrorAttributes {
             case NOT_FOUND -> "Không tìm thấy";
             case CONFLICT -> "Xung đột dữ liệu";
             case SERVICE_UNAVAILABLE -> "Dịch vụ tạm thời không khả dụng";
+            case GATEWAY_TIMEOUT -> "Gateway chờ dịch vụ quá thời gian";
             case INTERNAL_SERVER_ERROR -> "Lỗi hệ thống";
             default -> status.getReasonPhrase();
         };

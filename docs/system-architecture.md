@@ -80,6 +80,10 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | learning | LLM (ngoài hệ thống) | `POST {base}/chat/completions` (OpenAI-compatible) khi chấm bài luận, ngoài mọi transaction | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` |
 | assessment | LLM (ngoài hệ thống) | `POST {base}/chat/completions` cho essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE`, ngoài transaction | `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL`; quota ngày `ASSESSMENT_LLM_DAILY_LIMIT` |
 
+Các lời gọi HTTP đồng bộ dùng `shared/common-resilience`: retry tối đa một lần sau 200 ms chỉ cho lỗi kết nối/timeout và HTTP 5xx; chỉ `READ` và `IDEMPOTENT_WRITE` được retry. Circuit breaker dùng chung theo dịch vụ đích (content, access, user, assessment, library, learning, llm), mở 30 giây sau ngưỡng lỗi cấu hình; LLM có semaphore tối đa bốn lời gọi đồng thời. Lỗi breaker/bulkhead được client ánh xạ về contract lỗi của service gọi.
+
+Gateway đặt connect timeout 2 giây và response timeout mặc định 15 giây. Route upload và AI của assessment dùng 120 giây; ba endpoint chấm essay của Learning dùng 60 giây và tier rate limit `ai`; route tạo AI draft của Content dùng 210 giây theo timeout LLM mặc định 180 giây cộng dự phòng retry và gateway.
+
 Assessment, content, game và learning gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`.
 Content dùng timeout kết nối 2 giây, đọc 5 giây khi gọi Library; Library không đáp được thì Content trả 503 mã `VOCABULARY_SERVICE_UNAVAILABLE`. Library không gọi Content. Hai nơi cài snapshot game theo
 cùng [contract](contracts/game-content-snapshot-v1.md). Learning gọi Content qua API nội bộ (Gateway chặn `/internal/**`,
