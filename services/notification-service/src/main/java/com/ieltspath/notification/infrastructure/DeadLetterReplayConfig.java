@@ -9,7 +9,7 @@ import com.ieltspath.events.community.CommunityMessaging;
 import com.ieltspath.events.messaging.DeadLetterReplayer;
 import com.ieltspath.events.messaging.DeadLetterRoute;
 import org.springframework.amqp.core.AmqpAdmin;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -20,8 +20,8 @@ import java.util.List;
 public class DeadLetterReplayConfig {
 
     @Bean
-    DeadLetterReplayer notificationDeadLetterReplayer(RabbitTemplate rabbitTemplate, AmqpAdmin amqpAdmin) {
-        return new DeadLetterReplayer(rabbitTemplate, amqpAdmin, List.of(
+    DeadLetterReplayer notificationDeadLetterReplayer(ConnectionFactory connectionFactory, AmqpAdmin amqpAdmin) {
+        return new DeadLetterReplayer(connectionFactory, amqpAdmin, List.of(
                 new DeadLetterRoute(GradingCompletedTopology.DLQ, GradingCompletedTopology.QUEUE),
                 new DeadLetterRoute(GradingRequestedTopology.DLQ, GradingRequestedTopology.QUEUE),
                 new DeadLetterRoute(GradingOverdueTopology.DLQ, GradingOverdueTopology.QUEUE),

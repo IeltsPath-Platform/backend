@@ -1,35 +1,36 @@
 package com.ieltspath.events.messaging;
 
+import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.GetResponse;
+import com.rabbitmq.client.ReturnListener;
 import org.springframework.amqp.core.AmqpAdmin;
-import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
-import org.springframework.amqp.rabbit.connection.CorrelationData;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.support.DefaultMessagePropertiesConverter;
 
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Moves messages from a dead-letter queue back to the queue they were parked from, once an operator has fixed the cause.
- * Only the routes a service declares can be replayed. Each message is taken without auto-acknowledgement and acknowledged
- * only after the broker has confirmed the republished copy; a failure leaves it in the dead-letter queue.
+ * Only the routes a service declares can be replayed. Each replay uses its own channel with publisher confirms, so it does
+ * not depend on how the service configures its template. A message is taken without auto-acknowledgement and acknowledged
+ * only after the broker confirms the republished copy; any failure puts it back in the dead-letter queue.
  */
 public class DeadLetterReplayer {
     public static final int MAX_PER_CALL = 500;
-    private static final long CONFIRM_TIMEOUT_SECONDS = 5;
+    private static final long CONFIRM_TIMEOUT_MILLIS = 5_000;
 
-    private final RabbitTemplate rabbit;
+    private final ConnectionFactory connections;
     private final AmqpAdmin admin;
     private final List<DeadLetterRoute> routes;
     private final DefaultMessagePropertiesConverter converter = new DefaultMessagePropertiesConverter();
 
-    public DeadLetterReplayer(RabbitTemplate rabbit, AmqpAdmin admin, List<DeadLetterRoute> routes) {
-        this.rabbit = rabbit;
+    public DeadLetterReplayer(ConnectionFactory connections, AmqpAdmin admin, List<DeadLetterRoute> routes) {
+        this.connections = connections;
         this.admin = admin;
         this.routes = List.copyOf(routes);
     }
@@ -58,15 +59,30 @@ public class DeadLetterReplayer {
                 .filter(candidate -> candidate.deadLetterQueue().equals(deadLetterQueue))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Not a declared dead-letter queue: " + deadLetterQueue));
+        // Only the messages waiting now are taken. A message that fails again goes straight back to the dead-letter queue,
+        // and taking it again in the same call would replay the same failure over and over.
+        int available = (int) Math.min(max, messagesIn(deadLetterQueue));
         int moved = 0;
-        while (moved < max && Boolean.TRUE.equals(rabbit.execute(channel -> replayOne(channel, route)))) {
-            moved++;
+        try (var connection = connections.createConnection()) {
+            Channel channel = connection.createChannel(false);
+            try {
+                channel.confirmSelect();
+                while (moved < available && replayOne(channel, route)) {
+                    moved++;
+                }
+            } finally {
+                if (channel.isOpen()) {
+                    channel.close();
+                }
+            }
+        } catch (Exception failure) {
+            throw new IllegalStateException("Dead-letter replay stopped after " + moved + " messages", failure);
         }
         return new ReplayResult(deadLetterQueue, moved, messagesIn(deadLetterQueue));
     }
 
     /** @return true when one message was moved, false when the dead-letter queue was empty. */
-    private Boolean replayOne(Channel channel, DeadLetterRoute route) throws Exception {
+    private boolean replayOne(Channel channel, DeadLetterRoute route) throws Exception {
         GetResponse response = channel.basicGet(route.deadLetterQueue(), false);
         if (response == null) {
             return false;
@@ -75,11 +91,17 @@ public class DeadLetterReplayer {
         try {
             MessageProperties properties = converter.toMessageProperties(response.getProps(), response.getEnvelope(), "UTF-8");
             properties.getHeaders().remove(MessageHeaders.RETRY_COUNT);
-            CorrelationData correlation = new CorrelationData(String.valueOf(properties.getMessageId()));
-            rabbit.send("", route.queue(), new Message(response.getBody(), properties), correlation);
-            CorrelationData.Confirm confirm = correlation.getFuture().get(CONFIRM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            if (!confirm.isAck() || correlation.getReturned() != null) {
-                throw new IllegalStateException("Broker did not accept the replayed message");
+            AMQP.BasicProperties basic = converter.fromMessageProperties(properties, "UTF-8");
+            AtomicBoolean returned = new AtomicBoolean(false);
+            ReturnListener onReturn = (replyCode, replyText, exchange, routingKey, unused, body) -> returned.set(true);
+            channel.addReturnListener(onReturn);
+            try {
+                channel.basicPublish("", route.queue(), true, basic, response.getBody());
+                if (!channel.waitForConfirms(CONFIRM_TIMEOUT_MILLIS) || returned.get()) {
+                    throw new IllegalStateException("Broker did not accept the replayed message");
+                }
+            } finally {
+                channel.removeReturnListener(onReturn);
             }
             channel.basicAck(deliveryTag, false);
             return true;
