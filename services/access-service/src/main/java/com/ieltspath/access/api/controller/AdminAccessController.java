@@ -11,6 +11,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 
 import java.util.List;
 import java.util.UUID;
@@ -80,12 +82,17 @@ public class AdminAccessController {
 
     @PostMapping("/subscriptions/grant")
     @ResponseStatus(HttpStatus.CREATED)
-    public SubscriptionResponse grantSubscription(@Valid @RequestBody GrantSubscriptionRequest request) {
+    public SubscriptionResponse grantSubscription(
+            @Parameter(in = ParameterIn.HEADER, name = "Idempotency-Key", required = true,
+                    description = "UUID mới cho mỗi lần cấp; gửi lại cùng khóa khi thử lại")
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @Valid @RequestBody GrantSubscriptionRequest request) {
         return SubscriptionResponse.from(grantSubscriptionUseCase.execute(new GrantSubscriptionCommand(
                 request.userId(),
                 request.planId(),
                 request.durationDays(),
-                request.humanGradingCredits()
+                request.humanGradingCredits(),
+                idempotencyKey
         )));
     }
 }
