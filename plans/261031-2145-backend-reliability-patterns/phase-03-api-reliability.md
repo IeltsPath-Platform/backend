@@ -217,3 +217,8 @@ Qua gateway thật: 6 lần login sai cùng email từ một máy → lần 6 nh
 - `LoginContext` không mang IP client, hoặc `LoginUseCase` không có exception riêng cho sai thông tin.
 - Không tìm được danh sách route upload/AI rõ ràng.
 - Hai service có `ErrorResponse` khác kiểu ở cùng tên field (ví dụ `timestamp` là chuỗi ở chỗ này, `LocalDateTime` ở chỗ khác).
+
+**Đã chốt sau NEEDS_CONTEXT của Codex (Claude, 2026-11-01):**
+- Kiểu `timestamp` **không đổi**. Game giữ `Instant`; 8 service còn lại giữ `LocalDateTime`. Đổi kiểu là đổi contract API mà frontend đang dùng, nên ngoài phạm vi phase này. Contract test chỉ kiểm **tên** field (`timestamp, status, error, message, path, details, code` khi có), không kiểm kiểu. Ghi ngoại lệ game trong Javadoc của contract test.
+- `@Valid` cho community và notification: **đã có** trên mọi `@RequestBody` (Codex đã xác nhận). Bỏ khỏi phạm vi, không sửa.
+- Các việc còn lại của phase 3 vẫn làm như khung.
