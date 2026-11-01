@@ -1,5 +1,6 @@
 package com.ieltspath.content.infrastructure.client;
 
+import com.ieltspath.commonresilience.ResilientCall;
 import com.ieltspath.content.application.exception.VocabularyRejectedException;
 import com.ieltspath.content.application.exception.VocabularyServiceUnavailableException;
 import com.ieltspath.content.application.port.VocabularySenseLookup;
@@ -14,9 +15,17 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.Duration;
+
+import static org.springframework.test.web.client.ExpectedCount.times;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -76,6 +85,30 @@ class LibraryVocabularySenseClientTest {
         server.expect(requestTo("http://library.test/api/content/vocabulary/senses?ids=" + senseId))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
+        assertThatThrownBy(() -> client.describeActiveSenses(List.of(senseId)))
+                .isInstanceOf(VocabularyServiceUnavailableException.class);
+        server.verify();
+    }
+
+    @Test void repeatedLibraryFailuresOpenCircuitAndKeepUnavailableMapping() {
+        UUID senseId = UUID.randomUUID();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        CircuitBreakerConfig breakerConfig = CircuitBreakerConfig.custom()
+                .slidingWindowSize(2).minimumNumberOfCalls(2).failureRateThreshold(50)
+                .waitDurationInOpenState(Duration.ofSeconds(10)).build();
+        RetryConfig retryConfig = RetryConfig.custom().maxAttempts(2).waitDuration(Duration.ZERO)
+                .retryOnException(ResilientCall::isTransientFailure).build();
+        ResilientCall resilientCall = new ResilientCall(CircuitBreakerRegistry.of(breakerConfig),
+                RetryRegistry.of(retryConfig), BulkheadRegistry.ofDefaults());
+        LibraryVocabularySenseClient client = new LibraryVocabularySenseClient(
+                builder.baseUrl("http://library.test").build(), resilientCall);
+        signIn();
+        server.expect(times(2), requestTo("http://library.test/api/content/vocabulary/senses?ids=" + senseId))
+                .andRespond(withServerError());
+
+        assertThatThrownBy(() -> client.describeActiveSenses(List.of(senseId)))
+                .isInstanceOf(VocabularyServiceUnavailableException.class);
         assertThatThrownBy(() -> client.describeActiveSenses(List.of(senseId)))
                 .isInstanceOf(VocabularyServiceUnavailableException.class);
         server.verify();
