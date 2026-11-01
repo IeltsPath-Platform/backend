@@ -3,6 +3,7 @@ package com.ieltspath.access.infrastructure.messaging;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.access.domain.entity.OutboxEvent;
 import com.ieltspath.access.domain.repository.OutboxEventRepository;
+import com.ieltspath.commonobservability.CorrelationIdFilter;
 import com.ieltspath.events.access.SubscriptionGrantedTopology;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.slf4j.MDC;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -138,6 +140,20 @@ class AccessOutboxRelayIntegrationTest {
         assertEquals(1, relay.publishPendingBatch());
         assertEquals("PUBLISHED", status(eventId));
         assertEquals(1, receiveAll().size());
+    }
+
+    @Test
+    void relayOnAnotherThreadKeepsTheRequestCorrelationId() throws Exception {
+        MDC.put(CorrelationIdFilter.MDC_KEY, "req-9");
+        UUID eventId = UUID.randomUUID();
+        grant(eventId);
+        MDC.remove(CorrelationIdFilter.MDC_KEY);
+
+        assertEquals(1, CompletableFuture.supplyAsync(relay::publishPendingBatch).get());
+
+        Message message = rabbit.receive(SubscriptionGrantedTopology.QUEUE, 10_000);
+        assertNotNull(message, "the outbox row reached the broker from the relay thread");
+        assertEquals("req-9", message.getMessageProperties().getHeader("x-correlation-id"));
     }
 
     @Test
