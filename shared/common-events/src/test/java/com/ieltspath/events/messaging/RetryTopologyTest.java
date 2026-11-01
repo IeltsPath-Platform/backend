@@ -51,8 +51,8 @@ class RetryTopologyTest {
         assertEquals(Set.of(queue, retryQueue, dlq), queues.keySet());
         assertEquals(Map.of("x-dead-letter-exchange", dlx, "x-dead-letter-routing-key", dlq),
                 queues.get(queue).getArguments());
-        assertEquals(Map.of("x-message-ttl", 30000, "x-dead-letter-exchange", "",
-                "x-dead-letter-routing-key", queue), queues.get(retryQueue).getArguments());
+        assertEquals(Map.of("x-message-ttl", 30000, "x-dead-letter-exchange", "learning.points",
+                "x-dead-letter-routing-key", routingKey), queues.get(retryQueue).getArguments());
         assertEquals(Map.of(), queues.get(dlq).getArguments());
         queues.values().forEach(q -> {
             assertTrue(q.isDurable());

@@ -19,7 +19,7 @@ public final class RetryTopology {
 
     /**
      * The main queue dead-letters to the DLQ through its own direct DLX; the retry queue holds a message for
-     * {@code retryDelayMs}, then hands it back to the main queue through the default exchange.
+     * {@code retryDelayMs}, then routes it back through the source exchange with the original routing key.
      */
     public static Declarables of(Names n, long retryDelayMs, Exchange sourceExchange, String routingKey) {
         Queue main = QueueBuilder.durable(n.queue())
@@ -28,8 +28,8 @@ public final class RetryTopology {
                 .build();
         Queue retry = QueueBuilder.durable(n.retryQueue())
                 .ttl((int) retryDelayMs)
-                .deadLetterExchange("")
-                .deadLetterRoutingKey(n.queue())
+                .deadLetterExchange(sourceExchange.getName())
+                .deadLetterRoutingKey(routingKey)
                 .build();
         Queue deadLetters = QueueBuilder.durable(n.deadLetterQueue()).build();
         DirectExchange deadLetterExchange = new DirectExchange(n.deadLetterExchange(), true, false);
