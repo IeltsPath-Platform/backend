@@ -1,6 +1,7 @@
 package com.ieltspath.user.application.usecase;
 
 import com.ieltspath.user.application.command.LoginContext;
+import com.ieltspath.user.application.port.LoginAttemptLimiter;
 import com.ieltspath.user.application.result.AuthTokenResult;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.AuthenticationFailedException;
@@ -35,8 +36,34 @@ class AuditedLoginUseCaseTest {
     private UserRepository userRepository;
     @Mock
     private LoginHistoryRecorder recorder;
+    @Mock
+    private LoginAttemptLimiter loginAttemptLimiter;
     @InjectMocks
     private AuditedLoginUseCase useCase;
+
+    @Test
+    void recordsFailureAndRethrowsOnBadCredentials() {
+        AuthenticationFailedException failure = new AuthenticationFailedException("x");
+        when(loginUseCase.execute("John@Example.com", "bad")).thenThrow(failure);
+
+        assertThatThrownBy(() -> useCase.execute("John@Example.com", "bad", CONTEXT))
+                .isSameAs(failure);
+
+        verify(loginAttemptLimiter).checkAllowed("john@example.com", CONTEXT.ipAddress());
+        verify(loginAttemptLimiter).recordFailure("john@example.com", CONTEXT.ipAddress());
+    }
+
+    @Test
+    void recordsSuccess() {
+        AuthTokenResult tokens = new AuthTokenResult("access", "refresh", 3600, 604800);
+        when(loginUseCase.execute("John@Example.com", "secret")).thenReturn(tokens);
+        when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
+
+        assertThat(useCase.execute("John@Example.com", "secret", CONTEXT)).isEqualTo(tokens);
+
+        verify(loginAttemptLimiter).checkAllowed("john@example.com", CONTEXT.ipAddress());
+        verify(loginAttemptLimiter).recordSuccess("john@example.com", CONTEXT.ipAddress());
+    }
 
     @Test
     void recordsSuccessfulSignIn() {
