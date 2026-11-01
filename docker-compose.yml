@@ -6,6 +6,7 @@ name: ieltspath
 
 x-spring-service: &spring-service
   restart: unless-stopped
+  stop_grace_period: 40s
   networks:
     - codebase-network
   healthcheck:
@@ -20,7 +21,7 @@ x-spring-env: &spring-env
   EUREKA_URL: http://eureka-server:8761/eureka/
   GATEWAY_INTERNAL_JWT_SECRET: "${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}"
   API_DOCS_ENABLED: "${API_DOCS_ENABLED:-true}"
-  JAVA_TOOL_OPTIONS: "-Xms64m -Xmx512m"
+  JAVA_TOOL_OPTIONS: "-Xms64m -Xmx512m -Dsun.net.inetaddr.ttl=5"
 
 x-after-infra: &after-infra
   postgres:

@@ -310,6 +310,28 @@ Game không cần thêm claim riêng: hàng trận được khóa trước khi c
 
 Redis pub/sub của `game.room-events` và `notification.push` là kênh đẩy không bền; API/DB vẫn là nguồn dữ liệu. Vé WebSocket game lưu với TTL dưới `game:ws-ticket:*`. Compose cho phép scale service ứng dụng bằng `--scale` vì không gán `container_name` và không bind các cổng nội bộ ra host; gateway vẫn chạy một instance.
 
+## Dừng một instance
+
+Các service Spring dùng graceful shutdown 30 giây; scheduler đợi công việc đang chạy tối đa 20 giây. Compose đặt
+`stop_grace_period: 40s`, đủ cho khoảng drain của Spring và thời gian kết thúc JVM. Eureka server cập nhật cache mỗi
+3 giây, quét instance hết hạn mỗi 5 giây; client fetch registry mỗi 5 giây với heartbeat 10 giây và lease 30 giây.
+Gateway cache danh sách instance 5 giây. JVM của service dùng DNS TTL 5 giây cho các hostname trong Compose.
+
+Các giá trị này rút ngắn thời gian gửi request tới replica đang dừng nhưng Compose không bảo đảm zero-downtime. Khi
+deploy VPS, reverse proxy cần health check chủ động, loại instance khỏi pool trước khi dừng và lần lượt thay replica;
+cần đặt thời gian drain cho proxy và xử lý riêng kết nối WebSocket. Chưa có phép đo stack thật cho cửa sổ định tuyến;
+Claude sẽ ghi số request lỗi và thời gian dừng tới lỗi cuối sau khi chạy phép đo nhiều replica.
+
+## Kiểm chứng reliability
+
+| Kịch bản | Kiểm chứng tự động hiện có hoặc được thêm | Ranh giới |
+|---|---|---|
+| Server và scheduler chờ công việc trước khi dừng | `GracefulShutdownTest`, `SchedulerShutdownTest` | Kiểm tra config repo và scheduler đang chạy |
+| Subscription grant nhận lại cùng khóa | `GrantSubscriptionIdempotencyTest` | PostgreSQL Testcontainers, gồm cạnh tranh và outbox |
+| Mở breaker và hồi phục downstream | `RestLearningContentClientResilienceTest`, `ResilientCallTest` | Unit/integration test; phép dừng service qua gateway vẫn cần kiểm tay |
+| Message được retry và đưa lại từ DLQ | `SubscriptionGrantedBrokerIntegrationTest`, `ReplayedMessageIsProcessedTest` | RabbitMQ Testcontainers |
+| Dừng một replica còn replica khác | Đo bằng Compose sau khi triển khai; ghi lỗi request và thời gian tới lỗi cuối | Compose thu hẹp cửa sổ lỗi, không hứa zero-downtime |
+
 ## 7. Chạy local (tóm tắt)
 
 - Root `docker-compose.yml` khởi chạy PostgreSQL, RabbitMQ, Config Server, Eureka, Gateway và tất cả service đã triển khai.

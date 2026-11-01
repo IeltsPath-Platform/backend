@@ -8,6 +8,9 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
   cloud:
+    loadbalancer:
+      cache:
+        ttl: 5s
     gateway:
       server:
         webflux:

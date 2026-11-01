@@ -33,6 +33,8 @@ Kịch bản bắt buộc (mỗi kịch bản một test, tên mô tả hành vi
 | Correlation qua HTTP → outbox → consumer | consumer nhận correlation id của request tạo event | B9, B2 |
 | Dừng một replica khi service còn replica khác | request/event tiếp tục được xử lý; trạng thái không bị nhân đôi | B6 |
 | Danh sách endpoint auth sau khi chuẩn hóa | login, refresh, forgot-password, reset-password và register đều được rate limit; logout dùng tier mặc định | B8 |
+| Scheduler tiếp tục tới khi job đang chạy hoàn tất | `SchedulerShutdownTest.waitsForRunningScheduledWorkDuringShutdown` | mới |
+| Graceful shutdown và thời gian ngừng instance | `GracefulShutdownTest.configuresGracefulServerAndFastInstanceDiscovery` | mới |
 
 ## Architecture
 
