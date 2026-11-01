@@ -22,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.rabbitmq.listener.simple.auto-startup=false",
         "app.auth.internal-jwt-issuer=urn:test:gateway",
         "app.auth.internal-jwt-secret=dGVzdC1vbmx5LWludGVybmFsLWp3dC1zaWduaW5nLWtleQ==",
+        "app.auth.external-jwt-issuer=urn:code-base:auth",
         "management.endpoints.web.exposure.include=health,info,prometheus"
 })
 @AutoConfigureMockMvc
