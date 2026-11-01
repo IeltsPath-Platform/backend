@@ -26,11 +26,19 @@ public class CorrelationListenerAdvice implements MethodInterceptor {
         }
     }
 
+    /**
+     * The container invokes the listener as (channel, message), so the message is not always the first argument.
+     */
     private static String idOf(Object[] arguments) {
-        if (arguments != null && arguments.length > 0 && arguments[0] instanceof Message message) {
-            Object header = message.getMessageProperties().getHeader(CorrelationRabbitBeanPostProcessor.HEADER);
-            if (header != null) {
-                return CorrelationIdFilter.safeOrNew(header.toString());
+        if (arguments != null) {
+            for (Object argument : arguments) {
+                if (argument instanceof Message message) {
+                    Object header = message.getMessageProperties().getHeader(CorrelationRabbitBeanPostProcessor.HEADER);
+                    if (header != null) {
+                        return CorrelationIdFilter.safeOrNew(header.toString());
+                    }
+                    break;
+                }
             }
         }
         return UUID.randomUUID().toString();

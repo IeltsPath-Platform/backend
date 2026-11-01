@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.rabbitmq.client.Channel;
 import org.aopalliance.intercept.MethodInvocation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,23 @@ class CorrelationRabbitTest {
 
         assertEquals("evt-7", seen[0]);
         assertNull(MDC.get(CorrelationIdFilter.MDC_KEY));
+    }
+
+    @Test
+    void listenerInvokedWithChannelFirstStillReadsTheMessageId() throws Throwable {
+        Message message = MessageBuilder.withBody(new byte[0]).build();
+        message.getMessageProperties().setHeader(CorrelationRabbitBeanPostProcessor.HEADER, "evt-9");
+        String[] seen = new String[1];
+        MethodInvocation invocation = mock(MethodInvocation.class);
+        when(invocation.getArguments()).thenReturn(new Object[] {mock(Channel.class), message});
+        when(invocation.proceed()).thenAnswer(call -> {
+            seen[0] = MDC.get(CorrelationIdFilter.MDC_KEY);
+            return null;
+        });
+
+        new CorrelationListenerAdvice().invoke(invocation);
+
+        assertEquals("evt-9", seen[0]);
     }
 
     @Test
