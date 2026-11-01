@@ -13,8 +13,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Keeps the staff work queues current without anyone opening them: every few hours it adds the items new sources need.
- * Only one service instance runs a round at a time (a transaction-scoped database lock), so several instances never
- * duplicate work; a round that finds the lock taken is skipped. Disable with {@code learning.work-items.sync-enabled=false}.
+ * Instances load source data without holding a lock, then one applies the snapshot at a time under a transaction-scoped
+ * database lock. Unique work-item keys also make overlapping snapshots safe. Disable with
+ * {@code learning.work-items.sync-enabled=false}.
  */
 @Component
 @EnableScheduling
@@ -48,11 +49,12 @@ public class WorkItemSyncJob {
 
     /** One round; returns the number of items added, or -1 when another instance holds the lock. */
     public int runOnce() {
+        WorkItemSync.Loaded loaded = sync.loadFromContent();
         Integer added = transaction.execute(status -> {
             Boolean locked = jdbc.queryForObject("SELECT pg_try_advisory_xact_lock(hashtext(?))", Boolean.class,
                     LOCK_NAME);
             if (!Boolean.TRUE.equals(locked)) return -1;
-            return sync.sync();
+            return sync.apply(loaded);
         });
         if (added != null && added > 0) log.info("Work item sync added {} items", added);
         return added == null ? -1 : added;

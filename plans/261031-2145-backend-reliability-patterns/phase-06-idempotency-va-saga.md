@@ -4,7 +4,7 @@ title: "Idempotency va saga"
 status: pending
 priority: P2
 effort: "M"
-dependencies: [2, 5]
+dependencies: [2, 3]
 ---
 
 # Phase 6: Idempotency và saga

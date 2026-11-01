@@ -255,6 +255,38 @@ trước khi attempt hoàn tất; lần giao được consume cả khi trượt;
 quy tắc tương tự cho `course_test_assignments`; đạt ≥70% ghi `course_progress.passed_at`. ACK sau commit; topic kế trong
 cùng course mở theo trạng thái suy ra khi đọc. Course test không chặn topic hay course khác.
 
+## Scheduler và nhiều instance
+
+Backend hiện có 21 phương thức `@Scheduled` trong 20 job. Cơ chế chống xử lý trùng theo mã đang chạy:
+
+| Service | Job / lịch | Cơ chế cạnh tranh | HTTP/LLM khi giữ khóa hoặc transaction |
+|---|---|---|---|
+| game | `RocketRoundScheduler` | Khóa hàng trận (`FOR UPDATE`) và kiểm trạng thái vòng khi settle; hai lịch trùng không đóng vòng hai lần | Không |
+| game | `SoloTimeoutScheduler` | Khóa trận và người chơi (`FOR UPDATE OF m,p`), kiểm deadline; hai lịch trùng chỉ trừ một mạng | Không |
+| game | `OutboxRetentionJob` | Xóa theo ngưỡng thời gian; chạy lặp an toàn | Không |
+| game | `RoomEventChannelSupervisor` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
+| notification | `NoticePushChannelConfig` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
+| assessment | `OutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn để giữ claim tới khi gửi xong | Broker trong transaction ngắn |
+| access | `AccessOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
+| community | `CommunityOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
+| assessment | `GateEssayGradingScheduler` | Claim batch bằng `FOR UPDATE SKIP LOCKED` trong transaction; cập nhật job hoàn tất trong transaction riêng | LLM ngoài transaction claim và transaction ghi kết quả |
+| assessment | `GradingDeadlineScheduler` | Store chọn các job bằng `FOR UPDATE SKIP LOCKED`; ghi thông báo/outbox trong transaction | Không |
+| assessment | `SpeakingRecordingRetentionScheduler` | Xóa theo ngưỡng thời gian; chạy lặp an toàn | Không |
+| content | `ScheduledPublishJob` | Advisory lock tránh hai instance publish cùng đợt | Không |
+| content | `AiDraftScheduler` | Claim bản nháp bằng `FOR UPDATE SKIP LOCKED`, commit claim trước khi gọi generator; lưu kết quả riêng | Generator/LLM ngoài transaction claim |
+| learning | `LeagueCloseJob` | Advisory transaction lock quanh cập nhật tuần | Không |
+| learning | `InactivityFlagJob` | Advisory transaction lock quanh tính và ghi cờ | Không |
+| learning | `SnapshotJob` (weekly) | Advisory transaction lock theo kỳ snapshot | Không |
+| learning | `SnapshotJob` (monthly) | Advisory transaction lock theo kỳ snapshot | Không |
+| learning | `RewardGrantRelayJob` | Advisory transaction lock và `SKIP LOCKED` cho batch | Broker trong transaction ngắn |
+| learning | `MasteryDecayJob` | Session advisory lock; các batch ghi theo transaction riêng | Không |
+| learning | `WorkItemSyncJob` | Đọc nguồn và lấy metadata Content trước; transaction ngắn lấy advisory lock rồi ghi snapshot; unique key loại mục trùng | Content HTTP ngoài transaction/khóa |
+| user | `LoginHistoryPurgeScheduler` | Xóa theo cutoff thời gian; chạy lặp an toàn | Không |
+
+Game không cần thêm claim riêng: hàng trận được khóa trước khi cập nhật và trạng thái được kiểm lại. Relay dùng row claim để instance khác có thể xử lý các hàng còn lại. Việc đọc nguồn của `WorkItemSyncJob` có thể chạy đồng thời; phần ghi được tuần tự hóa và repository bỏ qua work item đã tồn tại.
+
+Redis pub/sub của `game.room-events` và `notification.push` là kênh đẩy không bền; API/DB vẫn là nguồn dữ liệu. Vé WebSocket game lưu với TTL dưới `game:ws-ticket:*`. Compose cho phép scale service ứng dụng bằng `--scale` vì không gán `container_name` và không bind các cổng nội bộ ra host; gateway vẫn chạy một instance.
+
 ## 7. Chạy local (tóm tắt)
 
 - Root `docker-compose.yml` khởi chạy PostgreSQL, RabbitMQ, Config Server, Eureka, Gateway và tất cả service đã triển khai.

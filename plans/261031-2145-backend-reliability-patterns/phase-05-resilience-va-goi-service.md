@@ -1,13 +1,15 @@
 ---
 phase: 5
 title: "Resilience va goi service"
-status: pending
+status: superseded
 priority: P2
 effort: "L"
 dependencies: [2, 3]
 ---
 
 # Phase 5: Resilience và gọi service
+
+Thiết kế cũ của phase này đã được thay bằng [spec resilience đã đính chính](../261101-0930-reliability-followups/phase-03-thiet-ke-lai-resilience.md). Tiếp tục giữ mục **Contract test** và danh sách client làm tài liệu phạm vi; không dùng các số lần thử, thứ tự bọc hay phân loại `CallKind` ở phần cũ.
 
 > **Thiết kế đã được đính chính.** Nguồn chuẩn: [plan đính chính, phase 3](../261101-0930-reliability-followups/phase-03-thiet-ke-lai-resilience.md). Khi mâu thuẫn với phần còn lại của file này, **file đính chính thắng**. Đã sửa tại chỗ trong file này: số lần thử, thứ tự bọc, phân loại `CallKind`, bảng client. Giữ nguyên từ file này: danh sách 22 client, fallback, mục Contract test và fixtures. Phase này cần trường `code` của `ErrorResponse` (phase 3), nên `dependencies` có thêm 3.
 

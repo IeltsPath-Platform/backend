@@ -30,6 +30,9 @@ Kịch bản bắt buộc (mỗi kịch bản một test, tên mô tả hành vi
 | Downstream treo sau gateway | gateway trả 504 theo định dạng lỗi chung | B5 |
 | Provider đổi hợp đồng API nội bộ | contract test provider đỏ | B7 |
 | Message vào DLQ rồi được đưa lại sau khi sửa nguyên nhân | xử lý đúng một lần | B3 |
+| Correlation qua HTTP → outbox → consumer | consumer nhận correlation id của request tạo event | B9, B2 |
+| Dừng một replica khi service còn replica khác | request/event tiếp tục được xử lý; trạng thái không bị nhân đôi | B6 |
+| Danh sách endpoint auth sau khi chuẩn hóa | login, refresh, forgot-password, reset-password và register đều được rate limit; logout dùng tier mặc định | B8 |
 
 ## Architecture
 

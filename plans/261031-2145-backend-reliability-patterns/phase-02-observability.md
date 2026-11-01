@@ -71,7 +71,7 @@ Một request có cùng `correlationId` trong log của gateway, mọi service n
 ## Success Criteria
 
 - [ ] Một request qua gateway → learning → content: cùng `correlationId` ở log JSON của cả ba (kiểm tay bằng `docker compose logs | grep`).
-- [ ] Event assessment → learning listener: log consumer có `correlationId` của request gốc.
+- [ ] Event assessment → learning listener: log consumer có `correlationId` của request gốc; phần truyền qua outbox thuộc phase 1 mới, còn test Rabbit publish trực tiếp chỉ chứng minh MDC/header của đường publish đó.
 - [ ] `/actuator/prometheus` có ở 9 service, không truy cập được qua gateway (`GET :8080/actuator/prometheus` → 404).
 - [ ] `docker compose --profile observability up` với `--scale learning-service=2`: Prometheus thấy cả 2 target learning ở trạng thái UP.
 - [ ] Toàn bộ test hiện có xanh.

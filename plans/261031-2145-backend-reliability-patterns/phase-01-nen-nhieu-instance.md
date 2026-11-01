@@ -9,7 +9,7 @@ dependencies: []
 
 # Phase 1: Nền nhiều instance
 
-<!-- Updated: Red Team Review - bỏ sticky và STOMP relay; game và notification phát qua Redis pub/sub; khóa scheduler game theo trận; không bọc khóa job đã claim theo hàng -->
+<!-- Các cơ chế triển khai được đối chiếu lại trong bảng scheduler bên dưới; kiểm tay hai instance vẫn do Claude thực hiện. -->
 
 ## Overview
 
@@ -18,7 +18,7 @@ Cho phép chạy 2+ instance mỗi service mà không chạy job trùng, không 
 ## Requirements
 
 - Redis 7 trong `docker-compose.yml`, healthcheck, cổng host chỉ `127.0.0.1` (nếu mở).
-- 16 `@Scheduled` job: mỗi đơn vị việc chỉ một instance xử lý.
+- 21 phương thức `@Scheduled` trong 20 job: cơ chế chống xử lý trùng được ghi rõ theo từng job.
 - notification-service: push STOMP tới người dùng dù họ nối vào instance khác.
 - game-service: mọi người trong phòng nhận event phòng dù nối vào instance khác, kể cả event do scheduler sinh ra.
 - Không đổi hợp đồng WebSocket phía frontend (`/ws/notifications`, `/ws/games`, destination `/user/queue/notifications`, định dạng message game).
@@ -27,7 +27,7 @@ Cho phép chạy 2+ instance mỗi service mà không chạy job trùng, không 
 
 - Game: một endpoint `/ws/games` (`GameWebSocketConfig.java:28`); phòng gắn qua vé (`InMemoryWebSocketTicketStore.issue(roomId, userId)`); session giữ trong `sessionsByRoom` (`GameWebSocketHandler.java:262`); event phòng là `@TransactionalEventListener` trong tiến trình (`GameWebSocketHandler.java:66` và 11 handler khác), phát từ REST use case và từ scheduler.
 - Notification: `enableSimpleBroker("/queue")` (`NotificationMessagingConfig.java:50`); listener RabbitMQ gọi `convertAndSendToUser` trên instance đang consume.
-- Scheduler game: `RocketMatchStoreAdapter.dueMatches` (`:130`) và `SoloGameplayRepositoryAdapter.due` (`:531`) đọc không claim → 2 instance cùng xử lý một trận.
+- Scheduler game đọc mục đến hạn không claim; ghi được khóa theo trận và kiểm tra trạng thái nên lần chạy trùng không áp dụng cùng thay đổi hai lần.
 - Relay assessment, community và store chấm LLM (`JdbcGateEssayJobStore`) đã claim bằng `FOR UPDATE SKIP LOCKED`.
 
 ## Architecture
@@ -38,34 +38,52 @@ Cho phép chạy 2+ instance mỗi service mà không chạy job trùng, không 
   - Pub/sub không bền: instance rớt thì mất push lúc đó; chấp nhận vì REST là nguồn sự thật (đã có đồng bộ lại). Ghi rõ trong tài liệu.
   - Lớp nhỏ dùng chung giữa hai service (publisher + listener container + mã hóa JSON): đặt trong mỗi service (2 chỗ, mã ngắn); chỉ đưa vào `shared/` nếu service thứ ba cần.
 - **Vé game:** `InMemoryWebSocketTicketStore` → `RedisWebSocketTicketStore` (TTL, `GETDEL` để dùng một lần), vì vé phát qua REST ở instance A có thể được dùng ở instance B.
-- **Scheduler:**
-  - Job có store claim theo hàng (`SKIP LOCKED`): không bọc gì, chỉ thêm test song song. Áp cho 2 relay và `GateEssayGradingScheduler` (gọi LLM, không được giữ khóa qua HTTP).
-  - Game (đã kiểm, **không cần khóa thêm**): `RocketGameplayUseCase.advance` khóa trận bằng `FOR UPDATE` và `settle` kiểm trạng thái vòng trước khi đóng; `SoloGameplayUseCase.timeout` khóa `FOR UPDATE OF m,p` và kiểm deadline. Lần chạy trùng thứ hai thấy vòng đã đóng nên không làm gì. Bằng chứng: test `concurrentSchedulesCloseAnExpiredRoundOnlyOnce` (Rocket) chạy hai luồng đồng thời, chỉ một sự kiện `Closed`. Rủi ro còn lại là tốn tải truy vấn, không sai dữ liệu. <!-- Updated: đo bằng test, bỏ yêu cầu claim sau red-team #2 -->
-  - Solo: cùng mẫu khóa; chưa có test đồng thời, ghi là bước kiểm tiếp.
-  - Job còn lại (đã rà khi làm phase 1, <!-- Updated: kiểm code, không cần khóa thêm --> không job nào cần khóa advisory):
-    - `GradingDeadlineScheduler` → `JdbcOverdueNoticeStore`, `JdbcDueSoonNoticeStore`: `FOR UPDATE OF j SKIP LOCKED`.
-    - `AiDraftScheduler` → `JdbcAiDraftRepository:105`: `FOR UPDATE SKIP LOCKED`.
-    - `SpeakingRecordingRetentionScheduler`, `LoginHistoryPurgeScheduler`: xóa theo ngưỡng thời gian (`delete ... where createdAt < :cutoff`), chạy trùng vô hại.
-  - Không thêm ShedLock, không thêm advisory lock cho các job này.
+- **Scheduler:** 21 lịch chạy trong 20 job; không thêm ShedLock hay advisory lock khi không cần.
+
+| Service | Job | Cơ chế chống trùng | HTTP/LLM trong transaction/khóa |
+|---|---|---|---|
+| game | `RocketRoundScheduler` | `FOR UPDATE` trận + kiểm trạng thái vòng; lịch trùng chỉ settle một lần | Không |
+| game | `SoloTimeoutScheduler` | `FOR UPDATE OF m,p` + kiểm deadline; chỉ trừ mạng một lần | Không |
+| game | `OutboxRetentionJob` | Xóa theo cutoff, lặp an toàn | Không |
+| game | `RoomEventChannelSupervisor` | Mỗi instance tự subscribe Redis pub/sub | Không |
+| notification | `NoticePushChannelConfig` | Mỗi instance tự subscribe Redis pub/sub | Không |
+| assessment | `OutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED` | Broker trong transaction ngắn |
+| access | `AccessOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED` | Broker trong transaction ngắn |
+| community | `CommunityOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED` | Broker trong transaction ngắn |
+| assessment | `GateEssayGradingScheduler` | Claim bằng `FOR UPDATE SKIP LOCKED`; hoàn tất trong transaction riêng | LLM ngoài transaction |
+| assessment | `GradingDeadlineScheduler` | Store claim hàng bằng `FOR UPDATE SKIP LOCKED` | Không |
+| assessment | `SpeakingRecordingRetentionScheduler` | Xóa theo cutoff, lặp an toàn | Không |
+| content | `ScheduledPublishJob` | Advisory lock theo đợt publish | Không |
+| content | `AiDraftScheduler` | Claim bằng `FOR UPDATE SKIP LOCKED`, commit trước khi gọi generator | Generator ngoài transaction |
+| learning | `LeagueCloseJob` | Advisory transaction lock | Không |
+| learning | `InactivityFlagJob` | Advisory transaction lock | Không |
+| learning | `SnapshotJob` (weekly) | Advisory transaction lock theo kỳ | Không |
+| learning | `SnapshotJob` (monthly) | Advisory transaction lock theo kỳ | Không |
+| learning | `RewardGrantRelayJob` | Advisory lock + `SKIP LOCKED` cho batch | Broker trong transaction ngắn |
+| learning | `MasteryDecayJob` | Session advisory lock; batch ghi riêng | Không |
+| learning | `WorkItemSyncJob` | Đọc nguồn/Content trước; transaction ngắn khóa advisory rồi áp dụng snapshot | Content HTTP ngoài transaction |
+| user | `LoginHistoryPurgeScheduler` | Xóa theo cutoff, lặp an toàn | Không |
+
+Chi tiết triển khai, pub/sub không bền, khóa vé và scale compose cũng có trong [mục scheduler và nhiều instance](../../docs/system-architecture.md#scheduler-va-nhieu-instance).
 - **Compose:** service ứng dụng không có `container_name` và không mở cổng host → `--scale` chạy được. Gateway giữ 1 bản (cổng 8080). Không cần load balancer tùy chỉnh ở gateway.
 
 ## Related Code Files
 
 - Modify: `docker-compose.yml` (Redis; env Redis cho notification, game), `infra/config-server/config-repo/{notification-service,game-service}.yaml`
 - Modify: `services/game-service/src/main/java/com/ieltspath/game/infrastructure/websocket/GameWebSocketHandler.java` (tách "phát" khỏi "gửi cục bộ")
-- Create: `services/game-service/.../infrastructure/websocket/{RoomEventBus,RedisRoomEventBus}.java`, `.../websocket/RedisWebSocketTicketStore.java`
+- Create: `services/game-service/.../infrastructure/websocket/{RoomEventBridge,RoomEventCodec,RoomEventDelivery,RoomEventChannelConfig,RoomEventChannelSupervisor,RedisWebSocketTicketStore}.java`
 - Delete: `services/game-service/.../infrastructure/websocket/InMemoryWebSocketTicketStore.java`
-- Modify: `services/game-service/.../persistence/adapter/{RocketMatchStoreAdapter,SoloGameplayRepositoryAdapter}.java`, `.../config/{RocketRoundScheduler,SoloTimeoutScheduler}.java`
-- Modify: `services/notification-service/.../infrastructure/{GradingCompletedListener,GradingRequestedListener,GradingOverdueListener,GradingDueSoonListener,CommunityEventConsumer}.java` (push qua bus), Create: `.../infrastructure/{PushBus,RedisPushBus}.java`
+- Rocket và Solo giữ cơ chế khóa hàng/trạng thái đã có; không cần thay `RocketMatchStoreAdapter`, `SoloGameplayRepositoryAdapter` hay hai scheduler để thêm distributed claim.
+- Modify: notification listeners để đẩy qua `NoticePushBridge`; `services/notification-service/.../infrastructure/NoticePushChannelConfig.java` đăng ký nhận push cục bộ.
 - Modify: `services/{game,notification}-service/pom.xml` (`spring-boot-starter-data-redis`)
-- Modify (nếu thiếu claim): scheduler và store của assessment, content, user liệt kê ở trên
+- Không thêm claim tùy tiện cho scheduler assessment, content, user; xem bảng cơ chế trong `docs/system-architecture.md`.
 
 ## Implementation Steps
 
 ### Test viết trước
 
 1. **Khóa hành vi hiện có:** chạy toàn bộ test notification-service và game-service; ghi số test làm mốc.
-2. **Scheduler song song:** với mỗi job trong 9 job chưa có khóa trong file, test tích hợp (Testcontainers Postgres) tạo dữ liệu, chạy hàm batch từ 2 luồng cùng lúc, khẳng định mỗi đơn vị việc xử lý đúng 1 lần. Rocket và Solo phải đỏ trước khi sửa.
+2. **Scheduler song song:** test tích hợp (Testcontainers Postgres) cho Rocket, Solo và các relay cần xác nhận; Rocket và Solo không cần thêm claim tường minh.
 3. **Game qua 2 instance:** Testcontainers Redis + Postgres, 2 context game-service; người A nối instance 1, người B nối instance 2 cùng phòng; B gửi đáp án qua REST ở instance 2 → A nhận `RANKING_UPDATED`; scheduler ở instance 2 kết thúc vòng → A nhận event vòng mới.
 4. **Notification qua 2 instance:** 2 context notification-service; client STOMP nối instance A; event RabbitMQ do instance B consume → client nhận push đúng một lần.
 5. **Vé game:** vé phát ở context 1, dùng ở context 2; dùng lần hai bị từ chối; hết TTL bị từ chối.
@@ -73,14 +91,13 @@ Cho phép chạy 2+ instance mỗi service mà không chạy job trùng, không 
 ### Code
 
 6. Thêm Redis vào compose (`REDIS_HOST`, `REDIS_PORT`, mật khẩu qua `.env`, không commit giá trị).
-7. Sửa scheduler theo kết quả bước 2 (game bắt buộc claim theo trận).
-8. Game: `RoomEventBus` + chuyển các handler sang publish; listener Redis gửi cục bộ; vé Redis.
-9. Notification: `PushBus` + chuyển các listener sang publish sau khi lưu.
-10. Tài liệu: mục "Chạy nhiều instance" trong `docs/system-architecture.md` (kênh Redis, push không bền, cách scale bằng compose).
+7. Game: bridge sự kiện phòng và vé Redis; giữ cơ chế khóa theo trận đã có.
+8. Notification: bridge push qua Redis sau khi lưu.
+9. Tài liệu: mục "Chạy nhiều instance" trong `docs/system-architecture.md`.
 
 ## Success Criteria
 
-- [ ] Test song song của 9 job xanh; Rocket và Solo mỗi trận xử lý 1 lần mỗi chu kỳ.
+- [ ] Test song song Rocket `concurrentSchedulesCloseAnExpiredRoundOnlyOnce`, Solo `concurrentTimeoutSchedulesCostExactlyOneLife`, relay assessment/community xanh; khóa DB không được giữ qua HTTP/LLM.
 - [ ] Test game và notification qua 2 instance xanh.
 - [ ] `docker compose up --scale notification-service=2 --scale game-service=2 --scale learning-service=2`: thử tay nhận thông báo, chơi một phòng Wordly và một phòng Rocket với hai trình duyệt.
 - [ ] Test hiện có của notification và game giữ nguyên số và xanh.
@@ -92,11 +109,6 @@ Cho phép chạy 2+ instance mỗi service mà không chạy job trùng, không 
 - **Redis chết:** game và notification mất push thời gian thực, REST vẫn chạy. Vé game không phát được → không vào phòng mới. Có metric cảnh báo (phase 2).
 - **Advisory lock giữ quá lâu:** chỉ dùng cho job không gọi HTTP; `pg_try_` để không chờ.
 
-## Việc còn lại sau rà soát (gói B1, Codex)
+## Cơ chế scheduler đã rà
 
-Code của phase này đã xong và đã merge (Redis, vé game, `RoomEventBridge`, `NoticePushBridge`, test hai instance, test đồng thời Rocket/Solo). Còn lại, spec chi tiết ở [đính chính, phase 5](../261101-0930-reliability-followups/phase-05-don-phase-1-va-khoa-http.md):
-
-- Dọn 10 chỗ trong file này còn mâu thuẫn với kết luận "không cần khóa thêm" (dòng 12, 30, 44, 56, 58, 59, 61, 68, 77, 83, 93).
-- `WorkItemSync` không giữ khóa advisory và transaction trong lúc gọi HTTP sang content.
-- Test song song cho relay assessment và community.
-- Bảng cơ chế chống xử lý trùng của 21 `@Scheduled`; mục "Chạy nhiều instance" trong `docs/system-architecture.md` (kênh `game.room-events` và `notification.push`, khóa vé `game:ws-ticket:*`, push không bền, cách scale bằng `--scale`).
+Bảng bên trên ghi cơ chế đã đối chiếu với code; phase vẫn chờ Claude kiểm tay đa instance theo tiêu chí phía trên.
