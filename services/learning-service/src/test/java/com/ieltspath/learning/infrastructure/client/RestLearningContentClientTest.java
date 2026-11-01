@@ -18,6 +18,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -514,10 +515,11 @@ class RestLearningContentClientTest {
     @CsvSource({"404,404,NOT_FOUND", "503,503,CONTENT_UNAVAILABLE", "400,502,CONTENT_FAILURE",
             "401,502,CONTENT_FAILURE", "403,502,CONTENT_FAILURE", "500,502,CONTENT_FAILURE"})
     void translatesHttpErrorsWithoutExposingContentResponse(int contentStatus, int status, String code) {
-        server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID))
+        server.expect(contentStatus >= 500 ? ExpectedCount.twice() : ExpectedCount.once(),
+                        requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID))
                 .andRespond(withStatus(HttpStatus.valueOf(contentStatus))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .body("{\"message\":\"private-content-response\"}"));
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"message\":\"private-content-response\"}"));
 
         var exception = assertThrows(LearningRequestException.class, () -> client.getLesson(LESSON_ID));
 
@@ -529,7 +531,7 @@ class RestLearningContentClientTest {
 
     @Test
     void translatesTransportFailureToContentUnavailable() {
-        server.expect(requestTo(INTERNAL_PATH + "/topic-sequence"))
+        server.expect(ExpectedCount.twice(), requestTo(INTERNAL_PATH + "/topic-sequence"))
                 .andRespond(withException(new IOException("private-transport-detail")));
 
         var exception = assertThrows(LearningRequestException.class, client::getTopicSequence);
