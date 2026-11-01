@@ -135,8 +135,15 @@ learning: AssessmentCompletedListener (ack thủ công)
 ```
 
 Contract: [`docs/contracts/assessment-completed-v2.md`](contracts/assessment-completed-v2.md). Bằng chứng gắn với user nên áp
-dụng được ngay, kể cả khi học viên chưa gọi API học. access, content và game có bảng outbox và ghi event nhưng chưa có
-relay, nên các event đó chưa được phát.
+dụng được ngay, kể cả khi học viên chưa gọi API học.
+
+Luồng `SubscriptionGranted` của Access thông báo cho người dùng khi admin cấp Premium:
+
+| Producer | Consumer | Queue / retry / DLQ | Contract |
+| --- | --- | --- | --- |
+| Access `GrantSubscriptionUseCase` ghi `SubscriptionGranted` vào `outbox_events` cùng transaction; `AccessOutboxRelay` publish với confirm tới exchange `access.events`, routing key `access.subscription-granted.v1` | Notification `SubscriptionGrantedListener` gọi `RecordSubscriptionGrantedUseCase`; `eventId` chống ghi thông báo trùng | `notification.subscription-granted.v1`; retry `notification.subscription-granted.v1.retry`; DLQ `notification.subscription-granted.v1.dlq` | [`subscription-granted-v1.md`](contracts/subscription-granted-v1.md) |
+
+Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload hoặc vi phạm contract được dead-letter. Kiểm thử integration hiện phát hiện lần trả message từ retry queue không giữ routing key ban đầu, khiến consumer từ chối contract và dead-letter lần retry; luồng này cần sửa trước khi coi retry là hoạt động đúng. Content và Game hiện vẫn ghi outbox cho event riêng nhưng chưa có relay.
 
 ### Correlation ID và metric
 
