@@ -18,6 +18,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RetryTopologyTest {
     @Test
+    void retryQueueReturnsToTheSourceExchangeWithTheOriginalRoutingKey() {
+        TopicExchange source = new TopicExchange("learning.points", true, false);
+        Declarables topology = RetryTopology.of(new RetryTopology.Names("queue", "queue.retry", "queue.dlq", "queue.dlx"),
+                30_000L, source, "points.grant.settled");
+        Queue retry = topology.getDeclarablesByType(Queue.class).stream()
+                .filter(queue -> queue.getName().equals("queue.retry")).findFirst().orElseThrow();
+
+        assertEquals("learning.points", retry.getArguments().get("x-dead-letter-exchange"));
+        assertEquals("points.grant.settled", retry.getArguments().get("x-dead-letter-routing-key"));
+    }
+
+    @Test
     void requestedGrantKeepsItsBrokerArguments() {
         assertTopology("access.points-grant", "access.points-grant.retry", "access.points-grant.dlq",
                 "access.points-grant.dlx", "points.grant.requested");
