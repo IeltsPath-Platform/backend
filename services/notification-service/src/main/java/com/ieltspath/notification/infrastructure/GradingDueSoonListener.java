@@ -18,8 +18,10 @@ import java.util.Map;
 
 /**
  * Stores the reminder and pushes it to the examiner. A payload that breaks the contract is refused and dead-lettered. Any
- * other failure is treated as temporary: the message goes to the retry queue and, after the allowed retries, to the
- * dead-letter queue. Storing is idempotent per event id, so handling a message twice never notifies twice.
+ * other failure is treated as temporary: the shared {@link MessageRetry} policy sends the message to the retry queue
+ * and, after the allowed retries, to the dead-letter queue. This common policy is appropriate because transient storage
+ * and push failures use the same bounded retry behavior. Storing is idempotent per event id, so handling a message twice
+ * never notifies twice.
  */
 @Component
 public class GradingDueSoonListener {
