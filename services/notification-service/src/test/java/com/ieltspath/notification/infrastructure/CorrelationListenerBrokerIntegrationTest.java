@@ -1,5 +1,7 @@
 package com.ieltspath.notification.infrastructure;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.events.community.CommunityEvent;
 import com.ieltspath.events.community.CommunityEventTypes;
 import com.ieltspath.events.community.CommunityMessaging;
@@ -20,7 +22,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -55,6 +56,7 @@ class CorrelationListenerBrokerIntegrationTest {
     }
 
     @Autowired RabbitTemplate rabbit;
+    @Autowired ObjectMapper mapper;
     @MockitoSpyBean RecordCommunityEventUseCase recordEvent;
 
     @Test
@@ -71,17 +73,20 @@ class CorrelationListenerBrokerIntegrationTest {
         publish(null, "second");
 
         assertTrue(handled.await(10, TimeUnit.SECONDS), "both messages were consumed");
-        assertEquals(List.of("req-notification-1", null), seen);
+        assertEquals("req-notification-1", seen.get(0));
+        assertTrue(seen.get(1) != null && !seen.get(1).isBlank(), "a message without a correlation id gets a fresh one");
     }
 
-    private void publish(String correlationId, String suffix) {
+    private void publish(String correlationId, String suffix) throws JsonProcessingException {
         UUID id = UUID.nameUUIDFromBytes(suffix.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         var event = new CommunityEvent(id, CommunityEventTypes.USER_FOLLOWED, Instant.now(), UUID.randomUUID(),
                 UUID.randomUUID(), null, null);
         MessagePostProcessor headers = message -> {
+            message.getMessageProperties().setMessageId(id.toString());
             if (correlationId != null) message.getMessageProperties().setHeader("x-correlation-id", correlationId);
             return message;
         };
-        rabbit.convertAndSend(CommunityMessaging.EXCHANGE, CommunityEventTypes.USER_FOLLOWED, event, headers);
+        rabbit.convertAndSend(CommunityMessaging.EXCHANGE, CommunityEventTypes.USER_FOLLOWED,
+                mapper.writeValueAsBytes(event), headers);
     }
 }
