@@ -55,13 +55,20 @@ class DeadLetterReplayBrokerIntegrationTest {
     @Test
     void aMessageParkedOnThePointsGrantDeadLetterQueueIsMovedBack() {
         Message parked = MessageBuilder.withBody(("parked " + UUID.randomUUID()).getBytes(StandardCharsets.UTF_8))
-                .setContentType(MessageProperties.CONTENT_TYPE_JSON).setMessageId(UUID.randomUUID().toString()).build();
+                .setContentType(MessageProperties.CONTENT_TYPE_JSON).setMessageId(UUID.randomUUID().toString())
+                .setHeader("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
+                .setHeader("x-correlation-id", "replay-correlation-42").build();
         // Publishing to the queue name through the default exchange lands the message on the dead-letter queue.
         rabbit.send("", LearningPointsMessagingConfig.GRANT_DLQ, parked);
 
         ReplayResult result = replayer.replay(LearningPointsMessagingConfig.GRANT_DLQ, 10);
 
         assertEquals(1, result.moved());
+        Message replayed = rabbit.receive(LearningPointsMessagingConfig.GRANT_QUEUE, 5_000);
+        org.junit.jupiter.api.Assertions.assertNotNull(replayed);
+        assertEquals("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+                replayed.getMessageProperties().getHeader("traceparent"));
+        assertEquals("replay-correlation-42", replayed.getMessageProperties().getHeader("x-correlation-id"));
     }
 
     @Test

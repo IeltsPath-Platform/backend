@@ -61,7 +61,7 @@ class CommunityOutboxRelayIntegrationTest {
     private static JdbcTemplate outboxTable() {
         var jdbc=new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()));
         jdbc.execute("DROP TABLE IF EXISTS outbox_events");
-        jdbc.execute("CREATE TABLE outbox_events(id UUID PRIMARY KEY,aggregate_type VARCHAR(100) NOT NULL,aggregate_id VARCHAR(255) NOT NULL,event_type VARCHAR(100) NOT NULL,payload JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL,published_at TIMESTAMPTZ,next_attempt_at TIMESTAMPTZ,retry_count INTEGER NOT NULL DEFAULT 0,last_error TEXT,failed_at TIMESTAMPTZ,correlation_id VARCHAR(100))");
+        jdbc.execute("CREATE TABLE outbox_events(id UUID PRIMARY KEY,aggregate_type VARCHAR(100) NOT NULL,aggregate_id VARCHAR(255) NOT NULL,event_type VARCHAR(100) NOT NULL,payload JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL,published_at TIMESTAMPTZ,next_attempt_at TIMESTAMPTZ,retry_count INTEGER NOT NULL DEFAULT 0,last_error TEXT,failed_at TIMESTAMPTZ,correlation_id VARCHAR(100),trace_context VARCHAR)");
         return jdbc;
     }
 
@@ -196,6 +196,35 @@ class CommunityOutboxRelayIntegrationTest {
 
     @Test void omitsHeaderWhenRowHasNone() {
         assertCorrelationHeader(null, null);
+    }
+
+    @Test
+    void legacyOutboxRowWithoutTraceContextStillReachesRabbitMq() {
+        var jdbc = outboxTable();
+        var connection = new CachingConnectionFactory(RABBIT.getHost(), RABBIT.getMappedPort(5672));
+        connection.setUsername("test");
+        connection.setPassword("test");
+        var rabbit = new RabbitTemplate(connection);
+        var admin = new RabbitAdmin(connection);
+        var exchange = new TopicExchange(CommunityMessaging.EXCHANGE, true, false);
+        var queue = new Queue("community.events.legacy." + UUID.randomUUID(), true, false, false);
+        admin.declareExchange(exchange);
+        admin.declareQueue(queue);
+        admin.declareBinding(BindingBuilder.bind(queue).to(exchange).with("community.#"));
+
+        jdbc.update("""
+                INSERT INTO outbox_events(id, aggregate_type, aggregate_id, event_type, payload, created_at,
+                                          correlation_id, trace_context)
+                VALUES (?, 'COMMUNITY', 'legacy', ?, '{}'::jsonb, now(), 'old-correlation', NULL)
+                """, UUID.randomUUID(), CommunityEventTypes.POST_REACTED);
+        var relay = new CommunityOutboxRelay(jdbc, rabbit, new ObjectMapper(), CommunityMessaging.EXCHANGE,
+                20, Duration.ofSeconds(5), true, 12, Duration.ofSeconds(60));
+
+        assertEquals(1, relay.publishPendingBatch());
+        assertNotNull(rabbit.receive(queue.getName(), 5_000));
+
+        admin.deleteQueue(queue.getName());
+        connection.destroy();
     }
 
     private void assertCorrelationHeader(String storedCorrelation, String expectedHeader) {

@@ -35,6 +35,7 @@ class TracePropagationTest {
 
     @Autowired RestClient.Builder builder;
     @Autowired Tracer tracer;
+    @Autowired OutboxTraceContext outboxTraceContext;
 
     @Test
     void outgoingRequestCarriesTheTraceOfTheActiveSpan() {
@@ -60,5 +61,30 @@ class TracePropagationTest {
         }
 
         server.verify();
+    }
+
+    @Test
+    void outboxSnapshotRestoresTheRequestTraceForAChildRelaySpan() {
+        Span request = tracer.nextSpan().name("request").start();
+        String traceId = request.context().traceId();
+        String requestSpanId = request.context().spanId();
+
+        try (Tracer.SpanInScope ignored = tracer.withSpan(request)) {
+            String snapshot = outboxTraceContext.capture();
+            assertNotNull(snapshot);
+
+            try (OutboxTraceContext.Scope relay = outboxTraceContext.openRelay(snapshot)) {
+                assertEquals(traceId, relay.span().context().traceId());
+                org.junit.jupiter.api.Assertions.assertNotEquals(requestSpanId, relay.span().context().spanId());
+                assertEquals(relay.span().context().spanId(), tracer.currentSpan().context().spanId());
+            }
+        } finally {
+            request.end();
+        }
+    }
+
+    @Test
+    void noActiveSpanProducesNoSnapshot() {
+        assertEquals(null, outboxTraceContext.capture());
     }
 }
