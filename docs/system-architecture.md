@@ -329,8 +329,10 @@ Claude sẽ ghi số request lỗi và thời gian dừng tới lỗi cuối sau
 | Server và scheduler chờ công việc trước khi dừng | `GracefulShutdownTest`, `SchedulerShutdownTest` | Kiểm tra config repo và scheduler đang chạy |
 | Subscription grant nhận lại cùng khóa | `GrantSubscriptionIdempotencyTest` | PostgreSQL Testcontainers, gồm cạnh tranh và outbox |
 | Mở breaker và hồi phục downstream | `RestLearningContentClientResilienceTest`, `ResilientCallTest` | Unit/integration test; phép dừng service qua gateway vẫn cần kiểm tay |
+| Correlation HTTP → downstream content/assessment → outbox → relay → consumer | `CorrelationAcrossServicesReliabilityTest.sameCorrelationIdInHttpAndConsumerLogs`; `CommunityOutboxRelayIntegrationTest.correlationSurvivesHttpOutboxRelayAndBrokerConsumerLogs` | Learning kiểm hai HTTP client, reward outbox production, relay/publisher production và log consumer với PostgreSQL/RabbitMQ Testcontainers; Community kiểm luồng outbox riêng |
+| Auth endpoint rate-limit mapping | `AuthRouteConsistencyTest` | `/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password`, `/api/users/register` thuộc tier `auth`; `/auth/logout` thuộc tier `default` |
 | Message được retry và đưa lại từ DLQ | `SubscriptionGrantedBrokerIntegrationTest`, `ReplayedMessageIsProcessedTest` | RabbitMQ Testcontainers |
-| Dừng một replica còn replica khác | Đo bằng Compose sau khi triển khai; ghi lỗi request và thời gian tới lỗi cuối | Compose thu hẹp cửa sổ lỗi, không hứa zero-downtime |
+| Dừng một replica còn replica khác | Phép đo in-flight và tải Compose trong report E; trạng thái idempotent được đối chiếu bằng `OutboxRelayConcurrencyTest`, `CommunityOutboxRelayConcurrencyTest`, `GrantSubscriptionIdempotencyTest.concurrentSameKeyGrantsOnce`, `UnlockCourseFailureWindowTest.retryWithSameKeyWhilePendingDoesNotCreateIntent` | Request đang xử lý hoàn tất 200 và replica còn lại tiếp tục phục vụ; kiểm tra idempotency chạy riêng, không gộp vào cùng phép dừng replica |
 
 ## 7. Chạy local (tóm tắt)
 
