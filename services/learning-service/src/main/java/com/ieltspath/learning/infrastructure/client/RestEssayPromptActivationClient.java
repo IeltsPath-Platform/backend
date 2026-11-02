@@ -1,6 +1,9 @@
 package com.ieltspath.learning.infrastructure.client;
 
 import com.ieltspath.commonsecurity.header.SecurityHeaders;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.EssayPromptActivationProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,37 +18,51 @@ import java.time.Duration;
 @Component
 public class RestEssayPromptActivationClient implements EssayPromptActivationProvider {
     private final RestClient client;
+    private final ResilientCall resilientCall;
 
     @Autowired
     public RestEssayPromptActivationClient(RestClient.Builder builder,
-            @Value("${learning.assessment.base-url:http://localhost:8083}") String baseUrl) {
+            @Value("${learning.assessment.base-url:http://localhost:8083}") String baseUrl,
+            ResilientCall resilientCall) {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(2));
         factory.setReadTimeout(Duration.ofSeconds(5));
         client = builder.requestFactory(factory).baseUrl(baseUrl).build();
+        this.resilientCall = resilientCall;
     }
 
-    RestEssayPromptActivationClient(RestClient client) { this.client = client; }
+    RestEssayPromptActivationClient(RestClient client) { this(client, defaultResilientCall()); }
+
+    RestEssayPromptActivationClient(RestClient client, ResilientCall resilientCall) {
+        this.client = client;
+        this.resilientCall = resilientCall;
+    }
 
     @Override
     public String activatedVersion(String task) {
         try {
-            Activation response = client.get()
+            Activation response = resilientCall.call("assessment", CallKind.READ, () -> client.get()
                     .uri("/internal/assessments/ai-prompt-activations?task={task}", task)
                     .headers(headers -> {
                         headers.setBearerAuth(GatewayRequestHeaders.bearerToken().orElseThrow(
                                 () -> new LearningRequestException(401, "UNAUTHORIZED", "Authenticated gateway JWT required")));
                         headers.set(SecurityHeaders.CORRELATION_ID, GatewayRequestHeaders.correlationId());
                     })
-                    .retrieve().body(Activation.class);
+                    .retrieve().body(Activation.class));
             if (response == null || !task.equals(response.task())
                     || response.promptVersion() != null && response.promptVersion().isBlank()) {
                 throw unavailable();
             }
             return response.promptVersion();
+        } catch (DownstreamUnavailableException exception) {
+            throw unavailable();
         } catch (RestClientException exception) {
             throw unavailable();
         }
+    }
+
+    private static ResilientCall defaultResilientCall() {
+        return ResilientCall.isolatedDefault();
     }
 
     private LearningRequestException unavailable() {

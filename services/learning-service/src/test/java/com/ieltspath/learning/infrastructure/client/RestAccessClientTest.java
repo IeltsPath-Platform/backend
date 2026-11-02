@@ -26,6 +26,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
+import static org.springframework.test.web.client.ExpectedCount.times;
 
 class RestAccessClientTest {
     private static final String BASE_URL = "http://access.test";
@@ -75,7 +76,8 @@ class RestAccessClientTest {
                 .andExpect(jsonPath("$.referenceId").value(submission.toString()))
                 .andExpect(jsonPath("$.idempotencyKey").value("lesson-writing:key"))
                 .andRespond(withSuccess("{\"id\":\"%s\",\"delta\":-3}".formatted(ledger), MediaType.APPLICATION_JSON));
-        assertEquals(ledger, client.debit(user, 3, submission, "lesson-writing:key", "Lesson essay grading"));
+        assertEquals(ledger, client.debit(user, 3, RestAccessClient.REFERENCE_TYPE, submission,
+                "lesson-writing:key", "Lesson essay grading"));
     }
 
     @Test
@@ -83,10 +85,11 @@ class RestAccessClientTest {
         server.expect(requestTo(BASE_URL + "/internal/access/points/debit"))
                 .andRespond(withStatus(HttpStatus.PAYMENT_REQUIRED));
         assertThrows(InsufficientPointsException.class,
-                () -> client.debit(UUID.randomUUID(), 3, UUID.randomUUID(), "k", null));
+                () -> client.debit(UUID.randomUUID(), 3, RestAccessClient.REFERENCE_TYPE, UUID.randomUUID(), "k", null));
         for (HttpStatus status : List.of(HttpStatus.UNAUTHORIZED, HttpStatus.CONFLICT, HttpStatus.INTERNAL_SERVER_ERROR)) {
             server.reset();
-            server.expect(requestTo(BASE_URL + "/api/access/me/points")).andRespond(withStatus(status));
+            server.expect(status == HttpStatus.INTERNAL_SERVER_ERROR ? times(2) : org.springframework.test.web.client.ExpectedCount.once(),
+                    requestTo(BASE_URL + "/api/access/me/points")).andRespond(withStatus(status));
             assertThrows(AccessUnavailableException.class, client::balance, status.toString());
         }
     }
