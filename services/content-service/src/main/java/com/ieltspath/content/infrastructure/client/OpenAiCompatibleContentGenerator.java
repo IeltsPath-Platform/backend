@@ -15,11 +15,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
-import io.github.resilience4j.bulkhead.BulkheadRegistry;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.retry.RetryConfig;
-import io.github.resilience4j.retry.RetryRegistry;
 
 import java.net.SocketTimeoutException;
 import java.time.Duration;
@@ -114,11 +109,7 @@ public class OpenAiCompatibleContentGenerator implements ContentGenerationPort {
     }
 
     private static ResilientCall defaultResilientCall() {
-        CircuitBreakerConfig breaker = CircuitBreakerConfig.custom()
-                .recordException(ResilientCall::isTransientFailure).build();
-        RetryConfig retry = RetryConfig.custom().retryOnException(ResilientCall::isTransientFailure).build();
-        return new ResilientCall(CircuitBreakerRegistry.of(breaker), RetryRegistry.of(retry),
-                BulkheadRegistry.ofDefaults());
+        return ResilientCall.isolatedDefault();
     }
 
     private static boolean isTimeout(Throwable failure) {

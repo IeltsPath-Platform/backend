@@ -8,11 +8,6 @@ import com.ieltspath.content.domain.vo.CourseDraftStructure.NewWord;
 import com.ieltspath.commonresilience.CallKind;
 import com.ieltspath.commonresilience.DownstreamUnavailableException;
 import com.ieltspath.commonresilience.ResilientCall;
-import io.github.resilience4j.bulkhead.BulkheadRegistry;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.retry.RetryConfig;
-import io.github.resilience4j.retry.RetryRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -132,11 +127,7 @@ public class LibraryVocabularySenseClient implements VocabularySenseLookup, Voca
     }
 
     private static ResilientCall defaultResilientCall() {
-        CircuitBreakerConfig breaker = CircuitBreakerConfig.custom()
-                .recordException(ResilientCall::isTransientFailure).build();
-        RetryConfig retry = RetryConfig.custom().retryOnException(ResilientCall::isTransientFailure).build();
-        return new ResilientCall(CircuitBreakerRegistry.of(breaker), RetryRegistry.of(retry),
-                BulkheadRegistry.ofDefaults());
+        return ResilientCall.isolatedDefault();
     }
 
     private String correlationId() {
