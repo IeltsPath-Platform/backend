@@ -126,6 +126,48 @@ class JdbcWritingTaskReaderTest {
     }
 
     @Test
+    void aPromptWithOnlyThePlaceholderHasNoSample() {
+        sql.update("""
+                UPDATE question_versions SET explanation = 'Graded by the essay grader.'
+                WHERE id = (SELECT sq.question_version_id FROM content_packages p
+                            JOIN content_sections s ON s.package_version_id = p.current_published_version_id AND s.part_no = 1
+                            JOIN section_questions sq ON sq.section_id = s.id WHERE p.code = 'PT-WRITING-01')
+                """);
+
+        assertThat(task("PT-WRITING-01", 1).sampleAnswer()).isNull();
+    }
+
+    @Test
+    void everyWritingPromptHasAModelAnswerOfFourPartsLongerThanItsMinimum() {
+        var word = java.util.regex.Pattern.compile("[\\p{L}\\p{N}]+(?:['’-][\\p{L}\\p{N}]+)*");
+        int checked = 0;
+        for (String code : sql.queryForList("SELECT code FROM content_packages WHERE code LIKE 'PT-WRITING-%' ORDER BY code", String.class)) {
+            for (int part : new int[] {1, 2}) {
+                var task = task(code, part);
+                String sample = task.sampleAnswer();
+                assertThat(sample).as("%s part %d has a model answer", code, part).isNotBlank();
+                assertThat(sample.split("\\n\\s*\\n")).as("%s part %d paragraphs", code, part).hasSize(4);
+                int words = (int) word.matcher(sample.replace("**", "")).results().count();
+                assertThat(words).as("%s part %d words", code, part).isGreaterThanOrEqualTo(task.minWords());
+                checked++;
+            }
+        }
+        assertThat(checked).isEqualTo(24);
+    }
+
+    @Test
+    void aModelAnswerStoredWithThePromptIsTheSample() {
+        sql.update("""
+                UPDATE question_versions SET explanation = ?
+                WHERE id = (SELECT sq.question_version_id FROM content_packages p
+                            JOIN content_sections s ON s.package_version_id = p.current_published_version_id AND s.part_no = 1
+                            JOIN section_questions sq ON sq.section_id = s.id WHERE p.code = 'PT-WRITING-01')
+                """, "The line graph shows **visits**.\n\nOverall, visits rose.");
+
+        assertThat(task("PT-WRITING-01", 1).sampleAnswer()).isEqualTo("The line graph shows **visits**.\n\nOverall, visits rose.");
+    }
+
+    @Test
     void aSectionOfAnotherSkillIsNotAWritingTask() {
         UUID version = sql.queryForObject("SELECT current_published_version_id FROM content_packages WHERE code = ?",
                 UUID.class, "PT-LISTENING-01");
