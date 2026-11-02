@@ -8,6 +8,7 @@ import com.ieltspath.access.infrastructure.persistence.adapter.JdbcHumanGradingC
 import com.ieltspath.access.infrastructure.persistence.adapter.OutboxEventRepositoryAdapter;
 import com.ieltspath.access.infrastructure.persistence.adapter.SubscriptionRepositoryAdapter;
 import com.ieltspath.access.infrastructure.persistence.mapper.AccessPersistenceMapper;
+import com.ieltspath.commonobservability.CorrelationRabbitAutoConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -30,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({ConsumeHumanGradingCreditUseCase.class, SubscriptionRepositoryAdapter.class,
         OutboxEventRepositoryAdapter.class, JdbcHumanGradingCreditConsumptionRepository.class,
-        AccessPersistenceMapper.class})
+        AccessPersistenceMapper.class, CorrelationRabbitAutoConfiguration.class})
 class HumanGradingCreditConsumptionIntegrationTest {
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:15-alpine");
 
