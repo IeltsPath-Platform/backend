@@ -31,6 +31,11 @@ public class JdbcAdminGrantRequestRepository implements AdminGrantRequestReposit
     }
 
     @Override
+    public void lock(String idempotencyKey) {
+        jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtext(?))", idempotencyKey);
+    }
+
+    @Override
     public Optional<AdminGrantRequest> find(String idempotencyKey) {
         return jdbc.query("""
                 SELECT idempotency_key, request_hash, subscription_id

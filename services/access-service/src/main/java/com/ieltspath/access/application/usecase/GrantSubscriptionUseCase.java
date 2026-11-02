@@ -70,6 +70,7 @@ public class GrantSubscriptionUseCase {
         if (grantRequests != null) {
             if (key == null || key.isBlank() || key.length() > 100) throw new InvalidIdempotencyKeyException();
             requestHash = requestHash(command);
+            grantRequests.lock(key);
             Optional<AdminGrantRequest> existing = grantRequests.find(key);
             if (existing.isPresent()) {
                 AdminGrantRequest saved = existing.get();
