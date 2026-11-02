@@ -94,6 +94,7 @@ class CorrelationAcrossServicesReliabilityTest {
                     reason VARCHAR(80) NOT NULL,
                     reference_id VARCHAR(160) NOT NULL,
                     correlation_id VARCHAR(100),
+                    trace_context VARCHAR,
                     status VARCHAR(24) NOT NULL DEFAULT 'PENDING',
                     attempts INTEGER NOT NULL DEFAULT 0,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
