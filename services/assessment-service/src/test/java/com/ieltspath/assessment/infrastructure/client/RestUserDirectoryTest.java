@@ -66,7 +66,7 @@ class RestUserDirectoryTest {
     @Test
     void moreThanFiftyIdsAreSentInBatches() {
         List<UUID> ids = IntStream.range(0, 120).mapToObj(i -> UUID.randomUUID()).toList();
-        server.expect(org.springframework.test.web.client.ExpectedCount.times(2),
+        server.expect(org.springframework.test.web.client.ExpectedCount.times(3),
                         requestTo(BASE_URL + "/internal/users/display-names"))
                 .andRespond(withSuccess("{\"items\":[]}", MediaType.APPLICATION_JSON));
 
