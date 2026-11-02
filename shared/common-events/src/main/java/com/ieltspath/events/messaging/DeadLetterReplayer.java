@@ -94,11 +94,12 @@ public class DeadLetterReplayer {
             // RabbitMQ counts dead-letter deaths in x-death; a replay starts a fresh count for both retry styles.
             properties.getHeaders().keySet().removeIf(key -> key.equals("x-death") || key.startsWith("x-first-death-") || key.startsWith("x-last-death-"));
             AMQP.BasicProperties basic = converter.fromMessageProperties(properties, "UTF-8");
+            String routingKey = routingKeyOf(route, properties);
             AtomicBoolean returned = new AtomicBoolean(false);
-            ReturnListener onReturn = (replyCode, replyText, exchange, routingKey, unused, body) -> returned.set(true);
+            ReturnListener onReturn = (replyCode, replyText, exchange, unusedKey, unused, body) -> returned.set(true);
             channel.addReturnListener(onReturn);
             try {
-                channel.basicPublish(route.exchange(), route.routingKey(), true, basic, response.getBody());
+                channel.basicPublish(route.exchange(), routingKey, true, basic, response.getBody());
                 if (!channel.waitForConfirms(CONFIRM_TIMEOUT_MILLIS) || returned.get()) {
                     throw new IllegalStateException("Broker did not accept the replayed message");
                 }
@@ -111,6 +112,17 @@ public class DeadLetterReplayer {
             channel.basicNack(deliveryTag, false, true);
             throw failure;
         }
+    }
+
+    private static String routingKeyOf(DeadLetterRoute route, MessageProperties properties) {
+        if (route.routingKey() != null) {
+            return route.routingKey();
+        }
+        Object original = properties.getHeaders().get(MessageHeaders.ORIGINAL_ROUTING_KEY);
+        if (original == null || original.toString().isBlank()) {
+            throw new IllegalStateException("Dead-letter message has no " + MessageHeaders.ORIGINAL_ROUTING_KEY + " header");
+        }
+        return original.toString();
     }
 
     private long messagesIn(String queue) {

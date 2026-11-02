@@ -32,7 +32,8 @@ public class DeadLetterReplayConfig {
                 new DeadLetterRoute(GradingOverdueTopology.DLQ, GradingOverdueTopology.QUEUE, AssessmentMessaging.EXCHANGE, AssessmentMessaging.GRADING_OVERDUE_ROUTING_KEY),
                 new DeadLetterRoute(GradingDueSoonTopology.DLQ, GradingDueSoonTopology.QUEUE, AssessmentMessaging.EXCHANGE, AssessmentMessaging.GRADING_DUE_SOON_ROUTING_KEY),
                 new DeadLetterRoute(SubscriptionGrantedTopology.DLQ, SubscriptionGrantedTopology.QUEUE, AccessMessaging.EXCHANGE, AccessMessaging.SUBSCRIPTION_GRANTED_ROUTING_KEY),
-                DeadLetterRoute.toQueue(CommunityMessaging.NOTIFICATIONS_DLQ, CommunityMessaging.NOTIFICATIONS_QUEUE)));
+                DeadLetterRoute.byOriginalRoutingKey(CommunityMessaging.NOTIFICATIONS_DLQ, CommunityMessaging.NOTIFICATIONS_QUEUE,
+                        CommunityMessaging.EXCHANGE)));
     }
 
     @Bean

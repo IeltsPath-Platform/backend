@@ -2,6 +2,7 @@ package com.ieltspath.notification.infrastructure;
 
 import com.ieltspath.events.community.CommunityEvent;
 import com.ieltspath.events.community.CommunityMessaging;
+import com.ieltspath.events.messaging.MessageHeaders;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.notification.application.RecordCommunityEventUseCase;
@@ -81,6 +82,9 @@ public class CommunityEventConsumer {
      * If parking itself fails, the message is requeued after a pause so a broker problem cannot spin the consumer.
      */
     private void park(Channel channel, long tag, String exchange, String routingKey, Message message) throws IOException {
+        // The dead-letter routing key replaces the original one, so keep the original where a replay can find it.
+        message.getMessageProperties().setHeader(MessageHeaders.ORIGINAL_ROUTING_KEY,
+                message.getMessageProperties().getReceivedRoutingKey());
         try {
             publishConfirmed(exchange, routingKey, message);
             channel.basicAck(tag, false);
