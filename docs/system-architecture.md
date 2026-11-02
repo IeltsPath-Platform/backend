@@ -2,7 +2,8 @@
 
 - Cập nhật lần cuối: 2026-10-25; thêm KP con theo mã lỗi, bằng chứng `error_trap`, chọn bộ theo bẫy, phản hồi `fixHint` và `ERROR_PATTERN` cho Learning
 - Đọc khi cần hiểu toàn hệ thống. Quy tắc bắt buộc nằm ở [`AGENTS.md`](../AGENTS.md); hướng dẫn chạy chi tiết ở
-  [`README.md`](../README.md). Code là nguồn đúng khi tài liệu này lệch.
+  [`local-development.md`](local-development.md); tổng quan và bảng pattern ở [`README.md`](../README.md).
+  Code là nguồn đúng khi tài liệu này lệch.
 
 ## 1. Tổng quan
 
@@ -374,13 +375,15 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 
 ## 9. Pattern đang dùng
 
+Bảng tổng hợp đầy đủ theo nhóm (resilience, idempotency, claim `SKIP LOCKED`, tracing…) nằm ở [`README.md`](../README.md); dưới đây là các pattern có chi tiết cài đặt riêng.
+
 | Pattern | Nơi dùng |
 | --- | --- |
 | API Gateway, Configuration Server, Service Discovery | `infra/*` |
 | Repository Adapter, Aggregate/Value Object, Mapper | Service Java |
 | Ports & adapters (`application/port`) | assessment, game, library, learning, content (đọc nội dung học) |
-| Transactional outbox + relay có publisher confirm | assessment (access/content/game mới có phần ghi) |
-| Consumer với retry queue TTL và dead-letter queue | learning |
+| Transactional outbox + relay có publisher confirm | assessment, access, community, learning (`reward_grants`); content và game mới có phần ghi, chưa có relay |
+| Consumer với retry queue TTL và dead-letter queue | learning, access (grant), notification |
 | Shared auto-configuration | `common-security` |
 | Global exception handler → `ErrorResponse` | Service Java |
 | WebSocket với ticket ngắn hạn | game |
