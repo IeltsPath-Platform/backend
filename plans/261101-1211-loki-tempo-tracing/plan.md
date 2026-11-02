@@ -53,9 +53,9 @@ Không Promtail, không Java Agent, không Kubernetes, không HA.
 
 | Phase | Tên | Người làm | Phụ thuộc | Status |
 |---|---|---|---|---|
-| 1 | [Hạ tầng Loki, Tempo, Alloy, Grafana](./phase-01-ha-tang-loki-tempo-grafana.md) | Claude | plan 2145 xong gói E | pending |
-| 2 | [Tracing trong Java](./phase-02-tracing-trong-java.md) | Claude | 1 | pending |
-| 3 | [Trace xuyên outbox, RabbitMQ, DLQ](./phase-03-trace-qua-outbox-rabbit-dlq.md) | Codex | 2 | pending |
+| 1 | [Hạ tầng Loki, Tempo, Alloy, Grafana](./phase-01-ha-tang-loki-tempo-grafana.md) | Claude | plan 2145 xong gói E | completed: đã kiểm trên stack (Tempo nhận trace qua Alloy, datasource Grafana OK) |
+| 2 | [Tracing trong Java](./phase-02-tracing-trong-java.md) | Claude | 1 | partial: code và reactor verify xanh (3891 test); CHƯA kiểm waterfall gateway → learning → content (cần đủ 12 service) |
+| 3 | [Trace xuyên outbox, RabbitMQ, DLQ](./phase-03-trace-qua-outbox-rabbit-dlq.md) | Claude (thực hiện code sau khi Codex dừng) | 2 | partial: code và test tập trung xanh ở 5 module; CHƯA có test đầy đủ xuyên HTTP → relay → consumer trên stack thật |
 
 Lý do chia: phase 1–2 là hạ tầng và module dùng chung (thuộc Claude theo plan gốc); phase 3 sửa outbox/DLQ vốn nằm trong phạm vi Codex. Claude không commit lên `feat/reliability-patterns` khi Codex còn chạy; phase 1 trùng `docker-compose.yml` và config-repo với gói E nên phải đợi E xong.
 
