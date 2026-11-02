@@ -1,6 +1,6 @@
 -- Store pronunciation audio as an object key in the media bucket instead of a full URL.
 --
--- V25 wrote https://<project>.supabase.co/storage/v1/object/public/media/vocabulary/pronunciation/{uk,us}/<slug>.mp3.
+-- V33 wrote https://<project>.supabase.co/storage/v1/object/public/media/vocabulary/pronunciation/{uk,us}/<slug>.mp3.
 -- Library now builds the URL from the key (VocabularyAudioUrlResolver), so a new bucket or domain is a configuration
 -- change and not an update of every row. Values that do not start with that media prefix are left as they are, and the
 -- resolver still passes an https:// value through untouched.

@@ -1,4 +1,4 @@
--- Photo covers for the practice tests, replacing the line-art illustrations of V34 and V87 for 63 sections.
+-- Photo covers for the practice tests, replacing the line-art illustrations of V34 and V95 for 63 sections.
 --
 -- The photos are CC0 or public domain files from Wikimedia Commons, cropped to 2:1 and stored in the public "media"
 -- bucket as practice/covers/<asset id>.webp (see scripts/practice-covers). The column holds the object key; Content builds
