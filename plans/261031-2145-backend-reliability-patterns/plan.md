@@ -1,7 +1,7 @@
 ---
 title: "Backend reliability patterns và nền nhiều instance"
 description: "Áp dụng 10 bước reliability (B1–B10) theo thứ tự rủi ro, trên nền chạy nhiều instance mỗi service: Redis, scheduler không chạy trùng, WebSocket qua broker chung, correlation ID và metric, rate limit, outbox relay, circuit breaker, idempotency, test lỗi."
-status: pending
+status: completed
 priority: P2
 branch: "main"
 tags: [reliability, observability, resilience, messaging, multi-instance, tdd]
@@ -195,3 +195,11 @@ Whole-Plan Consistency Sweep: rà `relay phase 1`, `STOMP (relay`, `frontend`, `
 - Chạy `docker compose up --scale learning-service=2 --scale notification-service=2 --scale game-service=2 --scale api-gateway=1`: thông báo tới đúng người, mỗi job chạy 1 lần mỗi chu kỳ, phòng game chơi được.
 - Mỗi B1–B10 có chỗ áp dụng và test theo bảng đối chiếu.
 - `mvn -B -ntp verify` cả reactor xanh trong CI có Docker.
+
+## Đóng plan (2026-11-02)
+
+Trạng thái: **hoàn thành về code và test tự động; còn tồn đọng đã biết.**
+
+- Gói A, B1–B4, C, D, E đã commit và verify toàn reactor xanh (3891 test, 0 lỗi, lần chạy cuối trên cây đã commit).
+- Tồn đọng: (1) kiểm tay trên stack thật cho phase 1–4 chưa chạy, checklist ở manual-checks-phases-1-to-4.md; (2) gói E: tải đo được 16 req/s, thấp hơn mục tiêu 20 của phase 4; phép đo dừng replica chỉ dùng request đọc.
+- Tracing phân tán được làm riêng ở plans/261101-1211-loki-tempo-tracing (trạng thái partial).

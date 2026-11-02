@@ -1,7 +1,7 @@
 ---
 title: "Reliability follow-ups: correlation qua outbox, auth rate limit, resilience, draining"
 description: "Xử lý 5 lỗi thiết kế phát hiện khi rà plan reliability: correlation id đứt ở outbox, route rate limit sai path và XFF, thứ tự exception/retry/breaker của Resilience4j, phase 1 tự mâu thuẫn về khóa scheduler, thiếu graceful shutdown và draining."
-status: pending
+status: completed
 priority: P2
 branch: "feat/reliability-patterns"
 tags: [reliability, observability, resilience, shutdown, follow-up]
@@ -87,3 +87,7 @@ Các sửa lỗi sau đang nằm ở nhánh phụ, chưa vào `feat/reliability-
 ## Cách thực hiện (cập nhật 2026-11-01)
 
 Plan này là **spec chi tiết đã đính chính** cho các gói A–E trong [work-split của plan 261031-2145](../261031-2145-backend-reliability-patterns/work-split-claude-codex.md#chạy-một-mạch-các-gói-còn-lại-cho-codex). Codex làm các gói A→B→C→D→E một mạch; Claude duyệt hàng loạt và làm kiểm tay. Ánh xạ: phase 1 → gói B2, phase 2 → gói A, phase 3 → gói C, phase 4 → gói E, phase 5 → gói B1. Cột "Người làm" ở bảng trên là phân công ban đầu, nay thay bằng ánh xạ này.
+
+## Đóng plan (2026-11-02)
+
+Trạng thái: **đã implement vào các gói A–E của plan 2145; còn tồn đọng đã biết** giống plan 2145 (kiểm tay trên stack thật và hai giới hạn của gói E).

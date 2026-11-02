@@ -1,7 +1,7 @@
 ---
 title: "Log tập trung và tracing phân tán (Loki, Tempo, Alloy, Grafana)"
 description: "Mở rộng observability của plan độ tin cậy backend: thu log Docker vào Loki, trace OpenTelemetry vào Tempo, xem bằng Grafana, giữ trace xuyên outbox và RabbitMQ."
-status: pending
+status: partial
 priority: P2
 branch: "feat/reliability-patterns"
 tags: [observability, tracing, logging, loki, tempo, grafana]
@@ -118,3 +118,10 @@ Kubernetes, HA Loki/Tempo, Kafka cho Tempo, ELK/OpenSearch, dashboard và alert 
 - Loki retention: https://grafana.com/docs/loki/latest/operations/storage/retention/
 - Tempo triển khai: https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/
 - Grafana trace-to-logs: https://grafana.com/docs/grafana/latest/datasources/tempo/configure-tempo-data-source/configure-trace-to-logs/
+
+## Đóng plan (2026-11-02): đóng ở trạng thái partial
+
+- Phase 1 đã kiểm trên stack: Tempo nhận trace qua Alloy; datasource Grafana OK.
+- Phase 2: code và reactor verify xanh; **chưa kiểm waterfall gateway → learning → content** (cần đủ 12 service; máy không đủ RAM).
+- Phase 3: code đã commit (7978bcf4); test tập trung xanh ở 5 module; **chưa có test xuyên HTTP → relay → consumer trên stack thật**.
+- Tồn đọng để mở lại: waterfall e2e và log ↔ trace trong Grafana. Khi có đủ RAM, chạy checklist này rồi đổi status thành completed.
