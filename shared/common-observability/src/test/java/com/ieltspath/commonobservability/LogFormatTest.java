@@ -3,54 +3,86 @@ package com.ieltspath.commonobservability;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.PatternLayout;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import net.logstash.logback.encoder.LogstashEncoder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
-import org.springframework.boot.WebApplicationType;
-import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.context.annotation.Configuration;
+import ch.qos.logback.classic.util.LogbackMDCAdapter;
 
-@ExtendWith(OutputCaptureExtension.class)
+import java.nio.charset.StandardCharsets;
+
+/**
+ * Checks the level pattern and the JSON encoder against a private Logback context. The test does not start Spring, so
+ * the result does not depend on which logging configuration an earlier test in the same JVM installed.
+ */
 class LogFormatTest {
     private static final String LEVEL_PATTERN = "%5p [%X{correlationId:-}]";
 
-    @Test
-    void jsonProfileWritesTheCorrelationIdAsAField(CapturedOutput output) {
-        logWithId("json-req-1", "json-logs", output);
+    private final LoggerContext context = new LoggerContext();
+    private final Logger logger = context.getLogger(LogFormatTest.class);
+    private final ListAppender<ILoggingEvent> events = new ListAppender<>();
 
-        assertTrue(output.getAll().contains("\"correlationId\":\"json-req-1\""), output.getAll());
+    @BeforeEach
+    void capture() {
+        context.setMDCAdapter(new LogbackMDCAdapter());
+        events.setContext(context);
+        events.start();
+        logger.addAppender(events);
+    }
+
+    @AfterEach
+    void release() {
+        logger.detachAppender(events);
+        events.stop();
+        context.getMDCAdapter().clear();
     }
 
     @Test
-    void defaultProfileKeepsTheCorrelationIdInTheLevelColumn(CapturedOutput output) {
-        logWithId("text-req-2", null, output);
+    void textPatternKeepsTheCorrelationIdInTheLevelColumn() {
+        context.getMDCAdapter().put(CorrelationIdFilter.MDC_KEY, "text-req-2");
+        logger.info("handled a request");
 
-        assertTrue(output.getAll().contains("INFO [text-req-2]"), output.getAll());
-        assertFalse(output.getAll().contains("\"correlationId\""), output.getAll());
+        String line = render(LEVEL_PATTERN + " %msg", events.list.get(0));
+
+        assertTrue(line.contains("INFO [text-req-2]"), line);
+        assertFalse(line.contains("\"correlationId\""), line);
     }
 
-    private static void logWithId(String id, String profile, CapturedOutput output) {
-        var builder = new SpringApplicationBuilder(EmptyContext.class)
-                .web(WebApplicationType.NONE)
-                .properties("logging.pattern.level=" + LEVEL_PATTERN);
-        if (profile != null) {
-            builder.profiles(profile);
-        }
-        try (ConfigurableApplicationContext ignored = builder.run()) {
-            MDC.put(CorrelationIdFilter.MDC_KEY, id);
-            try {
-                LoggerFactory.getLogger(LogFormatTest.class).info("handled a request");
-            } finally {
-                MDC.clear();
-            }
+    @Test
+    void jsonEncoderWritesTheCorrelationIdAsAField() {
+        context.getMDCAdapter().put(CorrelationIdFilter.MDC_KEY, "json-req-1");
+        logger.info("handled a request");
+
+        String json = encodeJson(events.list.get(0));
+
+        assertTrue(json.contains("\"correlationId\":\"json-req-1\""), json);
+    }
+
+    private String render(String pattern, ILoggingEvent event) {
+        PatternLayout layout = new PatternLayout();
+        layout.setContext(context);
+        layout.setPattern(pattern);
+        layout.start();
+        try {
+            return layout.doLayout(event);
+        } finally {
+            layout.stop();
         }
     }
 
-    @Configuration
-    static class EmptyContext {
+    private String encodeJson(ILoggingEvent event) {
+        LogstashEncoder encoder = new LogstashEncoder();
+        encoder.setContext(context);
+        encoder.start();
+        try {
+            return new String(encoder.encode(event), StandardCharsets.UTF_8);
+        } finally {
+            encoder.stop();
+        }
     }
 }
