@@ -25,10 +25,12 @@ class VocabularySeedMigrationTest {
     }
 
     // V4 seeds 300 mock items; V15 adds 30 lesson items and their 32 senses; V24-V29 add the game words, activating any
-    // pronunciation row they give a meaning to (V30). The remaining V11 pronunciations are inactive.
+    // pronunciation row they give a meaning to (V30). V31-V32 add 1115 senses for the words of the Reading passages to
+    // INACTIVE items, so the item status does not change. The remaining V11 pronunciations are inactive.
     private static final String IELTS_ITEMS = "vocabulary_items WHERE status = 'ACTIVE'";
     private static final int ACTIVE_ITEM_COUNT = 960;
-    private static final int SENSE_COUNT = 964;
+    private static final int SENSE_COUNT = 2079;
+    private static final int READING_PASSAGE_SENSE_COUNT = 1115;
 
     @Test
     void vocabularySeedsIncludeMockAndLessonContent() throws Exception {
@@ -37,9 +39,11 @@ class VocabularySeedMigrationTest {
     }
 
     @Test
-    void dictationWordPronunciationsAreInactiveItemsWithoutSenses() throws Exception {
-        assertEquals(0, count("vocabulary_items v WHERE v.status = 'INACTIVE' AND v.ipa IS NULL"));
-        assertEquals(0, count("vocabulary_senses s JOIN vocabulary_items v ON v.id = s.vocabulary_item_id WHERE v.status = 'INACTIVE'"));
+    void dictationWordPronunciationsStayInactiveAndOnlyReadingPassageWordsHaveSensesOnThem() throws Exception {
+        assertEquals(0, count("vocabulary_items v WHERE v.status = 'INACTIVE' AND v.ipa IS NULL"
+                + " AND NOT EXISTS (SELECT 1 FROM vocabulary_senses s WHERE s.vocabulary_item_id = v.id)"));
+        assertEquals(READING_PASSAGE_SENSE_COUNT, count("vocabulary_senses s JOIN vocabulary_items v ON v.id = s.vocabulary_item_id WHERE v.status = 'INACTIVE'"));
+        assertEquals(0, count("vocabulary_senses s JOIN vocabulary_items v ON v.id = s.vocabulary_item_id WHERE v.status = 'INACTIVE' AND s.status <> 'ACTIVE'"));
         assertEquals(1, count("vocabulary_items WHERE normalized_lemma = 'weekend' AND ipa = '/ˈwiˌkɛnd/' AND status = 'INACTIVE'"));
         assertEquals(1, count("vocabulary_items WHERE normalized_lemma = 'going'"), "one row per word");
     }

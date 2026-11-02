@@ -1,4 +1,4 @@
--- Topic cover illustrations for the nine Reading passages added in V86, replacing their plain coloured squares with a
+-- Topic cover illustrations for the nine Reading passages added in V94, replacing their plain coloured squares with a
 -- letter and number. Original line art stored as inline SVG data URIs: a gradient and one icon for the topic of the passage,
 -- in the style of V34.
 

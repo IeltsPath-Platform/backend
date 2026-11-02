@@ -1,8 +1,8 @@
 -- Meanings for the everyday words of the Reading practice passages (articles, pronouns, verbs such as be and have, common
--- nouns and adjectives), so that clicking any word of a passage shows what it means; V23 covered the content words. A word
+-- nouns and adjectives), so that clicking any word of a passage shows what it means; V31 covered the content words. A word
 -- that is a function word has its grammatical role at the start of the meaning, because the part of speech is limited to
 -- noun, verb, adjective, adverb, preposition and conjunction. Each word gets one sense, with a passage sentence as its
--- example. Words that are already in the library keep their row and stay INACTIVE, as in V23.
+-- example. Words that are already in the library keep their row and stay INACTIVE, as in V31.
 -- The meanings are original text written for this project and still need a review.
 
 CREATE TEMP TABLE reading_vocabulary (
@@ -723,7 +723,7 @@ FROM reading_vocabulary r
 WHERE NOT EXISTS (SELECT 1 FROM vocabulary_senses s JOIN vocabulary_items i ON i.id = s.vocabulary_item_id
                   WHERE i.normalized_lemma = lower(r.lemma));
 
--- V23 took the example of 'compute' from the sentence of 'computer'; this is the sentence that holds the verb.
+-- V31 took the example of 'compute' from the sentence of 'computer'; this is the sentence that holds the verb.
 UPDATE vocabulary_senses s SET example_sentence = 'A ship sends pulses of sound to the bottom and times the echo, and from that delay computes the depth.'
 FROM vocabulary_items i
 WHERE i.id = s.vocabulary_item_id AND i.normalized_lemma = 'compute';

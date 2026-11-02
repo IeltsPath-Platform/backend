@@ -27,8 +27,9 @@ class InlineImageStorageMigrationTest {
         imageRowsBeforeMigration = sql.queryForObject("SELECT count(*) FROM content_assets WHERE asset_type = 'IMAGE'", Integer.class);
         assertThat(sql.queryForObject("SELECT count(*) FROM content_assets WHERE media_reference LIKE 'data:image/svg+xml;base64,%'", Integer.class))
                 .isEqualTo(86);
+        // Stops at the storage migrations: later Reading seeds add covers that stay inline illustrations until a photo is chosen.
         Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-                .locations("classpath:db/migration").load().migrate();
+                .locations("classpath:db/migration").target("93").load().migrate();
     }
 
     @Test
