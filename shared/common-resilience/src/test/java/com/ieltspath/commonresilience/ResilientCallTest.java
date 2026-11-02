@@ -8,19 +8,62 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.convert.DurationStyle;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
 import java.time.Duration;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class ResilientCallTest {
+    @Test
+    void isolatedDefaultMatchesRetrySettingsInApplicationYaml() throws IOException {
+        Path applicationYaml = findApplicationYaml();
+        var properties = new YamlPropertySourceLoader()
+                .load("application", new FileSystemResource(applicationYaml)).get(0);
+        int expectedMaxAttempts = Integer.parseInt(String.valueOf(
+                properties.getProperty("resilience4j.retry.configs.default.max-attempts")));
+        Duration expectedWait = DurationStyle.detectAndParse(String.valueOf(
+                properties.getProperty("resilience4j.retry.configs.default.wait-duration")));
+
+        ResilientCall call = ResilientCall.isolatedDefault();
+        RetryRegistry retries = (RetryRegistry) ReflectionTestUtils.getField(call, "retries");
+        AtomicReference<Duration> observedWait = new AtomicReference<>();
+        retries.retry("yaml-config-check").getEventPublisher()
+                .onRetry(event -> observedWait.set(event.getWaitInterval()));
+        AtomicInteger attempts = new AtomicInteger();
+        assertThrows(ResourceAccessException.class, () -> call.call("yaml-config-check", CallKind.READ, () -> {
+            attempts.incrementAndGet();
+            throw connectionFailure();
+        }));
+
+        assertEquals(expectedMaxAttempts, attempts.get());
+        assertEquals(expectedWait, observedWait.get());
+    }
+
+    private static Path findApplicationYaml() {
+        Path directory = Path.of(System.getProperty("user.dir")).toAbsolutePath();
+        while (directory != null) {
+            Path candidate = directory.resolve("infra/config-server/config-repo/application.yaml");
+            if (Files.isRegularFile(candidate)) return candidate;
+            directory = directory.getParent();
+        }
+        throw new AssertionError("Could not locate infra/config-server/config-repo/application.yaml");
+    }
+
     @Test
     void opensAfterFailureThreshold() {
         var fixture = fixture(2, 1, Duration.ofSeconds(30));

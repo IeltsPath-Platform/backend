@@ -3,14 +3,17 @@ package com.ieltspath.commonresilience;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.time.Duration;
 import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -25,6 +28,19 @@ public class ResilientCall {
         this.breakers = Objects.requireNonNull(breakers);
         this.retries = Objects.requireNonNull(retries);
         this.bulkheads = Objects.requireNonNull(bulkheads);
+    }
+
+    /** Creates an isolated instance for direct adapter tests that do not load Spring configuration. */
+    public static ResilientCall isolatedDefault() {
+        CircuitBreakerConfig breaker = CircuitBreakerConfig.custom()
+                .recordException(ResilientCall::isTransientFailure).build();
+        RetryConfig retry = RetryConfig.custom()
+                .maxAttempts(2)
+                .waitDuration(Duration.ofMillis(200))
+                .retryOnException(ResilientCall::isTransientFailure)
+                .build();
+        return new ResilientCall(CircuitBreakerRegistry.of(breaker), RetryRegistry.of(retry),
+                BulkheadRegistry.ofDefaults());
     }
 
     public <T> T call(String target, CallKind kind, Supplier<T> request) {
