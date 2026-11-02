@@ -5,6 +5,7 @@ import com.ieltspath.content.application.result.GenerationReply;
 import com.ieltspath.content.infrastructure.config.ContentAiProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -15,10 +16,12 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.ExpectedCount.times;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withTooManyRequests;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -80,19 +83,20 @@ class OpenAiCompatibleContentGeneratorTest {
         ContentAiProperties properties = properties(BASE, "m-1");
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE);
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(BASE + "/chat/completions")).andRespond(withTooManyRequests());
+        server.expect(times(3), requestTo(BASE + "/chat/completions")).andRespond(withTooManyRequests());
 
         ContentGenerationException failure = assertThrows(ContentGenerationException.class,
-                () -> new OpenAiCompatibleContentGenerator(builder.build(), properties).generate("prompt"));
+                () -> new OpenAiCompatibleContentGenerator(builder.build(), properties, NO_WAIT).generate("prompt"));
         assertEquals("HTTP_429", failure.code());
+        server.verify();
     }
 
     @Test
-    void aBusyWriteIsNotRetriedAfterServiceUnavailable() {
+    void aBusyWriteIsRetriedAndThenFailsWithItsStatus() {
         ContentAiProperties properties = properties(BASE, "m-1");
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE);
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(times(1), requestTo(BASE + "/chat/completions"))
+        server.expect(times(3), requestTo(BASE + "/chat/completions"))
                 .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
 
         ContentGenerationException failure = assertThrows(ContentGenerationException.class,
@@ -103,11 +107,28 @@ class OpenAiCompatibleContentGeneratorTest {
     }
 
     @Test
-    void aGatewayTimeoutWriteIsNotRetried() {
+    void aBusyWriteThatRecoversReturnsTheReply() {
         ContentAiProperties properties = properties(BASE, "m-1");
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE);
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(times(1), requestTo(BASE + "/chat/completions"))
+        server.expect(once(), requestTo(BASE + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        server.expect(once(), requestTo(BASE + "/chat/completions"))
+                .andRespond(withSuccess("{\"model\":\"m-1\",\"choices\":[{\"message\":{\"content\":\"done\"}}]}",
+                        MediaType.APPLICATION_JSON));
+
+        GenerationReply reply = new OpenAiCompatibleContentGenerator(builder.build(), properties, NO_WAIT).generate("prompt");
+
+        assertEquals("done", reply.text());
+        server.verify();
+    }
+
+    @Test
+    void aGatewayTimeoutIsRetriedAndThenFailsWithItsStatus() {
+        ContentAiProperties properties = properties(BASE, "m-1");
+        RestClient.Builder builder = RestClient.builder().baseUrl(BASE);
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(times(3), requestTo(BASE + "/chat/completions"))
                 .andRespond(withStatus(HttpStatus.GATEWAY_TIMEOUT));
 
         ContentGenerationException failure = assertThrows(ContentGenerationException.class,
@@ -116,7 +137,6 @@ class OpenAiCompatibleContentGeneratorTest {
         assertEquals("HTTP_504", failure.code());
         server.verify();
     }
-
     @Test
     void aFailureThatIsNotBusyIsNotTriedAgain() {
         ContentAiProperties properties = properties(BASE, "m-1");
