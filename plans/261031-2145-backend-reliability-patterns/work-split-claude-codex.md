@@ -86,14 +86,14 @@ Cuối cùng báo cáo đúng mẫu trong plan.md (Phase, Status, Commits, Files
 
 | Phase | Người làm | Trạng thái | Commit cuối | Báo cáo review |
 |---|---|---|---|---|
-| 1 | Claude (code), Codex (việc còn lại: gói B) | Code xong và đã merge; còn tài liệu "Chạy nhiều instance", dọn văn bản plan, `WorkItemSync`, test relay song song; chờ kiểm tay | `3c6abea7`…`c54dfbdb` | — |
-| 2 | Claude (code), Codex (gói B) | Code xong và đã merge; còn test `/actuator/prometheus` mỗi service, gauge DLQ, correlation qua outbox, tài liệu; chờ kiểm tay | `fa162926`…`(prometheus)`, fix `5221e81c` | — |
-| 3 | Codex | `DONE_WITH_CONCERNS` (`e5161ba3`); chạy lại xanh; **chưa qua cổng**, chờ gói A | `56458bdf`, `e5161ba3` | Cổng duyệt 2026-11-01 (trong mục "Sửa sau cổng duyệt" của phase 3) |
-| 4 | Claude (code), Codex (gói B) | Code và test xong, đã merge; còn bảng event trong tài liệu, 2 test; chờ kiểm tay | `6b539bf4`…`e30674e0` | — |
-| 5 | Codex (gói C) | Chưa làm; spec đã đính chính | — | — |
-| 6 | Codex (gói D) | Chưa làm | — | — |
-| 7 | Claude (code), Codex (gói B) | Phần chính xong, đã merge; còn test song song, test replay learning, rà listener | `9e8aa3d4`…`32d3886d` | — |
-| 8 | Codex (gói E) | Chưa làm; thêm kịch bản draining và correlation | — | — |
+| 1 | Claude (code), gói B1 xong (Codex) | Code xong; gói B1 xong (`WorkItemSync` không giữ khóa khi gọi HTTP, test relay song song); chờ kiểm tay trên stack thật | `3c6abea7`…`4eaa68b4` | `codex-package-B1-report.md` |
+| 2 | Claude (code), gói B2 xong (Codex) | Code xong: correlation qua outbox (4 migration), `/actuator/prometheus` có test ở 9 service, gauge DLQ; chờ kiểm tay | `4c8c08f6`, `d3a855a3` | `codex-package-B2-report.md` |
+| 3 | Codex (gói A) | Gói A xong (auth path, XFF); cổng duyệt đạt; kiểm reset-password qua gateway còn để kiểm tay | `56458bdf`, `e5161ba3`, `a133080e` | Cổng duyệt 2026-11-01 (mục "Sửa sau cổng duyệt" của phase 3) |
+| 4 | Claude (code), gói B3 xong (Codex) | Gói B3 xong: retry qua exchange nguồn, test retry và rollback; chờ kiểm tay luồng subscription-granted | `424e71c4`, `5ad92eee` | `codex-package-B3-report.md` |
+| 5 | Codex (gói C) | **Chưa xong**: chỉ 2 client dùng `ResilientCall`; các RestClient còn lại chưa bọc. C3b: giữ 503 cho client library (quyết định 2026-11-01) | `8bd496f8` (báo cáo chặn), `850cf5c3` | `codex-package-C-3a-report.md`, `codex-package-C-3b-report.md` |
+| 6 | Codex (gói D) | **Chưa xong**: idempotency cấp gói admin có test; còn test saga failure-window và duplicate-delivery | `2735035b`, `be9c3082` | báo cáo D |
+| 7 | Claude (code), gói B4 xong (Codex) | Phần chính xong; test song song và replay đã xanh; test community và notification sửa ở `c2e4a633`, `762d0c64` | `9e8aa3d4`…`762d0c64` | `codex-package-B4-report.md` |
+| 8 | Codex (gói E) | **Chưa xong**: graceful shutdown và draining có test; còn kịch bản tổng hợp (dừng replica, correlation HTTP→outbox→consumer, endpoint auth) | `238f463f`, `3e79f7b5` | báo cáo E |
 
 Claude cập nhật bảng này sau mỗi cổng duyệt.
 

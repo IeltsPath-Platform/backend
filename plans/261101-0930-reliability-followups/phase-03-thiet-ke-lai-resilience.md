@@ -17,7 +17,7 @@ Thêm circuit breaker, retry và bulkhead cho lời gọi HTTP giữa service, �
 
 ## Hiện trạng (đã kiểm)
 
-- `RestLearningContentClient.response()` (dòng 230–246) bắt `RestClientResponseException`, `ResourceAccessException`, `RestClientException` và đổi thành `LearningRequestException` (404 → `NOT_FOUND`, 503 → `CONTENT_UNAVAILABLE`, còn lại → `CONTENT_FAILURE`). Các client khác theo cùng mẫu.
+- `RestLearningContentClient.response()` (dòng 230–246) bắt `RestClientResponseException`, `ResourceAccessException`, `RestClientException` và đổi thành `LearningRequestException` (404 → `NOT_FOUND`, 503 → `CONTENT_UNAVAILABLE`, còn lại → `CONTENT_FAILURE`). Các client khác **không** đều theo mẫu này: `LibraryVocabularySenseClient` (content-service) bắt mọi `RestClientException` trên lời gọi GET và ném `VocabularyServiceUnavailableException`, nên 404 từ library thành 503. Quyết định (2026-11-01): giữ hành vi 503 cho client này, không thêm mapping 404; test C3b khẳng định 503.
 - Learning có 7 POST chỉ để truy vấn (`progressMetadata`, `practiceSetAvailability`, `searchPracticeSets`, `prerequisites`, `questionDifficulties`, `workItemSubjects`, `suggestionCandidates`).
 - Timeout client: connect 2 s, read 3–5 s. LLM: learning `grading-timeout-seconds: 20` (connect 5 s), assessment đọc 45 s, content có `BUSY_RETRY_DELAYS` 5 s + 15 s.
 - Gateway chưa đặt `connect-timeout` và `response-timeout`; chưa có Retry filter; `GatewayErrorAttributes` đã có.
