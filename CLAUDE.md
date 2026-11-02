@@ -1,9 +1,10 @@
 # CLAUDE.md — IELTSPath backend
 
-- Cập nhật lần cuối: 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); thay đổi URL service giữ mốc 2026-10-15; dữ kiện kiến trúc khác đã kiểm ngày 2026-10-07 sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
+- Cập nhật lần cuối: 2026-11-02 (thêm hai module shared, trỏ tới pattern bắt buộc ở `AGENTS.md` §3.9, sửa trạng thái relay outbox); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); thay đổi URL service giữ mốc 2026-10-15; dữ kiện kiến trúc khác đã kiểm ngày 2026-10-07 sau course path, placement recommendation và course gate. Về dữ kiện, code là nguồn đúng khi tài
   liệu lệch; về quy tắc, xem thứ tự ưu tiên đầu `AGENTS.md`.
 - Quy tắc bắt buộc (stack, layer, bảo mật, điều cấm, quy trình) nằm trong `AGENTS.md`, được nạp ngay dưới đây.
 - Kiến trúc, flow, quyết định: `docs/system-architecture.md`.
+- Pattern hệ thống phải áp dụng (resilience, outbox, idempotency, scheduler, storage…): `AGENTS.md` §3.9; bảng tổng hợp ở `README.md`.
 
 @AGENTS.md
 
@@ -27,6 +28,8 @@ Reactor gồm 17 module: 3 infra, 5 shared, 9 business. Năm module shared là t
 | `shared/common-security` | Java lib | — | — | — |
 | `shared/common-events` | Java lib (tên/hình dạng event, `MessageRetry`, `RetryTopology`) | — | — | — |
 | `shared/common-storage` | Java lib | — | — | — |
+| `shared/common-resilience` | Java lib (`ResilientCall`: circuit breaker, retry, bulkhead) | — | — | — |
+| `shared/common-observability` | Java lib (`correlationId`, metric outbox/DLQ, trace context) | — | — | — |
 | `services/user-service` | Java | 8085 | `user_db` (Compose PostgreSQL host 5440) | `/auth/**`, `/api/users/**` (trừ goal và study-time đã chuyển sang learning) |
 | `services/content-service` | Java | 8082 | `content_db` (Compose PostgreSQL host 5440) | `/api/content/**` trừ ba nhóm catalog chuyển tới library |
 | `services/library-service` | Java | 8081 | `library_db` (Compose PostgreSQL host 5440) | `/api/content/{videos,vocabulary}/**`, `/api/content/admin/vocabulary/**`, `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**` |
@@ -64,7 +67,8 @@ Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/c
 - Service Java chạy trên host (IDE hoặc `java -jar`) theo thứ tự: config-server → eureka → api-gateway → user → content →
   library → assessment → các service còn lại (kể cả game-service, xem §5).
 - RabbitMQ: AMQP `127.0.0.1:5672`, UI `127.0.0.1:15673`. Learning Service tự khai báo queue, retry queue và DLQ khi khởi động.
-- Hướng dẫn luồng chính và cấu hình Compose: `README.md` §6.
+- Stack log và trace tùy chọn: `docker compose --profile observability -f docker-compose.yml -f docker-compose.observability.yml up -d` (cần `GRAFANA_ADMIN_PASSWORD` trong `.env`).
+- Hướng dẫn luồng chính và cấu hình Compose: `docs/local-development.md`.
 - Full stack trong container: `docker compose up -d --build`. Cổng mặc định: Gateway 8080, Eureka 8761, PostgreSQL 5440,
   RabbitMQ 5672/UI 15673. Đổi cổng qua `MVP_GATEWAY_PORT`, `MVP_EUREKA_PORT`, `MVP_POSTGRES_PORT`,
   `RABBITMQ_HOST_PORT`, `MVP_RABBITMQ_UI_PORT`.
@@ -113,7 +117,7 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 - Essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE` được chấm LLM miễn phí; thiếu cấu hình, LLM lỗi hoặc hết quota ngày thì
   chuyển sang hàng chờ EXAMINER. Essay không được nộp qua `/api/assessments/submissions` sẽ nhận 0 điểm và không tạo job.
   `MOCK` vẫn do EXAMINER chấm.
-- Outbox của access/content/game chỉ ghi, chưa có relay: event của các service này không tới consumer.
+- Outbox của content và game chỉ ghi, chưa có relay: event của hai service này không tới consumer. Access, assessment, community và learning (`reward_grants`) có relay.
 - Role chuẩn là `ADMIN`, `CUSTOMER`, `CONTENT_AUTHOR`, `EXAMINER`, `SALES_STAFF` (`LEARNER` cũ đã đổi thành `CUSTOMER`).
 - `graphify-out/` không được commit.
 - Bài Listening seed (content V12, reference dạng key) trả 500 `INVALID_MEDIA_REFERENCE` khi thiếu `CONTENT_MEDIA_BASE_URL`;
@@ -127,7 +131,8 @@ CI (`.github/workflows/ci.yml`) chạy `mvn -B -ntp verify` cả reactor và `do
 | Invariant cấp dự án (ưu tiên cao nhất) | `.sdd/global/constitution.md`; các file khác trong `.sdd/global`, `.sdd/constraints` là baseline cũ |
 | Contract HTTP/event | `docs/contracts/` (`lesson-learning-v1`, `lesson-writing-v1`, `learning-content-internal-v1`, `answer-spec-v1`, `assessment-completed-v2`) |
 | Schema toàn bộ database | `.sdd/database/DATABASE_V5.md` |
-| Chạy local, biến môi trường | `README.md`, `infra/README.md`, README từng service |
+| Chạy local, biến môi trường | `docs/local-development.md`, `infra/README.md`, README từng service |
+| Pattern hệ thống bắt buộc | `AGENTS.md` §3.9, `README.md` (bảng pattern) |
 | Cấu hình runtime | `infra/config-server/config-repo/<service>.yaml` |
 | Kế hoạch và quyết định đang làm | `plans/` (mỗi plan có `plan.md` + phase), `plans/reports/` |
 

@@ -1,7 +1,7 @@
 # AGENTS.md - Quy tắc bắt buộc cho AI Agent
 
-- Phiên bản: 2.2
-- Cập nhật lần cuối: 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
+- Phiên bản: 2.3
+- Cập nhật lần cuối: 2026-11-02 (thêm §3.9 và nhóm điều cấm "Pattern hệ thống" ở §5: resilience, outbox, idempotency, scheduler, storage; bổ sung Redis, Resilience4j, Micrometer/OpenTelemetry, Supabase vào stack và hai module shared mới); 2026-10-30 (Content gọi Library một chiều, Library không gọi Content; Notification đã có DB, listener và API; mặc định DB của config-repo là `localhost:5440`); 2026-10-26 (bốn queue thông báo chấm bài của Notification dùng helper trong `common-events`; 2026-10-19 bổ sung `common-events`); dữ kiện khác giữ mốc kiểm 2026-10-07 sau course path, placement recommendation và course gate
 - Dự án: `IELTSPath` (Maven coordinates: `com.ieltspath:code-base:1.0-SNAPSHOT`)
 - Kiến trúc chi tiết (sơ đồ, flow, data ownership, quyết định): [`docs/system-architecture.md`](docs/system-architecture.md)
 
@@ -21,6 +21,8 @@ suy diễn khả năng nghiệp vụ ngoài các module dưới đây.
 | `shared/common-security` | Thư viện security servlet dùng chung (internal JWT, `CanonicalRoles`, `CurrentUserProvider`); không deploy độc lập. |
 | `shared/common-events` | Thư viện tên exchange/routing key/header, record payload và helper `MessageRetry`/`RetryTopology` dùng chung; không deploy độc lập. |
 | `shared/common-storage` | Thư viện lưu object dùng chung (`ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy`); không deploy độc lập; service tự cấu hình bucket. |
+| `shared/common-resilience` | Thư viện `ResilientCall` (circuit breaker, retry, bulkhead bằng Resilience4j) cho lời gọi HTTP đồng bộ giữa service và tới LLM; không deploy độc lập. |
+| `shared/common-observability` | Thư viện `correlationId` (MDC, header HTTP, header AMQP), metric outbox và DLQ, trace context cho outbox; không deploy độc lập. |
 | `services/user-service` | Tài khoản, role, auth token, hồ sơ học viên (có múi giờ). Mục tiêu học, activity và thời gian học do learning-service giữ; streak cũng vậy. |
 | `services/content-service` | Curriculum: topic, knowledge point, câu hỏi, gói nội dung, asset. Khu author: soạn gói và đề cuối, tải audio, bản nháp AI (câu hỏi, course), dựng course từ cây tri thức, import Excel. Nội dung AI luôn qua bản nháp (`ai_drafts`) và người duyệt; sinh course chỉ chọn từ kho. |
 | `services/library-service` | Cổng 8081, `library_db` (Compose PostgreSQL host 5440): catalog từ vựng/video và thư viện cá nhân; Gateway chuyển `/api/content/{videos,vocabulary}`, `/api/content/admin/vocabulary` và năm nhóm `/api/learning-support` tương ứng tới đây. |
@@ -47,19 +49,24 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 | Bảo mật | Spring Security, OAuth2 Resource Server, Nimbus JWT, HMAC-SHA256 JWT, BCrypt. |
 | Messaging | RabbitMQ 3.13; Spring AMQP (`spring-boot-starter-amqp`): assessment phát, learning-service nhận. |
 | Realtime | Spring WebSocket (game-service). |
+| Redis | Redis 7: rate limit ở Gateway, giới hạn đăng nhập, ticket WebSocket của game, pub/sub đẩy realtime (kênh không bền). |
+| Resilience | Resilience4j 2.4.0, chỉ dùng qua `common-resilience` (`ResilientCall`). |
+| Quan sát | Micrometer, Micrometer Tracing + OpenTelemetry qua `common-observability`; Prometheus, Loki, Tempo, Alloy, Grafana là stack tùy chọn (`docker-compose.observability.yml`, profile `observability`). |
+| Lưu file | Supabase Storage qua `common-storage`. |
 | Shared code | `common-security` auto-configuration; `common-events` (tên/hình dạng event, helper retry AMQP); MapStruct 1.6.3; Lombok 1.18.46. |
 | API docs | springdoc-openapi 2.8.17 (duyệt 2026-10-02): `webmvc-api` ở user/access/assessment/learning, `webflux-ui` ở Gateway gom Swagger UI; chỉ route luồng chính, không `/internal/**`. |
 | Kiểm thử | JUnit Jupiter, Spring Boot Test, Mockito, Spring Security Test, Testcontainers PostgreSQL. |
 | Container | Docker Compose, `postgres:15-alpine`, `rabbitmq:3.13-management-alpine`, Eclipse Temurin 21. |
 | CI | GitHub Actions `.github/workflows/ci.yml`: mỗi PR và push vào `main` chạy `mvn -B -ntp verify` cả reactor (JDK 21, Testcontainers trên Docker của runner) và `docker compose config --quiet` với `.env` giả. Chưa có CD. |
 
-Repository **chưa có**: frontend, cache, object storage, file OpenAPI được track, CD/deploy pipeline,
+Repository **chưa có**: frontend, file OpenAPI được track, CD/deploy pipeline,
 formatter, linter, coverage gate. Bổ sung các thành phần này là quyết định thiết kế, không phải mở rộng mặc định.
 
 ## 3. Nguyên tắc kiến trúc
 
 Dự án dùng DDD, Clean Architecture và Microservices. Đây là ràng buộc bắt buộc, kể cả khi code hiện tại có điểm chưa
-nhất quán từ trước (xem §7).
+nhất quán từ trước (xem §7). Trước khi thiết kế hoặc sửa code, đối chiếu §3.9 để biết pattern bắt buộc; tự dựng
+cơ chế song song với pattern đã có là vi phạm (§5).
 
 ### 3.1 Layer và hướng phụ thuộc (service Java)
 
@@ -179,7 +186,7 @@ src/main/java/com/ieltspath/<service>
   IDE, dùng `docker compose up -d postgres rabbitmq` rồi trỏ các `*_DB_URL` tới `localhost:${MVP_POSTGRES_PORT:-5440}/<service>_db`; thứ tự service trên host là Config Server → Eureka → Gateway → business service.
   Tài khoản/điểm demo của user/access chỉ được ghi khi `DEMO_DATA_ENABLED=true` (Compose local mặc định bật).
   Game chọn snapshot `VOCABULARY` từ library và `GRAMMAR` từ content; trong Compose các base URL trỏ theo tên service.
-  Chi tiết: `README.md` §6, `docs/system-architecture.md` §7.
+  Chi tiết: `docs/local-development.md`, `docs/system-architecture.md` §7.
 - Nhóm cấu hình nghiệp vụ: `learning.mastery.*` (ngưỡng mastery, lịch ôn; Admin ghi đè ở `learning_rule_configs`),
   `learning.flags.*` (ngưỡng cờ bất thường), `learning.tree-quality.*` (ngưỡng cạnh đáng ngờ, câu quá dễ/khó),
   `content.ai.*` (bản nháp AI và hạn mức của khu author), `learning.work-items.*` (chu kỳ đồng bộ hàng việc), `learning.writing.*` (hạn mức chấm essay), `learning.free-practice.*`
@@ -290,6 +297,26 @@ src/main/java/com/ieltspath/<service>
   bài ôn không bao giờ được giao lại làm set ôn cho chính học viên đó (hết package thì bài ôn `SKIPPED`).
 - Consumer không gọi HTTP; ACK sau khi transaction commit; vi phạm contract hoặc hết lượt thử → DLQ.
 - Tác vụ LLM mới cho học viên (chấm Writing) phải có hạn mức theo ngày (plan 0737).
+### 3.9 Pattern hệ thống: bắt buộc áp dụng
+
+Mỗi thay đổi thuộc các tình huống dưới đây PHẢI dùng pattern đã có và đúng thư viện dùng chung; không tự dựng cơ chế
+song song. Bảng tổng hợp và lý do ở `README.md` (mục "Các Pattern Hệ Thống Dùng"), chi tiết ở `docs/system-architecture.md`.
+Gặp code cũ lệch pattern: giữ nguyên hành vi, không sửa lây trong task không liên quan, ghi vào mô tả PR.
+
+| Khi bạn... | PHẢI | Chi tiết |
+| --- | --- | --- |
+| Gọi HTTP sang service khác hoặc LLM | Bọc trong `ResilientCall.call(target, CallKind, ...)` của `common-resilience`: `target` là tên service đích (LLM là `llm`); `READ` và `IDEMPOTENT_WRITE` được retry một lần, `WRITE` không retry; bắt `DownstreamUnavailableException` rồi đổi về contract lỗi của service gọi; chạy ngoài transaction và ngoài khóa | `docs/system-architecture.md` §3 |
+| Phát event | Ghi bảng outbox cùng transaction với dữ liệu, relay publish có publisher confirm; bảng outbox có `correlation_id` và `trace_context`; tên exchange, routing key, payload nằm ở `common-events`, tên có version, contract ở `docs/contracts/`; đổi hình dạng event đã có cần duyệt (§5) | §3.5 |
+| Thêm consumer | Idempotent theo khóa tự nhiên (`eventId` hoặc `(attempt, result_version)`); lỗi tạm đi retry queue có TTL, lỗi contract hoặc hết lượt vào DLQ; service consumer sở hữu queue, retry queue, DLQ; chỉ ack sau khi ghi xong; mẫu là consumer của learning-service | §3.5 |
+| Trừ hoặc cộng điểm, cấp quyền (Premium), mở khóa trả phí | Bắt buộc `Idempotency-Key` hoặc khóa ổn định tương đương (như submission ID); lưu khóa cùng thông tin để phát hiện dùng lại khác payload trong cùng transaction với tác động: cùng khóa và payload trả kết quả cũ, khác payload trả `409`. Cần gọi service khác sau khi ghi thì ghi intent `PENDING` trước rồi đối soát (reconcile) | `docs/saga-course-unlock-and-human-grading.md`, `docs/contracts/subscription-granted-v1.md` |
+| Thêm `@Scheduled` hoặc job nền | An toàn khi nhiều instance cùng chạy: claim hàng bằng `FOR UPDATE SKIP LOCKED`, hoặc advisory lock, hoặc thao tác lặp an toàn; HTTP và LLM chạy ngoài khóa và transaction; thêm một dòng vào bảng "Scheduler và nhiều instance" | `docs/system-architecture.md` |
+| Ghi dữ liệu học của một học viên (learning-service) | Transaction mở đầu bằng `pg_advisory_xact_lock` theo user | §3.8 |
+| Thêm route hoặc endpoint công khai ở Gateway | Gán tier rate limit (`auth`, `upload`, `ai`, `default`) trong `config-repo/api-gateway.yaml`; route thuộc tier `auth` thì cập nhật `AuthRouteConsistencyTest` | `docs/system-architecture.md` §9 |
+| Lưu hoặc phát file | Dùng `ObjectStorage`, `ObjectKeys`, `UploadPolicy` của `common-storage`; bucket theo bảng trong tài liệu kiến trúc; file trả phí phát bằng URL ký ngắn hạn, không lưu URL ký vào DB hoặc log | `docs/system-architecture.md` §3 |
+| Log, metric, trace | Giữ `X-Correlation-Id` (filter và client customizer của `common-observability`); id đi qua header, không qua payload event; metric dùng Micrometer; trace context của event lưu ở cột `trace_context` | §3.3 |
+| Thêm thư viện dùng chung | Module `shared/common-*` đăng ký bằng `AutoConfiguration.imports`, chỉ chứa technical concern | §3.5 |
+| Đổi hợp đồng HTTP hoặc event | Sửa `docs/contracts/` trong cùng PR với code | §3.3, §3.5 |
+
 ## 4. Quy tắc đặt tên file và cấu trúc dự án
 
 ```text
@@ -332,6 +359,18 @@ Khi không có convention cụ thể, theo code lân cận trong cùng module.
 - TUYỆT ĐỐI KHÔNG đưa `third_party/` vào build, Dockerfile, compose hay classpath của service. Comment ghi nguồn của code
   port (`MasteryCalculator`) là được phép và phải giữ.
 
+### Pattern hệ thống
+
+- TUYỆT ĐỐI KHÔNG gọi HTTP sang service khác hoặc LLM mà không qua `ResilientCall`; không tự dựng retry, circuit breaker hay bulkhead song song.
+- TUYỆT ĐỐI KHÔNG giữ transaction hoặc khóa (advisory, row) khi gọi HTTP hoặc LLM.
+- TUYỆT ĐỐI KHÔNG phát event bằng `RabbitTemplate` ngay trong use case; ghi outbox cùng transaction rồi để relay publish.
+- TUYỆT ĐỐI KHÔNG viết consumer không idempotent, nuốt exception hoặc ack trước khi ghi xong.
+- TUYỆT ĐỐI KHÔNG làm thao tác trừ/cộng điểm, cấp quyền hoặc mở khóa trả phí mà không có `Idempotency-Key` hoặc khóa ổn định tương đương.
+- TUYỆT ĐỐI KHÔNG thêm `@Scheduled` giả định chỉ một instance chạy.
+- TUYỆT ĐỐI KHÔNG gọi Supabase Storage trực tiếp ngoài `common-storage`, và không lưu hoặc log URL ký.
+- TUYỆT ĐỐI KHÔNG tạo bảng outbox thiếu `correlation_id` và `trace_context`.
+- TUYỆT ĐỐI KHÔNG đổi hành vi pattern dùng chung (`ResilientCall`, `MessageRetry`, `RetryTopology`, outbox relay, rate limit Gateway) như side effect của task chỉ liên quan một service.
+
 ### Bảo mật
 
 - TUYỆT ĐỐI KHÔNG commit, hardcode, log, expose hoặc ghi giá trị secret vào tài liệu.
@@ -365,6 +404,7 @@ Khi không có convention cụ thể, theo code lân cận trong cùng module.
 
 1. Đọc file này, `README.md` và README/config của module bị ảnh hưởng trước khi sửa code.
 2. Giữ thay đổi trong đúng bounded context. Chỉ sửa `common-security`, Gateway, Config Server hoặc Docker khi contract thật sự cần.
+   Đối chiếu thay đổi với §3.9; mô tả PR nêu pattern đã áp dụng, hoặc lý do nếu lệch.
 3. Khi `graphify-out/graph.json` tồn tại, định hướng bằng Graphify trước khi đọc nhiều source (graph đã loại `third_party/`
    và `*.md`). Tên trùng nhau thì dùng dạng `path::Symbol`.
 
@@ -402,6 +442,7 @@ docker compose config --quiet
 6. Chỉ build/chạy Docker khi daemon khả dụng: `docker compose up -d --build <service...>`, `docker compose ps`.
 7. Không tuyên bố check nào đã chạy (CI, lint, coverage, contract test) khi chúng chưa tồn tại hoặc chưa thực sự chạy.
 8. Review PR: client HTTP mới nào trỏ tới service đã gọi ngược lại mình thì người viết phải giải thích trong mô tả PR (xem §3.5).
+   Reviewer cũng đối chiếu §3.9: thiếu pattern bắt buộc là lý do chặn merge.
 9. Commit theo conventional commit; không nhắc việc dùng AI/agent để viết code, số phase hay mã plan trong commit, code
    comment, tên test hay migration (comment ghi nguồn port DeepTutor là chuyện khác và bắt buộc).
 
@@ -414,6 +455,6 @@ Những điểm ảnh hưởng trực tiếp tới quy tắc:
   `infrastructure` và không đưa dependency dạng này vào `domain`.
 - `CONTENT_SERVICE_URL` của game mặc định `http://content-service:8082` trong config-repo; khi chạy game trên host,
   đặt `http://localhost:8082`. `LIBRARY_SERVICE_URL` đã mặc định `http://localhost:8081`.
-- Outbox của access/content/game đã ghi event nhưng chưa có relay; đừng giả định các event đó tới được consumer.
+- Outbox của content và game đã ghi event nhưng chưa có relay; đừng giả định các event đó tới được consumer. Access, assessment, community và learning (`reward_grants`) có relay.
 - Config-repo có giá trị fallback cho secret; không dựa vào chúng và không tự sửa như side effect, báo người dùng.
-- Chưa xác định: production deployment và CD, secret management, frontend contract, API versioning, cache, object storage.
+- Chưa xác định: production deployment và CD, secret management, frontend contract, API versioning.
