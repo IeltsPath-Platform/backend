@@ -5,15 +5,32 @@ import com.ieltspath.events.community.CommunityMessaging;
 import com.ieltspath.events.community.CommunityEventTypes;
 import com.ieltspath.community.infrastructure.messaging.CommunityEventOutboxAdapter;
 import com.ieltspath.community.infrastructure.messaging.CommunityOutboxRelay;
+import com.ieltspath.commonobservability.CorrelationIdFilter;
+import com.ieltspath.commonobservability.CorrelationListenerAdvice;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
+import org.slf4j.LoggerFactory;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageListener;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
+import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.http.HttpStatus;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -25,9 +42,14 @@ import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers
 class CommunityOutboxRelayIntegrationTest {
@@ -105,6 +127,73 @@ class CommunityOutboxRelayIntegrationTest {
         assertCorrelationHeader("req-community", "req-community");
     }
 
+    @Test
+    void correlationSurvivesHttpOutboxRelayAndBrokerConsumerLogs() throws Exception {
+        var jdbc = outboxTable();
+        var connection = new CachingConnectionFactory(RABBIT.getHost(), RABBIT.getMappedPort(5672));
+        connection.setUsername("test");
+        connection.setPassword("test");
+        connection.setPublisherConfirmType(CachingConnectionFactory.ConfirmType.CORRELATED);
+        connection.setPublisherReturns(true);
+        var rabbit = new RabbitTemplate(connection);
+        rabbit.setMandatory(true);
+        var admin = new RabbitAdmin(connection);
+        var exchange = new TopicExchange(CommunityMessaging.EXCHANGE, true, false);
+        var queue = new Queue("community.events.http-correlation." + UUID.randomUUID(), true, false, false);
+        admin.declareExchange(exchange);
+        admin.declareQueue(queue);
+        admin.declareBinding(BindingBuilder.bind(queue).to(exchange).with("community.#"));
+
+        var outbox = new CommunityEventOutboxAdapter(jdbc,
+                new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule()));
+        MockMvc http = MockMvcBuilders.standaloneSetup(new CorrelationProducingEndpoint(outbox))
+                .addFilters(new CorrelationIdFilter()).build();
+        http.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/test/events")
+                        .header("X-Correlation-Id", "http-request-42"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNoContent());
+
+        assertEquals("http-request-42", jdbc.queryForObject(
+                "SELECT correlation_id FROM outbox_events ORDER BY created_at DESC LIMIT 1", String.class));
+        var seenByConsumer = new AtomicReference<String>();
+        var handled = new CountDownLatch(1);
+        Logger consumerLogger = (Logger) LoggerFactory.getLogger("correlation.integration.consumer");
+        var appender = new ListAppender<ILoggingEvent>();
+        appender.start();
+        consumerLogger.addAppender(appender);
+        MessageListener listener = message -> {
+            seenByConsumer.set(MDC.get(CorrelationIdFilter.MDC_KEY));
+            consumerLogger.info("Consumed community event");
+            handled.countDown();
+        };
+        var proxy = new ProxyFactory(listener);
+        proxy.addAdvice(new CorrelationListenerAdvice());
+        var container = new SimpleMessageListenerContainer(connection);
+        container.setQueueNames(queue.getName());
+        container.setMessageListener((MessageListener) proxy.getProxy());
+        try {
+            container.start();
+            assertEquals("http-request-42", jdbc.queryForObject(
+                    "SELECT correlation_id FROM outbox_events ORDER BY created_at DESC LIMIT 1", String.class));
+            var relay = new CommunityOutboxRelay(jdbc, rabbit,
+                    new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule()),
+                    CommunityMessaging.EXCHANGE, 20, Duration.ofSeconds(5), true, 12, Duration.ofSeconds(60));
+            assertEquals(1, relay.publishPendingBatch());
+
+            assertTrue(handled.await(5, TimeUnit.SECONDS), "broker listener should consume the relayed event");
+            assertEquals("http-request-42", seenByConsumer.get());
+            assertTrue(appender.list.stream().anyMatch(event ->
+                    "http-request-42".equals(event.getMDCPropertyMap().get(CorrelationIdFilter.MDC_KEY))),
+                    "consumer log should carry the originating request correlation id");
+            assertNull(MDC.get(CorrelationIdFilter.MDC_KEY));
+        } finally {
+            container.stop();
+            consumerLogger.detachAppender(appender);
+            appender.stop();
+            admin.deleteQueue(queue.getName());
+            connection.destroy();
+        }
+    }
+
     @Test void omitsHeaderWhenRowHasNone() {
         assertCorrelationHeader(null, null);
     }
@@ -140,5 +229,21 @@ class CommunityOutboxRelayIntegrationTest {
         assertEquals(expectedHeader, message.getMessageProperties().getHeader("x-correlation-id"));
         admin.deleteQueue(queue.getName());
         connection.destroy();
+    }
+
+    @RestController
+    private static class CorrelationProducingEndpoint {
+        private final CommunityEventOutboxAdapter outbox;
+
+        private CorrelationProducingEndpoint(CommunityEventOutboxAdapter outbox) {
+            this.outbox = outbox;
+        }
+
+        @PostMapping("/test/events")
+        @ResponseStatus(HttpStatus.NO_CONTENT)
+        void createEvent() {
+            outbox.record(CommunityEventTypes.POST_COMMENTED, UUID.randomUUID(), UUID.randomUUID(),
+                    UUID.randomUUID(), null);
+        }
     }
 }
