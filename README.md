@@ -252,6 +252,7 @@ Java chạy trên host (IDE hoặc `java -jar`); Compose chỉ chạy DB và Rab
 | Biến | Dùng cho |
 | --- | --- |
 | `POSTGRES_PASSWORD` | Mật khẩu PostgreSQL dùng bởi các database riêng của từng service; host port mặc định `5440` |
+| `REDIS_PASSWORD` | Mật khẩu Redis dùng cho rate limit ở Gateway và giới hạn đăng nhập ở User Service; compose yêu cầu biến này |
 | `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | Broker trong compose; assessment và Learning Service trên host phải dùng đúng cặp này (mặc định `guest` sẽ fail) |
 | `GATEWAY_INTERNAL_JWT_SECRET` | Gateway và toàn bộ downstream service phải dùng cùng giá trị, lệch sẽ trả 401 |
 | `EXTERNAL_JWT_SECRET` | User Service ký token, Gateway xác thực |
@@ -336,7 +337,7 @@ docker compose up -d --build  # lần đầu build lâu; sau đó bỏ --build
 docker compose down           # thêm -v để xóa dữ liệu và nạp lại seed
 ```
 
-Cần trong `.env`: `POSTGRES_PASSWORD`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `EXTERNAL_JWT_SECRET`,
+Cần trong `.env`: `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `EXTERNAL_JWT_SECRET`,
 `GATEWAY_INTERNAL_JWT_SECRET`; tùy chọn `LEARNING_LLM_*`, `ASSESSMENT_LLM_*` (chấm Writing) và
 `CONTENT_MEDIA_BASE_URL` (mặc định là URL giữ chỗ, audio chưa phát được). Cổng host: Gateway 8080, Eureka 8761,
 Postgres 5440, RabbitMQ 5672/UI 15673; đổi bằng `MVP_GATEWAY_PORT`, `MVP_EUREKA_PORT`, `MVP_POSTGRES_PORT`,

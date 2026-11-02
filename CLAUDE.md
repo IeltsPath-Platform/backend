@@ -52,7 +52,7 @@ Nguồn: `application.yml` từng module (`SERVER_PORT`), `infra/config-server/c
   service đã triển khai; init script tạo các database, Flyway của mỗi service tạo schema và seed.
 - `.env` ở root (gitignored) chứa mật khẩu và secret: compose nội suy nó; Gateway và mọi service Java nghiệp vụ import nó
   (`optional:file:../../.env[.properties]`; config-server, eureka-server thì không). Chỉ ghi tên biến, không ghi giá trị.
-  Compose cần `POSTGRES_PASSWORD`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `EXTERNAL_JWT_SECRET`,
+  Compose cần `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `EXTERNAL_JWT_SECRET`,
   `GATEWAY_INTERNAL_JWT_SECRET`. Learning Service chấm bài luận cần `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`,
   `LEARNING_LLM_MODEL` (thiếu thì nộp bài luận trả 503, phần khác vẫn chạy); essay trong thi topic/course của Assessment
   dùng `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL`, `ASSESSMENT_LLM_DAILY_LIMIT`

@@ -57,7 +57,7 @@ jobs:
           POSTGRES_PASSWORD=ci-placeholder
           RABBITMQ_USERNAME=ci-placeholder
           RABBITMQ_PASSWORD=ci-placeholder
-          EXTERNAL_JWT_SECRET=Y2ktcGxhY2Vob2xkZXItZXh0ZXJuYWwtand0LXNlY3JldA==
+          REDIS_PASSWORD=ci-placeholder          EXTERNAL_JWT_SECRET=Y2ktcGxhY2Vob2xkZXItZXh0ZXJuYWwtand0LXNlY3JldA==
           GATEWAY_INTERNAL_JWT_SECRET=Y2ktcGxhY2Vob2xkZXItaW50ZXJuYWwtand0LXNlY3JldA==
           EOF
 

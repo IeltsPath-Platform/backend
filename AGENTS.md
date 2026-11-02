@@ -159,7 +159,7 @@ src/main/java/com/ieltspath/<service>
 - Gateway và mọi service Java nghiệp vụ import `.env` ở root (`optional:file:../../.env[.properties]`; config-server và
   eureka-server thì không); Compose cũng nội suy file này. `.env` không commit. Root chỉ có một
   `docker-compose.yml`: PostgreSQL chạy ở host port 5440 với database riêng cho mỗi service, RabbitMQ, hạ tầng Spring,
-  và các service đã triển khai. Các biến bắt buộc là `POSTGRES_PASSWORD`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`,
+  và các service đã triển khai. Các biến bắt buộc là `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`,
   `EXTERNAL_JWT_SECRET`, `GATEWAY_INTERNAL_JWT_SECRET`; có thể override cổng bằng `MVP_POSTGRES_PORT`,
   `RABBITMQ_HOST_PORT`, `MVP_RABBITMQ_UI_PORT`, `MVP_GATEWAY_PORT`, `MVP_EUREKA_PORT`.
 - Assessment gate essay dùng OpenAI-compatible LLM qua `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`,
