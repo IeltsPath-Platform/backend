@@ -1,5 +1,8 @@
 package com.ieltspath.game.observability;
 
+import com.ieltspath.commonresilience.ResilientCall;
+import com.ieltspath.game.infrastructure.client.ContentSnapshotClient;
+import io.github.resilience4j.retry.RetryRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -7,6 +10,7 @@ import org.springframework.boot.test.autoconfigure.actuate.observability.AutoCon
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -15,6 +19,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
@@ -38,6 +43,15 @@ class GamePrometheusSecurityIntegrationTest {
     }
 
     @Autowired MockMvc mvc;
+    @Autowired ContentSnapshotClient contentSnapshotClient;
+    @Autowired ResilientCall configuredResilientCall;
+    @Autowired RetryRegistry configuredRetryRegistry;
+
+    @Test
+    void contentSnapshotClientUsesSpringConfiguredResilienceBean() {
+        assertSame(configuredResilientCall, ReflectionTestUtils.getField(contentSnapshotClient, "resilientCall"));
+        assertSame(configuredRetryRegistry, ReflectionTestUtils.getField(configuredResilientCall, "retries"));
+    }
 
     @Test
     void prometheusIsAvailableWithoutAuthentication() throws Exception {

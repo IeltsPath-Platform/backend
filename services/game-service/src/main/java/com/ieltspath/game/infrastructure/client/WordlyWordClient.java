@@ -1,7 +1,11 @@
 package com.ieltspath.game.infrastructure.client;
 
 import com.ieltspath.game.application.port.WordlyWordProvider;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,15 +21,22 @@ import java.util.UUID;
 @Component
 public class WordlyWordClient implements WordlyWordProvider {
     private final RestClient client;
+    private final ResilientCall resilientCall;
 
+    @Autowired
     public WordlyWordClient(
             RestClient.Builder builder,
             @Value("${game.library.base-url:${LIBRARY_SERVICE_URL:http://localhost:8081}}")
-                    String baseUrl) {
+                    String baseUrl, ResilientCall resilientCall) {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(2));
         factory.setReadTimeout(Duration.ofSeconds(5));
         client = builder.clone().requestFactory(factory).baseUrl(baseUrl).build();
+        this.resilientCall = resilientCall;
+    }
+
+    WordlyWordClient(RestClient.Builder builder, String baseUrl) {
+        this(builder, baseUrl, ResilientCall.isolatedDefault());
     }
 
     private String bearer() {
@@ -45,14 +56,19 @@ public class WordlyWordClient implements WordlyWordProvider {
     }
 
     private Response request(String path, java.util.Map<String, Object> body) {
-        Response response =
-                client.post()
+        Response response;
+        try {
+            response = resilientCall.call("library", CallKind.READ, () -> client.post()
                         .uri(path)
                         .header("Authorization", bearer())
                         .header("X-Correlation-Id", correlation())
                         .body(body)
                         .retrieve()
-                        .body(Response.class);
+                        .body(Response.class));
+        } catch (DownstreamUnavailableException unavailable) {
+            throw new com.ieltspath.game.domain.exception.SoloGameplayException(503, "WORD_SOURCE_UNAVAILABLE",
+                    "Word source is temporarily unavailable");
+        }
         if (response == null || response.words() == null)
             throw new IllegalStateException("Word source unavailable");
         return response;
@@ -69,11 +85,11 @@ public class WordlyWordClient implements WordlyWordProvider {
 
     public Filters filters() {
         try {
-            Filters filters = client.get().uri("/internal/game-content/wordly/filters")
+            Filters filters = resilientCall.call("library", CallKind.READ, () -> client.get().uri("/internal/game-content/wordly/filters")
                     .header("Authorization", bearer()).header("X-Correlation-Id", correlation())
-                    .retrieve().body(Filters.class);
+                    .retrieve().body(Filters.class));
             if (filters != null && filters.topics() != null && filters.availability() != null) return filters;
-        } catch (org.springframework.web.client.RestClientException e) {
+        } catch (DownstreamUnavailableException | org.springframework.web.client.RestClientException e) {
             throw new com.ieltspath.game.domain.exception.SoloGameplayException(503, "WORD_FILTERS_UNAVAILABLE", "Word filters are unavailable");
         }
         throw new com.ieltspath.game.domain.exception.SoloGameplayException(503, "WORD_FILTERS_UNAVAILABLE", "Word filters are unavailable");
