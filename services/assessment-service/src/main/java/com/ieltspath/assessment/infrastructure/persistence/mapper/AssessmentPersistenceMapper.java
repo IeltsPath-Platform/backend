@@ -154,7 +154,8 @@ public class AssessmentPersistenceMapper {
 
     public OutboxEvent toDomain(OutboxEventJpaEntity e) {
         return new OutboxEvent(e.getId(), e.getAggregateType(), e.getAggregateId(), e.getEventType(), e.getPayload(),
-                e.getCreatedAt(), e.getPublishedAt(), e.getRetryCount(), e.getLastError(), e.getCorrelationId());
+                e.getCreatedAt(), e.getPublishedAt(), e.getRetryCount(), e.getLastError(), e.getCorrelationId(),
+                e.getTraceContext());
     }
 
     public OutboxEventJpaEntity toEntity(OutboxEvent d) {
@@ -169,6 +170,7 @@ public class AssessmentPersistenceMapper {
         e.setRetryCount(d.retryCount());
         e.setLastError(d.lastError());
         e.setCorrelationId(d.correlationId());
+        e.setTraceContext(d.traceContext());
         return e;
     }
 

@@ -36,7 +36,11 @@ public class CorrelationRabbitBeanPostProcessor implements BeanPostProcessor {
         if (bean instanceof RabbitTemplate template && !alreadyStamps(template)) {
             template.addBeforePublishPostProcessors(STAMP);
         }
+        if (bean instanceof RabbitTemplate template) {
+            template.setObservationEnabled(true);
+        }
         if (bean instanceof SimpleRabbitListenerContainerFactory factory) {
+            factory.setObservationEnabled(true);
             Advice[] chain = factory.getAdviceChain() == null ? new Advice[0] : factory.getAdviceChain();
             boolean advised = Arrays.stream(chain).anyMatch(CorrelationListenerAdvice.class::isInstance);
             if (!advised) {

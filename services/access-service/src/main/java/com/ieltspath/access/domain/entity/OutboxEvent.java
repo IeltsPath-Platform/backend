@@ -19,6 +19,7 @@ public class OutboxEvent {
     private final Instant createdAt;
     private Instant publishedAt;
     private final String correlationId;
+    private final String traceContext;
 
     public OutboxEvent(UUID id, String aggregateType, UUID aggregateId, String eventType, String payload, String status, int retryCount, Instant createdAt, Instant publishedAt) {
         this(id, aggregateType, aggregateId, eventType, payload, status, retryCount, createdAt, publishedAt, null);
@@ -26,6 +27,12 @@ public class OutboxEvent {
 
     public OutboxEvent(UUID id, String aggregateType, UUID aggregateId, String eventType, String payload, String status,
                        int retryCount, Instant createdAt, Instant publishedAt, String correlationId) {
+        this(id, aggregateType, aggregateId, eventType, payload, status, retryCount, createdAt, publishedAt,
+                correlationId, null);
+    }
+
+    public OutboxEvent(UUID id, String aggregateType, UUID aggregateId, String eventType, String payload, String status,
+                       int retryCount, Instant createdAt, Instant publishedAt, String correlationId, String traceContext) {
         this.id = id;
         this.aggregateType = aggregateType;
         this.aggregateId = aggregateId;
@@ -36,6 +43,7 @@ public class OutboxEvent {
         this.createdAt = createdAt != null ? createdAt : Instant.now();
         this.publishedAt = publishedAt;
         this.correlationId = correlationId;
+        this.traceContext = traceContext;
     }
 
     public static OutboxEvent create(String aggregateType, UUID aggregateId, String eventType, String payload) {
@@ -88,6 +96,7 @@ public class OutboxEvent {
     }
 
     public String getCorrelationId() { return correlationId; }
+    public String getTraceContext() { return traceContext; }
 
     public void markPublished() {
         this.status = "PUBLISHED";

@@ -2,10 +2,12 @@ package com.ieltspath.access.infrastructure.messaging;
 
 import com.ieltspath.access.domain.entity.OutboxEvent;
 import com.ieltspath.access.domain.repository.OutboxEventRepository;
+import com.ieltspath.commonobservability.OutboxTraceContext;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,15 +27,24 @@ public class AccessOutboxRelay {
     private final MeterRegistry meters;
     private final int batchSize;
     private final int maxAttempts;
+    private final OutboxTraceContext traceContext;
 
+    @Autowired
     public AccessOutboxRelay(OutboxEventRepository outbox, AccessEventPublisher publisher, MeterRegistry meters,
                              @Value("${access.outbox.relay.batch-size:50}") int batchSize,
-                             @Value("${access.outbox.relay.max-attempts:20}") int maxAttempts) {
+                             @Value("${access.outbox.relay.max-attempts:20}") int maxAttempts,
+                             OutboxTraceContext traceContext) {
         this.outbox = outbox;
         this.publisher = publisher;
         this.meters = meters;
         this.batchSize = batchSize;
         this.maxAttempts = maxAttempts;
+        this.traceContext = traceContext;
+    }
+
+    public AccessOutboxRelay(OutboxEventRepository outbox, AccessEventPublisher publisher, MeterRegistry meters,
+                             int batchSize, int maxAttempts) {
+        this(outbox, publisher, meters, batchSize, maxAttempts, null);
     }
 
     /** @return the number of events the broker confirmed in this batch. */
@@ -41,6 +52,7 @@ public class AccessOutboxRelay {
     public int publishPendingBatch() {
         int published = 0;
         for (OutboxEvent event : outbox.claimPending(batchSize, maxAttempts)) {
+            OutboxTraceContext.Scope scope = traceContext == null ? null : traceContext.openRelay(event.getTraceContext());
             try {
                 publisher.publish(event);
                 outbox.markPublished(event.getId(), Instant.now());
@@ -51,6 +63,8 @@ public class AccessOutboxRelay {
                         event.getEventType(), event.getRetryCount() + 1, giveUp, exception.getClass().getSimpleName());
                 meters.counter("outbox.relay.failures", "service", "access", "eventType", event.getEventType()).increment();
                 outbox.recordFailure(event.getId(), exception.getMessage(), maxAttempts);
+            } finally {
+                if (scope != null) scope.close();
             }
         }
         return published;

@@ -6,6 +6,7 @@ import com.ieltspath.access.infrastructure.persistence.entity.OutboxEventJpaEnti
 import com.ieltspath.access.infrastructure.persistence.mapper.AccessPersistenceMapper;
 import com.ieltspath.access.infrastructure.persistence.repository.OutboxEventJpaRepository;
 import com.ieltspath.commonobservability.Correlation;
+import com.ieltspath.commonobservability.OutboxTraceContext;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
@@ -22,10 +23,13 @@ public class OutboxEventRepositoryAdapter implements OutboxEventRepository {
 
     private final OutboxEventJpaRepository outboxEventJpaRepository;
     private final AccessPersistenceMapper mapper;
+    private final OutboxTraceContext traceContext;
 
-    public OutboxEventRepositoryAdapter(OutboxEventJpaRepository outboxEventJpaRepository, AccessPersistenceMapper mapper) {
+    public OutboxEventRepositoryAdapter(OutboxEventJpaRepository outboxEventJpaRepository, AccessPersistenceMapper mapper,
+                                        OutboxTraceContext traceContext) {
         this.outboxEventJpaRepository = outboxEventJpaRepository;
         this.mapper = mapper;
+        this.traceContext = traceContext;
     }
 
     @Override
@@ -63,6 +67,7 @@ public class OutboxEventRepositoryAdapter implements OutboxEventRepository {
     public OutboxEvent save(OutboxEvent event) {
         OutboxEventJpaEntity entity = mapper.toEntity(event);
         entity.setCorrelationId(Correlation.current());
+        entity.setTraceContext(traceContext.capture());
         OutboxEventJpaEntity saved = outboxEventJpaRepository.save(entity);
         return mapper.toDomain(saved);
     }

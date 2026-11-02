@@ -2,6 +2,7 @@ package com.ieltspath.community.infrastructure.messaging;
 
 import com.ieltspath.events.community.CommunityMessaging;
 import com.ieltspath.commonobservability.Correlation;
+import com.ieltspath.commonobservability.OutboxTraceContext;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,6 +14,7 @@ import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.ieltspath.events.community.CommunityEventTypes;
@@ -49,14 +51,17 @@ public class CommunityOutboxRelay {
     private final boolean enabled;
     private final int maxAttempts;
     private final Duration lease;
+    private final OutboxTraceContext traceContext;
 
+    @Autowired
     public CommunityOutboxRelay(JdbcTemplate jdbc, RabbitTemplate rabbit, ObjectMapper objectMapper,
                                 @Value("${community.messaging.exchange:" + CommunityMessaging.EXCHANGE + "}") String exchange,
                                 @Value("${community.outbox.relay.batch-size:50}") int batchSize,
                                 @Value("${community.outbox.relay.confirm-timeout:PT5S}") Duration confirmTimeout,
                                 @Value("${community.outbox.relay.enabled:true}") boolean enabled,
                                 @Value("${community.outbox.relay.max-attempts:12}") int maxAttempts,
-                                @Value("${community.outbox.relay.lease:PT60S}") Duration lease) {
+                                @Value("${community.outbox.relay.lease:PT60S}") Duration lease,
+                                OutboxTraceContext traceContext) {
         this.jdbc = jdbc;
         this.rabbit = rabbit;
         this.objectMapper = objectMapper;
@@ -66,6 +71,12 @@ public class CommunityOutboxRelay {
         this.enabled = enabled;
         this.maxAttempts = Math.max(1, maxAttempts);
         this.lease = lease;
+        this.traceContext = traceContext;
+    }
+
+    public CommunityOutboxRelay(JdbcTemplate jdbc, RabbitTemplate rabbit, ObjectMapper objectMapper, String exchange,
+                                int batchSize, Duration confirmTimeout, boolean enabled, int maxAttempts, Duration lease) {
+        this(jdbc, rabbit, objectMapper, exchange, batchSize, confirmTimeout, enabled, maxAttempts, lease, null);
     }
 
     /**
@@ -84,13 +95,15 @@ public class CommunityOutboxRelay {
                       AND (next_attempt_at IS NULL OR next_attempt_at <= now())
                     ORDER BY created_at, id
                     LIMIT ? FOR UPDATE SKIP LOCKED)
-                RETURNING id, event_type, payload::text payload, created_at, retry_count, correlation_id
+                RETURNING id, event_type, payload::text payload, created_at, retry_count, correlation_id, trace_context
                 """, (rs, row) -> new OutboxRow(rs.getObject("id", java.util.UUID.class),
                 rs.getString("event_type"), rs.getString("payload"), rs.getTimestamp("created_at").toInstant(),
-                rs.getInt("retry_count"), rs.getString("correlation_id")), lease.toSeconds(), batchSize));
+                rs.getInt("retry_count"), rs.getString("correlation_id"), rs.getString("trace_context")),
+                lease.toSeconds(), batchSize));
         rows.sort(Comparator.comparing(OutboxRow::createdAt).thenComparing(OutboxRow::id));
         int published = 0;
         for (OutboxRow row : rows) {
+            OutboxTraceContext.Scope scope = traceContext == null ? null : traceContext.openRelay(row.traceContext());
             try {
                 publish(row);
                 jdbc.update("UPDATE outbox_events SET published_at=?, last_error=NULL WHERE id=?",
@@ -114,6 +127,8 @@ public class CommunityOutboxRelay {
                 // The broker is the likely cause: stop here so one outage costs one confirm timeout, not one per row.
                 // The remaining claimed rows become due again when their lease expires.
                 break;
+            } finally {
+                if (scope != null) scope.close();
             }
         }
         return published;
@@ -154,5 +169,5 @@ public class CommunityOutboxRelay {
     }
 
     private record OutboxRow(java.util.UUID id, String eventType, String payload, Instant createdAt, int retryCount,
-                             String correlationId) { }
+                             String correlationId, String traceContext) { }
 }

@@ -5,6 +5,7 @@ import com.ieltspath.assessment.domain.repository.OutboxEventRepository;
 import com.ieltspath.assessment.infrastructure.persistence.mapper.AssessmentPersistenceMapper;
 import com.ieltspath.assessment.infrastructure.persistence.repository.OutboxEventJpaRepository;
 import com.ieltspath.commonobservability.Correlation;
+import com.ieltspath.commonobservability.OutboxTraceContext;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -17,16 +18,20 @@ public class OutboxEventRepositoryAdapter implements OutboxEventRepository {
 
     private final OutboxEventJpaRepository repository;
     private final AssessmentPersistenceMapper mapper;
+    private final OutboxTraceContext traceContext;
 
-    public OutboxEventRepositoryAdapter(OutboxEventJpaRepository repository, AssessmentPersistenceMapper mapper) {
+    public OutboxEventRepositoryAdapter(OutboxEventJpaRepository repository, AssessmentPersistenceMapper mapper,
+                                        OutboxTraceContext traceContext) {
         this.repository = repository;
         this.mapper = mapper;
+        this.traceContext = traceContext;
     }
 
     @Override
     public OutboxEvent save(OutboxEvent event) {
         var entity = mapper.toEntity(event);
         entity.setCorrelationId(Correlation.current());
+        entity.setTraceContext(traceContext.capture());
         return mapper.toDomain(repository.save(entity));
     }
 

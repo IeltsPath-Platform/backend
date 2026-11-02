@@ -8,9 +8,13 @@ import java.util.UUID;
 public interface RewardGrantRepository {
     /** A grant waiting to be sent or to be settled; {@code attempts} counts the times it was sent. */
     record PendingGrant(UUID id, UUID userId, int amount, String reason, String referenceId, int attempts,
-                        String correlationId) {
+                        String correlationId, String traceContext) {
+        public PendingGrant(UUID id, UUID userId, int amount, String reason, String referenceId, int attempts,
+                            String correlationId) {
+            this(id, userId, amount, reason, referenceId, attempts, correlationId, null);
+        }
         public PendingGrant(UUID id, UUID userId, int amount, String reason, String referenceId, int attempts) {
-            this(id, userId, amount, reason, referenceId, attempts, null);
+            this(id, userId, amount, reason, referenceId, attempts, null, null);
         }
     }
 

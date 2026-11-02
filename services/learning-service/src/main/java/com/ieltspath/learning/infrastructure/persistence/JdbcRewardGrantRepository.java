@@ -2,6 +2,8 @@ package com.ieltspath.learning.infrastructure.persistence;
 
 import com.ieltspath.learning.domain.repository.RewardGrantRepository;
 import com.ieltspath.commonobservability.Correlation;
+import com.ieltspath.commonobservability.OutboxTraceContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -15,29 +17,38 @@ public class JdbcRewardGrantRepository implements RewardGrantRepository {
     private static final int MAX_ERROR_LENGTH = 200;
 
     private final JdbcTemplate jdbc;
+    private final OutboxTraceContext traceContext;
+
+    @Autowired
+    public JdbcRewardGrantRepository(JdbcTemplate jdbc, OutboxTraceContext traceContext) {
+        this.jdbc = jdbc;
+        this.traceContext = traceContext;
+    }
 
     public JdbcRewardGrantRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+        this(jdbc, null);
     }
 
     @Override
     public void enqueue(UUID userId, String reason, String referenceId, int amount) {
         jdbc.update("""
-                INSERT INTO reward_grants (id, user_id, amount, reason, reference_id, correlation_id)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO reward_grants (id, user_id, amount, reason, reference_id, correlation_id, trace_context)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (user_id, reason, reference_id) DO NOTHING
-                """, UUID.randomUUID(), userId, amount, reason, referenceId, Correlation.current());
+                """, UUID.randomUUID(), userId, amount, reason, referenceId, Correlation.current(),
+                traceContext == null ? null : traceContext.capture());
     }
 
     @Override
     public List<PendingGrant> claimDue(int limit, Instant resendBefore) {
         return jdbc.query("""
-                SELECT id, user_id, amount, reason, reference_id, attempts, correlation_id FROM reward_grants
+                SELECT id, user_id, amount, reason, reference_id, attempts, correlation_id, trace_context FROM reward_grants
                 WHERE status = 'PENDING' AND (attempts = 0 OR updated_at < ?)
                 ORDER BY created_at LIMIT ? FOR UPDATE SKIP LOCKED
                 """, (rows, index) -> new PendingGrant(rows.getObject("id", UUID.class),
                 rows.getObject("user_id", UUID.class), rows.getInt("amount"), rows.getString("reason"),
-                rows.getString("reference_id"), rows.getInt("attempts"), rows.getString("correlation_id")),
+                rows.getString("reference_id"), rows.getInt("attempts"), rows.getString("correlation_id"),
+                rows.getString("trace_context")),
                 Timestamp.from(resendBefore), limit);
     }
 

@@ -9,10 +9,16 @@ import java.util.UUID;
  * The id doubles as the published event id so a republish carries the same identity.
  */
 public record OutboxEvent(UUID id, String aggregateType, String aggregateId, String eventType, String payload,
-                          Instant createdAt, Instant publishedAt, int retryCount, String lastError, String correlationId) {
+                          Instant createdAt, Instant publishedAt, int retryCount, String lastError, String correlationId,
+                          String traceContext) {
+    public OutboxEvent(UUID id, String aggregateType, String aggregateId, String eventType, String payload,
+                       Instant createdAt, Instant publishedAt, int retryCount, String lastError, String correlationId) {
+        this(id, aggregateType, aggregateId, eventType, payload, createdAt, publishedAt, retryCount, lastError,
+                correlationId, null);
+    }
     public OutboxEvent(UUID id, String aggregateType, String aggregateId, String eventType, String payload,
                        Instant createdAt, Instant publishedAt, int retryCount, String lastError) {
-        this(id, aggregateType, aggregateId, eventType, payload, createdAt, publishedAt, retryCount, lastError, null);
+        this(id, aggregateType, aggregateId, eventType, payload, createdAt, publishedAt, retryCount, lastError, null, null);
     }
     public OutboxEvent {
         Objects.requireNonNull(id, "id must not be null");
