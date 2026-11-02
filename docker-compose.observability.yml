@@ -2,6 +2,21 @@
 # its variables (GRAFANA_ADMIN_PASSWORD) are required only when the observability stack runs.
 # Start with: docker compose -f docker-compose.yml -f docker-compose.observability.yml --profile observability up -d loki tempo alloy grafana prometheus
 services:
+  # Turn on tracing for the gateway and business services. The default stack keeps tracing off.
+  api-gateway: &traced
+    environment:
+      TRACING_ENABLED: "true"
+      OTLP_TRACES_ENDPOINT: "http://alloy:4318/v1/traces"
+  user-service: *traced
+  content-service: *traced
+  library-service: *traced
+  access-service: *traced
+  assessment-service: *traced
+  learning-service: *traced
+  game-service: *traced
+  community-service: *traced
+  notification-service: *traced
+
   loki:
     image: grafana/loki:3.7.6
     command: ["-config.file=/etc/loki/loki-config.yml"]
@@ -13,7 +28,7 @@ services:
     restart: unless-stopped
 
   tempo:
-    image: grafana/tempo:3.0.5
+    image: grafana/tempo:2.10.10
     command: ["-config.file=/etc/tempo/tempo.yml"]
     volumes:
       - ./infra/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
