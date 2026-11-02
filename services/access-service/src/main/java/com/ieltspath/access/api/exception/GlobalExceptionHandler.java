@@ -1,5 +1,7 @@
 package com.ieltspath.access.api.exception;
 
+import com.ieltspath.events.messaging.InvalidDeadLetterBatchException;
+import com.ieltspath.events.messaging.UnknownDeadLetterQueueException;
 import com.ieltspath.access.domain.exception.*;
 import com.ieltspath.access.application.exception.InvalidIdempotencyKeyException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +27,15 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(UnknownDeadLetterQueueException.class)
+    public ResponseEntity<ErrorResponse> handleUnknownDeadLetterQueue(UnknownDeadLetterQueueException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(InvalidDeadLetterBatchException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidDeadLetterBatch(InvalidDeadLetterBatchException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
+    }
     @ExceptionHandler({
         PlanNotFoundException.class,
         KeyProductNotFoundException.class,

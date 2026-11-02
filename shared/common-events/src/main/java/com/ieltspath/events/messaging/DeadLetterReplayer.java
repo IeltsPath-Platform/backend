@@ -91,12 +91,14 @@ public class DeadLetterReplayer {
         try {
             MessageProperties properties = converter.toMessageProperties(response.getProps(), response.getEnvelope(), "UTF-8");
             properties.getHeaders().remove(MessageHeaders.RETRY_COUNT);
+            // RabbitMQ counts dead-letter deaths in x-death; a replay starts a fresh count for both retry styles.
+            properties.getHeaders().keySet().removeIf(key -> key.equals("x-death") || key.startsWith("x-first-death-") || key.startsWith("x-last-death-"));
             AMQP.BasicProperties basic = converter.fromMessageProperties(properties, "UTF-8");
             AtomicBoolean returned = new AtomicBoolean(false);
             ReturnListener onReturn = (replyCode, replyText, exchange, routingKey, unused, body) -> returned.set(true);
             channel.addReturnListener(onReturn);
             try {
-                channel.basicPublish("", route.queue(), true, basic, response.getBody());
+                channel.basicPublish(route.exchange(), route.routingKey(), true, basic, response.getBody());
                 if (!channel.waitForConfirms(CONFIRM_TIMEOUT_MILLIS) || returned.get()) {
                     throw new IllegalStateException("Broker did not accept the replayed message");
                 }

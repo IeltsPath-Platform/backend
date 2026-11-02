@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.events.access.AccessMessaging;
 import com.ieltspath.events.access.SubscriptionGrantedTopology;
 import com.ieltspath.events.access.SubscriptionGrantedV1;
+import com.ieltspath.events.messaging.DeadLetterReplayer;
 import com.ieltspath.notification.domain.repository.NotificationRepository;
 import com.ieltspath.notification.domain.vo.Notification;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,6 +73,7 @@ class SubscriptionGrantedBrokerIntegrationTest {
     @Autowired RabbitTemplate rabbit;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
+    @Autowired DeadLetterReplayer replayer;
     @MockitoBean NoticePushBridge noticePush;
     @MockitoSpyBean NotificationRepository notifications;
 
@@ -157,5 +159,20 @@ class SubscriptionGrantedBrokerIntegrationTest {
                 "the message is retried after the temporary database error");
         verify(notifications, times(2)).insertIfAbsent(eq(event.eventId()), any(Notification.class));
         verify(noticePush, times(1)).pushToUser(eq(learner), any());
+    }
+
+    @Test
+    void aReplayedDeadLetterReachesTheListenerWithTheOriginalRoutingKey() throws Exception {
+        UUID learner = UUID.randomUUID();
+        var event = event(learner);
+        // Parked on the dead-letter queue, as a failed delivery leaves it.
+        rabbit.send("", SubscriptionGrantedTopology.DLQ, MessageBuilder.withBody(json.writeValueAsBytes(event))
+                .setContentType(MessageProperties.CONTENT_TYPE_JSON).setMessageId(event.eventId().toString()).build());
+
+        var result = replayer.replay(SubscriptionGrantedTopology.DLQ, 10);
+
+        assertEquals(1, result.moved());
+        assertTrue(eventually(() -> noticesOf(learner) == 1),
+                "the listener received the replay on the original routing key and stored the notice");
     }
 }

@@ -1,5 +1,7 @@
 package com.ieltspath.notification.infrastructure;
 
+import com.ieltspath.events.access.AccessMessaging;
+import com.ieltspath.events.assessment.AssessmentMessaging;
 import com.ieltspath.events.assessment.GradingCompletedTopology;
 import com.ieltspath.events.assessment.GradingDueSoonTopology;
 import com.ieltspath.events.assessment.GradingOverdueTopology;
@@ -25,12 +27,12 @@ public class DeadLetterReplayConfig {
     @Bean
     DeadLetterReplayer notificationDeadLetterReplayer(ConnectionFactory connectionFactory, AmqpAdmin amqpAdmin) {
         return new DeadLetterReplayer(connectionFactory, amqpAdmin, List.of(
-                new DeadLetterRoute(GradingCompletedTopology.DLQ, GradingCompletedTopology.QUEUE),
-                new DeadLetterRoute(GradingRequestedTopology.DLQ, GradingRequestedTopology.QUEUE),
-                new DeadLetterRoute(GradingOverdueTopology.DLQ, GradingOverdueTopology.QUEUE),
-                new DeadLetterRoute(GradingDueSoonTopology.DLQ, GradingDueSoonTopology.QUEUE),
-                new DeadLetterRoute(SubscriptionGrantedTopology.DLQ, SubscriptionGrantedTopology.QUEUE),
-                new DeadLetterRoute(CommunityMessaging.NOTIFICATIONS_DLQ, CommunityMessaging.NOTIFICATIONS_QUEUE)));
+                new DeadLetterRoute(GradingCompletedTopology.DLQ, GradingCompletedTopology.QUEUE, AssessmentMessaging.EXCHANGE, AssessmentMessaging.GRADING_COMPLETED_ROUTING_KEY),
+                new DeadLetterRoute(GradingRequestedTopology.DLQ, GradingRequestedTopology.QUEUE, AssessmentMessaging.EXCHANGE, AssessmentMessaging.GRADING_REQUESTED_ROUTING_KEY),
+                new DeadLetterRoute(GradingOverdueTopology.DLQ, GradingOverdueTopology.QUEUE, AssessmentMessaging.EXCHANGE, AssessmentMessaging.GRADING_OVERDUE_ROUTING_KEY),
+                new DeadLetterRoute(GradingDueSoonTopology.DLQ, GradingDueSoonTopology.QUEUE, AssessmentMessaging.EXCHANGE, AssessmentMessaging.GRADING_DUE_SOON_ROUTING_KEY),
+                new DeadLetterRoute(SubscriptionGrantedTopology.DLQ, SubscriptionGrantedTopology.QUEUE, AccessMessaging.EXCHANGE, AccessMessaging.SUBSCRIPTION_GRANTED_ROUTING_KEY),
+                DeadLetterRoute.toQueue(CommunityMessaging.NOTIFICATIONS_DLQ, CommunityMessaging.NOTIFICATIONS_QUEUE)));
     }
 
     @Bean

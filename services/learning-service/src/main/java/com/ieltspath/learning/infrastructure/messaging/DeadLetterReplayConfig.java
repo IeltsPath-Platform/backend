@@ -19,8 +19,8 @@ public class DeadLetterReplayConfig {
     @Bean
     DeadLetterReplayer learningDeadLetterReplayer(ConnectionFactory connectionFactory, AmqpAdmin amqpAdmin) {
         return new DeadLetterReplayer(connectionFactory, amqpAdmin, List.of(
-                new DeadLetterRoute(RewardGrantMessagingConfig.SETTLED_DLQ, RewardGrantMessagingConfig.SETTLED_QUEUE),
-                new DeadLetterRoute(AssessmentMessagingConfig.DEAD_LETTER_QUEUE, AssessmentMessagingConfig.QUEUE)));
+                DeadLetterRoute.toQueue(RewardGrantMessagingConfig.SETTLED_DLQ, RewardGrantMessagingConfig.SETTLED_QUEUE),
+                DeadLetterRoute.toQueue(AssessmentMessagingConfig.DEAD_LETTER_QUEUE, AssessmentMessagingConfig.QUEUE)));
     }
 
     @Bean

@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** Replays a message from the points-grant dead-letter queue through a real RabbitMQ. */
@@ -58,7 +59,7 @@ class DeadLetterReplayBrokerIntegrationTest {
         Message parked = MessageBuilder.withBody(("parked " + UUID.randomUUID()).getBytes(StandardCharsets.UTF_8))
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON).setMessageId(UUID.randomUUID().toString())
                 .setHeader("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
-                .setHeader("x-correlation-id", "replay-correlation-42").build();
+                .setHeader("x-correlation-id", "replay-correlation-42").setHeader("x-death", "parked").build();
         // Publishing to the queue name through the default exchange lands the message on the dead-letter queue.
         rabbit.send("", LearningPointsMessagingConfig.GRANT_DLQ, parked);
 
@@ -70,6 +71,7 @@ class DeadLetterReplayBrokerIntegrationTest {
         assertEquals("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
                 replayed.getMessageProperties().getHeader("traceparent"));
         assertEquals("replay-correlation-42", replayed.getMessageProperties().getHeader("x-correlation-id"));
+        assertFalse(replayed.getMessageProperties().getHeaders().containsKey("x-death"), "a replay starts a fresh death count");
     }
 
     @Test
