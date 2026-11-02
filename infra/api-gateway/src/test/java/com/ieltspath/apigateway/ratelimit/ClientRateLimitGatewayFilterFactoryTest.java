@@ -188,4 +188,23 @@ class ClientRateLimitGatewayFilterFactoryTest {
         applicationContext.close();
         return redisRateLimiter;
     }
+
+    @Test
+    void exhaustingTheDefaultBucketDoesNotRateLimitAuth() {
+        when(keys.resolve(org.mockito.ArgumentMatchers.any())).thenReturn(Mono.just("ip:203.0.113.9"));
+        Map<String, Integer> used = new java.util.HashMap<>();
+        when(limiter.isAllowed(anyString(), anyString())).thenAnswer(call -> {
+            String bucket = call.getArgument(1);
+            return Mono.just(new RedisRateLimiter.Response(used.merge(bucket, 1, Integer::sum) <= 3, Map.of()));
+        });
+
+        for (int i = 0; i < 4; i++) {
+            filter("default").filter(exchange("home", "/api/anything"), ignored -> Mono.empty()).block();
+        }
+        MockServerWebExchange auth = exchange("auth-login", "/auth/login");
+        filter("auth").filter(auth, ignored -> Mono.empty()).block();
+
+        assertThat(auth.getResponse().getStatusCode()).isNotEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(used).containsKeys("default:ip:203.0.113.9", "auth:ip:203.0.113.9");
+    }
 }

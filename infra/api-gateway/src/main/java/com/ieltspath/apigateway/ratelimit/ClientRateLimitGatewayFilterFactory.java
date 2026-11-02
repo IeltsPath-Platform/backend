@@ -2,6 +2,7 @@ package com.ieltspath.apigateway.ratelimit;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
+import org.springframework.cloud.gateway.filter.OrderedGatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.cloud.gateway.filter.ratelimit.RedisRateLimiter;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
@@ -41,7 +42,7 @@ public class ClientRateLimitGatewayFilterFactory
 
     @Override
     public GatewayFilter apply(Config config) {
-        return (exchange, chain) -> {
+        GatewayFilter filter = (exchange, chain) -> {
             if (Boolean.TRUE.equals(exchange.getAttribute(RATE_LIMIT_APPLIED))) return chain.filter(exchange);
             String routeId = routeId(exchange);
             String tierName = resolveTier(exchange, config.getTier());
@@ -49,7 +50,7 @@ public class ClientRateLimitGatewayFilterFactory
                     properties.tiers().getOrDefault("default", new RateLimitProperties.Tier(20, 40)));
             exchange.getAttributes().put(RATE_LIMIT_APPLIED, Boolean.TRUE);
             return keys.resolve(exchange).flatMap(key ->
-                limiter.isAllowed(tierName, key).flatMap(result -> {
+                limiter.isAllowed(tierName, tierName + ":" + key).flatMap(result -> {
                     if (result.getHeaders() == null || result.getHeaders().isEmpty()) {
                         meters.counter("rate_limit_backend_errors_total", "route", routeId, "tier", tierName).increment();
                     }
@@ -58,19 +59,15 @@ public class ClientRateLimitGatewayFilterFactory
                     return reject(exchange, tier, routeId);
                 }));
         };
+        // Route-level tiers run first and set RATE_LIMIT_APPLIED, so the default tier applies only where no route set a tier.
+        int order = "default".equals(config.getTier()) ? 1000 : 0;
+        return new OrderedGatewayFilter(filter, order);
     }
 
     private String resolveTier(ServerWebExchange exchange, String configuredTier) {
         String path = exchange.getRequest().getURI().getRawPath();
-        if (path.equals("/auth/login") || path.equals("/auth/refresh") || path.equals("/auth/forgot-password")
-                || path.equals("/auth/reset-password") || path.equals("/api/users/register")) return "auth";
-        if (path.equals("/api/users/me/avatar") || path.equals("/api/community/media/images")
-                || path.equals("/api/content/admin/media/audio") || path.equals("/api/content/admin/media/image")
-                || path.equals("/api/assessments/speaking-recordings")
-                || path.equals("/api/learning-support/flashcards/images")) return "upload";
-        if (path.startsWith("/api/content/admin/ai-drafts/")
-                || path.startsWith("/api/assessments/admin/ai-")
-                || path.matches("/api/assessments/attempts/[^/]+/submit")) return "ai";
+        // Exact paths with a tier are declared on their routes; only prefixes wider than the routes stay here.
+        if (path.startsWith("/api/content/admin/ai-drafts/") || path.startsWith("/api/assessments/admin/ai-")) return "ai";
         return configuredTier;
     }
 
