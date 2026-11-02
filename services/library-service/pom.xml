@@ -24,6 +24,11 @@
         </dependency>
         <dependency>
             <groupId>com.ieltspath</groupId>
+            <artifactId>common-observability</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ieltspath</groupId>
             <artifactId>common-storage</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -105,7 +110,15 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
         </dependency>
-    </dependencies>
+            <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+</dependencies>
 
     <build>
         <plugins>

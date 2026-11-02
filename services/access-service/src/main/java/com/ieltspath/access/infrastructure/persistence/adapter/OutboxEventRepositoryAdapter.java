@@ -5,9 +5,12 @@ import com.ieltspath.access.domain.repository.OutboxEventRepository;
 import com.ieltspath.access.infrastructure.persistence.entity.OutboxEventJpaEntity;
 import com.ieltspath.access.infrastructure.persistence.mapper.AccessPersistenceMapper;
 import com.ieltspath.access.infrastructure.persistence.repository.OutboxEventJpaRepository;
+import com.ieltspath.commonobservability.Correlation;
+import com.ieltspath.commonobservability.OutboxTraceContext;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,12 +18,18 @@ import java.util.UUID;
 @Component
 public class OutboxEventRepositoryAdapter implements OutboxEventRepository {
 
+    /** Matches the length of the last_error column. */
+    private static final int MAX_ERROR_LENGTH = 500;
+
     private final OutboxEventJpaRepository outboxEventJpaRepository;
     private final AccessPersistenceMapper mapper;
+    private final OutboxTraceContext traceContext;
 
-    public OutboxEventRepositoryAdapter(OutboxEventJpaRepository outboxEventJpaRepository, AccessPersistenceMapper mapper) {
+    public OutboxEventRepositoryAdapter(OutboxEventJpaRepository outboxEventJpaRepository, AccessPersistenceMapper mapper,
+                                        OutboxTraceContext traceContext) {
         this.outboxEventJpaRepository = outboxEventJpaRepository;
         this.mapper = mapper;
+        this.traceContext = traceContext;
     }
 
     @Override
@@ -36,8 +45,29 @@ public class OutboxEventRepositoryAdapter implements OutboxEventRepository {
     }
 
     @Override
+    public List<OutboxEvent> claimPending(int limit, int maxAttempts) {
+        return outboxEventJpaRepository.claimPending(limit, maxAttempts).stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public void markPublished(UUID id, Instant publishedAt) {
+        outboxEventJpaRepository.markPublished(id, publishedAt);
+    }
+
+    @Override
+    public void recordFailure(UUID id, String error, int maxAttempts) {
+        String message = error == null ? "" : error;
+        outboxEventJpaRepository.recordFailure(id,
+                message.length() > MAX_ERROR_LENGTH ? message.substring(0, MAX_ERROR_LENGTH) : message, maxAttempts);
+    }
+
+    @Override
     public OutboxEvent save(OutboxEvent event) {
         OutboxEventJpaEntity entity = mapper.toEntity(event);
+        entity.setCorrelationId(Correlation.current());
+        entity.setTraceContext(traceContext.capture());
         OutboxEventJpaEntity saved = outboxEventJpaRepository.save(entity);
         return mapper.toDomain(saved);
     }

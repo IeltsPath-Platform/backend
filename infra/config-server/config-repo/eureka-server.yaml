@@ -16,6 +16,8 @@ eureka:
     # Tắt self-preservation để local/dev dễ thấy instance chết bị loại nhanh.
     # Production thường nên cân nhắc bật lại.
     enable-self-preservation: false
+    response-cache-update-interval-ms: 3000
+    eviction-interval-timer-in-ms: 5000
 
 management:
   endpoints:

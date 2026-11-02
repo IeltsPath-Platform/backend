@@ -6,6 +6,7 @@ import com.ieltspath.events.assessment.AssessmentMessaging;
 
 
 import com.ieltspath.assessment.domain.entity.OutboxEvent;
+import com.ieltspath.commonobservability.Correlation;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageDeliveryMode;
@@ -51,7 +52,7 @@ public class RabbitOutboxEventPublisher implements OutboxEventPublisher {
         if (routingKey == null) {
             throw new PublishFailedException("No routing key is configured for event type " + event.eventType());
         }
-        Message message = MessageBuilder.withBody(event.payload().getBytes(StandardCharsets.UTF_8))
+        var messageBuilder = MessageBuilder.withBody(event.payload().getBytes(StandardCharsets.UTF_8))
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON)
                 .setContentEncoding(StandardCharsets.UTF_8.name())
                 .setMessageId(event.id().toString())
@@ -59,8 +60,9 @@ public class RabbitOutboxEventPublisher implements OutboxEventPublisher {
                 .setTimestamp(Date.from(event.createdAt()))
                 .setDeliveryMode(MessageDeliveryMode.PERSISTENT)
                 .setHeader("event_type", event.eventType())
-                .setHeader("aggregate_id", event.aggregateId())
-                .build();
+                .setHeader("aggregate_id", event.aggregateId());
+        if (event.correlationId() != null) messageBuilder.setHeader(Correlation.HEADER, event.correlationId());
+        Message message = messageBuilder.build();
         CorrelationData correlation = new CorrelationData(event.id().toString());
         rabbitTemplate.send(AssessmentMessaging.EXCHANGE, routingKey, message, correlation);
         CorrelationData.Confirm confirm;

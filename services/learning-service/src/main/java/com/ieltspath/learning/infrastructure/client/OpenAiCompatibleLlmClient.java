@@ -3,7 +3,11 @@ package com.ieltspath.learning.infrastructure.client;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
 import com.ieltspath.learning.application.exception.LlmUnavailableException;
+import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LlmClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +42,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     private final String apiKey;
     private final String model;
     private final String reasoningEffort;
+    private final ResilientCall resilientCall;
 
     @Autowired
     public OpenAiCompatibleLlmClient(RestClient.Builder builder,
@@ -45,13 +50,20 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
                                      @Value("${learning.llm.api-key:}") String apiKey,
                                      @Value("${learning.llm.model:}") String model,
                                      @Value("${learning.llm.reasoning-effort:}") String reasoningEffort,
-                                     @Value("${learning.writing.grading-timeout-seconds:20}") int timeoutSeconds) {
+                                     @Value("${learning.writing.grading-timeout-seconds:20}") int timeoutSeconds,
+                                     ResilientCall resilientCall) {
         String normalizedBaseUrl = baseUrl.isBlank() ? null : baseUrl.replaceAll("/+$", "");
         this.restClient = normalizedBaseUrl == null ? null : builder.clone()
                 .requestFactory(requestFactory(timeoutSeconds)).baseUrl(normalizedBaseUrl).build();
         this.apiKey = apiKey;
         this.model = model;
         this.reasoningEffort = reasoningEffort;
+        this.resilientCall = resilientCall;
+    }
+
+    OpenAiCompatibleLlmClient(RestClient.Builder builder, String baseUrl, String apiKey, String model,
+                              String reasoningEffort, int timeoutSeconds) {
+        this(builder, baseUrl, apiKey, model, reasoningEffort, timeoutSeconds, null);
     }
 
     /** {@code restClient} is null when no endpoint is configured. */
@@ -60,6 +72,16 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         this.apiKey = apiKey;
         this.model = model;
         this.reasoningEffort = reasoningEffort;
+        this.resilientCall = null;
+    }
+
+    OpenAiCompatibleLlmClient(RestClient restClient, String apiKey, String model, String reasoningEffort,
+                              ResilientCall resilientCall) {
+        this.restClient = restClient;
+        this.apiKey = apiKey;
+        this.model = model;
+        this.reasoningEffort = reasoningEffort;
+        this.resilientCall = resilientCall;
     }
 
     private static SimpleClientHttpRequestFactory requestFactory(int timeoutSeconds) {
@@ -78,7 +100,14 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     public String completeJson(String systemPrompt, String userPrompt) {
         if (!configured()) throw new LlmUnavailableException(null);
         try {
-            return requestContent(request(systemPrompt, userPrompt));
+            Request request = request(systemPrompt, userPrompt);
+            return resilientCall == null ? requestContent(request)
+                    : resilientCall.call("llm", CallKind.WRITE, () -> requestContent(request));
+        } catch (DownstreamUnavailableException exception) {
+            if ("bulkhead-full".equals(exception.reason())) {
+                throw new LearningRequestException(503, "AI_BUSY", "AI grading is busy; try again shortly");
+            }
+            throw new LlmUnavailableException(null);
         } catch (RestClientResponseException exception) {
             int status = exception.getStatusCode().value();
             log.warn("LLM request failed: status={}", status);

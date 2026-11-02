@@ -16,6 +16,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.springframework.test.web.client.ExpectedCount.times;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -73,7 +74,7 @@ class RestAssessmentStudyContextClientTest {
 
     @Test
     void aFailureOrAnAnswerForAnotherSourceMeansTheSourceCannotBeChecked() {
-        server.expect(requestTo(url())).andRespond(withServerError());
+        server.expect(times(2), requestTo(url())).andRespond(withServerError());
         assertEquals("SOURCE_UNAVAILABLE",
                 assertThrows(StudyTrackingException.class, () -> client.context(source)).getCode());
 

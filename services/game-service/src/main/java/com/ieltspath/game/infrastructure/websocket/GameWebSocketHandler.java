@@ -22,7 +22,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-public class GameWebSocketHandler extends TextWebSocketHandler implements org.springframework.web.socket.SubProtocolCapable {
+public class GameWebSocketHandler extends TextWebSocketHandler implements org.springframework.web.socket.SubProtocolCapable, RoomEventDelivery {
     @Override
     public java.util.List<String> getSubProtocols() { return java.util.List.of("game.v1"); }
     public static final String ROOM_ID_ATTRIBUTE = "gameRoomId";
@@ -61,6 +61,26 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
         this.matches=matches;
         this.matchPlayers=matchPlayers;
         this.rocket=rocket;
+    }
+
+    /**
+     * Delivers a room event that another instance committed. The same listener methods deliver the events this instance
+     * committed itself, so each event reaches the sessions on each instance exactly once.
+     */
+    @Override
+    public void deliver(Object event) {
+        if (event instanceof com.ieltspath.game.application.result.RoomClosedEvent e) roomClosed(e);
+        else if (event instanceof com.ieltspath.game.application.result.RoomUpdatedEvent e) roomUpdated(e);
+        else if (event instanceof com.ieltspath.game.application.result.RoomMemberKickedEvent e) memberKicked(e);
+        else if (event instanceof com.ieltspath.game.application.result.WordlyMatchUpdatedEvent e) wordlyUpdated(e);
+        else if (event instanceof com.ieltspath.game.application.result.MatchStartedEvent e) matchStarted(e);
+        else if (event instanceof com.ieltspath.game.application.result.SoloGameplayEvent e) soloUpdated(e);
+        else if (event instanceof com.ieltspath.game.application.result.WordlyPlayerLeftEvent e) playerLeft(e);
+        else if (event instanceof RocketRoundEvents.Started e) rocketRoundStarted(e);
+        else if (event instanceof RocketRoundEvents.Answered e) rocketPlayerAnswered(e);
+        else if (event instanceof RocketRoundEvents.Closed e) rocketRoundClosed(e);
+        else if (event instanceof RocketRoundEvents.RankingChanged e) rocketRankingChanged(e);
+        else if (event instanceof RocketRoundEvents.Finished e) rocketFinished(e);
     }
 
     @org.springframework.transaction.event.TransactionalEventListener

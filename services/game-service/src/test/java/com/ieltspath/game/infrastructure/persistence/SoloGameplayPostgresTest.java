@@ -317,4 +317,34 @@ class SoloGameplayPostgresTest {
         assertEquals("MATCH_FINISHED", store.receipt(request).reply().body().get("code"));
         assertFalse(store.due(50).contains(match));
     }
+
+    @Test
+    void concurrentTimeoutSchedulesCostExactlyOneLife() throws Exception {
+        var current = words.current(match, user).orElseThrow();
+        int livesBefore = current.livesRemaining();
+        sql.update("UPDATE game_matches SET word_time_limit_seconds=180 WHERE id=?", match);
+        sql.update(
+                "UPDATE game_player_words SET started_at=now()-interval '181 seconds',"
+                        + "deadline_at=now()-interval '1 second' WHERE id=?",
+                current.playerWordId());
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var barrier = new java.util.concurrent.CyclicBarrier(2);
+        try {
+            var runs =
+                    java.util.stream.Stream.of(1, 2)
+                            .map(
+                                    i ->
+                                            pool.submit(
+                                                    () -> {
+                                                        barrier.await();
+                                                        game.timeout(match, user);
+                                                        return null;
+                                                    }))
+                            .toList();
+            for (var run : runs) run.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(livesBefore - 1, words.current(match, user).orElseThrow().livesRemaining());
+    }
 }

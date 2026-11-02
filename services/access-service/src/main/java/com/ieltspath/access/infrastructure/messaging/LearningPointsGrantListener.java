@@ -27,8 +27,10 @@ import java.util.UUID;
 /**
  * Credits the points Learning asks for and answers on {@code points.grant.settled}. A payload that cannot be read is
  * answered {@code FAILED}. A grant that violates a constraint is refused and dead-lettered. Any other failure is treated
- * as temporary: the message goes to the retry queue and, after the allowed retries, to the dead-letter queue. Crediting is
- * idempotent per grant id, so handling a message twice never pays twice. Grant contents are never logged.
+ * as temporary: the shared {@link MessageRetry} policy sends the message to the retry queue and, after the allowed
+ * retries, to the dead-letter queue. This listener uses the common retry policy because transient database or broker
+ * failures use the same bounded retry behavior as other event consumers. Crediting is idempotent per grant id, so
+ * handling a message twice never pays twice. Grant contents are never logged.
  */
 @Component
 public class LearningPointsGrantListener {

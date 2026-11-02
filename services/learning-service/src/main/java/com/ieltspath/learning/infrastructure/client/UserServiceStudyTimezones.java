@@ -1,6 +1,8 @@
 package com.ieltspath.learning.infrastructure.client;
 
 import com.ieltspath.commonsecurity.header.SecurityHeaders;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.ResilientCall;
 import com.ieltspath.learning.application.port.StudyTimezones;
 import com.ieltspath.learning.domain.repository.StudySessionRepository;
 import org.slf4j.Logger;
@@ -30,21 +32,29 @@ public class UserServiceStudyTimezones implements StudyTimezones {
 
     private final RestClient restClient;
     private final StudySessionRepository sessions;
+    private final ResilientCall resilientCall;
 
     @Autowired
     public UserServiceStudyTimezones(RestClient.Builder builder,
             @Value("${learning.user.base-url:http://localhost:8085}") String userBaseUrl,
-            StudySessionRepository sessions) {
+            StudySessionRepository sessions,
+            ResilientCall resilientCall) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
         requestFactory.setReadTimeout(Duration.ofSeconds(3));
         restClient = builder.requestFactory(requestFactory).baseUrl(userBaseUrl).build();
         this.sessions = sessions;
+        this.resilientCall = resilientCall;
     }
 
     UserServiceStudyTimezones(RestClient restClient, StudySessionRepository sessions) {
+        this(restClient, sessions, ResilientCall.isolatedDefault());
+    }
+
+    UserServiceStudyTimezones(RestClient restClient, StudySessionRepository sessions, ResilientCall resilientCall) {
         this.restClient = restClient;
         this.sessions = sessions;
+        this.resilientCall = resilientCall;
     }
 
     @Override
@@ -58,11 +68,12 @@ public class UserServiceStudyTimezones implements StudyTimezones {
         Optional<String> bearer = GatewayRequestHeaders.bearerToken();
         if (bearer.isEmpty()) return Optional.empty();
         try {
-            Answer answer = restClient.get().uri("/internal/users/{userId}/study-timezone", userId)
+            Answer answer = resilientCall.call("user", CallKind.READ, () -> restClient.get()
+                    .uri("/internal/users/{userId}/study-timezone", userId)
                     .headers((HttpHeaders headers) -> {
                         headers.setBearerAuth(bearer.get());
                         headers.set(SecurityHeaders.CORRELATION_ID, GatewayRequestHeaders.correlationId());
-                    }).retrieve().body(Answer.class);
+                    }).retrieve().body(Answer.class));
             return answer == null ? Optional.empty() : parse(answer.timezone());
         } catch (RuntimeException failure) {
             log.warn("Study timezone unavailable from the User Service: userId={}", userId, failure);

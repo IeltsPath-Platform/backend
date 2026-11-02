@@ -1,6 +1,9 @@
 package com.ieltspath.learning.infrastructure.client;
 
 import com.ieltspath.commonsecurity.header.SecurityHeaders;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
 import com.ieltspath.learning.application.port.AssessmentStudyContext;
 import com.ieltspath.learning.application.port.StudySourceVerifier.Context;
 import com.ieltspath.learning.domain.exception.StudyTrackingException;
@@ -20,33 +23,43 @@ import java.util.UUID;
 @Component
 public class RestAssessmentStudyContextClient implements AssessmentStudyContext {
     private final RestClient restClient;
+    private final ResilientCall resilientCall;
 
     @Autowired
     public RestAssessmentStudyContextClient(RestClient.Builder builder,
-            @Value("${learning.assessment.base-url:http://localhost:8083}") String assessmentBaseUrl) {
+            @Value("${learning.assessment.base-url:http://localhost:8083}") String assessmentBaseUrl,
+            ResilientCall resilientCall) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
         requestFactory.setReadTimeout(Duration.ofSeconds(3));
         restClient = builder.requestFactory(requestFactory).baseUrl(assessmentBaseUrl).build();
+        this.resilientCall = resilientCall;
     }
 
     RestAssessmentStudyContextClient(RestClient restClient) {
+        this(restClient, defaultResilientCall());
+    }
+
+    RestAssessmentStudyContextClient(RestClient restClient, ResilientCall resilientCall) {
         this.restClient = restClient;
+        this.resilientCall = resilientCall;
     }
 
     @Override
     public Context context(UUID assessmentId) {
         try {
-            Context context = restClient.get().uri(uri -> uri.path("/api/assessments/me/statistics/study-context")
+            Context context = resilientCall.call("assessment", CallKind.READ, () -> restClient.get().uri(uri -> uri.path("/api/assessments/me/statistics/study-context")
                             .queryParam("sourceType", "ASSESSMENT").queryParam("sourceId", assessmentId).build())
                     .headers((HttpHeaders headers) -> {
                         GatewayRequestHeaders.bearerToken().ifPresent(headers::setBearerAuth);
                         headers.set(SecurityHeaders.CORRELATION_ID, GatewayRequestHeaders.correlationId());
-                    }).retrieve().body(Context.class);
+                    }).retrieve().body(Context.class));
             if (context == null || !assessmentId.equals(context.sourceId())) {
                 throw new StudyTrackingException("SOURCE_UNAVAILABLE");
             }
             return context;
+        } catch (DownstreamUnavailableException unavailable) {
+            throw new StudyTrackingException("SOURCE_UNAVAILABLE");
         } catch (HttpClientErrorException refused) {
             int status = refused.getStatusCode().value();
             throw new StudyTrackingException(status == 404 || status == 403 || status == 409
@@ -54,5 +67,9 @@ public class RestAssessmentStudyContextClient implements AssessmentStudyContext 
         } catch (RestClientException unreachable) {
             throw new StudyTrackingException("SOURCE_UNAVAILABLE");
         }
+    }
+
+    private static ResilientCall defaultResilientCall() {
+        return ResilientCall.isolatedDefault();
     }
 }

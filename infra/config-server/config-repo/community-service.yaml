@@ -1,4 +1,9 @@
 spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
   datasource:
     url: ${COMMUNITY_DB_URL:jdbc:postgresql://localhost:5440/community_db}
     username: ${COMMUNITY_DB_USERNAME:postgres}
@@ -71,7 +76,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,refresh
+        include: health,info,refresh,prometheus
   endpoint:
     health:
       probes:

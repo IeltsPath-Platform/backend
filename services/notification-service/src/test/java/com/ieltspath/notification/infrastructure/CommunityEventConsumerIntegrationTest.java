@@ -15,7 +15,6 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -44,7 +43,7 @@ class CommunityEventConsumerIntegrationTest {
         var source = new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         org.flywaydb.core.Flyway.configure().dataSource(source).locations("filesystem:src/main/resources/db/migration").load().migrate();
         var jdbc = new JdbcTemplate(source);
-        var socket = mock(SimpMessagingTemplate.class);
+        var socket = mock(NoticePushBridge.class);
         var mapper = new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
                 .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         var connection = new org.springframework.amqp.rabbit.connection.CachingConnectionFactory(
@@ -80,7 +79,7 @@ class CommunityEventConsumerIntegrationTest {
                 return null;
             });
             assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM notifications WHERE id=?", Integer.class, event.eventId()));
-            verify(socket).convertAndSendToUser(eq(event.recipientId().toString()), eq("/queue/notifications"), any(Object.class));
+            verify(socket).pushToUser(eq(event.recipientId()), any());
         } finally {
             connection.destroy();
         }
@@ -90,7 +89,7 @@ class CommunityEventConsumerIntegrationTest {
         var source = new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         org.flywaydb.core.Flyway.configure().dataSource(source).locations("filesystem:src/main/resources/db/migration").load().migrate();
         var jdbc = new JdbcTemplate(source);
-        var socket = mock(SimpMessagingTemplate.class);
+        var socket = mock(NoticePushBridge.class);
         var mapper = new ObjectMapper();
         var consumer = new CommunityEventConsumer(mapper, recordEvent(jdbc), socket, mock(RabbitTemplate.class));
         UUID event=UUID.randomUUID(), actor=UUID.randomUUID(), recipient=UUID.randomUUID(), post=UUID.randomUUID(), comment=UUID.randomUUID();
@@ -103,7 +102,7 @@ class CommunityEventConsumerIntegrationTest {
             consumer.receive(new Message(body, properties), channel);
         }
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM notifications WHERE comment_id=? AND recipient_id=?", Integer.class, comment, recipient));
-        verify(socket, times(1)).convertAndSendToUser(eq(recipient.toString()), eq("/queue/notifications"), any());
+        verify(socket, times(1)).pushToUser(eq(recipient), any());
         verify(channel, times(2)).basicAck(anyLong(), eq(false));
     }
 
@@ -111,7 +110,7 @@ class CommunityEventConsumerIntegrationTest {
         var source = new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
         org.flywaydb.core.Flyway.configure().dataSource(source).locations("filesystem:src/main/resources/db/migration").load().migrate();
         var jdbc = new JdbcTemplate(source);
-        var socket = mock(SimpMessagingTemplate.class);
+        var socket = mock(NoticePushBridge.class);
         var preferences = new NotificationPreferenceService(new NotificationPreferenceRepositoryAdapter(jdbc));
         var mapper = new ObjectMapper();
         var consumer = new CommunityEventConsumer(mapper, recordEvent(jdbc), socket, mock(RabbitTemplate.class));
@@ -136,7 +135,7 @@ class CommunityEventConsumerIntegrationTest {
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM notifications WHERE recipient_id=? AND event_type=?",
                 Integer.class,recipient,CommunityEventTypes.COMMENT_MENTIONED));
         verify(socket,times(CommunityEventTypes.ORDERED.size()-1))
-                .convertAndSendToUser(eq(recipient.toString()),eq("/queue/notifications"),any());
+                .pushToUser(eq(recipient),any());
         verify(channel,times(CommunityEventTypes.ORDERED.size())).basicAck(anyLong(),eq(false));
     }
 

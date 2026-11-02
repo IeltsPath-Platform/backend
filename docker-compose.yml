@@ -6,6 +6,7 @@ name: ieltspath
 
 x-spring-service: &spring-service
   restart: unless-stopped
+  stop_grace_period: 40s
   networks:
     - codebase-network
   healthcheck:
@@ -20,7 +21,7 @@ x-spring-env: &spring-env
   EUREKA_URL: http://eureka-server:8761/eureka/
   GATEWAY_INTERNAL_JWT_SECRET: "${GATEWAY_INTERNAL_JWT_SECRET:?Set GATEWAY_INTERNAL_JWT_SECRET}"
   API_DOCS_ENABLED: "${API_DOCS_ENABLED:-true}"
-  JAVA_TOOL_OPTIONS: "-Xms64m -Xmx512m"
+  JAVA_TOOL_OPTIONS: "-Xms64m -Xmx512m -Dsun.net.inetaddr.ttl=5"
 
 x-after-infra: &after-infra
   postgres:
@@ -69,6 +70,19 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no", "--save", "", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD}"]
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    networks:
+      - codebase-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   config-server:
     <<: *spring-service
     build:
@@ -111,6 +125,8 @@ services:
       <<: *spring-env
       SERVER_PORT: 8080
       EXTERNAL_JWT_SECRET: "${EXTERNAL_JWT_SECRET:?Set EXTERNAL_JWT_SECRET}"
+      REDIS_HOST: redis
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:5173}"
     ports:
       - "127.0.0.1:${MVP_GATEWAY_PORT:-8080}:8080"
@@ -118,6 +134,8 @@ services:
       config-server:
         condition: service_healthy
       eureka-server:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   user-service:
@@ -131,13 +149,18 @@ services:
       <<: *spring-env
       SERVER_PORT: 8085
       EXTERNAL_JWT_SECRET: "${EXTERNAL_JWT_SECRET:?Set EXTERNAL_JWT_SECRET}"
+      REDIS_HOST: redis
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
       USER_DB_URL: jdbc:postgresql://postgres:5432/user_db
       USER_DB_PASSWORD: "${POSTGRES_PASSWORD}"
       DEMO_DATA_ENABLED: "${DEMO_DATA_ENABLED:-true}"
       SUPABASE_URL: "${SUPABASE_URL:-}"
       SUPABASE_SECRET_KEY: "${SUPABASE_SECRET_KEY:-}"
       USER_AVATAR_BUCKET: "${USER_AVATAR_BUCKET:-avatars}"
-    depends_on: *after-infra
+    depends_on:
+      <<: *after-infra
+      redis:
+        condition: service_healthy
 
   content-service:
     <<: *spring-service
@@ -279,10 +302,14 @@ services:
       SERVER_PORT: 8087
       GAME_DB_URL: jdbc:postgresql://postgres:5432/game_db
       GAME_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      REDIS_HOST: redis
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
       CONTENT_SERVICE_URL: http://content-service:8082
       LIBRARY_SERVICE_URL: http://library-service:8081
     depends_on:
       <<: *after-infra
+      redis:
+        condition: service_healthy
       content-service:
         condition: service_healthy
       library-service:
@@ -300,6 +327,8 @@ services:
       SERVER_PORT: 8089
       COMMUNITY_DB_URL: jdbc:postgresql://postgres:5432/community_db
       COMMUNITY_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      REDIS_HOST: redis
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"
       RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
@@ -311,6 +340,8 @@ services:
     depends_on:
       <<: *after-infra
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       user-service:
         condition: service_healthy
@@ -327,6 +358,8 @@ services:
       SERVER_PORT: 8088
       NOTIFICATION_DB_URL: jdbc:postgresql://postgres:5432/notification_db
       NOTIFICATION_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      REDIS_HOST: redis
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USERNAME: "${RABBITMQ_USERNAME}"
       RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
@@ -335,6 +368,20 @@ services:
       <<: *after-infra
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Optional metrics scraper. Start with: docker compose --profile observability up -d prometheus
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    profiles: ["observability"]
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:${PROMETHEUS_HOST_PORT:-9090}:9090"
+    networks:
+      - codebase-network
 
 networks:
   codebase-network:

@@ -1,5 +1,7 @@
 package com.ieltspath.notification.api.exception;
 
+import com.ieltspath.events.messaging.InvalidDeadLetterBatchException;
+import com.ieltspath.events.messaging.UnknownDeadLetterQueueException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
@@ -93,6 +95,15 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, e.getMessage(), r, null);
     }
 
+    @ExceptionHandler(UnknownDeadLetterQueueException.class)
+    ResponseEntity<ErrorResponse> unknownDeadLetterQueue(UnknownDeadLetterQueueException e, HttpServletRequest r) {
+        return error(HttpStatus.NOT_FOUND, e.getMessage(), r, null);
+    }
+
+    @ExceptionHandler(InvalidDeadLetterBatchException.class)
+    ResponseEntity<ErrorResponse> invalidDeadLetterBatch(InvalidDeadLetterBatchException e, HttpServletRequest r) {
+        return error(HttpStatus.BAD_REQUEST, e.getMessage(), r, null);
+    }
     @ExceptionHandler(Exception.class)
     ResponseEntity<ErrorResponse> unexpected(Exception e, HttpServletRequest r) {
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected system error", r, null);

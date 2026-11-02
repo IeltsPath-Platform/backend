@@ -19,6 +19,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.ExpectedCount.times;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -59,7 +60,7 @@ class UserServiceStudyTimezonesTest {
     @Test
     void fallsBackToTheLastTimezoneUsedWhenTheUserServiceIsDown() {
         signedInRequest();
-        server.expect(requestTo(url())).andRespond(withServerError());
+        server.expect(times(2), requestTo(url())).andRespond(withServerError());
         when(sessions.latestTimezone(user)).thenReturn(Optional.of("Europe/Paris"));
 
         assertEquals(ZoneId.of("Europe/Paris"), timezones.zoneOf(user));
@@ -68,7 +69,7 @@ class UserServiceStudyTimezonesTest {
     @Test
     void fallsBackToTheDefaultWhenNothingIsKnown() {
         signedInRequest();
-        server.expect(requestTo(url())).andRespond(withServerError());
+        server.expect(times(2), requestTo(url())).andRespond(withServerError());
         when(sessions.latestTimezone(user)).thenReturn(Optional.empty());
 
         assertEquals(DEFAULT, timezones.zoneOf(user));

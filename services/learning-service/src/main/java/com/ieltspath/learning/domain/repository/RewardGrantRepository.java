@@ -7,7 +7,16 @@ import java.util.UUID;
 /** Points owed to learners, queued until the relay sends them to Access and Access reports back. */
 public interface RewardGrantRepository {
     /** A grant waiting to be sent or to be settled; {@code attempts} counts the times it was sent. */
-    record PendingGrant(UUID id, UUID userId, int amount, String reason, String referenceId, int attempts) {}
+    record PendingGrant(UUID id, UUID userId, int amount, String reason, String referenceId, int attempts,
+                        String correlationId, String traceContext) {
+        public PendingGrant(UUID id, UUID userId, int amount, String reason, String referenceId, int attempts,
+                            String correlationId) {
+            this(id, userId, amount, reason, referenceId, attempts, correlationId, null);
+        }
+        public PendingGrant(UUID id, UUID userId, int amount, String reason, String referenceId, int attempts) {
+            this(id, userId, amount, reason, referenceId, attempts, null, null);
+        }
+    }
 
     /**
      * Queues a grant as pending. A grant already queued for the same reason and reference is not added again, so a

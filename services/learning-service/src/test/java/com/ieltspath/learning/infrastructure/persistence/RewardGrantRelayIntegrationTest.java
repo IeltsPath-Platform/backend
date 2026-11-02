@@ -5,6 +5,8 @@ import com.ieltspath.learning.application.service.RewardGrantService;
 import com.ieltspath.learning.domain.repository.RewardGrantRepository;
 import com.ieltspath.learning.domain.repository.RewardGrantRepository.PendingGrant;
 import com.ieltspath.learning.infrastructure.scheduler.RewardGrantRelayJob;
+import com.ieltspath.learning.infrastructure.messaging.PointsGrantSettledListener;
+import org.springframework.amqp.core.MessageBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -36,7 +38,8 @@ import static org.mockito.Mockito.verify;
         "spring.jpa.hibernate.ddl-auto=validate", "spring.jpa.open-in-view=false",
         "management.health.rabbit.enabled=false", "learning.messaging.consumer-enabled=false",
         "learning.mastery.backfill-on-startup=false", "learning.league.close-enabled=false",
-        "learning.rewards.relay-enabled=false", "app.auth.internal-jwt-issuer=urn:code-base:api-gateway"
+        "learning.rewards.relay-enabled=false", "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
+        "TRACING_ENABLED=false", "management.tracing.enabled=${TRACING_ENABLED:false}"
 })
 @Testcontainers(disabledWithoutDocker = true)
 class RewardGrantRelayIntegrationTest {
@@ -58,6 +61,7 @@ class RewardGrantRelayIntegrationTest {
     @Autowired RewardGrantRepository grants;
     @Autowired RewardGrantService service;
     @Autowired RewardGrantRelayJob relay;
+    @Autowired PointsGrantSettledListener settledListener;
     @MockitoBean PointsGrantPublisher publisher;
 
     private final UUID user = UUID.randomUUID();
@@ -71,6 +75,8 @@ class RewardGrantRelayIntegrationTest {
     @Test
     void aNewGrantIsSentOnceAndNotAgainBeforeTheResendDelay() {
         grants.enqueue(user, "STREAK_MILESTONE", "2026-10-01:7", 10);
+
+        assertNull(jdbc.queryForObject("SELECT trace_context FROM reward_grants", String.class));
 
         assertEquals(1, relay.runOnce());
         assertEquals(0, relay.runOnce());
@@ -107,6 +113,25 @@ class RewardGrantRelayIntegrationTest {
 
         assertEquals(0, relay.runOnce());
         assertEquals("GRANTED", status());
+    }
+
+    @Test
+    void secondDeliveryHasNoSideEffect() {
+        grants.enqueue(user, "BADGE", "STREAK_7", 5);
+        UUID id = jdbc.queryForObject("SELECT id FROM reward_grants", UUID.class);
+        byte[] body = ("{\"grantId\":\"" + id + "\",\"status\":\"GRANTED\",\"error\":null}")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var duplicate = MessageBuilder.withBody(body).setMessageId(id.toString()).build();
+
+        settledListener.onSettled(duplicate);
+        var updatedAt = jdbc.queryForObject("SELECT updated_at FROM reward_grants WHERE id = ?",
+                java.sql.Timestamp.class, id);
+        settledListener.onSettled(duplicate);
+
+        assertEquals("GRANTED", jdbc.queryForObject("SELECT status FROM reward_grants WHERE id = ?",
+                String.class, id));
+        assertEquals(updatedAt, jdbc.queryForObject("SELECT updated_at FROM reward_grants WHERE id = ?",
+                java.sql.Timestamp.class, id));
     }
 
     @Test

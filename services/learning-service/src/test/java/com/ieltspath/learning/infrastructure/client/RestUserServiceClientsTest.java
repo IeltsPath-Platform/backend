@@ -27,6 +27,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.ExpectedCount.times;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -111,7 +112,7 @@ class RestUserServiceClientsTest {
 
     @Test
     void aFailingUserServiceMeansNoNames() {
-        server.expect(requestTo(BASE_URL + "/internal/users/display-names")).andRespond(withServerError());
+        server.expect(times(2), requestTo(BASE_URL + "/internal/users/display-names")).andRespond(withServerError());
         assertTrue(names.names(List.of(UUID.randomUUID())).isEmpty());
     }
 }

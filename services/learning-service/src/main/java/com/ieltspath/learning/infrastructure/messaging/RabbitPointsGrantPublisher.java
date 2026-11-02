@@ -7,6 +7,8 @@ import com.ieltspath.events.points.PointsGrantMessaging;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.learning.application.port.PointsGrantPublisher;
+import com.ieltspath.commonobservability.Correlation;
+import com.ieltspath.commonobservability.OutboxTraceContext;
 import com.ieltspath.learning.domain.repository.RewardGrantRepository.PendingGrant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +39,8 @@ public class RabbitPointsGrantPublisher implements PointsGrantPublisher {
     private final RabbitTemplate rabbit;
     private final ObjectMapper json;
     private final Duration confirmTimeout;
+    @Autowired(required = false)
+    private OutboxTraceContext traceContext;
 
     @Autowired
     public RabbitPointsGrantPublisher(RabbitTemplate rabbit, ObjectMapper json,
@@ -52,14 +56,25 @@ public class RabbitPointsGrantPublisher implements PointsGrantPublisher {
 
     @Override
     public void publish(PendingGrant grant) {
+        OutboxTraceContext.Scope scope = traceContext == null ? null : traceContext.openRelay(grant.traceContext());
+        try {
+            publishWithinRelaySpan(grant);
+        } finally {
+            if (scope != null) scope.close();
+        }
+    }
+
+    private void publishWithinRelaySpan(PendingGrant grant) {
         PointsGrantRequested body = new PointsGrantRequested(grant.id(), grant.userId(), grant.amount(),
                 grant.reason(), grant.referenceId());
         Message message;
         try {
-            message = MessageBuilder.withBody(json.writeValueAsBytes(body))
+            var messageBuilder = MessageBuilder.withBody(json.writeValueAsBytes(body))
                     .setContentType(MessageProperties.CONTENT_TYPE_JSON)
                     .setDeliveryMode(MessageDeliveryMode.PERSISTENT)
-                    .setMessageId(grant.id().toString()).build();
+                    .setMessageId(grant.id().toString());
+            if (grant.correlationId() != null) messageBuilder.setHeader(Correlation.HEADER, grant.correlationId());
+            message = messageBuilder.build();
         } catch (JsonProcessingException failure) {
             throw new IllegalStateException("Points grant cannot be written", failure);
         }

@@ -5,6 +5,9 @@ import com.ieltspath.content.application.exception.VocabularyServiceUnavailableE
 import com.ieltspath.content.application.port.VocabularySenseLookup;
 import com.ieltspath.content.application.port.VocabularySenseWriter;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.NewWord;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -31,18 +34,26 @@ import java.util.stream.Collectors;
 @Component
 public class LibraryVocabularySenseClient implements VocabularySenseLookup, VocabularySenseWriter {
     private final RestClient restClient;
+    private final ResilientCall resilientCall;
 
     @Autowired
     public LibraryVocabularySenseClient(RestClient.Builder builder,
-            @Value("${content.library.base-url:http://localhost:8081}") String libraryBaseUrl) {
+            @Value("${content.library.base-url:http://localhost:8081}") String libraryBaseUrl,
+            ResilientCall resilientCall) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(2));
         factory.setReadTimeout(Duration.ofSeconds(5));
         this.restClient = builder.requestFactory(factory).baseUrl(libraryBaseUrl).build();
+        this.resilientCall = resilientCall;
     }
 
     LibraryVocabularySenseClient(RestClient restClient) {
+        this(restClient, defaultResilientCall());
+    }
+
+    LibraryVocabularySenseClient(RestClient restClient, ResilientCall resilientCall) {
         this.restClient = restClient;
+        this.resilientCall = resilientCall;
     }
 
     @Override
@@ -55,16 +66,18 @@ public class LibraryVocabularySenseClient implements VocabularySenseLookup, Voca
         if (senseIds == null || senseIds.isEmpty() || senseIds.size() > 100) return List.of();
         JwtAuthenticationToken token = signedIn();
         try {
-            VocabularySense[] response = restClient.get()
+            VocabularySense[] response = resilientCall.call("library", CallKind.READ, () -> restClient.get()
                     .uri(uriBuilder -> uriBuilder.path("/api/content/vocabulary/senses")
                             .queryParam("ids", senseIds.stream().map(UUID::toString).collect(Collectors.joining(",")))
                             .build())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token.getToken().getTokenValue())
                     .header("X-Correlation-Id", correlationId())
-                    .retrieve().body(VocabularySense[].class);
+                    .retrieve().body(VocabularySense[].class));
             if (response == null) return List.of();
             return Arrays.stream(response)
                     .map(sense -> new SenseText(sense.senseId(), sense.lemma(), sense.vietnameseMeaning())).toList();
+        } catch (DownstreamUnavailableException exception) {
+            throw new VocabularyServiceUnavailableException(exception);
         } catch (RestClientException exception) {
             throw new VocabularyServiceUnavailableException(exception);
         }
@@ -77,15 +90,17 @@ public class LibraryVocabularySenseClient implements VocabularySenseLookup, Voca
         List<Entry> entries = words.stream().map(word -> new Entry(word.lemma(), word.ipa(), word.partOfSpeech(),
                 word.englishDefinition(), word.vietnameseMeaning(), word.exampleSentence())).toList();
         try {
-            Resolved[] response = restClient.post().uri("/api/content/admin/vocabulary/bulk")
+            Resolved[] response = resilientCall.call("library", CallKind.WRITE, () -> restClient.post().uri("/api/content/admin/vocabulary/bulk")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + token.getToken().getTokenValue())
                     .header("X-Correlation-Id", correlationId())
-                    .body(new Bulk(entries)).retrieve().body(Resolved[].class);
+                    .body(new Bulk(entries)).retrieve().body(Resolved[].class));
             Map<String, UUID> senses = new LinkedHashMap<>();
             if (response != null) Arrays.stream(response).forEach(resolved -> senses.put(resolved.lemma(), resolved.senseId()));
             return senses;
         } catch (HttpClientErrorException refused) {
             throw new VocabularyRejectedException(refusal(refused));
+        } catch (DownstreamUnavailableException exception) {
+            throw new VocabularyServiceUnavailableException(exception);
         } catch (RestClientException exception) {
             throw new VocabularyServiceUnavailableException(exception);
         }
@@ -109,6 +124,10 @@ public class LibraryVocabularySenseClient implements VocabularySenseLookup, Voca
             // fall through to the status
         }
         return "Vocabulary service refused the words (" + refused.getStatusCode().value() + ")";
+    }
+
+    private static ResilientCall defaultResilientCall() {
+        return ResilientCall.isolatedDefault();
     }
 
     private String correlationId() {

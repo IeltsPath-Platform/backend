@@ -3,6 +3,9 @@ package com.ieltspath.assessment.infrastructure.client;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.ieltspath.assessment.application.exception.UserServiceUnavailableException;
 import com.ieltspath.assessment.application.port.ExaminerDirectory;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -25,17 +28,23 @@ import java.util.stream.Collectors;
 public class UserExaminerClient implements ExaminerDirectory {
     private final RestClient restClient;
     private final AssessmentServiceTokenProvider serviceTokens;
+    private final ResilientCall resilientCall;
 
     @Autowired
     public UserExaminerClient(RestClient.Builder builder,
                               @Value("${USER_SERVICE_URL:http://localhost:8085}") String userBaseUrl,
-                              AssessmentServiceTokenProvider serviceTokens) {
-        this(client(builder, userBaseUrl), serviceTokens);
+                              AssessmentServiceTokenProvider serviceTokens, ResilientCall resilientCall) {
+        this(client(builder, userBaseUrl), serviceTokens, resilientCall);
     }
 
     UserExaminerClient(RestClient restClient, AssessmentServiceTokenProvider serviceTokens) {
+        this(restClient, serviceTokens, ResilientCall.isolatedDefault());
+    }
+
+    UserExaminerClient(RestClient restClient, AssessmentServiceTokenProvider serviceTokens, ResilientCall resilientCall) {
         this.restClient = restClient;
         this.serviceTokens = serviceTokens;
+        this.resilientCall = resilientCall;
     }
 
     private static RestClient client(RestClient.Builder builder, String userBaseUrl) {
@@ -49,13 +58,15 @@ public class UserExaminerClient implements ExaminerDirectory {
     public Optional<Examiner> find(UUID examinerId) {
         ExaminerResponse response;
         try {
-            response = restClient.get()
+            response = resilientCall.call("user", CallKind.READ, () -> restClient.get()
                     .uri("/internal/users/examiners/{id}", examinerId)
                     .header(HttpHeaders.AUTHORIZATION, serviceTokens.authorizationHeader())
                     .header("X-Correlation-Id", GatewayRequestContext.correlationId())
                     .retrieve()
                     .onStatus(status -> status.value() == 404, (request, answer) -> { })
-                    .body(ExaminerResponse.class);
+                    .body(ExaminerResponse.class));
+        } catch (DownstreamUnavailableException exception) {
+            throw new UserServiceUnavailableException("User Service could not describe the examiner", exception);
         } catch (RestClientException exception) {
             throw new UserServiceUnavailableException("User Service could not describe the examiner", exception);
         }
@@ -69,13 +80,15 @@ public class UserExaminerClient implements ExaminerDirectory {
         if (ids.isEmpty()) return Map.of();
         ExaminerResponse[] response;
         try {
-            response = restClient.get()
+            response = resilientCall.call("user", CallKind.READ, () -> restClient.get()
                     .uri(uri -> uri.path("/internal/users/examiners")
                             .queryParam("ids", ids.stream().map(UUID::toString).collect(Collectors.joining(","))).build())
                     .header(HttpHeaders.AUTHORIZATION, serviceTokens.authorizationHeader())
                     .header("X-Correlation-Id", GatewayRequestContext.correlationId())
                     .retrieve()
-                    .body(ExaminerResponse[].class);
+                    .body(ExaminerResponse[].class));
+        } catch (DownstreamUnavailableException exception) {
+            throw new UserServiceUnavailableException("User Service could not describe the examiners", exception);
         } catch (RestClientException exception) {
             throw new UserServiceUnavailableException("User Service could not describe the examiners", exception);
         }

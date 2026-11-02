@@ -1,0 +1,2 @@
+com.ieltspath.commonobservability.CommonObservabilityAutoConfiguration
+com.ieltspath.commonobservability.CorrelationRabbitAutoConfiguration

@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.ExpectedCount.once;
+import static org.springframework.test.web.client.ExpectedCount.times;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -60,7 +61,7 @@ class UserExaminerClientTest {
 
     @Test
     void anUnreachableOrFailingUserServiceIsReportedAsUnavailable() {
-        server.expect(once(), requestTo("http://user/internal/users/examiners?ids=" + first)).andRespond(withServerError());
+        server.expect(times(2), requestTo("http://user/internal/users/examiners?ids=" + first)).andRespond(withServerError());
         assertThrows(UserServiceUnavailableException.class, () -> client.findAll(List.of(first)));
 
         server.reset();

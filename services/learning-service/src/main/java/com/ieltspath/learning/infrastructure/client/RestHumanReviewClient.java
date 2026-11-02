@@ -1,6 +1,9 @@
 package com.ieltspath.learning.infrastructure.client;
 
 import com.ieltspath.commonsecurity.header.SecurityHeaders;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.HumanReviewClient;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,18 +25,26 @@ import java.util.function.Supplier;
 public class RestHumanReviewClient implements HumanReviewClient {
     private final RestClient access;
     private final RestClient assessment;
+    private final ResilientCall resilientCall;
 
     @Autowired
     public RestHumanReviewClient(RestClient.Builder builder,
                                  @Value("${learning.access.base-url:http://localhost:8084}") String accessBaseUrl,
-                                 @Value("${learning.assessment.base-url:http://localhost:8083}") String assessmentBaseUrl) {
+                                 @Value("${learning.assessment.base-url:http://localhost:8083}") String assessmentBaseUrl,
+                                 ResilientCall resilientCall) {
         this.access = client(builder, accessBaseUrl);
         this.assessment = client(builder, assessmentBaseUrl);
+        this.resilientCall = resilientCall;
     }
 
     RestHumanReviewClient(RestClient access, RestClient assessment) {
+        this(access, assessment, defaultResilientCall());
+    }
+
+    RestHumanReviewClient(RestClient access, RestClient assessment, ResilientCall resilientCall) {
         this.access = access;
         this.assessment = assessment;
+        this.resilientCall = resilientCall;
     }
 
     private static RestClient client(RestClient.Builder builder, String baseUrl) {
@@ -46,20 +57,23 @@ public class RestHumanReviewClient implements HumanReviewClient {
     @Override
     public CreditCharge consumeCredit(UUID submissionId) {
         Credits credits = call(() -> access.post().uri("/internal/access/human-grading/consume")
-                .headers(this::forward).body(Map.of("submissionId", submissionId)).retrieve().body(Credits.class), false);
+                .headers(this::forward).body(Map.of("submissionId", submissionId)).retrieve().body(Credits.class),
+                "access", CallKind.IDEMPOTENT_WRITE, false);
         return new CreditCharge(credits.remainingCredits(), Boolean.TRUE.equals(credits.charged()));
     }
 
     @Override
     public void refundCredit(UUID submissionId) {
         call(() -> access.post().uri("/internal/access/human-grading/refund")
-                .headers(this::forward).body(Map.of("submissionId", submissionId)).retrieve().body(Credits.class), false);
+                .headers(this::forward).body(Map.of("submissionId", submissionId)).retrieve().body(Credits.class),
+                "access", CallKind.IDEMPOTENT_WRITE, false);
     }
 
     @Override
     public UUID createReview(CreateReview request) {
         Created created = call(() -> assessment.post().uri("/internal/assessments/human-reviews")
-                .headers(this::forward).body(body(request)).retrieve().body(Created.class), true);
+                .headers(this::forward).body(body(request)).retrieve().body(Created.class),
+                "assessment", CallKind.WRITE, true);
         if (created.reviewSubmissionId() == null) throw unavailable();
         return created.reviewSubmissionId();
     }
@@ -67,13 +81,13 @@ public class RestHumanReviewClient implements HumanReviewClient {
     @Override
     public Review fetchReview(UUID reviewSubmissionId, UUID learnerId) {
         return call(() -> assessment.get().uri("/internal/assessments/human-reviews/{id}", reviewSubmissionId)
-                .headers(this::forward).retrieve().body(Review.class), false);
+                .headers(this::forward).retrieve().body(Review.class), "assessment", CallKind.READ, false);
     }
 
     @Override
     public Review cancelReview(UUID reviewSubmissionId) {
         return call(() -> assessment.post().uri("/internal/assessments/human-reviews/{id}/cancel", reviewSubmissionId)
-                .headers(this::forward).retrieve().body(Review.class), false);
+                .headers(this::forward).retrieve().body(Review.class), "assessment", CallKind.WRITE, false);
     }
 
     private static Map<String, Object> body(CreateReview request) {
@@ -98,11 +112,13 @@ public class RestHumanReviewClient implements HumanReviewClient {
     }
 
     /** {@code refusalIsDefinite}: a 4xx answer to a create call means nothing was created, unlike a timeout or a 5xx. */
-    private <T> T call(Supplier<T> request, boolean refusalIsDefinite) {
+    private <T> T call(Supplier<T> request, String target, CallKind kind, boolean refusalIsDefinite) {
         try {
-            T body = request.get();
+            T body = resilientCall.call(target, kind, request);
             if (body == null) throw unavailable();
             return body;
+        } catch (DownstreamUnavailableException exception) {
+            throw unavailable();
         } catch (RestClientResponseException exception) {
             int status = exception.getStatusCode().value();
             if (status == 402) {
@@ -146,6 +162,10 @@ public class RestHumanReviewClient implements HumanReviewClient {
 
     private static LearningRequestException unavailable() {
         return new LearningRequestException(503, "HUMAN_REVIEW_UNAVAILABLE", "Mentor review is unavailable");
+    }
+
+    private static ResilientCall defaultResilientCall() {
+        return ResilientCall.isolatedDefault();
     }
 
     private record Credits(int remainingCredits, Boolean charged) {}

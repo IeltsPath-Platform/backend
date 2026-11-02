@@ -20,6 +20,20 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME}
     password: ${RABBITMQ_PASSWORD}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+
+# Outbox relay: publishes SubscriptionGranted events to Notification. Other event types stay in the table only.
+access:
+  outbox:
+    relay:
+      enabled: ${ACCESS_OUTBOX_RELAY_ENABLED:true}
+      batch-size: 50
+      max-attempts: 20
+      poll-interval: PT2S
+      confirm-timeout: PT5S
 
 app:
   auth:
@@ -45,7 +59,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,refresh
+        include: health,info,refresh,prometheus
   endpoint:
     health:
       probes:

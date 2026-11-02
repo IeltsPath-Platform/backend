@@ -35,4 +35,8 @@ public class OutboxEventJpaEntity {
     private int retryCount;
     @Column(name = "last_error", columnDefinition = "TEXT")
     private String lastError;
+    @Column(name = "correlation_id", length = 100)
+    private String correlationId;
+    @Column(name = "trace_context")
+    private String traceContext;
 }

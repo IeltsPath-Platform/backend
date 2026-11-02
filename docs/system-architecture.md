@@ -80,6 +80,10 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | learning | LLM (ngoài hệ thống) | `POST {base}/chat/completions` (OpenAI-compatible) khi chấm bài luận, ngoài mọi transaction | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` |
 | assessment | LLM (ngoài hệ thống) | `POST {base}/chat/completions` cho essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE`, ngoài transaction | `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL`; quota ngày `ASSESSMENT_LLM_DAILY_LIMIT` |
 
+Các lời gọi HTTP đồng bộ dùng `shared/common-resilience`: retry tối đa một lần sau 200 ms chỉ cho lỗi kết nối/timeout và HTTP 5xx; chỉ `READ` và `IDEMPOTENT_WRITE` được retry. Circuit breaker dùng chung theo dịch vụ đích (content, access, user, assessment, library, learning, llm), mở 30 giây sau ngưỡng lỗi cấu hình; LLM có semaphore tối đa bốn lời gọi đồng thời. Lỗi breaker/bulkhead được client ánh xạ về contract lỗi của service gọi.
+
+Gateway đặt connect timeout 2 giây và response timeout mặc định 15 giây. Route upload và AI của assessment dùng 120 giây; ba endpoint chấm essay của Learning dùng 60 giây và tier rate limit `ai`; route tạo AI draft của Content dùng 210 giây theo timeout LLM mặc định 180 giây cộng dự phòng retry và gateway.
+
 Assessment, content, game và learning gọi thẳng service đích (không qua Gateway), kèm bearer của request và `X-Correlation-Id`.
 Content dùng timeout kết nối 2 giây, đọc 5 giây khi gọi Library; Library không đáp được thì Content trả 503 mã `VOCABULARY_SERVICE_UNAVAILABLE`. Library không gọi Content. Hai nơi cài snapshot game theo
 cùng [contract](contracts/game-content-snapshot-v1.md). Learning gọi Content qua API nội bộ (Gateway chặn `/internal/**`,
@@ -135,8 +139,35 @@ learning: AssessmentCompletedListener (ack thủ công)
 ```
 
 Contract: [`docs/contracts/assessment-completed-v2.md`](contracts/assessment-completed-v2.md). Bằng chứng gắn với user nên áp
-dụng được ngay, kể cả khi học viên chưa gọi API học. access, content và game có bảng outbox và ghi event nhưng chưa có
-relay, nên các event đó chưa được phát.
+dụng được ngay, kể cả khi học viên chưa gọi API học.
+
+Luồng `SubscriptionGranted` của Access thông báo cho người dùng khi admin cấp Premium:
+
+| Producer | Consumer | Queue / retry / DLQ | Contract |
+| --- | --- | --- | --- |
+| Access `GrantSubscriptionUseCase` ghi `SubscriptionGranted` vào `outbox_events` cùng transaction; `AccessOutboxRelay` publish với confirm tới exchange `access.events`, routing key `access.subscription-granted.v1` | Notification `SubscriptionGrantedListener` gọi `RecordSubscriptionGrantedUseCase`; `eventId` chống ghi thông báo trùng | `notification.subscription-granted.v1`; retry `notification.subscription-granted.v1.retry`; DLQ `notification.subscription-granted.v1.dlq` | [`subscription-granted-v1.md`](contracts/subscription-granted-v1.md) |
+
+Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload hoặc vi phạm contract được dead-letter. Retry queue trả message về đúng exchange nguồn với routing key ban đầu, nên consumer nhận lại đúng contract (`RetryTopologyTest`). Khi Community park message vào DLQ, consumer ghi routing key gốc vào header `x-original-routing-key`, vì routing key của dead-letter là tên DLQ; replay đọc header này để gửi lại đúng đường. Content và Game hiện vẫn ghi outbox cho event riêng nhưng chưa có relay.
+
+### Correlation ID và metric
+
+`common-observability` đặt `correlationId` trong MDC cho mỗi request và chuyển tiếp header `X-Correlation-Id` qua HTTP
+client. Với event đi qua outbox, adapter ghi giá trị MDC vào cột nullable `correlation_id` ngay lúc lưu: `outbox_events`
+ở Assessment, Community, Access và `reward_grants` ở Learning. Relay có thể chạy ở thread khác; publisher đọc id đã lưu
+và gửi header RabbitMQ `x-correlation-id`, không đưa id vào payload. Event cũ hoặc do scheduler tạo không có id thì bỏ
+header; listener tạo context mới và xóa MDC sau khi xử lý.
+
+### Tracing và log tập trung (tùy chọn)
+
+Tracing dùng Micrometer Tracing với OpenTelemetry và gửi OTLP. Mặc định tắt (`TRACING_ENABLED=false`), nên chạy thường không đổi hành vi. Khi bật, Gateway và các service gửi span tới Alloy (`OTLP_TRACES_ENDPOINT`, mặc định `http://alloy:4318/v1/traces`); Alloy chuyển trace tới Tempo. Alloy cũng đọc log container và đẩy vào Loki. Grafana đọc cả Tempo và Loki, nhảy hai chiều giữa log và trace.
+
+- `traceId` nằm trong MDC và log JSON cùng `correlationId`. Hai id này khác nhau, và không id nào là label Loki.
+- Trace context của event qua outbox được lưu trong cột `trace_context` cạnh `correlation_id` (Access V9, Assessment V22, Community V10, Learning V42), rồi đi qua RabbitMQ bằng header W3C `traceparent`.
+- Hạ tầng nằm trong `docker-compose.observability.yml`, chạy cùng `docker-compose.yml` với profile `observability`. Cần `GRAFANA_ADMIN_PASSWORD` trong `.env`. Chỉ Grafana publish cổng, và chỉ trên `127.0.0.1:3000`; Loki, Tempo và Alloy không mở ra host.
+
+Các service Java mở `/actuator/prometheus` trong mạng nội bộ; Gateway không route actuator. Metric
+`dead_letter_messages{queue}` là gauge độ sâu DLQ hiện tại ở Notification, Access và Learning. Nếu broker không trả được
+số lượng, gauge trả `NaN` để biểu thị trạng thái chưa biết.
 
 ## 4. Mô hình bảo mật
 
@@ -258,6 +289,62 @@ trước khi attempt hoàn tất; lần giao được consume cả khi trượt;
 quy tắc tương tự cho `course_test_assignments`; đạt ≥70% ghi `course_progress.passed_at`. ACK sau commit; topic kế trong
 cùng course mở theo trạng thái suy ra khi đọc. Course test không chặn topic hay course khác.
 
+## Scheduler và nhiều instance
+
+Backend hiện có 21 phương thức `@Scheduled` trong 20 job. Cơ chế chống xử lý trùng theo mã đang chạy:
+
+| Service | Job / lịch | Cơ chế cạnh tranh | HTTP/LLM khi giữ khóa hoặc transaction |
+|---|---|---|---|
+| game | `RocketRoundScheduler` | Khóa hàng trận (`FOR UPDATE`) và kiểm trạng thái vòng khi settle; hai lịch trùng không đóng vòng hai lần | Không |
+| game | `SoloTimeoutScheduler` | Khóa trận và người chơi (`FOR UPDATE OF m,p`), kiểm deadline; hai lịch trùng chỉ trừ một mạng | Không |
+| game | `OutboxRetentionJob` | Xóa theo ngưỡng thời gian; chạy lặp an toàn | Không |
+| game | `RoomEventChannelSupervisor` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
+| notification | `NoticePushChannelConfig` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
+| assessment | `OutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn để giữ claim tới khi gửi xong | Broker trong transaction ngắn |
+| access | `AccessOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
+| community | `CommunityOutboxRelayScheduler` | `FOR UPDATE SKIP LOCKED`; publish broker trong transaction ngắn | Broker trong transaction ngắn |
+| assessment | `GateEssayGradingScheduler` | Claim batch bằng `FOR UPDATE SKIP LOCKED` trong transaction; cập nhật job hoàn tất trong transaction riêng | LLM ngoài transaction claim và transaction ghi kết quả |
+| assessment | `GradingDeadlineScheduler` | Store chọn các job bằng `FOR UPDATE SKIP LOCKED`; ghi thông báo/outbox trong transaction | Không |
+| assessment | `SpeakingRecordingRetentionScheduler` | Xóa theo ngưỡng thời gian; chạy lặp an toàn | Không |
+| content | `ScheduledPublishJob` | Advisory lock tránh hai instance publish cùng đợt | Không |
+| content | `AiDraftScheduler` | Claim bản nháp bằng `FOR UPDATE SKIP LOCKED`, commit claim trước khi gọi generator; lưu kết quả riêng | Generator/LLM ngoài transaction claim |
+| learning | `LeagueCloseJob` | Advisory transaction lock quanh cập nhật tuần | Không |
+| learning | `InactivityFlagJob` | Advisory transaction lock quanh tính và ghi cờ | Không |
+| learning | `SnapshotJob` (weekly) | Advisory transaction lock theo kỳ snapshot | Không |
+| learning | `SnapshotJob` (monthly) | Advisory transaction lock theo kỳ snapshot | Không |
+| learning | `RewardGrantRelayJob` | Advisory transaction lock và `SKIP LOCKED` cho batch | Broker trong transaction ngắn |
+| learning | `MasteryDecayJob` | Session advisory lock; các batch ghi theo transaction riêng | Không |
+| learning | `WorkItemSyncJob` | Đọc nguồn và lấy metadata Content trước; transaction ngắn lấy advisory lock rồi ghi snapshot; unique key loại mục trùng | Content HTTP ngoài transaction/khóa |
+| user | `LoginHistoryPurgeScheduler` | Xóa theo cutoff thời gian; chạy lặp an toàn | Không |
+
+Game không cần thêm claim riêng: hàng trận được khóa trước khi cập nhật và trạng thái được kiểm lại. Relay dùng row claim để instance khác có thể xử lý các hàng còn lại. Việc đọc nguồn của `WorkItemSyncJob` có thể chạy đồng thời; phần ghi được tuần tự hóa và repository bỏ qua work item đã tồn tại.
+
+Redis pub/sub của `game.room-events` và `notification.push` là kênh đẩy không bền; API/DB vẫn là nguồn dữ liệu. Vé WebSocket game lưu với TTL dưới `game:ws-ticket:*`. Compose cho phép scale service ứng dụng bằng `--scale` vì không gán `container_name` và không bind các cổng nội bộ ra host; gateway vẫn chạy một instance.
+
+## Dừng một instance
+
+Các service Spring dùng graceful shutdown 30 giây; scheduler đợi công việc đang chạy tối đa 20 giây. Compose đặt
+`stop_grace_period: 40s`, đủ cho khoảng drain của Spring và thời gian kết thúc JVM. Eureka server cập nhật cache mỗi
+3 giây, quét instance hết hạn mỗi 5 giây; client fetch registry mỗi 5 giây với heartbeat 10 giây và lease 30 giây.
+Gateway cache danh sách instance 5 giây. JVM của service dùng DNS TTL 5 giây cho các hostname trong Compose.
+
+Các giá trị này rút ngắn thời gian gửi request tới replica đang dừng nhưng Compose không bảo đảm zero-downtime. Khi
+deploy VPS, reverse proxy cần health check chủ động, loại instance khỏi pool trước khi dừng và lần lượt thay replica;
+cần đặt thời gian drain cho proxy và xử lý riêng kết nối WebSocket. Chưa có phép đo stack thật cho cửa sổ định tuyến;
+Claude sẽ ghi số request lỗi và thời gian dừng tới lỗi cuối sau khi chạy phép đo nhiều replica.
+
+## Kiểm chứng reliability
+
+| Kịch bản | Kiểm chứng tự động hiện có hoặc được thêm | Ranh giới |
+|---|---|---|
+| Server và scheduler chờ công việc trước khi dừng | `GracefulShutdownTest`, `SchedulerShutdownTest` | Kiểm tra config repo và scheduler đang chạy |
+| Subscription grant nhận lại cùng khóa | `GrantSubscriptionIdempotencyTest` | PostgreSQL Testcontainers, gồm cạnh tranh và outbox |
+| Mở breaker và hồi phục downstream | `RestLearningContentClientResilienceTest`, `ResilientCallTest` | Unit/integration test; phép dừng service qua gateway vẫn cần kiểm tay |
+| Correlation HTTP → downstream content/assessment → outbox → relay → consumer | `CorrelationAcrossServicesReliabilityTest.sameCorrelationIdInHttpAndConsumerLogs`; `CommunityOutboxRelayIntegrationTest.correlationSurvivesHttpOutboxRelayAndBrokerConsumerLogs` | Learning kiểm hai HTTP client, reward outbox production, relay/publisher production và log consumer với PostgreSQL/RabbitMQ Testcontainers; Community kiểm luồng outbox riêng |
+| Auth endpoint rate-limit mapping | `AuthRouteConsistencyTest` | `/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password`, `/api/users/register` thuộc tier `auth`; `/auth/logout` thuộc tier `default` |
+| Message được retry và đưa lại từ DLQ | `SubscriptionGrantedBrokerIntegrationTest`, `ReplayedMessageIsProcessedTest` | RabbitMQ Testcontainers |
+| Dừng một replica còn replica khác | Phép đo in-flight và tải Compose trong report E; trạng thái idempotent được đối chiếu bằng `OutboxRelayConcurrencyTest`, `CommunityOutboxRelayConcurrencyTest`, `GrantSubscriptionIdempotencyTest.concurrentSameKeyGrantsOnce`, `UnlockCourseFailureWindowTest.retryWithSameKeyWhilePendingDoesNotCreateIntent` | Request đang xử lý hoàn tất 200 và replica còn lại tiếp tục phục vụ; kiểm tra idempotency chạy riêng, không gộp vào cùng phép dừng replica |
+
 ## 7. Chạy local (tóm tắt)
 
 - Root `docker-compose.yml` khởi chạy PostgreSQL, RabbitMQ, Config Server, Eureka, Gateway và tất cả service đã triển khai.
@@ -297,6 +384,19 @@ Không có ADR chính thức; các quyết định sau suy ra từ code, README 
 | Shared auto-configuration | `common-security` |
 | Global exception handler → `ErrorResponse` | Service Java |
 | WebSocket với ticket ngắn hạn | game |
+| Rate limit dùng chung qua Redis | API Gateway, user-service, community-service |
+
+Rate limit được cấu hình trong `infra/config-server/config-repo/api-gateway.yaml` theo các tier `auth`,
+`upload`, `ai` và `default`; mỗi tier có `replenishRate` (token/giây) và `burstCapacity`. Gateway ưu tiên
+khóa theo subject của JWT; request ẩn danh dùng IP, chỉ tin `X-Forwarded-For` từ proxy thuộc
+`gateway.rate-limit.trusted-proxies`. Với header được tin, gateway duyệt các hop từ phải sang trái, bỏ qua proxy
+được tin cậy và chọn IP đầu tiên không thuộc danh sách; nếu không còn IP phù hợp thì dùng remote address.
+Tier `auth` áp dụng cho `/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password` và
+`/api/users/register`; `/auth/logout` thuộc tier `default`. Redis dùng chung trạng thái giữa các gateway instance. Khi Redis lỗi,
+gateway cho request thường đi tiếp và ghi metric cảnh báo; login bị fail-closed với HTTP 503 để tránh bỏ qua
+giới hạn đăng nhập. Upload avatar, media và ảnh community dùng Redis limiter riêng theo user, với mức lần
+lượt 10, 30 và 30 upload mỗi giờ; lỗi Redis ở các limiter upload được fail-open để lỗi hạ tầng không chặn
+hoạt động upload.
 
 ## 10. Bài học kỹ thuật
 

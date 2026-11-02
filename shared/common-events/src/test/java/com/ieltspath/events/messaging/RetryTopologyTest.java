@@ -18,6 +18,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RetryTopologyTest {
     @Test
+    void retryQueueReturnsToTheSourceExchangeWithTheOriginalRoutingKey() {
+        TopicExchange source = new TopicExchange("learning.points", true, false);
+        Declarables topology = RetryTopology.of(new RetryTopology.Names("queue", "queue.retry", "queue.dlq", "queue.dlx"),
+                30_000L, source, "points.grant.settled");
+        Queue retry = topology.getDeclarablesByType(Queue.class).stream()
+                .filter(queue -> queue.getName().equals("queue.retry")).findFirst().orElseThrow();
+
+        assertEquals("learning.points", retry.getArguments().get("x-dead-letter-exchange"));
+        assertEquals("points.grant.settled", retry.getArguments().get("x-dead-letter-routing-key"));
+    }
+
+    @Test
     void requestedGrantKeepsItsBrokerArguments() {
         assertTopology("access.points-grant", "access.points-grant.retry", "access.points-grant.dlq",
                 "access.points-grant.dlx", "points.grant.requested");
@@ -39,8 +51,8 @@ class RetryTopologyTest {
         assertEquals(Set.of(queue, retryQueue, dlq), queues.keySet());
         assertEquals(Map.of("x-dead-letter-exchange", dlx, "x-dead-letter-routing-key", dlq),
                 queues.get(queue).getArguments());
-        assertEquals(Map.of("x-message-ttl", 30000, "x-dead-letter-exchange", "",
-                "x-dead-letter-routing-key", queue), queues.get(retryQueue).getArguments());
+        assertEquals(Map.of("x-message-ttl", 30000, "x-dead-letter-exchange", "learning.points",
+                "x-dead-letter-routing-key", routingKey), queues.get(retryQueue).getArguments());
         assertEquals(Map.of(), queues.get(dlq).getArguments());
         queues.values().forEach(q -> {
             assertTrue(q.isDurable());
