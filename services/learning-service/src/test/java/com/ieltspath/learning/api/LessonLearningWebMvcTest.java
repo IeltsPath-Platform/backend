@@ -31,6 +31,7 @@ import com.ieltspath.learning.application.usecase.SubmitReviewUseCase;
 import com.ieltspath.learning.application.usecase.SubmitTheoryCheckUseCase;
 import com.ieltspath.learning.domain.exception.LearningGateException;
 import com.ieltspath.learning.domain.vo.LearningSkill;
+import com.ieltspath.learning.domain.vo.PracticeSubmission;
 import com.ieltspath.learning.domain.vo.PendingReview;
 import com.ieltspath.learning.domain.vo.ReviewListEntry;
 import com.ieltspath.learning.domain.vo.ReviewStage;
@@ -145,6 +146,24 @@ class LessonLearningWebMvcTest {
         assertFalse(started.toString().contains("explanation"));
         assertFalse(fetched.toString().contains("answerSpec"));
         assertFalse(fetched.toString().contains("explanation"));
+    }
+
+    @Test
+    void practiceSubmissionResponseSaysWhetherACreatedReviewBlocks() throws Exception {
+        UUID attemptId = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+        UUID kpId = UUID.randomUUID();
+        when(submitPractice.execute(eq(USER), eq(attemptId), any())).thenReturn(new PracticeSubmission(attemptId,
+                1, 2, 0.5, false, true, List.of(), null,
+                List.of(new PracticeSubmission.ReviewCreated(reviewId, kpId, "PRACTICE", false))));
+        String request = json.writeValueAsString(Map.of("requestId", REQUEST,
+                "answers", List.of(Map.of("questionVersionId", QUESTION, "answer", "A"))));
+
+        mvc.perform(authenticated(post("/api/learning/practice-attempts/{id}/submissions", attemptId)
+                        .contentType(MediaType.APPLICATION_JSON).content(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reviewsCreated[0].blocking").value(false))
+                .andExpect(jsonPath("$.reviewsCreated[0].stage").value("PRACTICE"));
     }
 
     @Test

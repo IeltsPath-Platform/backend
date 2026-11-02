@@ -70,7 +70,6 @@ public class JdbcPracticeAttemptRepository implements PracticeAttemptRepository 
                 FROM practice_attempts
                 WHERE user_id = :userId AND lesson_id IN (:lessonIds)
                   AND submitted_at IS NOT NULL AND counted_as_evidence = TRUE
-                  AND (passed = TRUE OR cardinality(passed_skills) > 0)
                 """;
         Map<String, Object> params = new HashMap<>();
         params.put("userId", userId);
