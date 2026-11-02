@@ -180,7 +180,10 @@ class MultiSkillLessonIntegrationTest {
                 .map(PracticeSubmission.ReviewCreated::knowledgePointId).toList());
         assertEquals("LISTENING", jdbc.queryForObject("SELECT skill FROM review_items WHERE user_id = ? "
                 + "AND knowledge_point_id = ?", String.class, USER, KP_LISTENING));
-        assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(USER, MIXED).practiceStatus());
+        assertFalse(result.reviewsCreated().getFirst().blocking());
+        var catalog = practiceSets.execute(USER, MIXED);
+        assertEquals(PracticeStatus.PASSED, catalog.practiceStatus());
+        assertEquals(PracticePassReason.ATTEMPT_NOT_BLOCKED, catalog.practicePassReason());
     }
 
     @Test

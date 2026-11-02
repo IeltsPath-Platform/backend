@@ -21,12 +21,14 @@ import java.util.stream.Collectors;
  *
  * <p>A skill (or the whole lesson) cleared through reviews needs at least one review of it and none still PENDING:
  * a finished review next to an open one does not clear the Practice. A DONE and a SKIPPED review (no package left)
- * both count as finished.
+ * both count as finished. A counted failed attempt with no pending blocking review clears softly as
+ * {@code ATTEMPT_NOT_BLOCKED}; that reason is derived on each read and is never stored.
  */
 public final class PracticeClearance {
     private static final Set<LearningSkill> OPTIONAL = EnumSet.of(LearningSkill.WRITING);
     private static final List<PracticePassReason> STRENGTH = List.of(PracticePassReason.FIRST_SUBMISSION,
-            PracticePassReason.REVIEW_FINISHED, PracticePassReason.ALL_SETS_ATTEMPTED);
+            PracticePassReason.REVIEW_FINISHED, PracticePassReason.ALL_SETS_ATTEMPTED,
+            PracticePassReason.ATTEMPT_NOT_BLOCKED);
 
     public Clearance derive(boolean lessonCompleted, Set<UUID> publishedPackages, List<AttemptFact> attempts,
                             Set<UUID> revealedPackages, List<ReviewFact> reviews, PracticePassReason stored) {
@@ -70,6 +72,12 @@ public final class PracticeClearance {
         boolean nonePending = ofSkill.stream().noneMatch(review -> review.status() == ReviewStatus.PENDING);
         if (!ofSkill.isEmpty() && nonePending) return PracticePassReason.REVIEW_FINISHED;
         if (revealed.containsAll(sets) && nonePending) return PracticePassReason.ALL_SETS_ATTEMPTED;
+        boolean noBlockingPending = ofSkill.stream()
+                .noneMatch(review -> review.status() == ReviewStatus.PENDING && review.blocking());
+        boolean failedHere = attempts.stream().anyMatch(attempt -> attempt.countedAsEvidence()
+                && sets.contains(attempt.packageId()) && !attempt.passedSkills().contains(skill));
+        // A failed first try with nothing blocking lets the learner go on; suggested reviews do not hold it back.
+        if (failedHere && noBlockingPending) return PracticePassReason.ATTEMPT_NOT_BLOCKED;
         return null;
     }
 
@@ -86,6 +94,11 @@ public final class PracticeClearance {
             return new Clearance(PracticeStatus.PASSED, PracticePassReason.ALL_SETS_ATTEMPTED);
         }
         if (publishedPackages.isEmpty()) return new Clearance(PracticeStatus.PASSED, PracticePassReason.NO_PRACTICE);
+        boolean noBlockingPending = reviews.stream()
+                .noneMatch(review -> review.status() == ReviewStatus.PENDING && review.blocking());
+        if (noBlockingPending && attempts.stream().anyMatch(attempt -> attempt.countedAsEvidence() && !attempt.passed())) {
+            return new Clearance(PracticeStatus.PASSED, PracticePassReason.ATTEMPT_NOT_BLOCKED);
+        }
         return new Clearance(PracticeStatus.REQUIRED, null);
     }
 
@@ -97,9 +110,10 @@ public final class PracticeClearance {
     }
 
     /** {@code skill} is the skill of the review's knowledge point; null for reviews created before skills. */
-    public record ReviewFact(ReviewStatus status, LearningSkill skill) {
+    public record ReviewFact(ReviewStatus status, LearningSkill skill, boolean blocking) {
+        public ReviewFact(ReviewStatus status, LearningSkill skill) { this(status, skill, true); }
         public ReviewFact(ReviewStatus status) {
-            this(status, null);
+            this(status, null, true);
         }
     }
 
