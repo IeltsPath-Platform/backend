@@ -38,7 +38,8 @@ import static org.mockito.Mockito.verify;
         "spring.jpa.hibernate.ddl-auto=validate", "spring.jpa.open-in-view=false",
         "management.health.rabbit.enabled=false", "learning.messaging.consumer-enabled=false",
         "learning.mastery.backfill-on-startup=false", "learning.league.close-enabled=false",
-        "learning.rewards.relay-enabled=false", "app.auth.internal-jwt-issuer=urn:code-base:api-gateway"
+        "learning.rewards.relay-enabled=false", "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
+        "management.tracing.enabled=false"
 })
 @Testcontainers(disabledWithoutDocker = true)
 class RewardGrantRelayIntegrationTest {
@@ -74,6 +75,8 @@ class RewardGrantRelayIntegrationTest {
     @Test
     void aNewGrantIsSentOnceAndNotAgainBeforeTheResendDelay() {
         grants.enqueue(user, "STREAK_MILESTONE", "2026-10-01:7", 10);
+
+        assertNull(jdbc.queryForObject("SELECT trace_context FROM reward_grants", String.class));
 
         assertEquals(1, relay.runOnce());
         assertEquals(0, relay.runOnce());

@@ -78,11 +78,18 @@ class PointsGrantDeadLetterBrokerTest {
     }
 
     private void send(UUID grantId, String messageId) {
+        send(grantId, messageId, null, null);
+    }
+
+    private void send(UUID grantId, String messageId, String traceparent, String correlationId) {
         String body = "{\"grantId\":\"" + grantId + "\",\"userId\":\"" + UUID.randomUUID()
                 + "\",\"amount\":3,\"reason\":\"DAILY_QUEST\",\"referenceId\":\"quest:1\"}";
+        var builder = MessageBuilder.withBody(body.getBytes(StandardCharsets.UTF_8)).setContentType("application/json")
+                .setMessageId(messageId);
+        if (traceparent != null) builder.setHeader("traceparent", traceparent);
+        if (correlationId != null) builder.setHeader("x-correlation-id", correlationId);
         rabbit.send(PointsGrantMessaging.EXCHANGE, PointsGrantMessaging.REQUESTED_ROUTING_KEY,
-                MessageBuilder.withBody(body.getBytes(StandardCharsets.UTF_8)).setContentType("application/json")
-                        .setMessageId(messageId).build());
+                builder.build());
     }
 
     private void creditFailsFor(UUID grantId, RuntimeException failure) {
@@ -113,13 +120,16 @@ class PointsGrantDeadLetterBrokerTest {
         when(credits.executeLearningReward(eq(healthy), any(), anyInt(), any(LearningRewardReason.class), anyString()))
                 .thenReturn(new PointCreditResult(3, false, 3, UUID.randomUUID()));
 
-        send(flaky, "message-" + flaky);
+        String traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+        send(flaky, "message-" + flaky, traceparent, "retry-correlation-42");
         send(healthy);
 
         Message parked = rabbit.receive(LearningPointsMessagingConfig.GRANT_RETRY_QUEUE, WAIT.toMillis());
         assertNotNull(parked, "the failing message waits on the retry queue");
         assertEquals(1, ((Number) parked.getMessageProperties().getHeader(MessageHeaders.RETRY_COUNT)).intValue());
         assertEquals("message-" + flaky, parked.getMessageProperties().getMessageId(), "same message, same grant id");
+        assertEquals(traceparent, parked.getMessageProperties().getHeader("traceparent"));
+        assertEquals("retry-correlation-42", parked.getMessageProperties().getHeader("x-correlation-id"));
         assertEquals(true, new String(parked.getBody(), StandardCharsets.UTF_8).contains(flaky.toString()));
         verify(credits, timeout(WAIT.toMillis())).executeLearningReward(eq(healthy), any(), anyInt(),
                 any(LearningRewardReason.class), anyString());
