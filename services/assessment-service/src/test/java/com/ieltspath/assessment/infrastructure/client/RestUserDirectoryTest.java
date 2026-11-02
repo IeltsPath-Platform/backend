@@ -66,7 +66,7 @@ class RestUserDirectoryTest {
     @Test
     void moreThanFiftyIdsAreSentInBatches() {
         List<UUID> ids = IntStream.range(0, 120).mapToObj(i -> UUID.randomUUID()).toList();
-        server.expect(org.springframework.test.web.client.ExpectedCount.times(3),
+        server.expect(org.springframework.test.web.client.ExpectedCount.times(2),
                         requestTo(BASE_URL + "/internal/users/display-names"))
                 .andRespond(withSuccess("{\"items\":[]}", MediaType.APPLICATION_JSON));
 
@@ -90,7 +90,8 @@ class RestUserDirectoryTest {
     @Test
     void aFailureMeansNoNamesAtAll() {
         UUID a = UUID.randomUUID();
-        server.expect(requestTo(BASE_URL + "/internal/users/display-names")).andRespond(withServerError());
+        server.expect(org.springframework.test.web.client.ExpectedCount.times(2),
+                requestTo(BASE_URL + "/internal/users/display-names")).andRespond(withServerError());
 
         assertTrue(directory.displayNames(List.of(a)).isEmpty());
     }

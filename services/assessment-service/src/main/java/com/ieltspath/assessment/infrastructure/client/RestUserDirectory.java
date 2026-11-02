@@ -1,6 +1,8 @@
 package com.ieltspath.assessment.infrastructure.client;
 
 import com.ieltspath.assessment.application.port.UserDirectory;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.ResilientCall;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,18 +31,26 @@ public class RestUserDirectory implements UserDirectory {
     static final int BATCH_SIZE = 50;
 
     private final RestClient restClient;
+    private final ResilientCall resilientCall;
 
     @Autowired
     public RestUserDirectory(RestClient.Builder builder,
-                             @Value("${assessment.user.base-url:http://localhost:8085}") String userBaseUrl) {
+                             @Value("${assessment.user.base-url:http://localhost:8085}") String userBaseUrl,
+                             ResilientCall resilientCall) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
         requestFactory.setReadTimeout(Duration.ofSeconds(3));
         this.restClient = builder.requestFactory(requestFactory).baseUrl(userBaseUrl).build();
+        this.resilientCall = resilientCall;
     }
 
     RestUserDirectory(RestClient restClient) {
+        this(restClient, ResilientCall.isolatedDefault());
+    }
+
+    RestUserDirectory(RestClient restClient, ResilientCall resilientCall) {
         this.restClient = restClient;
+        this.resilientCall = resilientCall;
     }
 
     @Override
@@ -53,10 +63,11 @@ public class RestUserDirectory implements UserDirectory {
             String correlationId = GatewayRequestContext.correlationId();
             for (int from = 0; from < ids.size(); from += BATCH_SIZE) {
                 List<UUID> batch = ids.subList(from, Math.min(ids.size(), from + BATCH_SIZE));
-                Response response = restClient.post().uri("/internal/users/display-names")
+                Response response = resilientCall.call("user", CallKind.READ, () -> restClient.post()
+                        .uri("/internal/users/display-names")
                         .header(HttpHeaders.AUTHORIZATION, bearer)
                         .header("X-Correlation-Id", correlationId)
-                        .body(new Request(List.copyOf(batch))).retrieve().body(Response.class);
+                        .body(new Request(List.copyOf(batch))).retrieve().body(Response.class));
                 if (response != null && response.items() != null) {
                     for (Item item : response.items()) {
                         if (item.id() != null && item.displayName() != null) names.put(item.id(), item.displayName());
