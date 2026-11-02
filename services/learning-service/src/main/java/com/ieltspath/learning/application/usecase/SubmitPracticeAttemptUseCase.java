@@ -209,7 +209,7 @@ public class SubmitPracticeAttemptUseCase {
                 var start = ReviewRule.initialStage(need.kpPercent(), wrongInLesson.contains(need.knowledgePointId()));
                 return new PracticeReviewCandidate(UUID.randomUUID(), attempt.lessonId(), need.knowledgePointId(),
                         kpSkills.getOrDefault(need.knowledgePointId(), attempt.skill()), attempt.id(), need.kpPercent(),
-                        start.stage(), start.theoryReason());
+                        start.stage(), start.theoryReason(), true);
             }).toList();
         }
         String transcript = ItemGrading.orderedSections(version).stream().filter(section -> section.audio() != null)
