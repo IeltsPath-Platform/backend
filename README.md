@@ -17,6 +17,8 @@ IELTSPath là backend microservices gồm các dịch vụ **Java 21 / Spring Cl
 | **Security & Auth**   | Spring Security & OAuth2 (Reactive)     | 3.5.14               | Xử lý token JWT và Context người dùng bất đồng bộ                                                                               |
 | **Shared Storage**    | Custom`common-storage`                | 1.0-SNAPSHOT         | Module dùng chung: `ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy` |
 | **Shared Common**     | `common-security`, `common-events` | 1.0-SNAPSHOT | Security servlet; tên exchange/routing key/header, record payload và helper retry AMQP dùng chung |
+| **Resilience**        | Resilience4j (`common-resilience`)      | 2.4.0                | Circuit breaker, retry và bulkhead cho lời gọi HTTP giữa service (`ResilientCall`) |
+| **Observability**     | Micrometer, Micrometer Tracing + OpenTelemetry (`common-observability`) | BOM của Spring Boot | Metric Prometheus, `correlationId` trong log JSON, trace OTLP tùy chọn |
 | **Database**          | PostgreSQL                              | 15-alpine            | Hệ quản trị cơ sở dữ liệu quan hệ                                                                                                 |
 | **Containerization**  | Docker & Docker Compose                 | Latest               | Đóng gói và chạy môi trường hạ tầng nhanh chóng                                                                                |
 | **Build Tool**        | Maven                                   | Maven 3.9+           | Maven multi-module cho mọi service                                                                                    |
@@ -25,7 +27,7 @@ IELTSPath là backend microservices gồm các dịch vụ **Java 21 / Spring Cl
 
 ## 📁 Cấu Trúc Dự Án (Project Architecture)
 
-Reactor **Maven Multi-module** gồm 14 module: 3 infra, 2 shared và 9 business.
+Reactor **Maven Multi-module** gồm 17 module: 3 infra, 5 shared và 9 business.
 
 ```text
 IELTSPath/

@@ -147,7 +147,7 @@ Luồng `SubscriptionGranted` của Access thông báo cho người dùng khi ad
 | --- | --- | --- | --- |
 | Access `GrantSubscriptionUseCase` ghi `SubscriptionGranted` vào `outbox_events` cùng transaction; `AccessOutboxRelay` publish với confirm tới exchange `access.events`, routing key `access.subscription-granted.v1` | Notification `SubscriptionGrantedListener` gọi `RecordSubscriptionGrantedUseCase`; `eventId` chống ghi thông báo trùng | `notification.subscription-granted.v1`; retry `notification.subscription-granted.v1.retry`; DLQ `notification.subscription-granted.v1.dlq` | [`subscription-granted-v1.md`](contracts/subscription-granted-v1.md) |
 
-Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload hoặc vi phạm contract được dead-letter. Kiểm thử integration hiện phát hiện lần trả message từ retry queue không giữ routing key ban đầu, khiến consumer từ chối contract và dead-letter lần retry; luồng này cần sửa trước khi coi retry là hoạt động đúng. Content và Game hiện vẫn ghi outbox cho event riêng nhưng chưa có relay.
+Lỗi xử lý tạm thời được chuyển qua retry queue; lỗi payload hoặc vi phạm contract được dead-letter. Retry queue trả message về đúng exchange nguồn với routing key ban đầu, nên consumer nhận lại đúng contract (`RetryTopologyTest`). Khi Community park message vào DLQ, consumer ghi routing key gốc vào header `x-original-routing-key`, vì routing key của dead-letter là tên DLQ; replay đọc header này để gửi lại đúng đường. Content và Game hiện vẫn ghi outbox cho event riêng nhưng chưa có relay.
 
 ### Correlation ID và metric
 
@@ -156,6 +156,14 @@ client. Với event đi qua outbox, adapter ghi giá trị MDC vào cột nullab
 ở Assessment, Community, Access và `reward_grants` ở Learning. Relay có thể chạy ở thread khác; publisher đọc id đã lưu
 và gửi header RabbitMQ `x-correlation-id`, không đưa id vào payload. Event cũ hoặc do scheduler tạo không có id thì bỏ
 header; listener tạo context mới và xóa MDC sau khi xử lý.
+
+### Tracing và log tập trung (tùy chọn)
+
+Tracing dùng Micrometer Tracing với OpenTelemetry và gửi OTLP. Mặc định tắt (`TRACING_ENABLED=false`), nên chạy thường không đổi hành vi. Khi bật, Gateway và các service gửi span tới Alloy (`OTLP_TRACES_ENDPOINT`, mặc định `http://alloy:4318/v1/traces`); Alloy chuyển trace tới Tempo. Alloy cũng đọc log container và đẩy vào Loki. Grafana đọc cả Tempo và Loki, nhảy hai chiều giữa log và trace.
+
+- `traceId` nằm trong MDC và log JSON cùng `correlationId`. Hai id này khác nhau, và không id nào là label Loki.
+- Trace context của event qua outbox được lưu trong cột `trace_context` cạnh `correlation_id` (Access V9, Assessment V22, Community V10, Learning V42), rồi đi qua RabbitMQ bằng header W3C `traceparent`.
+- Hạ tầng nằm trong `docker-compose.observability.yml`, chạy cùng `docker-compose.yml` với profile `observability`. Cần `GRAFANA_ADMIN_PASSWORD` trong `.env`. Chỉ Grafana publish cổng, và chỉ trên `127.0.0.1:3000`; Loki, Tempo và Alloy không mở ra host.
 
 Các service Java mở `/actuator/prometheus` trong mạng nội bộ; Gateway không route actuator. Metric
 `dead_letter_messages{queue}` là gauge độ sâu DLQ hiện tại ở Notification, Access và Learning. Nếu broker không trả được

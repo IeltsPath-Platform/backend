@@ -30,3 +30,8 @@ service declares are accepted; any other name returns 404.
 - The replay takes each message without auto-acknowledgement and acknowledges it only after the broker confirms the
   republished copy. A broker failure leaves the message where it was.
 - Each call is logged with the queue name and the counts, never the message body.
+- A replay can deliver a message a second time, when the first delivery was processed but its acknowledgement was lost. A
+  message that reaches the same queue again must be handled by an idempotent consumer, keyed on the event id.
+- A route that sends messages back through a shared exchange (`DeadLetterRoute.byOriginalRoutingKey`) needs the original
+  routing key. The consumer records it in the `x-original-routing-key` header when it parks the message. A message parked
+  before that header existed fails its replay and stays in the dead-letter queue.

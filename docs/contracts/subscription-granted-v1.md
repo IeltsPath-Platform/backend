@@ -26,6 +26,18 @@ routed it to a queue. The AMQP `message-id` is the `eventId`.
 - Only grants made through the administrator endpoint are announced. Other outbox event types in Access (point debits, human
   grading credits) are stored as `NOT_RELAYED` and never leave the service.
 
+## Granting: `Idempotency-Key`
+
+`POST /api/access/admin/subscriptions/grant` requires an `Idempotency-Key` header of 1 to 100 characters. The key is what
+makes a retried grant safe.
+
+- Same key, same payload (user, plan, duration, grading credits): returns the first result. The subscription is not extended
+  again and no second event is written.
+- Same key, different payload: `409 Conflict`.
+- Missing, blank or longer than 100 characters: `400` with code `IDEMPOTENCY_KEY_REQUIRED`.
+- Two requests with the same key at the same time: the second waits for the first to commit, then returns the same result.
+  Neither fails.
+
 ## Queue topology
 
 Queue `notification.subscription-granted.v1`, retry queue `….retry` (30 second delay), dead-letter queue `….dlq`, at most

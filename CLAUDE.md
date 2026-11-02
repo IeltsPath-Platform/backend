@@ -17,7 +17,7 @@ và DLQ). Mỗi service sở hữu một PostgreSQL DB.
 
 ## 2. Module
 
-Reactor gồm 14 module: 3 infra, 2 shared, 9 business. Hai module shared là thư viện, không deploy độc lập.
+Reactor gồm 17 module: 3 infra, 5 shared, 9 business. Năm module shared là thư viện, không deploy độc lập.
 
 | Module | Ngôn ngữ | Cổng | DB (nơi chạy) | Route Gateway |
 | --- | --- | --- | --- | --- |

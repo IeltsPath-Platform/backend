@@ -41,7 +41,7 @@ phần hạ tầng hoặc architectural pattern mới nếu chưa được phê 
 
 | Khu vực | Công nghệ đã được xác minh |
 | --- | --- |
-| Java build | Java 21; Maven multi-module (15 module trong reactor: 3 infra, 3 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
+| Java build | Java 21; Maven multi-module (17 module trong reactor: 3 infra, 5 shared, 9 business); Maven Compiler Plugin 3.14.0; Surefire 3.5.3 ở module đã cấu hình. |
 | Java framework | Spring Boot 3.5.14; Spring Cloud 2025.0.0 (Config, Netflix Eureka, Gateway Server WebFlux + Reactor). |
 | Persistence (Java) | Spring Data JPA, Hibernate, PostgreSQL JDBC, Flyway (chạy khi service khởi động). |
 | Bảo mật | Spring Security, OAuth2 Resource Server, Nimbus JWT, HMAC-SHA256 JWT, BCrypt. |
