@@ -39,7 +39,7 @@ import static org.mockito.Mockito.verify;
         "management.health.rabbit.enabled=false", "learning.messaging.consumer-enabled=false",
         "learning.mastery.backfill-on-startup=false", "learning.league.close-enabled=false",
         "learning.rewards.relay-enabled=false", "app.auth.internal-jwt-issuer=urn:code-base:api-gateway",
-        "management.tracing.enabled=false"
+        "TRACING_ENABLED=false", "management.tracing.enabled=${TRACING_ENABLED:false}"
 })
 @Testcontainers(disabledWithoutDocker = true)
 class RewardGrantRelayIntegrationTest {

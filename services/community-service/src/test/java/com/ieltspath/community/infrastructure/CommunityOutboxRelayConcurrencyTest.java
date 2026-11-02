@@ -92,7 +92,7 @@ class CommunityOutboxRelayConcurrencyTest {
         jdbc.execute("CREATE TABLE outbox_events(id UUID PRIMARY KEY, event_type VARCHAR(100) NOT NULL, "
                 + "payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL, published_at TIMESTAMPTZ, "
                 + "next_attempt_at TIMESTAMPTZ, retry_count INTEGER NOT NULL DEFAULT 0, last_error TEXT, failed_at TIMESTAMPTZ, "
-                + "correlation_id VARCHAR(100))");
+                + "correlation_id VARCHAR(100), trace_context TEXT)");
         return jdbc;
     }
 

@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @SpringBootTest(properties = {
         "spring.cloud.config.enabled=false", "spring.config.import=", "eureka.client.enabled=false",
         "access.outbox.relay.enabled=false",
+        "spring.rabbitmq.listener.simple.auto-startup=false",
         "app.auth.internal-jwt-issuer=urn:test:gateway",
         "app.auth.internal-jwt-secret=dGVzdC1vbmx5LWludGVybmFsLWp3dC1zaWduaW5nLWtleQ==",
         "spring.rabbitmq.publisher-confirm-type=correlated", "spring.rabbitmq.publisher-returns=true",

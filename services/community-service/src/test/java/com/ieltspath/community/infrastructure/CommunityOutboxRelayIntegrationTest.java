@@ -9,6 +9,8 @@ import com.ieltspath.commonobservability.CorrelationIdFilter;
 import com.ieltspath.commonobservability.CorrelationListenerAdvice;
 import com.ieltspath.commonobservability.OutboxTraceContext;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.MDC;
 import org.slf4j.LoggerFactory;
 import ch.qos.logback.classic.Logger;
@@ -33,7 +35,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
-import org.springframework.boot.SpringBootConfiguration;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import io.micrometer.tracing.Span;
@@ -67,10 +69,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @AutoConfigureObservability
 @SpringBootTest(classes = CommunityOutboxRelayIntegrationTest.Application.class, properties = {
         "management.tracing.enabled=true", "management.tracing.sampling.probability=1.0",
-        "spring.cloud.config.enabled=false", "spring.config.import=", "eureka.client.enabled=false"
+        "spring.cloud.config.enabled=false", "spring.config.import=", "eureka.client.enabled=false",
+        "app.auth.internal-jwt-issuer=urn:test:gateway", "app.auth.internal-jwt-secret=dGVzdC1vbmx5LWludGVybmFsLWp3dC1zaWduaW5nLWtleQ=="
 })
 class CommunityOutboxRelayIntegrationTest {
-    @SpringBootConfiguration
+    @Configuration
     @EnableAutoConfiguration
     static class Application { }
 
@@ -240,7 +243,10 @@ class CommunityOutboxRelayIntegrationTest {
         var connection = new CachingConnectionFactory(RABBIT.getHost(), RABBIT.getMappedPort(5672));
         connection.setUsername("test");
         connection.setPassword("test");
+        connection.setPublisherConfirmType(CachingConnectionFactory.ConfirmType.CORRELATED);
+        connection.setPublisherReturns(true);
         var rabbit = new RabbitTemplate(connection);
+        rabbit.setMandatory(true);
         var admin = new RabbitAdmin(connection);
         var exchange = new TopicExchange(CommunityMessaging.EXCHANGE, true, false);
         var queue = new Queue("community.events.legacy." + UUID.randomUUID(), true, false, false);
@@ -263,8 +269,9 @@ class CommunityOutboxRelayIntegrationTest {
         connection.destroy();
     }
 
-    @Test
-    void requestTraceSurvivesOutboxScheduledRelayRabbitAndConsumerRetry() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void requestTraceSurvivesScheduledOutboxRelayRabbitAndConsumer(boolean failOnce) throws Exception {
         var jdbc = outboxTable();
         var connection = new CachingConnectionFactory(RABBIT.getHost(), RABBIT.getMappedPort(5672));
         connection.setUsername("test");
@@ -310,7 +317,8 @@ class CommunityOutboxRelayIntegrationTest {
         container.setApplicationContext(applicationContext);
         container.setDefaultRequeueRejected(true);
         container.setMessageListener((MessageListener) message -> {
-            if (attempts.incrementAndGet() == 1) throw new IllegalStateException("retry once");
+            int delivery = attempts.incrementAndGet();
+            if (failOnce && delivery == 1) throw new IllegalStateException("retry once");
             consumedTraceId.set(tracer.currentSpan().context().traceId());
             consumedCorrelationId.set(message.getMessageProperties().getHeader("x-correlation-id"));
             handled.countDown();
@@ -323,7 +331,7 @@ class CommunityOutboxRelayIntegrationTest {
             java.util.concurrent.CompletableFuture.runAsync(scheduler::publishPending);
 
             assertTrue(handled.await(10, TimeUnit.SECONDS), "broker consumer should succeed after one retry");
-            assertEquals(2, attempts.get());
+            assertEquals(failOnce ? 2 : 1, attempts.get());
             assertEquals(traceId, consumedTraceId.get());
             assertEquals("trace-request-42", consumedCorrelationId.get());
         } finally {
