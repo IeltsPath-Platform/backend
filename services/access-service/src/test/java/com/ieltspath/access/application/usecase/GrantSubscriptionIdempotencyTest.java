@@ -19,6 +19,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -86,12 +87,8 @@ class GrantSubscriptionIdempotencyTest {
         try (var pool = Executors.newFixedThreadPool(2)) {
             var first = CompletableFuture.supplyAsync(() -> grant.execute(command(key, 30)), pool);
             var second = CompletableFuture.supplyAsync(() -> grant.execute(command(key, 30)), pool);
-            int successes = 0;
-            for (var result : new CompletableFuture[]{first, second}) {
-                try { result.join(); successes++; }
-                catch (RuntimeException expectedConflict) { }
-            }
-            assertThat(successes).isBetween(1, 2);
+            // The key lock makes the second request wait for the first and then replay its result, so neither one fails.
+            assertThat(first.get(30, TimeUnit.SECONDS).id()).isEqualTo(second.get(30, TimeUnit.SECONDS).id());
         }
         assertThat(jdbc.queryForObject("SELECT count(*) FROM admin_grant_requests WHERE idempotency_key = ?",
                 Integer.class, key)).isEqualTo(1);
