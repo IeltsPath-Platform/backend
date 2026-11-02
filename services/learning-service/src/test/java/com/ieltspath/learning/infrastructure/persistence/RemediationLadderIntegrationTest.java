@@ -100,14 +100,14 @@ class RemediationLadderIntegrationTest {
     @Test
     void failedReviewSetLeadsToTheoryThenNewSetsAndEndsOnlyWhenNoUnrevealedPackageIsLeft() {
         UUID user = UUID.randomUUID();
-        PackageVersion first = practiceSet(kpA, kpA);
+        PackageVersion first = practiceSet(kpA, kpA, kpA, kpA, kpA);
         PackageVersion second = practiceSet(kpA, kpA);
         PackageVersion third = practiceSet(kpA, kpA);
         topics.execute(user);
         exercise.execute(user, lesson, block, answers(List.of(lessonQuestionA, lessonQuestionB), "A", "A"));
 
         var attempt = start.execute(user, lesson, first.packageId());
-        var submitted = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "B"));
+        var submitted = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "A", "A", "B", "B"));
         assertEquals(1, submitted.reviewsCreated().size());
         assertEquals("PRACTICE", submitted.reviewsCreated().getFirst().stage());
         UUID reviewId = submitted.reviewsCreated().getFirst().reviewId();
@@ -121,6 +121,7 @@ class RemediationLadderIntegrationTest {
                 UUID.randomUUID(), answers(items(second), "A", "B").answers()));
         assertEquals("PENDING", failed.reviewStatus());
         assertEquals("THEORY", failed.stage());
+        assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT blocking FROM review_items WHERE id = ?", Boolean.class, reviewId));
         assertEquals("A", failed.results().getFirst().correctAnswer());
         assertNotNull(failed.results().get(1).explanation());
 
@@ -166,14 +167,14 @@ class RemediationLadderIntegrationTest {
     @Test
     void aReviewKeepsGivingNewSetsAfterEveryFailureUntilOneIsPassed() {
         UUID user = UUID.randomUUID();
-        PackageVersion first = practiceSet(kpA, kpA);
+        PackageVersion first = practiceSet(kpA, kpA, kpA, kpA, kpA);
         PackageVersion second = practiceSet(kpA, kpA);
         PackageVersion third = practiceSet(kpA, kpA);
         PackageVersion fourth = practiceSet(kpA, kpA);
         topics.execute(user);
         exercise.execute(user, lesson, block, answers(List.of(lessonQuestionA, lessonQuestionB), "A", "A"));
         var attempt = start.execute(user, lesson, first.packageId());
-        var submitted = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "B"));
+        var submitted = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "A", "A", "B", "B"));
         UUID reviewId = submitted.reviewsCreated().getFirst().reviewId();
 
         var setOne = getReview.execute(user, reviewId);
@@ -192,6 +193,7 @@ class RemediationLadderIntegrationTest {
                 UUID.randomUUID(), answers(items(third), "B", "B").answers()));
         assertEquals("PENDING", failedTwice.reviewStatus());
         assertEquals("PRACTICE", failedTwice.stage());
+        assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT blocking FROM review_items WHERE id = ?", Boolean.class, reviewId));
 
         var setThree = getReview.execute(user, reviewId);
         assertEquals(fourth.packageId(), setThree.set().packageId());
@@ -206,14 +208,14 @@ class RemediationLadderIntegrationTest {
     @Test
     void newReviewsStartWithTheoryForLowScoresAndMistakesMadeInTheLesson() {
         UUID user = UUID.randomUUID();
-        PackageVersion mixed = practiceSet(kpA, kpA, kpB, kpB);
+        PackageVersion mixed = practiceSet(kpA, kpA, kpA, kpA, kpB, kpB);
         practiceSet(kpA, kpB);
         topics.execute(user);
         exercise.execute(user, lesson, block, answers(List.of(lessonQuestionA, lessonQuestionB), "B", "A"));
         exercise.execute(user, lesson, block, answers(List.of(lessonQuestionA, lessonQuestionB), "A", "A"));
 
         var attempt = start.execute(user, lesson, mixed.packageId());
-        var submitted = practice.execute(user, attempt.attemptId(), answers(items(mixed), "A", "B", "B", "B"));
+        var submitted = practice.execute(user, attempt.attemptId(), answers(items(mixed), "A", "A", "B", "B", "B", "B"));
         Map<UUID, String> reasons = new HashMap<>();
         for (var created : submitted.reviewsCreated()) {
             assertEquals("THEORY", created.stage());

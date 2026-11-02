@@ -158,15 +158,15 @@ class PracticeIntegrationTest {
                 Integer.class));
 
         var failed = start.execute(user, secondLesson, failedPackage);
-        var failedResult = submit.execute(user, failed.attemptId(), answers(thirdQuestion, fourthQuestion, "A", "B"));
-        assertEquals(0.5, failedResult.percent());
+        var failedResult = submit.execute(user, failed.attemptId(), answers(thirdQuestion, fourthQuestion, "B", "B"));
+        assertEquals(0.0, failedResult.percent());
         assertEquals(1, failedResult.reviewsCreated().size());
         assertEquals("PRACTICE", jdbc.queryForObject(
                 "SELECT trigger_kind FROM review_items WHERE id = ?", String.class,
                 failedResult.reviewsCreated().getFirst().reviewId()));
-        var gate = assertThrows(LearningGateException.class,
-                () -> start.execute(user, secondLesson, sparePackage));
-        assertEquals("REVIEW_REQUIRED", gate.getCode());
+        assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT blocking FROM review_items WHERE id = ?",
+                Boolean.class, failedResult.reviewsCreated().getFirst().reviewId()));
+        assertDoesNotThrow(() -> start.execute(user, secondLesson, sparePackage));
         jdbc.update("UPDATE review_items SET status='DONE' WHERE id=?",
                 failedResult.reviewsCreated().getFirst().reviewId());
         assertNotNull(tests.execute(user, topic).assignmentId());

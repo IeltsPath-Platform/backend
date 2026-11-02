@@ -38,5 +38,9 @@ public record PracticeSubmission(UUID attemptId, int correct, int total, double 
         }
     }
     public record ErrorTrap(String code, String name, String fixHint) {}
-    public record ReviewCreated(UUID reviewId, UUID knowledgePointId, String stage) {}
+    public record ReviewCreated(UUID reviewId, UUID knowledgePointId, String stage, boolean blocking) {
+        public ReviewCreated(UUID reviewId, UUID knowledgePointId, String stage) {
+            this(reviewId, knowledgePointId, stage, true);
+        }
+    }
 }

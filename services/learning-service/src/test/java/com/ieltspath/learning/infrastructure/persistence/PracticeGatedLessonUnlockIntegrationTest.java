@@ -10,6 +10,8 @@ import com.ieltspath.learning.application.result.TopicLessonsResult;
 import com.ieltspath.learning.application.usecase.*;
 import com.ieltspath.learning.domain.exception.LearningGateException;
 import com.ieltspath.learning.domain.vo.LearningSkill;
+import com.ieltspath.learning.domain.vo.PracticePassReason;
+import com.ieltspath.learning.domain.vo.PracticeSubmission;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -247,44 +249,143 @@ class PracticeGatedLessonUnlockIntegrationTest {
     }
 
     @Test
-    void aFailedPracticeSendsTheLearnerToTheReviewAndTheSecondLessonOpensWhenItIsDone() {
+    void aFailedFirstPracticeSuggestsAReviewAndKeepsTheSecondLessonOpen() {
         UUID user = UUID.randomUUID();
-        PackageVersion first = practiceSet(kpA, kpA);
+        PackageVersion first = practiceSet(kpA, kpA, kpA, kpA);
         PackageVersion second = practiceSet(kpA, kpA);
         topics.execute(user);
         exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
         var attempt = start.execute(user, lesson1, first.packageId());
-        var submitted = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "B"));
+        var submitted = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "A", "B", "B"));
         assertFalse(submitted.passed());
-        UUID reviewId = submitted.reviewsCreated().getFirst().reviewId();
+        var created = submitted.reviewsCreated().getFirst();
+        assertFalse(created.blocking());
+        assertEquals("PRACTICE", created.stage());
+        assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT blocking FROM review_items WHERE id = ?",
+                Boolean.class, created.reviewId()));
+        assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
+        assertDoesNotThrow(() -> getLesson.execute(user, lesson2));
+        assertEquals(PracticePassReason.ATTEMPT_NOT_BLOCKED, practiceSets.execute(user, lesson1).practicePassReason());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM lesson_practice_passes WHERE user_id = ?",
+                Integer.class, user));
 
-        LearningGateException blocked = assertThrows(LearningGateException.class,
-                () -> getLesson.execute(user, lesson2));
-        assertEquals("REVIEW_REQUIRED", blocked.getCode());
-        assertEquals(List.of(reviewId), blocked.getReviews().stream().map(review -> review.reviewId()).toList());
-        assertEquals(List.of("COMPLETED", "LOCKED"), statuses(user));
-
-        var review = getReview.execute(user, reviewId);
+        var review = getReview.execute(user, created.reviewId());
         assertEquals(second.packageId(), review.set().packageId());
-        var done = submitReview.execute(user, reviewId, new SubmitReviewCommand(review.set().reviewSetId(),
+        var done = submitReview.execute(user, created.reviewId(), new SubmitReviewCommand(review.set().reviewSetId(),
                 UUID.randomUUID(), answers(items(second), "A", "A").answers()));
         assertEquals("DONE", done.reviewStatus());
-
         assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
         assertDoesNotThrow(() -> getLesson.execute(user, lesson2));
     }
 
     @Test
-    void aReviewThatRunsOutOfPackagesEndsAndOpensTheSecondLesson() {
+    void theSamePointWeakAgainInAnotherSetTurnsTheSuggestionIntoABlockingReview() {
         UUID user = UUID.randomUUID();
-        PackageVersion only = practiceSet(kpA, kpA);
+        PackageVersion first = practiceSet(kpA, kpA, kpA, kpA);
+        PackageVersion second = practiceSet(kpA, kpA, kpA, kpA);
+        PackageVersion third = practiceSet(kpA, kpA);
+        topics.execute(user);
+        exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
+        var suggested = practice.execute(user, start.execute(user, lesson1, first.packageId()).attemptId(),
+                answers(items(first), "A", "A", "B", "B")).reviewsCreated().getFirst();
+        var again = practice.execute(user, start.execute(user, lesson1, second.packageId()).attemptId(),
+                answers(items(second), "A", "A", "B", "B"));
+
+        assertEquals(List.of(suggested.reviewId()), again.reviewsCreated().stream()
+                .map(PracticeSubmission.ReviewCreated::reviewId).toList());
+        assertTrue(again.reviewsCreated().getFirst().blocking());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?", Integer.class, user));
+        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
+                () -> getLesson.execute(user, lesson2)).getCode());
+        assertEquals(List.of("COMPLETED", "LOCKED"), statuses(user));
+
+        var review = getReview.execute(user, suggested.reviewId());
+        assertEquals(third.packageId(), review.set().packageId());
+        assertEquals("DONE", submitReview.execute(user, suggested.reviewId(), new SubmitReviewCommand(
+                review.set().reviewSetId(), UUID.randomUUID(), answers(items(third), "A", "A").answers())).reviewStatus());
+        assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
+    }
+
+    @Test
+    void failingTheSetOfASuggestedReviewMakesItBlockingAtTheTheoryStage() {
+        UUID user = UUID.randomUUID();
+        PackageVersion first = practiceSet(kpA, kpA, kpA, kpA);
+        PackageVersion second = practiceSet(kpA, kpA);
+        topics.execute(user);
+        exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
+        UUID reviewId = practice.execute(user, start.execute(user, lesson1, first.packageId()).attemptId(),
+                answers(items(first), "A", "A", "B", "B")).reviewsCreated().getFirst().reviewId();
+
+        var review = getReview.execute(user, reviewId);
+        var failed = submitReview.execute(user, reviewId, new SubmitReviewCommand(review.set().reviewSetId(),
+                UUID.randomUUID(), answers(items(second), "B", "B").answers()));
+
+        assertEquals("PENDING", failed.reviewStatus());
+        assertEquals("THEORY", failed.stage());
+        assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT blocking FROM review_items WHERE id = ?",
+                Boolean.class, reviewId));
+        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
+                () -> getLesson.execute(user, lesson2)).getCode());
+    }
+
+    @Test
+    void aFailedPracticeWithoutTwoWrongAnswersOnAPointCreatesNoReviewAndOpensTheSecondLesson() {
+        UUID user = UUID.randomUUID();
+        PackageVersion first = practiceSet(kpA, kpA);
+        practiceSet(kpB, kpB);
+        topics.execute(user);
+        exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
+        var submitted = practice.execute(user, start.execute(user, lesson1, first.packageId()).attemptId(),
+                answers(items(first), "A", "B"));
+
+        assertFalse(submitted.passed());
+        assertTrue(submitted.reviewsCreated().isEmpty());
+        assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
+        assertEquals(PracticePassReason.ATTEMPT_NOT_BLOCKED, practiceSets.execute(user, lesson1).practicePassReason());
+    }
+
+    @Test
+    void aWeakPointPromotesItsPendingErrorPatternReviewButLeavesABasketReviewOptional() {
+        UUID user = UUID.randomUUID();
+        PackageVersion first = practiceSet(kpA, kpA, kpB, kpB);
+        practiceSet(kpA, kpB);
+        topics.execute(user);
+        exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
+        UUID errorReview = UUID.randomUUID();
+        UUID basketReview = UUID.randomUUID();
+        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind, "
+                + "blocking, stage) VALUES (?, ?, ?, ?, 'PENDING', 'READING', 'ERROR_PATTERN', false, 'PRACTICE')",
+                errorReview, user, kpA, lesson1);
+        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind, "
+                + "blocking, stage) VALUES (?, ?, ?, ?, 'PENDING', 'READING', 'CONSOLIDATE', false, 'PRACTICE')",
+                basketReview, user, kpB, lesson1);
+
+        var submitted = practice.execute(user, start.execute(user, lesson1, first.packageId()).attemptId(),
+                answers(items(first), "B", "B", "B", "B"));
+
+        assertEquals(List.of(errorReview), submitted.reviewsCreated().stream()
+                .map(PracticeSubmission.ReviewCreated::reviewId).toList());
+        assertTrue(submitted.reviewsCreated().getFirst().blocking());
+        assertEquals("ERROR_PATTERN", jdbc.queryForObject("SELECT trigger_kind FROM review_items WHERE id = ?",
+                String.class, errorReview));
+        assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT blocking FROM review_items WHERE id = ?",
+                Boolean.class, basketReview));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?", Integer.class, user));
+        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
+                () -> getLesson.execute(user, lesson2)).getCode());
+    }
+
+    @Test
+    void aSuggestedReviewThatRunsOutOfPackagesEndsWithoutHoldingTheSecondLesson() {
+        UUID user = UUID.randomUUID();
+        PackageVersion only = practiceSet(kpA, kpA, kpA, kpA);
         topics.execute(user);
         exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
         var attempt = start.execute(user, lesson1, only.packageId());
-        var submitted = practice.execute(user, attempt.attemptId(), answers(items(only), "A", "B"));
+        // Half right keeps the suggestion at the practice stage, where it can run out of packages.
+        var submitted = practice.execute(user, attempt.attemptId(), answers(items(only), "A", "A", "B", "B"));
         UUID reviewId = submitted.reviewsCreated().getFirst().reviewId();
-        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
-                () -> getLesson.execute(user, lesson2)).getCode());
+        assertDoesNotThrow(() -> getLesson.execute(user, lesson2));
 
         // The only package is revealed, so the review ends instead of leaving the learner stuck.
         assertEquals("SKIPPED", getReview.execute(user, reviewId).reviewStatus());

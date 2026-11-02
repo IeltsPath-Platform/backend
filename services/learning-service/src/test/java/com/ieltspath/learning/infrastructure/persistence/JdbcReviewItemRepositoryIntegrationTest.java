@@ -54,7 +54,7 @@ class JdbcReviewItemRepositoryIntegrationTest {
 
     private PracticeReviewCandidate candidate(UUID kp, boolean blocking) {
         return new PracticeReviewCandidate(UUID.randomUUID(), UUID.randomUUID(), kp, LearningSkill.READING,
-                UUID.randomUUID(), 0.5, ReviewStage.PRACTICE, null, blocking);
+                null, 0.5, ReviewStage.PRACTICE, null, blocking);
     }
 
     @Test
