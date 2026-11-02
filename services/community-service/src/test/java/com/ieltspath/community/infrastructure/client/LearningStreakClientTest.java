@@ -13,6 +13,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.ExpectedCount.times;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -48,7 +49,8 @@ class LearningStreakClientTest {
 
     @Test
     void reportsLearningAsUnavailableWhenItFails() {
-        server.expect(requestTo("http://learning.test/internal/learning/streaks")).andRespond(withServerError());
+        server.expect(times(2), requestTo("http://learning.test/internal/learning/streaks"))
+                .andRespond(withServerError());
 
         assertThatThrownBy(() -> client.streaks(Set.of(UUID.randomUUID())))
                 .isInstanceOf(CommunityUnavailableException.class);

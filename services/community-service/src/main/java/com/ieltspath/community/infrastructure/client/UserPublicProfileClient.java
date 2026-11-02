@@ -4,6 +4,9 @@ import com.ieltspath.community.application.port.PublicProfileClient;
 import com.ieltspath.community.application.port.StreakLookup;
 import com.ieltspath.community.application.result.PublicProfile;
 import com.ieltspath.community.domain.exception.CommunityUnavailableException;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -25,20 +28,28 @@ import java.util.stream.Collectors;
 public class UserPublicProfileClient implements PublicProfileClient {
     private final RestClient client;
     private final StreakLookup streaks;
+    private final ResilientCall resilientCall;
 
     @Autowired
     public UserPublicProfileClient(RestClient.Builder builder,
-            @Value("${community.user-service.base-url:http://localhost:8085}") String baseUrl, StreakLookup streaks) {
+            @Value("${community.user-service.base-url:http://localhost:8085}") String baseUrl, StreakLookup streaks,
+            ResilientCall resilientCall) {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(2000);
         factory.setReadTimeout(5000);
         client = builder.baseUrl(baseUrl).requestFactory(factory).build();
         this.streaks = streaks;
+        this.resilientCall = resilientCall;
     }
 
     UserPublicProfileClient(RestClient client, StreakLookup streaks) {
+        this(client, streaks, defaultResilientCall());
+    }
+
+    UserPublicProfileClient(RestClient client, StreakLookup streaks, ResilientCall resilientCall) {
         this.client = client;
         this.streaks = streaks;
+        this.resilientCall = resilientCall;
     }
 
     @Override
@@ -46,12 +57,15 @@ public class UserPublicProfileClient implements PublicProfileClient {
         if (ids.isEmpty()) return Map.of();
         if (ids.size() > 100) throw new IllegalArgumentException("At most 100 public profiles per batch");
         try {
-            var response = client.post().uri("/internal/users/public-profiles").headers(ForwardedRequestHeaders::copy)
-                    .body(Map.of("userIds", ids)).retrieve().body(Batch.class);
+            var response = resilientCall.call("user", CallKind.READ, () -> client.post()
+                    .uri("/internal/users/public-profiles").headers(ForwardedRequestHeaders::copy)
+                    .body(Map.of("userIds", ids)).retrieve().body(Batch.class));
             Map<UUID, PublicProfile> result = new HashMap<>();
             if (response != null && response.profiles() != null)
                 response.profiles().forEach(profile -> { if (ids.contains(profile.id())) result.put(profile.id(), profile); });
             return withStreaks(result.values()).stream().collect(Collectors.toMap(PublicProfile::id, profile -> profile));
+        } catch (DownstreamUnavailableException exception) {
+            throw new CommunityUnavailableException("Public profiles are temporarily unavailable");
         } catch (org.springframework.web.client.RestClientException exception) {
             throw new CommunityUnavailableException("Public profiles are temporarily unavailable");
         }
@@ -60,10 +74,12 @@ public class UserPublicProfileClient implements PublicProfileClient {
     @Override
     public List<PublicProfile> searchProfiles(UUID viewerId, String query, int limit) {
         try {
-            var response = client.get().uri(uri -> uri.path("/internal/users/public-profiles/search")
+            var response = resilientCall.call("user", CallKind.READ, () -> client.get().uri(uri -> uri.path("/internal/users/public-profiles/search")
                     .queryParam("q", query).queryParam("limit", limit).build())
-                    .headers(ForwardedRequestHeaders::copy).retrieve().body(Batch.class);
+                    .headers(ForwardedRequestHeaders::copy).retrieve().body(Batch.class));
             return response == null || response.profiles() == null ? List.of() : withStreaks(response.profiles());
+        } catch (DownstreamUnavailableException exception) {
+            throw new CommunityUnavailableException("Public profiles are temporarily unavailable");
         } catch (org.springframework.web.client.RestClientException exception) {
             throw new CommunityUnavailableException("Public profiles are temporarily unavailable");
         }
@@ -82,4 +98,8 @@ public class UserPublicProfileClient implements PublicProfileClient {
     }
 
     public record Batch(List<PublicProfile> profiles) { }
+
+    private static ResilientCall defaultResilientCall() {
+        return ResilientCall.isolatedDefault();
+    }
 }
