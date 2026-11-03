@@ -34,6 +34,10 @@ public class CourseJpaEntity {
     private String description;
     @Column(name = "combo_unlock_points")
     private Integer comboUnlockPoints;
+    @Column(nullable = false)
+    private boolean free;
+    @Column(name = "banner_image_url", length = 500)
+    private String bannerImageUrl;
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "course_skill_prices", joinColumns = @JoinColumn(name = "course_id"))
     @MapKeyColumn(name = "skill")

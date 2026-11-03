@@ -17,6 +17,7 @@ import com.ieltspath.content.application.command.CountPracticeSetsCommand;
 import com.ieltspath.content.application.command.SearchPracticeSetsCommand;
 import com.ieltspath.content.application.usecase.CountAvailablePracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetActiveKnowledgePrerequisitesUseCase;
+import com.ieltspath.content.application.usecase.GetFreeCourseIdsUseCase;
 import com.ieltspath.content.domain.vo.MediaReferencePolicy;
 import com.ieltspath.content.application.usecase.GetLessonPracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetTopicPracticeSetsUseCase;
@@ -52,6 +53,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class InternalLearningContentController {
     private final GetTopicSequenceUseCase getTopicSequence;
+    private final GetFreeCourseIdsUseCase getFreeCourseIds;
     private final GetTopicLessonsUseCase getTopicLessons;
     private final GetLessonContentUseCase getLessonContent;
     private final GetTopicTestPackagesUseCase getTopicTestPackages;
@@ -113,6 +115,11 @@ public class InternalLearningContentController {
     @GetMapping("/courses/{id}/test-packages")
     public List<TopicTestPackageResponse> courseTestPackages(@PathVariable("id") UUID courseId) {
         return getCourseTestPackages.execute(courseId).stream().map(TopicTestPackageResponse::from).toList();
+    }
+
+    @GetMapping("/courses/free")
+    public List<UUID> freeCourseIds() {
+        return List.copyOf(getFreeCourseIds.execute());
     }
 
     @GetMapping("/topic-sequence")

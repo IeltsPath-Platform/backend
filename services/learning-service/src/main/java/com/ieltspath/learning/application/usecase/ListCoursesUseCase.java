@@ -2,6 +2,7 @@ package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.AccessClient;
+import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.result.CourseResult;
 import com.ieltspath.learning.application.result.TopicResult;
@@ -22,6 +23,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -35,12 +37,13 @@ public class ListCoursesUseCase {
     private final LearnerCourseUnlockRepository unlocks;
     private final ReconcilePendingCourseUnlocks reconciler;
     private final AccessClient access;
+    private final LearningContentClient content;
 
     public ListCoursesUseCase(LearnerLock lock, RefreshLearningTopicsUseCase refreshTopics,
                               LearnerCurriculumRepository curricula, CourseProgressRepository courseProgress,
                               LearnerPlacementRepository placements, LessonProgressRepository lessonProgress,
                               LearnerCourseUnlockRepository unlocks, ReconcilePendingCourseUnlocks reconciler,
-                              AccessClient access) {
+                              AccessClient access, LearningContentClient content) {
         this.lock = lock;
         this.refreshTopics = refreshTopics;
         this.curricula = curricula;
@@ -50,6 +53,7 @@ public class ListCoursesUseCase {
         this.unlocks = unlocks;
         this.reconciler = reconciler;
         this.access = access;
+        this.content = content;
     }
 
     @Transactional
@@ -100,6 +104,7 @@ public class ListCoursesUseCase {
             premium = false;
         }
         final boolean premiumAccess = premium;
+        Set<UUID> freeCourses = Set.copyOf(content.getFreeCourseIds());
         return courses.values().stream().sorted(Comparator.comparing(TopicResult.Course::bandLevel))
                 .map(course -> {
                     int topicCount = total.getOrDefault(course.courseId(), 0);
@@ -131,7 +136,8 @@ public class ListCoursesUseCase {
                             totalLessons.getOrDefault(course.courseId(), 0), lastStudied.get(course.courseId()),
                             course.coverImageUrl(), course.description(), course.skillUnlockPoints(),
                             course.comboUnlockPoints(), unlockedSkills, comboUnlocked, comboPayable,
-                            course.availableSkills(), premiumAccess);
+                            course.availableSkills(), premiumAccess, freeCourses.contains(course.courseId()),
+                            course.bannerImageUrl());
                 }).toList();
     }
 

@@ -11,12 +11,22 @@ public record UpdateCourseRequest(@NotBlank @Size(max = 255) String name,
                                   ContentStatus status,
                                   @Size(max = 500) @Pattern(regexp = "(?i)^\\s*(https?://\\S+|content-image/[A-Za-z0-9._/-]+)?\\s*$") String coverImageUrl,
                                   @Size(max = 2000) String description,
-                                  Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints) {
+                                  Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints,
+                                  Boolean free, @Size(max = 500) @Pattern(regexp = "(?i)^\\s*(https?://\\S+|content-image/[A-Za-z0-9._/-]+)?\\s*$") String bannerImageUrl) {
+    public UpdateCourseRequest(String name, BigDecimal bandLevel, ContentStatus status, String coverImageUrl,
+                               String description, Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints,
+                               Boolean free) {
+        this(name, bandLevel, status, coverImageUrl, description, skillUnlockPoints, comboUnlockPoints, free, null);
+    }
+    public UpdateCourseRequest(String name, BigDecimal bandLevel, ContentStatus status, String coverImageUrl,
+                               String description, Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints) {
+        this(name, bandLevel, status, coverImageUrl, description, skillUnlockPoints, comboUnlockPoints, null);
+    }
     public UpdateCourseRequest(String name, BigDecimal bandLevel, ContentStatus status, String coverImageUrl,
                                String description) {
-        this(name, bandLevel, status, coverImageUrl, description, null, null);
+        this(name, bandLevel, status, coverImageUrl, description, null, null, null);
     }
     public UpdateCourseRequest(String name, BigDecimal bandLevel, ContentStatus status) {
-        this(name, bandLevel, status, null, null, null, null);
+        this(name, bandLevel, status, null, null, null, null, null);
     }
 }

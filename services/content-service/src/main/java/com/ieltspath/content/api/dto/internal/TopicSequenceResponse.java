@@ -38,10 +38,17 @@ public record TopicSequenceResponse(
     public record Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
                          boolean hasCourseTest, boolean active, String coverImageUrl, String description,
                          java.util.Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints,
-                         List<Skill> availableSkills) {
+                         List<Skill> availableSkills, String bannerImageUrl) {
         public Course {
             skillUnlockPoints = skillUnlockPoints == null ? java.util.Map.of() : java.util.Map.copyOf(skillUnlockPoints);
             availableSkills = availableSkills == null ? List.of() : List.copyOf(availableSkills);
+        }
+        public Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
+                      boolean hasCourseTest, boolean active, String coverImageUrl, String description,
+                      java.util.Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints,
+                      List<Skill> availableSkills) {
+            this(courseId, code, name, bandLevel, hasCourseTest, active, coverImageUrl, description, skillUnlockPoints,
+                    comboUnlockPoints, availableSkills, null);
         }
         public Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
                       boolean hasCourseTest, boolean active) {
@@ -56,7 +63,8 @@ public record TopicSequenceResponse(
         static Course from(TopicSequenceResult.CourseEntry entry, MediaReferencePolicy mediaPolicy) {
             return entry == null ? null : new Course(entry.courseId(), entry.code(), entry.name(), entry.bandLevel(),
                     entry.hasCourseTest(), entry.active(), resolveCoverImage(entry.coverImageUrl(), mediaPolicy), entry.description(),
-                    entry.skillUnlockPoints(), entry.comboUnlockPoints(), entry.availableSkills());
+                    entry.skillUnlockPoints(), entry.comboUnlockPoints(), entry.availableSkills(),
+                    resolveCoverImage(entry.bannerImageUrl(), mediaPolicy));
         }
 
         static Course from(TopicSequenceResult.CourseEntry entry) {

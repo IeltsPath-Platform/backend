@@ -1,6 +1,7 @@
 package com.ieltspath.learning.application.service;
 
 import com.ieltspath.learning.application.port.AccessClient;
+import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.port.LearningContentClient.KnowledgePoint;
 import com.ieltspath.learning.application.port.LearningContentClient.Lesson;
@@ -21,18 +22,23 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** Loads purchase and progress facts once per request, and asks Access for Premium only when required. */
+/**
+ * Loads purchase and progress facts once per request, and asks Access for Premium only when required. A free course is
+ * open to everyone, so it is checked before Premium and its lessons never reach the paywall.
+ */
 @Component
 public class PaywallGate {
     private final AccessClient access;
     private final LearnerCourseUnlockRepository unlocks;
     private final LessonProgressRepository progress;
+    private final LearningContentClient content;
 
     public PaywallGate(AccessClient access, LearnerCourseUnlockRepository unlocks,
-                       LessonProgressRepository progress) {
+                       LessonProgressRepository progress, LearningContentClient content) {
         this.access = access;
         this.unlocks = unlocks;
         this.progress = progress;
+        this.content = content;
     }
 
     public Request forLearner(UUID userId) {
@@ -42,6 +48,7 @@ public class PaywallGate {
     public final class Request {
         private final UUID userId;
         private final Map<UUID, Ownership> ownershipByCourse = new HashMap<>();
+        private Set<UUID> freeCourses;
         private boolean premiumChecked;
         private boolean premium;
         private RuntimeException premiumFailure;
@@ -52,6 +59,7 @@ public class PaywallGate {
             Ownership ownership = ownership(lesson.courseId());
             if (PaywallPolicy.isOpen(lesson.courseId(), lesson.skillPosition(), skills, ownership.skills,
                     ownership.combo, lessonProgress != null && lessonProgress.grandfathered(), false)) return true;
+            if (freeCourse(lesson.courseId())) return true;
             return PaywallPolicy.isOpen(lesson.courseId(), lesson.skillPosition(), skills, ownership.skills,
                     ownership.combo, lessonProgress != null && lessonProgress.grandfathered(), premium());
         }
@@ -65,13 +73,15 @@ public class PaywallGate {
             boolean grandfathered = lessonProgress != null && lessonProgress.grandfathered();
             if (PaywallPolicy.isOpen(lesson.courseId(), lesson.skillPosition(), lesson.skills(), ownership.skills,
                     ownership.combo, grandfathered, false)) return true;
+            if (freeCourse(lesson.courseId())) return true;
             return PaywallPolicy.isOpen(lesson.courseId(), lesson.skillPosition(), lesson.skills(), ownership.skills,
                     ownership.combo, grandfathered, premium());
         }
 
+        /** The first lessons of a skill that a paying course shows free; a free course has no preview, all is free. */
         public boolean freePreview(UUID courseId, Integer skillPosition) {
             return courseId != null && skillPosition != null
-                    && skillPosition <= PaywallPolicy.FREE_LESSONS_PER_SKILL;
+                    && skillPosition <= PaywallPolicy.FREE_LESSONS_PER_SKILL && !freeCourse(courseId);
         }
 
         public boolean premiumActive() { return premium(); }
@@ -92,6 +102,7 @@ public class PaywallGate {
             Ownership ownership = ownership(courseId);
             if (PaywallPolicy.isOpen(courseId, position, pointSkills, ownership.skills, ownership.combo,
                     grandfathered, false)) return true;
+            if (freeCourse(courseId)) return true;
             return PaywallPolicy.isOpen(courseId, position, pointSkills, ownership.skills, ownership.combo,
                     grandfathered, premium());
         }
@@ -106,6 +117,13 @@ public class PaywallGate {
             if (!knowledgePointOpen(topic, point)) {
                 throw new LearningGateException("PAYWALL", java.util.List.of());
             }
+        }
+
+        /** Read once per request, and only once a lesson is found closed to the learner's own purchases. */
+        private boolean freeCourse(UUID courseId) {
+            if (courseId == null) return false;
+            if (freeCourses == null) freeCourses = Set.copyOf(content.getFreeCourseIds());
+            return freeCourses.contains(courseId);
         }
 
         private Ownership ownership(UUID courseId) {

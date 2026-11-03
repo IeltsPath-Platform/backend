@@ -13,7 +13,8 @@ public interface CoursePersistenceMapper {
     default Course createCourse(CourseJpaEntity entity) {
         return new Course(entity.getId(), entity.getCode(), entity.getName(), entity.getBandLevel(),
                 entity.getStatus(), entity.getCreatedAt(), entity.getUpdatedAt(), entity.getCoverImageUrl(),
-                entity.getDescription(), entity.getSkillUnlockPoints(), entity.getComboUnlockPoints());
+                entity.getDescription(), entity.getSkillUnlockPoints(), entity.getComboUnlockPoints(), entity.isFree(),
+                entity.getBannerImageUrl());
     }
 
     @Mapping(target = "skillUnlockPoints", ignore = true)

@@ -14,7 +14,8 @@ public record CourseResponse(UUID courseId, String code, String name, BigDecimal
                             int completedLessonCount, int totalLessonCount, Instant lastStudiedAt,
                             String coverImageUrl, String description, Map<LearningSkill, Integer> skillPrices,
                             Integer comboUnlockPoints, Set<LearningSkill> unlockedSkills, boolean comboUnlocked,
-                            Integer comboPayablePoints, Set<LearningSkill> availableSkills, boolean premium) {
+                            Integer comboPayablePoints, Set<LearningSkill> availableSkills, boolean premium,
+                            boolean free, String bannerImageUrl) {
     public CourseResponse {
         skillPrices = skillPrices == null ? Map.of() : Map.copyOf(skillPrices);
         unlockedSkills = unlockedSkills == null ? Set.of() : Set.copyOf(unlockedSkills);
@@ -24,10 +25,33 @@ public record CourseResponse(UUID courseId, String code, String name, BigDecimal
     public CourseResponse(UUID courseId, String code, String name, BigDecimal bandLevel, int topicCount,
                           int passedTopicCount, boolean recommended, String testStatus, Instant passedAt,
                           int completedLessonCount, int totalLessonCount, Instant lastStudiedAt,
+                          String coverImageUrl, String description, Map<LearningSkill, Integer> skillPrices,
+                          Integer comboUnlockPoints, Set<LearningSkill> unlockedSkills, boolean comboUnlocked,
+                          Integer comboPayablePoints, Set<LearningSkill> availableSkills, boolean premium, boolean free) {
+        this(courseId, code, name, bandLevel, topicCount, passedTopicCount, recommended, testStatus, passedAt,
+                completedLessonCount, totalLessonCount, lastStudiedAt, coverImageUrl, description, skillPrices,
+                comboUnlockPoints, unlockedSkills, comboUnlocked, comboPayablePoints, availableSkills, premium, free,
+                null);
+    }
+
+    public CourseResponse(UUID courseId, String code, String name, BigDecimal bandLevel, int topicCount,
+                          int passedTopicCount, boolean recommended, String testStatus, Instant passedAt,
+                          int completedLessonCount, int totalLessonCount, Instant lastStudiedAt,
+                          String coverImageUrl, String description, Map<LearningSkill, Integer> skillPrices,
+                          Integer comboUnlockPoints, Set<LearningSkill> unlockedSkills, boolean comboUnlocked,
+                          Integer comboPayablePoints, Set<LearningSkill> availableSkills, boolean premium) {
+        this(courseId, code, name, bandLevel, topicCount, passedTopicCount, recommended, testStatus, passedAt,
+                completedLessonCount, totalLessonCount, lastStudiedAt, coverImageUrl, description, skillPrices,
+                comboUnlockPoints, unlockedSkills, comboUnlocked, comboPayablePoints, availableSkills, premium, false);
+    }
+
+    public CourseResponse(UUID courseId, String code, String name, BigDecimal bandLevel, int topicCount,
+                          int passedTopicCount, boolean recommended, String testStatus, Instant passedAt,
+                          int completedLessonCount, int totalLessonCount, Instant lastStudiedAt,
                           String coverImageUrl, String description) {
         this(courseId, code, name, bandLevel, topicCount, passedTopicCount, recommended, testStatus, passedAt,
                 completedLessonCount, totalLessonCount, lastStudiedAt, coverImageUrl, description, Map.of(), null,
-                Set.of(), false, null, Set.of(), false);
+                Set.of(), false, null, Set.of(), false, false);
     }
 
     public CourseResponse(UUID courseId, String code, String name, BigDecimal bandLevel, int topicCount,
@@ -35,7 +59,7 @@ public record CourseResponse(UUID courseId, String code, String name, BigDecimal
                           int completedLessonCount, int totalLessonCount, Instant lastStudiedAt) {
         this(courseId, code, name, bandLevel, topicCount, passedTopicCount, recommended, testStatus, passedAt,
                 completedLessonCount, totalLessonCount, lastStudiedAt, null, null, Map.of(), null,
-                Set.of(), false, null, Set.of(), false);
+                Set.of(), false, null, Set.of(), false, false);
     }
 
     public static CourseResponse from(CourseResult result) {
@@ -44,6 +68,6 @@ public record CourseResponse(UUID courseId, String code, String name, BigDecimal
                 result.passedAt(), result.completedLessonCount(), result.totalLessonCount(), result.lastStudiedAt(),
                 result.coverImageUrl(), result.description(), result.skillPrices(), result.comboUnlockPoints(),
                 result.unlockedSkills(), result.comboUnlocked(), result.comboPayablePoints(),
-                result.availableSkills(), result.premium());
+                result.availableSkills(), result.premium(), result.free(), result.bannerImageUrl());
     }
 }

@@ -43,6 +43,11 @@ public interface LearningContentReader {
         return topicSequence(minPracticeQuestions);
     }
 
+    /** Ids of the active courses flagged free; none when the flag is not stored. */
+    default java.util.Set<UUID> freeCourseIds() {
+        return java.util.Set.of();
+    }
+
     boolean activeTopicExists(UUID topicId);
 
     List<LessonSummaryResult> publishedLessons(UUID topicId);

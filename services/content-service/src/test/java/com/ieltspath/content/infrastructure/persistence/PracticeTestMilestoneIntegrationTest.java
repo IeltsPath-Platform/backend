@@ -102,11 +102,11 @@ class PracticeTestMilestoneIntegrationTest {
                 FROM course_practice_test_milestones m JOIN courses c ON c.id=m.course_id
                 JOIN content_packages p ON p.id=m.package_id
                 LEFT JOIN content_package_versions v ON v.id=p.current_published_version_id
-                WHERE c.band_level IN (5.5, 6.5)
+                WHERE c.band_level IN (6.0, 7.0)
                 ORDER BY c.band_level
                 """);
         assertThat(rows).extracting(row -> (BigDecimal) row.get("band_level"))
-                .contains(new BigDecimal("5.5"), new BigDecimal("6.5"));
+                .contains(new BigDecimal("6.0"), new BigDecimal("7.0"));
         for (var row : rows) {
             assertThat(row.get("course_status")).isEqualTo("ACTIVE");
             assertThat(row.get("package_type")).isEqualTo("PRACTICE_TEST");
@@ -190,7 +190,7 @@ class PracticeTestMilestoneIntegrationTest {
     @Test
     void rejectsPackagesAssignedToAnotherCourseWithoutChangingEitherCoursesMilestones() {
         UUID otherCourse = UUID.randomUUID();
-        jdbc.update("INSERT INTO courses(id,code,name,band_level,status) VALUES (?,'MILESTONE_OTHER','Other',8.0,'ACTIVE')",
+        jdbc.update("INSERT INTO courses(id,code,name,band_level,status) VALUES (?,'MILESTONE_OTHER','Other',9.0,'ACTIVE')",
                 otherCourse);
         var shared = practiceTest("OTHER_COURSE");
         repository.replace(otherCourse, List.of(entry(shared, 1)));

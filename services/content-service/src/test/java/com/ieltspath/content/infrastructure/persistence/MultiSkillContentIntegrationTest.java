@@ -50,7 +50,7 @@ class MultiSkillContentIntegrationTest {
         reader = new JdbcLearningContentReader(new NamedParameterJdbcTemplate(isolated));
         topic = UUID.randomUUID();
         lesson = UUID.randomUUID();
-        sql.update("INSERT INTO topics(id,code,name,sort_order,course_id) SELECT ?, 'MULTI_TEST', 'Mixed', 9999, id FROM courses WHERE code='IELTS_5_5'", topic);
+        sql.update("INSERT INTO topics(id,code,name,sort_order,course_id) SELECT ?, 'MULTI_TEST', 'Mixed', 9999, id FROM courses WHERE code='IELTS_6_0'", topic);
         sql.update("INSERT INTO lessons(id,topic_id,code,title,sort_order,status) VALUES (?,?,'MULTI_LESSON','Mixed lesson',1,'PUBLISHED')", lesson, topic);
     }
 
