@@ -105,7 +105,7 @@ class AiCourseDraftIntegrationTest {
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
     }
 
-    private static final BigDecimal BAND = new BigDecimal("8.0"); // CEFR C2
+    private static final BigDecimal BAND = new BigDecimal("9.0"); // CEFR C2, a band no seeded course uses
 
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;

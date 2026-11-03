@@ -1,10 +1,12 @@
--- Demo data only: sets the Points prices that unlock the skills of the IELTS 5.5 course, so the unlock buttons show on the
+-- Demo data only: sets the Points prices that unlock the skills of the IELTS 6.0 course (formerly IELTS 5.5), so the unlock buttons show on the
 -- course page. In production R&D enters these in the admin course drawer; no migration seeds them on purpose.
 --
 -- How the numbers were chosen (Point cards sell 50 and 100 Points; one AI Writing grading costs 3):
 --   * a skill's first 3 lessons are free, so the price follows the lessons behind the paywall, about 5 Points each:
 --     Listening 1 lesson, Reading 8, Writing 4. Listening has a floor of 10 and Writing sits higher for the AI grading it
---     brings, so a skill never costs less than it is worth to the learner.
+--     brings, so a skill never costs less than it is worth to the learner. These counts are those of the former 5.5
+--     course; since it took over the former 6.0 chặng there are more lessons behind the paywall (Listening 3, Reading 10,
+--     Writing 7), so the prices below are low for the course as it now stands.
 --   * the dearest skill (Reading, 40) fits one 50-Point card and leaves a few gradings; Reading + Listening is exactly 50.
 --   * the combo is 20% under the three skills bought apart (75), and one 100-Point card covers it with 40 left for gradings.
 --     The API requires it to sit above the dearest skill and below the sum.
@@ -15,7 +17,7 @@
 --
 -- Safe to run again: it overwrites the same prices and leaves unlocks that learners already bought untouched.
 -- It is a script and not a Flyway migration on purpose: a migration runs in every environment, these prices are for one.
-WITH course AS (SELECT id FROM courses WHERE code = 'IELTS_5_5'),
+WITH course AS (SELECT id FROM courses WHERE code = 'IELTS_6_0'),
      prices (skill, unlock_points) AS (VALUES ('LISTENING', 10), ('READING', 40), ('WRITING', 25)),
      priced AS (
          INSERT INTO course_skill_prices (course_id, skill, unlock_points)
@@ -30,5 +32,5 @@ UPDATE courses
 SELECT c.name, p.skill, p.unlock_points, c.combo_unlock_points
   FROM courses c
   JOIN course_skill_prices p ON p.course_id = c.id
- WHERE c.code = 'IELTS_5_5'
+ WHERE c.code = 'IELTS_6_0'
  ORDER BY p.skill;
