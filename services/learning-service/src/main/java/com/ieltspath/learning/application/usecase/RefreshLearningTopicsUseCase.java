@@ -85,7 +85,8 @@ public class RefreshLearningTopicsUseCase {
                             : new TopicResult.Course(topic.course().courseId(), topic.course().code(),
                             topic.course().name(), topic.course().bandLevel(), topic.course().coverImageUrl(),
                             topic.course().description(), topic.course().skillUnlockPoints(),
-                            topic.course().comboUnlockPoints(), Set.copyOf(topic.course().availableSkills())),
+                            topic.course().comboUnlockPoints(), Set.copyOf(topic.course().availableSkills()),
+                            topic.course().bannerImageUrl()),
                     topic.course() != null && topic.course().hasCourseTest(), topic.skills(), topic.lessonCount(),
                     topic.description()));
         }

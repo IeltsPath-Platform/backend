@@ -14,15 +14,28 @@ import com.ieltspath.content.domain.vo.Skill;
 
 public record CourseResponse(UUID id, String code, String name, BigDecimal bandLevel, ContentStatus status,
                              Instant createdAt, Instant updatedAt, String coverImageUrl, String description,
-                             Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints) {
+                             Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints, boolean free,
+                             String bannerImageUrl) {
+    public CourseResponse(UUID id, String code, String name, BigDecimal bandLevel, ContentStatus status,
+                          Instant createdAt, Instant updatedAt, String coverImageUrl, String description,
+                          Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints, boolean free) {
+        this(id, code, name, bandLevel, status, createdAt, updatedAt, coverImageUrl, description, skillUnlockPoints,
+                comboUnlockPoints, free, null);
+    }
     private static final Logger log = LoggerFactory.getLogger(CourseResponse.class);
     public CourseResponse(UUID id, String code, String name, BigDecimal bandLevel, ContentStatus status,
+                          Instant createdAt, Instant updatedAt, String coverImageUrl, String description,
+                          Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints) {
+        this(id, code, name, bandLevel, status, createdAt, updatedAt, coverImageUrl, description, skillUnlockPoints,
+                comboUnlockPoints, false);
+    }
+    public CourseResponse(UUID id, String code, String name, BigDecimal bandLevel, ContentStatus status,
                           Instant createdAt, Instant updatedAt) {
-        this(id, code, name, bandLevel, status, createdAt, updatedAt, null, null, Map.of(), null);
+        this(id, code, name, bandLevel, status, createdAt, updatedAt, null, null, Map.of(), null, false);
     }
     public CourseResponse(UUID id, String code, String name, BigDecimal bandLevel, ContentStatus status,
                           Instant createdAt, Instant updatedAt, String coverImageUrl, String description) {
-        this(id, code, name, bandLevel, status, createdAt, updatedAt, coverImageUrl, description, Map.of(), null);
+        this(id, code, name, bandLevel, status, createdAt, updatedAt, coverImageUrl, description, Map.of(), null, false);
     }
 
     public static CourseResponse from(CourseResult result) {
@@ -32,7 +45,8 @@ public record CourseResponse(UUID id, String code, String name, BigDecimal bandL
     public static CourseResponse from(CourseResult result, MediaReferencePolicy mediaPolicy) {
         return new CourseResponse(result.id(), result.code(), result.name(), result.bandLevel(), result.status(),
                 result.createdAt(), result.updatedAt(), resolveCoverImage(result.coverImageUrl(), mediaPolicy), result.description(),
-                result.skillUnlockPoints(), result.comboUnlockPoints());
+                result.skillUnlockPoints(), result.comboUnlockPoints(), result.free(),
+                resolveCoverImage(result.bannerImageUrl(), mediaPolicy));
     }
 
     private static String resolveCoverImage(String reference, MediaReferencePolicy mediaPolicy) {

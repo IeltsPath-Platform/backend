@@ -105,6 +105,12 @@ public class RestLearningContentClient implements LearningContentClient {
     }
 
     @Override
+    public java.util.Set<UUID> getFreeCourseIds() {
+        List<UUID> ids = get("/courses/free", new ParameterizedTypeReference<>() { });
+        return ids == null ? java.util.Set.of() : java.util.Set.copyOf(ids);
+    }
+
+    @Override
     public List<TestPackage> getCourseTestPackages(UUID courseId) {
         return get("/courses/{id}/test-packages", new ParameterizedTypeReference<>() { }, courseId);
     }

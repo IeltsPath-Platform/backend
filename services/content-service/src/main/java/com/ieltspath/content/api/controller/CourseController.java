@@ -37,7 +37,7 @@ public class CourseController {
     public CourseResponse create(@Valid @RequestBody CreateCourseRequest request) {
         return CourseResponse.from(createCourse.execute(new CreateCourseCommand(request.code(), request.name(),
                 request.bandLevel(), request.coverImageUrl(), request.description(), request.skillUnlockPoints(),
-                request.comboUnlockPoints())), mediaPolicy);
+                request.comboUnlockPoints(), Boolean.TRUE.equals(request.free()), request.bannerImageUrl())), mediaPolicy);
     }
 
     @PutMapping("/api/content/admin/courses/{id}")
@@ -45,6 +45,6 @@ public class CourseController {
     public CourseResponse update(@PathVariable("id") UUID id, @Valid @RequestBody UpdateCourseRequest request) {
         return CourseResponse.from(updateCourse.execute(new UpdateCourseCommand(id, request.name(),
                 request.bandLevel(), request.status(), request.coverImageUrl(), request.description(),
-                request.skillUnlockPoints(), request.comboUnlockPoints())), mediaPolicy);
+                request.skillUnlockPoints(), request.comboUnlockPoints(), request.free(), request.bannerImageUrl())), mediaPolicy);
     }
 }

@@ -10,19 +10,33 @@ import com.ieltspath.content.domain.vo.Skill;
 
 public record CourseResult(UUID id, String code, String name, BigDecimal bandLevel, ContentStatus status,
                            Instant createdAt, Instant updatedAt, String coverImageUrl, String description,
-                           Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints) {
+                           Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints, boolean free,
+                           String bannerImageUrl) {
+    public CourseResult(UUID id, String code, String name, BigDecimal bandLevel, ContentStatus status,
+                        Instant createdAt, Instant updatedAt, String coverImageUrl, String description,
+                        Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints, boolean free) {
+        this(id, code, name, bandLevel, status, createdAt, updatedAt, coverImageUrl, description, skillUnlockPoints,
+                comboUnlockPoints, free, null);
+    }
+    public CourseResult(UUID id, String code, String name, BigDecimal bandLevel, ContentStatus status,
+                        Instant createdAt, Instant updatedAt, String coverImageUrl, String description,
+                        Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints) {
+        this(id, code, name, bandLevel, status, createdAt, updatedAt, coverImageUrl, description, skillUnlockPoints,
+                comboUnlockPoints, false);
+    }
     public CourseResult(UUID id, String code, String name, BigDecimal bandLevel, ContentStatus status,
                         Instant createdAt, Instant updatedAt) {
-        this(id, code, name, bandLevel, status, createdAt, updatedAt, null, null, Map.of(), null);
+        this(id, code, name, bandLevel, status, createdAt, updatedAt, null, null, Map.of(), null, false);
     }
     public CourseResult(UUID id, String code, String name, BigDecimal bandLevel, ContentStatus status,
                         Instant createdAt, Instant updatedAt, String coverImageUrl, String description) {
-        this(id, code, name, bandLevel, status, createdAt, updatedAt, coverImageUrl, description, Map.of(), null);
+        this(id, code, name, bandLevel, status, createdAt, updatedAt, coverImageUrl, description, Map.of(), null, false);
     }
 
     public static CourseResult from(Course course) {
         return new CourseResult(course.getId(), course.getCode(), course.getName(), course.getBandLevel(),
                 course.getStatus(), course.getCreatedAt(), course.getUpdatedAt(), course.getCoverImageUrl(),
-                course.getDescription(), course.getSkillUnlockPoints(), course.getComboUnlockPoints());
+                course.getDescription(), course.getSkillUnlockPoints(), course.getComboUnlockPoints(), course.isFree(),
+                course.getBannerImageUrl());
     }
 }

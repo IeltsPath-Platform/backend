@@ -63,10 +63,18 @@ public record TopicSequenceResult(
     public record CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
                               boolean active, String coverImageUrl, String description,
                               java.util.Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints,
-                              List<Skill> availableSkills) {
+                              List<Skill> availableSkills, String bannerImageUrl) {
         public CourseEntry {
             skillUnlockPoints = skillUnlockPoints == null ? java.util.Map.of() : java.util.Map.copyOf(skillUnlockPoints);
             availableSkills = availableSkills == null ? List.of() : availableSkills.stream().distinct().sorted().toList();
+        }
+
+        public CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
+                           boolean active, String coverImageUrl, String description,
+                           java.util.Map<Skill, Integer> skillUnlockPoints, Integer comboUnlockPoints,
+                           List<Skill> availableSkills) {
+            this(courseId, code, name, bandLevel, hasCourseTest, active, coverImageUrl, description, skillUnlockPoints,
+                    comboUnlockPoints, availableSkills, null);
         }
 
         public CourseEntry(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,

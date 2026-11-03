@@ -129,6 +129,8 @@ class InternalLearningContentControllerTest {
     }
 
     private final GetTopicSequenceUseCase topicSequence = mock(GetTopicSequenceUseCase.class);
+    private final com.ieltspath.content.application.usecase.GetFreeCourseIdsUseCase freeCourseIds =
+            mock(com.ieltspath.content.application.usecase.GetFreeCourseIdsUseCase.class);
     private final GetTopicLessonsUseCase topicLessons = mock(GetTopicLessonsUseCase.class);
     private final GetLessonContentUseCase lessonContent = mock(GetLessonContentUseCase.class);
     private final GetTopicTestPackagesUseCase testPackages = mock(GetTopicTestPackagesUseCase.class);
@@ -149,13 +151,24 @@ class InternalLearningContentControllerTest {
     void setUp() {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
-        mockMvc = MockMvcBuilders.standaloneSetup(new InternalLearningContentController(topicSequence, topicLessons,
+        mockMvc = MockMvcBuilders.standaloneSetup(new InternalLearningContentController(topicSequence, freeCourseIds, topicLessons,
                         lessonContent, testPackages, search, packageVersion, lessonPracticeSets, topicPracticeSets,
                         availability, courseTests, placementTests, errorTypes, activeKnowledgePrerequisites,
                         new MediaReferencePolicy("")))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
+    }
+
+    @Test
+    void freeCoursesAreListedByIdForTheLearningFlow() throws Exception {
+        UUID free = UUID.randomUUID();
+        when(freeCourseIds.execute()).thenReturn(java.util.Set.of(free));
+
+        mockMvc.perform(get("/internal/learning-content/courses/free"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value(free.toString()))
+                .andExpect(jsonPath("$.length()").value(1));
     }
 
     @Test

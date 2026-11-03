@@ -116,6 +116,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
     private final boolean hasCourseCoverImageUrl;
     private final boolean hasCourseDescription;
     private final boolean hasComboUnlockPoints;
+    private final boolean hasCourseFree;
+    private final boolean hasCourseBannerImageUrl;
     private final boolean hasCourseSkillPrices;
 
     public JdbcLearningContentReader(NamedParameterJdbcTemplate jdbc) {
@@ -124,6 +126,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
         this.hasCourseCoverImageUrl = hasColumn("courses", "cover_image_url");
         this.hasCourseDescription = hasColumn("courses", "description");
         this.hasComboUnlockPoints = hasColumn("courses", "combo_unlock_points");
+        this.hasCourseFree = hasColumn("courses", "free");
+        this.hasCourseBannerImageUrl = hasColumn("courses", "banner_image_url");
         this.hasCourseSkillPrices = hasTable("course_skill_prices");
     }
 
@@ -160,6 +164,14 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     @Override
+    public java.util.Set<UUID> freeCourseIds() {
+        if (!hasCourseFree) return java.util.Set.of();
+        return new java.util.LinkedHashSet<>(jdbc.query(
+                "SELECT id FROM courses WHERE free AND status = 'ACTIVE' ORDER BY band_level", Map.of(),
+                (rs, i) -> uuid(rs, "id")));
+    }
+
+    @Override
     public List<TopicSequenceResult> topicSequence(int minPracticeQuestions, boolean includeErrorTraps) {
         record TopicRow(UUID id, String code, String name, int sortOrder, String requiredFeatureKey, Skill skill,
                         boolean hasTopicTest, TopicSequenceResult.CourseEntry course, List<Skill> skills,
@@ -171,6 +183,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 : "NULL::text AS course_description";
         String comboUnlockPoints = hasComboUnlockPoints ? "c.combo_unlock_points"
                 : "NULL::integer AS combo_unlock_points";
+        String bannerImageUrl = hasCourseBannerImageUrl ? "c.banner_image_url"
+                : "NULL::varchar AS banner_image_url";
         List<TopicRow> topics = jdbc.query("""
                 SELECT t.id, t.code, t.name, %s, t.sort_order, t.required_feature_key, t.skill,
                        ARRAY(SELECT DISTINCT ls.skill FROM lessons l
@@ -183,7 +197,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
                        (SELECT count(*) FROM lessons l
                         WHERE l.topic_id = t.id AND l.status = 'PUBLISHED') AS lesson_count,
                        c.id AS course_id, c.code AS course_code, c.name AS course_name, c.band_level,
-                       %s, %s, %s,
+                       %s, %s, %s, %s,
                        ARRAY(SELECT DISTINCT t2.skill FROM topics t2
                              WHERE t2.course_id = c.id AND t2.status = 'ACTIVE' AND t2.skill IS NOT NULL
                                AND EXISTS (SELECT 1 FROM lessons l2 WHERE l2.topic_id = t2.id AND l2.status = 'PUBLISHED')
@@ -197,14 +211,16 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 WHERE t.status = 'ACTIVE' AND c.status = 'ACTIVE'
                   AND EXISTS (SELECT 1 FROM lessons l WHERE l.topic_id = t.id AND l.status = 'PUBLISHED')
                 ORDER BY t.skill, c.band_level, t.sort_order, t.id
-                """.formatted(topicDescription, LESSON_SKILLS, coverImageUrl, courseDescription, comboUnlockPoints),
+                """.formatted(topicDescription, LESSON_SKILLS, coverImageUrl, courseDescription, comboUnlockPoints,
+                        bannerImageUrl),
                 Map.of(), (rs, i) -> new TopicRow(uuid(rs, "id"), rs.getString("code"), rs.getString("name"),
                 rs.getInt("sort_order"), rs.getString("required_feature_key"),
                 enumOrNull(Skill.class, rs.getString("skill")), rs.getBoolean("has_topic_test"),
                 new TopicSequenceResult.CourseEntry(uuid(rs, "course_id"), rs.getString("course_code"),
                         rs.getString("course_name"), rs.getBigDecimal("band_level"), rs.getBoolean("has_course_test"),
                         true, rs.getString("cover_image_url"), rs.getString("course_description"), Map.of(),
-                        (Integer) rs.getObject("combo_unlock_points"), skills(rs, "available_skills")), skills(rs),
+                        (Integer) rs.getObject("combo_unlock_points"), skills(rs, "available_skills"),
+                        rs.getString("banner_image_url")), skills(rs),
                 rs.getInt("lesson_count"), rs.getString("description")));
         if (topics.isEmpty()) {
             return List.of();
@@ -274,7 +290,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
                                 t.course().bandLevel(), t.course().hasCourseTest(), t.course().active(),
                                 t.course().coverImageUrl(), t.course().description(),
                                 pricesByCourse.getOrDefault(t.course().courseId(), Map.of()),
-                                t.course().comboUnlockPoints(), t.course().availableSkills()), t.skills(),
+                                t.course().comboUnlockPoints(), t.course().availableSkills(),
+                                t.course().bannerImageUrl()), t.skills(),
                         true, t.lessonCount(), t.description()))
                 .toList();
     }

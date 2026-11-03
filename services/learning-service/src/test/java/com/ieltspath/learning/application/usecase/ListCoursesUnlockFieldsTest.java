@@ -37,6 +37,7 @@ class ListCoursesUnlockFieldsTest {
     @Mock LearnerCourseUnlockRepository unlocks;
     @Mock ReconcilePendingCourseUnlocks reconciler;
     @Mock AccessClient access;
+    @Mock com.ieltspath.learning.application.port.LearningContentClient content;
     @InjectMocks ListCoursesUseCase useCase;
 
     @Test
@@ -68,5 +69,6 @@ class ListCoursesUnlockFieldsTest {
         assertThat(result.comboUnlocked()).isFalse();
         assertThat(result.comboPayablePoints()).isEqualTo(270);
         assertThat(result.premium()).isTrue();
+        assertThat(result.free()).isFalse();
     }
 }
