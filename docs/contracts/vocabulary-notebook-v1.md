@@ -10,6 +10,8 @@ Request: `{"vocabularySenseId":"<uuid>"}`. Creates one active vocabulary flashca
 
 Returns a `NotebookEntryResponse`: `flashcardId`, `vocabularySenseId`, `vocabularyItemId`, `lemma`, `ipa`, `pronunciationAudioReference`, `partOfSpeech`, `vietnameseMeaning`, `englishDefinition`, `exampleSentence`, `imageUrl`, `level`, `leitnerBox`, `reviewCount`, `lastReviewedAt`, `nextReviewAt`, `createdAt`, and `note`. First save returns 201; a repeated save returns the existing entry with 200. Missing or inactive sense returns 404.
 
+`pronunciationAudioReference` is the preferred audio in US → UK → legacy-column order, returned as a complete HTTPS URL or null.
+
 ### `GET /api/learning-support/flashcards/notebook/entries`
 
 Query: `q` (optional, up to 100 characters; case-insensitive search across lemma and meanings), repeated `level` (`UNKNOWN`, `FAMILIAR`, `LEARNING`, `MASTERED`), `due` (optional boolean), `topicId` and `setId` (optional UUID filters), `sort` (`RECENT` default, `DUE`, `ALPHABET`, `WEAKEST`), `page` (default 0), `size` (default 20, 1–50). Returns `{items,page,size,total}` with the entry fields above plus `cefrLevel` and `topicName`. Filtering, ordering, and paging run in SQL.
@@ -95,6 +97,8 @@ Returns `{items,page,size,total}` of active set members. Optional `topicId` filt
 ### `GET /api/content/vocabulary/mindmap?topicId=<uuid>` or `?itemId=<uuid>`
 
 Exactly one parameter is required. Returns `{nodes,edges}` with at most 80 total nodes; topic queries include the topic node and related words, collocations, and synonyms.
+
+The frontend no longer uses the mindmap endpoint from 2026-11; the endpoint remains for compatibility.
 
 ### Vocabulary catalog ownership
 

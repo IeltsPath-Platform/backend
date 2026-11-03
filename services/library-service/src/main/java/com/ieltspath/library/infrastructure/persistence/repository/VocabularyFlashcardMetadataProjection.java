@@ -6,5 +6,7 @@ public interface VocabularyFlashcardMetadataProjection {
     UUID getSenseId();
     String getIpa();
     String getPronunciationAudioReference();
+    String getAudioUkReference();
+    String getAudioUsReference();
     String getExampleSentence();
 }

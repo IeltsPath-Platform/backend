@@ -9,6 +9,7 @@ import com.ieltspath.library.application.query.PageQuery;
 import com.ieltspath.library.domain.vo.CefrLevel;
 import com.ieltspath.library.domain.vo.VocabularySetKind;
 import com.ieltspath.library.infrastructure.adapter.VocabularyProgressJdbcAdapter;
+import com.ieltspath.commonstorage.ObjectStorage;
 import com.ieltspath.library.application.port.FlashcardImageStorage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
 
 @JdbcTest
 @Testcontainers(disabledWithoutDocker = true)
@@ -50,6 +52,7 @@ class VocabularyNotebookJdbcIntegrationTest {
     @Autowired VocabularyProgressJdbcAdapter progress;
     @Autowired VocabularyCatalogJdbcAdapter catalogStore;
     @MockBean FlashcardImageStorage imageStorage;
+    @MockBean ObjectStorage objectStorage;
 
     @DynamicPropertySource static void datasource(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -86,6 +89,33 @@ class VocabularyNotebookJdbcIntegrationTest {
         assertThrows(org.springframework.dao.DuplicateKeyException.class, () -> jdbc.update(
                 "insert into flashcards(id,user_id,source_type,vocabulary_sense_id,front,back,status) values(?,?,'VOCABULARY_SENSE',?,?,?,'ACTIVE')",
                 UUID.randomUUID(), user, sense, "apple", "meaning"));
+    }
+
+    @Test void notebookResolvesPreferredAudioKeyAndKeepsLegacyHttps() {
+        UUID user = UUID.randomUUID();
+        UUID item = UUID.randomUUID(), sense = UUID.randomUUID(), card = UUID.randomUUID();
+        String key = "vocabulary/pronunciation/us/preferred.mp3";
+        String url = "https://storage.example/storage/v1/object/public/media/" + key;
+        when(objectStorage.publicUrl("media", key)).thenReturn(url);
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,audio_us_reference,audio_uk_reference,pronunciation_audio_reference) values(?,?,?,'ACTIVE',?,?,?)",
+                item, "preferred", "preferred", key, "vocabulary/pronunciation/uk/other.mp3", "https://legacy.example/old.mp3");
+        jdbc.update("insert into vocabulary_senses(id,vocabulary_item_id,part_of_speech,vietnamese_meaning,example_sentence,status) values(?,?,'NOUN','nghĩa','Example.','ACTIVE')",
+                sense, item);
+        jdbc.update("insert into flashcards(id,user_id,source_type,vocabulary_sense_id,front,back,status) values(?,?,'VOCABULARY_SENSE',?,?,'meaning','ACTIVE')",
+                card, user, sense, "preferred");
+
+        var entry = adapter.findEntry(user, card).orElseThrow();
+
+        assertEquals(url, entry.pronunciationAudioReference());
+
+        UUID legacyItem = UUID.randomUUID(), legacySense = UUID.randomUUID(), legacyCard = UUID.randomUUID();
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,pronunciation_audio_reference) values(?,?,?,'ACTIVE',?)",
+                legacyItem, "legacy audio", "legacy audio", "https://legacy.example/audio.mp3");
+        jdbc.update("insert into vocabulary_senses(id,vocabulary_item_id,part_of_speech,vietnamese_meaning,example_sentence,status) values(?,?,'NOUN','nghĩa','Example.','ACTIVE')",
+                legacySense, legacyItem);
+        jdbc.update("insert into flashcards(id,user_id,source_type,vocabulary_sense_id,front,back,status) values(?,?,'VOCABULARY_SENSE',?,?,'meaning','ACTIVE')",
+                legacyCard, user, legacySense, "legacy audio");
+        assertEquals("https://legacy.example/audio.mp3", adapter.findEntry(user, legacyCard).orElseThrow().pronunciationAudioReference());
     }
 
     @Test void pronunciationAudioIsReturnedOnlyForWordsThatHaveAny() {

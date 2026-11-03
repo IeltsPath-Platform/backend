@@ -482,9 +482,9 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
             return List.of();
         }
         MapSqlParameterSource p = new MapSqlParameterSource("ids", ids);
-        List<ItemRow> items = jdbc.query("SELECT id, lemma, normalized_lemma, ipa, pronunciation_audio_reference, ipa_uk, ipa_us, "
+        List<ItemRow> items = jdbc.query("SELECT id, lemma, normalized_lemma, ipa, " + VocabularyAudioSql.PREFERRED_REFERENCE + " preferred_audio_reference, ipa_uk, ipa_us, "
                 + "audio_uk_reference, audio_us_reference, frequency_rank, academic_word_list, word_family, status, created_at, "
-                + "updated_at FROM vocabulary_items WHERE id IN (:ids)" + (activeOnly ? " AND status='ACTIVE'" : ""), p, this::itemRow);
+                + "updated_at FROM vocabulary_items v WHERE id IN (:ids)" + (activeOnly ? " AND status='ACTIVE'" : ""), p, this::itemRow);
         List<SenseRow> senses = jdbc.query("SELECT id, vocabulary_item_id, part_of_speech, english_definition, vietnamese_meaning, "
                 + "example_sentence, image_url, sort_order, status, created_at, updated_at, cefr_level, topic_id, register, "
                 + "grammar_note, usage_note, example_translation FROM vocabulary_senses "
@@ -617,7 +617,7 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
 
     private ItemRow itemRow(ResultSet rs, int n) throws SQLException {
         return new ItemRow(uuid(rs, "id"), rs.getString("lemma"), rs.getString("normalized_lemma"), rs.getString("ipa"),
-                rs.getString("pronunciation_audio_reference"), rs.getString("ipa_uk"), rs.getString("ipa_us"),
+                rs.getString("preferred_audio_reference"), rs.getString("ipa_uk"), rs.getString("ipa_us"),
                 audioUrls.resolve(rs.getString("audio_uk_reference")), audioUrls.resolve(rs.getString("audio_us_reference")),
                 rs.getObject("frequency_rank", Integer.class),
                 rs.getBoolean("academic_word_list"), rs.getString("word_family"), ContentStatus.valueOf(rs.getString("status")),

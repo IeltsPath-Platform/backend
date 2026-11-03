@@ -38,6 +38,7 @@ public interface VocabularyItemJpaRepository extends JpaRepository<VocabularyIte
     @Query("""
             SELECT sense.id AS senseId, item.id AS vocabularyItemId, item.lemma AS lemma,
                    item.ipa AS ipa, item.pronunciationAudioReference AS pronunciationAudioReference,
+                   item.audioUkReference AS audioUkReference, item.audioUsReference AS audioUsReference,
                    sense.partOfSpeech AS partOfSpeech, sense.englishDefinition AS englishDefinition,
                    sense.vietnameseMeaning AS vietnameseMeaning, sense.exampleSentence AS exampleSentence,
                    sense.imageUrl AS imageUrl
@@ -55,6 +56,8 @@ public interface VocabularyItemJpaRepository extends JpaRepository<VocabularyIte
         String getLemma();
         String getIpa();
         String getPronunciationAudioReference();
+        String getAudioUkReference();
+        String getAudioUsReference();
         com.ieltspath.library.domain.vo.PartOfSpeech getPartOfSpeech();
         String getEnglishDefinition();
         String getVietnameseMeaning();

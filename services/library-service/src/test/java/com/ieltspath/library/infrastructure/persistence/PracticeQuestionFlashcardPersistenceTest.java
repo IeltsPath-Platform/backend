@@ -1,6 +1,7 @@
 package com.ieltspath.library.infrastructure.persistence;
 
 import com.ieltspath.library.application.port.FlashcardImageStorage;
+import com.ieltspath.library.application.port.PronunciationAudioUrls;
 import com.ieltspath.library.application.result.SavedFlashcard;
 import com.ieltspath.library.application.usecase.SavePracticeQuestionFlashcardUseCase;
 import com.ieltspath.library.application.usecase.ReviewFlashcardUseCase;
@@ -68,6 +69,8 @@ class PracticeQuestionFlashcardPersistenceTest {
     private ReviewFlashcardUseCase reviewFlashcard;
     @Autowired
     private JdbcTemplate jdbc;
+    @MockBean
+    private PronunciationAudioUrls pronunciationAudioUrls;
     @MockBean
     private FlashcardImageStorage storage;
 

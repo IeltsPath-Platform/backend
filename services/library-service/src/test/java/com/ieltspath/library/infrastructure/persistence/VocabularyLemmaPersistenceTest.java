@@ -2,6 +2,7 @@ package com.ieltspath.library.infrastructure.persistence;
 
 import com.ieltspath.library.application.command.ResolveVocabularyCommand;
 import com.ieltspath.library.application.command.ResolveVocabularyCommand.Entry;
+import com.ieltspath.library.application.port.PronunciationAudioUrls;
 import com.ieltspath.library.application.result.ResolvedVocabularyResult;
 import com.ieltspath.library.application.result.VocabularyItemResult;
 import com.ieltspath.library.application.usecase.FindVocabularyByLemmasUseCase;
@@ -16,6 +17,7 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -60,6 +62,7 @@ class VocabularyLemmaPersistenceTest {
     @Autowired FindVocabularyByLemmasUseCase find;
     @Autowired JdbcTemplate jdbc;
     @Autowired jakarta.persistence.EntityManager entityManager;
+    @MockBean PronunciationAudioUrls pronunciationAudioUrls;
 
     private final String lemma = "zz" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
 
