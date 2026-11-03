@@ -118,6 +118,19 @@ class VocabularyNotebookJdbcIntegrationTest {
         assertEquals("https://legacy.example/audio.mp3", adapter.findEntry(user, legacyCard).orElseThrow().pronunciationAudioReference());
     }
 
+    @Test void catalogItemResolvesPreferredAudioKey() {
+        UUID item = UUID.randomUUID();
+        String key = "vocabulary/pronunciation/us/catalog-word.mp3";
+        String url = "https://storage.example/storage/v1/object/public/media/" + key;
+        when(objectStorage.publicUrl("media", key)).thenReturn(url);
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,audio_us_reference) values(?,?,?,'ACTIVE',?)",
+                item, "catalog word", "catalog word", key);
+        jdbc.update("insert into vocabulary_senses(id,vocabulary_item_id,part_of_speech,vietnamese_meaning,example_sentence,status) values(?,?,'NOUN','nghĩa','Example.','ACTIVE')",
+                UUID.randomUUID(), item);
+
+        assertEquals(url, catalogStore.findActiveItem(item).orElseThrow().pronunciationAudioReference());
+    }
+
     @Test void pronunciationAudioIsReturnedOnlyForWordsThatHaveAny() {
         jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,audio_uk_reference) values(?,?,?,'ACTIVE',?)",
                 UUID.randomUUID(), "audio probe", "audio probe", "https://cdn.example.com/probe.mp3");

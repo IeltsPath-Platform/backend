@@ -617,7 +617,7 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
 
     private ItemRow itemRow(ResultSet rs, int n) throws SQLException {
         return new ItemRow(uuid(rs, "id"), rs.getString("lemma"), rs.getString("normalized_lemma"), rs.getString("ipa"),
-                rs.getString("preferred_audio_reference"), rs.getString("ipa_uk"), rs.getString("ipa_us"),
+                audioUrls.resolve(rs.getString("preferred_audio_reference")), rs.getString("ipa_uk"), rs.getString("ipa_us"),
                 audioUrls.resolve(rs.getString("audio_uk_reference")), audioUrls.resolve(rs.getString("audio_us_reference")),
                 rs.getObject("frequency_rank", Integer.class),
                 rs.getBoolean("academic_word_list"), rs.getString("word_family"), ContentStatus.valueOf(rs.getString("status")),
