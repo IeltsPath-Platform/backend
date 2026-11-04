@@ -55,6 +55,12 @@ The public catalog also supports `lang=EN|VI`, CEFR/topic filters, `/suggestions
 
 Topics and sets are part of the Library dictionary and are independent from Content curriculum topics. Topic/set cover keys reuse the existing `flashcards` storage bucket and `POST /api/learning-support/flashcards/images`; no additional bucket or environment variable is required.
 
+Sense pictures and pronunciation audio are not stored in `flashcards`. They go to the public `media` bucket (`LIBRARY_CATALOG_MEDIA_BUCKET`, default `media`), so authored vocabulary media does not share a bucket with learners' flashcard images:
+
+- `POST /api/content/admin/vocabulary/sense-images` (multipart `file`, JPEG/PNG/WebP, max 2 MB) stores `vocabulary/images/{uuid}.{ext}` and returns `{mediaReference, mediaUrl, contentType, sizeBytes}`; the URL is kept as the sense `imageUrl`.
+- `POST /api/content/admin/vocabulary/pronunciation` (multipart `file`, `lemma`, `accent` = `us` or `uk`; MP3/MP4/WAV/OGG, max 25 MB) stores `vocabulary/pronunciation/{us|uk}/{slug}.{ext}`, where `slug` is the normalized lemma with each run of characters outside a-z0-9 replaced by `-`. It is refused when the word already exists, so an existing file is never overwritten. The returned URL is stored in `audio_us_reference` / `audio_uk_reference`.
+- `POST /api/content/admin/vocabulary` accepts optional `ipaUs`, `ipaUk`, `audioUsReference` and `audioUkReference` and writes them with the word in the same transaction.
+
 Learners save vocabulary senses with `POST /api/learning-support/flashcards/notebook/entries`, list/filter/sort them at `/entries`, read aggregate counts at `/summary`, and set understanding at `/entries/{flashcardId}/level`. Existing flashcard review and delete routes remain in use. One non-deleted card is allowed per learner and sense; level is derived from Leitner boxes (1 UNKNOWN, 2 FAMILIAR, 3 LEARNING, 4–5 MASTERED). Notes use `sourceType=VOCABULARY_SENSE` and are limited to 300 characters. Migration V18 adds the partial unique index.
 
 Reviews optionally accept `sessionId` and append `flashcard_review_events` in the review transaction only when the request is applied. Notebook progress includes weekly goals (`library.vocabulary.weekly-goal-default`, default 120), the six-band vocabulary map, topic/set progress, recent session result, and read-time achievements. Summary and entry responses only gain fields; entries accept `topicId` and `setId` filters. These authenticated endpoints scope every learner aggregate to the current user, use SQL aggregates, and do not call learning-service or award XP/points. Migration V21 adds review events and per-user weekly goals.
@@ -79,6 +85,7 @@ For the full container stack, run `docker compose up -d --build`. To run Library
 | `SUPABASE_URL` | Supabase API URL for object storage |
 | `SUPABASE_SECRET_KEY` | Supabase secret key for storage access |
 | `LIBRARY_FLASHCARD_BUCKET` | Bucket name for flashcard illustrations (`flashcards` by default) |
+| `LIBRARY_CATALOG_MEDIA_BUCKET` | Public bucket for vocabulary sense pictures and pronunciation audio (`media` by default) |
 
 Verify with `mvn -q -pl services/library-service -am test`. Migration tests use Testcontainers and require Docker.
 

@@ -19,6 +19,8 @@ import com.ieltspath.library.application.result.WordRelationResult;
 import com.ieltspath.library.application.result.StoredImageResult;
 import com.ieltspath.library.application.usecase.VocabularyCatalogUseCase;
 import com.ieltspath.library.application.usecase.UploadCatalogCoverUseCase;
+import com.ieltspath.library.application.usecase.UploadPronunciationAudioUseCase;
+import com.ieltspath.library.application.usecase.UploadSenseImageUseCase;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.library.domain.catalog.CatalogLimits;
@@ -55,6 +57,8 @@ import java.io.IOException;
 public class AdminVocabularyCatalogController {
     private final VocabularyCatalogUseCase catalog;
     private final UploadCatalogCoverUseCase uploadCatalogCover;
+    private final UploadSenseImageUseCase uploadSenseImage;
+    private final UploadPronunciationAudioUseCase uploadPronunciationAudio;
     private final CurrentUserProvider currentUserProvider;
 
     @PostMapping(value = "/covers", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -71,6 +75,36 @@ public class AdminVocabularyCatalogController {
         }
         StoredImageResult result = uploadCatalogCover.execute(currentUserProvider.requireUserId(), file.getContentType(), bytes);
         return CatalogCoverResponse.from(result);
+    }
+
+    /** A picture for one sense, in the public media bucket under {@code vocabulary/images/}. */
+    @PostMapping(value = "/sense-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public CatalogCoverResponse uploadSenseImage(@RequestParam("file") MultipartFile file) {
+        return CatalogCoverResponse.from(uploadSenseImage.execute(file.getContentType(), readUpload(file)));
+    }
+
+    /**
+     * US or UK pronunciation of a word that is not in the library yet. The file is named after the lemma, so it is sent
+     * with the lemma and is refused when the word already exists.
+     */
+    @PostMapping(value = "/pronunciation", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public CatalogCoverResponse uploadPronunciation(@RequestParam("file") MultipartFile file,
+                                                    @RequestParam("lemma") String lemma,
+                                                    @RequestParam("accent") String accent) {
+        return CatalogCoverResponse.from(uploadPronunciationAudio.execute(lemma, accent, file.getContentType(), readUpload(file)));
+    }
+
+    private static byte[] readUpload(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
+        }
+        try {
+            return file.getBytes();
+        } catch (IOException e) {
+            throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
+        }
     }
 
     @PutMapping("/items/{id}")

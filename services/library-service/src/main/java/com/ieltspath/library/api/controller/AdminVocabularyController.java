@@ -61,7 +61,7 @@ public class AdminVocabularyController {
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public VocabularyItemResponse create(@Valid @RequestBody CreateVocabularyItemRequest request) {
         return VocabularyItemResponse.from(create.execute(new CreateVocabularyItemCommand(
-                request.lemma(), request.ipa(), request.pronunciationAudioReference())));
+                request.lemma(), request.ipa(), request.pronunciationAudioReference(), request.toDictionary())));
     }
 
     @PostMapping("/{id}/senses")

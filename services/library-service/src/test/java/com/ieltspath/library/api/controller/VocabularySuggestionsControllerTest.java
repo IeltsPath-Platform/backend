@@ -31,16 +31,16 @@ class VocabularySuggestionsControllerTest {
     @Autowired MockMvc mvc;
     @MockBean SuggestVocabularyUseCase suggest;
 
-    @Test void requiresAuthorOrAdmin() throws Exception {
+    @Test void requiresContentAuthor() throws Exception {
         mvc.perform(get(PATH).param("q", "poll")).andExpect(status().isUnauthorized());
-        mvc.perform(get(PATH).param("q", "poll").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CUSTOMER"))))
-                .andExpect(status().isForbidden());
-        when(suggest.execute(any())).thenReturn(new VocabularySuggestionsResult(List.of(), 0, 20, false));
-        for (String role : List.of("CONTENT_AUTHOR", "ADMIN")) {
+        for (String role : List.of("CUSTOMER", "ADMIN")) {
             mvc.perform(get(PATH).param("q", "poll").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_" + role))))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.content").isArray())
-                    .andExpect(jsonPath("$.size").value(20)).andExpect(jsonPath("$.hasMore").value(false));
+                    .andExpect(status().isForbidden());
         }
+        when(suggest.execute(any())).thenReturn(new VocabularySuggestionsResult(List.of(), 0, 20, false));
+        mvc.perform(get(PATH).param("q", "poll").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CONTENT_AUTHOR"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.size").value(20)).andExpect(jsonPath("$.hasMore").value(false));
     }
 
     @Test void rejectsOversizedQueriesAndInvalidPagination() throws Exception {

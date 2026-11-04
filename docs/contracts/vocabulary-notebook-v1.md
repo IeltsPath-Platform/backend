@@ -106,7 +106,10 @@ These paths require `CONTENT_AUTHOR` or `ADMIN`; missing/invalid authentication 
 
 | Method and path | Request | Success |
 | --- | --- | --- |
-| `PUT /api/content/admin/vocabulary/items/{id}` | JSON fields `ipaUk`, `ipaUs`, `audioUkReference`, `audioUsReference`, `frequencyRank`, `academicWordList`, `wordFamily` | 200 updated item |
+| `POST /api/content/admin/vocabulary` | `{lemma,ipa,pronunciationAudioReference,ipaUs,ipaUk,audioUsReference,audioUkReference}`; only `lemma` is required; the IPA and audio fields are stored with the word in the same transaction | 201 item (no senses yet) |
+| `POST /api/content/admin/vocabulary/sense-images` | multipart `file`: JPEG, PNG or WebP, ≤2 MB | 201 `{mediaReference,mediaUrl,contentType,sizeBytes}`; the file goes to `media/vocabulary/images/<uuid>.<ext>` and `mediaUrl` is stored as the sense `imageUrl` |
+| `POST /api/content/admin/vocabulary/pronunciation` | multipart `file` (MP3, MP4 audio, WAV or OGG, ≤25 MB), `lemma`, `accent` = `us` or `uk` | 201 same body; the file goes to `media/vocabulary/pronunciation/{us\|uk}/<slug>.<ext>`, slug = lemma lower-cased with each run of characters outside a-z0-9 as `-`; 400 when the word already exists, so an existing file is never overwritten |
+| `PUT /api/content/admin/vocabulary/items/{id}` | JSON fields `ipaUk`, `ipaUs`, `audioUkReference`, `audioUsReference`, `frequencyRank`, `academicWordList`, `wordFamily`; every field not sent is cleared | 200 updated item |
 | `PUT /api/content/admin/vocabulary/senses/{id}` | JSON fields `cefrLevel`, `topicId`, `register`, `grammarNote`, `usageNote`, `exampleTranslation` | 200 updated sense |
 | `PUT /api/content/admin/vocabulary/senses/{id}/collocations` | Array of `{phrase,meaningVi,example}` (≤30) | 200 replacement list |
 | `PUT /api/content/admin/vocabulary/senses/{id}/relations` | Array of `{relatedLemma,relatedItemId,kind}`; kind is `SYNONYM|ANTONYM|RELATED` (≤30) | 200 replacement list |
@@ -122,7 +125,7 @@ These paths require `CONTENT_AUTHOR` or `ADMIN`; missing/invalid authentication 
 | `DELETE /api/content/admin/vocabulary/sets/{id}` | — | 204; marks inactive |
 | `PUT /api/content/admin/vocabulary/sets/{id}/items` | JSON array of ordered sense UUIDs (≤500; unique) | 204 |
 
-Topic/set covers store an object key in the existing `flashcards` bucket and resolve a public URL through common-storage. Uploads reuse `POST /api/learning-support/flashcards/images`; no extra bucket or environment setting is introduced.
+Topic/set covers store an object key in the existing `flashcards` bucket and resolve a public URL through common-storage. Uploads reuse `POST /api/learning-support/flashcards/images`. Sense pictures and pronunciation audio are public URLs in the `media` bucket (`LIBRARY_CATALOG_MEDIA_BUCKET`, default `media`), not in `flashcards`, so they do not share a bucket with learners' flashcard images.
 
 Migrations V19 (additive schema) and V20 (demo catalog) extend the library database. Demo CEFR/topic/examples/collocations/mistakes are authored content and require IELTS examiner review. `frequency_rank` remains null without a COCA source; only Coxhead AWL lemmas are marked true (`data`, `method`, `research`, plus `income`, `network`, `diversity`, `assignment` from V22).
 

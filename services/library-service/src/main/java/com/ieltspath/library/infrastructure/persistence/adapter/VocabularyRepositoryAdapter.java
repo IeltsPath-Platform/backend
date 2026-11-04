@@ -3,6 +3,7 @@ package com.ieltspath.library.infrastructure.persistence.adapter;
 import com.ieltspath.library.domain.aggregate.VocabularyItem;
 import com.ieltspath.library.domain.repository.VocabularyRepository;
 import com.ieltspath.library.domain.vo.VocabularySenseCard;
+import com.ieltspath.library.infrastructure.persistence.JpaSupport;
 import com.ieltspath.library.infrastructure.persistence.mapper.VocabularyPersistenceMapper;
 import com.ieltspath.library.infrastructure.persistence.repository.VocabularyItemJpaRepository;
 import org.springframework.stereotype.Component;
@@ -26,8 +27,8 @@ public class VocabularyRepositoryAdapter implements VocabularyRepository {
     @Override
     public VocabularyItem save(VocabularyItem item) {
         var entity = mapper.toEntity(item);
-        var saved = vocabularyItemJpaRepository.save(entity);
-        return mapper.toDomain(saved);
+        // Flushed so the row exists for JDBC writes later in the same transaction (the dictionary columns).
+        return mapper.toDomain(JpaSupport.flush(vocabularyItemJpaRepository, entity));
     }
 
     @Override

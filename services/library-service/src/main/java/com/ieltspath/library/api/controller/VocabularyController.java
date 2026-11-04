@@ -126,7 +126,8 @@ public class VocabularyController {
         VocabularyItemResult result = createVocabularyItemUseCase.execute(new CreateVocabularyItemCommand(
                 request.lemma(),
                 request.ipa(),
-                request.pronunciationAudioReference()
+                request.pronunciationAudioReference(),
+                request.toDictionary()
         ));
         return VocabularyItemResponse.from(result);
     }

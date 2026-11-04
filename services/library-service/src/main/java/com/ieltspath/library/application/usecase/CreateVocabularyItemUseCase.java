@@ -1,9 +1,11 @@
 package com.ieltspath.library.application.usecase;
 
 import com.ieltspath.library.application.command.CreateVocabularyItemCommand;
+import com.ieltspath.library.application.port.VocabularyCatalogStore;
 import com.ieltspath.library.application.result.VocabularyItemResult;
 import com.ieltspath.library.domain.aggregate.VocabularyItem;
 import com.ieltspath.library.domain.exception.DuplicateCodeException;
+import com.ieltspath.library.domain.exception.ResourceNotFoundException;
 import com.ieltspath.library.domain.repository.VocabularyRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,9 +18,11 @@ import java.util.Locale;
 public class CreateVocabularyItemUseCase {
 
     private final VocabularyRepository vocabularyRepository;
+    private final VocabularyCatalogStore catalogStore;
 
-    public CreateVocabularyItemUseCase(VocabularyRepository vocabularyRepository) {
+    public CreateVocabularyItemUseCase(VocabularyRepository vocabularyRepository, VocabularyCatalogStore catalogStore) {
         this.vocabularyRepository = vocabularyRepository;
+        this.catalogStore = catalogStore;
     }
 
     public VocabularyItemResult execute(CreateVocabularyItemCommand command) {
@@ -34,6 +38,10 @@ public class CreateVocabularyItemUseCase {
         );
 
         VocabularyItem saved = vocabularyRepository.save(item);
+        // The dictionary columns are written by the catalog store, not the entity mapping. The save above is flushed
+        // first, so the row exists for this update in the same transaction.
+        catalogStore.updateItem(saved.getId(), command.dictionary())
+                .orElseThrow(ResourceNotFoundException::new);
         return new VocabularyItemResult(
                 saved.getId(),
                 saved.getLemma(),
