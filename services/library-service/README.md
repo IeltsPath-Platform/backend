@@ -75,6 +75,8 @@ For the full container stack, run `docker compose up -d --build`. To run Library
 | `SUPABASE_SECRET_KEY` | Supabase secret key for storage access |
 | `LIBRARY_FLASHCARD_BUCKET` | Bucket name for flashcard illustrations (`flashcards` by default) |
 
+Key-backed vocabulary `pronunciationAudioReference` values resolve from the public `media` bucket and require `SUPABASE_URL`; without it, these values return `null` (existing HTTPS references are preserved).
+
 Verify with `mvn -q -pl services/library-service -am test`. Migration tests use Testcontainers and require Docker.
 
 ## Wordly random vocabulary

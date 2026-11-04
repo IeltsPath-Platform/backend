@@ -1,6 +1,7 @@
 package com.ieltspath.library.application.usecase;
 
 import com.ieltspath.library.application.command.AddVocabularySenseCommand;
+import com.ieltspath.library.application.port.PronunciationAudioUrls;
 import com.ieltspath.library.application.result.VocabularyItemResult;
 import com.ieltspath.library.application.result.VocabularySenseResult;
 import com.ieltspath.library.domain.aggregate.VocabularyItem;
@@ -17,9 +18,11 @@ import java.util.List;
 public class AddVocabularySenseUseCase {
 
     private final VocabularyRepository vocabularyRepository;
+    private final PronunciationAudioUrls audioUrls;
 
-    public AddVocabularySenseUseCase(VocabularyRepository vocabularyRepository) {
+    public AddVocabularySenseUseCase(VocabularyRepository vocabularyRepository, PronunciationAudioUrls audioUrls) {
         this.vocabularyRepository = vocabularyRepository;
+        this.audioUrls = audioUrls;
     }
 
     public VocabularyItemResult execute(AddVocabularySenseCommand command) {
@@ -60,7 +63,7 @@ public class AddVocabularySenseUseCase {
                 saved.getLemma(),
                 saved.getNormalizedLemma(),
                 saved.getIpa(),
-                saved.getPronunciationAudioReference(),
+                audioUrls.resolve(saved.preferredAudioReference()),
                 saved.getStatus(),
                 saved.getCreatedAt(),
                 saved.getUpdatedAt(),
