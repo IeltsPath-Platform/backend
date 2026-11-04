@@ -172,7 +172,10 @@ public class JdbcHumanReviewStore implements HumanReviewStore {
                     draft_payload=NULL,draft_saved_at=NULL
                 WHERE grading_job_id=:id AND grader_user_id=:examiner
                 """, new MapSqlParameterSource("id", jobId).addValue("examiner", examinerId));
-        return Optional.of(new Completed(job.learnerId(), job.submissionId(), job.skill()));
+        UUID sourceSubmissionId = jdbc.queryForObject(
+                "SELECT source_submission_id FROM human_review_submissions WHERE id=:id",
+                new MapSqlParameterSource("id", job.submissionId()), UUID.class);
+        return Optional.of(new Completed(job.learnerId(), job.submissionId(), sourceSubmissionId, job.skill()));
     }
 
     private boolean alreadyCompleted(UUID submissionId, BigDecimal band, JsonNode criteria, List<String> errors,

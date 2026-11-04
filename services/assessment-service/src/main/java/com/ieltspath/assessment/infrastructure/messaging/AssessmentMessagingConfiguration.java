@@ -2,6 +2,7 @@ package com.ieltspath.assessment.infrastructure.messaging;
 
 import com.ieltspath.events.assessment.AssessmentMessaging;
 import com.ieltspath.events.assessment.GradingCompletedTopology;
+import com.ieltspath.events.assessment.HumanReviewCompletedTopology;
 import com.ieltspath.events.assessment.GradingDueSoonTopology;
 import com.ieltspath.events.assessment.GradingOverdueTopology;
 import com.ieltspath.events.assessment.GradingRequestedTopology;
@@ -55,5 +56,11 @@ public class AssessmentMessagingConfiguration {
     @Bean
     Declarables gradingCompletedTopology() {
         return GradingCompletedTopology.declarables(AssessmentMessaging.EXCHANGE);
+    }
+
+    /** Same reason, and the same fixed exchange, for Learning's "examiner finished a Writing review" queue. */
+    @Bean
+    Declarables humanReviewCompletedTopology() {
+        return HumanReviewCompletedTopology.declarables(AssessmentMessaging.EXCHANGE);
     }
 }

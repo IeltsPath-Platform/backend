@@ -11,13 +11,17 @@ import com.ieltspath.assessment.application.port.ErrorTypeCatalog;
 import com.ieltspath.assessment.application.port.HumanReviewStore;
 import com.ieltspath.assessment.domain.exception.AssessmentNotFoundException;
 import com.ieltspath.assessment.domain.exception.InvalidAssessmentStateException;
+import com.ieltspath.events.assessment.HumanReviewCompletedV1;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -32,16 +36,19 @@ public class HumanReviewService {
     private final ExaminerAssignmentService assignments;
     private final GradingRequestAnnouncer announcer;
     private final GradingCompletedAnnouncer completedAnnouncer;
+    private final HumanReviewCompletedAnnouncer learningAnnouncer;
 
     public HumanReviewService(HumanReviewStore store, ObjectMapper json, ErrorTypeCatalog errorTypes,
                               ExaminerAssignmentService assignments, GradingRequestAnnouncer announcer,
-                              GradingCompletedAnnouncer completedAnnouncer) {
+                              GradingCompletedAnnouncer completedAnnouncer,
+                              HumanReviewCompletedAnnouncer learningAnnouncer) {
         this.store = store;
         this.json = json;
         this.errorTypes = errorTypes;
         this.assignments = assignments;
         this.announcer = announcer;
         this.completedAnnouncer = completedAnnouncer;
+        this.learningAnnouncer = learningAnnouncer;
     }
 
     @Transactional
@@ -100,8 +107,39 @@ public class HumanReviewService {
         JsonNode marked = annotations.isEmpty() ? null : json.valueToTree(annotations);
         // Only the call that finished the review tells the learner; a repeated request finds it already announced.
         store.complete(jobId, examinerId, request.band(), criteria, errorCodes, request.feedback(), marked)
-                .ifPresent(done -> completedAnnouncer.announce(done.learnerId(), jobId, done.reviewSubmissionId(),
-                        done.skill(), Instant.now()));
+                .ifPresent(done -> {
+                    Instant now = Instant.now();
+                    completedAnnouncer.announce(done.learnerId(), jobId, done.reviewSubmissionId(), done.skill(), now);
+                    // Learning applies the grade to mastery only for a standalone Writing review.
+                    if ("WRITING".equals(done.skill())) {
+                        learningAnnouncer.announce(done.learnerId(), done.reviewSubmissionId(), done.sourceSubmissionId(),
+                                criterionBands(request.criteria()), countedErrorCodes(errorCodes, annotations), now);
+                    }
+                });
+    }
+
+    /** Each criterion's band, named as the examiner named it; the comments stay in Assessment. */
+    static List<HumanReviewCompletedV1.Criterion> criterionBands(List<CompleteHumanReviewCommand.Criterion> criteria) {
+        return criteria.stream().map(criterion -> new HumanReviewCompletedV1.Criterion(criterion.criterion(), criterion.band()))
+                .toList();
+    }
+
+    /**
+     * Each error code once, with how often the examiner marked it in the essay. A code listed without any mark counts once.
+     * The most frequent comes first, a tie goes to the alphabetically first code, so the same grade always yields the same list.
+     */
+    static List<HumanReviewCompletedV1.ErrorCodeCount> countedErrorCodes(List<String> errorCodes,
+                                                                         List<CompleteHumanReviewCommand.Annotation> annotations) {
+        Map<String, Integer> counts = new HashMap<>();
+        for (CompleteHumanReviewCommand.Annotation annotation : annotations) {
+            counts.merge(annotation.errorCode(), 1, Integer::sum);
+        }
+        for (String code : errorCodes) counts.putIfAbsent(code, 1);
+        return counts.entrySet().stream()
+                .map(entry -> new HumanReviewCompletedV1.ErrorCodeCount(entry.getKey(), entry.getValue()))
+                .sorted(Comparator.comparingInt(HumanReviewCompletedV1.ErrorCodeCount::count).reversed()
+                        .thenComparing(HumanReviewCompletedV1.ErrorCodeCount::code))
+                .toList();
     }
 
     /** Keeps an unfinished review. The shape is the examiner's own, so only its type and size are checked. */
