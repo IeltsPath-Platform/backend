@@ -131,6 +131,40 @@ class VocabularyNotebookJdbcIntegrationTest {
         assertEquals(url, catalogStore.findActiveItem(item).orElseThrow().pronunciationAudioReference());
     }
 
+    @Test void catalogItemKeepsUkAudioSeparateFromPreferredAudio() {
+        UUID usOnly = UUID.randomUUID();
+        UUID legacyOnly = UUID.randomUUID();
+        UUID ukAndUs = UUID.randomUUID();
+        String usKey = "vocabulary/pronunciation/us/us-only.mp3";
+        String ukKey = "vocabulary/pronunciation/uk/uk.mp3";
+        String usOnlyUrl = "https://storage.example/storage/v1/object/public/media/" + usKey;
+        String ukUrl = "https://storage.example/storage/v1/object/public/media/" + ukKey;
+        String legacyUrl = "https://legacy.example/legacy.mp3";
+        String usUrl = "https://storage.example/storage/v1/object/public/media/vocabulary/pronunciation/us/us.mp3";
+        when(objectStorage.publicUrl("media", usKey)).thenReturn(usOnlyUrl);
+        when(objectStorage.publicUrl("media", ukKey)).thenReturn(ukUrl);
+        when(objectStorage.publicUrl("media", "vocabulary/pronunciation/us/us.mp3")).thenReturn(usUrl);
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,audio_us_reference) values(?,?,?,'ACTIVE',?)",
+                usOnly, "us only", "us only", usKey);
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,pronunciation_audio_reference) values(?,?,?,'ACTIVE',?)",
+                legacyOnly, "legacy only", "legacy only", legacyUrl);
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,audio_uk_reference,audio_us_reference) values(?,?,?,'ACTIVE',?,?)",
+                ukAndUs, "uk and us", "uk and us", ukKey, "vocabulary/pronunciation/us/us.mp3");
+
+        var usItem = catalogStore.findActiveItem(usOnly).orElseThrow();
+        assertNull(usItem.audioUkReference());
+        assertEquals(usOnlyUrl, usItem.audioUsReference());
+        assertEquals(usOnlyUrl, usItem.pronunciationAudioReference());
+
+        var legacyItem = catalogStore.findActiveItem(legacyOnly).orElseThrow();
+        assertEquals(legacyUrl, legacyItem.audioUkReference());
+
+        var ukUsItem = catalogStore.findActiveItem(ukAndUs).orElseThrow();
+        assertEquals(ukUrl, ukUsItem.audioUkReference());
+        assertEquals(usUrl, ukUsItem.audioUsReference());
+        assertEquals(usUrl, ukUsItem.pronunciationAudioReference());
+    }
+
     @Test void pronunciationAudioIsReturnedOnlyForWordsThatHaveAny() {
         jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,audio_uk_reference) values(?,?,?,'ACTIVE',?)",
                 UUID.randomUUID(), "audio probe", "audio probe", "https://cdn.example.com/probe.mp3");

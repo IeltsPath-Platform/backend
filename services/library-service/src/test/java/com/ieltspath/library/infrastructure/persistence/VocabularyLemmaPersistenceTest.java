@@ -8,6 +8,8 @@ import com.ieltspath.library.application.result.VocabularyItemResult;
 import com.ieltspath.library.application.usecase.FindVocabularyByLemmasUseCase;
 import com.ieltspath.library.application.usecase.ResolveVocabularyUseCase;
 import com.ieltspath.library.domain.exception.InvalidContentStateException;
+import com.ieltspath.library.domain.aggregate.VocabularyItem;
+import com.ieltspath.library.domain.repository.VocabularyRepository;
 import com.ieltspath.library.domain.vo.PartOfSpeech;
 import com.ieltspath.library.infrastructure.persistence.adapter.VocabularyRepositoryAdapter;
 import com.ieltspath.library.infrastructure.persistence.mapper.VocabularyPersistenceMapper;
@@ -61,6 +63,7 @@ class VocabularyLemmaPersistenceTest {
     @Autowired ResolveVocabularyUseCase resolve;
     @Autowired FindVocabularyByLemmasUseCase find;
     @Autowired JdbcTemplate jdbc;
+    @Autowired VocabularyRepository vocabularyRepository;
     @Autowired jakarta.persistence.EntityManager entityManager;
     @MockBean PronunciationAudioUrls pronunciationAudioUrls;
 
@@ -144,5 +147,26 @@ class VocabularyLemmaPersistenceTest {
         assertThat(find.execute(List.of(lemma))).isEmpty();
         assertThatThrownBy(() -> resolve.execute(new ResolveVocabularyCommand(List.of(entry(lemma)))))
                 .isInstanceOf(InvalidContentStateException.class);
+    }
+
+    @Test
+    void savingStaleItemDoesNotOverwriteAudioUpdatedThroughJdbc() {
+        UUID itemId = UUID.randomUUID();
+        jdbc.update("INSERT INTO vocabulary_items(id,lemma,normalized_lemma,status,audio_uk_reference,audio_us_reference) "
+                        + "VALUES (?, ?, ?, 'ACTIVE', ?, ?)",
+                itemId, lemma, lemma, "old-uk.mp3", "old-us.mp3");
+
+        VocabularyItem stale = vocabularyRepository.findById(itemId).orElseThrow();
+        entityManager.clear();
+        jdbc.update("UPDATE vocabulary_items SET audio_uk_reference = ?, audio_us_reference = ? WHERE id = ?",
+                "new-uk.mp3", "new-us.mp3", itemId);
+
+        vocabularyRepository.save(stale);
+        entityManager.flush();
+
+        assertThat(jdbc.queryForObject("SELECT audio_uk_reference FROM vocabulary_items WHERE id = ?", String.class, itemId))
+                .isEqualTo("new-uk.mp3");
+        assertThat(jdbc.queryForObject("SELECT audio_us_reference FROM vocabulary_items WHERE id = ?", String.class, itemId))
+                .isEqualTo("new-us.mp3");
     }
 }

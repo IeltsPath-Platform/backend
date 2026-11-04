@@ -6,6 +6,7 @@ import com.ieltspath.library.application.result.NotebookEntryResult;
 import com.ieltspath.library.application.result.NotebookSummaryResult;
 import com.ieltspath.library.application.result.PageResult;
 import com.ieltspath.library.domain.vo.UnderstandingLevel;
+import com.ieltspath.library.domain.aggregate.VocabularyItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -53,7 +54,7 @@ public class VocabularyNotebookJdbcAdapter implements VocabularyNotebookReader {
         };
         Long total = jdbc.queryForObject("select count(*) from flashcards f join vocabulary_senses s on s.id=f.vocabulary_sense_id join vocabulary_items v on v.id=s.vocabulary_item_id" + where,
                 params, Long.class);
-        String sql = "select f.id flashcard_id,f.vocabulary_sense_id,s.vocabulary_item_id,v.lemma,v.ipa," + VocabularyAudioSql.PREFERRED_REFERENCE + " pronunciation_audio_reference,s.part_of_speech,s.vietnamese_meaning,s.english_definition,coalesce(f.example_sentence,s.example_sentence) example_sentence,s.image_url,f.leitner_box,f.review_count,f.last_reviewed_at,f.next_review_at,f.created_at,n.body note,s.cefr_level,t.name topic_name "
+        String sql = "select f.id flashcard_id,f.vocabulary_sense_id,s.vocabulary_item_id,v.lemma,v.ipa,v.audio_us_reference,v.audio_uk_reference,v.pronunciation_audio_reference,s.part_of_speech,s.vietnamese_meaning,s.english_definition,coalesce(f.example_sentence,s.example_sentence) example_sentence,s.image_url,f.leitner_box,f.review_count,f.last_reviewed_at,f.next_review_at,f.created_at,n.body note,s.cefr_level,t.name topic_name "
                 + "from flashcards f join vocabulary_senses s on s.id=f.vocabulary_sense_id join vocabulary_items v on v.id=s.vocabulary_item_id "
                 + "left join vocabulary_topics t on t.id=s.topic_id "
                 + "left join lateral (select body from notes where user_id=f.user_id and source_type='VOCABULARY_SENSE' and source_reference_id=f.vocabulary_sense_id and status='ACTIVE' order by updated_at desc,id desc limit 1) n on true"
@@ -65,7 +66,7 @@ public class VocabularyNotebookJdbcAdapter implements VocabularyNotebookReader {
 
     @Override
     public java.util.Optional<NotebookEntryResult> findEntry(UUID userId, UUID flashcardId) {
-        String sql = "select f.id flashcard_id,f.vocabulary_sense_id,s.vocabulary_item_id,v.lemma,v.ipa," + VocabularyAudioSql.PREFERRED_REFERENCE + " pronunciation_audio_reference,s.part_of_speech,s.vietnamese_meaning,s.english_definition,coalesce(f.example_sentence,s.example_sentence) example_sentence,s.image_url,f.leitner_box,f.review_count,f.last_reviewed_at,f.next_review_at,f.created_at,n.body note,s.cefr_level,t.name topic_name "
+        String sql = "select f.id flashcard_id,f.vocabulary_sense_id,s.vocabulary_item_id,v.lemma,v.ipa,v.audio_us_reference,v.audio_uk_reference,v.pronunciation_audio_reference,s.part_of_speech,s.vietnamese_meaning,s.english_definition,coalesce(f.example_sentence,s.example_sentence) example_sentence,s.image_url,f.leitner_box,f.review_count,f.last_reviewed_at,f.next_review_at,f.created_at,n.body note,s.cefr_level,t.name topic_name "
                 + "from flashcards f join vocabulary_senses s on s.id=f.vocabulary_sense_id join vocabulary_items v on v.id=s.vocabulary_item_id "
                 + "left join vocabulary_topics t on t.id=s.topic_id "
                 + "left join lateral (select body from notes where user_id=f.user_id and source_type='VOCABULARY_SENSE' and source_reference_id=f.vocabulary_sense_id and status='ACTIVE' order by updated_at desc,id desc limit 1) n on true "
@@ -97,7 +98,9 @@ public class VocabularyNotebookJdbcAdapter implements VocabularyNotebookReader {
         int box = rs.getInt("leitner_box");
         return new NotebookEntryResult(rs.getObject("flashcard_id", UUID.class), rs.getObject("vocabulary_sense_id", UUID.class),
                 rs.getObject("vocabulary_item_id", UUID.class), rs.getString("lemma"), rs.getString("ipa"),
-                audioUrls.resolve(rs.getString("pronunciation_audio_reference")), rs.getString("part_of_speech"), rs.getString("vietnamese_meaning"),
+                audioUrls.resolve(VocabularyItem.preferredAudioReference(rs.getString("audio_us_reference"),
+                        rs.getString("audio_uk_reference"), rs.getString("pronunciation_audio_reference"))),
+                rs.getString("part_of_speech"), rs.getString("vietnamese_meaning"),
                 rs.getString("english_definition"), rs.getString("example_sentence"), rs.getString("image_url"),
                 UnderstandingLevel.fromBox(box), box, rs.getInt("review_count"), instant(rs, "last_reviewed_at"),
                 instant(rs, "next_review_at"), instant(rs, "created_at"), rs.getString("note"), rs.getString("cefr_level"), rs.getString("topic_name"));

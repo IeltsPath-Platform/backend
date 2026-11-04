@@ -36,10 +36,10 @@ public class VocabularyItemJpaEntity {
     @Column(name = "pronunciation_audio_reference", columnDefinition = "TEXT")
     private String pronunciationAudioReference;
 
-    @Column(name = "audio_uk_reference", columnDefinition = "TEXT")
+    @Column(name = "audio_uk_reference", columnDefinition = "TEXT", insertable = false, updatable = false)
     private String audioUkReference;
 
-    @Column(name = "audio_us_reference", columnDefinition = "TEXT")
+    @Column(name = "audio_us_reference", columnDefinition = "TEXT", insertable = false, updatable = false)
     private String audioUsReference;
 
     @Enumerated(EnumType.STRING)
