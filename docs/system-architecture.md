@@ -292,12 +292,13 @@ cùng course mở theo trạng thái suy ra khi đọc. Course test không chặ
 
 ## Scheduler và nhiều instance
 
-Backend hiện có 21 phương thức `@Scheduled` trong 20 job. Cơ chế chống xử lý trùng theo mã đang chạy:
+Backend hiện có 22 phương thức `@Scheduled` trong 21 job. Cơ chế chống xử lý trùng theo mã đang chạy:
 
 | Service | Job / lịch | Cơ chế cạnh tranh | HTTP/LLM khi giữ khóa hoặc transaction |
 |---|---|---|---|
 | game | `RocketRoundScheduler` | Khóa hàng trận (`FOR UPDATE`) và kiểm trạng thái vòng khi settle; hai lịch trùng không đóng vòng hai lần | Không |
 | game | `SoloTimeoutScheduler` | Khóa trận và người chơi (`FOR UPDATE OF m,p`), kiểm deadline; hai lịch trùng chỉ trừ một mạng | Không |
+| game | `LobbySeatScheduler` | Khóa hàng phòng (`FOR UPDATE`) rồi kiểm lại hạn giữ chỗ trước khi cho rời phòng; hai lịch trùng chỉ cho rời một lần | Không |
 | game | `OutboxRetentionJob` | Xóa theo ngưỡng thời gian; chạy lặp an toàn | Không |
 | game | `RoomEventChannelSupervisor` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
 | notification | `NoticePushChannelConfig` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
