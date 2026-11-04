@@ -140,7 +140,9 @@ Only the owner can read a submission; another user's id → 404.
 A graded lesson essay can be rewritten and sent again (`POST /writing-submissions/{id}/revisions`, `GET
 /writing-submissions/{id}/history`): see [essay-revision-v1](essay-revision-v1.md). A learner with a human-grading credit
 can ask a Mentor to review a graded essay (`POST`/`GET /writing-submissions/{id}/human-review`): see
-[human-review-v1](human-review-v1.md). Neither changes the evidence rule above.
+[human-review-v1](human-review-v1.md). A Mentor review does change evidence: once the examiner finishes it, its criterion
+results replace this essay's AI criterion evidence, and its marked errors count against their trap points (see
+[human-review-completed-v1](human-review-completed-v1.md)). Asking for a review still changes no gate.
 
 ## Idempotency and payment
 
