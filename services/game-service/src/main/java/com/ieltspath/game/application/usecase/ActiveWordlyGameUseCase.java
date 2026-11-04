@@ -17,16 +17,18 @@ public class ActiveWordlyGameUseCase {
     private final SoloGameplayUseCase gameplay;
     private final Clock clock;
     private final RocketGameplayUseCase rocket;
+    private final LobbySeatUseCase lobbySeats;
 
     /** Without Rocket; a running Rocket match then cannot be left through here. */
     public ActiveWordlyGameUseCase(ActiveWordlyGameRepository games, ChangeGameRoomMembershipUseCase membership,
             SoloGameplayUseCase gameplay, Clock clock) {
-        this(games, membership, gameplay, clock, null);
+        this(games, membership, gameplay, clock, null, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public ActiveWordlyGameUseCase(ActiveWordlyGameRepository games, ChangeGameRoomMembershipUseCase membership,
-            SoloGameplayUseCase gameplay, Clock clock, RocketGameplayUseCase rocket) {
+            SoloGameplayUseCase gameplay, Clock clock, RocketGameplayUseCase rocket, LobbySeatUseCase lobbySeats) {
+        this.lobbySeats = lobbySeats;
         this.games = games;
         this.membership = membership;
         this.gameplay = gameplay;
@@ -34,13 +36,16 @@ public class ActiveWordlyGameUseCase {
         this.rocket = rocket;
     }
 
-    @Transactional(readOnly = true)
+    /** An expired lobby seat is released first, so it is never offered for rejoining. */
+    @Transactional
     public Optional<ActiveWordlyGameResult> find(UUID userId) {
+        if (lobbySeats != null) lobbySeats.expireFor(userId);
         return games.find(userId);
     }
 
     /** Leaves the current room: forfeits a running match, otherwise uses the waiting-room lifecycle. */
     public void leave(UUID userId) {
+        if (lobbySeats != null) lobbySeats.expireFor(userId);
         var active = games.find(userId);
         if (active.isEmpty()) return;
         var game = active.get();

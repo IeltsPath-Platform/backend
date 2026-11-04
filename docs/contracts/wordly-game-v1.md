@@ -180,6 +180,12 @@ with stale parallel responses. Private WORD_STATE is not broadcast to opponents.
 Ping frames every 10s detect missing pong after 30s; losing the last socket starts a separate
 persisted 30s reconnect grace. Another live tab prevents false disconnect. Timers keep running;
 expired grace forfeits the player. Detection and worker scheduling add delay to observed timeout.
+The same 30s grace holds a seat in a WAITING multiplayer lobby (Wordly and Rocket): the member turns
+DISCONNECTED and loses readiness, so the host cannot start. Reconnecting in time makes them JOINED;
+otherwise they leave the room as with leave, and an expired host closes it. A restart gives every
+lobby member the grace; members still connected restore their seat at the next heartbeat.
+GET /api/games/me/active-game and room creation or joining release an expired seat first, so it is
+never offered for rejoining.
 
 ## Errors and persistence
 
