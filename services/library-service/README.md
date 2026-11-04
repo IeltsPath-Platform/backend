@@ -44,6 +44,11 @@ See the [flashcard SRS contract](../../docs/contracts/flashcard-srs-v1.md) for r
 
 ## Vocabulary notebook and catalog
 
+Author lesson pickers use authenticated `GET /api/content/admin/vocabulary/suggestions?q=&page=0&size=20`:
+bounded exact/prefix/substring ranking, active senses, and `hasMore`. Flyway V36 adds the active-lemma prefix/trigram
+indexes and requires `pg_trgm`. Deploy Library before the updated frontend. See the
+[author suggestions contract](../../docs/contracts/vocabulary-author-suggestions-v1.md) for limits and migration notes.
+
 `GET /api/content/vocabulary?q=&page=0&size=20` browses active catalog items (maximum page size 50); `GET /api/content/vocabulary/{id}` returns one active item. These two GET routes are public and cacheable for five minutes. `/search`, `/senses`, writes, and `/api/content/admin/vocabulary/**` still require authentication. See the [vocabulary notebook contract](../../docs/contracts/vocabulary-notebook-v1.md).
 
 The public catalog also supports `lang=EN|VI`, CEFR/topic filters, `/suggestions`, `/topics`, `/sets`, set words, and `/mindmap`. V19 adds UK/US pronunciation slots, CEFR and library-owned vocabulary topics, examples/collocations/thesaurus/common-mistake tables, and band/topic sets. IELTS band ranges are derived from CEFR in the domain. V20 adds six demo topics and demo enrichment for existing V4/V15 entries; frequency ranks remain null because no COCA source is loaded. The AWL flag is enabled only for verified Coxhead entries. **Demo content authored by AI; requires review by an IELTS examiner before production.**
