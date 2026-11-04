@@ -106,9 +106,9 @@ These paths require `CONTENT_AUTHOR` or `ADMIN`; missing/invalid authentication 
 
 | Method and path | Request | Success |
 | --- | --- | --- |
-| `POST /api/content/admin/vocabulary` | `{lemma,ipa,pronunciationAudioReference,ipaUs,ipaUk,audioUsReference,audioUkReference}`; only `lemma` is required; the IPA and audio fields are stored with the word in the same transaction | 201 item (no senses yet) |
+| `POST /api/content/admin/vocabulary` | `{lemma,ipa,pronunciationAudioReference,ipaUs,ipaUk,audioUsReference,audioUkReference}`; only `lemma` is required; the IPA and audio fields are stored with the word in the same transaction. An active word with the same lemma is refused (400); an INACTIVE one (such as a dictation pronunciation row) is switched on instead, keeping its stored IPA/audio where the request leaves a field empty, and its existing senses come back in the response | 201 item (no senses yet) |
 | `POST /api/content/admin/vocabulary/sense-images` | multipart `file`: JPEG, PNG or WebP, ≤2 MB | 201 `{mediaReference,mediaUrl,contentType,sizeBytes}`; the file goes to `media/vocabulary/images/<uuid>.<ext>` and `mediaUrl` is stored as the sense `imageUrl` |
-| `POST /api/content/admin/vocabulary/pronunciation` | multipart `file` (MP3, MP4 audio, WAV or OGG, ≤25 MB), `lemma`, `accent` = `us` or `uk` | 201 same body; the file goes to `media/vocabulary/pronunciation/{us\|uk}/<slug>.<ext>`, slug = lemma lower-cased with each run of characters outside a-z0-9 as `-`; 400 when the word already exists, so an existing file is never overwritten |
+| `POST /api/content/admin/vocabulary/pronunciation` | multipart `file` (MP3, MP4 audio, WAV or OGG, ≤2 MB), `lemma`, `accent` = `us` or `uk` | 201 same body; the file goes to `media/vocabulary/pronunciation/{us\|uk}/<slug>.<ext>`, slug = lemma lower-cased with each run of characters outside a-z0-9 as `-`; 400 when an active word already has the lemma; an INACTIVE word is allowed. A file already stored under the key is never overwritten: the new one is named `<slug>-<8 hex>.<ext>` |
 | `PUT /api/content/admin/vocabulary/items/{id}` | JSON fields `ipaUk`, `ipaUs`, `audioUkReference`, `audioUsReference`, `frequencyRank`, `academicWordList`, `wordFamily`; every field not sent is cleared | 200 updated item |
 | `PUT /api/content/admin/vocabulary/senses/{id}` | JSON fields `cefrLevel`, `topicId`, `register`, `grammarNote`, `usageNote`, `exampleTranslation` | 200 updated sense |
 | `PUT /api/content/admin/vocabulary/senses/{id}/collocations` | Array of `{phrase,meaningVi,example}` (≤30) | 200 replacement list |
@@ -132,6 +132,8 @@ Migrations V19 (additive schema) and V20 (demo catalog) extend the library datab
 Migration V22 enriches 48 more existing V4 words (8 per topic) with CEFR, topic, register, US IPA, two collocations, a synonym, a common mistake and two examples, then appends them to the existing topic and band sets. It creates no new words and skips senses that are already enriched. Same review requirement as V20.
 
 `/api/content/vocabulary/search`, `/api/content/vocabulary/senses`, catalog writes, `/api/content/admin/vocabulary/**`, and every notebook route require authentication. Unauthorized requests return 401; authenticated users without the required author role receive 403 for the catalog author API.
+
+`GET /api/content/vocabulary/search?query=` matches active words whose lemma contains the text, ignoring case and the spaces at its ends, and returns at most 50 words: the exact word first, then words starting with the text, then the rest, each group in alphabetical order. An empty or blank query returns `[]`; it used to return the whole catalog. `%` and `_` in the text match themselves. The catalog browse (`lang=EN`) and `/suggestions` match on the same normalized lemma; `lang=VI` matches a sense meaning ignoring case and Vietnamese accents (`o nhiem` and `ô nhiễm` both find `ô nhiễm`; `đ` matches `d`) through the `vocabulary_fold` function. Migrations V37 and V38 add the indexes these searches use.
 
 ## Errors
 

@@ -52,6 +52,11 @@ public class CatalogMediaStorageAdapter implements CatalogMediaStorage {
         }
     }
 
+    @Override
+    public boolean exists(String key) {
+        return objectStorage.exists(bucket, key);
+    }
+
     private String publicUrl(String key) {
         try {
             return objectStorage.publicUrl(bucket, key);

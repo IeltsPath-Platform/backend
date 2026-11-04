@@ -93,6 +93,26 @@ class CreateVocabularyItemDictionaryPersistenceTest {
     }
 
     @Test
+    void creatingAWordKeptInactiveSwitchesItOnAndKeepsTheAudioItAlreadyHas() {
+        // A dictation pronunciation row: inactive, with a US recording and an IPA.
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO vocabulary_items(id, lemma, normalized_lemma, ipa, status, audio_us_reference) "
+                + "VALUES (?, ?, ?, '/old/', 'INACTIVE', 'vocabulary/pronunciation/us/kept.mp3')", id, lemma, lemma);
+        var given = new VocabularyItemDetails(null, "/new us/", "https://cdn.test/uk.mp3", null, null, false, null);
+
+        VocabularyItemResult created = create.execute(new CreateVocabularyItemCommand(lemma, "/new us/", null, given));
+
+        assertThat(created.id()).isEqualTo(id);
+        var row = jdbc.queryForMap("SELECT status, ipa, ipa_us, audio_us_reference, audio_uk_reference "
+                + "FROM vocabulary_items WHERE id = ?", id);
+        assertThat(row).containsEntry("status", "ACTIVE")
+                .containsEntry("ipa", "/new us/")
+                .containsEntry("ipa_us", "/new us/")
+                .containsEntry("audio_us_reference", "vocabulary/pronunciation/us/kept.mp3")
+                .containsEntry("audio_uk_reference", "https://cdn.test/uk.mp3");
+    }
+
+    @Test
     void aSecondWordWithTheSameLemmaIsRefused() {
         var empty = new VocabularyItemDetails(null, null, null, null, null, false, null);
         create.execute(new CreateVocabularyItemCommand(lemma, null, null, empty));

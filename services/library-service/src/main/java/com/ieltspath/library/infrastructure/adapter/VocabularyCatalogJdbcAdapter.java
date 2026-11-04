@@ -103,12 +103,15 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
     @Override
     public PageResult<CatalogItemResult> browse(CatalogBrowseQuery query) {
         PageQuery page = query.page();
-        // The column is chosen from a closed pair, never from input text.
-        String searchColumn = query.vietnamese() ? "s.vietnamese_meaning" : "i.lemma";
-        String text = query.text().toLowerCase(Locale.ROOT);
-        String senseFilters = "AND (:query='' OR lower(" + searchColumn + ") LIKE :pattern ESCAPE '\\')";
-        MapSqlParameterSource p = new MapSqlParameterSource().addValue("query", text)
+        String text = query.text().trim().toLowerCase(Locale.ROOT);
+        MapSqlParameterSource p = new MapSqlParameterSource()
                 .addValue("pattern", "%" + escapeLike(text) + "%").addValue("limit", page.size()).addValue("offset", offset(page));
+        // English text matches the word on the item itself (normalized_lemma has the trigram index of V36). Vietnamese
+        // text matches a sense meaning with accents and case folded on both sides, so "o nhiem" finds "ô nhiễm"
+        // (vocabulary_fold(vietnamese_meaning) has the trigram index of V38). An empty text adds no filter.
+        String itemFilter = !text.isEmpty() && !query.vietnamese() ? " AND i.normalized_lemma LIKE :pattern ESCAPE '\\'" : "";
+        String senseFilters = !text.isEmpty() && query.vietnamese()
+                ? "AND vocabulary_fold(s.vietnamese_meaning) LIKE vocabulary_fold(:pattern) ESCAPE '\\'" : "";
         if (query.cefrLevel() != null) {
             senseFilters += " AND s.cefr_level=:cefr";
             p.addValue("cefr", query.cefrLevel().name());
@@ -117,7 +120,7 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
             senseFilters += " AND s.topic_id=:topicId";
             p.addValue("topicId", query.topicId());
         }
-        String where = "i.status='ACTIVE' AND EXISTS (SELECT 1 FROM vocabulary_senses s WHERE s.vocabulary_item_id=i.id "
+        String where = "i.status='ACTIVE'" + itemFilter + " AND EXISTS (SELECT 1 FROM vocabulary_senses s WHERE s.vocabulary_item_id=i.id "
                 + "AND s.status='ACTIVE' " + senseFilters + ")";
         long total = count("SELECT count(*) FROM vocabulary_items i WHERE " + where, p);
         List<UUID> ids = jdbc.query("SELECT i.id FROM vocabulary_items i WHERE " + where
@@ -127,9 +130,10 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
 
     @Override
     public List<VocabularySuggestionResult> suggestions(String prefix) {
-        return jdbc.query("SELECT id, lemma FROM vocabulary_items WHERE status='ACTIVE' AND lower(lemma) LIKE :q ESCAPE '\\' "
-                        + "ORDER BY lower(lemma), id LIMIT 8",
-                Map.of("q", escapeLike(prefix.toLowerCase(Locale.ROOT)) + "%"),
+        // normalized_lemma is lower(trim(lemma)), and its prefix index (V36) answers this without reading the table.
+        return jdbc.query("SELECT id, lemma FROM vocabulary_items WHERE status='ACTIVE' AND normalized_lemma LIKE :q ESCAPE '\\' "
+                        + "ORDER BY normalized_lemma, id LIMIT 8",
+                Map.of("q", escapeLike(prefix.trim().toLowerCase(Locale.ROOT)) + "%"),
                 (rs, n) -> new VocabularySuggestionResult(uuid(rs, "id"), rs.getString("lemma")));
     }
 
@@ -290,6 +294,16 @@ public class VocabularyCatalogJdbcAdapter implements VocabularyCatalogStore {
                         .addValue("rank", details.frequencyRank()).addValue("awl", details.academicWordList())
                         .addValue("family", details.wordFamily()));
         return updated == 0 ? Optional.empty() : loadItems(List.of(itemId), false).stream().findFirst();
+    }
+
+    @Override
+    public Optional<VocabularyItemDetails> findItemDetails(UUID itemId) {
+        return jdbc.query("SELECT ipa_uk, ipa_us, audio_uk_reference, audio_us_reference, frequency_rank, academic_word_list, "
+                        + "word_family FROM vocabulary_items WHERE id=:id", new MapSqlParameterSource("id", itemId),
+                (rs, n) -> new VocabularyItemDetails(rs.getString("ipa_uk"), rs.getString("ipa_us"),
+                        rs.getString("audio_uk_reference"), rs.getString("audio_us_reference"),
+                        rs.getObject("frequency_rank", Integer.class), rs.getBoolean("academic_word_list"),
+                        rs.getString("word_family"))).stream().findFirst();
     }
 
     @Override

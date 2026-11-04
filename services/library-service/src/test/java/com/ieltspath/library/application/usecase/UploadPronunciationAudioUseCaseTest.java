@@ -9,6 +9,11 @@ import com.ieltspath.library.domain.repository.VocabularyRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.ieltspath.library.domain.aggregate.VocabularyItem;
+import com.ieltspath.library.domain.vo.ContentStatus;
+
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -35,8 +40,6 @@ class UploadPronunciationAudioUseCaseTest {
 
     @Test
     void storesTheFileUnderTheAccentAndTheSlugOfTheWord() {
-        when(vocabulary.existsByNormalizedLemma("green roof")).thenReturn(false);
-
         StoredImageResult result = useCase.execute("Green Roof", "us", "audio/mpeg", MP3);
 
         assertEquals("vocabulary/pronunciation/us/green-roof.mp3", result.key());
@@ -45,15 +48,13 @@ class UploadPronunciationAudioUseCaseTest {
 
     @Test
     void usesTheUkFolderForBritishPronunciation() {
-        when(vocabulary.existsByNormalizedLemma("climate")).thenReturn(false);
-
         assertEquals("vocabulary/pronunciation/uk/climate.mp3",
                 useCase.execute("climate", "uk", "audio/mpeg", MP3).key());
     }
 
     @Test
     void refusesAWordThatAlreadyExistsWithoutTouchingStorage() {
-        when(vocabulary.existsByNormalizedLemma("climate")).thenReturn(true);
+        when(vocabulary.findByNormalizedLemma("climate")).thenReturn(Optional.of(word(ContentStatus.ACTIVE)));
 
         assertThrows(DuplicateCodeException.class, () -> useCase.execute("climate", "us", "audio/mpeg", MP3));
         verifyNoInteractions(storage);
@@ -73,9 +74,30 @@ class UploadPronunciationAudioUseCaseTest {
 
     @Test
     void refusesBytesThatAreNotTheDeclaredAudio() {
-        when(vocabulary.existsByNormalizedLemma("climate")).thenReturn(false);
-
         assertThrows(UploadRejectedException.class, () -> useCase.execute("climate", "us", "audio/mpeg", PNG));
         verifyNoInteractions(storage);
+    }
+
+    @Test
+    void storesTheFileOfAWordKeptInactiveSoItCanBeCreatedAgain() {
+        when(vocabulary.findByNormalizedLemma("grammar")).thenReturn(Optional.of(word(ContentStatus.INACTIVE)));
+
+        assertEquals("vocabulary/pronunciation/us/grammar.mp3", useCase.execute("grammar", "us", "audio/mpeg", MP3).key());
+    }
+
+    @Test
+    void givesTheFileASuffixWhenOneIsAlreadyStoredUnderTheWord() {
+        when(storage.exists("vocabulary/pronunciation/uk/grammar.mp3")).thenReturn(true);
+
+        String key = useCase.execute("grammar", "uk", "audio/mpeg", MP3).key();
+
+        assertTrue(key.matches("vocabulary/pronunciation/uk/grammar-[0-9a-f]{8}\\.mp3"), key);
+        verify(storage, never()).store(eq("vocabulary/pronunciation/uk/grammar.mp3"), any(), anyString());
+    }
+
+    private static VocabularyItem word(ContentStatus status) {
+        VocabularyItem item = VocabularyItem.create("word", null, null);
+        item.update("word", null, null, status);
+        return item;
     }
 }

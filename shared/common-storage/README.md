@@ -48,7 +48,7 @@ theo kiểm kê ngày 2026-10-31.
 | `avatars` | có | Ảnh đại diện học viên | 2 MB | png, jpeg, webp | user-service | `images/{userId}/{uuid}.{ext}` | đã có |
 | `flashcards` | có | Ảnh thẻ, bìa bộ thẻ, bìa chủ đề và bộ từ vựng | 2 MB | png, jpeg, webp | library-service | `images/{userId}/{uuid}.{ext}`; bìa chủ đề/bộ từ `catalog-cover/{userId}/{uuid}.{ext}` | đã có |
 | `community` | có | Ảnh bài đăng cộng đồng | 5 MB | png, jpeg, webp, gif | community-service | `community/post/{userId}/{uuid}.{ext}` | đã có |
-| `media` | có | Audio và ảnh nội dung bài học; ảnh nghĩa và audio phát âm từ vựng | 25 MB (ảnh nghĩa từ vựng tối đa 2 MB) | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service, library-service | seed: `listening/demo/ls1.mp3`; content upload API: `content-audio/{userId}/{uuid}.{ext}`; từ vựng: ảnh nghĩa `vocabulary/images/{uuid}.{ext}`, phát âm `vocabulary/pronunciation/{us\|uk}/{slug}.{ext}` | đã có |
+| `media` | có | Audio và ảnh nội dung bài học; ảnh nghĩa và audio phát âm từ vựng | 25 MB (ảnh nghĩa và phát âm từ vựng tối đa 2 MB) | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service, library-service | seed: `listening/demo/ls1.mp3`; content upload API: `content-audio/{userId}/{uuid}.{ext}`; từ vựng: ảnh nghĩa `vocabulary/images/{uuid}.{ext}`, phát âm `vocabulary/pronunciation/{us\|uk}/{slug}.{ext}` | đã có |
 | `speaking-recordings` | không | Ghi âm Speaking của học viên | 5 MB | webm, mp4, ogg, mpeg, wav | assessment-service | `speaking/{userId}/{uuid}.{ext}` | đang dùng (upload ghi âm Speaking) |
 | `media-premium` | không | Audio bài trả phí, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | đã tạo, riêng tư |
 
@@ -57,7 +57,7 @@ Biến cấu hình tên bucket: `USER_AVATAR_BUCKET`, `LIBRARY_FLASHCARD_BUCKET`
 
 Ảnh nghĩa và audio phát âm của từ vựng nằm ở `media`, không nằm ở `flashcards`, để nội dung biên soạn công khai không
 dùng chung bucket với ảnh flashcard do học viên tải lên. File phát âm đặt tên theo từ: `{slug}` là lemma chuẩn hóa chữ
-thường, mỗi cụm ký tự ngoài a-z0-9 thành `-`. Library từ chối upload khi từ đã tồn tại nên không ghi đè file cũ.
+thường, mỗi cụm ký tự ngoài a-z0-9 thành `-`. Library từ chối upload khi từ đang ACTIVE; nếu key đã có file (từ phát âm của video, hoặc lần upload trước chưa lưu từ) thì file mới thêm hậu tố 8 ký tự, không ghi đè file cũ.
 Bìa chủ đề và bộ từ vẫn ở `flashcards` vì chúng lưu theo key và đọc qua bucket đó.
 Giới hạn trong code là nguồn chuẩn; giới hạn bucket phải bằng hoặc lớn hơn giới hạn code.
 

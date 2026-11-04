@@ -28,11 +28,22 @@ public interface VocabularyItemJpaRepository extends JpaRepository<VocabularyIte
     @EntityGraph(attributePaths = {"senses"})
     List<VocabularyItemJpaEntity> findAllByIdIn(List<UUID> ids);
 
-    @EntityGraph(attributePaths = {"senses"})
-    // INACTIVE items stay out of the search: the pronunciation rows of the dictation words ("the", "going"...) are such items.
-    @Query("SELECT v FROM VocabularyItemJpaEntity v WHERE v.status = com.ieltspath.library.domain.vo.ContentStatus.ACTIVE "
-            + "AND LOWER(v.lemma) LIKE LOWER(CONCAT('%', :query, '%')) ORDER BY v.lemma ASC")
-    List<VocabularyItemJpaEntity> searchByLemma(@Param("query") String query);
+    /**
+     * Ids of the active words whose lemma contains the text: the exact word first, then words starting with it, then the
+     * rest, at most {@code limit}. It reads {@code normalized_lemma} so the trigram and prefix indexes of V36 apply.
+     * INACTIVE items stay out: the pronunciation rows of the dictation words ("the", "going"...) are such items.
+     * {@code text} is lower-cased and trimmed; {@code prefix} and {@code contains} are LIKE patterns with it escaped.
+     */
+    @Query(nativeQuery = true, value = """
+            SELECT i.id FROM vocabulary_items i
+            WHERE i.status = 'ACTIVE' AND i.normalized_lemma LIKE :contains ESCAPE '\\'
+            ORDER BY CASE WHEN i.normalized_lemma = :text THEN 0
+                          WHEN i.normalized_lemma LIKE :prefix ESCAPE '\\' THEN 1 ELSE 2 END,
+                     i.normalized_lemma, i.id
+            LIMIT :limit
+            """)
+    List<UUID> searchIdsByLemma(@Param("text") String text, @Param("prefix") String prefix,
+                                @Param("contains") String contains, @Param("limit") int limit);
 
 
     @Query("""

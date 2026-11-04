@@ -15,6 +15,9 @@ import java.util.UUID;
 @Component
 public class VocabularyRepositoryAdapter implements VocabularyRepository {
 
+    /** The most words one search returns: the box shows the best matches, not the whole catalog. */
+    static final int SEARCH_LIMIT = 50;
+
     private final VocabularyItemJpaRepository vocabularyItemJpaRepository;
     private final VocabularyPersistenceMapper mapper;
 
@@ -66,7 +69,16 @@ public class VocabularyRepositoryAdapter implements VocabularyRepository {
 
     @Override
     public List<VocabularyItem> searchByLemma(String query) {
-        return vocabularyItemJpaRepository.searchByLemma(query).stream().map(mapper::toDomain).toList();
+        String text = query == null ? "" : query.trim().toLowerCase(java.util.Locale.ROOT);
+        // An empty box used to return the whole catalog; it now asks for nothing.
+        if (text.isEmpty()) return List.of();
+        String escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        // Ids first, senses second: a LIMIT on a fetch of the senses collection would page in memory.
+        List<UUID> ids = vocabularyItemJpaRepository.searchIdsByLemma(text, escaped + "%", "%" + escaped + "%", SEARCH_LIMIT);
+        if (ids.isEmpty()) return List.of();
+        java.util.Map<UUID, VocabularyItem> byId = new java.util.HashMap<>();
+        vocabularyItemJpaRepository.findAllByIdIn(ids).forEach(entity -> byId.put(entity.getId(), mapper.toDomain(entity)));
+        return ids.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
     }
 
     @Override
