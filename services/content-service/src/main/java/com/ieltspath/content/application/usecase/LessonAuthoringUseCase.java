@@ -86,7 +86,10 @@ public class LessonAuthoringUseCase {
         validateBlock(lessonId, type, sortOrder, textContent, assetId, vocabularySenseIds,
                 questionVersionIds, knowledgePointIds);
         if (type == BlockType.EXERCISE) requireQuestionsFree(null, questionVersionIds);
-        int position = sortOrder == null ? lesson.getBlocks().size() : sortOrder;
+        // After the last block, whatever its number: lessons seeded from 1 (or with gaps after deletions) have a block at
+        // the number of blocks, and giving a new block that same position broke the unique (lesson, sort order) key.
+        int position = sortOrder != null ? sortOrder
+                : lesson.getBlocks().stream().mapToInt(LessonBlock::getSortOrder).max().orElse(-1) + 1;
         lesson.addBlock(LessonBlock.create(lessonId, type, position, textContent, assetId,
                 vocabularySenseIds, questionVersionIds, knowledgePointIds));
         repository.save(lesson);

@@ -94,6 +94,20 @@ class LessonAuthoringIntegrationTest {
         assertThat(result.blocks().get(2).id()).isEqualTo(vocabBlockId);
         assertThat(result.blocks().get(2).vocabularySenseIds()).containsExactly(senseId);
         assertThat(result.blocks().get(3).questions()).extracting("id").containsExactly(questionId);
+        // The editor opens the question from the block, so each version names its question.
+        assertThat(result.blocks().get(3).questions()).extracting("questionId").doesNotContainNull();
+    }
+
+    @Test void addsABlockAfterTheLastOneWhenTheLessonWasNumberedFromOne() {
+        // Seeded lessons number their blocks 1, 2, 3. A new block without a position used to take 3, the number of blocks.
+        var lesson = createLesson("NUMBERED_FROM_ONE");
+        useCase.addBlock(lesson.id(), BlockType.TEXT, 1, "First", null, List.of(), List.of(), List.of());
+        useCase.addBlock(lesson.id(), BlockType.TEXT, 2, "Second", null, List.of(), List.of(), List.of());
+        useCase.addBlock(lesson.id(), BlockType.TEXT, 3, "Third", null, List.of(), List.of(), List.of());
+
+        var result = useCase.addBlock(lesson.id(), BlockType.TEXT, null, "Fourth", null, List.of(), List.of(), List.of());
+
+        assertThat(result.blocks()).extracting("textContent").containsExactly("First", "Second", "Third", "Fourth");
     }
 
     @Test void reordersBlocksAroundNegativeVocabularyOrder() {

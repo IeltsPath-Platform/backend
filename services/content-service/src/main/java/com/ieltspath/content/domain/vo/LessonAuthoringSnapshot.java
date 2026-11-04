@@ -21,5 +21,5 @@ public record LessonAuthoringSnapshot(UUID id, UUID topicId, String code, String
     }
     public record QuestionVersion(UUID id, int versionNumber, QuestionType questionType, Skill skill,
                                   QuestionPurpose purpose, PublicationStatus status, String stem,
-                                  String answerSpecJson) {}
+                                  String answerSpecJson, UUID questionId) {}
 }
