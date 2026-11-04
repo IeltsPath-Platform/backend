@@ -306,6 +306,7 @@ services:
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
       CONTENT_SERVICE_URL: http://content-service:8082
       LIBRARY_SERVICE_URL: http://library-service:8081
+      GAME_WEBSOCKET_ALLOWED_ORIGINS: "${GAME_WEBSOCKET_ALLOWED_ORIGINS:-http://localhost:5173}"
     depends_on:
       <<: *after-infra
       redis:
