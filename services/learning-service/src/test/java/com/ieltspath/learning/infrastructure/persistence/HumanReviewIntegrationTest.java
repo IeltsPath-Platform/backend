@@ -1,10 +1,16 @@
 package com.ieltspath.learning.infrastructure.persistence;
 
+import com.ieltspath.learning.application.command.HumanReviewResult;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.HumanReviewClient;
 import com.ieltspath.learning.application.port.LearningContentClient;
+import com.ieltspath.learning.application.service.LessonEvidenceReference;
+import com.ieltspath.learning.application.usecase.ApplyHumanReviewResultUseCase;
 import com.ieltspath.learning.application.usecase.HumanReviewUseCase;
 import com.ieltspath.learning.application.usecase.ListExaminerReviewsUseCase;
+import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
+import com.ieltspath.learning.domain.vo.EvidenceSource;
+import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +58,8 @@ class HumanReviewIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired HumanReviewUseCase reviews;
     @Autowired ListExaminerReviewsUseCase list;
+    @Autowired ApplyHumanReviewResultUseCase applyResult;
+    @Autowired KnowledgeEvidenceRepository evidenceRepository;
     @MockitoBean HumanReviewClient client;
     @MockitoBean LearningContentClient content;
 
@@ -60,7 +68,8 @@ class HumanReviewIntegrationTest {
 
     @BeforeEach
     void clean() {
-        jdbc.execute("TRUNCATE human_review_requests, lesson_writing_submissions, kp_evidence, review_items CASCADE");
+        jdbc.execute("TRUNCATE human_review_outcomes, human_review_requests, lesson_writing_submissions, kp_evidence, "
+                + "review_items, knowledge_point_catalog CASCADE");
         reset(client, content);
         when(content.getActiveRubric(any())).thenReturn(new LearningContentClient.Rubric("IELTS_WRITING", "TASK_2", 1,
                 "source", List.of(), List.of()));
@@ -89,6 +98,97 @@ class HumanReviewIntegrationTest {
                 "GRADED".equals(status) ? new BigDecimal("6.0") : null, "GRADED".equals(status) ? true : null,
                 "GRADED".equals(status) ? UUID.randomUUID() : null);
         return id;
+    }
+
+    /** A catalog point as Learning keeps it: a grammar or writing point, or an error trap under its parent. */
+    private void catalogPoint(UUID point, UUID parent, String errorCode) {
+        jdbc.update("""
+                INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set, skill, parent_kp_id, error_code)
+                VALUES (?, ?, ?, 'WRITING', ?, ?)
+                """, point, UUID.randomUUID(), parent == null, parent, errorCode);
+    }
+
+    private int count(String sql, Object... arguments) {
+        return jdbc.queryForObject(sql, Integer.class, arguments);
+    }
+
+    private static HumanReviewResult.Criterion criterion(String name, String band) {
+        return new HumanReviewResult.Criterion(name, new BigDecimal(band));
+    }
+
+    /**
+     * The examiner's criterion results take the place of the AI's on the same essay, the marked error counts as one wrong
+     * answer on its trap point, and a repeated event changes nothing. Evidence from other sources is never touched.
+     */
+    @Test
+    void anExaminersResultReplacesTheAiEvidenceOfTheEssayAndIsAppliedOnce() {
+        UUID essay = essay(user, "GRADED", false);
+        UUID review = UUID.randomUUID();
+        jdbc.update("UPDATE lesson_writing_submissions SET prompt_snapshot = jsonb_set(prompt_snapshot, '{passBand}', '6.0') "
+                + "WHERE id = ?", essay);
+        jdbc.update("INSERT INTO human_review_requests (submission_id, user_id, review_submission_id) VALUES (?, ?, ?)",
+                essay, user, review);
+        UUID coherence = UUID.randomUUID(), taskResponse = UUID.randomUUID(), parent = UUID.randomUUID(),
+                trap = UUID.randomUUID();
+        catalogPoint(coherence, null, null);
+        catalogPoint(taskResponse, null, null);
+        catalogPoint(parent, null, null);
+        catalogPoint(trap, parent, "LINKER_MISUSE");
+        when(content.getActiveRubric("TASK_2")).thenReturn(new LearningContentClient.Rubric("IELTS_WRITING_TASK_2", "TASK_2",
+                1, "source", List.of(
+                new LearningContentClient.RubricCriterion("TR", "Task response", "", 1, List.of(), taskResponse),
+                new LearningContentClient.RubricCriterion("CC", "Coherence", "", 2, List.of(), coherence)), List.of()));
+        when(content.activeErrorTypes()).thenReturn(List.of(
+                new LearningContentClient.ErrorType("LINKER_MISUSE", "Linker", "COHERENCE", 1, "Use the right linker")));
+        // The AI judged coherence right on this essay; a review by someone else must survive the replacement.
+        evidenceRepository.append(user, List.of(
+                KnowledgeEvidence.of(coherence, true, EvidenceSource.LESSON_WRITING, LessonEvidenceReference.forWriting(essay, coherence)),
+                KnowledgeEvidence.of(coherence, true, EvidenceSource.REVIEW_SET, LessonEvidenceReference.forWriting(essay, coherence))));
+        HumanReviewResult result = new HumanReviewResult(UUID.randomUUID(), user, review, essay,
+                List.of(criterion("coherence", "5.0"), criterion("taskResponse", "6.5")),
+                List.of(new HumanReviewResult.ErrorCount("LINKER_MISUSE", 1)));
+
+        applyResult.execute(result);
+
+        assertEquals(0, count("SELECT count(*) FROM kp_evidence WHERE source = 'lesson_writing' AND kp_id = ?", coherence),
+                "the AI's criterion evidence for this essay is replaced");
+        assertEquals(1, count("SELECT count(*) FROM kp_evidence WHERE source = 'review_set' AND kp_id = ?", coherence),
+                "evidence of another source is kept");
+        assertEquals(false, jdbc.queryForObject("SELECT correct FROM kp_evidence WHERE source = 'human_review' AND kp_id = ?",
+                Boolean.class, coherence));
+        assertEquals(true, jdbc.queryForObject("SELECT correct FROM kp_evidence WHERE source = 'human_review' AND kp_id = ?",
+                Boolean.class, taskResponse));
+        assertEquals(1, count("SELECT count(*) FROM kp_evidence WHERE source = 'error_trap' AND kp_id = ?", trap));
+        assertEquals(1, count("SELECT count(*) FROM human_review_outcomes WHERE submission_id = ?", essay));
+
+        applyResult.execute(result);
+
+        assertEquals(2, count("SELECT count(*) FROM kp_evidence WHERE source = 'human_review'"),
+                "a repeated event adds no evidence");
+        assertEquals(1, count("SELECT count(*) FROM kp_evidence WHERE source = 'error_trap'"));
+        assertEquals(1, count("SELECT count(*) FROM human_review_outcomes"));
+    }
+
+    /** An error code Content has not approved is neither counted nor kept for the learner. */
+    @Test
+    void anUnapprovedCodeLeavesNoTrapEvidenceAndNoStudyPoint() {
+        UUID essay = essay(user, "GRADED", false);
+        UUID review = UUID.randomUUID();
+        jdbc.update("UPDATE lesson_writing_submissions SET prompt_snapshot = jsonb_set(prompt_snapshot, '{passBand}', '6.0') "
+                + "WHERE id = ?", essay);
+        jdbc.update("INSERT INTO human_review_requests (submission_id, user_id, review_submission_id) VALUES (?, ?, ?)",
+                essay, user, review);
+        UUID parent = UUID.randomUUID(), trap = UUID.randomUUID();
+        catalogPoint(parent, null, null);
+        catalogPoint(trap, parent, "LINKER_MISUSE");
+        when(content.activeErrorTypes()).thenReturn(List.of());
+
+        applyResult.execute(new HumanReviewResult(UUID.randomUUID(), user, review, essay, List.of(),
+                List.of(new HumanReviewResult.ErrorCount("LINKER_MISUSE", 2))));
+
+        assertEquals(0, count("SELECT count(*) FROM kp_evidence WHERE source = 'error_trap'"));
+        assertEquals("[]", jdbc.queryForObject("SELECT study_points::text FROM human_review_outcomes WHERE submission_id = ?",
+                String.class, essay));
     }
 
     @Test

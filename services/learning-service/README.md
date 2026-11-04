@@ -246,6 +246,13 @@ affect Practice clearance. They appear in the additive `weak` review-basket grou
 Free writing, revisions and judged sub knowledge points do not create these reviews. See
 [lesson-writing-v1](../../docs/contracts/lesson-writing-v1.md#optional-criterion-reviews) for the rules and limits.
 
+An examiner's finished Writing review is applied to mastery by `ApplyHumanReviewResultUseCase` (from
+`assessment.human-review-completed.v1`). Its criterion bands count as `human_review` evidence with weight
+`learning.mastery.mp1.source-weights.human-review` (default `0.75`) and replace the AI's criterion evidence for the same essay; its
+approved error codes count against their trap points. Up to `learning.human-review.review-limit` (default `2`) optional reviews follow,
+shared between `ERROR_PATTERN` and `WRITING_CRITERION`. Dead letters of `learning.human-review-completed.v1.dlq` are replayed with
+`POST /api/learning/admin/dead-letters/{queue}/replay`. See [human-review-completed-v1](../../docs/contracts/human-review-completed-v1.md).
+
 ## Assessment results
 
 The consumer reads queue `learning.assessment-completed.v2` (bound to `assessment.events` /

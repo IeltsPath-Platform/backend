@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -30,7 +31,8 @@ public class PointsGrantSettledListener {
     private final ObjectMapper json;
     private final MessageRetry retry;
 
-    public PointsGrantSettledListener(RewardGrantService grants, ObjectMapper json, MessageRetry retry) {
+    public PointsGrantSettledListener(RewardGrantService grants, ObjectMapper json,
+                                      @Qualifier("pointsGrantSettledRetry") MessageRetry retry) {
         this.grants = grants;
         this.json = json;
         this.retry = retry;

@@ -45,13 +45,15 @@ public class MasteryFormulaSettings {
                                   @Value("${learning.mastery.mp1.source-weights.probe:1.0}") double probe,
                                   @Value("${learning.mastery.mp1.source-weights.practice:0.6}") double practice,
                                   @Value("${learning.mastery.mp1.source-weights.essay:0.5}") double essay,
-                                  @Value("${learning.mastery.mp1.source-weights.error-trap:0.3}") double errorTrap) {
+                                  @Value("${learning.mastery.mp1.source-weights.error-trap:0.3}") double errorTrap,
+                                  @Value("${learning.mastery.mp1.source-weights.human-review:0.75}") double humanReview) {
         this.configs = configs;
         this.json = json;
         this.configured = parse(policy);
         this.configuredErrorTrapWeight = errorTrap;
         this.params = new Mp1Params(window, maxPractice, halfLifeDays, minEvidence, minDistinctDays, minConfidence,
-                hysteresis, sameItemDays, new Mp1Params.SourceWeights(exam, review, probe, practice, essay, errorTrap));
+                hysteresis, sameItemDays,
+                new Mp1Params.SourceWeights(exam, review, probe, practice, essay, errorTrap, humanReview));
     }
 
     public Formula formula() {
@@ -87,7 +89,7 @@ public class MasteryFormulaSettings {
         return new Mp1Params(params.window(), params.maxPracticeInWindow(), params.halfLifeDays(), params.minEvidence(),
                 params.minDistinctDays(), params.minConfidence(), params.hysteresis(), params.sameItemDays(),
                 new Mp1Params.SourceWeights(weights.exam(), weights.review(), weights.probe(), weights.practice(),
-                        weights.essay(), trapWeight));
+                        weights.essay(), trapWeight, weights.humanReview()));
     }
 
     private static Formula parse(String value) {

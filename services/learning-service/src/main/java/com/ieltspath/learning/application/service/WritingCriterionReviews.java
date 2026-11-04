@@ -40,7 +40,12 @@ public class WritingCriterionReviews {
     }
 
     public void create(UUID userId, UUID lessonId, Collection<FailedWritingCriterion> failedCriteria) {
-        if (lessonId == null || limit == 0 || failedCriteria.isEmpty()) return;
+        create(userId, lessonId, failedCriteria, limit);
+    }
+
+    /** As {@link #create(UUID, UUID, Collection)} with at most {@code maxReviews} new reviews, for callers that share a cap. */
+    public void create(UUID userId, UUID lessonId, Collection<FailedWritingCriterion> failedCriteria, int maxReviews) {
+        if (lessonId == null || maxReviews <= 0 || failedCriteria.isEmpty()) return;
         Set<UUID> pending = reviews.findPending(userId).stream().map(review -> review.knowledgePointId())
                 .collect(Collectors.toSet());
         List<UUID> pointIds = failedCriteria.stream().map(FailedWritingCriterion::knowledgePointId)
@@ -52,7 +57,7 @@ public class WritingCriterionReviews {
         Map<UUID, Integer> available = content.practiceSetAvailability(pointIds,
                 excluded.stream().sorted(Comparator.comparing(UUID::toString)).toList(), MIN_SET_QUESTIONS);
         List<ReviewCandidate> selected = rule.select(failedCriteria, pending,
-                        available == null ? Map.of() : available, limit).stream()
+                        available == null ? Map.of() : available, maxReviews).stream()
                 .map(criterion -> new ReviewCandidate(criterion.knowledgePointId(), lessonId, LearningSkill.WRITING))
                 .toList();
         reviews.insertPending(userId, selected, false, "WRITING_CRITERION");

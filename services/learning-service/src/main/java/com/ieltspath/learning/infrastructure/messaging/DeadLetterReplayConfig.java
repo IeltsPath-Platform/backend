@@ -1,5 +1,6 @@
 package com.ieltspath.learning.infrastructure.messaging;
 
+import com.ieltspath.events.assessment.HumanReviewCompletedTopology;
 import com.ieltspath.events.messaging.DeadLetterReplayer;
 import com.ieltspath.events.messaging.DeadLetterRoute;
 import com.ieltspath.commonobservability.DeadLetterMeterBinder;
@@ -20,7 +21,8 @@ public class DeadLetterReplayConfig {
     DeadLetterReplayer learningDeadLetterReplayer(ConnectionFactory connectionFactory, AmqpAdmin amqpAdmin) {
         return new DeadLetterReplayer(connectionFactory, amqpAdmin, List.of(
                 DeadLetterRoute.toQueue(RewardGrantMessagingConfig.SETTLED_DLQ, RewardGrantMessagingConfig.SETTLED_QUEUE),
-                DeadLetterRoute.toQueue(AssessmentMessagingConfig.DEAD_LETTER_QUEUE, AssessmentMessagingConfig.QUEUE)));
+                DeadLetterRoute.toQueue(AssessmentMessagingConfig.DEAD_LETTER_QUEUE, AssessmentMessagingConfig.QUEUE),
+                DeadLetterRoute.toQueue(HumanReviewCompletedTopology.DLQ, HumanReviewCompletedMessagingConfig.QUEUE)));
     }
 
     @Bean

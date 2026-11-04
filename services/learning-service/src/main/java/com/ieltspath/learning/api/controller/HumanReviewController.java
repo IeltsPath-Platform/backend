@@ -1,7 +1,7 @@
 package com.ieltspath.learning.api.controller;
 
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
-import com.ieltspath.learning.application.port.HumanReviewClient;
+import com.ieltspath.learning.api.dto.response.HumanReviewResponse;
 import com.ieltspath.learning.application.usecase.HumanReviewUseCase;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -37,8 +37,9 @@ public class HumanReviewController {
     }
 
     @GetMapping
-    public HumanReviewClient.Review review(@PathVariable("id") UUID id) {
-        return reviews.review(currentUser.requireUserId(), id);
+    public HumanReviewResponse review(@PathVariable("id") UUID id) {
+        UUID userId = currentUser.requireUserId();
+        return HumanReviewResponse.of(reviews.review(userId, id), reviews.studyPoints(userId, id));
     }
 
     /** The examiner the learner chose from the list User Service offers. */

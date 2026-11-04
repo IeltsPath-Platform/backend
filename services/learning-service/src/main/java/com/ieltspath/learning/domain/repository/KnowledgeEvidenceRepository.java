@@ -34,6 +34,14 @@ public interface KnowledgeEvidenceRepository {
      */
     Map<UUID, List<EvidencePoint>> findEvidencePoints(UUID userId, Collection<UUID> knowledgePointIds, int perPoint);
 
+    /**
+     * Removes one learner's AI-graded writing evidence (lesson and practice essays) with the given source references, so an
+     * examiner's result can replace it. Other sources are never touched, even when a reference matches.
+     *
+     * @return the knowledge points that lost evidence, so their profiles can be rebuilt
+     */
+    Set<UUID> removeWritingEvidence(UUID userId, Collection<UUID> sourceReferenceIds);
+
     /** When each of the given knowledge points last received evidence; points without evidence are absent. */
     Map<UUID, Instant> lastEvidenceAt(UUID userId, Collection<UUID> knowledgePointIds);
 }

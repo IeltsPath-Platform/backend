@@ -74,6 +74,20 @@ public class JdbcKnowledgeEvidenceRepository implements KnowledgeEvidenceReposit
     }
 
     @Override
+    public Set<UUID> removeWritingEvidence(UUID userId, Collection<UUID> sourceReferenceIds) {
+        if (sourceReferenceIds.isEmpty()) return Set.of();
+        String placeholders = sourceReferenceIds.stream().map(id -> "?").collect(java.util.stream.Collectors.joining(","));
+        List<Object> arguments = new java.util.ArrayList<>();
+        arguments.add(userId);
+        arguments.addAll(sourceReferenceIds);
+        return new HashSet<>(jdbc.queryForList("""
+                DELETE FROM kp_evidence WHERE user_id = ? AND source IN ('lesson_writing', 'practice_set')
+                    AND source_reference_id IN (%s)
+                RETURNING kp_id
+                """.formatted(placeholders), UUID.class, arguments.toArray()));
+    }
+
+    @Override
     public List<MasteryHistory> findMasteryHistories(UUID userId) {
         return histories(userId, null);
     }

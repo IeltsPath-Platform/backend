@@ -1,16 +1,22 @@
 package com.ieltspath.learning.application.usecase;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.HumanReviewClient;
 import com.ieltspath.learning.application.port.HumanReviewClient.CreateReview;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
+import com.ieltspath.learning.domain.repository.HumanReviewOutcomeRepository;
 import com.ieltspath.learning.domain.repository.HumanReviewRequestRepository;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
 import com.ieltspath.learning.domain.vo.WritingSubmissionStatus;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -27,13 +33,37 @@ public class HumanReviewUseCase {
     private final HumanReviewRequestRepository requests;
     private final HumanReviewClient client;
     private final LearningContentClient content;
+    private final HumanReviewOutcomeRepository outcomes;
+    private final ObjectMapper json;
 
     public HumanReviewUseCase(WritingSubmissionRepository essays, HumanReviewRequestRepository requests,
-                              HumanReviewClient client, LearningContentClient content) {
+                              HumanReviewClient client, LearningContentClient content,
+                              HumanReviewOutcomeRepository outcomes, ObjectMapper json) {
         this.essays = essays;
         this.requests = requests;
         this.client = client;
         this.content = content;
+        this.outcomes = outcomes;
+        this.json = json;
+    }
+
+    /**
+     * What the examiner's review taught the learner: the marked errors and weak criteria, as applied to mastery. Empty until the
+     * review has been applied.
+     */
+    public List<JsonNode> studyPoints(UUID userId, UUID submissionId) {
+        owned(userId, submissionId);
+        return outcomes.studyPointsOf(submissionId)
+                .map(stored -> {
+                    try {
+                        List<JsonNode> points = new ArrayList<>();
+                        json.readTree(stored).forEach(points::add);
+                        return points;
+                    } catch (JsonProcessingException corrupt) {
+                        throw new IllegalStateException("Stored human review study points are invalid", corrupt);
+                    }
+                })
+                .orElse(List.of());
     }
 
     /**

@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -128,6 +129,53 @@ class ErrorTrapReviewsTest {
         verify(reviews, times(1)).insertPending(eq(user), anyList(), eq(false), eq("ERROR_PATTERN"));
         verify(content, times(1)).searchPracticeSets(eq(secondParent), anyList(), eq(3), eq(1),
                 any(), eq("B_ERROR"));
+    }
+
+    /** An examiner marked the error once: the parent is reviewed at once, whatever the trap's mastery tier. */
+    @Test
+    void aMarkedErrorReviewsItsParentWithoutWaitingForThePriorityTier() {
+        when(profiles.findErrorTrapProfiles(user)).thenReturn(List.of(profile(trap, .9, MasteryTier.MAINTAIN)));
+
+        int created = subject.createForMarkedCodes(user, null,
+                List.of(new ErrorTrapReviews.MarkedErrorTrap("TFNG_NG_AS_FALSE", trap, 1)), 2);
+
+        assertEquals(1, created);
+        verify(reviews).insertPending(user, List.of(new ReviewCandidate(parent, lesson, null)), false, "ERROR_PATTERN");
+    }
+
+    @Test
+    void theMarkedErrorsShareTheLimitAndTheParentWithAPendingReviewIsSkipped() {
+        UUID otherTrap = UUID.randomUUID(), otherParent = UUID.randomUUID();
+        when(catalog.load()).thenReturn(new ErrorTraps(
+                Map.of("TFNG_NG_AS_FALSE", trap, "B_ERROR", otherTrap),
+                Map.of(trap, parent, otherTrap, otherParent),
+                Map.of(parent, List.of(trap), otherParent, List.of(otherTrap))));
+        when(lessonLocator.teaching(user, otherParent)).thenReturn(Optional.of(lesson));
+        when(content.searchPracticeSets(eq(otherParent), anyList(), eq(3), eq(1), eq(lesson), eq("B_ERROR")))
+                .thenReturn(List.of(new LearningContentClient.PracticeSet(UUID.randomUUID(), UUID.randomUUID(),
+                        "B_SET", 3, 3, null, null, 2)));
+        when(reviews.findPending(user)).thenReturn(List.of(pending(parent)));
+
+        int created = subject.createForMarkedCodes(user, null, List.of(
+                new ErrorTrapReviews.MarkedErrorTrap("TFNG_NG_AS_FALSE", trap, 2),
+                new ErrorTrapReviews.MarkedErrorTrap("B_ERROR", otherTrap, 1)), 1);
+
+        assertEquals(1, created, "the first marked error's parent has a pending review, so the second one takes the single slot");
+        verify(reviews).insertPending(user, List.of(new ReviewCandidate(otherParent, lesson, null)), false, "ERROR_PATTERN");
+        verify(reviews, times(1)).insertPending(any(), anyList(), anyBoolean(), anyString());
+    }
+
+    @Test
+    void anErrorWithoutATrapPointOrWithoutAMatchingSetCreatesNothing() {
+        assertEquals(0, subject.createForMarkedCodes(user, null,
+                List.of(new ErrorTrapReviews.MarkedErrorTrap("UNKNOWN", UUID.randomUUID(), 1)), 2));
+
+        when(content.searchPracticeSets(eq(parent), anyList(), eq(3), eq(1), eq(lesson), eq("TFNG_NG_AS_FALSE")))
+                .thenReturn(List.of(new LearningContentClient.PracticeSet(UUID.randomUUID(), UUID.randomUUID(),
+                        "NO_TRAP_SET", 3, 3, null, null, 1)));
+        assertEquals(0, subject.createForMarkedCodes(user, null,
+                List.of(new ErrorTrapReviews.MarkedErrorTrap("TFNG_NG_AS_FALSE", trap, 1)), 2));
+        verify(reviews, never()).insertPending(any(), anyList(), anyBoolean(), anyString());
     }
 
     private MasteryProfile profile(UUID kp, double mastery, MasteryTier tier) {

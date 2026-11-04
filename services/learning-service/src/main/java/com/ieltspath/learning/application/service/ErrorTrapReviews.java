@@ -114,6 +114,53 @@ public class ErrorTrapReviews {
         }
     }
 
+    /**
+     * Reviews for the error codes an examiner marked, most marked first. Unlike {@link #create}, a single marking is enough: the
+     * examiner has seen the error, so the parent point is reviewed now rather than when its trap point reaches PRIORITY. A point
+     * with a pending review is skipped; the learner is sent to a lesson that teaches the point. Returns how many were created.
+     */
+    public int createForMarkedCodes(UUID userId, UUID submissionLessonId, Collection<MarkedErrorTrap> marked, int maxReviews) {
+        if (maxReviews <= 0 || marked == null || marked.isEmpty()) return 0;
+        ErrorTrapCatalog.ErrorTraps traps = catalog.load();
+        if (traps == null || traps.parentByTrapKp().isEmpty()) return 0;
+
+        Set<UUID> pendingKps = reviews.findPending(userId).stream()
+                .map(PendingReview::knowledgePointId).collect(Collectors.toSet());
+        Set<UUID> excluded = new HashSet<>(attempts.revealedPackageIds(userId));
+        excluded.addAll(reviews.assignedPackageIds(userId));
+        List<UUID> excludedIds = excluded.stream().sorted(Comparator.comparing(UUID::toString)).toList();
+        int created = 0;
+
+        for (MarkedErrorTrap mark : marked) {
+            if (created >= maxReviews) break;
+            UUID parent = traps.parentByTrapKp().get(mark.trapKnowledgePointId());
+            if (parent == null || pendingKps.contains(parent)) continue;
+
+            UUID lessonId = teachingSubmissionLesson(userId, submissionLessonId, parent);
+            if (lessonId == null) continue;
+            List<LearningContentClient.PracticeSet> candidates;
+            try {
+                candidates = content.searchPracticeSets(parent, excludedIds, MIN_SET_QUESTIONS, 1, lessonId, mark.code());
+            } catch (RuntimeException exception) {
+                log.warn("Skipping marked error review: userId={}, errorCode={}, reason={}",
+                        userId, mark.code(), exception.getMessage());
+                continue;
+            }
+            if (candidates == null || candidates.stream().noneMatch(set -> set.trapQuestionCount() >= MIN_TRAP_QUESTIONS)) {
+                continue;
+            }
+            LearningSkill skill = evidence.findMasteryHistories(userId, List.of(parent)).stream()
+                    .map(history -> history.skill()).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+            reviews.insertPending(userId, List.of(new ReviewCandidate(parent, lessonId, skill)), false, "ERROR_PATTERN");
+            pendingKps.add(parent);
+            created++;
+        }
+        return created;
+    }
+
+    /** A trap point an examiner's marking counts against, with how often the examiner marked its error. */
+    public record MarkedErrorTrap(String code, UUID trapKnowledgePointId, int count) { }
+
     private UUID teachingSubmissionLesson(UUID userId, UUID submissionLessonId, UUID parent) {
         if (submissionLessonId != null) {
             try {
