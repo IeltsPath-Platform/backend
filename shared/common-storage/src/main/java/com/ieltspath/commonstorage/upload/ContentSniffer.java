@@ -5,7 +5,7 @@ import java.util.Optional;
 /**
  * Nhận dạng loại file từ vài byte đầu (magic bytes).
  *
- * <p>Chặn được giả mạo rõ ràng: ảnh đội lốt audio, văn bản đội lốt ảnh, Matroska đội lốt webm. Không phải bộ giải mã
+ * <p>Nhận ảnh, audio và PDF ({@code %PDF-} ở byte đầu). Chặn được giả mạo rõ ràng: ảnh đội lốt audio, văn bản đội lốt ảnh, Matroska đội lốt webm. Không phải bộ giải mã
  * đầy đủ: file polyglot, MP4 có hình đội lốt {@code audio/mp4}, hay byte {@code FF Ex} ngẫu nhiên vẫn có thể qua.
  * Đừng coi đây là cổng bảo mật duy nhất.
  *
@@ -31,6 +31,9 @@ public final class ContentSniffer {
         }
         if (ascii(content, 0, "GIF87a") || ascii(content, 0, "GIF89a")) {
             return Optional.of("image/gif");
+        }
+        if (ascii(content, 0, "%PDF-")) {
+            return Optional.of("application/pdf");
         }
         if (ascii(content, 0, "OggS")) {
             return Optional.of("audio/ogg");

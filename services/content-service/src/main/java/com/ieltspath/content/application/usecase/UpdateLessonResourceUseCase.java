@@ -1,6 +1,7 @@
 package com.ieltspath.content.application.usecase;
 
 import com.ieltspath.content.application.command.UpdateLessonResourceCommand;
+import com.ieltspath.content.application.port.LessonDocumentFiles;
 import com.ieltspath.content.application.result.LessonResourceResult;
 import com.ieltspath.content.domain.aggregate.LessonResource;
 import com.ieltspath.content.domain.exception.LessonResourceNotFoundException;
@@ -12,14 +13,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class UpdateLessonResourceUseCase {
     private final LessonResourceRepository resources;
+    private final LessonDocumentFiles files;
 
-    public UpdateLessonResourceUseCase(LessonResourceRepository resources) { this.resources = resources; }
+    public UpdateLessonResourceUseCase(LessonResourceRepository resources, LessonDocumentFiles files) {
+        this.resources = resources;
+        this.files = files;
+    }
 
     public LessonResourceResult execute(UpdateLessonResourceCommand command) {
         LessonResource resource = resources.findById(command.resourceId())
                 .filter(found -> found.getLessonId().equals(command.lessonId()))
                 .orElseThrow(() -> new LessonResourceNotFoundException(command.lessonId(), command.resourceId()));
         resource.update(command.title(), command.url(), command.sortOrder());
-        return LessonResourceResult.from(resources.save(resource));
+        return LessonResourceResult.from(resources.save(resource), files);
     }
 }

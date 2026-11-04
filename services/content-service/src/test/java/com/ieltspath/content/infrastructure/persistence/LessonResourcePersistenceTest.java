@@ -53,6 +53,15 @@ class LessonResourcePersistenceTest {
         assertThat(mapper.toDomain(mapper.toEntity(resource))).usingRecursiveComparison().isEqualTo(resource);
     }
 
+    @Test
+    void anUploadedFileRoundTripsThroughTheJpaMapper() {
+        var file = LessonResource.createFile(UUID.randomUUID(), "Giáo trình",
+                "lesson-document/0b1f7c9e-3a40-4d3a-9a52-1d2c8e0a7f11/9c2e5d3a-77b1-4f0a-8f6e-2b8d1c4a9e10.pdf", 1);
+
+        assertThat(mapper.toDomain(mapper.toEntity(file))).usingRecursiveComparison().isEqualTo(file);
+        assertThat(mapper.toEntity(file).getUrl()).isNull();
+    }
+
     private LessonResourceRepositoryAdapter adapter(LessonResourceJpaRepository jpa) {
         return new LessonResourceRepositoryAdapter(jpa, mapper, mock(NamedParameterJdbcTemplate.class));
     }

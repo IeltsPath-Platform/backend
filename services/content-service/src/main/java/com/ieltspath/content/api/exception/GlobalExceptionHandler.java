@@ -378,22 +378,26 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UploadRejectedException.class)
     public ResponseEntity<ErrorResponse> handleUploadRejected(UploadRejectedException ex, HttpServletRequest request) {
+        boolean document = request.getRequestURI().endsWith("/media/document");
         return switch (ex.reason()) {
             case TOO_LARGE -> buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "The file is larger than the limit",
-                    request.getRequestURI(), Map.of("code", "AUDIO_TOO_LARGE"));
+                    request.getRequestURI(), Map.of("code", document ? "DOCUMENT_TOO_LARGE" : "AUDIO_TOO_LARGE"));
             case EMPTY -> buildResponse(HttpStatus.BAD_REQUEST, "The file is empty", request.getRequestURI(),
                     Map.of("code", "EMPTY_FILE"));
-            case TYPE_NOT_ALLOWED, CONTENT_MISMATCH -> buildResponse(HttpStatus.BAD_REQUEST,
-                    "The file is not a supported audio format", request.getRequestURI(),
-                    Map.of("code", "UNSUPPORTED_AUDIO"));
+            case TYPE_NOT_ALLOWED, CONTENT_MISMATCH -> document
+                    ? buildResponse(HttpStatus.BAD_REQUEST, "The file is not a PDF", request.getRequestURI(),
+                            Map.of("code", "UNSUPPORTED_DOCUMENT"))
+                    : buildResponse(HttpStatus.BAD_REQUEST, "The file is not a supported audio format",
+                            request.getRequestURI(), Map.of("code", "UNSUPPORTED_AUDIO"));
         };
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex,
                                                              HttpServletRequest request) {
-        String code = request.getRequestURI().contains("/course-import")
-                ? ImportFileRejectedException.FILE_TOO_LARGE : "AUDIO_TOO_LARGE";
+        String uri = request.getRequestURI();
+        String code = uri.contains("/course-import") ? ImportFileRejectedException.FILE_TOO_LARGE
+                : uri.endsWith("/media/document") ? "DOCUMENT_TOO_LARGE" : "AUDIO_TOO_LARGE";
         return buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "The file is larger than the limit",
                 request.getRequestURI(), Map.of("code", code));
     }

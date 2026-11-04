@@ -3,10 +3,12 @@ package com.ieltspath.content.api.controller;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.content.api.dto.response.StoredAudioResponse;
+import com.ieltspath.content.api.dto.response.StoredDocumentResponse;
 import com.ieltspath.content.api.dto.response.StoredImageResponse;
 import com.ieltspath.content.application.result.StoredMediaResult;
 import com.ieltspath.content.application.usecase.UploadContentAudioUseCase;
 import com.ieltspath.content.application.usecase.UploadContentImageUseCase;
+import com.ieltspath.content.application.usecase.UploadLessonDocumentUseCase;
 import com.ieltspath.content.domain.vo.AccessTier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -28,12 +30,14 @@ public class ContentMediaController {
 
     private final UploadContentAudioUseCase uploadAudio;
     private final UploadContentImageUseCase uploadImage;
+    private final UploadLessonDocumentUseCase uploadDocument;
     private final CurrentUserProvider currentUser;
 
     public ContentMediaController(UploadContentAudioUseCase uploadAudio, UploadContentImageUseCase uploadImage,
-                                  CurrentUserProvider currentUser) {
+                                  UploadLessonDocumentUseCase uploadDocument, CurrentUserProvider currentUser) {
         this.uploadAudio = uploadAudio;
         this.uploadImage = uploadImage;
+        this.uploadDocument = uploadDocument;
         this.currentUser = currentUser;
     }
 
@@ -70,5 +74,22 @@ public class ContentMediaController {
         }
         StoredMediaResult stored = uploadImage.execute(currentUser.requireUserId(), file.getContentType(), bytes);
         return StoredImageResponse.from(stored);
+    }
+
+    /** A PDF for a lesson. It is stored privately; attach the returned key to a lesson document to publish it. */
+    @PostMapping(value = "/document", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public StoredDocumentResponse uploadDocument(@RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
+        }
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException unreadable) {
+            throw new UploadRejectedException(UploadRejectedException.Reason.EMPTY);
+        }
+        StoredMediaResult stored = uploadDocument.execute(currentUser.requireUserId(), file.getContentType(), bytes);
+        return StoredDocumentResponse.from(stored);
     }
 }

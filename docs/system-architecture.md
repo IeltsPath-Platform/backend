@@ -109,7 +109,7 @@ biệt bằng tiền tố khóa; khác chính sách thì dùng bucket mới; kh�
 | `community` | có | Ảnh bài đăng cộng đồng | 5 MB | png, jpeg, webp, gif | community-service | `community/post/{userId}/{uuid}.{ext}` | đã có |
 | `media` | có | Audio và ảnh nội dung bài học | 25 MB | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service | seed: `listening/demo/ls1.mp3`; upload API: `content-audio/{userId}/{uuid}.{ext}` | đã có |
 | `speaking-recordings` | không | Ghi âm Speaking của học viên | 5 MB | webm, mp4, ogg, mpeg, wav | assessment-service | `speaking/{userId}/{uuid}.{ext}` | đã có, chưa dùng |
-| `media-premium` | không | Audio PREMIUM, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | đã có |
+| `media-premium` | không | Audio PREMIUM và PDF tài liệu bài học, chỉ phát bằng URL ký | 25 MB (PDF tối đa 20 MB) | mpeg, mp4, wav, ogg, pdf | content-service | audio như `media`; tài liệu `lesson-document/{userId}/{uuid}.pdf` | đã có; cần thêm `application/pdf` vào loại file cho phép |
 
 Content lưu `access_tier` cùng asset. `PUBLIC` dùng URL công khai của `media`; `PREMIUM` dùng URL ký của
 `media-premium` với TTL 900 giây. Learning kiểm tra lesson gate trước khi Content tạo URL ký. URL ký chỉ giữ ở response,
