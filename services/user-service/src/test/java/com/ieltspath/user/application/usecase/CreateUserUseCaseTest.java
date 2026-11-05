@@ -65,6 +65,24 @@ class CreateUserUseCaseTest {
     }
 
     @Test
+    void rejectsANameOverTheColumnBeforeAnythingIsSaved() {
+        assertThatThrownBy(() -> useCase().execute(
+                new CreateUserCommand("john@example.com", "secret123", "n".repeat(151), null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Họ tên không được vượt quá 150 ký tự");
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void rejectsABlankName() {
+        assertThatThrownBy(() -> useCase().execute(
+                new CreateUserCommand("john@example.com", "secret123", "   ", null, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Họ tên không được để trống");
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
     void rejectsAnEmailThatIsAlreadyRegistered() {
         when(userRepository.existsByEmail("john@example.com")).thenReturn(true);
         assertThatThrownBy(() -> useCase().execute(

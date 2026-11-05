@@ -68,6 +68,19 @@ class UpdateUserUseCaseTest {
     }
 
     @Test
+    void rejectsANameOverTheColumnEvenWhenTheRequestWasNotValidated() {
+        UUID userId = UUID.randomUUID();
+        User existing = existingUser(userId);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> useCase.execute(new UpdateUserCommand(userId, "n".repeat(151), null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Họ tên không được vượt quá 150 ký tự");
+        assertThat(existing.getFullName()).isEqualTo("John Doe");
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
     void rejectsAPhoneNumberUsedByAnotherAccount() {
         UUID userId = UUID.randomUUID();
         when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser(userId)));
