@@ -1,7 +1,7 @@
 -- DEV ONLY. Gives one learner a Speaking study history (answers with error tags) so there is something to read back as
 -- "where this learner is weak". Never run it on a real environment: it writes answers the learner did not give.
 --
--- Needs content-service migration V103 (the question and knowledge point ids below come from it).
+-- Needs content-service migration V115 (the question and knowledge point ids below come from it).
 --
 --   psql -U postgres -d learning_db -v user_id=<learner uuid> -f scripts/dev/seed-speaking-learner-history.sql
 --

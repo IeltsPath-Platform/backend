@@ -37,6 +37,6 @@ through 9.0 for each criterion. PR is stored for learner feedback but is not an 
 `GET /internal/learning-content/rubrics/{code}/{version}` responses include `systemPrompt` and the mapped
 `knowledgePointId` on each criterion. Learning uses the immutable version selected when grading begins.
 
-Migration V104 creates `IELTS_SPEAKING@1` as a starter `DRAFT`. Its prompt and paraphrased descriptors are authoring
+Migration V116 creates `IELTS_SPEAKING@1` as a starter `DRAFT`. Its prompt and paraphrased descriptors are authoring
 notes, not approved IELTS guidance; an IELTS-qualified reviewer must revise and activate it before AI grading can use
 it.

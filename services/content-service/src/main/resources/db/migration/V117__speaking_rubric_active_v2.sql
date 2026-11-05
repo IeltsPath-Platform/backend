@@ -1,4 +1,4 @@
--- The first Speaking rubric (V104) was a DRAFT with one generic sentence per band. This migration adds version 2 with a
+-- The first Speaking rubric (V116) was a DRAFT with one generic sentence per band. This migration adds version 2 with a
 -- full set of band descriptors and a system prompt for the grader, and makes it the ACTIVE Speaking rubric so that AI
 -- grading has a rubric to work from. The descriptors are original wording written for this project around the four
 -- public IELTS Speaking criteria. They are practice-grade notes, not official IELTS descriptors, and they have not been

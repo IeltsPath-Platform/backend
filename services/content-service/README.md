@@ -15,7 +15,7 @@ Library implements the same [snapshot contract](../../docs/contracts/game-conten
 ## Speaking rubric
 
 Speaking uses the existing versioned rubric authoring API with `task=SPEAKING`. Active rubric snapshots include the
-admin-authored `systemPrompt` and mapped criterion knowledge point IDs for Learning. The seed in V104 is a draft only;
+admin-authored `systemPrompt` and mapped criterion knowledge point IDs for Learning. The seed in V116 is a draft only;
 review it before activation. See the [Speaking rubric contract](../../docs/contracts/speaking-rubric-v1.md).
 
 Courses group topics by an IELTS band level shared across skills. `bandLevel` is unique and must be between 0 and 9

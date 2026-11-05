@@ -419,16 +419,23 @@ class LessonPipelineSeedTest {
                 "FOUNDATION_WRITING_MESSAGES", "IELTS_5_0_GRAMMAR", "IELTS_5_0_VOCABULARY", "IELTS_5_0_WRITING",
                 "IELTS_5_0_WRITING_DATA", "TREES_WRITING", "DEMO_WRITING", "IELTS_6_0_WRITING",
                 "WRITING_6_5_DISCUSSION", "IELTS_7_0_WRITING", "IELTS_8_0_WRITING_STYLE", "IELTS_8_0_WRITING_ARGUMENT");
+        // Speaking has one chặng, in the 7.0 course, between Reading and Writing.
+        List<String> speaking = List.of("SPEAKING_FRAMEWORK");
         List<String> expected = new ArrayList<>(listening);
         expected.addAll(readingTopics);
+        expected.addAll(speaking);
         expected.addAll(writing);
         assertThat(sequence).extracting(TopicSequenceResult::code).containsExactlyElementsOf(expected);
+        int readingEnd = listening.size() + readingTopics.size();
         assertThat(sequence.subList(0, listening.size())).allMatch(entry -> entry.skill() == Skill.LISTENING);
-        assertThat(sequence.subList(listening.size(), listening.size() + readingTopics.size()))
-                .allMatch(entry -> entry.skill() == Skill.READING);
-        assertThat(sequence.subList(listening.size() + readingTopics.size(), sequence.size()))
+        assertThat(sequence.subList(listening.size(), readingEnd)).allMatch(entry -> entry.skill() == Skill.READING);
+        assertThat(sequence.subList(readingEnd, readingEnd + speaking.size()))
+                .allMatch(entry -> entry.skill() == Skill.SPEAKING);
+        assertThat(sequence.subList(readingEnd + speaking.size(), sequence.size()))
                 .allMatch(entry -> entry.skill() == Skill.WRITING);
-        assertThat(sequence).allMatch(TopicSequenceResult::hasTopicTest);
+        // The Speaking chặng has no final test: a learner passes it by completing its lessons.
+        assertThat(sequence).filteredOn(entry -> entry.skill() != Skill.SPEAKING).allMatch(TopicSequenceResult::hasTopicTest);
+        assertThat(topic(sequence, "SPEAKING_FRAMEWORK").hasTopicTest()).isFalse();
         // The lower-band Reading course keeps its paid topics after its free topics.
         assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
                 .containsOnlyNulls();
