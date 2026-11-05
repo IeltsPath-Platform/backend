@@ -22,6 +22,11 @@ public interface LearningContentClient {
 
     List<Topic> getTopicSequence();
 
+    /** Ids of the courses open to everyone; their lessons and points are never behind the course paywall. */
+    default java.util.Set<UUID> getFreeCourseIds() {
+        return java.util.Set.of();
+    }
+
     default List<Topic> getTopicSequence(boolean includeErrorTraps) {
         return getTopicSequence();
     }
@@ -237,11 +242,19 @@ public interface LearningContentClient {
 
     record Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest, Boolean active,
                   String coverImageUrl, String description, Map<LearningSkill, Integer> skillUnlockPoints,
-                  Integer comboUnlockPoints, List<LearningSkill> availableSkills) {
+                  Integer comboUnlockPoints, List<LearningSkill> availableSkills, String bannerImageUrl) {
         public Course {
             active = active == null || active;
             skillUnlockPoints = skillUnlockPoints == null ? Map.of() : Map.copyOf(skillUnlockPoints);
             availableSkills = availableSkills == null ? List.of() : List.copyOf(availableSkills);
+        }
+
+        public Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,
+                      Boolean active, String coverImageUrl, String description,
+                      Map<LearningSkill, Integer> skillUnlockPoints, Integer comboUnlockPoints,
+                      List<LearningSkill> availableSkills) {
+            this(courseId, code, name, bandLevel, hasCourseTest, active, coverImageUrl, description,
+                    skillUnlockPoints, comboUnlockPoints, availableSkills, null);
         }
 
         public Course(UUID courseId, String code, String name, BigDecimal bandLevel, boolean hasCourseTest,

@@ -2,6 +2,7 @@ package com.ieltspath.library.application.usecase;
 
 import com.ieltspath.library.application.result.VocabularySenseCardResult;
 import com.ieltspath.library.domain.repository.VocabularyRepository;
+import com.ieltspath.library.application.port.PronunciationAudioUrls;
 import com.ieltspath.library.domain.vo.PartOfSpeech;
 import com.ieltspath.library.domain.vo.VocabularySenseCard;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,9 @@ class GetVocabularySensesUseCaseTest {
 
     @Mock
     private VocabularyRepository vocabularyRepository;
+
+    @Mock
+    private PronunciationAudioUrls audioUrls;
 
     @InjectMocks
     private GetVocabularySensesUseCase useCase;

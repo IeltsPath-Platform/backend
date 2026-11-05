@@ -403,24 +403,38 @@ class LessonPipelineSeedTest {
     void topicSequenceListsEachSkillsTopicsWithLessonsAndTheirActiveKnowledgePoints() {
         List<TopicSequenceResult> sequence = reader.topicSequence(3);
 
-        assertThat(sequence).extracting(TopicSequenceResult::code)
-                .containsExactly("DEMO_LISTENING", "TREES_LISTENING", "LISTENING_6_5_DETAIL", "DEMO_READING",
-                        "TFNG_SKILLS", "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION", "TREES_READING",
-                        "READING_6_5_INFERENCE", "SPEAKING_FRAMEWORK", "DEMO_WRITING", "TREES_WRITING",
-                        "WRITING_6_5_DISCUSSION");
-        assertThat(sequence).extracting(TopicSequenceResult::skill)
-                .containsExactly(Skill.LISTENING, Skill.LISTENING, Skill.LISTENING, Skill.READING, Skill.READING,
-                        Skill.READING, Skill.READING, Skill.READING, Skill.READING, Skill.SPEAKING, Skill.WRITING,
-                        Skill.WRITING, Skill.WRITING);
-        // The Speaking and Writing 6.5 topics have no final test; a learner passes them by completing their lessons.
-        assertThat(sequence).extracting(TopicSequenceResult::hasTopicTest)
-                .containsExactly(true, true, true, true, true, true, true, true, true, false, true, true, false);
+        // Each skill runs through the courses by band, and each course's chặng in teaching order.
+        List<String> listening = List.of("FOUNDATION_LISTENING", "FOUNDATION_LISTENING_PLACES",
+                "FOUNDATION_LISTENING_ROUTINES", "IELTS_5_0_LISTENING_EVERYDAY", "IELTS_5_0_LISTENING_PREDICT",
+                "IELTS_5_0_LISTENING_FORMS", "IELTS_5_0_LISTENING_CHOICE", "IELTS_5_0_LISTENING_TALKS",
+                "DEMO_LISTENING", "TREES_LISTENING", "IELTS_6_0_LISTENING", "LISTENING_6_5_DETAIL",
+                "IELTS_7_0_LISTENING", "IELTS_8_0_LISTENING_IMPLIED", "IELTS_8_0_LISTENING_LECTURE");
+        List<String> readingTopics = List.of("FOUNDATION_READING_BASICS", "FOUNDATION_READING",
+                "FOUNDATION_READING_MESSAGES", "IELTS_5_0_READING_SKIM", "IELTS_5_0_READING_SHORT_ANSWER",
+                "IELTS_5_0_READING_FORMATS", "IELTS_5_0_READING_COMPLETION", "IELTS_5_0_READING_LONGER",
+                "DEMO_READING", "TREES_READING", "TFNG_SKILLS", "PREMIUM_MATCHING_INFO",
+                "PREMIUM_SENTENCE_COMPLETION", "IELTS_6_0_READING", "READING_6_5_INFERENCE", "IELTS_7_0_READING",
+                "IELTS_8_0_READING_INFERENCE", "IELTS_8_0_READING_TIMED");
+        List<String> writing = List.of("FOUNDATION_WRITING", "FOUNDATION_WRITING_GRAMMAR",
+                "FOUNDATION_WRITING_MESSAGES", "IELTS_5_0_GRAMMAR", "IELTS_5_0_VOCABULARY", "IELTS_5_0_WRITING",
+                "IELTS_5_0_WRITING_DATA", "TREES_WRITING", "DEMO_WRITING", "IELTS_6_0_WRITING",
+                "WRITING_6_5_DISCUSSION", "IELTS_7_0_WRITING", "IELTS_8_0_WRITING_STYLE", "IELTS_8_0_WRITING_ARGUMENT");
+        List<String> expected = new ArrayList<>(listening);
+        expected.addAll(readingTopics);
+        expected.addAll(writing);
+        assertThat(sequence).extracting(TopicSequenceResult::code).containsExactlyElementsOf(expected);
+        assertThat(sequence.subList(0, listening.size())).allMatch(entry -> entry.skill() == Skill.LISTENING);
+        assertThat(sequence.subList(listening.size(), listening.size() + readingTopics.size()))
+                .allMatch(entry -> entry.skill() == Skill.READING);
+        assertThat(sequence.subList(listening.size() + readingTopics.size(), sequence.size()))
+                .allMatch(entry -> entry.skill() == Skill.WRITING);
+        assertThat(sequence).allMatch(TopicSequenceResult::hasTopicTest);
         // The lower-band Reading course keeps its paid topics after its free topics.
         assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
                 .containsOnlyNulls();
         assertThat(sequence).allMatch(entry -> entry.course().hasCourseTest());
-        assertThat(topic(sequence, "READING_6_5_INFERENCE").course().bandLevel()).isEqualByComparingTo("6.5");
-        assertThat(topic(sequence, "DEMO_READING").course().bandLevel()).isEqualByComparingTo("5.5");
+        assertThat(topic(sequence, "READING_6_5_INFERENCE").course().bandLevel()).isEqualByComparingTo("7.0");
+        assertThat(topic(sequence, "DEMO_READING").course().bandLevel()).isEqualByComparingTo("6.0");
         TopicSequenceResult reading = topic(sequence, "DEMO_READING");
         assertThat(reading.knowledgePoints()).extracting(TopicSequenceResult.KnowledgePointEntry::code)
                 .containsExactly("DEMO_READING_MAIN_IDEA", "DR_IDEA_OR_DETAIL", "DR_TOPIC_SENTENCE",
@@ -536,7 +550,7 @@ class LessonPipelineSeedTest {
                 .containsExactly(4, 4);
         assertThat(availableKp2.subList(2, 10)).allSatisfy(set -> assertThat(set.questionCount()).isGreaterThanOrEqualTo(3));
         assertThat(availableKp2).filteredOn(set -> set.band() != null)
-                .allSatisfy(set -> assertThat(set.band()).isEqualByComparingTo("5.5"));
+                .allSatisfy(set -> assertThat(set.band()).isEqualByComparingTo("6.0"));
         assertThat(availableKp2).extracting(PracticeSetResult::requiredFeatureKey).containsOnlyNulls();
 
         List<UUID> excluded = new ArrayList<>();
@@ -575,9 +589,11 @@ class LessonPipelineSeedTest {
     @Test
     void practiceSetsBelongToTheEarliestLessonTeachingTheirKnowledgePoint() {
         Map<String, String> lessonOfPackage = new java.util.TreeMap<>();
+        // The course ladder seed (Foundation to 8.0) is held to the same rule by CourseLadderSeedTest.
         jdbc.query("""
                 SELECT p.code, l.code AS lesson FROM content_packages p JOIN lessons l ON l.id = p.lesson_id
                 WHERE p.package_type = 'PRACTICE_SET'
+                  AND left(p.id::text, 4) NOT IN ('cf08', 'c508', 'c608', 'c708', 'c808', 'e108', 'e208')
                 """, Map.of(), rs -> {
             lessonOfPackage.put(rs.getString("code"), rs.getString("lesson"));
         });
@@ -718,7 +734,7 @@ class LessonPipelineSeedTest {
         assertThat(reader.lessonPracticeSets(lessonId("PM1")))
                 .allSatisfy(set -> {
                     assertThat(set.requiredFeatureKey()).isEqualTo("PREMIUM_CONTENT");
-                    assertThat(set.band()).isEqualByComparingTo("5.5");
+                    assertThat(set.band()).isEqualByComparingTo("6.0");
                 });
     }
 

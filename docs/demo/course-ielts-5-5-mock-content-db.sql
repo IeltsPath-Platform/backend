@@ -1,4 +1,4 @@
--- Demo data only: fills the IELTS 5.5 course so every skill has many chặng of many lessons, the size the real course will
+-- Demo data only: fills the IELTS 6.0 course (formerly IELTS 5.5) so every skill has many chặng of many lessons, the size the real course will
 -- have (about 30-40 lessons per skill). It adds 16 chặng (4 per skill) of 6 lessons each next to the ones already there.
 -- Every lesson is PUBLISHED with one short TEXT block linked to one knowledge point of its skill, so the lesson page opens
 -- and each skill progresses on its own; there are no exercises, practice sets or chặng tests, so a chặng passes once all its
@@ -69,7 +69,7 @@ INSERT INTO mock_chang (skill, sort_order, code, name, description, lessons) VAL
  ARRAY['Trọng âm từ', 'Ngữ điệu', 'Nối âm', 'Kỹ thuật kéo dài thời gian nói', 'Sửa lỗi phát âm hay gặp', 'Luyện tập tổng hợp']);
 
 INSERT INTO topics (code, name, sort_order, status, skill, course_id, description)
-SELECT m.code, m.name, m.sort_order, 'ACTIVE', m.skill, (SELECT id FROM courses WHERE code = 'IELTS_5_5'), m.description
+SELECT m.code, m.name, m.sort_order, 'ACTIVE', m.skill, (SELECT id FROM courses WHERE code = 'IELTS_6_0'), m.description
   FROM mock_chang m
  WHERE NOT EXISTS (SELECT 1 FROM topics t WHERE t.code = m.code);
 
@@ -121,7 +121,7 @@ COMMIT;
 
 SELECT t.skill, count(DISTINCT t.id) AS chang, count(l.id) FILTER (WHERE l.status = 'PUBLISHED') AS lessons
   FROM topics t
-  JOIN courses c ON c.id = t.course_id AND c.code = 'IELTS_5_5'
+  JOIN courses c ON c.id = t.course_id AND c.code = 'IELTS_6_0'
   LEFT JOIN lessons l ON l.topic_id = t.id
  WHERE t.status = 'ACTIVE'
  GROUP BY t.skill

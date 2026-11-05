@@ -38,7 +38,7 @@ class FindVocabularyByLemmasUseCaseTest {
         when(vocabulary.findByNormalizedLemmas(List.of("trend", "plummet", "going")))
                 .thenReturn(List.of(item, withoutSenses, inactive));
 
-        List<VocabularyItemResult> result = new FindVocabularyByLemmasUseCase(vocabulary)
+        List<VocabularyItemResult> result = new FindVocabularyByLemmasUseCase(vocabulary, reference -> reference)
                 .execute(List.of(" Trend ", "plummet", "going", "TREND"));
 
         assertThat(result).singleElement().satisfies(found -> {

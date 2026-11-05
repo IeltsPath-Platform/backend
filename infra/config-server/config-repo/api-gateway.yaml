@@ -169,7 +169,7 @@ spring:
                 connect-timeout: 2000
                 response-timeout: 120000
               predicates:
-                - Path=/api/content/admin/media/audio,/api/content/admin/media/image
+                - Path=/api/content/admin/media/audio,/api/content/admin/media/image,/api/content/admin/media/document
               filters:
                 - name: ClientRateLimit
                   args:

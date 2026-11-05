@@ -70,10 +70,12 @@ class CourseSkillContentRepairMigrationTest {
                 GROUP BY cs.course_id, cs.course_code, cs.band_level, cs.skill
                 ORDER BY cs.band_level, cs.course_code, cs.skill
                 """, String.class)).containsExactly(
-                "IELTS_5_5/LISTENING:4/1", "IELTS_5_5/READING:11/8", "IELTS_5_5/SPEAKING:0/0", "IELTS_5_5/WRITING:7/4",
-                "IELTS_6_0/LISTENING:0/0", "IELTS_6_0/READING:0/0", "IELTS_6_0/SPEAKING:0/0", "IELTS_6_0/WRITING:0/0",
-                "IELTS_6_5/LISTENING:1/0", "IELTS_6_5/READING:1/0", "IELTS_6_5/SPEAKING:4/1", "IELTS_6_5/WRITING:1/0",
-                "IELTS_7_0/LISTENING:0/0", "IELTS_7_0/READING:0/0", "IELTS_7_0/SPEAKING:0/0", "IELTS_7_0/WRITING:0/0");
+                "IELTS_FOUNDATION/LISTENING:6/3", "IELTS_FOUNDATION/READING:6/3", "IELTS_FOUNDATION/SPEAKING:0/0",
+                "IELTS_FOUNDATION/WRITING:6/3",
+                "IELTS_5_0/LISTENING:8/5", "IELTS_5_0/READING:8/5", "IELTS_5_0/SPEAKING:0/0", "IELTS_5_0/WRITING:10/7",
+                "IELTS_6_0/LISTENING:6/3", "IELTS_6_0/READING:13/10", "IELTS_6_0/SPEAKING:0/0", "IELTS_6_0/WRITING:10/7",
+                "IELTS_7_0/LISTENING:3/0", "IELTS_7_0/READING:3/0", "IELTS_7_0/SPEAKING:0/0", "IELTS_7_0/WRITING:4/1",
+                "IELTS_8_0/LISTENING:2/0", "IELTS_8_0/READING:2/0", "IELTS_8_0/SPEAKING:0/0", "IELTS_8_0/WRITING:2/0");
     }
 
     private static DataSource dataSource(PostgreSQLContainer<?> postgres) {
@@ -135,14 +137,15 @@ class CourseSkillContentRepairMigrationTest {
                 SELECT t.skill, count(DISTINCT l.id) AS lesson_count
                 FROM courses c JOIN topics t ON t.course_id = c.id
                 LEFT JOIN lessons l ON l.topic_id = t.id AND l.status = 'PUBLISHED'
-                WHERE c.code = 'IELTS_5_5'
+                WHERE c.code = 'IELTS_6_0'
                 GROUP BY t.skill
                 """, rs -> {
             var result = new java.util.HashMap<String, Integer>();
             while (rs.next()) result.put(rs.getString("skill"), rs.getInt("lesson_count"));
             return result;
         });
-        assertThat(counts).containsEntry("LISTENING", 4).containsEntry("READING", 11).containsEntry("WRITING", 7);
+        // The former 5.5 lessons (4 / 11 / 7) plus those of the former 6.0 chặng it took over.
+        assertThat(counts).containsEntry("LISTENING", 6).containsEntry("READING", 13).containsEntry("WRITING", 10);
         assertThat(jdbc.queryForList("""
                 SELECT t.skill || ':' || count(l.id)
                 FROM topics t JOIN lessons l ON l.topic_id = t.id AND l.status = 'PUBLISHED'

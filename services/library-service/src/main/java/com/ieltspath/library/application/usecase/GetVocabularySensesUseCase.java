@@ -1,6 +1,7 @@
 package com.ieltspath.library.application.usecase;
 
 import com.ieltspath.library.application.result.VocabularySenseCardResult;
+import com.ieltspath.library.application.port.PronunciationAudioUrls;
 import com.ieltspath.library.domain.repository.VocabularyRepository;
 import com.ieltspath.library.domain.vo.VocabularySenseCard;
 import org.springframework.stereotype.Service;
@@ -16,9 +17,11 @@ import java.util.UUID;
 public class GetVocabularySensesUseCase {
 
     private final VocabularyRepository vocabularyRepository;
+    private final PronunciationAudioUrls audioUrls;
 
-    public GetVocabularySensesUseCase(VocabularyRepository vocabularyRepository) {
+    public GetVocabularySensesUseCase(VocabularyRepository vocabularyRepository, PronunciationAudioUrls audioUrls) {
         this.vocabularyRepository = vocabularyRepository;
+        this.audioUrls = audioUrls;
     }
 
     public List<VocabularySenseCardResult> execute(List<UUID> senseIds) {
@@ -35,7 +38,7 @@ public class GetVocabularySensesUseCase {
                         card.vocabularyItemId(),
                         card.lemma(),
                         card.ipa(),
-                        card.pronunciationAudioReference(),
+                        audioUrls.resolve(card.pronunciationAudioReference()),
                         card.partOfSpeech(),
                         card.englishDefinition(),
                         card.vietnameseMeaning(),

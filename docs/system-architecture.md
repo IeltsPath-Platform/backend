@@ -106,11 +106,11 @@ biệt bằng tiền tố khóa; khác chính sách thì dùng bucket mới; kh�
 | Bucket | Công khai | Dùng để | Giới hạn | Loại file (MIME) | Chủ | Khóa thường gặp | Trạng thái |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `avatars` | có | Ảnh đại diện học viên | 2 MB | png, jpeg, webp | user-service | `images/{userId}/{uuid}.{ext}` | đã có |
-| `flashcards` | có | Ảnh thẻ, bìa bộ thẻ, bìa catalog từ vựng | 2 MB | png, jpeg, webp | library-service | `images/{userId}/{uuid}.{ext}`; bìa catalog `catalog-cover/{userId}/{uuid}.{ext}` | đã có; bìa catalog là kế hoạch |
+| `flashcards` | có | Ảnh thẻ, bìa bộ thẻ, bìa chủ đề và bộ từ vựng | 2 MB | png, jpeg, webp | library-service | `images/{userId}/{uuid}.{ext}`; bìa chủ đề/bộ từ `catalog-cover/{userId}/{uuid}.{ext}` | đã có |
 | `community` | có | Ảnh bài đăng cộng đồng | 5 MB | png, jpeg, webp, gif | community-service | `community/post/{userId}/{uuid}.{ext}` | đã có |
-| `media` | có | Audio và ảnh nội dung bài học | 25 MB | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service | seed: `listening/demo/ls1.mp3`; upload API: `content-audio/{userId}/{uuid}.{ext}` | đã có |
-| `speaking-recordings` | không | Ghi âm Speaking của học viên | 10 MB (nâng từ 5 MB; learning-service cần 10 MB, assessment-service vẫn giới hạn 5 MB trong code) | webm, mp4, ogg, mpeg, wav | assessment-service (tiền tố `speaking/`), learning-service (tiền tố `practice/`) | `speaking/{userId}/{uuid}.{ext}`; luyện tập chấm bằng AI: `practice/{userId}/{yyyy-MM-dd}_{submissionId}/part{n}_q{nn}[_r{k}].{ext}` | assessment đang dùng; learning: upload đã có, chấm chưa |
-| `media-premium` | không | Audio PREMIUM, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | đã có |
+| `media` | có | Audio và ảnh nội dung bài học; ảnh nghĩa và audio phát âm từ vựng | 25 MB (ảnh nghĩa và phát âm từ vựng tối đa 2 MB) | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service, library-service | seed: `listening/demo/ls1.mp3`; content upload API: `content-audio/{userId}/{uuid}.{ext}`; từ vựng: ảnh nghĩa `vocabulary/images/{uuid}.{ext}`, phát âm `vocabulary/pronunciation/{us\|uk}/{slug}.{ext}` | đã có |
+| `speaking-recordings` | không | Ghi âm Speaking của học viên | 10 MB (nâng từ 5 MB; learning-service cần 10 MB, assessment-service vẫn giới hạn 5 MB trong code) | webm, mp4, ogg, mpeg, wav | assessment-service (tiền tố `speaking/`), learning-service (tiền tố `practice/`) | `speaking/{userId}/{uuid}.{ext}`; luyện tập chấm bằng AI: `practice/{userId}/{yyyy-MM-dd}_{submissionId}/part{n}_q{nn}[_r{k}].{ext}` | đang dùng (assessment và luyện tập Speaking chấm bằng AI) |
+| `media-premium` | không | Audio PREMIUM và PDF tài liệu bài học, chỉ phát bằng URL ký | 25 MB (PDF tối đa 20 MB) | mpeg, mp4, wav, ogg, pdf | content-service | audio như `media`; tài liệu `lesson-document/{userId}/{uuid}.pdf` | đã có; cần thêm `application/pdf` vào loại file cho phép |
 
 Content lưu `access_tier` cùng asset. `PUBLIC` dùng URL công khai của `media`; `PREMIUM` dùng URL ký của
 `media-premium` với TTL 900 giây. Learning kiểm tra lesson gate trước khi Content tạo URL ký. URL ký chỉ giữ ở response,
@@ -293,12 +293,13 @@ cùng course mở theo trạng thái suy ra khi đọc. Course test không chặ
 
 ## Scheduler và nhiều instance
 
-Backend hiện có 21 phương thức `@Scheduled` trong 20 job. Cơ chế chống xử lý trùng theo mã đang chạy:
+Backend hiện có 22 phương thức `@Scheduled` trong 21 job. Cơ chế chống xử lý trùng theo mã đang chạy:
 
 | Service | Job / lịch | Cơ chế cạnh tranh | HTTP/LLM khi giữ khóa hoặc transaction |
 |---|---|---|---|
 | game | `RocketRoundScheduler` | Khóa hàng trận (`FOR UPDATE`) và kiểm trạng thái vòng khi settle; hai lịch trùng không đóng vòng hai lần | Không |
 | game | `SoloTimeoutScheduler` | Khóa trận và người chơi (`FOR UPDATE OF m,p`), kiểm deadline; hai lịch trùng chỉ trừ một mạng | Không |
+| game | `LobbySeatScheduler` | Khóa hàng phòng (`FOR UPDATE`) rồi kiểm lại hạn giữ chỗ trước khi cho rời phòng; hai lịch trùng chỉ cho rời một lần | Không |
 | game | `OutboxRetentionJob` | Xóa theo ngưỡng thời gian; chạy lặp an toàn | Không |
 | game | `RoomEventChannelSupervisor` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |
 | notification | `NoticePushChannelConfig` | Mỗi instance tự đăng ký lại Redis pub/sub của nó | Không |

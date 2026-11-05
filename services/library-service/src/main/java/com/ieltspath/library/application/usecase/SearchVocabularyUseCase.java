@@ -2,6 +2,7 @@ package com.ieltspath.library.application.usecase;
 
 import com.ieltspath.library.application.result.VocabularyItemResult;
 import com.ieltspath.library.application.result.VocabularySenseResult;
+import com.ieltspath.library.application.port.PronunciationAudioUrls;
 import com.ieltspath.library.domain.aggregate.VocabularyItem;
 import com.ieltspath.library.domain.repository.VocabularyRepository;
 import org.springframework.stereotype.Service;
@@ -14,9 +15,11 @@ import java.util.List;
 public class SearchVocabularyUseCase {
 
     private final VocabularyRepository vocabularyRepository;
+    private final PronunciationAudioUrls audioUrls;
 
-    public SearchVocabularyUseCase(VocabularyRepository vocabularyRepository) {
+    public SearchVocabularyUseCase(VocabularyRepository vocabularyRepository, PronunciationAudioUrls audioUrls) {
         this.vocabularyRepository = vocabularyRepository;
+        this.audioUrls = audioUrls;
     }
 
     public List<VocabularyItemResult> execute(String query) {
@@ -27,7 +30,7 @@ public class SearchVocabularyUseCase {
                         item.getLemma(),
                         item.getNormalizedLemma(),
                         item.getIpa(),
-                        item.getPronunciationAudioReference(),
+                        audioUrls.resolve(item.preferredAudioReference()),
                         item.getStatus(),
                         item.getCreatedAt(),
                         item.getUpdatedAt(),

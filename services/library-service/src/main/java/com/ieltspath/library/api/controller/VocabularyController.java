@@ -3,14 +3,10 @@ package com.ieltspath.library.api.controller;
 import com.ieltspath.library.api.dto.request.AddVocabularySenseRequest;
 import com.ieltspath.library.api.dto.request.CreateVocabularyItemRequest;
 import com.ieltspath.library.api.dto.response.VocabularyItemResponse;
-import com.ieltspath.library.api.dto.response.VocabularySenseResponse;
 import com.ieltspath.library.api.dto.response.VocabularySenseCardResponse;
 import com.ieltspath.library.application.command.AddVocabularySenseCommand;
 import com.ieltspath.library.application.command.CreateVocabularyItemCommand;
 import com.ieltspath.library.application.result.VocabularyItemResult;
-import com.ieltspath.library.application.result.VocabularySenseResult;
-import com.ieltspath.library.domain.vo.ContentStatus;
-import com.ieltspath.library.domain.exception.ResourceNotFoundException;
 import com.ieltspath.library.application.usecase.AddVocabularySenseUseCase;
 import com.ieltspath.library.application.usecase.CreateVocabularyItemUseCase;
 import com.ieltspath.library.application.usecase.GetVocabularyDetailUseCase;
@@ -40,9 +36,6 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import org.springframework.validation.annotation.Validated;
-import com.ieltspath.library.api.dto.response.PageResponse;
-import com.ieltspath.library.application.result.VocabularyItemResult;
-import com.ieltspath.library.application.result.VocabularySenseResult;
 
 import java.util.List;
 import java.util.regex.Pattern;
@@ -126,7 +119,8 @@ public class VocabularyController {
         VocabularyItemResult result = createVocabularyItemUseCase.execute(new CreateVocabularyItemCommand(
                 request.lemma(),
                 request.ipa(),
-                request.pronunciationAudioReference()
+                request.pronunciationAudioReference(),
+                request.toDictionary()
         ));
         return VocabularyItemResponse.from(result);
     }
@@ -150,11 +144,4 @@ public class VocabularyController {
         return VocabularyItemResponse.from(result);
     }
 
-    private static VocabularyItemResponse toResponse(com.ieltspath.library.domain.aggregate.VocabularyItem item) {
-        return VocabularyItemResponse.from(new VocabularyItemResult(item.getId(), item.getLemma(), item.getNormalizedLemma(),
-                item.getIpa(), item.getPronunciationAudioReference(), item.getStatus(), item.getCreatedAt(), item.getUpdatedAt(),
-                item.getSenses().stream().filter(s -> s.getStatus() == ContentStatus.ACTIVE).map(s -> new VocabularySenseResult(s.getId(), s.getVocabularyItemId(), s.getPartOfSpeech(),
-                        s.getEnglishDefinition(), s.getVietnameseMeaning(), s.getExampleSentence(), s.getImageUrl(), s.getSortOrder(),
-                        s.getStatus(), s.getCreatedAt(), s.getUpdatedAt())).toList()));
-    }
 }

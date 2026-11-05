@@ -51,10 +51,17 @@ public record TopicResult(UUID topicId, String code, String name, int sequenceOr
     public record Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
                          String coverImageUrl, String description,
                          java.util.Map<LearningSkill, Integer> skillUnlockPoints,
-                         Integer comboUnlockPoints, Set<LearningSkill> availableSkills) {
+                         Integer comboUnlockPoints, Set<LearningSkill> availableSkills, String bannerImageUrl) {
         public Course {
             skillUnlockPoints = skillUnlockPoints == null ? java.util.Map.of() : java.util.Map.copyOf(skillUnlockPoints);
             availableSkills = availableSkills == null ? Set.of() : Set.copyOf(availableSkills);
+        }
+        public Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
+                      String coverImageUrl, String description,
+                      java.util.Map<LearningSkill, Integer> skillUnlockPoints,
+                      Integer comboUnlockPoints, Set<LearningSkill> availableSkills) {
+            this(courseId, code, name, bandLevel, coverImageUrl, description, skillUnlockPoints, comboUnlockPoints,
+                    availableSkills, null);
         }
         public Course(UUID courseId, String code, String name, java.math.BigDecimal bandLevel,
                       String coverImageUrl, String description) {

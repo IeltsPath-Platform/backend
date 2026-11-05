@@ -90,6 +90,20 @@ class LessonAuthoringUseCaseTest {
         verify(repository, never()).questionVersionsOwnedElsewhere(any(), any());
     }
 
+    @Test void placesANewBlockAfterTheLastOneEvenWhenTheLessonWasNumberedFromOne() {
+        // Seeded lessons number their blocks 1, 2, 3; the new block used to take the number of blocks (3) and collide.
+        when(repository.lockAndFindById(lessonId)).thenReturn(Optional.of(
+                lesson(LessonStatus.DRAFT, textBlockAt(1), textBlockAt(2), textBlockAt(3))));
+
+        // The block is saved; reading the lesson back is not stubbed, which is all this test lets fail.
+        assertThatThrownBy(() -> useCase.addBlock(lessonId, BlockType.TEXT, null, "text", null,
+                List.of(), List.of(), List.of()));
+
+        var saved = org.mockito.ArgumentCaptor.forClass(Lesson.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getBlocks()).extracting(LessonBlock::getSortOrder).containsExactly(1, 2, 3, 4);
+    }
+
     @Test void rejectsBlockThatDoesNotBelongToLesson() {
         assertThatThrownBy(() -> useCase.updateBlock(lessonId, UUID.randomUUID(), BlockType.TEXT, null, "text", null,
                 List.of(), List.of(), List.of()))
@@ -117,6 +131,10 @@ class LessonAuthoringUseCaseTest {
     private Lesson lesson(LessonStatus status, LessonBlock... blocks) {
         return new Lesson(lessonId, UUID.randomUUID(), "L-1", "Lesson", null, null, 10, 0, status,
                 Instant.now(), List.of(blocks), List.of(UUID.randomUUID()));
+    }
+    private LessonBlock textBlockAt(int sortOrder) {
+        return new LessonBlock(UUID.randomUUID(), lessonId, BlockType.TEXT, sortOrder, "text", null, List.of(),
+                List.of(), List.of());
     }
     private LessonBlock exerciseBlock() {
         return new LessonBlock(blockId, lessonId, BlockType.EXERCISE, 0, null, null, List.of(),

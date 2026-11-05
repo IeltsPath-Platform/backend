@@ -13,6 +13,7 @@ public interface VocabularySenseJpaRepository extends JpaRepository<VocabularySe
     @Query("""
             select sense.id as senseId, item.ipa as ipa,
                    item.pronunciationAudioReference as pronunciationAudioReference,
+                   item.audioUkReference as audioUkReference, item.audioUsReference as audioUsReference,
                    sense.exampleSentence as exampleSentence
             from VocabularySenseJpaEntity sense, VocabularyItemJpaEntity item
             where sense.vocabularyItemId = item.id and sense.id in :senseIds

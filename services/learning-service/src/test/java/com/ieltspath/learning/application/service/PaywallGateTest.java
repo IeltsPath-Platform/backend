@@ -2,6 +2,7 @@ package com.ieltspath.learning.application.service;
 
 import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.port.AccessClient;
+import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.KnowledgePoint;
 import com.ieltspath.learning.application.port.LearningContentClient.Lesson;
 import com.ieltspath.learning.application.port.LearningContentClient.Topic;
@@ -31,7 +32,8 @@ class PaywallGateTest {
     private final AccessClient access = mock(AccessClient.class);
     private final LearnerCourseUnlockRepository unlocks = mock(LearnerCourseUnlockRepository.class);
     private final LessonProgressRepository progress = mock(LessonProgressRepository.class);
-    private final PaywallGate gate = new PaywallGate(access, unlocks, progress);
+    private final LearningContentClient content = mock(LearningContentClient.class);
+    private final PaywallGate gate = new PaywallGate(access, unlocks, progress, content);
     private final UUID user = UUID.randomUUID();
     private final UUID course = UUID.randomUUID();
     private final UUID topicId = UUID.randomUUID();
@@ -41,6 +43,28 @@ class PaywallGateTest {
         when(unlocks.findActive(user, course)).thenReturn(List.of());
         assertTrue(gate.forLearner(user).lessonOpen(lesson(3), null));
         verify(access, never()).premium();
+    }
+
+    @Test
+    void aFreeCourseOpensEveryLessonWithoutPurchaseOrPremiumAndHasNoFreePreview() {
+        when(unlocks.findActive(user, course)).thenReturn(List.of());
+        when(content.getFreeCourseIds()).thenReturn(Set.of(course));
+        var request = gate.forLearner(user);
+        assertTrue(request.lessonOpen(lesson(4), null));
+        assertTrue(request.lessonOpen(lesson(40, LearningSkill.WRITING), null));
+        assertFalse(request.freePreview(course, 2));
+        verify(access, never()).premium();
+        verify(content).getFreeCourseIds();
+    }
+
+    @Test
+    void aCourseThatIsNotFreeStillHasItsPaywallAndItsFreePreview() {
+        when(unlocks.findActive(user, course)).thenReturn(List.of());
+        when(content.getFreeCourseIds()).thenReturn(Set.of(UUID.randomUUID()));
+        when(access.premium()).thenReturn(false);
+        var request = gate.forLearner(user);
+        assertFalse(request.lessonOpen(lesson(4), null));
+        assertTrue(request.freePreview(course, 2));
     }
 
     @Test

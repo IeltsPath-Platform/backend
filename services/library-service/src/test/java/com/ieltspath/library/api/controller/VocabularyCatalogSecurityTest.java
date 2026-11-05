@@ -62,6 +62,8 @@ class VocabularyCatalogSecurityTest {
     @MockBean VocabularyCatalogUseCase catalog;
     @MockBean com.ieltspath.library.application.usecase.VocabularyProgressUseCase progress;
     @MockBean UploadCatalogCoverUseCase uploadCatalogCover;
+    @MockBean UploadSenseImageUseCase uploadSenseImage;
+    @MockBean UploadPronunciationAudioUseCase uploadPronunciationAudio;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
         registry.add("app.auth.internal-jwt-secret", () -> SECRET);

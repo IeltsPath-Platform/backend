@@ -57,6 +57,9 @@ public interface VocabularyCatalogStore {
     /** Returns the updated word, or empty when no word has this id. */
     Optional<CatalogItemResult> updateItem(UUID itemId, VocabularyItemDetails details);
 
+    /** The dictionary fields of a word as stored, whatever its status, with no fallback to the older columns. */
+    Optional<VocabularyItemDetails> findItemDetails(UUID itemId);
+
     /** Returns the word that owns the updated sense, or empty when no sense has this id. */
     Optional<CatalogItemResult> updateSense(UUID senseId, VocabularySenseDetails details);
 

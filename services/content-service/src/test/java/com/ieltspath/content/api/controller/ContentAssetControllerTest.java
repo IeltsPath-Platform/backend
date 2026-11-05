@@ -5,6 +5,7 @@ import com.ieltspath.content.application.result.ContentAssetResult;
 import com.ieltspath.content.application.usecase.CreateContentAssetUseCase;
 import com.ieltspath.content.application.usecase.GetContentAssetUseCase;
 import com.ieltspath.content.application.usecase.LinkAssetUseCase;
+import com.ieltspath.content.application.usecase.MediaUrlResolver;
 import com.ieltspath.content.domain.vo.AccessTier;
 import com.ieltspath.content.domain.vo.AssetType;
 import com.ieltspath.content.domain.vo.AssetValidationStatus;
@@ -26,8 +27,36 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class ContentAssetControllerTest {
     private final CreateContentAssetUseCase createAsset = mock(CreateContentAssetUseCase.class);
+    private final GetContentAssetUseCase getAsset = mock(GetContentAssetUseCase.class);
+    private final MediaUrlResolver mediaUrls = mock(MediaUrlResolver.class);
     private final MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new ContentAssetController(
-            mock(GetContentAssetUseCase.class), createAsset, mock(LinkAssetUseCase.class))).build();
+            getAsset, createAsset, mock(LinkAssetUseCase.class), mediaUrls)).build();
+
+    @Test
+    void readingAnAssetCarriesAUrlTheAuthorCanOpen() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(getAsset.execute(id)).thenReturn(new ContentAssetResult(id, AssetType.AUDIO, null,
+                "listening/demo/ls1.mp3", 45, null, AssetValidationStatus.VALID, Instant.now(), AccessTier.PUBLIC));
+        when(mediaUrls.resolve(AssetType.AUDIO, "listening/demo/ls1.mp3", AccessTier.PUBLIC, true))
+                .thenReturn("https://cdn.test/media/listening/demo/ls1.mp3");
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/content/assets/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assetType").value("AUDIO"))
+                .andExpect(jsonPath("$.mediaUrl").value("https://cdn.test/media/listening/demo/ls1.mp3"));
+    }
+
+    @Test
+    void aTextAssetHasNoMediaUrl() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(getAsset.execute(id)).thenReturn(new ContentAssetResult(id, AssetType.PASSAGE, "A short passage.",
+                null, null, null, AssetValidationStatus.VALID, Instant.now(), AccessTier.PUBLIC));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/content/assets/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.textContent").value("A short passage."))
+                .andExpect(jsonPath("$.mediaUrl").doesNotExist());
+    }
 
     @Test
     void createsPremiumLessonAudioWithTheSelectedTier() throws Exception {

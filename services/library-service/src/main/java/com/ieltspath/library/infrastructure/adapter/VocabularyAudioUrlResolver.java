@@ -2,6 +2,7 @@ package com.ieltspath.library.infrastructure.adapter;
 
 import com.ieltspath.commonstorage.ObjectStorage;
 import com.ieltspath.commonstorage.UnavailableObjectStorage;
+import com.ieltspath.library.application.port.PronunciationAudioUrls;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Component;
  * (older rows, or one an admin pasted) is returned as it is.
  */
 @Component
-public class VocabularyAudioUrlResolver {
+public class VocabularyAudioUrlResolver implements PronunciationAudioUrls {
 
     private static final Logger log = LoggerFactory.getLogger(VocabularyAudioUrlResolver.class);
 
@@ -37,6 +38,7 @@ public class VocabularyAudioUrlResolver {
     }
 
     /** @return a playable URL, or null when there is no reference or the storage is not configured */
+    @Override
     public String resolve(String reference) {
         if (reference == null || reference.isBlank()) {
             return null;
@@ -45,7 +47,8 @@ public class VocabularyAudioUrlResolver {
             return reference;
         }
         try {
-            return objectStorage.publicUrl(bucket, reference);
+            String url = objectStorage.publicUrl(bucket, reference);
+            return url != null && url.startsWith("https://") ? url : null;
         } catch (Exception e) {
             log.debug("Could not build a public URL for a vocabulary audio key: {}", e.getMessage());
             return null;

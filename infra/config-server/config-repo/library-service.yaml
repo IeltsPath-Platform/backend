@@ -47,6 +47,9 @@ library:
     weekly-goal-default: 120
   flashcard-images:
     bucket: ${LIBRARY_FLASHCARD_BUCKET:flashcards}
+  catalog-media:
+    # Public bucket for vocabulary sense pictures and pronunciation audio; the same bucket holds the listening audio.
+    bucket: ${LIBRARY_CATALOG_MEDIA_BUCKET:media}
 
 springdoc:
   # OpenAPI for the Gateway Swagger UI; set API_DOCS_ENABLED=false outside local development.

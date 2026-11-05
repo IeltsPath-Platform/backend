@@ -87,6 +87,10 @@ class ApproveCourseDraftIntegrationTest {
     @TestConfiguration
     static class Beans {
         @Bean ObjectMapper objectMapper() { return new ObjectMapper(); }
+        /** These tests only create link resources, so the document storage is never reached. */
+        @Bean com.ieltspath.content.application.port.LessonDocumentFiles documentFiles() {
+            return org.mockito.Mockito.mock(com.ieltspath.content.application.port.LessonDocumentFiles.class);
+        }
         @Bean Clock clock() { return Clock.systemUTC(); }
         @Bean FakeLibrary library() { return new FakeLibrary(); }
     }
@@ -128,7 +132,7 @@ class ApproveCourseDraftIntegrationTest {
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
     }
 
-    private static final BigDecimal BAND = new BigDecimal("8.5"); // CEFR C2: no seeded course or point uses it
+    private static final BigDecimal BAND = new BigDecimal("8.5"); // CEFR C2: no seeded course uses this band
 
     @Autowired JdbcTemplate jdbc;
     @Autowired jakarta.persistence.EntityManager entityManager;
@@ -423,11 +427,17 @@ class ApproveCourseDraftIntegrationTest {
     @Test
     void analysisReportsCoverageAndGapsWithoutChangingAnything() throws Exception {
         UUID id = drafts.create(author, structure(goodDraft())).getId();
+        // The IELTS 8.0 seed has C2 Reading points of its own, which a C2 Reading draft is also expected to cover.
+        Integer seededC2Reading = jdbc.queryForObject("""
+                SELECT count(*) FROM knowledge_points
+                WHERE status = 'ACTIVE' AND cefr_level = 'C2' AND (skill IS NULL OR skill IN ('READING', 'ALL'))
+                  AND id NOT IN (?, ?)
+                """, Integer.class, kpFoundation, kpAdvanced);
 
         var analysis = drafts.analyze(author, id);
 
         assertThat(analysis.valid()).isTrue();
-        assertThat(analysis.coverage().expected()).isEqualTo(2);
+        assertThat(analysis.coverage().expected()).isEqualTo(2 + seededC2Reading);
         assertThat(analysis.coverage().covered()).isEqualTo(2);
         // One practice set only: below the three wanted, and the advanced point has none and no question.
         assertThat(analysis.gaps()).extracting("reason").contains("FEW_PRACTICE_SETS", "NO_PRACTICE_SET",

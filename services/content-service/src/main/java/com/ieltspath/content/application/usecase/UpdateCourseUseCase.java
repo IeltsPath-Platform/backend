@@ -25,7 +25,8 @@ public class UpdateCourseUseCase {
             throw new DuplicateCourseException("bandLevel", band.toPlainString());
         }
         course.update(command.name(), band, command.status(), command.coverImageUrl(), command.description(),
-                command.skillUnlockPoints(), command.comboUnlockPoints());
+                command.skillUnlockPoints(), command.comboUnlockPoints(), command.free(),
+                command.bannerImageUrl());
         return CourseResult.from(repository.save(course));
     }
 }

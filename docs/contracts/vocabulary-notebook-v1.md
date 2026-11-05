@@ -10,6 +10,8 @@ Request: `{"vocabularySenseId":"<uuid>"}`. Creates one active vocabulary flashca
 
 Returns a `NotebookEntryResponse`: `flashcardId`, `vocabularySenseId`, `vocabularyItemId`, `lemma`, `ipa`, `pronunciationAudioReference`, `partOfSpeech`, `vietnameseMeaning`, `englishDefinition`, `exampleSentence`, `imageUrl`, `level`, `leitnerBox`, `reviewCount`, `lastReviewedAt`, `nextReviewAt`, `createdAt`, and `note`. First save returns 201; a repeated save returns the existing entry with 200. Missing or inactive sense returns 404.
 
+`pronunciationAudioReference` is the preferred audio in US → UK → legacy-column order, returned as a complete HTTPS URL or null.
+
 ### `GET /api/learning-support/flashcards/notebook/entries`
 
 Query: `q` (optional, up to 100 characters; case-insensitive search across lemma and meanings), repeated `level` (`UNKNOWN`, `FAMILIAR`, `LEARNING`, `MASTERED`), `due` (optional boolean), `topicId` and `setId` (optional UUID filters), `sort` (`RECENT` default, `DUE`, `ALPHABET`, `WEAKEST`), `page` (default 0), `size` (default 20, 1–50). Returns `{items,page,size,total}` with the entry fields above plus `cefrLevel` and `topicName`. Filtering, ordering, and paging run in SQL.
@@ -68,7 +70,7 @@ Query: `q` (optional, up to 100 characters), `lang=EN|VI` (default `EN`), `cefr=
 
 ### `GET /api/content/vocabulary/{id}`
 
-`id` must be a UUID. Returns the existing vocabulary item fields with active senses only; inactive or missing items return 404. Existing fields are preserved. Added item fields are `ipaUk`, `ipaUs`, `audioUkReference`, `audioUsReference`, `frequencyRank`, `academicWordList`, `wordFamily`, and aggregate `counts`. `ipaUk`/`audioUkReference` fall back to legacy `ipa`/`pronunciationAudioReference` when unset. Each sense adds `cefrLevel`, derived `bandRange:{min,max}`, `topic`, `register`, `grammarNote`, `usageNote`, `exampleTranslation`, `collocations[]`, `synonyms[]`, `antonyms[]`, `commonMistakes[]`, `examples[]`, and `counts:{definitions,collocations,thesaurus,commonMistakes,examples}`. A missing CEFR has a null `bandRange`. No frequency rank is supplied without a verified source. Response is cacheable for 5 minutes.
+`id` must be a UUID. Returns the existing vocabulary item fields with active senses only; inactive or missing items return 404. Existing fields are preserved. Added item fields are `ipaUk`, `ipaUs`, `audioUkReference`, `audioUsReference`, `frequencyRank`, `academicWordList`, `wordFamily`, and aggregate `counts`. `ipaUk`/`audioUkReference` fall back to legacy `ipa`/`pronunciationAudioReference` when unset; specifically, `audioUkReference` falls back to the legacy column `pronunciation_audio_reference`, independently of the response field `pronunciationAudioReference` (which uses preferred US → UK → legacy audio). Each sense adds `cefrLevel`, derived `bandRange:{min,max}`, `topic`, `register`, `grammarNote`, `usageNote`, `exampleTranslation`, `collocations[]`, `synonyms[]`, `antonyms[]`, `commonMistakes[]`, `examples[]`, and `counts:{definitions,collocations,thesaurus,commonMistakes,examples}`. A missing CEFR has a null `bandRange`. No frequency rank is supplied without a verified source. Response is cacheable for 5 minutes.
 
 The CEFR-to-IELTS mapping is domain-owned: A1 1.0–2.5, A2 3.0–3.5, B1 4.0–5.0, B2 5.5–6.5, C1 7.0–8.0, C2 8.5–9.0.
 
@@ -96,6 +98,8 @@ Returns `{items,page,size,total}` of active set members. Optional `topicId` filt
 
 Exactly one parameter is required. Returns `{nodes,edges}` with at most 80 total nodes; topic queries include the topic node and related words, collocations, and synonyms.
 
+The frontend no longer uses the mindmap endpoint from 2026-11; the endpoint remains for compatibility.
+
 ### Vocabulary catalog ownership
 
 `vocabulary_topics` belongs to Library and is separate from Content's curriculum `topics`. Catalog browsing does not call `content-service`. Band is derived from CEFR and is not persisted.
@@ -106,7 +110,10 @@ These paths require `CONTENT_AUTHOR` or `ADMIN`; missing/invalid authentication 
 
 | Method and path | Request | Success |
 | --- | --- | --- |
-| `PUT /api/content/admin/vocabulary/items/{id}` | JSON fields `ipaUk`, `ipaUs`, `audioUkReference`, `audioUsReference`, `frequencyRank`, `academicWordList`, `wordFamily` | 200 updated item |
+| `POST /api/content/admin/vocabulary` | `{lemma,ipa,pronunciationAudioReference,ipaUs,ipaUk,audioUsReference,audioUkReference}`; only `lemma` is required; the IPA and audio fields are stored with the word in the same transaction. An active word with the same lemma is refused (400); an INACTIVE one (such as a dictation pronunciation row) is switched on instead, keeping its stored IPA/audio where the request leaves a field empty, and its existing senses come back in the response | 201 item (no senses yet) |
+| `POST /api/content/admin/vocabulary/sense-images` | multipart `file`: JPEG, PNG or WebP, ≤2 MB | 201 `{mediaReference,mediaUrl,contentType,sizeBytes}`; the file goes to `media/vocabulary/images/<uuid>.<ext>` and `mediaUrl` is stored as the sense `imageUrl` |
+| `POST /api/content/admin/vocabulary/pronunciation` | multipart `file` (MP3, MP4 audio, WAV or OGG, ≤2 MB), `lemma`, `accent` = `us` or `uk` | 201 same body; the file goes to `media/vocabulary/pronunciation/{us\|uk}/<slug>.<ext>`, slug = lemma lower-cased with each run of characters outside a-z0-9 as `-`; 400 when an active word already has the lemma; an INACTIVE word is allowed. A file already stored under the key is never overwritten: the new one is named `<slug>-<8 hex>.<ext>` |
+| `PUT /api/content/admin/vocabulary/items/{id}` | JSON fields `ipaUk`, `ipaUs`, `audioUkReference`, `audioUsReference`, `frequencyRank`, `academicWordList`, `wordFamily`; every field not sent is cleared | 200 updated item |
 | `PUT /api/content/admin/vocabulary/senses/{id}` | JSON fields `cefrLevel`, `topicId`, `register`, `grammarNote`, `usageNote`, `exampleTranslation` | 200 updated sense |
 | `PUT /api/content/admin/vocabulary/senses/{id}/collocations` | Array of `{phrase,meaningVi,example}` (≤30) | 200 replacement list |
 | `PUT /api/content/admin/vocabulary/senses/{id}/relations` | Array of `{relatedLemma,relatedItemId,kind}`; kind is `SYNONYM|ANTONYM|RELATED` (≤30) | 200 replacement list |
@@ -122,13 +129,15 @@ These paths require `CONTENT_AUTHOR` or `ADMIN`; missing/invalid authentication 
 | `DELETE /api/content/admin/vocabulary/sets/{id}` | — | 204; marks inactive |
 | `PUT /api/content/admin/vocabulary/sets/{id}/items` | JSON array of ordered sense UUIDs (≤500; unique) | 204 |
 
-Topic/set covers store an object key in the existing `flashcards` bucket and resolve a public URL through common-storage. Uploads reuse `POST /api/learning-support/flashcards/images`; no extra bucket or environment setting is introduced.
+Topic/set covers store an object key in the existing `flashcards` bucket and resolve a public URL through common-storage. Uploads reuse `POST /api/learning-support/flashcards/images`. Sense pictures and pronunciation audio are public URLs in the `media` bucket (`LIBRARY_CATALOG_MEDIA_BUCKET`, default `media`), not in `flashcards`, so they do not share a bucket with learners' flashcard images.
 
 Migrations V19 (additive schema) and V20 (demo catalog) extend the library database. Demo CEFR/topic/examples/collocations/mistakes are authored content and require IELTS examiner review. `frequency_rank` remains null without a COCA source; only Coxhead AWL lemmas are marked true (`data`, `method`, `research`, plus `income`, `network`, `diversity`, `assignment` from V22).
 
 Migration V22 enriches 48 more existing V4 words (8 per topic) with CEFR, topic, register, US IPA, two collocations, a synonym, a common mistake and two examples, then appends them to the existing topic and band sets. It creates no new words and skips senses that are already enriched. Same review requirement as V20.
 
 `/api/content/vocabulary/search`, `/api/content/vocabulary/senses`, catalog writes, `/api/content/admin/vocabulary/**`, and every notebook route require authentication. Unauthorized requests return 401; authenticated users without the required author role receive 403 for the catalog author API.
+
+`GET /api/content/vocabulary/search?query=` matches active words whose lemma contains the text, ignoring case and the spaces at its ends, and returns at most 50 words: the exact word first, then words starting with the text, then the rest, each group in alphabetical order. An empty or blank query returns `[]`; it used to return the whole catalog. `%` and `_` in the text match themselves. The catalog browse (`lang=EN`) and `/suggestions` match on the same normalized lemma; `lang=VI` matches a sense meaning ignoring case and Vietnamese accents (`o nhiem` and `ô nhiễm` both find `ô nhiễm`; `đ` matches `d`) through the `vocabulary_fold` function. Migrations V37 and V38 add the indexes these searches use.
 
 ## Errors
 

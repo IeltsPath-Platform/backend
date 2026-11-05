@@ -1,6 +1,7 @@
 package com.ieltspath.content.application.usecase;
 
 import com.ieltspath.content.application.port.LearningContentReader;
+import com.ieltspath.content.application.port.LessonDocumentFiles;
 import com.ieltspath.content.application.result.LessonResourceResult;
 import com.ieltspath.content.application.result.LessonResourcesResult;
 import com.ieltspath.content.domain.exception.LessonNotFoundException;
@@ -16,10 +17,13 @@ import java.util.UUID;
 public class ListLessonResourcesUseCase {
     private final LessonResourceRepository resources;
     private final LearningContentReader lessons;
+    private final LessonDocumentFiles files;
 
-    public ListLessonResourcesUseCase(LessonResourceRepository resources, LearningContentReader lessons) {
+    public ListLessonResourcesUseCase(LessonResourceRepository resources, LearningContentReader lessons,
+                                      LessonDocumentFiles files) {
         this.resources = resources;
         this.lessons = lessons;
+        this.files = files;
     }
 
     public LessonResourcesResult execute(UUID lessonId) {
@@ -34,6 +38,6 @@ public class ListLessonResourcesUseCase {
 
     private LessonResourcesResult load(UUID lessonId) {
         return new LessonResourcesResult(lessonId, resources.findSummaryMarkdown(lessonId),
-                resources.findByLessonId(lessonId).stream().map(LessonResourceResult::from).toList());
+                resources.findByLessonId(lessonId).stream().map(resource -> LessonResourceResult.from(resource, files)).toList());
     }
 }
