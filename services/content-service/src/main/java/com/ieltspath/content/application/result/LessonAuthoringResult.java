@@ -32,14 +32,15 @@ public record LessonAuthoringResult(UUID id, UUID topicId, String code, String t
 
     public record QuestionVersion(UUID id, int versionNumber, QuestionType questionType, Skill skill,
                                   QuestionPurpose purpose, PublicationStatus status, String stem,
-                                  String answerSpecJson) {}
+                                  String answerSpecJson, UUID questionId) {}
 
     public static LessonAuthoringResult from(LessonAuthoringSnapshot snapshot) {
         List<Block> blocks = snapshot.blocks().stream().map(block -> new Block(block.id(), block.sortOrder(),
                 block.blockType(), block.textContent(), block.assetId(), block.vocabularySenseIds(),
                 block.knowledgePointIds(), block.questions().stream().map(question -> new QuestionVersion(
                         question.id(), question.versionNumber(), question.questionType(), question.skill(),
-                        question.purpose(), question.status(), question.stem(), question.answerSpecJson())).toList())).toList();
+                        question.purpose(), question.status(), question.stem(), question.answerSpecJson(),
+                        question.questionId())).toList())).toList();
         return new LessonAuthoringResult(snapshot.id(), snapshot.topicId(), snapshot.code(), snapshot.title(),
                 snapshot.summary(), snapshot.summaryMarkdown(), snapshot.estimatedMinutes(), snapshot.sortOrder(),
                 snapshot.status(), snapshot.createdAt(), snapshot.updatedAt(), snapshot.knowledgePointIds(), blocks);

@@ -9,9 +9,9 @@ import java.util.UUID;
 
 /** A lesson's summary with its slides and documents, each in order. Shared by the author and internal reads. */
 public record LessonResourcesResponse(UUID lessonId, String summaryMarkdown, List<Item> slides, List<Item> documents) {
-    public record Item(UUID id, String title, String url, int sortOrder) {
+    public record Item(UUID id, String title, String url, String fileKey, int sortOrder) {
         static Item from(LessonResourceResult result) {
-            return new Item(result.id(), result.title(), result.url(), result.sortOrder());
+            return new Item(result.id(), result.title(), result.url(), result.fileKey(), result.sortOrder());
         }
     }
 

@@ -20,6 +20,7 @@ public final class ContentTypes {
             Map.entry("image/jpeg", "jpg"),
             Map.entry("image/webp", "webp"),
             Map.entry("image/gif", "gif"),
+            Map.entry("application/pdf", "pdf"),
             Map.entry("audio/webm", "webm"),
             Map.entry("audio/mp4", "m4a"),
             Map.entry("audio/ogg", "ogg"),

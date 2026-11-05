@@ -2,6 +2,7 @@ package com.ieltspath.content.api.controller;
 
 import com.ieltspath.content.api.exception.GlobalExceptionHandler;
 import com.ieltspath.content.application.port.LearningContentReader;
+import com.ieltspath.content.application.port.LessonDocumentFiles;
 import com.ieltspath.content.application.usecase.ListLessonResourcesUseCase;
 import com.ieltspath.content.domain.aggregate.LessonResource;
 import com.ieltspath.content.domain.repository.LessonResourceRepository;
@@ -22,12 +23,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class InternalLessonResourceControllerTest {
     private final LessonResourceRepository repository = mock(LessonResourceRepository.class);
     private final LearningContentReader lessons = mock(LearningContentReader.class);
+    private final LessonDocumentFiles files = mock(LessonDocumentFiles.class);
     private MockMvc mvc;
 
     @BeforeEach
     void setup() {
         mvc = MockMvcBuilders.standaloneSetup(new InternalLessonResourceController(
-                        new ListLessonResourcesUseCase(repository, lessons)))
+                        new ListLessonResourcesUseCase(repository, lessons, files)))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 

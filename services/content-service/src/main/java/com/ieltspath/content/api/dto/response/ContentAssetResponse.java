@@ -17,9 +17,15 @@ public record ContentAssetResponse(
         String checksum,
         AssetValidationStatus validationStatus,
         Instant createdAt,
-        AccessTier accessTier
+        AccessTier accessTier,
+        /** A URL the author can open to see or hear the asset; null for text assets and when it cannot be resolved. */
+        String mediaUrl
 ) {
     public static ContentAssetResponse from(ContentAssetResult result) {
+        return from(result, null);
+    }
+
+    public static ContentAssetResponse from(ContentAssetResult result, String mediaUrl) {
         return new ContentAssetResponse(
                 result.id(),
                 result.assetType(),
@@ -29,7 +35,8 @@ public record ContentAssetResponse(
                 result.checksum(),
                 result.validationStatus(),
                 result.createdAt(),
-                result.accessTier()
+                result.accessTier(),
+                mediaUrl
         );
     }
 }
