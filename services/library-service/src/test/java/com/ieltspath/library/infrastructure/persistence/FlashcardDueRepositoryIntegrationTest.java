@@ -2,14 +2,17 @@ package com.ieltspath.library.infrastructure.persistence;
 
 import com.ieltspath.library.application.port.FlashcardVocabularyMetadataReader;
 import com.ieltspath.library.infrastructure.adapter.FlashcardVocabularyMetadataAdapter;
+import com.ieltspath.library.infrastructure.adapter.VocabularyAudioUrlResolver;
 import com.ieltspath.library.infrastructure.persistence.entity.FlashcardJpaEntity;
 import com.ieltspath.library.infrastructure.persistence.repository.FlashcardJpaRepository;
 import com.ieltspath.library.domain.vo.LibraryStatus;
+import com.ieltspath.commonstorage.ObjectStorage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.data.domain.PageRequest;
@@ -29,11 +32,12 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
 
 @DataJpaTest
 @Testcontainers(disabledWithoutDocker = true)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(FlashcardVocabularyMetadataAdapter.class)
+@Import({FlashcardVocabularyMetadataAdapter.class, VocabularyAudioUrlResolver.class})
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @TestPropertySource(properties = {
         "spring.jpa.hibernate.ddl-auto=validate",
@@ -51,6 +55,8 @@ class FlashcardDueRepositoryIntegrationTest {
     private JdbcTemplate jdbc;
     @Autowired
     private FlashcardVocabularyMetadataReader vocabularyMetadataReader;
+    @MockBean
+    private ObjectStorage objectStorage;
 
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
@@ -104,8 +110,12 @@ class FlashcardDueRepositoryIntegrationTest {
 
     @Test
     void vocabularyMetadataIsReadForManySenseIdsInOneBatch() {
-        UUID firstItem = insertVocabularyItem("first", "fəːst", "audio/first.mp3");
-        UUID secondItem = insertVocabularyItem("second", "ˈsekənd", "audio/second.mp3");
+        String firstKey = "vocabulary/pronunciation/us/first.mp3";
+        String secondKey = "vocabulary/pronunciation/us/second.mp3";
+        when(objectStorage.publicUrl("media", firstKey)).thenReturn("https://storage.example/media/" + firstKey);
+        when(objectStorage.publicUrl("media", secondKey)).thenReturn("https://storage.example/media/" + secondKey);
+        UUID firstItem = insertVocabularyItemWithUsAudio("first", "fəːst", firstKey);
+        UUID secondItem = insertVocabularyItemWithUsAudio("second", "ˈsekənd", secondKey);
         UUID firstSense = insertVocabularySense(firstItem, "first example");
         UUID secondSense = insertVocabularySense(secondItem, "second example");
 
@@ -113,7 +123,7 @@ class FlashcardDueRepositoryIntegrationTest {
 
         assertEquals(2, metadata.size());
         assertEquals("fəːst", metadata.get(firstSense).ipa());
-        assertEquals("audio/first.mp3", metadata.get(firstSense).pronunciationAudioReference());
+        assertEquals("https://storage.example/media/" + firstKey, metadata.get(firstSense).pronunciationAudioReference());
         assertEquals("second example", metadata.get(secondSense).exampleSentence());
     }
 
@@ -151,6 +161,13 @@ class FlashcardDueRepositoryIntegrationTest {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO vocabulary_items(id,lemma,normalized_lemma,ipa,pronunciation_audio_reference) "
                 + "VALUES (?,?,?,?,?)", id, lemma, lemma, ipa, audio);
+        return id;
+    }
+
+    private UUID insertVocabularyItemWithUsAudio(String lemma, String ipa, String audioUs) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO vocabulary_items(id,lemma,normalized_lemma,ipa,audio_us_reference) VALUES (?,?,?,?,?)",
+                id, lemma, lemma, ipa, audioUs);
         return id;
     }
 

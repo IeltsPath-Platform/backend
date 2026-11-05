@@ -10,6 +10,8 @@ Request: `{"vocabularySenseId":"<uuid>"}`. Creates one active vocabulary flashca
 
 Returns a `NotebookEntryResponse`: `flashcardId`, `vocabularySenseId`, `vocabularyItemId`, `lemma`, `ipa`, `pronunciationAudioReference`, `partOfSpeech`, `vietnameseMeaning`, `englishDefinition`, `exampleSentence`, `imageUrl`, `level`, `leitnerBox`, `reviewCount`, `lastReviewedAt`, `nextReviewAt`, `createdAt`, and `note`. First save returns 201; a repeated save returns the existing entry with 200. Missing or inactive sense returns 404.
 
+`pronunciationAudioReference` is the preferred audio in US → UK → legacy-column order, returned as a complete HTTPS URL or null.
+
 ### `GET /api/learning-support/flashcards/notebook/entries`
 
 Query: `q` (optional, up to 100 characters; case-insensitive search across lemma and meanings), repeated `level` (`UNKNOWN`, `FAMILIAR`, `LEARNING`, `MASTERED`), `due` (optional boolean), `topicId` and `setId` (optional UUID filters), `sort` (`RECENT` default, `DUE`, `ALPHABET`, `WEAKEST`), `page` (default 0), `size` (default 20, 1–50). Returns `{items,page,size,total}` with the entry fields above plus `cefrLevel` and `topicName`. Filtering, ordering, and paging run in SQL.
@@ -68,7 +70,7 @@ Query: `q` (optional, up to 100 characters), `lang=EN|VI` (default `EN`), `cefr=
 
 ### `GET /api/content/vocabulary/{id}`
 
-`id` must be a UUID. Returns the existing vocabulary item fields with active senses only; inactive or missing items return 404. Existing fields are preserved. Added item fields are `ipaUk`, `ipaUs`, `audioUkReference`, `audioUsReference`, `frequencyRank`, `academicWordList`, `wordFamily`, and aggregate `counts`. `ipaUk`/`audioUkReference` fall back to legacy `ipa`/`pronunciationAudioReference` when unset. Each sense adds `cefrLevel`, derived `bandRange:{min,max}`, `topic`, `register`, `grammarNote`, `usageNote`, `exampleTranslation`, `collocations[]`, `synonyms[]`, `antonyms[]`, `commonMistakes[]`, `examples[]`, and `counts:{definitions,collocations,thesaurus,commonMistakes,examples}`. A missing CEFR has a null `bandRange`. No frequency rank is supplied without a verified source. Response is cacheable for 5 minutes.
+`id` must be a UUID. Returns the existing vocabulary item fields with active senses only; inactive or missing items return 404. Existing fields are preserved. Added item fields are `ipaUk`, `ipaUs`, `audioUkReference`, `audioUsReference`, `frequencyRank`, `academicWordList`, `wordFamily`, and aggregate `counts`. `ipaUk`/`audioUkReference` fall back to legacy `ipa`/`pronunciationAudioReference` when unset; specifically, `audioUkReference` falls back to the legacy column `pronunciation_audio_reference`, independently of the response field `pronunciationAudioReference` (which uses preferred US → UK → legacy audio). Each sense adds `cefrLevel`, derived `bandRange:{min,max}`, `topic`, `register`, `grammarNote`, `usageNote`, `exampleTranslation`, `collocations[]`, `synonyms[]`, `antonyms[]`, `commonMistakes[]`, `examples[]`, and `counts:{definitions,collocations,thesaurus,commonMistakes,examples}`. A missing CEFR has a null `bandRange`. No frequency rank is supplied without a verified source. Response is cacheable for 5 minutes.
 
 The CEFR-to-IELTS mapping is domain-owned: A1 1.0–2.5, A2 3.0–3.5, B1 4.0–5.0, B2 5.5–6.5, C1 7.0–8.0, C2 8.5–9.0.
 
@@ -95,6 +97,8 @@ Returns `{items,page,size,total}` of active set members. Optional `topicId` filt
 ### `GET /api/content/vocabulary/mindmap?topicId=<uuid>` or `?itemId=<uuid>`
 
 Exactly one parameter is required. Returns `{nodes,edges}` with at most 80 total nodes; topic queries include the topic node and related words, collocations, and synonyms.
+
+The frontend no longer uses the mindmap endpoint from 2026-11; the endpoint remains for compatibility.
 
 ### Vocabulary catalog ownership
 

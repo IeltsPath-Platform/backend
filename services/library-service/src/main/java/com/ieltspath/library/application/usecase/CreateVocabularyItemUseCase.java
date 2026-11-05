@@ -1,6 +1,7 @@
 package com.ieltspath.library.application.usecase;
 
 import com.ieltspath.library.application.command.CreateVocabularyItemCommand;
+import com.ieltspath.library.application.port.PronunciationAudioUrls;
 import com.ieltspath.library.application.port.VocabularyCatalogStore;
 import com.ieltspath.library.application.result.VocabularyItemResult;
 import com.ieltspath.library.application.result.VocabularySenseResult;
@@ -28,10 +29,13 @@ public class CreateVocabularyItemUseCase {
 
     private final VocabularyRepository vocabularyRepository;
     private final VocabularyCatalogStore catalogStore;
+    private final PronunciationAudioUrls audioUrls;
 
-    public CreateVocabularyItemUseCase(VocabularyRepository vocabularyRepository, VocabularyCatalogStore catalogStore) {
+    public CreateVocabularyItemUseCase(VocabularyRepository vocabularyRepository, VocabularyCatalogStore catalogStore,
+                                       PronunciationAudioUrls audioUrls) {
         this.vocabularyRepository = vocabularyRepository;
         this.catalogStore = catalogStore;
+        this.audioUrls = audioUrls;
     }
 
     public VocabularyItemResult execute(CreateVocabularyItemCommand command) {
@@ -61,7 +65,9 @@ public class CreateVocabularyItemUseCase {
                 saved.getLemma(),
                 saved.getNormalizedLemma(),
                 saved.getIpa(),
-                saved.getPronunciationAudioReference(),
+                // The US/UK audio was just written by the catalog store, not the entity, so pick from what was stored.
+                audioUrls.resolve(VocabularyItem.preferredAudioReference(dictionary.audioUsReference(),
+                        dictionary.audioUkReference(), saved.getPronunciationAudioReference())),
                 saved.getStatus(),
                 saved.getCreatedAt(),
                 saved.getUpdatedAt(),

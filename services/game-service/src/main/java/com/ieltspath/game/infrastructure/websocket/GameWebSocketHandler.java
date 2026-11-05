@@ -40,6 +40,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
     private final com.ieltspath.game.domain.repository.GameMatchRepository matches;
     private final GameMatchPlayerRepository matchPlayers;
     private final RocketGameplayUseCase rocket;
+    private final com.ieltspath.game.application.usecase.LobbySeatUseCase lobbySeats;
     private final Map<UUID, Set<WebSocketSession>> sessionsByRoom = new ConcurrentHashMap<>();
     private final Map<String,org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator> writers=new ConcurrentHashMap<>();
     private final Map<String,Long> lastPong=new ConcurrentHashMap<>();
@@ -50,6 +51,19 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
                                 SoloGameplayUseCase gameplay, GetWordlyRankingUseCase ranking,
                                 com.ieltspath.game.domain.repository.GameMatchRepository matches,
                                 GameMatchPlayerRepository matchPlayers, RocketGameplayUseCase rocket) {
+        this(objectMapper, getRoom, membership, startMatch, getMatch, submitAnswer, gameplay, ranking, matches,
+                matchPlayers, rocket, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public GameWebSocketHandler(ObjectMapper objectMapper, GetGameRoomUseCase getRoom,
+                                ChangeGameRoomMembershipUseCase membership, StartGameMatchUseCase startMatch,
+                                GetGameMatchStateUseCase getMatch, SubmitGameAnswerUseCase submitAnswer,
+                                SoloGameplayUseCase gameplay, GetWordlyRankingUseCase ranking,
+                                com.ieltspath.game.domain.repository.GameMatchRepository matches,
+                                GameMatchPlayerRepository matchPlayers, RocketGameplayUseCase rocket,
+                                com.ieltspath.game.application.usecase.LobbySeatUseCase lobbySeats) {
+        this.lobbySeats = lobbySeats;
         this.objectMapper = objectMapper;
         this.getRoom = getRoom;
         this.membership = membership;
@@ -284,10 +298,12 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
             sessions.add(session);
             try {
                 getRoom.byId(roomId,userId);
-                matches.findActiveIdByRoomId(roomId).ifPresent(id -> {
+                var active = matches.findActiveIdByRoomId(roomId);
+                active.ifPresent(id -> {
                     if (isRocket(id)) rocket.reconnected(id, userId);
                     else gameplay.reconnect(id,userId);
                 });
+                if (active.isEmpty() && lobbySeats != null) lobbySeats.reconnected(roomId, userId);
             } catch (RuntimeException denied) {
                 sessions.remove(session);
                 closeQuietly(session,CloseStatus.POLICY_VIOLATION);
@@ -348,11 +364,14 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
                 synchronized(members) {
                     members.remove(session);
                     UUID userId=attribute(session,USER_ID_ATTRIBUTE);
-                    if(members.stream().noneMatch(s -> s.isOpen() && userId.equals(attribute(s,USER_ID_ATTRIBUTE))))
-                        matches.findActiveIdByRoomId(roomId).ifPresent(id -> {
+                    if(members.stream().noneMatch(s -> s.isOpen() && userId.equals(attribute(s,USER_ID_ATTRIBUTE)))) {
+                        var active = matches.findActiveIdByRoomId(roomId);
+                        active.ifPresent(id -> {
                             if (isRocket(id)) rocket.disconnected(id, userId);
                             else gameplay.disconnected(id,userId);
                         });
+                        if (active.isEmpty()) lobbyDisconnected(roomId, userId);
+                    }
                 }
             }
         }
@@ -447,6 +466,24 @@ public class GameWebSocketHandler extends TextWebSocketHandler implements org.sp
     @Override
     protected void handlePongMessage(WebSocketSession session,PongMessage message) {
         lastPong.put(session.getId(),System.currentTimeMillis());
+        // A restart of another instance may have marked this live lobby member as disconnected.
+        if (lobbySeats == null) return;
+        UUID roomId = attribute(session, ROOM_ID_ATTRIBUTE);
+        try {
+            if (matches.findActiveIdByRoomId(roomId).isEmpty())
+                lobbySeats.reconnected(roomId, attribute(session, USER_ID_ATTRIBUTE));
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(getClass()).warn("Could not refresh lobby seat for room {}", roomId, e);
+        }
+    }
+
+    private void lobbyDisconnected(UUID roomId, UUID userId) {
+        if (lobbySeats == null) return;
+        try {
+            lobbySeats.disconnected(roomId, userId);
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(getClass()).warn("Could not hold lobby seat for room {}", roomId, e);
+        }
     }
 
     @org.springframework.scheduling.annotation.Scheduled(fixedDelay=10000)

@@ -51,4 +51,11 @@ class VocabularyAudioUrlResolverTest {
         when(objectStorage.publicUrl(BUCKET, "../secret")).thenThrow(new IllegalArgumentException("unsafe key"));
         assertNull(resolver.resolve("../secret"));
     }
+
+    @Test
+    void rejectsPublicUrlsThatAreNotHttps() {
+        when(objectStorage.publicUrl(BUCKET, KEY)).thenReturn("http://storage.example/media/" + KEY);
+
+        assertNull(resolver.resolve(KEY));
+    }
 }

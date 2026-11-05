@@ -9,6 +9,7 @@ import com.ieltspath.library.application.query.PageQuery;
 import com.ieltspath.library.domain.vo.CefrLevel;
 import com.ieltspath.library.domain.vo.VocabularySetKind;
 import com.ieltspath.library.infrastructure.adapter.VocabularyProgressJdbcAdapter;
+import com.ieltspath.commonstorage.ObjectStorage;
 import com.ieltspath.library.application.port.FlashcardImageStorage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
 
 @JdbcTest
 @Testcontainers(disabledWithoutDocker = true)
@@ -50,6 +52,7 @@ class VocabularyNotebookJdbcIntegrationTest {
     @Autowired VocabularyProgressJdbcAdapter progress;
     @Autowired VocabularyCatalogJdbcAdapter catalogStore;
     @MockBean FlashcardImageStorage imageStorage;
+    @MockBean ObjectStorage objectStorage;
 
     @DynamicPropertySource static void datasource(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -86,6 +89,80 @@ class VocabularyNotebookJdbcIntegrationTest {
         assertThrows(org.springframework.dao.DuplicateKeyException.class, () -> jdbc.update(
                 "insert into flashcards(id,user_id,source_type,vocabulary_sense_id,front,back,status) values(?,?,'VOCABULARY_SENSE',?,?,?,'ACTIVE')",
                 UUID.randomUUID(), user, sense, "apple", "meaning"));
+    }
+
+    @Test void notebookResolvesPreferredAudioKeyAndKeepsLegacyHttps() {
+        UUID user = UUID.randomUUID();
+        UUID item = UUID.randomUUID(), sense = UUID.randomUUID(), card = UUID.randomUUID();
+        String key = "vocabulary/pronunciation/us/preferred.mp3";
+        String url = "https://storage.example/storage/v1/object/public/media/" + key;
+        when(objectStorage.publicUrl("media", key)).thenReturn(url);
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,audio_us_reference,audio_uk_reference,pronunciation_audio_reference) values(?,?,?,'ACTIVE',?,?,?)",
+                item, "preferred", "preferred", key, "vocabulary/pronunciation/uk/other.mp3", "https://legacy.example/old.mp3");
+        jdbc.update("insert into vocabulary_senses(id,vocabulary_item_id,part_of_speech,vietnamese_meaning,example_sentence,status) values(?,?,'NOUN','nghĩa','Example.','ACTIVE')",
+                sense, item);
+        jdbc.update("insert into flashcards(id,user_id,source_type,vocabulary_sense_id,front,back,status) values(?,?,'VOCABULARY_SENSE',?,?,'meaning','ACTIVE')",
+                card, user, sense, "preferred");
+
+        var entry = adapter.findEntry(user, card).orElseThrow();
+
+        assertEquals(url, entry.pronunciationAudioReference());
+
+        UUID legacyItem = UUID.randomUUID(), legacySense = UUID.randomUUID(), legacyCard = UUID.randomUUID();
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,pronunciation_audio_reference) values(?,?,?,'ACTIVE',?)",
+                legacyItem, "legacy audio", "legacy audio", "https://legacy.example/audio.mp3");
+        jdbc.update("insert into vocabulary_senses(id,vocabulary_item_id,part_of_speech,vietnamese_meaning,example_sentence,status) values(?,?,'NOUN','nghĩa','Example.','ACTIVE')",
+                legacySense, legacyItem);
+        jdbc.update("insert into flashcards(id,user_id,source_type,vocabulary_sense_id,front,back,status) values(?,?,'VOCABULARY_SENSE',?,?,'meaning','ACTIVE')",
+                legacyCard, user, legacySense, "legacy audio");
+        assertEquals("https://legacy.example/audio.mp3", adapter.findEntry(user, legacyCard).orElseThrow().pronunciationAudioReference());
+    }
+
+    @Test void catalogItemResolvesPreferredAudioKey() {
+        UUID item = UUID.randomUUID();
+        String key = "vocabulary/pronunciation/us/catalog-word.mp3";
+        String url = "https://storage.example/storage/v1/object/public/media/" + key;
+        when(objectStorage.publicUrl("media", key)).thenReturn(url);
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,audio_us_reference) values(?,?,?,'ACTIVE',?)",
+                item, "catalog word", "catalog word", key);
+        jdbc.update("insert into vocabulary_senses(id,vocabulary_item_id,part_of_speech,vietnamese_meaning,example_sentence,status) values(?,?,'NOUN','nghĩa','Example.','ACTIVE')",
+                UUID.randomUUID(), item);
+
+        assertEquals(url, catalogStore.findActiveItem(item).orElseThrow().pronunciationAudioReference());
+    }
+
+    @Test void catalogItemKeepsUkAudioSeparateFromPreferredAudio() {
+        UUID usOnly = UUID.randomUUID();
+        UUID legacyOnly = UUID.randomUUID();
+        UUID ukAndUs = UUID.randomUUID();
+        String usKey = "vocabulary/pronunciation/us/us-only.mp3";
+        String ukKey = "vocabulary/pronunciation/uk/uk.mp3";
+        String usOnlyUrl = "https://storage.example/storage/v1/object/public/media/" + usKey;
+        String ukUrl = "https://storage.example/storage/v1/object/public/media/" + ukKey;
+        String legacyUrl = "https://legacy.example/legacy.mp3";
+        String usUrl = "https://storage.example/storage/v1/object/public/media/vocabulary/pronunciation/us/us.mp3";
+        when(objectStorage.publicUrl("media", usKey)).thenReturn(usOnlyUrl);
+        when(objectStorage.publicUrl("media", ukKey)).thenReturn(ukUrl);
+        when(objectStorage.publicUrl("media", "vocabulary/pronunciation/us/us.mp3")).thenReturn(usUrl);
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,audio_us_reference) values(?,?,?,'ACTIVE',?)",
+                usOnly, "us only", "us only", usKey);
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,pronunciation_audio_reference) values(?,?,?,'ACTIVE',?)",
+                legacyOnly, "legacy only", "legacy only", legacyUrl);
+        jdbc.update("insert into vocabulary_items(id,lemma,normalized_lemma,status,audio_uk_reference,audio_us_reference) values(?,?,?,'ACTIVE',?,?)",
+                ukAndUs, "uk and us", "uk and us", ukKey, "vocabulary/pronunciation/us/us.mp3");
+
+        var usItem = catalogStore.findActiveItem(usOnly).orElseThrow();
+        assertNull(usItem.audioUkReference());
+        assertEquals(usOnlyUrl, usItem.audioUsReference());
+        assertEquals(usOnlyUrl, usItem.pronunciationAudioReference());
+
+        var legacyItem = catalogStore.findActiveItem(legacyOnly).orElseThrow();
+        assertEquals(legacyUrl, legacyItem.audioUkReference());
+
+        var ukUsItem = catalogStore.findActiveItem(ukAndUs).orElseThrow();
+        assertEquals(ukUrl, ukUsItem.audioUkReference());
+        assertEquals(usUrl, ukUsItem.audioUsReference());
+        assertEquals(usUrl, ukUsItem.pronunciationAudioReference());
     }
 
     @Test void pronunciationAudioIsReturnedOnlyForWordsThatHaveAny() {

@@ -130,7 +130,7 @@ A `VOCABULARY` block contains `blockId`, `blockType`, `sortOrder`, and the order
 }
 ```
 
-Resolve metadata with Library `GET /api/content/vocabulary/senses?ids=<comma-separated-UUIDs>`. The `ids` parameter must contain 1–100 valid UUIDs; an empty value, malformed UUID, or more than 100 IDs returns `400`. The response is an array in requested-ID order; missing or inactive senses are omitted. Each response object has exactly `senseId`, `vocabularyItemId`, `lemma`, `ipa`, `pronunciationAudioReference`, `partOfSpeech`, `englishDefinition`, `vietnameseMeaning`, `exampleSentence`, and `imageUrl`.
+Resolve metadata with Library `GET /api/content/vocabulary/senses?ids=<comma-separated-UUIDs>`. The `ids` parameter must contain 1–100 valid UUIDs; an empty value, malformed UUID, or more than 100 IDs returns `400`. The response is an array in requested-ID order; missing or inactive senses are omitted. Each response object has exactly `senseId`, `vocabularyItemId`, `lemma`, `ipa`, `pronunciationAudioReference`, `partOfSpeech`, `englishDefinition`, `vietnameseMeaning`, `exampleSentence`, and `imageUrl`. `pronunciationAudioReference` is the preferred audio in US → UK → legacy-column order, returned as a complete HTTPS URL or null.
 
 For flashcards, each sense ID can identify a `VOCABULARY_SENSE` card by `vocabularySenseId` through the existing flashcard module. Card creation, deck UX, and any vocabulary completion policy remain deferred; this adds no review endpoint. Vocabulary SRS does not write `kp_evidence`; `VOCABULARY` mastery continues to come from scored exercises.
 
