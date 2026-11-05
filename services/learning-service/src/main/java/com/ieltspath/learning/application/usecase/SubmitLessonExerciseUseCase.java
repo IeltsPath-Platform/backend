@@ -20,6 +20,8 @@ import com.ieltspath.learning.domain.aggregate.LessonProgress;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.application.port.QuestionEventLog;
 import com.ieltspath.learning.application.service.MasteryProfileUpdater;
+import com.ieltspath.learning.application.service.ErrorTrapEvidence;
+import com.ieltspath.learning.application.service.ErrorTrapCatalog;
 import com.ieltspath.learning.application.service.AnswerDurations;
 import com.ieltspath.learning.domain.service.ErrorTagger;
 import com.ieltspath.learning.domain.vo.QuestionAttemptEvent;
@@ -59,6 +61,7 @@ public class SubmitLessonExerciseUseCase {
     private final MasteryProfileUpdater masteryProfiles;
     private final GamificationRecorder gamificationRecorder;
     private final HeartsService hearts;
+    private final ErrorTrapEvidence errorTrapEvidence;
     private final AnswerSpecGrader grader = new AnswerSpecGrader();
     private final ErrorTagger errorTagger = new ErrorTagger();
     private final Clock clock = Clock.systemUTC();
@@ -68,7 +71,7 @@ public class SubmitLessonExerciseUseCase {
                                        PracticeProgress practice, LessonViewAssembler view,
                                        TopicCompletion topicCompletion, QuestionEventLog questionEvents,
                                        MasteryProfileUpdater masteryProfiles, GamificationRecorder gamificationRecorder,
-                                       HeartsService hearts) {
+                                       HeartsService hearts, ErrorTrapEvidence errorTrapEvidence) {
         this.lock = lock;
         this.access = access;
         this.submissions = submissions;
@@ -81,6 +84,7 @@ public class SubmitLessonExerciseUseCase {
         this.masteryProfiles = masteryProfiles;
         this.gamificationRecorder = gamificationRecorder;
         this.hearts = hearts;
+        this.errorTrapEvidence = errorTrapEvidence;
     }
 
     @Transactional
@@ -116,11 +120,13 @@ public class SubmitLessonExerciseUseCase {
         // Every submission is logged per question; only the first one also becomes mastery evidence below.
         Map<UUID, Long> durations = AnswerDurations.of(command.answers());
         List<QuestionAttemptEvent> events = new ArrayList<>();
+        List<String> resultErrorCodes = new ArrayList<>();
         for (int index = 0; index < questions.size(); index++) {
             Question question = questions.get(index);
             UUID questionId = question.questionVersionId();
             boolean correct = grades.get(index).correct();
             String errorCode = correct ? null : errorTagger.tag(question.answerSpec(), answers.get(questionId), false);
+            resultErrorCodes.add(errorCode);
             events.add(QuestionAttemptEvent.of(userId, questionId, List.copyOf(new LinkedHashSet<>(question.knowledgePointIds())),
                     correct, durations.get(questionId), errorCode, QuestionEventSource.LESSON_EXERCISE,
                     command.requestId(), firstSubmission));
@@ -137,6 +143,9 @@ public class SubmitLessonExerciseUseCase {
         Set<UUID> passed = new HashSet<>(progress.passedBlockIds());
         if (firstSubmission) {
             List<KnowledgeEvidence> firstAnswers = new ArrayList<>();
+            Set<UUID> withoutMilestone = new HashSet<>();
+            ErrorTrapCatalog.ErrorTraps trapCatalog = errorTrapEvidence.loadIfNeeded(
+                    questions.stream().anyMatch(question -> question.answerSpec().get("distractors") instanceof Map<?, ?>));
             for (int index = 0; index < questions.size(); index++) {
                 Question question = questions.get(index);
                 for (UUID kpId : new LinkedHashSet<>(question.knowledgePointIds())) {
@@ -150,10 +159,18 @@ public class SubmitLessonExerciseUseCase {
                                 userId, question.questionVersionId(), kpId);
                     }
                 }
+                errorTrapEvidence.append(firstAnswers, withoutMilestone,
+                        question.answerSpec(), grades.get(index).correct(), errorTagger.tag(question.answerSpec(),
+                                answers.get(question.questionVersionId()), grades.get(index).correct()),
+                        question.questionVersionId(), kp -> LessonEvidenceReference.create(command.requestId(),
+                                question.questionVersionId(), kp), trapCatalog);
             }
             evidence.append(userId, firstAnswers);
-            masteryProfiles.recordEvidence(userId, firstAnswers);
+            masteryProfiles.recordEvidence(userId, firstAnswers, withoutMilestone);
+            errorTrapEvidence.createReviews(userId, lessonId, firstAnswers);
         }
+        Map<String, com.ieltspath.learning.application.service.ErrorTypeTexts.Text> errorTexts =
+                errorTrapEvidence.errorTexts(resultErrorCodes);
         // Essay blocks never gate completion: a learner without points can still finish every lesson.
         boolean lessonCompleted = LessonAccess.completed(context.progress()) || lesson.blocks().stream()
                 .filter(Block::isExercise).allMatch(item -> passed.contains(item.blockId()));
@@ -164,7 +181,8 @@ public class SubmitLessonExerciseUseCase {
             if (!grade.correct()) opened.add(question.questionVersionId());
             results.add(new SubmissionResult.AnswerResult(question.questionVersionId(), grade.correct(),
                     blockPassed ? grade.correctAnswer() : null, blockPassed ? question.explanation() : null,
-                    view.hint(question, passed.contains(blockId), opened)));
+                    view.hint(question, passed.contains(blockId), opened),
+                    errorTrapEvidence.feedback(resultErrorCodes.get(index), errorTexts)));
         }
         // XP is awarded for the first submission of a block only; a repeat shows the learner's standing unchanged.
         GamificationSummary xp = firstSubmission

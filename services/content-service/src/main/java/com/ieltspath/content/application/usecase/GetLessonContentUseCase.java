@@ -4,10 +4,12 @@ import com.ieltspath.content.application.port.LearningContentReader;
 import com.ieltspath.content.application.result.LessonContentResult;
 import com.ieltspath.content.domain.exception.LessonNotFoundException;
 import com.ieltspath.content.domain.vo.AssetType;
+import com.ieltspath.content.domain.vo.AccessTier;
 import com.ieltspath.content.domain.vo.BlockType;
 import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.domain.vo.MediaReferencePolicy;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
@@ -17,22 +19,46 @@ import java.util.UUID;
 public class GetLessonContentUseCase {
     private final LearningContentReader reader;
     private final MediaReferencePolicy mediaPolicy;
+    private final MediaUrlResolver mediaUrls;
+
+    @Autowired
+    public GetLessonContentUseCase(LearningContentReader reader, MediaReferencePolicy mediaPolicy,
+                                  MediaUrlResolver mediaUrls) {
+        this.reader = reader;
+        this.mediaPolicy = mediaPolicy;
+        this.mediaUrls = mediaUrls;
+    }
 
     public GetLessonContentUseCase(LearningContentReader reader, MediaReferencePolicy mediaPolicy) {
         this.reader = reader;
         this.mediaPolicy = mediaPolicy;
+        this.mediaUrls = null;
     }
 
     public LessonContentResult execute(UUID lessonId) {
-        LessonContentResult lesson = reader.publishedLesson(lessonId)
-                .orElseThrow(() -> new LessonNotFoundException(lessonId));
-        return lesson.withBlocks(lesson.blocks().stream().map(this::resolved).toList());
+        return execute(lessonId, false);
     }
 
-    private LessonContentResult.Block resolved(LessonContentResult.Block block) {
+    public LessonContentResult execute(UUID lessonId, boolean signedAudio) {
+        LessonContentResult lesson = load(lessonId);
+        return lesson.withBlocks(lesson.blocks().stream().map(block -> resolved(block, signedAudio)).toList());
+    }
+
+    public LessonContentResult accessSummary(UUID lessonId) {
+        return load(lessonId);
+    }
+
+    private LessonContentResult load(UUID lessonId) {
+        return reader.publishedLesson(lessonId).orElseThrow(() -> new LessonNotFoundException(lessonId));
+    }
+
+    private LessonContentResult.Block resolved(LessonContentResult.Block block, boolean signedAudio) {
         if (block.blockType() == BlockType.ASSET && block.asset().assetType() != AssetType.PASSAGE) {
             LessonContentResult.Asset asset = block.asset();
-            return block.withAsset(asset.withMediaUrl(mediaPolicy.resolve(asset.assetType(), asset.mediaReference())));
+            String url = signedAudio && mediaUrls != null
+                    ? mediaUrls.resolve(asset.assetType(), asset.mediaReference(), asset.accessTier(), true)
+                    : mediaPolicy.resolve(asset.assetType(), asset.mediaReference());
+            return block.withAsset(asset.withMediaUrl(url));
         }
         if (block.blockType() != BlockType.EXERCISE) {
             return block;

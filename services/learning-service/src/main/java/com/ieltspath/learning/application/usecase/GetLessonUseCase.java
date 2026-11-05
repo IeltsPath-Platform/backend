@@ -35,16 +35,18 @@ public class GetLessonUseCase {
     @Transactional
     public LessonResult execute(UUID userId, UUID lessonId) {
         lock.lock(userId);
-        LessonAccess.Context context = access.authorizeToRead(userId, lessonId);
-        access.refresh(userId, context.lesson(), context.progress());
+        LessonAccess.ReadContext read = access.authorizeAndLoadForReading(userId, lessonId);
+        LessonAccess.Context context = read.access();
+        Lesson lesson = read.lesson();
+        access.refresh(userId, lesson, context.progress());
         boolean completed = LessonAccess.completed(context.progress());
         Set<UUID> passed = context.progress() == null ? Set.of() : context.progress().passedBlockIds();
-        Lesson lesson = context.lesson();
         var blocks = view.blocks(lesson, passed, completed,
                 essays.summarizeBlocks(userId, lesson.blocks().stream().filter(Block::isEssay).map(Block::blockId)
                         .toList()),
                 submissions.wrongQuestions(userId, lessonId));
         return new LessonResult(lesson.lessonId(), lesson.topicId(), lesson.code(), lesson.title(), lesson.summary(),
-                lesson.sortOrder(), completed ? "COMPLETED" : "AVAILABLE", blocks, lesson.skill(), lesson.skills());
+                lesson.sortOrder(), completed ? "COMPLETED" : "AVAILABLE", blocks, lesson.skill(), lesson.skills(),
+                lesson.courseId(), lesson.skillPosition());
     }
 }

@@ -34,7 +34,8 @@ public class GlobalExceptionHandler {
         body.put("code", e.code());
         body.put("message", e.getMessage());
         body.put("path", request.getRequestURI());
-        body.put("details", null);
+        body.put("details", e instanceof com.ieltspath.game.domain.exception.NotEnoughWordsException shortage
+                ? java.util.Map.of("available", shortage.available()) : null);
         return ResponseEntity.status(e.status()).body(body);
     }
 

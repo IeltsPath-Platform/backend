@@ -1,380 +1,168 @@
 # 🚀 IELTSPath
 
-IELTSPath là backend microservices gồm các dịch vụ **Java 21 / Spring Cloud**. Hệ thống tích hợp Gateway, Service Discovery, Config Server cùng các thư viện bảo mật và event dùng chung.
+Backend microservices cho nền tảng học IELTS: **Java 21 / Spring Boot 3.5 / Spring Cloud**. Client chỉ đi qua API Gateway. Mỗi business service sở hữu một database PostgreSQL riêng, gọi nhau bằng HTTP nội bộ (có resilience) và bằng sự kiện RabbitMQ (transactional outbox).
 
 ---
 
-## 🛠️ Công Nghệ Sử Dụng (Tech Stack)
-
-| Thành phần                | Công nghệ / Thư viện                | Phiên bản          | Chức năng chính                                                                                                                        |
-| :-------------------------- | :-------------------------------------- | :------------------- | :---------------------------------------------------------------------------------------------------------------------------------------- |
-| **Language**          | Java                                    | **OpenJDK 21**       | Ngôn ngữ triển khai các microservice                                                                                              |
-| **Framework**         | Spring Boot                             | **3.5.14**     | Framework ứng dụng nền tảng                                                                                                           |
-| **Cloud Ecosystem**   | Spring Cloud                            | **2025.0.0**   | Hệ sinh thái dịch vụ đám mây                                                                                                       |
-| **API Gateway**       | Spring Cloud Gateway (WebFlux Reactive) | 2025.0.0             | Quản lý định tuyến API, xác thực & phân quyền tập trung dựa trên kiến trúc Phản ứng (Reactive, Non-blocking Netty Engine) |
-| **Service Discovery** | Spring Cloud Netflix Eureka             | 2025.0.0             | Đăng ký và phát hiện dịch vụ tự động                                                                                           |
-| **Config Management** | Spring Cloud Config Server              | 2025.0.0             | Quản lý cấu hình tập trung cho toàn bộ microservices                                                                               |
-| **Security & Auth**   | Spring Security & OAuth2 (Reactive)     | 3.5.14               | Xử lý token JWT và Context người dùng bất đồng bộ                                                                               |
-| **Shared Storage**    | Custom`common-storage`                | 1.0-SNAPSHOT         | Module dùng chung: `ObjectStorage`, client Supabase Storage, `ObjectKeys`, `UploadPolicy` |
-| **Shared Common**     | `common-security`, `common-events` | 1.0-SNAPSHOT | Security servlet; tên exchange/routing key/header, record payload và helper retry AMQP dùng chung |
-| **Database**          | PostgreSQL                              | 15-alpine            | Hệ quản trị cơ sở dữ liệu quan hệ                                                                                                 |
-| **Containerization**  | Docker & Docker Compose                 | Latest               | Đóng gói và chạy môi trường hạ tầng nhanh chóng                                                                                |
-| **Build Tool**        | Maven                                   | Maven 3.9+           | Maven multi-module cho mọi service                                                                                    |
-
----
-
-## 📁 Cấu Trúc Dự Án (Project Architecture)
-
-Reactor **Maven Multi-module** gồm 14 module: 3 infra, 2 shared và 9 business.
-
-```text
-IELTSPath/
-├── infra/                      # Chứa các dịch vụ hạ tầng Spring Cloud
-│   ├── api-gateway/            # [Port 8080] API Gateway (WebFlux Reactive Netty), kiểm tra JWT & định tuyến
-│   ├── config-server/          # [Port 8888] Centralized Config Server
-│   └── eureka-server/          # [Port 8761] Eureka Service Discovery Registry Server
-├── shared/                     # Chứa các module dùng chung giữa các microservices
-│   ├── common-security/        # CanonicalRoles, InternalJwtClaims, InternalJwtAuthorities, InternalJwtValidators
-│   ├── common-events/          # Tên/hình dạng event, MessageRetry và RetryTopology; thư viện không deploy độc lập
-│   └── common-storage/         # ObjectStorage, client Supabase Storage, ObjectKeys, UploadPolicy
-├── services/                   # Chứa các microservice nghiệp vụ
-│   ├── learning-service/       # [Port 8086] Thứ tự topic, bài học, mastery, bài ôn, mã đề, consumer kết quả thi
-│   ├── user-service/           # Identity, auth, learning goals, activity và streak
-│   ├── content-service/        # Topic, knowledge point, câu hỏi, gói nội dung và asset
-│   ├── library-service/        # Catalog từ vựng/video và thư viện học cá nhân
-│   ├── game-service/           # Phòng game, phiên chơi và WebSocket
-│   ├── community-service/      # Bài viết, bình luận, reaction và moderation
-│   └── notification-service/   # Thông báo bền vững, RabbitMQ và WebSocket STOMP
-├── docker-compose.yml          # Một file Compose cho database, broker và các service đã triển khai
-├── pom.xml                     # Root POM quản lý phiên bản và danh sách module
-└── README.md                   # Tài liệu hướng dẫn dự án
-```
-
-`shared/common-events` giữ hợp đồng mã hóa cho points, assessment và community; ý nghĩa event nằm trong
-[`docs/contracts/`](docs/contracts/). Đổi exchange/routing key hoặc hình dạng payload phải cập nhật cả thư viện và
-contract. Service vẫn sở hữu queue và khai báo topology; chi tiết helper grant và topology retry ở
-[`docs/system-architecture.md`](docs/system-architecture.md#bất-đồng-bộ-rabbitmq). Build service bằng `-am` tự kéo thư viện
-vào; không có tiến trình hay container riêng cho `common-events`.
-
-Namespace Java thống nhất của các module là `com.ieltspath.<module>`; Maven `groupId` dùng `com.ieltspath`.
-
----
-
-## 🔄 Cách Thức Hoạt Động (How It Works)
-
-### 1. Luồng Xử Lý Request (Request Lifecycle)
+## 🏗️ Kiến Trúc Tổng Quan
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    actor Client as Client / Frontend
-    participant Gateway as API Gateway (8080)
-    participant Eureka as Eureka Server (8761)
-    participant Service as Business Microservice
-    participant Auth as Authentication Service
-
-    Client->>Gateway: Gửi HTTP Request + Authorization Header (Bearer JWT)
-    Gateway->>Gateway: Verify external JWT (issuer/subject/role)
-    Gateway->>Gateway: Replace client Authorization with internal JWT
-    Gateway->>Gateway: Ký internal JWT ngắn hạn cho downstream
-    Gateway->>Eureka: Truy vấn vị trí IP/Port của Business Microservice
-    Eureka-->>Gateway: Trả về địa chỉ của Microservice
-    Gateway->>Service: Forward Request + Authorization: Bearer internal JWT
-    Service->>Service: Verify gateway signature + issuer/subject/role
-    Service-->>Client: Trả về kết quả HTTP Response
+flowchart LR
+    Client([Client]) -->|external JWT| GW[API Gateway :8080]
+    GW -->|internal JWT, lb://| SVC[9 business service]
+    CFG[Config Server :8888] -. cấu hình .-> GW
+    CFG -. cấu hình .-> SVC
+    EUR[Eureka :8761] -. đăng ký, tìm instance .- GW
+    EUR -. đăng ký, tìm instance .- SVC
+    SVC --> PG[(PostgreSQL, mỗi service một DB)]
+    SVC -->|outbox + relay| MQ{{RabbitMQ}}
+    MQ -->|event| SVC
+    GW --> RD[(Redis)]
+    SVC --> RD
+    SVC --> SB[Supabase Storage]
 ```
 
-### 2. Cơ Chế Bảo Mật
+| Nhóm | Module | Vai trò |
+| :-- | :-- | :-- |
+| `infra/` | `api-gateway` :8080, `config-server` :8888, `eureka-server` :8761 | Ingress WebFlux, cấu hình tập trung (`config-repo/`), service registry |
+| `shared/` | `common-security`, `common-events`, `common-resilience`, `common-observability`, `common-storage` | Thư viện dùng chung, tự cấu hình bằng Spring Boot auto-configuration, không deploy độc lập |
+| `services/` | `user` :8085, `content` :8082, `library` :8081, `assessment` :8083, `access` :8084, `learning` :8086, `game` :8087, `notification` :8088, `community` :8089 | Business service, mỗi service một bounded context và một database |
 
-Client xác thực bằng access token. API Gateway kiểm tra token này trước khi định tuyến,
-sau đó thay nó bằng một internal JWT ngắn hạn để gửi đến service đích. Các downstream
-service xác thực internal JWT bằng `common-security` và chỉ dùng identity đã được xác
-thực; không tin cậy các header danh tính do client tự gửi. Secret cho external và
-internal token được tách riêng, còn role được quản lý tập trung.
-
-### 3. Kiến Trúc Reactive (Reactive Programming Model) Tại API Gateway
-
-Dịch vụ **API Gateway** (`infra/api-gateway`) được xây dựng 100% dựa trên mô hình **Lập trình Phản ứng (Reactive Programming)**:
-
-- **Framework**: Sử dụng `spring-cloud-starter-gateway-server-webflux` chạy trên engine non-blocking **Netty** giúp xử lý hàng nghìn kết nối đồng thời với lượng tài nguyên CPU/RAM tối thiểu.
-- **Reactive Security**: Phân quyền & giải mã Token JWT bất đồng bộ thông qua `ServerHttpSecurity`, `SecurityWebFilterChain` và `NimbusReactiveJwtDecoder`.
-- **Reactive Filters**: Tất cả bộ lọc (`CorrelationIdFilter`, `LoggingFilter`) đều thực thi non-blocking thông qua `Mono<Void>` và `ServerWebExchange`.
-- **Shared Security Constants**: `SecurityConfig` và `InternalJwtService` dùng constants tập trung từ `common-security` — `CanonicalRoles.ALL`, `InternalJwtClaims.ROLES`, `InternalJwtAuthorities` — thay vì hardcode string literal.
+Reactor Maven gồm 17 module (3 infra, 5 shared, 9 business). Kiến trúc chi tiết, luồng nghiệp vụ và quyết định thiết kế: [`docs/system-architecture.md`](docs/system-architecture.md).
 
 ---
 
-## 🚀 Hướng Dẫn Chạy Dự Án Cho Lập Trình Viên (Getting Started)
+## 🧩 Các Pattern Hệ Thống Dùng
 
-### 1. Yêu Cầu Môi Trường (Prerequisites)
+Chỉ liệt kê pattern đã có trong code. Cột "Xem" trỏ tới nơi đọc tiếp.
 
-- **Java Development Kit (JDK)**: Version 21.
-- **Maven**: Version 3.9+.
-- **Docker & Docker Desktop**: Để chạy ứng dụng hạ tầng và Cơ sở dữ liệu.
+### Biên hệ thống và cấu hình
 
-### 2. Cài Graphify Cho Người Lần Đầu
+| Pattern | Cách áp dụng | Xem |
+| :-- | :-- | :-- |
+| **API Gateway** | Một điểm vào: xác thực external JWT, định tuyến `lb://`, CORS, timeout theo route, chặn `/internal/**` | `infra/api-gateway` |
+| **Service Discovery** | Service đăng ký với Eureka; Gateway và client tìm instance qua tên service | `infra/eureka-server` |
+| **Centralized Configuration** | Config Server dạng native đọc `config-repo/*.yaml`; giá trị đổi theo môi trường dùng `${VAR:default}` | `infra/config-server` |
+| **Token exchange tại biên** | User Service ký external JWT; Gateway kiểm rồi ký **internal JWT** ngắn hạn (~60 giây) cho downstream. Downstream chỉ tin internal JWT, không tin header `X-User-*` | `shared/common-security`, mục 4 của system-architecture |
+| **Rate limiting (token bucket qua Redis)** | Tier `auth`, `upload`, `ai`, `default` theo subject JWT hoặc IP. Redis lỗi: request thường đi tiếp, login trả 503 (fail-closed) | `config-repo/api-gateway.yaml` |
 
-Graphify giúp tạo knowledge graph từ source code để đọc kiến trúc, quan hệ file,
-class, dependency và luồng gọi nhanh hơn. Package trên PyPI tên là `graphifyy`
-nhưng command sau khi cài là `graphify`.
+### Cấu trúc trong service và dữ liệu
 
-Kiểm tra máy đã có `uv` chưa:
+| Pattern | Cách áp dụng | Xem |
+| :-- | :-- | :-- |
+| **Database per service + Flyway** | Mỗi service một DB, migration `V<n>__<mô_tả>.sql` chạy khi khởi động, không sửa migration đã áp | `services/*/src/main/resources/db/migration` |
+| **DDD + Clean Architecture** | `api` → `application` (mỗi use case một class `*UseCase`) → `domain`; `infrastructure` giữ JPA, adapter, client, messaging | mục 5 của system-architecture |
+| **Repository Adapter, Mapper, Ports & Adapters** | Domain không phụ thuộc JPA; entity JPA ánh xạ bằng MapStruct; client, outbox, khóa đi qua `application/port` | `services/learning-service`, `assessment-service` |
+| **Lỗi thống nhất** | `GlobalExceptionHandler` đổi exception thành `ErrorResponse` | mỗi service, gói `api/exception` |
+| **Object storage trừu tượng** | `ObjectStorage` + adapter Supabase, khóa object được kiểm tra, file PREMIUM phát bằng URL ký 900 giây | `shared/common-storage` |
 
-```powershell
-uv --version
-```
+### Giao tiếp đồng bộ
 
-Nếu chưa có `uv`, cài bằng PowerShell:
+| Pattern | Cách áp dụng | Xem |
+| :-- | :-- | :-- |
+| **Circuit Breaker + Retry + Bulkhead** | `ResilientCall` bọc mọi lời gọi HTTP giữa service. Breaker theo service đích (mở 30 giây); retry tối đa một lần sau 200 ms, chỉ cho `READ` và `IDEMPOTENT_WRITE`, chỉ với lỗi kết nối, timeout, 5xx; LLM giới hạn 4 lời gọi đồng thời. Lỗi được đổi về contract lỗi của service gọi | `shared/common-resilience` |
+| **Gọi ngoài transaction** | HTTP và LLM không chạy trong transaction hay khi giữ khóa | mục 3 của system-architecture |
 
-```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
+### Giao tiếp bất đồng bộ
 
-Sau khi cài, đóng terminal rồi mở lại. Nếu command vẫn chưa nhận, chạy:
+| Pattern | Cách áp dụng | Xem |
+| :-- | :-- | :-- |
+| **Transactional Outbox + Relay** | Event ghi vào `outbox_events` cùng transaction với dữ liệu; relay publish với publisher confirm. Áp dụng ở assessment, access, community và learning (`reward_grants`) | `OutboxRelay*` trong từng service |
+| **Retry queue + Dead-letter queue + Replay** | Consumer ack thủ công; lỗi tạm đi qua retry queue có TTL, lỗi contract hoặc hết lượt vào DLQ. Replay gửi lại đúng exchange và routing key gốc (`x-original-routing-key`) | `shared/common-events` (`MessageRetry`, `RetryTopology`) |
+| **Idempotent consumer** | Notification chống trùng theo `eventId`; Learning áp kết quả theo `(attempt, result_version)` | listener của notification, learning |
+| **Event có version** | Tên exchange, routing key, payload nằm ở `common-events`, có hậu tố `.v1`, `.v2`; đổi event phải đổi contract cùng lúc | `docs/contracts/` |
 
-```powershell
-uv tool update-shell
-```
+### Nhất quán và đồng thời
 
-Cài Graphify bằng `uv`:
+| Pattern | Cách áp dụng | Xem |
+| :-- | :-- | :-- |
+| **Idempotency-Key** | Cấp Premium (Access) và mở khóa course (Learning) bắt buộc khóa này; gửi lại cùng khóa trả kết quả cũ, khác payload trả conflict | `docs/saga-course-unlock-and-human-grading.md` |
+| **Intent bền + đối soát (saga)** | Mở khóa course ghi `PENDING` trước, trừ điểm ở Access bằng cùng khóa, rồi kích hoạt; `ReconcilePendingCourseUnlocks` hoàn tất phần dang dở. Chấm bài người cũng dùng khóa tín dụng ổn định và hoàn điểm khi chắc chắn lỗi | `docs/saga-course-unlock-and-human-grading.md` |
+| **Claim hàng bằng `FOR UPDATE SKIP LOCKED`** | Relay outbox, chấm essay, bản nháp AI chạy an toàn trên nhiều instance | mục "Scheduler và nhiều instance" của system-architecture |
+| **Advisory lock** | Job định kỳ của learning, publish theo lịch của content, khóa theo user (`LearnerLock`, `AdvisoryUserLock`) | cùng mục trên |
+| **Graceful shutdown** | Spring drain 30 giây, scheduler đợi tối đa 20 giây | mục "Dừng một instance" |
 
-```powershell
-uv tool install graphifyy
-graphify --version
-```
+### Realtime
 
-Đăng ký Graphify skill cho Codex trong project hiện tại (tuỳ chọn):
+| Pattern | Cách áp dụng | Xem |
+| :-- | :-- | :-- |
+| **WebSocket ticket ngắn hạn** | Game cấp ticket qua REST, lưu Redis có TTL | `services/game-service` |
+| **Push sau commit, nguồn dữ liệu là DB** | Notification chỉ đẩy STOMP sau commit; Redis pub/sub là kênh không bền, REST dùng để đồng bộ lại khi reconnect | `services/notification-service` |
 
-```powershell
-graphify install --platform codex
-```
+### Quan sát
 
-Tạo knowledge graph từ source code. Chế độ `--code-only` không cần API key hoặc LLM:
+| Pattern | Cách áp dụng | Xem |
+| :-- | :-- | :-- |
+| **Correlation ID** | `X-Correlation-Id` đi qua HTTP, MDC, cột outbox và header AMQP `x-correlation-id` | `shared/common-observability` |
+| **Metrics** | `/actuator/prometheus` trong mạng nội bộ; gauge độ sâu DLQ và outbox | mục "Correlation ID và metric" |
+| **Distributed tracing (tùy chọn)** | Micrometer Tracing + OpenTelemetry, mặc định tắt. Trace context lưu cạnh outbox (`trace_context`) và đi qua RabbitMQ bằng `traceparent`. Stack Loki, Tempo, Alloy, Grafana chạy bằng profile `observability` | mục "Tracing và log tập trung" |
 
-```powershell
-graphify extract . --code-only
-```
+### Quy trình
 
-Tạo trang đồ thị tương tác từ graph đã sinh:
+| Pattern | Cách áp dụng | Xem |
+| :-- | :-- | :-- |
+| **Contract-first** | Hợp đồng endpoint và event nằm trong `docs/contracts/`; đổi hành vi phải cập nhật contract cùng PR | `docs/contracts/` |
 
-```powershell
-graphify export html --graph .\graphify-out\graph.json
-```
+---
 
-Cập nhật đồ thị sau khi code thay đổi (Incremental Update):
+## 🛠️ Công Nghệ
 
-Sau khi thêm mới hoặc sửa đổi code, chạy lệnh cập nhật gia tăng để cập nhật graph nhanh chóng mà không cần extract lại toàn bộ từ đầu:
+| Thành phần | Công nghệ |
+| :-- | :-- |
+| Ngôn ngữ, build | Java 21, Maven 3.9+ (multi-module) |
+| Framework | Spring Boot 3.5.14, Spring Cloud 2025.0.0 (Gateway WebFlux, Eureka, Config) |
+| Dữ liệu | PostgreSQL 15, Spring Data JPA, Flyway, Redis 7 |
+| Messaging | RabbitMQ 3.13 (Spring AMQP) |
+| Bảo mật | Spring Security, JWT HMAC, BCrypt |
+| Resilience | Resilience4j 2.4.0 |
+| Quan sát | Micrometer, OpenTelemetry; Prometheus, Loki, Tempo, Alloy, Grafana (tùy chọn) |
+| Lưu file | Supabase Storage |
+| Kiểm thử | JUnit 5, Mockito, Testcontainers |
+| Chạy | Docker, Docker Compose |
 
-```powershell
-graphify update .
-```
+---
 
-Nếu vừa refactor lớn hoặc xóa nhiều file, dùng cờ `--force`:
+## ⚡ Chạy Nhanh
 
-```powershell
-graphify update . --force
-```
+Cần JDK 21, Maven 3.9+ và Docker.
 
-Sau khi update, chạy lại lệnh xuất HTML để đồng bộ giao diện hiển thị:
-
-```powershell
-graphify export html --graph .\graphify-out\graph.json
-```
-
-Truy vấn và phân tích quan hệ codebase qua CLI:
-
-```powershell
-graphify query "<câu hỏi về codebase>"
-graphify explain "<khái niệm hoặc symbol>"
-graphify path "<symbol A>" "<symbol B>"
-graphify affected "<symbol thay đổi>"
-```
-
-Kết quả nằm trong `graphify-out/`:
-
-- `graph.json`: knowledge graph dùng với các lệnh như `graphify query`, `graphify path` và `graphify explain`.
-- `graph.html`: trang đồ thị tương tác, có thể mở trực tiếp bằng trình duyệt.
-- `cache/`: cache nội bộ; `cache/stat-index.json` không phải graph hoàn chỉnh.
-
-Nếu đã cấu hình API key/backend LLM, có thể bỏ `--code-only` để Graphify bổ sung các quan hệ semantic. Repo đã có `.graphifyignore` để bỏ qua artifact Graphify và markdown khi build graph.
-
-### 3. Biên Dịch Dự Án (Build Codebase)
-
-Mở terminal tại thư mục gốc của dự án và chạy:
-
-```bash
-mvn clean compile -DskipTests
-```
-
-Kiểm thử riêng tên event, payload và helper retry:
+1. Tạo `.env` ở thư mục gốc (đã gitignore). Compose bắt buộc sáu biến: `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `EXTERNAL_JWT_SECRET`, `GATEWAY_INTERNAL_JWT_SECRET`. Hai secret JWT là Base64, tối thiểu 32 byte.
+2. Kiểm cấu hình và khởi chạy toàn stack:
 
 ```bash
-mvn -q -pl shared/common-events test
-```
-
-*(Nếu hiển thị `BUILD SUCCESS` là toàn bộ cấu trúc dự án và các module con đã hợp lệ).*
-
-### 4. Khởi Chạy Backend Với Docker
-
-Compose khởi chạy PostgreSQL (mỗi service vẫn có database riêng), RabbitMQ, Config Server, Eureka, Gateway và các
-service đã triển khai. Các database schema và dữ liệu demo được nạp bởi Flyway; tài khoản và điểm demo bật mặc định
-trong môi trường local. Đặt biến môi trường của §6 trong `.env` ở root, kiểm cấu hình rồi khởi chạy:
-
-```powershell
 docker compose config --quiet
 docker compose up -d --build
 ```
 
-PostgreSQL được publish ở host port `5440` và chứa database riêng cho user, content, assessment, access, learning,
-library, game, community và notification. `docker compose down` giữ dữ liệu; thêm `-v` để xóa database và khởi tạo lại toàn bộ seed.
+3. Mở Gateway `http://localhost:8080`, Swagger `http://localhost:8080/swagger-ui.html`, Eureka `http://localhost:8761`, RabbitMQ UI `http://localhost:15673`. PostgreSQL ở host port `5440`.
 
-**Cạm bẫy khi dùng volume PostgreSQL cũ:** `infra/postgres/init-databases.sql` chỉ chạy khi volume `postgres-data` được khởi tạo lần đầu. Nếu đã có volume trước khi thêm Notification Service, cần tạo database một lần thủ công nếu chưa có: `docker compose exec postgres psql -U postgres -d postgres -c "CREATE DATABASE notification_db;"`. Không chạy lệnh nếu database đã tồn tại.
-
-Sau khi tạo lại container Gateway, chờ khoảng 1–2 phút để Eureka cập nhật định tuyến trước khi kiểm tra các route qua Gateway.
-
-### 5. Quản Lý Schema Bằng Flyway
-
-Với service sử dụng Flyway, migration tự chạy khi service khởi động. Khi thay đổi schema:
-
-1. Thêm file SQL vào `services/<service-name>/src/main/resources/db/migration/`.
-2. Đặt tên theo mẫu `V<version>__<short_description>.sql`: version tăng dần, mô tả viết thường và dùng dấu gạch dưới; ví dụ `V1__create_initial_schema.sql`.
-3. Không sửa migration đã được áp dụng; tạo migration mới với version tiếp theo cho mọi thay đổi schema.
-
-### 6. Chạy Luồng Chính Local (học bài → đề cuối → Learning Service)
-
-Luồng: học viên gọi `GET /api/learning/topics` → học từng bài, nộp khối bài tập (`/api/learning/lessons/**`) → bài ôn khi
-KP yếu (`/api/learning/reviews/**`) → nhận mã đề (`POST /api/learning/topics/{id}/test-assignments`) → làm đề ở
-`/api/assessments/**` → outbox → RabbitMQ → consumer của Learning Service ghi bằng chứng và mở topic kế. Mọi service
-Java chạy trên host (IDE hoặc `java -jar`); Compose chỉ chạy DB và RabbitMQ. Contract: `docs/contracts/lesson-learning-v1.md`,
-`lesson-writing-v1.md`, `assessment-completed-v2.md`.
-
-**Biến môi trường** (đặt trong `.env` ở root, file này đã được gitignore; không commit giá trị):
-
-| Biến | Dùng cho |
-| --- | --- |
-| `POSTGRES_PASSWORD` | Mật khẩu PostgreSQL dùng bởi các database riêng của từng service; host port mặc định `5440` |
-| `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | Broker trong compose; assessment và Learning Service trên host phải dùng đúng cặp này (mặc định `guest` sẽ fail) |
-| `GATEWAY_INTERNAL_JWT_SECRET` | Gateway và toàn bộ downstream service phải dùng cùng giá trị, lệch sẽ trả 401 |
-| `EXTERNAL_JWT_SECRET` | User Service ký token, Gateway xác thực |
-| `CONTENT_MEDIA_BASE_URL` | Prefix https của bucket chứa mp3 Listening; thiếu thì bài Listening trả 500 `INVALID_MEDIA_REFERENCE` |
-| `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` | Endpoint OpenAI-compatible để Learning Service chấm bài luận Writing; thiếu thì nộp bài luận trả 503 `GRADING_UNAVAILABLE`. API key là secret. Gemini: base URL `https://generativelanguage.googleapis.com/v1beta/openai`, model `gemini-3.8-flash` (đã thử 2026-10-02; `gemini-2.5-flash` không còn cấp cho key mới) |
-| `LEARNING_LLM_REASONING_EFFORT` | Mức suy luận gửi cho model. Với `gemini-3.8-flash` đặt `low`: mặc định của client cho `gemini-3*` là `minimal`, model này trả 400 |
-| `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL` | Endpoint OpenAI-compatible để Assessment Service chấm essay trong thi topic/course. Thiếu cấu hình, lỗi LLM hoặc hết hạn mức ngày thì chuyển bài sang EXAMINER; bài thi MOCK vẫn do EXAMINER chấm. API key là secret. |
-| `ASSESSMENT_LLM_DAILY_LIMIT` | Số essay tối đa mỗi học viên mỗi ngày mà Assessment Service gửi chấm AI (mặc định `20`; tính theo ngày `Asia/Ho_Chi_Minh`) |
-
-Nếu mật khẩu có ký tự đặc biệt, hãy percent-encode hoặc chọn giá trị an toàn cho URL, vì nó nằm trong URL DB/AMQP.
-
-**Thứ tự khởi động:**
-
-1. Chạy toàn stack trong container: `docker compose up -d --build`. Init script tạo database riêng cho từng service;
-   Flyway áp schema/seed. User và Access ghi tài khoản/điểm demo khi `DEMO_DATA_ENABLED=true` (mặc định local bật).
-2. Hoặc chạy Java từ IDE: `docker compose up -d postgres rabbitmq`, đặt từng `*_DB_URL` về
-   `jdbc:postgresql://localhost:5440/<service>_db` và password bằng `POSTGRES_PASSWORD`; sau đó chạy Config Server →
-   Eureka → Gateway → các business service. Các Spring module tự nạp `.env` ở root repository.
-3. Mở Swagger tại Gateway `http://localhost:8080/swagger-ui.html`.
-
-Gateway giữ path công khai: `/api/content/videos/**`, `/api/content/vocabulary/**` và
-`/api/content/admin/vocabulary/**` tới library; `/api/learning-support/{flashcards,decks,notes,video-progress,saved-segments}/**`
-tới library; `/api/learning-support/{activities,streak}/**` tới user; `/api/learning/**` tới learning. Gateway chặn
-`/internal/**`. Game chọn snapshot `VOCABULARY` từ library (`LIBRARY_SERVICE_URL` mặc định `http://localhost:8081`),
-`GRAMMAR` từ content. Khi game chạy trên host, đặt `CONTENT_SERVICE_URL=http://localhost:8082` vì Config Server vẫn
-mặc định địa chỉ `http://content-service:8082`. Library kiểm topic video qua Content. Content V7 xóa năm bảng catalog;
-chỉ cho Flyway chạy migration phá hủy này trên Testcontainers cho tới khi có duyệt riêng đối với `content_db` dùng chung.
-
-Nội dung demo Reading, Writing, Listening và lesson nhiều skill nằm trong các migration Content V9–V23. V13 thêm gợi ý
-Reading ở Content; Learning Service trả `hint` cho câu từng sai trong cùng user/bài/khối chưa đạt (câu điền hoặc chọn ≥3 phương án,
-TFNG hỗ trợ options thiếu/rỗng), giữ tới khi khối đạt. Contract: [lesson-learning-v1](docs/contracts/lesson-learning-v1.md).
-Listening cần 8 file mp3 upload
-đúng key dưới `CONTENT_MEDIA_BASE_URL` (danh sách trong `services/content-service/README.md`). Thư mục
-`third_party/deeptutor` chỉ là bản clone để **đọc**: công thức mastery của Learning Service được port từ đó, không
-service nào build hay import thư mục này.
-**Tài khoản demo cho frontend (chỉ dev/demo, mật khẩu công khai):** bật `DEMO_DATA_ENABLED=true` thì user-service và
-access-service tự ghi tài khoản demo sau mỗi lần Flyway chạy (callback `db/callback/afterMigrate__demo_data.sql`). Mặc
-định là `false`; Compose local bật sẵn (đặt `DEMO_DATA_ENABLED=false` để không ghi tài khoản/điểm demo); chạy service từ IDE thì
-thêm `DEMO_DATA_ENABLED=true` vào `.env`. Ghi một lần, khởi động lại không ghi trùng và không nạp lại point đã dùng.
-
-| Tài khoản | userId | Mật khẩu | Ghi chú |
-| --- | --- | --- | --- |
-| `learner@ielts.demo` | `00000000-0000-0000-0000-000000000001` | `Demo@123` | CUSTOMER, ví 30 point (10 lần chấm Writing) |
-| `admin@ielts.demo` | `00000000-0000-0000-0000-000000000002` | `Demo@123` | ADMIN, nạp point qua `POST /api/access/admin/points/adjust` |
-
-Content seed các bài Reading, Listening, Writing, topic nhiều skill và đề placement `PLACEMENT-4SKILLS` qua các Flyway
-migration (V9–V25). Placement test (`GET /api/learning/placement-test`) không bắt buộc: học viên học được mọi course khi chưa làm,
-placement chỉ dùng để gợi ý course và chỉ làm được một lần. Band placement lấy từ
-Listening/Reading quy đổi theo số câu đúng trên 40 (bảng IELTS, không đúng câu nào là band 0), Writing do LLM chấm
-(Task 2 nặng gấp đôi Task 1; band mặc định `assessment.placement.default-writing-band` = 5.5 khi LLM không chấm được)
-và Speaking cố định `assessment.placement.speaking-band` (mặc định 0 cho tới khi chấm được ghi âm). Learning tự
-tạo lộ trình khi học viên gọi `GET /api/learning/topics` lần đầu, nên không cần seed thêm. Không bật cờ demo trên
-database dùng chung hoặc production.
-
-**Tài khoản có quyền (chỉ dev, chỉ trên DB local):**
-
-1. Đăng ký tài khoản qua `POST /api/users/register`. Mọi tài khoản mới đều nhận role `CUSTOMER`.
-2. Hệ thống không seed ADMIN. Gán ADMIN cho tài khoản đầu tiên bằng SQL trên `user_db` local:
-   ```sql
-   INSERT INTO user_roles (user_id, role_id)
-   SELECT u.id, r.id FROM users u JOIN roles r ON r.name = 'ADMIN'
-   WHERE u.email = '<email của admin>'
-   ON CONFLICT DO NOTHING;
-   ```
-   > ⚠️ Không bao giờ chạy lệnh này trên database dùng chung hoặc production.
-3. Admin đăng nhập lại (`POST /auth/login`) để token mang role mới, rồi cấp role khác (ví dụ `EXAMINER`) qua `PUT /api/users/{id}/roles`. Người được cấp cũng phải đăng nhập lại.
-
-Grader (`EXAMINER`/`ADMIN`) chấm qua `/api/assessments/grading/**`, xem `services/assessment-service/README.md`.
-Bằng chứng E2E của lần kiểm chứng gần nhất:
-`plans/260930-2057-mvp-reading-writing-listening-roadmap/reports/e2e-261002-mvp-reading-writing-listening.md`.
-
-**Chạy backend bằng Docker** (không cần IDE, không cần Postgres local): file `docker-compose.yml` dựng config-server,
-Eureka, Gateway, user, content, library, access, assessment, learning, game, community, một PostgreSQL có database riêng
-cho từng service, và RabbitMQ. Community ghi transactional outbox; Notification lưu event vào `notification_db` và push qua
-`/ws/notifications` sau commit. Gateway xác thực JWT trong WebSocket subprotocol.
+Build và test:
 
 ```bash
-docker compose up -d --build  # lần đầu build lâu; sau đó bỏ --build
-docker compose down           # thêm -v để xóa dữ liệu và nạp lại seed
+mvn clean compile -DskipTests   # build cả reactor
+mvn -B verify                    # test đầy đủ, cần Docker cho Testcontainers
 ```
 
-Cần trong `.env`: `POSTGRES_PASSWORD`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `EXTERNAL_JWT_SECRET`,
-`GATEWAY_INTERNAL_JWT_SECRET`; tùy chọn `LEARNING_LLM_*`, `ASSESSMENT_LLM_*` (chấm Writing) và
-`CONTENT_MEDIA_BASE_URL` (mặc định là URL giữ chỗ, audio chưa phát được). Cổng host: Gateway 8080, Eureka 8761,
-Postgres 5440, RabbitMQ 5672/UI 15673; đổi bằng `MVP_GATEWAY_PORT`, `MVP_EUREKA_PORT`, `MVP_POSTGRES_PORT`,
-`RABBITMQ_HOST_PORT`, `MVP_RABBITMQ_UI_PORT` nếu cổng đã được dùng.
-Config-repo được mount chỉ đọc, sửa YAML xong chỉ cần restart service.
+Build, biến môi trường, chạy service trên IDE, tài khoản demo, Swagger và stack quan sát: [`docs/local-development.md`](docs/local-development.md).
 
-**Ghép FE:** thứ tự gọi API và kịch bản luồng học chính ở [`docs/fe-main-flow-guide.md`](docs/fe-main-flow-guide.md).
+---
 
-**Swagger UI của luồng chính:** khi Gateway và các service đã chạy, mở `http://localhost:8080/swagger-ui.html`, chọn
-tài liệu (user, access, assessment, learning) ở ô "Select a definition". Đăng nhập bằng `POST /auth/login`, bấm
-**Authorize** và dán `accessToken` (không kèm chữ `Bearer`); "Try it out" đi qua Gateway như client thật. Tài liệu chỉ
-gồm các route của luồng chính (auth, `/api/learning/**`, `/api/assessments/attempts/**`, point của access) và không có
-`/internal/**`. Schema sinh từ code, mã lỗi nghiệp vụ xem contract. Tắt bằng `API_DOCS_ENABLED=false` ngoài môi trường dev.
+## 📚 Tài Liệu
 
-## 🌿 Quy Chuẩn Đặt Tên Nhánh (Branch Naming Convention)
+| Tài liệu | Nội dung |
+| :-- | :-- |
+| [`docs/system-architecture.md`](docs/system-architecture.md) | Kiến trúc đầy đủ: service, giao tiếp, bảo mật, luồng chính, scheduler, reliability |
+| [`docs/local-development.md`](docs/local-development.md) | Build, Docker, Flyway, biến môi trường, tài khoản demo, Swagger |
+| [`docs/contracts/`](docs/contracts) | Hợp đồng endpoint và event theo từng tính năng |
+| [`docs/saga-course-unlock-and-human-grading.md`](docs/saga-course-unlock-and-human-grading.md) | Idempotency và phục hồi lỗi cho mở khóa course, chấm bài người, cấp Premium |
+| [`docs/graphify-setup.md`](docs/graphify-setup.md) | Cài Graphify để duyệt codebase bằng knowledge graph |
+| [`AGENTS.md`](AGENTS.md) | Quy tắc bắt buộc cho AI agent và người đóng góp |
+| `services/<tên>/README.md` | Endpoint và quy tắc riêng của từng service |
 
-Để team làm việc thống nhất và dễ review code, nên đặt tên nhánh theo quy tắc sau:
+---
 
-### 1. Nguyên tắc chung
+## 🌿 Quy Chuẩn Đặt Tên Nhánh
 
-- Dùng chữ thường, không dấu
-- Dùng kiểu `kebab-case`
-- Bắt đầu bằng prefix mô tả mục đích
-- Nếu có ticket/issue, nên thêm ID vào tên nhánh
-- Không đặt tên quá dài, ưu tiên ngắn gọn nhưng rõ ý nghĩa
+Dạng `<type>/<module>-<mô-tả-ngắn>` hoặc `<type>/<issue-id>-<mô-tả-ngắn>`; chữ thường, không dấu, `kebab-case`, ngắn nhưng rõ ý.
 
-### 2. Prefix khuyến nghị
-
-- `feature/` — thêm tính năng mới
-- `fix/` — sửa bug
-- `hotfix/` — sửa lỗi gấp trên môi trường production
-- `refactor/` — cải tổ code mà không đổi behavior
-- `chore/` — setup, config, cleanup, maintenance
-- `docs/` — cập nhật tài liệu
-- `test/` — thêm hoặc sửa test
-- `perf/` — tối ưu hiệu năng
-- `release/` — chuẩn bị bản phát hành
-
-### 3. Template đề xuất
-
-```text
-<type>/<module>-<short-description>
-<type>/<issue-id>-<short-description>
-```
+`feature/` tính năng mới · `fix/` sửa bug · `hotfix/` lỗi gấp trên production · `refactor/` cải tổ không đổi hành vi · `chore/` setup, cấu hình, dọn dẹp · `docs/` tài liệu · `test/` kiểm thử · `perf/` hiệu năng · `release/` chuẩn bị phát hành.

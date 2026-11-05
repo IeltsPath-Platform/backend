@@ -2,17 +2,14 @@ package com.ieltspath.user.api.controller;
 
 import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.user.application.command.AssignRoleCommand;
-import com.ieltspath.user.application.command.ChangeLearningGoalStatusCommand;
 import com.ieltspath.user.application.command.ChangeUserStatusCommand;
 import com.ieltspath.user.application.command.CreateUserCommand;
 import com.ieltspath.user.application.command.UpdateLearnerProfileCommand;
 import com.ieltspath.user.application.command.UpdateUserCommand;
 import com.ieltspath.user.application.result.AccountActionTokenResult;
 import com.ieltspath.user.application.result.LearnerProfileResult;
-import com.ieltspath.user.application.result.LearningGoalResult;
 import com.ieltspath.user.application.result.OAuthIdentityResult;
 import com.ieltspath.user.application.usecase.AssignRoleUseCase;
-import com.ieltspath.user.application.usecase.ChangeLearningGoalStatusUseCase;
 import com.ieltspath.user.application.usecase.ChangeUserStatusUseCase;
 import com.ieltspath.user.application.usecase.CreateUserUseCase;
 import com.ieltspath.user.application.usecase.DeleteLearnerProfileUseCase;
@@ -20,7 +17,6 @@ import com.ieltspath.user.application.usecase.DeleteUserUseCase;
 import com.ieltspath.user.application.usecase.GetActionTokensByUserIdUseCase;
 import com.ieltspath.user.application.usecase.GetAllUsersUseCase;
 import com.ieltspath.user.application.usecase.GetLearnerProfileUseCase;
-import com.ieltspath.user.application.usecase.GetLearningGoalsByUserIdUseCase;
 import com.ieltspath.user.application.usecase.GetOAuthIdentitiesUseCase;
 import com.ieltspath.user.application.usecase.GetUserByIdUseCase;
 import com.ieltspath.user.application.usecase.RevokeUserActionTokensUseCase;
@@ -111,11 +107,6 @@ class UserManagementControllerSecurityTest {
     private DeleteLearnerProfileUseCase deleteLearnerProfileUseCase;
 
     @MockBean
-    private GetLearningGoalsByUserIdUseCase getLearningGoalsByUserIdUseCase;
-    @MockBean
-    private ChangeLearningGoalStatusUseCase changeLearningGoalStatusUseCase;
-
-    @MockBean
     private GetOAuthIdentitiesUseCase getOAuthIdentitiesUseCase;
     @MockBean
     private UnlinkOAuthIdentityUseCase unlinkOAuthIdentityUseCase;
@@ -150,10 +141,6 @@ class UserManagementControllerSecurityTest {
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/api/users/{id}/profile", userId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + customerToken))
-                .andExpect(status().isForbidden());
-
-        mockMvc.perform(get("/api/users/{id}/learning-goals", userId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + customerToken))
                 .andExpect(status().isForbidden());
 
@@ -348,32 +335,6 @@ class UserManagementControllerSecurityTest {
     }
 
     @Test
-    void adminCanManageLearningGoals() throws Exception {
-        UUID targetId = UUID.randomUUID();
-        UUID goalId = UUID.randomUUID();
-        when(getLearningGoalsByUserIdUseCase.execute(targetId)).thenReturn(List.of(goalResult(targetId, BigDecimal.valueOf(7.0))));
-        when(changeLearningGoalStatusUseCase.execute(any(ChangeLearningGoalStatusCommand.class)))
-                .thenReturn(goalResult(targetId, BigDecimal.valueOf(7.0)));
-        String adminToken = signedToken(INTERNAL_SECRET, UUID.randomUUID(), INTERNAL_ISSUER, List.of("ADMIN"));
-
-        mockMvc.perform(get("/api/users/{id}/learning-goals", targetId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken))
-                .andExpect(status().isOk());
-
-        String body = """
-                {
-                    "status": "ACHIEVED"
-                }
-                """;
-
-        mockMvc.perform(put("/api/users/{id}/learning-goals/{goalId}/status", targetId, goalId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-                .andExpect(status().isOk());
-    }
-
-    @Test
     void adminCanManageOAuthIdentities() throws Exception {
         UUID targetId = UUID.randomUUID();
         when(getOAuthIdentitiesUseCase.execute(targetId)).thenReturn(List.of());
@@ -432,21 +393,6 @@ class UserManagementControllerSecurityTest {
                 BigDecimal.valueOf(7.0),
                 "Asia/Ho_Chi_Minh",
                 "PUBLIC",
-                LocalDateTime.now(),
-                LocalDateTime.now()
-        );
-    }
-
-    private LearningGoalResult goalResult(UUID userId, BigDecimal targetBand) {
-        return new LearningGoalResult(
-                UUID.randomUUID(),
-                userId,
-                targetBand,
-                LocalDate.now().plusMonths(3),
-                60,
-                "ACTIVE",
-                LocalDateTime.now(),
-                null,
                 LocalDateTime.now(),
                 LocalDateTime.now()
         );

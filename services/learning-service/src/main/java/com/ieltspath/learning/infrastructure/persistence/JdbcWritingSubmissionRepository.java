@@ -72,6 +72,15 @@ public class JdbcWritingSubmissionRepository implements WritingSubmissionReposit
     }
 
     @Override
+    public Optional<WritingSubmission> findLatestSentToExaminer(UUID userId, UUID questionVersionId) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM lesson_writing_submissions s WHERE user_id = ? "
+                        + "AND source = 'FREE_WRITING' AND question_version_id = ? AND status = 'AWAITING_EXAMINER' "
+                        + "AND EXISTS (SELECT 1 FROM human_review_requests r WHERE r.submission_id = s.id) "
+                        + "ORDER BY submitted_at DESC, id LIMIT 1",
+                this::submission, userId, questionVersionId).stream().findFirst();
+    }
+
+    @Override
     public Map<UUID, WritingSubmission> latestForPractice(UUID userId, UUID practiceAttemptId) {
         Map<UUID, WritingSubmission> latest = new HashMap<>();
         jdbc.query("SELECT DISTINCT ON (question_version_id) question_version_id AS question, " + COLUMNS

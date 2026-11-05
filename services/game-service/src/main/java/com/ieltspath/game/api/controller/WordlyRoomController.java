@@ -24,7 +24,8 @@ public class WordlyRoomController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public GameRoomResponse create(@Valid @RequestBody CreateWordlyRoomRequest request) {
-        var settings = new WordlyRoomSettings(request.playerMode(), request.initialLives(), request.playMode(), request.wordLimit(), request.timeEnabled() == null || request.timeEnabled());
+        var settings = new WordlyRoomSettings(request.playerMode(), request.initialLives(), request.playMode(), request.wordLimit(), request.timeEnabled() == null || request.timeEnabled(),
+                new com.ieltspath.game.domain.vo.WordFilter(request.cefrLevel(), request.topicId()));
         return GameRoomResponse.from(createRoom.execute(new CreateWordlyRoomCommand(currentUser.requireUserId(), settings)));
     }
 }

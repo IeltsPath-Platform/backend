@@ -74,7 +74,10 @@ public class PracticeProgress {
     public void persistPassed(UUID userId, Map<UUID, Clearance> states) {
         Map<UUID, PracticePassReason> newlyPassed = new HashMap<>();
         states.forEach((id, state) -> {
-            if (state.status() == PracticeStatus.PASSED) newlyPassed.put(id, state.reason());
+            // The soft reason is derived on every read: storing it would make it sticky and break a rollback.
+            if (state.status() == PracticeStatus.PASSED && state.reason() != PracticePassReason.ATTEMPT_NOT_BLOCKED) {
+                newlyPassed.put(id, state.reason());
+            }
         });
         passes.insertIfAbsent(userId, newlyPassed);
     }
@@ -92,7 +95,7 @@ public class PracticeProgress {
         Map<UUID, List<PracticeClearance.ReviewFact>> reviewFacts = new HashMap<>();
         for (PracticeReviewState review : allReviews) {
             reviewFacts.computeIfAbsent(review.lessonId(), ignored -> new ArrayList<>())
-                    .add(new PracticeClearance.ReviewFact(review.status(), review.skill()));
+                    .add(new PracticeClearance.ReviewFact(review.status(), review.skill(), review.blocking()));
         }
         Map<UUID, Clearance> result = new HashMap<>();
         for (var entry : sets.entrySet()) {

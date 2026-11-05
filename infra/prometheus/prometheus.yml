@@ -1,0 +1,60 @@
+# Scrapes every replica of each internal service. dns_sd resolves the compose service name to all running
+# containers, so `docker compose up --scale <service>=N` is picked up without editing this file.
+# The gateway is not scraped: its /actuator endpoints are public on its port, and metrics stay internal.
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: user-service
+    metrics_path: /actuator/prometheus
+    dns_sd_configs:
+      - names: [user-service]
+        type: A
+        port: 8085
+  - job_name: content-service
+    metrics_path: /actuator/prometheus
+    dns_sd_configs:
+      - names: [content-service]
+        type: A
+        port: 8082
+  - job_name: library-service
+    metrics_path: /actuator/prometheus
+    dns_sd_configs:
+      - names: [library-service]
+        type: A
+        port: 8081
+  - job_name: access-service
+    metrics_path: /actuator/prometheus
+    dns_sd_configs:
+      - names: [access-service]
+        type: A
+        port: 8084
+  - job_name: assessment-service
+    metrics_path: /actuator/prometheus
+    dns_sd_configs:
+      - names: [assessment-service]
+        type: A
+        port: 8083
+  - job_name: learning-service
+    metrics_path: /actuator/prometheus
+    dns_sd_configs:
+      - names: [learning-service]
+        type: A
+        port: 8086
+  - job_name: game-service
+    metrics_path: /actuator/prometheus
+    dns_sd_configs:
+      - names: [game-service]
+        type: A
+        port: 8087
+  - job_name: community-service
+    metrics_path: /actuator/prometheus
+    dns_sd_configs:
+      - names: [community-service]
+        type: A
+        port: 8089
+  - job_name: notification-service
+    metrics_path: /actuator/prometheus
+    dns_sd_configs:
+      - names: [notification-service]
+        type: A
+        port: 8088

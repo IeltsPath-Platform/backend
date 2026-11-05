@@ -1,6 +1,8 @@
 package com.ieltspath.notification.infrastructure;
 
 import com.ieltspath.events.community.CommunityEvent;
+import com.ieltspath.events.community.CommunityMessaging;
+import com.ieltspath.events.messaging.MessageHeaders;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.notification.application.RecordCommunityEventUseCase;
@@ -12,7 +14,6 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -21,7 +22,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-/** AMQP adapter: decodes a community event, hands it to the use case, then acks, parks or requeues the message. */
+/**
+ * AMQP adapter: decodes a community event, hands it to the use case, then acks, parks or requeues the message.
+ * It keeps its own retry and park logic instead of {@code MessageRetry}: it acknowledges only after the broker confirms the
+ * parked copy, and it requeues on its own when that confirmation fails, which the shared helper does not do.
+ */
 @Component
 public class CommunityEventConsumer {
     private static final Logger log = LoggerFactory.getLogger(CommunityEventConsumer.class);
@@ -29,14 +34,14 @@ public class CommunityEventConsumer {
     private static final int MAX_RETRIES = 2;
     private final ObjectMapper mapper;
     private final RecordCommunityEventUseCase recordEvent;
-    private final SimpMessagingTemplate socket;
+    private final NoticePushBridge noticePush;
     private final RabbitTemplate rabbit;
 
     public CommunityEventConsumer(ObjectMapper mapper, RecordCommunityEventUseCase recordEvent,
-                                  SimpMessagingTemplate socket, RabbitTemplate rabbit) {
+                                  NoticePushBridge noticePush, RabbitTemplate rabbit) {
         this.mapper = mapper;
         this.recordEvent = recordEvent;
-        this.socket = socket;
+        this.noticePush = noticePush;
         this.rabbit = rabbit;
     }
 
@@ -49,11 +54,11 @@ public class CommunityEventConsumer {
             channel.basicAck(tag, false);
             stored.ifPresent(n -> push(n.recipientId(), n.id(), n.actorId(), n.eventType(), n.postId(), n.createdAt()));
         } catch (IllegalArgumentException | com.fasterxml.jackson.core.JsonProcessingException bad) {
-            park(channel, tag, "community.events.dlx", "community.notifications.v1.dlq", message);
+            park(channel, tag, "community.events.dlx", CommunityMessaging.NOTIFICATIONS_DLQ, message);
         } catch (Exception transientFailure) {
             Object attemptsValue = message.getMessageProperties().getHeaders().get("community-retry-count");
             int attempts = attemptsValue instanceof Number n ? n.intValue() : 0;
-            if (attempts >= MAX_RETRIES) park(channel, tag, "community.events.dlx", "community.notifications.v1.dlq", message);
+            if (attempts >= MAX_RETRIES) park(channel, tag, "community.events.dlx", CommunityMessaging.NOTIFICATIONS_DLQ, message);
             else {
                 message.getMessageProperties().setHeader("community-retry-count", attempts + 1);
                 park(channel, tag, "community.events.retry", "retry." + message.getMessageProperties().getReceivedRoutingKey(), message);
@@ -68,10 +73,8 @@ public class CommunityEventConsumer {
     }
 
     private void push(UUID recipient, UUID id, UUID actor, String type, UUID post, Instant at) {
-        try {
-            socket.convertAndSendToUser(recipient.toString(), "/queue/notifications", Map.of("id", id, "actorId", actor,
-                    "eventType", type, "postId", post == null ? "" : post.toString(), "createdAt", at.toString()));
-        } catch (RuntimeException ignored) { /* REST reconciliation remains authoritative after push failure. */ }
+        noticePush.pushToUser(recipient, Map.of("id", id, "actorId", actor,
+                "eventType", type, "postId", post == null ? "" : post.toString(), "createdAt", at.toString()));
     }
 
     /**
@@ -79,6 +82,9 @@ public class CommunityEventConsumer {
      * If parking itself fails, the message is requeued after a pause so a broker problem cannot spin the consumer.
      */
     private void park(Channel channel, long tag, String exchange, String routingKey, Message message) throws IOException {
+        // The dead-letter routing key replaces the original one, so keep the original where a replay can find it.
+        message.getMessageProperties().setHeader(MessageHeaders.ORIGINAL_ROUTING_KEY,
+                message.getMessageProperties().getReceivedRoutingKey());
         try {
             publishConfirmed(exchange, routingKey, message);
             channel.basicAck(tag, false);

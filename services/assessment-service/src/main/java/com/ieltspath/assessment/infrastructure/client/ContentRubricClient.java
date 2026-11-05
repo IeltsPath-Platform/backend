@@ -3,6 +3,10 @@ package com.ieltspath.assessment.infrastructure.client;
 import com.ieltspath.assessment.application.exception.ContentUnavailableException;
 import com.ieltspath.assessment.application.port.ActiveRubricProvider;
 import com.ieltspath.assessment.infrastructure.client.GatewayRequestContext;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -15,14 +19,20 @@ import java.time.Duration;
 public class ContentRubricClient implements ActiveRubricProvider {
     private final RestClient client;
     private final AssessmentServiceTokenProvider serviceTokens;
+    private final ResilientCall resilientCall;
+    @Autowired
     public ContentRubricClient(RestClient.Builder builder,
             @Value("${assessment.content.base-url:http://localhost:8082}") String baseUrl,
-            AssessmentServiceTokenProvider serviceTokens) {
+            AssessmentServiceTokenProvider serviceTokens, ResilientCall resilientCall) {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(2));
         factory.setReadTimeout(Duration.ofSeconds(5));
         client = builder.requestFactory(factory).baseUrl(baseUrl).build();
         this.serviceTokens = serviceTokens;
+        this.resilientCall = resilientCall;
+    }
+    ContentRubricClient(RestClient.Builder builder, String baseUrl, AssessmentServiceTokenProvider tokens) {
+        this(builder, baseUrl, tokens, ResilientCall.isolatedDefault());
     }
     @Override public Rubric getActive(String task) { return get("/internal/learning-content/rubrics/active?task=" + task); }
     @Override public Rubric getVersion(String code, String version) {
@@ -30,12 +40,14 @@ public class ContentRubricClient implements ActiveRubricProvider {
     }
     private Rubric get(String path) {
         try {
-            Rubric rubric = client.get().uri(path).header(HttpHeaders.AUTHORIZATION,
+            Rubric rubric = resilientCall.call("content", CallKind.READ, () -> client.get().uri(path).header(HttpHeaders.AUTHORIZATION,
                     serviceTokens.authorizationHeader())
-                    .header("X-Correlation-Id", GatewayRequestContext.correlationId()).retrieve().body(Rubric.class);
+                    .header("X-Correlation-Id", GatewayRequestContext.correlationId()).retrieve().body(Rubric.class));
             if (rubric == null || rubric.criteria() == null || rubric.criteria().isEmpty())
                 throw new ContentUnavailableException("Content Service returned no usable rubric");
             return rubric;
+        } catch (DownstreamUnavailableException exception) {
+            throw new ContentUnavailableException("Content Service could not provide the rubric", exception);
         } catch (RestClientException exception) {
             throw new ContentUnavailableException("Content Service could not provide the rubric", exception);
         }

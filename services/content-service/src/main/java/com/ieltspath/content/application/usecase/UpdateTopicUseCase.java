@@ -41,6 +41,12 @@ public class UpdateTopicUseCase {
             courseRepository.findById(command.courseId())
                     .orElseThrow(() -> new CourseNotFoundException(command.courseId()));
         }
+        if (command.courseId() != null || topic.getCourseId() != null) {
+            var effectiveSkill = command.skill() == null ? topic.getSkill() : command.skill();
+            if (effectiveSkill == null || effectiveSkill == com.ieltspath.content.domain.vo.Skill.ALL) {
+                throw new IllegalArgumentException("A course topic must have exactly one skill");
+            }
+        }
 
         boolean moved = !java.util.Objects.equals(command.parentTopicId(), topic.getParentTopicId())
                 || command.sortOrder() != topic.getSortOrder();
@@ -49,7 +55,7 @@ public class UpdateTopicUseCase {
         }
 
         topic.update(command.parentTopicId(), command.name(), command.sortOrder(), command.status(),
-                command.band());
+                command.band(), command.description());
         if (command.skill() != null && command.skill() != topic.getSkill()) {
             topic.changeSkill(command.skill());
         }
@@ -67,7 +73,8 @@ public class UpdateTopicUseCase {
                 saved.getUpdatedAt(),
                 saved.getBand(),
                 saved.getSkill(),
-                saved.getCourseId()
+                saved.getCourseId(),
+                saved.getDescription()
         );
     }
 }

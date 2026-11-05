@@ -160,4 +160,193 @@ class CourseDraftCodecTest {
 
         assertEquals(plan, codec.read(codec.write(plan)));
     }
+
+    @Test
+    void aLessonKeepsItsMarkdownSummaryMinutesAndResources() throws Exception {
+        String lesson = "{\"code\":\"L1\",\"title\":\"Lesson\",\"summaryMarkdown\":\"- one\\n- two\",\"estimatedMinutes\":15,"
+                + "\"resources\":[{\"type\":\"SLIDE\",\"title\":\"Deck\",\"url\":\"https://slides.example/deck\"},"
+                + "{\"type\":\"DOCUMENT\",\"title\":\"Sheet\",\"url\":\"https://docs.example/sheet\"}]}";
+
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals("- one\n- two", read.summaryMarkdown());
+        assertEquals(15, read.estimatedMinutes());
+        assertEquals(2, read.resources().size());
+        assertEquals("https://slides.example/deck", read.resources().get(0).url());
+    }
+
+    @Test
+    void aDraftWithoutTheNewLessonFieldsStillReads() throws Exception {
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson("L1") + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals(null, read.summaryMarkdown());
+        assertEquals(null, read.estimatedMinutes());
+        assertEquals(List.of(), read.resources());
+    }
+
+    @Test
+    void badLessonMinutesAndResourceLinksAreReportedWithTheirPath() throws Exception {
+        String lesson = "{\"code\":\"L1\",\"title\":\"Lesson\",\"estimatedMinutes\":0,"
+                + "\"resources\":[{\"type\":\"SLIDE\",\"title\":\"Deck\",\"url\":\"ftp://nope\"},"
+                + "{\"type\":\"DOCUMENT\",\"title\":\" \",\"url\":\"https://ok.example\"}]}";
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".lessons[0].estimatedMinutes") && p.problem().equals("OUT_OF_RANGE")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources[0].url") && p.problem().equals("INVALID")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources[1].title")));
+    }
+
+    @Test
+    void aLessonMayHaveOnlyOneSlide() throws Exception {
+        String lesson = "{\"code\":\"L1\",\"title\":\"Lesson\",\"resources\":["
+                + "{\"type\":\"SLIDE\",\"title\":\"A\",\"url\":\"https://slides.example/a\"},"
+                + "{\"type\":\"SLIDE\",\"title\":\"B\",\"url\":\"https://slides.example/b\"},"
+                + "{\"type\":\"DOCUMENT\",\"title\":\"D1\",\"url\":\"https://docs.example/1\"},"
+                + "{\"type\":\"DOCUMENT\",\"title\":\"D2\",\"url\":\"https://docs.example/2\"}]}";
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".resources") && p.problem().equals("TOO_MANY_SLIDES")));
+    }
+
+    private static String word(String lemma, String partOfSpeech, String meaning) {
+        return "{\"lemma\":\"" + lemma + "\",\"partOfSpeech\":\"" + partOfSpeech + "\",\"vietnameseMeaning\":\""
+                + meaning + "\",\"exampleSentence\":\"Example.\"}";
+    }
+
+    private static String lessonWith(String fields) {
+        return "{\"code\":\"L1\",\"title\":\"Lesson\"," + fields + "}";
+    }
+
+    @Test
+    void aLessonKeepsItsPickedSensesAndProposedWords() throws Exception {
+        UUID sense = UUID.randomUUID();
+        String lesson = lessonWith("\"vocabularySenseIds\":[\"" + sense + "\"],\"newVocabulary\":[" + word("trend", "NOUN", "xu huong") + "]");
+
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals(List.of(sense), read.vocabularySenseIds());
+        assertEquals("trend", read.newVocabulary().get(0).lemma());
+        assertEquals(read, codec.read(codec.write(codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]")))))
+                .topics().get(0).lessons().get(0));
+    }
+
+    @Test
+    void aDraftWithoutVocabularyReadsAsEmpty() throws Exception {
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson("L1") + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals(List.of(), read.vocabularySenseIds());
+        assertEquals(List.of(), read.newVocabulary());
+    }
+
+    @Test
+    void badProposedWordsAreReportedWithTheirPath() throws Exception {
+        String lesson = lessonWith("\"newVocabulary\":[" + word("", "NOUN", "x") + "," + word("ok", "PRONOUN", "x") + ","
+                + word("fine", "NOUN", " ") + "," + word("12 bad!", "NOUN", "x") + "]");
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary[0].lemma") && p.problem().equals("REQUIRED")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary[1].partOfSpeech") && p.problem().equals("INVALID_VALUE")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary[2].vietnameseMeaning") && p.problem().equals("REQUIRED")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary[3].lemma") && p.problem().equals("INVALID_VALUE")));
+    }
+
+    @Test
+    void vocabularyIsLimitedPerLesson() throws Exception {
+        String words = java.util.stream.IntStream.range(0, 21).mapToObj(n -> word("word", "NOUN", "x"))
+                .collect(java.util.stream.Collectors.joining(","));
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lessonWith("\"newVocabulary\":[" + words + "]") + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newVocabulary") && p.problem().equals("TOO_MANY")));
+    }
+
+    private static String question(String stem, String correct) {
+        return "{\"stem\":\"" + stem + "\",\"explanation\":\"Because.\",\"correctKey\":\"" + correct + "\",\"difficulty\":\"MEDIUM\","
+                + "\"options\":[{\"optionKey\":\"A\",\"content\":\"x\"},{\"optionKey\":\"B\",\"content\":\"y\"}]}";
+    }
+
+    private String set(String type, String points, String... questions) {
+        return "{\"title\":\"Set\",\"instructions\":\"Read.\",\"passage\":\"A. Text.\",\"questionType\":\"" + type
+                + "\",\"knowledgePointIds\":" + points + ",\"questions\":[" + String.join(",", questions) + "]}";
+    }
+
+    private String lessonWithSets(String... sets) {
+        return lessonWith("\"knowledgePointIds\":[\"" + kp + "\"],\"newPracticeSets\":[" + String.join(",", sets) + "]");
+    }
+
+    @Test
+    void aLessonKeepsThePracticeSetsTheModelWroteForIt() throws Exception {
+        String lesson = lessonWithSets(set("MULTIPLE_CHOICE", "[\"" + kp + "\"]", question("Q1", "A"), question("Q2", "B"), question("Q3", "A")));
+        String body = draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]");
+
+        var read = codec.parse(node(body)).topics().get(0).lessons().get(0);
+
+        assertEquals(1, read.newPracticeSets().size());
+        assertEquals("Set", read.newPracticeSets().get(0).title());
+        assertEquals(3, read.newPracticeSets().get(0).questions().size());
+        assertEquals("A", read.newPracticeSets().get(0).questions().get(0).correctKey());
+        assertEquals(read, codec.read(codec.write(codec.parse(node(body)))).topics().get(0).lessons().get(0));
+    }
+
+    @Test
+    void aDraftWithoutPracticeSetsReadsAsEmpty() throws Exception {
+        var read = codec.parse(node(draft(COURSE, "[" + topic("T1", 1, "[" + lesson("L1") + "]") + "]"))).topics().get(0).lessons().get(0);
+
+        assertEquals(List.of(), read.newPracticeSets());
+    }
+
+    @Test
+    void aBadPracticeSetIsReportedWithItsPath() throws Exception {
+        String bad = set("SHORT_ANSWER", "[\"" + UUID.randomUUID() + "\"]", question("Q1", "Z"), question("", "A"));
+        String lesson = lessonWithSets(bad);
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newPracticeSets[0].questionType") && p.problem().equals("INVALID_VALUE")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newPracticeSets[0].knowledgePointIds") && p.problem().equals("NOT_IN_LESSON")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newPracticeSets[0].questions") && p.problem().equals("TOO_FEW")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".questions[0].correctKey") && p.problem().equals("NOT_AN_OPTION")));
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".questions[1].stem") && p.problem().equals("REQUIRED")));
+    }
+
+    @Test
+    void aQuestionMayTestOnlyPointsOfItsOwnSet() throws Exception {
+        String own = question("Q1", "A").replaceFirst("\\{", "{\"knowledgePointIds\":[\"" + kp + "\"],");
+        String foreign = question("Q2", "A").replaceFirst("\\{", "{\"knowledgePointIds\":[\"" + UUID.randomUUID() + "\"],");
+        String valid = draft(COURSE, "[" + topic("T1", 1, "[" + lessonWithSets(
+                set("MULTIPLE_CHOICE", "[\"" + kp + "\"]", own, question("Q2", "A"), question("Q3", "A"))) + "]") + "]");
+        String invalid = draft(COURSE, "[" + topic("T1", 1, "[" + lessonWithSets(
+                set("MULTIPLE_CHOICE", "[\"" + kp + "\"]", own, foreign, question("Q3", "A"))) + "]") + "]");
+
+        var questions = codec.parse(node(valid)).topics().get(0).lessons().get(0).newPracticeSets().get(0).questions();
+        List<Problem> problems = problemsOf(invalid);
+
+        assertEquals(List.of(kp), questions.get(0).knowledgePointIds());
+        assertEquals(List.of(), questions.get(1).knowledgePointIds());
+        assertEquals(1, problems.stream().filter(p -> p.path().endsWith(".knowledgePointIds")
+                && p.path().contains(".questions[") && p.problem().equals("NOT_IN_LESSON")).count());
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".questions[1].knowledgePointIds")));
+    }
+
+    @Test
+    void aTrueFalseNotGivenQuestionMustOfferExactlyThoseThreeAnswers() throws Exception {
+        String lesson = lessonWithSets(set("TRUE_FALSE_NOT_GIVEN", "[\"" + kp + "\"]", question("Q1", "A"), question("Q2", "A"), question("Q3", "A")));
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".questions[0].options") && p.problem().equals("INVALID_VALUE")));
+    }
+
+    @Test
+    void practiceSetsAreLimitedPerLesson() throws Exception {
+        String one = set("MULTIPLE_CHOICE", "[\"" + kp + "\"]", question("Q1", "A"), question("Q2", "A"), question("Q3", "A"));
+        String lesson = lessonWithSets(one, one, one, one);
+
+        List<Problem> problems = problemsOf(draft(COURSE, "[" + topic("T1", 1, "[" + lesson + "]") + "]"));
+
+        assertTrue(problems.stream().anyMatch(p -> p.path().endsWith(".newPracticeSets") && p.problem().equals("TOO_MANY")));
+    }
 }

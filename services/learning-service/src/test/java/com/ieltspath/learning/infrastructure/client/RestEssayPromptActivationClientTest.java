@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.client.ExpectedCount.times;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
@@ -52,7 +53,7 @@ class RestEssayPromptActivationClientTest {
     }
 
     @Test void outageCannotBeMistakenForMissingActivation() {
-        server.expect(requestTo("http://assessment.test/internal/assessments/ai-prompt-activations?task=TASK_2"))
+        server.expect(times(2), requestTo("http://assessment.test/internal/assessments/ai-prompt-activations?task=TASK_2"))
                 .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
         assertEquals("PROMPT_VERSION_UNAVAILABLE", assertThrows(LearningRequestException.class,
                 () -> client.activatedVersion("TASK_2")).getCode());

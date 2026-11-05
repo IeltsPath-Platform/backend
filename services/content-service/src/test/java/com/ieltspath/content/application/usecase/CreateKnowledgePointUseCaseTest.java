@@ -62,6 +62,19 @@ class CreateKnowledgePointUseCaseTest {
     }
 
     @Test
+    void rejectsSkillMismatchForKnowledgePointsInCourseTopics() {
+        UUID topicId = UUID.randomUUID();
+        Topic topic = new Topic(topicId, null, "TOPIC", "Topic", 1, ContentStatus.ACTIVE,
+                null, Skill.WRITING, Instant.now(), Instant.now(), UUID.randomUUID());
+        when(knowledgePointRepository.existsByCode("S60_PART2_LONG_TURN")).thenReturn(false);
+        when(topicRepository.findById(topicId)).thenReturn(Optional.of(topic));
+
+        assertThatThrownBy(() -> useCase.execute(new CreateKnowledgePointCommand(topicId, "S60_PART2_LONG_TURN",
+                "Long turn", KnowledgePointKind.STRATEGY, LearningType.PROCEDURE, Skill.SPEAKING, null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must match its skill");
+    }
+
+    @Test
     void speakingPrefixRequiresSpeakingSkill() {
         var command = new CreateKnowledgePointCommand(UUID.randomUUID(), "S60_PART2_LONG_TURN",
                 "Long turn", KnowledgePointKind.STRATEGY, LearningType.PROCEDURE, Skill.READING, null);

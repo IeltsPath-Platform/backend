@@ -8,6 +8,7 @@ import com.ieltspath.content.application.port.ContentGenerationPort;
 import com.ieltspath.content.application.result.GenerationOutcome;
 import com.ieltspath.content.application.result.GenerationReply;
 import com.ieltspath.content.domain.aggregate.AiDraft;
+import com.ieltspath.content.domain.aggregate.ErrorType;
 import com.ieltspath.content.domain.aggregate.KnowledgePoint;
 import com.ieltspath.content.domain.repository.ErrorTypeRepository;
 import com.ieltspath.content.domain.repository.KnowledgePointRepository;
@@ -23,10 +24,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -48,7 +51,7 @@ class QuestionDraftGeneratorTest {
         assertEquals(1, result.path("items").size());
         assertEquals("CORRECT_NOT_AN_OPTION", result.path("rejected").get(0).path("reason").asText());
         assertEquals("CHOICE", result.path("items").get(0).path("answerSpec").path("type").asText());
-        assertEquals("QUESTIONS-v1", outcome.promptVersion());
+        assertEquals(QuestionDraftPromptBuilder.VERSION, outcome.promptVersion());
     }
 
     @Test
@@ -82,20 +85,73 @@ class QuestionDraftGeneratorTest {
                 result.path("rejected").get(1).path("reason").asText()));
     }
 
+    @Test
+    void aWrongOptionNamingAnUnknownCodeLosesTheLabelAndKeepsTheQuestion() throws Exception {
+        String reply = "{\"items\":[{\"stem\":\"Q1\",\"explanation\":\"E\",\"options\":[{\"optionKey\":\"A\",\"content\":\"x\"},"
+                + "{\"optionKey\":\"B\",\"content\":\"y\"}],\"correct\":\"A\",\"distractors\":{\"B\":\"MADE_UP\"}}]}";
+
+        GenerationOutcome outcome = generator(reply, List.of(errorType("KNOWN_CODE"))).generate(
+                draft(QuestionType.MULTIPLE_CHOICE, 1));
+
+        JsonNode result = json.readTree(outcome.resultJson());
+        assertEquals(1, result.path("items").size());
+        assertEquals(0, result.path("rejected").size());
+        assertFalse(result.path("items").get(0).path("answerSpec").has("distractors"));
+    }
+
+    @Test
+    void aWrongOptionNamingAnApprovedCodeKeepsItsLabel() throws Exception {
+        String reply = "{\"items\":[{\"stem\":\"Q1\",\"explanation\":\"E\",\"options\":[{\"optionKey\":\"A\",\"content\":\"x\"},"
+                + "{\"optionKey\":\"B\",\"content\":\"y\"}],\"correct\":\"A\",\"distractors\":{\"B\":\"KNOWN_CODE\"}}]}";
+
+        GenerationOutcome outcome = generator(reply, List.of(errorType("KNOWN_CODE"))).generate(
+                draft(QuestionType.MULTIPLE_CHOICE, 1));
+
+        JsonNode result = json.readTree(outcome.resultJson());
+        assertEquals("KNOWN_CODE", result.path("items").get(0).path("answerSpec").path("distractors").path("B").asText());
+    }
+
+    @Test
+    void thePromptNamesTheApprovedCodesTheModelMayUse() throws Exception {
+        AtomicReference<String> prompt = new AtomicReference<>();
+        ContentGenerationPort model = sent -> {
+            prompt.set(sent);
+            return new GenerationReply("{\"items\":[{\"stem\":\"\"}]}", "m-1");
+        };
+        assertThrows(ContentGenerationException.class, () -> generator(model, List.of(errorType("KNOWN_CODE")))
+                .generate(draft(QuestionType.MULTIPLE_CHOICE, 1)));
+
+        assertTrue(prompt.get().contains("- KNOWN_CODE: Known name"), prompt.get());
+    }
+
     private static String item(String stem) {
         return "{\"stem\":\"" + stem + "\",\"explanation\":\"E\",\"options\":[{\"optionKey\":\"A\",\"content\":\"x\"},"
                 + "{\"optionKey\":\"B\",\"content\":\"y\"}],\"correct\":\"A\"}";
     }
 
+    private static ErrorType errorType(String code) {
+        ErrorType type = mock(ErrorType.class);
+        when(type.getCode()).thenReturn(code);
+        when(type.getName()).thenReturn("Known name");
+        return type;
+    }
+
     private QuestionDraftGenerator generator(String modelReply, String... existingStems) {
-        ContentGenerationPort model = prompt -> new GenerationReply(modelReply, "m-1");
+        return generator(prompt -> new GenerationReply(modelReply, "m-1"), List.of(), existingStems);
+    }
+
+    private QuestionDraftGenerator generator(String modelReply, List<ErrorType> codes) {
+        return generator(prompt -> new GenerationReply(modelReply, "m-1"), codes);
+    }
+
+    private QuestionDraftGenerator generator(ContentGenerationPort model, List<ErrorType> codes, String... existingStems) {
         KnowledgePointRepository points = mock(KnowledgePointRepository.class);
         KnowledgePoint point = mock(KnowledgePoint.class);
         when(point.getStatus()).thenReturn(ContentStatus.ACTIVE);
         when(point.getName()).thenReturn("Paraphrase");
         when(points.findById(kpId)).thenReturn(Optional.of(point));
         ErrorTypeRepository errorTypes = mock(ErrorTypeRepository.class);
-        when(errorTypes.findApprovedActive()).thenReturn(List.of());
+        when(errorTypes.findApprovedActive()).thenReturn(codes);
         com.ieltspath.content.application.port.QuestionStemReader stems = id -> List.of(existingStems);
         return new QuestionDraftGenerator(model, points, errorTypes, stems, json, new ContentAiProperties());
     }

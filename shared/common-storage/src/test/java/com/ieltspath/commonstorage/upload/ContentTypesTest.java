@@ -39,6 +39,7 @@ class ContentTypesTest {
         assertThat(ContentTypes.extensionFor("audio/ogg")).isEqualTo("ogg");
         assertThat(ContentTypes.extensionFor("audio/mpeg")).isEqualTo("mp3");
         assertThat(ContentTypes.extensionFor("audio/wav")).isEqualTo("wav");
+        assertThat(ContentTypes.extensionFor("application/pdf")).isEqualTo("pdf");
         assertThatThrownBy(() -> ContentTypes.extensionFor("image/svg+xml"))
                 .isInstanceOf(IllegalArgumentException.class);
     }

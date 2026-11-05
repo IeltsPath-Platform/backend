@@ -9,17 +9,22 @@ import java.util.UUID;
 
 public record LessonResult(UUID lessonId, UUID topicId, String code, String title, String summary,
                            int sortOrder, String status, List<Block> blocks, LearningSkill skill,
-                           Set<LearningSkill> skills) {
+                           Set<LearningSkill> skills, UUID courseId, Integer skillPosition) {
     public LessonResult {
         skills = skills == null ? (skill == null ? Set.of() : Set.of(skill)) : skills;
     }
     public LessonResult(UUID lessonId, UUID topicId, String code, String title, String summary,
                         int sortOrder, String status, List<Block> blocks, LearningSkill skill) {
-        this(lessonId, topicId, code, title, summary, sortOrder, status, blocks, skill, null);
+        this(lessonId, topicId, code, title, summary, sortOrder, status, blocks, skill, null, null, null);
+    }
+    public LessonResult(UUID lessonId, UUID topicId, String code, String title, String summary,
+                        int sortOrder, String status, List<Block> blocks, LearningSkill skill,
+                        Set<LearningSkill> skills) {
+        this(lessonId, topicId, code, title, summary, sortOrder, status, blocks, skill, skills, null, null);
     }
     public LessonResult(UUID lessonId, UUID topicId, String code, String title, String summary,
                         int sortOrder, String status, List<Block> blocks) {
-        this(lessonId, topicId, code, title, summary, sortOrder, status, blocks, null);
+        this(lessonId, topicId, code, title, summary, sortOrder, status, blocks, null, null, null, null);
     }
     /**
      * {@code blockKind} is set on exercise blocks; an essay block carries {@code essay} instead of questions, the

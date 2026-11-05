@@ -8,6 +8,7 @@ import com.ieltspath.learning.application.port.LearningContentClient.PracticeSet
 import com.ieltspath.learning.application.port.LearningContentClient.Section;
 import com.ieltspath.learning.application.result.LessonResult;
 import com.ieltspath.learning.application.result.ReviewResult;
+import com.ieltspath.learning.application.result.ErrorTrapResult;
 import com.ieltspath.learning.application.service.DiagnosticFlow;
 import com.ieltspath.learning.application.service.FirstAttemptMistakes;
 import com.ieltspath.learning.domain.repository.DiagnosticRepository;
@@ -15,14 +16,19 @@ import com.ieltspath.learning.domain.vo.DiagnosticSession;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.PracticeProgress;
 import com.ieltspath.learning.application.service.TheoryFocus;
+import com.ieltspath.learning.application.service.ErrorTrapCatalog;
+import com.ieltspath.learning.application.service.ErrorTypeTexts;
 import com.ieltspath.learning.domain.aggregate.ReviewItem;
 import com.ieltspath.learning.domain.entity.ReviewSet;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
+import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
+import com.ieltspath.learning.domain.service.MainErrorRule;
 import com.ieltspath.learning.domain.vo.ReviewStage;
 import com.ieltspath.learning.domain.vo.ReviewStatus;
 import com.ieltspath.learning.domain.vo.TheoryReason;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
@@ -48,14 +54,22 @@ public class GetReviewUseCase {
     private final FirstAttemptMistakes mistakes;
     private final DiagnosticRepository diagnostics;
     private final DiagnosticFlow diagnosticFlow;
+    private final ErrorTrapCatalog errorTraps;
+    private final MasteryProfileRepository profiles;
+    private final ErrorTypeTexts errorTypeTexts;
     private final TheoryFocus theoryFocus = new TheoryFocus();
 
+    @Autowired
     public GetReviewUseCase(LearningContentClient content, LearnerLock lock, ReviewItemRepository reviews,
                             PracticeAttemptRepository attempts, PracticeProgress practice,
                             FirstAttemptMistakes mistakes, DiagnosticRepository diagnostics,
-                            DiagnosticFlow diagnosticFlow) {
+                            DiagnosticFlow diagnosticFlow, ErrorTrapCatalog errorTraps,
+                            MasteryProfileRepository profiles, ErrorTypeTexts errorTypeTexts) {
         this.diagnostics = diagnostics;
         this.diagnosticFlow = diagnosticFlow;
+        this.errorTraps = errorTraps;
+        this.profiles = profiles;
+        this.errorTypeTexts = errorTypeTexts;
         this.content = content;
         this.lock = lock;
         this.reviews = reviews;
@@ -68,16 +82,18 @@ public class GetReviewUseCase {
     public ReviewResult execute(UUID userId, UUID reviewId) {
         lock.lock(userId);
         ReviewItem review = ownedReview(userId, reviewId);
+        ErrorTrapResult errorTrap = review.status() == ReviewStatus.PENDING
+                ? errorTrap(userId, review.knowledgePointId()) : null;
         var lesson = content.getLesson(review.lessonId());
         var focus = theoryFocus.of(lesson, review.knowledgePointId());
         Optional<DiagnosticSession> diagnosis = diagnostics.findByRootReview(reviewId);
-        if (review.status() != ReviewStatus.PENDING) return result(review, focus, null, List.of(), diagnosis, List.of());
+        if (review.status() != ReviewStatus.PENDING) return result(review, focus, null, List.of(), diagnosis, List.of(), errorTrap);
         // While the learner probes the prerequisites, or waits for the reviews of the gap points, the review gives no set.
         if (diagnosis.isPresent() && diagnosis.get().probing()) {
-            return result(review, focus, null, List.of(), diagnosis, List.of());
+            return result(review, focus, null, List.of(), diagnosis, List.of(), errorTrap);
         }
         List<UUID> waitingOn = diagnostics.pendingWaitingOn(reviewId);
-        if (!waitingOn.isEmpty()) return result(review, focus, null, List.of(), diagnosis, waitingOn);
+        if (!waitingOn.isEmpty()) return result(review, focus, null, List.of(), diagnosis, waitingOn, errorTrap);
         // Practice reviews choose their stage when created; reviews from assessment results are created by the
         // event consumer, which cannot read lessons, so the lesson check happens on first open.
         if (review.blocking() && review.isFresh() && !"PRACTICE".equals(review.triggerKind())
@@ -89,7 +105,7 @@ public class GetReviewUseCase {
             return result(review, focus, null, focus.quickCheck().stream()
                     .map(question -> new LessonResult.Question(question.questionVersionId(), question.sortOrder(),
                             question.stem(), options(question.options()), question.hint())).toList(), diagnosis,
-                    List.of());
+                    List.of(), errorTrap);
         }
         Set<UUID> revealed = attempts.revealedPackageIds(userId);
         if (review.openSet().isPresent() && revealed.contains(review.openSet().orElseThrow().packageId())) {
@@ -97,7 +113,8 @@ public class GetReviewUseCase {
             reviews.deleteOpenSet(userId, reviewId, stale.id());
         }
         if (review.openSet().isEmpty()) {
-            Optional<PracticeSet> next = nextPackage(userId, review.knowledgePointId(), review.lessonId(), revealed);
+            Optional<PracticeSet> next = nextPackage(userId, review.knowledgePointId(), review.lessonId(), revealed,
+                    errorTrap == null ? null : errorTrap.code());
             if (next.isEmpty()) {
                 // No unrevealed eligible package remains, so the learner can continue.
                 review.skip();
@@ -105,7 +122,7 @@ public class GetReviewUseCase {
                 // Skipped first, so a diagnosis that finds a gap does not leave this review waiting.
                 Optional<DiagnosticSession> opened = diagnosticFlow.startWhenOutOfSets(review);
                 practice.refreshPassForLesson(userId, review.lessonId());
-                return result(review, focus, null, List.of(), opened, List.of());
+                return result(review, focus, null, List.of(), opened, List.of(), errorTrap);
             }
             review.assignSet(UUID.randomUUID(), next.get().packageId(), next.get().packageVersionId());
             reviews.save(review);
@@ -120,12 +137,12 @@ public class GetReviewUseCase {
         ReviewResult.Audio audio = first == null || first.audio() == null ? null
                 : new ReviewResult.Audio(first.audio().mediaUrl(), first.audio().durationSeconds());
         return result(review, focus, new ReviewResult.ReviewSet(set.id(), set.packageId(), set.packageVersionId(),
-                first == null ? null : first.passage(), audio, questions), List.of(), diagnosis, List.of());
+                first == null ? null : first.passage(), audio, questions), List.of(), diagnosis, List.of(), errorTrap);
     }
 
     private static ReviewResult result(ReviewItem review, TheoryFocus.Focus focus, ReviewResult.ReviewSet set,
                                        List<LessonResult.Question> quickCheck, Optional<DiagnosticSession> diagnosis,
-                                       List<UUID> waitingOn) {
+                                       List<UUID> waitingOn, ErrorTrapResult errorTrap) {
         boolean probing = review.status() == ReviewStatus.PENDING && diagnosis.isPresent() && diagnosis.get().probing();
         String state = probing ? ReviewResult.DIAGNOSING
                 : !waitingOn.isEmpty() ? ReviewResult.WAITING_ON_PREREQUISITES : ReviewResult.ACTIVE;
@@ -133,7 +150,7 @@ public class GetReviewUseCase {
                 review.knowledgePointId(), review.skill(), review.stage().name(),
                 review.theoryReason() == null ? null : review.theoryReason().name(), focus.scope(),
                 review.failedSets(), null, quickCheck, state, diagnosis.map(DiagnosticSession::id).orElse(null),
-                waitingOn);
+                review.blocking(), waitingOn, errorTrap);
     }
 
     private static List<LessonResult.Option> options(List<LearningContentClient.Option> options) {
@@ -148,10 +165,25 @@ public class GetReviewUseCase {
     }
 
     /** Only a package whose answers the learner has not seen and that no earlier set gave can be assigned. */
-    private Optional<PracticeSet> nextPackage(UUID userId, UUID knowledgePointId, UUID lessonId, Set<UUID> revealed) {
+    private Optional<PracticeSet> nextPackage(UUID userId, UUID knowledgePointId, UUID lessonId, Set<UUID> revealed,
+                                              String trapErrorCode) {
         Set<UUID> excluded = new HashSet<>(revealed);
         excluded.addAll(reviews.assignedPackageIds(userId));
-        return content.searchPracticeSets(knowledgePointId, excluded.stream().toList(), MIN_SET_QUESTIONS, 1, lessonId)
+        List<PracticeSet> candidates = trapErrorCode == null
+                ? content.searchPracticeSets(knowledgePointId, excluded.stream().toList(), MIN_SET_QUESTIONS, 1,
+                        lessonId)
+                : content.searchPracticeSets(knowledgePointId, excluded.stream().toList(), MIN_SET_QUESTIONS, 1,
+                        lessonId, trapErrorCode);
+        return candidates
                 .stream().findFirst();
+    }
+
+    private ErrorTrapResult errorTrap(UUID userId, UUID parentKp) {
+        if (errorTraps == null || profiles == null || errorTypeTexts == null) return null;
+        var traps = errorTraps.load();
+        var code = MainErrorRule.mainErrorCode(parentKp, profiles.findErrorTrapProfiles(userId), traps).orElse(null);
+        if (code == null) return null;
+        ErrorTypeTexts.Text text = errorTypeTexts.byCode().get(code);
+        return text == null ? null : new ErrorTrapResult(code, text.name(), text.fixHint());
     }
 }

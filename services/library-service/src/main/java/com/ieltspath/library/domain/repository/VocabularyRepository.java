@@ -14,5 +14,6 @@ public interface VocabularyRepository {
     List<VocabularySenseCard> findActiveSensesByIds(List<UUID> senseIds);
     Optional<VocabularyItem> findByNormalizedLemma(String normalizedLemma);
     List<VocabularyItem> searchByLemma(String query);
+    List<VocabularyItem> findByNormalizedLemmas(java.util.Collection<String> normalizedLemmas);
     boolean existsByNormalizedLemma(String normalizedLemma);
 }

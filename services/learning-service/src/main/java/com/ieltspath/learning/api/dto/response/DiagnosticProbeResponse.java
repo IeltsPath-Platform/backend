@@ -32,7 +32,7 @@ public record DiagnosticProbeResponse(UUID sessionId, UUID probeId, UUID knowled
             return new Submission(result.probeId(), result.passed(), result.correct(), result.total(),
                     result.results().stream().map(answer -> new SubmissionResponse.SolvedAnswer(
                             answer.questionVersionId(), answer.correct(), answer.correctAnswer(),
-                            answer.explanation())).toList(),
+                            answer.explanation(), null, answer.error())).toList(),
                     result.transcript(), result.sessionStatus(), result.conclusionKnowledgePointIds());
         }
     }

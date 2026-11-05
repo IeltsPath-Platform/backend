@@ -5,6 +5,15 @@
 Access owns point balances and enforces the daily earning limit. All `/internal/**` routes require a verified internal
 service JWT; the Gateway blocks them from public clients.
 
+## Spending points from a service
+
+`POST /internal/access/points/debit` is service-to-service only and requires the caller identity to match `userId`.
+The JSON body is `{userId, amount, referenceType, referenceId, idempotencyKey, description}`; `amount` must be positive,
+`referenceId` is a UUID, and repeating an identical idempotency key returns the existing debit result rather than taking
+Points again. Learning uses `referenceType: "COURSE_UNLOCK"` for durable course-skill purchases; the ledger transaction
+type is `COURSE_UNLOCK_DEBIT`. The caller records a pending purchase before this debit and replays it with the same key
+if the response is lost.
+
 ## Earning points
 
 Points are earned only through the `points.grant.requested` message below. Access exposes no HTTP route that credits

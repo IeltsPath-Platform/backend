@@ -10,7 +10,7 @@
 
 **Vocabulary blocks (2026-10-21):** `GET /lessons/{id}` exposes ordered vocabulary sense IDs; Library resolves their display metadata. Vocabulary is supplemental and does not gate lesson completion or write mastery evidence.
 
-The MVP app displays course, topic and lesson status. The Java Learning Service owns learner placements, course/topic progress, mastery evidence, reviews and test assignments. The placement test is optional: every course is open with or without it, and a placement only recommends a course without changing topic state. Topics form one sequence per course, shared across skills. Reviews still gate work by skill. A course-final-test assignment uses a package code once before rotating; since 2026-10-17 the course is passed by the weighted total score, not by the course test alone ([course-score-v1](course-score-v1.md)), and neither the course test nor a topic test below 70% blocks the next topic. Topic order, course id and skill are stored in `topic_progress`; topic and course pass timestamps are one-way. Tutor, practice notebook, learner memory, learning goals and LLM ordering are removed.
+The MVP app displays course, topic and lesson status. The Java Learning Service owns learner placements, course/topic progress, mastery evidence, reviews and test assignments. The placement test is optional: every course is open with or without it, and a placement only recommends a course without changing topic state. Course topics progress independently per skill, in `sequenceOrder` within each `(courseId, skill)` group; topics without a course share one group. Lesson content uses the separate course-skill paywall below. Reviews still gate work by skill. A course-final-test assignment uses a package code once before rotating; since 2026-10-17 the course is passed by the weighted total score, not by the course test alone ([course-score-v1](course-score-v1.md)), and neither the course test nor a topic test below 70% blocks the next topic. Topic order, course id and skill are stored in `topic_progress`; topic and course pass timestamps are one-way. Tutor, practice notebook, learner memory, learning goals and LLM ordering are removed.
 
 ## Learner routes
 
@@ -44,7 +44,7 @@ All routes in this section have prefix `/api/learning`, require the learner bear
 
 ### `GET /topics`
 
-Refreshes the shared `knowledge_point_catalog` and the user's topic order from one Content `topic-sequence` read. Returns `[{topicId, code, name, sequenceOrder, status, completedLessonCount, accessLevel, skill, hasTopicTest, course}]`, where `course` is `{courseId, code, name, bandLevel}`. `accessLevel` is `FREE`, or `PREMIUM` when Content requires a paid feature for the topic (`requiredFeatureKey`); Learning does not check the learner's plan yet. Topics are ordered by course band, free before premium, topic `sortOrder`, then `topicId`. Within each course, a topic is `PASSED` when `passed_at` exists; otherwise the first unpassed topic is `IN_PROGRESS` and later topics are `LOCKED`, regardless of skill. Topics whose course is not yet known share a separate null-course group. Removed topics have no sequence order and are omitted.
+Refreshes the shared `knowledge_point_catalog` and the user's topic order from one Content `topic-sequence` read. Returns `[{topicId, code, name, description, sequenceOrder, status, completedLessonCount, accessLevel, skill, hasTopicTest, course}]`, where `course` is `{courseId, code, name, bandLevel, coverImageUrl, description}`. The descriptions and `coverImageUrl` are nullable and remain null when returned by an older Content service or unset in Content. `accessLevel` remains for compatibility and is `FREE` for course topics; Premium access is applied at the lesson gate, not as a topic-level lock. Topics are ordered by course band, topic `sortOrder`, then `topicId`. Within each `(courseId, skill)` group, a topic is `PASSED` when `passed_at` exists; otherwise the first unpassed topic is `IN_PROGRESS` and later topics are `LOCKED`. Topics whose course is not yet known share one separate null-course group. Removed topics have no sequence order and are omitted.
 
 ```json
 [
@@ -56,7 +56,15 @@ Refreshes the shared `knowledge_point_catalog` and the user's topic order from o
 
 ### `GET /courses`
 
-Available only to role `CUSTOMER`. Returns courses ordered by `bandLevel` as `[{courseId, code, name, bandLevel, topicCount, passedTopicCount, recommended, testStatus, passedAt}]`. A recommendation uses the learner's latest non-null `overall_band` from a `PLACEMENT` result: the lowest course band at or above it, or the highest course if no band is high enough. Without a placement, no course is recommended. Placement never changes topic status. `testStatus` is `NONE` when the course has no published final test, `LOCKED` while a course topic remains unpassed, `AVAILABLE` once all topics pass, and `PASSED` after the course test reaches 70%.
+Available only to role `CUSTOMER`. Returns courses ordered by `bandLevel` as `[{courseId, code, name, bandLevel, coverImageUrl, description, topicCount, passedTopicCount, completedLessons, totalLessons, lastStudiedAt, recommended, testStatus, skillPrices, comboUnlockPoints, unlockedSkills, comboUnlocked, comboPayablePoints, availableSkills, premium, free}]`. `coverImageUrl` and `description` are nullable. `free` (added 2026-11-03) is true for a course open to everyone: none of its lessons or knowledge points sits behind the course paywall, so no purchase or Premium is needed, a lesson of it is never a `freePreview`, and the course has no `skillPrices` or `comboUnlockPoints`. `skillPrices` maps purchasable `LISTENING`, `READING`, `WRITING` and `SPEAKING` skills to positive Points prices; absent keys are not for sale. `comboUnlockPoints` is the configured full combo price, while `comboPayablePoints` is the server-calculated remaining price after active skill purchases. `unlockedSkills` and `comboUnlocked` report durable ownership; `availableSkills` excludes skills not offered by Content. `premium` reports whether the learner currently has Premium. A recommendation uses the learner's latest non-null `overall_band` from a `PLACEMENT` result: the lowest course band at or above it, or the highest course if no band is high enough. Without a placement, no course is recommended. Placement never changes topic status. `testStatus` is `NONE` when the course has no published final test, `LOCKED` while a course topic remains unpassed, `AVAILABLE` once all topics pass, and `PASSED` after the course test reaches 70%.
+
+### `POST /courses/{id}/unlocks`
+
+Requires role `CUSTOMER`, body `{"target":"LISTENING"}` (or `READING`, `WRITING`, `SPEAKING`, `COMBO`) and a UUID `Idempotency-Key` header. Returns `{courseId, target, pointCost, status, ledgerEntryId}`. The Learning Service stores a pending intent before asking Access to debit Points; retries with the same key replay/reconcile that purchase without a second debit. An insufficient balance cancels the pending intent. `409 ALREADY_UNLOCKED`, `409 NOT_FOR_SALE`, and `409 SKILL_NOT_AVAILABLE` describe refused purchases. `402 INSUFFICIENT_POINTS` means the balance cannot cover the purchase; `503 ACCESS_UNAVAILABLE` means Access could not confirm the debit, so the pending intent is reconciled on retry. Combo payable price is computed from actual active skill purchase costs and cannot be overridden by the client.
+
+### Lesson paywall
+
+Lesson summaries include `paywall` and `freePreview`; `LOCKED` remains the progress status (previous lessons/reviews), so a paywall lock is represented separately. Access is granted in this order: the first three published lessons of each course skill, active skill/combo unlock, grandfathered progress that predates V39, then active Premium. A failed Premium lookup returns `503` only when none of those earlier rules grants access. `GET /lessons/{id}`, resources, practice-set listing, lesson submissions/completion, and free practice use this gate. Free practice refuses a paywalled knowledge point with `403 PAYWALL` before creating an attempt or charging hearts; knowledge tree points carry `locked` and disable free practice while gated. Topics without a course are not paywalled.
 
 ### `GET /placement-test`
 
@@ -80,7 +88,7 @@ Example after Lan completes L1:
 
 ### `GET /topics/{id}/lessons`
 
-The topic must be `IN_PROGRESS` or `PASSED`; otherwise `403 TOPIC_LOCKED`. Returns `{topicId, skill, hasTopicTest, lessons, testStatus}`. Lesson statuses are `LOCKED`, `AVAILABLE`, or `COMPLETED`. A lesson that is not completed is `AVAILABLE` only when every earlier lesson of the topic is `COMPLETED` and its Practice is `PASSED`; otherwise it is `LOCKED`. Each lesson also has `practiceStatus` (`LOCKED`, `REQUIRED`, `PASSED`) and nullable `practicePassReason` (`FIRST_SUBMISSION`, `REVIEW_FINISHED`, `ALL_SETS_ATTEMPTED`, `NO_PRACTICE`). `testStatus` is `LOCKED`, `AVAILABLE`, `PASSED`, or `NONE` when `hasTopicTest=false`. A test is available only after all topic lessons are completed, all their practice statuses are `PASSED`, and no review of the same skill (or unassigned skill) is pending. Completing every published lesson passes a topic without a test.
+Returns `{topicId, skill, hasTopicTest, lessons, testStatus}` for any topic. A `LOCKED` topic still lists its lessons so the course can be read ahead: every lesson is `LOCKED` with `practiceStatus: LOCKED` and no `blockingReviewId`, `paywall` and `freePreview` are computed as for any learner, and `testStatus` is `LOCKED` (`NONE` when the topic has no test). Opening, submitting or completing a lesson of a locked topic still returns `403 TOPIC_LOCKED`. Lesson statuses are `LOCKED`, `AVAILABLE`, or `COMPLETED`. A lesson that is not completed is `AVAILABLE` only when every earlier lesson of the topic is `COMPLETED` and its Practice is `PASSED`; otherwise it is `LOCKED`. Each lesson also has `practiceStatus` (`LOCKED`, `REQUIRED`, `PASSED`) and nullable `practicePassReason` (`FIRST_SUBMISSION`, `REVIEW_FINISHED`, `ALL_SETS_ATTEMPTED`, `NO_PRACTICE`, `ATTEMPT_NOT_BLOCKED`). `testStatus` is `LOCKED`, `AVAILABLE`, `PASSED`, or `NONE` when `hasTopicTest=false`. A test is available only after all topic lessons are completed, all their practice statuses are `PASSED`, and no review of the same skill (or unassigned skill) is pending. Completing every published lesson passes a topic without a test.
 
 ```json
 {
@@ -122,7 +130,7 @@ A `VOCABULARY` block contains `blockId`, `blockType`, `sortOrder`, and the order
 }
 ```
 
-Resolve metadata with Library `GET /api/content/vocabulary/senses?ids=<comma-separated-UUIDs>`. The `ids` parameter must contain 1–100 valid UUIDs; an empty value, malformed UUID, or more than 100 IDs returns `400`. The response is an array in requested-ID order; missing or inactive senses are omitted. Each response object has exactly `senseId`, `vocabularyItemId`, `lemma`, `ipa`, `pronunciationAudioReference`, `partOfSpeech`, `englishDefinition`, `vietnameseMeaning`, `exampleSentence`, and `imageUrl`.
+Resolve metadata with Library `GET /api/content/vocabulary/senses?ids=<comma-separated-UUIDs>`. The `ids` parameter must contain 1–100 valid UUIDs; an empty value, malformed UUID, or more than 100 IDs returns `400`. The response is an array in requested-ID order; missing or inactive senses are omitted. Each response object has exactly `senseId`, `vocabularyItemId`, `lemma`, `ipa`, `pronunciationAudioReference`, `partOfSpeech`, `englishDefinition`, `vietnameseMeaning`, `exampleSentence`, and `imageUrl`. `pronunciationAudioReference` is the preferred audio in US → UK → legacy-column order, returned as a complete HTTPS URL or null.
 
 For flashcards, each sense ID can identify a `VOCABULARY_SENSE` card by `vocabularySenseId` through the existing flashcard module. Card creation, deck UX, and any vocabulary completion policy remain deferred; this adds no review endpoint. Vocabulary SRS does not write `kp_evidence`; `VOCABULARY` mastery continues to come from scored exercises.
 
@@ -179,9 +187,9 @@ Only a lesson with **no** `EXERCISE` block can be completed this way; a lesson w
 
 `GET /practice-attempts/{id}/review` reopens a submitted attempt read-only and returns `{attempt, result}`: `attempt` is the question and essay view of the package version the attempt was pinned to (essays carry the learner's newest submission, graded or not), and `result` is the saved submission response. It exposes nothing the submission did not already show, and the learner's own selected answers are not stored. An attempt that is still open returns `409 ATTEMPT_NOT_SUBMITTED`; another learner's attempt returns 404. Starting the same set again ("Làm lại") is unchanged and creates a new attempt.
 
-`POST /practice-attempts/{id}/submissions` takes `{requestId, answers:[{questionVersionId, answer}]}` with exactly one answer per question. It returns `{attemptId, correct, total, percent, passed, countedAsEvidence, results, transcript?, reviewsCreated}`; each result contains `questionVersionId`, `correct`, `correctAnswer`, `explanation`, and `hint:null`. A Listening transcript appears after submission. A repeated `requestId` returns the saved result; another request for a submitted attempt returns `409 ATTEMPT_ALREADY_SUBMITTED`. Passing is at least 70%. Only the first submission of an unrevealed package writes `practice_set` evidence and can give `FIRST_SUBMISSION`; subsequent practice of that package, including after a submitted review set, is graded and revealed but writes no evidence or review. A counted submission below 70% can create a `PRACTICE` review for each KP below 70% if that KP has no pending review and an unrevealed eligible set remains. Lesson completion itself creates no review.
+`POST /practice-attempts/{id}/submissions` takes `{requestId, answers:[{questionVersionId, answer}]}` with exactly one answer per question. It returns `{attemptId, correct, total, percent, passed, countedAsEvidence, results, transcript?, reviewsCreated}`; each result contains `questionVersionId`, `correct`, `correctAnswer`, `explanation`, and `hint:null`. A Listening transcript appears after submission. A repeated `requestId` returns the saved result; another request for a submitted attempt returns `409 ATTEMPT_ALREADY_SUBMITTED`. Passing is at least 70%. Only the first submission of an unrevealed package writes `practice_set` evidence and can give `FIRST_SUBMISSION`; subsequent practice of that package, including after a submitted review set, is graded and revealed but writes no evidence or review. `reviewsCreated` is a list of `{reviewId, knowledgePointId, stage, blocking}`. A knowledge point is weak in a counted submission below 70% when it has at least 2 wrong answers in that set and its own share is under 70%. A weak point with no pending review and an unrevealed eligible set gets a suggested `PRACTICE` review, listed with `blocking: false`; the next lesson stays open. A point that is weak again in another counted set while its suggestion (or an `ERROR_PATTERN` review) is still pending has that review promoted to blocking, listed with `blocking: true`. A point with any other pending optional review (for example one picked from the basket) gets no new review. Lesson completion itself creates no review.
 
-Practice clearance is one-way: after the lesson completes, it passes with the first applicable reason in this order: counted first practice submission at 70% or above; at least one practice-triggered review of the skill (or of the lesson, for sets without skills) with none still pending, where completed and skipped reviews both count as finished; all currently published lesson packages submitted in practice or review with no pending practice review; or no practice packages. The first passing reason is stored and later content changes do not revoke it. Reads calculate status without writing a pass row. A blocking pending same-skill review (or legacy null-skill review) blocks practice; `REVIEW_REQUIRED` remains HTTP 403. An incomplete lesson gives `409 PRACTICE_LOCKED` on start.
+Practice clearance is one-way: after the lesson completes, it passes with the first applicable reason in this order: counted first practice submission at 70% or above; at least one practice-triggered review of the skill (or of the lesson, for sets without skills) with none still pending, where completed and skipped reviews both count as finished; all currently published lesson packages submitted in practice or review with no pending practice review; or no practice packages. After those reasons, a counted failed attempt clears the Practice with `ATTEMPT_NOT_BLOCKED` when no blocking pending review of the skill (or of the lesson, for sets without skills) exists. This reason is derived on every read and never stored: a blocking review that appears later returns the lesson to `REQUIRED`, and once that review is finished the reason becomes `REVIEW_FINISHED`. The first passing reason is stored and later content changes do not revoke it. Reads calculate status without writing a pass row. A blocking pending same-skill review (or legacy null-skill review) blocks practice; `REVIEW_REQUIRED` remains HTTP 403. An incomplete lesson gives `409 PRACTICE_LOCKED` on start.
 
 ### `GET /reviews`
 
@@ -218,12 +226,27 @@ updates the mastery profile.
 
 A counted lesson Practice essay can create an optional review for a mapped rubric criterion whose band is strictly
 below the prompt's pass band. These reviews have `blocking = false`, `skill = WRITING`, and
-`trigger_kind = WRITING_CRITERION`; the submission response keeps `reviewsCreated` scoped to blocking `PRACTICE` reviews. Optional criterion reviews appear in `GET /reviews` (the lesson Practice tab can filter by skill) and the
+`trigger_kind = WRITING_CRITERION`; the submission response's `reviewsCreated` does not list criterion reviews. Optional criterion reviews appear in `GET /reviews` (the lesson Practice tab can filter by skill) and the
 basket. They never affect lesson gates, Practice clearance or topic test gates. Only `PRACTICE` reviews affect
 `PracticeClearance`. They use the normal review endpoints; a set may be a `PS-WCR-*` package that belongs to no lesson.
 The associated lesson is a preference when selecting a set, not an eligibility requirement. Passing a set marks the
-review `DONE`, writes `review_set` evidence and updates mastery. Optional reviews end `SKIPPED` on a failed set.
+review `DONE`, writes `review_set` evidence and updates mastery. Optional reviews end `SKIPPED` on a failed set. Exception: a suggested review from Practice (optional, trigger `PRACTICE`) can start at the theory stage, and a failed set turns it blocking and sends it to the theory stage instead of `SKIPPED`.
 Creation limits and excluded Writing sources are described in [lesson-writing-v1](lesson-writing-v1.md).
+
+### `GET /review-basket/summary`
+
+Role `CUSTOMER`. The counts of the basket without its items, for a badge that is read on every page.
+
+```json
+{"required":2,"due":5}
+```
+
+- `required`: the learner's `PENDING` blocking reviews, the size of `required` in `GET /review-basket`.
+- `due`: maintained points whose `dueAt` (`next_review_at`) has come and that no blocking review holds, the size of `due`
+  in `GET /review-basket`. Error-trap child points are not counted, as in the basket.
+- `consolidate` and `weak` are not counted: they stay for as long as the learner is unsure and would keep the number high.
+- It reads only the learner's own mastery profiles and reviews in Learning's database and never asks Content, so it has
+  no `hasUnrevealedSet`: a counted due point may have no unseen set left, which `GET /review-basket` shows.
 
 ### `POST /review-basket/{knowledgePointId}/start`
 
@@ -235,6 +258,14 @@ Role `CUSTOMER`. Starts an optional review of the point and returns it like `GET
   `409 NOT_IN_REVIEW_BASKET`. A point no completed lesson teaches answers `409 NO_LESSON_FOR_KNOWLEDGE_POINT`. When
   Content has no set the learner has not seen, `409 NO_UNREVEALED_SET` is returned and nothing is created.
 - The review has `trigger_kind` `CONSOLIDATE` or `MAINTAIN` and is not blocking.
+
+An error-trap child at `PRIORITY` can create an optional parent review with `trigger_kind: ERROR_PATTERN` after a
+lesson, counted Practice, review, counted free-practice or diagnostic submission records its evidence and refreshes mastery.
+There is at most one new such review per submission (configurable with `learning.error-trap.review-limit`, default 1).
+The child selects the parent review and its practice set; the review always belongs to the parent. A pending review of
+that parent suppresses another. The child must have a completed teaching lesson and Content must offer an unseen set
+with at least two questions tagged for the child's error code. Content lookup failure does not fail the submission.
+Starting a child point from the review basket returns `409 NOT_IN_REVIEW_BASKET`.
 
 An **optional review** is one set with no theory step: passing it ends the review `DONE`, failing it ends it `SKIPPED`.
 Both write `review_set` evidence and update the mastery profile. A point can hold only one `PENDING` review, so when a
@@ -252,6 +283,7 @@ can create an optional review with `trigger_kind` `FREE_PRACTICE_TEST`. A milest
 - At `PRACTICE`, the response has the one open review set, preferring its lesson and excluding every package the learner was given in a review or whose answers were seen in submitted practice. Repeated GETs return the same open set. If no such package remains, the review becomes `SKIPPED` with no set. Set questions use the lesson allowlist with their `hint`; a Listening set adds `audio: {mediaUrl, durationSeconds}` next to `passage` (no transcript). `quickCheck` is empty.
 - At `THEORY`, `set` is null and `quickCheck` lists up to 3 auto-graded questions of that lesson tagged with the knowledge point (lesson order, same allowlist with `hint`, no answers). The learner answers them through `theory-check`.
 - A review starts at `THEORY` when the knowledge point scored below 40% in the practice attempt that created it (`LOW_SCORE`), or when the learner answered it wrong on the first submission of the lesson's exercises (`WRONG_IN_LESSON`). Practice reviews decide this when created; reviews from assessment results decide it the first time they are opened.
+- A review of a parent with a profiled trap child adds optional `errorTrap: {code, name, fixHint}` for the current main error. The main error is the non-`INSUFFICIENT` trap profile with the lowest mastery; ties use error code order. `name` and `fixHint` come from active error types. Missing text or a Content error omits `errorTrap`. The current main error is also sent when searching for the next set, including when the review returns to theory after its first failed set.
 
 After Lan misses L2 Q5, she can receive `PS-KP1-A` and L2 theory:
 
@@ -333,7 +365,7 @@ New learning-gate errors use `{ "detail": string, "code": string, "reviews"?: ar
 | 403 | `REVIEW_REQUIRED` | `{"detail":"Complete the pending review first","code":"REVIEW_REQUIRED","reviews":[{"reviewId":"20000000-0000-4000-8000-000000000901","lessonId":"20000000-0000-4000-8000-000000000102","knowledgePointId":"10000000-0000-4000-8000-000000000002"}]}` |
 | 409 | `PLACEMENT_ALREADY_DONE` | `{"detail":"The placement test was already taken","code":"PLACEMENT_ALREADY_DONE"}` |
 | 404 | `NO_PLACEMENT_TEST` | `{"detail":"No placement test is published","code":"NO_PLACEMENT_TEST"}` |
-| 403 | `TOPIC_LOCKED` | `{"detail":"Topic is locked","code":"TOPIC_LOCKED"}` |
+| 403 | `TOPIC_LOCKED` | `{"detail":"Topic is locked","code":"TOPIC_LOCKED"}` (opening, submitting or completing a lesson of a locked topic; listing its lessons is allowed) |
 | 403 | `LESSON_LOCKED` | `{"detail":"Complete L1 before L2","code":"LESSON_LOCKED"}` |
 | 403 | `PRACTICE_REQUIRED` | `{"detail":"Complete practice of the earlier lessons first.","code":"PRACTICE_REQUIRED","lessonIds":["20000000-0000-4000-8000-000000000101"]}` (lesson gate; the same code is `409` when asking for a topic test, below) |
 | 403 | `TEST_LOCKED` | `{"detail":"Complete the topic lessons first","code":"TEST_LOCKED"}` |
@@ -479,3 +511,14 @@ Role `CUSTOMER`. Up to five optional suggestions from published content; they ne
   practice set of a weak point; `null` for a practice test (opened from its course list) and for a practice set of a
   `NEXT_IN_TREE` point.
 - A point with a blocking review is not suggested; it is already required.
+
+## Error-trap feedback and review detail fields (2026-10-25)
+
+When an incorrect lesson, Practice, review-set, free-practice, or diagnostic answer has a recognized error code, its
+result includes optional `error: {code, name, fixHint}`. The text is looked up from active Content error types; an
+unknown code or a failed lookup omits `error` without failing the submission. Correct answers and untagged wrong answers
+omit the field. `answerSpec` is never returned. Essay results are not tagged by this answer-level field.
+
+`GET /reviews/{reviewId}` and responses from review-basket start include `blocking`, copied from the stored review item.
+The review detail uses the stored value for both required and optional reviews. A review triggered as `ERROR_PATTERN`
+also has optional `errorTrap: {code, name, fixHint}` for the parent's current main error; ordinary reviews omit it.

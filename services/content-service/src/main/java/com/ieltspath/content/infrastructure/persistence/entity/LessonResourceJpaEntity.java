@@ -26,8 +26,10 @@ public class LessonResourceJpaEntity {
     private LessonResourceType resourceType;
     @Column(nullable = false, length = 255)
     private String title;
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String url;
+    @Column(name = "file_key", updatable = false, length = 300)
+    private String fileKey;
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
     @CreationTimestamp

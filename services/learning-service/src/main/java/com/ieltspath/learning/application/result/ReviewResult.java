@@ -1,6 +1,7 @@
 package com.ieltspath.learning.application.result;
 
 import com.ieltspath.learning.domain.vo.LearningSkill;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.List;
 import java.util.UUID;
@@ -18,7 +19,8 @@ public record ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, Li
                            UUID knowledgePointId, LearningSkill skill, String stage, String theoryReason,
                            String theoryScope, int failedSets, Integer maxFailedSets,
                            List<LessonResult.Question> quickCheck, String state, UUID diagnosticSessionId,
-                           List<UUID> waitingOnReviewIds) {
+                           boolean blocking, List<UUID> waitingOnReviewIds,
+                           @JsonInclude(JsonInclude.Include.NON_NULL) ErrorTrapResult errorTrap) {
     public static final String ACTIVE = "ACTIVE";
     public static final String DIAGNOSING = "DIAGNOSING";
     public static final String WAITING_ON_PREREQUISITES = "WAITING_ON_PREREQUISITES";
@@ -28,7 +30,25 @@ public record ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, Li
                         String theoryScope, int failedSets, Integer maxFailedSets,
                         List<LessonResult.Question> quickCheck) {
         this(reviewId, reviewStatus, lessonId, theory, set, knowledgePointId, skill, stage, theoryReason, theoryScope,
-                failedSets, maxFailedSets, quickCheck, ACTIVE, null, List.of());
+                failedSets, maxFailedSets, quickCheck, ACTIVE, null, true, List.of(), null);
+    }
+
+    public ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, List<String> theory, ReviewSet set,
+                        UUID knowledgePointId, LearningSkill skill, String stage, String theoryReason,
+                        String theoryScope, int failedSets, Integer maxFailedSets,
+                        List<LessonResult.Question> quickCheck, String state, UUID diagnosticSessionId,
+                        List<UUID> waitingOnReviewIds) {
+        this(reviewId, reviewStatus, lessonId, theory, set, knowledgePointId, skill, stage, theoryReason, theoryScope,
+                failedSets, maxFailedSets, quickCheck, state, diagnosticSessionId, true, waitingOnReviewIds, null);
+    }
+
+    public ReviewResult(UUID reviewId, String reviewStatus, UUID lessonId, List<String> theory, ReviewSet set,
+                        UUID knowledgePointId, LearningSkill skill, String stage, String theoryReason,
+                        String theoryScope, int failedSets, Integer maxFailedSets,
+                        List<LessonResult.Question> quickCheck, String state, UUID diagnosticSessionId,
+                        List<UUID> waitingOnReviewIds, ErrorTrapResult errorTrap) {
+        this(reviewId, reviewStatus, lessonId, theory, set, knowledgePointId, skill, stage, theoryReason, theoryScope,
+                failedSets, maxFailedSets, quickCheck, state, diagnosticSessionId, true, waitingOnReviewIds, errorTrap);
     }
 
     public record ReviewSet(UUID reviewSetId, UUID packageId, UUID packageVersionId, String passage, Audio audio,

@@ -24,6 +24,9 @@ import com.ieltspath.learning.application.result.LearnerReportResult.EvidenceEnt
 import com.ieltspath.learning.application.result.LearnerReportResult.KnowledgePointReport;
 import com.ieltspath.learning.application.result.LearnerReportResult.Score;
 import com.ieltspath.learning.application.service.MasteryProfileUpdater;
+import com.ieltspath.learning.application.service.ErrorTrapCatalog;
+import com.ieltspath.learning.application.result.LearnerReportResult.ErrorTrapPoint;
+import com.ieltspath.learning.domain.service.MainErrorRule;
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
 import com.ieltspath.learning.domain.repository.DiagnosticRepository;
 import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
@@ -31,6 +34,7 @@ import com.ieltspath.learning.domain.repository.ReviewItemRepository;
 import com.ieltspath.learning.domain.vo.MasteryTier;
 import com.ieltspath.learning.domain.vo.PendingReview;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -60,13 +64,15 @@ public class GetLearnerReportUseCase {
     private final LearnerGoalClient goals;
     private final SnapshotRepository snapshots;
     private final SnapshotService snapshotService;
+    private final ErrorTrapCatalog trapCatalog;
     private final Clock clock = Clock.systemUTC();
 
+    @Autowired
     public GetLearnerReportUseCase(MasteryProfileRepository profiles, QuestionEventLog events,
                                    ReviewItemRepository reviews, KnowledgePointDirectory directory,
                                    DiagnosticRepository diagnostics, LearnerPlacementRepository placements,
                                    LearnerGoalClient goals, SnapshotRepository snapshots,
-                                   SnapshotService snapshotService) {
+                                   SnapshotService snapshotService, ErrorTrapCatalog trapCatalog) {
         this.diagnostics = diagnostics;
         this.placements = placements;
         this.goals = goals;
@@ -76,6 +82,7 @@ public class GetLearnerReportUseCase {
         this.events = events;
         this.reviews = reviews;
         this.directory = directory;
+        this.trapCatalog = trapCatalog;
     }
 
     @Transactional(readOnly = true)
@@ -94,26 +101,57 @@ public class GetLearnerReportUseCase {
             pendingReviews.putIfAbsent(review.knowledgePointId(), review.reviewId());
         }
         Set<UUID> diagnosing = diagnostics.probingRootKnowledgePoints(userId);
-        Map<UUID, KnowledgePointDirectory.Entry> described = directory.describe();
+        Map<UUID, KnowledgePointDirectory.Entry> described = directory.describe(true);
+        if (described == null || described.isEmpty()) described = directory.describe();
+        final Map<UUID, KnowledgePointDirectory.Entry> pointDirectory = described;
+        List<MasteryProfile> trapProfiles = profiles.findErrorTrapProfiles(userId);
+        var trapCatalogEntries = trapCatalog == null ? null : trapCatalog.load();
+        Map<UUID, List<ErrorTrapPoint>> trapsByParent = new HashMap<>();
+        if (trapCatalogEntries != null) {
+            for (MasteryProfile trap : trapProfiles) {
+                if (trap.evidenceCount() == 0) continue;
+                UUID parentId = trapCatalogEntries.parentByTrapKp().get(trap.knowledgePointId());
+                var meta = pointDirectory.get(trap.knowledgePointId());
+                if (parentId == null || meta == null) continue;
+                String errorCode = trapCatalogEntries.trapKpByCode().entrySet().stream()
+                        .filter(entry -> entry.getValue().equals(trap.knowledgePointId()))
+                        .map(Map.Entry::getKey).findFirst().orElse(null);
+                trapsByParent.computeIfAbsent(parentId, ignored -> new java.util.ArrayList<>())
+                        .add(new ErrorTrapPoint(trap.knowledgePointId(), errorCode, meta.name(), trap.tier().name(),
+                                trap.mastery(), trap.evidenceCount()));
+            }
+        }
 
         List<KnowledgePointReport> report = stored.stream().map(profile -> {
-            var meta = described.getOrDefault(profile.knowledgePointId(), KnowledgePointDirectory.Entry.UNKNOWN);
+            var meta = pointDirectory.getOrDefault(profile.knowledgePointId(), KnowledgePointDirectory.Entry.UNKNOWN);
             EventStats pointStats = stats.get(profile.knowledgePointId());
             return new KnowledgePointReport(profile.knowledgePointId(), meta.code(), meta.name(), meta.skill(),
                     meta.band(), new Score(profile.mastery(), profile.tier().name(), profile.evidenceCount()),
-                    pointStats == null ? List.of() : pointStats.errors().stream()
-                            .map(error -> new ErrorEntry(error.code(), error.count())).toList(),
+                    mainErrorEntries(profile.knowledgePointId(), pointStats, trapProfiles, trapCatalogEntries),
                     recent.getOrDefault(profile.knowledgePointId(), List.of()).stream()
                             .map(event -> new EvidenceEntry(event.questionVersionId(), event.correct(),
                                     event.durationMs(), event.source().value(), event.errorCode(), event.at(),
                                     event.revisionNo(), event.revisionDelta()))
                             .toList(),
                     action(profile, pendingReviews.get(profile.knowledgePointId()),
-                            diagnosing.contains(profile.knowledgePointId()), now));
+                            diagnosing.contains(profile.knowledgePointId()), now),
+                    trapsByParent.getOrDefault(profile.knowledgePointId(), List.of()));
         }).sorted(Comparator.<KnowledgePointReport>comparingInt(point -> MasteryTier.valueOf(point.score().tier()).ordinal())
                 .thenComparingDouble(point -> point.score().mastery())
                 .thenComparing(point -> point.code() == null ? "￿" : point.code())).toList();
         return withSummary(userId, now, report);
+    }
+
+    private static List<ErrorEntry> mainErrorEntries(UUID parentId, EventStats stats,
+                                                      List<MasteryProfile> trapProfiles,
+                                                      ErrorTrapCatalog.ErrorTraps catalog) {
+        if (catalog == null) return stats == null ? List.of() : stats.errors().stream()
+                .map(error -> new ErrorEntry(error.code(), error.count())).toList();
+        String main = MainErrorRule.mainErrorCode(parentId, trapProfiles, catalog).orElse(null);
+        if (main == null) return List.of();
+        int count = stats == null ? 0 : stats.errors().stream().filter(error -> main.equals(error.code()))
+                .mapToInt(QuestionEventLog.ErrorCount::count).sum();
+        return List.of(new ErrorEntry(main, count));
     }
 
     /** Adds the per-skill view, the points to focus on, the estimated band and the learner's target to the report. */

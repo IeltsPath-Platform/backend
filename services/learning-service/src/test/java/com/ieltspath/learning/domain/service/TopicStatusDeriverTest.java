@@ -89,23 +89,37 @@ class TopicStatusDeriverTest {
     }
 
     @Test
-    void opensAnIndependentTopicForEachSkillIncludingUnspecified() {
+    void opensTheFirstUnfinishedTopicIndependentlyForEachCourseSkill() {
         UUID fourth = new UUID(0, 4);
         UUID fifth = new UUID(0, 5);
-        UUID readingCourse = new UUID(1, 1);
-        UUID higherCourse = new UUID(1, 2);
-        UUID unassignedCourse = new UUID(1, 3);
+        UUID sixth = new UUID(0, 6);
+        UUID seventh = new UUID(0, 7);
+        UUID course = new UUID(1, 1);
         var result = deriver.derive(List.of(
-                new TopicProgress(first, readingCourse, 1, null, LearningSkill.READING, true),
-                new TopicProgress(second, readingCourse, 2, null, LearningSkill.LISTENING, true),
-                new TopicProgress(third, unassignedCourse, 3, null, null, true),
-                new TopicProgress(fourth, higherCourse, 4, null, LearningSkill.READING, true),
-                new TopicProgress(fifth, higherCourse, 5, null, LearningSkill.LISTENING, true)));
+                new TopicProgress(first, course, 1, null, LearningSkill.READING, true),
+                new TopicProgress(second, course, 2, null, LearningSkill.LISTENING, true),
+                new TopicProgress(third, course, 3, null, LearningSkill.WRITING, true),
+                new TopicProgress(fourth, course, 4, null, LearningSkill.SPEAKING, true),
+                new TopicProgress(fifth, course, 5, null, LearningSkill.READING, true),
+                new TopicProgress(sixth, course, 6, null, LearningSkill.LISTENING, true),
+                new TopicProgress(seventh, course, 7, passedAt, LearningSkill.WRITING, true)));
 
         assertThat(result).containsEntry(first, TopicStatus.IN_PROGRESS)
-                .containsEntry(second, TopicStatus.LOCKED)
+                .containsEntry(second, TopicStatus.IN_PROGRESS)
                 .containsEntry(third, TopicStatus.IN_PROGRESS)
                 .containsEntry(fourth, TopicStatus.IN_PROGRESS)
-                .containsEntry(fifth, TopicStatus.LOCKED);
+                .containsEntry(fifth, TopicStatus.LOCKED)
+                .containsEntry(sixth, TopicStatus.LOCKED)
+                .containsEntry(seventh, TopicStatus.PASSED);
+    }
+
+    @Test
+    void topicsWithoutACourseContinueToShareOneSequence() {
+        var result = deriver.derive(List.of(
+                new TopicProgress(first, 1, null, LearningSkill.READING, true),
+                new TopicProgress(second, 2, null, LearningSkill.LISTENING, true)));
+
+        assertThat(result).containsEntry(first, TopicStatus.IN_PROGRESS)
+                .containsEntry(second, TopicStatus.LOCKED);
     }
 }

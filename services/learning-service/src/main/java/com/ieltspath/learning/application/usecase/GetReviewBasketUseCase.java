@@ -4,14 +4,19 @@ import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.result.ReviewBasketResult;
 import com.ieltspath.learning.application.result.ReviewBasketResult.OptionalItem;
 import com.ieltspath.learning.application.result.ReviewBasketResult.RequiredItem;
+import com.ieltspath.learning.application.result.ErrorTrapResult;
+import com.ieltspath.learning.application.service.ErrorTrapCatalog;
+import com.ieltspath.learning.application.service.ErrorTypeTexts;
 import com.ieltspath.learning.application.service.KnowledgePointDirectory;
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
 import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
+import com.ieltspath.learning.domain.service.MainErrorRule;
 import com.ieltspath.learning.domain.vo.MasteryTier;
 import com.ieltspath.learning.domain.vo.PendingReview;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -36,16 +41,22 @@ public class GetReviewBasketUseCase {
     private final PracticeAttemptRepository attempts;
     private final LearningContentClient content;
     private final KnowledgePointDirectory directory;
+    private final ErrorTrapCatalog errorTraps;
+    private final ErrorTypeTexts errorTypeTexts;
     private final Clock clock = Clock.systemUTC();
 
+    @Autowired
     public GetReviewBasketUseCase(MasteryProfileRepository profiles, ReviewItemRepository reviews,
                                   PracticeAttemptRepository attempts, LearningContentClient content,
-                                  KnowledgePointDirectory directory) {
+                                  KnowledgePointDirectory directory, ErrorTrapCatalog errorTraps,
+                                  ErrorTypeTexts errorTypeTexts) {
         this.profiles = profiles;
         this.reviews = reviews;
         this.attempts = attempts;
         this.content = content;
         this.directory = directory;
+        this.errorTraps = errorTraps;
+        this.errorTypeTexts = errorTypeTexts;
     }
 
     @Transactional(readOnly = true)
@@ -83,6 +94,7 @@ public class GetReviewBasketUseCase {
         List<OptionalItem> consolidate = new ArrayList<>();
         List<OptionalItem> due = new ArrayList<>();
         List<OptionalItem> weak = new ArrayList<>();
+        Map<UUID, ErrorTrapResult> errorTrapByParent = errorTrapLabels(userId, optionalByPoint);
         for (MasteryProfile profile : candidates) {
             var meta = described.getOrDefault(profile.knowledgePointId(), KnowledgePointDirectory.Entry.UNKNOWN);
             boolean isDue = profile.tier() == MasteryTier.MAINTAIN;
@@ -95,7 +107,8 @@ public class GetReviewBasketUseCase {
                     profile.tier().name(), profile.mastery(), profile.nextReviewAt(), reason,
                     availability.getOrDefault(profile.knowledgePointId(), 0) > 0
                             || optionalReviewByPoint.containsKey(profile.knowledgePointId()),
-                    optionalReviewByPoint.get(profile.knowledgePointId()));
+                    optionalReviewByPoint.get(profile.knowledgePointId()),
+                    errorTrapByParent.get(profile.knowledgePointId()));
             (isWeak ? weak : isDue ? due : consolidate).add(item);
         }
         Comparator<OptionalItem> weakestFirst = Comparator.comparingDouble(OptionalItem::mastery)
@@ -121,5 +134,26 @@ public class GetReviewBasketUseCase {
                         .sorted(Comparator.comparing(UUID::toString)).toList(),
                 excluded.stream().sorted(Comparator.comparing(UUID::toString)).toList(), MIN_SET_QUESTIONS);
         return counts == null ? Map.of() : counts;
+    }
+
+    private Map<UUID, ErrorTrapResult> errorTrapLabels(UUID userId, Map<UUID, PendingReview> optionalByPoint) {
+        if (errorTraps == null || errorTypeTexts == null || optionalByPoint.values().stream()
+                .noneMatch(review -> "ERROR_PATTERN".equals(review.triggerKind()))) return Map.of();
+        var traps = errorTraps.load();
+        var childProfiles = profiles.findErrorTrapProfiles(userId);
+        Map<UUID, String> codes = new HashMap<>();
+        for (UUID parent : optionalByPoint.entrySet().stream()
+                .filter(entry -> "ERROR_PATTERN".equals(entry.getValue().triggerKind()))
+                .map(Map.Entry::getKey).toList()) {
+            MainErrorRule.mainErrorCode(parent, childProfiles, traps).ifPresent(code -> codes.put(parent, code));
+        }
+        if (codes.isEmpty()) return Map.of();
+        var texts = errorTypeTexts.byCode();
+        Map<UUID, ErrorTrapResult> result = new HashMap<>();
+        codes.forEach((parent, code) -> {
+            ErrorTypeTexts.Text text = texts.get(code);
+            if (text != null) result.put(parent, new ErrorTrapResult(code, text.name(), text.fixHint()));
+        });
+        return result;
     }
 }

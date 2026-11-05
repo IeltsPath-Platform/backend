@@ -5,6 +5,7 @@ import com.ieltspath.library.domain.exception.InvalidDataException;
 import com.ieltspath.library.domain.DomainChecks;
 import com.ieltspath.library.domain.vo.FlashcardSourceType;
 import com.ieltspath.library.domain.vo.LibraryStatus;
+import com.ieltspath.library.domain.vo.UnderstandingLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -139,6 +140,23 @@ public class Flashcard {
         lastReviewedAt = reviewedAt;
         nextReviewAt = reviewedAt.plus(Duration.ofDays(intervalsDays.get(leitnerBox - 1)));
         reviewCount = Math.addExact(reviewCount, 1);
+        lastReviewRequestId = requestId;
+        return true;
+    }
+
+    public boolean setUnderstanding(UnderstandingLevel level, Instant now, List<Integer> intervalsDays, UUID requestId) {
+        if (level == null || requestId == null || now == null) {
+            throw new InvalidDataException("understanding request is incomplete");
+        }
+        if (requestId.equals(lastReviewRequestId)) return false;
+        if (intervalsDays == null || intervalsDays.size() != 5
+                || intervalsDays.stream().anyMatch(days -> days == null || days < 1)) {
+            throw new InvalidDataException("Leitner schedule is invalid");
+        }
+        leitnerBox = level.targetBox();
+        Instant changedAt = now.truncatedTo(ChronoUnit.MICROS);
+        nextReviewAt = level == UnderstandingLevel.UNKNOWN
+                ? changedAt : changedAt.plus(Duration.ofDays(intervalsDays.get(leitnerBox - 1)));
         lastReviewRequestId = requestId;
         return true;
     }

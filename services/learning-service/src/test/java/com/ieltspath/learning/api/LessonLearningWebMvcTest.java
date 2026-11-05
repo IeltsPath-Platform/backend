@@ -31,6 +31,7 @@ import com.ieltspath.learning.application.usecase.SubmitReviewUseCase;
 import com.ieltspath.learning.application.usecase.SubmitTheoryCheckUseCase;
 import com.ieltspath.learning.domain.exception.LearningGateException;
 import com.ieltspath.learning.domain.vo.LearningSkill;
+import com.ieltspath.learning.domain.vo.PracticeSubmission;
 import com.ieltspath.learning.domain.vo.PendingReview;
 import com.ieltspath.learning.domain.vo.ReviewListEntry;
 import com.ieltspath.learning.domain.vo.ReviewStage;
@@ -145,6 +146,24 @@ class LessonLearningWebMvcTest {
         assertFalse(started.toString().contains("explanation"));
         assertFalse(fetched.toString().contains("answerSpec"));
         assertFalse(fetched.toString().contains("explanation"));
+    }
+
+    @Test
+    void practiceSubmissionResponseSaysWhetherACreatedReviewBlocks() throws Exception {
+        UUID attemptId = UUID.randomUUID();
+        UUID reviewId = UUID.randomUUID();
+        UUID kpId = UUID.randomUUID();
+        when(submitPractice.execute(eq(USER), eq(attemptId), any())).thenReturn(new PracticeSubmission(attemptId,
+                1, 2, 0.5, false, true, List.of(), null,
+                List.of(new PracticeSubmission.ReviewCreated(reviewId, kpId, "PRACTICE", false))));
+        String request = json.writeValueAsString(Map.of("requestId", REQUEST,
+                "answers", List.of(Map.of("questionVersionId", QUESTION, "answer", "A"))));
+
+        mvc.perform(authenticated(post("/api/learning/practice-attempts/{id}/submissions", attemptId)
+                        .contentType(MediaType.APPLICATION_JSON).content(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reviewsCreated[0].blocking").value(false))
+                .andExpect(jsonPath("$.reviewsCreated[0].stage").value("PRACTICE"));
     }
 
     @Test
@@ -495,7 +514,9 @@ class LessonLearningWebMvcTest {
                 .andExpect(jsonPath("$[1].accessLevel").value("PREMIUM"));
         mvc.perform(authenticated(get("/api/learning/topics/{id}/lessons", TOPIC)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.testStatus").value("AVAILABLE"))
-                .andExpect(jsonPath("$.lessons[0].status").value("COMPLETED"));
+                .andExpect(jsonPath("$.lessons[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.lessons[0].paywall").value(false))
+                .andExpect(jsonPath("$.lessons[0].freePreview").value(false));
         mvc.perform(authenticated(get("/api/learning/mastery")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].knowledgePointId").value(KP.toString()))
                 .andExpect(jsonPath("$[0].mastery").value(0.729)).andExpect(jsonPath("$[0].evidenceCount").value(4));
@@ -506,6 +527,17 @@ class LessonLearningWebMvcTest {
         verify(getTopicLessonsUseCase).execute(USER, TOPIC);
         verify(mastery).execute(USER);
         verify(completeLessonUseCase).execute(USER, LESSON);
+    }
+
+    @Test
+    void paywallGateMapsToForbiddenWithExplicitCode() throws Exception {
+        when(completeLessonUseCase.execute(USER, LESSON)).thenThrow(
+                new com.ieltspath.learning.domain.exception.LearningGateException("PAYWALL", List.of()));
+
+        JsonNode response = body(mvc.perform(authenticated(post("/api/learning/lessons/{id}/complete", LESSON)))
+                .andExpect(status().isForbidden()).andReturn());
+
+        assertEquals("PAYWALL", response.path("code").asText());
     }
 
     enum ProtectedRoute { TOPICS, TOPIC_LESSONS, LESSON, SUBMISSION, COMPLETE, MASTERY }

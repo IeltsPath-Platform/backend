@@ -161,8 +161,8 @@ class VideoDictationPersistenceTest {
     @Test
     void pronunciationRowsDoNotShowInTheVocabularySearch() {
         assertTrue(vocabularyItems.findByNormalizedLemma("weekend").isPresent());
-        assertTrue(vocabularyItems.searchByLemma("weekend").isEmpty(), "an INACTIVE pronunciation row is not a vocabulary hit");
-        assertFalse(vocabularyItems.searchByLemma("accommodation").isEmpty(), "the IELTS vocabulary is still found");
+        assertTrue(vocabularyItems.searchIdsByLemma("weekend", "weekend%", "%weekend%", 50).isEmpty(), "an INACTIVE pronunciation row is not a vocabulary hit");
+        assertFalse(vocabularyItems.searchIdsByLemma("accommodation", "accommodation%", "%accommodation%", 50).isEmpty(), "the IELTS vocabulary is still found");
     }
 
     @Test

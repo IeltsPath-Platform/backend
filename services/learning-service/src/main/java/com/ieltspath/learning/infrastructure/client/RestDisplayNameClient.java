@@ -1,6 +1,8 @@
 package com.ieltspath.learning.infrastructure.client;
 
 import com.ieltspath.commonsecurity.header.SecurityHeaders;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.ResilientCall;
 import com.ieltspath.learning.application.port.DisplayNameClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,18 +26,26 @@ import java.util.UUID;
 public class RestDisplayNameClient implements DisplayNameClient {
     private static final Logger log = LoggerFactory.getLogger(RestDisplayNameClient.class);
     private final RestClient restClient;
+    private final ResilientCall resilientCall;
 
     @Autowired
     public RestDisplayNameClient(RestClient.Builder builder,
-                                 @Value("${learning.user.base-url:http://localhost:8081}") String userBaseUrl) {
+                                 @Value("${learning.user.base-url:http://localhost:8081}") String userBaseUrl,
+                                 ResilientCall resilientCall) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
         requestFactory.setReadTimeout(Duration.ofSeconds(3));
         restClient = builder.requestFactory(requestFactory).baseUrl(userBaseUrl).build();
+        this.resilientCall = resilientCall;
     }
 
     RestDisplayNameClient(RestClient restClient) {
+        this(restClient, defaultResilientCall());
+    }
+
+    RestDisplayNameClient(RestClient restClient, ResilientCall resilientCall) {
         this.restClient = restClient;
+        this.resilientCall = resilientCall;
     }
 
     @Override
@@ -45,11 +55,11 @@ public class RestDisplayNameClient implements DisplayNameClient {
         try {
             Optional<String> bearer = GatewayRequestHeaders.bearerToken();
             if (bearer.isEmpty()) return names;
-            Response response = restClient.post().uri("/internal/users/display-names")
+            Response response = resilientCall.call("user", CallKind.READ, () -> restClient.post().uri("/internal/users/display-names")
                     .headers((HttpHeaders headers) -> {
                         headers.setBearerAuth(bearer.get());
                         headers.set(SecurityHeaders.CORRELATION_ID, GatewayRequestHeaders.correlationId());
-                    }).body(new Request(List.copyOf(userIds))).retrieve().body(Response.class);
+                    }).body(new Request(List.copyOf(userIds))).retrieve().body(Response.class));
             if (response != null && response.items() != null) {
                 for (Item item : response.items()) {
                     if (item.id() != null && item.displayName() != null) names.put(item.id(), item.displayName());
@@ -59,6 +69,10 @@ public class RestDisplayNameClient implements DisplayNameClient {
             log.warn("Display names unavailable", failure);
         }
         return names;
+    }
+
+    private static ResilientCall defaultResilientCall() {
+        return ResilientCall.isolatedDefault();
     }
 
     private record Request(List<UUID> ids) {}

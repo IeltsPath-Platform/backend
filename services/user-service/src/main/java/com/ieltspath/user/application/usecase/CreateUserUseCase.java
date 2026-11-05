@@ -10,6 +10,7 @@ import com.ieltspath.user.domain.repository.RoleRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.service.RoleAssignmentPolicy;
 import com.ieltspath.user.domain.vo.Email;
+import com.ieltspath.user.domain.vo.PasswordPolicy;
 import com.ieltspath.user.domain.vo.PhoneNumber;
 import com.ieltspath.user.domain.vo.RoleName;
 import com.ieltspath.user.domain.vo.UserStatus;
@@ -35,7 +36,7 @@ public class CreateUserUseCase {
     public User execute(CreateUserCommand command) {
         log.info("Create local user requested roleCount={}", command.roles() == null ? 0 : command.roles().size());
         Email email = new Email(command.email());
-        PhoneNumber phoneNumber = new PhoneNumber(command.phoneNumber());
+        PhoneNumber phoneNumber = PhoneNumber.parse(command.phoneNumber());
         if (userRepository.existsByEmail(email.value())) {
             throw new EmailAlreadyExistsException("Email đã tồn tại: " + email.value());
         }
@@ -77,6 +78,9 @@ public class CreateUserUseCase {
     private String requirePassword(String password) {
         if (password == null || password.isBlank()) {
             throw new IllegalArgumentException("Mật khẩu không được để trống");
+        }
+        if (!PasswordPolicy.isWithinLimits(password)) {
+            throw new IllegalArgumentException(PasswordPolicy.MESSAGE);
         }
         return password;
     }

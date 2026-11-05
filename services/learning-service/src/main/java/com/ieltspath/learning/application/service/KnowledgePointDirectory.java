@@ -19,8 +19,18 @@ public class KnowledgePointDirectory {
 
     /** A knowledge point listed in several topics takes the first one. */
     public Map<UUID, Entry> describe() {
+        return describeTopics(content.getTopicSequence());
+    }
+
+    /** Optionally includes error-trap children for learner reports and the knowledge tree. */
+    public Map<UUID, Entry> describe(boolean includeErrorTraps) {
+        return describeTopics(includeErrorTraps ? content.getTopicSequence(true) : content.getTopicSequence());
+    }
+
+    private Map<UUID, Entry> describeTopics(java.util.List<LearningContentClient.Topic> topics) {
         Map<UUID, Entry> described = new HashMap<>();
-        for (LearningContentClient.Topic topic : content.getTopicSequence()) {
+        if (topics == null) return described;
+        for (LearningContentClient.Topic topic : topics) {
             BigDecimal band = topic.course() == null ? null : topic.course().bandLevel();
             for (LearningContentClient.KnowledgePoint point : topic.knowledgePoints()) {
                 described.putIfAbsent(point.id(), new Entry(point.code(), point.name(), point.skill(), band));

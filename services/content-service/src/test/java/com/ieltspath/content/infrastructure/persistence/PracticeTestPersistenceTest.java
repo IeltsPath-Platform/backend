@@ -181,7 +181,7 @@ class PracticeTestPersistenceTest {
     }
 
     @Test
-    void v30CatalogHasExpectedNumericAndFilterResultsAndKeepsSvgCovers() {
+    void v30CatalogHasExpectedNumericAndFilterResultsAndResolvesCoverKeys() {
         var catalog = new JdbcPracticeTestCatalogReader(new NamedParameterJdbcTemplate(jdbc.getDataSource()));
 
         var allParts = catalog.search(new PracticeTestCatalogReader.Search(Skill.READING, "PART", null,
@@ -198,7 +198,10 @@ class PracticeTestPersistenceTest {
         assertThat(isp.questionCount()).isEqualTo(15);
         assertThat(isp.timeLimitSeconds()).isEqualTo(3600);
         assertThat(isp.parts()).hasSize(3);
-        assertThat(isp.coverReference()).startsWith("data:image/svg+xml;base64,");
+        assertThat(isp.coverReference()).isEqualTo("practice/covers/2d000000-0000-4000-8000-010000000001.webp");
+        var search = new com.ieltspath.content.application.usecase.SearchPracticeTestsUseCase(catalog,
+                new com.ieltspath.content.domain.vo.MediaReferencePolicy("https://media.example.test/ieltspath"));
+        assertThat(search.coverUrl(isp)).isEqualTo("https://media.example.test/ieltspath/" + isp.coverReference());
         assertThat(isp.parts().getFirst().formats()).containsExactly("TRUE_FALSE_NOT_GIVEN", "GAP_FILLING");
 
         assertThat(catalog.search(new PracticeTestCatalogReader.Search(Skill.READING, "FULL", null,

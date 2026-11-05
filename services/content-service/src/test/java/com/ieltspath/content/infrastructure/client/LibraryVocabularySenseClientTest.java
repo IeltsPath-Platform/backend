@@ -1,22 +1,41 @@
 package com.ieltspath.content.infrastructure.client;
 
+import com.ieltspath.commonresilience.ResilientCall;
+import com.ieltspath.content.application.exception.VocabularyRejectedException;
+import com.ieltspath.content.application.exception.VocabularyServiceUnavailableException;
+import com.ieltspath.content.application.port.VocabularySenseLookup;
+import com.ieltspath.content.domain.vo.CourseDraftStructure.NewWord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.Duration;
+
+import static org.springframework.test.web.client.ExpectedCount.times;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import org.springframework.http.HttpMethod;
 
@@ -40,5 +59,129 @@ class LibraryVocabularySenseClientTest {
 
         assertThat(client.findActiveSenseIds(List.of(senseId))).containsExactly(senseId);
         server.verify();
+    }
+
+    @Test void describesTheActiveSensesWithTheirWordAndVietnameseMeaning() {
+        UUID senseId = UUID.randomUUID();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        LibraryVocabularySenseClient client = new LibraryVocabularySenseClient(builder.baseUrl("http://library.test").build());
+        signIn();
+        server.expect(requestTo("http://library.test/api/content/vocabulary/senses?ids=" + senseId))
+                .andRespond(withSuccess("[{\"senseId\":\"" + senseId + "\",\"lemma\":\"infer\",\"vietnameseMeaning\":\"suy luận\","
+                        + "\"imageUrl\":null}]", MediaType.APPLICATION_JSON));
+
+        assertThat(client.describeActiveSenses(List.of(senseId)))
+                .containsExactly(new VocabularySenseLookup.SenseText(senseId, "infer", "suy luận"));
+        server.verify();
+    }
+
+    @Test void libraryNotFoundIsReportedAsUnavailable() {
+        UUID senseId = UUID.randomUUID();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        LibraryVocabularySenseClient client = new LibraryVocabularySenseClient(builder.baseUrl("http://library.test").build());
+        signIn();
+        server.expect(requestTo("http://library.test/api/content/vocabulary/senses?ids=" + senseId))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThatThrownBy(() -> client.describeActiveSenses(List.of(senseId)))
+                .isInstanceOf(VocabularyServiceUnavailableException.class);
+        server.verify();
+    }
+
+    @Test void repeatedLibraryFailuresOpenCircuitAndKeepUnavailableMapping() {
+        UUID senseId = UUID.randomUUID();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        CircuitBreakerConfig breakerConfig = CircuitBreakerConfig.custom()
+                .slidingWindowSize(2).minimumNumberOfCalls(2).failureRateThreshold(50)
+                .waitDurationInOpenState(Duration.ofSeconds(10)).build();
+        RetryConfig retryConfig = RetryConfig.custom().maxAttempts(2).waitDuration(Duration.ZERO)
+                .retryOnException(ResilientCall::isTransientFailure).build();
+        ResilientCall resilientCall = new ResilientCall(CircuitBreakerRegistry.of(breakerConfig),
+                RetryRegistry.of(retryConfig), BulkheadRegistry.ofDefaults());
+        LibraryVocabularySenseClient client = new LibraryVocabularySenseClient(
+                builder.baseUrl("http://library.test").build(), resilientCall);
+        signIn();
+        server.expect(times(2), requestTo("http://library.test/api/content/vocabulary/senses?ids=" + senseId))
+                .andRespond(withServerError());
+
+        assertThatThrownBy(() -> client.describeActiveSenses(List.of(senseId)))
+                .isInstanceOf(VocabularyServiceUnavailableException.class);
+        assertThatThrownBy(() -> client.describeActiveSenses(List.of(senseId)))
+                .isInstanceOf(VocabularyServiceUnavailableException.class);
+        server.verify();
+    }
+
+    private static NewWord word(String lemma) {
+        return new NewWord(lemma, null, "NOUN", "a general direction", "xu hướng", "There is an upward trend.");
+    }
+
+    private static void signIn() {
+        Jwt jwt = Jwt.withTokenValue("test-token").header("alg", "none").claim("sub", "author").build();
+        JwtAuthenticationToken authentication = new JwtAuthenticationToken(jwt);
+        authentication.setAuthenticated(true);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    @Test void sendsReviewedWordsInOneCallAndReturnsTheirSensesByLemma() {
+        UUID senseId = UUID.randomUUID();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        LibraryVocabularySenseClient client = new LibraryVocabularySenseClient(builder.baseUrl("http://library.test").build());
+        signIn();
+        server.expect(requestTo("http://library.test/api/content/admin/vocabulary/bulk"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-token"))
+                .andExpect(jsonPath("$.entries[0].lemma").value("Trend"))
+                .andExpect(jsonPath("$.entries[0].partOfSpeech").value("NOUN"))
+                .andExpect(jsonPath("$.entries[0].vietnameseMeaning").value("xu hướng"))
+                .andRespond(withSuccess("[{\"lemma\":\"trend\",\"senseId\":\"" + senseId + "\",\"created\":true}]",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.resolveOrCreate(List.of(word("Trend")))).containsExactly(entry("trend", senseId));
+        server.verify();
+    }
+
+    @Test void doesNotCallTheLibraryWhenThereAreNoWords() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        LibraryVocabularySenseClient client = new LibraryVocabularySenseClient(builder.baseUrl("http://library.test").build());
+
+        assertThat(client.resolveOrCreate(List.of())).isEmpty();
+        server.verify();
+    }
+
+    @Test void aRefusalFromTheLibraryCarriesItsMessage() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        LibraryVocabularySenseClient client = new LibraryVocabularySenseClient(builder.baseUrl("http://library.test").build());
+        signIn();
+        server.expect(requestTo("http://library.test/api/content/admin/vocabulary/bulk"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"message\":\"Vocabulary item is inactive: going\"}"));
+
+        assertThatThrownBy(() -> client.resolveOrCreate(List.of(word("going"))))
+                .isInstanceOf(VocabularyRejectedException.class).hasMessage("Vocabulary item is inactive: going");
+    }
+
+    @Test void aLibraryOutageIsReportedAsUnavailable() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        LibraryVocabularySenseClient client = new LibraryVocabularySenseClient(builder.baseUrl("http://library.test").build());
+        signIn();
+        server.expect(requestTo("http://library.test/api/content/admin/vocabulary/bulk"))
+                .andRespond(withServerError());
+
+        assertThatThrownBy(() -> client.resolveOrCreate(List.of(word("trend"))))
+                .isInstanceOf(VocabularyServiceUnavailableException.class);
+    }
+
+    @Test void writingWithoutASignedInAuthorIsRefused() {
+        LibraryVocabularySenseClient client = new LibraryVocabularySenseClient(RestClient.builder().baseUrl("http://library.test").build());
+
+        assertThatThrownBy(() -> client.resolveOrCreate(List.of(word("trend"))))
+                .isInstanceOf(VocabularyServiceUnavailableException.class);
     }
 }

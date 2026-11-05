@@ -50,7 +50,7 @@ class MultiSkillContentIntegrationTest {
         reader = new JdbcLearningContentReader(new NamedParameterJdbcTemplate(isolated));
         topic = UUID.randomUUID();
         lesson = UUID.randomUUID();
-        sql.update("INSERT INTO topics(id,code,name,sort_order,course_id) SELECT ?, 'MULTI_TEST', 'Mixed', 9999, id FROM courses WHERE code='IELTS_5_5'", topic);
+        sql.update("INSERT INTO topics(id,code,name,sort_order,course_id) SELECT ?, 'MULTI_TEST', 'Mixed', 9999, id FROM courses WHERE code='IELTS_6_0'", topic);
         sql.update("INSERT INTO lessons(id,topic_id,code,title,sort_order,status) VALUES (?,?,'MULTI_LESSON','Mixed lesson',1,'PUBLISHED')", lesson, topic);
     }
 
@@ -88,12 +88,16 @@ class MultiSkillContentIntegrationTest {
     }
 
     @Test
-    void singleSkillCompatibilityComesFromExercisesRatherThanTopicMetadata() {
+    void singularSkillCompatibilityComesFromTopicWhilePluralSkillsComeFromExercises() {
         exercise("LISTENING", 1);
         sql.update("UPDATE topics SET skill='READING' WHERE id=?", topic);
-        assertThat(reader.publishedLesson(lesson).orElseThrow().skill().name()).isEqualTo("LISTENING");
-        assertThat(reader.topicSequence(1).stream().filter(t -> t.topicId().equals(topic)).findFirst().orElseThrow().skill().name())
-                .isEqualTo("LISTENING");
+        var lessonResult = reader.publishedLesson(lesson).orElseThrow();
+        var topicResult = reader.topicSequence(1).stream().filter(t -> t.topicId().equals(topic)).findFirst()
+                .orElseThrow();
+        assertThat(lessonResult.skill()).isEqualTo(Skill.READING);
+        assertThat(lessonResult.skills()).containsExactly(Skill.LISTENING);
+        assertThat(topicResult.skill()).isEqualTo(Skill.READING);
+        assertThat(topicResult.skills()).containsExactly(Skill.LISTENING);
     }
 
     @Test

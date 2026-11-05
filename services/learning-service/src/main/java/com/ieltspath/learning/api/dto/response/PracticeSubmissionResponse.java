@@ -11,16 +11,18 @@ public record PracticeSubmissionResponse(UUID attemptId, int correct, int total,
                                          boolean countedAsEvidence, List<SubmissionResponse.SolvedAnswer> results,
                                          String transcript, List<ReviewCreated> reviewsCreated,
                                          List<SkillScore> skillScores, GamificationSummary gamification) {
-    public record ReviewCreated(UUID reviewId, UUID knowledgePointId, String stage) {}
+    public record ReviewCreated(UUID reviewId, UUID knowledgePointId, String stage, boolean blocking) {}
     public record SkillScore(LearningSkill skill, int correct, int total, double percent, boolean passed) {}
 
     public static PracticeSubmissionResponse from(PracticeSubmission result) {
         return new PracticeSubmissionResponse(result.attemptId(), result.correct(), result.total(), result.percent(),
                 result.passed(), result.countedAsEvidence(), result.results().stream().map(answer ->
                 new SubmissionResponse.SolvedAnswer(answer.questionVersionId(), answer.correct(),
-                        answer.correctAnswer(), answer.explanation(), answer.hint())).toList(), result.transcript(),
+                        answer.correctAnswer(), answer.explanation(), answer.hint(), answer.error() == null ? null
+                        : new com.ieltspath.learning.application.result.ErrorTrapResult(answer.error().code(),
+                                answer.error().name(), answer.error().fixHint()))).toList(), result.transcript(),
                 result.reviewsCreated().stream().map(review -> new ReviewCreated(review.reviewId(),
-                        review.knowledgePointId(), review.stage())).toList(),
+                        review.knowledgePointId(), review.stage(), review.blocking())).toList(),
                 result.skillScores().stream().map(score -> new SkillScore(score.skill(), score.correct(),
                         score.total(), score.percent(), score.passed())).toList(), result.gamification());
     }

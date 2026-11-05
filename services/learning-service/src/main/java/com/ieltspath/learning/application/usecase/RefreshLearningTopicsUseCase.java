@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /** Takes the topic order and knowledge point catalog from Content and returns the learner's topics with status. */
@@ -43,7 +44,10 @@ public class RefreshLearningTopicsUseCase {
     @Transactional
     public List<TopicResult> execute(UUID userId) {
         lock.lock(userId);
-        var topics = content.getTopicSequence()
+        var sequence = content.getTopicSequence(true);
+        // Clients that predate the error-trap flag and test doubles still provide the legacy sequence.
+        if (sequence == null || sequence.isEmpty()) sequence = content.getTopicSequence();
+        var topics = sequence
                 .stream()
                 .filter(topic -> Boolean.TRUE.equals(topic.active()))
                 .filter(topic -> topic.course() == null || Boolean.TRUE.equals(topic.course().active()))
@@ -57,9 +61,10 @@ public class RefreshLearningTopicsUseCase {
         List<KnowledgePointCatalogEntry> entries = new ArrayList<>();
         for (var topic : topics) {
             for (var kp : topic.knowledgePoints()) {
-                LearningSkill skill = kp.skill() == null ? topic.skill() : LearningSkill.valueOf(kp.skill());
+                LearningSkill skill = skillOf(kp.skill(), topic.skill());
                 entries.add(new KnowledgePointCatalogEntry(kp.id(), topic.topicId(), kp.hasPracticeSet(), skill,
-                        topic.course() == null ? null : topic.course().bandLevel()));
+                        topic.course() == null ? null : topic.course().bandLevel(), kp.parentKnowledgePointId(),
+                        kp.errorCode()));
             }
         }
         LearnerCurriculum curriculum = curricula.find(userId);
@@ -78,9 +83,24 @@ public class RefreshLearningTopicsUseCase {
                     statuses.get(topic.topicId()), counts.getOrDefault(topic.topicId(), 0),
                     topic.requiredFeatureKey(), topic.skill(), topic.hasTopicTest(), topic.course() == null ? null
                             : new TopicResult.Course(topic.course().courseId(), topic.course().code(),
-                            topic.course().name(), topic.course().bandLevel()),
-                    topic.course() != null && topic.course().hasCourseTest(), topic.skills(), topic.lessonCount()));
+                            topic.course().name(), topic.course().bandLevel(), topic.course().coverImageUrl(),
+                            topic.course().description(), topic.course().skillUnlockPoints(),
+                            topic.course().comboUnlockPoints(), Set.copyOf(topic.course().availableSkills()),
+                            topic.course().bannerImageUrl()),
+                    topic.course() != null && topic.course().hasCourseTest(), topic.skills(), topic.lessonCount(),
+                    topic.description()));
         }
         return List.copyOf(results);
+    }
+
+    /**
+     * The skill a knowledge point is practised in. Content marks a point that belongs to no single skill (grammar, for
+     * one) with {@code ALL}, or leaves it empty; such a point takes the skill of the topic that holds it.
+     */
+    static LearningSkill skillOf(String knowledgePointSkill, LearningSkill topicSkill) {
+        if (knowledgePointSkill == null || knowledgePointSkill.isBlank() || "ALL".equals(knowledgePointSkill)) {
+            return topicSkill;
+        }
+        return LearningSkill.valueOf(knowledgePointSkill);
     }
 }

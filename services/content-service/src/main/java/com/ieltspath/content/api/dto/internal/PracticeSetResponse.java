@@ -6,9 +6,11 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 public record PracticeSetResponse(UUID packageId, UUID packageVersionId, String code, int questionCount,
-                                  int matchedQuestionCount, BigDecimal band, String requiredFeatureKey) {
+                                  int matchedQuestionCount, BigDecimal band, String requiredFeatureKey,
+                                  int trapQuestionCount) {
     public static PracticeSetResponse from(PracticeSetResult result) {
         return new PracticeSetResponse(result.packageId(), result.packageVersionId(), result.code(),
-                result.questionCount(), result.matchedQuestionCount(), result.band(), result.requiredFeatureKey());
+                result.questionCount(), result.matchedQuestionCount(), result.band(), result.requiredFeatureKey(),
+                result.trapQuestionCount());
     }
 }

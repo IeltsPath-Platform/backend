@@ -11,10 +11,16 @@ public record PracticeSetResult(
         int questionCount,
         int matchedQuestionCount,
         BigDecimal band,
-        String requiredFeatureKey
+        String requiredFeatureKey,
+        int trapQuestionCount
 ) {
     public PracticeSetResult(UUID packageId, UUID packageVersionId, String code, int questionCount,
                              int matchedQuestionCount) {
-        this(packageId, packageVersionId, code, questionCount, matchedQuestionCount, null, null);
+        this(packageId, packageVersionId, code, questionCount, matchedQuestionCount, null, null, 0);
+    }
+
+    public PracticeSetResult(UUID packageId, UUID packageVersionId, String code, int questionCount,
+                             int matchedQuestionCount, BigDecimal band, String requiredFeatureKey) {
+        this(packageId, packageVersionId, code, questionCount, matchedQuestionCount, band, requiredFeatureKey, 0);
     }
 }

@@ -13,6 +13,7 @@ import com.ieltspath.content.domain.repository.KnowledgePointRepository;
 import com.ieltspath.content.domain.repository.KnowledgePrerequisiteRepository;
 import com.ieltspath.content.domain.repository.TopicRepository;
 import com.ieltspath.content.domain.service.KnowledgeGraph;
+import com.ieltspath.content.application.service.TrapKnowledgePointSync;
 import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.KnowledgePointCodeRules;
 import org.springframework.stereotype.Service;
@@ -31,21 +32,27 @@ public class UpdateKnowledgePointUseCase {
     private final KnowledgePointRepository knowledgePointRepository;
     private final TopicRepository topicRepository;
     private final KnowledgePrerequisiteRepository prerequisiteRepository;
+    private final TrapKnowledgePointSync trapKnowledgePointSync;
     private final KnowledgeGraph knowledgeGraph = new KnowledgeGraph();
 
     public UpdateKnowledgePointUseCase(KnowledgePointRepository knowledgePointRepository,
                                        TopicRepository topicRepository,
-                                       KnowledgePrerequisiteRepository prerequisiteRepository) {
+                                       KnowledgePrerequisiteRepository prerequisiteRepository,
+                                       TrapKnowledgePointSync trapKnowledgePointSync) {
         this.knowledgePointRepository = knowledgePointRepository;
         this.topicRepository = topicRepository;
         this.prerequisiteRepository = prerequisiteRepository;
+        this.trapKnowledgePointSync = trapKnowledgePointSync;
     }
 
     public KnowledgePointResult execute(UUID id, UpdateKnowledgePointCommand command) {
         KnowledgePoint knowledgePoint = knowledgePointRepository.findById(id)
                 .orElseThrow(() -> new KnowledgePointNotFoundException(id));
-        if (topicRepository.findById(command.topicId()).isEmpty()) {
-            throw new TopicNotFoundException(command.topicId());
+        var topic = topicRepository.findById(command.topicId())
+                .orElseThrow(() -> new TopicNotFoundException(command.topicId()));
+        if (topic.getCourseId() != null && command.skill() != com.ieltspath.content.domain.vo.Skill.ALL
+                && command.skill() != topic.getSkill()) {
+            throw new IllegalArgumentException("A knowledge point in a course topic must match its skill");
         }
         if (!knowledgePoint.getCode().equals(command.code())) {
             if (!KnowledgePointCodeRules.isValid(command.code(), command.kind(), command.skill())) {
@@ -69,7 +76,9 @@ public class UpdateKnowledgePointUseCase {
         knowledgePoint.update(command.topicId(), command.code(), command.name(), command.kind(),
                 command.learningType(), command.skill(), command.description(), command.cefrLevel(), command.canDo(),
                 command.scopeIn(), command.scopeOut());
-        return KnowledgePointResult.from(knowledgePointRepository.save(knowledgePoint));
+        KnowledgePoint saved = knowledgePointRepository.save(knowledgePoint);
+        trapKnowledgePointSync.syncForKnowledgePoint(id);
+        return KnowledgePointResult.from(saved);
     }
 
     /** A new level must keep every prerequisite at or below it and every dependent at or above it. */

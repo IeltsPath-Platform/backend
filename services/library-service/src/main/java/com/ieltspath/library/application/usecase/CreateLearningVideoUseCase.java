@@ -2,7 +2,6 @@ package com.ieltspath.library.application.usecase;
 
 import com.ieltspath.library.application.command.CreateLearningVideoCommand;
 import com.ieltspath.library.application.result.LearningVideoResult;
-import com.ieltspath.library.application.port.TopicLookup;
 import com.ieltspath.library.domain.aggregate.LearningVideo;
 import com.ieltspath.library.domain.exception.DuplicateCodeException;
 import com.ieltspath.library.domain.repository.LearningVideoRepository;
@@ -14,17 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class CreateLearningVideoUseCase {
 
     private final LearningVideoRepository learningVideoRepository;
-    private final TopicLookup topicLookup;
 
-    public CreateLearningVideoUseCase(LearningVideoRepository learningVideoRepository, TopicLookup topicLookup) {
+    public CreateLearningVideoUseCase(LearningVideoRepository learningVideoRepository) {
         this.learningVideoRepository = learningVideoRepository;
-        this.topicLookup = topicLookup;
     }
 
+    /** The topic id is kept as a reference; Library does not ask Content whether the topic exists. */
     public LearningVideoResult execute(CreateLearningVideoCommand command) {
-        if (command.topicId() != null && !topicLookup.exists(command.topicId())) {
-            throw new IllegalArgumentException("Topic not found: " + command.topicId());
-        }
         if (learningVideoRepository.existsByYoutubeVideoId(command.youtubeVideoId())) {
             throw new DuplicateCodeException("LearningVideo", command.youtubeVideoId());
         }

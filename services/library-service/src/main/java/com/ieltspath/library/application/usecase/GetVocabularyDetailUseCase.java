@@ -1,6 +1,7 @@
 package com.ieltspath.library.application.usecase;
 
 import com.ieltspath.library.application.result.VocabularyItemResult;
+import com.ieltspath.library.application.port.PronunciationAudioUrls;
 import com.ieltspath.library.application.result.VocabularySenseResult;
 import com.ieltspath.library.domain.aggregate.VocabularyItem;
 import com.ieltspath.library.domain.exception.VocabularyNotFoundException;
@@ -15,9 +16,11 @@ import java.util.UUID;
 public class GetVocabularyDetailUseCase {
 
     private final VocabularyRepository vocabularyRepository;
+    private final PronunciationAudioUrls audioUrls;
 
-    public GetVocabularyDetailUseCase(VocabularyRepository vocabularyRepository) {
+    public GetVocabularyDetailUseCase(VocabularyRepository vocabularyRepository, PronunciationAudioUrls audioUrls) {
         this.vocabularyRepository = vocabularyRepository;
+        this.audioUrls = audioUrls;
     }
 
     public VocabularyItemResult execute(UUID id) {
@@ -29,7 +32,7 @@ public class GetVocabularyDetailUseCase {
                 item.getLemma(),
                 item.getNormalizedLemma(),
                 item.getIpa(),
-                item.getPronunciationAudioReference(),
+                audioUrls.resolve(item.preferredAudioReference()),
                 item.getStatus(),
                 item.getCreatedAt(),
                 item.getUpdatedAt(),

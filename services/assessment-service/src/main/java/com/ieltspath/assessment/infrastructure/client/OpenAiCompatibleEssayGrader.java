@@ -11,6 +11,9 @@ import com.ieltspath.assessment.application.port.EssayGradingPort;
 import com.ieltspath.assessment.application.port.ActiveRubricProvider;
 import com.ieltspath.assessment.application.port.ErrorTypeCatalog;
 import com.ieltspath.assessment.infrastructure.config.AssessmentLlmProperties;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -39,20 +42,28 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
     private final RestClient restClient;
     private final ActiveRubricProvider rubrics;
     private final ErrorTypeCatalog errorTypes;
+    private final ResilientCall resilientCall;
 
     @Autowired
     public OpenAiCompatibleEssayGrader(RestClient.Builder builder, AssessmentLlmProperties properties, ObjectMapper json,
-                                       ActiveRubricProvider rubrics, ErrorTypeCatalog errorTypes) {
-        this(createClient(builder), properties, json, rubrics, errorTypes);
+                                       ActiveRubricProvider rubrics, ErrorTypeCatalog errorTypes,
+                                       ResilientCall resilientCall) {
+        this(createClient(builder), properties, json, rubrics, errorTypes, resilientCall);
     }
 
     OpenAiCompatibleEssayGrader(RestClient restClient, AssessmentLlmProperties properties, ObjectMapper json,
                                 ActiveRubricProvider rubrics, ErrorTypeCatalog errorTypes) {
+        this(restClient, properties, json, rubrics, errorTypes, ResilientCall.isolatedDefault());
+    }
+
+    OpenAiCompatibleEssayGrader(RestClient restClient, AssessmentLlmProperties properties, ObjectMapper json,
+                                ActiveRubricProvider rubrics, ErrorTypeCatalog errorTypes, ResilientCall resilientCall) {
         this.properties = properties;
         this.json = json;
         this.restClient = restClient;
         this.rubrics = rubrics;
         this.errorTypes = errorTypes;
+        this.resilientCall = resilientCall;
     }
 
     private static RestClient createClient(RestClient.Builder builder) {
@@ -83,15 +94,17 @@ public class OpenAiCompatibleEssayGrader implements EssayGradingPort {
             body.putArray("messages")
                     .addObject().put("role", "system").put("content", RubricPromptBuilder.build(rubric, activeErrorTypes));
             body.withArray("messages").addObject().put("role", "user").put("content", userPrompt(prompt, essay));
-            String response = restClient.post().uri(endpoint(properties.getBaseUrl()))
+            String response = resilientCall.call("llm", CallKind.WRITE, () -> restClient.post().uri(endpoint(properties.getBaseUrl()))
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("Authorization", "Bearer " + properties.getApiKey())
-                    .body(body).retrieve().body(String.class);
+                    .body(body).retrieve().body(String.class));
             return parseGrade(response, rubric, allowedErrorCodes, essay);
         } catch (EssayGradingException exception) {
             throw exception;
         } catch (ContentUnavailableException exception) {
             throw new EssayGradingException("RUBRIC_UNAVAILABLE");
+        } catch (DownstreamUnavailableException exception) {
+            throw new EssayGradingException("LLM_REQUEST_FAILED");
         } catch (RestClientException exception) {
             throw new EssayGradingException("LLM_REQUEST_FAILED");
         } catch (Exception exception) {

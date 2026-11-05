@@ -81,6 +81,19 @@ class FlashcardImageUseCaseTest {
     }
 
     @Test
+    void createCardCannotUseCatalogCoverAsPersonalImage() {
+        String catalogCoverKey = "catalog-cover/" + userId + "/cover.png";
+
+        InvalidDataException ex = assertThrows(InvalidDataException.class, () ->
+                createUseCase.execute(userId, FlashcardSourceType.MANUAL, null, null, null,
+                        "front", "back", catalogCoverKey, null));
+
+        assertEquals("INVALID_IMAGE_KEY", ex.getMessage());
+        verify(storage, never()).exists(any());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void createCardWithNonExistentKeyThrowsInvalidImageKey() {
         String myKey = ObjectKeys.forUser("images", userId, "png");
         when(storage.exists(myKey)).thenReturn(false);

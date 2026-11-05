@@ -54,10 +54,26 @@ abstract class ExaminerIntegrationSupport {
     @Autowired com.ieltspath.assessment.application.port.GateEssayJobStore essayJobs;
     @Autowired com.ieltspath.assessment.application.port.EssayGradeComparisonStore comparisons;
     @MockitoBean com.ieltspath.assessment.application.port.ErrorTypeCatalog errorTypes;
+    @MockitoBean com.ieltspath.assessment.application.port.ExaminerDirectory examinerDirectory;
     @MockitoBean ContentPackageProvider content;
     @MockitoBean EssayGradingPort grader;
     final UUID learner = UUID.randomUUID();
     final UUID examiner = UUID.randomUUID();
+
+    /**
+     * The service reads a list of examiners with one {@code findAll}. Tests describe an examiner by stubbing {@code find}; this
+     * lets {@code findAll} answer from those same stubs, so both ways of asking see the same examiners.
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void findAllAnswersFromTheStubbedExaminers() {
+        when(examinerDirectory.findAll(org.mockito.ArgumentMatchers.anyCollection())).thenAnswer(call -> {
+            Map<UUID, com.ieltspath.assessment.application.port.ExaminerDirectory.Examiner> found = new HashMap<>();
+            for (Object id : (Collection<?>) call.getArgument(0)) {
+                examinerDirectory.find((UUID) id).ifPresent(examiner -> found.put(examiner.id(), examiner));
+            }
+            return found;
+        });
+    }
 
     String internalToken(UUID subject, String role) throws Exception {
         var claims = new JWTClaimsSet.Builder().issuer("urn:test:gateway").subject(subject.toString())
@@ -89,8 +105,17 @@ abstract class ExaminerIntegrationSupport {
     UUID item(UUID attempt) {
         return jdbc.queryForObject("SELECT i.id FROM attempt_items i JOIN attempt_sections s ON s.id=i.attempt_section_id WHERE s.attempt_id=?", UUID.class, attempt);
     }
-    /** The examiner job of the attempt. A finalised result is sampled for QA at random, which adds a second HUMAN job. */
+    /**
+     * The examiner job of the attempt, with {@link #examiner} as the examiner the learner chose. In the product the learner
+     * makes that choice; tests about grading, not about choosing, let the default examiner be chosen here.
+     */
     UUID humanJob(UUID attempt) {
+        UUID job = unchosenHumanJob(attempt);
+        jdbc.update("UPDATE grading_jobs SET requested_examiner_id=?,requested_at=CURRENT_TIMESTAMP WHERE id=? AND requested_examiner_id IS NULL", examiner, job);
+        return job;
+    }
+    /** The examiner job as the system created it: nobody chosen yet. A finalised result is sampled for QA at random, which adds a second HUMAN job. */
+    UUID unchosenHumanJob(UUID attempt) {
         return jdbc.queryForObject("SELECT j.id FROM grading_jobs j JOIN learner_submissions l ON l.id=j.submission_id JOIN attempt_items i ON i.id=l.attempt_item_id JOIN attempt_sections s ON s.id=i.attempt_section_id WHERE s.attempt_id=? AND j.grading_mode='HUMAN' AND COALESCE(j.reason,'') <> 'QA_SAMPLE'", UUID.class, attempt);
     }
     int count(String sql, Object... args) { return jdbc.queryForObject(sql, Integer.class, args); }

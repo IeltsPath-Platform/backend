@@ -28,7 +28,9 @@ class ErrorTypeSeedMigrationTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").load().migrate();
+        // The seed as first shipped, before the examiner approved the taxonomy; the approved state is checked by
+        // ErrorTrapCoverageMigrationTest.
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("81").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
     }
 

@@ -25,7 +25,8 @@ class DistractorSeedMigrationTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").load().migrate();
+        // Later trap distractors are covered by the ErrorTrap migration and coverage tests.
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("78").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
     }
 

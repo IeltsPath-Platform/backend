@@ -2,7 +2,6 @@ package com.ieltspath.learning.application.usecase;
 
 import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.exception.LearningRequestException;
-import com.ieltspath.learning.application.port.AccessClient;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageVersion;
@@ -12,6 +11,7 @@ import com.ieltspath.learning.application.result.PracticeAttemptView;
 import com.ieltspath.learning.application.service.HeartsService;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.KnowledgePointDirectory;
+import com.ieltspath.learning.application.service.PaywallGate;
 import com.ieltspath.learning.application.service.PracticeAttemptViewAssembler;
 import com.ieltspath.learning.domain.aggregate.PracticeAttempt;
 import com.ieltspath.learning.domain.exception.LearningGateException;
@@ -54,15 +54,15 @@ public class StartFreePracticeUseCase {
     private final PracticeAttemptViewAssembler view;
     private final int reserve;
     private final HeartsService hearts;
-    private final AccessClient access;
+    private final PaywallGate paywall;
     private final Clock clock = Clock.systemUTC();
 
     public StartFreePracticeUseCase(LearnerLock lock, LearningContentClient content, KnowledgePointDirectory directory,
                                     LearnerCurriculumRepository curricula, ReviewItemRepository reviews,
                                     PracticeAttemptRepository attempts, PracticeAttemptViewAssembler view,
-                                    HeartsService hearts, AccessClient access,
+                                    HeartsService hearts, PaywallGate paywall,
                                     @Value("${learning.free-practice.reserve:2}") int reserve) {
-        this.access = access;
+        this.paywall = paywall;
         this.hearts = hearts;
         this.lock = lock;
         this.content = content;
@@ -77,9 +77,11 @@ public class StartFreePracticeUseCase {
     @Transactional
     public PracticeAttemptView execute(UUID userId, UUID knowledgePointId) {
         lock.lock(userId);
-        hearts.requireHearts(userId);
         Topic topic = topicOf(knowledgePointId);
+        PaywallGate.Request paywallRequest = paywall.forLearner(userId);
+        paywallRequest.requireKnowledgePointOpen(topic, point(topic, knowledgePointId));
         requireOpenCourse(userId, topic);
+        hearts.requireHearts(userId);
         List<PendingReview> blocking = reviews.findPending(userId).stream().filter(PendingReview::blocking)
                 .filter(review -> review.knowledgePointId().equals(knowledgePointId)).toList();
         if (!blocking.isEmpty()) throw new LearningGateException("REVIEW_REQUIRED", blocking);
@@ -96,7 +98,8 @@ public class StartFreePracticeUseCase {
         List<PracticeSet> candidates = content.searchPracticeSets(knowledgePointId, excludedList,
                 GetReviewBasketUseCase.MIN_SET_QUESTIONS, CANDIDATES);
         // One question to Access for the whole list, and only when some set needs a plan.
-        boolean premium = candidates.stream().anyMatch(set -> set.requiredFeatureKey() != null) && hasPlan();
+        boolean premium = candidates.stream().anyMatch(set -> set.requiredFeatureKey() != null)
+                && hasPlan(paywallRequest);
         BigDecimal courseBand = topic.course() == null ? null : topic.course().bandLevel();
         for (PracticeSet candidate : candidates) {
             if (!withinBand(candidate, courseBand)) continue;
@@ -122,9 +125,9 @@ public class StartFreePracticeUseCase {
      * Whether the learner has an active plan. A set that needs a feature is offered only to a learner with one; when Access
      * cannot answer, the learner is treated as having none.
      */
-    private boolean hasPlan() {
+    private boolean hasPlan(PaywallGate.Request paywallRequest) {
         try {
-            return access.premium();
+            return paywallRequest.premiumActive();
         } catch (AccessUnavailableException unavailable) {
             return false;
         }
@@ -140,7 +143,8 @@ public class StartFreePracticeUseCase {
 
     /** The learner must be taking the course of the point, and the course must be open. */
     private void requireOpenCourse(UUID userId, Topic topic) {
-        if (topic.course() == null || !topic.course().active()) {
+        if (topic.course() == null) return;
+        if (!topic.course().active()) {
             throw new LearningRequestException(403, "COURSE_NOT_OPEN", "The course of this knowledge point is closed");
         }
         boolean taking = curricula.find(userId).topics().stream()
@@ -150,13 +154,19 @@ public class StartFreePracticeUseCase {
         }
     }
 
+    private static com.ieltspath.learning.application.port.LearningContentClient.KnowledgePoint point(
+            Topic topic, UUID knowledgePointId) {
+        return topic.knowledgePoints().stream().filter(item -> item.id().equals(knowledgePointId)).findFirst()
+                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND", "Knowledge point was not found"));
+    }
+
     /** The point's skill as Content names it; a point whose skill is missing or unknown cannot be practised freely. */
     private Optional<LearningSkill> skillOf(Topic topic, UUID knowledgePointId) {
         String named = directory.describe().getOrDefault(knowledgePointId, KnowledgePointDirectory.Entry.UNKNOWN).skill();
-        if (named == null) named = topic.skill() == null ? null : topic.skill().name();
-        String skillName = named;
-        return Arrays.stream(LearningSkill.values()).filter(skill -> Objects.equals(skill.name(), skillName))
-                .findFirst();
+        if (named == null || named.isBlank()) return Optional.ofNullable(topic.skill());
+        Optional<LearningSkill> pointSkill = Arrays.stream(LearningSkill.values())
+                .filter(skill -> skill.name().equals(named.trim())).findFirst();
+        return pointSkill.isPresent() ? pointSkill : Optional.ofNullable(topic.skill());
     }
 
     private static LearningRequestException exhausted() {

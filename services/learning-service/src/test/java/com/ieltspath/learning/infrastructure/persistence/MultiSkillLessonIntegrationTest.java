@@ -111,6 +111,7 @@ class MultiSkillLessonIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        LearningContentClientTestSupport.stubLessonAccessSummaries(content);
         jdbc.execute("TRUNCATE review_theory_checks, review_sets, review_items, practice_attempts, "
                 + "lesson_practice_passes, lesson_exercise_submissions, kp_evidence, lesson_progress, topic_progress, "
                 + "knowledge_point_catalog, topic_test_assignments, assessment_result_versions CASCADE");
@@ -179,7 +180,10 @@ class MultiSkillLessonIntegrationTest {
                 .map(PracticeSubmission.ReviewCreated::knowledgePointId).toList());
         assertEquals("LISTENING", jdbc.queryForObject("SELECT skill FROM review_items WHERE user_id = ? "
                 + "AND knowledge_point_id = ?", String.class, USER, KP_LISTENING));
-        assertEquals(PracticeStatus.REQUIRED, practiceSets.execute(USER, MIXED).practiceStatus());
+        assertFalse(result.reviewsCreated().getFirst().blocking());
+        var catalog = practiceSets.execute(USER, MIXED);
+        assertEquals(PracticeStatus.PASSED, catalog.practiceStatus());
+        assertEquals(PracticePassReason.ATTEMPT_NOT_BLOCKED, catalog.practicePassReason());
     }
 
     @Test

@@ -10,6 +10,27 @@ import static org.junit.jupiter.api.Assertions.*;
 @Testcontainers(disabledWithoutDocker=true)
 class WordlyVocabularyPostgresTest {
  @Container static PostgreSQLContainer<?> db=new PostgreSQLContainer<>("postgres:15-alpine");
+ @Test void filtersByLevelAndTopicBeforeChoosingAMeaning() {
+  var ds=new DriverManagerDataSource(db.getJdbcUrl(),db.getUsername(),db.getPassword());
+  Flyway.configure().dataSource(ds).load().migrate();var sql=new JdbcTemplate(ds);
+  var work=sql.queryForObject("SELECT id FROM vocabulary_topics WHERE slug='work-business'",java.util.UUID.class);
+  var life=sql.queryForObject("SELECT id FROM vocabulary_topics WHERE slug='daily-life'",java.util.UUID.class);
+  var run=java.util.UUID.randomUUID();
+  sql.update("INSERT INTO vocabulary_items(id,lemma,normalized_lemma) VALUES (?,'zzrun','zzrun')",run);
+  String sense="INSERT INTO vocabulary_senses(vocabulary_item_id,part_of_speech,vietnamese_meaning,example_sentence,sort_order,cefr_level,topic_id) VALUES (?,'VERB',?,'x',?,?,?)";
+  sql.update(sense,run,"chạy",0,"A1",life);
+  sql.update(sense,run,"điều hành",1,"B2",work);
+  var adapter=new WordlyVocabularyAdapter(sql);
+  java.util.function.BiFunction<String,java.util.UUID,String> meaning=(level,topic)->adapter.page("ZZRU",5,level,topic)
+   .stream().filter(w->w.answer().equals("ZZRUN")).map(w->w.meaning()).findFirst().orElse(null);
+  assertEquals("chạy",meaning.apply(null,null),"no filter keeps the first meaning");
+  assertEquals("điều hành",meaning.apply("B2",null));
+  assertEquals("điều hành",meaning.apply(null,work));
+  assertEquals("điều hành",meaning.apply("B2",work));
+  assertNull(meaning.apply("B2",life),"one meaning has to match both");
+  assertEquals("chạy",meaning.apply("A1",life));
+  sql.update("DELETE FROM vocabulary_items WHERE id=?",run);
+ }
  @Test void filtersInvalidInactiveAndDuplicateWords() {
   var ds=new DriverManagerDataSource(db.getJdbcUrl(),db.getUsername(),db.getPassword());
   Flyway.configure().dataSource(ds).load().migrate();var sql=new JdbcTemplate(ds);

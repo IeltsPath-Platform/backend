@@ -7,6 +7,8 @@ import com.ieltspath.user.domain.exception.InvalidActionTokenException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.AccountActionTokenRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
+import com.ieltspath.user.application.port.UserLock;
+import com.ieltspath.user.domain.repository.RefreshTokenRepository;
 import com.ieltspath.user.domain.vo.ActionTokenPurpose;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,8 @@ public class ResetPasswordUseCase {
     private final AccountActionTokenRepository accountActionTokenRepository;
     private final TokenHashService tokenHashService;
     private final PasswordEncoder passwordEncoder;
+    private final UserLock userLock;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Transactional
     public void execute(ResetPasswordCommand command) {
@@ -40,14 +44,16 @@ public class ResetPasswordUseCase {
             throw new InvalidActionTokenException("Mã token đã hết hạn hoặc đã được sử dụng");
         }
 
-        actionToken.use();
-        accountActionTokenRepository.save(actionToken);
-
         User user = userRepository.findById(actionToken.getUserId())
                 .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng sở hữu token này"));
+        userLock.lock(user.getId());
+        if (!accountActionTokenRepository.consumePasswordResetToken(tokenHash, java.time.LocalDateTime.now())) {
+            throw new InvalidActionTokenException("Mã token đã hết hạn hoặc đã được sử dụng");
+        }
 
         user.changePassword(passwordEncoder.encode(command.newPassword()));
         userRepository.save(user);
+        refreshTokenRepository.revokeAllActiveForUser(user.getId(), java.time.LocalDateTime.now());
 
         log.info("Đặt lại mật khẩu thành công cho userId={}", user.getId());
     }

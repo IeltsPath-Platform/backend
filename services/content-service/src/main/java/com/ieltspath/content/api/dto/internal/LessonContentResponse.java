@@ -22,8 +22,14 @@ public record LessonContentResponse(
         List<UUID> knowledgePointIds,
         List<Block> blocks,
         Skill skill,
-        List<Skill> skills
+        List<Skill> skills,
+        UUID courseId,
+        Integer skillPosition
 ) {
+    public LessonContentResponse(UUID lessonId, UUID topicId, String code, String title, String summary, int sortOrder,
+                                 List<UUID> knowledgePointIds, List<Block> blocks, Skill skill, List<Skill> skills) {
+        this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, blocks, skill, skills, null, null);
+    }
     /**
      * A block shows only the field of its type; {@code blockKind} appears on EXERCISE blocks.
      * {@code knowledgePointIds} are those a TEXT block teaches or an EXERCISE block's questions measure.
@@ -66,7 +72,8 @@ public record LessonContentResponse(
     public static LessonContentResponse from(LessonContentResult result) {
         return new LessonContentResponse(result.lessonId(), result.topicId(), result.code(), result.title(),
                 result.summary(), result.sortOrder(), result.knowledgePointIds(),
-                result.blocks().stream().map(LessonContentResponse::block).toList(), result.skill(), result.skills());
+                result.blocks().stream().map(LessonContentResponse::block).toList(), result.skill(), result.skills(),
+                result.courseId(), result.skillPosition());
     }
 
     private static Block block(LessonContentResult.Block block) {

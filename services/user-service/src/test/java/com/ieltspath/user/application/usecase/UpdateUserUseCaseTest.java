@@ -1,5 +1,9 @@
 package com.ieltspath.user.application.usecase;
 
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.ieltspath.user.domain.exception.PhoneAlreadyExistsException;
 import com.ieltspath.user.application.command.UpdateUserCommand;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.repository.UserRepository;
@@ -33,16 +37,45 @@ class UpdateUserUseCaseTest {
                 .id(userId)
                 .email(new Email("john@example.com"))
                 .fullName("John Doe")
-                .phoneNumber(new PhoneNumber("111"))
+                .phoneNumber(new PhoneNumber("0111111111"))
                 .status(UserStatus.ACTIVE)
                 .build();
         when(userRepository.findById(userId)).thenReturn(Optional.of(existing));
-        when(userRepository.existsByPhoneNumberAndIdNot("222", userId)).thenReturn(false);
+        when(userRepository.existsByPhoneNumberAndIdNot("0222222222", userId)).thenReturn(false);
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        User updated = useCase.execute(new UpdateUserCommand(userId, "John Updated", "222"));
+        User updated = useCase.execute(new UpdateUserCommand(userId, "John Updated", "0222222222"));
 
         assertThat(updated.getFullName()).isEqualTo("John Updated");
-        assertThat(updated.getPhoneNumber().value()).isEqualTo("222");
+        assertThat(updated.getPhoneNumber().value()).isEqualTo("0222222222");
+    }
+
+    private User existingUser(UUID userId) {
+        return User.builder().id(userId).email(new Email("john@example.com")).fullName("John Doe")
+                .phoneNumber(new PhoneNumber("0111111111")).status(UserStatus.ACTIVE).build();
+    }
+
+    @Test
+    void checksAndSavesThePhoneNumberWithoutSeparators() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser(userId)));
+        when(userRepository.existsByPhoneNumberAndIdNot("0123456789", userId)).thenReturn(false);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User updated = useCase.execute(new UpdateUserCommand(userId, "John Doe", "0123 456 789"));
+
+        assertThat(updated.getPhoneNumber().value()).isEqualTo("0123456789");
+    }
+
+    @Test
+    void rejectsAPhoneNumberUsedByAnotherAccount() {
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser(userId)));
+        when(userRepository.existsByPhoneNumberAndIdNot("0222222222", userId)).thenReturn(true);
+
+        assertThatThrownBy(() -> useCase.execute(new UpdateUserCommand(userId, "John Doe", "0222222222")))
+                .isInstanceOf(PhoneAlreadyExistsException.class)
+                .hasMessage("Số điện thoại đã tồn tại: 0222222222");
+        verify(userRepository, never()).save(any(User.class));
     }
 }

@@ -79,6 +79,8 @@ return `400`.
 
 `exampleSentence` returns the card's custom sentence if set; if null, it falls back to the linked vocabulary sense example sentence. Vocabulary metadata fields (`ipa`, `pronunciationAudioReference`) are `null` when the card has no linked vocabulary sense or the catalog metadata is unavailable.
 
+`pronunciationAudioReference` is the preferred audio in US → UK → legacy-column order, returned as a complete HTTPS URL or null.
+
 ## Review a card
 
 `POST /api/learning-support/flashcards/{flashcardId}/reviews` accepts:

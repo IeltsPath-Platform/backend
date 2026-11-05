@@ -15,6 +15,8 @@ import com.ieltspath.learning.application.service.DiagnosticFlow;
 import com.ieltspath.learning.application.service.ItemGrading;
 import com.ieltspath.learning.application.service.LessonEvidenceReference;
 import com.ieltspath.learning.application.service.MasteryProfileUpdater;
+import com.ieltspath.learning.application.service.ErrorTrapEvidence;
+import com.ieltspath.learning.application.service.ErrorTrapCatalog;
 import com.ieltspath.learning.domain.repository.DiagnosticRepository;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.PracticeAttemptRepository;
@@ -50,12 +52,14 @@ public class SubmitDiagnosticProbeUseCase {
     private final QuestionEventLog questionEvents;
     private final MasteryProfileUpdater masteryProfiles;
     private final DiagnosticFlow flow;
+    private final ErrorTrapEvidence errorTrapEvidence;
     private final ItemGrading grading = new ItemGrading();
 
     public SubmitDiagnosticProbeUseCase(LearnerLock lock, DiagnosticRepository diagnostics,
                                         PracticeAttemptRepository attempts, LearningContentClient content,
                                         KnowledgeEvidenceRepository evidence, QuestionEventLog questionEvents,
-                                        MasteryProfileUpdater masteryProfiles, DiagnosticFlow flow) {
+                                        MasteryProfileUpdater masteryProfiles, DiagnosticFlow flow,
+                                        ErrorTrapEvidence errorTrapEvidence) {
         this.lock = lock;
         this.diagnostics = diagnostics;
         this.attempts = attempts;
@@ -64,6 +68,7 @@ public class SubmitDiagnosticProbeUseCase {
         this.questionEvents = questionEvents;
         this.masteryProfiles = masteryProfiles;
         this.flow = flow;
+        this.errorTrapEvidence = errorTrapEvidence;
     }
 
     @Transactional
@@ -87,11 +92,14 @@ public class SubmitDiagnosticProbeUseCase {
         if (!replay) record(userId, probe, command, graded);
 
         List<SubmissionResult.AnswerResult> results = new ArrayList<>();
+        Map<String, com.ieltspath.learning.application.service.ErrorTypeTexts.Text> errorTexts =
+                errorTrapEvidence.errorTexts(graded.errorCodes());
         for (int index = 0; index < graded.items().size(); index++) {
             Item item = graded.items().get(index);
             AnswerSpecGrader.Grade grade = graded.grades().get(index);
             results.add(new SubmissionResult.AnswerResult(item.questionVersionId(), grade.correct(),
-                    grade.correctAnswer(), item.explanation()));
+                    grade.correctAnswer(), item.explanation(), null,
+                    errorTrapEvidence.feedback(graded.errorCodes().get(index), errorTexts)));
         }
         Section first = ItemGrading.orderedSections(version).stream().findFirst().orElse(null);
         String transcript = first != null && first.audio() != null ? first.audio().transcript() : null;
@@ -106,6 +114,9 @@ public class SubmitDiagnosticProbeUseCase {
         Map<UUID, Long> durations = AnswerDurations.of(command.answers());
         List<KnowledgeEvidence> answers = new ArrayList<>();
         List<QuestionAttemptEvent> events = new ArrayList<>();
+        ErrorTrapCatalog.ErrorTraps trapCatalog = errorTrapEvidence.loadIfNeeded(
+                graded.items().stream().anyMatch(item -> item.answerSpec().get("distractors") instanceof Map<?, ?>));
+        java.util.Set<UUID> withoutMilestone = new java.util.HashSet<>();
         for (int index = 0; index < graded.items().size(); index++) {
             Item item = graded.items().get(index);
             boolean correct = graded.grades().get(index).correct();
@@ -116,13 +127,18 @@ public class SubmitDiagnosticProbeUseCase {
                         LessonEvidenceReference.forDiagnosticProbe(command.requestId(), item.questionVersionId(),
                                 kpId)).forQuestion(item.questionVersionId()));
             }
+            errorTrapEvidence.append(answers, withoutMilestone, item.answerSpec(),
+                    correct, graded.errorCodes().get(index), item.questionVersionId(),
+                    kp -> LessonEvidenceReference.forDiagnosticProbe(command.requestId(), item.questionVersionId(), kp),
+                    trapCatalog);
             events.add(QuestionAttemptEvent.of(userId, item.questionVersionId(), mapped, correct,
                     durations.get(item.questionVersionId()), graded.errorCodes().get(index),
                     QuestionEventSource.DIAGNOSTIC_PROBE, command.requestId(), true));
         }
         questionEvents.append(events);
         evidence.append(userId, answers);
-        masteryProfiles.recordEvidence(userId, answers);
+        masteryProfiles.recordEvidence(userId, answers, withoutMilestone);
+        errorTrapEvidence.createReviews(userId, null, answers);
 
         boolean passed = PassMark.passes(graded.correct(), graded.total());
         diagnostics.answerProbe(probe.id(), graded.correct(), graded.total(), passed, command.requestId());

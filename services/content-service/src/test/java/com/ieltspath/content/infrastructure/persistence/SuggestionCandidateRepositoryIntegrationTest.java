@@ -58,8 +58,8 @@ class SuggestionCandidateRepositoryIntegrationTest {
         transaction = transactionManager.getTransaction(new DefaultTransactionDefinition());
         repository = new JdbcSuggestionCandidateRepository(new NamedParameterJdbcTemplate(dataSource));
 
-        UUID lowCourse = jdbc.queryForObject("SELECT id FROM courses WHERE band_level=5.5", UUID.class);
-        UUID highCourse = jdbc.queryForObject("SELECT id FROM courses WHERE band_level=6.5", UUID.class);
+        UUID lowCourse = jdbc.queryForObject("SELECT id FROM courses WHERE band_level=6.0", UUID.class);
+        UUID highCourse = jdbc.queryForObject("SELECT id FROM courses WHERE band_level=7.0", UUID.class);
         UUID lowTopic = topic(lowCourse);
         UUID highTopic = topic(highCourse);
         lowKp = knowledgePoint(lowTopic);
@@ -78,7 +78,7 @@ class SuggestionCandidateRepositoryIntegrationTest {
 
     @Test
     void batchesSetsTestsAndLessonsWithinTheRequestedBand() {
-        var atLowBand = candidates(new BigDecimal("5.5"));
+        var atLowBand = candidates(new BigDecimal("6.0"));
         assertThat(atLowBand.packages()).extracting(SuggestionCandidatesResult.PackageCandidate::packageId)
                 .containsExactlyInAnyOrder(lowSet.id(), lowTest.id());
         assertThat(atLowBand.packages()).extracting(SuggestionCandidatesResult.PackageCandidate::type)
@@ -86,13 +86,13 @@ class SuggestionCandidateRepositoryIntegrationTest {
         assertThat(atLowBand.packages()).allSatisfy(item -> {
             assertThat(item.packageVersionId()).isNotNull();
             assertThat(item.knowledgePointIds()).containsExactly(lowKp);
-            assertThat(item.band()).isEqualByComparingTo("5.5");
+            assertThat(item.band()).isEqualByComparingTo("6.0");
             assertThat(item.skill().name()).isEqualTo("READING");
         });
         assertThat(atLowBand.lessons()).extracting(SuggestionCandidatesResult.LessonCandidate::lessonId)
                 .containsExactly(lowLesson);
 
-        var atHighBand = candidates(new BigDecimal("6.5"));
+        var atHighBand = candidates(new BigDecimal("7.0"));
         assertThat(atHighBand.packages()).extracting(SuggestionCandidatesResult.PackageCandidate::packageId)
                 .containsExactlyInAnyOrder(lowSet.id(), lowTest.id(), highTest.id());
         assertThat(atHighBand.lessons()).extracting(SuggestionCandidatesResult.LessonCandidate::lessonId)
@@ -110,9 +110,9 @@ class SuggestionCandidateRepositoryIntegrationTest {
         jdbc.update("UPDATE content_package_versions SET status='DRAFT' WHERE id=?", lowTest.versionId());
         jdbc.update("UPDATE lessons SET status='DRAFT' WHERE id=?", lowLesson);
 
-        var result = repository.packages(List.of(lowKp), new BigDecimal("5.5"));
+        var result = repository.packages(List.of(lowKp), new BigDecimal("6.0"));
         assertThat(result).isEmpty();
-        assertThat(repository.lessons(List.of(lowKp), new BigDecimal("5.5"))).isEmpty();
+        assertThat(repository.lessons(List.of(lowKp), new BigDecimal("6.0"))).isEmpty();
     }
 
     @Test
@@ -120,19 +120,19 @@ class SuggestionCandidateRepositoryIntegrationTest {
         jdbc.update("INSERT INTO question_knowledge_points(question_version_id,knowledge_point_id) VALUES (?,?)",
                 lowSet.questionVersionId(), highKp);
         jdbc.update("UPDATE knowledge_points SET skill='WRITING' WHERE id=?", highKp);
-        var lowBand = candidates(new BigDecimal("5.5"));
+        var lowBand = candidates(new BigDecimal("6.0"));
         assertThat(lowBand.packages()).extracting(SuggestionCandidatesResult.PackageCandidate::packageId)
                 .containsExactly(lowTest.id());
 
-        var highBand = candidates(new BigDecimal("6.5"));
+        var highBand = candidates(new BigDecimal("7.0"));
         var set = highBand.packages().stream().filter(item -> item.packageId().equals(lowSet.id())).findFirst().orElseThrow();
-        assertThat(set.band()).isEqualByComparingTo("6.5");
+        assertThat(set.band()).isEqualByComparingTo("7.0");
         assertThat(set.knowledgePointIds()).containsExactlyInAnyOrder(lowKp, highKp);
         assertThat(set.skill()).isNull();
 
         jdbc.update("UPDATE content_packages SET current_published_version_id=? WHERE id=?",
                 highTest.versionId(), lowSet.id());
-        assertThat(repository.packages(List.of(lowKp), new BigDecimal("6.5")))
+        assertThat(repository.packages(List.of(lowKp), new BigDecimal("7.0")))
                 .extracting(SuggestionCandidatesResult.PackageCandidate::packageId).doesNotContain(lowSet.id());
     }
 
@@ -166,7 +166,7 @@ class SuggestionCandidateRepositoryIntegrationTest {
                 .extracting(SuggestionCandidatesResult.PackageCandidate::packageId).containsExactly(lowTest.id());
 
         jdbc.update("UPDATE lessons SET status='PUBLISHED' WHERE id=?", lowLesson);
-        UUID otherCourse = jdbc.queryForObject("SELECT id FROM courses WHERE band_level=6.5", UUID.class);
+        UUID otherCourse = jdbc.queryForObject("SELECT id FROM courses WHERE band_level=7.0", UUID.class);
         jdbc.update("UPDATE content_packages SET course_id=? WHERE id=?", otherCourse, lowTest.id());
         jdbc.update("UPDATE courses SET status='INACTIVE' WHERE id=?", otherCourse);
         assertThat(repository.packages(List.of(lowKp), new BigDecimal("9.0")))

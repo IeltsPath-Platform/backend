@@ -72,6 +72,27 @@ class ErrorTypeControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void aLearnerReadsTheNameAndFixOfApprovedErrorTypesOnly() throws Exception {
+        when(listErrorTypes.executeApprovedActive()).thenReturn(List.of(
+                ErrorType.create("TENSE", "Verb tense", ErrorCategory.GRAMMAR, 2, null, "Match the tense to the time.")));
+
+        mockMvc.perform(get("/api/content/error-types/approved"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("TENSE"))
+                .andExpect(jsonPath("$[0].name").value("Verb tense"))
+                .andExpect(jsonPath("$[0].category").value("GRAMMAR"))
+                .andExpect(jsonPath("$[0].fixHint").value("Match the tense to the time."))
+                .andExpect(jsonPath("$[0].id").doesNotExist())
+                .andExpect(jsonPath("$[0].reviewStatus").doesNotExist());
+    }
+
+    @Test
+    void theApprovedListNeedsASignedInUser() throws Exception {
+        mockMvc.perform(get("/api/content/error-types/approved")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @WithMockUser(roles = "EXAMINER")
     void examinerCannotCreateErrorTypes() throws Exception {
         mockMvc.perform(post("/api/content/error-types")

@@ -31,9 +31,23 @@ class UpdateTopicUseCaseTest {
                 courseId, "IELTS", "IELTS", new java.math.BigDecimal("5.5"), ContentStatus.ACTIVE, null, null)));
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
         var result = new UpdateTopicUseCase(repository, courses).execute(new UpdateTopicCommand(
-                topic.getId(), null, "Topic", 1, null, BandRange.UNBOUNDED, null, courseId));
+                topic.getId(), null, "Topic", 1, null, BandRange.UNBOUNDED, Skill.READING, courseId));
         assertThat(result.courseId()).isEqualTo(courseId);
         assertThat(topic.getCourseId()).isEqualTo(courseId);
+    }
+
+    @Test
+    void anExistingCourseTopicCannotRemainWithoutOneSkill() {
+        var courses = mock(com.ieltspath.content.domain.repository.CourseRepository.class);
+        UUID courseId = UUID.randomUUID();
+        var topic = new Topic(UUID.randomUUID(), null, "TOPIC", "Topic", 1, ContentStatus.ACTIVE,
+                BandRange.UNBOUNDED, null, Instant.now(), Instant.now(), courseId);
+        when(repository.findById(topic.getId())).thenReturn(Optional.of(topic));
+
+        assertThatThrownBy(() -> new UpdateTopicUseCase(repository, courses).execute(new UpdateTopicCommand(
+                topic.getId(), null, "Changed", 1, null, BandRange.UNBOUNDED, null, null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("exactly one skill");
+        verify(repository, never()).save(any());
     }
 
     @Test
@@ -54,6 +68,7 @@ class UpdateTopicUseCaseTest {
         var topic = Topic.create(null, "TOPIC", "Topic", 1);
         UUID courseId = UUID.randomUUID();
         topic.assignCourse(courseId);
+        topic.changeSkill(Skill.READING);
         when(repository.findById(topic.getId())).thenReturn(Optional.of(topic));
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
         var result = new UpdateTopicUseCase(repository, courses).execute(new UpdateTopicCommand(

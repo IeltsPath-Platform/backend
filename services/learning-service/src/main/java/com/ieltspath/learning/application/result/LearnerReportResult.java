@@ -46,7 +46,18 @@ public record LearnerReportResult(UUID userId, Instant generatedAt, List<Knowled
 
     public record KnowledgePointReport(UUID knowledgeId, String code, String name, String skill, BigDecimal band,
                                        Score score, List<ErrorEntry> errors, List<EvidenceEntry> evidence,
-                                       Action action) {}
+                                       Action action, List<ErrorTrapPoint> errorTraps) {
+        public KnowledgePointReport {
+            errorTraps = errorTraps == null ? List.of() : List.copyOf(errorTraps);
+        }
+        public KnowledgePointReport(UUID knowledgeId, String code, String name, String skill, BigDecimal band,
+                                    Score score, List<ErrorEntry> errors, List<EvidenceEntry> evidence, Action action) {
+            this(knowledgeId, code, name, skill, band, score, errors, evidence, action, List.of());
+        }
+    }
+
+    public record ErrorTrapPoint(UUID knowledgePointId, String code, String name, String tier, double mastery,
+                                 int evidenceCount) {}
 
     public record Score(double mastery, String tier, int evidenceCount) {}
 

@@ -19,5 +19,6 @@ public record PracticeSetSearchRequest(
         @Min(value = 1, message = "limit must be between 1 and 10")
         @Max(value = 10, message = "limit must be between 1 and 10")
         Integer limit,
-        UUID preferredLessonId
+        UUID preferredLessonId,
+        String trapErrorCode
 ) {}

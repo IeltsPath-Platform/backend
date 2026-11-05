@@ -18,10 +18,21 @@ public record LessonSummaryResult(
         List<UUID> knowledgePointIds,
         List<UUID> exerciseBlockIds,
         List<Skill> skills,
-        Integer estimatedMinutes
+        Integer estimatedMinutes,
+        UUID courseId,
+        Skill skill,
+        Integer skillPosition
 ) {
     public LessonSummaryResult(UUID lessonId, UUID topicId, String code, String title, String summary, int sortOrder,
+                               List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds, List<Skill> skills,
+                               Integer estimatedMinutes) {
+        this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, skills,
+                estimatedMinutes, null, skills != null && skills.size() == 1 ? skills.getFirst() : null, null);
+    }
+
+    public LessonSummaryResult(UUID lessonId, UUID topicId, String code, String title, String summary, int sortOrder,
                                List<UUID> knowledgePointIds, List<UUID> exerciseBlockIds) {
-        this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, List.of(), null);
+        this(lessonId, topicId, code, title, summary, sortOrder, knowledgePointIds, exerciseBlockIds, List.of(), null,
+                null, null, null);
     }
 }

@@ -63,13 +63,26 @@ public class CourseCoverageAnalyzer {
         }
     }
 
+    /**
+     * A question of an exercise block must exist, and a question belongs to one place only: not to a lesson or a
+     * package already, and not to a second block of this draft. Each problem is reported once per question.
+     */
     private static void checkQuestionRefs(List<LessonPlan> lessons, CourseCatalogFacts facts, List<Issue> errors) {
         Set<String> reported = new HashSet<>();
+        Set<UUID> placed = new HashSet<>();
         for (LessonPlan lesson : lessons) {
             lesson.blocks().stream().filter(block -> block.type() == BlockType.EXERCISE)
                     .flatMap(block -> block.questionRefs().stream())
-                    .filter(ref -> !facts.resolvedQuestionRefs().containsKey(ref) && reported.add(ref))
-                    .forEach(ref -> errors.add(new Issue("QUESTION_REF_UNKNOWN", ref, null)));
+                    .forEach(ref -> {
+                        UUID version = facts.resolvedQuestionRefs().get(ref);
+                        if (version == null) {
+                            if (reported.add(ref)) errors.add(new Issue("QUESTION_REF_UNKNOWN", ref, null));
+                        } else if (facts.ownedQuestionVersions().contains(version)) {
+                            if (reported.add(ref)) errors.add(new Issue("QUESTION_ALREADY_OWNED", ref, null));
+                        } else if (!placed.add(version) && reported.add(ref)) {
+                            errors.add(new Issue("QUESTION_REUSED", ref, null));
+                        }
+                    });
         }
     }
 

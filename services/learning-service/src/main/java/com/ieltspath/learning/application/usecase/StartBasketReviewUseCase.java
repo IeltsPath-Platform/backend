@@ -5,6 +5,7 @@ import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.result.ReviewResult;
 import com.ieltspath.learning.application.service.CompletedLessonLocator;
+import com.ieltspath.learning.application.service.ErrorTrapCatalog;
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
 import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
 import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
@@ -13,6 +14,8 @@ import com.ieltspath.learning.domain.repository.ReviewItemRepository;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.MasteryTier;
 import com.ieltspath.learning.domain.vo.PendingReview;
+import com.ieltspath.learning.domain.service.MainErrorRule;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,12 +40,15 @@ public class StartBasketReviewUseCase {
     private final KnowledgeEvidenceRepository evidence;
     private final LearningContentClient content;
     private final GetReviewUseCase getReview;
+    private final ErrorTrapCatalog errorTraps;
     private final Clock clock = Clock.systemUTC();
 
+    @Autowired
     public StartBasketReviewUseCase(LearnerLock lock, MasteryProfileRepository profiles, ReviewItemRepository reviews,
                                     PracticeAttemptRepository attempts, CompletedLessonLocator lessonLocator,
                                     KnowledgeEvidenceRepository evidence,
-                                    LearningContentClient content, GetReviewUseCase getReview) {
+                                    LearningContentClient content, GetReviewUseCase getReview,
+                                    ErrorTrapCatalog errorTraps) {
         this.lock = lock;
         this.profiles = profiles;
         this.reviews = reviews;
@@ -51,11 +57,17 @@ public class StartBasketReviewUseCase {
         this.evidence = evidence;
         this.content = content;
         this.getReview = getReview;
+        this.errorTraps = errorTraps;
     }
 
     @Transactional
     public ReviewResult execute(UUID userId, UUID knowledgePointId) {
         lock.lock(userId);
+        ErrorTrapCatalog.ErrorTraps traps = errorTraps == null ? null : errorTraps.load();
+        if (traps != null && traps.parentByTrapKp().containsKey(knowledgePointId)) {
+            throw new LearningRequestException(409, "NOT_IN_REVIEW_BASKET",
+                    "This knowledge point is not in the review basket");
+        }
         Optional<PendingReview> existing = reviews.findPending(userId).stream()
                 .filter(review -> review.knowledgePointId().equals(knowledgePointId)).findFirst();
         if (existing.isPresent()) return getReview.execute(userId, existing.get().reviewId());
@@ -70,8 +82,14 @@ public class StartBasketReviewUseCase {
                 "NO_LESSON_FOR_KNOWLEDGE_POINT", "No completed lesson teaches this knowledge point"));
         Set<UUID> excluded = new HashSet<>(attempts.revealedPackageIds(userId));
         excluded.addAll(reviews.assignedPackageIds(userId));
-        if (content.searchPracticeSets(knowledgePointId, excluded.stream().toList(),
-                GetReviewBasketUseCase.MIN_SET_QUESTIONS, 1, lessonId).isEmpty()) {
+        String trapErrorCode = traps == null ? null : MainErrorRule.mainErrorCode(knowledgePointId,
+                profiles.findErrorTrapProfiles(userId), traps).orElse(null);
+        List<LearningContentClient.PracticeSet> candidates = trapErrorCode == null
+                ? content.searchPracticeSets(knowledgePointId, excluded.stream().toList(),
+                        GetReviewBasketUseCase.MIN_SET_QUESTIONS, 1, lessonId)
+                : content.searchPracticeSets(knowledgePointId, excluded.stream().toList(),
+                        GetReviewBasketUseCase.MIN_SET_QUESTIONS, 1, lessonId, trapErrorCode);
+        if (candidates.isEmpty()) {
             throw new LearningRequestException(409, "NO_UNREVEALED_SET",
                     "No practice set the learner has not seen is left for this knowledge point");
         }

@@ -58,6 +58,10 @@ public class GameRoomJpaEntity {
     private Short questionCount;
     @Column(name = "seconds_per_question")
     private Short secondsPerQuestion;
+    @Column(name = "cefr_level")
+    private String cefrLevel;
+    @Column(name = "topic_id")
+    private UUID topicId;
     @Column(name = "is_delete", nullable = false)
     private boolean isDelete;
     @Column(name = "deleted_at")
@@ -66,7 +70,8 @@ public class GameRoomJpaEntity {
     public WordlyRoomSettings wordlySettings() {
         return "WORDLY".equals(gameType) ? new WordlyRoomSettings(
                 WordlyRoomSettings.PlayerMode.valueOf(playerMode), initialLives,
-                WordlyRoomSettings.PlayMode.valueOf(playMode), wordLimit, wordTimeLimitSeconds != null) : null;
+                WordlyRoomSettings.PlayMode.valueOf(playMode), wordLimit, wordTimeLimitSeconds != null,
+                new com.ieltspath.game.domain.vo.WordFilter(cefrLevel, topicId)) : null;
     }
 
     /** Settings of the room's current game; null for legacy session rooms. */
@@ -74,7 +79,7 @@ public class GameRoomJpaEntity {
         return switch (gameType) {
             case "WORDLY" -> wordlySettings();
             case "ROCKET" -> new RocketRoomSettings("SOLO".equals(playerMode), questionCount, initialLives,
-                    secondsPerQuestion);
+                    secondsPerQuestion, new com.ieltspath.game.domain.vo.WordFilter(cefrLevel, topicId));
             default -> null;
         };
     }
@@ -89,6 +94,8 @@ public class GameRoomJpaEntity {
                 initialLives = (short) rocket.initialLives();
                 questionCount = (short) rocket.questionCount();
                 secondsPerQuestion = (short) rocket.secondsPerQuestion();
+                cefrLevel = rocket.wordFilter().cefrLevel();
+                topicId = rocket.wordFilter().topicId();
             }
         }
     }
@@ -100,6 +107,8 @@ public class GameRoomJpaEntity {
         wordTimeLimitSeconds = settings.timeEnabled() ? (short) 180 : null;
         playMode = settings.playMode().name();
         wordLimit = settings.wordLimit();
+        cefrLevel = settings.wordFilter().cefrLevel();
+        topicId = settings.wordFilter().topicId();
     }
 
     protected GameRoomJpaEntity() {

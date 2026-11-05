@@ -14,6 +14,8 @@ source: conversation
 
 # Lưu mp3 và ảnh bài học trên Supabase Storage
 
+> **Tiếp nối 2026-10-31:** phần cấu hình bucket còn lại, nạp file thiếu, ảnh bìa, bucket `media-premium` và upload Speaking được lập kế hoạch ở `261031-1215-supabase-storage-reorganization`.
+
 ## Cập nhật 2026-10-19 (thay các mục "upload tay" và "sau MVP" bên dưới)
 
 Người dùng chốt **không upload tay nữa: mọi file phải đi qua API**. Phạm vi mở rộng và cách làm thay đổi:

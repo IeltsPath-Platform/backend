@@ -31,7 +31,8 @@ public class GetContentAssetUseCase {
                 asset.getDurationSeconds(),
                 asset.getChecksum(),
                 asset.getValidationStatus(),
-                asset.getCreatedAt()
+                asset.getCreatedAt(),
+                asset.getAccessTier()
         );
     }
 }

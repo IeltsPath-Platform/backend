@@ -14,6 +14,14 @@ public interface ErrorTypeCatalog {
      */
     Set<String> activeCodes();
 
+    /**
+     * The codes an examiner may record: every {@code ACTIVE} code, including those whose review is not finished.
+     * {@link #activeCodes()} stays the set a learner may be shown. Failure to read is thrown like {@link #activeCodes()}.
+     */
+    default Set<String> staffCodes() {
+        return activeCodes();
+    }
+
     default List<ErrorType> activeErrorTypes() {
         return activeCodes().stream().sorted().map(code -> new ErrorType(code, code, "")).toList();
     }

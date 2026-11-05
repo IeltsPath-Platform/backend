@@ -90,7 +90,8 @@ class RestUserDirectoryTest {
     @Test
     void aFailureMeansNoNamesAtAll() {
         UUID a = UUID.randomUUID();
-        server.expect(requestTo(BASE_URL + "/internal/users/display-names")).andRespond(withServerError());
+        server.expect(org.springframework.test.web.client.ExpectedCount.times(2),
+                requestTo(BASE_URL + "/internal/users/display-names")).andRespond(withServerError());
 
         assertTrue(directory.displayNames(List.of(a)).isEmpty());
     }

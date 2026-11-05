@@ -12,10 +12,15 @@ import com.ieltspath.learning.application.port.LearningContentClient.Topic;
 import com.ieltspath.learning.application.result.LearnerReportResult;
 import com.ieltspath.learning.application.result.LearnerReportResult.KnowledgePointReport;
 import com.ieltspath.learning.application.service.MasteryProfileMaintenance;
+import com.ieltspath.learning.application.service.MasteryProfileUpdater;
 import com.ieltspath.learning.application.usecase.ApplyAssessmentResultUseCase;
 import com.ieltspath.learning.application.usecase.GetLearnerReportUseCase;
 import com.ieltspath.learning.application.usecase.ManageRuleConfigUseCase;
 import com.ieltspath.learning.domain.vo.LearningSkill;
+import com.ieltspath.learning.domain.repository.KnowledgeEvidenceRepository;
+import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
+import com.ieltspath.learning.domain.vo.EvidenceSource;
+import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,6 +93,9 @@ class MasteryProfileIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired ApplyAssessmentResultUseCase apply;
     @Autowired MasteryProfileMaintenance maintenance;
+    @Autowired MasteryProfileUpdater updater;
+    @Autowired KnowledgeEvidenceRepository evidence;
+    @Autowired MasteryProfileRepository profiles;
     @Autowired ManageRuleConfigUseCase ruleConfig;
     @Autowired GetLearnerReportUseCase report;
     @MockitoBean LearningContentClient content;
@@ -116,6 +124,49 @@ class MasteryProfileIntegrationTest {
                 VALUES (?, ?, ?, ?, ?, ?)
                 """, UUID.randomUUID(), USER, TOPIC, UUID.randomUUID(), VERSION,
                 Timestamp.from(COMPLETED.minusSeconds(600)));
+    }
+
+    @Test
+    void trapEvidenceBuildsChildMasteryButDefaultLearnerReadsExcludeIt() {
+        UUID trap = UUID.randomUUID();
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "T1", "Topic one", 1, null,
+                List.of(new KnowledgePoint(KP_WEAK, "WEAK", "Weak point", "PROCEDURE", "READING", "", true),
+                        new KnowledgePoint(trap, "TRAP", "Trap label", "PROCEDURE", "READING", "", false,
+                                null, null, KP_WEAK, "PARAPHRASE_TRAP")), LearningSkill.READING, true)));
+        KnowledgeEvidence parentEvidence = KnowledgeEvidence.of(KP_WEAK, true, EvidenceSource.LESSON_EXERCISE,
+                UUID.randomUUID()).forQuestion(UUID.randomUUID());
+        evidence.append(USER, List.of(parentEvidence));
+        updater.recordEvidence(USER, List.of(parentEvidence));
+        LearnerReportResult beforeTrap = report.execute(USER);
+        jdbc.update("INSERT INTO knowledge_point_catalog (kp_id, topic_id, has_practice_set, parent_kp_id, error_code) " +
+                        "VALUES (?, ?, FALSE, ?, ?)", trap, TOPIC, KP_WEAK, "PARAPHRASE_TRAP");
+        KnowledgeEvidence answer = KnowledgeEvidence.of(trap, false, EvidenceSource.ERROR_TRAP, UUID.randomUUID())
+                .forQuestion(UUID.randomUUID());
+        evidence.append(USER, List.of(answer));
+        updater.recordEvidence(USER, List.of(answer), java.util.Set.of(trap));
+
+        assertThat(jdbc.queryForObject("SELECT source FROM kp_evidence WHERE kp_id = ?", String.class, trap))
+                .isEqualTo("error_trap");
+        assertThat(profiles.find(USER, List.of(trap))).containsKey(trap);
+        assertThat(profiles.findErrorTrapProfiles(USER)).extracting(profile -> profile.knowledgePointId())
+                .containsExactly(trap);
+        assertThat(profiles.findAll(USER)).extracting(profile -> profile.knowledgePointId()).doesNotContain(trap);
+        assertThat(evidence.findMasteryHistories(USER)).extracting(history -> history.knowledgePointId())
+                .doesNotContain(trap);
+        assertThat(evidence.findMasteryHistories(USER, List.of(trap)))
+                .extracting(history -> history.knowledgePointId()).containsExactly(trap);
+
+        LearnerReportResult afterTrap = report.execute(USER);
+        assertThat(afterTrap.estimatedBand()).isEqualTo(beforeTrap.estimatedBand());
+        assertThat(afterTrap.skills()).isEqualTo(beforeTrap.skills());
+        assertThat(afterTrap.focus()).isEqualTo(beforeTrap.focus());
+        assertThat(afterTrap.knowledgePoints()).extracting(KnowledgePointReport::knowledgeId)
+                .doesNotContain(trap);
+        assertThat(afterTrap.knowledgePoints().stream().filter(point -> point.knowledgeId().equals(KP_WEAK))
+                .findFirst().orElseThrow().errorTraps()).extracting(LearnerReportResult.ErrorTrapPoint::knowledgePointId)
+                .containsExactly(trap);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM xp_ledger WHERE user_id = ? "
+                + "AND source IN ('KP_CONSOLIDATE', 'KP_MAINTAIN')", Integer.class, USER)).isZero();
     }
 
     @Test
@@ -270,10 +321,7 @@ class MasteryProfileIntegrationTest {
         assertThat(weak.skill()).isEqualTo("READING");
         assertThat(weak.band()).isEqualByComparingTo("6.0");
         assertThat(weak.score().tier()).isEqualTo("PRIORITY");
-        assertThat(weak.errors()).singleElement().satisfies(error -> {
-            assertThat(error.code()).isEqualTo("PARAPHRASE_TRAP");
-            assertThat(error.count()).isEqualTo(1);
-        });
+        assertThat(weak.errors()).as("a parent error summary requires trap child mastery").isEmpty();
         assertThat(weak.evidence()).singleElement().satisfies(entry -> {
             assertThat(entry.correct()).isFalse();
             assertThat(entry.durationMs()).isEqualTo(4000L);

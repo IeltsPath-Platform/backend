@@ -14,12 +14,14 @@ import com.ieltspath.user.application.command.ResetPasswordCommand;
 import com.ieltspath.user.application.result.AuthTokenResult;
 import com.ieltspath.user.application.usecase.ForgotPasswordUseCase;
 import com.ieltspath.user.application.usecase.GetUserByIdUseCase;
-import com.ieltspath.user.application.usecase.LoginUseCase;
+import com.ieltspath.user.application.usecase.AuditedLoginUseCase;
 import com.ieltspath.user.application.usecase.LogoutUseCase;
 import com.ieltspath.user.application.usecase.RefreshTokenUseCase;
 import com.ieltspath.user.application.usecase.ResetPasswordUseCase;
 import com.ieltspath.user.api.cookie.AuthCookieService;
+import com.ieltspath.user.api.request.LoginContextResolver;
 import com.ieltspath.user.domain.aggregate.User;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +38,7 @@ import java.util.List;
 @RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthController {
-    private final LoginUseCase loginUseCase;
+    private final AuditedLoginUseCase loginUseCase;
     private final RefreshTokenUseCase refreshTokenUseCase;
     private final LogoutUseCase logoutUseCase;
     private final ForgotPasswordUseCase forgotPasswordUseCase;
@@ -58,8 +60,13 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public AuthTokenResponse login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
-        AuthTokenResult tokens = loginUseCase.execute(request.usernameOrEmail(), request.password());
+    public AuthTokenResponse login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse response
+    ) {
+        AuthTokenResult tokens = loginUseCase.execute(
+                request.usernameOrEmail(), request.password(), LoginContextResolver.from(httpRequest));
         authCookieService.addAuthCookies(
                 response,
                 tokens.accessToken(),

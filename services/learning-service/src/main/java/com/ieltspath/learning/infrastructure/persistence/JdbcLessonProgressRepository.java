@@ -43,6 +43,23 @@ public class JdbcLessonProgressRepository implements LessonProgressRepository {
     }
 
     @Override
+    public boolean hasGrandfatheredLessonForKnowledgePoint(UUID userId, UUID knowledgePointId) {
+        Boolean found = jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM lesson_progress "
+                        + "WHERE user_id = ? AND grandfathered = true AND knowledge_point_ids @> ARRAY[?]::uuid[])",
+                Boolean.class, userId, knowledgePointId);
+        return Boolean.TRUE.equals(found);
+    }
+
+    @Override
+    public Set<UUID> findGrandfatheredKnowledgePointIds(UUID userId) {
+        Set<UUID> knowledgePoints = new HashSet<>();
+        jdbc.query("SELECT knowledge_point_ids FROM lesson_progress WHERE user_id = ? AND grandfathered = true",
+                (RowCallbackHandler) row -> knowledgePoints.addAll(SqlArrays.uuids(row.getArray("knowledge_point_ids"))),
+                userId);
+        return Set.copyOf(knowledgePoints);
+    }
+
+    @Override
     public Map<UUID, Instant> lastStudiedByTopic(UUID userId) {
         Map<UUID, Instant> latest = new HashMap<>();
         // Opening a lesson saves its progress row; a practice set belongs to the topic of its lesson.
@@ -75,7 +92,7 @@ public class JdbcLessonProgressRepository implements LessonProgressRepository {
         jdbc.update(connection -> {
             var statement = connection.prepareStatement("""
                     INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, knowledge_point_ids,
-                    passed_block_ids, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    passed_block_ids, completed_at, grandfathered) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (user_id, lesson_id) DO UPDATE
                     SET topic_id = EXCLUDED.topic_id, lesson_sort_order = EXCLUDED.lesson_sort_order,
                     knowledge_point_ids = EXCLUDED.knowledge_point_ids, passed_block_ids = EXCLUDED.passed_block_ids,
@@ -90,6 +107,7 @@ public class JdbcLessonProgressRepository implements LessonProgressRepository {
             statement.setArray(6, connection.createArrayOf("text",
                     progress.passedBlockIds().stream().map(UUID::toString).toArray()));
             statement.setTimestamp(7, progress.completedAt() == null ? null : Timestamp.from(progress.completedAt()));
+            statement.setBoolean(8, progress.grandfathered());
             return statement;
         });
     }
@@ -100,6 +118,6 @@ public class JdbcLessonProgressRepository implements LessonProgressRepository {
                 row.getObject("topic_id", UUID.class), row.getInt("lesson_sort_order"),
                 SqlArrays.uuids(row.getArray("knowledge_point_ids")),
                 new LinkedHashSet<>(SqlArrays.uuids(row.getArray("passed_block_ids"))),
-                completed == null ? null : completed.toInstant());
+                completed == null ? null : completed.toInstant(), row.getBoolean("grandfathered"));
     }
 }

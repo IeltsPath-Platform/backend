@@ -15,9 +15,10 @@ public final class LessonProgress {
     private List<UUID> knowledgePointIds;
     private final Set<UUID> passedBlockIds;
     private Instant completedAt;
+    private final boolean grandfathered;
 
     private LessonProgress(UUID userId, UUID lessonId, UUID topicId, int sortOrder, List<UUID> knowledgePointIds,
-                           Set<UUID> passedBlockIds, Instant completedAt) {
+                           Set<UUID> passedBlockIds, Instant completedAt, boolean grandfathered) {
         this.userId = Objects.requireNonNull(userId, "userId");
         this.lessonId = Objects.requireNonNull(lessonId, "lessonId");
         this.topicId = Objects.requireNonNull(topicId, "topicId");
@@ -25,16 +26,24 @@ public final class LessonProgress {
         this.knowledgePointIds = List.copyOf(knowledgePointIds);
         this.passedBlockIds = new LinkedHashSet<>(passedBlockIds);
         this.completedAt = completedAt;
+        this.grandfathered = grandfathered;
     }
 
     public static LessonProgress start(UUID userId, UUID lessonId, UUID topicId, int sortOrder,
                                        List<UUID> knowledgePointIds) {
-        return new LessonProgress(userId, lessonId, topicId, sortOrder, knowledgePointIds, Set.of(), null);
+        return new LessonProgress(userId, lessonId, topicId, sortOrder, knowledgePointIds, Set.of(), null, false);
     }
 
     public static LessonProgress restore(UUID userId, UUID lessonId, UUID topicId, int sortOrder,
                                          List<UUID> knowledgePointIds, Set<UUID> passedBlockIds, Instant completedAt) {
-        return new LessonProgress(userId, lessonId, topicId, sortOrder, knowledgePointIds, passedBlockIds, completedAt);
+        return restore(userId, lessonId, topicId, sortOrder, knowledgePointIds, passedBlockIds, completedAt, false);
+    }
+
+    public static LessonProgress restore(UUID userId, UUID lessonId, UUID topicId, int sortOrder,
+                                         List<UUID> knowledgePointIds, Set<UUID> passedBlockIds, Instant completedAt,
+                                         boolean grandfathered) {
+        return new LessonProgress(userId, lessonId, topicId, sortOrder, knowledgePointIds, passedBlockIds, completedAt,
+                grandfathered);
     }
 
     /** Follows Content: the lesson's topic, order and knowledge points as Content currently has them. */
@@ -58,6 +67,7 @@ public final class LessonProgress {
 
     public boolean hasPassed(UUID blockId) { return passedBlockIds.contains(blockId); }
     public boolean isCompleted() { return completedAt != null; }
+    public boolean grandfathered() { return grandfathered; }
 
     public UUID userId() { return userId; }
     public UUID lessonId() { return lessonId; }

@@ -6,7 +6,7 @@ import com.ieltspath.user.application.command.ForgotPasswordCommand;
 import com.ieltspath.user.application.command.ResetPasswordCommand;
 import com.ieltspath.user.application.usecase.ForgotPasswordUseCase;
 import com.ieltspath.user.application.usecase.GetUserByIdUseCase;
-import com.ieltspath.user.application.usecase.LoginUseCase;
+import com.ieltspath.user.application.usecase.AuditedLoginUseCase;
 import com.ieltspath.user.application.usecase.LogoutUseCase;
 import com.ieltspath.user.application.usecase.RefreshTokenUseCase;
 import com.ieltspath.user.application.usecase.ResetPasswordUseCase;
@@ -49,7 +49,7 @@ class ActionTokenSecurityTest {
     private MockMvc mockMvc;
 
     @MockBean
-    private LoginUseCase loginUseCase;
+    private AuditedLoginUseCase loginUseCase;
     @MockBean
     private RefreshTokenUseCase refreshTokenUseCase;
     @MockBean

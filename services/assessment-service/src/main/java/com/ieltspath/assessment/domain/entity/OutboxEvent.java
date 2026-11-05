@@ -9,7 +9,17 @@ import java.util.UUID;
  * The id doubles as the published event id so a republish carries the same identity.
  */
 public record OutboxEvent(UUID id, String aggregateType, String aggregateId, String eventType, String payload,
-                          Instant createdAt, Instant publishedAt, int retryCount, String lastError) {
+                          Instant createdAt, Instant publishedAt, int retryCount, String lastError, String correlationId,
+                          String traceContext) {
+    public OutboxEvent(UUID id, String aggregateType, String aggregateId, String eventType, String payload,
+                       Instant createdAt, Instant publishedAt, int retryCount, String lastError, String correlationId) {
+        this(id, aggregateType, aggregateId, eventType, payload, createdAt, publishedAt, retryCount, lastError,
+                correlationId, null);
+    }
+    public OutboxEvent(UUID id, String aggregateType, String aggregateId, String eventType, String payload,
+                       Instant createdAt, Instant publishedAt, int retryCount, String lastError) {
+        this(id, aggregateType, aggregateId, eventType, payload, createdAt, publishedAt, retryCount, lastError, null, null);
+    }
     public OutboxEvent {
         Objects.requireNonNull(id, "id must not be null");
         Objects.requireNonNull(aggregateType, "aggregateType must not be null");
@@ -21,6 +31,6 @@ public record OutboxEvent(UUID id, String aggregateType, String aggregateId, Str
 
     public static OutboxEvent pending(UUID id, String aggregateType, String aggregateId, String eventType,
                                       String payload, Instant createdAt) {
-        return new OutboxEvent(id, aggregateType, aggregateId, eventType, payload, createdAt, null, 0, null);
+        return new OutboxEvent(id, aggregateType, aggregateId, eventType, payload, createdAt, null, 0, null, null);
     }
 }

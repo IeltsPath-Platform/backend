@@ -20,6 +20,8 @@ import com.ieltspath.content.infrastructure.persistence.adapter.JdbcImportCatalo
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcPracticeTestMilestoneRepository;
 import com.ieltspath.content.infrastructure.persistence.adapter.LessonAuthoringRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.adapter.LessonResourceRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.mapper.LessonResourcePersistenceMapperImpl;
 import com.ieltspath.content.infrastructure.persistence.adapter.QuestionRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.adapter.TopicRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.mapper.ContentPackagePersistenceMapper;
@@ -64,6 +66,7 @@ import static org.mockito.Mockito.doThrow;
         JdbcErrorTypeRepository.class, JdbcAiUsageQuota.class, CreateQuestionUseCase.class,
         AddQuestionVersionUseCase.class, QuestionRepositoryAdapter.class, QuestionPersistenceMapper.class,
         CreateContentSectionUseCase.class, AddSectionQuestionUseCase.class, CourseMaterializer.class,
+        CreateLessonResourceUseCase.class, LessonResourceRepositoryAdapter.class, LessonResourcePersistenceMapperImpl.class,
         CourseDraftCodec.class, CourseDraftAnalysisService.class, JdbcCourseCatalogReader.class,
         CreateCourseUseCase.class, UpdateCourseUseCase.class, CourseRepositoryAdapter.class,
         CoursePersistenceMapperImpl.class, CreateTopicUseCase.class, UpdateTopicUseCase.class,
@@ -78,6 +81,10 @@ class CourseImportIntegrationTest {
     @TestConfiguration
     static class Beans {
         @Bean ObjectMapper objectMapper() { return new ObjectMapper(); }
+        /** These tests only create link resources, so the document storage is never reached. */
+        @Bean com.ieltspath.content.application.port.LessonDocumentFiles documentFiles() {
+            return org.mockito.Mockito.mock(com.ieltspath.content.application.port.LessonDocumentFiles.class);
+        }
         @Bean Clock clock() { return Clock.systemUTC(); }
         @Bean VocabularySenseLookup senses() { return ids -> Set.copyOf(ids); }
         @Bean ContentAiProperties properties() { return new ContentAiProperties(); }

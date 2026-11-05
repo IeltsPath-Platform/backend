@@ -17,6 +17,8 @@ import com.ieltspath.content.application.command.CountPracticeSetsCommand;
 import com.ieltspath.content.application.command.SearchPracticeSetsCommand;
 import com.ieltspath.content.application.usecase.CountAvailablePracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetActiveKnowledgePrerequisitesUseCase;
+import com.ieltspath.content.application.usecase.GetFreeCourseIdsUseCase;
+import com.ieltspath.content.domain.vo.MediaReferencePolicy;
 import com.ieltspath.content.application.usecase.GetLessonPracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetTopicPracticeSetsUseCase;
 import com.ieltspath.content.application.usecase.GetLessonContentUseCase;
@@ -51,6 +53,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class InternalLearningContentController {
     private final GetTopicSequenceUseCase getTopicSequence;
+    private final GetFreeCourseIdsUseCase getFreeCourseIds;
     private final GetTopicLessonsUseCase getTopicLessons;
     private final GetLessonContentUseCase getLessonContent;
     private final GetTopicTestPackagesUseCase getTopicTestPackages;
@@ -63,6 +66,7 @@ public class InternalLearningContentController {
     private final GetPlacementTestPackagesUseCase getPlacementTestPackages;
     private final ListErrorTypesUseCase listErrorTypes;
     private final GetActiveKnowledgePrerequisitesUseCase getActiveKnowledgePrerequisites;
+    private final MediaReferencePolicy mediaPolicy;
 
     @PostMapping("/knowledge-points/prerequisites")
     public Map<UUID, List<UUID>> knowledgePointPrerequisites(
@@ -90,14 +94,39 @@ public class InternalLearningContentController {
         }
     }
 
+    /**
+     * Every active error type, reviewed or not, with its review status. Graders may record these codes; a learner is
+     * shown a code and its fix hint only once it is approved (see {@code /error-types}).
+     */
+    @GetMapping("/error-types/staff")
+    public List<StaffErrorTypeResponse> staffErrorTypes() {
+        return listErrorTypes.executeActive().stream().map(StaffErrorTypeResponse::from).toList();
+    }
+
+    public record StaffErrorTypeResponse(String code, String name, String category, int severity, String fixHint,
+                                         String reviewStatus) {
+        static StaffErrorTypeResponse from(com.ieltspath.content.domain.aggregate.ErrorType errorType) {
+            return new StaffErrorTypeResponse(errorType.getCode(), errorType.getName(),
+                    errorType.getCategory().name(), errorType.getSeverity(), errorType.getFixHint(),
+                    errorType.getReviewStatus().name());
+        }
+    }
+
     @GetMapping("/courses/{id}/test-packages")
     public List<TopicTestPackageResponse> courseTestPackages(@PathVariable("id") UUID courseId) {
         return getCourseTestPackages.execute(courseId).stream().map(TopicTestPackageResponse::from).toList();
     }
 
+    @GetMapping("/courses/free")
+    public List<UUID> freeCourseIds() {
+        return List.copyOf(getFreeCourseIds.execute());
+    }
+
     @GetMapping("/topic-sequence")
-    public List<TopicSequenceResponse> topicSequence() {
-        return getTopicSequence.execute().stream().map(TopicSequenceResponse::from).toList();
+    public List<TopicSequenceResponse> topicSequence(
+            @RequestParam(value = "includeErrorTraps", defaultValue = "false") boolean includeErrorTraps) {
+        return getTopicSequence.execute(includeErrorTraps).stream()
+                .map(result -> TopicSequenceResponse.from(result, mediaPolicy)).toList();
     }
 
     @GetMapping("/topics/{id}/lessons")
@@ -106,8 +135,17 @@ public class InternalLearningContentController {
     }
 
     @GetMapping("/lessons/{id}")
-    public LessonContentResponse lesson(@PathVariable("id") UUID lessonId) {
-        return LessonContentResponse.from(getLessonContent.execute(lessonId));
+    public LessonContentResponse lesson(@PathVariable("id") UUID lessonId,
+                                        @RequestParam(value = "signedAudio", defaultValue = "false") boolean signedAudio) {
+        return LessonContentResponse.from(getLessonContent.execute(lessonId, signedAudio));
+    }
+
+    @GetMapping("/lessons/{id}/access")
+    public LessonSummaryResponse lessonAccess(@PathVariable("id") UUID lessonId) {
+        var lesson = getLessonContent.accessSummary(lessonId);
+        return new LessonSummaryResponse(lesson.lessonId(), lesson.topicId(), lesson.code(), lesson.title(),
+                lesson.summary(), lesson.sortOrder(), lesson.knowledgePointIds(), List.of(), lesson.skills(), null,
+                lesson.courseId(), lesson.skill(), lesson.skillPosition());
     }
 
     @GetMapping("/topics/{id}/test-packages")
@@ -119,7 +157,7 @@ public class InternalLearningContentController {
     public List<PracticeSetResponse> searchPracticeSets(@Valid @RequestBody PracticeSetSearchRequest request) {
         return searchPracticeSets.execute(new SearchPracticeSetsCommand(request.knowledgePointId(),
                         request.excludePackageIds(), request.minQuestions(), request.limit(),
-                        request.preferredLessonId()))
+                        request.preferredLessonId(), request.trapErrorCode()))
                 .stream().map(PracticeSetResponse::from).toList();
     }
 

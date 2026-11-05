@@ -13,6 +13,7 @@ import com.ieltspath.content.application.result.PackageQuestionSpec;
 import com.ieltspath.content.application.result.KnowledgeTreeNodeResult;
 import com.ieltspath.content.domain.vo.QuestionType;
 import com.ieltspath.content.domain.vo.AssetType;
+import com.ieltspath.content.domain.vo.AccessTier;
 import com.ieltspath.content.domain.vo.BlockType;
 import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.domain.vo.LearningType;
@@ -61,6 +62,14 @@ public class JdbcLearningContentReader implements LearningContentReader {
             WHERE b.lesson_id = l.id AND b.block_type = 'TEXT' AND kp.skill <> 'ALL'
             """;
 
+    private static final String RANKED_COURSE_LESSONS = """
+            SELECT l.id, l.topic_id, t.course_id, t.skill,
+                   row_number() OVER (PARTITION BY t.course_id, t.skill
+                       ORDER BY t.sort_order, t.id, l.sort_order, l.id) AS skill_position
+            FROM lessons l JOIN topics t ON t.id = l.topic_id
+            WHERE t.course_id IS NOT NULL AND t.status = 'ACTIVE' AND l.status = 'PUBLISHED'
+            """;
+
     private static final String PRACTICE_SKILLS = """
             SELECT DISTINCT q.skill FROM content_sections s
             JOIN section_questions sq ON sq.section_id = s.id
@@ -103,9 +112,23 @@ public class JdbcLearningContentReader implements LearningContentReader {
             """;
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final boolean hasTopicDescription;
+    private final boolean hasCourseCoverImageUrl;
+    private final boolean hasCourseDescription;
+    private final boolean hasComboUnlockPoints;
+    private final boolean hasCourseFree;
+    private final boolean hasCourseBannerImageUrl;
+    private final boolean hasCourseSkillPrices;
 
     public JdbcLearningContentReader(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
+        this.hasTopicDescription = hasColumn("topics", "description");
+        this.hasCourseCoverImageUrl = hasColumn("courses", "cover_image_url");
+        this.hasCourseDescription = hasColumn("courses", "description");
+        this.hasComboUnlockPoints = hasColumn("courses", "combo_unlock_points");
+        this.hasCourseFree = hasColumn("courses", "free");
+        this.hasCourseBannerImageUrl = hasColumn("courses", "banner_image_url");
+        this.hasCourseSkillPrices = hasTable("course_skill_prices");
     }
 
     private static String eligiblePracticeSet(String knowledgePointExpression) {
@@ -137,12 +160,33 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
     @Override
     public List<TopicSequenceResult> topicSequence(int minPracticeQuestions) {
+        return topicSequence(minPracticeQuestions, false);
+    }
+
+    @Override
+    public java.util.Set<UUID> freeCourseIds() {
+        if (!hasCourseFree) return java.util.Set.of();
+        return new java.util.LinkedHashSet<>(jdbc.query(
+                "SELECT id FROM courses WHERE free AND status = 'ACTIVE' ORDER BY band_level", Map.of(),
+                (rs, i) -> uuid(rs, "id")));
+    }
+
+    @Override
+    public List<TopicSequenceResult> topicSequence(int minPracticeQuestions, boolean includeErrorTraps) {
         record TopicRow(UUID id, String code, String name, int sortOrder, String requiredFeatureKey, Skill skill,
                         boolean hasTopicTest, TopicSequenceResult.CourseEntry course, List<Skill> skills,
-                        int lessonCount) {}
+                        int lessonCount, String description) {}
         // Course metadata is read with the topic; topics outside an active course do not join the curriculum.
+        String topicDescription = hasTopicDescription ? "t.description" : "NULL::text AS description";
+        String coverImageUrl = hasCourseCoverImageUrl ? "c.cover_image_url" : "NULL::varchar AS cover_image_url";
+        String courseDescription = hasCourseDescription ? "c.description AS course_description"
+                : "NULL::text AS course_description";
+        String comboUnlockPoints = hasComboUnlockPoints ? "c.combo_unlock_points"
+                : "NULL::integer AS combo_unlock_points";
+        String bannerImageUrl = hasCourseBannerImageUrl ? "c.banner_image_url"
+                : "NULL::varchar AS banner_image_url";
         List<TopicRow> topics = jdbc.query("""
-                SELECT t.id, t.code, t.name, t.sort_order, t.required_feature_key, t.skill,
+                SELECT t.id, t.code, t.name, %s, t.sort_order, t.required_feature_key, t.skill,
                        ARRAY(SELECT DISTINCT ls.skill FROM lessons l
                              CROSS JOIN LATERAL (%s) ls
                              WHERE l.topic_id = t.id AND l.status = 'PUBLISHED') AS skills,
@@ -153,6 +197,11 @@ public class JdbcLearningContentReader implements LearningContentReader {
                        (SELECT count(*) FROM lessons l
                         WHERE l.topic_id = t.id AND l.status = 'PUBLISHED') AS lesson_count,
                        c.id AS course_id, c.code AS course_code, c.name AS course_name, c.band_level,
+                       %s, %s, %s, %s,
+                       ARRAY(SELECT DISTINCT t2.skill FROM topics t2
+                             WHERE t2.course_id = c.id AND t2.status = 'ACTIVE' AND t2.skill IS NOT NULL
+                               AND EXISTS (SELECT 1 FROM lessons l2 WHERE l2.topic_id = t2.id AND l2.status = 'PUBLISHED')
+                             ORDER BY t2.skill) AS available_skills,
                        EXISTS (SELECT 1 FROM content_packages p
                                WHERE p.course_id = c.id AND p.package_type = 'COURSE_TEST'
                                  AND p.status = 'PUBLISHED' AND p.current_published_version_id IS NOT NULL)
@@ -162,25 +211,60 @@ public class JdbcLearningContentReader implements LearningContentReader {
                 WHERE t.status = 'ACTIVE' AND c.status = 'ACTIVE'
                   AND EXISTS (SELECT 1 FROM lessons l WHERE l.topic_id = t.id AND l.status = 'PUBLISHED')
                 ORDER BY t.skill, c.band_level, t.sort_order, t.id
-                """.formatted(LESSON_SKILLS), Map.of(), (rs, i) -> new TopicRow(uuid(rs, "id"), rs.getString("code"), rs.getString("name"),
+                """.formatted(topicDescription, LESSON_SKILLS, coverImageUrl, courseDescription, comboUnlockPoints,
+                        bannerImageUrl),
+                Map.of(), (rs, i) -> new TopicRow(uuid(rs, "id"), rs.getString("code"), rs.getString("name"),
                 rs.getInt("sort_order"), rs.getString("required_feature_key"),
                 enumOrNull(Skill.class, rs.getString("skill")), rs.getBoolean("has_topic_test"),
                 new TopicSequenceResult.CourseEntry(uuid(rs, "course_id"), rs.getString("course_code"),
-                        rs.getString("course_name"), rs.getBigDecimal("band_level"), rs.getBoolean("has_course_test")), skills(rs),
-                rs.getInt("lesson_count")));
+                        rs.getString("course_name"), rs.getBigDecimal("band_level"), rs.getBoolean("has_course_test"),
+                        true, rs.getString("cover_image_url"), rs.getString("course_description"), Map.of(),
+                        (Integer) rs.getObject("combo_unlock_points"), skills(rs, "available_skills"),
+                        rs.getString("banner_image_url")), skills(rs),
+                rs.getInt("lesson_count"), rs.getString("description")));
         if (topics.isEmpty()) {
             return List.of();
         }
 
+        Map<UUID, Map<Skill, Integer>> pricesByCourse = new LinkedHashMap<>();
+        List<UUID> courseIds = topics.stream().map(row -> row.course().courseId()).distinct().toList();
+        if (hasCourseSkillPrices) {
+            jdbc.query("SELECT course_id, skill, unlock_points FROM course_skill_prices WHERE course_id IN (:courseIds)",
+                    Map.of("courseIds", courseIds), (org.springframework.jdbc.core.RowCallbackHandler) rs ->
+                            pricesByCourse.computeIfAbsent(uuid(rs, "course_id"), ignored -> new LinkedHashMap<>())
+                                    .put(Skill.valueOf(rs.getString("skill")), rs.getInt("unlock_points")));
+        }
+
         Map<UUID, List<TopicSequenceResult.KnowledgePointEntry>> pointsByTopic = new LinkedHashMap<>();
-        jdbc.query("""
+        String trapJoin = includeErrorTraps
+                ? "LEFT JOIN error_types trap ON trap.trap_knowledge_point_id = kp.id" : "";
+        String trapColumns = includeErrorTraps
+                ? ", trap.knowledge_point_id AS parent_knowledge_point_id, trap.code AS error_code," : ",";
+        String trapFilter = includeErrorTraps || !hasTrapKnowledgePointColumn() ? ""
+                : "AND NOT EXISTS (SELECT 1 FROM error_types trap_filter WHERE trap_filter.trap_knowledge_point_id = kp.id)";
+        String practiceSetProjection = includeErrorTraps
+                ? "CASE WHEN trap.id IS NOT NULL THEN FALSE ELSE EXISTS (SELECT 1 FROM content_packages p WHERE %s) END"
+                    .formatted(eligiblePracticeSet("kp.id"))
+                : "EXISTS (SELECT 1 FROM content_packages p WHERE %s)".formatted(eligiblePracticeSet("kp.id"));
+        jdbc.query(("""
+                WITH ranked_lessons AS (%s), point_positions AS (
+                    SELECT l.topic_id, lkp.knowledge_point_id, MIN(rl.skill_position) AS earliest_lesson_position
+                    FROM lesson_knowledge_points lkp
+                    JOIN lessons l ON l.id = lkp.lesson_id
+                    JOIN ranked_lessons rl ON rl.id = l.id
+                    GROUP BY l.topic_id, lkp.knowledge_point_id
+                )
                 SELECT kp.id, kp.topic_id, kp.code, kp.name, kp.learning_type, kp.skill, kp.description,
-                       kp.cefr_level, kp.can_do, kp.scope_in, kp.scope_out,
-                       EXISTS (SELECT 1 FROM content_packages p WHERE %s) AS has_practice_set
+                       kp.cefr_level, kp.can_do, kp.scope_in, kp.scope_out %s
+                       %s AS has_practice_set, point_positions.earliest_lesson_position
                 FROM knowledge_points kp
+                %s
+                LEFT JOIN point_positions ON point_positions.topic_id = kp.topic_id
+                                          AND point_positions.knowledge_point_id = kp.id
                 WHERE kp.status = 'ACTIVE' AND kp.topic_id IN (:topicIds)
+                  %s
                 ORDER BY kp.created_at, kp.id
-                """.formatted(eligiblePracticeSet("kp.id")),
+                """).formatted(RANKED_COURSE_LESSONS, trapColumns, practiceSetProjection, trapJoin, trapFilter),
                 new MapSqlParameterSource()
                         .addValue("topicIds", topics.stream().map(TopicRow::id).toList())
                         .addValue("minQuestions", minPracticeQuestions),
@@ -193,14 +277,47 @@ public class JdbcLearningContentReader implements LearningContentReader {
                                     enumOrNull(Skill.class, rs.getString("skill")),
                                     rs.getString("description"), rs.getBoolean("has_practice_set"),
                                     enumOrNull(CefrLevel.class, rs.getString("cefr_level")),
-                                    rs.getString("can_do"), rs.getString("scope_in"), rs.getString("scope_out")));
+                                    rs.getString("can_do"), rs.getString("scope_in"), rs.getString("scope_out"),
+                                    includeErrorTraps ? uuid(rs, "parent_knowledge_point_id") : null,
+                                    includeErrorTraps ? rs.getString("error_code") : null,
+                                    nullableInt(rs, "earliest_lesson_position")));
                 });
 
         return topics.stream()
                 .map(t -> new TopicSequenceResult(t.id(), t.code(), t.name(), t.sortOrder(), t.requiredFeatureKey(),
-                        pointsByTopic.getOrDefault(t.id(), List.of()), t.skill(), t.hasTopicTest(), t.course(), t.skills(),
-                        true, t.lessonCount()))
+                        pointsByTopic.getOrDefault(t.id(), List.of()), t.skill(), t.hasTopicTest(),
+                        new TopicSequenceResult.CourseEntry(t.course().courseId(), t.course().code(), t.course().name(),
+                                t.course().bandLevel(), t.course().hasCourseTest(), t.course().active(),
+                                t.course().coverImageUrl(), t.course().description(),
+                                pricesByCourse.getOrDefault(t.course().courseId(), Map.of()),
+                                t.course().comboUnlockPoints(), t.course().availableSkills(),
+                                t.course().bannerImageUrl()), t.skills(),
+                        true, t.lessonCount(), t.description()))
                 .toList();
+    }
+
+    private boolean hasTrapKnowledgePointColumn() {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'error_types'
+                      AND column_name = 'trap_knowledge_point_id'
+                )
+                """, Map.of(), Boolean.class));
+    }
+
+    private boolean hasColumn(String table, String column) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM information_schema.columns
+                               WHERE table_schema = current_schema() AND table_name = :table AND column_name = :column)
+                """, Map.of("table", table, "column", column), Boolean.class));
+    }
+
+    private boolean hasTable(String table) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT to_regclass(:table) IS NOT NULL
+                """, Map.of("table", table), Boolean.class));
     }
 
     @Override
@@ -214,15 +331,20 @@ public class JdbcLearningContentReader implements LearningContentReader {
     @Override
     public List<LessonSummaryResult> publishedLessons(UUID topicId) {
         record LessonRow(UUID id, String code, String title, String summary, int sortOrder, List<Skill> skills,
-                         Integer estimatedMinutes) {}
+                         Integer estimatedMinutes, UUID courseId, Skill skill, Integer skillPosition) {}
         List<LessonRow> lessons = jdbc.query("""
-                SELECT l.id, l.code, l.title, l.summary, l.sort_order, l.estimated_minutes, ARRAY(%s) AS skills
+                WITH ranked_lessons AS (%s)
+                SELECT l.id, l.code, l.title, l.summary, l.sort_order, l.estimated_minutes, ARRAY(%s) AS skills,
+                       t.course_id, t.skill AS topic_skill, ranked_lessons.skill_position
                 FROM lessons l
+                JOIN topics t ON t.id = l.topic_id
+                LEFT JOIN ranked_lessons ON ranked_lessons.id = l.id
                 WHERE l.topic_id = :topicId AND l.status = 'PUBLISHED'
                 ORDER BY l.sort_order
-                """.formatted(LESSON_SKILLS), Map.of("topicId", topicId), (rs, i) -> new LessonRow(uuid(rs, "id"), rs.getString("code"),
+                """.formatted(RANKED_COURSE_LESSONS, LESSON_SKILLS), Map.of("topicId", topicId), (rs, i) -> new LessonRow(uuid(rs, "id"), rs.getString("code"),
                 rs.getString("title"), rs.getString("summary"), rs.getInt("sort_order"), skills(rs),
-                (Integer) rs.getObject("estimated_minutes")));
+                (Integer) rs.getObject("estimated_minutes"), uuid(rs, "course_id"),
+                enumOrNull(Skill.class, rs.getString("topic_skill")), nullableInt(rs, "skill_position")));
         if (lessons.isEmpty()) {
             return List.of();
         }
@@ -241,20 +363,27 @@ public class JdbcLearningContentReader implements LearningContentReader {
         return lessons.stream()
                 .map(l -> new LessonSummaryResult(l.id(), topicId, l.code(), l.title(), l.summary(), l.sortOrder(),
                         knowledgePoints.getOrDefault(l.id(), List.of()),
-                        exerciseBlocks.getOrDefault(l.id(), List.of()), l.skills(), l.estimatedMinutes()))
+                        exerciseBlocks.getOrDefault(l.id(), List.of()), l.skills(), l.estimatedMinutes(), l.courseId(),
+                        l.skill(), l.skillPosition()))
                 .toList();
     }
 
     @Override
     public Optional<LessonContentResult> publishedLesson(UUID lessonId) {
-        record LessonRow(UUID topicId, String code, String title, String summary, int sortOrder, List<Skill> skills) {}
+        record LessonRow(UUID topicId, String code, String title, String summary, int sortOrder, List<Skill> skills,
+                         UUID courseId, Skill skill, Integer skillPosition) {}
         List<LessonRow> found = jdbc.query("""
-                SELECT l.topic_id, l.code, l.title, l.summary, l.sort_order, ARRAY(%s) AS skills FROM lessons l
+                WITH ranked_lessons AS (%s)
+                SELECT l.topic_id, l.code, l.title, l.summary, l.sort_order, ARRAY(%s) AS skills,
+                       t.course_id, t.skill AS topic_skill, ranked_lessons.skill_position
+                FROM lessons l
                 JOIN topics t ON t.id = l.topic_id
+                LEFT JOIN ranked_lessons ON ranked_lessons.id = l.id
                 WHERE l.id = :id AND l.status = 'PUBLISHED'
-                """.formatted(LESSON_SKILLS), Map.of("id", lessonId), (rs, i) -> new LessonRow(uuid(rs, "topic_id"), rs.getString("code"),
+                """.formatted(RANKED_COURSE_LESSONS, LESSON_SKILLS), Map.of("id", lessonId), (rs, i) -> new LessonRow(uuid(rs, "topic_id"), rs.getString("code"),
                 rs.getString("title"), rs.getString("summary"), rs.getInt("sort_order"),
-                skills(rs)));
+                skills(rs), uuid(rs, "course_id"), enumOrNull(Skill.class, rs.getString("topic_skill")),
+                nullableInt(rs, "skill_position")));
         if (found.isEmpty()) {
             return Optional.empty();
         }
@@ -340,7 +469,7 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
         List<LessonContentResult.Block> blocks = jdbc.query("""
                 SELECT b.id, b.block_type, b.sort_order, b.text_content, a.id AS asset_id, a.asset_type,
-                       a.text_content AS asset_text, a.media_reference, a.duration_seconds
+                       a.text_content AS asset_text, a.media_reference, a.duration_seconds, a.access_tier
                 FROM lesson_blocks b
                 LEFT JOIN content_assets a ON a.id = b.asset_id
                 WHERE b.lesson_id = :lessonId
@@ -351,7 +480,9 @@ public class JdbcLearningContentReader implements LearningContentReader {
             LessonContentResult.Asset asset = type == BlockType.ASSET
                     ? new LessonContentResult.Asset(uuid(rs, "asset_id"),
                     AssetType.valueOf(rs.getString("asset_type")), rs.getString("asset_text"),
-                    rs.getString("media_reference"), (Integer) rs.getObject("duration_seconds"), null)
+                    rs.getString("media_reference"), (Integer) rs.getObject("duration_seconds"), null,
+                    enumOrNull(AccessTier.class, rs.getString("access_tier")) == null ? AccessTier.PUBLIC
+                            : enumOrNull(AccessTier.class, rs.getString("access_tier")))
                     : null;
             List<LessonContentResult.Question> questions =
                     type == BlockType.EXERCISE ? questionsByBlock.getOrDefault(blockId, List.of()) : null;
@@ -370,7 +501,8 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
         return Optional.of(new LessonContentResult(lessonId, lesson.topicId(), lesson.code(), lesson.title(),
                 lesson.summary(), lesson.sortOrder(),
-                lessonKnowledgePoints(List.of(lessonId)).getOrDefault(lessonId, List.of()), blocks, null, lesson.skills()));
+                lessonKnowledgePoints(List.of(lessonId)).getOrDefault(lessonId, List.of()), blocks, lesson.skill(),
+                lesson.skills(), lesson.courseId(), lesson.skillPosition()));
     }
 
     @Override
@@ -515,7 +647,11 @@ public class JdbcLearningContentReader implements LearningContentReader {
     }
 
     private static List<Skill> skills(ResultSet rs) throws SQLException {
-        var array = rs.getArray("skills");
+        return skills(rs, "skills");
+    }
+
+    private static List<Skill> skills(ResultSet rs, String column) throws SQLException {
+        var array = rs.getArray(column);
         if (array == null) return List.of();
         try {
             return java.util.Arrays.stream((String[]) array.getArray()).map(Skill::valueOf).sorted().toList();
@@ -639,6 +775,13 @@ public class JdbcLearningContentReader implements LearningContentReader {
     @Override
     public List<PracticeSetResult> searchPracticeSets(UUID knowledgePointId, Collection<UUID> excludePackageIds,
                                                       int minQuestions, int limit, UUID preferredLessonId) {
+        return searchPracticeSets(knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId, null);
+    }
+
+    @Override
+    public List<PracticeSetResult> searchPracticeSets(UUID knowledgePointId, Collection<UUID> excludePackageIds,
+                                                      int minQuestions, int limit, UUID preferredLessonId,
+                                                      String trapErrorCode) {
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("knowledgePointId", knowledgePointId)
                 .addValue("minQuestions", minQuestions)
@@ -650,30 +793,50 @@ public class JdbcLearningContentReader implements LearningContentReader {
         }
         String preferred = "";
         if (preferredLessonId != null) {
-            preferred = "COALESCE(p.lesson_id = :preferredLessonId, FALSE) DESC,";
+            preferred = "COALESCE(ranked.lesson_id = :preferredLessonId, FALSE) DESC,";
             params.addValue("preferredLessonId", preferredLessonId);
         }
+        String trapCount = trapErrorCode == null ? "0" : """
+                (SELECT count(DISTINCT sq.question_version_id) FROM content_sections s
+                 JOIN section_questions sq ON sq.section_id = s.id
+                 JOIN question_versions qv ON qv.id = sq.question_version_id
+                 WHERE s.package_version_id = p.current_published_version_id
+                   AND jsonb_typeof(qv.answer_spec->'distractors') = 'object'
+                   AND EXISTS (SELECT 1 FROM jsonb_each_text(qv.answer_spec->'distractors') d
+                               WHERE d.value = :trapErrorCode))
+                """;
+        if (trapErrorCode != null) params.addValue("trapErrorCode", trapErrorCode);
         return jdbc.query("""
-                SELECT p.id, p.current_published_version_id, p.code, p.required_feature_key,
-                       COALESCE(c.band_level, t.band_max, t.band_min) AS band,
-                       (SELECT count(*) FROM content_sections s JOIN section_questions sq ON sq.section_id = s.id
-                        WHERE s.package_version_id = p.current_published_version_id) AS question_count,
-                       (SELECT count(DISTINCT sq.question_version_id) FROM content_sections s
-                        JOIN section_questions sq ON sq.section_id = s.id
-                        JOIN question_knowledge_points qkp ON qkp.question_version_id = sq.question_version_id
-                        WHERE s.package_version_id = p.current_published_version_id
-                          AND qkp.knowledge_point_id = :knowledgePointId) AS matched_question_count
-                FROM content_packages p
-                LEFT JOIN lessons package_lesson ON package_lesson.id = p.lesson_id
-                LEFT JOIN topics t ON t.id = COALESCE(p.topic_id, package_lesson.topic_id)
-                LEFT JOIN courses c ON c.id = COALESCE(p.course_id, t.course_id)
-                WHERE %s %s
-                ORDER BY %s matched_question_count DESC, p.id
+                SELECT ranked.id, ranked.current_published_version_id, ranked.code, ranked.required_feature_key,
+                       ranked.band, ranked.question_count, ranked.matched_question_count, ranked.trap_question_count
+                FROM (
+                    SELECT p.id, p.current_published_version_id, p.code, p.required_feature_key, p.lesson_id,
+                           COALESCE(c.band_level, t.band_max, t.band_min) AS band,
+                           (SELECT count(*) FROM content_sections s JOIN section_questions sq ON sq.section_id = s.id
+                            WHERE s.package_version_id = p.current_published_version_id) AS question_count,
+                           (SELECT count(DISTINCT sq.question_version_id) FROM content_sections s
+                            JOIN section_questions sq ON sq.section_id = s.id
+                            JOIN question_knowledge_points qkp ON qkp.question_version_id = sq.question_version_id
+                            WHERE s.package_version_id = p.current_published_version_id
+                              AND qkp.knowledge_point_id = :knowledgePointId) AS matched_question_count,
+                           %s AS trap_question_count
+                    FROM content_packages p
+                    LEFT JOIN lessons package_lesson ON package_lesson.id = p.lesson_id
+                    LEFT JOIN topics t ON t.id = COALESCE(p.topic_id, package_lesson.topic_id)
+                    LEFT JOIN courses c ON c.id = COALESCE(p.course_id, t.course_id)
+                    WHERE %s %s
+                ) ranked
+                ORDER BY CASE WHEN ranked.trap_question_count >= 2 THEN ranked.trap_question_count ELSE 0 END DESC,
+                         CASE WHEN ranked.trap_question_count >= 2
+                              THEN ranked.trap_question_count::numeric / NULLIF(ranked.question_count, 0)
+                              ELSE 0 END DESC,
+                         %s ranked.matched_question_count DESC, ranked.id
                 LIMIT :limit
-                """.formatted(eligiblePracticeSet(":knowledgePointId"), exclusion, preferred), params,
+                """.formatted(trapCount, eligiblePracticeSet(":knowledgePointId"), exclusion, preferred), params,
                 (rs, i) -> new PracticeSetResult(uuid(rs, "id"), uuid(rs, "current_published_version_id"),
                         rs.getString("code"), rs.getInt("question_count"), rs.getInt("matched_question_count"),
-                        rs.getBigDecimal("band"), rs.getString("required_feature_key")));
+                        rs.getBigDecimal("band"), rs.getString("required_feature_key"),
+                        rs.getInt("trap_question_count")));
     }
 
     @Override
@@ -980,6 +1143,11 @@ public class JdbcLearningContentReader implements LearningContentReader {
 
     private static UUID nullableUuid(ResultSet rs, String column) throws SQLException {
         return rs.getObject(column, UUID.class);
+    }
+
+    private static Integer nullableInt(ResultSet rs, String column) throws SQLException {
+        int value = rs.getInt(column);
+        return rs.wasNull() ? null : value;
     }
 
     private static List<UUID> uuids(Array array) throws SQLException {

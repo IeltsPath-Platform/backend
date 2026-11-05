@@ -159,9 +159,79 @@ class AddQuestionVersionUseCaseTest {
                 .isInstanceOf(InvalidErrorTypeException.class);
     }
 
+    @Test
+    void addsTfngTrapForNotGivenWhenBothCodesAreActive() {
+        Question question = Question.create(QuestionType.TRUE_FALSE_NOT_GIVEN, Skill.READING, null);
+        when(questionRepository.findById(question.getId())).thenReturn(Optional.of(question));
+        when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(errorTypeRepository.findActiveCodes(Set.of("TFNG_NG_AS_FALSE", "TFNG_FALSE_AS_NG")))
+                .thenReturn(Set.of("TFNG_NG_AS_FALSE", "TFNG_FALSE_AS_NG"));
+        when(errorTypeRepository.findActiveCodes(Set.of("TFNG_NG_AS_FALSE")))
+                .thenReturn(Set.of("TFNG_NG_AS_FALSE"));
+
+        addQuestionVersionUseCase.execute(tfngCommand(question.getId(), "NOT_GIVEN",
+                List.of("TRUE", "FALSE", "NOT_GIVEN"), null));
+
+        assertThat(question.getVersions().getFirst().getAnswerSpecJson())
+                .contains("\"correct\":\"NOT_GIVEN\"")
+                .contains("\"FALSE\":\"TFNG_NG_AS_FALSE\"");
+    }
+
+    @Test
+    void preservesDistractorsProvidedByTheAuthor() {
+        Question question = Question.create(QuestionType.TRUE_FALSE_NOT_GIVEN, Skill.READING, null);
+        when(questionRepository.findById(question.getId())).thenReturn(Optional.of(question));
+        when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(errorTypeRepository.findActiveCodes(Set.of("OFF_TOPIC"))).thenReturn(Set.of("OFF_TOPIC"));
+
+        addQuestionVersionUseCase.execute(tfngCommand(question.getId(), "NOT_GIVEN",
+                List.of("TRUE", "FALSE", "NOT_GIVEN"), "{\"FALSE\":\"OFF_TOPIC\"}"));
+
+        assertThat(question.getVersions().getFirst().getAnswerSpecJson()).contains("OFF_TOPIC")
+                .doesNotContain("TFNG_NG_AS_FALSE");
+    }
+
+    @Test
+    void doesNotAutofillTfngWhenEitherTrapCodeIsUnavailable() {
+        Question question = Question.create(QuestionType.TRUE_FALSE_NOT_GIVEN, Skill.READING, null);
+        when(questionRepository.findById(question.getId())).thenReturn(Optional.of(question));
+        when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(errorTypeRepository.findActiveCodes(Set.of("TFNG_NG_AS_FALSE", "TFNG_FALSE_AS_NG")))
+                .thenReturn(Set.of("TFNG_NG_AS_FALSE"));
+
+        addQuestionVersionUseCase.execute(tfngCommand(question.getId(), "NOT_GIVEN",
+                List.of("TRUE", "FALSE", "NOT_GIVEN"), null));
+
+        assertThat(question.getVersions().getFirst().getAnswerSpecJson()).doesNotContain("distractors");
+    }
+
+    @Test
+    void refusesToMapAQuestionToATrapKnowledgePoint() {
+        Question question = Question.create(QuestionType.MULTIPLE_CHOICE, Skill.READING, null);
+        UUID trapPointId = UUID.randomUUID();
+        when(questionRepository.findById(question.getId())).thenReturn(Optional.of(question));
+        when(errorTypeRepository.containsTrapKnowledgePoints(Set.of(trapPointId))).thenReturn(true);
+
+        assertThatThrownBy(() -> addQuestionVersionUseCase.execute(new AddQuestionVersionCommand(question.getId(), 1,
+                "Stem", null, null, null, null, QuestionDifficulty.MEDIUM,
+                List.of(new AddQuestionVersionCommand.KnowledgePointInput(null, trapPointId, BigDecimal.ONE)))))
+                .isInstanceOf(InvalidErrorTypeException.class)
+                .hasMessage("TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
+        verify(questionRepository, never()).save(any(Question.class));
+    }
+
     private static AddQuestionVersionCommand choiceCommand(UUID questionId, String answerSpecJson) {
         return new AddQuestionVersionCommand(questionId, 1, "Stem",
                 List.of(new QuestionOptionPayload("A", "Right", 1), new QuestionOptionPayload("B", "Wrong", 2)),
                 answerSpecJson, null, null, QuestionDifficulty.MEDIUM, List.of());
+    }
+
+    private static AddQuestionVersionCommand tfngCommand(UUID questionId, String correct, List<String> keys,
+                                                           String distractors) {
+        String suffix = distractors == null ? "" : ",\"distractors\":" + distractors;
+        String answerSpec = "{\"type\":\"CHOICE\",\"correct\":\"" + correct + "\"" + suffix + "}";
+        List<QuestionOptionPayload> options = keys.stream().map(key -> new QuestionOptionPayload(key, key, keys.indexOf(key) + 1)).toList();
+        return new AddQuestionVersionCommand(questionId, 1, "TFNG stem", options, answerSpec, null, null,
+                QuestionDifficulty.MEDIUM, List.of());
     }
 }

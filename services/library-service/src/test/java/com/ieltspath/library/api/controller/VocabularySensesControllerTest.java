@@ -8,6 +8,7 @@ import com.ieltspath.library.application.usecase.CreateVocabularyItemUseCase;
 import com.ieltspath.library.application.usecase.GetVocabularyDetailUseCase;
 import com.ieltspath.library.application.usecase.GetVocabularySensesUseCase;
 import com.ieltspath.library.application.usecase.SearchVocabularyUseCase;
+import com.ieltspath.library.application.usecase.VocabularyCatalogUseCase;
 import com.ieltspath.library.domain.vo.ContentStatus;
 import com.ieltspath.library.domain.vo.PartOfSpeech;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,11 +37,12 @@ class VocabularySensesControllerTest {
     private final CreateVocabularyItemUseCase create = mock(CreateVocabularyItemUseCase.class);
     private final AddVocabularySenseUseCase addSense = mock(AddVocabularySenseUseCase.class);
     private final GetVocabularySensesUseCase getSenses = mock(GetVocabularySensesUseCase.class);
+    private final VocabularyCatalogUseCase catalog = mock(VocabularyCatalogUseCase.class);
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new VocabularyController(search, detail, getSenses, create, addSense))
+        mvc = MockMvcBuilders.standaloneSetup(new VocabularyController(search, detail, getSenses, create, addSense, catalog))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -98,14 +100,13 @@ class VocabularySensesControllerTest {
     @Test
     void keepsTheExistingItemDetailRoute() throws Exception {
         UUID itemId = UUID.fromString("20000000-0000-4000-8000-000000000001");
-        Instant now = Instant.parse("2026-10-21T00:00:00Z");
-        when(detail.execute(itemId)).thenReturn(new VocabularyItemResult(
-                itemId, "tree", "tree", null, null, ContentStatus.ACTIVE, now, now, List.of()
-        ));
+        when(catalog.detail(itemId)).thenReturn(new com.ieltspath.library.application.result.CatalogItemResult(itemId, "tree", "tree",
+                null, null, null, null, null, null, null, false, null, com.ieltspath.library.domain.vo.ContentStatus.ACTIVE, null, null,
+                List.of(), new com.ieltspath.library.application.result.CatalogCountsResult(0, 0, 0, 0, 0)));
 
         mvc.perform(get("/api/content/vocabulary/{id}", itemId).accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lemma").value("tree"));
-        verify(detail).execute(itemId);
+        verify(catalog).detail(itemId);
     }
 }

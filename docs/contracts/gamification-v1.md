@@ -78,8 +78,8 @@ Starting or submitting a lesson exercise, a Practice attempt or free practice wi
 
 The streak is counted on the server from submitted answers, in the learner's local day. A day with an answer continues it.
 An empty day is covered by a freeze if one is owned, otherwise the streak breaks and the lost length is kept for display.
-A graded essay (lesson or Practice) counts as an answered day like any other answer: it writes a question event. The old client-reported streak in User Service is
-unchanged and is not used for rewards.
+A graded essay (lesson or Practice) counts as an answered day like any other answer: it writes a question event. User Service no longer keeps a streak: the old client-reported one and its `/api/learning-support/streak` route were removed,
+and public profiles take the streak from here (see [`POST /internal/learning/streaks`](#post-internallearningstreaks)).
 
 ### `GET /me/streak`
 
@@ -115,6 +115,30 @@ pay a day the learner did not study. Applying or regrading a result, or replayin
 ### Streak rewards
 
 Each multiple of 7 days pays +100 XP and +10 points; day 30 pays +500 XP (no points). A milestone pays once per streak run.
+
+### `POST /internal/learning/streaks`
+
+Service-to-service only: the Gateway does not route `/internal/**`, and the caller forwards the bearer token and
+`X-Correlation-Id` of the request it is serving. Community uses it to show a streak beside public profiles.
+
+```json
+{ "userIds": ["<uuid>", "<uuid>"] }
+```
+
+`userIds` is required, at most 100. Response:
+
+```json
+{ "streaks": [ { "userId": "<uuid>", "currentDays": 6 } ] }
+```
+
+Each learner is judged on their own local day, as `GET /me/streak` does, so a streak that lapsed reads `0`. The call only
+reads: it does not store the lapse. A learner with no streak is left out of `streaks` (the caller shows 0). One query
+reads the streaks and one reads the timezones, however many learners are listed.
+
+| HTTP | When |
+| --- | --- |
+| 422 | `userIds` missing, or more than 100 |
+| 401 | No valid token |
 
 ## Daily quests
 

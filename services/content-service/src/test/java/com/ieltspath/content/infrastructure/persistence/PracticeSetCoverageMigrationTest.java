@@ -42,7 +42,7 @@ class PracticeSetCoverageMigrationTest {
         source.setURL(POSTGRES.getJdbcUrl());
         source.setUser(POSTGRES.getUsername());
         source.setPassword(POSTGRES.getPassword());
-        Flyway.configure().dataSource(source).locations("classpath:db/migration").load().migrate();
+        Flyway.configure().dataSource(source).locations("classpath:db/migration").target("79").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
         reader = new JdbcLearningContentReader(jdbc);
     }
@@ -151,7 +151,8 @@ class PracticeSetCoverageMigrationTest {
 
     private Map<String, Integer> eligibleSetCountsByCode() {
         var knowledgePoints = jdbc.queryForList("SELECT kp.id, kp.code FROM knowledge_points kp JOIN topics t ON t.id = kp.topic_id "
-                + "JOIN courses c ON c.id = t.course_id WHERE kp.status = 'ACTIVE' AND c.band_level IN (5.5, 6.5)",
+                        + "JOIN courses c ON c.id = t.course_id WHERE kp.status = 'ACTIVE' AND c.band_level IN (5.5, 6.5) "
+                        + "AND kp.id NOT IN (SELECT trap_knowledge_point_id FROM error_types WHERE trap_knowledge_point_id IS NOT NULL)",
                 Collections.emptyMap());
         List<UUID> ids = knowledgePoints.stream().map(row -> (UUID) row.get("id")).toList();
         var counts = reader.countEligiblePracticeSets(ids, List.of(), 1);

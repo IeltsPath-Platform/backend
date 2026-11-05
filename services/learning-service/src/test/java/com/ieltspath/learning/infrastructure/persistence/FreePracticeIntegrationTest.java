@@ -10,6 +10,7 @@ import com.ieltspath.learning.application.usecase.GetLearnerTreeUseCase;
 import com.ieltspath.learning.application.usecase.StartFreePracticeUseCase;
 import com.ieltspath.learning.application.usecase.SubmitPracticeAttemptUseCase;
 import com.ieltspath.learning.domain.vo.LearningSkill;
+import com.ieltspath.learning.domain.exception.LearningGateException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** Free practice on one knowledge point, end to end against a real database and a stubbed Content. */
@@ -62,12 +64,15 @@ class FreePracticeIntegrationTest {
     private static final UUID TOPIC = UUID.randomUUID();
     private static final UUID COURSE = UUID.randomUUID();
     private static final UUID KP = UUID.randomUUID();
+    private static final UUID TRAP_KP = UUID.randomUUID();
     private static final UUID PACKAGE = UUID.randomUUID();
     private static final UUID VERSION = UUID.randomUUID();
     private static final UUID FIRST_QUESTION = UUID.randomUUID();
     private static final UUID SECOND_QUESTION = UUID.randomUUID();
+    private static final UUID THIRD_QUESTION = UUID.randomUUID();
 
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.ieltspath.learning.application.usecase.RefreshLearningTopicsUseCase topics;
     @Autowired StartFreePracticeUseCase start;
     @Autowired SubmitPracticeAttemptUseCase submit;
     @Autowired GetLearnerTreeUseCase treeUseCase;
@@ -107,6 +112,74 @@ class FreePracticeIntegrationTest {
                 + "AND source = 'free_practice'", user));
         assertEquals(0, count("SELECT count(*) FROM review_items WHERE user_id = ?", user),
                 "a free attempt never raises a review, even when it fails");
+    }
+
+    @Test
+    void countedFreePracticeSubmissionPersistsTaggedChildEvidence() {
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(KP, "R_FREE", "Free point", "PROCEDURE", "READING", "", true),
+                        new KnowledgePoint(TRAP_KP, "R_TRAP", "Trap", "PROCEDURE", "READING", "", false,
+                                null, null, KP, "TFNG_NG_AS_FALSE")), LearningSkill.READING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+        when(content.getPackageVersion(VERSION)).thenReturn(taggedVersion());
+        UUID user = enrolled();
+        topics.execute(user);
+        start.execute(user, KP);
+        UUID attempt = jdbc.queryForObject("SELECT id FROM practice_attempts WHERE user_id = ?", UUID.class, user);
+
+        var submission = submit.execute(user, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of(
+                new SubmitExerciseCommand.Answer(FIRST_QUESTION, "B"),
+                new SubmitExerciseCommand.Answer(SECOND_QUESTION, "A"))));
+
+        assertTrue(submission.countedAsEvidence());
+        assertEquals(1, count("SELECT count(*) FROM knowledge_point_catalog WHERE kp_id = ? "
+                + "AND parent_kp_id = ? AND error_code = 'TFNG_NG_AS_FALSE'", TRAP_KP, KP));
+        assertEquals(1, count("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id = ? "
+                + "AND source = 'error_trap' AND correct = false", user, TRAP_KP));
+        var parentNode = treeUseCase.execute(user, COURSE).knowledgePoints().stream()
+                .filter(node -> node.knowledgePointId().equals(KP)).findFirst().orElseThrow();
+        assertEquals(List.of(TRAP_KP), parentNode.errorTraps().stream()
+                .map(trap -> trap.knowledgePointId()).toList());
+        assertEquals(List.of("TFNG_NG_AS_FALSE"), parentNode.errorTraps().stream()
+                .map(trap -> trap.code()).toList(), "the tree names the error code, not the child point's own code");
+    }
+
+    @Test
+    void freePracticeSubmissionCreatesAnErrorPatternForItsCompletedParentLesson() {
+        UUID lessonId = UUID.nameUUIDFromBytes("parent-lesson".getBytes());
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(KP, "R_FREE", "Free point", "PROCEDURE", "READING", "", true),
+                        new KnowledgePoint(TRAP_KP, "R_TRAP", "Trap", "PROCEDURE", "READING", "", false,
+                                null, null, KP, "TFNG_NG_AS_FALSE")), LearningSkill.READING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+        when(content.getLesson(lessonId)).thenReturn(
+                new Lesson(lessonId, TOPIC, "L1", "Parent lesson", null,
+                        1, List.of(KP), List.of(), LearningSkill.READING));
+        when(content.getPackageVersion(VERSION)).thenReturn(taggedWrongVersion());
+        when(content.searchPracticeSets(eq(KP), anyList(), eq(3), eq(1), eq(lessonId), eq("TFNG_NG_AS_FALSE")))
+                .thenReturn(List.of(new PracticeSet(UUID.randomUUID(), UUID.randomUUID(), "TRAP_SET", 3, 3,
+                        null, null, 2)));
+        UUID user = enrolled();
+        topics.execute(user);
+        jdbc.update("INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, "
+                + "knowledge_point_ids, completed_at) VALUES (?, ?, ?, 1, ARRAY[CAST(? AS uuid)], now())",
+                user, lessonId, TOPIC, KP.toString());
+        jdbc.update("INSERT INTO kp_mastery_profiles (user_id, knowledge_point_id, mastery, tier, evidence_count, "
+                + "success_streak, last_evidence_at) VALUES (?, ?, 0.85, 'MAINTAIN', 10, 4, now())", user, KP);
+        start.execute(user, KP);
+        UUID attempt = jdbc.queryForObject("SELECT id FROM practice_attempts WHERE user_id = ?", UUID.class, user);
+
+        submit.execute(user, attempt, new SubmitExerciseCommand(UUID.randomUUID(), List.of(
+                new SubmitExerciseCommand.Answer(FIRST_QUESTION, "B"),
+                new SubmitExerciseCommand.Answer(SECOND_QUESTION, "B"),
+                new SubmitExerciseCommand.Answer(THIRD_QUESTION, "B"))));
+
+        assertEquals(3, count("SELECT count(*) FROM kp_evidence WHERE user_id = ? AND kp_id = ? "
+                + "AND source = 'error_trap' AND correct = false", user, TRAP_KP));
+        assertEquals("PRIORITY", jdbc.queryForObject("SELECT tier FROM kp_mastery_profiles WHERE user_id = ? "
+                + "AND knowledge_point_id = ?", String.class, user, TRAP_KP));
+        assertEquals(1, count("SELECT count(*) FROM review_items WHERE user_id = ? AND knowledge_point_id = ? "
+                + "AND trigger_kind = 'ERROR_PATTERN' AND status = 'PENDING' AND blocking = false", user, KP));
     }
 
     private void offering(BigDecimal band, String featureKey) {
@@ -218,6 +291,35 @@ class FreePracticeIntegrationTest {
     }
 
     @Test
+    void freePracticeForAPaywalledPointIsRefusedBeforeHeartsOrAttemptsAreCreated() {
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(KP, "R_LOCKED", "Locked point", "PROCEDURE", "READING", "", true,
+                        null, null, null, null, 4)), LearningSkill.READING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+        UUID user = enrolled();
+
+        LearningGateException error = assertThrows(LearningGateException.class, () -> start.execute(user, KP));
+
+        assertEquals("PAYWALL", error.getCode());
+        assertEquals(0, count("SELECT count(*) FROM learner_hearts WHERE user_id = ?", user));
+        assertEquals(0, count("SELECT count(*) FROM practice_attempts WHERE user_id = ?", user));
+    }
+
+    @Test
+    void freePracticeUsesWritingTopicSkillForAnAllKnowledgePoint() {
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "WRITE", "Writing", 1, null,
+                List.of(new KnowledgePoint(KP, "W_ALL", "General writing point", "STRATEGY", "ALL", "", true,
+                        null, null, null, null, 5)), LearningSkill.WRITING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+        UUID user = enrolled();
+        ownSkill(user, LearningSkill.WRITING);
+
+        start.execute(user, KP);
+
+        assertEquals(1, count("SELECT count(*) FROM practice_attempts WHERE user_id = ?", user));
+    }
+
+    @Test
     void theTreeListsThePointsOfTheCourseWithFreePracticeOpen() {
         var tree = treeUseCase.execute(enrolled(), COURSE);
 
@@ -228,6 +330,49 @@ class FreePracticeIntegrationTest {
         assertNull(node.mastery(), "no evidence yet, so no score or tier");
         assertNull(node.tier());
         assertTrue(node.practiceAvailable());
+        assertFalse(node.locked());
+    }
+
+    @Test
+    void theTreeMarksPaywalledPointsAndDisablesFreePractice() {
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(KP, "R_LOCKED", "Locked point", "PROCEDURE", "READING", "", true,
+                        null, null, null, null, 4)), LearningSkill.READING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+
+        var node = treeUseCase.execute(enrolled(), COURSE).knowledgePoints().get(0);
+
+        assertTrue(node.locked());
+        assertFalse(node.practiceAvailable());
+    }
+
+    @Test
+    void theTreeOpensAnAllPointUsingItsWritingTopicForSkillOwnership() {
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "WRITE", "Writing", 1, null,
+                List.of(new KnowledgePoint(KP, "W_ALL", "General writing point", "STRATEGY", "ALL", "", true,
+                        null, null, null, null, 5)), LearningSkill.WRITING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+        UUID user = enrolled();
+        ownSkill(user, LearningSkill.WRITING);
+
+        var node = treeUseCase.execute(user, COURSE).knowledgePoints().get(0);
+
+        assertFalse(node.locked());
+    }
+
+    @Test
+    void accessOutageLocksOnlyPaywalledTreePointsWithoutFailingTheTree() {
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(TOPIC, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(KP, "R_LOCKED", "Locked point", "PROCEDURE", "READING", "", true,
+                        null, null, null, null, 4)), LearningSkill.READING, true,
+                new Course(COURSE, "C60", "Band 6.0", new BigDecimal("6.0"), true, true))));
+        when(access.premium()).thenThrow(new AccessUnavailableException(503));
+
+        var node = treeUseCase.execute(enrolled(), COURSE).knowledgePoints().get(0);
+
+        assertTrue(node.locked());
+        assertFalse(node.practiceAvailable());
+        verify(access).premium();
     }
 
     @Test
@@ -290,8 +435,13 @@ class FreePracticeIntegrationTest {
         return user;
     }
 
-    private int count(String sql, UUID user) {
-        return jdbc.queryForObject(sql, Integer.class, user);
+    private void ownSkill(UUID user, LearningSkill skill) {
+        jdbc.update("INSERT INTO learner_course_unlocks (user_id, course_id, skill, point_cost, request_id, status) "
+                        + "VALUES (?, ?, ?, 50, ?, 'ACTIVE')", user, COURSE, skill.name(), UUID.randomUUID());
+    }
+
+    private int count(String sql, UUID... args) {
+        return jdbc.queryForObject(sql, Integer.class, (Object[]) args);
     }
 
     private static PackageVersion version() {
@@ -302,6 +452,28 @@ class FreePracticeIntegrationTest {
                 new Item(SECOND_QUESTION, 2, "Choose", List.of(new Option("A", "Correct", 1),
                         new Option("B", "Wrong", 2)), Map.of("type", "CHOICE", "correct", "A"), "Because A",
                         BigDecimal.ONE, List.of(new KnowledgePointMapping(KP, BigDecimal.ONE))));
+        return new PackageVersion(VERSION, PACKAGE, "PRACTICE_SET", null, Map.of(),
+                List.of(new Section(UUID.randomUUID(), "Practice", "READING", null, 1, "Passage", items)));
+    }
+
+    private static PackageVersion taggedVersion() {
+        List<Item> items = List.of(
+                new Item(FIRST_QUESTION, 1, "Choose", List.of(new Option("A", "Correct", 1),
+                        new Option("B", "Wrong", 2)), Map.of("type", "CHOICE", "correct", "A",
+                        "distractors", Map.of("B", "TFNG_NG_AS_FALSE")), "Because A", BigDecimal.ONE,
+                        List.of(new KnowledgePointMapping(KP, BigDecimal.ONE))),
+                new Item(SECOND_QUESTION, 2, "Choose", List.of(new Option("A", "Correct", 1),
+                        new Option("B", "Wrong", 2)), Map.of("type", "CHOICE", "correct", "A"), "Because A",
+                        BigDecimal.ONE, List.of(new KnowledgePointMapping(KP, BigDecimal.ONE))));
+        return new PackageVersion(VERSION, PACKAGE, "PRACTICE_SET", null, Map.of(),
+                List.of(new Section(UUID.randomUUID(), "Practice", "READING", null, 1, "Passage", items)));
+    }
+
+    private static PackageVersion taggedWrongVersion() {
+        List<Item> items = List.of(FIRST_QUESTION, SECOND_QUESTION, THIRD_QUESTION).stream().map(id ->
+                new Item(id, 1, "Choose", List.of(new Option("A", "Correct", 1), new Option("B", "Wrong", 2)),
+                        Map.of("type", "CHOICE", "correct", "A", "distractors", Map.of("B", "TFNG_NG_AS_FALSE")),
+                        "Because A", BigDecimal.ONE, List.of(new KnowledgePointMapping(KP, BigDecimal.ONE)))).toList();
         return new PackageVersion(VERSION, PACKAGE, "PRACTICE_SET", null, Map.of(),
                 List.of(new Section(UUID.randomUUID(), "Practice", "READING", null, 1, "Passage", items)));
     }

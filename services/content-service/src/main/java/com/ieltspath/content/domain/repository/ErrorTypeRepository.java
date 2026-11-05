@@ -13,6 +13,8 @@ public interface ErrorTypeRepository {
 
     Optional<ErrorType> findById(UUID id);
 
+    List<ErrorType> findByKnowledgePointId(UUID knowledgePointId);
+
     boolean existsByCode(String code);
 
     List<ErrorType> findAll();
@@ -21,6 +23,15 @@ public interface ErrorTypeRepository {
 
     /** Error types safe for grading output: both active and reviewed by a person. */
     List<ErrorType> findApprovedActive();
+
+    /** Trap child ids among the requested knowledge points. */
+    default Set<UUID> findTrapKnowledgePointIds(Collection<UUID> knowledgePointIds) {
+        return Set.of();
+    }
+
+    default boolean containsTrapKnowledgePoints(Collection<UUID> knowledgePointIds) {
+        return !findTrapKnowledgePointIds(knowledgePointIds).isEmpty();
+    }
 
     /** The subset of {@code codes} that exists, is {@code ACTIVE}, and has been approved. */
     Set<String> findActiveCodes(Collection<String> codes);

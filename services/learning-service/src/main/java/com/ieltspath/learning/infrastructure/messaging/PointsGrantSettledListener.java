@@ -18,8 +18,9 @@ import java.util.UUID;
 /**
  * Reads Access's answer to a points grant and records it. A message that cannot be read is refused and dead-lettered: it
  * would never become readable. A failure to record is treated as temporary: the message goes to the retry queue and,
- * after the allowed retries, to the dead-letter queue. Recording is a single idempotent update, so handling a message
- * twice is harmless. Contents are not logged.
+ * after the allowed retries. This listener uses the shared {@link MessageRetry} policy because transient settlement
+ * failures use the same bounded retry behavior as other event consumers. Recording is a single idempotent update, so
+ * handling a message twice is harmless. Contents are not logged.
  */
 @Component
 public class PointsGrantSettledListener {

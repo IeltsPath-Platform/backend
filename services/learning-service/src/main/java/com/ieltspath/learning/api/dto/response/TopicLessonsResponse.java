@@ -12,13 +12,13 @@ public record TopicLessonsResponse(UUID topicId, List<Lesson> lessons, String te
                                    LearningSkill skill, boolean hasTopicTest, List<LearningSkill> skills) {
     public record Lesson(UUID lessonId, String code, String title, int sortOrder, String status,
                          PracticeStatus practiceStatus, PracticePassReason practicePassReason,
-                         Integer estimatedMinutes, UUID blockingReviewId) {}
+                         Integer estimatedMinutes, UUID blockingReviewId, boolean paywall, boolean freePreview) {}
 
     public static TopicLessonsResponse from(TopicLessonsResult result) {
         return new TopicLessonsResponse(result.topicId(), result.lessons().stream().map(lesson -> new Lesson(
                 lesson.lessonId(), lesson.code(), lesson.title(), lesson.sortOrder(), lesson.status(),
                 lesson.practiceStatus(), lesson.practicePassReason(), lesson.estimatedMinutes(),
-                lesson.blockingReviewId())).toList(),
+                lesson.blockingReviewId(), lesson.paywall(), lesson.freePreview())).toList(),
                 result.testStatus(), result.skill(), result.hasTopicTest(),
                 result.skills().stream().sorted().toList());
     }

@@ -4,21 +4,28 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.ieltspath.content.application.exception.VocabularyRejectedException;
 import com.ieltspath.content.application.port.VocabularySenseLookup;
+import com.ieltspath.content.application.port.VocabularySenseLookup.SenseText;
+import com.ieltspath.content.application.port.VocabularySenseWriter;
 import com.ieltspath.content.application.service.CourseDraftAnalysisService;
 import com.ieltspath.content.application.service.CourseDraftCodec;
 import com.ieltspath.content.application.service.CourseMaterializer;
 import com.ieltspath.content.domain.exception.CourseDraftErrorsException;
 import com.ieltspath.content.domain.exception.InvalidContentStateException;
 import com.ieltspath.content.domain.repository.AiDraftRepository;
+import com.ieltspath.content.domain.vo.CourseDraftStructure.NewWord;
 import com.ieltspath.content.domain.vo.DraftStatus;
 import com.ieltspath.content.infrastructure.persistence.adapter.ContentPackageRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.adapter.CourseRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcAiDraftRepository;
+import com.ieltspath.content.infrastructure.persistence.adapter.JdbcCourseCandidateReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcCourseCatalogReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcPracticeTestMilestoneRepository;
 import com.ieltspath.content.infrastructure.persistence.adapter.LessonAuthoringRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.adapter.LessonResourceRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.mapper.LessonResourcePersistenceMapperImpl;
 import com.ieltspath.content.infrastructure.persistence.adapter.TopicRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.mapper.ContentPackagePersistenceMapper;
 import com.ieltspath.content.infrastructure.persistence.mapper.CoursePersistenceMapperImpl;
@@ -43,8 +50,15 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -58,13 +72,14 @@ import static org.mockito.Mockito.doThrow;
 @DataJpaTest(properties = {"spring.cloud.config.enabled=false", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({ApproveCourseDraftUseCase.class, CourseDraftUseCases.class, CourseMaterializer.class, CourseDraftCodec.class,
-        CourseDraftAnalysisService.class, JdbcCourseCatalogReader.class, CreateCourseUseCase.class,
+        CourseDraftAnalysisService.class, JdbcCourseCatalogReader.class, JdbcCourseCandidateReader.class, CreateCourseUseCase.class,
         UpdateCourseUseCase.class, CourseRepositoryAdapter.class, CoursePersistenceMapperImpl.class,
         CreateTopicUseCase.class, UpdateTopicUseCase.class, TopicRepositoryAdapter.class,
         TopicPersistenceMapper.class, LessonAuthoringUseCase.class, LessonAuthoringRepositoryAdapter.class,
         ContentPackageRepositoryAdapter.class, ContentPackagePersistenceMapper.class,
         CreateContentPackageUseCase.class, CreateDraftPackageVersionUseCase.class, JdbcLearningContentReader.class,
         JdbcPracticeTestMilestoneRepository.class, JdbcAiDraftRepository.class,
+        CreateLessonResourceUseCase.class, LessonResourceRepositoryAdapter.class, LessonResourcePersistenceMapperImpl.class,
         ApproveCourseDraftIntegrationTest.Beans.class})
 @Testcontainers(disabledWithoutDocker = true)
 class ApproveCourseDraftIntegrationTest {
@@ -72,8 +87,38 @@ class ApproveCourseDraftIntegrationTest {
     @TestConfiguration
     static class Beans {
         @Bean ObjectMapper objectMapper() { return new ObjectMapper(); }
+        /** These tests only create link resources, so the document storage is never reached. */
+        @Bean com.ieltspath.content.application.port.LessonDocumentFiles documentFiles() {
+            return org.mockito.Mockito.mock(com.ieltspath.content.application.port.LessonDocumentFiles.class);
+        }
         @Bean Clock clock() { return Clock.systemUTC(); }
-        @Bean VocabularySenseLookup senses() { return ids -> Set.copyOf(ids); }
+        @Bean FakeLibrary library() { return new FakeLibrary(); }
+    }
+
+    /** The vocabulary library as the approval sees it: which senses are switched off, and the words it is given. */
+    static class FakeLibrary implements VocabularySenseLookup, VocabularySenseWriter {
+        final Set<UUID> inactive = new HashSet<>();
+        final List<List<NewWord>> writes = new ArrayList<>();
+        final Map<UUID, SenseText> texts = new HashMap<>();
+        String refusal;
+
+        @Override public Set<UUID> findActiveSenseIds(List<UUID> ids) {
+            return ids.stream().filter(id -> !inactive.contains(id)).collect(Collectors.toSet());
+        }
+
+        @Override public List<SenseText> describeActiveSenses(List<UUID> ids) {
+            return ids.stream().filter(id -> !inactive.contains(id) && texts.containsKey(id)).map(texts::get).toList();
+        }
+
+        @Override public Map<String, UUID> resolveOrCreate(List<NewWord> words) {
+            if (refusal != null) throw new VocabularyRejectedException(refusal);
+            writes.add(words);
+            Map<String, UUID> senses = new LinkedHashMap<>();
+            words.forEach(word -> senses.put(word.normalizedLemma(), senseOf(word.normalizedLemma())));
+            return senses;
+        }
+
+        static UUID senseOf(String lemma) { return UUID.nameUUIDFromBytes(lemma.getBytes()); }
     }
 
     @Container
@@ -87,7 +132,7 @@ class ApproveCourseDraftIntegrationTest {
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
     }
 
-    private static final BigDecimal BAND = new BigDecimal("8.5"); // CEFR C2: no seeded course or point uses it
+    private static final BigDecimal BAND = new BigDecimal("8.5"); // CEFR C2: no seeded course uses this band
 
     @Autowired JdbcTemplate jdbc;
     @Autowired jakarta.persistence.EntityManager entityManager;
@@ -95,7 +140,9 @@ class ApproveCourseDraftIntegrationTest {
     @Autowired CourseDraftUseCases drafts;
     @Autowired ApproveCourseDraftUseCase approve;
     @Autowired AiDraftRepository draftStore;
+    @Autowired FakeLibrary library;
     @Autowired JdbcLearningContentReader reader;
+    @Autowired JdbcCourseCandidateReader candidates;
     @MockitoSpyBean CreateDraftPackageVersionUseCase draftVersions;
 
     private final UUID author = UUID.randomUUID();
@@ -109,6 +156,10 @@ class ApproveCourseDraftIntegrationTest {
 
     @BeforeEach
     void fixtures() {
+        library.inactive.clear();
+        library.writes.clear();
+        library.texts.clear();
+        library.refusal = null;
         jdbc.update("DELETE FROM courses WHERE band_level = ?", BAND);
         fixtureTopic = UUID.randomUUID();
         jdbc.update("INSERT INTO topics(id,code,name,sort_order) VALUES(?,?,?,?)", fixtureTopic, tag + "_FIXTURE",
@@ -151,6 +202,11 @@ class ApproveCourseDraftIntegrationTest {
                 + "(SELECT id FROM topics WHERE course_id=?)", String.class, approved.courseId()))
                 .containsOnly("DRAFT");
         UUID first = approved.lessonIds().get(0);
+        assertThat(jdbc.queryForObject("SELECT summary_markdown FROM lessons WHERE id=?", String.class, first)).isEqualTo("- one\n- two");
+        assertThat(jdbc.queryForObject("SELECT estimated_minutes FROM lessons WHERE id=?", Integer.class, first)).isEqualTo(20);
+        assertThat(jdbc.queryForList("SELECT resource_type || ':' || sort_order || ':' || title FROM lesson_resources WHERE lesson_id=? "
+                + "ORDER BY resource_type DESC, sort_order", String.class, first))
+                .containsExactly("SLIDE:0:Deck", "DOCUMENT:0:Sheet B", "DOCUMENT:1:Sheet A");
         assertThat(jdbc.queryForList("SELECT knowledge_point_id FROM lesson_knowledge_points WHERE lesson_id=?",
                 UUID.class, first)).contains(kpFoundation);
         assertThat(jdbc.queryForList("SELECT block_type FROM lesson_blocks WHERE lesson_id=? ORDER BY sort_order",
@@ -183,6 +239,99 @@ class ApproveCourseDraftIntegrationTest {
                 .doesNotContainAnyElementsOf(approved.topicIds());
         assertThat(reader.publishedTestPackages(approved.topicIds().get(0))).isEmpty();
         assertThat(reader.courseTestPackages(approved.courseId())).isEmpty();
+    }
+
+    // --- vocabulary
+
+    @Test
+    void aLessonGetsOneVocabularyBlockWithThePickedAndTheProposedSenses() throws Exception {
+        UUID picked = UUID.randomUUID();
+        ObjectNode draft = (ObjectNode) json.readTree(goodDraft());
+        ArrayNode lessons = (ArrayNode) draft.path("topics").get(0).path("lessons");
+        ObjectNode first = (ObjectNode) lessons.get(0);
+        first.putArray("vocabularySenseIds").add(picked.toString());
+        first.putArray("newVocabulary").add(word("fluctuate")).add(word("Trend"));
+        ((ObjectNode) lessons.get(1)).putArray("newVocabulary").add(word("trend"));
+        UUID id = drafts.create(author, draft).getId();
+
+        var approved = approve.execute(author, id);
+        entityManager.flush();
+
+        // The library is asked once, and a lemma two lessons propose is sent once.
+        assertThat(library.writes).hasSize(1);
+        assertThat(library.writes.get(0)).extracting(NewWord::normalizedLemma).containsExactly("fluctuate", "trend");
+        assertThat(senseIdsOfVocabularyBlock(approved.lessonIds().get(0))).containsExactly(picked,
+                FakeLibrary.senseOf("fluctuate"), FakeLibrary.senseOf("trend"));
+        assertThat(senseIdsOfVocabularyBlock(approved.lessonIds().get(1))).containsExactly(FakeLibrary.senseOf("trend"));
+    }
+
+    @Test
+    void theSummaryEndsWithAVocabularyCoreTableOfTheLessonsWords() throws Exception {
+        UUID picked = UUID.randomUUID();
+        library.texts.put(picked, new SenseText(picked, "accelerate", "tăng tốc"));
+        ObjectNode draft = (ObjectNode) json.readTree(goodDraft());
+        ArrayNode lessons = (ArrayNode) draft.path("topics").get(0).path("lessons");
+        ObjectNode first = (ObjectNode) lessons.get(0);
+        first.putArray("vocabularySenseIds").add(picked.toString());
+        first.putArray("newVocabulary").add(word("fluctuate")).add(word("Accelerate"));
+        UUID id = drafts.create(author, draft).getId();
+
+        var approved = approve.execute(author, id);
+        entityManager.flush();
+
+        String summary = jdbc.queryForObject("SELECT summary_markdown FROM lessons WHERE id=?", String.class,
+                approved.lessonIds().get(0));
+        assertThat(summary).startsWith("- one\n- two\n\n## Vocabulary Core\n\n| Từ | Nghĩa |\n| --- | --- |\n");
+        assertThat(summary).contains("| accelerate | tăng tốc |\n| fluctuate | dao dong |").doesNotContain("Accelerate");
+        // A lesson with no words gets no table; this one was given no summary, so it stays without one.
+        assertThat(jdbc.queryForObject("SELECT summary_markdown FROM lessons WHERE id=?", String.class,
+                approved.lessonIds().get(1))).isNull();
+    }
+
+    @Test
+    void aLessonWithoutVocabularyGetsNoVocabularyBlockAndTheLibraryIsNotAsked() throws Exception {
+        UUID id = drafts.create(author, structure(goodDraft())).getId();
+
+        var approved = approve.execute(author, id);
+        entityManager.flush();
+
+        assertThat(library.writes).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM lesson_blocks WHERE block_type='VOCABULARY' AND lesson_id=?",
+                Integer.class, approved.lessonIds().get(0))).isZero();
+    }
+
+    @Test
+    void aPickedSenseThatIsNoLongerActiveIsRefusedAndNothingIsCreated() throws Exception {
+        UUID gone = UUID.randomUUID();
+        library.inactive.add(gone);
+        ObjectNode draft = (ObjectNode) json.readTree(goodDraft());
+        ((ObjectNode) draft.path("topics").get(0).path("lessons").get(0)).putArray("vocabularySenseIds")
+                .add(gone.toString());
+        UUID id = drafts.create(author, draft).getId();
+
+        assertThatThrownBy(() -> approve.execute(author, id)).isInstanceOfSatisfying(CourseDraftErrorsException.class,
+                error -> {
+                    assertThat(error.getIssues()).extracting("code").containsExactly("VOCABULARY_SENSE_UNAVAILABLE");
+                    assertThat(error.getIssues()).extracting("subject").containsExactly(gone.toString());
+                });
+        assertThat(library.writes).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM courses WHERE band_level=?", Integer.class, BAND)).isZero();
+    }
+
+    @Test
+    void aWordTheLibraryRefusesIsReportedAndNothingIsCreated() throws Exception {
+        library.refusal = "Vocabulary item is inactive: going";
+        ObjectNode draft = (ObjectNode) json.readTree(goodDraft());
+        ((ObjectNode) draft.path("topics").get(0).path("lessons").get(0)).putArray("newVocabulary").add(word("going"));
+        UUID id = drafts.create(author, draft).getId();
+
+        assertThatThrownBy(() -> approve.execute(author, id)).isInstanceOfSatisfying(CourseDraftErrorsException.class,
+                error -> {
+                    assertThat(error.getIssues()).extracting("code").containsExactly("VOCABULARY_REJECTED");
+                    assertThat(error.getIssues()).extracting("subject").containsExactly(library.refusal);
+                });
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM courses WHERE band_level=?", Integer.class, BAND)).isZero();
+        assertThat(draftStore.findById(id).orElseThrow().getStatus()).isEqualTo(DraftStatus.READY);
     }
 
     @Test
@@ -278,17 +427,41 @@ class ApproveCourseDraftIntegrationTest {
     @Test
     void analysisReportsCoverageAndGapsWithoutChangingAnything() throws Exception {
         UUID id = drafts.create(author, structure(goodDraft())).getId();
+        // The IELTS 8.0 seed has C2 Reading points of its own, which a C2 Reading draft is also expected to cover.
+        Integer seededC2Reading = jdbc.queryForObject("""
+                SELECT count(*) FROM knowledge_points
+                WHERE status = 'ACTIVE' AND cefr_level = 'C2' AND (skill IS NULL OR skill IN ('READING', 'ALL'))
+                  AND id NOT IN (?, ?)
+                """, Integer.class, kpFoundation, kpAdvanced);
 
         var analysis = drafts.analyze(author, id);
 
         assertThat(analysis.valid()).isTrue();
-        assertThat(analysis.coverage().expected()).isEqualTo(2);
+        assertThat(analysis.coverage().expected()).isEqualTo(2 + seededC2Reading);
         assertThat(analysis.coverage().covered()).isEqualTo(2);
         // One practice set only: below the three wanted, and the advanced point has none and no question.
         assertThat(analysis.gaps()).extracting("reason").contains("FEW_PRACTICE_SETS", "NO_PRACTICE_SET",
                 "NO_EXERCISE_QUESTION");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM courses WHERE band_level=?", Integer.class, BAND))
                 .isZero();
+    }
+
+    @Test
+    void aQuestionThatAPackageHoldsIsNotOfferedAndIsAnErrorWhenADraftUsesIt() throws Exception {
+        assertThat(candidates.exerciseQuestions(List.of(kpFoundation), 10).get(kpFoundation)).containsExactly(questionVersion);
+        UUID id = drafts.create(author, structure(goodDraft())).getId();
+        assertThat(drafts.analyze(author, id).errors()).extracting("code").doesNotContain("QUESTION_ALREADY_OWNED");
+
+        // The question joins a package section: from now on it has a home.
+        UUID section = jdbc.queryForObject("SELECT s.id FROM content_sections s JOIN content_packages p "
+                + "ON p.current_published_version_id = s.package_version_id WHERE p.id = ?", UUID.class, practiceTest);
+        jdbc.update("INSERT INTO section_questions(section_id,question_version_id,sort_order) VALUES(?,?,2)",
+                section, questionVersion);
+
+        assertThat(candidates.exerciseQuestions(List.of(kpFoundation), 10)).doesNotContainKey(kpFoundation);
+        var analysis = drafts.analyze(author, id);
+        assertThat(analysis.errors()).extracting("code").contains("QUESTION_ALREADY_OWNED");
+        assertThat(analysis.gaps()).extracting("reason").contains("NO_EXERCISE_QUESTION");
     }
 
     // --- fixtures
@@ -300,6 +473,10 @@ class ApproveCourseDraftIntegrationTest {
                   {"code":"%1$s_T1","name":"Foundations","skill":"READING","sortOrder":%2$d,
                    "lessons":[
                      {"code":"%1$s_L1","title":"Basics","summary":"s","knowledgePointIds":["%3$s"],
+                      "summaryMarkdown":"- one\\n- two","estimatedMinutes":20,
+                      "resources":[{"type":"SLIDE","title":"Deck","url":"https://slides.example/deck"},
+                                   {"type":"DOCUMENT","title":"Sheet B","url":"https://docs.example/b"},
+                                   {"type":"DOCUMENT","title":"Sheet A","url":"https://docs.example/a"}],
                       "blocks":[{"type":"TEXT","text":"Intro","knowledgePointIds":["%3$s"]},
                                 {"type":"EXERCISE","questionRefs":["%1$s-Q1"]}],
                       "practiceSetPackageIds":["%5$s"]},
@@ -310,6 +487,18 @@ class ApproveCourseDraftIntegrationTest {
                  "courseTest":{"code":"%1$s_COURSE_TEST","title":"Course test"},
                  "practiceTestMilestones":[{"packageId":"%7$s","afterTopicSequence":1}]}
                 """.formatted(tag, sortOrder(1), kpFoundation, kpAdvanced, practiceSet, sortOrder(2), practiceTest);
+    }
+
+    private ObjectNode word(String lemma) {
+        return json.createObjectNode().put("lemma", lemma).put("partOfSpeech", "VERB")
+                .put("englishDefinition", "to change often").put("vietnameseMeaning", "dao dong")
+                .put("exampleSentence", "Prices fluctuate.");
+    }
+
+    private List<UUID> senseIdsOfVocabularyBlock(UUID lessonId) {
+        return jdbc.queryForList("SELECT v.vocabulary_sense_id FROM lesson_block_vocabulary v "
+                + "JOIN lesson_blocks b ON b.id = v.block_id WHERE b.lesson_id=? AND b.block_type='VOCABULARY' "
+                + "ORDER BY v.sort_order", UUID.class, lessonId);
     }
 
     private int sortOrder(int n) {
@@ -338,8 +527,17 @@ class ApproveCourseDraftIntegrationTest {
         UUID section = UUID.randomUUID();
         jdbc.update("INSERT INTO content_sections(id,package_version_id,title,sort_order) VALUES(?,?,'S',1)",
                 section, version);
+        // A package holds a question of its own: the exercise question of a lesson belongs to that lesson alone.
+        UUID ownQuestion = UUID.randomUUID();
+        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status) "
+                + "VALUES(?,'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED')", ownQuestion);
+        UUID ownVersion = UUID.randomUUID();
+        jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) "
+                + "VALUES(?,?,1,'Package stem','PUBLISHED')", ownVersion, ownQuestion);
+        jdbc.update("INSERT INTO question_knowledge_points(question_version_id,knowledge_point_id) VALUES(?,?)",
+                ownVersion, kpFoundation);
         jdbc.update("INSERT INTO section_questions(section_id,question_version_id,sort_order) VALUES(?,?,1)",
-                section, questionVersion);
+                section, ownVersion);
         jdbc.update("UPDATE content_packages SET status='PUBLISHED', current_published_version_id=? WHERE id=?",
                 version, id);
         return id;

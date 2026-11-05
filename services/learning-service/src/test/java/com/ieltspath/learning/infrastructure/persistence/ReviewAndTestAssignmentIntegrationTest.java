@@ -96,6 +96,7 @@ class ReviewAndTestAssignmentIntegrationTest {
 
     @BeforeEach
     void resetDataAndCurriculum() {
+        LearningContentClientTestSupport.stubLessonAccessSummaries(content);
         jdbc.execute("""
                 TRUNCATE review_theory_checks, diagnostic_probes, diagnostic_sessions,review_sets, review_items, practice_attempts, lesson_practice_passes,
                 lesson_exercise_submissions, kp_evidence,

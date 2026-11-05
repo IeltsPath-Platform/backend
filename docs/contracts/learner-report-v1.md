@@ -94,8 +94,8 @@ The report body also carries four blocks added after `knowledgePoints`; the fiel
     enter it. `speakingIncluded` is true only when Speaking has a band.
   - `nextBandHints`: for a skill whose next band has at least 80% of its points at `CONSOLIDATE` or better, up to five points
     still to maintain there, weakest first.
-- `target`: set only when User Service returned a goal (`GET /internal/users/{id}/learning-goal`); otherwise `null` and the
-  report is otherwise complete (a slow or failing User Service never fails the report). `gap` is the target minus `estimatedBand.value` (`null` if either is unknown).
+- `target`: set only when the learner has an active goal (read from `learning_goals` in Learning's own database); otherwise `null`
+  and the report is otherwise complete. `gap` is the target minus `estimatedBand.value` (`null` if either is unknown).
   `projection` is described in [progress-snapshots-v1](progress-snapshots-v1.md) and is `null` without a target band.
 
 ## Mastery rules (Content Author)
@@ -127,3 +127,12 @@ Role `CONTENT_AUTHOR` for all three routes.
 - `priorityBelow` is also the line below which a wrong answer creates a blocking review, so changing it changes which
   reviews are created from then on. Existing reviews are not touched.
 - A stored set that no longer validates as a whole is ignored and the service configuration applies.
+
+## Error-trap children (2026-10-25)
+
+Each parent KP report entry may include `errorTraps`, containing only child KPs with at least one evidence row for this
+learner. Each item is `{knowledgePointId, code, name, tier, mastery, evidenceCount}`. These children are not separate
+top-level report points and do not affect skills, focus, or estimated band. The parent's `errors` array contains its
+current main error code selected from child mastery, with its count from the existing three-most-frequent event
+aggregates when present (otherwise zero); it no longer shows the parent's `top_error_codes`. That stored profile field is
+retained for staff statistics.

@@ -6,7 +6,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.community.application.port.CommunityEventOutbox;
 import com.ieltspath.events.community.CommunityEventTypes;
-import lombok.RequiredArgsConstructor;
+import com.ieltspath.commonobservability.Correlation;
+import com.ieltspath.commonobservability.OutboxTraceContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -14,13 +16,24 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Repository
-@RequiredArgsConstructor
 public class CommunityEventOutboxAdapter implements CommunityEventOutbox {
     private static final java.time.Duration SOCIAL_DEDUPE_WINDOW = java.time.Duration.ofHours(24);
     private static final java.util.Set<String> SOCIAL_SIGNALS =
             java.util.Set.of(CommunityEventTypes.POST_REACTED, CommunityEventTypes.USER_FOLLOWED);
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
+    private final OutboxTraceContext traceContext;
+
+    @Autowired
+    public CommunityEventOutboxAdapter(JdbcTemplate jdbc, ObjectMapper objectMapper, OutboxTraceContext traceContext) {
+        this.jdbc = jdbc;
+        this.objectMapper = objectMapper;
+        this.traceContext = traceContext;
+    }
+
+    public CommunityEventOutboxAdapter(JdbcTemplate jdbc, ObjectMapper objectMapper) {
+        this(jdbc, objectMapper, null);
+    }
 
     @Override
     public void record(String eventType, UUID actorId, UUID recipientId, UUID postId, UUID commentId) {
@@ -39,10 +52,11 @@ public class CommunityEventOutboxAdapter implements CommunityEventOutbox {
             throw new IllegalStateException("Could not serialize community event", exception);
         }
         jdbc.update("""
-                INSERT INTO outbox_events(id, aggregate_type, aggregate_id, event_type, payload, created_at)
-                VALUES (?, 'COMMUNITY', ?, ?, CAST(? AS jsonb), ?)
+                INSERT INTO outbox_events(id, aggregate_type, aggregate_id, event_type, payload, created_at,
+                                          correlation_id, trace_context)
+                VALUES (?, 'COMMUNITY', ?, ?, CAST(? AS jsonb), ?, ?, ?)
                 """, eventId, postId == null ? recipientId.toString() : postId.toString(), eventType, payload,
-                java.sql.Timestamp.from(occurredAt));
+                java.sql.Timestamp.from(occurredAt), Correlation.current(), traceContext == null ? null : traceContext.capture());
     }
 
     /** Reactions and follows can be toggled freely, so the same actor/target pair notifies at most once per window. */

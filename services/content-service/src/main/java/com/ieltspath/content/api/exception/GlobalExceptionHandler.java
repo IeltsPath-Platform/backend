@@ -60,7 +60,10 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<ErrorResponse> handleBadRequestException(Exception ex, HttpServletRequest request) {
         log.warn("Bad request: {}", ex.getMessage());
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
+        Map<String, Object> details = ex instanceof InvalidErrorTypeException
+                && "TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE".equals(ex.getMessage())
+                ? Map.of("code", "TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE") : null;
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), details);
     }
 
     @ExceptionHandler(QuestionAlreadyInVersionException.class)
@@ -348,6 +351,13 @@ public class GlobalExceptionHandler {
                 Map.of("code", "LESSON_EXERCISE_LOCKED"));
     }
 
+    @ExceptionHandler(QuestionAlreadyOwnedException.class)
+    public ResponseEntity<ErrorResponse> handleQuestionAlreadyOwned(QuestionAlreadyOwnedException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
+                Map.of("code", "QUESTION_ALREADY_OWNED",
+                        "questionVersionIds", ex.getQuestionVersionIds().stream().map(java.util.UUID::toString).toList()));
+    }
+
     @ExceptionHandler(LessonSortConflictException.class)
     public ResponseEntity<ErrorResponse> handleLessonSortConflict(LessonSortConflictException ex, HttpServletRequest request) {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request.getRequestURI(),
@@ -368,22 +378,26 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UploadRejectedException.class)
     public ResponseEntity<ErrorResponse> handleUploadRejected(UploadRejectedException ex, HttpServletRequest request) {
+        boolean document = request.getRequestURI().endsWith("/media/document");
         return switch (ex.reason()) {
             case TOO_LARGE -> buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "The file is larger than the limit",
-                    request.getRequestURI(), Map.of("code", "AUDIO_TOO_LARGE"));
+                    request.getRequestURI(), Map.of("code", document ? "DOCUMENT_TOO_LARGE" : "AUDIO_TOO_LARGE"));
             case EMPTY -> buildResponse(HttpStatus.BAD_REQUEST, "The file is empty", request.getRequestURI(),
                     Map.of("code", "EMPTY_FILE"));
-            case TYPE_NOT_ALLOWED, CONTENT_MISMATCH -> buildResponse(HttpStatus.BAD_REQUEST,
-                    "The file is not a supported audio format", request.getRequestURI(),
-                    Map.of("code", "UNSUPPORTED_AUDIO"));
+            case TYPE_NOT_ALLOWED, CONTENT_MISMATCH -> document
+                    ? buildResponse(HttpStatus.BAD_REQUEST, "The file is not a PDF", request.getRequestURI(),
+                            Map.of("code", "UNSUPPORTED_DOCUMENT"))
+                    : buildResponse(HttpStatus.BAD_REQUEST, "The file is not a supported audio format",
+                            request.getRequestURI(), Map.of("code", "UNSUPPORTED_AUDIO"));
         };
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex,
                                                              HttpServletRequest request) {
-        String code = request.getRequestURI().contains("/course-import")
-                ? ImportFileRejectedException.FILE_TOO_LARGE : "AUDIO_TOO_LARGE";
+        String uri = request.getRequestURI();
+        String code = uri.contains("/course-import") ? ImportFileRejectedException.FILE_TOO_LARGE
+                : uri.endsWith("/media/document") ? "DOCUMENT_TOO_LARGE" : "AUDIO_TOO_LARGE";
         return buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "The file is larger than the limit",
                 request.getRequestURI(), Map.of("code", code));
     }

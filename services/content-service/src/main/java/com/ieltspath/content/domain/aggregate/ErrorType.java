@@ -24,6 +24,7 @@ public class ErrorType {
     private ErrorCategory category;
     private int severity;
     private UUID knowledgePointId;
+    private UUID trapKnowledgePointId;
     private String fixHint;
     private ContentStatus status;
     private ErrorReviewStatus reviewStatus;
@@ -33,12 +34,20 @@ public class ErrorType {
     public ErrorType(UUID id, String code, String name, ErrorCategory category, int severity, UUID knowledgePointId,
                      String fixHint, ContentStatus status, ErrorReviewStatus reviewStatus,
                      Instant createdAt, Instant updatedAt) {
+        this(id, code, name, category, severity, knowledgePointId, null, fixHint, status, reviewStatus,
+                createdAt, updatedAt);
+    }
+
+    public ErrorType(UUID id, String code, String name, ErrorCategory category, int severity, UUID knowledgePointId,
+                     UUID trapKnowledgePointId, String fixHint, ContentStatus status, ErrorReviewStatus reviewStatus,
+                     Instant createdAt, Instant updatedAt) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.code = requireCode(code);
         this.name = requireName(name);
         this.category = Objects.requireNonNull(category, "category must not be null");
         this.severity = requireSeverity(severity);
         this.knowledgePointId = knowledgePointId;
+        this.trapKnowledgePointId = trapKnowledgePointId;
         this.fixHint = requireFixHint(fixHint);
         this.status = status != null ? status : ContentStatus.ACTIVE;
         this.reviewStatus = reviewStatus != null ? reviewStatus : ErrorReviewStatus.DRAFT;
@@ -63,6 +72,11 @@ public class ErrorType {
         this.fixHint = requireFixHint(fixHint);
         this.status = status != null ? status : this.status;
         this.reviewStatus = reviewStatus != null ? reviewStatus : this.reviewStatus;
+        this.updatedAt = Instant.now();
+    }
+
+    public void setTrapKnowledgePointId(UUID trapKnowledgePointId) {
+        this.trapKnowledgePointId = trapKnowledgePointId;
         this.updatedAt = Instant.now();
     }
 
@@ -100,6 +114,7 @@ public class ErrorType {
     public ErrorCategory getCategory() { return category; }
     public int getSeverity() { return severity; }
     public UUID getKnowledgePointId() { return knowledgePointId; }
+    public UUID getTrapKnowledgePointId() { return trapKnowledgePointId; }
     public String getFixHint() { return fixHint; }
     public ContentStatus getStatus() { return status; }
     public ErrorReviewStatus getReviewStatus() { return reviewStatus; }

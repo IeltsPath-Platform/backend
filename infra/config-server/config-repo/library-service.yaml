@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: ${LIBRARY_DB_URL:jdbc:postgresql://localhost:5437/library_db}
+    url: ${LIBRARY_DB_URL:jdbc:postgresql://localhost:5440/library_db}
     username: ${LIBRARY_DB_USERNAME:postgres}
     password: ${LIBRARY_DB_PASSWORD}
   jpa:
@@ -31,12 +31,25 @@ app:
           - /actuator/info
           - /v3/api-docs
           - /v3/api-docs/**
+      - method: GET
+        patterns:
+          - /api/content/vocabulary
+          - "/api/content/vocabulary/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
+          - /api/content/vocabulary/suggestions
+          - /api/content/vocabulary/topics
+          - /api/content/vocabulary/sets
+          - /api/content/vocabulary/mindmap
+          - "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
+          - "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/words"
 
 library:
-  content:
-    base-url: ${CONTENT_SERVICE_URL:http://localhost:8082}
+  vocabulary:
+    weekly-goal-default: 120
   flashcard-images:
     bucket: ${LIBRARY_FLASHCARD_BUCKET:flashcards}
+  catalog-media:
+    # Public bucket for vocabulary sense pictures and pronunciation audio; the same bucket holds the listening audio.
+    bucket: ${LIBRARY_CATALOG_MEDIA_BUCKET:media}
 
 springdoc:
   # OpenAPI for the Gateway Swagger UI; set API_DOCS_ENABLED=false outside local development.
@@ -57,7 +70,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,refresh
+        include: health,info,refresh,prometheus
   endpoint:
     health:
       probes:

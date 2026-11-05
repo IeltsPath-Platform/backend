@@ -42,9 +42,31 @@ an incorrect answer resets the card to box 1. Replaying the most recent `request
 resulting box comes from `library.srs.intervals-days`, defaulting to `[1, 2, 4, 8, 16]`.
 See the [flashcard SRS contract](../../docs/contracts/flashcard-srs-v1.md) for request, response, and ownership details.
 
-When saving a video, Library verifies its topic through Content's `GET /api/content/topics/{id}`, forwarding the
-authenticated bearer token and `X-Correlation-Id`. The HTTP client uses a 2-second connection and 5-second read
-timeout; Content failures return 503. `POST /internal/game-content/snapshots` serves `VOCABULARY` using the shared
+## Vocabulary notebook and catalog
+
+Author lesson pickers use authenticated `GET /api/content/admin/vocabulary/suggestions?q=&page=0&size=20`:
+bounded exact/prefix/substring ranking, active senses, and `hasMore`. Flyway V36 adds the active-lemma prefix/trigram
+indexes and requires `pg_trgm`. Deploy Library before the updated frontend. See the
+[author suggestions contract](../../docs/contracts/vocabulary-author-suggestions-v1.md) for limits and migration notes.
+
+`GET /api/content/vocabulary?q=&page=0&size=20` browses active catalog items (maximum page size 50); `GET /api/content/vocabulary/{id}` returns one active item. These two GET routes are public and cacheable for five minutes. `/search`, `/senses`, writes, and `/api/content/admin/vocabulary/**` still require authentication. See the [vocabulary notebook contract](../../docs/contracts/vocabulary-notebook-v1.md).
+
+The public catalog also supports `lang=EN|VI`, CEFR/topic filters, `/suggestions`, `/topics`, `/sets`, set words, and `/mindmap`. V19 adds UK/US pronunciation slots, CEFR and library-owned vocabulary topics, examples/collocations/thesaurus/common-mistake tables, and band/topic sets. IELTS band ranges are derived from CEFR in the domain. V20 adds six demo topics and demo enrichment for existing V4/V15 entries; frequency ranks remain null because no COCA source is loaded. The AWL flag is enabled only for verified Coxhead entries. **Demo content authored by AI; requires review by an IELTS examiner before production.**
+
+Topics and sets are part of the Library dictionary and are independent from Content curriculum topics. Topic/set cover keys reuse the existing `flashcards` storage bucket and `POST /api/learning-support/flashcards/images`; no additional bucket or environment variable is required.
+
+Sense pictures and pronunciation audio are not stored in `flashcards`. They go to the public `media` bucket (`LIBRARY_CATALOG_MEDIA_BUCKET`, default `media`), so authored vocabulary media does not share a bucket with learners' flashcard images:
+
+- `POST /api/content/admin/vocabulary/sense-images` (multipart `file`, JPEG/PNG/WebP, max 2 MB) stores `vocabulary/images/{uuid}.{ext}` and returns `{mediaReference, mediaUrl, contentType, sizeBytes}`; the URL is kept as the sense `imageUrl`.
+- `POST /api/content/admin/vocabulary/pronunciation` (multipart `file`, `lemma`, `accent` = `us` or `uk`; MP3/MP4/WAV/OGG, max 2 MB, the multipart limit of the service) stores `vocabulary/pronunciation/{us|uk}/{slug}.{ext}`, where `slug` is the normalized lemma with each run of characters outside a-z0-9 replaced by `-`. It is refused when an active word already has the lemma; an INACTIVE word (a dictation pronunciation row) is allowed and is switched on when the word is created. A file already stored under the key is never overwritten: the new one takes an 8-character suffix. The returned URL is stored in `audio_us_reference` / `audio_uk_reference`.
+- `POST /api/content/admin/vocabulary` accepts optional `ipaUs`, `ipaUk`, `audioUsReference` and `audioUkReference` and writes them with the word in the same transaction.
+
+Learners save vocabulary senses with `POST /api/learning-support/flashcards/notebook/entries`, list/filter/sort them at `/entries`, read aggregate counts at `/summary`, and set understanding at `/entries/{flashcardId}/level`. Existing flashcard review and delete routes remain in use. One non-deleted card is allowed per learner and sense; level is derived from Leitner boxes (1 UNKNOWN, 2 FAMILIAR, 3 LEARNING, 4–5 MASTERED). Notes use `sourceType=VOCABULARY_SENSE` and are limited to 300 characters. Migration V18 adds the partial unique index.
+
+Reviews optionally accept `sessionId` and append `flashcard_review_events` in the review transaction only when the request is applied. Notebook progress includes weekly goals (`library.vocabulary.weekly-goal-default`, default 120), the six-band vocabulary map, topic/set progress, recent session result, and read-time achievements. Summary and entry responses only gain fields; entries accept `topicId` and `setId` filters. These authenticated endpoints scope every learner aggregate to the current user, use SQL aggregates, and do not call learning-service or award XP/points. Migration V21 adds review events and per-user weekly goals.
+
+A video keeps its `topicId` as a plain reference: Library does not call Content to check that the topic exists, so the
+calls between the two services run one way only (Content calls Library for vocabulary). `POST /internal/game-content/snapshots` serves `VOCABULARY` using the shared
 [game snapshot contract](../../docs/contracts/game-content-snapshot-v1.md); Content serves `GRAMMAR`.
 
 ## Local setup
@@ -59,11 +81,13 @@ For the full container stack, run `docker compose up -d --build`. To run Library
 | `LIBRARY_DB_URL` | `jdbc:postgresql://localhost:5440/library_db` |
 | `LIBRARY_DB_USERNAME` | `postgres` |
 | `LIBRARY_DB_PASSWORD` | Required database password; no fallback in service config |
-| `CONTENT_SERVICE_URL` | `http://localhost:8082` for topic lookup |
 | `GATEWAY_INTERNAL_JWT_SECRET` | Verifies Gateway's internal JWT; use the same value as Gateway |
 | `SUPABASE_URL` | Supabase API URL for object storage |
 | `SUPABASE_SECRET_KEY` | Supabase secret key for storage access |
 | `LIBRARY_FLASHCARD_BUCKET` | Bucket name for flashcard illustrations (`flashcards` by default) |
+| `LIBRARY_CATALOG_MEDIA_BUCKET` | Public bucket for vocabulary sense pictures and pronunciation audio (`media` by default) |
+
+Key-backed vocabulary `pronunciationAudioReference` values resolve from the public `media` bucket and require `SUPABASE_URL`; without it, these values return `null` (existing HTTPS references are preserved).
 
 Verify with `mvn -q -pl services/library-service -am test`. Migration tests use Testcontainers and require Docker.
 

@@ -25,7 +25,7 @@ public class NotificationController {
     @GetMapping
     public List<Item> list(@RequestParam(name = "page", defaultValue = "0") int page, @RequestParam(name = "size", defaultValue = "20") int size) {
         return inbox.list(users.requireCurrentUser().id(), page, size).stream()
-                .map(n -> new Item(n.id(), n.actorId(), n.eventType(), n.postId(), n.commentId(), n.createdAt(), n.readAt())).toList();
+                .map(n -> new Item(n.id(), n.actorId(), n.eventType(), n.postId(), n.commentId(), n.gradingJobId(), n.createdAt(), n.readAt())).toList();
     }
     @GetMapping("/unread-count")
     public Count unreadCount() { return new Count(inbox.unreadCount(users.requireCurrentUser().id())); }
@@ -41,6 +41,6 @@ public class NotificationController {
         catch (IllegalArgumentException invalid) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, invalid.getMessage()); }
     }
     public record PreferenceRequest(@NotNull Boolean enabled) { }
-    public record Item(UUID id, UUID actorId, String eventType, UUID postId, UUID commentId, Instant createdAt, Instant readAt) {}
+    public record Item(UUID id, UUID actorId, String eventType, UUID postId, UUID commentId, UUID gradingJobId, Instant createdAt, Instant readAt) {}
     public record Count(long count) {}
 }

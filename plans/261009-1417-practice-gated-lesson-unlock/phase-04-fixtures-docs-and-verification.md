@@ -15,10 +15,11 @@ dependencies: [3]
   `MultiSkillLessonIntegrationTest` (bài ôn của lesson trước chặn lesson sau bất kể skill). Không tắt cổng ở test nào.
   Test mới: `PracticeGatedLessonUnlockIntegrationTest` (L1 → Practice → L2, bài ôn đạt, hết package, không có Practice).
 - Đã cập nhật: `docs/contracts/lesson-learning-v1.md`, `AGENTS.md` §3.8, `services/learning-service/README.md`.
-- **Chưa làm:**
-  - `docs/system-architecture.md` và `docs/fe-main-flow-guide.md` không có trong repo backend này (không tìm thấy).
-  - `mvn -q compile -DskipTests` cả reactor: bị chặn bởi `JdbcRubricRepository` của content-service (đang do phase 11 sửa dở).
-  - Smoke qua Gateway bằng docker compose và `graphify update .`.
+- Cập nhật 2026-11-01: `docs/system-architecture.md` (cổng lesson có `PRACTICE_REQUIRED`, bài ôn lặp đến khi đạt, topic khóa
+  vẫn liệt kê bài), `docs/contracts/lesson-learning-v1.md`, `AGENTS.md`, `services/learning-service/README.md` khớp code.
+  `docs/fe-main-flow-guide.md` không tồn tại ở cả hai repo nên bỏ. `mvn -q compile -DskipTests` cả reactor: xanh.
+  `graphify update .`: xong.
+- **Chưa làm:** smoke qua Gateway (cần ghi tiến độ vào một tài khoản thử; chờ người dùng đồng ý).
 
 ## Overview
 

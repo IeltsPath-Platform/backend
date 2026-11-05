@@ -1,6 +1,11 @@
 spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
   datasource:
-    url: ${COMMUNITY_DB_URL:jdbc:postgresql://localhost:5432/community_db}
+    url: ${COMMUNITY_DB_URL:jdbc:postgresql://localhost:5440/community_db}
     username: ${COMMUNITY_DB_USERNAME:postgres}
     password: ${COMMUNITY_DB_PASSWORD:123456}
   jpa:
@@ -27,6 +32,9 @@ spring:
 community:
   user-service:
     base-url: ${USER_SERVICE_URL:http://localhost:8085}
+  # Learning owns the streak shown beside public profiles; without it profiles still load, with no streak.
+  learning-service:
+    base-url: ${LEARNING_SERVICE_URL:http://localhost:8086}
   media:
     bucket: ${COMMUNITY_MEDIA_BUCKET:community}
     image-hosts: ${COMMUNITY_IMAGE_HOSTS:images.unsplash.com,i.imgur.com}
@@ -68,7 +76,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,refresh
+        include: health,info,refresh,prometheus
   endpoint:
     health:
       probes:

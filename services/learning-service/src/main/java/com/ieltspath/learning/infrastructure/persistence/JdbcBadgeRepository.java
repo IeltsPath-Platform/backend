@@ -69,7 +69,9 @@ public class JdbcBadgeRepository implements BadgeRepository {
     @Override
     public int maintainedPoints(UUID userId) {
         Integer count = jdbc.queryForObject(
-                "SELECT count(*) FROM kp_mastery_profiles WHERE user_id = ? AND tier = 'MAINTAIN'", Integer.class,
+                "SELECT count(*) FROM kp_mastery_profiles p WHERE p.user_id = ? AND p.tier = 'MAINTAIN' " +
+                        "AND NOT EXISTS (SELECT 1 FROM knowledge_point_catalog c " +
+                        "WHERE c.kp_id = p.knowledge_point_id AND c.parent_kp_id IS NOT NULL)", Integer.class,
                 userId);
         return count == null ? 0 : count;
     }

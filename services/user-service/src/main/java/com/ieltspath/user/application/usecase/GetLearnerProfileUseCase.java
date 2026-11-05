@@ -2,16 +2,13 @@ package com.ieltspath.user.application.usecase;
 
 import com.ieltspath.user.application.result.LearnerProfileResult;
 import com.ieltspath.user.domain.aggregate.LearnerProfile;
-import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.LearnerProfileRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
-import com.ieltspath.user.domain.vo.ProfileVisibility;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
@@ -28,23 +25,10 @@ public class GetLearnerProfileUseCase {
     }
 
     private LearnerProfile createDefaultProfile(UUID userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng với id: " + userId));
-
-        String displayName = (user.getFullName() != null && !user.getFullName().isBlank())
-                ? user.getFullName()
-                : "Learner";
-
-        LearnerProfile defaultProfile = LearnerProfile.builder()
-                .userId(userId)
-                .displayName(displayName)
-                .timezone("Asia/Ho_Chi_Minh")
-                .visibility(ProfileVisibility.PUBLIC)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        return learnerProfileRepository.save(defaultProfile);
+        String fullName = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("Không tìm thấy người dùng với id: " + userId))
+                .getFullName();
+        return learnerProfileRepository.save(LearnerProfile.createDefault(userId, fullName));
     }
 
     private LearnerProfileResult toResult(LearnerProfile profile) {
@@ -61,4 +45,3 @@ public class GetLearnerProfileUseCase {
         );
     }
 }
-

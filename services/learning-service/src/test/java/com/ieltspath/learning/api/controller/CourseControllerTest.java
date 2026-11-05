@@ -5,6 +5,8 @@ import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.usecase.AssignCourseTestUseCase;
 import com.ieltspath.learning.application.usecase.ListCoursesUseCase;
+import com.ieltspath.learning.application.usecase.UnlockCourseUseCase;
+import com.ieltspath.learning.application.result.CourseUnlockResult;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -43,6 +45,7 @@ class CourseControllerTest {
     @MockitoBean CurrentUserProvider currentUser;
     @MockitoBean AssignCourseTestUseCase assignCourseTest;
     @MockitoBean ListCoursesUseCase listCourses;
+    @MockitoBean UnlockCourseUseCase unlockCourse;
     final UUID learner = UUID.randomUUID();
     final UUID course = UUID.randomUUID();
 
@@ -65,5 +68,29 @@ class CourseControllerTest {
         mvc.perform(post("/api/learning/courses/not-a-uuid/test-assignments")
                         .with(user("learner").roles("CUSTOMER")))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void unlockRequestUsesTheAuthenticatedLearnerPathCourseAndIdempotencyKey() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(learner);
+        UUID requestId = UUID.randomUUID();
+        when(unlockCourse.execute(learner, course, "READING", requestId)).thenReturn(
+                new CourseUnlockResult(course, "READING", 120, "ACTIVE", UUID.randomUUID()));
+
+        mvc.perform(post("/api/learning/courses/" + course + "/unlocks")
+                        .header("Idempotency-Key", requestId).contentType("application/json")
+                        .content("{\"target\":\"READING\"}").with(user("learner").roles("CUSTOMER")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.target").value("READING"))
+                .andExpect(jsonPath("$.pointCost").value(120)).andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        verify(unlockCourse).execute(learner, course, "READING", requestId);
+    }
+
+    @Test
+    void unlockRequiresAnIdempotencyKey() throws Exception {
+        mvc.perform(post("/api/learning/courses/" + course + "/unlocks")
+                        .contentType("application/json").content("{\"target\":\"READING\"}")
+                        .with(user("learner").roles("CUSTOMER")))
+                .andExpect(status().isBadRequest());
     }
 }

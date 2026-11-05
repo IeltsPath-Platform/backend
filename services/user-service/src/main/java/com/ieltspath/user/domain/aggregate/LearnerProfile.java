@@ -25,18 +25,36 @@ public class LearnerProfile {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public void updateDetails(String displayName, String avatarReference, String bio, BigDecimal selfReportedBand, String timezone) {
+    /** Profile a learner gets the first time it is read or written: named after the account, public, Vietnam time. */
+    public static LearnerProfile createDefault(UUID userId, String name) {
+        LocalDateTime now = LocalDateTime.now();
+        return LearnerProfile.builder()
+                .userId(userId)
+                .displayName(name == null || name.isBlank() ? "Learner" : name.trim())
+                .timezone("Asia/Ho_Chi_Minh")
+                .visibility(ProfileVisibility.PUBLIC)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+    }
+
+    /** The avatar is not touched here: it changes only through {@link #updateAvatarReference}, i.e. upload and delete. */
+    public void updateDetails(String displayName, String bio, BigDecimal selfReportedBand, String timezone) {
         if (displayName == null || displayName.isBlank()) {
             throw new IllegalArgumentException("Tên hiển thị không được để trống");
         }
         this.displayName = displayName.trim();
-        this.avatarReference = avatarReference;
         this.bio = bio;
         this.selfReportedBand = selfReportedBand;
         if (timezone != null && !timezone.isBlank()) {
             String normalizedTimezone = timezone.trim();
             if (isValidTimezone(normalizedTimezone)) this.timezone = normalizedTimezone;
         }
+        touch();
+    }
+
+    public void updateAvatarReference(String avatarReference) {
+        this.avatarReference = avatarReference;
         touch();
     }
 

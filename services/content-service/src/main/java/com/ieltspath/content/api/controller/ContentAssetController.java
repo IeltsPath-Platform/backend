@@ -9,6 +9,8 @@ import com.ieltspath.content.application.result.ContentAssetResult;
 import com.ieltspath.content.application.usecase.CreateContentAssetUseCase;
 import com.ieltspath.content.application.usecase.GetContentAssetUseCase;
 import com.ieltspath.content.application.usecase.LinkAssetUseCase;
+import com.ieltspath.content.application.usecase.MediaUrlResolver;
+import com.ieltspath.content.domain.vo.AccessTier;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,13 +27,26 @@ public class ContentAssetController {
     private final GetContentAssetUseCase getContentAssetUseCase;
     private final CreateContentAssetUseCase createContentAssetUseCase;
     private final LinkAssetUseCase linkAssetUseCase;
+    private final MediaUrlResolver mediaUrls;
 
-    /** Authoring only: asset text can be a transcript, so learners get media through lessons and tests. */
+    /**
+     * Authoring only: asset text can be a transcript, so learners get media through lessons and tests. The response
+     * carries a URL for the media (a signed one for premium audio) so the author can see or hear what a block holds.
+     */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public ContentAssetResponse getAssetById(@PathVariable("id") UUID id) {
         ContentAssetResult result = getContentAssetUseCase.execute(id);
-        return ContentAssetResponse.from(result);
+        return ContentAssetResponse.from(result, previewUrl(result));
+    }
+
+    private String previewUrl(ContentAssetResult asset) {
+        if (asset.mediaReference() == null || asset.mediaReference().isBlank()) return null;
+        try {
+            return mediaUrls.resolve(asset.assetType(), asset.mediaReference(), asset.accessTier(), true);
+        } catch (RuntimeException unresolvable) {
+            return null;
+        }
     }
 
     @PostMapping
@@ -43,7 +58,8 @@ public class ContentAssetController {
                 request.textContent(),
                 request.mediaReference(),
                 request.durationSeconds(),
-                request.checksum()
+                request.checksum(),
+                request.accessTier() == null ? AccessTier.PUBLIC : request.accessTier()
         ));
         return ContentAssetResponse.from(result);
     }

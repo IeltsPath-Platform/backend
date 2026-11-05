@@ -20,7 +20,9 @@ import java.util.UUID;
  * unrevealed package is left, so the learner is never stuck. DONE and SKIPPED are final.
  *
  * <p>An optional review ({@code blocking = false}, picked from the review basket or created from a free practice test)
- * never blocks anything and has no theory step: it is one set, DONE when passed and SKIPPED when failed.
+ * never blocks anything and has no theory step: it is one set, DONE when passed and SKIPPED when failed. A suggestion
+ * from Practice (optional, trigger {@code PRACTICE}) may start at the theory stage and becomes blocking when it fails
+ * a set.
  */
 public final class ReviewItem {
     private final UUID id;
@@ -29,7 +31,8 @@ public final class ReviewItem {
     private final UUID lessonId;
     private final LearningSkill skill;
     private final String triggerKind;
-    private final boolean blocking;
+    private boolean blocking;
+    private static final String PRACTICE_TRIGGER = "PRACTICE";
     private ReviewStatus status;
     private ReviewStage stage;
     private TheoryReason theoryReason;
@@ -136,13 +139,18 @@ public final class ReviewItem {
         openSet = null;
         if (passed) {
             status = ReviewStatus.DONE;
-        } else if (!blocking) {
-            failedSets++;
-            status = ReviewStatus.SKIPPED;
-        } else if (++failedSets == 1) {
-            stage = ReviewStage.THEORY;
-            theoryReason = (double) correct / total < ReviewRule.LOW_SCORE ? TheoryReason.LOW_SCORE
-                    : TheoryReason.SECOND_FAIL;
+        } else {
+            // A suggested review from Practice that fails its set is weak for real: it becomes blocking and reads the
+            // theory first, like any blocking review after its first failed set.
+            if (!blocking && PRACTICE_TRIGGER.equals(triggerKind)) blocking = true;
+            if (!blocking) {
+                failedSets++;
+                status = ReviewStatus.SKIPPED;
+            } else if (++failedSets == 1) {
+                stage = ReviewStage.THEORY;
+                theoryReason = (double) correct / total < ReviewRule.LOW_SCORE ? TheoryReason.LOW_SCORE
+                        : TheoryReason.SECOND_FAIL;
+            }
         }
         return status;
     }

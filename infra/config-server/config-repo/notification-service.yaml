@@ -1,6 +1,11 @@
 spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
   datasource:
-    url: ${NOTIFICATION_DB_URL:jdbc:postgresql://localhost:5432/notification_db}
+    url: ${NOTIFICATION_DB_URL:jdbc:postgresql://localhost:5440/notification_db}
     username: ${NOTIFICATION_DB_USERNAME:postgres}
     password: ${NOTIFICATION_DB_PASSWORD:123456}
   jpa:
@@ -35,7 +40,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,refresh
+        include: health,info,refresh,prometheus
   endpoint:
     health:
       probes:

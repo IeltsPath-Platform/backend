@@ -21,7 +21,7 @@ public interface PracticeAttemptRepository {
     void insert(PracticeAttempt attempt);
     void saveResult(PracticeAttempt attempt);
 
-    /** A counted first submission that passed the set or at least one of its skills. */
+    /** A counted first submission of a lesson set, passed or not; {@code passedSkills} lists the skills it passed. */
     record FirstPass(UUID lessonId, UUID packageId, boolean passed, Set<LearningSkill> passedSkills) {
         public FirstPass(UUID lessonId, UUID packageId) {
             this(lessonId, packageId, true, Set.of());

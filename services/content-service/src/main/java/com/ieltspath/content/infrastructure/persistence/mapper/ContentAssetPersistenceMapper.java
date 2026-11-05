@@ -19,7 +19,8 @@ public class ContentAssetPersistenceMapper {
                 entity.getDurationSeconds(),
                 entity.getChecksum(),
                 entity.getValidationStatus(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getAccessTier()
         );
     }
 
@@ -33,6 +34,7 @@ public class ContentAssetPersistenceMapper {
                 .durationSeconds(domain.getDurationSeconds())
                 .checksum(domain.getChecksum())
                 .validationStatus(domain.getValidationStatus())
+                .accessTier(domain.getAccessTier())
                 .createdAt(domain.getCreatedAt())
                 .build();
     }

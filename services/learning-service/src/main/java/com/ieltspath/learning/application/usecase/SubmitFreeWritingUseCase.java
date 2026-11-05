@@ -1,13 +1,11 @@
 package com.ieltspath.learning.application.usecase;
 
-import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearnerLock;
-import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.Item;
 import com.ieltspath.learning.application.result.WritingSubmissionResult;
 import com.ieltspath.learning.application.service.EssayPrompts;
 import com.ieltspath.learning.application.service.EssaySubmissionFlow;
-import com.ieltspath.learning.application.service.ItemGrading;
+import com.ieltspath.learning.application.service.FreeWritingPrompts;
 import com.ieltspath.learning.application.service.WritingSubmissionViewAssembler;
 import com.ieltspath.learning.domain.aggregate.WritingSubmission;
 import com.ieltspath.learning.domain.repository.WritingSubmissionRepository;
@@ -28,9 +26,7 @@ import java.util.UUID;
  */
 @Service
 public class SubmitFreeWritingUseCase {
-    private static final String PRACTICE_TEST = "PRACTICE_TEST";
-
-    private final LearningContentClient content;
+    private final FreeWritingPrompts prompts;
     private final LearnerLock lock;
     private final WritingSubmissionRepository essays;
     private final EssaySubmissionFlow flow;
@@ -38,11 +34,11 @@ public class SubmitFreeWritingUseCase {
     private final WritingSubmissionViewAssembler view;
     private final Clock clock = Clock.systemUTC();
 
-    public SubmitFreeWritingUseCase(LearningContentClient content, LearnerLock lock,
+    public SubmitFreeWritingUseCase(FreeWritingPrompts prompts, LearnerLock lock,
                                     WritingSubmissionRepository essays, EssaySubmissionFlow flow,
                                     PlatformTransactionManager transactionManager,
                                     WritingSubmissionViewAssembler view) {
-        this.content = content;
+        this.prompts = prompts;
         this.lock = lock;
         this.essays = essays;
         this.flow = flow;
@@ -66,16 +62,7 @@ public class SubmitFreeWritingUseCase {
         }
         flow.requireGraderAvailable();
 
-        var version = content.getPackageVersion(packageVersionId);
-        if (!PRACTICE_TEST.equals(version.packageType())) {
-            throw new LearningRequestException(422, "NOT_A_PRACTICE_TEST",
-                    "Free writing is only available for the prompts of a practice test");
-        }
-        Item item = ItemGrading.orderedItems(version).stream()
-                .filter(candidate -> candidate.questionVersionId().equals(questionVersionId))
-                .filter(ItemGrading::isEssay).findFirst()
-                .orElseThrow(() -> new LearningRequestException(404, "NOT_FOUND",
-                        "This writing prompt was not found in the test"));
+        Item item = prompts.find(packageVersionId, questionVersionId);
         flow.requireBalance();
 
         WritingSubmission grading = transaction.execute(status -> startGrading(userId, item, requestId, essayText,

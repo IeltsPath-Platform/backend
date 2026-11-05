@@ -9,6 +9,7 @@ import com.ieltspath.learning.domain.vo.ReviewStatus;
 import com.ieltspath.learning.domain.vo.PracticeReviewState;
 import com.ieltspath.learning.domain.vo.PracticeReviewCandidate;
 import com.ieltspath.learning.domain.vo.TopicReviewSnapshot;
+import com.ieltspath.learning.domain.vo.PromotedReview;
 
 import java.util.Collection;
 import java.util.List;
@@ -45,6 +46,13 @@ public interface ReviewItemRepository {
      * knowledge point can hold only one PENDING review, so a wrong answer in the main flow upgrades the optional one.
      */
     void promoteToBlocking(UUID userId, Collection<UUID> knowledgePointIds, String triggerKind);
+
+    /**
+     * Makes the learner's optional PENDING reviews of these knowledge points blocking when the system raised them
+     * itself (trigger {@code PRACTICE} or {@code ERROR_PATTERN}); reviews the learner picked from the basket stay
+     * optional. The trigger is kept. Returns the reviews it changed.
+     */
+    List<PromotedReview> promoteSuggestionsToBlocking(UUID userId, Collection<UUID> knowledgePointIds);
 
     /** Starts an optional PENDING review; false when the knowledge point already has a PENDING review. */
     boolean insertOptional(UUID userId, UUID reviewId, UUID knowledgePointId, UUID lessonId, LearningSkill skill,

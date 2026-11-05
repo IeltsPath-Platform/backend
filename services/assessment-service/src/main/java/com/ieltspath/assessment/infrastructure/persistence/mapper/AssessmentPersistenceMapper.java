@@ -54,9 +54,9 @@ public class AssessmentPersistenceMapper {
     public LearnerSubmissionJpaEntity toEntity(LearnerSubmission d) {
         var e = new LearnerSubmissionJpaEntity(); e.setId(d.id()); e.setUserId(d.userId()); e.setAttemptItemId(d.attemptItemId()); e.setPromptSnapshot(d.promptSnapshot()); e.setSkill(d.skill()); e.setTextPayload(d.textPayload()); e.setAudioReference(d.audioReference()); e.setStatus(d.status()); e.setSubmissionKey(d.submissionKey()); e.setSubmittedAt(d.submittedAt()); return e;
     }
-    public GradingJob toDomain(GradingJobJpaEntity e) { return new GradingJob(e.getId(), e.getSubmissionId(), e.getUserId(), e.getSkill(), e.getGradingMode(), e.getStatus(), e.getPointCostSnapshot(), e.getIdempotencyKey(), e.getCreatedAt(), e.getCompletedAt()); }
+    public GradingJob toDomain(GradingJobJpaEntity e) { return new GradingJob(e.getId(), e.getSubmissionId(), e.getUserId(), e.getSkill(), e.getGradingMode(), e.getStatus(), e.getPointCostSnapshot(), e.getIdempotencyKey(), e.getCreatedAt(), e.getCompletedAt(), e.getRequestedExaminerId(), e.getRequestedAt()); }
     public GradingJobJpaEntity toEntity(GradingJob d) {
-        var e = new GradingJobJpaEntity(); e.setId(d.id()); e.setSubmissionId(d.submissionId()); e.setUserId(d.userId()); e.setSkill(d.skill()); e.setGradingMode(d.gradingMode()); e.setStatus(d.status()); e.setPointCostSnapshot(d.pointCostSnapshot()); e.setIdempotencyKey(d.idempotencyKey()); e.setCreatedAt(d.createdAt()); e.setCompletedAt(d.completedAt()); return e;
+        var e = new GradingJobJpaEntity(); e.setId(d.id()); e.setSubmissionId(d.submissionId()); e.setUserId(d.userId()); e.setSkill(d.skill()); e.setGradingMode(d.gradingMode()); e.setStatus(d.status()); e.setPointCostSnapshot(d.pointCostSnapshot()); e.setIdempotencyKey(d.idempotencyKey()); e.setCreatedAt(d.createdAt()); e.setCompletedAt(d.completedAt()); e.setRequestedExaminerId(d.requestedExaminerId()); e.setRequestedAt(d.requestedAt()); return e;
     }
 
     public SkillScore toDomain(SkillScoreJpaEntity e) {
@@ -154,7 +154,8 @@ public class AssessmentPersistenceMapper {
 
     public OutboxEvent toDomain(OutboxEventJpaEntity e) {
         return new OutboxEvent(e.getId(), e.getAggregateType(), e.getAggregateId(), e.getEventType(), e.getPayload(),
-                e.getCreatedAt(), e.getPublishedAt(), e.getRetryCount(), e.getLastError());
+                e.getCreatedAt(), e.getPublishedAt(), e.getRetryCount(), e.getLastError(), e.getCorrelationId(),
+                e.getTraceContext());
     }
 
     public OutboxEventJpaEntity toEntity(OutboxEvent d) {
@@ -168,6 +169,8 @@ public class AssessmentPersistenceMapper {
         e.setPublishedAt(d.publishedAt());
         e.setRetryCount(d.retryCount());
         e.setLastError(d.lastError());
+        e.setCorrelationId(d.correlationId());
+        e.setTraceContext(d.traceContext());
         return e;
     }
 

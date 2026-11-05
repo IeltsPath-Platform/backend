@@ -19,20 +19,21 @@ public class NotificationRepositoryAdapter implements NotificationRepository {
     @Override
     public boolean insertIfAbsent(UUID sourceEventId, Notification n) {
         return jdbc.update("""
-                INSERT INTO notifications(id,source_event_id,recipient_id,actor_id,event_type,post_id,comment_id,created_at)
-                VALUES (?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING
+                INSERT INTO notifications(id,source_event_id,recipient_id,actor_id,event_type,post_id,comment_id,grading_job_id,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING
                 """, n.id(), sourceEventId, n.recipientId(), n.actorId(), n.eventType(), n.postId(), n.commentId(),
-                Timestamp.from(n.createdAt())) > 0;
+                n.gradingJobId(), Timestamp.from(n.createdAt())) > 0;
     }
 
     @Override
     public List<Notification> findByRecipient(UUID recipientId, int size, long offset) {
         return jdbc.query("""
-                SELECT id,actor_id,recipient_id,event_type,post_id,comment_id,created_at,read_at
+                SELECT id,actor_id,recipient_id,event_type,post_id,comment_id,grading_job_id,created_at,read_at
                 FROM notifications WHERE recipient_id=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?
                 """, (rs, row) -> new Notification(rs.getObject("id", UUID.class), rs.getObject("actor_id", UUID.class),
                 rs.getObject("recipient_id", UUID.class), rs.getString("event_type"), rs.getObject("post_id", UUID.class),
-                rs.getObject("comment_id", UUID.class), rs.getTimestamp("created_at").toInstant(),
+                rs.getObject("comment_id", UUID.class), rs.getObject("grading_job_id", UUID.class),
+                rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("read_at") == null ? null : rs.getTimestamp("read_at").toInstant()),
                 recipientId, size, offset);
     }

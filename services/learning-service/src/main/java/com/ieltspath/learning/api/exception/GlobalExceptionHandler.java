@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.exception;
 
+import com.ieltspath.events.messaging.InvalidDeadLetterBatchException;
+import com.ieltspath.events.messaging.UnknownDeadLetterQueueException;
 import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.exception.InsufficientPointsException;
 import com.ieltspath.learning.application.exception.LearningRequestException;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -25,6 +28,17 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(UnknownDeadLetterQueueException.class)
+    public ResponseEntity<LearningErrorResponse> unknownDeadLetterQueue(UnknownDeadLetterQueueException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new LearningErrorResponse(exception.getMessage(), "UNKNOWN_DEAD_LETTER_QUEUE", null));
+    }
+
+    @ExceptionHandler(InvalidDeadLetterBatchException.class)
+    public ResponseEntity<LearningErrorResponse> invalidDeadLetterBatch(InvalidDeadLetterBatchException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new LearningErrorResponse(exception.getMessage(), "INVALID_DEAD_LETTER_BATCH", null));
+    }
     @ExceptionHandler(PracticeAttemptAlreadySubmittedException.class)
     public ResponseEntity<LearningErrorResponse> submitted(PracticeAttemptAlreadySubmittedException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -64,7 +78,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(LearningRequestException.class)
     public ResponseEntity<LearningErrorResponse> learningRequest(LearningRequestException exception) {
-        return ResponseEntity.status(exception.getStatus())
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(exception.getStatus());
+        if ("AI_BUSY".equals(exception.getCode())) response.header("Retry-After", "5");
+        if ("CONTENT_UNAVAILABLE".equals(exception.getCode())) response.header("Retry-After", "30");
+        return response
                 .body(new LearningErrorResponse(exception.getMessage(), exception.getCode(), null,
                         exception.getSubmissionId(), exception.getLessonIds()));
     }
@@ -73,6 +90,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<LearningErrorResponse> validation(MethodArgumentNotValidException exception,
                                                      HttpServletRequest request) {
         return ResponseEntity.unprocessableEntity().body(new LearningErrorResponse("Invalid request", null, null));
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<LearningErrorResponse> missingHeader(MissingRequestHeaderException exception) {
+        return ResponseEntity.badRequest().body(new LearningErrorResponse("Required header is missing",
+                "INVALID_REQUEST", null));
     }
 
     @ExceptionHandler({IllegalArgumentException.class, HttpMessageNotReadableException.class,

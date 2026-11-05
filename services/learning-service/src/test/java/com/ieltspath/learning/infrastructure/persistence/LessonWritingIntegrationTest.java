@@ -114,6 +114,7 @@ class LessonWritingIntegrationTest {
                 question_attempt_events RESTART IDENTITY
                 """);
         reset(content, access, llm);
+        LearningContentClientTestSupport.stubLessonAccessSummaries(content);
         when(content.getActiveRubric(anyString())).thenAnswer(invocation -> testRubric(invocation.getArgument(0)));
         when(content.activeErrorTypes()).thenReturn(List.of(new LearningContentClient.ErrorType("GRAMMAR",
                 "Grammar", "GRAMMAR", 1, "Fix grammar")));

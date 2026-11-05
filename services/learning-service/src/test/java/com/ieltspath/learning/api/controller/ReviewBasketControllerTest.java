@@ -4,6 +4,8 @@ import com.ieltspath.commonsecurity.config.CommonSecurityAutoConfiguration;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.result.ReviewBasketResult;
+import com.ieltspath.learning.application.result.ReviewBasketSummaryResult;
+import com.ieltspath.learning.application.usecase.GetReviewBasketSummaryUseCase;
 import com.ieltspath.learning.application.usecase.GetReviewBasketUseCase;
 import com.ieltspath.learning.application.usecase.StartBasketReviewUseCase;
 import org.junit.jupiter.api.Test;
@@ -47,6 +49,7 @@ class ReviewBasketControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean CurrentUserProvider currentUser;
     @MockitoBean GetReviewBasketUseCase basket;
+    @MockitoBean GetReviewBasketSummaryUseCase summary;
     @MockitoBean StartBasketReviewUseCase start;
     final UUID learner = UUID.randomUUID();
     final UUID point = UUID.randomUUID();
@@ -93,6 +96,20 @@ class ReviewBasketControllerTest {
     }
 
     @Test
+    void theSummaryGivesTheRequiredAndDueCountsOfTheVerifiedLearnerOnly() throws Exception {
+        when(currentUser.requireUserId()).thenReturn(learner);
+        when(summary.execute(learner)).thenReturn(new ReviewBasketSummaryResult(2, 5));
+
+        mvc.perform(get("/api/learning/review-basket/summary").with(user("customer").roles("CUSTOMER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.required").value(2))
+                .andExpect(jsonPath("$.due").value(5))
+                .andExpect(jsonPath("$.length()").value(2));
+        verify(summary).execute(learner);
+        verifyNoInteractions(basket);
+    }
+
+    @Test
     void startMapsAMissingSetTo409() throws Exception {
         when(currentUser.requireUserId()).thenReturn(learner);
         when(start.execute(learner, point)).thenThrow(
@@ -107,13 +124,16 @@ class ReviewBasketControllerTest {
     @ValueSource(strings = {"ADMIN", "EXAMINER", "CONTENT_AUTHOR"})
     void onlyACustomerUsesTheBasket(String role) throws Exception {
         mvc.perform(get("/api/learning/review-basket").with(user("staff").roles(role))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/learning/review-basket/summary").with(user("staff").roles(role)))
+                .andExpect(status().isForbidden());
         mvc.perform(post("/api/learning/review-basket/" + point + "/start").with(user("staff").roles(role)))
                 .andExpect(status().isForbidden());
-        verifyNoInteractions(basket, start);
+        verifyNoInteractions(basket, summary, start);
     }
 
     @Test
     void unauthenticatedCallersAreRejected() throws Exception {
         mvc.perform(get("/api/learning/review-basket")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/learning/review-basket/summary")).andExpect(status().isUnauthorized());
     }
 }

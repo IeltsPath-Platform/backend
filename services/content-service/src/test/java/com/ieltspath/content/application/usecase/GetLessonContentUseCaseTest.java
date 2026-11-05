@@ -4,6 +4,7 @@ import com.ieltspath.content.application.port.LearningContentReader;
 import com.ieltspath.content.application.result.LessonContentResult;
 import com.ieltspath.content.domain.exception.InvalidMediaReferenceException;
 import com.ieltspath.content.domain.vo.AssetType;
+import com.ieltspath.content.domain.vo.AccessTier;
 import com.ieltspath.content.domain.vo.BlockType;
 import com.ieltspath.content.domain.vo.LessonBlockKind;
 import com.ieltspath.content.domain.vo.MediaReferencePolicy;
@@ -17,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 class GetLessonContentUseCaseTest {
     private final LearningContentReader reader = mock(LearningContentReader.class);
@@ -46,14 +48,15 @@ class GetLessonContentUseCaseTest {
 
     @Test
     void essayBlockKeepsItsCheckedImagesAndExerciseQuestionsDropTheirs() {
-        String svg = "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=";
+        String svg = "writing/charts/example.svg";
         when(reader.publishedLesson(lessonId)).thenReturn(Optional.of(lessonWith(question("ESSAY", List.of(image(svg))))));
 
         LessonContentResult.Block essay = new GetLessonContentUseCase(reader, policy).execute(lessonId).blocks().get(1);
 
         assertThat(essay.blockKind()).isEqualTo(LessonBlockKind.ESSAY);
         assertThat(essay.questions().get(0).assets()).singleElement()
-                .satisfies(asset -> assertThat(asset.mediaUrl()).isEqualTo(svg));
+                .satisfies(asset -> assertThat(asset.mediaUrl())
+                        .isEqualTo("https://media.example.test/ieltspath/" + svg));
 
         when(reader.publishedLesson(lessonId)).thenReturn(Optional.of(lessonWith(question("CHOICE", List.of()))));
         LessonContentResult.Block exercise = new GetLessonContentUseCase(reader, policy).execute(lessonId).blocks().get(1);
@@ -68,5 +71,28 @@ class GetLessonContentUseCaseTest {
 
         assertThatThrownBy(() -> new GetLessonContentUseCase(reader, policy).execute(lessonId))
                 .isInstanceOf(InvalidMediaReferenceException.class);
+    }
+
+    @Test
+    void lessonSignsPremiumAudioOnlyWhenTheLearningCallerOptsIn() {
+        var storage = mock(com.ieltspath.commonstorage.ObjectStorage.class);
+        String signed = "https://private.example.test/object/sign/media-premium/listening/demo/ls1.mp3?token=x";
+        when(storage.signedDownloadUrl("media-premium", "listening/demo/ls1.mp3",
+                java.time.Duration.ofSeconds(900))).thenReturn(signed);
+        var resolver = new MediaUrlResolver(policy, storage, "media-premium", java.time.Duration.ofSeconds(900));
+        var audio = new LessonContentResult.Asset(UUID.randomUUID(), AssetType.AUDIO, "transcript",
+                "listening/demo/ls1.mp3", 45, null, AccessTier.PREMIUM);
+        var block = new LessonContentResult.Block(UUID.randomUUID(), BlockType.ASSET, null, 1, null, audio,
+                null, null, List.of());
+        when(reader.publishedLesson(lessonId)).thenReturn(Optional.of(new LessonContentResult(lessonId,
+                UUID.randomUUID(), "L4", "Lesson", null, 4, List.of(), List.of(block),
+                com.ieltspath.content.domain.vo.Skill.LISTENING)));
+        var useCase = new GetLessonContentUseCase(reader, policy, resolver);
+
+        assertThat(useCase.execute(lessonId).blocks().getFirst().asset().mediaUrl())
+                .isEqualTo("https://media.example.test/ieltspath/listening/demo/ls1.mp3");
+        assertThat(useCase.execute(lessonId, true).blocks().getFirst().asset().mediaUrl()).isEqualTo(signed);
+        verify(storage).signedDownloadUrl("media-premium", "listening/demo/ls1.mp3",
+                java.time.Duration.ofSeconds(900));
     }
 }

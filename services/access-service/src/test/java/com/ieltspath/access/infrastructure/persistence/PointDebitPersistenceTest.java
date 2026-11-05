@@ -6,6 +6,7 @@ import com.ieltspath.access.infrastructure.persistence.adapter.OutboxEventReposi
 import com.ieltspath.access.infrastructure.persistence.adapter.PointLedgerRepositoryAdapter;
 import com.ieltspath.access.infrastructure.persistence.adapter.PointWalletRepositoryAdapter;
 import com.ieltspath.access.infrastructure.persistence.mapper.AccessPersistenceMapper;
+import com.ieltspath.commonobservability.CorrelationRabbitAutoConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -28,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @DataJpaTest(properties = {"spring.cloud.config.enabled=false", "spring.jpa.hibernate.ddl-auto=validate"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({PointDebitWriter.class, PointWalletRepositoryAdapter.class, PointLedgerRepositoryAdapter.class,
-        OutboxEventRepositoryAdapter.class, AccessPersistenceMapper.class})
+        OutboxEventRepositoryAdapter.class, AccessPersistenceMapper.class, CorrelationRabbitAutoConfiguration.class})
 class PointDebitPersistenceTest {
     @Container
     private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:15-alpine");

@@ -27,6 +27,8 @@ class CourseSeedTest {
         source.setPassword(POSTGRES.getPassword());
         Flyway.configure().dataSource(source).locations("classpath:db/migration").target("58").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(source);
+        // Keep the seed fixture at its intended migration snapshot while satisfying the current reader projection.
+        jdbc.getJdbcTemplate().execute("ALTER TABLE content_assets ADD COLUMN access_tier VARCHAR(16) NOT NULL DEFAULT 'PUBLIC'");
         reader = new JdbcLearningContentReader(jdbc);
     }
 

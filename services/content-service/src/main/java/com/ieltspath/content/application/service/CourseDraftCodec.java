@@ -11,7 +11,11 @@ import com.ieltspath.content.domain.vo.CourseDraftStructure;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.BlockPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.FinalTestPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.LessonPlan;
+import com.ieltspath.content.domain.vo.CourseDraftStructure.OptionPlan;
+import com.ieltspath.content.domain.vo.CourseDraftStructure.PracticeSetPlan;
+import com.ieltspath.content.domain.vo.CourseDraftStructure.QuestionPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.TopicPlan;
+import com.ieltspath.content.domain.vo.QuestionType;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -19,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -34,6 +39,26 @@ public class CourseDraftCodec {
     static final int MAX_QUESTION_REFS = 100;
     static final int MAX_KNOWLEDGE_POINTS = 50;
     static final int MAX_PRACTICE_SETS = 20;
+    static final int MAX_RESOURCES = 20;
+    static final int MAX_SUMMARY_MARKDOWN = 20000;
+    static final int MAX_MINUTES = 600;
+    static final int MAX_NEW_WORDS = 20;
+    static final int MAX_VOCABULARY = 50;
+    static final int MAX_LEMMA = 100;
+    static final int MAX_WORD_TEXT = 1000;
+    static final int MAX_NEW_PRACTICE_SETS = 3;
+    static final int MIN_SET_QUESTIONS = 3;
+    static final int MAX_SET_QUESTIONS = 10;
+    static final int MAX_SET_PASSAGE = 6000;
+    static final int MAX_SET_INSTRUCTIONS = 1000;
+    static final int MAX_QUESTION_TEXT = 4000;
+    static final int MAX_OPTIONS = 6;
+    static final int MAX_OPTION_KEY = 20;
+    /** The parts of speech the library knows; a proposed word must name one. */
+    static final Set<String> PARTS_OF_SPEECH = Set.of("NOUN", "VERB", "ADJECTIVE", "ADVERB", "PREPOSITION",
+            "CONJUNCTION", "IDIOM", "PHRASAL_VERB");
+    static final Pattern LEMMA = Pattern.compile("[\\p{L}][\\p{L}\\p{N}' .-]*");
+    private static final Pattern WEB_LINK = Pattern.compile("(?i)^https?://\\S+$");
     static final int MAX_MILESTONES = 100;
     private static final Pattern CODE = Pattern.compile("[A-Za-z0-9._-]{1,100}");
     private static final BigDecimal NINE = new BigDecimal("9");
@@ -145,12 +170,147 @@ public class CourseDraftCodec {
         if (lesson.knowledgePointIds().size() > MAX_KNOWLEDGE_POINTS) {
             problems.add(new Problem(at + ".knowledgePointIds", "TOO_MANY"));
         }
+        if (lesson.summaryMarkdown() != null && lesson.summaryMarkdown().length() > MAX_SUMMARY_MARKDOWN) {
+            problems.add(new Problem(at + ".summaryMarkdown", "TOO_LONG"));
+        }
+        if (lesson.estimatedMinutes() != null && (lesson.estimatedMinutes() < 1 || lesson.estimatedMinutes() > MAX_MINUTES)) {
+            problems.add(new Problem(at + ".estimatedMinutes", "OUT_OF_RANGE"));
+        }
+        if (lesson.resources().size() > MAX_RESOURCES) problems.add(new Problem(at + ".resources", "TOO_MANY"));
+        // A lesson has one slide; any number of documents.
+        if (lesson.resources().stream().filter(r -> r != null && r.type() == com.ieltspath.content.domain.vo.LessonResourceType.SLIDE).count() > 1) {
+            problems.add(new Problem(at + ".resources", "TOO_MANY_SLIDES"));
+        }
+        for (int r = 0; r < lesson.resources().size(); r++) {
+            var resource = lesson.resources().get(r);
+            String where = at + ".resources[" + r + "]";
+            if (resource == null || resource.type() == null) {
+                problems.add(new Problem(where + ".type", "REQUIRED"));
+                continue;
+            }
+            text(problems, where + ".title", resource.title(), 255);
+            if (resource.url() == null || resource.url().length() > 2000 || !WEB_LINK.matcher(resource.url().trim()).matches()) {
+                problems.add(new Problem(where + ".url", "INVALID"));
+            }
+        }
+        vocabulary(problems, at, lesson);
         if (lesson.practiceSetPackageIds().size() > MAX_PRACTICE_SETS) {
             problems.add(new Problem(at + ".practiceSetPackageIds", "TOO_MANY"));
         }
+        newPracticeSets(problems, at, lesson);
         if (lesson.blocks().size() > MAX_BLOCKS) problems.add(new Problem(at + ".blocks", "TOO_MANY"));
         for (int b = 0; b < lesson.blocks().size(); b++) {
             block(problems, at + ".blocks[" + b + "]", lesson.blocks().get(b));
+        }
+    }
+
+    private static void vocabulary(List<Problem> problems, String at, LessonPlan lesson) {
+        if (lesson.newVocabulary().size() > MAX_NEW_WORDS) problems.add(new Problem(at + ".newVocabulary", "TOO_MANY"));
+        if (lesson.vocabularySenseIds().size() + lesson.newVocabulary().size() > MAX_VOCABULARY) {
+            problems.add(new Problem(at + ".vocabularySenseIds", "TOO_MANY"));
+        }
+        if (lesson.vocabularySenseIds().stream().anyMatch(java.util.Objects::isNull)) {
+            problems.add(new Problem(at + ".vocabularySenseIds", "REQUIRED"));
+        }
+        for (int w = 0; w < lesson.newVocabulary().size(); w++) {
+            var word = lesson.newVocabulary().get(w);
+            String where = at + ".newVocabulary[" + w + "]";
+            if (word == null) {
+                problems.add(new Problem(where, "REQUIRED"));
+                continue;
+            }
+            if (word.lemma() == null || word.lemma().isBlank()) {
+                problems.add(new Problem(where + ".lemma", "REQUIRED"));
+            } else if (word.lemma().length() > MAX_LEMMA) {
+                problems.add(new Problem(where + ".lemma", "TOO_LONG"));
+            } else if (!LEMMA.matcher(word.lemma().trim()).matches()) {
+                problems.add(new Problem(where + ".lemma", "INVALID_VALUE"));
+            }
+            if (word.partOfSpeech() == null || !PARTS_OF_SPEECH.contains(word.partOfSpeech())) {
+                problems.add(new Problem(where + ".partOfSpeech", "INVALID_VALUE"));
+            }
+            text(problems, where + ".vietnameseMeaning", word.vietnameseMeaning(), MAX_WORD_TEXT);
+            text(problems, where + ".exampleSentence", word.exampleSentence(), MAX_WORD_TEXT);
+            if (word.englishDefinition() != null && word.englishDefinition().length() > MAX_WORD_TEXT) {
+                problems.add(new Problem(where + ".englishDefinition", "TOO_LONG"));
+            }
+            if (word.ipa() != null && word.ipa().length() > MAX_LEMMA) problems.add(new Problem(where + ".ipa", "TOO_LONG"));
+        }
+    }
+
+    /**
+     * The sets the model wrote for a lesson. Each is a passage and 3 to 10 choice questions on points the lesson teaches;
+     * the answer must be one of the options, and a true/false/not-given question offers exactly those three.
+     */
+    private static void newPracticeSets(List<Problem> problems, String at, LessonPlan lesson) {
+        if (lesson.newPracticeSets().size() > MAX_NEW_PRACTICE_SETS
+                || lesson.practiceSetPackageIds().size() + lesson.newPracticeSets().size() > MAX_PRACTICE_SETS) {
+            problems.add(new Problem(at + ".newPracticeSets", "TOO_MANY"));
+        }
+        Set<UUID> taught = new HashSet<>(lesson.allKnowledgePointIds());
+        for (int s = 0; s < lesson.newPracticeSets().size(); s++) {
+            PracticeSetPlan set = lesson.newPracticeSets().get(s);
+            String where = at + ".newPracticeSets[" + s + "]";
+            if (set == null) {
+                problems.add(new Problem(where, "REQUIRED"));
+                continue;
+            }
+            text(problems, where + ".title", set.title(), 255);
+            if (set.instructions() != null && set.instructions().length() > MAX_SET_INSTRUCTIONS) {
+                problems.add(new Problem(where + ".instructions", "TOO_LONG"));
+            }
+            text(problems, where + ".passage", set.passage(), MAX_SET_PASSAGE);
+            if (set.questionType() != QuestionType.MULTIPLE_CHOICE
+                    && set.questionType() != QuestionType.TRUE_FALSE_NOT_GIVEN) {
+                problems.add(new Problem(where + ".questionType", "INVALID_VALUE"));
+            }
+            if (set.knowledgePointIds().isEmpty() || set.knowledgePointIds().stream().anyMatch(java.util.Objects::isNull)) {
+                problems.add(new Problem(where + ".knowledgePointIds", "REQUIRED"));
+            } else if (!taught.containsAll(set.knowledgePointIds())) {
+                problems.add(new Problem(where + ".knowledgePointIds", "NOT_IN_LESSON"));
+            }
+            if (set.questions().size() < MIN_SET_QUESTIONS) problems.add(new Problem(where + ".questions", "TOO_FEW"));
+            if (set.questions().size() > MAX_SET_QUESTIONS) problems.add(new Problem(where + ".questions", "TOO_MANY"));
+            for (int q = 0; q < set.questions().size(); q++) {
+                setQuestion(problems, where + ".questions[" + q + "]", set.questions().get(q), set.questionType(),
+                        new HashSet<>(set.knowledgePointIds()));
+            }
+        }
+    }
+
+    private static void setQuestion(List<Problem> problems, String at, QuestionPlan question, QuestionType type,
+                                    Set<UUID> setPoints) {
+        if (question == null) {
+            problems.add(new Problem(at, "REQUIRED"));
+            return;
+        }
+        // A question tests points of its own set; none listed means all of them.
+        if (question.knowledgePointIds().stream().anyMatch(point -> point == null || !setPoints.contains(point))) {
+            problems.add(new Problem(at + ".knowledgePointIds", "NOT_IN_LESSON"));
+        }
+        text(problems, at + ".stem", question.stem(), MAX_QUESTION_TEXT);
+        text(problems, at + ".explanation", question.explanation(), MAX_QUESTION_TEXT);
+        if (question.options().size() < 2 || question.options().size() > MAX_OPTIONS) {
+            problems.add(new Problem(at + ".options", "INVALID_VALUE"));
+            return;
+        }
+        Set<String> keys = new HashSet<>();
+        for (int o = 0; o < question.options().size(); o++) {
+            OptionPlan option = question.options().get(o);
+            String where = at + ".options[" + o + "]";
+            if (option == null || option.optionKey() == null || option.optionKey().isBlank()
+                    || option.optionKey().length() > MAX_OPTION_KEY) {
+                problems.add(new Problem(where + ".optionKey", "INVALID_VALUE"));
+            } else if (!keys.add(option.optionKey())) {
+                problems.add(new Problem(where + ".optionKey", "DUPLICATE"));
+            }
+            text(problems, where + ".content", option == null ? null : option.content(), MAX_QUESTION_TEXT);
+        }
+        if (question.correctKey() == null || !keys.contains(question.correctKey())) {
+            problems.add(new Problem(at + ".correctKey", "NOT_AN_OPTION"));
+        }
+        if (type == QuestionType.TRUE_FALSE_NOT_GIVEN && !keys.equals(Set.of("TRUE", "FALSE", "NOT_GIVEN"))) {
+            problems.add(new Problem(at + ".options", "INVALID_VALUE"));
         }
     }
 

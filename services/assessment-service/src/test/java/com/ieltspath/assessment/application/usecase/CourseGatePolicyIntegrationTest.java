@@ -77,7 +77,7 @@ class CourseGatePolicyIntegrationTest extends ExaminerIntegrationSupport {
         assertEquals("QUEUED",jdbc.queryForObject("SELECT status FROM grading_jobs WHERE id=?",String.class,humanJob(attempt)));
     }
 
-    @Test void unassignedAndPreviousExaminerCannotGradeAfterReclaim() throws Exception {
+    @Test void unassignedAndUnchosenExaminersCannotGradeOrTakeOver() throws Exception {
         UUID attempt=courseEssay();
         mvc.perform(post("/api/assessments/grading/attempts/{id}/results",attempt).with(user(examiner.toString()).roles("EXAMINER")))
                 .andExpect(status().isForbidden());
@@ -86,12 +86,12 @@ class CourseGatePolicyIntegrationTest extends ExaminerIntegrationSupport {
         UUID other=UUID.randomUUID();
         jdbc.update("UPDATE grading_jobs SET claimed_at=CURRENT_TIMESTAMP-INTERVAL '25 hours' WHERE id=?",humanJob(attempt));
         mvc.perform(post("/api/assessments/grading-jobs/{id}/claim",humanJob(attempt)).with(user(other.toString()).roles("EXAMINER")))
-                .andExpect(status().isOk());
-        finalizeResult(result,examiner,403);
-        mvc.perform(get("/api/assessments/grading-jobs/{id}/essay",humanJob(attempt)).with(user(examiner.toString()).roles("EXAMINER")))
+                .andExpect(status().isConflict());
+        finalizeResult(result,other,403);
+        mvc.perform(get("/api/assessments/grading-jobs/{id}/essay",humanJob(attempt)).with(user(other.toString()).roles("EXAMINER")))
                 .andExpect(status().isForbidden());
-        finalizeResult(result,other,200);
-        assertEquals(1,count("SELECT count(*) FROM essay_grade_comparisons c JOIN learner_submissions l ON l.id=c.submission_id WHERE l.attempt_item_id=? AND examiner_id=?",item(attempt),other));
+        finalizeResult(result,examiner,200);
+        assertEquals(1,count("SELECT count(*) FROM essay_grade_comparisons c JOIN learner_submissions l ON l.id=c.submission_id WHERE l.attempt_item_id=? AND examiner_id=?",item(attempt),examiner));
     }
 
     @Test void omittedEssayDoesNotAutomaticallyCompleteCourseGate() {
@@ -140,12 +140,12 @@ class CourseGatePolicyIntegrationTest extends ExaminerIntegrationSupport {
         assertEquals(0,count("SELECT count(*) FROM essay_grade_comparisons WHERE submission_id=?",replacement));
     }
 
-    @Test void regradeReopensAssignmentsForAnotherExaminer() throws Exception {
+    @Test void regradeReopensTheAssignmentOfTheChosenExaminer() throws Exception {
         UUID attempt=courseEssay();
         UUID first=openClaimed(attempt);
         save(first,attempt,6.5);
         finalizeResult(first,examiner,200);
-        UUID next=UUID.randomUUID();
+        UUID next=examiner;
         String response=mvc.perform(post("/api/assessments/grading/attempts/{id}/results",attempt).with(user(next.toString()).roles("EXAMINER")))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.resultVersion").value(2)).andReturn().getResponse().getContentAsString();
         UUID second=UUID.fromString(json.readTree(response).get("id").textValue());
@@ -159,6 +159,26 @@ class CourseGatePolicyIntegrationTest extends ExaminerIntegrationSupport {
         finalizeResult(second,next,200);
         assertEquals(2,eventCount(attempt));
         assertEquals(1,count("SELECT count(*) FROM essay_grade_comparisons c JOIN learner_submissions l ON l.id=c.submission_id WHERE l.attempt_item_id=? AND examiner_band=7.0 AND examiner_id=?",item(attempt),next));
+    }
+
+    @Test void aRegradeStaysWithTheExaminerTheLearnerChoseAndNoOtherExaminerCanTakeIt() throws Exception {
+        UUID attempt=courseEssay();
+        UUID first=openClaimed(attempt);
+        save(first,attempt,6.5);
+        finalizeResult(first,examiner,200);
+        mvc.perform(post("/api/assessments/grading/attempts/{id}/results",attempt).with(user(examiner.toString()).roles("EXAMINER")))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.resultVersion").value(2));
+        UUID job=humanJob(attempt);
+
+        // The job is open again, unassigned, and still belongs to the chosen examiner: it is not a shared queue.
+        assertEquals(1,count("SELECT count(*) FROM grading_jobs WHERE id=? AND status='QUEUED' AND assigned_examiner_id IS NULL AND requested_examiner_id=?",job,examiner));
+        UUID other=UUID.randomUUID();
+        mvc.perform(post("/api/assessments/grading-jobs/{id}/claim",job).with(user(other.toString()).roles("EXAMINER")))
+                .andExpect(status().isConflict());
+        assertEquals(1,count("SELECT count(*) FROM grading_jobs WHERE id=? AND assigned_examiner_id IS NULL",job));
+        mvc.perform(post("/api/assessments/grading-jobs/{id}/claim",job).with(user(examiner.toString()).roles("EXAMINER")))
+                .andExpect(status().isOk());
+        assertEquals(1,count("SELECT count(*) FROM grading_jobs WHERE id=? AND assigned_examiner_id=?",job,examiner));
     }
 
     private UUID openClaimed(UUID attempt) throws Exception {

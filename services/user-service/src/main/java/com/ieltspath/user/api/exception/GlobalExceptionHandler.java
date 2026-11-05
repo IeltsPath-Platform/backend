@@ -7,17 +7,23 @@ import com.ieltspath.user.domain.exception.InvalidActionTokenException;
 import com.ieltspath.user.domain.exception.InvalidDataException;
 import com.ieltspath.user.domain.exception.InvalidUserStatusException;
 import com.ieltspath.user.domain.exception.LearnerProfileNotFoundException;
-import com.ieltspath.user.domain.exception.LearningGoalNotFoundException;
-import com.ieltspath.user.domain.exception.LearningGoalConflictException;
 import com.ieltspath.user.domain.exception.OAuthIdentityNotFoundException;
 import com.ieltspath.user.domain.exception.PhoneAlreadyExistsException;
 import com.ieltspath.user.domain.exception.RoleNotFoundException;
 import com.ieltspath.user.domain.exception.ResourceNotFoundException;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.exception.UserManagementRuleViolationException;
+import com.ieltspath.user.domain.exception.PasswordChangeException;
+import com.ieltspath.user.domain.exception.PasswordNotConfiguredException;
+import com.ieltspath.user.application.exception.AvatarUploadRateLimitException;
+import com.ieltspath.user.application.exception.LoginLimiterUnavailableException;
+import com.ieltspath.user.application.exception.LoginRateLimitedException;
+import com.ieltspath.commonstorage.UploadRejectedException;
+import com.ieltspath.commonstorage.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -35,16 +41,6 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    @ExceptionHandler(com.ieltspath.user.domain.exception.StudyTrackingException.class)
-    ResponseEntity<ErrorResponse> handleStudyTracking(com.ieltspath.user.domain.exception.StudyTrackingException exception,
-                                                     HttpServletRequest request) {
-        HttpStatus status = switch(exception.getCode()) {
-            case "SESSION_NOT_FOUND", "SOURCE_NOT_AVAILABLE" -> HttpStatus.NOT_FOUND;
-            case "SOURCE_UNAVAILABLE" -> HttpStatus.SERVICE_UNAVAILABLE;
-            default -> HttpStatus.CONFLICT;
-        };
-        return error(status, exception.getCode(), request, Map.of("code", exception.getCode()));
-    }
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     void handleClientAbort(AsyncRequestNotUsableException exception, HttpServletRequest request) {
         log.debug("Client disconnected before response completed path={} reason={}",
@@ -55,7 +51,6 @@ public class GlobalExceptionHandler {
             UserNotFoundException.class,
             ResourceNotFoundException.class,
             LearnerProfileNotFoundException.class,
-            LearningGoalNotFoundException.class,
             OAuthIdentityNotFoundException.class
     })
     ResponseEntity<ErrorResponse> handleNotFound(RuntimeException exception, HttpServletRequest request) {
@@ -63,9 +58,48 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({EmailAlreadyExistsException.class, PhoneAlreadyExistsException.class,
-            LearningGoalConflictException.class, ConflictException.class})
+            ConflictException.class, PasswordNotConfiguredException.class})
     ResponseEntity<ErrorResponse> handleConflict(RuntimeException exception, HttpServletRequest request) {
         return error(HttpStatus.CONFLICT, exception.getMessage(), request, null);
+    }
+
+    @ExceptionHandler(PasswordChangeException.class)
+    ResponseEntity<ErrorResponse> handlePasswordChange(PasswordChangeException exception, HttpServletRequest request) {
+        HttpStatus status = exception.isRateLimited() ? HttpStatus.TOO_MANY_REQUESTS
+                : "CURRENT_PASSWORD_INVALID".equals(exception.getCode()) ? HttpStatus.UNAUTHORIZED : HttpStatus.BAD_REQUEST;
+        return error(status, exception.getMessage(), request, Map.of("code", exception.getCode()));
+    }
+
+    @ExceptionHandler(UploadRejectedException.class)
+    ResponseEntity<ErrorResponse> handleUploadRejected(UploadRejectedException exception, HttpServletRequest request) {
+        HttpStatus status = switch (exception.reason()) {
+            case TOO_LARGE -> HttpStatus.PAYLOAD_TOO_LARGE;
+            case TYPE_NOT_ALLOWED -> HttpStatus.UNSUPPORTED_MEDIA_TYPE;
+            default -> HttpStatus.BAD_REQUEST;
+        };
+        String message = switch (exception.reason()) {
+            case EMPTY -> "Chưa chọn ảnh đại diện";
+            case TOO_LARGE -> "Ảnh đại diện không được vượt quá 2 MB";
+            case TYPE_NOT_ALLOWED -> "Chỉ chấp nhận ảnh JPEG, PNG hoặc WebP";
+            case CONTENT_MISMATCH -> "Nội dung ảnh không khớp với định dạng đã khai báo";
+        };
+        return error(status, message, request, null);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ErrorResponse> handleMaxUploadSize(Exception exception, HttpServletRequest request) {
+        return error(HttpStatus.PAYLOAD_TOO_LARGE, "Ảnh đại diện không được vượt quá 2 MB", request, null);
+    }
+
+    @ExceptionHandler(StorageException.class)
+    ResponseEntity<ErrorResponse> handleStorage(StorageException exception, HttpServletRequest request) {
+        log.error("Avatar storage failed operation={} reason={} ref={}", exception.operation(), exception.reason(), exception.ref());
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "Kho ảnh tạm thời không khả dụng", request, null);
+    }
+
+    @ExceptionHandler(AvatarUploadRateLimitException.class)
+    ResponseEntity<ErrorResponse> handleAvatarRateLimit(AvatarUploadRateLimitException exception, HttpServletRequest request) {
+        return error(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage(), request, null);
     }
 
     @ExceptionHandler(UserManagementRuleViolationException.class)
@@ -82,6 +116,22 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, null);
     }
 
+    @ExceptionHandler(LoginRateLimitedException.class)
+    ResponseEntity<ErrorResponse> handleLoginRateLimited(LoginRateLimitedException exception, HttpServletRequest request) {
+        long retryAfter = Math.max(1, exception.retryAfter().toSeconds());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(retryAfter))
+                .body(errorBody(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage(), request, null, "LOGIN_RATE_LIMITED"));
+    }
+
+    @ExceptionHandler(LoginLimiterUnavailableException.class)
+    ResponseEntity<ErrorResponse> handleLoginLimiterUnavailable(LoginLimiterUnavailableException exception,
+                                                                 HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(errorBody(HttpStatus.SERVICE_UNAVAILABLE, "Đăng nhập tạm thời không khả dụng", request,
+                        null, "LOGIN_TEMPORARILY_UNAVAILABLE"));
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException exception, HttpServletRequest request) {
         return error(HttpStatus.FORBIDDEN, "Forbidden", request, null);
@@ -95,19 +145,19 @@ public class GlobalExceptionHandler {
             IllegalStateException.class
     })
     ResponseEntity<ErrorResponse> handleBadRequest(RuntimeException exception, HttpServletRequest request) {
-        return error(HttpStatus.BAD_REQUEST,
-                isLearningSupportPath(request) ? "Dữ liệu không hợp lệ" : exception.getMessage(), request, null);
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request, null);
     }
 
     @ExceptionHandler(InvalidDataException.class)
-    ResponseEntity<ErrorResponse> handleInvalidActivityData(InvalidDataException exception, HttpServletRequest request) {
+    ResponseEntity<ErrorResponse> handleInvalidData(InvalidDataException exception, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, "Dữ liệu không hợp lệ", request, null);
     }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MissingServletRequestParameterException.class,
+            org.springframework.web.multipart.support.MissingServletRequestPartException.class,
             MethodArgumentTypeMismatchException.class})
-    ResponseEntity<ErrorResponse> handleMalformedActivityRequest(Exception exception, HttpServletRequest request) {
-        return isLearningSupportPath(request) || request.getRequestURI().startsWith("/api/users/me/study-sessions")
+    ResponseEntity<ErrorResponse> handleMalformedRequest(Exception exception, HttpServletRequest request) {
+        return request.getRequestURI().equals("/api/users/me/avatar")
                 || request.getRequestURI().startsWith("/api/users/me/statistics/")
                 || request.getRequestURI().equals("/internal/users/public-profiles")
                 || request.getRequestURI().matches("/api/users/[^/]+/public-profile")
@@ -136,18 +186,20 @@ public class GlobalExceptionHandler {
             HttpServletRequest request,
             Map<String, String> details
     ) {
-        return ResponseEntity.status(status).body(new ErrorResponse(
-                LocalDateTime.now(),
-                status.value(),
-                isLearningSupportPath(request) ? status.getReasonPhrase() : reasonPhrase(status),
-                message,
-                request.getRequestURI(),
-                details
-        ));
+        return ResponseEntity.status(status).body(errorBody(status, message, request, details, null));
     }
 
-    private boolean isLearningSupportPath(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/api/learning-support/");
+    private ErrorResponse errorBody(HttpStatus status, String message, HttpServletRequest request,
+                                    Map<String, String> details, String code) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                status.value(),
+                reasonPhrase(status),
+                message,
+                request.getRequestURI(),
+                details,
+                code
+        );
     }
 
     private String reasonPhrase(HttpStatus status) {

@@ -12,6 +12,7 @@ public interface AccountActionTokenRepository {
     Optional<AccountActionToken> findById(UUID id);
     Optional<AccountActionToken> findByTokenHash(String tokenHash);
     Optional<AccountActionToken> findByTokenHashAndPurpose(String tokenHash, ActionTokenPurpose purpose);
+    boolean consumePasswordResetToken(String tokenHash, java.time.LocalDateTime consumedAt);
     List<AccountActionToken> findByUserId(UUID userId);
     void deleteById(UUID id);
     void deleteByUserId(UUID userId);

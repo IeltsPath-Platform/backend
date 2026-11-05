@@ -5,6 +5,9 @@ import com.ieltspath.user.application.command.UpdateLearnerProfileCommand;
 import com.ieltspath.user.application.result.LearnerProfileResult;
 import com.ieltspath.user.application.usecase.GetLearnerProfileUseCase;
 import com.ieltspath.user.application.usecase.UpdateLearnerProfileUseCase;
+import com.ieltspath.user.application.usecase.UploadAvatarUseCase;
+import com.ieltspath.user.application.usecase.DeleteAvatarUseCase;
+import com.ieltspath.user.application.usecase.ChangePasswordUseCase;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.OctetSequenceKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -25,6 +28,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
@@ -35,10 +39,14 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -61,6 +69,33 @@ class LearnerProfileSecurityTest {
     private GetLearnerProfileUseCase getLearnerProfileUseCase;
     @MockBean
     private UpdateLearnerProfileUseCase updateLearnerProfileUseCase;
+    @MockBean private UploadAvatarUseCase uploadAvatarUseCase;
+    @MockBean private DeleteAvatarUseCase deleteAvatarUseCase;
+    @MockBean private ChangePasswordUseCase changePasswordUseCase;
+
+    @Test
+    void avatarAndPasswordEndpointsRequireAuthentication() throws Exception {
+        mockMvc.perform(post("/api/users/me/avatar")).andExpect(status().isUnauthorized());
+        mockMvc.perform(delete("/api/users/me/avatar")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/users/me/password").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"currentPassword\":\"oldpass\",\"newPassword\":\"newpass\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void avatarUploadUsesAuthenticatedSubjectAndIgnoresClientUserId() throws Exception {
+        UUID authenticatedId = UUID.randomUUID();
+        UUID suppliedId = UUID.randomUUID();
+        when(uploadAvatarUseCase.execute(eq(authenticatedId), any(byte[].class), any())).thenReturn(profileResult(authenticatedId, "Owner"));
+        String token = signedToken(INTERNAL_SECRET, authenticatedId, INTERNAL_ISSUER, List.of("CUSTOMER"));
+        mockMvc.perform(multipart("/api/users/me/avatar")
+                        .file(new MockMultipartFile("file", "avatar.png", "image/png", new byte[]{1}))
+                        .param("userId", suppliedId.toString())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(authenticatedId.toString()));
+        verify(uploadAvatarUseCase).execute(eq(authenticatedId), any(byte[].class), eq("image/png"));
+    }
 
     @DynamicPropertySource
     static void hmacProperties(DynamicPropertyRegistry registry) {
@@ -102,7 +137,7 @@ class LearnerProfileSecurityTest {
                     "bio": "IELTS learner",
                     "selfReportedBand": 6.5,
                     "timezone": "Asia/Ho_Chi_Minh",
-                    "visibility": "PUBLIC"
+                    "visibility": "PRIVATE"
                 }
                 """;
 

@@ -20,6 +20,7 @@ import java.util.Map;
 @Component
 public class MasteryFormulaSettings {
     public static final String POLICY_KEY = "mastery.policy";
+    public static final String ERROR_TRAP_WEIGHT_KEY = "mastery.mp1.source-weight.error-trap";
 
     public enum Formula { DEEPTUTOR, MP1 }
 
@@ -27,6 +28,7 @@ public class MasteryFormulaSettings {
     private final ObjectMapper json;
     private final Formula configured;
     private final Mp1Params params;
+    private final double configuredErrorTrapWeight;
 
     public MasteryFormulaSettings(LearningRuleConfigRepository configs, ObjectMapper json,
                                   @Value("${learning.mastery.policy:DEEPTUTOR}") String policy,
@@ -42,12 +44,14 @@ public class MasteryFormulaSettings {
                                   @Value("${learning.mastery.mp1.source-weights.review:1.0}") double review,
                                   @Value("${learning.mastery.mp1.source-weights.probe:1.0}") double probe,
                                   @Value("${learning.mastery.mp1.source-weights.practice:0.6}") double practice,
-                                  @Value("${learning.mastery.mp1.source-weights.essay:0.5}") double essay) {
+                                  @Value("${learning.mastery.mp1.source-weights.essay:0.5}") double essay,
+                                  @Value("${learning.mastery.mp1.source-weights.error-trap:0.3}") double errorTrap) {
         this.configs = configs;
         this.json = json;
         this.configured = parse(policy);
+        this.configuredErrorTrapWeight = errorTrap;
         this.params = new Mp1Params(window, maxPractice, halfLifeDays, minEvidence, minDistinctDays, minConfidence,
-                hysteresis, sameItemDays, new Mp1Params.SourceWeights(exam, review, probe, practice, essay));
+                hysteresis, sameItemDays, new Mp1Params.SourceWeights(exam, review, probe, practice, essay, errorTrap));
     }
 
     public Formula formula() {
@@ -67,7 +71,23 @@ public class MasteryFormulaSettings {
     }
 
     public Mp1Params params() {
-        return params;
+        double trapWeight = configuredErrorTrapWeight;
+        String stored = configs.findAll().get(ERROR_TRAP_WEIGHT_KEY);
+        if (stored != null) {
+            try {
+                JsonNode node = json.readTree(stored);
+                if (node.isNumber() && Double.isFinite(node.asDouble()) && node.asDouble() >= 0) {
+                    trapWeight = node.asDouble();
+                }
+            } catch (java.io.IOException exception) {
+                log.warn("Stored error-trap mastery weight is invalid, using the service configuration");
+            }
+        }
+        Mp1Params.SourceWeights weights = params.weights();
+        return new Mp1Params(params.window(), params.maxPracticeInWindow(), params.halfLifeDays(), params.minEvidence(),
+                params.minDistinctDays(), params.minConfidence(), params.hysteresis(), params.sameItemDays(),
+                new Mp1Params.SourceWeights(weights.exam(), weights.review(), weights.probe(), weights.practice(),
+                        weights.essay(), trapWeight));
     }
 
     private static Formula parse(String value) {

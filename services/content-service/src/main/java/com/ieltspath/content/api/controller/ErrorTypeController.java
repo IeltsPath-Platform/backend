@@ -34,6 +34,16 @@ public class ErrorTypeController {
         return listErrorTypes.execute(activeOnly).stream().map(ErrorTypeResponse::from).toList();
     }
 
+    /**
+     * What a learner is told about an error the examiner marked: its name and how to fix it. Only reviewed, active codes are
+     * listed, the same set a learner is ever shown in grading output, and nothing about ids or review status.
+     */
+    @GetMapping("/approved")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CONTENT_AUTHOR', 'EXAMINER')")
+    public List<LearnerErrorTypeResponse> approved() {
+        return listErrorTypes.executeApprovedActive().stream().map(LearnerErrorTypeResponse::from).toList();
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
@@ -67,6 +77,13 @@ public class ErrorTypeController {
             @NotBlank String fixHint,
             ContentStatus status,
             ErrorReviewStatus reviewStatus) {}
+
+    public record LearnerErrorTypeResponse(String code, String name, ErrorCategory category, String fixHint) {
+        static LearnerErrorTypeResponse from(ErrorType errorType) {
+            return new LearnerErrorTypeResponse(errorType.getCode(), errorType.getName(), errorType.getCategory(),
+                    errorType.getFixHint());
+        }
+    }
 
     public record ErrorTypeResponse(UUID id, String code, String name, ErrorCategory category, int severity,
                                     UUID knowledgePointId, String fixHint, ContentStatus status,

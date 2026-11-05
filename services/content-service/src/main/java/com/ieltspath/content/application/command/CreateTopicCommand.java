@@ -11,10 +11,16 @@ public record CreateTopicCommand(
         int sortOrder,
         BandRange band,
         Skill skill,
-        UUID courseId
+        UUID courseId,
+        String description
 ) {
     public CreateTopicCommand(UUID parentTopicId, String code, String name, int sortOrder, BandRange band, Skill skill) {
-        this(parentTopicId, code, name, sortOrder, band, skill, null);
+        this(parentTopicId, code, name, sortOrder, band, skill, null, null);
+    }
+
+    public CreateTopicCommand(UUID parentTopicId, String code, String name, int sortOrder, BandRange band, Skill skill,
+                              UUID courseId) {
+        this(parentTopicId, code, name, sortOrder, band, skill, courseId, null);
     }
 }
 

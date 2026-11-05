@@ -66,6 +66,22 @@ class AiCourseDraftControllerTest {
     }
 
     @Test
+    void theGeneratorAddsPrerequisitesUnlessTheClientTurnsItOff() throws Exception {
+        AiDraft queued = AiDraft.request(DraftKind.COURSE, author, "{\"bandLevel\":6.5}", Instant.now());
+        when(request.execute(eq(author), any())).thenReturn(queued);
+
+        for (String body : List.of("{\"bandLevel\":6.5,\"skills\":[\"READING\"],\"topics\":[\"Paraphrase\"]}",
+                "{\"bandLevel\":6.5,\"skills\":[\"READING\"],\"topics\":[\"Paraphrase\"],\"includePrerequisites\":false}")) {
+            mockMvc.perform(post("/api/content/admin/ai-drafts/courses").contentType("application/json").content(body))
+                    .andExpect(status().isAccepted());
+        }
+
+        ArgumentCaptor<CourseDraftRequest> sent = ArgumentCaptor.forClass(CourseDraftRequest.class);
+        verify(request, org.mockito.Mockito.times(2)).execute(eq(author), sent.capture());
+        assertEquals(List.of(true, false), sent.getAllValues().stream().map(CourseDraftRequest::withPrerequisites).toList());
+    }
+
+    @Test
     void theBandIsRequired() throws Exception {
         mockMvc.perform(post("/api/content/admin/ai-drafts/courses").contentType("application/json")
                         .content("{\"skills\":[\"READING\"],\"topics\":[\"a\"]}"))

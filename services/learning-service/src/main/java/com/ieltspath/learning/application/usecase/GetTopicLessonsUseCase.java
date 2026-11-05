@@ -3,8 +3,9 @@ package com.ieltspath.learning.application.usecase;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.result.TopicLessonsResult;
 import com.ieltspath.learning.application.service.LessonAccess;
+import com.ieltspath.learning.application.service.PaywallGate;
 import com.ieltspath.learning.application.service.PracticeProgress;
-import com.ieltspath.learning.domain.exception.LearningGateException;
+import com.ieltspath.learning.domain.entity.TopicProgress;
 import com.ieltspath.learning.domain.repository.LessonProgressRepository;
 import com.ieltspath.learning.domain.service.LessonAccessGate;
 import com.ieltspath.learning.domain.vo.PendingReview;
@@ -27,23 +28,26 @@ public class GetTopicLessonsUseCase {
     private final LessonAccess access;
     private final LessonProgressRepository lessons;
     private final PracticeProgress practice;
+    private final PaywallGate paywall;
 
     public GetTopicLessonsUseCase(LearningContentClient content, LessonAccess access,
                                   LessonProgressRepository lessons,
-                                  PracticeProgress practice) {
+                                  PracticeProgress practice, PaywallGate paywall) {
         this.content = content;
         this.access = access;
         this.lessons = lessons;
         this.practice = practice;
+        this.paywall = paywall;
     }
 
     @Transactional
     public TopicLessonsResult execute(UUID userId, UUID topicId) {
         var topic = access.topic(userId, topicId);
         TopicStatus topicStatus = access.status(userId, topicId);
-        if (topicStatus == TopicStatus.LOCKED) throw new LearningGateException("TOPIC_LOCKED", List.of());
         var ordered = LessonAccess.orderedLessons(content.getTopicLessons(topicId));
+        if (topicStatus == TopicStatus.LOCKED) return lockedPreview(userId, topicId, topic, ordered);
         var progress = lessons.findByTopic(userId, topicId);
+        var paywallRequest = paywall.forLearner(userId);
         Map<UUID, Boolean> completedByLesson = new HashMap<>();
         for (var lesson : ordered) completedByLesson.put(lesson.lessonId(),
                 LessonAccess.completed(progress.get(lesson.lessonId())));
@@ -64,9 +68,11 @@ public class GetTopicLessonsUseCase {
                     : LessonAccessGate.blocking(topicPractice.pendingReviews(), topic.skills(), Set.copyOf(previousIds));
             UUID blockingReviewId = blockedBy.isEmpty() ? null : blockedBy.get(0).reviewId();
             String status = completed ? "COMPLETED" : previousOpen && blockedBy.isEmpty() ? "AVAILABLE" : "LOCKED";
+            boolean paywalled = !paywallRequest.lessonOpen(lesson, progress.get(lesson.lessonId()));
             summaries.add(new TopicLessonsResult.LessonSummary(lesson.lessonId(), lesson.code(), lesson.title(),
                     lesson.sortOrder(), status, clearance.status(), clearance.reason(), lesson.estimatedMinutes(),
-                    blockingReviewId));
+                    blockingReviewId, paywalled,
+                    paywallRequest.freePreview(lesson.courseId(), lesson.skillPosition())));
             previousIds.add(lesson.lessonId());
             previousComplete &= completed;
             previousOpen &= completed && clearance.status() == PracticeStatus.PASSED;
@@ -77,6 +83,24 @@ public class GetTopicLessonsUseCase {
         String testStatus = !topic.hasTopicTest() ? "NONE" : topicStatus == TopicStatus.PASSED ? "PASSED"
                 : previousComplete && practicePassed && !hasPendingReview ? "AVAILABLE" : "LOCKED";
         return new TopicLessonsResult(topicId, List.copyOf(summaries), testStatus,
+                topic.skill(), topic.hasTopicTest(), topic.skills());
+    }
+
+    /**
+     * A topic the learner has not reached: its lessons are listed so the course can be read ahead, every one closed.
+     * Nothing is read from the learner's progress, and opening a lesson still stops at the topic gate.
+     */
+    private TopicLessonsResult lockedPreview(UUID userId, UUID topicId, TopicProgress topic,
+                                             List<LearningContentClient.LessonSummary> ordered) {
+        var paywallRequest = paywall.forLearner(userId);
+        List<TopicLessonsResult.LessonSummary> summaries = new ArrayList<>();
+        for (var lesson : ordered) {
+            boolean paywalled = !paywallRequest.lessonOpen(lesson, null);
+            summaries.add(new TopicLessonsResult.LessonSummary(lesson.lessonId(), lesson.code(), lesson.title(),
+                    lesson.sortOrder(), "LOCKED", PracticeStatus.LOCKED, null, lesson.estimatedMinutes(), null,
+                    paywalled, paywallRequest.freePreview(lesson.courseId(), lesson.skillPosition())));
+        }
+        return new TopicLessonsResult(topicId, List.copyOf(summaries), topic.hasTopicTest() ? "LOCKED" : "NONE",
                 topic.skill(), topic.hasTopicTest(), topic.skills());
     }
 }

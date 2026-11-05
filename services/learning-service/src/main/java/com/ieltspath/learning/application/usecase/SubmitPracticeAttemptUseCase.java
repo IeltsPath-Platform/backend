@@ -15,6 +15,8 @@ import com.ieltspath.learning.application.service.FreePracticeSubmission;
 import com.ieltspath.learning.application.service.GamificationRecorder;
 import com.ieltspath.learning.application.service.HeartsService;
 import com.ieltspath.learning.application.service.WritingCriterionReviews;
+import com.ieltspath.learning.application.service.ErrorTrapEvidence;
+import com.ieltspath.learning.application.service.ErrorTrapCatalog;
 import com.ieltspath.learning.domain.vo.FailedWritingCriterion;
 import com.ieltspath.learning.domain.vo.GamificationSummary;
 import com.ieltspath.learning.domain.vo.PracticeOrigin;
@@ -37,8 +39,11 @@ import com.ieltspath.learning.domain.vo.KnowledgeEvidence;
 import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.PracticeReviewCandidate;
 import com.ieltspath.learning.domain.vo.PracticeSubmission;
+import com.ieltspath.learning.domain.vo.PromotedReview;
+import com.ieltspath.learning.domain.vo.PendingReview;
 import com.ieltspath.learning.domain.vo.WritingSubmissionStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -48,10 +53,12 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class SubmitPracticeAttemptUseCase {
     private static final int MIN_SET_QUESTIONS = 3;
+    private static final Set<String> SUGGESTION_TRIGGERS = Set.of("PRACTICE", "ERROR_PATTERN");
     private final LearnerLock lock;
     private final PracticeAccess access;
     private final LearningContentClient content;
@@ -67,19 +74,22 @@ public class SubmitPracticeAttemptUseCase {
     private final GamificationRecorder gamificationRecorder;
     private final HeartsService hearts;
     private final WritingCriterionReviews criterionReviews;
+    private final ErrorTrapEvidence errorTrapEvidence;
     private final ItemGrading grading = new ItemGrading();
     private final LessonHintPolicy hints = new LessonHintPolicy();
     private final PracticeReviewRule reviewRule = new PracticeReviewRule();
     private final WritingEvidenceRule writingEvidence = new WritingEvidenceRule();
     private final Clock clock = Clock.systemUTC();
 
+    @Autowired
     public SubmitPracticeAttemptUseCase(LearnerLock lock, PracticeAccess access, LearningContentClient content,
                                         PracticeAttemptRepository attempts, ReviewItemRepository reviews,
                                         KnowledgeEvidenceRepository evidence, PracticeProgress progress,
                                         FirstAttemptMistakes mistakes, WritingSubmissionRepository essays,
                                         QuestionEventLog questionEvents, MasteryProfileUpdater masteryProfiles,
                                         FreePracticeSubmission freePractice, GamificationRecorder gamificationRecorder,
-                                        HeartsService hearts, WritingCriterionReviews criterionReviews) {
+                                        HeartsService hearts, WritingCriterionReviews criterionReviews,
+                                        ErrorTrapEvidence errorTrapEvidence) {
         this.lock = lock;
         this.access = access;
         this.content = content;
@@ -95,6 +105,7 @@ public class SubmitPracticeAttemptUseCase {
         this.gamificationRecorder = gamificationRecorder;
         this.hearts = hearts;
         this.criterionReviews = criterionReviews;
+        this.errorTrapEvidence = errorTrapEvidence;
     }
 
     /** Wrong objective answers; essay items are graded by a tutor and never cost a heart. */
@@ -136,6 +147,11 @@ public class SubmitPracticeAttemptUseCase {
         Set<UUID> itemKps = new HashSet<>();
         Set<UUID> criterionOnly = new HashSet<>();
         List<FailedWritingCriterion> failedCriteria = new ArrayList<>();
+        ErrorTrapCatalog.ErrorTraps trapCatalog = errorTrapEvidence.loadIfNeeded(
+                graded.items().stream().anyMatch(item -> item.answerSpec().get("distractors") instanceof Map<?, ?>));
+        List<String> feedbackCodes = graded.errorCodes().stream().filter(Objects::nonNull).toList();
+        Map<String, com.ieltspath.learning.application.service.ErrorTypeTexts.Text> errorTexts =
+                feedbackCodes.isEmpty() ? Map.of() : errorTrapEvidence.errorTexts(feedbackCodes);
         Map<LearningSkill, List<PracticeReviewRule.ItemOutcome>> outcomesBySkill = new EnumMap<>(LearningSkill.class);
         for (int index = 0; index < graded.items().size(); index++) {
             var item = graded.items().get(index);
@@ -163,15 +179,21 @@ public class SubmitPracticeAttemptUseCase {
                     entry.getValue(), EvidenceSource.PRACTICE_SET,
                     LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), entry.getKey()))
                     .forQuestion(item.questionVersionId()));
+            if (counted) errorTrapEvidence.append(firstAnswers, criterionOnly,
+                    item.answerSpec(), grade.correct(), errorCode, item.questionVersionId(),
+                    kp -> LessonEvidenceReference.forPracticeSet(command.requestId(), item.questionVersionId(), kp),
+                    trapCatalog);
             events.add(QuestionAttemptEvent.of(userId, item.questionVersionId(), List.copyOf(kps), grade.correct(),
                     durations.get(item.questionVersionId()), errorCode,
                     QuestionEventSource.PRACTICE_SET, command.requestId(), counted));
             results.add(new PracticeSubmission.Answer(item.questionVersionId(), grade.correct(),
                     grade.correctAnswer(), item.explanation(),
-                    hints.afterAnswer(grade.correct(), item.answerSpec(), item.options(), item.hint())));
+                    hints.afterAnswer(grade.correct(), item.answerSpec(), item.options(), item.hint()),
+                    errorTrapEvidence.practiceFeedback(errorCode, errorTexts)));
         }
         criterionOnly.removeAll(itemKps);
         List<PracticeReviewCandidate> candidates = List.of();
+        List<PromotedReview> promoted = List.of();
         if (counted && !graded.passed()) {
             Set<UUID> kps = new HashSet<>();
             for (var item : outcomes) kps.addAll(item.knowledgePointIds());
@@ -180,26 +202,40 @@ public class SubmitPracticeAttemptUseCase {
             Map<UUID, Integer> availability = kps.isEmpty() ? Map.of() : content.practiceSetAvailability(
                     kps.stream().sorted(Comparator.comparing(UUID::toString)).toList(),
                     excluded.stream().sorted(Comparator.comparing(UUID::toString)).toList(), MIN_SET_QUESTIONS);
-            Set<UUID> pending = new HashSet<>();
-            reviews.findPending(userId).stream().filter(review -> review.blocking())
-                    .forEach(review -> pending.add(review.knowledgePointId()));
-            var needs = reviewNeeds(graded, outcomes, outcomesBySkill, pending, availability);
-            Set<UUID> wrongInLesson = needs.isEmpty() ? Set.of() : mistakes.of(userId, lesson);
+            Set<UUID> blockingKps = new HashSet<>();
+            Set<UUID> suggestionKps = new HashSet<>();
+            Set<UUID> otherOptionalKps = new HashSet<>();
+            for (PendingReview review : reviews.findPending(userId)) {
+                if (review.blocking()) blockingKps.add(review.knowledgePointId());
+                else if (SUGGESTION_TRIGGERS.contains(review.triggerKind())) suggestionKps.add(review.knowledgePointId());
+                else otherOptionalKps.add(review.knowledgePointId());
+            }
+            var needs = reviewNeeds(graded, outcomes, outcomesBySkill, blockingKps, availability);
+            // Weak again while the system's suggestion is still pending: that review now blocks.
+            Set<UUID> repeatKps = needs.stream().map(PracticeReviewRule.Need::knowledgePointId)
+                    .filter(suggestionKps::contains).collect(Collectors.toSet());
+            promoted = reviews.promoteSuggestionsToBlocking(userId, repeatKps);
+            // First weakness: a suggestion. A point holding a review the learner picked gets no second review.
+            var fresh = needs.stream().filter(need -> !suggestionKps.contains(need.knowledgePointId())
+                    && !otherOptionalKps.contains(need.knowledgePointId())).toList();
+            Set<UUID> wrongInLesson = fresh.isEmpty() ? Set.of() : mistakes.of(userId, lesson);
             Map<UUID, LearningSkill> kpSkills = new HashMap<>();
-            if (!needs.isEmpty()) evidence.findMasteryHistories(userId).stream().filter(history -> history.skill() != null)
+            if (!fresh.isEmpty()) evidence.findMasteryHistories(userId).stream().filter(history -> history.skill() != null)
                     .forEach(history -> kpSkills.put(history.knowledgePointId(), history.skill()));
-            candidates = needs.stream().map(need -> {
+            candidates = fresh.stream().map(need -> {
                 var start = ReviewRule.initialStage(need.kpPercent(), wrongInLesson.contains(need.knowledgePointId()));
                 return new PracticeReviewCandidate(UUID.randomUUID(), attempt.lessonId(), need.knowledgePointId(),
                         kpSkills.getOrDefault(need.knowledgePointId(), attempt.skill()), attempt.id(), need.kpPercent(),
-                        start.stage(), start.theoryReason());
+                        start.stage(), start.theoryReason(), false);
             }).toList();
         }
         String transcript = ItemGrading.orderedSections(version).stream().filter(section -> section.audio() != null)
                 .map(section -> section.audio().transcript()).findFirst().orElse(null);
-        List<PracticeSubmission.ReviewCreated> created = candidates.stream()
-                .map(candidate -> new PracticeSubmission.ReviewCreated(candidate.reviewId(),
-                        candidate.knowledgePointId(), candidate.stage().name())).toList();
+        List<PracticeSubmission.ReviewCreated> created = new ArrayList<>();
+        candidates.forEach(candidate -> created.add(new PracticeSubmission.ReviewCreated(candidate.reviewId(),
+                candidate.knowledgePointId(), candidate.stage().name(), false)));
+        promoted.forEach(review -> created.add(new PracticeSubmission.ReviewCreated(review.reviewId(),
+                review.knowledgePointId(), review.stage().name(), true)));
         // XP only for the first counted submission of a set, as evidence is.
         GamificationSummary xp = counted
                 ? gamificationRecorder.recordCorrectAnswers(userId, command.requestId(), graded.correctQuestionIds())
@@ -215,9 +251,8 @@ public class SubmitPracticeAttemptUseCase {
         questionEvents.append(events);
         evidence.append(userId, firstAnswers);
         masteryProfiles.recordEvidence(userId, firstAnswers, criterionOnly);
+        if (counted) errorTrapEvidence.createReviews(userId, attempt.lessonId(), firstAnswers);
         reviews.insertPracticePending(userId, candidates);
-        reviews.promoteToBlocking(userId, candidates.stream().map(PracticeReviewCandidate::knowledgePointId).toList(),
-                "PRACTICE");
         if (counted) criterionReviews.create(userId, attempt.lessonId(), failedCriteria);
         progress.refreshPassForLesson(userId, attempt.lessonId());
         return response;

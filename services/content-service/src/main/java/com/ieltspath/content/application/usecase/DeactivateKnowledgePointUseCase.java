@@ -2,6 +2,7 @@ package com.ieltspath.content.application.usecase;
 
 import com.ieltspath.content.domain.exception.KnowledgePointNotFoundException;
 import com.ieltspath.content.domain.repository.KnowledgePointRepository;
+import com.ieltspath.content.application.service.TrapKnowledgePointSync;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,9 +12,12 @@ import java.util.UUID;
 @Transactional
 public class DeactivateKnowledgePointUseCase {
     private final KnowledgePointRepository knowledgePointRepository;
+    private final TrapKnowledgePointSync trapKnowledgePointSync;
 
-    public DeactivateKnowledgePointUseCase(KnowledgePointRepository knowledgePointRepository) {
+    public DeactivateKnowledgePointUseCase(KnowledgePointRepository knowledgePointRepository,
+                                           TrapKnowledgePointSync trapKnowledgePointSync) {
         this.knowledgePointRepository = knowledgePointRepository;
+        this.trapKnowledgePointSync = trapKnowledgePointSync;
     }
 
     public void execute(UUID id) {
@@ -21,5 +25,6 @@ public class DeactivateKnowledgePointUseCase {
                 .orElseThrow(() -> new KnowledgePointNotFoundException(id));
         knowledgePoint.deactivate();
         knowledgePointRepository.save(knowledgePoint);
+        trapKnowledgePointSync.syncForKnowledgePoint(id);
     }
 }

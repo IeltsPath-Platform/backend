@@ -8,15 +8,18 @@ Both routes are under `/api/learning`, role `CUSTOMER`.
 
 ## `GET /tree?courseId=<uuid>`
 
-The learner's knowledge tree for one course: every KP with the learner's standing, what it builds on, and whether free practice
-is open on it.
+The learner's knowledge tree for one course: every KP with the learner's standing, what it builds on, whether free practice
+is open on it, and where it is taught (its chặng and lessons).
 
 ```json
 { "courseId": "…",
   "knowledgePoints": [{
     "knowledgePointId": "…", "code": "R60_TFNG_F_VS_NG", "name": "…", "skill": "READING", "kind": "STRATEGY",
     "cefrLevel": "B1", "canDo": "…", "mastery": 0.72, "tier": "CONSOLIDATE", "evidenceCount": 9, "nextReviewAt": "2026-10-25T00:00:00Z",
-    "prerequisiteIds": ["…"], "practiceAvailable": true }] }
+    "prerequisiteIds": ["…"], "practiceAvailable": true,
+    "topic": { "topicId": "…", "name": "Demo IELTS Reading", "position": 1 },
+    "lessons": [{ "lessonId": "…", "title": "Câu chủ đề nằm ở đâu", "position": 1,
+                  "topicId": "…", "topicName": "Demo IELTS Reading", "topicPosition": 1 }] }] }
 ```
 
 - `cefrLevel` (`A1` to `C2`) and `canDo` come from Content and are `null` when it has not set them.
@@ -27,8 +30,14 @@ is open on it.
   It is also an upper bound: it does not subtract sets the start route will skip (above the course band, needing a plan the
   learner lacks, or holding an essay). Treat `practiceAvailable: true` as "may be possible" and handle
   `409 FREE_PRACTICE_EXHAUSTED` from the start route.
-- The tree costs a fixed number of calls to Content (the tree and the prerequisites) and one query for the profiles, however
-  many points it has.
+- `topic` is the chặng that owns the KP (`null` only if Content names none). `topic.position` and `lessons[].topicPosition`
+  count the chặng from 1 inside its own skill, the number the course page shows ("Chặng 03"); `lessons[].position` counts the
+  lesson from 1 inside its chặng. `lessons` are the lessons of this course that teach the KP, in the order of their chặng and
+  then of the lesson, and are empty for a KP no lesson teaches. This says where a KP is taught; `prerequisiteIds` says only in
+  which order the points build on each other, and the two orders do not have to agree.
+- The tree costs a fixed number of calls to Content (the tree and the prerequisites), one more call per chặng of the course for
+  its lessons, and one query for the profiles, however many points it has. A chặng whose lessons cannot be read is left out of
+  `lessons`; the tree is still returned.
 - `404 NOT_FOUND` for an unknown course, `403 COURSE_NOT_OPEN` for a closed course, `403 COURSE_NOT_JOINED` when the learner is
   not taking it.
 
@@ -51,3 +60,14 @@ attempt submission route; that response carries the `gamification` block ([gamif
   FREE_PRACTICE_UNAVAILABLE` for a point with no skill to practise.
 - Its answers count as practice evidence for mastery (under `MP1`, with the practice weight and at most three practice
   answers in the mastery window), and they earn answer XP like any first submission.
+
+## Error-trap fields (2026-10-25)
+
+The learner tree lists only parent knowledge points at the top level. A parent may include `errorTraps`, containing its
+trap child KPs with at least one learner evidence row. Each child has `{knowledgePointId, code, name, tier, mastery,
+evidenceCount}`. Child points do not affect the tree's prerequisites or practice availability. Learner report uses the
+same nested shape. A report parent's `errors` contains only the main error code selected from its trap child mastery;
+the stored `top_error_codes` field remains available for staff statistics.
+
+Practice attempt results may include `error: {code, name, fixHint}` when an incorrect answer has a recognized active
+error type. Missing/unavailable error text omits the field and does not fail submission.

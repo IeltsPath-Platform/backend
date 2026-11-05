@@ -1,6 +1,9 @@
 package com.ieltspath.access.api.exception;
 
+import com.ieltspath.events.messaging.InvalidDeadLetterBatchException;
+import com.ieltspath.events.messaging.UnknownDeadLetterQueueException;
 import com.ieltspath.access.domain.exception.*;
+import com.ieltspath.access.application.exception.InvalidIdempotencyKeyException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +15,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
@@ -23,6 +27,15 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(UnknownDeadLetterQueueException.class)
+    public ResponseEntity<ErrorResponse> handleUnknownDeadLetterQueue(UnknownDeadLetterQueueException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(InvalidDeadLetterBatchException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidDeadLetterBatch(InvalidDeadLetterBatchException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
+    }
     @ExceptionHandler({
         PlanNotFoundException.class,
         KeyProductNotFoundException.class,
@@ -73,6 +86,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUnreadableRequest(HttpMessageNotReadableException ex,
                                                                    HttpServletRequest request) {
         return buildResponse(HttpStatus.BAD_REQUEST, "Malformed request body", request.getRequestURI(), null);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException ex,
+                                                              HttpServletRequest request) {
+        if (!"Idempotency-Key".equals(ex.getHeaderName())) {
+            return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
+        }
+        return ResponseEntity.badRequest().body(new ErrorResponse(LocalDateTime.now(), 400, "Bad Request",
+                "Idempotency-Key is required", request.getRequestURI(), null, "IDEMPOTENCY_KEY_REQUIRED"));
+    }
+
+    @ExceptionHandler(InvalidIdempotencyKeyException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidIdempotencyKey(InvalidIdempotencyKeyException ex,
+                                                                      HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(new ErrorResponse(LocalDateTime.now(), 400, "Bad Request",
+                ex.getMessage(), request.getRequestURI(), null, "IDEMPOTENCY_KEY_REQUIRED"));
     }
 
     @ExceptionHandler(PointsActorMismatchException.class)

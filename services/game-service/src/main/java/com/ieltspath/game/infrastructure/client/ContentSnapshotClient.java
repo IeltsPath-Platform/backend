@@ -1,6 +1,10 @@
 package com.ieltspath.game.infrastructure.client;
 
 import com.ieltspath.game.application.port.GameContentProvider;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.Authentication;
@@ -20,15 +24,29 @@ import java.util.UUID;
 public class ContentSnapshotClient implements GameContentProvider {
     private final RestClient contentClient;
     private final RestClient libraryClient;
+    private final ResilientCall resilientCall;
 
+    @Autowired
     public ContentSnapshotClient(RestClient.Builder builder,
                                  @Value("${game.content.base-url:http://localhost:8082}") String contentBaseUrl,
-                                 @Value("${game.library.base-url:http://localhost:8081}") String libraryBaseUrl) {
+                                 @Value("${game.library.base-url:http://localhost:8081}") String libraryBaseUrl,
+                                 ResilientCall resilientCall) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
         requestFactory.setReadTimeout(Duration.ofSeconds(5));
         this.contentClient = builder.clone().requestFactory(requestFactory).baseUrl(contentBaseUrl).build();
         this.libraryClient = builder.clone().requestFactory(requestFactory).baseUrl(libraryBaseUrl).build();
+        this.resilientCall = resilientCall;
+    }
+
+    ContentSnapshotClient(RestClient.Builder builder, String contentBaseUrl, String libraryBaseUrl) {
+        this(builder, contentBaseUrl, libraryBaseUrl, ResilientCall.isolatedDefault());
+    }
+
+    ContentSnapshotClient(RestClient contentClient, RestClient libraryClient) {
+        this.contentClient = contentClient;
+        this.libraryClient = libraryClient;
+        this.resilientCall = ResilientCall.isolatedDefault();
     }
 
     @Override
@@ -43,13 +61,20 @@ public class ContentSnapshotClient implements GameContentProvider {
             case "GRAMMAR" -> contentClient;
             default -> throw new IllegalArgumentException("Unsupported learningDomain: " + learningDomain);
         };
-        ContentSnapshotResponse response = target.post()
+        String targetName = "VOCABULARY".equals(learningDomain) ? "library" : "content";
+        ContentSnapshotResponse response;
+        try {
+            response = resilientCall.call(targetName, CallKind.READ, () -> target.post()
                 .uri("/internal/game-content/snapshots")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + jwtAuthenticationToken.getToken().getTokenValue())
                 .header("X-Correlation-Id", correlationId())
                 .body(new ContentSnapshotRequest(gameType, contentIds, learningDomain))
                 .retrieve()
-                .body(ContentSnapshotResponse.class);
+                .body(ContentSnapshotResponse.class));
+        } catch (DownstreamUnavailableException unavailable) {
+            throw new com.ieltspath.game.domain.exception.SoloGameplayException(503, "GAME_CONTENT_UNAVAILABLE",
+                    "Game content is temporarily unavailable");
+        }
         if (response == null || response.items() == null) return List.of();
         return response.items().stream().map(item -> new GameContentItem(item.canonicalId(),
                 item.vocabularySenseId(), item.questionVersionId(), item.prompt(), item.options(),

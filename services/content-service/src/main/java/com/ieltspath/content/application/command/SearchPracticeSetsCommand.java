@@ -12,5 +12,11 @@ public record SearchPracticeSetsCommand(
         List<UUID> excludePackageIds,
         Integer minQuestions,
         Integer limit,
-        UUID preferredLessonId
-) {}
+        UUID preferredLessonId,
+        String trapErrorCode
+) {
+    public SearchPracticeSetsCommand(UUID knowledgePointId, List<UUID> excludePackageIds, Integer minQuestions,
+                                     Integer limit, UUID preferredLessonId) {
+        this(knowledgePointId, excludePackageIds, minQuestions, limit, preferredLessonId, null);
+    }
+}

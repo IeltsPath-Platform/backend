@@ -1,5 +1,8 @@
 package com.ieltspath.user.application.usecase;
 
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.ieltspath.user.domain.exception.InvalidUserStatusException;
 import com.ieltspath.user.application.command.ChangeUserStatusCommand;
 import com.ieltspath.user.domain.aggregate.User;
 import com.ieltspath.user.domain.repository.UserRepository;
@@ -41,5 +44,13 @@ class ChangeUserStatusUseCaseTest {
         User updated = useCase.execute(new ChangeUserStatusCommand(userId, UserStatus.LOCKED, UUID.randomUUID()));
 
         assertThat(updated.getStatus()).isEqualTo(UserStatus.LOCKED);
+    }
+
+    @Test
+    void rejectsAMissingStatusBeforeAnyLookup() {
+        assertThatThrownBy(() -> useCase.execute(new ChangeUserStatusCommand(UUID.randomUUID(), null, UUID.randomUUID())))
+                .isInstanceOf(InvalidUserStatusException.class)
+                .hasMessage("Trạng thái người dùng không được để trống");
+        verifyNoInteractions(userRepository);
     }
 }

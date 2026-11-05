@@ -52,6 +52,7 @@ class CourseCoverageAnalyzerTest {
     private final Set<String> takenPackage = new HashSet<>();
     private final Set<Integer> takenSort = new HashSet<>();
     private boolean bandTaken;
+    private final Set<UUID> ownedQuestions = new HashSet<>();
 
     {
         for (UUID id : List.of(kpA, kpB, kpC)) {
@@ -62,7 +63,7 @@ class CourseCoverageAnalyzerTest {
 
     private CourseCatalogFacts facts() {
         return new CourseCatalogFacts(points, expected, prerequisites, lowerBand, packages, milestoneElsewhere, sets,
-                noQuestions, refs, takenCourse, takenTopic, takenLesson, takenPackage, bandTaken, takenSort);
+                noQuestions, refs, takenCourse, takenTopic, takenLesson, takenPackage, bandTaken, takenSort, ownedQuestions);
     }
 
     private static LessonPlan lesson(String code, UUID... kps) {
@@ -174,6 +175,37 @@ class CourseCoverageAnalyzerTest {
 
         assertEquals(List.of(new Issue("KNOWLEDGE_POINT_UNKNOWN", unknown.toString(), null),
                 new Issue("KNOWLEDGE_POINT_INACTIVE", kpC.toString(), null)), result.errors());
+    }
+
+    @Test
+    void aQuestionThatBelongsToALessonOrAPackageAlreadyIsAnError() {
+        UUID owned = UUID.randomUUID();
+        refs.put("owned-ref", owned);
+        refs.put("free-ref", UUID.randomUUID());
+        ownedQuestions.add(owned);
+        LessonPlan withExercises = new LessonPlan("L1", "L", null, List.of(kpA), List.of(
+                new BlockPlan(BlockType.EXERCISE, null, List.of(), List.of("owned-ref", "free-ref")),
+                new BlockPlan(BlockType.EXERCISE, null, List.of(), List.of("owned-ref"))), List.of());
+
+        CourseDraftAnalysis result = analyzer.analyze(draft(withExercises), facts());
+
+        assertEquals(List.of(new Issue("QUESTION_ALREADY_OWNED", "owned-ref", null)), result.errors());
+    }
+
+    @Test
+    void aQuestionUsedInTwoBlocksOfTheDraftIsAnErrorOncePerQuestion() {
+        UUID shared = UUID.randomUUID();
+        refs.put("first", shared);
+        refs.put("same-question", shared);
+        refs.put("other", UUID.randomUUID());
+        LessonPlan one = new LessonPlan("L1", "L", null, List.of(kpA), List.of(
+                new BlockPlan(BlockType.EXERCISE, null, List.of(), List.of("first", "other"))), List.of());
+        LessonPlan two = new LessonPlan("L2", "L", null, List.of(kpB), List.of(
+                new BlockPlan(BlockType.EXERCISE, null, List.of(), List.of("same-question", "same-question"))), List.of());
+
+        CourseDraftAnalysis result = analyzer.analyze(draft(one, two), facts());
+
+        assertEquals(List.of(new Issue("QUESTION_REUSED", "same-question", null)), result.errors());
     }
 
     @Test

@@ -27,6 +27,8 @@ import com.ieltspath.content.infrastructure.persistence.adapter.JdbcCourseCatalo
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcLearningContentReader;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcPracticeTestMilestoneRepository;
 import com.ieltspath.content.infrastructure.persistence.adapter.LessonAuthoringRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.adapter.LessonResourceRepositoryAdapter;
+import com.ieltspath.content.infrastructure.persistence.mapper.LessonResourcePersistenceMapperImpl;
 import com.ieltspath.content.infrastructure.persistence.adapter.TopicRepositoryAdapter;
 import com.ieltspath.content.infrastructure.persistence.mapper.ContentPackagePersistenceMapper;
 import com.ieltspath.content.infrastructure.persistence.mapper.CoursePersistenceMapperImpl;
@@ -74,7 +76,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         LessonAuthoringRepositoryAdapter.class, ContentPackageRepositoryAdapter.class,
         ContentPackagePersistenceMapper.class, CreateContentPackageUseCase.class,
         CreateDraftPackageVersionUseCase.class, JdbcLearningContentReader.class,
-        JdbcPracticeTestMilestoneRepository.class, CourseMaterializer.class, AiCourseDraftIntegrationTest.Beans.class})
+        JdbcPracticeTestMilestoneRepository.class, CreateLessonResourceUseCase.class,
+        LessonResourceRepositoryAdapter.class, LessonResourcePersistenceMapperImpl.class, CourseMaterializer.class, AiCourseDraftIntegrationTest.Beans.class})
 @Testcontainers(disabledWithoutDocker = true)
 class AiCourseDraftIntegrationTest {
 
@@ -84,7 +87,12 @@ class AiCourseDraftIntegrationTest {
     @TestConfiguration
     static class Beans {
         @Bean ObjectMapper objectMapper() { return new ObjectMapper(); }
+        /** These tests only create link resources, so the document storage is never reached. */
+        @Bean com.ieltspath.content.application.port.LessonDocumentFiles documentFiles() {
+            return org.mockito.Mockito.mock(com.ieltspath.content.application.port.LessonDocumentFiles.class);
+        }
         @Bean VocabularySenseLookup senses() { return ids -> Set.copyOf(ids); }
+        @Bean com.ieltspath.content.application.port.VocabularySenseWriter words() { return words -> java.util.Map.of(); }
         @Bean ContentGenerationPort model() {
             return prompt -> new GenerationReply(REPLY.get().apply(prompt), "stand-in-model");
         }
@@ -101,7 +109,7 @@ class AiCourseDraftIntegrationTest {
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
     }
 
-    private static final BigDecimal BAND = new BigDecimal("8.0"); // CEFR C2
+    private static final BigDecimal BAND = new BigDecimal("9.0"); // CEFR C2, a band no seeded course uses
 
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
@@ -151,8 +159,17 @@ class AiCourseDraftIntegrationTest {
         UUID section = UUID.randomUUID();
         jdbc.update("INSERT INTO content_sections(id,package_version_id,title,sort_order) VALUES(?,?,'S',1)",
                 section, setVersion);
+        // The set holds a question of its own: the exercise question above belongs to no package.
+        UUID setQuestion = UUID.randomUUID();
+        jdbc.update("INSERT INTO questions(id,question_type,skill,purpose,status) "
+                + "VALUES(?,'MULTIPLE_CHOICE','READING','LEARNING','PUBLISHED')", setQuestion);
+        UUID setQuestionVersion = UUID.randomUUID();
+        jdbc.update("INSERT INTO question_versions(id,question_id,version_number,stem,status) "
+                + "VALUES(?,?,1,'Set stem','PUBLISHED')", setQuestionVersion, setQuestion);
+        jdbc.update("INSERT INTO question_knowledge_points(question_version_id,knowledge_point_id) VALUES(?,?)",
+                setQuestionVersion, kpFoundation);
         jdbc.update("INSERT INTO section_questions(section_id,question_version_id,sort_order) VALUES(?,?,1)",
-                section, version);
+                section, setQuestionVersion);
         jdbc.update("UPDATE content_packages SET status='PUBLISHED', current_published_version_id=? WHERE id=?",
                 setVersion, practiceSet);
 
@@ -184,7 +201,7 @@ class AiCourseDraftIntegrationTest {
 
         assertThat(draft.getStatus()).isEqualTo(DraftStatus.READY);
         assertThat(draft.getModel()).isEqualTo("stand-in-model");
-        assertThat(draft.getPromptVersion()).isEqualTo("COURSE-v1");
+        assertThat(draft.getPromptVersion()).isEqualTo("COURSE-v4");
         JsonNode result = json.readTree(draft.getResultJson());
         JsonNode lessons = result.path("topics").get(0).path("lessons");
         assertThat(lessons).hasSize(2);

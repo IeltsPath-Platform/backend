@@ -8,6 +8,7 @@ import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.PendingReview;
 import com.ieltspath.learning.domain.vo.PracticeReviewCandidate;
 import com.ieltspath.learning.domain.vo.PracticeReviewState;
+import com.ieltspath.learning.domain.vo.PromotedReview;
 import com.ieltspath.learning.domain.vo.ReviewListEntry;
 import com.ieltspath.learning.domain.vo.ReviewStage;
 import com.ieltspath.learning.domain.vo.ReviewStatus;
@@ -65,12 +66,13 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
     public List<PracticeReviewState> findPracticeByLessons(UUID userId, Collection<UUID> lessonIds) {
         if (lessonIds.isEmpty()) return List.of();
         return jdbc.query("""
-                SELECT lesson_id, knowledge_point_id, status, skill FROM review_items
+                SELECT lesson_id, knowledge_point_id, status, skill, blocking FROM review_items
                 WHERE user_id = :userId AND lesson_id IN (:lessonIds) AND trigger_kind = 'PRACTICE'
                 """, Map.of("userId", userId, "lessonIds", lessonIds), (row, index) ->
                 new PracticeReviewState(row.getObject("lesson_id", UUID.class),
                         row.getObject("knowledge_point_id", UUID.class),
-                        ReviewStatus.valueOf(row.getString("status")), skill(row.getString("skill"))));
+                        ReviewStatus.valueOf(row.getString("status")), skill(row.getString("skill")),
+                        row.getBoolean("blocking")));
     }
 
     @Override
@@ -92,7 +94,7 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
             if (status == ReviewStatus.PENDING) pending.add(new PendingReview(row.getObject("id", UUID.class),
                     lessonId, kpId, skill, row.getBoolean("blocking"), row.getString("trigger_kind")));
             if ("PRACTICE".equals(row.getString("trigger_kind")) && lessonIds.contains(lessonId)) {
-                practice.add(new PracticeReviewState(lessonId, kpId, status, skill));
+                practice.add(new PracticeReviewState(lessonId, kpId, status, skill, row.getBoolean("blocking")));
             }
         });
         return new TopicReviewSnapshot(List.copyOf(pending), List.copyOf(practice));
@@ -107,8 +109,8 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         if (candidates.isEmpty()) return;
         jdbc.getJdbcOperations().batchUpdate("""
                 INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill,
-                                          trigger_kind, source_attempt_id, stage, theory_reason)
-                VALUES (?, ?, ?, ?, 'PENDING', ?, 'PRACTICE', ?, ?, ?)
+                                          trigger_kind, source_attempt_id, stage, theory_reason, blocking)
+                VALUES (?, ?, ?, ?, 'PENDING', ?, 'PRACTICE', ?, ?, ?, ?)
                 ON CONFLICT (user_id, knowledge_point_id) WHERE status = 'PENDING' DO NOTHING
                 """, candidates, candidates.size(), (statement, review) -> {
             statement.setObject(1, review.reviewId());
@@ -119,6 +121,7 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
             statement.setObject(6, review.sourceAttemptId());
             statement.setString(7, review.stage().name());
             statement.setString(8, review.theoryReason() == null ? null : review.theoryReason().name());
+            statement.setBoolean(9, review.blocking());
         });
     }
 
@@ -189,6 +192,19 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
     }
 
     @Override
+    public List<PromotedReview> promoteSuggestionsToBlocking(UUID userId, Collection<UUID> knowledgePointIds) {
+        if (knowledgePointIds.isEmpty()) return List.of();
+        return jdbc.query("""
+                UPDATE review_items SET blocking = TRUE
+                WHERE user_id = :userId AND status = 'PENDING' AND blocking = FALSE
+                  AND trigger_kind IN ('PRACTICE', 'ERROR_PATTERN') AND knowledge_point_id IN (:kpIds)
+                RETURNING id, knowledge_point_id, stage
+                """, Map.of("userId", userId, "kpIds", knowledgePointIds), (row, index) -> new PromotedReview(
+                row.getObject("id", UUID.class), row.getObject("knowledge_point_id", UUID.class),
+                ReviewStage.valueOf(row.getString("stage"))));
+    }
+
+    @Override
     public boolean insertOptional(UUID userId, UUID reviewId, UUID knowledgePointId, UUID lessonId,
                                   LearningSkill skill, String triggerKind) {
         Map<String, Object> params = new HashMap<>();
@@ -226,9 +242,10 @@ public class JdbcReviewItemRepository implements ReviewItemRepository {
         state.put("stage", review.stage().name());
         state.put("reason", review.theoryReason() == null ? null : review.theoryReason().name());
         state.put("theoryCount", review.theoryCompletedCount());
+        state.put("blocking", review.blocking());
         jdbc.update("""
                 UPDATE review_items SET status = :status, stage = :stage, theory_reason = :reason,
-                theory_completed_count = :theoryCount,
+                theory_completed_count = :theoryCount, blocking = :blocking,
                 done_at = CASE WHEN :status = 'PENDING' THEN NULL ELSE clock_timestamp() END
                 WHERE id = :reviewId AND status = 'PENDING'
                 """, state);

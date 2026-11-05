@@ -3,6 +3,8 @@ package com.ieltspath.content.infrastructure.persistence;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.content.application.port.WritingTaskReader;
+import com.ieltspath.content.application.usecase.GetWritingTaskUseCase;
+import com.ieltspath.content.domain.vo.MediaReferencePolicy;
 import com.ieltspath.content.infrastructure.persistence.adapter.JdbcWritingTaskReader;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
@@ -77,9 +79,15 @@ class JdbcWritingTaskReaderTest {
         assertThat(task.timeLimitSeconds()).isEqualTo(1200);
         assertThat(task.stem()).contains("line graph");
         assertThat(task.images()).singleElement().satisfies(image -> {
-            assertThat(image.mediaReference()).startsWith("data:image/svg+xml;base64,");
+            assertThat(image.mediaReference()).isEqualTo("writing/charts/2e000000-0000-4000-8000-010000003001.webp");
             assertThat(image.altText()).contains("Line graph");
         });
+        UUID version = sql.queryForObject("SELECT current_published_version_id FROM content_packages WHERE code = ?", UUID.class, "PT-WRITING-01");
+        UUID section = sql.queryForObject("SELECT id FROM content_sections WHERE package_version_id = ? AND part_no = 1", UUID.class, version);
+        var response = new GetWritingTaskUseCase(reader,
+                new MediaReferencePolicy("https://media.example.test/ieltspath")).execute(version, section);
+        assertThat(response.images()).singleElement().satisfies(image ->
+                assertThat(image.url()).isEqualTo("https://media.example.test/ieltspath/writing/charts/2e000000-0000-4000-8000-010000003001.webp"));
         assertThat(task.guide()).contains("## 1. Giải thích đề");
         JsonNode steps = JSON.readTree(task.guideSteps());
         assertThat(steps).hasSize(6);
@@ -115,6 +123,48 @@ class JdbcWritingTaskReaderTest {
                       <> CASE WHEN s.part_no = 1 THEN 1 ELSE 0 END
                 """, String.class);
         assertThat(wrong).isEmpty();
+    }
+
+    @Test
+    void aPromptWithOnlyThePlaceholderHasNoSample() {
+        sql.update("""
+                UPDATE question_versions SET explanation = 'Graded by the essay grader.'
+                WHERE id = (SELECT sq.question_version_id FROM content_packages p
+                            JOIN content_sections s ON s.package_version_id = p.current_published_version_id AND s.part_no = 1
+                            JOIN section_questions sq ON sq.section_id = s.id WHERE p.code = 'PT-WRITING-01')
+                """);
+
+        assertThat(task("PT-WRITING-01", 1).sampleAnswer()).isNull();
+    }
+
+    @Test
+    void everyWritingPromptHasAModelAnswerOfFourPartsLongerThanItsMinimum() {
+        var word = java.util.regex.Pattern.compile("[\\p{L}\\p{N}]+(?:['’-][\\p{L}\\p{N}]+)*");
+        int checked = 0;
+        for (String code : sql.queryForList("SELECT code FROM content_packages WHERE code LIKE 'PT-WRITING-%' ORDER BY code", String.class)) {
+            for (int part : new int[] {1, 2}) {
+                var task = task(code, part);
+                String sample = task.sampleAnswer();
+                assertThat(sample).as("%s part %d has a model answer", code, part).isNotBlank();
+                assertThat(sample.split("\\n\\s*\\n")).as("%s part %d paragraphs", code, part).hasSize(4);
+                int words = (int) word.matcher(sample.replace("**", "")).results().count();
+                assertThat(words).as("%s part %d words", code, part).isGreaterThanOrEqualTo(task.minWords());
+                checked++;
+            }
+        }
+        assertThat(checked).isEqualTo(24);
+    }
+
+    @Test
+    void aModelAnswerStoredWithThePromptIsTheSample() {
+        sql.update("""
+                UPDATE question_versions SET explanation = ?
+                WHERE id = (SELECT sq.question_version_id FROM content_packages p
+                            JOIN content_sections s ON s.package_version_id = p.current_published_version_id AND s.part_no = 1
+                            JOIN section_questions sq ON sq.section_id = s.id WHERE p.code = 'PT-WRITING-01')
+                """, "The line graph shows **visits**.\n\nOverall, visits rose.");
+
+        assertThat(task("PT-WRITING-01", 1).sampleAnswer()).isEqualTo("The line graph shows **visits**.\n\nOverall, visits rose.");
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.ieltspath.library.infrastructure.persistence;
 
 import com.ieltspath.library.application.port.FlashcardImageStorage;
+import com.ieltspath.library.application.port.PronunciationAudioUrls;
 import com.ieltspath.library.application.result.SavedFlashcard;
 import com.ieltspath.library.application.usecase.SavePracticeQuestionFlashcardUseCase;
 import com.ieltspath.library.application.usecase.ReviewFlashcardUseCase;
@@ -12,6 +13,7 @@ import com.ieltspath.library.domain.vo.FlashcardSourceType;
 import com.ieltspath.library.domain.vo.LibraryStatus;
 import com.ieltspath.library.domain.vo.OwnedPage;
 import com.ieltspath.library.infrastructure.adapter.FlashcardRepositoryAdapter;
+import com.ieltspath.library.infrastructure.adapter.FlashcardReviewEventJdbcAdapter;
 import com.ieltspath.library.infrastructure.adapter.FlashcardVocabularyMetadataAdapter;
 import com.ieltspath.library.infrastructure.persistence.mapper.FlashcardMapperImpl;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -44,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DataJpaTest
 @Testcontainers(disabledWithoutDocker = true)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({FlashcardRepositoryAdapter.class, FlashcardVocabularyMetadataAdapter.class, FlashcardMapperImpl.class,
+@Import({FlashcardRepositoryAdapter.class, FlashcardReviewEventJdbcAdapter.class, FlashcardVocabularyMetadataAdapter.class, FlashcardMapperImpl.class,
         SavePracticeQuestionFlashcardUseCase.class, ReviewFlashcardUseCase.class, FlashcardSrsProperties.class})
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -64,6 +67,10 @@ class PracticeQuestionFlashcardPersistenceTest {
     private SavePracticeQuestionFlashcardUseCase savePracticeQuestion;
     @Autowired
     private ReviewFlashcardUseCase reviewFlashcard;
+    @Autowired
+    private JdbcTemplate jdbc;
+    @MockBean
+    private PronunciationAudioUrls pronunciationAudioUrls;
     @MockBean
     private FlashcardImageStorage storage;
 
@@ -109,6 +116,8 @@ class PracticeQuestionFlashcardPersistenceTest {
         assertEquals(1, replay.reviewCount());
         assertEquals(2, persisted.getLeitnerBox());
         assertEquals(1, persisted.getReviewCount());
+        assertEquals(1, jdbc.queryForObject("select count(*) from flashcard_review_events where user_id=? and flashcard_id=?",
+                Integer.class, userId, stored.getId()));
     }
 
     @Test

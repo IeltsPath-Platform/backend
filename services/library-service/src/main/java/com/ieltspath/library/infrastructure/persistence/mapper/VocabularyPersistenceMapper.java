@@ -26,6 +26,8 @@ public class VocabularyPersistenceMapper {
                 entity.getNormalizedLemma(),
                 entity.getIpa(),
                 entity.getPronunciationAudioReference(),
+                entity.getAudioUkReference(),
+                entity.getAudioUsReference(),
                 entity.getStatus(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
@@ -47,6 +49,8 @@ public class VocabularyPersistenceMapper {
                 .normalizedLemma(domain.getNormalizedLemma())
                 .ipa(domain.getIpa())
                 .pronunciationAudioReference(domain.getPronunciationAudioReference())
+                .audioUkReference(domain.getAudioUkReference())
+                .audioUsReference(domain.getAudioUsReference())
                 .status(domain.getStatus())
                 .createdAt(domain.getCreatedAt())
                 .updatedAt(domain.getUpdatedAt())

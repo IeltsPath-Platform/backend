@@ -10,6 +10,7 @@ import com.ieltspath.content.domain.vo.CourseDraftStructure.BlockPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.CourseInfo;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.FinalTestPlan;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.LessonPlan;
+import com.ieltspath.content.domain.vo.CourseDraftStructure.NewWord;
 import com.ieltspath.content.domain.vo.CourseDraftStructure.TopicPlan;
 import com.ieltspath.content.domain.vo.Skill;
 import org.springframework.stereotype.Component;
@@ -35,6 +36,9 @@ public class CourseDraftValidator {
     public static final String DUPLICATE_REFERENCE = "DUPLICATE_REFERENCE";
     public static final String EMPTY_LESSON_DROPPED = "EMPTY_LESSON_DROPPED";
     public static final String EMPTY_TOPIC_DROPPED = "EMPTY_TOPIC_DROPPED";
+    public static final String VOCABULARY_INVALID = "VOCABULARY_INVALID";
+    /** Words proposed for one lesson beyond this are left out. */
+    static final int MAX_WORDS_PER_LESSON = 8;
 
     /** {@code subject} is the offending reference as the model wrote it, or the code of the dropped lesson or topic. */
     public record Warning(String code, String subject) {
@@ -66,6 +70,7 @@ public class CourseDraftValidator {
         Set<UUID> usedSets = new HashSet<>();
         Set<UUID> usedQuestions = new HashSet<>();
         Set<String> usedCodes = new HashSet<>();
+        Set<String> usedLemmas = new HashSet<>();
 
         List<TopicPlan> topics = new ArrayList<>();
         for (JsonNode topicNode : reply.path("topics")) {
@@ -83,7 +88,8 @@ public class CourseDraftValidator {
                         null, List.of(), questions.stream().map(UUID::toString).toList()));
                 lessons.add(new LessonPlan(unique(code(lessonNode.path("code"), "LESSON_" + (lessons.size() + 1)),
                         usedCodes), text(lessonNode.path("title"), 255, "Lesson"), summary(lessonNode.path("summary")),
-                        points, blocks, sets));
+                        points, blocks, sets, outline(lessonNode.path("summaryMarkdown")), minutes(lessonNode.path("estimatedMinutes")),
+                        List.of(), List.of(), words(lessonNode.path("vocabulary"), usedLemmas, warnings)));
             }
             if (lessons.isEmpty()) {
                 warnings.add(new Warning(EMPTY_TOPIC_DROPPED, text(topicNode.path("code"), 100)));
@@ -107,6 +113,36 @@ public class CourseDraftValidator {
         FinalTestPlan courseTest = finalTest(reply.path("courseTest"), courseCode + "_TEST", course.name()
                 + " - final test", usedCodes);
         return new Built(new CourseDraftStructure(course, topics, courseTest, List.of(), List.of()), warnings);
+    }
+
+    /**
+     * The words the model proposed for a lesson. A word with a part of speech the library does not have, or without a
+     * meaning or an example, is dropped with a warning; so is a lemma already proposed for another lesson.
+     */
+    private static List<NewWord> words(JsonNode nodes, Set<String> usedLemmas, List<Warning> warnings) {
+        List<NewWord> words = new ArrayList<>();
+        for (JsonNode node : nodes) {
+            if (words.size() == MAX_WORDS_PER_LESSON) break;
+            String lemma = text(node.path("lemma"), CourseDraftCodec.MAX_LEMMA);
+            String part = node.path("partOfSpeech").asText("").trim().toUpperCase(Locale.ROOT).replaceAll("[ -]+", "_");
+            String meaning = text(node.path("vietnameseMeaning"), CourseDraftCodec.MAX_WORD_TEXT);
+            String example = text(node.path("exampleSentence"), CourseDraftCodec.MAX_WORD_TEXT);
+            if (lemma.isEmpty() || !CourseDraftCodec.PARTS_OF_SPEECH.contains(part) || meaning.isEmpty()
+                    || example.isEmpty() || !CourseDraftCodec.LEMMA.matcher(lemma).matches()) {
+                warnings.add(new Warning(VOCABULARY_INVALID, lemma.isEmpty() ? text(node, 100) : lemma));
+            } else if (!usedLemmas.add(lemma.toLowerCase(Locale.ROOT))) {
+                warnings.add(new Warning(DUPLICATE_REFERENCE, lemma));
+            } else {
+                words.add(new NewWord(lemma, optional(node.path("ipa"), CourseDraftCodec.MAX_LEMMA), part,
+                        optional(node.path("englishDefinition"), CourseDraftCodec.MAX_WORD_TEXT), meaning, example));
+            }
+        }
+        return words;
+    }
+
+    private static String optional(JsonNode node, int max) {
+        String value = text(node, max);
+        return value.isEmpty() ? null : value;
     }
 
     /** Each name in the list is resolved against the candidates; unknown ones and repeats are dropped with a warning. */
@@ -167,6 +203,19 @@ public class CourseDraftValidator {
     private static String text(JsonNode node, int max) {
         String value = node.asText("").replaceAll("\\s+", " ").trim();
         return value.length() > max ? value.substring(0, max) : value;
+    }
+
+    /** A short outline the model wrote from the knowledge points of the lesson; kept within a sensible length. */
+    private static String outline(JsonNode node) {
+        String value = node.asText("").trim();
+        return value.isEmpty() ? null : value.length() > 3000 ? value.substring(0, 3000) : value;
+    }
+
+    /** Minutes the model estimated; anything outside 1 to 240 is ignored rather than trusted. */
+    private static Integer minutes(JsonNode node) {
+        if (!node.isNumber()) return null;
+        int value = node.asInt();
+        return value >= 1 && value <= 240 ? value : null;
     }
 
     private static String summary(JsonNode node) {

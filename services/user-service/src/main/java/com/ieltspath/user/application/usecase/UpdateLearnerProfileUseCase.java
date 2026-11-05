@@ -1,50 +1,38 @@
 package com.ieltspath.user.application.usecase;
 
 import com.ieltspath.user.application.command.UpdateLearnerProfileCommand;
+import com.ieltspath.user.application.port.UserLock;
 import com.ieltspath.user.application.result.LearnerProfileResult;
 import com.ieltspath.user.domain.aggregate.LearnerProfile;
 import com.ieltspath.user.domain.exception.UserNotFoundException;
 import com.ieltspath.user.domain.repository.LearnerProfileRepository;
-import com.ieltspath.user.domain.repository.LearningGoalRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.vo.ProfileVisibility;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.Objects;
-
+/** Edits the text fields of a profile. The avatar is left as it is: it changes only through upload and delete. */
 @Service
 @RequiredArgsConstructor
 public class UpdateLearnerProfileUseCase {
     private final LearnerProfileRepository learnerProfileRepository;
     private final UserRepository userRepository;
-    private final LearningGoalRepository learningGoalRepository;
-    private final ScheduleStudyGoalUseCase studyGoals;
+    private final UserLock userLock;
 
     @Transactional
     public LearnerProfileResult execute(UpdateLearnerProfileCommand command) {
-        studyGoals.lock(command.userId());
+        userLock.lock(command.userId());
         LearnerProfile profile = learnerProfileRepository.findByUserId(command.userId())
                 .orElseGet(() -> {
                     if (userRepository.findById(command.userId()).isEmpty()) {
                         throw new UserNotFoundException("Không tìm thấy người dùng với id: " + command.userId());
                     }
-                    return LearnerProfile.builder()
-                            .userId(command.userId())
-                            .displayName(command.displayName())
-                            .timezone("Asia/Ho_Chi_Minh")
-                            .visibility(ProfileVisibility.PUBLIC)
-                            .createdAt(LocalDateTime.now())
-                            .updatedAt(LocalDateTime.now())
-                            .build();
+                    return LearnerProfile.createDefault(command.userId(), command.displayName());
                 });
 
-        String previousTimezone = profile.getTimezone();
         profile.updateDetails(
                 command.displayName(),
-                command.avatarReference(),
                 command.bio(),
                 command.selfReportedBand(),
                 command.timezone()
@@ -55,9 +43,6 @@ public class UpdateLearnerProfileUseCase {
         }
 
         LearnerProfile saved = learnerProfileRepository.save(profile);
-        if (!Objects.equals(previousTimezone, saved.getTimezone())) {
-            learningGoalRepository.findActiveByUserId(command.userId()).ifPresent(studyGoals::execute);
-        }
         return toResult(saved);
     }
 

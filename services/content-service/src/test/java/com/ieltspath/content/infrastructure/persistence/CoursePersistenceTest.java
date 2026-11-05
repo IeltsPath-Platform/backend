@@ -12,6 +12,8 @@ import org.mapstruct.factory.Mappers;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
+import com.ieltspath.content.domain.vo.Skill;
 import java.sql.SQLException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,7 +29,8 @@ class CoursePersistenceTest {
 
     @Test
     void concurrentCodeOrBandConflictsBecomeCourseConflicts() {
-        Course course = Course.create("IELTS", "IELTS", new BigDecimal("5.5"));
+        Course course = Course.create("IELTS", "IELTS", new BigDecimal("5.5"),
+                "https://images.example/ielts.jpg", "Course description");
         for (String constraint : List.of("courses_code_key", "courses_band_level_key")) {
             var jpa = mock(CourseJpaRepository.class);
             when(jpa.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("Duplicate course",
@@ -51,9 +54,18 @@ class CoursePersistenceTest {
 
     @Test
     void courseFieldsRoundTripThroughTheJpaMapper() {
-        Course course = Course.create("IELTS", "IELTS", new BigDecimal("5.5"));
+        Course course = Course.create("IELTS", "IELTS", new BigDecimal("5.5"),
+                "https://images.example/ielts.jpg", "Course description");
         Course restored = mapper.toDomain(mapper.toEntity(course));
         assertThat(restored).usingRecursiveComparison().isEqualTo(course);
+    }
+
+    @Test
+    void courseSkillPricesRoundTripThroughTheJpaMapper() {
+        Course course = Course.create("PRICED", "Priced", new BigDecimal("5.5"), null, null,
+                Map.of(Skill.READING, 120, Skill.WRITING, 150), 250);
+
+        assertThat(mapper.toDomain(mapper.toEntity(course))).usingRecursiveComparison().isEqualTo(course);
     }
 
     @Test
@@ -70,7 +82,7 @@ class CoursePersistenceTest {
 
     @Test
     void topicCourseMembershipRoundTripsWithoutChangingBandMetadata() {
-        Topic topic = Topic.create(null, "TOPIC", "Topic", 1);
+        Topic topic = Topic.create(null, "TOPIC", "Topic", 1, null, null, "Topic description");
         topic.assignCourse(UUID.randomUUID());
         var topicMapper = new TopicPersistenceMapper();
         assertThat(topicMapper.toDomain(topicMapper.toEntity(topic))).usingRecursiveComparison().isEqualTo(topic);

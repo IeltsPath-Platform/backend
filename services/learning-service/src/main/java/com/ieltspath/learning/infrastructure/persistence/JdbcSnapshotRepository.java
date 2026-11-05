@@ -74,7 +74,8 @@ public class JdbcSnapshotRepository implements SnapshotRepository {
         if (userIds.isEmpty()) return result;
         named.query("""
                 SELECT user_id, knowledge_point_id, tier, mastery, evidence_count
-                FROM kp_mastery_profiles WHERE user_id IN (:ids)
+                FROM kp_mastery_profiles m JOIN knowledge_point_catalog c ON c.kp_id = m.knowledge_point_id
+                WHERE user_id IN (:ids) AND c.parent_kp_id IS NULL
                 """, new MapSqlParameterSource("ids", userIds), rows -> {
             result.computeIfAbsent(rows.getObject("user_id", UUID.class), key -> new ArrayList<>())
                     .add(new ProfileRow(rows.getObject("knowledge_point_id", UUID.class),

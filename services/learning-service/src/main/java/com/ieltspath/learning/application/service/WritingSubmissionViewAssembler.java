@@ -27,6 +27,11 @@ public class WritingSubmissionViewAssembler {
                     submission.overallBand(), submission.passed(), submission.grade(), submission.pointCost(),
                     showSample ? submission.prompt().sampleAnswer() : null, null, null, submission.essayText());
         }
+        if (submission.status() == WritingSubmissionStatus.AWAITING_EXAMINER) {
+            // No grade lives here: the examiner's review is read from Assessment (GET .../human-review).
+            return new WritingSubmissionResult(submission.id(), status, task, submission.wordCount(), null, null, null,
+                    null, null, null, null, submission.essayText());
+        }
         if (submission.status() == WritingSubmissionStatus.PAYMENT_PENDING) {
             return new WritingSubmissionResult(submission.id(), status, task, null, null, null, null,
                     null, null, submission.failureCode(), null);

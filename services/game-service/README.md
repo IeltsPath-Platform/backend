@@ -36,6 +36,11 @@ a match (at most one OPEN per match; indexes for the deadline and opening worker
 per player per round, a miss included; composite foreign keys keep answers inside their own match and request ids are
 unique per player. Player totals reuse `game_match_players` (lives, score, rounds played, correct count and time).
 
+## Word filter (V11)
+
+`V11__add_room_word_filter.sql` adds `cefr_level` and `topic_id` to `game_rooms`; both games share them and null means any.
+Library filters before it picks a word's meaning, and reports the counts behind `GET /api/games/word-filters`.
+
 ## Rocket solo play
 
 Contract: [Rocket Game v1](../../docs/contracts/rocket-game-v1.md). `POST /api/games/rocket/rooms` creates a SOLO room;

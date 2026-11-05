@@ -7,6 +7,7 @@ import com.ieltspath.content.api.dto.response.AiDraftResponse;
 import com.ieltspath.content.api.dto.response.CourseDraftAnalysisResponse;
 import com.ieltspath.content.application.usecase.ApproveCourseDraftUseCase;
 import com.ieltspath.content.application.usecase.CourseDraftUseCases;
+import com.ieltspath.content.application.usecase.FindPracticeSetsForPointsUseCase;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,15 +32,24 @@ public class CourseDraftController {
 
     private final CourseDraftUseCases drafts;
     private final ApproveCourseDraftUseCase approve;
+    private final FindPracticeSetsForPointsUseCase practiceSets;
     private final CurrentUserProvider currentUser;
     private final ObjectMapper json;
 
     public CourseDraftController(CourseDraftUseCases drafts, ApproveCourseDraftUseCase approve,
-                                 CurrentUserProvider currentUser, ObjectMapper json) {
+                                 FindPracticeSetsForPointsUseCase practiceSets, CurrentUserProvider currentUser,
+                                 ObjectMapper json) {
         this.drafts = drafts;
         this.approve = approve;
+        this.practiceSets = practiceSets;
         this.currentUser = currentUser;
         this.json = json;
+    }
+
+    /** The free practice sets that measure any of the points: the ones that fit a lesson teaching them. */
+    @GetMapping("/practice-sets")
+    public PracticeSetsResponse practiceSetsFor(@RequestParam(name = "knowledgePointIds", defaultValue = "") List<UUID> knowledgePointIds) {
+        return new PracticeSetsResponse(List.copyOf(practiceSets.execute(knowledgePointIds)));
     }
 
     @PostMapping
@@ -70,6 +81,9 @@ public class CourseDraftController {
 
     /** {@code structure} is the plan as JSON; it is checked by the use case, not by bean validation. */
     public record StructureBody(@NotNull JsonNode structure) {
+    }
+
+    public record PracticeSetsResponse(List<UUID> packageIds) {
     }
 
     public record ApprovedResponse(UUID draftId, UUID courseId, List<UUID> topicIds, List<UUID> lessonIds,

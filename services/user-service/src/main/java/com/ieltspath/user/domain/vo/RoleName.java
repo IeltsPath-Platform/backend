@@ -5,12 +5,18 @@ public enum RoleName {
     CUSTOMER,
     CONTENT_AUTHOR,
     EXAMINER,
-    SALES_STAFF;
+    SALES_STAFF,
+    STAFF_MANAGER;
 
     public static RoleName from(String value) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("Tên vai trò không được để trống");
         }
-        return RoleName.valueOf(value.trim().toUpperCase());
+        String name = value.trim();
+        try {
+            return RoleName.valueOf(name.toUpperCase());
+        } catch (IllegalArgumentException unknown) {
+            throw new IllegalArgumentException("Vai trò không tồn tại: " + name);
+        }
     }
 }

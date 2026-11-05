@@ -57,6 +57,21 @@ class PointDebitWriterTest {
     }
 
     @Test
+    @DisplayName("Should record course unlock debits with their dedicated ledger type")
+    void shouldRecordCourseUnlockDebit() {
+        UUID userId = UUID.randomUUID();
+        PointWallet wallet = new PointWallet(userId, 50, 50, 0, 0, Instant.now());
+        when(pointWalletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(pointLedgerRepository.save(any(PointLedgerEntry.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        PointLedgerResult result = pointDebitWriter.debit(new DebitPointsCommand(
+                userId, userId, 8, "COURSE_UNLOCK", UUID.randomUUID(), "idem-course", "Course unlock"));
+
+        assertThat(result.transactionType()).isEqualTo(PointTransactionType.COURSE_UNLOCK_DEBIT);
+        assertThat(result.delta()).isEqualTo(-8);
+    }
+
+    @Test
     @DisplayName("Should throw InsufficientPointsException when balance is less than required")
     void shouldThrowWhenInsufficientBalance() {
         UUID userId = UUID.randomUUID();

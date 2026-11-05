@@ -35,6 +35,27 @@ public class LessonAuthoringRepositoryAdapter implements LessonAuthoringReposito
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<Skill> courseTopicSkillForLesson(UUID lessonId) {
+        return jdbc.query("""
+                SELECT COALESCE(t.skill, 'ALL') AS skill FROM lessons l JOIN topics t ON t.id = l.topic_id
+                WHERE l.id = ? AND t.course_id IS NOT NULL
+                """, rs -> rs.next() ? Optional.ofNullable(Skill.valueOf(rs.getString("skill"))) : Optional.empty(),
+                lessonId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, Skill> knowledgePointSkills(List<UUID> knowledgePointIds) {
+        if (knowledgePointIds == null || knowledgePointIds.isEmpty()) return Map.of();
+        Map<UUID, Skill> skills = new LinkedHashMap<>();
+        namedJdbc.query("SELECT id, skill FROM knowledge_points WHERE id IN (:ids)",
+                Map.of("ids", knowledgePointIds), (org.springframework.jdbc.core.RowCallbackHandler) rs ->
+                        skills.put(rs.getObject("id", UUID.class), Skill.valueOf(rs.getString("skill"))));
+        return Map.copyOf(skills);
+    }
+
+    @Override
     @Transactional
     public Lesson create(UUID topicId, String code, String title, String summary, String summaryMarkdown,
                          Integer estimatedMinutes, Integer sortOrder) {
@@ -124,6 +145,22 @@ public class LessonAuthoringRepositoryAdapter implements LessonAuthoringReposito
         }
         errors.addAll(exerciseBlockIssues(lessonId));
         return errors;
+    }
+
+    @Override
+    public List<UUID> questionVersionsOwnedElsewhere(UUID exceptBlockId, List<UUID> questionVersionIds) {
+        if (questionVersionIds.isEmpty()) return List.of();
+        java.util.Set<UUID> owned = new java.util.HashSet<>();
+        org.springframework.jdbc.core.namedparam.MapSqlParameterSource params =
+                new org.springframework.jdbc.core.namedparam.MapSqlParameterSource("ids", questionVersionIds)
+                        .addValue("except", exceptBlockId);
+        // `except` may be null: `block_id <> NULL` is never true, so the null case is a separate query.
+        String inBlocks = exceptBlockId == null
+                ? "SELECT question_version_id FROM lesson_block_questions WHERE question_version_id IN (:ids)"
+                : "SELECT question_version_id FROM lesson_block_questions WHERE question_version_id IN (:ids) AND block_id <> :except";
+        namedJdbc.query(inBlocks + " UNION SELECT question_version_id FROM section_questions WHERE question_version_id IN (:ids)",
+                params, rs -> { owned.add(rs.getObject(1, UUID.class)); });
+        return questionVersionIds.stream().filter(owned::contains).distinct().toList();
     }
 
     private List<String> exerciseBlockIssues(UUID lessonId) {
@@ -335,10 +372,10 @@ public class LessonAuthoringRepositoryAdapter implements LessonAuthoringReposito
                     rs.getObject("id", UUID.class), rs.getInt("version_number"),
                     QuestionType.valueOf(rs.getString("question_type")), enumOrNull(Skill.class, rs.getString("skill")),
                     enumOrNull(QuestionPurpose.class, rs.getString("purpose")),
-                    PublicationStatus.valueOf(rs.getString("status")), rs.getString("stem"), rs.getString("answer_spec")));
+                    PublicationStatus.valueOf(rs.getString("status")), rs.getString("stem"), rs.getString("answer_spec"), rs.getObject("question_id", UUID.class)));
         };
         namedJdbc.query("""
-                SELECT lbq.block_id, qv.id, qv.version_number, q.question_type, q.skill, q.purpose,
+                SELECT lbq.block_id, qv.id, qv.question_id, qv.version_number, q.question_type, q.skill, q.purpose,
                        qv.status, qv.stem, qv.answer_spec::text
                 FROM lesson_block_questions lbq
                 JOIN question_versions qv ON qv.id = lbq.question_version_id

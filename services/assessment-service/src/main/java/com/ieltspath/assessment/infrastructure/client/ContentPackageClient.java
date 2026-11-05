@@ -3,6 +3,10 @@ package com.ieltspath.assessment.infrastructure.client;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.ieltspath.assessment.application.exception.ContentUnavailableException;
 import com.ieltspath.assessment.application.port.ContentPackageProvider;
+import com.ieltspath.commonresilience.CallKind;
+import com.ieltspath.commonresilience.DownstreamUnavailableException;
+import com.ieltspath.commonresilience.ResilientCall;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -22,27 +26,37 @@ import java.util.UUID;
 @Component
 public class ContentPackageClient implements ContentPackageProvider {
     private final RestClient restClient;
+    private final ResilientCall resilientCall;
 
+    @Autowired
     public ContentPackageClient(RestClient.Builder builder,
-                                @Value("${assessment.content.base-url:http://localhost:8082}") String contentBaseUrl) {
+                                @Value("${assessment.content.base-url:http://localhost:8082}") String contentBaseUrl,
+                                ResilientCall resilientCall) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
         requestFactory.setReadTimeout(Duration.ofSeconds(5));
         this.restClient = builder.requestFactory(requestFactory).baseUrl(contentBaseUrl).build();
+        this.resilientCall = resilientCall;
+    }
+
+    ContentPackageClient(RestClient.Builder builder, String contentBaseUrl) {
+        this(builder, contentBaseUrl, ResilientCall.isolatedDefault());
     }
 
     @Override
     public Optional<PackageVersion> findPackageVersion(UUID packageVersionId) {
         VersionResponse response;
         try {
-            response = restClient.get()
+            response = resilientCall.call("content", CallKind.READ, () -> restClient.get()
                     .uri("/internal/learning-content/package-versions/{id}", packageVersionId)
                     .header(HttpHeaders.AUTHORIZATION, GatewayRequestContext.bearerToken())
                     .header("X-Correlation-Id", GatewayRequestContext.correlationId())
                     .retrieve()
-                    .body(VersionResponse.class);
+                    .body(VersionResponse.class));
         } catch (HttpClientErrorException.NotFound exception) {
             return Optional.empty();
+        } catch (DownstreamUnavailableException exception) {
+            throw new ContentUnavailableException("Content Service could not provide the package version", exception);
         } catch (RestClientException exception) {
             throw new ContentUnavailableException("Content Service could not provide the package version", exception);
         }

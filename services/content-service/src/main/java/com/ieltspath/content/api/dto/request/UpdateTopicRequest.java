@@ -27,11 +27,17 @@ public record UpdateTopicRequest(
         BigDecimal bandMax,
         // Null keeps the current skill; a change is refused once the topic has published lessons.
         Skill skill,
-        UUID courseId
+        UUID courseId,
+        @Size(max = 2000) String description
 ) {
     public UpdateTopicRequest(UUID parentTopicId, String name, int sortOrder, ContentStatus status,
                               BigDecimal bandMin, BigDecimal bandMax, Skill skill) {
-        this(parentTopicId, name, sortOrder, status, bandMin, bandMax, skill, null);
+        this(parentTopicId, name, sortOrder, status, bandMin, bandMax, skill, null, null);
+    }
+
+    public UpdateTopicRequest(UUID parentTopicId, String name, int sortOrder, ContentStatus status,
+                              BigDecimal bandMin, BigDecimal bandMax, Skill skill, UUID courseId) {
+        this(parentTopicId, name, sortOrder, status, bandMin, bandMax, skill, courseId, null);
     }
 }
 

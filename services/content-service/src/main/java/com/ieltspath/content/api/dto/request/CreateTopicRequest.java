@@ -29,11 +29,17 @@ public record CreateTopicRequest(
         BigDecimal bandMax,
         // The skill the topic's lessons teach; optional, never ALL.
         Skill skill,
-        UUID courseId
+        UUID courseId,
+        @Size(max = 2000) String description
 ) {
     public CreateTopicRequest(UUID parentTopicId, String code, String name, int sortOrder,
                               BigDecimal bandMin, BigDecimal bandMax, Skill skill) {
-        this(parentTopicId, code, name, sortOrder, bandMin, bandMax, skill, null);
+        this(parentTopicId, code, name, sortOrder, bandMin, bandMax, skill, null, null);
+    }
+
+    public CreateTopicRequest(UUID parentTopicId, String code, String name, int sortOrder,
+                              BigDecimal bandMin, BigDecimal bandMax, Skill skill, UUID courseId) {
+        this(parentTopicId, code, name, sortOrder, bandMin, bandMax, skill, courseId, null);
     }
 }
 

@@ -18,6 +18,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -50,6 +51,31 @@ class RestLearningContentClientTest {
         assertEquals(1,result.size());
         assertEquals(VERSION_ID,result.getFirst().packageVersionId());
         assertEquals(2,result.getFirst().afterTopicSequence());
+    }
+
+    @Test
+    void readsLessonAccessSummaryBeforeRequestingLessonMedia() {
+        server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID + "/access"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"lessonId":"%s","topicId":"%s","code":"L4","title":"Lesson",
+                         "sortOrder":4,"knowledgePointIds":[],"exerciseBlockIds":[],
+                         "skills":["LISTENING"],"courseId":"%s","skill":"LISTENING","skillPosition":4}
+                        """.formatted(LESSON_ID, TOPIC_ID, UUID.randomUUID()), MediaType.APPLICATION_JSON));
+        var summary = client.getLessonAccessSummary(LESSON_ID);
+        assertEquals(4, summary.sortOrder());
+        assertEquals(4, summary.skillPosition());
+    }
+
+    @Test
+    void requestsSignedAudioOnlyForTheLessonPayloadFetch() {
+        server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID + "?signedAudio=true"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"lessonId":"%s","topicId":"%s","code":"L4","title":"Lesson",
+                         "sortOrder":4,"knowledgePointIds":[],"blocks":[],"skills":["LISTENING"]}
+                        """.formatted(LESSON_ID, TOPIC_ID), MediaType.APPLICATION_JSON));
+        assertEquals(LESSON_ID, client.getLesson(LESSON_ID, true).lessonId());
     }
 
     @Test
@@ -197,6 +223,45 @@ class RestLearningContentClientTest {
         assertEquals("IELTS 6.5", course.name());
         assertEquals(new BigDecimal("6.5"), course.bandLevel());
         assertTrue(course.hasCourseTest());
+    }
+
+    @Test
+    void mapsOptionalCourseAndTopicDescriptionsAndCoverImageUrl() {
+        server.expect(requestTo(INTERNAL_PATH + "/topic-sequence"))
+                .andRespond(withSuccess("""
+                        [{"topicId":"10000000-0000-4000-8000-000000000001","code":"R65",
+                          "name":"Reading 6.5","description":"Build inference skills","sortOrder":960,
+                          "requiredFeatureKey":null,"skill":"READING","hasTopicTest":true,
+                          "course":{"courseId":"30000000-0000-4000-8000-000000000002",
+                            "code":"IELTS_6_5","name":"IELTS 6.5","bandLevel":6.5,"hasCourseTest":true,
+                            "coverImageUrl":"https://cdn.example/course.jpg","description":"Course overview"},
+                          "knowledgePoints":[]}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var topic = client.getTopicSequence().getFirst();
+
+        assertEquals("Build inference skills", topic.description());
+        assertEquals("https://cdn.example/course.jpg", topic.course().coverImageUrl());
+        assertEquals("Course overview", topic.course().description());
+    }
+
+    @Test
+    void olderTopicSequencePayloadKeepsNewFieldsNull() {
+        server.expect(requestTo(INTERNAL_PATH + "/topic-sequence"))
+                .andRespond(withSuccess("""
+                        [{"topicId":"10000000-0000-4000-8000-000000000001","code":"R65",
+                          "name":"Reading 6.5","sortOrder":960,"requiredFeatureKey":null,
+                          "skill":"READING","hasTopicTest":true,
+                          "course":{"courseId":"30000000-0000-4000-8000-000000000002",
+                            "code":"IELTS_6_5","name":"IELTS 6.5","bandLevel":6.5,"hasCourseTest":true},
+                          "knowledgePoints":[]}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var topic = client.getTopicSequence().getFirst();
+
+        assertNull(topic.description());
+        assertNull(topic.course().coverImageUrl());
+        assertNull(topic.course().description());
     }
 
     @Test
@@ -450,10 +515,11 @@ class RestLearningContentClientTest {
     @CsvSource({"404,404,NOT_FOUND", "503,503,CONTENT_UNAVAILABLE", "400,502,CONTENT_FAILURE",
             "401,502,CONTENT_FAILURE", "403,502,CONTENT_FAILURE", "500,502,CONTENT_FAILURE"})
     void translatesHttpErrorsWithoutExposingContentResponse(int contentStatus, int status, String code) {
-        server.expect(requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID))
+        server.expect(contentStatus >= 500 ? ExpectedCount.twice() : ExpectedCount.once(),
+                        requestTo(INTERNAL_PATH + "/lessons/" + LESSON_ID))
                 .andRespond(withStatus(HttpStatus.valueOf(contentStatus))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .body("{\"message\":\"private-content-response\"}"));
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"message\":\"private-content-response\"}"));
 
         var exception = assertThrows(LearningRequestException.class, () -> client.getLesson(LESSON_ID));
 
@@ -465,7 +531,7 @@ class RestLearningContentClientTest {
 
     @Test
     void translatesTransportFailureToContentUnavailable() {
-        server.expect(requestTo(INTERNAL_PATH + "/topic-sequence"))
+        server.expect(ExpectedCount.twice(), requestTo(INTERNAL_PATH + "/topic-sequence"))
                 .andRespond(withException(new IOException("private-transport-detail")));
 
         var exception = assertThrows(LearningRequestException.class, client::getTopicSequence);

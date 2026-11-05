@@ -1,6 +1,7 @@
 package com.ieltspath.library.application.usecase;
 
 import com.ieltspath.library.application.port.FlashcardImageStorage;
+import com.ieltspath.library.application.port.FlashcardReviewEventWriter;
 import com.ieltspath.library.application.port.FlashcardVocabularyMetadataReader;
 import com.ieltspath.library.application.result.FlashcardResult;
 import com.ieltspath.library.config.FlashcardSrsProperties;
@@ -23,9 +24,15 @@ public class ReviewFlashcardUseCase {
     private final FlashcardSrsProperties srsProperties;
     private final FlashcardVocabularyMetadataReader vocabularyMetadataReader;
     private final FlashcardImageStorage storage;
+    private final FlashcardReviewEventWriter reviewEventWriter;
 
     @Transactional
     public FlashcardResult execute(UUID userId, UUID flashcardId, boolean correct, UUID requestId) {
+        return execute(userId, flashcardId, correct, requestId, null);
+    }
+
+    @Transactional
+    public FlashcardResult execute(UUID userId, UUID flashcardId, boolean correct, UUID requestId, UUID sessionId) {
         Flashcard card = repository.findForReviewByIdAndUserId(flashcardId, userId)
                 .orElseThrow(ResourceNotFoundException::new);
         if (card.getStatus() != LibraryStatus.ACTIVE) {
@@ -33,6 +40,7 @@ public class ReviewFlashcardUseCase {
         }
         if (card.review(correct, requestId, Instant.now(), srsProperties.getIntervalsDays())) {
             card = repository.save(card);
+            reviewEventWriter.append(userId, card.getId(), card.getVocabularySenseId(), sessionId, correct, card.getLastReviewedAt());
         }
         var metadata = card.getVocabularySenseId() == null
                 ? null

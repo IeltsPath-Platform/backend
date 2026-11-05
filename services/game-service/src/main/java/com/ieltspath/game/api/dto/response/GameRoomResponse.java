@@ -11,7 +11,7 @@ public record GameRoomResponse(UUID id, String roomCode, UUID hostUserId, String
                                Instant createdAt, List<GameRoomMemberResponse> members,
                                List<GameItemResponse> items, String playerMode, SettingsResponse settings, UUID activeMatchId) {
     public record SettingsResponse(int initialLives, Integer wordTimeLimitSeconds, String playMode, Integer wordLimit, boolean timeEnabled,
-            Integer questionCount, Integer secondsPerQuestion) {}
+            Integer questionCount, Integer secondsPerQuestion, String cefrLevel, UUID topicId) {}
     public GameRoomResponse {
         members = List.copyOf(members);
         items = List.copyOf(items);
@@ -39,6 +39,7 @@ public record GameRoomResponse(UUID id, String roomCode, UUID hostUserId, String
                 result.items().stream().map(GameItemResponse::from).toList(), result.playerMode(),
                 result.settings() == null ? null : new SettingsResponse(result.settings().initialLives(),
                         result.settings().wordTimeLimitSeconds(), result.settings().playMode(), result.settings().wordLimit(), result.settings().timeEnabled(),
-                        result.settings().questionCount(), result.settings().secondsPerQuestion()),result.activeMatchId());
+                        result.settings().questionCount(), result.settings().secondsPerQuestion(),
+                        result.settings().cefrLevel(), result.settings().topicId()),result.activeMatchId());
     }
 }

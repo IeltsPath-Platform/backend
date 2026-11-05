@@ -24,7 +24,22 @@ public record CourseCatalogFacts(
         Set<String> takenLessonCodes,
         Set<String> takenPackageCodes,
         boolean bandTaken,
-        Set<Integer> takenTopicSortOrders) {
+        Set<Integer> takenTopicSortOrders,
+        Set<UUID> ownedQuestionVersions) {
+
+    /** The facts of a catalogue in which none of the draft's questions belongs to a lesson or a package yet. */
+    public CourseCatalogFacts(Map<UUID, KnowledgePointFact> knowledgePoints, Set<UUID> expectedKnowledgePoints,
+                              Map<UUID, Set<UUID>> prerequisites, Map<UUID, BigDecimal> lowestBandTaught,
+                              Map<UUID, PackageFact> packages, Set<UUID> milestonePackagesLinkedElsewhere,
+                              Map<UUID, Integer> unlinkedPracticeSets, Set<UUID> withoutExerciseQuestion,
+                              Map<String, UUID> resolvedQuestionRefs, Set<String> takenCourseCodes,
+                              Set<String> takenTopicCodes, Set<String> takenLessonCodes, Set<String> takenPackageCodes,
+                              boolean bandTaken, Set<Integer> takenTopicSortOrders) {
+        this(knowledgePoints, expectedKnowledgePoints, prerequisites, lowestBandTaught, packages,
+                milestonePackagesLinkedElsewhere, unlinkedPracticeSets, withoutExerciseQuestion, resolvedQuestionRefs,
+                takenCourseCodes, takenTopicCodes, takenLessonCodes, takenPackageCodes, bandTaken,
+                takenTopicSortOrders, Set.of());
+    }
 
     public CourseCatalogFacts {
         knowledgePoints = Map.copyOf(knowledgePoints);
@@ -41,6 +56,7 @@ public record CourseCatalogFacts(
         takenLessonCodes = Set.copyOf(takenLessonCodes);
         takenPackageCodes = Set.copyOf(takenPackageCodes);
         takenTopicSortOrders = Set.copyOf(takenTopicSortOrders);
+        ownedQuestionVersions = Set.copyOf(ownedQuestionVersions);
     }
 
     /**
@@ -54,7 +70,7 @@ public record CourseCatalogFacts(
         return new CourseCatalogFacts(knowledgePoints, expectedKnowledgePoints, prerequisites, lowestBandTaught,
                 packages, milestonePackagesLinkedElsewhere, unlinkedPracticeSets, withoutExerciseQuestion, resolved,
                 takenCourseCodes, takenTopicCodes, takenLessonCodes, takenPackageCodes, bandTaken,
-                takenTopicSortOrders);
+                takenTopicSortOrders, ownedQuestionVersions);
     }
 
     /** {@code status} is {@code ACTIVE} or {@code INACTIVE}. */

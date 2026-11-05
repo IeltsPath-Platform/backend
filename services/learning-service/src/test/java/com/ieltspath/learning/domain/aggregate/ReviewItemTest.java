@@ -2,6 +2,7 @@ package com.ieltspath.learning.domain.aggregate;
 
 import com.ieltspath.learning.domain.vo.ReviewStage;
 import com.ieltspath.learning.domain.vo.ReviewStatus;
+import com.ieltspath.learning.domain.vo.LearningSkill;
 import com.ieltspath.learning.domain.vo.TheoryReason;
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +10,9 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReviewItemTest {
     private static ReviewItem pending(int failedSets) {
@@ -84,6 +88,46 @@ class ReviewItemTest {
     private static ReviewItem optional() {
         return ReviewItem.restore(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 ReviewStatus.PENDING, null, 0, null, ReviewStage.PRACTICE, null, 0, "CONSOLIDATE", false);
+    }
+
+    private static ReviewItem optional(String trigger) {
+        return ReviewItem.restore(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                ReviewStatus.PENDING, null, 0, LearningSkill.READING, ReviewStage.PRACTICE, null, 0, trigger, false);
+    }
+
+    @Test
+    void aSuggestionFromPracticeThatFailsItsSetBecomesBlockingAtTheTheoryStage() {
+        ReviewItem review = optional("PRACTICE");
+        var set = review.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        assertEquals(ReviewStatus.PENDING, review.recordSetResult(set.id(), UUID.randomUUID(), 1, 2));
+        assertTrue(review.blocking());
+        assertEquals(ReviewStage.THEORY, review.stage());
+        assertEquals(TheoryReason.SECOND_FAIL, review.theoryReason());
+        assertEquals(1, review.failedSets());
+    }
+
+    @Test
+    void aSuggestionThatFailsBadlyReadsTheTheoryForTheLowScore() {
+        ReviewItem review = optional("PRACTICE");
+        var set = review.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        review.recordSetResult(set.id(), UUID.randomUUID(), 0, 2);
+        assertEquals(TheoryReason.LOW_SCORE, review.theoryReason());
+    }
+
+    @Test
+    void aSuggestionThatPassesIsDoneAndStaysOptional() {
+        ReviewItem review = optional("PRACTICE");
+        var set = review.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        assertEquals(ReviewStatus.DONE, review.recordSetResult(set.id(), UUID.randomUUID(), 2, 2));
+        assertFalse(review.blocking());
+    }
+
+    @Test
+    void aBasketReviewThatFailsIsStillSkipped() {
+        ReviewItem review = optional("CONSOLIDATE");
+        var set = review.assignSet(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        assertEquals(ReviewStatus.SKIPPED, review.recordSetResult(set.id(), UUID.randomUUID(), 0, 2));
+        assertFalse(review.blocking());
     }
 
     @Test

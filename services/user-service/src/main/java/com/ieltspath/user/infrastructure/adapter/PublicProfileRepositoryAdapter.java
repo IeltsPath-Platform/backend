@@ -21,20 +21,17 @@ public class PublicProfileRepositoryAdapter implements PublicProfileRepository {
     public List<PublicProfile> findByUserIds(Set<UUID> userIds) {
         if (userIds.isEmpty()) return List.of();
         if (userIds.size() > 100) throw new IllegalArgumentException("At most 100 user IDs are allowed");
-        // The active-goal partial unique index and profile/streak primary keys keep this one row per user.
+        // The profile primary key keeps this one row per user.
         return jdbc.query("""
-                SELECT u.id, u.full_name, p.display_name, p.avatar_reference, p.bio, p.profile_visibility,
-                       g.target_band, s.current_days
+                SELECT u.id, u.full_name, p.display_name, p.avatar_reference, p.bio, p.profile_visibility
                 FROM users u
                 LEFT JOIN learner_profiles p ON p.user_id = u.id
-                LEFT JOIN learning_goals g ON g.user_id = u.id AND g.status = 'ACTIVE'
-                LEFT JOIN streaks s ON s.user_id = u.id
                 WHERE u.status = 'ACTIVE'
                   AND u.id IN (:userIds)
                 """, Map.of("userIds", userIds), (row, index) -> new PublicProfile(
                 row.getObject("id", UUID.class), row.getString("display_name"), row.getString("full_name"),
-                row.getString("avatar_reference"), row.getString("bio"), row.getBigDecimal("target_band"),
-                row.getObject("current_days", Integer.class), row.getString("profile_visibility") == null ? null
+                row.getString("avatar_reference"), row.getString("bio"),
+                row.getString("profile_visibility") == null ? null
                         : ProfileVisibility.valueOf(row.getString("profile_visibility"))));
     }
 
@@ -42,12 +39,9 @@ public class PublicProfileRepositoryAdapter implements PublicProfileRepository {
     public List<PublicProfile> searchVisibleByName(UUID viewerId, String query, int limit) {
         String escapedQuery = "%" + escapeLike(query.toLowerCase()) + "%";
         return jdbc.query("""
-                SELECT u.id, u.full_name, p.display_name, p.avatar_reference, p.bio, p.profile_visibility,
-                       g.target_band, s.current_days
+                SELECT u.id, u.full_name, p.display_name, p.avatar_reference, p.bio, p.profile_visibility
                 FROM users u
                 LEFT JOIN learner_profiles p ON p.user_id = u.id
-                LEFT JOIN learning_goals g ON g.user_id = u.id AND g.status = 'ACTIVE'
-                LEFT JOIN streaks s ON s.user_id = u.id
                 WHERE u.status = 'ACTIVE'
                   AND (p.profile_visibility IN ('PUBLIC','COMMUNITY') OR u.id = :viewerId)
                   AND lower(coalesce(nullif(trim(p.display_name), ''), u.full_name)) LIKE :query ESCAPE '\\'
@@ -56,7 +50,6 @@ public class PublicProfileRepositoryAdapter implements PublicProfileRepository {
                 """, Map.of("viewerId", viewerId, "query", escapedQuery, "limit", limit),
                 (row, index) -> new PublicProfile(row.getObject("id", UUID.class), row.getString("display_name"),
                         row.getString("full_name"), row.getString("avatar_reference"), row.getString("bio"),
-                        row.getBigDecimal("target_band"), row.getObject("current_days", Integer.class),
                         row.getString("profile_visibility") == null ? null
                                 : ProfileVisibility.valueOf(row.getString("profile_visibility"))));
     }

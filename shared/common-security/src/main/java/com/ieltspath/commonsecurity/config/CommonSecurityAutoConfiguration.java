@@ -53,7 +53,7 @@ public class CommonSecurityAutoConfiguration {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> {
                     authorize.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
-                    authorize.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
+                    authorize.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll();
                     securityProperties.publicEndpoints().forEach(endpoint -> {
                         String[] patterns = endpoint.patterns().toArray(String[]::new);
                         if (patterns.length == 0) {

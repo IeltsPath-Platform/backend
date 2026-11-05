@@ -76,8 +76,8 @@ class PublicProfileSecurityTest {
                         .header(HttpHeaders.AUTHORIZATION, token(viewer, "urn:code-base:api-gateway")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(target.toString()))
                 .andExpect(jsonPath("$.displayName").value("Display"))
-                .andExpect(jsonPath("$.targetBand").value(7.5)).andExpect(jsonPath("$.streak").value(3))
-                .andExpect(jsonPath("$.length()").value(6))
+                .andExpect(jsonPath("$.targetBand").doesNotExist()).andExpect(jsonPath("$.streak").doesNotExist())
+                .andExpect(jsonPath("$.length()").value(4))
                 .andExpect(jsonPath("$.email").doesNotExist()).andExpect(jsonPath("$.phoneNumber").doesNotExist())
                 .andExpect(jsonPath("$.roles").doesNotExist()).andExpect(jsonPath("$.timezone").doesNotExist());
         verify(useCase).execute(viewer, target);
@@ -91,7 +91,8 @@ class PublicProfileSecurityTest {
                         .header(HttpHeaders.AUTHORIZATION, token(viewer, "urn:code-base:api-gateway"))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"userIds\":[\"" + target + "\"]}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.profiles[0].id").value(target.toString()))
-                .andExpect(jsonPath("$.profiles[0].length()").value(6));
+                .andExpect(jsonPath("$.profiles[0].length()").value(4))
+                .andExpect(jsonPath("$.profiles[0].streak").doesNotExist());
         verify(useCase).executeBatch(viewer, List.of(target));
     }
 
@@ -123,7 +124,7 @@ class PublicProfileSecurityTest {
     }
 
     private PublicProfileResult profile(UUID id) {
-        return new PublicProfileResult(id, "Display", null, "Bio", new BigDecimal("7.5"), 3);
+        return new PublicProfileResult(id, "Display", null, "Bio");
     }
 
     private String token(UUID viewer, String issuer) {

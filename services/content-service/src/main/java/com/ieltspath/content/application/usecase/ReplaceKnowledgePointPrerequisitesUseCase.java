@@ -6,7 +6,9 @@ import com.ieltspath.content.domain.exception.InvalidPrerequisiteException;
 import com.ieltspath.content.domain.exception.KnowledgePointNotFoundException;
 import com.ieltspath.content.domain.exception.PrerequisiteLevelException;
 import com.ieltspath.content.domain.repository.KnowledgePointRepository;
+import com.ieltspath.content.domain.repository.ErrorTypeRepository;
 import com.ieltspath.content.domain.repository.KnowledgePrerequisiteRepository;
+import com.ieltspath.content.domain.exception.InvalidErrorTypeException;
 import com.ieltspath.content.domain.service.KnowledgeGraph;
 import com.ieltspath.content.domain.vo.CefrLevel;
 import com.ieltspath.content.domain.vo.ContentStatus;
@@ -25,20 +27,29 @@ import java.util.UUID;
 public class ReplaceKnowledgePointPrerequisitesUseCase {
     private final KnowledgePointRepository knowledgePointRepository;
     private final KnowledgePrerequisiteRepository prerequisiteRepository;
+    private final ErrorTypeRepository errorTypeRepository;
     private final KnowledgeGraph knowledgeGraph = new KnowledgeGraph();
 
     public ReplaceKnowledgePointPrerequisitesUseCase(KnowledgePointRepository knowledgePointRepository,
-                                                     KnowledgePrerequisiteRepository prerequisiteRepository) {
+                                                     KnowledgePrerequisiteRepository prerequisiteRepository,
+                                                     ErrorTypeRepository errorTypeRepository) {
         this.knowledgePointRepository = knowledgePointRepository;
         this.prerequisiteRepository = prerequisiteRepository;
+        this.errorTypeRepository = errorTypeRepository;
     }
 
     public List<KnowledgePointResult> execute(UUID id, List<UUID> requestedIds) {
         prerequisiteRepository.lockTree();
+        if (errorTypeRepository.containsTrapKnowledgePoints(List.of(id))) {
+            throw new InvalidErrorTypeException("TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
+        }
         KnowledgePoint dependent = knowledgePointRepository.findById(id)
                 .orElseThrow(() -> new KnowledgePointNotFoundException(id));
 
         List<UUID> prerequisiteIds = List.copyOf(new LinkedHashSet<>(requestedIds));
+        if (errorTypeRepository.containsTrapKnowledgePoints(prerequisiteIds)) {
+            throw new InvalidErrorTypeException("TRAP_KNOWLEDGE_POINT_NOT_ASSIGNABLE");
+        }
         Map<UUID, KnowledgePoint> prerequisitesById = new HashMap<>();
         knowledgePointRepository.findByIds(prerequisiteIds)
                 .forEach(prerequisite -> prerequisitesById.put(prerequisite.getId(), prerequisite));

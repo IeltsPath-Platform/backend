@@ -125,6 +125,45 @@ class CourseSequenceIntegrationTest {
     }
 
     @Test
+    void practiceSetOrderPrefersLessonThenKnowledgePointMatchesThenPackageId() {
+        UUID course = course("ORDER", "0.5", "ACTIVE");
+        UUID topic = topic("ORDER_TOPIC", course, 1, true);
+        UUID lesson = sql.queryForObject("SELECT id FROM lessons WHERE topic_id=?", UUID.class, topic);
+        UUID kp = UUID.randomUUID();
+        sql.update("INSERT INTO knowledge_points(id,topic_id,code,name,kind,learning_type,skill) " +
+                "VALUES (?,?,'ORDER_KP','KP','STRATEGY','PROCEDURE','READING')", kp, topic);
+
+        var preferred = packageFixture("ORDER_PREFERRED", "PRACTICE_SET", null, "PUBLISHED", "PUBLISHED", true);
+        sql.update("UPDATE content_packages SET lesson_id=? WHERE id=?", lesson, preferred.pkg());
+        var tiedA = packageFixture("ORDER_TIED_A", "PRACTICE_SET", null, "PUBLISHED", "PUBLISHED", true);
+        var tiedB = packageFixture("ORDER_TIED_B", "PRACTICE_SET", null, "PUBLISHED", "PUBLISHED", true);
+        var lowerMatches = packageFixture("ORDER_LOWER_MATCHES", "PRACTICE_SET", null, "PUBLISHED", "PUBLISHED", true);
+
+        attachForOrder(preferred.version(), kp, 1);
+        attachForOrder(tiedA.version(), kp, 2);
+        attachForOrder(tiedB.version(), kp, 2);
+        attachForOrder(lowerMatches.version(), kp, 1);
+
+        var results = reader.searchPracticeSets(kp, List.of(), 2, 10, lesson);
+        var tieSorted = List.of(tiedA, tiedB).stream()
+                .sorted(Comparator.comparing(fixture -> fixture.pkg().toString()))
+                .map(fixture -> fixture.pkg().toString()).toList();
+        assertThat(results).extracting(result -> result.packageId().toString())
+                .containsExactly(preferred.pkg().toString(), tieSorted.get(0), tieSorted.get(1), lowerMatches.pkg().toString());
+    }
+
+    private void attachForOrder(UUID version, UUID knowledgePointId, int matchedQuestions) {
+        for (int index = 0; index < 2; index++) {
+            UUID questionVersion = question(UUID.randomUUID(), 1, "MULTIPLE_CHOICE", "{\"type\":\"CHOICE\",\"correct\":\"A\"}");
+            if (index < matchedQuestions) {
+                sql.update("INSERT INTO question_knowledge_points(question_version_id,knowledge_point_id) VALUES (?,?)",
+                        questionVersion, knowledgePointId);
+            }
+            attach(version, questionVersion);
+        }
+    }
+
+    @Test
     void questionSpecProjectionIncludesEssayAndMalformedObjectiveShapesForPublishValidation() {
         UUID course = course("LOW", "0.5", "ACTIVE");
         var courseTest = packageFixture("FINAL", "COURSE_TEST", course, "DRAFT", "DRAFT", true);

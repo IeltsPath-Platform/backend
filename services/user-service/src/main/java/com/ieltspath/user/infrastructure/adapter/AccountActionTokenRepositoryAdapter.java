@@ -46,6 +46,11 @@ public class AccountActionTokenRepositoryAdapter implements AccountActionTokenRe
     }
 
     @Override
+    public boolean consumePasswordResetToken(String tokenHash, java.time.LocalDateTime consumedAt) {
+        return accountActionTokenJpaRepository.consumePasswordResetToken(tokenHash, consumedAt) == 1;
+    }
+
+    @Override
     public List<AccountActionToken> findByUserId(UUID userId) {
         return accountActionTokenJpaRepository.findByUser_Id(userId).stream()
                 .map(accountActionTokenMapper::toDomain)

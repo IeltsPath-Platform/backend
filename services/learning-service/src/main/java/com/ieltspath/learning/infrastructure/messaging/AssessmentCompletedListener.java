@@ -21,6 +21,8 @@ import java.util.Map;
  * Applies each completed result and acknowledges only after the transaction committed. A transient failure is
  * rejected to the retry queue; a contract violation or the last allowed attempt is copied to the DLQ (with an
  * {@code x-learning-failure} header) before the original is acknowledged. Payloads are never logged.
+ * It does not use {@code MessageRetry}: it acknowledges only after the database transaction has committed, so a transient
+ * failure must be rejected back to the broker rather than republished by the listener.
  */
 @Component
 public class AssessmentCompletedListener {

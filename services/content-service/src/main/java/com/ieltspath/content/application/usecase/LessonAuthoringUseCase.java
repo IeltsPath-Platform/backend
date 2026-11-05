@@ -6,6 +6,7 @@ import com.ieltspath.content.application.result.LessonAuthoringSummaryResult;
 import com.ieltspath.content.domain.aggregate.Lesson;
 import com.ieltspath.content.domain.aggregate.LessonBlock;
 import com.ieltspath.content.domain.exception.LessonBlockInvalidException;
+import com.ieltspath.content.domain.exception.QuestionAlreadyOwnedException;
 import com.ieltspath.content.domain.exception.LessonNotFoundException;
 import com.ieltspath.content.domain.exception.LessonNotPublishableException;
 import com.ieltspath.content.domain.exception.LessonSortConflictException;
@@ -70,6 +71,7 @@ public class LessonAuthoringUseCase {
     @Transactional
     public void knowledgePoints(UUID lessonId, List<UUID> knowledgePointIds) {
         Lesson lesson = requireLocked(lessonId);
+        requireCourseSkill(lessonId, knowledgePointIds);
         lesson.replaceKnowledgePoints(knowledgePointIds);
         repository.save(lesson);
     }
@@ -80,9 +82,14 @@ public class LessonAuthoringUseCase {
                                           List<UUID> questionVersionIds, List<UUID> knowledgePointIds) {
         Lesson lesson = requireLocked(lessonId);
         if (type == BlockType.EXERCISE) lesson.ensureExerciseEditable();
+        requireCourseSkill(lessonId, knowledgePointIds);
         validateBlock(lessonId, type, sortOrder, textContent, assetId, vocabularySenseIds,
                 questionVersionIds, knowledgePointIds);
-        int position = sortOrder == null ? lesson.getBlocks().size() : sortOrder;
+        if (type == BlockType.EXERCISE) requireQuestionsFree(null, questionVersionIds);
+        // After the last block, whatever its number: lessons seeded from 1 (or with gaps after deletions) have a block at
+        // the number of blocks, and giving a new block that same position broke the unique (lesson, sort order) key.
+        int position = sortOrder != null ? sortOrder
+                : lesson.getBlocks().stream().mapToInt(LessonBlock::getSortOrder).max().orElse(-1) + 1;
         lesson.addBlock(LessonBlock.create(lessonId, type, position, textContent, assetId,
                 vocabularySenseIds, questionVersionIds, knowledgePointIds));
         repository.save(lesson);
@@ -98,12 +105,14 @@ public class LessonAuthoringUseCase {
         if (block.getType() != blockType) {
             throw new LessonBlockInvalidException("Block type cannot be changed");
         }
+        requireCourseSkill(lessonId, knowledgePointIds);
         List<UUID> requestedQuestions = questionVersionIds == null ? List.of() : questionVersionIds;
         if (blockType == BlockType.EXERCISE && !block.getQuestionVersionIds().equals(requestedQuestions)) {
             lesson.ensureExerciseEditable();
         }
         validateBlock(lessonId, blockType, sortOrder, textContent, assetId, vocabularySenseIds,
                 questionVersionIds, knowledgePointIds);
+        if (blockType == BlockType.EXERCISE) requireQuestionsFree(blockId, questionVersionIds);
         block.update(sortOrder, textContent, assetId,
                 vocabularySenseIds, questionVersionIds, knowledgePointIds);
         repository.save(lesson);
@@ -159,6 +168,18 @@ public class LessonAuthoringUseCase {
         if (!repository.topicExists(topicId)) throw new TopicNotFoundException(topicId);
     }
 
+    private void requireCourseSkill(UUID lessonId, List<UUID> knowledgePointIds) {
+        if (knowledgePointIds == null || knowledgePointIds.isEmpty()) return;
+        var topicSkill = repository.courseTopicSkillForLesson(lessonId);
+        if (topicSkill.isEmpty()) return;
+        var skills = repository.knowledgePointSkills(knowledgePointIds);
+        if (!skills.keySet().containsAll(knowledgePointIds)
+                || skills.values().stream().anyMatch(skill -> skill != topicSkill.get()
+                        && skill != com.ieltspath.content.domain.vo.Skill.ALL)) {
+            throw new LessonBlockInvalidException("Lesson knowledge points must match the course topic skill");
+        }
+    }
+
     private void validateBlock(UUID lessonId, BlockType type, Integer sortOrder, String textContent, UUID assetId,
                                List<UUID> vocabularySenseIds, List<UUID> questionVersionIds,
                                List<UUID> knowledgePointIds) {
@@ -168,6 +189,13 @@ public class LessonAuthoringUseCase {
                 && !vocabulary.findActiveSenseIds(block.getVocabularySenseIds()).containsAll(block.getVocabularySenseIds())) {
             throw new LessonBlockInvalidException("Vocabulary block contains a missing or inactive sense");
         }
+    }
+
+    /** Every question of an exercise block must be free: one that has a home elsewhere is refused, and none is taken. */
+    private void requireQuestionsFree(UUID blockId, List<UUID> questionVersionIds) {
+        if (questionVersionIds == null || questionVersionIds.isEmpty()) return;
+        List<UUID> taken = repository.questionVersionsOwnedElsewhere(blockId, questionVersionIds);
+        if (!taken.isEmpty()) throw new QuestionAlreadyOwnedException(taken);
     }
 
     private void requireUniqueOrder(List<UUID> ids) {

@@ -6,6 +6,7 @@ import com.ieltspath.events.assessment.AssessmentMessaging;
 
 
 import com.ieltspath.assessment.domain.entity.OutboxEvent;
+import com.ieltspath.commonobservability.Correlation;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageDeliveryMode;
@@ -30,17 +31,18 @@ import java.util.concurrent.TimeoutException;
 @Component
 public class RabbitOutboxEventPublisher implements OutboxEventPublisher {
     static final Map<String, String> ROUTING_KEYS = Map.of(
-            AssessmentCompletedV2.EVENT_TYPE, AssessmentMessaging.COMPLETED_ROUTING_KEY);
+            AssessmentCompletedV2.EVENT_TYPE, AssessmentMessaging.COMPLETED_ROUTING_KEY,
+            com.ieltspath.events.assessment.GradingOverdueV1.EVENT_TYPE, AssessmentMessaging.GRADING_OVERDUE_ROUTING_KEY,
+            com.ieltspath.events.assessment.GradingDueSoonV1.EVENT_TYPE, AssessmentMessaging.GRADING_DUE_SOON_ROUTING_KEY,
+            com.ieltspath.events.assessment.GradingRequestedV1.EVENT_TYPE, AssessmentMessaging.GRADING_REQUESTED_ROUTING_KEY,
+            com.ieltspath.events.assessment.GradingCompletedV1.EVENT_TYPE, AssessmentMessaging.GRADING_COMPLETED_ROUTING_KEY);
 
     private final RabbitTemplate rabbitTemplate;
-    private final String exchange;
     private final Duration confirmTimeout;
 
     public RabbitOutboxEventPublisher(RabbitTemplate rabbitTemplate,
-                                      @Value("${assessment.messaging.exchange:" + AssessmentMessaging.EXCHANGE + "}") String exchange,
                                       @Value("${assessment.outbox.relay.confirm-timeout:PT5S}") Duration confirmTimeout) {
         this.rabbitTemplate = rabbitTemplate;
-        this.exchange = exchange;
         this.confirmTimeout = confirmTimeout;
     }
 
@@ -50,7 +52,7 @@ public class RabbitOutboxEventPublisher implements OutboxEventPublisher {
         if (routingKey == null) {
             throw new PublishFailedException("No routing key is configured for event type " + event.eventType());
         }
-        Message message = MessageBuilder.withBody(event.payload().getBytes(StandardCharsets.UTF_8))
+        var messageBuilder = MessageBuilder.withBody(event.payload().getBytes(StandardCharsets.UTF_8))
                 .setContentType(MessageProperties.CONTENT_TYPE_JSON)
                 .setContentEncoding(StandardCharsets.UTF_8.name())
                 .setMessageId(event.id().toString())
@@ -58,10 +60,11 @@ public class RabbitOutboxEventPublisher implements OutboxEventPublisher {
                 .setTimestamp(Date.from(event.createdAt()))
                 .setDeliveryMode(MessageDeliveryMode.PERSISTENT)
                 .setHeader("event_type", event.eventType())
-                .setHeader("aggregate_id", event.aggregateId())
-                .build();
+                .setHeader("aggregate_id", event.aggregateId());
+        if (event.correlationId() != null) messageBuilder.setHeader(Correlation.HEADER, event.correlationId());
+        Message message = messageBuilder.build();
         CorrelationData correlation = new CorrelationData(event.id().toString());
-        rabbitTemplate.send(exchange, routingKey, message, correlation);
+        rabbitTemplate.send(AssessmentMessaging.EXCHANGE, routingKey, message, correlation);
         CorrelationData.Confirm confirm;
         try {
             confirm = correlation.getFuture().get(confirmTimeout.toMillis(), TimeUnit.MILLISECONDS);

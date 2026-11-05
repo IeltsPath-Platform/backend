@@ -8,4 +8,5 @@ public interface RefreshTokenRepository {
     RefreshToken save(RefreshToken refreshToken);
     Optional<RefreshToken> findByTokenHash(String tokenHash);
     Optional<RefreshToken> consumeActiveToken(String tokenHash, java.time.LocalDateTime consumedAt);
+    int revokeAllActiveForUser(java.util.UUID userId, java.time.LocalDateTime revokedAt);
 }

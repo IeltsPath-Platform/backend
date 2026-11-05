@@ -37,6 +37,7 @@ public class JdbcCourseCatalogReader implements CourseCatalogReader {
         Map<UUID, KnowledgePointFact> points = knowledgePoints(query.knowledgePointIds());
         Set<UUID> packageIds = new LinkedHashSet<>(query.practiceSetPackageIds());
         packageIds.addAll(query.milestonePackageIds());
+        Map<String, UUID> questionRefs = resolveQuestionRefs(query.questionRefs());
         return new CourseCatalogFacts(
                 points,
                 expectedKnowledgePoints(query.cefrLevel(), query.skills()),
@@ -46,7 +47,7 @@ public class JdbcCourseCatalogReader implements CourseCatalogReader {
                 milestonePackagesLinked(query.milestonePackageIds()),
                 unlinkedPracticeSets(query.knowledgePointIds()),
                 withoutExerciseQuestion(query.knowledgePointIds()),
-                resolveQuestionRefs(query.questionRefs()),
+                questionRefs,
                 existing("courses", query.courseCodes()),
                 existing("topics", query.topicCodes()),
                 existing("lessons", query.lessonCodes()),
@@ -55,7 +56,8 @@ public class JdbcCourseCatalogReader implements CourseCatalogReader {
                         "SELECT EXISTS (SELECT 1 FROM courses WHERE band_level = :band)",
                         Map.of("band", query.band()), Boolean.class)),
                 new HashSet<>(jdbc.query("SELECT sort_order FROM topics WHERE parent_topic_id IS NULL",
-                        (rs, i) -> rs.getInt(1))));
+                        (rs, i) -> rs.getInt(1))),
+                ownedQuestionVersions(questionRefs.values()));
     }
 
     private Map<UUID, KnowledgePointFact> knowledgePoints(Collection<UUID> ids) {
@@ -164,10 +166,29 @@ public class JdbcCourseCatalogReader implements CourseCatalogReader {
                 JOIN question_versions qv ON qv.id = qkp.question_version_id
                 JOIN questions q ON q.id = qv.question_id
                 WHERE qkp.knowledge_point_id IN (:ids) AND qv.status = 'PUBLISHED' AND q.purpose = 'LEARNING'
+                  AND NOT EXISTS (SELECT 1 FROM lesson_block_questions owned WHERE owned.question_version_id = qv.id)
+                  AND NOT EXISTS (SELECT 1 FROM section_questions owned_sq WHERE owned_sq.question_version_id = qv.id)
                 """, Map.of("ids", ids), rs -> {
             without.remove(uuid(rs, "knowledge_point_id"));
         });
         return without;
+    }
+
+    /**
+     * The question versions that already belong to a lesson's exercise block or to a package section. A question has
+     * one home, so such a version cannot also be the exercise of a new lesson.
+     */
+    private Set<UUID> ownedQuestionVersions(Collection<UUID> versionIds) {
+        Set<UUID> owned = new HashSet<>();
+        if (versionIds.isEmpty()) return owned;
+        jdbc.query("""
+                SELECT question_version_id FROM lesson_block_questions WHERE question_version_id IN (:ids)
+                UNION
+                SELECT question_version_id FROM section_questions WHERE question_version_id IN (:ids)
+                """, Map.of("ids", List.copyOf(versionIds)), rs -> {
+            owned.add(uuid(rs, "question_version_id"));
+        });
+        return owned;
     }
 
     /**

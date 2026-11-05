@@ -14,7 +14,7 @@ public record ReviewSubmissionResponse(String reviewStatus, List<SubmissionRespo
     public static ReviewSubmissionResponse from(ReviewSubmissionResult result) {
         List<SubmissionResponse.Result> answers = result.results().stream().<SubmissionResponse.Result>map(answer ->
                 new SubmissionResponse.SolvedAnswer(answer.questionVersionId(), answer.correct(),
-                        answer.correctAnswer(), answer.explanation())).toList();
+                        answer.correctAnswer(), answer.explanation(), null, answer.error())).toList();
         return new ReviewSubmissionResponse(result.reviewStatus(), answers, result.transcript(), result.stage(),
                 result.failedSets(), result.gamification());
     }

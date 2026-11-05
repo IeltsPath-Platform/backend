@@ -21,6 +21,11 @@ public class ListErrorTypesUseCase {
         return activeOnly ? errorTypes.findActive() : errorTypes.findAll();
     }
 
+    /** The {@code ACTIVE} codes whatever their review status: the set a grader may record. */
+    public List<ErrorType> executeActive() {
+        return errorTypes.findActive();
+    }
+
     /** Returns only reviewed codes that may be included in learner-facing grading output. */
     public List<ErrorType> executeApprovedActive() {
         return errorTypes.findApprovedActive();

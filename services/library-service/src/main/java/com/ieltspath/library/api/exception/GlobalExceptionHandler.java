@@ -2,7 +2,6 @@ package com.ieltspath.library.api.exception;
 
 import com.ieltspath.commonstorage.StorageException;
 import com.ieltspath.commonstorage.UploadRejectedException;
-import com.ieltspath.library.application.exception.TopicServiceUnavailableException;
 import com.ieltspath.library.domain.exception.ConflictException;
 import com.ieltspath.library.domain.exception.ContentDomainException;
 import com.ieltspath.library.domain.exception.DuplicateCodeException;
@@ -12,6 +11,7 @@ import com.ieltspath.library.domain.exception.ResourceNotFoundException;
 import com.ieltspath.library.domain.exception.VideoNotFoundException;
 import com.ieltspath.library.domain.exception.VocabularyNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -24,6 +24,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.time.LocalDateTime;
@@ -34,6 +35,14 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler({org.springframework.dao.QueryTimeoutException.class,
+            org.springframework.transaction.TransactionTimedOutException.class})
+    public ResponseEntity<ErrorResponse> handleQueryTimeout(Exception ex, HttpServletRequest request) {
+        log.warn("Database query timed out: {}", request.getRequestURI());
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "Dịch vụ đang bận. Vui lòng thử lại.",
+                request.getRequestURI(), null);
+    }
 
     @ExceptionHandler({
             VocabularyNotFoundException.class,
@@ -123,6 +132,12 @@ public class GlobalExceptionHandler {
                 messageForPath(request, "Dữ liệu không hợp lệ", "Validation failed"), request.getRequestURI(), details);
     }
 
+    @ExceptionHandler({ConstraintViolationException.class, HandlerMethodValidationException.class})
+    public ResponseEntity<ErrorResponse> handleMethodValidation(Exception ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST,
+                messageForPath(request, "Dữ liệu không hợp lệ", "Validation failed"), request.getRequestURI(), null);
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadableRequest(HttpMessageNotReadableException ex,
                                                                    HttpServletRequest request) {
@@ -137,12 +152,6 @@ public class GlobalExceptionHandler {
         log.warn("Access denied: {}", ex.getMessage());
         return buildResponse(HttpStatus.FORBIDDEN,
                 messageForPath(request, "Forbidden", "Access denied"), request.getRequestURI(), null);
-    }
-
-    @ExceptionHandler(TopicServiceUnavailableException.class)
-    public ResponseEntity<ErrorResponse> handleTopicUnavailable(TopicServiceUnavailableException ex,
-                                                                  HttpServletRequest request) {
-        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request.getRequestURI(), null);
     }
 
     @ExceptionHandler(Exception.class)

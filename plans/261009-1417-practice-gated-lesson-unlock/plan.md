@@ -6,7 +6,7 @@ priority: P1
 branch: "main"
 tags: [learning-service, lesson-gate, practice, review, tdd]
 blockedBy: []
-blocks: []
+blocks: [261101-2358-first-attempt-suggested-review]
 created: "2026-10-09T07:37:24.523Z"
 createdBy: "ck:plan"
 source: skill
@@ -51,7 +51,7 @@ Chế độ: `--tdd`: mỗi phase viết/sửa test cho hành vi mới trước,
 | 1 | [Review repeats until passed](./phase-01-review-repeats-until-passed.md) | Completed |
 | 2 | [Practice clearance waits for every review](./phase-02-practice-clearance-waits-for-every-review.md) | Completed |
 | 3 | [Practice-gated lesson gate](./phase-03-practice-gated-lesson-gate.md) | Completed |
-| 4 | [Fixtures docs and verification](./phase-04-fixtures-docs-and-verification.md) | In progress (còn smoke, compile reactor) |
+| 4 | [Fixtures docs and verification](./phase-04-fixtures-docs-and-verification.md) | In progress (còn smoke qua Gateway) |
 
 Thứ tự: 1 → 2 → 3 → 4. Phase 1 và 2 độc lập về file nhưng phase 3 dựa trên luật của cả hai.
 

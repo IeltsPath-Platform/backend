@@ -3,8 +3,11 @@ package com.ieltspath.content.application.usecase;
 import com.ieltspath.commonstorage.key.ObjectKeys;
 import com.ieltspath.commonstorage.upload.ContentTypes;
 import com.ieltspath.commonstorage.upload.UploadPolicy;
-import com.ieltspath.content.application.port.ContentAudioStorage;
-import com.ieltspath.content.application.result.StoredAudioResult;
+import com.ieltspath.content.application.port.ContentMediaStorage;
+import com.ieltspath.content.application.result.StoredMediaResult;
+import com.ieltspath.content.domain.vo.AccessTier;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -21,15 +24,29 @@ public class UploadContentAudioUseCase {
     private static final UploadPolicy POLICY = UploadPolicy.of(MAX_AUDIO_BYTES,
             "audio/mpeg", "audio/mp4", "audio/wav", "audio/ogg");
 
-    private final ContentAudioStorage storage;
+    private final ContentMediaStorage storage;
+    private final String premiumBucket;
 
-    public UploadContentAudioUseCase(ContentAudioStorage storage) {
+    @Autowired
+    public UploadContentAudioUseCase(ContentMediaStorage storage,
+                                    @Value("${content.media.premium-bucket:media-premium}") String premiumBucket) {
         this.storage = storage;
+        this.premiumBucket = premiumBucket;
     }
 
-    public StoredAudioResult execute(UUID userId, String declaredContentType, byte[] content) {
+    public UploadContentAudioUseCase(ContentMediaStorage storage) {
+        this(storage, "media-premium");
+    }
+
+    public StoredMediaResult execute(UUID userId, String declaredContentType, byte[] content) {
+        return execute(userId, declaredContentType, content, AccessTier.PUBLIC);
+    }
+
+    public StoredMediaResult execute(UUID userId, String declaredContentType, byte[] content, AccessTier tier) {
         String contentType = POLICY.check(content, declaredContentType);
         String key = ObjectKeys.forUser(KEY_PREFIX, userId, ContentTypes.extensionFor(contentType));
-        return storage.store(key, content, contentType);
+        return tier == AccessTier.PREMIUM
+                ? storage.store(premiumBucket, key, content, contentType)
+                : storage.store(key, content, contentType);
     }
 }

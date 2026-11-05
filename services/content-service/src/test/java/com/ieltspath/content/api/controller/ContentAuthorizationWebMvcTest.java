@@ -63,6 +63,8 @@ class ContentAuthorizationWebMvcTest {
     @MockitoBean ListCoursesUseCase listCourses;
     @MockitoBean CreateCourseUseCase createCourse;
     @MockitoBean UpdateCourseUseCase updateCourse;
+    @MockitoBean MediaReferencePolicy mediaReferencePolicy;
+    @MockitoBean com.ieltspath.content.application.usecase.MediaUrlResolver mediaUrlResolver;
 
     @Test
     @WithMockUser(roles = "CUSTOMER")
@@ -103,6 +105,7 @@ class ContentAuthorizationWebMvcTest {
     }
     @MockitoBean ListQuestionsUseCase listQuestions;
     @MockitoBean GetQuestionDetailUseCase getQuestionDetail;
+    @MockitoBean GetQuestionPassagesUseCase getQuestionPassages;
     @MockitoBean CreateQuestionUseCase createQuestion;
     @MockitoBean AddQuestionVersionUseCase addQuestionVersion;
     @MockitoBean ArchiveQuestionUseCase archiveQuestion;

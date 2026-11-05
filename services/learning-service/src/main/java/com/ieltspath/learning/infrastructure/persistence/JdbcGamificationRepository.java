@@ -25,6 +25,21 @@ public class JdbcGamificationRepository implements GamificationRepository {
     }
 
     @Override
+    public java.util.Map<UUID, String> timezones(java.util.Collection<UUID> userIds) {
+        if (userIds.isEmpty()) return java.util.Map.of();
+        java.util.Map<UUID, String> zones = new java.util.HashMap<>();
+        jdbc.query(connection -> {
+            var statement = connection.prepareStatement(
+                    "SELECT user_id, timezone FROM learner_settings WHERE user_id = ANY (?)");
+            statement.setArray(1, connection.createArrayOf("uuid", userIds.stream().map(UUID::toString).toArray()));
+            return statement;
+        }, rows -> {
+            zones.put(rows.getObject("user_id", UUID.class), rows.getString("timezone"));
+        });
+        return zones;
+    }
+
+    @Override
     public void saveTimezone(UUID userId, String timezone) {
         jdbc.update("""
                 INSERT INTO learner_settings (user_id, timezone) VALUES (?, ?)

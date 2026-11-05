@@ -12,8 +12,6 @@ import java.util.regex.Pattern;
 public final class MediaReferencePolicy {
 
     private static final Pattern HTTPS_URL = Pattern.compile("^https://\\S+$");
-    private static final Pattern IMAGE_DATA_URI =
-            Pattern.compile("^data:image/(png|jpeg|svg\\+xml);base64,[A-Za-z0-9+/]+={0,2}$");
     /** A relative object key such as {@code listening/demo/ls1.mp3}: no scheme, no leading slash. */
     private static final Pattern OBJECT_KEY = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9._-]+)*$");
 
@@ -31,9 +29,6 @@ public final class MediaReferencePolicy {
     public String resolve(AssetType assetType, String mediaReference) {
         if (mediaReference != null && assetType != null) {
             if (HTTPS_URL.matcher(mediaReference).matches()) {
-                return mediaReference;
-            }
-            if (assetType == AssetType.IMAGE && IMAGE_DATA_URI.matcher(mediaReference).matches()) {
                 return mediaReference;
             }
             if ((assetType == AssetType.AUDIO || assetType == AssetType.IMAGE)

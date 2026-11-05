@@ -18,6 +18,14 @@ class EventNamesContractTest {
         assertEquals("points.grant.settled", PointsGrantMessaging.SETTLED_ROUTING_KEY);
         assertEquals("assessment.events", AssessmentMessaging.EXCHANGE);
         assertEquals("assessment.completed.v2", AssessmentMessaging.COMPLETED_ROUTING_KEY);
+        assertEquals("assessment.grading-overdue.v1", AssessmentMessaging.GRADING_OVERDUE_ROUTING_KEY);
+        assertEquals("assessment.grading-overdue.v1", com.ieltspath.events.assessment.GradingOverdueV1.EVENT_TYPE);
+        assertEquals("assessment.grading-due-soon.v1", AssessmentMessaging.GRADING_DUE_SOON_ROUTING_KEY);
+        assertEquals("assessment.grading-due-soon.v1", com.ieltspath.events.assessment.GradingDueSoonV1.EVENT_TYPE);
+        assertEquals("assessment.grading-requested.v1", AssessmentMessaging.GRADING_REQUESTED_ROUTING_KEY);
+        assertEquals("assessment.grading-requested.v1", com.ieltspath.events.assessment.GradingRequestedV1.EVENT_TYPE);
+        assertEquals("assessment.grading-completed.v1", AssessmentMessaging.GRADING_COMPLETED_ROUTING_KEY);
+        assertEquals("assessment.grading-completed.v1", com.ieltspath.events.assessment.GradingCompletedV1.EVENT_TYPE);
         assertEquals("community.events", CommunityMessaging.EXCHANGE);
         assertEquals("x-retry-count", MessageHeaders.RETRY_COUNT);
         assertEquals(30_000L, PointsGrantMessaging.RETRY_DELAY_MS);

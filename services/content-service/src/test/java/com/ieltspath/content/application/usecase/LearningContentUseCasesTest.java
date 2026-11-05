@@ -29,7 +29,7 @@ class LearningContentUseCasesTest {
     void practiceSetSearchAppliesDefaults() {
         UUID kp = UUID.randomUUID();
         new SearchPracticeSetsUseCase(reader).execute(new SearchPracticeSetsCommand(kp, null, null, null, null));
-        verify(reader).searchPracticeSets(kp, List.of(), 3, 1, null);
+        verify(reader).searchPracticeSets(kp, List.of(), 3, 1, null, null);
     }
 
     @Test
@@ -38,7 +38,15 @@ class LearningContentUseCasesTest {
         List<UUID> exclude = List.of(UUID.randomUUID());
         UUID lesson = UUID.randomUUID();
         new SearchPracticeSetsUseCase(reader).execute(new SearchPracticeSetsCommand(kp, exclude, 4, 10, lesson));
-        verify(reader).searchPracticeSets(kp, exclude, 4, 10, lesson);
+        verify(reader).searchPracticeSets(kp, exclude, 4, 10, lesson, null);
+    }
+
+    @Test
+    void practiceSetSearchPassesTrapCode() {
+        UUID kp = UUID.randomUUID();
+        new SearchPracticeSetsUseCase(reader).execute(
+                new SearchPracticeSetsCommand(kp, List.of(), 3, 5, null, "TFNG_NG_AS_FALSE"));
+        verify(reader).searchPracticeSets(kp, List.of(), 3, 5, null, "TFNG_NG_AS_FALSE");
     }
 
     @Test
@@ -51,13 +59,19 @@ class LearningContentUseCasesTest {
                 () -> useCase.execute(new SearchPracticeSetsCommand(kp, null, null, 11, null)));
         assertThrows(IllegalArgumentException.class,
                 () -> useCase.execute(new SearchPracticeSetsCommand(kp, null, 0, null, null)));
-        verify(reader, never()).searchPracticeSets(any(), any(), anyInt(), anyInt(), any());
+        verify(reader, never()).searchPracticeSets(any(), any(), anyInt(), anyInt(), any(), any());
     }
 
     @Test
     void topicSequenceUsesTheSearchDefaultForPracticeSets() {
         new GetTopicSequenceUseCase(reader).execute();
-        verify(reader).topicSequence(SearchPracticeSetsUseCase.DEFAULT_MIN_QUESTIONS);
+        verify(reader).topicSequence(SearchPracticeSetsUseCase.DEFAULT_MIN_QUESTIONS, false);
+    }
+
+    @Test
+    void topicSequenceForwardsOptionalTrapRequest() {
+        new GetTopicSequenceUseCase(reader).execute(true);
+        verify(reader).topicSequence(SearchPracticeSetsUseCase.DEFAULT_MIN_QUESTIONS, true);
     }
 
     @Test

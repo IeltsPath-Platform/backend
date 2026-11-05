@@ -4,10 +4,14 @@ import com.ieltspath.learning.application.command.SubmitExerciseCommand;
 import com.ieltspath.learning.application.command.SubmitReviewCommand;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.*;
+import com.ieltspath.learning.application.port.AccessClient;
+import com.ieltspath.learning.application.exception.AccessUnavailableException;
 import com.ieltspath.learning.application.result.TopicLessonsResult;
 import com.ieltspath.learning.application.usecase.*;
 import com.ieltspath.learning.domain.exception.LearningGateException;
 import com.ieltspath.learning.domain.vo.LearningSkill;
+import com.ieltspath.learning.domain.vo.PracticePassReason;
+import com.ieltspath.learning.domain.vo.PracticeSubmission;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -57,6 +62,7 @@ class PracticeGatedLessonUnlockIntegrationTest {
     @Autowired RefreshLearningTopicsUseCase topics;
     @Autowired GetLessonUseCase getLesson;
     @Autowired GetTopicLessonsUseCase topicLessons;
+    @Autowired GetLessonPracticeSetsUseCase practiceSets;
     @Autowired CompleteLessonUseCase complete;
     @Autowired SubmitLessonExerciseUseCase exercise;
     @Autowired StartPracticeAttemptUseCase start;
@@ -64,6 +70,7 @@ class PracticeGatedLessonUnlockIntegrationTest {
     @Autowired GetReviewUseCase getReview;
     @Autowired SubmitReviewUseCase submitReview;
     @MockitoBean LearningContentClient content;
+    @MockitoBean AccessClient access;
 
     private final UUID topic = UUID.randomUUID();
     private final UUID lesson1 = UUID.randomUUID();
@@ -79,6 +86,7 @@ class PracticeGatedLessonUnlockIntegrationTest {
 
     @BeforeEach
     void stubContent() {
+        LearningContentClientTestSupport.stubLessonAccessSummaries(content);
         when(content.getTopicSequence()).thenReturn(List.of(new Topic(topic, "READ", "Reading", 1, null,
                 List.of(new KnowledgePoint(kpA, "A", "A", "PROCEDURE", "READING", "", true),
                         new KnowledgePoint(kpB, "B", "B", "PROCEDURE", "READING", "", true)),
@@ -182,44 +190,202 @@ class PracticeGatedLessonUnlockIntegrationTest {
     }
 
     @Test
-    void aFailedPracticeSendsTheLearnerToTheReviewAndTheSecondLessonOpensWhenItIsDone() {
+    void lessonsBeyondTheFreePreviewReturnPaywallWhileTheFirstThreeStayOpen() {
+        UUID courseId = UUID.randomUUID();
+        var course = new Course(courseId, "C65", "Band 6.5", new BigDecimal("6.5"), false);
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(topic, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(kpA, "A", "A", "PROCEDURE", "READING", "", true)),
+                LearningSkill.READING, false, course)));
+        when(content.getTopicLessons(topic)).thenReturn(List.of(
+                new LessonSummary(lesson1, topic, "L1", "Lesson one", null, 1, List.of(kpA), List.of(),
+                        Set.of(LearningSkill.READING), null, courseId, LearningSkill.READING, 2),
+                new LessonSummary(lesson2, topic, "L2", "Lesson two", null, 2, List.of(kpA), List.of(),
+                        Set.of(LearningSkill.READING), null, courseId, LearningSkill.READING, 4)));
+        when(content.getLesson(lesson1)).thenReturn(new Lesson(lesson1, topic, "L1", "Lesson one", null, 1,
+                List.of(kpA), List.of(), LearningSkill.READING, Set.of(LearningSkill.READING), courseId, 2));
+        when(content.getLesson(lesson2)).thenReturn(new Lesson(lesson2, topic, "L2", "Lesson two", null, 2,
+                List.of(kpA), List.of(), LearningSkill.READING, Set.of(LearningSkill.READING), courseId, 4));
+        when(access.premium()).thenReturn(false);
         UUID user = UUID.randomUUID();
-        PackageVersion first = practiceSet(kpA, kpA);
+        topics.execute(user);
+
+        assertDoesNotThrow(() -> getLesson.execute(user, lesson1));
+        LearningGateException error = assertThrows(LearningGateException.class, () -> getLesson.execute(user, lesson2));
+        assertEquals("PAYWALL", error.getCode());
+        TopicLessonsResult result = topicLessons.execute(user, topic);
+        assertFalse(result.lessons().get(0).paywall());
+        assertTrue(result.lessons().get(0).freePreview());
+        assertTrue(result.lessons().get(1).paywall());
+        assertFalse(result.lessons().get(1).freePreview());
+    }
+
+    @Test
+    void premiumExpiryLocksNewPremiumProgressButGrandfatheredProgressStaysReadableDuringAccessOutage() {
+        UUID courseId = UUID.randomUUID();
+        var course = new Course(courseId, "C65", "Band 6.5", new BigDecimal("6.5"), false);
+        when(content.getTopicSequence()).thenReturn(List.of(new Topic(topic, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(kpA, "A", "A", "PROCEDURE", "READING", "", true)),
+                LearningSkill.READING, false, course)));
+        when(content.getTopicLessons(topic)).thenReturn(List.of(new LessonSummary(lesson1, topic, "L1",
+                "Lesson one", null, 1, List.of(kpA), List.of(), Set.of(LearningSkill.READING), null, courseId,
+                LearningSkill.READING, 4)));
+        when(content.getLesson(lesson1)).thenReturn(new Lesson(lesson1, topic, "L1", "Lesson one", null, 1,
+                List.of(kpA), List.of(), LearningSkill.READING, Set.of(LearningSkill.READING), courseId, 4));
+        UUID user = UUID.randomUUID();
+        topics.execute(user);
+        when(access.premium()).thenReturn(true);
+        complete.execute(user, lesson1);
+        assertFalse(jdbc.queryForObject("SELECT grandfathered FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
+                Boolean.class, user, lesson1));
+
+        when(access.premium()).thenReturn(false);
+        assertEquals("PAYWALL", assertThrows(LearningGateException.class,
+                () -> getLesson.execute(user, lesson1)).getCode());
+
+        jdbc.update("UPDATE lesson_progress SET grandfathered = true WHERE user_id = ? AND lesson_id = ?",
+                user, lesson1);
+        when(access.premium()).thenThrow(new AccessUnavailableException(503));
+        assertDoesNotThrow(() -> getLesson.execute(user, lesson1));
+    }
+
+    @Test
+    void aFailedFirstPracticeSuggestsAReviewAndKeepsTheSecondLessonOpen() {
+        UUID user = UUID.randomUUID();
+        PackageVersion first = practiceSet(kpA, kpA, kpA, kpA);
         PackageVersion second = practiceSet(kpA, kpA);
         topics.execute(user);
         exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
         var attempt = start.execute(user, lesson1, first.packageId());
-        var submitted = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "B"));
+        var submitted = practice.execute(user, attempt.attemptId(), answers(items(first), "A", "A", "B", "B"));
         assertFalse(submitted.passed());
-        UUID reviewId = submitted.reviewsCreated().getFirst().reviewId();
+        var created = submitted.reviewsCreated().getFirst();
+        assertFalse(created.blocking());
+        assertEquals("PRACTICE", created.stage());
+        assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT blocking FROM review_items WHERE id = ?",
+                Boolean.class, created.reviewId()));
+        assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
+        assertDoesNotThrow(() -> getLesson.execute(user, lesson2));
+        assertEquals(PracticePassReason.ATTEMPT_NOT_BLOCKED, practiceSets.execute(user, lesson1).practicePassReason());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM lesson_practice_passes WHERE user_id = ?",
+                Integer.class, user));
 
-        LearningGateException blocked = assertThrows(LearningGateException.class,
-                () -> getLesson.execute(user, lesson2));
-        assertEquals("REVIEW_REQUIRED", blocked.getCode());
-        assertEquals(List.of(reviewId), blocked.getReviews().stream().map(review -> review.reviewId()).toList());
-        assertEquals(List.of("COMPLETED", "LOCKED"), statuses(user));
-
-        var review = getReview.execute(user, reviewId);
+        var review = getReview.execute(user, created.reviewId());
         assertEquals(second.packageId(), review.set().packageId());
-        var done = submitReview.execute(user, reviewId, new SubmitReviewCommand(review.set().reviewSetId(),
+        var done = submitReview.execute(user, created.reviewId(), new SubmitReviewCommand(review.set().reviewSetId(),
                 UUID.randomUUID(), answers(items(second), "A", "A").answers()));
         assertEquals("DONE", done.reviewStatus());
-
         assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
         assertDoesNotThrow(() -> getLesson.execute(user, lesson2));
     }
 
     @Test
-    void aReviewThatRunsOutOfPackagesEndsAndOpensTheSecondLesson() {
+    void theSamePointWeakAgainInAnotherSetTurnsTheSuggestionIntoABlockingReview() {
         UUID user = UUID.randomUUID();
-        PackageVersion only = practiceSet(kpA, kpA);
+        PackageVersion first = practiceSet(kpA, kpA, kpA, kpA);
+        PackageVersion second = practiceSet(kpA, kpA, kpA, kpA);
+        PackageVersion third = practiceSet(kpA, kpA);
+        topics.execute(user);
+        exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
+        var suggested = practice.execute(user, start.execute(user, lesson1, first.packageId()).attemptId(),
+                answers(items(first), "A", "A", "B", "B")).reviewsCreated().getFirst();
+        var again = practice.execute(user, start.execute(user, lesson1, second.packageId()).attemptId(),
+                answers(items(second), "A", "A", "B", "B"));
+
+        assertEquals(List.of(suggested.reviewId()), again.reviewsCreated().stream()
+                .map(PracticeSubmission.ReviewCreated::reviewId).toList());
+        assertTrue(again.reviewsCreated().getFirst().blocking());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?", Integer.class, user));
+        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
+                () -> getLesson.execute(user, lesson2)).getCode());
+        assertEquals(List.of("COMPLETED", "LOCKED"), statuses(user));
+
+        var review = getReview.execute(user, suggested.reviewId());
+        assertEquals(third.packageId(), review.set().packageId());
+        assertEquals("DONE", submitReview.execute(user, suggested.reviewId(), new SubmitReviewCommand(
+                review.set().reviewSetId(), UUID.randomUUID(), answers(items(third), "A", "A").answers())).reviewStatus());
+        assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
+    }
+
+    @Test
+    void failingTheSetOfASuggestedReviewMakesItBlockingAtTheTheoryStage() {
+        UUID user = UUID.randomUUID();
+        PackageVersion first = practiceSet(kpA, kpA, kpA, kpA);
+        PackageVersion second = practiceSet(kpA, kpA);
+        topics.execute(user);
+        exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
+        UUID reviewId = practice.execute(user, start.execute(user, lesson1, first.packageId()).attemptId(),
+                answers(items(first), "A", "A", "B", "B")).reviewsCreated().getFirst().reviewId();
+
+        var review = getReview.execute(user, reviewId);
+        var failed = submitReview.execute(user, reviewId, new SubmitReviewCommand(review.set().reviewSetId(),
+                UUID.randomUUID(), answers(items(second), "B", "B").answers()));
+
+        assertEquals("PENDING", failed.reviewStatus());
+        assertEquals("THEORY", failed.stage());
+        assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT blocking FROM review_items WHERE id = ?",
+                Boolean.class, reviewId));
+        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
+                () -> getLesson.execute(user, lesson2)).getCode());
+    }
+
+    @Test
+    void aFailedPracticeWithoutTwoWrongAnswersOnAPointCreatesNoReviewAndOpensTheSecondLesson() {
+        UUID user = UUID.randomUUID();
+        PackageVersion first = practiceSet(kpA, kpA);
+        practiceSet(kpB, kpB);
+        topics.execute(user);
+        exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
+        var submitted = practice.execute(user, start.execute(user, lesson1, first.packageId()).attemptId(),
+                answers(items(first), "A", "B"));
+
+        assertFalse(submitted.passed());
+        assertTrue(submitted.reviewsCreated().isEmpty());
+        assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
+        assertEquals(PracticePassReason.ATTEMPT_NOT_BLOCKED, practiceSets.execute(user, lesson1).practicePassReason());
+    }
+
+    @Test
+    void aWeakPointPromotesItsPendingErrorPatternReviewButLeavesABasketReviewOptional() {
+        UUID user = UUID.randomUUID();
+        PackageVersion first = practiceSet(kpA, kpA, kpB, kpB);
+        practiceSet(kpA, kpB);
+        topics.execute(user);
+        exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
+        UUID errorReview = UUID.randomUUID();
+        UUID basketReview = UUID.randomUUID();
+        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind, "
+                + "blocking, stage) VALUES (?, ?, ?, ?, 'PENDING', 'READING', 'ERROR_PATTERN', false, 'PRACTICE')",
+                errorReview, user, kpA, lesson1);
+        jdbc.update("INSERT INTO review_items (id, user_id, knowledge_point_id, lesson_id, status, skill, trigger_kind, "
+                + "blocking, stage) VALUES (?, ?, ?, ?, 'PENDING', 'READING', 'CONSOLIDATE', false, 'PRACTICE')",
+                basketReview, user, kpB, lesson1);
+
+        var submitted = practice.execute(user, start.execute(user, lesson1, first.packageId()).attemptId(),
+                answers(items(first), "B", "B", "B", "B"));
+
+        assertEquals(List.of(errorReview), submitted.reviewsCreated().stream()
+                .map(PracticeSubmission.ReviewCreated::reviewId).toList());
+        assertTrue(submitted.reviewsCreated().getFirst().blocking());
+        assertEquals("ERROR_PATTERN", jdbc.queryForObject("SELECT trigger_kind FROM review_items WHERE id = ?",
+                String.class, errorReview));
+        assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT blocking FROM review_items WHERE id = ?",
+                Boolean.class, basketReview));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM review_items WHERE user_id = ?", Integer.class, user));
+        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
+                () -> getLesson.execute(user, lesson2)).getCode());
+    }
+
+    @Test
+    void aSuggestedReviewThatRunsOutOfPackagesEndsWithoutHoldingTheSecondLesson() {
+        UUID user = UUID.randomUUID();
+        PackageVersion only = practiceSet(kpA, kpA, kpA, kpA);
         topics.execute(user);
         exercise.execute(user, lesson1, block1, answers(List.of(question1a, question1b), "A", "A"));
         var attempt = start.execute(user, lesson1, only.packageId());
-        var submitted = practice.execute(user, attempt.attemptId(), answers(items(only), "A", "B"));
+        // Half right keeps the suggestion at the practice stage, where it can run out of packages.
+        var submitted = practice.execute(user, attempt.attemptId(), answers(items(only), "A", "A", "B", "B"));
         UUID reviewId = submitted.reviewsCreated().getFirst().reviewId();
-        assertEquals("REVIEW_REQUIRED", assertThrows(LearningGateException.class,
-                () -> getLesson.execute(user, lesson2)).getCode());
+        assertDoesNotThrow(() -> getLesson.execute(user, lesson2));
 
         // The only package is revealed, so the review ends instead of leaving the learner stuck.
         assertEquals("SKIPPED", getReview.execute(user, reviewId).reviewStatus());
@@ -227,6 +393,129 @@ class PracticeGatedLessonUnlockIntegrationTest {
         assertEquals(List.of("COMPLETED", "AVAILABLE"), statuses(user));
         assertDoesNotThrow(() -> getLesson.execute(user, lesson2));
     }
+
+    @Test
+    void practiceSetListingRejectsAnUnownedPaywalledLesson() {
+        var target = practiceListingLesson(4, false, false, false);
+        when(access.premium()).thenReturn(false);
+
+        LearningGateException error = assertThrows(LearningGateException.class,
+                () -> practiceSets.execute(target.userId(), target.lessonId()));
+
+        assertEquals("PAYWALL", error.getCode());
+    }
+
+    @Test
+    void completedLessonPracticeSetsRemainListableAfterPremiumExpires() {
+        var target = practiceListingLesson(4, true, false, false);
+        // Durable completion remains reviewable after Premium expires.
+        when(access.premium()).thenReturn(false);
+
+        var result = practiceSets.execute(target.userId(), target.lessonId());
+
+        assertTrue(result.lessonCompleted());
+        assertEquals(1, result.items().size());
+    }
+
+    @Test
+    void listingCompletedLessonPracticeSetsDoesNotWritePracticePassesInReadOnlyTransaction() {
+        var target = practiceListingLesson(4, true, false, false);
+        UUID topicId = jdbc.queryForObject("SELECT topic_id FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
+                UUID.class, target.userId(), target.lessonId());
+        UUID previousLessonId = UUID.randomUUID();
+        UUID previousKnowledgePointId = UUID.randomUUID();
+        Lesson current = content.getLesson(target.lessonId());
+        Lesson previous = new Lesson(previousLessonId, topicId, "PREVIOUS", "Previous lesson", null, 1,
+                List.of(previousKnowledgePointId), List.of(), LearningSkill.READING);
+        LessonSummary previousSummary = new LessonSummary(previousLessonId, topicId, "PREVIOUS", "Previous lesson",
+                null, 1, List.of(previousKnowledgePointId), List.of());
+        LessonSummary currentSummary = new LessonSummary(current.lessonId(), current.topicId(), current.code(),
+                current.title(), current.summary(), 2, current.knowledgePointIds(), List.of(), current.skills(), null,
+                current.courseId(), current.skill(), current.skillPosition());
+        when(content.getTopicLessons(topicId)).thenReturn(List.of(previousSummary, currentSummary));
+        when(content.getLesson(previousLessonId)).thenReturn(previous);
+        jdbc.update("INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, "
+                        + "knowledge_point_ids, completed_at) VALUES (?, ?, ?, 1, ARRAY[CAST(? AS uuid)], now())",
+                target.userId(), previousLessonId, topicId, previousKnowledgePointId.toString());
+        when(access.premium()).thenReturn(false);
+
+        var result = assertDoesNotThrow(() -> practiceSets.execute(target.userId(), target.lessonId()));
+
+        assertTrue(result.lessonCompleted());
+        assertEquals(1, result.items().size());
+    }
+
+    @Test
+    void premiumLearnerCanListPracticeSetsForAnUnownedPaywalledLesson() {
+        var target = practiceListingLesson(4, false, false, false);
+        when(access.premium()).thenReturn(true);
+
+        var result = practiceSets.execute(target.userId(), target.lessonId());
+
+        assertEquals(1, result.items().size());
+    }
+
+    @Test
+    void accessOutageAllowsFreeOwnedGrandfatheredAndCompletedPracticeSetsButFailsClosedForPaywalledLessons() {
+        when(access.premium()).thenThrow(new AccessUnavailableException(503));
+
+        var free = practiceListingLesson(3, false, false, false);
+        assertDoesNotThrow(() -> practiceSets.execute(free.userId(), free.lessonId()));
+
+        var owned = practiceListingLesson(4, false, false, true);
+        assertDoesNotThrow(() -> practiceSets.execute(owned.userId(), owned.lessonId()));
+
+        var grandfathered = practiceListingLesson(4, false, true, false);
+        assertDoesNotThrow(() -> practiceSets.execute(grandfathered.userId(), grandfathered.lessonId()));
+        var completed = practiceListingLesson(4, true, false, false);
+        var completedResult = assertDoesNotThrow(() -> practiceSets.execute(completed.userId(), completed.lessonId()));
+        assertTrue(completedResult.lessonCompleted());
+
+        var paywalled = practiceListingLesson(4, false, false, false);
+        AccessUnavailableException error = assertThrows(AccessUnavailableException.class,
+                () -> practiceSets.execute(paywalled.userId(), paywalled.lessonId()));
+        assertTrue(error.getMessage().contains("status 503"));
+        verify(access, times(1)).premium();
+    }
+
+    private PracticeListingTarget practiceListingLesson(int skillPosition, boolean completed, boolean grandfathered,
+                                                         boolean owned) {
+        UUID courseId = UUID.randomUUID();
+        UUID topicId = UUID.randomUUID();
+        UUID lessonId = UUID.randomUUID();
+        UUID kpId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID packageId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        var course = new Course(courseId, "C60", "Band 6.0", new BigDecimal("6.0"), true, true);
+        var topic = new Topic(topicId, "READ", "Reading", 1, null,
+                List.of(new KnowledgePoint(kpId, "READ", "Reading", "PROCEDURE", "READING", "", true)),
+                LearningSkill.READING, false, course);
+        var summary = new LessonSummary(lessonId, topicId, "L", "Lesson", null, 1, List.of(kpId), List.of(),
+                Set.of(LearningSkill.READING), null, courseId, LearningSkill.READING, skillPosition);
+        var lesson = new Lesson(lessonId, topicId, "L", "Lesson", null, 1, List.of(kpId), List.of(),
+                LearningSkill.READING, Set.of(LearningSkill.READING), courseId, skillPosition);
+        when(content.getTopicSequence()).thenReturn(List.of(topic));
+        when(content.getTopicLessons(topicId)).thenReturn(List.of(summary));
+        when(content.getLesson(lessonId)).thenReturn(lesson);
+        when(content.lessonPracticeSets(lessonId)).thenReturn(List.of(new LessonPracticeSet(packageId, versionId,
+                "PS", "Practice", 2, List.of(), null)));
+        topics.execute(userId);
+        if (owned) {
+            jdbc.update("INSERT INTO learner_course_unlocks (user_id, course_id, skill, point_cost, request_id, status) "
+                    + "VALUES (?, ?, 'READING', 50, ?, 'ACTIVE')", userId, courseId, UUID.randomUUID());
+        }
+        if (completed || grandfathered) {
+            jdbc.update("INSERT INTO lesson_progress (user_id, lesson_id, topic_id, lesson_sort_order, "
+                            + "knowledge_point_ids, completed_at, grandfathered) "
+                            + "VALUES (?, ?, ?, 1, ARRAY[CAST(? AS uuid)], ?, ?)", userId, lessonId, topicId,
+                    kpId.toString(), completed ? java.sql.Timestamp.from(java.time.Instant.now()) : null,
+                    grandfathered);
+        }
+        return new PracticeListingTarget(userId, lessonId);
+    }
+
+    private record PracticeListingTarget(UUID userId, UUID lessonId) {}
 
     @Test
     void aFirstLessonWithoutPracticeOpensTheSecondAndAnOpenedLessonStaysOpenWhenSetsArePublishedLater() {
