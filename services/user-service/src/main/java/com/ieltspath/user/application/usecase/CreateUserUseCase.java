@@ -10,6 +10,7 @@ import com.ieltspath.user.domain.repository.RoleRepository;
 import com.ieltspath.user.domain.repository.UserRepository;
 import com.ieltspath.user.domain.service.RoleAssignmentPolicy;
 import com.ieltspath.user.domain.vo.Email;
+import com.ieltspath.user.domain.vo.FullName;
 import com.ieltspath.user.domain.vo.PasswordPolicy;
 import com.ieltspath.user.domain.vo.PhoneNumber;
 import com.ieltspath.user.domain.vo.RoleName;
@@ -46,7 +47,7 @@ public class CreateUserUseCase {
         User user = User.builder()
                 .email(email)
                 .passwordHash(passwordEncoder.encode(requirePassword(command.password())))
-                .fullName(requireFullName(command.fullName()))
+                .fullName(new FullName(command.fullName()).value())
                 .phoneNumber(phoneNumber)
                 .status(UserStatus.ACTIVE)
                 .roles(resolveRoles(command.roles()))
@@ -66,13 +67,6 @@ public class CreateUserUseCase {
             throw new RoleNotFoundException("Một hoặc nhiều vai trò không tồn tại");
         }
         return roles;
-    }
-
-    private String requireFullName(String fullName) {
-        if (fullName == null || fullName.isBlank()) {
-            throw new IllegalArgumentException("Họ tên không được để trống");
-        }
-        return fullName.trim();
     }
 
     private String requirePassword(String password) {

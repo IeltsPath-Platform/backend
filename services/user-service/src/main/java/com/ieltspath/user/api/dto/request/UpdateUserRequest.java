@@ -1,11 +1,12 @@
 package com.ieltspath.user.api.dto.request;
 
 import com.ieltspath.user.api.validation.PhoneInput;
+import com.ieltspath.user.domain.vo.FullName;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotBlank;
 
 public record UpdateUserRequest(@NotBlank(message = "Họ tên không được để trống")
-        @Size(max = 150, message = "Họ tên không được vượt quá 150 ký tự")
+        @Size(max = FullName.MAX_LENGTH, message = FullName.TOO_LONG_MESSAGE)
         String fullName,
         @Size(max = 30, message = "Số điện thoại không được vượt quá 30 ký tự")
         @PhoneInput
