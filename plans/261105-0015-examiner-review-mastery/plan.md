@@ -71,7 +71,7 @@ thứ tự: event chưa có người nghe thì nằm trong queue (topology khai 
 
 ## Dữ kiện đã kiểm chứng (2026-11-05)
 
-- Migration mới nhất: learning **V42**, assessment **V22**, content **V112**. Plan dùng learning V43, content V113 (kiểm lại trước khi tạo).
+- Migration baseline: learning **V42**, assessment **V22**, content **V114** trên main. Nhánh dùng learning V43, content V115 cho mapping grammar và V116 cho bộ luyện grammar; giữ nguyên Content V113/V114 và Library V36 từ main để tương thích DB đã chạy chúng.
 - Examiner gửi `criteria[{criterion, band, comment}]` với `criterion` ∈ `taskResponse|coherence|lexical|grammar` (`gradingLabels.ts`), `errorCodes`, `annotations[].errorCode`.
 - `JdbcHumanReviewStore.complete` trả `Completed` khi thật sự lưu lần đầu; `GradingCompletedAnnouncer` ghi outbox `Propagation.MANDATORY`.
 - `human_review_submissions.source_submission_id` = id bài viết trong Learning (`lesson_writing_submissions.id`).

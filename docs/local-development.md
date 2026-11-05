@@ -52,6 +52,11 @@ Với service sử dụng Flyway, migration tự chạy khi service khởi độ
 2. Đặt tên theo mẫu `V<version>__<short_description>.sql`: version tăng dần, mô tả viết thường và dùng dấu gạch dưới; ví dụ `V1__create_initial_schema.sql`.
 3. Không sửa migration đã được áp dụng; tạo migration mới với version tiếp theo cho mọi thay đổi schema.
 
+Khi đổi nhánh mà gặp checksum mismatch hoặc migration đã chạy nhưng thiếu file local, đối chiếu tên file và checksum
+với lịch sử Git trước. Giữ nguyên migration đã chạy từ nhánh chính và đánh số tiếp theo cho migration mới của nhánh
+tính năng nếu trùng version. Không dùng `repair` để thay checksum của hai migration có nội dung khác nhau: thao tác
+này chỉ đổi lịch sử Flyway, không chạy SQL còn thiếu.
+
 ## 4. Chạy luồng chính local (học bài → đề cuối → Learning Service)
 
 Luồng: học viên gọi `GET /api/learning/topics` → học từng bài, nộp khối bài tập (`/api/learning/lessons/**`) → bài ôn khi

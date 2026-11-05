@@ -133,7 +133,7 @@ class ErrorTrapCoverageMigrationTest {
                 "SELECT count(*) FROM content_packages WHERE code LIKE 'PS-TRAP-%'", Integer.class);
 
         org.junit.jupiter.api.Assertions.assertEquals(0, prefixed);
-        // 79 trap sets before the grammar error codes got their own (V114 adds eight).
+        // The grammar error codes add eight sets to the existing 79 trap sets.
         org.junit.jupiter.api.Assertions.assertEquals(87, sets);
     }
 

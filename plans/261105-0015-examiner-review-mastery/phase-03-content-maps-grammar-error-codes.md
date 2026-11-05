@@ -31,7 +31,7 @@ Gắn các mã lỗi Writing chưa có KP vào KP ngữ pháp ACTIVE (V84) và t
 - Không tạo bộ luyện bẫy cho các mã này (ngoài phạm vi): review `ERROR_PATTERN` sẽ tự bỏ qua vì không có bộ ≥2 câu bẫy.
 
 ## Architecture
-Migration `V113__map_grammar_error_codes_to_knowledge_points.sql`:
+Migration `V115__map_grammar_error_codes_to_knowledge_points.sql` (V113/V114 đã được dùng trên main):
 1. `UPDATE error_types SET knowledge_point_id = …` cho các mã đã duyệt.
 2. Tạo KP con bẫy cho đúng các mã đó (copy logic V79: `TRAP_<code>`, topic của KP cha, `status = 'ACTIVE'`), set `trap_knowledge_point_id`.
 3. Khối `DO $$` kiểm điều kiện ở Requirements.
@@ -40,7 +40,7 @@ Learning nhận KP con mới qua đồng bộ catalog (`knowledge_point_catalog.
 `RefreshLearningTopicsUseCase` / `JdbcLearningContentReader.topicSequence` có trả KP con bẫy của topic không (V79 đã chạy qua đường này).
 
 ## Related Code Files
-- Create: `services/content-service/src/main/resources/db/migration/V113__map_grammar_error_codes_to_knowledge_points.sql` (kiểm số trống trước)
+- Create: `services/content-service/src/main/resources/db/migration/V115__map_grammar_error_codes_to_knowledge_points.sql`
 - Create: `services/content-service/src/test/java/com/ieltspath/content/infrastructure/persistence/GrammarErrorCodeMappingMigrationTest.java` (theo mẫu `CourseLadderSeedTest`)
 
 ## Implementation Steps
