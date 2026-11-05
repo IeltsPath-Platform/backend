@@ -20,8 +20,9 @@ class TranscriptQualityTest {
     }
 
     @Test
-    void manyWeaklyPronouncedWordsIsLowEvenWithGoodConfidence() {
-        assertThat(TranscriptQuality.of(List.of(analysis(0.95, 40, 20))).level()).isEqualTo(TranscriptQuality.Level.LOW);
+    void manyWeaklyPronouncedWordsKeepGoodConfidenceFromBeingHighButNeverMakeItLow() {
+        // The learner pronounces badly; the recogniser still understood them, so the transcript is trustworthy.
+        assertThat(TranscriptQuality.of(List.of(analysis(0.95, 40, 20))).level()).isEqualTo(TranscriptQuality.Level.MEDIUM);
     }
 
     @Test

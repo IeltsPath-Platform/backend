@@ -125,6 +125,36 @@ class SpeakingSubmissionTest {
     }
 
     @Test
+    void aSubmissionWithoutSpeechEndsAndFreesTheLearner() {
+        SpeakingSubmission submission = submission();
+        submission.startAnalysis(NOW);
+
+        submission.noSpeech(NOW.plusSeconds(5));
+
+        assertEquals(SpeakingSubmissionStatus.ABANDONED, submission.status());
+        assertEquals(SpeakingSubmission.NO_SPEECH, submission.failureCode());
+        assertFalse(submission.status().isActive());
+    }
+
+    @Test
+    void aDeferredSubmissionWaitsAgainWithoutLosingAnAttempt() {
+        SpeakingSubmission submission = submission();
+        submission.startAnalysis(NOW);
+        submission.startAnalysis(NOW.plusSeconds(200));
+        assertEquals(2, submission.gradingAttempts());
+
+        submission.deferred("DAILY_LIMIT_REACHED", NOW.plusSeconds(210));
+
+        assertEquals(SpeakingSubmissionStatus.FAILED_RETRYABLE, submission.status());
+        assertEquals("DAILY_LIMIT_REACHED", submission.failureCode());
+        assertEquals(1, submission.gradingAttempts());
+        // The count never goes below zero.
+        SpeakingSubmission fresh = submission();
+        fresh.deferred("DAILY_LIMIT_REACHED", NOW);
+        assertEquals(0, fresh.gradingAttempts());
+    }
+
+    @Test
     void waitingStatusesAreTheActiveOnes() {
         for (SpeakingSubmissionStatus status : SpeakingSubmissionStatus.values()) {
             boolean active = status == SpeakingSubmissionStatus.UPLOADING || status == SpeakingSubmissionStatus.QUEUED

@@ -4,6 +4,7 @@ import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.result.SpeakingSubmissionResult;
+import com.ieltspath.learning.application.service.SpeakingGradingContextCapture;
 import com.ieltspath.learning.domain.aggregate.SpeakingSubmission;
 import com.ieltspath.learning.domain.repository.SpeakingSubmissionRepository;
 import com.ieltspath.learning.domain.vo.SpeakingSubmissionStatus;
@@ -26,22 +27,25 @@ public class CompleteSpeakingSubmissionUseCase {
     private final TransactionTemplate transaction;
     private final LearningContentClient content;
     private final ObjectMapper json;
+    private final SpeakingGradingContextCapture contextCapture;
     private final Clock clock = Clock.systemUTC();
 
     public CompleteSpeakingSubmissionUseCase(SpeakingSubmissionRepository submissions, LearnerLock lock,
                                              PlatformTransactionManager transactionManager) {
-        this(submissions, lock, transactionManager, null, new ObjectMapper());
+        this(submissions, lock, transactionManager, null, new ObjectMapper(), null);
     }
 
     @Autowired
     public CompleteSpeakingSubmissionUseCase(SpeakingSubmissionRepository submissions, LearnerLock lock,
                                              PlatformTransactionManager transactionManager,
-                                             LearningContentClient content, ObjectMapper json) {
+                                             LearningContentClient content, ObjectMapper json,
+                                             SpeakingGradingContextCapture contextCapture) {
         this.submissions = submissions;
         this.lock = lock;
         this.transaction = new TransactionTemplate(transactionManager);
         this.content = content;
         this.json = json;
+        this.contextCapture = contextCapture;
     }
 
     public SpeakingSubmissionResult execute(UUID userId, UUID submissionId) {
@@ -49,13 +53,17 @@ public class CompleteSpeakingSubmissionUseCase {
                 .orElseThrow(() -> new LearningRequestException(404, "SPEAKING_SUBMISSION_NOT_FOUND",
                         "Speaking submission not found"));
         Map<String, Object> rubricSnapshot = null;
+        String gradingContext = null;
         if (existing.status() == SpeakingSubmissionStatus.UPLOADING && existing.hasAllRecordings()
                 && existing.rubricSnapshot() == null
                 && content != null) {
             LearningContentClient.Rubric rubric = content.getActiveRubric("SPEAKING");
             rubricSnapshot = json.convertValue(rubric, new TypeReference<>() { });
+            // The grading job holds no learner token, so everything it needs from Content is captured here.
+            if (contextCapture != null) gradingContext = contextCapture.capture();
         }
         Map<String, Object> snapshot = rubricSnapshot;
+        String context = gradingContext;
         return transaction.execute(status -> {
             lock.lock(userId);
             SpeakingSubmission submission = submissions.findForUpdate(submissionId)
@@ -68,6 +76,7 @@ public class CompleteSpeakingSubmissionUseCase {
                             submission.missingRecordings() + " question(s) have no recording yet", submissionId);
                 }
                 if (snapshot != null) submission.saveRubricSnapshot(snapshot);
+                if (context != null) submissions.saveGradingContext(submissionId, context);
                 submission.complete(clock.instant());
                 submissions.save(submission);
             } else if (submission.status() == SpeakingSubmissionStatus.ABANDONED) {

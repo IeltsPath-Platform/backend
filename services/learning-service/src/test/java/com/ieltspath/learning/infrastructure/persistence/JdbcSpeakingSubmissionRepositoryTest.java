@@ -151,4 +151,17 @@ class JdbcSpeakingSubmissionRepositoryTest {
         assertThrows(DataIntegrityViolationException.class,
                 () -> repository.save(submission(UUID.randomUUID(), requestId, UUID.randomUUID())));
     }
+
+    @Test
+    void keepsTheFirstGradingContextSavedForASubmission() {
+        SpeakingSubmission saved = submission(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        repository.save(saved);
+        assertTrue(repository.findGradingContext(saved.id()).isEmpty());
+
+        repository.saveGradingContext(saved.id(), "{\"errorTypes\":[]}");
+        repository.saveGradingContext(saved.id(), "{\"errorTypes\":[1]}");
+
+        // jsonb prints a space after the colon.
+        assertEquals("{\"errorTypes\": []}", repository.findGradingContext(saved.id()).orElseThrow());
+    }
 }

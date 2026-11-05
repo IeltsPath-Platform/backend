@@ -23,6 +23,15 @@ public interface SpeakingSubmissionRepository {
     /** Claims one queued or stale grading row atomically across service instances. */
     Optional<SpeakingSubmission> claimNext(Instant staleBefore, int maxAttempts);
 
+    /** Moves {@code updated_at} of a submission being graded to now, so a long run is not taken for a stuck one. */
+    void touch(UUID id);
+
+    /** The questions' context captured when the learner completed the submission; empty for an older submission. */
+    Optional<String> findGradingContext(UUID submissionId);
+
+    /** Keeps the first context saved for the submission; a later call changes nothing. */
+    void saveGradingContext(UUID submissionId, String contextJson);
+
     Optional<String> findAnalysis(UUID submissionId, UUID questionVersionId);
 
     void saveAnalysis(UUID submissionId, UUID questionVersionId, String analysisJson);

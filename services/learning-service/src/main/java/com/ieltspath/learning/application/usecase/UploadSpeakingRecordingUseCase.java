@@ -75,7 +75,7 @@ public class UploadSpeakingRecordingUseCase {
                     "The recording must be WAV, 16-bit, mono, 16 kHz");
         }
         int attempt = current.attempt() + 1;
-        String key = SpeakingRecordingKeys.key(userId, snapshot.createdAt().atZone(ZoneId.of(settings.timezone())).toLocalDate(),
+        String key = SpeakingRecordingKeys.uniqueKey(userId, snapshot.createdAt().atZone(ZoneId.of(settings.timezone())).toLocalDate(),
                 submissionId, current.partNo(), current.questionNo(), attempt, ContentTypes.extensionFor(contentType));
         ObjectKeys.requireSafe(key);
 

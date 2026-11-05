@@ -11,6 +11,10 @@ import com.ieltspath.learning.application.port.LearningContentClient.Item;
 import com.ieltspath.learning.application.port.LearningContentClient.PackageVersion;
 import com.ieltspath.learning.application.port.LearningContentClient.Section;
 import com.ieltspath.learning.application.result.SpeakingSubmissionResult;
+import com.ieltspath.learning.application.port.SpeechAnalysisClient;
+import com.ieltspath.learning.application.service.SpeakingAvailability;
+import com.ieltspath.learning.application.service.SpeakingGrader;
+import com.ieltspath.learning.application.service.SpeakingGradingContextCapture;
 import com.ieltspath.learning.application.service.SpeakingPracticeSettings;
 import com.ieltspath.learning.application.service.SpeakingSettingsFixture;
 import com.ieltspath.learning.application.service.SpeakingTestQuestions;
@@ -58,6 +62,8 @@ class SpeakingPracticeUseCasesTest {
     private final AccessClient points = mock(AccessClient.class);
     private final ObjectStorage storage = mock(ObjectStorage.class);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+    private final SpeechAnalysisClient speech = mock(SpeechAnalysisClient.class);
+    private final SpeakingGrader grader = mock(SpeakingGrader.class);
 
     private CreateSpeakingSubmissionUseCase create;
     private UploadSpeakingRecordingUseCase upload;
@@ -66,6 +72,8 @@ class SpeakingPracticeUseCasesTest {
     @BeforeEach
     void setUp() {
         when(points.balance()).thenReturn(50L);
+        when(speech.available()).thenReturn(true);
+        when(grader.available()).thenReturn(true);
         when(content.getPackageVersion(PACKAGE_VERSION)).thenReturn(new PackageVersion(PACKAGE_VERSION, UUID.randomUUID(),
                 "PRACTICE_TEST", null, Map.of(), List.of(
                 section(PART_2, 2, item(Q3, 1)),
@@ -74,7 +82,7 @@ class SpeakingPracticeUseCasesTest {
                 new StoredObject(call.getArgument(0), call.getArgument(1), call.getArgument(3),
                         ((byte[]) call.getArgument(2)).length));
         create = new CreateSpeakingSubmissionUseCase(submissions, new SpeakingTestQuestions(content), points, userId -> { },
-                SETTINGS, transactions);
+                SETTINGS, new SpeakingAvailability(SETTINGS, speech, grader), transactions);
         upload = new UploadSpeakingRecordingUseCase(submissions, storage, userId -> { }, SETTINGS, transactions);
         complete = new CompleteSpeakingSubmissionUseCase(submissions, userId -> { }, transactions);
     }
@@ -234,7 +242,7 @@ class SpeakingPracticeUseCasesTest {
         verify(storage).put(eq("speaking-recordings"), key.capture(), any(), eq("audio/wav"));
         assertTrue(key.getValue().startsWith("practice/" + USER + "/"), key.getValue());
         assertTrue(key.getValue().contains("_" + opened.id() + "/"), key.getValue());
-        assertTrue(key.getValue().endsWith("/part1_q02.wav"), key.getValue());
+        assertTrue(key.getValue().matches(".*/part1_q02_[0-9a-f]{8}\\.wav"), key.getValue());
         assertTrue(submissions.get(opened.id()).recordingFor(Q2).orElseThrow().isUploaded());
     }
 
@@ -247,7 +255,7 @@ class SpeakingPracticeUseCasesTest {
         record(opened.id(), Q1);
 
         String second = submissions.get(opened.id()).recordingFor(Q1).orElseThrow().objectKey();
-        assertTrue(second.endsWith("/part1_q01_r2.wav"), second);
+        assertTrue(second.matches(".*/part1_q01_r2_[0-9a-f]{8}\\.wav"), second);
         verify(storage).delete("speaking-recordings", first);
         verify(storage, never()).delete("speaking-recordings", second);
     }
@@ -330,6 +338,37 @@ class SpeakingPracticeUseCasesTest {
     }
 
     @Test
+    void completingKeepsTheContentTheGradingJobNeedsBecauseItHoldsNoLearnerToken() {
+        String context = "{\"errorTypes\":[],\"knowledgePoints\":[]}";
+        SpeakingGradingContextCapture capture = mock(SpeakingGradingContextCapture.class);
+        when(capture.capture()).thenReturn(context);
+        when(content.getActiveRubric("SPEAKING")).thenReturn(new LearningContentClient.Rubric("IELTS_SPEAKING", "SPEAKING",
+                2, "note", List.of(), List.of()));
+        CompleteSpeakingSubmissionUseCase withContext = new CompleteSpeakingSubmissionUseCase(submissions, userId -> { },
+                transactions, content, new com.fasterxml.jackson.databind.ObjectMapper(), capture);
+        SpeakingSubmissionResult opened = open(UUID.randomUUID());
+        for (UUID question : List.of(Q1, Q2, Q3)) record(opened.id(), question);
+
+        withContext.execute(USER, opened.id());
+        // Completing again does not capture a second time or replace the first copy.
+        withContext.execute(USER, opened.id());
+
+        assertEquals(Optional.of(context), submissions.findGradingContext(opened.id()));
+        verify(capture).capture();
+    }
+
+    @Test
+    void aSubmissionCannotBeOpenedWhenGradingCannotRun() {
+        when(speech.available()).thenReturn(false);
+
+        LearningRequestException refused = assertThrows(LearningRequestException.class, () -> open(UUID.randomUUID()));
+
+        assertEquals("SPEAKING_GRADING_DISABLED", refused.getCode());
+        assertEquals(503, refused.getStatus());
+        assertTrue(submissions.all().isEmpty());
+    }
+
+    @Test
     void aQueuedSubmissionTakesNoMoreRecordings() {
         SpeakingSubmissionResult opened = open(UUID.randomUUID());
         for (UUID question : List.of(Q1, Q2, Q3)) record(opened.id(), question);
@@ -363,6 +402,7 @@ class SpeakingPracticeUseCasesTest {
     /** A repository that keeps submissions in a map; {@code age} moves a submission's last change into the past. */
     private static final class InMemorySubmissions implements SpeakingSubmissionRepository {
         private final Map<UUID, SpeakingSubmission> byId = new LinkedHashMap<>();
+        private final Map<UUID, String> contexts = new LinkedHashMap<>();
 
         List<SpeakingSubmission> all() {
             return new ArrayList<>(byId.values());
@@ -433,5 +473,20 @@ class SpeakingPracticeUseCasesTest {
         @Override
         public boolean deleteExpired(UUID id, java.time.Instant cutoff) {
             return false;
-        }    }
+        }
+
+        @Override
+        public void touch(UUID id) {
+        }
+
+        @Override
+        public Optional<String> findGradingContext(UUID submissionId) {
+            return Optional.ofNullable(contexts.get(submissionId));
+        }
+
+        @Override
+        public void saveGradingContext(UUID submissionId, String contextJson) {
+            contexts.putIfAbsent(submissionId, contextJson);
+        }
+    }
 }

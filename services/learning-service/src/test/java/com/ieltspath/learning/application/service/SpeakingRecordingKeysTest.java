@@ -31,6 +31,17 @@ class SpeakingRecordingKeysTest {
     }
 
     @Test
+    void aStoredFileGetsARandomPartSoALeftoverFileNeverBlocksTheNextAttempt() {
+        String first = SpeakingRecordingKeys.uniqueKey(USER, DAY, SUBMISSION, 1, 1, 2, "wav");
+        String second = SpeakingRecordingKeys.uniqueKey(USER, DAY, SUBMISSION, 1, 1, 2, "wav");
+
+        assertTrue(first.matches(".*/part1_q01_r2_[0-9a-f]{8}\\.wav"), first);
+        assertFalse(first.equals(second));
+        assertTrue(SpeakingRecordingKeys.isOwnedBy(first, USER));
+        ObjectKeys.requireSafe(first);
+    }
+
+    @Test
     void everyKeyPassesTheStorageSafetyCheck() {
         ObjectKeys.requireSafe(SpeakingRecordingKeys.key(USER, DAY, SUBMISSION, 1, 1, 1, "wav"));
         ObjectKeys.requireSafe(SpeakingRecordingKeys.key(USER, DAY, SUBMISSION, 2, 5, 4, "webm"));

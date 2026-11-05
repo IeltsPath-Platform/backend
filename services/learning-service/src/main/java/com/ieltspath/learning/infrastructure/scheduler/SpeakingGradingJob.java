@@ -4,9 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieltspath.commonstorage.ObjectStorage;
 import com.ieltspath.learning.application.exception.LlmUnavailableException;
 import com.ieltspath.learning.application.exception.SpeechUnavailableException;
+import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LlmUsageQuota;
 import com.ieltspath.learning.application.port.SpeechAnalysisClient;
 import com.ieltspath.learning.application.service.SpeakingGrader;
+import com.ieltspath.learning.application.service.SpeakingGradingContext;
+import com.ieltspath.learning.application.service.SpeakingGradingContextCapture;
 import com.ieltspath.learning.application.service.SpeakingGradingInput;
 import com.ieltspath.learning.application.service.SpeakingHistorySummarizer;
 import com.ieltspath.learning.application.service.SpeakingPracticeSettings;
@@ -21,7 +24,6 @@ import com.ieltspath.learning.domain.vo.SpeechAnalysis;
 import com.ieltspath.learning.domain.vo.SpeakingRecording;
 import com.ieltspath.learning.domain.vo.SpeakingSubmissionStatus;
 import com.ieltspath.learning.domain.vo.TranscriptQuality;
-import com.ieltspath.learning.application.port.LearningContentClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
@@ -53,15 +55,15 @@ public class SpeakingGradingJob {
     private final LlmUsageQuota quota;
     private final SpeakingPracticeSettings settings;
     private final ObjectMapper json;
-    private final LearningContentClient content;
+    private final SpeakingGradingContextCapture contexts;
     private final SpeakingHistorySummarizer history;
     private final Clock clock = Clock.systemUTC();
 
     public SpeakingGradingJob(SpeakingSubmissionRepository submissions, @Lazy ObjectStorage storage,
                               SpeechAnalysisClient speech, SpeakingGrader grader, LlmUsageQuota quota,
                               SpeakingPracticeSettings settings,
-                              ObjectMapper json, LearningContentClient content, SpeakingHistorySummarizer history) {
-        this.content = content;
+                              ObjectMapper json, SpeakingGradingContextCapture contexts, SpeakingHistorySummarizer history) {
+        this.contexts = contexts;
         this.history = history;
         this.submissions = submissions;
         this.storage = storage;
@@ -80,6 +82,8 @@ public class SpeakingGradingJob {
     }
 
     private void process(SpeakingSubmission submission) {
+        LocalDate quotaDay = null;
+        boolean graded = false;
         try {
             if (submission.result() != null) {
                 // Already graded (an earlier run stopped before the status was saved): keep the grade, never grade twice.
@@ -99,16 +103,25 @@ public class SpeakingGradingJob {
             }
             List<SpeakingRecording> recordings = submission.recordings();
             List<SpeechAnalysis> analyses = analyze(submission, recordings);
-            SpeakingGradingInput input = input(submission, recordings, analyses);
+            if (analyses.stream().allMatch(SpeechAnalysis::isEmpty)) {
+                // Nothing was heard, so there is nothing to grade and nothing to charge.
+                submission.noSpeech(Instant.now(clock));
+                submissions.save(submission);
+                log.warn("Speaking submission holds no speech: submissionId={}", submission.id());
+                return;
+            }
+            SpeakingGradingContext context = contexts.read(submissions.findGradingContext(submission.id()).orElse(null));
+            SpeakingGradingInput input = input(submission, recordings, analyses, context);
             SpeakingPromptAssembler.Prepared prepared = grader.prepare(readRubricSnapshot(submission), input);
-            quota(submission.userId());
+            quotaDay = quota(submission.userId());
             submission.beginGrading(prepared.rubric().code(), prepared.rubric().version(), prepared.checksum(),
                     SpeakingPromptAssembler.PROMPT_VERSION, Instant.now(clock));
             submissions.save(submission);
-            SpeakingResultAssembler.Assembled graded = grader.grade(prepared, input);
+            SpeakingResultAssembler.Assembled result = grader.grade(prepared, input);
             // The grade is kept as PAYMENT_PENDING and the learner's own request charges it (SettleSpeakingSubmissionUseCase).
-            submission.paymentPending(graded.result(), graded.overallBand(), Instant.now(clock));
+            submission.paymentPending(result.result(), result.overallBand(), Instant.now(clock));
             submissions.save(submission);
+            graded = true;
         } catch (SpeakingPromptAssembler.TranscriptTooLongException exception) {
             needsExaminer(submission, "TRANSCRIPT_TOO_LONG");
         } catch (SpeakingPromptAssembler.UnusableRubricException exception) {
@@ -121,10 +134,16 @@ public class SpeakingGradingJob {
         } catch (LlmUnavailableException exception) {
             failRetryable(submission, "LLM_UNAVAILABLE");
         } catch (DailyLimitException exception) {
-            failRetryable(submission, "DAILY_LIMIT_REACHED");
+            // The day's limit is not a grading failure: the claim does not count as an attempt.
+            submission.deferred("DAILY_LIMIT_REACHED", Instant.now(clock));
+            submissions.save(submission);
+            log.warn("Speaking grading deferred: submissionId={}, code={}", submission.id(), "DAILY_LIMIT_REACHED");
         } catch (RuntimeException exception) {
             log.warn("Speaking grading failed: submissionId={}, code={}", submission.id(), "INTERNAL_FAILURE");
             failRetryable(submission, "INTERNAL_FAILURE");
+        } finally {
+            // A call that produced no grade does not use up the learner's day.
+            if (quotaDay != null && !graded) releaseQuota(submission.userId(), quotaDay);
         }
     }
 
@@ -143,6 +162,8 @@ public class SpeakingGradingJob {
                 catch (Exception exception) { throw new IllegalStateException("Speech analysis is not serializable", exception); }
             }
             analyses.add(analysis);
+            // A long submission must not look stuck to another instance while it is still being worked on.
+            submissions.touch(submission.id());
         }
         return analyses;
     }
@@ -154,35 +175,35 @@ public class SpeakingGradingJob {
 
     /** The answers in order, how far the transcript can be trusted, the learner's standing and the codes the model may name. */
     private SpeakingGradingInput input(SpeakingSubmission submission, List<SpeakingRecording> recordings,
-                                       List<SpeechAnalysis> analyses) {
+                                       List<SpeechAnalysis> analyses, SpeakingGradingContext context) {
         List<SpeakingGradingInput.Answer> answers = new ArrayList<>();
         for (int index = 0; index < recordings.size(); index++) {
             SpeakingRecording recording = recordings.get(index);
             answers.add(new SpeakingGradingInput.Answer(recording.partNo(), recording.questionNo(),
                     recording.questionText(), analyses.get(index)));
         }
-        List<SpeakingGradingInput.ErrorOption> errorCodes = errorOptions();
+        List<SpeakingGradingInput.ErrorOption> errorCodes = context.errorTypes();
         Set<String> codes = errorCodes.stream().map(SpeakingGradingInput.ErrorOption::code).collect(Collectors.toSet());
         return new SpeakingGradingInput(submission.scope(), answers, TranscriptQuality.of(analyses),
                 SpeakingAnalysisSummary.of(analyses, PronunciationBandMapper.INTERIM, 10),
-                history.summarize(submission.userId(), codes), errorCodes, settings.maxInputChars());
+                history.summarize(submission.userId(), codes, context.knowledgePoints()), errorCodes,
+                settings.maxInputChars());
     }
 
-    /** Active Speaking error types; a Content outage only means the grade carries no error list. */
-    private List<SpeakingGradingInput.ErrorOption> errorOptions() {
-        try {
-            return content.activeErrorTypes().stream().filter(type -> type.code() != null && type.code().startsWith("SPK_"))
-                    .map(type -> new SpeakingGradingInput.ErrorOption(type.code(), type.name())).toList();
-        } catch (RuntimeException unavailable) {
-            log.warn("Speaking error types unavailable: {}", unavailable.getClass().getSimpleName());
-            return List.of();
-        }
-    }
-
-    private void quota(UUID userId) {
+    /** Takes one unit of the learner's day; returns the day, so the same unit can be given back. */
+    private LocalDate quota(UUID userId) {
         LocalDate date = LocalDate.now(clock.withZone(ZoneId.of(settings.timezone())));
         if (!quota.tryConsume(userId, date, USAGE_KIND, settings.dailyGradingLimit())) {
             throw new DailyLimitException();
+        }
+        return date;
+    }
+
+    private void releaseQuota(UUID userId, LocalDate day) {
+        try {
+            quota.release(userId, day, USAGE_KIND);
+        } catch (RuntimeException exception) {
+            log.warn("Speaking quota could not be given back: reason={}", exception.getClass().getSimpleName());
         }
     }
 

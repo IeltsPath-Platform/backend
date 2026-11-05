@@ -31,5 +31,21 @@ block listed. `display.pronunciation` carries `weakWords[]` (`word`, `accuracy`,
 `weakSounds[]` (`symbol`, `count`, `accuracy`, `heardAs`, `words`, `tip`); `display.transcripts[].words[]` carries every
 word with its `accuracy`, `errorType` and `sounds[]` (`symbol`, `accuracy`, `heardAs`). An analysis cached before sounds were
 kept has no sounds: its words read as empty and the block is left out of the prompt.
-The phase-2 starter rubric and the interim pronunciation band table are calibration placeholders. The scheduler remains
-enabled by default in the development configuration; set `LEARNING_SPEAKING_ENABLED=false` to switch it off until the rubric is reviewed and calibrated.
+The starter rubric and the interim pronunciation band table are calibration placeholders, so grading is off by default:
+set `LEARNING_SPEAKING_ENABLED=true` to try it. `/terms.enabled` is true only when the flag is on and Azure Speech and the
+LLM are both configured; creating a submission otherwise answers 503 `SPEAKING_GRADING_DISABLED`.
+
+Grading context. The grading job holds no learner token and cannot call Content. `POST .../complete` therefore captures,
+in the learner's request, the active rubric (as before) and the Speaking error types (`SPK_*`) and knowledge points, and
+stores the latter two in `speaking_grading_contexts` (V45). The job reads them from there. If Content cannot be reached at
+that moment the context is stored empty: the grade is still given, without error codes or personal advice.
+
+Recordings without speech. When the speech analysis finds no spoken word in any recording, the submission ends as
+`ABANDONED` with failure code `NO_SPEECH` before any quota, LLM call or charge, and the learner may record again.
+
+Daily limit. One unit of `speaking_grading` is taken just before the LLM call and given back when that call produces no
+grade. A learner who has reached the limit has the submission wait (`FAILED_RETRYABLE`, `DAILY_LIMIT_REACHED`); that wait
+does not count as a grading attempt, so it never turns into `NEEDS_EXAMINER`.
+
+Transcript quality is `LOW` only when the mean ASR confidence is under 0.85. A high share of badly pronounced words keeps
+a transcript from being `HIGH` but does not make it `LOW`, so weak speakers' results still reach the learning path.

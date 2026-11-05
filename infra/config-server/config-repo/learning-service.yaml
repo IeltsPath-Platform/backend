@@ -71,9 +71,10 @@ learning:
     max-concurrent: 2
   # AI-graded Speaking practice. Recordings live in the shared bucket under practice/{userId}/{date}_{submissionId}/.
   speaking:
-    # On by default for development. Set LEARNING_SPEAKING_ENABLED=false to switch it off, for example until the
-    # rubric and the grading have been reviewed against examiner scores.
-    enabled: ${LEARNING_SPEAKING_ENABLED:true}
+    # Off by default: the grading charges points, and the starter rubric and the interim pronunciation band table have not
+    # been calibrated against examiner scores. Set LEARNING_SPEAKING_ENABLED=true in .env to try it. Even then learners
+    # are offered it only while Azure Speech and the LLM are configured (see SpeakingAvailability).
+    enabled: ${LEARNING_SPEAKING_ENABLED:false}
     point-cost: ${LEARNING_SPEAKING_POINT_COST:5}
     bucket: ${LEARNING_SPEAKING_BUCKET:speaking-recordings}
     # Must not be above the size limit of the bucket on Supabase.
@@ -82,7 +83,9 @@ learning:
     retention-days: ${LEARNING_SPEAKING_RETENTION_DAYS:90}
     timezone: Asia/Ho_Chi_Minh
     daily-grading-limit: ${LEARNING_SPEAKING_DAILY_LIMIT:5}
-    stale-after-seconds: 120
+    # A row being graded that has not changed for this long is taken over. The job signals progress after every recording,
+    # so this only has to cover the longest single step (one recording at the speech timeout, or the LLM call).
+    stale-after-seconds: 600
     max-attempts: 3
     pass-band: 6.0
     max-input-chars: 60000

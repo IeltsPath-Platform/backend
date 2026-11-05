@@ -5,6 +5,7 @@ import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.port.AccessClient;
 import com.ieltspath.learning.application.port.LearnerLock;
 import com.ieltspath.learning.application.result.SpeakingSubmissionResult;
+import com.ieltspath.learning.application.service.SpeakingAvailability;
 import com.ieltspath.learning.application.service.SpeakingPracticeSettings;
 import com.ieltspath.learning.application.service.SpeakingTestQuestions;
 import com.ieltspath.learning.application.service.SpeakingTestQuestions.Resolved;
@@ -32,23 +33,26 @@ public class CreateSpeakingSubmissionUseCase {
     private final AccessClient points;
     private final LearnerLock lock;
     private final SpeakingPracticeSettings settings;
+    private final SpeakingAvailability availability;
     private final TransactionTemplate transaction;
     private final Clock clock = Clock.systemUTC();
 
     public CreateSpeakingSubmissionUseCase(SpeakingSubmissionRepository submissions, SpeakingTestQuestions questions,
                                            AccessClient points, LearnerLock lock, SpeakingPracticeSettings settings,
+                                           SpeakingAvailability availability,
                                            PlatformTransactionManager transactionManager) {
         this.submissions = submissions;
         this.questions = questions;
         this.points = points;
         this.lock = lock;
         this.settings = settings;
+        this.availability = availability;
         this.transaction = new TransactionTemplate(transactionManager);
     }
 
     public SpeakingSubmissionResult execute(UUID userId, UUID requestId, UUID packageVersionId,
                                             List<UUID> partSectionIds, boolean consent) {
-        if (!settings.enabled()) {
+        if (!availability.isAvailable()) {
             throw new LearningRequestException(503, "SPEAKING_GRADING_DISABLED",
                     "AI Speaking grading is not available yet");
         }

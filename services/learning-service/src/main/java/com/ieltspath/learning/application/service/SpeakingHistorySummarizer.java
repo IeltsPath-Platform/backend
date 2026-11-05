@@ -1,8 +1,7 @@
 package com.ieltspath.learning.application.service;
 
-import com.ieltspath.learning.application.exception.LearningRequestException;
-import com.ieltspath.learning.application.port.LearningContentClient;
 import com.ieltspath.learning.application.port.LearningContentClient.KnowledgePoint;
+import com.ieltspath.learning.application.port.LearningContentClient.Topic;
 import com.ieltspath.learning.application.port.QuestionEventLog;
 import com.ieltspath.learning.application.port.QuestionEventLog.RecentEvent;
 import com.ieltspath.learning.domain.aggregate.MasteryProfile;
@@ -10,8 +9,6 @@ import com.ieltspath.learning.domain.repository.MasteryProfileRepository;
 import com.ieltspath.learning.domain.repository.ReviewItemRepository;
 import com.ieltspath.learning.domain.vo.MasteryTier;
 import com.ieltspath.learning.domain.vo.PendingReview;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -22,7 +19,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,7 +34,6 @@ import java.util.UUID;
  */
 @Component
 public class SpeakingHistorySummarizer {
-    private static final Logger log = LoggerFactory.getLogger(SpeakingHistorySummarizer.class);
     private static final int MAX_ERRORS_PER_POINT = 3;
     /** Share of right answers the newer half must be ahead (or behind) the older half by to call the trend. Interim. */
     private static final double TREND_SHIFT = 0.34;
@@ -88,7 +83,6 @@ public class SpeakingHistorySummarizer {
         }
     }
 
-    private final LearningContentClient content;
     private final MasteryProfileRepository profiles;
     private final QuestionEventLog events;
     private final ReviewItemRepository reviews;
@@ -96,15 +90,13 @@ public class SpeakingHistorySummarizer {
     private final Clock clock;
 
     @Autowired
-    public SpeakingHistorySummarizer(LearningContentClient content, MasteryProfileRepository profiles,
-                                     QuestionEventLog events, ReviewItemRepository reviews,
-                                     SpeakingPracticeSettings settings) {
-        this(content, profiles, events, reviews, settings, Clock.systemUTC());
+    public SpeakingHistorySummarizer(MasteryProfileRepository profiles, QuestionEventLog events,
+                                     ReviewItemRepository reviews, SpeakingPracticeSettings settings) {
+        this(profiles, events, reviews, settings, Clock.systemUTC());
     }
 
-    SpeakingHistorySummarizer(LearningContentClient content, MasteryProfileRepository profiles, QuestionEventLog events,
+    SpeakingHistorySummarizer(MasteryProfileRepository profiles, QuestionEventLog events,
                               ReviewItemRepository reviews, SpeakingPracticeSettings settings, Clock clock) {
-        this.content = content;
         this.profiles = profiles;
         this.events = events;
         this.reviews = reviews;
@@ -113,27 +105,36 @@ public class SpeakingHistorySummarizer {
     }
 
     /**
-     * The catalog and the learner's history. A failure to read the knowledge points from Content only costs the
-     * personalised part of the feedback, so it is logged and an empty context is returned; the grade does not wait on it.
+     * The knowledge points of the topic sequence the grader may name: the Speaking ones, and the Writing ones listed in
+     * {@code history-extra-kp-codes}. Child (error trap) points are left out. Called in the learner's request, where
+     * Content can be reached; the grading job reads the result from the stored context.
+     */
+    public List<KnowledgePoint> relevantPoints(List<? extends Topic> topics) {
+        Map<UUID, KnowledgePoint> relevant = new LinkedHashMap<>();
+        if (topics == null) return List.of();
+        Set<String> extra = extraCodes();
+        for (Topic topic : topics) {
+            if (topic.knowledgePoints() == null) continue;
+            for (KnowledgePoint point : topic.knowledgePoints()) {
+                if (isSpeaking(point) || isExtra(point, extra)) relevant.putIfAbsent(point.id(), point);
+            }
+        }
+        return List.copyOf(relevant.values());
+    }
+
+    /**
+     * The catalog and the learner's history, from the points captured with the submission. No Content call is made here:
+     * this runs in the grading job, which holds no learner token.
      *
      * @param errorCodes the Speaking error codes the grader may name; only these are ever shown for a point
      */
-    public LearnerContext summarize(UUID userId, Set<String> errorCodes) {
-        Map<UUID, KnowledgePoint> points;
-        try {
-            points = knowledgePoints();
-        } catch (LearningRequestException unavailable) {
-            log.warn("Speaking knowledge points unavailable: code={}", unavailable.getCode());
-            return LearnerContext.empty();
-        }
+    public LearnerContext summarize(UUID userId, Set<String> errorCodes, List<KnowledgePoint> points) {
         Map<UUID, KnowledgePoint> speaking = new LinkedHashMap<>();
         Map<UUID, KnowledgePoint> fromWriting = new LinkedHashMap<>();
         Set<String> extra = extraCodes();
-        for (Map.Entry<UUID, KnowledgePoint> entry : points.entrySet()) {
-            KnowledgePoint point = entry.getValue();
-            if (point.parentKnowledgePointId() != null || point.code() == null) continue;
-            if ("SPEAKING".equalsIgnoreCase(point.skill())) speaking.put(entry.getKey(), point);
-            else if (extra.contains(point.code())) fromWriting.put(entry.getKey(), point);
+        for (KnowledgePoint point : points) {
+            if (isSpeaking(point)) speaking.putIfAbsent(point.id(), point);
+            else if (isExtra(point, extra)) fromWriting.putIfAbsent(point.id(), point);
         }
         List<CatalogPoint> catalog = speaking.values().stream()
                 .map(point -> new CatalogPoint(point.id(), point.code(), point.canDo() == null ? "" : point.canDo()))
@@ -141,15 +142,12 @@ public class SpeakingHistorySummarizer {
         return new LearnerContext(catalog, history(userId, speaking, fromWriting, errorCodes));
     }
 
-    private Map<UUID, KnowledgePoint> knowledgePoints() {
-        Map<UUID, KnowledgePoint> all = new HashMap<>();
-        var topics = content.getTopicSequence();
-        if (topics == null) return all;
-        for (var topic : topics) {
-            if (topic.knowledgePoints() == null) continue;
-            for (KnowledgePoint point : topic.knowledgePoints()) all.putIfAbsent(point.id(), point);
-        }
-        return all;
+    private static boolean isSpeaking(KnowledgePoint point) {
+        return point.parentKnowledgePointId() == null && point.code() != null && "SPEAKING".equalsIgnoreCase(point.skill());
+    }
+
+    private static boolean isExtra(KnowledgePoint point, Set<String> extra) {
+        return point.parentKnowledgePointId() == null && point.code() != null && extra.contains(point.code());
     }
 
     private Set<String> extraCodes() {

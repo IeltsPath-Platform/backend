@@ -93,6 +93,26 @@ public class JdbcSpeakingSubmissionRepository implements SpeakingSubmissionRepos
     }
 
     @Override
+    public void touch(UUID id) {
+        jdbc.update("UPDATE speaking_submissions SET updated_at = CURRENT_TIMESTAMP "
+                + "WHERE id = ? AND status IN ('ANALYZING', 'GRADING')", id);
+    }
+
+    @Override
+    public Optional<String> findGradingContext(UUID submissionId) {
+        return jdbc.query("SELECT context::text FROM speaking_grading_contexts WHERE submission_id = ?",
+                (rs, row) -> rs.getString(1), submissionId).stream().findFirst();
+    }
+
+    @Override
+    public void saveGradingContext(UUID submissionId, String contextJson) {
+        jdbc.update("""
+                INSERT INTO speaking_grading_contexts (submission_id, context) VALUES (?, CAST(? AS JSONB))
+                ON CONFLICT (submission_id) DO NOTHING
+                """, submissionId, contextJson);
+    }
+
+    @Override
     public Optional<String> findAnalysis(UUID submissionId, UUID questionVersionId) {
         return jdbc.query("SELECT result::text FROM speaking_analyses WHERE submission_id=? AND question_version_id=? "
                         + "AND status='ANALYZED'", (rs, row) -> rs.getString(1), submissionId, questionVersionId)

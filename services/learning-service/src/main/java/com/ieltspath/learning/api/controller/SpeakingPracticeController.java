@@ -3,6 +3,7 @@ package com.ieltspath.learning.api.controller;
 import com.ieltspath.commonsecurity.currentuser.CurrentUserProvider;
 import com.ieltspath.learning.api.dto.request.CreateSpeakingSubmissionRequest;
 import com.ieltspath.learning.application.result.SpeakingSubmissionResult;
+import com.ieltspath.learning.application.service.SpeakingAvailability;
 import com.ieltspath.learning.application.service.SpeakingPracticeSettings;
 import com.ieltspath.learning.application.usecase.CompleteSpeakingSubmissionUseCase;
 import com.ieltspath.learning.application.usecase.CreateSpeakingSubmissionUseCase;
@@ -44,11 +45,12 @@ public class SpeakingPracticeController {
     private final GetSpeakingSubmissionUseCase get;
     private final SettleSpeakingSubmissionUseCase settle;
     private final SpeakingPracticeSettings settings;
+    private final SpeakingAvailability availability;
 
     /** What grading costs and the largest recording accepted, so the confirm dialog can show them before sending. */
     @GetMapping("/terms")
     public Terms terms() {
-        return new Terms(settings.enabled(), settings.pointCost(), settings.maxRecordingBytes(), settings.retentionDays());
+        return new Terms(availability.isAvailable(), settings.pointCost(), settings.maxRecordingBytes(), settings.retentionDays());
     }
 
     /** 402 {@code INSUFFICIENT_POINTS} when the balance is under the cost; no file is stored before this succeeds. */

@@ -19,6 +19,9 @@ import java.util.UUID;
  * submission (see {@link SpeakingSubmissionStatus#isActive()}).
  */
 public class SpeakingSubmission {
+    /** Failure code of a submission whose recordings held no speech. */
+    public static final String NO_SPEECH = "NO_SPEECH";
+
     private final UUID id;
     private final UUID userId;
     private final UUID requestId;
@@ -219,6 +222,25 @@ public class SpeakingSubmission {
     public void retryable(String code, Instant now) {
         status = SpeakingSubmissionStatus.FAILED_RETRYABLE;
         failureCode = code;
+        updatedAt = now;
+    }
+
+    /**
+     * A failure that is not the grading's fault (a daily limit, say): the submission waits again, and the claim that led
+     * here does not count against {@code maxAttempts}.
+     */
+    public void deferred(String code, Instant now) {
+        gradingAttempts = Math.max(0, gradingAttempts - 1);
+        retryable(code, now);
+    }
+
+    /**
+     * Nothing could be heard in any recording. Nothing was graded or charged, so the submission ends and frees the
+     * learner to record again.
+     */
+    public void noSpeech(Instant now) {
+        status = SpeakingSubmissionStatus.ABANDONED;
+        failureCode = NO_SPEECH;
         updatedAt = now;
     }
 

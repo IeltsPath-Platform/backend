@@ -7,6 +7,7 @@ import com.ieltspath.learning.api.exception.GlobalExceptionHandler;
 import com.ieltspath.learning.application.exception.InsufficientPointsException;
 import com.ieltspath.learning.application.exception.LearningRequestException;
 import com.ieltspath.learning.application.result.SpeakingSubmissionResult;
+import com.ieltspath.learning.application.service.SpeakingAvailability;
 import com.ieltspath.learning.application.service.SpeakingPracticeSettings;
 import com.ieltspath.learning.application.service.SpeakingSettingsFixture;
 import com.ieltspath.learning.application.usecase.CompleteSpeakingSubmissionUseCase;
@@ -49,6 +50,7 @@ class SpeakingPracticeControllerTest {
     private final CompleteSpeakingSubmissionUseCase complete = mock(CompleteSpeakingSubmissionUseCase.class);
     private final GetSpeakingSubmissionUseCase get = mock(GetSpeakingSubmissionUseCase.class);
     private final SettleSpeakingSubmissionUseCase settle = mock(SettleSpeakingSubmissionUseCase.class);
+    private final SpeakingAvailability availability = mock(SpeakingAvailability.class);
     private MockMvc mvc;
 
     @BeforeEach
@@ -56,7 +58,9 @@ class SpeakingPracticeControllerTest {
         CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
         when(currentUser.requireUserId()).thenReturn(USER);
         SpeakingPracticeSettings settings = SpeakingSettingsFixture.enabled();
-        mvc = MockMvcBuilders.standaloneSetup(new SpeakingPracticeController(currentUser, create, upload, complete, get, settle, settings))
+        when(availability.isAvailable()).thenReturn(true);
+        mvc = MockMvcBuilders.standaloneSetup(new SpeakingPracticeController(currentUser, create, upload, complete, get, settle,
+                        settings, availability))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
     }
 
@@ -77,6 +81,13 @@ class SpeakingPracticeControllerTest {
                 .andExpect(jsonPath("$.pointCost").value(5))
                 .andExpect(jsonPath("$.maxRecordingBytes").value(5L * 1024 * 1024))
                 .andExpect(jsonPath("$.retentionDays").value(90));
+    }
+
+    @Test
+    void termsSayGradingIsOffWhenItsServicesAreNotAvailable() throws Exception {
+        when(availability.isAvailable()).thenReturn(false);
+
+        mvc.perform(get(BASE + "/terms")).andExpect(status().isOk()).andExpect(jsonPath("$.enabled").value(false));
     }
 
     @Test
