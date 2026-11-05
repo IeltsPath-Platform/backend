@@ -143,4 +143,25 @@ class ChangePasswordUseCaseTest {
 
         assertEquals("new-hash", user.getPasswordHash());
     }
+
+    @Test void rejectsANewPasswordOver72BytesBeforeTouchingAnything() {
+        UUID id = UUID.randomUUID();
+        var error = assertThrows(IllegalArgumentException.class,
+                () -> useCase.execute(new ChangePasswordCommand(id, "old-password", "ậ".repeat(25))));
+        assertEquals("Mật khẩu phải có từ 6 đến 72 byte (chữ có dấu tính nhiều byte hơn)", error.getMessage());
+        verifyNoInteractions(userLock, users, tokens, encoder);
+        assertTrue(stored.isEmpty());
+    }
+
+    @Test void rejectsTheSameNewPasswordAsTheCurrentOne() {
+        UUID id = UUID.randomUUID();
+        when(users.findById(id)).thenReturn(Optional.of(userWithHash(id)));
+        when(encoder.matches("old-password", "old-hash")).thenReturn(true);
+
+        var error = assertThrows(PasswordChangeException.class,
+                () -> useCase.execute(new ChangePasswordCommand(id, "old-password", "old-password")));
+
+        assertEquals("PASSWORD_UNCHANGED", error.getCode());
+        verifyNoInteractions(tokens);
+    }
 }

@@ -1,5 +1,9 @@
 package com.ieltspath.user.application.usecase;
 
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.ieltspath.user.domain.exception.RoleNotFoundException;
 import com.ieltspath.user.application.command.AssignRoleCommand;
 import com.ieltspath.user.domain.aggregate.Role;
 import com.ieltspath.user.domain.aggregate.User;
@@ -50,5 +54,25 @@ class AssignRoleUseCaseTest {
         User updated = useCase.execute(new AssignRoleCommand(userId, Set.of("ADMIN"), UUID.randomUUID()));
 
         assertThat(updated.getRoles()).extracting(role -> role.getName().name()).containsExactly("ADMIN");
+    }
+
+    @Test
+    void rejectsAnEmptyOrMissingRoleSetWithoutSaving() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .id(userId)
+                .email(new Email("user@example.com"))
+                .fullName("User One")
+                .status(UserStatus.ACTIVE)
+                .build();
+        when(userRepository.lockActiveAdminUserIds()).thenReturn(List.of());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        for (Set<String> roles : new Set[]{Set.of(), null}) {
+            assertThatThrownBy(() -> useCase.execute(new AssignRoleCommand(userId, roles, UUID.randomUUID())))
+                    .isInstanceOf(RoleNotFoundException.class)
+                    .hasMessage("Cần chọn ít nhất một vai trò");
+        }
+        verify(userRepository, never()).save(any(User.class));
     }
 }

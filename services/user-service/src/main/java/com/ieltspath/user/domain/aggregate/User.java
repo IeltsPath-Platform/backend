@@ -1,6 +1,7 @@
 package com.ieltspath.user.domain.aggregate;
 
 import com.ieltspath.user.domain.vo.Email;
+import com.ieltspath.user.domain.vo.FullName;
 import com.ieltspath.user.domain.vo.PhoneNumber;
 import com.ieltspath.user.domain.vo.UserStatus;
 import lombok.AccessLevel;
@@ -31,10 +32,7 @@ public class User {
     private LocalDateTime updatedAt;
 
     public void updateProfile(String fullName, PhoneNumber phoneNumber) {
-        if (fullName == null || fullName.isBlank()) {
-            throw new IllegalArgumentException("Họ tên không được để trống");
-        }
-        this.fullName = fullName.trim();
+        this.fullName = new FullName(fullName).value();
         this.phoneNumber = phoneNumber;
         touch();
     }

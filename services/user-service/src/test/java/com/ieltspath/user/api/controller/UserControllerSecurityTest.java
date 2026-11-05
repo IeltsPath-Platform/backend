@@ -179,6 +179,33 @@ class UserControllerSecurityTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void registerWithAPasswordOver72BytesReturnsTheVietnameseMessage() throws Exception {
+        String body = """
+                {"email":"learner@example.com","password":"%s","fullName":"Learner","phoneNumber":"0123 456 789"}
+                """.formatted("ậ".repeat(25));
+
+        mockMvc.perform(post("/api/users/register")
+                .contentType("application/json")
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.password")
+                        .value("Mật khẩu phải có từ 6 đến 72 byte (chữ có dấu tính nhiều byte hơn)"));
+    }
+
+    @Test
+    void registerWithALetterPhoneNumberReturnsTheVietnameseMessage() throws Exception {
+        String body = """
+                {"email":"learner@example.com","password":"secret123","fullName":"Learner","phoneNumber":"abc"}
+                """;
+
+        mockMvc.perform(post("/api/users/register")
+                .contentType("application/json")
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.phoneNumber").value("Số điện thoại không hợp lệ"));
+    }
+
     private String signedToken(
             String secret,
             UUID subject,
