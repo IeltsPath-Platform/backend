@@ -49,7 +49,7 @@ theo kiểm kê ngày 2026-10-31.
 | `flashcards` | có | Ảnh thẻ, bìa bộ thẻ, bìa chủ đề và bộ từ vựng | 2 MB | png, jpeg, webp | library-service | `images/{userId}/{uuid}.{ext}`; bìa chủ đề/bộ từ `catalog-cover/{userId}/{uuid}.{ext}` | đã có |
 | `community` | có | Ảnh bài đăng cộng đồng | 5 MB | png, jpeg, webp, gif | community-service | `community/post/{userId}/{uuid}.{ext}` | đã có |
 | `media` | có | Audio và ảnh nội dung bài học; ảnh nghĩa và audio phát âm từ vựng | 25 MB (ảnh nghĩa và phát âm từ vựng tối đa 2 MB) | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service, library-service | seed: `listening/demo/ls1.mp3`; content upload API: `content-audio/{userId}/{uuid}.{ext}`; từ vựng: ảnh nghĩa `vocabulary/images/{uuid}.{ext}`, phát âm `vocabulary/pronunciation/{us\|uk}/{slug}.{ext}` | đã có |
-| `speaking-recordings` | không | Ghi âm Speaking của học viên | 5 MB | webm, mp4, ogg, mpeg, wav | assessment-service | `speaking/{userId}/{uuid}.{ext}` | đang dùng (upload ghi âm Speaking) |
+| `speaking-recordings` | không | Ghi âm Speaking của học viên | 10 MB (nâng từ 5 MB; learning-service cần 10 MB, assessment-service vẫn giới hạn 5 MB trong code) | webm, mp4, ogg, mpeg, wav | assessment-service (`speaking/`), learning-service (`practice/`) | `speaking/{userId}/{uuid}.{ext}`; learning: `practice/{userId}/{yyyy-MM-dd}_{submissionId}/part{n}_q{nn}[_r{k}].{ext}` | đang dùng (assessment và luyện tập Speaking chấm bằng AI) |
 | `media-premium` | không | Audio bài trả phí, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | đã tạo, riêng tư |
 
 Biến cấu hình tên bucket: `USER_AVATAR_BUCKET`, `LIBRARY_FLASHCARD_BUCKET`, `LIBRARY_CATALOG_MEDIA_BUCKET` (mặc định

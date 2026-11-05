@@ -95,12 +95,13 @@ class CourseLadderSeedTest {
 
     @Test
     void everyPointOfACourseIsTaughtAndPractisable() {
-        // Error traps hang off a parent point, and writing criteria are judged when an essay is graded.
+        // Error traps hang off a parent point, and writing and speaking criteria are judged when an essay or a recording is graded.
         List<String> missing = jdbc.queryForList("""
                 SELECT kp.code FROM knowledge_points kp JOIN topics t ON t.id = kp.topic_id
                 WHERE t.course_id IS NOT NULL AND t.status = 'ACTIVE' AND kp.status = 'ACTIVE'
                   AND kp.code NOT LIKE 'TRAP\\_%'
                   AND NOT EXISTS (SELECT 1 FROM writing_criterion_knowledge_points wc WHERE wc.knowledge_point_id = kp.id)
+                  AND NOT EXISTS (SELECT 1 FROM speaking_criterion_knowledge_points sc WHERE sc.knowledge_point_id = kp.id)
                   AND (NOT EXISTS (SELECT 1 FROM lesson_knowledge_points lk JOIN lessons l ON l.id = lk.lesson_id
                                    WHERE lk.knowledge_point_id = kp.id AND l.status = 'PUBLISHED')
                        OR NOT\s""" + ELIGIBLE_SET_FOR_POINT + ") ORDER BY kp.code", Map.of(), String.class);

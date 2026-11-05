@@ -27,7 +27,7 @@ public class RubricController {
     @GetMapping("/rubrics")
     @PreAuthorize("hasAnyRole('CONTENT_AUTHOR', 'EXAMINER')")
     public List<RubricResponse> active(@RequestParam("task") String task) {
-        return rubrics.active(task).stream().map(RubricResponse::from).toList();
+        return rubrics.active(task).stream().map(rubric -> RubricResponse.from(rubric, false)).toList();
     }
 
     @GetMapping("/admin/rubrics")
@@ -48,6 +48,7 @@ public class RubricController {
     @PreAuthorize("hasRole('CONTENT_AUTHOR')")
     public RubricResponse create(@Valid @RequestBody RubricRequest request) {
         return RubricResponse.from(rubrics.create(request.code(), request.task(), request.version(), request.sourceNote(),
+                request.systemPrompt(),
                 request.criteria().stream().map(CriterionRequest::toDomain).toList(),
                 request.examples().stream().map(ExampleRequest::toDomain).toList()));
     }
@@ -60,6 +61,7 @@ public class RubricController {
             throw new IllegalArgumentException("Rubric code and version in the body must match the path");
         }
         return RubricResponse.from(rubrics.updateDraft(code, version, request.task(), request.sourceNote(),
+                request.systemPrompt(),
                 request.criteria().stream().map(CriterionRequest::toDomain).toList(),
                 request.examples().stream().map(ExampleRequest::toDomain).toList()));
     }
@@ -71,8 +73,13 @@ public class RubricController {
     }
 
     public record RubricRequest(@NotBlank String code, @NotBlank String task, @Min(1) int version,
-                                @NotBlank String sourceNote, @NotEmpty List<@Valid CriterionRequest> criteria,
+                                @NotBlank String sourceNote, @jakarta.validation.constraints.Size(max = 4000) String systemPrompt,
+                                @NotEmpty List<@Valid CriterionRequest> criteria,
                                 List<@Valid ExampleRequest> examples) {
+        public RubricRequest(String code, String task, int version, String sourceNote,
+                             List<CriterionRequest> criteria, List<ExampleRequest> examples) {
+            this(code, task, version, sourceNote, null, criteria, examples);
+        }
         public RubricRequest {
             if (examples == null) examples = List.of();
         }
@@ -97,10 +104,19 @@ public class RubricController {
     }
 
     public record RubricResponse(String code, String task, int version, String status, String sourceNote,
+                                  String systemPrompt,
                                   List<CriterionResponse> criteria, List<Rubric.Example> examples) {
+        public RubricResponse(String code, String task, int version, String status, String sourceNote,
+                              List<CriterionResponse> criteria, List<Rubric.Example> examples) {
+            this(code, task, version, status, sourceNote, null, criteria, examples);
+        }
         static RubricResponse from(Rubric rubric) {
+            return from(rubric, true);
+        }
+        static RubricResponse from(Rubric rubric, boolean includeSystemPrompt) {
             return new RubricResponse(rubric.code(), rubric.task(), rubric.version(), rubric.status(),
-                    rubric.sourceNote(), rubric.criteria().stream().map(CriterionResponse::from).toList(),
+                    rubric.sourceNote(), includeSystemPrompt ? rubric.systemPrompt() : null,
+                    rubric.criteria().stream().map(CriterionResponse::from).toList(),
                     rubric.examples());
         }
     }

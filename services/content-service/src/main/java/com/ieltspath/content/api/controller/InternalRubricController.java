@@ -31,9 +31,11 @@ public class InternalRubricController {
 
     /** This additive shape is shared with the Learning and Assessment grading clients. */
     public record RubricPromptResponse(String code, String task, int version, String sourceNote,
-                                       List<CriterionResponse> criteria, List<ExampleResponse> examples) {
+                                       String systemPrompt, List<CriterionResponse> criteria,
+                                       List<ExampleResponse> examples) {
         static RubricPromptResponse from(Rubric rubric) {
             return new RubricPromptResponse(rubric.code(), rubric.task(), rubric.version(), rubric.sourceNote(),
+                    rubric.systemPrompt(),
                     rubric.criteria().stream().map(CriterionResponse::from).toList(),
                     rubric.examples().stream().map(ExampleResponse::from).toList());
         }

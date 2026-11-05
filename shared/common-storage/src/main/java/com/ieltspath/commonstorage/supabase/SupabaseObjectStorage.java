@@ -140,6 +140,20 @@ public final class SupabaseObjectStorage implements ObjectStorage, AutoCloseable
     }
 
     @Override
+    public byte[] download(String bucket, String key) {
+        requireBucket("download", bucket);
+        ObjectKeys.requireSafe(key);
+        try {
+            byte[] content = rest.get().uri(objectPath(bucket, key)).retrieve().body(byte[].class);
+            if (content == null) throw new StorageException("download", Reason.UNEXPECTED_RESPONSE, 200, false,
+                    StorageException.ref(bucket, key));
+            return content;
+        } catch (RuntimeException e) {
+            throw SupabaseErrors.map("download", bucket, key, e, false);
+        }
+    }
+
+    @Override
     public String publicUrl(String bucket, String key) {
         requireBucket("publicUrl", bucket);
         ObjectKeys.requireSafe(key);

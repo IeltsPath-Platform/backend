@@ -1,5 +1,7 @@
 package com.ieltspath.learning.api.exception;
 
+import com.ieltspath.commonstorage.StorageException;
+import com.ieltspath.commonstorage.UploadRejectedException;
 import com.ieltspath.events.messaging.InvalidDeadLetterBatchException;
 import com.ieltspath.events.messaging.UnknownDeadLetterQueueException;
 import com.ieltspath.learning.application.exception.AccessUnavailableException;
@@ -18,6 +20,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.MissingRequestHeaderException;
@@ -96,6 +99,29 @@ public class GlobalExceptionHandler {
     public ResponseEntity<LearningErrorResponse> missingHeader(MissingRequestHeaderException exception) {
         return ResponseEntity.badRequest().body(new LearningErrorResponse("Required header is missing",
                 "INVALID_REQUEST", null));
+    }
+
+    /** A recording the bucket would refuse: empty, too large, a type that is not allowed, or content that is not what it claims. */
+    @ExceptionHandler(UploadRejectedException.class)
+    public ResponseEntity<LearningErrorResponse> recordingRejected(UploadRejectedException exception) {
+        HttpStatus status = exception.reason() == UploadRejectedException.Reason.TOO_LARGE
+                ? HttpStatus.PAYLOAD_TOO_LARGE : HttpStatus.UNPROCESSABLE_ENTITY;
+        return ResponseEntity.status(status).body(new LearningErrorResponse("The recording was refused",
+                "RECORDING_" + exception.reason().name(), null));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<LearningErrorResponse> recordingTooLarge(MaxUploadSizeExceededException exception) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(new LearningErrorResponse(
+                "The recording is too large", "RECORDING_TOO_LARGE", null));
+    }
+
+    /** The message of a storage failure holds no key or credential, but only its operation and reason are logged. */
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<LearningErrorResponse> storageUnavailable(StorageException exception) {
+        log.error("Recording storage failed: operation={} reason={}", exception.operation(), exception.reason());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new LearningErrorResponse(
+                "Recording storage is unavailable", "STORAGE_UNAVAILABLE", null));
     }
 
     @ExceptionHandler({IllegalArgumentException.class, HttpMessageNotReadableException.class,

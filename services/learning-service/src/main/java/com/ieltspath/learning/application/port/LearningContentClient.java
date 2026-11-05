@@ -150,8 +150,13 @@ public interface LearningContentClient {
     /** Error codes currently accepted by Content. */
     List<ErrorType> activeErrorTypes();
 
-    record Rubric(String code, String task, int version, String sourceNote, List<RubricCriterion> criteria,
-                  List<RubricExample> examples) {}
+    record Rubric(String code, String task, int version, String sourceNote, String systemPrompt,
+                  List<RubricCriterion> criteria, List<RubricExample> examples) {
+        public Rubric(String code, String task, int version, String sourceNote, List<RubricCriterion> criteria,
+                      List<RubricExample> examples) {
+            this(code, task, version, sourceNote, null, criteria, examples);
+        }
+    }
     /** {@code knowledgePointId} is the point the criterion is evidence for; null when Content does not map it. */
     record RubricCriterion(String code, String name, String description, int sortOrder,
                            List<RubricBandDescriptor> bandDescriptors, UUID knowledgePointId,
