@@ -28,7 +28,7 @@ INSERT INTO seed_kp VALUES
   'Luyện cấu trúc câu khi nói');
 
 -- seq = k * 10 + n. n 1..2 sit in the lesson exercise block; n 3..5 only in the practice set, because a practice set
--- must not reuse a lesson question.
+-- must not reuse a lesson question; n 6..7 only in the final test of the topic, which must not reuse either.
 CREATE TEMP TABLE seed_q (k int, n int, stem text, a text, b text, c text, correct text, expl text) ON COMMIT DROP;
 INSERT INTO seed_q VALUES
  (1,1,'The examiner asks: "Do you like cooking?" Which answer is best for Part 1?','Yes.','Yes, I do, mainly because it helps me relax after a long day at work.','Cooking is a very broad topic and there are many kinds of it.','B','B answers directly and adds a reason in a natural, short way.'),
@@ -50,7 +50,15 @@ INSERT INTO seed_q VALUES
  (4,2,'Which sentence is correct?','I have lived here since five years.','I have lived here for five years.','I live here since five years.','B','Use "for" with a period of time and the present perfect.'),
  (4,3,'Which sentence uses a second conditional correctly?','If I will have time, I travel.','If I had more time, I would travel more.','If I have had time, I would travelled.','B','Second conditional: if + past simple, would + base verb.'),
  (4,4,'Which sentence is correct?','She don''t like spicy food.','She doesn''t like spicy food.','She not like spicy food.','B','Third person singular takes "doesn''t".'),
- (4,5,'Which sentence contains a relative clause?','I met a man who speaks three languages.','I met a man. Three languages.','Man speak three languages I meet.','A','"who speaks three languages" is a relative clause.');
+ (4,5,'Which sentence contains a relative clause?','I met a man who speaks three languages.','I met a man. Three languages.','Man speak three languages I meet.','A','"who speaks three languages" is a relative clause.'),
+ (1,6,'The examiner asks: "What do you usually do at weekends?" Which answer follows "direct answer + reason" best?','Nothing.','I usually meet friends for coffee, because it is the best way to relax after a busy week.','Weekends are two days long and include Saturday and Sunday.','B','B answers directly and adds a reason. A is too short and C does not answer the question.'),
+ (1,7,'Which answer is best for the Part 1 question "Do you enjoy cooking?"','Cooking.','I do, mostly because it is a creative way to spend time with my family.','There are many kinds of food in the world.','B','B gives a direct answer and a reason; the others are too short or off the question.'),
+ (2,6,'You need a moment to think before you answer. Which is the best thing to say?','"Hmm... hmm... um..." and then wait.','"That is a good question. Let me think for a second."','Nothing; look at the ceiling until you are ready.','B','A short natural phrase buys thinking time without breaking the flow.'),
+ (2,7,'Choose the linking word that adds a result: "It was raining heavily, ___ we stayed at home."','but','so','although','B','"So" introduces a result; "but" and "although" show contrast.'),
+ (3,6,'You cannot remember the word "umbrella". What is the best way to continue?','Stop talking and wait.','Say "the thing you hold above your head when it rains".','Say "I forgot, sorry" and change the topic.','B','Describing the missing word keeps you talking and shows that you can paraphrase.'),
+ (3,7,'Which sentence uses a more precise word than "very tired"?','I was exhausted after the long trip.','I was very very tired after the trip.','I was not not energetic after the trip.','A','"Exhausted" is precise; repeating "very" or doubling a negative is not.'),
+ (4,6,'Which answer joins "I live in the city." and "I like the nightlife." into one complex sentence?','I live in the city I like the nightlife.','I live in the city because I like the nightlife.','I live city, nightlife like.','B','"Because" joins the two ideas with a subordinate clause.'),
+ (4,7,'Which sentence is correct?','If I would have more time, I would travel.','If I had more time, I would travel.','If I have more time, I would travelled.','B','Second conditional: if + past simple, would + base verb.');
 
 -- Wrong option -> error code. Only codes without a trap knowledge point.
 CREATE TEMP TABLE seed_dis (seq int, opt text, code text) ON COMMIT DROP;
@@ -74,7 +82,15 @@ INSERT INTO seed_dis VALUES
  (42,'A','TENSE'),(42,'C','TENSE'),
  (43,'A','TENSE'),(43,'C','TENSE'),
  (44,'A','SUBJECT_VERB_AGREEMENT'),(44,'C','SUBJECT_VERB_AGREEMENT'),
- (45,'B','SPK_SIMPLE_STRUCTURES_ONLY'),(45,'C','SENTENCE_FRAGMENT');
+ (45,'B','SPK_SIMPLE_STRUCTURES_ONLY'),(45,'C','SENTENCE_FRAGMENT'),
+ (16,'A','SPK_NO_REASON'),(16,'C','SPK_OFF_QUESTION'),
+ (17,'A','SPK_NO_REASON'),(17,'C','SPK_OFF_QUESTION'),
+ (26,'A','SPK_FILLER_OVERUSE'),(26,'C','SPK_FILLER_OVERUSE'),
+ (27,'A','SPK_WRONG_LINKER'),(27,'C','SPK_WRONG_LINKER'),
+ (36,'A','SPK_REPAIR_FAILURE'),(36,'C','SPK_REPAIR_FAILURE'),
+ (37,'B','SPK_IMPRECISE_WORD'),(37,'C','SPK_IMPRECISE_WORD'),
+ (46,'A','SENTENCE_FRAGMENT'),(46,'C','SENTENCE_FRAGMENT'),
+ (47,'A','TENSE'),(47,'C','TENSE');
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- Error catalog (error_types allows no SPEAKING category, so the existing ones are reused)
@@ -96,7 +112,8 @@ SELECT gen_random_uuid(), t.code, t.name, t.category, t.severity, kp.id, t.fix_h
  WHERE NOT EXISTS (SELECT 1 FROM error_types e WHERE e.code = t.code);
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- Topic into the IELTS 6.5 course after Writing (980); only the four KPs with content go ACTIVE.
+-- Topic into the course ...0002 after Writing (990). V103 turned that row, formerly IELTS 6.5, into IELTS 7.0 (B2 to C1), so
+-- the lessons below sit in the 7.0 course although some of their points are B1 or B2. Only the four KPs with content go ACTIVE.
 -- An ACTIVE knowledge point needs learning_type: GRAMMAR = CONCEPT, VOCABULARY = MEMORY, STRATEGY = PROCEDURE.
 -- ---------------------------------------------------------------------------------------------------------------------
 UPDATE topics SET status = 'ACTIVE', course_id = '30000000-0000-4000-8000-000000000002', sort_order = 990, updated_at = now()
@@ -169,7 +186,28 @@ INSERT INTO content_sections (id, package_version_id, title, skill, sort_order, 
 SELECT pg_temp.sid('0a', s.k), pg_temp.sid('09', s.k), s.pkg_title, 'SPEAKING', 1, now(), now() FROM seed_kp s
 ON CONFLICT (id) DO NOTHING;
 INSERT INTO section_questions (id, section_id, question_version_id, sort_order, max_score, created_at)
-SELECT pg_temp.sid('0b', q.k * 10 + q.n), pg_temp.sid('0a', q.k), pg_temp.sid('07', q.k * 10 + q.n), q.n - 2, 1.00, now() FROM seed_q q WHERE q.n >= 3
+SELECT pg_temp.sid('0b', q.k * 10 + q.n), pg_temp.sid('0a', q.k), pg_temp.sid('07', q.k * 10 + q.n), q.n - 2, 1.00, now() FROM seed_q q WHERE q.n BETWEEN 3 AND 5
+ON CONFLICT (id) DO NOTHING;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Final test of the topic (a topic in a course needs one): n = 6, 7 of every KP, eight questions that nothing else uses.
+-- ---------------------------------------------------------------------------------------------------------------------
+INSERT INTO content_packages (id, code, title, package_type, status, topic_id, lesson_id, created_at, updated_at)
+SELECT pg_temp.sid('08', 90), 'SPK-TT-1', 'Bài kiểm tra cuối chặng Speaking', 'TOPIC_TEST', 'PUBLISHED', t.id, NULL, now(), now()
+  FROM topics t WHERE t.code = 'SPEAKING_FRAMEWORK'
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO content_package_versions (id, package_id, version_number, status, rules, schema_version, published_at, created_at, updated_at)
+VALUES (pg_temp.sid('09', 90), pg_temp.sid('08', 90), 1, 'PUBLISHED', '{}'::jsonb, 1, now(), now(), now())
+ON CONFLICT (id) DO NOTHING;
+UPDATE content_packages SET current_published_version_id = pg_temp.sid('09', 90)
+ WHERE id = pg_temp.sid('08', 90) AND current_published_version_id IS NULL;
+INSERT INTO content_sections (id, package_version_id, title, skill, sort_order, created_at, updated_at)
+VALUES (pg_temp.sid('0a', 90), pg_temp.sid('09', 90), 'Bài kiểm tra cuối chặng Speaking', 'SPEAKING', 1, now(), now())
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO section_questions (id, section_id, question_version_id, sort_order, max_score, created_at)
+SELECT pg_temp.sid('0b', q.k * 10 + q.n), pg_temp.sid('0a', 90), pg_temp.sid('07', q.k * 10 + q.n),
+       (q.k - 1) * 2 + (q.n - 5), 1.00, now()
+  FROM seed_q q WHERE q.n >= 6
 ON CONFLICT (id) DO NOTHING;
 
 DROP FUNCTION pg_temp.sid(text, int);
