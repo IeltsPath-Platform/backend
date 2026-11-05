@@ -1,18 +1,6 @@
--- Demo data only: sets the cover image (thumbnail on the course tile) and the banner image (wide picture behind the course page
--- header) of the five whole-band courses, using the pictures already uploaded to the shared Supabase media bucket
--- (CONTENT_MEDIA_BASE_URL in backend/.env). Other developers' databases start with both columns empty, so the courses show the
--- placeholder art until this script is run.
---
--- The values are storage keys (content-image/<uploader id>/<file>.png), not full URLs: the API resolves them against
--- CONTENT_MEDIA_BASE_URL. They only show a picture when your .env points at the same Supabase project as the one that holds
--- these files; otherwise upload your own pictures in the admin course drawer instead.
---
---   psql -h localhost -U postgres -d content_db -f backend/docs/demo/course-cover-banner-images-content-db.sql
---   (or, with the Compose database: docker cp the file into ieltspath-postgres-1 and run psql -d content_db -f on it)
---
--- Safe to run again: it overwrites the same two columns and touches nothing else. Run it after Flyway has applied V112 (the
--- banner_image_url column) and V103 (the course codes). A code that does not exist in your database is skipped.
--- It is a script and not a Flyway migration on purpose: a migration runs in every environment, these pictures are for one.
+-- Cover image (thumbnail on the course tile) and banner image (wide picture behind the course page header) of the five
+-- whole-band courses. The values are storage keys in the shared media bucket, not full URLs: the API resolves them
+-- against CONTENT_MEDIA_BASE_URL. A course code that does not exist is skipped.
 UPDATE courses AS c
    SET cover_image_url  = v.cover_image_url,
        banner_image_url = v.banner_image_url,
