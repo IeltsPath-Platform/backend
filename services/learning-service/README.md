@@ -246,6 +246,13 @@ affect Practice clearance. They appear in the additive `weak` review-basket grou
 Free writing, revisions and judged sub knowledge points do not create these reviews. See
 [lesson-writing-v1](../../docs/contracts/lesson-writing-v1.md#optional-criterion-reviews) for the rules and limits.
 
+## AI Speaking practice
+
+Speaking submissions are graded asynchronously with Azure Speech followed by one LLM request. Each submission snapshots
+the active Content rubric, caches Azure analysis by recording, stores learner-facing `display` separately from internal
+`signals`, and charges points only after a valid grade is saved. The scheduler and submission endpoint are disabled by
+default until the starter rubric is reviewed. See the [Speaking grading contract](../../docs/contracts/speaking-practice-grading-v1.md).
+
 ## Assessment results
 
 The consumer reads queue `learning.assessment-completed.v2` (bound to `assessment.events` /

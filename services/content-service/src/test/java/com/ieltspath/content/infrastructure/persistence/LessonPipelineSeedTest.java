@@ -406,14 +406,15 @@ class LessonPipelineSeedTest {
         assertThat(sequence).extracting(TopicSequenceResult::code)
                 .containsExactly("DEMO_LISTENING", "TREES_LISTENING", "LISTENING_6_5_DETAIL", "DEMO_READING",
                         "TFNG_SKILLS", "PREMIUM_MATCHING_INFO", "PREMIUM_SENTENCE_COMPLETION", "TREES_READING",
-                        "READING_6_5_INFERENCE", "DEMO_WRITING", "TREES_WRITING", "WRITING_6_5_DISCUSSION");
+                        "READING_6_5_INFERENCE", "SPEAKING_FRAMEWORK", "DEMO_WRITING", "TREES_WRITING",
+                        "WRITING_6_5_DISCUSSION");
         assertThat(sequence).extracting(TopicSequenceResult::skill)
                 .containsExactly(Skill.LISTENING, Skill.LISTENING, Skill.LISTENING, Skill.READING, Skill.READING,
-                        Skill.READING, Skill.READING, Skill.READING, Skill.READING, Skill.WRITING, Skill.WRITING,
-                        Skill.WRITING);
-        // The Writing 6.5 topic has no final test; a learner passes it by completing its lessons.
+                        Skill.READING, Skill.READING, Skill.READING, Skill.READING, Skill.SPEAKING, Skill.WRITING,
+                        Skill.WRITING, Skill.WRITING);
+        // The Speaking and Writing 6.5 topics have no final test; a learner passes them by completing their lessons.
         assertThat(sequence).extracting(TopicSequenceResult::hasTopicTest)
-                .containsExactly(true, true, true, true, true, true, true, true, true, true, true, false);
+                .containsExactly(true, true, true, true, true, true, true, true, true, false, true, true, false);
         // The lower-band Reading course keeps its paid topics after its free topics.
         assertThat(sequence).extracting(TopicSequenceResult::requiredFeatureKey)
                 .containsOnlyNulls();
@@ -601,7 +602,9 @@ class LessonPipelineSeedTest {
                 Map.entry("PS-W2-WR-1", "W2"), Map.entry("PS-W2-WR-2", "W2"),
                 Map.entry("PS-W3-WR-1", "W3"), Map.entry("PS-W3-WR-2", "W3"),
                 Map.entry("PS-W4-WR-1", "W4"), Map.entry("PS-W4-WR-2", "W4"),
-                Map.entry("PS-W5-WR-1", "W5"), Map.entry("PS-W5-WR-2", "W5"))));
+                Map.entry("PS-W5-WR-1", "W5"), Map.entry("PS-W5-WR-2", "W5"),
+                Map.entry("SPK-PS-1", "S55-1"), Map.entry("SPK-PS-2", "S60-1"),
+                Map.entry("SPK-PS-3", "S60-2"), Map.entry("SPK-PS-4", "S65-1"))));
         // The one-question V4 demo package is too small to be anyone's Practice.
         assertThat(jdbc.queryForObject("SELECT lesson_id FROM content_packages WHERE code = 'DEMO_MAIN_FLOW_READING'",
                 Map.of(), UUID.class)).isNull();

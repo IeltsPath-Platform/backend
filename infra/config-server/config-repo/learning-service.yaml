@@ -1,4 +1,10 @@
 spring:
+  servlet:
+    multipart:
+      # One Speaking recording per request: 10 MB file (the bucket's limit, about 5 minutes of WAV), a little headroom for
+      # the multipart envelope.
+      max-file-size: 10MB
+      max-request-size: 11MB
   datasource:
     url: ${LEARNING_DB_URL:jdbc:postgresql://localhost:5440/learning_db}
     username: ${LEARNING_DB_USERNAME:postgres}
@@ -19,6 +25,12 @@ app:
   auth:
     internal-jwt-issuer: ${INTERNAL_JWT_ISSUER:urn:code-base:api-gateway}
     internal-jwt-secret: ${GATEWAY_INTERNAL_JWT_SECRET}
+  # Object storage for Speaking recordings. Blank url and key keep the service running; storing a recording then answers 503.
+  storage:
+    enabled: true
+    supabase:
+      url: ${SUPABASE_URL:}
+      secret-key: ${SUPABASE_SECRET_KEY:}
   security:
     public-endpoints:
       - method: GET
@@ -49,6 +61,41 @@ learning:
     daily-grading-limit: ${LEARNING_WRITING_DAILY_GRADING_LIMIT:10}
     quota-timezone: Asia/Ho_Chi_Minh
     grading-timeout-seconds: 20
+  # Azure Speech: transcript and pronunciation scores of a Speaking recording. The key lives only in .env. Blank key or
+  # region turns the analysis off; storing recordings still works. locale en-US also gives an intonation score.
+  speech:
+    key: ${LEARNING_SPEECH_KEY:}
+    region: ${LEARNING_SPEECH_REGION:}
+    locale: ${LEARNING_SPEECH_LOCALE:en-US}
+    timeout-seconds: 180
+    max-concurrent: 2
+  # AI-graded Speaking practice. Recordings live in the shared bucket under practice/{userId}/{date}_{submissionId}/.
+  speaking:
+    # On by default for development. Set LEARNING_SPEAKING_ENABLED=false to switch it off, for example until the
+    # rubric and the grading have been reviewed against examiner scores.
+    enabled: ${LEARNING_SPEAKING_ENABLED:true}
+    point-cost: ${LEARNING_SPEAKING_POINT_COST:5}
+    bucket: ${LEARNING_SPEAKING_BUCKET:speaking-recordings}
+    # Must not be above the size limit of the bucket on Supabase.
+    max-recording-bytes: 10485760
+    upload-stale-seconds: 1800
+    retention-days: ${LEARNING_SPEAKING_RETENTION_DAYS:90}
+    timezone: Asia/Ho_Chi_Minh
+    daily-grading-limit: ${LEARNING_SPEAKING_DAILY_LIMIT:5}
+    stale-after-seconds: 120
+    max-attempts: 3
+    pass-band: 6.0
+    max-input-chars: 60000
+    history-min-evidence: 3
+    history-max-kps: 5
+    history-extra-kp-codes: ${LEARNING_SPEAKING_HISTORY_EXTRA_KP_CODES:}
+    history-trend-window: 5
+    history-max-age-days: 90
+    # Interim caps, to be fixed with the examiners: bands are lowered when the answer is too short, off topic or not English.
+    min-total-words: 30
+    too-short-band-cap: 5.0
+    off-topic-band-cap: 4.0
+    not-english-band-cap: 3.0
   error-trap:
     review-limit: 1
   # Older name of mastery.priority-below; it is the default for that key.

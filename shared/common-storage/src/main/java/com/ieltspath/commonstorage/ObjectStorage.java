@@ -27,6 +27,11 @@ public interface ObjectStorage {
     /** Object có tồn tại không. Gọi trước khi tin một key do client gửi lại. */
     boolean exists(String bucket, String key);
 
+    /** Reads a bounded private object into memory for server-side processing. */
+    default byte[] download(String bucket, String key) {
+        throw new UnsupportedOperationException("This storage adapter does not support downloads");
+    }
+
     /** Không gọi mạng. Chỉ đúng với bucket công khai. */
     String publicUrl(String bucket, String key);
 

@@ -72,7 +72,7 @@ class CourseSkillContentRepairMigrationTest {
                 """, String.class)).containsExactly(
                 "IELTS_5_5/LISTENING:4/1", "IELTS_5_5/READING:11/8", "IELTS_5_5/SPEAKING:0/0", "IELTS_5_5/WRITING:7/4",
                 "IELTS_6_0/LISTENING:0/0", "IELTS_6_0/READING:0/0", "IELTS_6_0/SPEAKING:0/0", "IELTS_6_0/WRITING:0/0",
-                "IELTS_6_5/LISTENING:1/0", "IELTS_6_5/READING:1/0", "IELTS_6_5/SPEAKING:0/0", "IELTS_6_5/WRITING:1/0",
+                "IELTS_6_5/LISTENING:1/0", "IELTS_6_5/READING:1/0", "IELTS_6_5/SPEAKING:4/1", "IELTS_6_5/WRITING:1/0",
                 "IELTS_7_0/LISTENING:0/0", "IELTS_7_0/READING:0/0", "IELTS_7_0/SPEAKING:0/0", "IELTS_7_0/WRITING:0/0");
     }
 

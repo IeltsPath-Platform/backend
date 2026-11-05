@@ -79,6 +79,7 @@ Gateway giữ các path công khai nhưng trỏ từng nhóm tới chủ sở h�
 | learning | assessment | `GET /api/assessments/me/statistics/study-context` xác minh bài thi của người học khi mở phiên học | `ASSESSMENT_SERVICE_URL` (mặc định `http://localhost:8083`) |
 | learning | access | `GET /api/access/me/points` (số dư), `POST /internal/access/points/debit` (AI grading and durable course-skill unlock purchases) | `ACCESS_SERVICE_URL` (mặc định `http://localhost:8084`) |
 | learning | LLM (ngoài hệ thống) | `POST {base}/chat/completions` (OpenAI-compatible) khi chấm bài luận, ngoài mọi transaction | `LEARNING_LLM_BASE_URL`, `LEARNING_LLM_API_KEY`, `LEARNING_LLM_MODEL` |
+| learning | Azure Speech (ngoài hệ thống) | Speech SDK (`client-sdk` 1.53.0), một lượt nhận dạng liên tục cho cả ghi âm, đẩy audio qua stream (không ghi file); chạy ngoài transaction. Không qua `ResilientCall` (SDK tự mở kết nối); số phân tích chạy cùng lúc bị giới hạn bằng `learning.speech.max-concurrent` | `LEARNING_SPEECH_KEY`, `LEARNING_SPEECH_REGION`, `LEARNING_SPEECH_LOCALE` |
 | assessment | LLM (ngoài hệ thống) | `POST {base}/chat/completions` cho essay đã nộp trong `TOPIC_GATE`/`COURSE_GATE`, ngoài transaction | `ASSESSMENT_LLM_BASE_URL`, `ASSESSMENT_LLM_API_KEY`, `ASSESSMENT_LLM_MODEL`; quota ngày `ASSESSMENT_LLM_DAILY_LIMIT` |
 
 Các lời gọi HTTP đồng bộ dùng `shared/common-resilience`: retry tối đa một lần sau 200 ms chỉ cho lỗi kết nối/timeout và HTTP 5xx; chỉ `READ` và `IDEMPOTENT_WRITE` được retry. Circuit breaker dùng chung theo dịch vụ đích (content, access, user, assessment, library, learning, llm), mở 30 giây sau ngưỡng lỗi cấu hình; LLM có semaphore tối đa bốn lời gọi đồng thời. Lỗi breaker/bulkhead được client ánh xạ về contract lỗi của service gọi.
@@ -108,7 +109,7 @@ biệt bằng tiền tố khóa; khác chính sách thì dùng bucket mới; kh�
 | `flashcards` | có | Ảnh thẻ, bìa bộ thẻ, bìa catalog từ vựng | 2 MB | png, jpeg, webp | library-service | `images/{userId}/{uuid}.{ext}`; bìa catalog `catalog-cover/{userId}/{uuid}.{ext}` | đã có; bìa catalog là kế hoạch |
 | `community` | có | Ảnh bài đăng cộng đồng | 5 MB | png, jpeg, webp, gif | community-service | `community/post/{userId}/{uuid}.{ext}` | đã có |
 | `media` | có | Audio và ảnh nội dung bài học | 25 MB | mpeg, mp4, wav, ogg, png, jpeg, webp | content-service | seed: `listening/demo/ls1.mp3`; upload API: `content-audio/{userId}/{uuid}.{ext}` | đã có |
-| `speaking-recordings` | không | Ghi âm Speaking của học viên | 5 MB | webm, mp4, ogg, mpeg, wav | assessment-service | `speaking/{userId}/{uuid}.{ext}` | đã có, chưa dùng |
+| `speaking-recordings` | không | Ghi âm Speaking của học viên | 10 MB (nâng từ 5 MB; learning-service cần 10 MB, assessment-service vẫn giới hạn 5 MB trong code) | webm, mp4, ogg, mpeg, wav | assessment-service (tiền tố `speaking/`), learning-service (tiền tố `practice/`) | `speaking/{userId}/{uuid}.{ext}`; luyện tập chấm bằng AI: `practice/{userId}/{yyyy-MM-dd}_{submissionId}/part{n}_q{nn}[_r{k}].{ext}` | assessment đang dùng; learning: upload đã có, chấm chưa |
 | `media-premium` | không | Audio PREMIUM, chỉ phát bằng URL ký | 25 MB | mpeg, mp4, wav, ogg | content-service | như `media` | đã có |
 
 Content lưu `access_tier` cùng asset. `PUBLIC` dùng URL công khai của `media`; `PREMIUM` dùng URL ký của

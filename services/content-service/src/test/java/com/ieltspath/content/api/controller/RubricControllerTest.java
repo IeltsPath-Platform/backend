@@ -74,7 +74,7 @@ class RubricControllerTest {
     @Test
     @WithMockUser(roles = "CONTENT_AUTHOR")
     void authorCanCreateDraftAndInternalReadersGetTheSharedProjection() throws Exception {
-        when(rubrics.create(any(), any(), anyInt(), any(), any(), any())).thenReturn(draftRubric());
+        when(rubrics.create(any(), any(), anyInt(), any(), any(), any(), any())).thenReturn(draftRubric());
         mockMvc.perform(post("/api/content/admin/rubrics").contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody()))
                 .andExpect(status().isCreated())

@@ -25,8 +25,8 @@ public class JdbcRubricRepository implements RubricRepository {
 
     @Override
     public Rubric create(Rubric rubric) {
-        jdbc.update("INSERT INTO rubrics (code, task, rubric_version, status, source_note) "
-                        + "VALUES (:code, :task, :version, 'DRAFT', :sourceNote)", params(rubric));
+        jdbc.update("INSERT INTO rubrics (code, task, rubric_version, status, source_note, system_prompt) "
+                        + "VALUES (:code, :task, :version, 'DRAFT', :sourceNote, :systemPrompt)", params(rubric));
         saveChildren(rubric);
         return findByCodeAndVersion(rubric.code(), rubric.version()).orElseThrow();
     }
@@ -42,7 +42,7 @@ public class JdbcRubricRepository implements RubricRepository {
             throw new RubricNotFoundException("Rubric not found: " + code + "@" + version);
         }
         if (!"DRAFT".equals(status)) throw new RubricNotEditableException("Only draft rubrics can be edited");
-        jdbc.update("UPDATE rubrics SET task=:task, source_note=:sourceNote, updated_at=CURRENT_TIMESTAMP "
+        jdbc.update("UPDATE rubrics SET task=:task, source_note=:sourceNote, system_prompt=:systemPrompt, updated_at=CURRENT_TIMESTAMP "
                 + "WHERE code=:code AND rubric_version=:version", params(rubric));
         UUID id = jdbc.queryForObject("SELECT id FROM rubrics WHERE code=:code AND rubric_version=:version", key, UUID.class);
         jdbc.update("DELETE FROM rubric_criteria WHERE rubric_id=:id", new MapSqlParameterSource("id", id));
@@ -103,12 +103,15 @@ public class JdbcRubricRepository implements RubricRepository {
 
     private Rubric load(UUID id) {
         var p = new MapSqlParameterSource("id", id);
-        var parent = jdbc.queryForMap("SELECT code, task, rubric_version, source_note, status FROM rubrics WHERE id=:id", p);
+        var parent = jdbc.queryForMap("SELECT code, task, rubric_version, source_note, status, system_prompt FROM rubrics WHERE id=:id", p);
         List<CriterionRow> criterionRows = jdbc.query("""
-                        SELECT c.id, c.code, c.name, c.description, c.sort_order, m.knowledge_point_id
+                        SELECT c.id, c.code, c.name, c.description, c.sort_order,
+                               COALESCE(w.knowledge_point_id, s.knowledge_point_id) AS knowledge_point_id
                         FROM rubric_criteria c
                         JOIN rubrics r ON r.id = c.rubric_id
-                        LEFT JOIN writing_criterion_knowledge_points m ON m.task = r.task AND m.criterion_code = c.code
+                        LEFT JOIN writing_criterion_knowledge_points w ON w.task = r.task AND w.criterion_code = c.code
+                        LEFT JOIN speaking_criterion_knowledge_points s
+                          ON r.task = 'SPEAKING' AND s.criterion_code = c.code
                         WHERE c.rubric_id = :id ORDER BY c.sort_order
                         """, p,
                 (rs, row) -> new CriterionRow(rs.getObject("id", UUID.class), rs.getString("code"),
@@ -145,19 +148,28 @@ public class JdbcRubricRepository implements RubricRepository {
                         rs.getString("essay"), rs.getString("commentary")));
         return new Rubric((String) parent.get("code"), (String) parent.get("task"),
                 ((Number) parent.get("rubric_version")).intValue(), (String) parent.get("source_note"),
-                (String) parent.get("status"), criteria, examples);
+                (String) parent.get("status"), (String) parent.get("system_prompt"), criteria, examples);
     }
 
     private static void validateForActivation(Rubric rubric) {
-        Set<String> expectedCriteria = "TASK_1".equals(rubric.task())
-                ? Set.of("TA", "CC", "LR", "GRA") : Set.of("TR", "CC", "LR", "GRA");
         Set<String> actualCriteria = rubric.criteria().stream().map(Rubric.Criterion::code)
                 .collect(java.util.stream.Collectors.toSet());
-        if (!expectedCriteria.equals(actualCriteria)) {
+        Set<String> expectedCriteria = switch (rubric.task()) {
+            case "TASK_1" -> Set.of("TA", "CC", "LR", "GRA");
+            case "TASK_2" -> Set.of("TR", "CC", "LR", "GRA");
+            case "SPEAKING" -> Set.of("FC", "LR", "GRA");
+            default -> throw new IllegalArgumentException("Unsupported rubric task: " + rubric.task());
+        };
+        boolean validSpeakingCriteria = "SPEAKING".equals(rubric.task())
+                && actualCriteria.containsAll(expectedCriteria)
+                && Set.of("FC", "LR", "GRA", "PR").containsAll(actualCriteria);
+        if (!(expectedCriteria.equals(actualCriteria) || validSpeakingCriteria)) {
             throw new IllegalArgumentException("Rubric " + rubric.task() + " requires criteria " + expectedCriteria);
         }
-        List<Double> expectedBands = java.util.stream.IntStream.rangeClosed(0, 10)
-                .mapToDouble(step -> 4.0 + step * 0.5).boxed().toList();
+        double lowestBand = "SPEAKING".equals(rubric.task()) ? 0.0 : 4.0;
+        List<Double> expectedBands = java.util.stream.IntStream.rangeClosed(0,
+                        "SPEAKING".equals(rubric.task()) ? 18 : 10)
+                .mapToDouble(step -> lowestBand + step * 0.5).boxed().toList();
         for (Rubric.Criterion criterion : rubric.criteria()) {
             List<Double> actualBands = criterion.bandDescriptors().stream().map(Rubric.BandDescriptor::band)
                     .sorted().toList();
@@ -199,7 +211,8 @@ public class JdbcRubricRepository implements RubricRepository {
 
     private static MapSqlParameterSource params(Rubric rubric) {
         return new MapSqlParameterSource().addValue("code", rubric.code()).addValue("task", rubric.task())
-                .addValue("version", rubric.version()).addValue("sourceNote", rubric.sourceNote());
+                .addValue("version", rubric.version()).addValue("sourceNote", rubric.sourceNote())
+                .addValue("systemPrompt", rubric.systemPrompt());
     }
 
     private record CriterionRow(UUID id, String code, String name, String description, int sortOrder,
