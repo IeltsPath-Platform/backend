@@ -1,9 +1,9 @@
 ﻿---
 title: "BE: học từ vựng theo unit cho mobile, XP/streak/tim độc lập với web"
 description: "library-service cung cấp unit do content author biên soạn, chấm bài theo attempt, và hệ thống XP/streak(freeze)/tim riêng; hồi tim và mua freeze bằng Points của access-service"
-status: pending
+status: in-progress
 priority: P1
-branch: ""
+branch: "feat/mobile-vocabulary-study"
 tags: [backend, library-service, vocabulary, gamification, hearts, streak, points]
 blockedBy: []
 blocks: []

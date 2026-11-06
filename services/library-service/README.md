@@ -115,3 +115,9 @@ This endpoint is internal; it must not be exposed as a browser/Gateway route.
 
 - **Dọn ảnh mồ côi (Orphaned images cleanup)**: Ảnh đã upload lên bucket nhưng người dùng hủy không tạo thẻ hoặc không lưu deck sẽ tồn tại trong bucket như rác. Cần một background job định kỳ (hoặc lifecycle rule trên bucket) để dọn dẹp các object không được tham chiếu trong DB.
 - **Hạn mức tải ảnh theo người dùng (Per-user upload rate limit / quota)**: Hiện tại người dùng có thể tải lên ảnh 2MB mà chưa có hạn mức theo ngày (daily upload count / bandwidth quota). Cần bổ sung rate limit hoặc kiểm tra hạn mức lưu trữ theo tài khoản để tránh lạm dụng dung lượng storage.
+
+## Mobile vocabulary study units
+
+V39 adds author-curated study units and immutable published revisions in Library. CONTENT_AUTHOR alone may create, edit, validate, publish, reorder, and archive units under `/api/content/admin/vocabulary`; ADMIN alone is refused. Public GET reads are `/api/content/vocabulary/topics/{topicId}/units` and `/api/content/vocabulary/units/{unitId}`. Published content and its curriculum version are read from a consistent snapshot; draft edits (including LEARN/REVIEW kind) stay private until publication. Active senses are returned in author order and distinct-word totals count vocabulary items across units.
+
+The implementation contract and delivery status are tracked in [the vocabulary study plan](../../plans/261106-2330-mobile-vocabulary-study/plan.md). Learner attempts, rewards, and gateway end-to-end verification follow in the same release branch.

@@ -37,6 +37,8 @@ app:
           - "/api/content/vocabulary/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
           - /api/content/vocabulary/suggestions
           - /api/content/vocabulary/topics
+          - "/api/content/vocabulary/topics/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/units"
+          - "/api/content/vocabulary/units/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
           - /api/content/vocabulary/sets
           - /api/content/vocabulary/mindmap
           - "/api/content/vocabulary/sets/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}"
@@ -56,6 +58,7 @@ springdoc:
   api-docs:
     enabled: ${API_DOCS_ENABLED:true}
   paths-to-match:
+    - /api/learning-support/vocabulary-study/**
     - /api/content/videos/**
     - /api/content/vocabulary/**
     - /api/content/admin/vocabulary/**
