@@ -88,4 +88,52 @@ class CommunityDomainTest {
         c.delete(admin, true);
         assertEquals(ContentStatus.DELETED, c.getStatus());
     }
+
+    @Test
+    void postBodyOfExactly20000CharactersIsAccepted() {
+        Post p = Post.create(UUID.randomUUID(), PostCategory.GENERAL, null, "x".repeat(20000));
+        assertEquals(20000, p.getBody().length());
+    }
+
+    @Test
+    void postBodyOf20001CharactersIsRejected() {
+        var error = assertThrows(CommunityException.class,
+                () -> Post.create(UUID.randomUUID(), PostCategory.GENERAL, null, "x".repeat(20001)));
+        assertEquals("Body is too long", error.getMessage());
+    }
+
+    @Test
+    void postBodyIsTrimmedBeforeTheLengthIsChecked() {
+        Post p = Post.create(UUID.randomUUID(), PostCategory.GENERAL, null, " " + "x".repeat(20000) + " ");
+        assertEquals(20000, p.getBody().length());
+    }
+
+    @Test
+    void blankOrMissingPostBodyIsRejected() {
+        for (String body : new String[]{"   ", "", null}) {
+            var error = assertThrows(CommunityException.class,
+                    () -> Post.create(UUID.randomUUID(), PostCategory.GENERAL, null, body));
+            assertEquals("Body is required", error.getMessage());
+        }
+    }
+
+    @Test
+    void commentBodyOfExactly5000CharactersIsAccepted() {
+        Comment c = Comment.create(UUID.randomUUID(), UUID.randomUUID(), null, "x".repeat(5000));
+        assertEquals(5000, c.getBody().length());
+    }
+
+    @Test
+    void commentBodyOf5001CharactersIsRejected() {
+        var error = assertThrows(CommunityException.class,
+                () -> Comment.create(UUID.randomUUID(), UUID.randomUUID(), null, "x".repeat(5001)));
+        assertEquals("Comment is too long", error.getMessage());
+    }
+
+    @Test
+    void blankCommentBodyIsRejected() {
+        var error = assertThrows(CommunityException.class,
+                () -> Comment.create(UUID.randomUUID(), UUID.randomUUID(), null, "  "));
+        assertEquals("Body is required", error.getMessage());
+    }
 }
