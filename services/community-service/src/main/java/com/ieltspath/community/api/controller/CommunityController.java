@@ -52,6 +52,8 @@ public class CommunityController {
     private final ModerateCommentUseCase moderateCommentUseCase;
     private final AddReactionUseCase addReactionUseCase;
     private final RemoveReactionUseCase removeReactionUseCase;
+    private final AddCommentReactionUseCase addCommentReactionUseCase;
+    private final RemoveCommentReactionUseCase removeCommentReactionUseCase;
     private final CommunityQueriesUseCase queries;
     private final ManageSocialUseCase social;
     private final PublicProfileClient profiles;
@@ -165,7 +167,7 @@ public class CommunityController {
         CommentResult result = createCommentUseCase.execute(currentActor, new CreateCommentCommand(
                 postId, request.parentCommentId(), request.body()
         ));
-        return CommentResponse.from(queries.enrichComments(java.util.List.of(result)).getFirst());
+        return CommentResponse.from(queries.enrichComments(currentActor, java.util.List.of(result)).getFirst());
     }
 
     @GetMapping("/users/mention-suggestions")
@@ -191,8 +193,9 @@ public class CommunityController {
             return new PageResponse<>(result.content().stream().map(CommentResponse::from).toList(),
                     result.page(), result.size(), result.totalElements(), result.totalPages(), "createdAt,asc;id,asc");
         }
-        PageResult<CommentResult> result = listCommentsUseCase.execute(actor(), postId, new PageQuery(page, size));
-        var enrichedComments = queries.enrichComments(result.content());
+        var currentActor = actor();
+        PageResult<CommentResult> result = listCommentsUseCase.execute(currentActor, postId, new PageQuery(page, size));
+        var enrichedComments = queries.enrichComments(currentActor, result.content());
         return new PageResponse<>(
                 enrichedComments.stream().map(CommentResponse::from).toList(),
                 result.page(), result.size(), result.totalElements(), result.totalPages(),
@@ -278,8 +281,9 @@ public class CommunityController {
             @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateCommentRequest request
     ) {
-        var result = editCommentUseCase.execute(actor(), new EditCommentCommand(id, request.body()));
-        return CommentResponse.from(queries.enrichComments(java.util.List.of(result)).getFirst());
+        var currentActor = actor();
+        var result = editCommentUseCase.execute(currentActor, new EditCommentCommand(id, request.body()));
+        return CommentResponse.from(queries.enrichComments(currentActor, java.util.List.of(result)).getFirst());
     }
 
     @DeleteMapping("/comments/{id}")
@@ -293,9 +297,21 @@ public class CommunityController {
             @PathVariable("id") UUID id,
             @Valid @RequestBody ModerationRequest request
     ) {
-        return CommentResponse.from(moderateCommentUseCase.execute(
-                actor(), new ModerateCommentCommand(id, request.status())
-        ));
+        var currentActor = actor();
+        var result = moderateCommentUseCase.execute(currentActor, new ModerateCommentCommand(id, request.status()));
+        return CommentResponse.from(queries.enrichComments(currentActor, java.util.List.of(result)).getFirst());
+    }
+
+    @PutMapping("/comments/{commentId}/reactions/{type}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void reactComment(@PathVariable("commentId") UUID commentId, @PathVariable("type") ReactionType type) {
+        addCommentReactionUseCase.execute(actor(), new AddCommentReactionCommand(commentId, type));
+    }
+
+    @DeleteMapping("/comments/{commentId}/reactions/{type}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void unreactComment(@PathVariable("commentId") UUID commentId, @PathVariable("type") ReactionType type) {
+        removeCommentReactionUseCase.execute(actor(), new RemoveCommentReactionCommand(commentId, type));
     }
 
     @PutMapping("/posts/{postId}/reactions/{type}")

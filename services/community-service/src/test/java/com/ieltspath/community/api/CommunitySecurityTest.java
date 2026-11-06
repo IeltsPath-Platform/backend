@@ -87,6 +87,8 @@ class CommunitySecurityTest {
     AddReactionUseCase addReactionUseCase;
     @MockitoBean
     RemoveReactionUseCase removeReactionUseCase;
+    @MockitoBean AddCommentReactionUseCase addCommentReactionUseCase;
+    @MockitoBean RemoveCommentReactionUseCase removeCommentReactionUseCase;
     @MockitoBean
     CommunityQueriesUseCase queries;
     @MockitoBean
@@ -279,7 +281,7 @@ class CommunitySecurityTest {
                 .thenReturn(new CurrentUser(userId, Set.of(CanonicalRoles.CUSTOMER)));
         when(createCommentUseCase.execute(eq(new CommunityActor(userId, false)), any(CreateCommentCommand.class)))
                 .thenReturn(result);
-        when(queries.enrichComments(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(queries.enrichComments(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
 
         mvc.perform(post("/api/community/posts/{postId}/comments", result.postId())
                         .with(jwt().jwt(token -> token.subject(userId.toString()).claim("roles", List.of("CUSTOMER"))))
@@ -287,7 +289,12 @@ class CommunitySecurityTest {
                         .header("X-User-Roles", "ADMIN")
                         .contentType("application/json")
                         .content("{\"body\":\"A comment\"}"))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.reactionCounts.LIKE").value(0))
+                .andExpect(jsonPath("$.reactionCounts.LOVE").value(0))
+                .andExpect(jsonPath("$.reactionCounts.HELPFUL").value(0))
+                .andExpect(jsonPath("$.reactionCounts.ACCURATE").value(0))
+                .andExpect(jsonPath("$.myReaction").value(org.hamcrest.Matchers.nullValue()));
 
         verify(createCommentUseCase).execute(
                 eq(new CommunityActor(userId, false)), any(CreateCommentCommand.class)
@@ -456,6 +463,70 @@ class CommunitySecurityTest {
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.status").value(415))
                 .andExpect(jsonPath("$.error").value("Unsupported Media Type"));
+    }
+
+    @Test
+    void commentReactionEndpointsRequireAuthenticationAndRejectUnknownTypes() throws Exception {
+        UUID id = UUID.randomUUID();
+        for (var method : List.of(org.springframework.http.HttpMethod.PUT, org.springframework.http.HttpMethod.DELETE)) {
+            mvc.perform(request(method, "/api/community/comments/" + id + "/reactions/LIKE").with(csrf()))
+                    .andExpect(status().isUnauthorized());
+            mvc.perform(request(method, "/api/community/comments/" + id + "/reactions/INVALID")
+                            .with(jwt()).with(csrf()))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(addCommentReactionUseCase, removeCommentReactionUseCase);
+    }
+
+    @Test
+    void commentReactionsForwardAuthenticatedActorAndReturnNoContent() throws Exception {
+        UUID viewer = UUID.randomUUID(), id = UUID.randomUUID();
+        var actor = new CommunityActor(viewer, false);
+        when(currentUserProvider.requireCurrentUser()).thenReturn(new CurrentUser(viewer, Set.of(CanonicalRoles.CUSTOMER)));
+        mvc.perform(put("/api/community/comments/" + id + "/reactions/LOVE").with(jwt()).with(csrf()))
+                .andExpect(status().isNoContent()).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(""));
+        mvc.perform(delete("/api/community/comments/" + id + "/reactions/LOVE").with(jwt()).with(csrf()))
+                .andExpect(status().isNoContent()).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(""));
+        verify(addCommentReactionUseCase).execute(actor, new com.ieltspath.community.application.command.AddCommentReactionCommand(id, com.ieltspath.community.domain.vo.ReactionType.LOVE));
+        verify(removeCommentReactionUseCase).execute(actor, new com.ieltspath.community.application.command.RemoveCommentReactionCommand(id, com.ieltspath.community.domain.vo.ReactionType.LOVE));
+    }
+
+    @Test
+    void everyCommentResponsePathIncludesCountsAndViewerReaction() throws Exception {
+        UUID viewer = UUID.randomUUID(), id = UUID.randomUUID(), postId = UUID.randomUUID();
+        var actor = new CommunityActor(viewer, false);
+        when(currentUserProvider.requireCurrentUser()).thenReturn(new CurrentUser(viewer, Set.of(CanonicalRoles.CUSTOMER)));
+        var raw = new CommentResult(id, postId, viewer, null, "body", ContentStatus.ACTIVE, Instant.now(), Instant.now());
+        var summary = new com.ieltspath.community.domain.vo.CommentInteractions(java.util.Map.of(
+                com.ieltspath.community.domain.vo.ReactionType.LOVE, 2L), com.ieltspath.community.domain.vo.ReactionType.LOVE);
+        var enriched = raw.withDetails(com.ieltspath.community.application.result.PublicProfile.anonymous(viewer), 0L, summary);
+        when(queries.enrichComments(eq(actor), eq(List.of(raw)))).thenReturn(List.of(enriched));
+        when(listCommentsUseCase.execute(eq(actor), eq(postId), any())).thenReturn(new PageResult<>(List.of(raw), 0, 20, 1, 1));
+        when(queries.thread(eq(actor), eq(postId), org.mockito.ArgumentMatchers.isNull(), any())).thenReturn(new PageResult<>(List.of(enriched), 0, 20, 1, 1));
+        when(queries.thread(eq(actor), org.mockito.ArgumentMatchers.isNull(), eq(id), any())).thenReturn(new PageResult<>(List.of(enriched), 0, 10, 1, 1));
+        when(createCommentUseCase.execute(eq(actor), any())).thenReturn(raw);
+        when(editCommentUseCase.execute(eq(actor), any())).thenReturn(raw);
+        when(moderateCommentUseCase.execute(eq(actor), any())).thenReturn(raw);
+        for (String url : List.of("/api/community/posts/" + postId + "/comments",
+                "/api/community/posts/" + postId + "/comments?threaded=true", "/api/community/comments/" + id + "/replies")) {
+            assertReactionFields(mvc.perform(get(url).with(jwt())), "$.content[0]");
+        }
+        assertReactionFields(mvc.perform(post("/api/community/posts/" + postId + "/comments").with(jwt()).with(csrf())
+                .contentType("application/json").content("{\"body\":\"body\"}")), "$");
+        assertReactionFields(mvc.perform(put("/api/community/comments/" + id).with(jwt()).with(csrf())
+                .contentType("application/json").content("{\"body\":\"body\"}")), "$");
+        assertReactionFields(mvc.perform(put("/api/community/comments/" + id + "/status").with(jwt()).with(csrf())
+                .contentType("application/json").content("{\"status\":\"ACTIVE\"}")), "$");
+        verify(queries, org.mockito.Mockito.times(4)).enrichComments(actor, List.of(raw));
+    }
+
+    private static void assertReactionFields(org.springframework.test.web.servlet.ResultActions result, String path) throws Exception {
+        result.andExpect(status().is2xxSuccessful())
+                .andExpect(jsonPath(path + ".reactionCounts.LIKE").value(0))
+                .andExpect(jsonPath(path + ".reactionCounts.LOVE").value(2))
+                .andExpect(jsonPath(path + ".reactionCounts.HELPFUL").value(0))
+                .andExpect(jsonPath(path + ".reactionCounts.ACCURATE").value(0))
+                .andExpect(jsonPath(path + ".myReaction").value("LOVE"));
     }
 
     @Test

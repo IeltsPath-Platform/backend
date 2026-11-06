@@ -33,7 +33,8 @@ class FeedQueryLimitsTest {
     private final CommunityReadRepository reads = mock(CommunityReadRepository.class);
     private final PublicProfileClient profiles = mock(PublicProfileClient.class);
     private final CommunityQueriesUseCase queries = new CommunityQueriesUseCase(
-            reads, profiles, mock(PostRepository.class), mock(CommentRepository.class));
+            reads, profiles, mock(PostRepository.class), mock(CommentRepository.class),
+            mock(com.ieltspath.community.domain.repository.CommentReactionRepository.class));
 
     private static Post post(UUID author) {
         Instant created = Instant.parse("2026-10-16T10:00:00Z");

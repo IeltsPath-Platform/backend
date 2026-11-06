@@ -17,6 +17,7 @@ public class CommunityQueriesUseCase {
  private final PublicProfileClient profiles;
  private final PostRepository posts;
  private final CommentRepository comments;
+ private final CommentReactionRepository commentReactions;
  public CursorResult<PostResult> feed(CommunityActor actor,UUID author,boolean bookmarked,boolean followingOnly,PostCategory category,String cursor,int size) {
  new PageQuery(0,size);
  var rows=reads.feed(actor.userId(),author,bookmarked,followingOnly,category,FeedCursor.parse(cursor),size+1);
@@ -52,11 +53,14 @@ public class CommunityQueriesUseCase {
  return content.stream().map(p->p.withDetails(people.getOrDefault(p.authorId(),PublicProfile.anonymous(p.authorId())),
  interactions.getOrDefault(p.id(),PostInteractions.empty()))).toList();
  }
- public List<CommentResult> enrichComments(List<CommentResult> content) {
+ public List<CommentResult> enrichComments(CommunityActor actor,List<CommentResult> content) {
  if(content.isEmpty())return List.of();
  var people=profiles.findProfiles(content.stream().map(CommentResult::authorId).collect(Collectors.toSet()));
- var counts=reads.replyCounts(content.stream().map(CommentResult::id).collect(Collectors.toSet()));
- return content.stream().map(c->c.withDetails(people.getOrDefault(c.authorId(),PublicProfile.anonymous(c.authorId())),counts.getOrDefault(c.id(),0L))).toList();
+ var ids=content.stream().map(CommentResult::id).collect(Collectors.toSet());
+ var counts=reads.replyCounts(ids);
+ var interactions=commentReactions.interactions(ids,actor.userId());
+ return content.stream().map(c->c.withDetails(people.getOrDefault(c.authorId(),PublicProfile.anonymous(c.authorId())),
+ counts.getOrDefault(c.id(),0L),interactions.getOrDefault(c.id(),CommentInteractions.empty()))).toList();
  }
  public PageResult<CommentResult> thread(CommunityActor actor,UUID post,UUID parent,PageQuery query) {
  if(parent!=null) {
@@ -68,7 +72,7 @@ public class CommunityQueriesUseCase {
  CommunityApplicationSupport.requireVisiblePost(posts,post,actor);
  var page=reads.thread(post,parent,query.page(),query.size());
  var result=PageResult.from(page,query.page(),query.size(),CommentResult::from);
- return new PageResult<>(enrichComments(result.content()),result.page(),result.size(),result.totalElements(),result.totalPages());
+ return new PageResult<>(enrichComments(actor,result.content()),result.page(),result.size(),result.totalElements(),result.totalPages());
  }
  public CursorResult<PublicProfile> follows(UUID user,boolean followers,String cursor,int size) {
  new PageQuery(0,size);

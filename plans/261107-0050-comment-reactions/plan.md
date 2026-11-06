@@ -1,9 +1,9 @@
 ---
 title: "Thả cảm xúc cho bình luận (community), dùng chung FE và mobile"
 description: "Thêm cảm xúc LIKE/LOVE/HELPFUL/ACCURATE cho bình luận trong community-service; FE và mobile dùng cùng API"
-status: pending
+status: completed
 priority: P2
-branch: ""
+branch: "feat/comment-reactions"
 tags: [backend, community-service, comments, reactions]
 blockedBy: []
 blocks: []
@@ -108,3 +108,17 @@ Quy tắc:
 - Hai API mới chạy qua gateway; mọi `CommentResponse` có `reactionCounts` và `myReaction`.
 - Test community-service xanh (`mvn -pl services/community-service -o clean test`).
 - FE và mobile thả và bỏ được cảm xúc trên bình luận mà không cần sửa BE thêm.
+
+## 10. Ghi nhận thực hiện (07/11/2026, Asia/Bangkok)
+
+Các mục 1–9 giữ nguyên yêu cầu và bối cảnh trước khi triển khai. Backend đã hoàn tất trên nhánh `feat/comment-reactions`, không lệch thiết kế; enrichment cho response kiểm duyệt bảo đảm mọi `CommentResponse` có dữ liệu cảm xúc. Lượt test sạch cuối cùng đã qua; kiểm tra E2E runtime qua gateway là giới hạn xác minh còn lại, chưa thực hiện.
+
+- [x] Ghi nhận TDD: test mới được thêm trước, lượt compile RED do các kiểu/chữ ký chưa được triển khai; sau đó bổ sung implementation và cập nhật các caller bị ảnh hưởng.
+- [x] `AddCommentReactionUseCase`/`RemoveCommentReactionUseCase`, `CommentReactionJpaRepository` và migration `V11__comment_reactions.sql` thực hiện thêm/thay thế/no-op, kiểm tra quyền xem và khóa duy nhất theo bình luận/người dùng.
+- [x] `CommunityQueriesUseCase.enrichComments(actor, content)` và `CommentResponse` trả đủ bốn số đếm cùng cảm xúc của người xem ở danh sách phẳng, luồng, trả lời, tạo, sửa và kiểm duyệt.
+- [x] Tester xác nhận cả 13 test của `CommunityOutboxUseCaseIntegrationTest` và test nâng cấp dữ liệu V10 của `CommentReactionMigrationTest` đã qua. Test `twentyCommentsUseOneSqlForCountsAndViewerReaction` đo đúng một prepared statement cho 20 bình luận; test đồng thời xác nhận còn đúng một hàng.
+- [x] Review source không phát hiện blocker; không thêm thông báo cho tác giả hay thay đổi module khác.
+- [x] Lượt `clean test` cuối cùng: **244 tests, 0 failures, 0 errors, 0 skipped**, exit 0, 2 phút 07 giây; chi tiết trong [báo cáo xác minh](reports/comment-reactions-verification.md).
+- [ ] Giới hạn xác minh: chưa chạy E2E runtime qua gateway; route `/api/community/**` hiện có được giữ nguyên. Không ghi nhận E2E hoàn tất.
+
+Chi tiết bằng chứng và phần còn chờ: [comment-reactions-verification.md](reports/comment-reactions-verification.md). Hợp đồng API: [comment-reactions-v1.md](../../docs/contracts/comment-reactions-v1.md).
